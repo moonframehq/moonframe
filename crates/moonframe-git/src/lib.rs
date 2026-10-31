@@ -15,6 +15,9 @@
 //! - `{ commit = "<message>", id = ... }` stages everything and commits;
 //! - `{ push = true, id = ... }` pushes the branch to `origin`.
 //!
+//! Only the mods named in provider.toml's `writers` setting may commit or
+//! push; any other gets a refusal as its answer. Reading is open to all.
+//!
 //! An action answers its mod with `{ reply = id, action, ok, message }`,
 //! or `error` instead of `message` when it failed; `reply` is the action's
 //! name when the mod gave no `id`.
@@ -89,29 +92,35 @@ impl Repo {
     }
 
     /// What git printed, whatever its exit status (`diff --no-index`
-    /// exits 1 when the files differ).
+    /// exits 1 when the files differ), bounded and with a deadline like
+    /// every other read.
     pub(crate) fn text_any_status(
         &self,
         args: &[&str],
         _operation: &'static str,
     ) -> Option<String> {
-        let output = std::process::Command::new("git")
-            .arg("-C")
+        let mut command = std::process::Command::new("git");
+        command
+            .args(["-c", "core.fsmonitor=false", "--no-optional-locks", "-C"])
             .arg(&self.root)
             .args(args)
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .stdin(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .output()
-            .ok()?;
-        let bytes = &output.stdout[..output.stdout.len().min(READ_LIMIT)];
-        Some(String::from_utf8_lossy(bytes).into_owned())
+            .env("GIT_TERMINAL_PROMPT", "0");
+        let (_, bytes) = herdr_github::pull_request::run_bytes(
+            &mut command,
+            Instant::now() + READ_TIMEOUT,
+            &|| false,
+            READ_LIMIT,
+        )
+        .ok()?;
+        Some(String::from_utf8_lossy(&bytes).into_owned())
     }
 }
 
 #[derive(Default)]
 pub struct Git {
     root: Option<PathBuf>,
+    /// The mods that may commit and push (`[settings] writers`).
+    writers: Vec<String>,
     /// Status and numstat bytes last read: a look that finds them the same
     /// publishes nothing.
     last_look: Vec<u8>,
@@ -135,6 +144,7 @@ pub struct Git {
 impl Native for Git {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         self.root = repository(host.dir());
+        self.writers = writers(host.settings());
         self.refresh(host, true);
         Ok(())
     }
@@ -246,7 +256,19 @@ impl Git {
             "remote": self.remote, "stashes": self.stashes,
         });
         if let (Some(path), Value::Object(fields)) = (&self.diff_path, &mut out) {
-            fields.insert("diff".to_owned(), diff::read(&repo, &base, path));
+            // Only a file git reports as changed: a path a mod makes up
+            // (`../..`, `/etc/hosts`) would otherwise publish a file outside
+            // the repository to every view.
+            let listed = status
+                .files
+                .iter()
+                .any(|file| file["path"] == path.as_str());
+            let diff = if listed {
+                diff::read(&repo, &base, path)
+            } else {
+                diff::parse(path, "")
+            };
+            fields.insert("diff".to_owned(), diff);
         }
         self.publish(host, out, force);
     }
@@ -284,6 +306,14 @@ impl Git {
                 );
             }
         };
+        // A write changes the user's history and remote; a mod from
+        // elsewhere must not do it unasked.
+        if !self.writers.iter().any(|writer| writer == from) {
+            answer(Err(format!(
+                "`{from}` may not {name}: only the mods in providers/git's `writers` may"
+            )));
+            return;
+        }
         let Some(root) = self.root.clone() else {
             answer(Err("not a git repository".to_owned()));
             return;
@@ -329,6 +359,23 @@ fn run(input: Input, action: Action) -> Result<String, String> {
         (Some(outcome), _) => Ok(outcome.message.clone()),
         (None, Some(error)) => Err(error.to_owned()),
         (None, None) => Err("git stopped without saying why".to_owned()),
+    }
+}
+
+/// The mods `[settings] writers` names; none when it is missing.
+fn writers(settings: &Data) -> Vec<String> {
+    let Data::Map(settings) = settings else {
+        return Vec::new();
+    };
+    match settings.get("writers") {
+        Some(Data::List(names)) => names
+            .iter()
+            .filter_map(|name| match name {
+                Data::String(name) => Some(name.clone()),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
     }
 }
 

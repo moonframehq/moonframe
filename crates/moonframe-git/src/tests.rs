@@ -102,6 +102,14 @@ fn a_diff_becomes_numbered_hunks() {
     assert_eq!(lines[3], json!({ "kind": "add", "new": 5, "text": "more" }));
 }
 
+/// provider.toml's settings with these `writers`.
+fn writers(names: &[&str]) -> Data {
+    Data::Map(BTreeMap::from([(
+        "writers".to_owned(),
+        Data::List(names.iter().map(|name| Data::from(*name)).collect()),
+    )]))
+}
+
 /// A repository of the test's own, with an identity and no signing or
 /// hooks, so a commit never waits on the user's key or config.
 fn repository() -> tempfile::TempDir {
@@ -160,7 +168,7 @@ fn a_repository_is_published_and_a_commit_answers_its_mod() {
     // The provider's folder is two below the repository, as in an app.
     let folder = dir.path().join("providers").join("git");
     std::fs::create_dir_all(&folder).unwrap();
-    let host = Handle::new("git", &folder, Data::Nil, events);
+    let host = Handle::new("git", &folder, writers(&["editor", "status"]), events);
     let mut git = Git::default();
     git.start(&host).unwrap();
 
@@ -182,6 +190,16 @@ fn a_repository_is_published_and_a_commit_answers_its_mod() {
     assert_eq!(
         published(&seen)["diff"]["hunks"][0]["lines"][1]["text"],
         "two"
+    );
+    // An untracked file diffs against nothing.
+    git.receive(
+        &host,
+        "editor",
+        Data::Map(BTreeMap::from([("diff".to_owned(), Data::from("b.txt"))])),
+    );
+    assert_eq!(
+        published(&seen)["diff"]["hunks"][0]["lines"][0],
+        json!({ "kind": "add", "new": 1, "text": "new" })
     );
 
     git.receive(
@@ -251,7 +269,7 @@ fn a_failed_push_answers_with_the_reason() {
     let (events, seen) = events();
     let folder = dir.path().join("providers").join("git");
     std::fs::create_dir_all(&folder).unwrap();
-    let host = Handle::new("git", &folder, Data::Nil, events);
+    let host = Handle::new("git", &folder, writers(&["editor", "status"]), events);
     let mut git = Git::default();
     git.start(&host).unwrap();
     git.receive(
@@ -278,5 +296,70 @@ fn a_failed_push_answers_with_the_reason() {
         }
         assert!(Instant::now() < deadline, "no reply to the push");
         thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// A mod not named in `writers` is refused, and nothing is committed.
+#[test]
+fn only_writers_may_commit() {
+    let dir = repository();
+    std::fs::write(dir.path().join("a.txt"), "changed\n").unwrap();
+    let (events, seen) = events();
+    let folder = dir.path().join("providers").join("git");
+    std::fs::create_dir_all(&folder).unwrap();
+    let host = Handle::new("git", &folder, writers(&["status"]), events);
+    let mut git = Git::default();
+    git.start(&host).unwrap();
+    git.receive(
+        &host,
+        "stranger",
+        Data::Map(BTreeMap::from([(
+            "commit".to_owned(),
+            Data::from("sneaky"),
+        )])),
+    );
+    let reply = seen.lock().unwrap().iter().find_map(|event| match event {
+        Event::Sent { to, msg, .. } => Some((to.clone(), moonframe_providers::to_json(msg))),
+        _ => None,
+    });
+    let (to, reply) = reply.expect("a refusal, at once");
+    assert_eq!(to, "stranger");
+    assert_eq!(reply["ok"], false);
+    assert!(
+        reply["error"].as_str().unwrap().contains("may not commit"),
+        "{reply}"
+    );
+    assert_eq!(published(&seen)["changed"], 1, "nothing was committed");
+}
+
+/// A diff only covers files git lists as changed, never a path from
+/// outside the repository.
+#[test]
+fn a_diff_never_reads_outside_the_repository() {
+    let dir = repository();
+    let outside = tempfile::tempdir().unwrap();
+    let secret = outside.path().join("secret.txt");
+    std::fs::write(&secret, "do not publish\n").unwrap();
+    let (events, seen) = events();
+    let folder = dir.path().join("providers").join("git");
+    std::fs::create_dir_all(&folder).unwrap();
+    let host = Handle::new("git", &folder, Data::Nil, events);
+    let mut git = Git::default();
+    git.start(&host).unwrap();
+    for path in [
+        secret.to_string_lossy().into_owned(),
+        "../../../etc/hosts".to_owned(),
+    ] {
+        git.receive(
+            &host,
+            "editor",
+            Data::Map(BTreeMap::from([(
+                "diff".to_owned(),
+                Data::from(path.as_str()),
+            )])),
+        );
+        let state = published(&seen);
+        assert_eq!(state["diff"]["lines"], 0, "{path}: {}", state["diff"]);
+        assert!(!state.to_string().contains("do not publish"));
     }
 }

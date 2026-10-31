@@ -974,8 +974,10 @@ only `reason` (with `repository = false` for git). Times are Unix seconds.
 `app.git` (git): every 5 s when `git status` or the numstat changed;
 worktrees, branches, remote and stashes every 30 s or when HEAD moves.
 Any message refreshes. `{ diff = "<path>" }` adds `diff` for that file and
-keeps it fresh; `{ diff = false }` drops it. Writes, one at a time, each
-answered to the mod that asked (`{ reply, action, ok, message | error }`):
+keeps it fresh (only a file in `files`; any other path gets an empty diff);
+`{ diff = false }` drops it. Writes, one at a time, only from the mods named
+in `providers/git`'s `[settings] writers` (`status` as shipped; add yours
+there), each answered to the mod that asked (`{ reply, action, ok, message | error }`):
 `{ commit = "<message>", id = ... }` stages everything and commits;
 `{ push = true, id = ... }` pushes the branch to `origin`, setting its
 upstream. Signing and pushing may wait on the user's hardware key: show

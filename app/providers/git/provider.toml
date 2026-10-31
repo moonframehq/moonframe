@@ -8,3 +8,9 @@
 # `git` feature), running git through herdr-vcs with your own access.
 interval = 1.0
 kind     = "native"
+
+[settings]
+# The mods that may commit and push; any other is refused. The status
+# bar's sheet acts only when the user clicks. Add your own mod here to let
+# it write.
+writers = ["status"]
