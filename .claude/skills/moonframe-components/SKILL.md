@@ -41,7 +41,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`) |
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone` |
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`) |
-| `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` and `loading` (messages sent with `url`, `title`, `loading` added) |
+| `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
 
 ### Controls
 
@@ -116,7 +116,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`card`](#card) | Containers | A titled box around related content inside a panel or page; for a whole sidebar section use `ui.panel`, for a plain heading use `section`. |
 | [`collapsible`](#collapsible) | Containers | One foldable block of content, such as "No agent yet" or advanced options. For several of them stacked use `accordion`; for a titled sidebar group with a count and actions use `sidebar-section`; for a plain heading use `section`. |
 | [`section`](#section) | Containers | A small muted heading over a group of content inside a panel or settings page. |
-| [`browser`](#browser) | Content | A web page in a pane, with browser chrome. Keep the address the page reports in state (from `navigate`) and pass it as `at`; on `go`, set the typed address as `url`. For a bare page without a bar use `ui.browser`. |
+| [`browser`](#browser) | Content | A web page in a pane, with browser chrome. Keep the page's `navigate` messages in state and pass the latest as `page`; the address bar navigates on its own. For a bare page without a bar use `ui.browser`. |
 | [`button-group`](#button-group) | Controls | Related actions or view modes side by side in a header: Unified \| Split, Uncommitted \| Branch, zoom − \| +. For a settings choice in a track use `segmented`; for separate quiet buttons use `toolbar`; for back/forward use `nav-buttons`. |
 | [`chips`](#chips) | Controls | Filters over a list where any number can be on (Open, Mine, Has agent). For exactly one of a few use `segmented`; for read-only labels use `tags`; for a single on/off setting use `switch`. |
 | [`copy-field`](#copy-field) | Controls | Text the user will paste elsewhere: an install command, a token, a URL, a path. For read-only label/value pairs use `key-values`; for an editable field wait for `ui.input`. |
@@ -309,27 +309,25 @@ A whole mod using it, with state: `app/components/demos/section.luau`.
 
 #### `browser`
 
-**Browser.** A web page with an address bar: back, forward, reload, its address, and open in the system browser.
+**Browser.** A web page with an address bar: back, forward, reload or stop, an editable address, the title, and open in the system browser.
 
-**When:** A web page in a pane, with browser chrome. Keep the address the page reports in state (from `navigate`) and pass it as `at`; on `go`, set the typed address as `url`. For a bare page without a bar use `ui.browser`.
+**When:** A web page in a pane, with browser chrome. Keep the page's `navigate` messages in state and pass the latest as `page`; the address bar navigates on its own. For a bare page without a bar use `ui.browser`.
 
 | Prop | Meaning |
 | --- | --- |
-| `at` | the address to show in the bar, from `navigate` messages |
-| `go` | message sent on Enter in the address field, with `value` set to the typed address; set it as `url` |
 | `id` | keeps the page across renders; one per id |
 | `loading` | message sent as loads start and finish, with `loading` and `url` added |
-| `navigate` | message sent as the page navigates, with `url` and `title` added |
-| `title` | the page title to show, from `navigate` messages |
+| `navigate` | message sent as the page navigates, loads or its title changes; keep it and pass it as `page` |
+| `page` | the last `navigate` message: `url`, `title`, `loading`, `back`, `forward` |
 | `url` | address to load (http, https, file); a new value navigates |
 | `zoom` | page zoom, 0.25 to 5 |
 
-**Styles:** `.browser` `.browser-address` `.browser-bar` `.browser-title`
+**Styles:** `.browser` `.browser-address` `.browser-bar` `.browser-security` `.browser-title`
 
 ```lua
 local browser = use "browser"
 
-browser { at = "https://example.com/", id = "example", title = "Example Domain", url = "https://example.com" }
+browser { id = "example", page = { back = true, forward = false, title = "Example Domain", url = "https://example.com/" }, url = "https://example.com" }
 ```
 
 A whole mod using it, with state: `app/components/demos/browser.luau`.

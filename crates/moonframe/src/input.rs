@@ -4,7 +4,9 @@
 //! is gpui-base's unstyled input engine; the look is the stylesheet's.
 //!
 //! Edits, Enter and the field's `keys` become messages for the drawing
-//! mod's `update`, shaped by [`moonframe_core::Input::message`].
+//! mod's `update`, shaped by [`moonframe_core::Input::message`]. A field
+//! with `browser` is that page's address bar: Enter loads what it says,
+//! focus selects it, and Escape puts back the page's address.
 
 use {
     crate::app::MoonframeApp,
@@ -77,6 +79,11 @@ impl Editor {
             .set_placeholder(placeholder, window, cx)))
     }
 
+    fn select_all(&self, window: &mut Window, cx: &mut App) {
+        on_state!(self, |state| state
+            .update(cx, |state, cx| state.select_all(window, cx)))
+    }
+
     fn set_disabled(&self, disabled: bool, cx: &mut App) {
         on_state!(self, |state| state
             .update(cx, |state, cx| state.set_disabled(disabled, cx)))
@@ -108,6 +115,8 @@ pub(crate) struct Wiring {
     pub(crate) keys: Vec<(KeyChord, Data)>,
     pub(crate) multiline: bool,
     pub(crate) disabled: bool,
+    /// The browser it is the address bar of.
+    pub(crate) browser: Option<String>,
 }
 
 impl Wiring {
@@ -120,7 +129,14 @@ impl Wiring {
             keys: input.keys.clone(),
             multiline: input.multiline,
             disabled: input.disabled,
+            browser: input.browser.clone(),
         }
+    }
+
+    /// The mod whose browser the field drives, and the browser's id.
+    fn browser(&self) -> Option<(&str, &str)> {
+        let id = self.browser.as_deref()?;
+        Some((self.to.as_deref().unwrap_or(&self.owner), id))
     }
 
     /// `msg` with the field's text, sent as the field's mod would send it.
@@ -252,6 +268,19 @@ impl Inputs {
         Some((field.wiring.clone(), field.editor.value(cx).to_string()))
     }
 
+    /// The editor of the field at `key`, or of the focused one.
+    fn editor(&self, key: Option<&str>, window: &Window, cx: &App) -> Option<Editor> {
+        let registry = self.0.borrow();
+        let field = match key {
+            Some(key) => registry.fields.get(key),
+            None => registry
+                .fields
+                .values()
+                .find(|field| field.editor.focus_handle(cx).is_focused(window)),
+        };
+        field.map(|field| field.editor.clone())
+    }
+
     /// The field with keyboard focus in `window`, if any.
     fn focused(&self, window: &Window, cx: &App) -> Option<(Wiring, String)> {
         let registry = self.0.borrow();
@@ -317,9 +346,29 @@ impl MoonframeApp {
         };
         let msg = match event {
             InputEvent::Change => wiring.change.as_ref(),
-            InputEvent::PressEnter { .. } if !wiring.multiline => wiring.submit.as_ref(),
+            InputEvent::PressEnter { .. } if !wiring.multiline => {
+                // An address bar loads what it says, and hands the keyboard
+                // back so the next keys don't edit it.
+                if let Some((owner, id)) = wiring.browser()
+                    && self.browsers.visit(owner, id, &value)
+                {
+                    window.blur(cx);
+                    cx.notify();
+                }
+                wiring.submit.as_ref()
+            },
             InputEvent::PressEnter { .. } => None,
-            InputEvent::Focus | InputEvent::Blur => {
+            InputEvent::Focus => {
+                // As in a browser, the whole address, to type over.
+                if wiring.browser.is_some()
+                    && let Some(editor) = self.inputs.editor(Some(key), window, cx)
+                {
+                    editor.select_all(window, cx);
+                }
+                cx.notify();
+                None
+            },
+            InputEvent::Blur => {
                 cx.notify();
                 None
             },
@@ -350,12 +399,24 @@ impl MoonframeApp {
             .keys
             .iter()
             .find(|(chord, _)| pressed(chord, keystroke))
-            .map(|(_, msg)| msg)
-            .or_else(|| {
-                let submits = wiring.multiline
-                    && pressed(&KeyChord::parse("secondary-enter").ok()?, keystroke);
-                submits.then_some(wiring.submit.as_ref()).flatten()
-            });
+            .map(|(_, msg)| msg);
+        if msg.is_none()
+            && let Some((owner, id)) = wiring.browser()
+            && KeyChord::parse("escape").is_ok_and(|escape| pressed(&escape, keystroke))
+        {
+            // Escape in an address bar puts back where the page is.
+            let address = self.browsers.address(owner, id).unwrap_or_default();
+            if let Some(editor) = self.inputs.editor(None, window, cx) {
+                editor.set_value(&address, window, cx);
+                editor.select_all(window, cx);
+            }
+            return true;
+        }
+        let msg = msg.or_else(|| {
+            let submits =
+                wiring.multiline && pressed(&KeyChord::parse("secondary-enter").ok()?, keystroke);
+            submits.then_some(wiring.submit.as_ref()).flatten()
+        });
         let Some(msg) = msg else {
             return false;
         };

@@ -24,7 +24,7 @@ use {
     crate::app::MoonframeApp,
     futures::StreamExt as _,
     gpui_kit::*,
-    moonframe_core::{Browser, BrowserCommand, Data, is_web_url},
+    moonframe_core::{Browser, BrowserCommand, Data, is_web_url, typed_address},
     std::{
         cell::{Cell, RefCell},
         collections::{BTreeMap, HashMap},
@@ -87,11 +87,24 @@ struct State {
     failed: Option<String>,
     url: String,
     title: String,
-    /// The `(url, title)` last sent as `navigate`, so each is sent once.
-    sent: Option<(String, String)>,
+    /// A load is under way.
+    busy: bool,
+    /// What was last sent as `navigate`, so each change is sent once.
+    sent: Option<Report>,
     zoom: f32,
     navigate: Option<Data>,
     loading: Option<Data>,
+}
+
+/// What `navigate` tells the mod: where the page is, its title, whether
+/// it is loading, and whether it can go back and forward (None where the
+/// platform can't say).
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Report {
+    url: String,
+    title: String,
+    loading: bool,
+    history: Option<(bool, bool)>,
 }
 
 /// One `ui.browser`'s page.
@@ -194,19 +207,37 @@ impl Page {
         }
     }
 
+    /// Goes where `text`, typed in its address field, says (see
+    /// [`typed_address`]), even to the address it shows. Returns whether
+    /// the text named somewhere to go.
+    fn visit(&self, text: &str) -> bool {
+        let Some(url) = typed_address(text) else {
+            return false;
+        };
+        let mut state = self.state.borrow_mut();
+        self.go(&mut state, &url);
+        true
+    }
+
+    /// Where the page is: its view's address, else the last one it
+    /// reported, else the one its mod gave.
+    fn address(&self) -> Option<String> {
+        let state = self.state.borrow();
+        self.native
+            .borrow()
+            .as_ref()
+            .and_then(native::Native::url)
+            .or_else(|| Some(state.url.clone()).filter(|url| !url.is_empty()))
+            .or_else(|| state.asked.clone())
+    }
+
     /// Runs `command`; returns the address to open in the system browser
     /// for `browser-open`.
     fn command(&self, command: BrowserCommand) -> Option<String> {
-        let native = self.native.borrow();
         if command == BrowserCommand::Open {
-            let state = self.state.borrow();
-            let url = native
-                .as_ref()
-                .and_then(native::Native::url)
-                .or_else(|| Some(state.url.clone()).filter(|url| !url.is_empty()))
-                .or_else(|| state.asked.clone());
-            return url.filter(|url| is_web_url(url));
+            return self.address().filter(|url| is_web_url(url));
         }
+        let native = self.native.borrow();
         let view = native.as_ref()?;
         match command {
             BrowserCommand::Back => view.script("history.back()"),
@@ -227,10 +258,12 @@ impl Page {
                 self.local
                     .store(moonframe_core::is_file_url(&url), Ordering::Relaxed);
                 state.url = url;
+                state.busy = true;
                 Some(true)
             },
             Event::Finished(url) => {
                 state.url = url;
+                state.busy = false;
                 Some(false)
             },
             Event::Title(title) => {
@@ -257,14 +290,31 @@ impl Page {
                 ("url", Data::String(state.url.clone())),
             ]));
         }
-        let now = (state.url.clone(), state.title.clone());
+        let now = Report {
+            url: state.url.clone(),
+            title: state.title.clone(),
+            loading: state.busy,
+            history: self
+                .native
+                .borrow()
+                .as_ref()
+                .and_then(native::Native::history),
+        };
         if state.sent.as_ref() != Some(&now)
             && let Some(msg) = &state.navigate
         {
-            sends.push(with(msg, [
-                ("url", Data::String(now.0.clone())),
-                ("title", Data::String(now.1.clone())),
-            ]));
+            let mut msg = with(msg, [
+                ("url", Data::String(now.url.clone())),
+                ("title", Data::String(now.title.clone())),
+                ("loading", Data::Bool(now.loading)),
+            ]);
+            if let Some((back, forward)) = now.history {
+                msg = with(&msg, [
+                    ("back", Data::Bool(back)),
+                    ("forward", Data::Bool(forward)),
+                ]);
+            }
+            sends.push(msg);
             state.sent = Some(now);
         }
         sends
@@ -360,6 +410,19 @@ impl Browsers {
                 None
             },
         }
+    }
+
+    /// Loads what was typed in the address field of the browser `id` of the
+    /// mod `owner`. Returns whether it went anywhere.
+    pub(crate) fn visit(&self, owner: &str, id: &str, text: &str) -> bool {
+        self.pages
+            .get(&format!("{owner}/{id}"))
+            .is_some_and(|page| page.visit(text))
+    }
+
+    /// Where the browser `id` of the mod `owner` is, if it has one.
+    pub(crate) fn address(&self, owner: &str, id: &str) -> Option<String> {
+        self.pages.get(&format!("{owner}/{id}"))?.address()
     }
 
     /// What the pages reported since the last call, as messages for their
@@ -585,9 +648,16 @@ mod tests {
             field(&started[1], "url"),
             Some(Data::String("https://a.test/".to_owned()))
         );
-        // The same address and title again is not sent again.
+        assert_eq!(field(&started[1], "loading"), Some(Data::Bool(true)));
+        // The load ending is news; the same report again is not.
         let finished = page.report(Event::Finished("https://a.test/".to_owned()));
-        assert_eq!(finished.len(), 1);
+        assert_eq!(finished.len(), 2);
+        assert_eq!(field(&finished[1], "loading"), Some(Data::Bool(false)));
+        assert_eq!(
+            page.report(Event::Finished("https://a.test/".to_owned()))
+                .len(),
+            1
+        );
         let titled = page.report(Event::Title("A".to_owned()));
         assert_eq!(
             field(&titled[0], "title"),
@@ -607,6 +677,29 @@ mod tests {
             page.state.borrow().pending.as_deref(),
             Some("https://c.test/")
         );
+    }
+
+    #[test]
+    fn typed_addresses_load_even_the_one_shown() {
+        let mut browsers = browsers();
+        let page = browsers
+            .open("docs", &element("a", Some("https://a.test/")))
+            .unwrap();
+        page.state.borrow_mut().pending = None;
+        assert!(browsers.visit("docs", "a", "a.test/"));
+        assert_eq!(
+            page.state.borrow().pending.as_deref(),
+            Some("https://a.test/")
+        );
+        assert!(browsers.visit("docs", "a", "two words"));
+        assert_eq!(
+            page.state.borrow().pending.as_deref(),
+            Some("https://duckduckgo.com/?q=two+words")
+        );
+        assert!(!browsers.visit("docs", "a", "  "));
+        assert!(!browsers.visit("docs", "b", "a.test"));
+        // The mod's address still stands: a new render does not undo it.
+        assert_eq!(page.address().as_deref(), Some("https://a.test/"));
     }
 
     #[test]

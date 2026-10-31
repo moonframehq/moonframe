@@ -2121,6 +2121,57 @@ fn only_web_addresses_count_as_remote() {
     assert!(!is_remote_url("javascript:alert(1)"));
 }
 
+#[test]
+fn typed_addresses_go_where_a_browser_would() {
+    use crate::typed_address;
+    let go = |text: &str| typed_address(text);
+    assert_eq!(
+        go("  https://a.test/x  ").as_deref(),
+        Some("https://a.test/x")
+    );
+    assert_eq!(go("example.com").as_deref(), Some("https://example.com"));
+    assert_eq!(
+        go("docs.rs/serde?x=1#top").as_deref(),
+        Some("https://docs.rs/serde?x=1#top")
+    );
+    assert_eq!(
+        go("localhost:3000/a").as_deref(),
+        Some("http://localhost:3000/a")
+    );
+    assert_eq!(
+        go("127.0.0.1:8080").as_deref(),
+        Some("http://127.0.0.1:8080")
+    );
+    assert_eq!(
+        go("file:///tmp/a.html").as_deref(),
+        Some("file:///tmp/a.html")
+    );
+    // Words, and anything that is not a host, are a search.
+    assert_eq!(
+        go("rust borrow checker").as_deref(),
+        Some("https://duckduckgo.com/?q=rust+borrow+checker")
+    );
+    assert_eq!(
+        go("serde").as_deref(),
+        Some("https://duckduckgo.com/?q=serde")
+    );
+    assert_eq!(
+        go("a&b=c é").as_deref(),
+        Some("https://duckduckgo.com/?q=a%26b%3Dc+%C3%A9")
+    );
+    assert_eq!(
+        go(".hidden").as_deref(),
+        Some("https://duckduckgo.com/?q=.hidden")
+    );
+    // An address with a scheme the browser can't show goes nowhere.
+    assert_eq!(
+        go("javascript:alert(1)").as_deref(),
+        Some("https://duckduckgo.com/?q=javascript%3Aalert%281%29")
+    );
+    assert_eq!(go("vscode://x"), None);
+    assert_eq!(go("   "), None);
+}
+
 /// The one element `view` returns, or the problem reading it.
 fn input_view(view: &str) -> Result<Node, String> {
     let source = format!("return mod {{ view = function() return {view} end }}");
@@ -2209,7 +2260,11 @@ fn inputs_read_their_text_messages_and_keys() {
         panic!("no plain input");
     };
     assert_eq!(plain.rows, Input::DEFAULT_ROWS);
-    assert!(plain.keys.is_empty() && plain.change.is_none());
+    assert!(plain.keys.is_empty() && plain.change.is_none() && plain.browser.is_none());
+    let Ok(Node::Input(bar)) = input_view("ui.input { browser = 'docs', to = 'pages' }") else {
+        panic!("no address bar");
+    };
+    assert_eq!(bar.browser.as_deref(), Some("docs"));
 }
 
 #[test]
@@ -2229,6 +2284,7 @@ fn bad_inputs_are_refused() {
             "a whole number from 1",
         ),
         ("ui.input { id = 'a b' }", "an id is 1 to 64"),
+        ("ui.input { browser = 'a/b' }", "an id is 1 to 64"),
         ("ui.input { to = 'x' }", "`to` goes with `change`"),
         ("ui.input { keys = 'up' }", "expected a table"),
         ("ui.input { keys = { 'up' } }", "keys are key names"),

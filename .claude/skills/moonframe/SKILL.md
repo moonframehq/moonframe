@@ -287,34 +287,45 @@ where it went; it can't run scripts in the page.
 ui.browser {
 	id = "docs",                      -- one page per mod and id
 	url = state.url,                  -- http, https or file
-	navigate = { navigated = true },  -- arrives as { navigated = true, url = ..., title = ... }
+	navigate = { navigated = true },  -- arrives as { navigated = true, url, title, loading, back, forward }
 	loading = "loading",              -- arrives as { msg = "loading", loading = true|false, url = ... }
 	zoom = 1.25,                      -- 0.25 to 5
 }
 ui.button { "Back", command = "browser-back", browser = "docs" }
+ui.input { id = "docs-address", value = state.page.url, browser = "docs" }  -- its address bar
 ```
 
 - **Lifetime:** the host keeps one page per mod and `id`, like a terminal.
   It survives reloads and hidden panes (hidden, it keeps its place and
   history) and ends with the app.
 - **`url`:** the page goes there when the mod passes an address different
-  from the last one it passed. Links the user follows stand until then, so
-  an address bar keeps its own text in state and sets `url` on Enter. To
-  load the same address again, use `browser-reload`. Only `http://`,
+  from the last one it passed. Links the user follows stand until then.
+  To load the same address again, use `browser-reload`. Only `http://`,
   `https://` and `file://` addresses are read; anything else is an error.
   The page itself may follow links only to those (and `about:blank`); a
   link that opens a new window opens in the same page, and downloads are
   refused.
-- **Messages:** `navigate` is sent as the page goes somewhere or its title
-  changes, `loading` as a load starts and finishes. A table message gets
+- **Address bar:** `ui.input { browser = "<id>" }` (with `to = "mod"` for
+  another mod's) drives the page itself, with nothing in `update`: Enter
+  loads the text, even the address already shown (`example.com` over
+  https, `localhost:3000` over http, words as a DuckDuckGo search), and
+  hands the keyboard back; focus selects the whole text; Escape puts back
+  the page's address. Pass the page's address (from `navigate`) as its
+  `value` so it follows the page.
+- **Messages:** `navigate` is sent as the page goes somewhere, its title
+  changes, or a load starts or ends, with `url`, `title`, `loading`, and
+  `back` and `forward` (whether it can go there; macOS only, absent
+  elsewhere): keep the whole message in state. `loading` is sent as a load
+  starts and finishes. A table message gets
   the fields added; any other value arrives as `{ msg = <value>, ... }`.
   Both go to the drawing mod's `update`.
 - **Chrome:** `command = "browser-back"`, `"browser-forward"`,
   `"browser-reload"`, `"browser-stop"` or `"browser-open"` (the page's
   address in the system browser) on a button, item, row or column,
   with `browser = "<id>"`, runs on that browser of the drawing mod (`to =
-  "mod"` for another mod's). An address bar, back and forward buttons and a
-  title are Luau around it: the `browser` component is one
+  "mod"` for another mod's). The bar around it is Luau: the `browser`
+  component is one, with back and forward greyed out at the ends of the
+  history and reload turning into stop while the page loads
   (`app/components/demos/browser.luau` is a mod using it).
 - **Sizing and look:** it fills its container (give it `grow`). The box is
   styled by the `browser` rule, a class or `style` (`background`, `border`,
@@ -533,7 +544,7 @@ Text-like elements take their main value positionally:
 | `ui.badge "..."` | `text`, `tone` | pill |
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
-| `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
+| `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
 | `ui.icon "cpu"` | `name`, `tone`, `size`, `spin` | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
 | `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
 | `ui.divider()` | | a line across the parent's axis |
