@@ -391,6 +391,11 @@ ui.input {
   `:disabled`, and `input-placeholder`, `input-selection` and
   `input-caret` (see "Stylesheet"). Without a rule it has a 1px border and
   `{ 4, 8 }` padding, and the caret and selection follow `accent`.
+- **No focus look.** The blinking caret is the only sign of focus, by the
+  user's choice: don't add an `input:focus` border, ring or glow, and in
+  Rust build `gpui_kit` `Input`s with `.focus_bordered(false)` (as the
+  components and theme picker searches do). A host window with a search
+  field focuses it when it opens (`search.update(cx, |s, cx| s.focus(window, cx))`).
 
 Building the `ghostty` engine needs Zig 0.15 (in `mise.toml`). On macOS 27
 and later, Zig 0.15 can't link natively, so `tools/zig/zig` (first on
@@ -656,7 +661,7 @@ return style {
     `ui.button`. A disabled element has no hover.
 
   A state's rule layers over the same selector's resting rule, so
-  `["input:focus"] = { border_color = "accent" }` keeps the `input` rule's
+  `["input:hover"] = { border_color = "accent" }` keeps the `input` rule's
   background.
 
 **Classes and inline styles.** These elements take `class = "a b"` (or
