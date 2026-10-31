@@ -2005,9 +2005,46 @@ A whole mod using it, with state: `app/components/demos/tree.luau`.
 **Styles:** `.activity-bar` `.activity-bar-count` `.activity-bar-icon` `.activity-bar-item` `.activity-bar-item:hover` `.activity-bar-item:selected`
 
 ```lua
+-- An app's main.luau: the bar picks which region the side pane shows.
+-- Each view's mods declare that region (`region = "files"`), and keep
+-- their state while hidden. Clicking the current view folds the pane.
 local activity_bar = use "activity-bar"
 
-activity_bar { bottom = { { icon = "settings", id = "settings", tooltip = "Settings" } }, height = 440, items = { { icon = "square-terminal", id = "terminals", tooltip = "Terminals" }, { icon = "activity", id = "activity", tooltip = "Activity" }, { count = 3, icon = "git-pull-request", id = "pulls", tooltip = "Pull requests" }, { count = 1, icon = "circle-dot", id = "issues", tooltip = "Issues" }, { icon = "shield", id = "security", tooltip = "Security" }, { icon = "bot", id = "agents", tooltip = "Agents" }, { icon = "chart-column", id = "usage", tooltip = "Usage" } }, selected = "pulls" }
+local VIEWS = {
+	{ id = "files", icon = "file-text", tooltip = "Explorer" },
+	{ id = "search", icon = "search", tooltip = "Search" },
+	{ id = "changes", icon = "git-branch", tooltip = "Changes" },
+}
+
+return mod {
+	init = function(previous)
+		return previous or { activity = "files", open = true }
+	end,
+
+	update = function(state, msg)
+		if typeof(msg) == "table" and msg.activity then
+			state.open = not (state.open and state.activity == msg.activity)
+			state.activity = msg.activity
+		end
+	end,
+
+	view = function(state)
+		return ui.row {
+			gap = "none",
+			grow = true,
+			activity_bar {
+				items = VIEWS,
+				selected = state.open and state.activity or nil,
+				bottom = { { id = "settings", icon = "settings", tooltip = "Settings" } },
+			},
+			ui.hsplit {
+				id = "body",
+				ui.pane { size = 260, min = 160, max = 480, fixed = true, visible = state.open, surface = "sidebar", ui.region(state.activity) },
+				ui.pane { ui.region "main" },
+			},
+		}
+	end,
+}
 ```
 
 A whole mod using it, with state: `app/components/demos/activity-bar.luau`.
