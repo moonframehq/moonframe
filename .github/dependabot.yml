@@ -1,0 +1,48 @@
+version: 2
+
+updates:
+  # Pinned action SHAs go stale silently; this is the only thing watching them.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # A compromised release is usually yanked within days. Waiting keeps an
+    # automated PR from being the thing that pulls it in.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Workspace dependencies, grouped so the lockfile moves in one reviewable PR.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+    groups:
+      cargo-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Pinned to exact versions on purpose; upgrades are manual, tested changes.
+      - dependency-name: gpui-kit
+      - dependency-name: lb-wry
+
+  # The Wasm provider builds outside the workspace, with its own lockfile.
+  - package-ecosystem: cargo
+    directory: /app/providers/system
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+    groups:
+      provider:
+        patterns: ["*"]

@@ -3,6 +3,10 @@
 # Command Palette, and chose "Reload Window".
 #
 # https://taplo.tamasfe.dev/configuration/formatter-options.html
+
+# Build output holds dependencies' own TOML (Ghostty's sources, for one).
+exclude = ["target/**"]
+
 [formatting]
 align_comments        = false
 align_entries         = true

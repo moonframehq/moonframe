@@ -95,8 +95,10 @@ build without it, use `cargo run --no-default-features --features alacritty`.
 On macOS 27, Zig 0.15 needs the wrapper in `tools/zig`, which mise and the
 justfile put first on `PATH`, and a macOS SDK of version 15 or older.
 
-Moonframe is developed on macOS. GPUI also runs on Linux and Windows, but
-those aren't tested here yet.
+Moonframe is developed on macOS. CI builds, lints and tests it on macOS,
+Linux and Windows (x86_64 and ARM64), and each release ships a macOS disk
+image, Linux tarballs and Windows zips, with checksums, Sigstore signatures
+and GitHub attestations; see [docs/releasing.md](docs/releasing.md).
 
 ## Make it yours
 
@@ -207,6 +209,8 @@ Packages ship source only, so everything they run can be read first.
 | `just bundle` | builds `target/bundle/Moonframe.app` |
 | `just install` | builds the app and installs it in `/Applications` |
 | `just ci` | formatting, lints, tests, types, providers and check |
+| `just audit` | zizmor and actionlint on the workflows, cargo-deny on the dependencies |
+| `just release` | publishes `main` as the version in `Cargo.toml` |
 
 `moonframe --help` lists the app's own options, such as `--user DIR`,
 `--no-user`, `--check`, and `--background` (open without taking focus).

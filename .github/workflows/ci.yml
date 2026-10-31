@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Deny by default; every job below declares the scopes it needs.
+permissions: {}
+
+# A newer push cancels a pull request's run, but every main run finishes:
+# a release requires a complete CI run for its exact commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # Smaller caches and faster builds; panics still report file and line.
+  CARGO_PROFILE_DEV_DEBUG: '0'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Audits the workflows themselves: template injection, over-broad
+  # permissions, unpinned actions, persisted credentials, cache poisoning.
+  zizmor:
+    name: Workflow security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@53290badfa369cb0bf7ad16342cb62c2fa47ac7b # v0.8.0
+        with:
+          advanced-security: false
+          online-audits: false
+
+  # Everything that needs no native build: formatting, the Luau types, the
+  # Wasm providers.
+  lint:
+    name: Format, Luau types, and providers
+    needs: zizmor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchains
+        run: |
+          rustup toolchain install
+          nightly=$(sed -n 's/^nightly_toolchain := "\(.*\)"/\1/p' justfile)
+          rustup toolchain install "$nightly" --profile minimal --component rustfmt
+      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2.88.1
+        with:
+          tool: just@1.58.0,taplo@0.10.0
+          fallback: none
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: lint
+          # `just providers` builds into target/providers.
+          cache-directories: target/providers
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Check formatting (Rust and TOML)
+        run: just format-check
+      - name: Check Cargo.lock is in sync
+        run: just lockfile-check
+      - name: Type-check the app's Luau
+        run: just types
+      - name: Lint and build the Wasm providers
+        run: just providers
+
+  # Lints, tests and the headless app check on every platform the release
+  # ships for.
+  checks:
+    name: Lint and test (${{ matrix.runner }})
+    needs: zizmor
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2025, windows-11-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: scripts/install-linux-deps.sh
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      # The `ghostty` terminal builds libghostty-vt with Zig (see mise.toml).
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.15.2
+          use-cache: false
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: checks
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Lint every target and feature
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Test
+        run: cargo test --locked --workspace --all-features
+      - name: Load every built-in module headlessly
+        run: cargo run --locked -p moonframe -- --check --no-user app
+      - name: Check the component catalogue skill is current
+        run: |
+          mkdir -p target
+          cargo run --quiet --locked -p moonframe -- --no-user --catalogue app > target/components.md
+          diff -u .claude/skills/moonframe-components/SKILL.md target/components.md
+
+  # One stable context for branch protection, requiring every job above.
+  ci-passed:
+    name: CI passed
+    needs: [zizmor, lint, checks]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every job
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            test "$result" = success
+          done

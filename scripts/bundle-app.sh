@@ -4,6 +4,9 @@
 # prebuilt, no sources) in Contents/Resources/app, the icon, and an
 # Info.plist, signed ad hoc so it runs on this Mac. The user's mods,
 # providers and stylesheet live in ~/.config/moonframe, never here.
+#
+# MOONFRAME_BINARY bundles a prebuilt executable (the release's universal
+# one) instead of building for this Mac.
 set -euo pipefail
 
 out=${1:-target/bundle}
@@ -11,12 +14,16 @@ name=moonframe
 title=Moonframe
 bundle="$out/$title.app"
 version=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
+binary=${MOONFRAME_BINARY:-}
 
-cargo build --quiet --release --locked -p moonframe
+if [ -z "$binary" ]; then
+    cargo build --quiet --release --locked -p moonframe
+    binary="target/release/$name"
+fi
 
 rm -rf "$bundle"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
-cp "target/release/$name" "$bundle/Contents/MacOS/$name"
+cp "$binary" "$bundle/Contents/MacOS/$name"
 scripts/stage-app.sh "$bundle/Contents/Resources/app" >/dev/null
 
 # The icon, at every size Finder and the Dock ask for.
@@ -48,6 +55,8 @@ cat > "$bundle/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+
+cp LICENSE "$bundle/Contents/Resources/LICENSE"
 
 codesign --force --deep --sign - "$bundle" 2>/dev/null
 echo "$bundle"

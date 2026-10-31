@@ -11,14 +11,19 @@ use {
 const NAME: &str = "moonframe";
 
 /// The app folder the binary ships with: `Contents/Resources/app` inside a
-/// macOS bundle, else `app` in the current folder (running from the
-/// repository).
+/// macOS bundle, `app` beside the executable in the Linux and Windows
+/// archives, else `app` in the current folder (running from the repository).
 pub(crate) fn builtin() -> PathBuf {
-    env::current_exe()
-        .and_then(|exe| exe.canonicalize())
-        .ok()
-        .and_then(|exe| Some(exe.parent()?.parent()?.join("Resources").join("app")))
-        .filter(|resources| resources.is_dir())
+    let exe = env::current_exe().and_then(|exe| exe.canonicalize()).ok();
+    let dir = exe.as_deref().and_then(|exe| exe.parent());
+    let bundle = dir
+        .and_then(|dir| dir.parent())
+        .map(|contents| contents.join("Resources").join("app"));
+    let beside = dir.map(|dir| dir.join("app"));
+    bundle
+        .into_iter()
+        .chain(beside)
+        .find(|app| app.is_dir())
         .unwrap_or_else(|| PathBuf::from("app"))
 }
 
