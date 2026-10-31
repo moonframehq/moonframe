@@ -1,0 +1,6 @@
+# The project's files, shared as `app.files`: the entries of the root folder
+# and of each folder the explorer has open, folders first, with git-ignored
+# ones marked. A process provider: it reads your files with your access.
+# Needs bash (3.2 or later); git, if present, marks ignored entries.
+command = ["bash", "files.sh"]
+kind    = "process"

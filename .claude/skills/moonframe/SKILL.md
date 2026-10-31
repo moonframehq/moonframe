@@ -865,9 +865,10 @@ restyle an extension from the app side, add a rule for the same selector in
 Providers share data under `app`: `app.system` (CPU, memory, network, from
 the Wasm provider each second), `app.git` (branch, files, diffs, worktrees),
 `app.github` and `app.gitlab` (pull requests, checks, issues) and
-`app.agents` (coding agents running here), from process providers; their
-shapes are under "Built-in providers" below and typed in
-`types/moonframe.d.luau` (`Git`, `Forge`, `Agents`). Views re-run with each publish. If a widget needs data
+`app.agents` (coding agents running here) and `app.files` (the project's
+file tree), from process providers; their shapes are under "Built-in
+providers" below and typed in `types/moonframe.d.luau` (`Git`, `Forge`,
+`Agents`, `Files`). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
 is labelled demo data, as in `mods/usage`.
 
@@ -962,6 +963,19 @@ GitLab merge requests fill `prs` and `current_pr`.
 | `checks` | `{ total, passed, failed, pending, skipped }` (GitLab lists show the head pipeline only on `current_pr`) |
 | `tone` | `"merged"`, `"closed"`, `"draft"`, `"attention"` (conflicts, failed checks, changes requested), `"waiting"` (checks running, review required), `"ready"`, `"held"` (blocked or behind) |
 | `issues` | 30 open: `{ number, title, url, author, updated, labels = { { name, color } }, assignees = { login } }` |
+
+`app.files` (files): the project's files, every 3 s when they changed. The
+root is the git repository the app runs from (else the home folder;
+`MOONFRAME_FILES` picks another). Only the root and the open folders are
+listed, so a large folder costs nothing until it is opened: send
+`{ open = "app\napp/mods" }`, the open folders' paths one per line, the
+whole set each time (`mods/explorer` does). `.git` and `.DS_Store` are
+never listed; paths with `..` are refused.
+
+| field | shape |
+|---|---|
+| `root`, `path` | the root folder's name and absolute path |
+| `dirs` | `{ [path] = { { name, dir, ignored } } }`: the root at `""`, then each open folder; folders first, sorted without regard to case; `ignored` is git's |
 
 `app.agents` (agents): every 4 s, from `ps` and the agents' folders (`/proc`
 or `lsof`).

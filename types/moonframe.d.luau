@@ -871,6 +871,23 @@ type Agents = {
 	count: number,
 }
 
+-- One entry of a folder, from the `files` provider.
+type FileEntry = {
+	name: string,
+	dir: boolean,
+	-- Ignored by git: editors dim these.
+	ignored: boolean,
+}
+
+type Files = {
+	-- The root folder's name, and its absolute path.
+	root: string,
+	path: string,
+	-- Entries of the root (key "") and of each open folder (its path from
+	-- the root), folders first, each group sorted without regard to case.
+	dirs: { [string]: { FileEntry } },
+}
+
 -- What every `view` gets as `app`.
 type App = {
 	dark: boolean,
@@ -884,6 +901,7 @@ type App = {
 	github: Forge?,
 	gitlab: Forge?,
 	agents: Agents?,
+	files: Files?,
 	-- What each provider in app/providers/ publishes, as `app.<name>`.
 	[string]: any,
 }
