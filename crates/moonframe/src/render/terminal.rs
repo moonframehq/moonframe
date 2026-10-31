@@ -3,7 +3,7 @@
 //! to the shell. Its size follows the space the layout gives it.
 
 use {
-    super::{Cx, Draw, Painter, Place, problem},
+    super::{Cx, Draw, Painter, Place, problem, styling::StyleExt as _},
     crate::{color::ThemeColor as _, terminal::TerminalView},
     gpui_kit::{component::ActiveTheme as _, *},
     moonframe_core::{Part, Terminal, TerminalEngine},
@@ -46,6 +46,12 @@ impl<'w> Draw<'w> for Terminal {
             .overflow_hidden()
             .bg(background)
             .text_color(foreground);
+        // Children are clipped to a rectangle, not to rounded corners: a
+        // terminal filling a rounded card rounds its own background to match.
+        let frame = match look.base.radius {
+            Some(radius) => frame.cornered(radius),
+            None => frame,
+        };
         if painter.preview {
             // A preview shows what it is; it starts no shell.
             return frame

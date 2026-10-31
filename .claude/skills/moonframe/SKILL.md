@@ -53,6 +53,9 @@ Pick the lowest layer that can do the job:
 | something on screen, from data Luau already has | a **mod** (or edit one) | `mods/<name>/main.luau` | no |
 | the same piece of UI in several places | a **component** | `components/<name>.luau` | no |
 | a shell or command line in the window | `ui.terminal` or `use "terminal"` | in a mod | no |
+| tabs the user opens and closes, remembered | `use "tabbed"`, and a `tab` entry on what they show | in a mod | no |
+| a widget with memory of its own, reusable | a component with `update` (an instance) | `components/<name>.luau` | no |
+| several modules sharing a value | a topic: publish to `topic:<name>`, `subscribe` to it | in the mods | no |
 | a web page in the window | `ui.browser` | in a mod | no |
 | a text field, search box, prompt or text area | `ui.input` or `use "search-field"` | in a mod | no |
 | data from the machine, files, network or a CLI | a **provider** feeding `app.<name>` | `providers/<name>/` | no (the host builds Wasm providers itself) |
@@ -398,6 +401,147 @@ and later, Zig 0.15 can't link natively, so `tools/zig/zig` (first on
 SDK of version 15 or older installed. Build without it with
 `--no-default-features --features alacritty`.
 
+## State that outlives the app
+
+Every mod's state, and every instance's, is saved to SQLite whenever it
+changes and handed back to `init` as `previous` at the next launch. So state
+must stay plain data (see the rules above): a function in it is not saved.
+
+- Where: `~/.local/state/moonframe/state.sqlite` (`$XDG_STATE_HOME`), outside
+  the watched config folder. With `--no-user` nothing is restored or saved,
+  so tests and screenshots start clean.
+- Keys: `mod:<name>` for a mod, `mod:<instance key>` for an instance, and
+  each topic by name.
+- The schema grows by numbered migrations in `crates/moonframe-store`
+  (`MIGRATIONS`), recorded in SQLite's `user_version`: only ever append a
+  step. A file from a newer app opens read-only.
+- To start a mod over, change what `init` builds; to drop old state, ignore
+  `previous` when it lacks what you need.
+
+## Instances: mods and components with state of their own
+
+**A mod mounted with an id** is an instance with its own state:
+`ui.mount { "explorer", id = "files-2", props = { root = "app" } }`. Its key
+is `explorer#files-2`, the same wherever it is mounted. It runs the mod's
+file in a Luau state of its own; `init`, `update` and `view` get `props`
+last. Without an id, `ui.mount "explorer"` draws the mod itself, as before.
+
+**A component with `update`** keeps state: `use "tabbed"` then returns a
+function that mounts an instance, `tabbed { id = "main", ... }`, keyed by
+the module that drew it (`editor/tabbed#main`), so two mods' instances are
+separate. Its definition:
+
+```lua
+return component {
+	title = "Counter",
+	example = { id = "example" },
+	init = function(previous, props) return previous or { count = 0 } end,
+	update = function(state, msg, props)
+		if msg == "add" then
+			state.count += 1
+			return state, { { to = "parent", msg = { counted = state.count } } }
+		end
+	end,
+	build = function(props, state, app)   -- props first, then its state
+		return ui.button { `{state.count}`, msg = "add" }
+	end,
+}
+```
+
+- Clicks inside an instance go to its own `update`.
+- `to = "parent"` reaches the module that drew it; that module reaches it
+  as `to = "<component>#<id>"` (`"tabbed#main"`).
+- An instance not drawn (a hidden tab) is dropped from memory; its saved
+  state brings it back where it was when it is drawn again.
+- Ids are plain (`a-z A-Z 0-9 - _`); at most 256 instances are drawn at
+  once, so never make an id per row of data.
+
+## Topics: pushing changes to whoever listens
+
+A module publishes with a send: `{ to = "topic:tabs/main", msg = value }`.
+The value is kept (and saved), and every module that lists the topic in
+`subscribe` hears it in `update` as `{ topic = "tabs/main", value = ... }`:
+
+```lua
+return mod {
+	subscribe = { "tabs/*", "provider/git" },   -- names, or prefixes ending in *
+	update = function(state, msg)
+		if type(msg) == "table" and msg.topic == "tabs/main" then
+			state.tab_count = msg.value.count
+		end
+	end,
+	view = function(state) return ui.text(`{state.tab_count or 0} tabs`) end,
+}
+```
+
+- A module that loads or reloads hears each subscribed topic's current
+  value at once, so it starts in step; instances too, when mounted.
+- `provider/<name>` carries a provider's data each time it publishes, for a
+  mod that must react (not only redraw); views still read `app.<name>`.
+- Names are 1 to 128 of `a-z A-Z 0-9 - _ . /`; `provider/` is the
+  providers'. Previews (the Components window) hear nothing.
+- Use a topic when several modules share a value; use `to = "<mod>"` when
+  one module tells another.
+
+## Tabs
+
+`tabbed { id = "main", start = "component:terminal" }` is a tab bar that
+keeps its tabs: a tab is data (a kind and its props), never a file. The `+`
+opens a menu of `app.kinds`; each tab shows its kind; tabs are saved and come
+back at the next launch (a terminal starts a fresh shell in its folder, a
+browser reopens its page). Every change is published on `tabs/<id>` as
+`{ count, selected, title }`. The main area and the bottom pane each have
+one (`mods/editor`, `mods/terminal`).
+
+To offer something as a kind of tab, give its component or mod a `tab`:
+
+```lua
+tab = { title = "Terminal", icon = "terminal", props = { cwd = "~" } },
+-- A browser also names the prop it reports through; the tab keeps the
+-- `url` and `title` that come back:
+tab = { title = "Browser", icon = "globe", props = { url = "https://luau.org" }, report = "navigate" },
+```
+
+A component kind is drawn with its tab's props and `id` (so a terminal or
+browser is the tab's own); a mod kind is mounted as an instance per tab.
+`offer = { "component:terminal", ... }` limits a bar's menu.
+
+**The strip apart from its content.** `tabbed { id = "main", show = "bar" }`
+draws only the strip, as the shell does in its title row. The bar publishes
+`tabs/<id>` as it starts and at every change, with the selected tab's record
+as `tab`; a mod subscribed to it draws that tab with `tab-view { tab, kind }`
+(`mods/editor` does, finding `kind` in `app.kinds`). What the content reports
+(`{ tab_report = id, url, title }`) goes back to the bar on
+`topic:tabs/<id>/report`.
+
+**Looks.** The strip's look comes from its `variant` prop, else the
+stylesheet's `looks = { tabs = "..." }`, else `classic`. Built in: `pills`,
+`underline`, `outline`, `cards`, `compact`, `classic`, `square`. Any other
+name works too: it becomes the classes `.tabs-<name>` (the strip) and
+`.tabs-<name>-tab` (each tab), so a stylesheet can define a look with rules
+alone:
+
+```lua
+looks = { tabs = "soft" },
+rules = {
+	[".tabs-soft"] = { gap = 4, padding = 4 },
+	[".tabs-soft-tab"] = { radius = 10, padding = { 6, 12 } },
+	[".tabs-soft-tab:selected"] = { background = "accent/15", color = "accent" },
+},
+```
+
+`curved` joins the selected tab to what is under the strip, as one piece: a
+body in the `card` color, square at its foot, with shoulders flaring out into
+the card (`.tabs-shoulder-left` and `-right`, colored as the strip's
+background). It only reads right with a card of the same color directly
+under the strip, so with `looks = { tabs = "curved" }` the shell moves its
+title bar over the center column (each side panel gets a bar of its own),
+drops the bar's bottom line (`.toolbar-joined`), and the editor's card
+starts right under it with no border (`.tab-card-joined`). A strip of your
+own in that look needs the same: no gap, no border between it and a `card`.
+Tabs open and close with the `.tabs-tab` rule's transition (see
+"Arriving and leaving"); set it to `"none"` to stop that.
+
 ## Loop
 
 1. Edit or create `.luau` files under `app/`.
@@ -467,11 +611,14 @@ return mod {
 	order = 0,         -- optional: position in the region, lower first, then by name
 	title = "Files",   -- optional: informational
 
-	-- Optional. `previous` is the state from before a reload (nil on first load).
-	init = function(previous)
+	-- Optional. `previous` is the state from before a reload, or saved from
+	-- the last run (nil the very first time). `props` is what an instance was
+	-- mounted with (nil for a mod in its own place); see "Instances".
+	init = function(previous, props)
 		return previous or { selected = nil }
 	end,
 
+	-- `init` may also return sends, as `update` does, delivered once loaded.
 	-- Optional. Return the new state, or nothing to keep the table you changed.
 	-- A second result sends messages on: { { to = "mod", msg = ... }, ... }
 	update = function(state, msg)
@@ -483,6 +630,7 @@ return mod {
 
 	-- Required. Returns one element. `app` is
 	-- { dark = bool, mods = { names }, regions = { name = { mod names } },
+	--   kinds = what tab bars can open (see "Tabs"), looks = the stylesheet's looks,
 	--   window = { platform = "macos"|"linux"|"windows", titlebar = "system"|"hidden",
 	--              maximized, fullscreen, active },
 	--   <provider> = what each provider last published, e.g.
@@ -500,8 +648,9 @@ Rules that trip agents up:
 - Unknown element types, keys and token values are errors, not ignored.
   `just check` names them.
 - The keys allowed on the `mod { }` table are only `init`, `update`, `view`,
-  `region`, `order`, `title` and `styles`, plus `window` in `main.luau` only
-  (see "Window and title bar").
+  `region`, `order`, `title`, `styles`, `subscribe` (see "Topics") and `tab`
+  (see "Tabs"), plus `window` in `main.luau` only (see "Window and title
+  bar"). `update` and `view` also get `props` last.
 - State and messages must be plain data: nil, booleans, numbers, strings,
   lists, and string-keyed tables. Functions in state stop it surviving a
   reload. A table is a list without gaps or has string keys, never both.
@@ -523,7 +672,7 @@ Text-like elements take their main value positionally:
 
 | Element | Keys (besides children) | Notes |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, extras, and `msg`/`to` or `command` | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
+| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id` | user-resizable; children must be `ui.pane`. Always grows to fill |
 | `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size` |
@@ -694,7 +843,7 @@ Leave an element's own keys off if the stylesheet should decide.
 | --- | --- |
 | `background`, `color` (text, inherited), `border_color` | a color |
 | `border` | `true`, `all`, `top`, `bottom`, `left`, `right`, `none` |
-| `radius` | pixels |
+| `radius` | pixels, or each corner clockwise from the top left as in CSS: `{ 8, 8, 0, 0 }` rounds the top only, `{ a, b }` gives the top left and bottom right `a` |
 | `padding`, `margin` | a space token or pixels for every edge, `{ y, x }`, `{ top, right, bottom, left }`, or named edges `{ x = 12, top = 4 }` (edge names win over `x`/`y`) |
 | `gap` | a space token or pixels |
 | `shadow` | a preset (`small` `medium` `large`, or `none` to remove one set by a lower rule), a CSS box-shadow string, a layer table, or a list of layers (see below) |
@@ -702,7 +851,7 @@ Leave an element's own keys off if the stylesheet should decide.
 | `font` | `sans` or `mono` (the terminal font, for code and paths; inherited) |
 | `case` | `upper`, `lower` or `none`: the letter case a `ui.text` shows (headings in capitals, restyleable) |
 | `opacity` | 0 to 1 |
-| `transition` | how a `pane`, `popover` or `overlay` animates when it shows or hides (see below) |
+| `transition` | how a `pane`, `popover` or `overlay` animates when it shows or hides, and how a keyed row or column arrives and goes (see below) |
 
 **Shadows.** Write them like CSS `box-shadow`. Lengths are pixels, with or
 without `px`, and layers are separated by commas. The color can be any
@@ -751,6 +900,24 @@ Words can come in any order. Toggling again mid-animation turns back from
 where the pane is. A slide moves across the pane's `size` (or `max`), not a
 width the user dragged it to. Put the transition on the pane (type rule,
 class, or `style`), not on what is inside it.
+
+**Arriving and leaving.** A `ui.row` or `ui.column` with a `key` (1 to 64 of
+a-z, 0-9, `-` and `_`, unique among its siblings) stays itself as its
+siblings come and go. Give it a `transition` rule and it plays in when its key
+appears, and when the key goes its last drawing stays where it was, playing
+out without taking clicks. `slide` grows or shrinks it along its parent's
+axis (from its measured size), `fade` fades it, `slide-fade` does both. Its
+container must already be on screen: what a container holds as it first
+appears simply is there. Tabs do this (`.tabs-tab` has
+`transition = "slide-fade fast ease-out"`); key the items of any list that
+gains and loses entries the same way:
+
+```lua
+for _, note in state.notes do
+	ui.row { key = note.id, class = "note", ui.text { note.title } }
+end
+-- style: [".note"] = { transition = "slide-fade fast ease-out" }
+```
 
 **Colors.**
 - `#rgb`, `#rrggbb` or `#rrggbbaa`.
@@ -817,7 +984,11 @@ return mod {
   window menu.
 - `app.window` updates as the window is maximized, goes fullscreen, or
   gains and loses focus: dim the title bar on `not app.window.active`.
-- `app/main.luau` ships with the system title bar; this is opt-in.
+- `app/main.luau` ships without the system title bar: its top row is the
+  title bar, with the main tab strip in it. Reserve room for the traffic
+  lights only when `app.window.titlebar == "hidden"` (until the restart that
+  applies `window`, the system bar is still there and the room would be a
+  gap).
 
 ## Patterns
 
@@ -965,12 +1136,13 @@ GitLab merge requests fill `prs` and `current_pr`.
 | `issues` | 30 open: `{ number, title, url, author, updated, labels = { { name, color } }, assignees = { login } }` |
 
 `app.files` (files): the project's files, every 3 s when they changed. The
-root is the git repository the app runs from (else the home folder;
-`MOONFRAME_FILES` picks another). Only the root and the open folders are
+root is the git repository the app runs from, or `MOONFRAME_FILES`; with
+neither it is unavailable (never home). Only the root and the open folders are
 listed, so a large folder costs nothing until it is opened: send
 `{ open = "app\napp/mods" }`, the open folders' paths one per line, the
 whole set each time (`mods/explorer` does). `.git` and `.DS_Store` are
-never listed; paths with `..` are refused.
+never listed; paths with `..`, `.` or empty parts are refused, and so is a
+folder whose real path (through symlinks) leaves the root.
 
 | field | shape |
 |---|---|

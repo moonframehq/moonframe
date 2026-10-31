@@ -23,6 +23,7 @@ const SHEET_KEYS: &[&str] = &[
     "colors",
     "speeds",
     "animation_speed",
+    "looks",
     "rules",
 ];
 const STYLE_KEYS: &[&str] = &[
@@ -44,6 +45,24 @@ const STYLE_KEYS: &[&str] = &[
 ];
 const EDGE_KEYS: &[&str] = &["x", "y", "top", "right", "bottom", "left"];
 const LAYER_KEYS: &[&str] = &["x", "y", "blur", "spread", "color", "inset"];
+
+/// `looks = { tabs = "cards", ... }`: plain names on both sides, as a look
+/// becomes a class (`tabs-cards`).
+fn looks(fields: &Fields) -> Result<BTreeMap<String, String>, Error> {
+    let Some(table) = fields.get::<Table>("looks")? else {
+        return Ok(BTreeMap::new());
+    };
+    let cx = fields.cx().key("looks");
+    let mut looks = BTreeMap::new();
+    for pair in table.pairs::<String, String>() {
+        let (kind, look) = pair?;
+        if !valid_name(&kind) || !valid_name(&look) {
+            return Err(cx.key(&kind).fail("use a-z, 0-9, - and _ in looks"));
+        }
+        looks.insert(kind, look);
+    }
+    Ok(looks)
+}
 
 impl Stylesheet {
     /// Reads what `style.luau` returns. Colors and speeds come first, so
@@ -86,6 +105,7 @@ impl Stylesheet {
             font_family: fields.get("font_family")?,
             radius: fields.number("radius", 0.0..=64.0)?,
             overrides,
+            looks: looks(&fields)?,
             names,
             rules,
             components: Rules::default(),
@@ -179,7 +199,7 @@ impl Read for Style {
             color: fields.get("color")?,
             border: fields.get::<Edges>("border")?.map(|edges| edges.0),
             border_color: fields.get("border_color")?,
-            radius: fields.number("radius", 0.0..=1000.0)?,
+            radius: fields.get("radius")?,
             padding: fields.get("padding")?.unwrap_or_default(),
             gap: fields.get::<Spacing>("gap")?.map(|gap| gap.0),
             margin: fields.get("margin")?.unwrap_or_default(),
@@ -255,6 +275,48 @@ impl Read for Spacing {
             _ => return Err(cx.fail("expected a space name or pixels")),
         };
         Ok(Self(pixels))
+    }
+}
+
+/// Rounding: one radius for every corner, or a CSS-style list clockwise
+/// from the top left (`{ 8, 8, 0, 0 }` rounds the top only; `{ a, b }`
+/// gives the top left and bottom right `a`, the others `b`).
+impl Read for Corners {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let radius = |value: &Value, cx: &Cx| match value {
+            Value::Integer(_) | Value::Number(_) => {
+                let radius = f32::read(value, cx)?;
+                if (0.0..=1000.0).contains(&radius) {
+                    Ok(radius)
+                } else {
+                    Err(cx.fail("a radius is from 0 to 1000"))
+                }
+            },
+            _ => Err(cx.fail("expected a radius in pixels, or a list of 2 or 4")),
+        };
+        let Value::Table(table) = value else {
+            return radius(value, cx).map(Self::all);
+        };
+        let values = (1..=table.raw_len())
+            .map(|index| radius(&table.raw_get::<Value>(index)?, &cx.index(index)))
+            .collect::<Result<Vec<_>, _>>()?;
+        if table.pairs::<Value, Value>().count() != values.len() {
+            return Err(cx.fail("a radius list takes only numbers"));
+        }
+        let [top_left, top_right, bottom_right, bottom_left] = match values[..] {
+            [all] => [all; 4],
+            [a, b] => [a, b, a, b],
+            [top_left, top_right, bottom_right, bottom_left] => {
+                [top_left, top_right, bottom_right, bottom_left]
+            },
+            _ => return Err(cx.fail("a radius list takes 1, 2, or 4 values")),
+        };
+        Ok(Self {
+            top_left,
+            top_right,
+            bottom_right,
+            bottom_left,
+        })
     }
 }
 

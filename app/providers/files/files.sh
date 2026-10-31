@@ -12,8 +12,9 @@
 # Messages: `{ open = "app\napp/mods" }` sets which folders are open (their
 # paths from the root, one per line); anything else looks again.
 #
-# The root is the git repository the app runs from, else the home folder;
-# set MOONFRAME_FILES to show another folder. Plain bash (3.2 or later), no
+# The root is the git repository the app runs from; set MOONFRAME_FILES to
+# show another folder. Without either it publishes `available = false`:
+# it never falls back to a folder as broad as home. Plain bash (3.2 or later), no
 # jq or python: every string goes through `jstr`.
 
 POLL=3             # seconds between looks
@@ -117,12 +118,20 @@ json_field() {
 
 OPEN=()
 
+# Whether folder $1 (a path from the root) is inside the root once symlinks
+# are resolved: a link in the project to /etc is not listed.
+inside_root() {
+    local real
+    real=$(cd "$ROOT${1:+/$1}" 2>/dev/null && pwd -P) || return 1
+    [ "$real" = "$ROOT_REAL" ] || [[ $real == "$ROOT_REAL"/* ]]
+}
+
 # Sets ENTRIES_JSON to folder $1's entries (a path from the root, "" for the
 # root itself), folders first.
 list_dir() {
     local dir=$1 base name kind count=0 dirs=() files=() ignored sep=
     base=$ROOT${dir:+/$dir}
-    [ -d "$base" ] || { ENTRIES_JSON=; return 1; }
+    [ -d "$base" ] && inside_root "$dir" || { ENTRIES_JSON=; return 1; }
     while IFS= read -r -d '' path; do
         name=${path##*/}
         case " $HIDDEN " in *" $name "*) continue ;; esac
@@ -162,14 +171,15 @@ list_dir() {
 emit() {
     local force=$1 dir out sep=, count=0
     list_dir "" || return
-    jstr "${ROOT##*/}" && out="{\"root\":$J"
+    jstr "${ROOT##*/}" && out="{\"available\":true,\"root\":$J"
     jstr "$ROOT" && out+=",\"path\":$J"
     out+=",\"dirs\":{\"\":[$ENTRIES_JSON]"
     for dir in "${OPEN[@]}"; do
         count=$((count + 1))
         [ "$count" -le "$MAX_OPEN" ] || break
-        # Only folders inside the root, by a path without `..`.
-        case "/$dir/" in */../* | */./*) continue ;; esac
+        # Only relative paths without `..`, `.` or empty parts; list_dir
+        # then checks the resolved folder is still inside the root.
+        case "/$dir/" in */../* | */./* | *//*) continue ;; esac
         list_dir "$dir" || continue
         jstr "$dir"
         out+="$sep$J:[$ENTRIES_JSON]"
@@ -184,9 +194,16 @@ emit() {
 if [ -n "$MOONFRAME_FILES" ]; then
     ROOT=$MOONFRAME_FILES
 else
-    ROOT=$(git -C ../.. rev-parse --show-toplevel 2>/dev/null || echo "$HOME")
+    ROOT=$(git -C ../.. rev-parse --show-toplevel 2>/dev/null)
 fi
 ROOT=${ROOT%/}
+ROOT_REAL=$(cd "$ROOT" 2>/dev/null && pwd -P)
+if [ -z "$ROOT" ] || [ -z "$ROOT_REAL" ]; then
+    printf '%s\n' '{"available":false,"reason":"not in a git repository; set MOONFRAME_FILES to the folder to show"}'
+    # Stay until the app closes stdin, as a provider should.
+    while IFS= read -r _; do :; done
+    exit 0
+fi
 GIT=
 git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 && GIT=1
 
