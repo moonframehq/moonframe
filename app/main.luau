@@ -61,6 +61,9 @@ return mod {
 				ui.pane { size = 280, min = 180, max = 520, fixed = true, visible = state.right, surface = "sidebar", ui.region "right" },
 			},
 			ui.row {
+				-- A fixed height lets the regions hide the mods that do not fit.
+				height = 30,
+				shrink = false,
 				padding = "small",
 				gap = "large",
 				align = "center",
