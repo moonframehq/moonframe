@@ -1,5 +1,7 @@
 use {
-    crate::{Color, Emulator, Engine, Key, Screen, Session, Size, Spawn, encode, paste},
+    crate::{
+        Backend as _, Color, Emulator, Engine, Key, Open, Pty, Screen, Session, Size, encode, paste,
+    },
     std::{
         sync::Arc,
         time::{Duration, Instant},
@@ -153,15 +155,14 @@ fn a_session_runs_a_shell() {
         .into_iter()
         .filter(|engine| engine.available())
     {
-        let session = Session::spawn(
-            Spawn {
-                engine,
+        let opened = Pty
+            .open(&Open {
+                key: "test/main".into(),
                 cwd: None,
                 size: Size::default(),
-            },
-            Arc::new(|| {}),
-        )
-        .unwrap();
+            })
+            .unwrap();
+        let session = Session::start(opened, engine, Size::default(), Arc::new(|| {})).unwrap();
         session.write(b"echo moonframe-$((40 + 2))\r");
         let deadline = Instant::now() + Duration::from_secs(15);
         let found = loop {

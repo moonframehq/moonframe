@@ -258,8 +258,15 @@ live shell. The host runs it, so it can't be written in Luau:
 - **What runs:** always the user's login shell. A mod chooses `cwd`, never
   a command, so the sandbox still can't run programs on its own.
 - **Lifetime:** the host keeps one shell per mod and `id`. It survives
-  reloads and hidden panes, and ends with the app or when the shell exits
-  (Enter starts another). Two `id`s are two shells.
+  reloads and hidden panes; with herdr-core or tmux it survives quitting
+  the app too, and the next launch attaches to it again. It ends when the
+  shell exits (Enter starts another). Two `id`s are two shells.
+- **Backends:** `backend = "auto"` (default) runs it on herdr-core (`hc`)
+  when installed (starting its server if needed), else tmux (a session per
+  terminal on the app's own server: `tmux -L moonframe ls`), else a local
+  pty that ends with the app. `"herdr-core"`, `"tmux"` or `"pty"` asks for
+  one; one that is missing falls back to the next. A faint label in the
+  terminal's bottom-right corner names the backend in use.
 - **Engines:** `engine = "alacritty"` (default, pure Rust) or `"ghostty"`
   (libghostty-vt). Both are cargo features of `moonframe`, on by default.
   A build without one shows why in the element's place.
@@ -531,7 +538,7 @@ Text-like elements take their main value positionally:
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
 | `ui.badge "..."` | `text`, `tone` | pill |
-| `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
+| `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
 | `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
 | `ui.icon "cpu"` | `name`, `tone`, `size`, `spin` | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |

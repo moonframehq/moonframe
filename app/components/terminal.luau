@@ -7,6 +7,9 @@ type Props = {
 	id: string?,
 	-- The folder it starts in: a path, or `~/...`; the home folder if unset.
 	cwd: string?,
+	-- What keeps it running: "auto" (herdr-core, else tmux, else a pty),
+	-- "herdr-core", "tmux" or "pty".
+	backend: string?,
 	style: any,
 }
 
@@ -19,6 +22,7 @@ return component {
 	props = {
 		["id"] = "keeps the shell across reloads; one per id",
 		["cwd"] = "starting folder",
+		["backend"] = "`auto` (default), `herdr-core`, `tmux` or `pty`",
 		["style"] = "style table for the box",
 	},
 	example = { id = "shell", cwd = "~" },
@@ -27,6 +31,7 @@ return component {
 		return ui.terminal {
 			id = props.id or "shell",
 			cwd = props.cwd,
+			backend = props.backend :: any,
 			engine = "alacritty",
 			style = props.style,
 		}

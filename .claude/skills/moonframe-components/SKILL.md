@@ -2753,6 +2753,7 @@ A whole mod using it, with state: `app/components/demos/status-bar.luau`.
 
 | Prop | Meaning |
 | --- | --- |
+| `backend` | `auto` (default), `herdr-core`, `tmux` or `pty` |
 | `cwd` | starting folder |
 | `id` | keeps the shell across reloads; one per id |
 | `style` | style table for the box |
@@ -2773,6 +2774,7 @@ A whole mod using it, with state: `app/components/demos/ghostty-terminal.luau`.
 
 | Prop | Meaning |
 | --- | --- |
+| `backend` | `auto` (default), `herdr-core`, `tmux` or `pty` |
 | `cwd` | starting folder |
 | `id` | keeps the shell across reloads; one per id |
 | `style` | style table for the box |

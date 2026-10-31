@@ -1,11 +1,14 @@
 //! The shells `ui.terminal` elements show. Each is kept by its mod and `id`,
-//! so it outlives reloads and hidden panes; it ends with the app. Output
-//! wakes the window from the session's thread, through a channel.
+//! so it outlives reloads and hidden panes. herdr-core or tmux, when this
+//! machine has one, keeps it across launches too; a pty's ends with the
+//! app. Output wakes the window from the session's thread, through a
+//! channel.
 
 use {
     crate::{app::MoonframeApp, keys::Taken},
     gpui_kit::*,
-    moonframe_terminal::{Ansi, Engine, Key, Session, Spawn, encode, paste},
+    moonframe_mux::{Backends, Preference},
+    moonframe_terminal::{Ansi, Engine, Key, Open, Session, encode, paste},
     std::{cell::Cell, collections::HashMap, path::PathBuf, rc::Rc, sync::Arc},
 };
 
@@ -14,9 +17,19 @@ use {
 const PER_MOD: usize = 8;
 const TOTAL: usize = 32;
 
+/// What a terminal was opened with, to open it again after it exits.
+#[derive(Clone)]
+struct Spawn {
+    engine: Engine,
+    preference: Preference,
+    open: Open,
+}
+
 /// A shell and what the window keeps for it.
 pub(crate) struct TerminalView {
     pub(crate) session: Result<Session, String>,
+    /// The backend that runs it, shown as a hint in its corner.
+    pub(crate) backend: &'static str,
     pub(crate) focus: FocusHandle,
     spawn: Spawn,
     /// Scrolling not yet worth a whole line.
@@ -25,6 +38,7 @@ pub(crate) struct TerminalView {
 
 pub(crate) struct Terminals {
     views: HashMap<String, Rc<TerminalView>>,
+    backends: Backends,
     wake: Arc<dyn Fn() + Send + Sync>,
     /// The theme's 16 colors; xterm's when `None`.
     palette: Option<Ansi>,
@@ -34,6 +48,7 @@ impl Terminals {
     pub(crate) fn new(wake: Arc<dyn Fn() + Send + Sync>) -> Self {
         Self {
             views: HashMap::new(),
+            backends: Backends::new(),
             wake,
             palette: None,
         }
@@ -52,13 +67,20 @@ impl Terminals {
         }
     }
 
-    /// A shell for `spawn`, in the theme's colors.
-    fn spawn(&self, spawn: Spawn) -> Result<Session, String> {
-        let session = Session::spawn(spawn, self.wake.clone())?;
-        if self.palette.is_some() {
+    /// A shell for `spawn` on the best backend there is, in the theme's
+    /// colors, and the backend's name.
+    fn spawn(&self, spawn: &Spawn) -> (Result<Session, String>, &'static str) {
+        let (opened, backend) = match self.backends.open(spawn.preference, &spawn.open) {
+            Ok(opened) => opened,
+            Err(problem) => return (Err(problem), ""),
+        };
+        let session = Session::start(opened, spawn.engine, spawn.open.size, self.wake.clone());
+        if let Ok(session) = &session
+            && self.palette.is_some()
+        {
             session.set_palette(self.palette);
         }
-        Ok(session)
+        (session, backend)
     }
 
     /// The terminal at `key`, started now if it is new.
@@ -66,6 +88,7 @@ impl Terminals {
         &mut self,
         key: &str,
         engine: Engine,
+        preference: Preference,
         cwd: Option<&str>,
         cx: &App,
     ) -> Rc<TerminalView> {
@@ -87,16 +110,21 @@ impl Terminals {
         };
         let spawn = Spawn {
             engine,
-            cwd: cwd.map(expand),
-            size: moonframe_terminal::Size::default(),
+            preference,
+            open: Open {
+                key: key.to_owned(),
+                cwd: cwd.map(expand),
+                size: moonframe_terminal::Size::default(),
+            },
         };
         let refused = limit.is_some();
-        let session = match limit {
-            Some(limit) => Err(limit),
-            None => self.spawn(spawn.clone()),
+        let (session, backend) = match limit {
+            Some(limit) => (Err(limit), ""),
+            None => self.spawn(&spawn),
         };
         let view = Rc::new(TerminalView {
             session,
+            backend,
             focus: cx.focus_handle(),
             spawn,
             scrolled: Cell::new(0.),
@@ -114,8 +142,10 @@ impl Terminals {
     /// Starts the shell at `key` again, after it exited.
     fn restart(&mut self, key: &str) {
         if let Some(old) = self.views.get(key) {
+            let (session, backend) = self.spawn(&old.spawn);
             let view = Rc::new(TerminalView {
-                session: self.spawn(old.spawn.clone()),
+                session,
+                backend,
                 focus: old.focus.clone(),
                 spawn: old.spawn.clone(),
                 scrolled: Cell::new(0.),

@@ -3,6 +3,7 @@ exclude = ["app/providers"]
 members = [
   "crates/moonframe",
   "crates/moonframe-core",
+  "crates/moonframe-mux",
   "crates/moonframe-providers",
   "crates/moonframe-terminal",
 ]
@@ -25,13 +26,19 @@ expect_used = "deny"
 unwrap_used = "deny"
 
 [workspace.dependencies]
-alacritty_terminal  = "0.26"
-block2              = "0.6"
-futures             = "0.3"
-gpui-kit            = "=0.8.1"
+alacritty_terminal = "0.26"
+block2             = "0.6"
+futures            = "0.3"
+gpui-kit           = "=0.8.1"
+# Crates of herdr-gpui (to be renamed), pinned to one commit. To work on
+# them beside this app, patch them to a local checkout:
+#   [patch."https://github.com/penso/herdr-gpui"]
+#   herdr-core-client = { path = "../herdr-gpui/crates/herdr-core-client" }
+herdr-core-client   = { git = "https://github.com/penso/herdr-gpui", rev = "2a14613fc6030583df328e583ec62d87727e3f9c" }
 libghostty-vt       = "0.2.2"
 mlua                = { features = ["luau"], version = "0.12.2" }
 moonframe-core      = { path = "crates/moonframe-core" }
+moonframe-mux       = { default-features = false, path = "crates/moonframe-mux" }
 moonframe-providers = { path = "crates/moonframe-providers" }
 moonframe-terminal  = { default-features = false, path = "crates/moonframe-terminal" }
 notify              = "8"

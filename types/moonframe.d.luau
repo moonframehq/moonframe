@@ -479,6 +479,10 @@ type ImageProps = {
 }
 
 type TerminalEngine = "alacritty" | "ghostty"
+-- What keeps the shell running: `auto` (default) is herdr-core, else tmux,
+-- else a pty. herdr-core and tmux keep it across launches; a pty ends with
+-- the app. One that isn't installed falls back to the next.
+type TerminalBackend = "auto" | "herdr-core" | "tmux" | "pty"
 
 -- A live shell (your login shell). The host keeps it by mod and `id`.
 type TerminalProps = {
@@ -488,6 +492,7 @@ type TerminalProps = {
 	-- Where it starts: a path or `~/...`; the home folder when unset.
 	cwd: string?,
 	engine: TerminalEngine?,
+	backend: TerminalBackend?,
 	[number]: string,
 }
 

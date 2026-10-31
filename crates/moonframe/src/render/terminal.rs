@@ -6,7 +6,8 @@ use {
     super::{Cx, Draw, Painter, Place, problem},
     crate::{color::ThemeColor as _, terminal::TerminalView},
     gpui_kit::{component::ActiveTheme as _, *},
-    moonframe_core::{Part, Terminal, TerminalEngine},
+    moonframe_core::{Part, Terminal, TerminalBackend, TerminalEngine},
+    moonframe_mux::Preference,
     moonframe_terminal::{Cell, Color, Engine, Screen, Size},
     std::rc::Rc,
 };
@@ -56,15 +57,23 @@ impl<'w> Draw<'w> for Terminal {
                 .into_any_element();
         }
         let key = format!("{}/{}", place.owner, self.id);
+        let preference = match self.backend {
+            TerminalBackend::Auto => Preference::Auto,
+            TerminalBackend::HerdrCore => Preference::HerdrCore,
+            TerminalBackend::Tmux => Preference::Tmux,
+            TerminalBackend::Pty => Preference::Pty,
+        };
         let view = painter
             .terminals
-            .open(&key, engine, self.cwd.as_deref(), cx);
+            .open(&key, engine, preference, self.cwd.as_deref(), cx);
         if let Err(error) = &view.session {
             return problem(format!("terminal `{}`: {error}", self.id), cx);
         }
         let focus = view.focus.clone();
         let scroll_view = view.clone();
+        let hint = hint(view.backend, theme.muted_foreground);
         frame
+            .relative()
             .key_context("Terminal")
             .track_focus(&view.focus)
             .cursor(CursorStyle::IBeam)
@@ -84,8 +93,22 @@ impl<'w> Draw<'w> for Terminal {
                 }
             })
             .child(grid(view, background, foreground))
+            .child(hint)
             .into_any_element()
     }
+}
+
+/// Which backend runs the terminal, small and faint in its bottom corner,
+/// clear of the grid's last row.
+fn hint(backend: &'static str, muted: Hsla) -> impl IntoElement {
+    div()
+        .absolute()
+        .bottom(px(1.))
+        .right(px(PADDING))
+        .text_size(px(9.))
+        .line_height(px(PADDING - 1.))
+        .text_color(muted.opacity(0.6))
+        .child(backend)
 }
 
 /// The cell grid, fitted to the space it gets.
