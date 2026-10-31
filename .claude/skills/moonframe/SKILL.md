@@ -835,6 +835,16 @@ ui.hsplit {
 **Bottom panel.** Put a `ui.vsplit` inside the center pane, with a second
 fixed pane (`size = 180`, `visible = state.bottom`) holding `ui.region "bottom"`.
 
+**Activity bar switching the side pane, as in VS Code.** The shell keeps the
+current view in its state and draws `use "activity-bar"` beside the split,
+with the side pane holding `ui.region(state.activity)`. Each view is a
+region name: its mods declare it (`region = "files"`), so a new view is a new
+mod plus one entry in the bar's items. Hidden mods keep their state. Clicking
+the current view folds the pane. Copy the whole shell from the component's
+`usage` (`app/components/activity-bar.luau`). The starter's `app/main.luau`
+has no activity bar on purpose; add one to an app's own shell (a profile),
+not to the starter, unless the user asks.
+
 **A mod that fills its pane.** The root should be `ui.panel { grow = true, ... }`.
 Use `scroll = true` for long lists. Several mods in one region stack. Give
 `grow = true` only to those that should share the leftover height.
