@@ -113,7 +113,15 @@ jobs:
       - name: Lint every target and feature
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Test
-        run: cargo test --locked --workspace --all-features
+        env:
+          RUNNER: ${{ matrix.runner }}
+        run: |
+          # TEMPORARY: one test at a time on Windows ARM, to name the one that crashes.
+          if [[ $RUNNER == windows-11-arm ]]; then
+            cargo test --locked --workspace --all-features -- --test-threads=1
+          else
+            cargo test --locked --workspace --all-features
+          fi
       - name: Load every built-in module headlessly
         run: cargo run --locked -p moonframe -- --check --no-user app
       - name: Check the component catalogue skill is current
