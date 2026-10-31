@@ -54,6 +54,13 @@ return component {
 		url = "https://example.com",
 		page = { url = "https://example.com/", title = "Example Domain", back = true, forward = false },
 	},
+	usage = [[
+local browser = use "browser"
+
+-- in view: the address bar, history and loading follow `page` by themselves
+browser { id = "docs", url = state.url, page = state.page, navigate = { navigated = true } }
+-- in update: msg.navigated sets state.page = msg (keep the whole message)
+-- to send the page somewhere from code, set state.url to a new address]],
 
 	build = function(props: Props)
 		local id = props.id or "browser"

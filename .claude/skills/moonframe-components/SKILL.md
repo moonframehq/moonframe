@@ -327,7 +327,10 @@ A whole mod using it, with state: `app/components/demos/section.luau`.
 ```lua
 local browser = use "browser"
 
-browser { id = "example", page = { back = true, forward = false, title = "Example Domain", url = "https://example.com/" }, url = "https://example.com" }
+-- in view: the address bar, history and loading follow `page` by themselves
+browser { id = "docs", url = state.url, page = state.page, navigate = { navigated = true } }
+-- in update: msg.navigated sets state.page = msg (keep the whole message)
+-- to send the page somewhere from code, set state.url to a new address
 ```
 
 A whole mod using it, with state: `app/components/demos/browser.luau`.

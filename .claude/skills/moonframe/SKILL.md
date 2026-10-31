@@ -94,8 +94,13 @@ arrows (see "Dialogs, palettes, sheets and toasts").
 **A reusable piece.** A component with a good `example`, so it previews
 in the Components window, then `use` it from the mod.
 
-**A web page.** `ui.browser { id = "docs", url = "https://example.com" }`
-inside a container with `grow = true`, with buttons sending
+**A web page.** With browser chrome (back, forward, reload, an address
+bar that navigates, the title): `local browser = use "browser"`, then
+`browser { id = "docs", url = state.url, page = state.page, navigate =
+{ navigated = true } }` and `state.page = msg` in `update`
+(`app/components/demos/browser.luau` is the whole mod). A bare page:
+`ui.browser { id = "docs", url = "https://example.com" }` inside a
+container with `grow = true`, with buttons sending
 `command = "browser-back", browser = "docs"` (see "Browsers").
 
 **A terminal.** `local terminal = use "terminal"` and
@@ -301,7 +306,10 @@ ui.input { id = "docs-address", value = state.page.url, browser = "docs" }  -- i
 - **`url`:** the page goes there when the mod passes an address different
   from the last one it passed. Links the user follows stand until then.
   To load the same address again, use `browser-reload`. Only `http://`,
-  `https://` and `file://` addresses are read; anything else is an error.
+  `https://` and `file://` addresses are read; anything else is an error
+  that fails the mod's whole view, so never pass text the user typed as
+  `url`: make the field an address bar (below), which also loads the
+  address already shown, which a `url` the mod sets again cannot.
   The page itself may follow links only to those (and `about:blank`); a
   link that opens a new window opens in the same page, and downloads are
   refused.
@@ -362,6 +370,7 @@ ui.input {
 	submit = "run",            -- sent on Enter (⌘/Ctrl-Enter when multiline)
 	keys = { up = "prev", down = "next", escape = "close" },
 	focus = true,              -- take focus when it appears or turns true
+	-- browser = "docs",       -- or: be that ui.browser's address bar
 }
 ```
 
@@ -388,6 +397,9 @@ ui.input {
   `["secondary-k"]`. `secondary` is ⌘ on macOS and Ctrl elsewhere; use it
   for shortcuts that should work everywhere. Modifiers must match exactly
   (`up` is not `shift-up`). A key in `keys` wins over `submit`. Up to 32.
+- **`browser = "<id>"`** makes the field that `ui.browser`'s address bar,
+  with no messages to handle: Enter loads the text, focus selects it, and
+  Escape puts back the page's address (see "Browsers").
 - **Focus.** Clicking focuses a field; so does `focus = true`, once, when
   the field appears or `focus` turns from false to true (a field gone for a
   render and back counts as appearing). Previews in the component browser
