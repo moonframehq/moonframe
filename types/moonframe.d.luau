@@ -893,6 +893,31 @@ type Files = {
 	dirs: { [string]: { FileEntry } },
 }
 
+-- What this machine has for keeping terminals (the `herdr` provider).
+type Herdr = {
+	installed: boolean,
+	version: string?,
+	path: string?,
+	tmux: boolean,
+	-- herdr-core's installer is running.
+	installing: boolean,
+	-- Why the last install failed.
+	error: string?,
+	-- Installed during this run.
+	fresh: boolean,
+}
+
+-- A native provider's answer to an action a mod asked for, arriving in that
+-- mod's `update`: `reply` is the `id` the mod sent, else the action's name.
+type Reply = {
+	reply: any,
+	action: string,
+	ok: boolean,
+	-- What happened, when it worked; why not, when it did not.
+	message: string?,
+	error: string?,
+}
+
 -- What every `view` gets as `app`.
 type App = {
 	dark: boolean,
@@ -907,6 +932,7 @@ type App = {
 	gitlab: Forge?,
 	agents: Agents?,
 	files: Files?,
+	herdr: Herdr?,
 	-- What each provider in app/providers/ publishes, as `app.<name>`.
 	[string]: any,
 }

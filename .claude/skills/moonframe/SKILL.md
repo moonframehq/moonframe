@@ -1,6 +1,6 @@
 ---
 name: moonframe
-description: Build anything in Moonframe, a starter app whose window is laid out entirely by Luau. Covers panels, side panels, splits, toolbars, status bars, popovers, overlays (dialogs, command palettes, sheets, toasts) and their keys, mods and extensions, reusable components (`use`), live terminals (`ui.terminal`), data providers (Wasm or process), icons, and styling through style.luau (colors, corners, shadows, spacing, animations). Also covers acting on the user's Inspect Element selection ("add X here"). Use whenever the task is to add, move, restyle or experiment with any UI in moonframe, to build a widget, component, provider or extension, or to customise the installed app in ~/.config/moonframe. The window reloads live as files change, so no Rust build is needed for Luau work.
+description: Build anything in Moonframe, a starter app whose window is laid out entirely by Luau. Covers panels, side panels, splits, toolbars, status bars, popovers, overlays (dialogs, command palettes, sheets, toasts) and their keys, mods and extensions, reusable components (`use`), live terminals (`ui.terminal`, kept by herdr-core or tmux across launches), state kept across launches (`persist`), providers (Wasm, process, or native Rust built into the app, such as git, which also commits and pushes for a mod and answers it), icons, and styling through style.luau (colors, corners, shadows, spacing, animations). Also covers acting on the user's Inspect Element selection ("add X here"). Use whenever the task is to add, move, restyle or experiment with any UI in moonframe, to build a widget, component, provider or extension, or to customise the installed app in ~/.config/moonframe. The window reloads live as files change, so no Rust build is needed for Luau work.
 ---
 
 # Moonframe
@@ -56,6 +56,9 @@ Pick the lowest layer that can do the job:
 | a web page in the window | `ui.browser` | in a mod | no |
 | a text field, search box, prompt or text area | `ui.input` or `use "search-field"` | in a mod | no |
 | data from the machine, files, network or a CLI | a **provider** feeding `app.<name>` | `providers/<name>/` | no (the host builds Wasm providers itself) |
+| state that survives quitting the app (open panels, tabs, a choice) | `persist` on the mod | the mod's `mod { }` | no |
+| git status, a file's diff, commit or push | read `app.git`; send `provider:git` a message | in a mod | no (git is built in) |
+| a provider that needs a Rust library or answers actions | a **native provider** | `crates/` + `providers/<name>/provider.toml` | yes, and the app restarts |
 | a look change | a rule in `style.luau`, or the mod's `styles` | | no |
 | a new kind of element (tree, chart, image) | a host element | `crates/` | yes, and the app restarts |
 
@@ -126,6 +129,34 @@ For a palette, add `keys = { up = "prev", down = "next" }` and
 
 **Mods that talk.** Send `msg = ..., to = "other"` from a control, or
 return sends from `update`. Messages to `provider:<name>` go to a provider.
+
+**Remember something across launches.** Add `persist = { "key", ... }`
+(or `persist = true`) to the `mod { }` and keep `init = function(previous)
+return previous or {...} end`: the kept keys come back as `previous` next
+launch. Name only what the user would expect back (open panels, the tab
+they were on), never transient keys (`loading`, `hover`, errors).
+
+**Ask a provider to act, and show the answer.** Native providers answer
+actions in the asking mod's `update` (a `Reply`, see "Built-in providers"):
+
+```lua
+-- in update
+if msg == "commit" and not state.running then
+	state.running = "commit"
+	return state, { { to = "provider:git", msg = { commit = state.message, id = "mine" } } }
+elseif type(msg) == "table" and msg.reply == "mine" then
+	state.running = nil                                   -- show msg.message or msg.error
+	state.result = { ok = msg.ok, text = msg.message or msg.error }
+end
+```
+
+Show a spinner while `running` (a push may wait on the user's hardware
+key), disable the button meanwhile, and show `error` as the user's next
+step. git only takes writes from mods in `providers/git`'s
+`[settings] writers` (as shipped, `status`). For a new mod, copy
+`app/providers/git/` to `~/.config/moonframe/providers/git/` and add its
+name to `writers` there (in this repository, edit `app/providers/git`
+itself); otherwise it is refused with a reply saying so. `mods/status` is the full example (a commit sheet on the branch).
 
 **Customising the installed app.** Write to `~/.config/moonframe`
 (same layout as `app/`). Copy a built-in mod's folder there to change it.
@@ -881,13 +912,14 @@ restyle an extension from the app side, add a rule for the same selector in
 
 **Live data.** Mods can't read the machine (no `os`, `io` or network).
 Providers share data under `app`: `app.system` (CPU, memory, network, from
-the Wasm provider each second), `app.git` (branch, files, diffs, worktrees),
-`app.github` and `app.gitlab` (pull requests, checks, issues) and
+the Wasm provider each second), `app.git` (branch, files, diffs, worktrees;
+native, and it commits and pushes on request), and from process providers
+`app.github` and `app.gitlab` (pull requests, checks, issues),
 `app.agents` (coding agents running here), `app.files` (the project's
-file tree) and `app.herdr` (whether herdr-core and tmux are installed),
-from process providers; their shapes are under "Built-in
-providers" below and typed in `types/moonframe.d.luau` (`Git`, `Forge`,
-`Agents`, `Files`). Views re-run with each publish. If a widget needs data
+file tree) and `app.herdr` (whether herdr-core and tmux are installed).
+Their shapes are under "Built-in providers" below and typed in
+`types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`,
+and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
 is labelled demo data, as in `mods/usage`.
 
@@ -1047,7 +1079,15 @@ publishes. Keep the published JSON small and shaped for the view (numbers
 and short lists, not raw dumps), and pick the longest `interval` the widget
 can live with. Wasm needs a host capability for anything outside its
 sandbox; if none fits (today only `system`), use a process provider or add a
-capability in `crates/moonframe-providers` (a Rust change).
+capability in `crates/moonframe-providers` (a Rust change). Reach for a
+native provider only when it needs a Rust library (herdr-gpui's crates,
+for one) or must answer actions; it is a Rust change and a restart. Write
+it as a crate (`crates/moonframe-<name>`) implementing `Native`, register
+it in `crates/moonframe/src/natives.rs` behind a cargo feature, add
+`providers/<name>/provider.toml` with `kind = "native"`, and test it
+through `Handle::new` as `crates/moonframe-git` does. Writes it does for
+mods take an allowlist in `[settings]` (like git's `writers`), checked
+against the sender, and answer every request, refused ones too.
 
 **Progress bars and sparklines** are plain stacks: a fixed-`width` track
 row holding a fill row of `width * fraction`, with `.track` and `.fill`
@@ -1193,15 +1233,19 @@ moonframe mod link ~/code/my-mod               # use a folder in place, to devel
 Installs clone into `~/.config/moonframe/packages/<host>/<owner>/<repo>`
 and are listed in `~/.config/moonframe/packages.toml`; an open window
 picks up every change. Mods, components and styles are sandboxed Luau;
-providers that run as the user (process providers, and Wasm, which is
-built from source) are shown and must be approved, or passed `--yes`.
+providers that run as the user (process providers, Wasm, which is
+built from source, and native ones, which replace a built-in provider
+with the package's settings) are shown and must be approved, or passed
+`--yes`.
 **Packages ship source only**: install, update and link refuse a package
 holding a `provider.wasm` or any other file that is not text (images
 aside), so the user, or an agent, can review everything it runs before
 installing. A Wasm provider in a package ships its crate (`Cargo.toml`,
 `src/`) and never a build; gitignore `target/`. When asked whether a
 package is safe, read its providers' source and commands, not just the
-mods. To publish, push the
+mods. A package's `kind = "native"` provider replaces the built-in one
+of that name with its own `[settings]`: a `providers/git` widening git's
+`writers` lets that package's mods commit and push, so read those too. To publish, push the
 repository anywhere git can clone from and share the install line. When
 the user asks to share something they built in `~/.config/moonframe`,
 copy it into a new package (`mod new`), `link` it, and remove the original

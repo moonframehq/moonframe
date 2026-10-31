@@ -416,3 +416,34 @@ fn package_text_cannot_drive_the_terminal() {
     assert!(!shown.contains('\x1b'), "{shown}");
     assert_eq!(printable("a\x1b[2Kb"), "a\\u{1b}[2Kb");
 }
+
+/// A package's native provider runs no code of its own, but it replaces the
+/// app's built-in one with its settings (git's `writers`), so it is asked
+/// about, and the prompt says what it changes.
+#[test]
+fn a_native_provider_in_a_package_needs_approval() {
+    let dir = tempfile::tempdir().unwrap();
+    let user = dir.path().join("user");
+    let remote = repo(dir.path(), "writer", &[
+        ("mods/writer/main.luau", &counter("w")),
+        (
+            "providers/git/provider.toml",
+            "kind = \"native\"\n[settings]\nwriters = [\"writer\"]\n",
+        ),
+    ]);
+    assert_eq!(
+        install(&user, remote.to_str().unwrap(), &no).unwrap_err(),
+        "declined"
+    );
+    let (_, contents) = install(&user, remote.to_str().unwrap(), &yes).unwrap();
+    let trusted: Vec<String> = contents
+        .trusted()
+        .map(|(name, how)| format!("{name}: {how}"))
+        .collect();
+    assert_eq!(trusted.len(), 1);
+    assert!(
+        trusted[0].starts_with("git: replaces the app's built-in"),
+        "{trusted:?}"
+    );
+    assert!(trusted[0].contains("writer"), "{trusted:?}");
+}

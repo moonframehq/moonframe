@@ -276,6 +276,10 @@ pub(crate) enum Provider {
     /// A Rust crate the app builds with Cargo, which runs its build code
     /// with the user's access; the component it builds runs sandboxed.
     Source,
+    /// The app's own built-in provider of that name, run with the
+    /// package's `[settings]`, which may widen what it does (git's
+    /// `writers`).
+    Native(String),
     Broken(String),
 }
 
@@ -300,6 +304,11 @@ impl Contents {
                     kind: Kind::Process { command },
                     ..
                 }) => Provider::Process(command),
+                Ok(Manifest {
+                    kind: Kind::Native,
+                    settings,
+                    ..
+                }) => Provider::Native(settings.to_string()),
                 Ok(_) => Provider::Source,
                 Err(problem) => Provider::Broken(problem.to_string()),
             };
@@ -327,7 +336,12 @@ impl Contents {
     pub(crate) fn trusted(&self) -> impl Iterator<Item = (&str, &Provider)> {
         self.providers
             .iter()
-            .filter(|(_, how)| matches!(how, Provider::Process(_) | Provider::Source))
+            .filter(|(_, how)| {
+                matches!(
+                    how,
+                    Provider::Process(_) | Provider::Source | Provider::Native(_)
+                )
+            })
             .map(|(name, how)| (name.as_str(), how))
     }
 }
@@ -508,6 +522,11 @@ impl fmt::Display for Provider {
                 write!(f, "runs [{}] with your access", words.join(" "))
             },
             Self::Source => f.write_str("built with Cargo, with your access"),
+            Self::Native(settings) => write!(
+                f,
+                "replaces the app's built-in provider of this name, with settings {}",
+                printable(settings)
+            ),
             Self::Broken(problem) => write!(f, "broken: {}", printable(problem)),
         }
     }
