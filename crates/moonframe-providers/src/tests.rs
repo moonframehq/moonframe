@@ -295,3 +295,108 @@ fn a_higher_layer_replaces_a_provider_of_the_same_name() {
     }
     assert_eq!(published, Some(Data::from("user")));
 }
+
+/// Echoes each message back to the mod that sent it, and panics on "boom".
+struct Echo;
+
+impl crate::Native for Echo {
+    fn start(&mut self, host: &crate::Handle) -> Result<(), String> {
+        host.publish(Data::from("ready"));
+        Ok(())
+    }
+
+    fn tick(&mut self, _: &crate::Handle) {}
+
+    fn receive(&mut self, host: &crate::Handle, from: &str, message: Data) {
+        assert!(message != Data::from("boom"), "asked to fail");
+        host.send(from, message);
+    }
+}
+
+fn echo() -> Box<dyn crate::Native> {
+    Box::new(Echo)
+}
+
+#[test]
+fn a_native_provider_publishes_and_answers_the_mod_that_asked() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/echo/provider.toml",
+        "kind = 'native'\ninterval = 5\n",
+    );
+    write(root, "providers/gone/provider.toml", "kind = 'native'\n");
+    let (events, received) = events();
+    let natives = crate::Natives::from([("echo", echo as crate::native::Factory)]);
+    let providers = Providers::start_with(root.into(), root.join("build"), events, natives);
+    let mut seen = Vec::new();
+    let mut next = || {
+        let event = received.recv_timeout(Duration::from_secs(5)).unwrap();
+        seen.push(format!("{event:?}"));
+        event
+    };
+    // Both start; their order is the threads'.
+    let (mut ready, mut missing) = (false, false);
+    while !(ready && missing) {
+        match next() {
+            Event::Published { provider, data } if provider == "echo" => {
+                assert_eq!(data, Data::from("ready"));
+                ready = true;
+            },
+            Event::Failed { provider, problem } if provider == "gone" => {
+                assert!(
+                    problem.to_string().contains("no native `gone`"),
+                    "{problem}"
+                );
+                missing = true;
+            },
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    providers.send("echo", "editor", Data::from("hi")).unwrap();
+    let Event::Sent { provider, to, msg } = next() else {
+        panic!("no answer: {seen:?}");
+    };
+    assert_eq!(
+        (provider.as_str(), to.as_str(), msg),
+        ("echo", "editor", Data::from("hi"))
+    );
+
+    // A panic stops that provider with a reason; the test, like the app, goes on.
+    providers
+        .send("echo", "editor", Data::from("boom"))
+        .unwrap();
+    let Event::Failed { provider, problem } = next() else {
+        panic!("no failure: {seen:?}");
+    };
+    assert_eq!(provider, "echo");
+    assert!(problem.to_string().contains("asked to fail"), "{problem}");
+}
+
+#[test]
+fn a_native_manifest_takes_no_command_or_capabilities() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "a/provider.toml",
+        "kind = 'native'\ncommand = ['x']\n",
+    );
+    write(
+        root,
+        "b/provider.toml",
+        "kind = 'native'\ncapabilities = ['system']\n",
+    );
+    write(
+        root,
+        "c/provider.toml",
+        "kind = 'native'\n[settings]\nlimit = 3\n",
+    );
+    assert!(Manifest::load("a", &root.join("a")).is_err());
+    assert!(Manifest::load("b", &root.join("b")).is_err());
+    let manifest = Manifest::load("c", &root.join("c")).unwrap();
+    assert_eq!(manifest.kind, Kind::Native);
+    assert_eq!(manifest.settings["limit"], 3);
+}

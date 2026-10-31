@@ -897,7 +897,7 @@ publishes appears to every view as `app.<name>`, and a mod messages it with
 `msg = ..., to = "provider:<name>"`. Adding, editing or removing a provider
 folder starts, restarts or stops only that provider, while the window keeps
 running; the others keep their state. A failed provider shows a banner, and its error appears in the
-terminal log. There are two kinds:
+terminal log. There are three kinds:
 
 - **`kind = "wasm"`:** a WebAssembly component implementing
   `wit/provider.wit`, shipped as `provider.wasm` in the folder, or as the
@@ -941,22 +941,45 @@ terminal log. There are two kinds:
     `{"available":false,"reason":"..."}` and keep polling. Exit only when
     stdin closes. Under macOS's bash 3.2, `read -t` returns 1 for both a
     timeout and the end of input; tell them apart by elapsed time (see
-    `git.sh`).
+    `github.sh`).
   - Keep caches out of the provider folder (a change there restarts it);
     use `~/.cache/moonframe/`.
   - The host refuses a line over 1 MiB or with over 10,000 values.
-  - `app/providers/git` is the example; it shows how to escape any string
-    for JSON in plain bash, and how to parse a message.
+  - `app/providers/github` is the example; `app/providers/herdr` shows how
+    to check who sent a message.
+- **`kind = "native"`:** Rust compiled into the app, registered under the
+  folder's name (`crates/moonframe/src/natives.rs`, each behind a cargo
+  feature); a build without it shows why in the provider's banner. For
+  what needs real libraries and the user's own access: git (on herdr-vcs),
+  and later the forges and herdr-core.
+  - It implements `moonframe_providers::Native` (`start`, `tick` every
+    `interval`, `receive(from, message)`) and gets a `Handle` it may clone
+    into its own threads, so a slow action (a push waiting on a hardware
+    key) never holds up its ticks.
+  - Besides publishing, it can **answer a mod**: `handle.send(mod, msg)`
+    arrives in that mod's `update` like any message. Actions answer with
+    `{ reply = <id the mod sent, else the action's name>, action, ok,
+    message | error }`; keep what is waiting in the mod's state and clear
+    it on the reply (`app/mods/status` does, for commit and push).
+  - A panic stops that provider with a banner, never the app.
+  - `crates/moonframe-git` is the example, with tests that drive it through
+    a `Handle::new`.
 
-**Built-in providers.** All are process providers in bash (3.2 or later),
-macOS and Linux; on Windows they need a bash such as Git Bash, and
-`agents` does not work there. Each publishes `available` and, when false,
+**Built-in providers.** `git` is native (Rust in the app); `system` is
+wasm; the rest are process providers in bash (3.2 or later), macOS and
+Linux; on Windows they need a bash such as Git Bash, and `agents` does
+not work there. Each publishes `available` and, when false,
 only `reason` (with `repository = false` for git). Times are Unix seconds.
 
 `app.git` (git): every 5 s when `git status` or the numstat changed;
 worktrees, branches, remote and stashes every 30 s or when HEAD moves.
 Any message refreshes. `{ diff = "<path>" }` adds `diff` for that file and
-keeps it fresh; `{ diff = false }` drops it.
+keeps it fresh; `{ diff = false }` drops it. Writes, one at a time, each
+answered to the mod that asked (`{ reply, action, ok, message | error }`):
+`{ commit = "<message>", id = ... }` stages everything and commits;
+`{ push = true, id = ... }` pushes the branch to `origin`, setting its
+upstream. Signing and pushing may wait on the user's hardware key: show
+that something runs until the reply comes.
 
 | field | shape |
 |---|---|

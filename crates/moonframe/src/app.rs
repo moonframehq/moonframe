@@ -698,12 +698,13 @@ fn toast(message: SharedString, cx: &Context<MoonframeApp>) -> AnyElement {
 /// Starts the providers, sharing what each publishes as `app.<name>`.
 fn start_providers(workspace: &Workspace, cx: &mut Context<MoonframeApp>) -> Providers {
     let (sender, mut events) = futures::channel::mpsc::unbounded();
-    let providers = Providers::start(
+    let providers = Providers::start_with(
         workspace.roots().clone(),
         paths::builds(),
         Arc::new(move |event| {
             let _ = sender.unbounded_send(event);
         }),
+        crate::natives::natives(),
     );
     cx.spawn(async move |this, cx| {
         while let Some(event) = events.next().await {
@@ -716,6 +717,12 @@ fn start_providers(workspace: &Workspace, cx: &mut Context<MoonframeApp>) -> Pro
                         tracing::warn!("provider {provider}: {problem}");
                         let problem = Error::new(format!("provider failed: {problem}"));
                         this.workspace.clear_host(&provider, Some(problem));
+                    },
+                    // A native provider's answer to the mod that asked.
+                    Event::Sent { provider, to, msg } => {
+                        let from = format!("{}{provider}", moonframe_core::PROVIDER);
+                        this.workspace.send(&from, &to, msg);
+                        this.flush(&from, cx);
                     },
                 }
                 cx.notify();

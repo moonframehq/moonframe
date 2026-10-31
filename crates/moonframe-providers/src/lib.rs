@@ -14,6 +14,9 @@
 //!   refuses the most direct build hooks, a `build.rs` or a folder-local
 //!   `.cargo/`. A provider from elsewhere ships its source, which can be
 //!   reviewed; packages are refused with any `provider.wasm`.
+//! - **native**: Rust built into the app (see [`native`]), for git, forges
+//!   and the like: the user's own access, real libraries, and replies to
+//!   the mod that asked.
 //! - **process**: any command that prints one JSON value per line and reads
 //!   messages from stdin, each with the mod that sent it. It runs with the user's full access, for data a
 //!   sandbox cannot reach.
@@ -26,6 +29,7 @@
 mod fingerprint;
 mod json;
 mod manifest;
+pub mod native;
 mod process;
 mod system;
 mod wasm;
@@ -33,6 +37,7 @@ mod wasm;
 pub use {
     json::{from_json, to_json},
     manifest::{Capability, Kind, Manifest, PREBUILT},
+    native::{Handle, Native, Natives},
 };
 
 use {
@@ -66,6 +71,12 @@ pub enum Event {
     /// The provider stopped or could not start; it shares nothing until it
     /// is reloaded.
     Failed { provider: String, problem: Error },
+    /// A native provider's message for the mod `to`: a reply to an action.
+    Sent {
+        provider: String,
+        to: String,
+        msg: Data,
+    },
 }
 
 /// Where events go: called on provider threads.
@@ -78,6 +89,8 @@ pub struct Providers {
     build_dir: PathBuf,
     events: Events,
     running: BTreeMap<String, Running>,
+    /// The native providers built into the app, by name.
+    natives: Natives,
 }
 
 /// A provider's thread, and how to reach and stop it.
@@ -129,12 +142,23 @@ impl Providers {
     /// Starts every provider in `roots`. Wasm providers build into
     /// `build_dir`.
     pub fn start(roots: Roots, build_dir: impl Into<PathBuf>, events: Events) -> Self {
+        Self::start_with(roots, build_dir, events, Natives::new())
+    }
+
+    /// The same, with the native providers this build has.
+    pub fn start_with(
+        roots: Roots,
+        build_dir: impl Into<PathBuf>,
+        events: Events,
+        natives: Natives,
+    ) -> Self {
         let build_dir = build_dir.into();
         let mut providers = Self {
             roots,
             build_dir: std::path::absolute(&build_dir).unwrap_or(build_dir),
             events,
             running: BTreeMap::new(),
+            natives,
         };
         providers.reload();
         providers
@@ -178,11 +202,13 @@ impl Providers {
                 stop: stop.clone(),
                 events: self.events.clone(),
             };
+            let native = self.natives.get(name.as_str()).copied();
             let spawned = thread::Builder::new()
                 .name(format!("provider-{name}"))
                 .spawn(move || match context.manifest.kind {
                     Kind::Wasm => wasm::run(&context),
                     Kind::Process { .. } => process::run(&context),
+                    Kind::Native => native::run(&context, native),
                 });
             match spawned {
                 Ok(_) => {

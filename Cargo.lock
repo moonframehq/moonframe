@@ -3191,7 +3191,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 [[package]]
 name = "herdr-backend"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=2a14613fc6030583df328e583ec62d87727e3f9c#2a14613fc6030583df328e583ec62d87727e3f9c"
+source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
 dependencies = [
  "herdr-protocol",
  "serde",
@@ -3201,7 +3201,7 @@ dependencies = [
 [[package]]
 name = "herdr-client"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=2a14613fc6030583df328e583ec62d87727e3f9c#2a14613fc6030583df328e583ec62d87727e3f9c"
+source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
 dependencies = [
  "base64 0.23.1",
  "crossbeam-channel",
@@ -3219,7 +3219,7 @@ dependencies = [
 [[package]]
 name = "herdr-core-client"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=2a14613fc6030583df328e583ec62d87727e3f9c#2a14613fc6030583df328e583ec62d87727e3f9c"
+source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
 dependencies = [
  "crossbeam-channel",
  "herdr-backend",
@@ -3234,9 +3234,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "herdr-credentials"
+version = "0.1.0"
+source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
+dependencies = [
+ "futures-lite",
+ "oo7",
+ "rustix",
+ "secrecy",
+ "security-framework",
+ "thiserror 2.0.21",
+ "tracing",
+ "windows-sys 0.61.2",
+ "zeroize",
+]
+
+[[package]]
+name = "herdr-github"
+version = "0.1.0"
+source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
+dependencies = [
+ "chrono",
+ "getrandom 0.4.3",
+ "herdr-client",
+ "herdr-credentials",
+ "herdr-rate-limit",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tracing",
+ "ureq",
+ "zeroize",
+]
+
+[[package]]
 name = "herdr-protocol"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=2a14613fc6030583df328e583ec62d87727e3f9c#2a14613fc6030583df328e583ec62d87727e3f9c"
+source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
 dependencies = [
  "base64 0.23.1",
  "bincode",
@@ -3246,14 +3281,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "herdr-rate-limit"
+version = "0.1.0"
+source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
+dependencies = [
+ "chrono",
+ "http",
+]
+
+[[package]]
 name = "herdr-terminal"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=2a14613fc6030583df328e583ec62d87727e3f9c#2a14613fc6030583df328e583ec62d87727e3f9c"
+source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
 dependencies = [
  "alacritty_terminal 0.25.1",
  "herdr-backend",
  "herdr-protocol",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "herdr-vcs"
+version = "0.1.0"
+source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
+dependencies = [
+ "herdr-client",
+ "herdr-github",
+ "secrecy",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tracing",
 ]
 
 [[package]]
@@ -4479,6 +4536,7 @@ dependencies = [
  "gpui-kit",
  "lb-wry",
  "moonframe-core",
+ "moonframe-git",
  "moonframe-mux",
  "moonframe-providers",
  "moonframe-terminal",
@@ -4502,6 +4560,18 @@ dependencies = [
  "mlua",
  "tempfile",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "moonframe-git"
+version = "0.1.0"
+dependencies = [
+ "herdr-github",
+ "herdr-vcs",
+ "moonframe-core",
+ "moonframe-providers",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -6622,6 +6692,7 @@ version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",
@@ -6786,6 +6857,16 @@ name = "seahash"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
+
+[[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
+ "serde",
+ "zeroize",
+]
 
 [[package]]
 name = "security-framework"
@@ -8046,6 +8127,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
 
 [[package]]
+name = "ureq"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cde93ff05758a36a851a398a772b0b79a82fbe3c186a46f2696baaeaf84c966b"
+dependencies = [
+ "base64 0.23.1",
+ "flate2",
+ "log",
+ "percent-encoding",
+ "rustls",
+ "rustls-pki-types",
+ "ureq-proto",
+ "utf8-zero",
+ "webpki-roots",
+]
+
+[[package]]
+name = "ureq-proto"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "841583fc36089d7d59419568ae157f43a5a03a2e5a81ba87c77d1596ef46e922"
+dependencies = [
+ "base64 0.23.1",
+ "http",
+ "httparse",
+ "log",
+]
+
+[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8116,6 +8226,12 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
+
+[[package]]
+name = "utf8-zero"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8c0a043c9540bae7c578c88f91dda8bd82e59ae27c21baca69c8b191aaf5a6e"
 
 [[package]]
 name = "utf8_iter"
@@ -8825,6 +8941,15 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
+dependencies = [
+ "rustls-pki-types",
 ]
 
 [[package]]

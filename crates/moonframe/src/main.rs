@@ -14,6 +14,7 @@ mod input;
 mod inspect;
 mod keys;
 mod motion;
+mod natives;
 mod overlay;
 mod packages;
 mod paths;
