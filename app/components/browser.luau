@@ -1,6 +1,8 @@
 -- A web page with an address bar: back, forward and reload buttons, the
 -- address it shows, and a button that opens it in the system browser. The
 -- page is a `ui.browser`; the bar drives it with the host's browser commands.
+-- The address is a text field: Enter sends `go` with `value` set to the
+-- typed address, for the mod to pass back as `url`.
 
 type Props = {
 	-- Names the page within the mod; one page per id.
@@ -10,6 +12,8 @@ type Props = {
 	-- The address and title to show, from the mod's `navigate` messages.
 	at: string?,
 	title: string?,
+	-- Sent on Enter in the address field, with `value` set to the text.
+	go: any,
 	-- Sent with `url` and `title` added as the page navigates.
 	navigate: any,
 	loading: any,
@@ -21,12 +25,13 @@ return component {
 	category = "Content",
 	icon = "globe",
 	description = "A web page with an address bar: back, forward, reload, its address, and open in the system browser.",
-	when = "A web page in a pane, with browser chrome. Keep the address the page reports in state (from `navigate`) and pass it as `at`. For a bare page without a bar use `ui.browser`.",
+	when = "A web page in a pane, with browser chrome. Keep the address the page reports in state (from `navigate`) and pass it as `at`; on `go`, set the typed address as `url`. For a bare page without a bar use `ui.browser`.",
 	props = {
 		["id"] = "keeps the page across renders; one per id",
 		["url"] = "address to load (http, https, file); a new value navigates",
 		["at"] = "the address to show in the bar, from `navigate` messages",
 		["title"] = "the page title to show, from `navigate` messages",
+		["go"] = "message sent on Enter in the address field, with `value` set to the typed address; set it as `url`",
 		["navigate"] = "message sent as the page navigates, with `url` and `title` added",
 		["loading"] = "message sent as loads start and finish, with `loading` and `url` added",
 		["zoom"] = "page zoom, 0.25 to 5",
@@ -34,7 +39,7 @@ return component {
 	styles = {
 		[".browser"] = { gap = 0, radius = 8, border = true },
 		[".browser-bar"] = { padding = { 4, 6 }, gap = 4, border = "bottom", background = "secondary" },
-		[".browser-address"] = { padding = { 2, 8 }, radius = 6, background = "background", font = "mono", size = "small" },
+		[".browser-address"] = { padding = { 2, 8 }, size = "small" },
 		[".browser-title"] = { color = "muted-foreground", size = "small" },
 	},
 	example = { id = "example", url = "https://example.com", at = "https://example.com/", title = "Example Domain" },
@@ -60,11 +65,14 @@ return component {
 				chrome("Back", "arrow-left", "browser-back"),
 				chrome("Forward", "arrow-right", "browser-forward"),
 				chrome("Reload", "rotate-cw", "browser-reload"),
-				ui.row {
+				ui.input {
+					id = id .. "-address",
 					class = "browser-address",
+					value = props.at or props.url or "",
+					placeholder = "Enter an address",
+					submit = props.go,
+					mono = true,
 					grow = true,
-					align = "center",
-					ui.text { props.at or props.url or "about:blank", truncate = true },
 				},
 				props.title and props.title ~= "" and ui.text { props.title, class = "browser-title", truncate = true },
 				chrome("Open in the system browser", "external-link", "browser-open"),

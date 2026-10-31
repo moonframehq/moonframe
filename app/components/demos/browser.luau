@@ -20,7 +20,13 @@ return mod {
 		if type(msg) ~= "table" then
 			return
 		end
-		if msg.navigated then
+		if msg.go then
+			-- A bare host gets https; anything the browser can't show is dropped.
+			local url = string.match(msg.value or "", "^%s*(.-)%s*$") or ""
+			if url ~= "" then
+				state.url = if string.find(url, "://", 1, true) then url else "https://" .. url
+			end
+		elseif msg.navigated then
 			state.at = msg.url
 			state.title = msg.title
 		elseif msg.loaded ~= nil then
@@ -37,6 +43,7 @@ return mod {
 				url = state.url,
 				at = state.at,
 				title = state.title,
+				go = { go = true },
 				navigate = { navigated = true },
 				loading = { loaded = true },
 			},
