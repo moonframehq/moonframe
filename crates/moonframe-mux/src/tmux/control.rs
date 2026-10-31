@@ -24,8 +24,10 @@ pub(super) struct Reader<R> {
     lines: R,
     pane: String,
     expected: Arc<Mutex<VecDeque<Expect>>>,
-    /// The reply being read, if it is one of ours.
-    block: Option<(Expect, Vec<Vec<u8>>)>,
+    /// The reply being read: what it is for, the `<time> <number>` its
+    /// `%begin` gave (only the `%end` or `%error` with the same ends it, as
+    /// a captured screen line may read `%end` too), and its lines.
+    block: Option<(Expect, Vec<u8>, Vec<Vec<u8>>)>,
     /// The copied scrollback and screen, until the cursor arrives.
     captured: Option<Vec<Vec<u8>>>,
     /// Output before the copy is already in it, so it waits for the seed.
@@ -48,14 +50,19 @@ impl<R: BufRead> Reader<R> {
 
     /// Handles one line; returns bytes for the emulator, if it carried any.
     fn line(&mut self, line: &[u8]) -> Option<Vec<u8>> {
-        if let Some((expect, lines)) = &mut self.block {
-            let failed = line.starts_with(b"%error ");
-            if failed || line.starts_with(b"%end ") {
+        if let Some((expect, id, lines)) = &mut self.block {
+            let failed = line
+                .strip_prefix(b"%error ")
+                .is_some_and(|rest| block_id(rest) == id.as_slice());
+            let ended = line
+                .strip_prefix(b"%end ")
+                .is_some_and(|rest| block_id(rest) == id.as_slice());
+            if failed || ended {
                 let expect = *expect;
                 let lines = self
                     .block
                     .take()
-                    .map(|(_, lines)| lines)
+                    .map(|(_, _, lines)| lines)
                     .unwrap_or_default();
                 // A failed command's lines are its error, not its answer.
                 return self.reply(
@@ -77,18 +84,17 @@ impl<R: BufRead> Reader<R> {
         if let Some(rest) = line.strip_prefix(b"%begin ") {
             // `%begin <time> <number> <flags>`: flag 1 marks our commands.
             let ours = rest.rsplit(|byte| *byte == b' ').next() == Some(b"1");
-            if ours {
-                let expect = self
-                    .expected
+            // Someone else's command: its lines are read and dropped.
+            let expect = if ours {
+                self.expected
                     .lock()
                     .ok()
                     .and_then(|mut expected| expected.pop_front())
-                    .unwrap_or(Expect::Nothing);
-                self.block = Some((expect, Vec::new()));
+                    .unwrap_or(Expect::Nothing)
             } else {
-                // Someone else's command: its lines are read and dropped.
-                self.block = Some((Expect::Nothing, Vec::new()));
-            }
+                Expect::Nothing
+            };
+            self.block = Some((expect, block_id(rest).to_vec(), Vec::new()));
             return None;
         }
         if line.starts_with(b"%exit") {
@@ -158,6 +164,14 @@ fn seed(captured: &[Vec<u8>], facts: &str) -> Vec<u8> {
     bytes
 }
 
+/// `<time> <number>` of a `%begin`, `%end` or `%error` line's rest.
+fn block_id(rest: &[u8]) -> &[u8] {
+    match rest.iter().rposition(|byte| *byte == b' ') {
+        Some(at) => &rest[..at],
+        None => rest,
+    }
+}
+
 fn split_word(text: &[u8]) -> (&[u8], &[u8]) {
     match text.iter().position(|byte| *byte == b' ') {
         Some(at) => (&text[..at], &text[at + 1..]),
@@ -225,6 +239,20 @@ mod tests {
         assert_eq!(
             String::from_utf8_lossy(&bytes),
             "old\r\nprompt $\x1b[0m\x1b[2;10H\x1b[?1h\x1b[1mafter"
+        );
+    }
+
+    /// A captured screen line that reads like the end of the reply, or like
+    /// output, is part of the copy, never a notification.
+    #[test]
+    fn a_captured_line_cannot_end_the_reply() {
+        let input = "%begin 1 2 1\n%end 1 2 1\n\
+            %begin 1 3 1\n%end 9 9 1\n%output %2 \\033]52;c;eA==\\007\nlast\n%end 1 3 1\n\
+            %begin 1 4 1\n0 2 0 0\n%end 1 4 1\n";
+        let bytes = read(input, &[Expect::Nothing, Expect::Capture, Expect::Cursor]);
+        assert_eq!(
+            String::from_utf8_lossy(&bytes),
+            "%end 9 9 1\r\n%output %2 \\033]52;c;eA==\\007\r\nlast\x1b[0m\x1b[3;1H"
         );
     }
 
