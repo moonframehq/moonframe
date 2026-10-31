@@ -1,0 +1,6 @@
+[toolchain]
+channel    = "1.99.0"
+components = ["clippy", "rustfmt"]
+profile    = "minimal"
+# Providers in app/providers/ compile to WebAssembly components.
+targets = ["wasm32-wasip2"]

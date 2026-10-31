@@ -1,0 +1,212 @@
+//! The shells `ui.terminal` elements show. Each is kept by its mod and `id`,
+//! so it outlives reloads and hidden panes; it ends with the app. Output
+//! wakes the window from the session's thread, through a channel.
+
+use {
+    crate::app::MoonframeApp,
+    gpui_kit::*,
+    moonframe_terminal::{Ansi, Engine, Key, Session, Spawn, encode, paste},
+    std::{cell::Cell, collections::HashMap, path::PathBuf, rc::Rc, sync::Arc},
+};
+
+/// Shells one mod can have, and the whole app: each is a process, and a mod
+/// drawing ids in a loop must not start them without end.
+const PER_MOD: usize = 8;
+const TOTAL: usize = 32;
+
+/// A shell and what the window keeps for it.
+pub(crate) struct TerminalView {
+    pub(crate) session: Result<Session, String>,
+    pub(crate) focus: FocusHandle,
+    spawn: Spawn,
+    /// Scrolling not yet worth a whole line.
+    pub(crate) scrolled: Cell<f32>,
+}
+
+pub(crate) struct Terminals {
+    views: HashMap<String, Rc<TerminalView>>,
+    wake: Arc<dyn Fn() + Send + Sync>,
+    /// The theme's 16 colors; xterm's when `None`.
+    palette: Option<Ansi>,
+}
+
+impl Terminals {
+    pub(crate) fn new(wake: Arc<dyn Fn() + Send + Sync>) -> Self {
+        Self {
+            views: HashMap::new(),
+            wake,
+            palette: None,
+        }
+    }
+
+    /// Paints every terminal, and those started later, in `palette`.
+    pub(crate) fn set_palette(&mut self, palette: Option<Ansi>) {
+        if self.palette == palette {
+            return;
+        }
+        self.palette = palette;
+        for view in self.views.values() {
+            if let Ok(session) = &view.session {
+                session.set_palette(palette);
+            }
+        }
+    }
+
+    /// A shell for `spawn`, in the theme's colors.
+    fn spawn(&self, spawn: Spawn) -> Result<Session, String> {
+        let session = Session::spawn(spawn, self.wake.clone())?;
+        if self.palette.is_some() {
+            session.set_palette(self.palette);
+        }
+        Ok(session)
+    }
+
+    /// The terminal at `key`, started now if it is new.
+    pub(crate) fn open(
+        &mut self,
+        key: &str,
+        engine: Engine,
+        cwd: Option<&str>,
+        cx: &App,
+    ) -> Rc<TerminalView> {
+        if let Some(view) = self.views.get(key) {
+            return view.clone();
+        }
+        let owner = key.split_once('/').map_or(key, |(owner, _)| owner);
+        let mine = self
+            .views
+            .keys()
+            .filter(|other| other.split_once('/').is_some_and(|(of, _)| of == owner))
+            .count();
+        let limit = if mine >= PER_MOD {
+            Some(format!("`{owner}` already has {PER_MOD} terminals"))
+        } else if self.views.len() >= TOTAL {
+            Some(format!("the app already has {TOTAL} terminals"))
+        } else {
+            None
+        };
+        let spawn = Spawn {
+            engine,
+            cwd: cwd.map(expand),
+            size: moonframe_terminal::Size::default(),
+        };
+        let refused = limit.is_some();
+        let session = match limit {
+            Some(limit) => Err(limit),
+            None => self.spawn(spawn.clone()),
+        };
+        let view = Rc::new(TerminalView {
+            session,
+            focus: cx.focus_handle(),
+            spawn,
+            scrolled: Cell::new(0.),
+        });
+        if let Err(problem) = &view.session {
+            tracing::warn!("terminal {key}: {problem}");
+        }
+        // A refused one is asked for again next frame, not kept.
+        if !refused {
+            self.views.insert(key.to_owned(), view.clone());
+        }
+        view
+    }
+
+    /// Starts the shell at `key` again, after it exited.
+    fn restart(&mut self, key: &str) {
+        if let Some(old) = self.views.get(key) {
+            let view = Rc::new(TerminalView {
+                session: self.spawn(old.spawn.clone()),
+                focus: old.focus.clone(),
+                spawn: old.spawn.clone(),
+                scrolled: Cell::new(0.),
+            });
+            self.views.insert(key.to_owned(), view);
+        }
+    }
+}
+
+impl Terminals {
+    /// The terminal with keyboard focus in `window`, by key.
+    fn focused(&self, window: &Window) -> Option<(String, Rc<TerminalView>)> {
+        self.views
+            .iter()
+            .find(|(_, view)| view.focus.is_focused(window))
+            .map(|(key, view)| (key.clone(), view.clone()))
+    }
+}
+
+impl MoonframeApp {
+    /// Every keystroke, before any key binding: one for a focused terminal
+    /// goes to its shell, Tab, Esc and Ctrl keys included, so completion
+    /// and the like work. ⌘ combinations stay the app's, except ⌘V, which
+    /// pastes. Returns whether the terminal took it.
+    pub(crate) fn terminal_keystroke(
+        &mut self,
+        keystroke: &Keystroke,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some((key, view)) = self.terminals.focused(window) else {
+            return false;
+        };
+        let Ok(session) = &view.session else {
+            return false;
+        };
+        let modifiers = keystroke.modifiers;
+        let screen = session.screen();
+        if modifiers.platform {
+            if keystroke.key == "v"
+                && let Some(text) = cx.read_from_clipboard().and_then(|item| item.text())
+            {
+                session.write(&paste(&text, screen.bracketed_paste));
+                return true;
+            }
+            return false;
+        }
+        if screen.exited {
+            if keystroke.key == "enter" {
+                self.terminals.restart(&key);
+                cx.notify();
+            }
+            return true;
+        }
+        let pressed = Key {
+            name: &keystroke.key,
+            text: keystroke.key_char.as_deref(),
+            ctrl: modifiers.control,
+            alt: modifiers.alt,
+            shift: modifiers.shift,
+        };
+        // A key it has no bytes for (F13) does nothing, and still does not
+        // reach the app while the terminal has focus.
+        if let Some(bytes) = encode(pressed, screen.app_cursor) {
+            session.write(&bytes);
+        }
+        true
+    }
+}
+
+/// Hands keystrokes to the focused terminal before key bindings see them.
+pub(crate) fn intercept_keys(cx: &mut Context<MoonframeApp>) -> Subscription {
+    let app = cx.entity().downgrade();
+    cx.intercept_keystrokes(move |event, window, cx| {
+        let taken = app
+            .update(cx, |app, cx| {
+                app.terminal_keystroke(&event.keystroke, window, cx)
+            })
+            .unwrap_or(false);
+        if taken {
+            cx.stop_propagation();
+        }
+    })
+}
+
+/// `~` and `~/…` are the home folder.
+fn expand(cwd: &str) -> PathBuf {
+    match (cwd.strip_prefix('~'), std::env::var_os("HOME")) {
+        (Some(rest), Some(home)) if rest.is_empty() || rest.starts_with('/') => {
+            PathBuf::from(home).join(rest.trim_start_matches('/'))
+        },
+        _ => PathBuf::from(cwd),
+    }
+}

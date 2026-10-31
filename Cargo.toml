@@ -1,0 +1,58 @@
+[workspace]
+exclude = ["app/providers"]
+members = [
+  "crates/moonframe",
+  "crates/moonframe-core",
+  "crates/moonframe-providers",
+  "crates/moonframe-terminal",
+]
+resolver = "2"
+
+[workspace.package]
+edition      = "2024"
+license      = "MIT"
+publish      = false
+repository   = "https://github.com/penso/moonframe"
+rust-version = "1.99"
+version      = "0.1.0"
+
+[workspace.lints.rust]
+unsafe_code           = "deny"
+unused_qualifications = "deny"
+
+[workspace.lints.clippy]
+expect_used = "deny"
+unwrap_used = "deny"
+
+[workspace.dependencies]
+alacritty_terminal  = "0.26"
+futures             = "0.3"
+gpui-kit            = "=0.8.1"
+libghostty-vt       = "0.2.2"
+mlua                = { features = ["luau"], version = "0.12.2" }
+moonframe-core      = { path = "crates/moonframe-core" }
+moonframe-providers = { path = "crates/moonframe-providers" }
+moonframe-terminal  = { default-features = false, path = "crates/moonframe-terminal" }
+notify              = "8"
+objc2               = "0.6"
+objc2-app-kit       = { default-features = false, features = ["NSApplication", "NSImage", "NSResponder", "std"], version = "0.3" }
+objc2-foundation    = { default-features = false, features = ["NSData", "std"], version = "0.3" }
+portable-pty        = "0.9"
+serde               = { features = ["derive"], version = "1" }
+serde_json          = "1"
+sysinfo             = { default-features = false, features = ["network", "system"], version = "0.39" }
+tempfile            = "3"
+thiserror           = "2"
+toml                = "1"
+tracing             = "0.1"
+tracing-subscriber  = { default-features = false, features = ["ansi", "env-filter", "fmt", "std"], version = "0.3" }
+wasmtime            = "50"
+wasmtime-wasi       = "50"
+
+[profile.dev.package."*"]
+# GPUI and Luau are unusably slow unoptimised; keep our own crates debuggable.
+opt-level = 2
+
+[profile.release]
+codegen-units = 16
+lto           = "thin"

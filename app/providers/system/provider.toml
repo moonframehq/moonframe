@@ -1,0 +1,10 @@
+# CPU, memory, and network for the status bar, shared as `app.system`.
+# A Rust crate built to a WebAssembly component and run sandboxed: it reads
+# the machine only through the `system` capability below.
+capabilities = ["system"]
+interval     = 1.0
+kind         = "wasm"
+
+[settings]
+# CPU samples kept for the sparkline.
+history = 16

@@ -1,0 +1,30 @@
+# Build output
+/target/
+**/*.rs.bk
+*.pdb
+
+# Profiling and coverage
+*.profraw
+*.profdata
+/lcov.info
+/coverage/
+flamegraph.svg
+perf.data*
+
+# Local configuration and secrets
+.env
+.env.*
+.envrc
+.direnv/
+mise.local.toml
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude Code
+/.claude/worktrees/

@@ -1,0 +1,12 @@
+# Pinned developer toolchain for mise users. `rust-toolchain.toml` remains the
+# authority for rustup and CI; keep the version here identical to that file's
+# `channel` so both entry points build with the same compiler.
+[tools]
+rust = { components = "clippy,rustfmt", profile = "minimal", version = "1.99.0" }
+# libghostty-vt (the `ghostty` terminal feature) is built from Ghostty's
+# source with Zig; the version Ghostty's build.zig.zon asks for.
+zig = "0.15.2"
+
+[env]
+# Ahead of mise's zig: works around Zig 0.15 on macOS 27 (see tools/zig/zig).
+_.path = ["{{config_root}}/tools/zig"]

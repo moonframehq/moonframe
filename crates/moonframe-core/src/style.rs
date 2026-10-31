@@ -1,0 +1,416 @@
+//! Stylesheets: `app/style.luau` restyles elements on top of the layout the
+//! modules describe. Rules match an element type (`panel`), a class
+//! (`.card`), and optionally a state (`item:selected`, `button:hover`).
+//! Elements opt into classes with `class` and add their own `style`.
+//!
+//! ```lua
+//! return style {
+//!   radius = 8,
+//!   colors = {
+//!     accent = { light = "#4f46e5", dark = "#818cf8" }, -- re-themes the app
+//!     card = { light = "#ffffff", dark = "#1f1f23" },   -- a new name
+//!   },
+//!   rules = {
+//!     panel = { radius = 10, margin = "small", background = "card", shadow = "small" },
+//!     ["item:selected"] = { background = "accent/20", color = "accent" },
+//!     [".danger"] = { color = "danger" },
+//!   },
+//! }
+//! ```
+//!
+//! A mod can bring rules of its own under `styles`; they apply only to what
+//! that mod draws. At each step the stylesheet's rule outranks the mod's, so
+//! the app can always restyle an extension.
+//!
+//! Precedence, lowest first: type rules (the mod's, then the stylesheet's),
+//! class rules in the order the element lists them (each the mod's, then the
+//! stylesheet's), the element's `style`, then its own keys such as `padding`.
+
+mod read;
+
+use {
+    crate::{Border, TextSize, Weight},
+    std::{collections::BTreeMap, time::Duration},
+};
+
+pub(crate) use read::{Edges, valid_name};
+
+tokens! {
+    /// A color the theme defines, so it follows light and dark mode.
+    Token {
+        Background = "background",
+        Foreground = "foreground",
+        Muted = "muted",
+        MutedForeground = "muted-foreground",
+        Sidebar = "sidebar",
+        /// What panels and popovers are drawn on.
+        Card = "card",
+        Secondary = "secondary",
+        Border = "border",
+        Accent = "accent",
+        AccentForeground = "accent-foreground",
+        Success = "success",
+        Warning = "warning",
+        Danger = "danger",
+        ListHover = "list-hover",
+        ListActive = "list-active",
+    }
+}
+
+tokens! {
+    /// The theme's ready-made shadows; `none` removes one set by a rule below.
+    ShadowPreset {
+        None = "none",
+        Small = "small",
+        Medium = "medium",
+        Large = "large",
+    }
+}
+
+tokens! {
+    /// What a rule can match besides classes. `panel-header` is the title
+    /// bar of a panel, which has no element of its own.
+    Part {
+        Row = "row",
+        Column = "column",
+        Panel = "panel",
+        PanelHeader = "panel-header",
+        Pane = "pane",
+        Text = "text",
+        Button = "button",
+        Item = "item",
+        Badge = "badge",
+        Icon = "icon",
+        Terminal = "terminal",
+        Divider = "divider",
+        Popover = "popover",
+    }
+}
+
+tokens! {
+    State {
+        Hover = "hover",
+        Selected = "selected",
+    }
+}
+
+/// A box shadow: a preset, or layers as in CSS.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Shadow {
+    Preset(ShadowPreset),
+    Layers(Vec<ShadowLayer>),
+}
+
+/// One layer of a CSS `box-shadow`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ShadowLayer {
+    pub x: f32,
+    pub y: f32,
+    pub blur: f32,
+    pub spread: f32,
+    pub color: Color,
+    /// Drawn inside the element's edge instead of outside it.
+    pub inset: bool,
+}
+
+tokens! {
+    /// How a pane shows and hides when its `visible` changes.
+    TransitionKind {
+        /// Its size grows from or shrinks to nothing.
+        Slide = "slide",
+        /// It fades in or out, then takes or gives back its space.
+        Fade = "fade",
+        SlideFade = "slide-fade",
+        None = "none",
+    }
+}
+
+/// An animation for a change of state: what moves, for how long, and how
+/// its speed changes along the way.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Transition {
+    pub kind: TransitionKind,
+    pub duration: Duration,
+    pub curve: Curve,
+}
+
+/// An easing curve, as in CSS: progress over time, both from 0 to 1.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Curve {
+    Linear,
+    /// A cubic Bézier from (0, 0) to (1, 1) through these control points.
+    CubicBezier(f32, f32, f32, f32),
+}
+
+impl Curve {
+    pub const EASE: Self = Self::CubicBezier(0.25, 0.1, 0.25, 1.0);
+    pub const EASE_IN: Self = Self::CubicBezier(0.42, 0.0, 1.0, 1.0);
+    pub const EASE_IN_OUT: Self = Self::CubicBezier(0.42, 0.0, 0.58, 1.0);
+    pub const EASE_OUT: Self = Self::CubicBezier(0.0, 0.0, 0.58, 1.0);
+
+    /// Progress at `time`, both from 0 to 1.
+    pub fn at(&self, time: f32) -> f32 {
+        let time = time.clamp(0.0, 1.0);
+        match *self {
+            Self::Linear => time,
+            Self::CubicBezier(x1, y1, x2, y2) => {
+                let bezier = |a: f32, b: f32, t: f32| {
+                    3.0 * a * t * (1.0 - t).powi(2) + 3.0 * b * t.powi(2) * (1.0 - t) + t.powi(3)
+                };
+                // The curve is given by x (time); find its parameter, which
+                // grows with x, by bisection, then read y (progress).
+                let (mut low, mut high) = (0.0_f32, 1.0_f32);
+                for _ in 0..32 {
+                    let middle = (low + high) / 2.0;
+                    if bezier(x1, x2, middle) < time {
+                        low = middle;
+                    } else {
+                        high = middle;
+                    }
+                }
+                bezier(y1, y2, (low + high) / 2.0)
+            },
+        }
+    }
+}
+
+/// An `0xRRGGBBAA` color for each mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Shade {
+    pub light: u32,
+    pub dark: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Paint {
+    Token(Token),
+    Fixed(Shade),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Color {
+    pub paint: Paint,
+    /// From 0 to 1, multiplied into the paint's own alpha: `accent/20`.
+    pub alpha: f32,
+}
+
+/// Visual properties; each one unset unless a rule or the element sets it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Style {
+    pub background: Option<Color>,
+    /// Text color; children inherit it.
+    pub color: Option<Color>,
+    pub border: Option<Border>,
+    pub border_color: Option<Color>,
+    pub radius: Option<f32>,
+    pub padding: Sides,
+    pub gap: Option<f32>,
+    pub margin: Sides,
+    pub shadow: Option<Shadow>,
+    /// Text size; children inherit it.
+    pub size: Option<TextSize>,
+    pub weight: Option<Weight>,
+    pub opacity: Option<f32>,
+    /// How a pane animates when it shows or hides.
+    pub transition: Option<Transition>,
+}
+
+impl Style {
+    /// Takes every property `over` sets.
+    pub fn layer(&mut self, over: &Style) {
+        macro_rules! take {
+            ($($field:ident),+) => {
+                $(if over.$field.is_some() {
+                    self.$field = over.$field.clone();
+                })+
+            };
+        }
+        take!(
+            background,
+            color,
+            border,
+            border_color,
+            radius,
+            gap,
+            shadow,
+            size,
+            weight,
+            opacity,
+            transition
+        );
+        self.padding.layer(&over.padding);
+        self.margin.layer(&over.margin);
+    }
+}
+
+/// Pixels for each edge. An unset edge falls through to the rule below, so
+/// a class can change `top` alone.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Sides {
+    pub top: Option<f32>,
+    pub right: Option<f32>,
+    pub bottom: Option<f32>,
+    pub left: Option<f32>,
+}
+
+impl Sides {
+    pub fn all(value: f32) -> Self {
+        Self {
+            top: Some(value),
+            right: Some(value),
+            bottom: Some(value),
+            left: Some(value),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+
+    fn layer(&mut self, over: &Sides) {
+        for (side, over) in [
+            (&mut self.top, over.top),
+            (&mut self.right, over.right),
+            (&mut self.bottom, over.bottom),
+            (&mut self.left, over.left),
+        ] {
+            if over.is_some() {
+                *side = over;
+            }
+        }
+    }
+}
+
+/// The classes an element opts into and the style it sets itself.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Look {
+    pub class: Vec<String>,
+    pub style: Style,
+    /// The line of the module's source that built the element, for the
+    /// inspector to point at.
+    pub line: Option<u32>,
+}
+
+/// The style for an element at rest, and what changes under the pointer.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Resolved {
+    pub base: Style,
+    pub hover: Style,
+}
+
+/// Color names a stylesheet defines, beside the theme's own.
+pub(crate) type Palette = BTreeMap<String, Shade>;
+
+/// The speeds every stylesheet has, which `speeds` can redefine.
+const DEFAULT_SPEEDS: &[(&str, u64)] = &[("fast", 120), ("normal", 220), ("slow", 400)];
+
+/// What a stylesheet names for values to refer to: colors, animation
+/// speeds, and how fast every animation runs.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Names {
+    pub(crate) colors: Palette,
+    pub(crate) speeds: BTreeMap<String, Duration>,
+    /// Divides every duration: 2 is twice as fast, 0 turns animations off.
+    pub(crate) animation_speed: f32,
+}
+
+impl Names {
+    /// Before any stylesheet: no colors of its own, the default speeds.
+    pub(crate) const NONE: Self = Self {
+        colors: BTreeMap::new(),
+        speeds: BTreeMap::new(),
+        animation_speed: 1.0,
+    };
+
+    /// A named speed, the stylesheet's or a default one.
+    pub(crate) fn speed(&self, name: &str) -> Option<Duration> {
+        self.speeds.get(name).copied().or_else(|| {
+            DEFAULT_SPEEDS
+                .iter()
+                .find(|(default, _)| *default == name)
+                .map(|(_, milliseconds)| Duration::from_millis(*milliseconds))
+        })
+    }
+
+    /// A duration as the app runs it, after `animation_speed`.
+    pub(crate) fn scaled(&self, duration: Duration) -> Duration {
+        if self.animation_speed == 0.0 {
+            Duration::ZERO
+        } else {
+            duration.div_f32(self.animation_speed)
+        }
+    }
+}
+
+impl Default for Names {
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
+/// What a rule matches: an element type or a class, maybe in a state.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Selector {
+    base: Base,
+    state: Option<State>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Base {
+    Part(Part),
+    Class(String),
+}
+
+/// Styles by selector: the stylesheet's `rules`, or a mod's `styles`.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Rules(BTreeMap<Selector, Style>);
+
+impl Rules {
+    fn get(&self, base: &Base, state: Option<State>) -> Option<&Style> {
+        self.0.get(&Selector {
+            base: base.clone(),
+            state,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Stylesheet {
+    pub font_size: Option<f32>,
+    pub font_family: Option<String>,
+    /// The theme's corner radius, which buttons and other controls use.
+    pub radius: Option<f32>,
+    /// Theme colors replaced for the whole app.
+    pub overrides: Vec<(Token, Shade)>,
+    names: Names,
+    rules: Rules,
+}
+
+impl Stylesheet {
+    pub(crate) fn names(&self) -> &Names {
+        &self.names
+    }
+
+    /// The style for a `part` with `look`, `selected` or not, drawn by a mod
+    /// whose own rules are `local`.
+    pub fn resolve(&self, part: Part, look: &Look, selected: bool, local: &Rules) -> Resolved {
+        let mut resolved = Resolved::default();
+        let bases =
+            std::iter::once(Base::Part(part)).chain(look.class.iter().cloned().map(Base::Class));
+        for base in bases {
+            for rules in [local, &self.rules] {
+                if let Some(style) = rules.get(&base, None) {
+                    resolved.base.layer(style);
+                }
+                if selected && let Some(style) = rules.get(&base, Some(State::Selected)) {
+                    resolved.base.layer(style);
+                }
+                if let Some(style) = rules.get(&base, Some(State::Hover)) {
+                    resolved.hover.layer(style);
+                }
+            }
+        }
+        resolved.base.layer(&look.style);
+        resolved
+    }
+}

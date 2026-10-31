@@ -1,0 +1,38 @@
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[features]
+# The terminal emulators `ui.terminal` can run on; both by default. `ghostty`
+# builds libghostty-vt with Zig (see mise.toml and tools/zig).
+alacritty = ["moonframe-terminal/alacritty"]
+default   = ["alacritty", "ghostty"]
+ghostty   = ["moonframe-terminal/ghostty"]
+
+[dependencies]
+futures.workspace             = true
+gpui-kit.workspace            = true
+moonframe-core.workspace      = true
+moonframe-providers.workspace = true
+moonframe-terminal.workspace  = true
+notify.workspace              = true
+serde.workspace               = true
+toml.workspace                = true
+tracing.workspace             = true
+tracing-subscriber.workspace  = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2.workspace            = true
+objc2-app-kit.workspace    = true
+objc2-foundation.workspace = true

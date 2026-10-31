@@ -1,0 +1,23 @@
+#!/bin/sh
+# Stands in for xcrun while Zig runs; see ../zig. Zig itself gets no SDK, so
+# it links with its bundled stubs. Everything else (a build script finding
+# headers and libraries) gets the newest installed SDK Zig 0.15 can read.
+case "$(ps -o comm= -p "$PPID")" in
+    */zig | zig) exit 1 ;;
+esac
+for arg in "$@"; do
+    if [ "$arg" = "--show-sdk-path" ]; then
+        for root in /Library/Developer/CommandLineTools/SDKs \
+            /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs; do
+            sdk=$(ls -d "$root"/MacOSX1[0-5].*sdk 2>/dev/null | sort -V | tail -1)
+            if [ -n "$sdk" ]; then
+                echo "$sdk"
+                exit 0
+            fi
+        done
+        echo "Zig 0.15 needs a macOS 15 or older SDK to build Ghostty on macOS 27;" \
+            "install one, or build without it: --no-default-features --features alacritty" >&2
+        exit 1
+    fi
+done
+exec /usr/bin/xcrun "$@"

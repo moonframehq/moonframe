@@ -1,0 +1,4 @@
+# The git state of the folder the app runs from, shared as `app.git`.
+# A process provider: it runs with your own access, unlike a wasm one.
+command = ["bash", "git.sh"]
+kind    = "process"

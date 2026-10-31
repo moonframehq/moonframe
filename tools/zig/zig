@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Runs the project's Zig (0.15, which Ghostty requires for the `ghostty`
+# terminal feature), working around Zig 0.15 on macOS 27 and later, where
+# it links nothing natively: it reads neither the host's version nor
+# recent SDKs' libSystem stubs. On those systems this:
+#
+# - hides the SDK from Zig itself (`no-xcrun/xcrun`), so it links against
+#   the macOS stubs it bundles;
+# - answers the build's own SDK lookups with the newest installed SDK that
+#   Zig 0.15 reads (macOS 15 or older);
+# - targets macOS 26 in `zig build` when no target is given, instead of
+#   the host's version.
+#
+# mise and the justfile put this folder first on PATH; on other systems it
+# only hands over to the real zig. Remove it once Ghostty builds with a Zig
+# that supports macOS 27.
+set -euo pipefail
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+real=""
+IFS=: read -ra dirs <<<"$PATH"
+for dir in "${dirs[@]}"; do
+    if [ "$dir" != "$here" ] && [ -x "$dir/zig" ]; then
+        real="$dir/zig"
+        break
+    fi
+done
+if [ -z "$real" ]; then
+    echo "zig is not installed; with mise: mise install" >&2
+    exit 127
+fi
+args=("$@")
+if [ "$(uname)" = Darwin ] && [ "$(sw_vers -productVersion | cut -d. -f1)" -ge 27 ]; then
+    export PATH="$here/no-xcrun:$PATH"
+    if [ "${1:-}" = build ] && ! printf '%s\n' "$@" | grep -q '^-Dtarget='; then
+        arch=$([ "$(uname -m)" = arm64 ] && echo aarch64 || echo x86_64)
+        args+=("-Dtarget=$arch-macos.26.0")
+    fi
+fi
+exec "$real" "${args[@]}"

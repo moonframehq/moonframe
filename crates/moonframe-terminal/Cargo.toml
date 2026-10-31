@@ -1,0 +1,25 @@
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-terminal"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[features]
+# Two emulators behind one interface; both are built by default.
+alacritty = ["dep:alacritty_terminal"]
+default   = ["alacritty", "ghostty"]
+# Builds libghostty-vt from Ghostty's source, which needs Zig (see mise.toml)
+# and fetches Ghostty with git on the first build.
+ghostty = ["dep:libghostty-vt"]
+
+[dependencies]
+alacritty_terminal     = { optional = true, workspace = true }
+libghostty-vt          = { optional = true, workspace = true }
+portable-pty.workspace = true
+tracing.workspace      = true

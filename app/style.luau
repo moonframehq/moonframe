@@ -1,0 +1,83 @@
+-- The stylesheet: colors, corners, and spacing on top of the layout the
+-- modules describe. Delete this file and the app falls back to the stock
+-- theme; edit it while the window is open to see each change.
+return style {
+	font_size = 14,
+	radius = 8,
+
+	-- Named speeds for transitions; fast (120ms), normal (220ms), and slow
+	-- (400ms) exist already and can be redefined.
+	speeds = { drawer = "220ms" },
+	-- Every animation at once: 2 is twice as fast, 0.5 half, 0 turns them off.
+	animation_speed = 1,
+
+	colors = {
+		-- Names the theme already has re-theme the whole app, buttons included,
+		-- in the Default theme; one picked in View > Themes brings its own.
+		accent = { light = "#4f46e5", dark = "#818cf8" },
+		sidebar = { light = "#f4f4f6", dark = "#141417" },
+		card = { light = "#ffffff", dark = "#1e1e22" },
+		-- New names can be used anywhere a color goes.
+	},
+
+	rules = {
+		-- Panels float as rounded cards on the sidebar background.
+		panel = { background = "card", radius = 12, margin = { 8, 6 }, border = true },
+		-- A terminal takes its panel's color, so it runs on into the header.
+		terminal = { background = "card" },
+		-- Padding and margin take one value, { y, x }, { top, right, bottom, left },
+		-- or named edges such as { x = 14, top = 10 }.
+		["panel-header"] = { border = "none", padding = { top = 10, x = 14 }, color = "accent" },
+		item = { padding = { 6, 10 } },
+
+		-- Side panels slide in and out when the toolbar hides or shows them.
+		-- Kinds: slide, fade, slide-fade, none. Curves: linear, ease, ease-in,
+		-- ease-out, ease-in-out, cubic-bezier(x1, y1, x2, y2). Durations:
+		-- 220ms, 0.22s, or a speed name.
+		pane = { transition = "slide drawer ease-out" },
+
+		["item:selected"] = { background = "accent/15", color = "accent", weight = "medium" },
+		["item:hover"] = { background = "accent/8" },
+
+		badge = { background = "accent/12", color = "accent" },
+		divider = { background = "border" },
+
+		-- The status bar's widgets (mods/usage, mods/system).
+		[".status-text"] = { size = "small", color = "muted-foreground" },
+		[".status-label"] = { size = "small", color = "muted-foreground", weight = "medium" },
+		[".usage-widget"] = { padding = { 2, 6 }, radius = 6 },
+		[".usage-widget:hover"] = { background = "accent/10" },
+		[".track"] = { background = "muted-foreground/20", radius = 3 },
+		[".fill"] = { background = "accent", radius = 3 },
+		[".fill-hot"] = { background = "warning" },
+		[".sparkline"] = { gap = 1 },
+		[".spark"] = { background = "muted-foreground/60", radius = 1 },
+		[".spark-hot"] = { background = "warning" },
+
+		-- The usage sheet: a floating card that slides up and fades in.
+		popover = {
+			background = "card",
+			radius = 12,
+			border = true,
+			padding = 16,
+			shadow = "0 12px 32px -8px #00000040, 0 2px 6px #0000001a",
+			transition = "slide-fade fast ease-out",
+		},
+		[".sheet-title"] = { weight = "bold", size = "large" },
+		[".muted"] = { size = "small", color = "muted-foreground" },
+		[".tabs"] = { margin = { top = 4 } },
+		[".tab"] = { padding = { 6, 0 }, radius = 8, color = "muted-foreground" },
+		[".tab:hover"] = { background = "accent/8" },
+		[".tab-active"] = { background = "accent/12", color = "accent" },
+		[".tab-label"] = { size = "small" },
+
+		-- Classes: opt in with `class = "..."` on an element.
+		[".toolbar"] = { background = "card", border = "bottom", padding = { 4, 8 } },
+		[".toolbar-title"] = { size = "small", color = "muted-foreground" },
+		[".tool"] = { padding = 6, radius = 6, color = "muted-foreground" },
+		[".tool:hover"] = { background = "accent/10", color = "foreground" },
+		[".tool-on"] = { color = "accent" },
+		[".tool-on:hover"] = { background = "accent/12", color = "accent" },
+		[".hero"] = { color = "accent", size = "title", weight = "bold" },
+	},
+}
