@@ -57,7 +57,7 @@ return mod {
 				level = "success",
 				source = "herdr-core",
 				title = `herdr-core {herdr.version or ""} is installed`,
-				body = "New terminals run on it, and the app keeps its state there.",
+				body = "New terminals run on it now; from the next launch the app keeps its state there too.",
 				full = true,
 			}
 		elseif not herdr.installed and not state.dismissed then
