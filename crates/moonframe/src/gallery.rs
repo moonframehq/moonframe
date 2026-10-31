@@ -54,8 +54,8 @@ impl Gallery {
 
     fn new(app: Entity<MoonframeApp>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let focus = cx.focus_handle();
-        focus.focus(window, cx);
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search components"));
+        search.update(cx, |search, cx| search.focus(window, cx));
         let search_changes = cx.subscribe(&search, |_, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
                 cx.notify();
@@ -77,6 +77,7 @@ impl Render for Gallery {
         let theme = cx.theme();
         let search = Input::new(&self.search)
             .cleanable(true)
+            .focus_bordered(false)
             .prefix(
                 Icon::default()
                     .path("icons/search.svg")

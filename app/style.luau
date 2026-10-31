@@ -40,10 +40,10 @@ return style {
 		["item:hover"] = { background = "accent/8" },
 
 		-- Text fields (ui.input): the frame and its states, then what the
-		-- editor paints inside it. A focused field ignores its hover rule.
+		-- editor paints inside it. A focused field ignores its hover rule, and has
+		-- no look of its own: the caret shows it.
 		input = { background = "background", border = true, border_color = "border", radius = 6, padding = { 5, 8 } },
 		["input:hover"] = { border_color = "muted-foreground/50" },
-		["input:focus"] = { border_color = "accent", shadow = "0 0 0 3px accent/20" },
 		["input:disabled"] = { opacity = 0.5 },
 		["input-placeholder"] = { color = "muted-foreground" },
 		["input-selection"] = { background = "accent/25" },
