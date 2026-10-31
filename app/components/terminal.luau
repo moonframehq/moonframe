@@ -15,6 +15,12 @@ return component {
 	category = "Terminals",
 	icon = "square-terminal",
 	description = "A live shell on alacritty_terminal, the pure-Rust emulator. It keeps running across reloads and while hidden.",
+	when = "A live shell (alacritty engine) filling its space: a pane, a bottom panel.",
+	props = {
+		["id"] = "keeps the shell across reloads; one per id",
+		["cwd"] = "starting folder",
+		["style"] = "style table for the box",
+	},
 	example = { id = "shell", cwd = "~" },
 
 	build = function(props: Props)

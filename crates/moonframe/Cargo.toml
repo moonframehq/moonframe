@@ -24,6 +24,7 @@ moonframe-core.workspace      = true
 moonframe-providers.workspace = true
 moonframe-terminal.workspace  = true
 notify.workspace              = true
+rust-embed.workspace          = true
 serde.workspace               = true
 toml.workspace                = true
 tracing.workspace             = true
@@ -33,6 +34,14 @@ tracing-subscriber.workspace  = true
 tempfile.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
+block2.workspace           = true
 objc2.workspace            = true
-objc2-app-kit.workspace    = true
+objc2-app-kit              = { features = ["NSEvent", "NSView", "NSWindow", "block2"], workspace = true }
 objc2-foundation.workspace = true
+objc2-web-kit.workspace    = true
+
+# wry has no working GPUI child-view backend on Linux yet; a `ui.browser`
+# there shows its address and opens it in the system browser.
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+wry.workspace = true

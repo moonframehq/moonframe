@@ -32,6 +32,18 @@ bundle out="target/bundle":
 install:
     scripts/install-app.sh
 
+# The component catalogue agents read: write the moonframe-components skill from
+# app/components and crates/moonframe-core/src/catalogue/elements.md.
+components dir="app":
+    mkdir -p .claude/skills/moonframe-components
+    cargo run --quiet --release -p moonframe -- --no-user --catalogue {{dir}} > target/components.md
+    mv target/components.md .claude/skills/moonframe-components/SKILL.md
+
+# Fail when the moonframe-components skill is out of date with the components.
+components-check dir="app":
+    cargo run --quiet --release -p moonframe -- --no-user --catalogue {{dir}} > target/components.md
+    diff -u .claude/skills/moonframe-components/SKILL.md target/components.md
+
 # Stage the built-in app as it ships in the bundle (Contents/Resources/app):
 # wasm providers prebuilt to provider.wasm, without their sources.
 stage out="target/stage/app":
@@ -69,6 +81,11 @@ types dir="app":
 screenshot out="target/screenshot.png" pid="":
     scripts/screenshot.sh {{out}} {{pid}}
 
+# Capture one component's preview page to a PNG from a background instance
+# that never takes focus and is stopped afterwards (macOS).
+component-shot name out="" dir="app":
+    scripts/component-shot.sh {{name}} {{ if out == "" { "target/components/" + name + ".png" } else { out } }} {{dir}}
+
 # Format Rust (nightly rustfmt) and TOML (taplo).
 format:
     cargo +{{nightly_toolchain}} fmt --all
@@ -90,4 +107,4 @@ test:
     cargo test --locked --workspace
     cargo test --locked --workspace --all-features
 
-ci: format-check lint test types providers check-builtin
+ci: format-check lint test types providers check-builtin components-check

@@ -22,9 +22,14 @@
 //! that mod draws. At each step the stylesheet's rule outranks the mod's, so
 //! the app can always restyle an extension.
 //!
-//! Precedence, lowest first: type rules (the mod's, then the stylesheet's),
-//! class rules in the order the element lists them (each the mod's, then the
-//! stylesheet's), the element's `style`, then its own keys such as `padding`.
+//! A component brings default rules the same way, under `styles`; they
+//! apply wherever it is used, under the mod's and the stylesheet's, so
+//! `style.luau` restyles any component by its classes.
+//!
+//! Precedence, lowest first: type rules (the components', the mod's, then
+//! the stylesheet's), class rules in the order the element lists them (each
+//! the components', the mod's, then the stylesheet's), the element's
+//! `style`, then its own keys such as `padding`.
 
 mod read;
 
@@ -81,9 +86,40 @@ tokens! {
         Item = "item",
         Badge = "badge",
         Icon = "icon",
+        Image = "image",
         Terminal = "terminal",
+        Browser = "browser",
+        Input = "input",
+        /// An input's placeholder; its `color` colors it.
+        InputPlaceholder = "input-placeholder",
+        /// Selected text in an input; its `background` highlights it.
+        InputSelection = "input-selection",
+        /// An input's text cursor; its `background` colors it.
+        InputCaret = "input-caret",
         Divider = "divider",
         Popover = "popover",
+        Tooltip = "tooltip",
+        Overlay = "overlay",
+        /// What dims the window behind an overlay with `backdrop = true`.
+        OverlayBackdrop = "overlay-backdrop",
+    }
+}
+
+tokens! {
+    /// Letter case a text is shown in, whatever its words.
+    Case {
+        Upper = "upper",
+        Lower = "lower",
+        None = "none",
+    }
+}
+
+tokens! {
+    /// A typeface role: the interface font or the fixed-width one terminals
+    /// and code use.
+    Font {
+        Sans = "sans",
+        Mono = "mono",
     }
 }
 
@@ -91,6 +127,10 @@ tokens! {
     State {
         Hover = "hover",
         Selected = "selected",
+        /// It has keyboard focus: an input.
+        Focus = "focus",
+        /// It takes no input: an input or a button.
+        Disabled = "disabled",
     }
 }
 
@@ -210,6 +250,10 @@ pub struct Style {
     /// Text size; children inherit it.
     pub size: Option<TextSize>,
     pub weight: Option<Weight>,
+    /// Typeface; children inherit it.
+    pub font: Option<Font>,
+    /// Letter case of a `ui.text`: section headings in capitals.
+    pub case: Option<Case>,
     pub opacity: Option<f32>,
     /// How a pane animates when it shows or hides.
     pub transition: Option<Transition>,
@@ -235,6 +279,8 @@ impl Style {
             shadow,
             size,
             weight,
+            font,
+            case,
             opacity,
             transition
         );
@@ -296,6 +342,18 @@ pub struct Look {
 pub struct Resolved {
     pub base: Style,
     pub hover: Style,
+}
+
+/// The states an element is in when its style is resolved: which of the
+/// `:selected`, `:focus` and `:disabled` rules apply.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct States {
+    /// A list row that is the current choice (`ui.item`).
+    pub selected: bool,
+    /// It has keyboard focus (`ui.input`).
+    pub focus: bool,
+    /// It takes no input (`ui.input`, `ui.button`).
+    pub disabled: bool,
 }
 
 /// Color names a stylesheet defines, beside the theme's own.
@@ -366,6 +424,30 @@ enum Base {
 pub struct Rules(BTreeMap<Selector, Style>);
 
 impl Rules {
+    /// Each selector, as a stylesheet writes it: `.tab:selected`.
+    pub fn selectors(&self) -> Vec<String> {
+        self.0
+            .keys()
+            .map(|selector| {
+                let base = match &selector.base {
+                    Base::Part(part) => part.name().to_owned(),
+                    Base::Class(class) => format!(".{class}"),
+                };
+                match selector.state {
+                    Some(state) => format!("{base}:{}", state.name()),
+                    None => base,
+                }
+            })
+            .collect()
+    }
+
+    /// Takes every rule `over` has, each laid over the same selector's here.
+    pub(crate) fn layer(&mut self, over: &Rules) {
+        for (selector, style) in &over.0 {
+            self.0.entry(selector.clone()).or_default().layer(style);
+        }
+    }
+
     fn get(&self, base: &Base, state: Option<State>) -> Option<&Style> {
         self.0.get(&Selector {
             base: base.clone(),
@@ -384,6 +466,8 @@ pub struct Stylesheet {
     pub overrides: Vec<(Token, Shade)>,
     names: Names,
     rules: Rules,
+    /// Every component's `styles`, under each mod's and the stylesheet's.
+    pub(crate) components: Rules,
 }
 
 impl Stylesheet {
@@ -391,21 +475,47 @@ impl Stylesheet {
         &self.names
     }
 
+    /// A duration as the app runs it, after `animation_speed`: zero when
+    /// animations are off.
+    pub fn scaled(&self, duration: Duration) -> Duration {
+        self.names.scaled(duration)
+    }
+
     /// The style for a `part` with `look`, `selected` or not, drawn by a mod
     /// whose own rules are `local`.
     pub fn resolve(&self, part: Part, look: &Look, selected: bool, local: &Rules) -> Resolved {
+        let states = States {
+            selected,
+            ..States::default()
+        };
+        self.resolve_in(part, look, states, local)
+    }
+
+    /// The style for a `part` with `look` in `states`. At each selector the
+    /// states layer over its resting rule (`selected`, then `focus`, then
+    /// `disabled`); a disabled element has no hover.
+    pub fn resolve_in(&self, part: Part, look: &Look, states: States, local: &Rules) -> Resolved {
         let mut resolved = Resolved::default();
         let bases =
             std::iter::once(Base::Part(part)).chain(look.class.iter().cloned().map(Base::Class));
+        let active = [
+            (states.selected, State::Selected),
+            (states.focus, State::Focus),
+            (states.disabled, State::Disabled),
+        ];
         for base in bases {
-            for rules in [local, &self.rules] {
+            for rules in [&self.components, local, &self.rules] {
                 if let Some(style) = rules.get(&base, None) {
                     resolved.base.layer(style);
                 }
-                if selected && let Some(style) = rules.get(&base, Some(State::Selected)) {
-                    resolved.base.layer(style);
+                for (on, state) in active {
+                    if on && let Some(style) = rules.get(&base, Some(state)) {
+                        resolved.base.layer(style);
+                    }
                 }
-                if let Some(style) = rules.get(&base, Some(State::Hover)) {
+                if !states.disabled
+                    && let Some(style) = rules.get(&base, Some(State::Hover))
+                {
                     resolved.hover.layer(style);
                 }
             }

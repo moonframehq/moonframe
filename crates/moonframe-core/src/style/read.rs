@@ -37,6 +37,8 @@ const STYLE_KEYS: &[&str] = &[
     "shadow",
     "size",
     "weight",
+    "font",
+    "case",
     "opacity",
     "transition",
 ];
@@ -86,6 +88,7 @@ impl Stylesheet {
             overrides,
             names,
             rules,
+            components: Rules::default(),
         })
     }
 }
@@ -183,6 +186,8 @@ impl Read for Style {
             shadow: fields.get("shadow")?,
             size: fields.get("size")?,
             weight: fields.get("weight")?,
+            font: fields.get("font")?,
+            case: fields.get("case")?,
             opacity: fields.number("opacity", 0.0..=1.0)?,
             transition: fields.get("transition")?,
         })

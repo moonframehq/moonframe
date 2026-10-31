@@ -20,6 +20,12 @@ return component {
 	category = "Lists",
 	icon = "menu",
 	description = "Selectable rows with a label, detail and badge; a click sends { select = id } to the mod drawing it.",
+	when = "A plain selectable list of rows with label, detail and badge. For rich rows (status, icons, two lines) use `agent-row`, `workspace-row` or `tree`.",
+	props = {
+		["rows"] = "list of { id, label, detail, badge }",
+		["selected"] = "id of the selected row",
+		["to"] = "mod to send { select = id } to, if not the drawing one",
+	},
 	example = {
 		selected = "main",
 		rows = {

@@ -4,11 +4,15 @@
 
 mod actions;
 mod app;
+mod assets;
 mod branch_bar;
+mod browser;
 mod color;
 mod dock;
 mod gallery;
+mod input;
 mod inspect;
+mod keys;
 mod motion;
 mod overlay;
 mod packages;
@@ -21,8 +25,12 @@ mod themes;
 
 use {
     app::MoonframeApp,
-    gpui_kit::{AppContext as _, Bounds, WindowBounds, WindowOptions, component::Root, px, size},
-    moonframe_core::{Roots, Workspace},
+    gpui_kit::{
+        AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowDecorations, WindowOptions,
+        component::{ActiveTheme as _, Root},
+        point, px, size,
+    },
+    moonframe_core::{Chrome, Roots, Titlebar, Workspace},
     std::{fs, path::PathBuf, process::ExitCode},
 };
 
@@ -47,6 +55,10 @@ Options:
   --check       load every module, report problems, and exit without a window
   --background  open the window without bringing the app forward (for
                 screenshots and scripts while someone is working)
+  --component NAME
+                open the components window on NAME as well
+  --catalogue   print the component catalogue (markdown) and exit; fails if a
+                component is broken or says nothing of when to use it
   -h, --help    show this help";
 
 /// The app's id for the window system: every window's, and the bundle's
@@ -68,6 +80,8 @@ struct Args {
     check: bool,
     /// Open without activating the app or focusing its window.
     background: bool,
+    catalogue: bool,
+    component: Option<String>,
     /// The words after `mod`, for the package manager.
     packages: Option<Vec<String>>,
 }
@@ -76,13 +90,17 @@ fn parse_args() -> Result<Option<Args>, String> {
     let mut builtin = None;
     let mut user = paths::user();
     let mut check = false;
+    let mut catalogue = false;
     let mut background = false;
+    let mut component = None;
     let mut packages = None;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--check" => check = true,
+            "--catalogue" => catalogue = true,
             "--background" => background = true,
+            "--component" => component = Some(args.next().ok_or("--component needs a name")?),
             "--user" => {
                 user = Some(PathBuf::from(args.next().ok_or("--user needs a folder")?));
             },
@@ -100,7 +118,9 @@ fn parse_args() -> Result<Option<Args>, String> {
         builtin: builtin.unwrap_or_else(paths::builtin),
         user,
         check,
+        catalogue,
         background,
+        component,
         packages,
     }))
 }
@@ -144,6 +164,57 @@ fn check(roots: Roots) -> ExitCode {
     ExitCode::FAILURE
 }
 
+/// Prints the catalogue the `moonframe-components` skill is made of.
+fn catalogue(roots: Roots) -> ExitCode {
+    let workspace = Workspace::open(roots, false);
+    let components = workspace.components();
+    let mut failed = false;
+    for component in components {
+        if let Err(error) = &component.preview {
+            eprintln!("components/{}: {error}", component.path_name());
+            failed = true;
+        }
+        if component.when.is_empty() {
+            eprintln!(
+                "components/{}: say `when` to use it, for the catalogue",
+                component.path_name()
+            );
+            failed = true;
+        }
+    }
+    if failed {
+        return ExitCode::FAILURE;
+    }
+    print!("{}", moonframe_core::catalogue(components));
+    ExitCode::SUCCESS
+}
+
+/// The window's frame for what the shell asks. GPUI takes it only when it
+/// opens a window, so a change to the shell's `window` waits for a restart.
+///
+/// A hidden title bar puts the layout under the transparent title bar with
+/// the traffic lights over it on macOS, and drops the system frame on
+/// Windows and Linux (client-side decorations, where the compositor allows:
+/// gpui-component's `Root` then draws the resize edges and shadow). The
+/// layout moves the window from its `drag = true` stacks, so AppKit must
+/// not take the title bar's clicks for itself.
+fn framed(chrome: Chrome) -> WindowOptions {
+    let hidden = chrome.titlebar == Titlebar::Hidden;
+    WindowOptions {
+        titlebar: Some(TitlebarOptions {
+            title: None,
+            appears_transparent: hidden,
+            traffic_light_position: chrome
+                .traffic_lights
+                .filter(|_| hidden)
+                .map(|(x, y)| point(px(x), px(y))),
+        }),
+        window_decorations: hidden.then_some(WindowDecorations::Client),
+        app_owns_titlebar_drag: hidden,
+        ..Default::default()
+    }
+}
+
 fn main() -> ExitCode {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -173,6 +244,9 @@ fn main() -> ExitCode {
     if args.check {
         return check(paths::roots(args.builtin, args.user));
     }
+    if args.catalogue {
+        return catalogue(paths::roots(args.builtin, args.user));
+    }
 
     // The user's folder exists from the first run, so it is watched and
     // easy to find.
@@ -183,8 +257,9 @@ fn main() -> ExitCode {
     }
     let (builtin, user, background) = (args.builtin, args.user, args.background);
     BACKGROUND.store(background, std::sync::atomic::Ordering::Relaxed);
+    let component = args.component;
     gpui_kit::application()
-        .with_assets(gpui_kit::assets::Assets)
+        .with_assets(assets::Assets)
         .run(move |cx| {
             gpui_kit::init(cx);
             dock::set_icon();
@@ -198,16 +273,28 @@ fn main() -> ExitCode {
             })
             .detach();
 
+            // The shell says what window it wants, so it loads first.
+            let workspace = Workspace::open(
+                paths::roots(builtin.clone(), user.clone()),
+                cx.theme().is_dark(),
+            );
+            let chrome = workspace.chrome();
             let bounds = Bounds::centered(None, size(px(1280.), px(820.)), cx);
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 window_min_size: Some(size(px(640.), px(400.))),
                 app_id: Some(APP_ID.into()),
                 focus: !background,
-                ..Default::default()
+                ..framed(chrome)
             };
             let opened = cx.open_window(options, |window, cx| {
-                let view = cx.new(|cx| MoonframeApp::new(builtin, user, window, cx));
+                let view = cx.new(|cx| {
+                    let mut app = MoonframeApp::new(workspace, chrome, builtin, user, window, cx);
+                    if let Some(name) = &component {
+                        app.show_component(name, cx);
+                    }
+                    app
+                });
                 cx.new(|cx| Root::new(view, window, cx))
             });
             if let Err(error) = opened {

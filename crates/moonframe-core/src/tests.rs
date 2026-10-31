@@ -206,6 +206,103 @@ fn icons_are_checked_against_the_bundled_set() {
 }
 
 #[test]
+fn browsers_take_web_addresses_and_commands_name_them() {
+    use crate::{Browser, BrowserCommand};
+    let source = r#"return mod { view = function()
+        return ui.column {
+            ui.browser "https://example.com",
+            ui.browser { id = "docs", url = "file:///tmp/a.html", zoom = 2, navigate = { go = true } },
+            ui.button { "Back", command = "browser-back", browser = "docs" },
+            ui.button { "Open", command = "browser-open", browser = "docs", to = "other" },
+        }
+    end }"#;
+    let dir = app(&[("web", source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    let slot = workspace.slot("web").unwrap();
+    assert_eq!(slot.error().map(ToString::to_string), None);
+    let Some(Node::Stack(column)) = slot.view() else {
+        panic!("expected a column");
+    };
+    let [
+        Node::Browser(first),
+        Node::Browser(docs),
+        Node::Button(back),
+        Node::Button(open),
+    ] = &column.children[..]
+    else {
+        panic!("unexpected children {:?}", column.children);
+    };
+    assert_eq!(
+        (first.id.as_str(), first.url.as_deref()),
+        ("browser", Some("https://example.com"))
+    );
+    let Browser { zoom, navigate, .. } = docs;
+    assert_eq!((*zoom, navigate.is_some()), (2.0, true));
+    assert_eq!(
+        back.action,
+        Some(Action::Browser {
+            to: None,
+            id: "docs".into(),
+            command: BrowserCommand::Back
+        })
+    );
+    assert_eq!(
+        open.action,
+        Some(Action::Browser {
+            to: Some("other".into()),
+            id: "docs".into(),
+            command: BrowserCommand::Open
+        })
+    );
+
+    for (view, expected) in [
+        (
+            r#"ui.browser "javascript:alert(1)""#,
+            "not an http, https or file address",
+        ),
+        (
+            r#"ui.browser "vscode://x""#,
+            "not an http, https or file address",
+        ),
+        (
+            r#"ui.browser { url = "https://a b" }"#,
+            "not an http, https or file address",
+        ),
+        (
+            r#"ui.button { "x", command = "browser-back" }"#,
+            "needs `browser",
+        ),
+        (
+            r#"ui.button { "x", msg = "m", browser = "a" }"#,
+            "`browser` goes with a browser command",
+        ),
+        (
+            r#"ui.button { "x", command = "quit", browser = "a" }"#,
+            "`browser` goes with a browser command",
+        ),
+        (
+            r#"ui.button { "x", command = "browser-go", browser = "a" }"#,
+            "browser-back",
+        ),
+    ] {
+        let source = format!("return mod {{ view = function() return {view} end }}");
+        let dir = app(&[("bad", &source)]);
+        let workspace = Workspace::open(dir.path(), false);
+        let error = workspace
+            .slot("bad")
+            .unwrap()
+            .error()
+            .map(ToString::to_string);
+        assert!(
+            error
+                .as_deref()
+                .is_some_and(|error| error.contains(expected)),
+            "{view}: {error:?}"
+        );
+    }
+}
+
+#[test]
 fn bad_values_are_refused() {
     for (view, expected) in [
         (
@@ -908,8 +1005,8 @@ fn speeds_name_durations_and_animation_speed_scales_them() {
 #[test]
 fn the_type_definitions_cover_what_the_host_accepts() {
     use crate::{
-        Align, Anchor, Command, Direction, Element, Justify, Side, Space, Surface, TextSize, Tone,
-        TransitionKind, Variant, Weight,
+        Align, Anchor, BrowserCommand, Command, Direction, Element, Justify, Placement, Side,
+        Space, Surface, TextSize, Tone, TransitionKind, Variant, Weight,
     };
     let definitions = include_str!("../../../types/moonframe.d.luau");
     let missing: Vec<String> = Element::NAMES
@@ -928,10 +1025,15 @@ fn the_type_definitions_cover_what_the_host_accepts() {
                 Direction::NAMES,
                 Variant::NAMES,
                 Command::NAMES,
+                BrowserCommand::NAMES,
                 TransitionKind::NAMES,
                 Border::NAMES,
                 Side::NAMES,
                 Anchor::NAMES,
+                Placement::NAMES,
+                crate::Fit::NAMES,
+                crate::Titlebar::NAMES,
+                crate::Platform::NAMES,
             ]
             .concat()
             .into_iter()
@@ -1227,6 +1329,677 @@ return mod { view = function() return ui.text "x" end }"#;
     );
 }
 
+const TAB_COMPONENT: &str = r#"
+return component {
+  title = "Tab",
+  when = "One of several views.",
+  props = { label = "the text", selected = "whether it is the open one" },
+  styles = {
+    [".tab"] = { padding = 6, radius = 4 },
+    [".tab:selected"] = { color = "accent" },
+  },
+  example = { label = "One", selected = true },
+  build = function(props)
+    return ui.row { class = "tab", selected = props.selected, ui.text { props.label } }
+  end,
+}
+"#;
+
+#[test]
+fn component_styles_sit_under_the_stylesheet_and_reach_every_mod() {
+    let source = "local tab = use \"tab\"\nreturn mod { view = function()\n  return tab { label = \"a\", selected = true }\nend }\n";
+    let dir = app(&[("tabs", source)]);
+    write(dir.path(), "components/tab.luau", TAB_COMPONENT);
+    write(
+        dir.path(),
+        "style.luau",
+        r#"return style { rules = { [".tab"] = { radius = 9 } } }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let slot = workspace.slot("tabs").unwrap();
+    assert_eq!(slot.error().map(ToString::to_string), None);
+    let Some(Node::Stack(tab)) = slot.view() else {
+        panic!("expected the tab's row");
+    };
+    assert!(tab.selected);
+    let resolved = workspace
+        .stylesheet()
+        .resolve(Part::Row, &tab.look, tab.selected, slot.rules());
+    // The stylesheet's radius wins; the component's padding and selected
+    // color stand where nothing overrides them.
+    assert_eq!(resolved.base.radius, Some(9.0));
+    assert_eq!(resolved.base.padding, Sides::all(6.0));
+    assert!(resolved.base.color.is_some());
+
+    let component = &workspace.components()[0];
+    assert_eq!(component.when, "One of several views.");
+    assert_eq!(component.props.len(), 2);
+    assert_eq!(component.rules.selectors(), [".tab", ".tab:selected"]);
+    let catalogue = crate::catalogue(workspace.components());
+    assert!(catalogue.contains("#### `tab`"), "{catalogue}");
+    assert!(catalogue.contains("`.tab:selected`"), "{catalogue}");
+}
+
+#[test]
+fn controls_take_a_tooltip_a_context_message_and_text_to_copy() {
+    let source = r#"return mod { view = function()
+  return ui.row {
+    tooltip = "Open", context = { menu = "row" }, to = "other", copy = "abc",
+    ui.button { "b", tooltip = "Run", context = "menu" },
+  }
+end }"#;
+    let dir = app(&[("extras", source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    let slot = workspace.slot("extras").unwrap();
+    assert_eq!(slot.error().map(ToString::to_string), None);
+    let Some(Node::Stack(row)) = slot.view() else {
+        panic!("expected a row");
+    };
+    assert_eq!(row.action, None);
+    assert_eq!(row.extras.tooltip.as_deref(), Some("Open"));
+    assert_eq!(row.extras.copy.as_deref(), Some("abc"));
+    let Some(Action::Send { to, .. }) = &row.extras.context else {
+        panic!("expected a context message");
+    };
+    assert_eq!(to.as_deref(), Some("other"));
+    let Node::Button(button) = &row.children[0] else {
+        panic!("expected a button");
+    };
+    assert_eq!(button.extras.tooltip.as_deref(), Some("Run"));
+}
+
+/// The view of a mod made from `source`, or its problem.
+fn view_of(source: &str) -> Result<Node, String> {
+    let dir = app(&[("probe", source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    let slot = workspace.slot("probe").unwrap();
+    match slot.error() {
+        Some(error) => Err(error.to_string()),
+        None => Ok(slot.view().unwrap().clone()),
+    }
+}
+
+#[test]
+fn overlays_float_content_with_a_placement_backdrop_and_keys() {
+    use crate::{Chord, Placement};
+    let source = r#"return mod {
+      view = function()
+        return ui.overlay {
+          open = true, dismiss = "close", place = "right", backdrop = true,
+          width = 360, height = 200, class = "sheet",
+          keys = { down = "next", ["cmd-k"] = { palette = true }, ["shift-tab"] = "back" },
+          content = ui.column { ui.text "Settings" },
+        }
+      end,
+    }"#;
+    let Ok(Node::Overlay(overlay)) = view_of(source) else {
+        panic!("no overlay");
+    };
+    assert!(overlay.open && overlay.backdrop);
+    assert_eq!(overlay.dismiss, Some(Data::from("close")));
+    assert_eq!(overlay.place, Placement::Right);
+    assert_eq!((overlay.width, overlay.height), (Some(360.0), Some(200.0)));
+    assert_eq!(overlay.look.class, ["sheet"]);
+    assert!(matches!(overlay.content.as_ref(), Node::Stack(_)));
+    // Sorted by name, so the same view reads the same.
+    let chords: Vec<&Chord> = overlay.keys.0.iter().map(|(chord, _)| chord).collect();
+    assert_eq!(chords[0], &Chord::parse("cmd-k").unwrap());
+    assert_eq!(chords[1], &Chord::parse("down").unwrap());
+    assert_eq!(chords[2], &Chord::parse("shift-tab").unwrap());
+    assert_eq!(
+        overlay.keys.0[0].1,
+        Data::Map([("palette".to_owned(), Data::Bool(true))].into())
+    );
+
+    // Defaults: closed, centered, no backdrop, no keys.
+    let plain = r#"return mod { view = function()
+      return ui.overlay { content = ui.text "hi" } end }"#;
+    let Ok(Node::Overlay(overlay)) = view_of(plain) else {
+        panic!("no overlay");
+    };
+    assert!(!overlay.open && !overlay.backdrop);
+    assert_eq!(overlay.place, Placement::Center);
+    assert!(overlay.keys.is_empty() && overlay.dismiss.is_none());
+
+    // Popovers take keys too.
+    let popover = r#"return mod { view = function()
+      return ui.popover { open = true, keys = { up = "up" }, content = ui.text "x", "anchor" } end }"#;
+    let Ok(Node::Popover(popover)) = view_of(popover) else {
+        panic!("no popover");
+    };
+    assert_eq!(popover.keys.0.len(), 1);
+
+    for (props, expected) in [
+        (r#"open = true"#, "overlay.content: missing"),
+        (
+            r#"place = "middle", content = ui.text "x""#,
+            "overlay.place: unknown `middle`; expected one of center, top",
+        ),
+        (
+            r#"anchor = 1, content = ui.text "x""#,
+            "overlay: unknown key `anchor`",
+        ),
+        (
+            r#"width = -1, content = ui.text "x""#,
+            "overlay.width: expected 0 to",
+        ),
+        (
+            r#"keys = "escape", content = ui.text "x""#,
+            "overlay.keys: expected a table",
+        ),
+        (
+            r#"keys = { "escape" }, content = ui.text "x""#,
+            "overlay.keys: keys are key names",
+        ),
+        (
+            r#"keys = { ["hyper-k"] = 1 }, content = ui.text "x""#,
+            r#"overlay.keys["hyper-k"]: unknown modifier `hyper`"#,
+        ),
+        (
+            r#"keys = { ["ctrl-K"] = 1 }, content = ui.text "x""#,
+            r#"overlay.keys["ctrl-K"]: write `shift-k` for `K`"#,
+        ),
+        (
+            r#"keys = { esc = 1 }, content = ui.text "x""#,
+            r#"overlay.keys["esc"]: unknown key `esc`"#,
+        ),
+        (
+            r#"keys = { ["ctrl-"] = 1 }, content = ui.text "x""#,
+            "missing the key after the modifiers",
+        ),
+        (
+            r#"keys = { ["ctrl-ctrl-k"] = 1 }, content = ui.text "x""#,
+            "`ctrl` twice",
+        ),
+        (
+            r#"keys = { ["ctrl-shift-k"] = 1, ["shift-ctrl-k"] = 2 }, content = ui.text "x""#,
+            "the same key as",
+        ),
+        (
+            r#"keys = { up = function() end }, content = ui.text "x""#,
+            r#"overlay.keys["up"]: a function cannot leave its module"#,
+        ),
+    ] {
+        let source =
+            format!("return mod {{ view = function() return ui.overlay {{ {props} }} end }}");
+        let error = view_of(&source).err().unwrap_or_default();
+        assert!(error.contains(expected), "{props}: {error}");
+    }
+}
+
+#[test]
+fn key_names_match_keystrokes_on_each_platform() {
+    use crate::{Chord, Keys, Pressed};
+    let key = |key, ctrl, alt, shift, cmd| Pressed {
+        key,
+        text: None,
+        ctrl,
+        alt,
+        shift,
+        cmd,
+    };
+    let matches =
+        |name: &str, pressed: Pressed, mac| Chord::parse(name).unwrap().matches(&pressed, mac);
+    assert!(matches(
+        "escape",
+        key("escape", false, false, false, false),
+        true
+    ));
+    assert!(!matches(
+        "escape",
+        key("escape", false, false, true, false),
+        true
+    ));
+    assert!(matches(
+        "shift-tab",
+        key("tab", false, false, true, false),
+        false
+    ));
+    assert!(matches(
+        "ctrl-alt-shift-p",
+        key("p", true, true, true, false),
+        false
+    ));
+    assert!(matches("cmd-k", key("k", false, false, false, true), false));
+    // `secondary` is ⌘ on macOS and Ctrl elsewhere.
+    assert!(matches(
+        "secondary-k",
+        key("k", false, false, false, true),
+        true
+    ));
+    assert!(!matches(
+        "secondary-k",
+        key("k", true, false, false, false),
+        true
+    ));
+    assert!(matches(
+        "secondary-k",
+        key("k", true, false, false, false),
+        false
+    ));
+    assert!(!matches(
+        "secondary-k",
+        key("k", false, false, false, true),
+        false
+    ));
+    // Minus, function keys, and a symbol typed with shift.
+    assert!(matches("cmd--", key("-", false, false, false, true), true));
+    assert!(matches("f12", key("f12", false, false, false, false), true));
+    assert!(Chord::parse("f25").is_err());
+    let question = Pressed {
+        text: Some("?"),
+        ..key("/", false, true, true, false)
+    };
+    assert!(matches("alt-?", question, true));
+    assert!(!matches("alt-/", question, true));
+    // What a key types is never taken without ctrl, alt or cmd, so an
+    // overlay cannot read what goes to a terminal behind it.
+    for typed in ["a", "shift-a", "-", "?", "7", "space", "shift-space"] {
+        let error = Chord::parse(typed).unwrap_err();
+        assert!(error.contains("types text"), "{typed}: {error}");
+    }
+
+    // Escape sends `dismiss` unless a key takes it.
+    let dismiss = Data::from("close");
+    let escape = key("escape", false, false, false, false);
+    let none = Keys::default();
+    assert_eq!(none.message(Some(&dismiss), &escape, true), Some(&dismiss));
+    assert_eq!(none.message(None, &escape, true), None);
+    let own = Keys(vec![(Chord::parse("escape").unwrap(), Data::from("back"))]);
+    assert_eq!(
+        own.message(Some(&dismiss), &escape, true),
+        Some(&Data::from("back"))
+    );
+    let enter = key("enter", false, false, false, false);
+    assert_eq!(own.message(Some(&dismiss), &enter, true), None);
+}
+
+#[test]
+fn icons_can_spin() {
+    let source = r#"return mod { view = function()
+      return ui.row { ui.icon { name = "loader-circle", spin = true }, ui.icon "cpu" } end }"#;
+    let Ok(Node::Stack(row)) = view_of(source) else {
+        panic!("no row");
+    };
+    let spins: Vec<bool> = row
+        .children
+        .iter()
+        .map(|child| matches!(child, Node::Icon(icon) if icon.spin))
+        .collect();
+    assert_eq!(spins, [true, false]);
+    let bad = r#"return mod { view = function() return ui.icon { name = "cpu", spin = 1 } end }"#;
+    let error = view_of(bad).err().unwrap_or_default();
+    assert!(
+        error.contains("icon.spin: expected true or false"),
+        "{error}"
+    );
+}
+
+#[test]
+fn overlay_parts_are_selectors() {
+    let dir = app(&[]);
+    write(
+        dir.path(),
+        "style.luau",
+        r##"return style { rules = {
+          overlay = { radius = 12, transition = "slide-fade fast" },
+          ["overlay-backdrop"] = { background = "#000000/50" },
+        } }"##,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.style_error().is_none(),
+        "{:?}",
+        workspace.style_error()
+    );
+    let look = crate::Look::default();
+    let overlay = workspace
+        .stylesheet()
+        .resolve(Part::Overlay, &look, false, &Rules::default());
+    assert_eq!(overlay.base.radius, Some(12.0));
+    assert!(overlay.base.transition.is_some());
+    let backdrop =
+        workspace
+            .stylesheet()
+            .resolve(Part::OverlayBackdrop, &look, false, &Rules::default());
+    assert!(backdrop.base.background.is_some());
+}
+
+#[test]
+fn images_name_a_file_and_refuse_urls() {
+    use {crate::Fit, std::path::PathBuf};
+    let source = r#"return mod { view = function()
+        return ui.row {
+          ui.image "logo.png",
+          ui.image { src = "~/Pictures/me.png", width = 32, height = 32, fit = "cover", class = "avatar" },
+          ui.image { src = "/tmp/abs.png" },
+        }
+    end }"#;
+    let dir = app(&[("pics", source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    let slot = workspace.slot("pics").unwrap();
+    assert_eq!(slot.error().map(ToString::to_string), None);
+    let Some(Node::Stack(row)) = slot.view() else {
+        panic!("no row");
+    };
+    let images: Vec<_> = row
+        .children
+        .iter()
+        .map(|child| match child {
+            Node::Image(image) => image.clone(),
+            other => panic!("expected an image, got {other:?}"),
+        })
+        .collect();
+    assert_eq!(images[0].fit, Fit::Contain);
+    assert_eq!(
+        (images[1].width, images[1].height),
+        (Some(32.0), Some(32.0))
+    );
+    assert_eq!(images[1].fit, Fit::Cover);
+    assert_eq!(images[1].look.class, ["avatar"]);
+    // Each resolves against the mod's folder or home, inside what is allowed.
+    let root = tempfile::tempdir().unwrap();
+    let real = root.path().canonicalize().unwrap();
+    write(&real, "app/mods/pics/logo.png", "png");
+    write(&real, "home/Pictures/me.png", "png");
+    let folder = real.join("app/mods/pics");
+    let home = real.join("home");
+    let resolved: Vec<Option<PathBuf>> = images
+        .iter()
+        .map(|image| image.resolve(&folder, Some(&home), std::slice::from_ref(&real)))
+        .collect();
+    assert_eq!(resolved, [
+        Some(real.join("app/mods/pics/logo.png")),
+        Some(real.join("home/Pictures/me.png")),
+        None,
+    ]);
+
+    for (view, expected) in [
+        (
+            r#"ui.image "https://example.com/a.png""#,
+            "images are files, not https:// URLs",
+        ),
+        (r#"ui.image { src = "" }"#, "an empty path"),
+        (r#"ui.image {}"#, "image.src: missing"),
+        (
+            r#"ui.image { src = "a.png", fit = "stretch" }"#,
+            "unknown `stretch`",
+        ),
+        (
+            r#"ui.image { src = "a.png", alt = "x" }"#,
+            "unknown key `alt`",
+        ),
+    ] {
+        let source = format!("return mod {{ view = function() return {view} end }}");
+        let dir = app(&[("bad", &source)]);
+        let workspace = Workspace::open(dir.path(), false);
+        let error = workspace.slot("bad").unwrap().error().unwrap().to_string();
+        assert!(error.contains(expected), "{view}: {error}");
+    }
+}
+
+#[test]
+fn the_shell_asks_for_its_window_and_views_see_it() {
+    use crate::{Chrome, Platform, Titlebar, WindowState};
+    let dir = app(&[]);
+    let workspace = Workspace::open(dir.path(), false);
+    assert_eq!(workspace.chrome(), Chrome::default());
+    assert_eq!(workspace.chrome().titlebar, Titlebar::System);
+
+    let shell = r#"return mod {
+      window = { titlebar = "hidden", traffic_lights = { x = 12, y = 16 } },
+      view = function(_, app)
+        return ui.row { drag = true,
+          ui.text(`{app.window.platform} {app.window.titlebar} {app.window.maximized}`),
+          ui.button { "x", command = "close-window" },
+          ui.button { "-", command = "minimize" },
+          ui.button { "+", command = "maximize" },
+        }
+      end,
+    }"#;
+    write(dir.path(), "main.luau", shell);
+    let mut workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    assert_eq!(workspace.chrome(), Chrome {
+        titlebar: Titlebar::Hidden,
+        traffic_lights: Some((12.0, 16.0)),
+    });
+    let row = |workspace: &Workspace| {
+        let Some(Node::Stack(row)) = workspace.shell().view() else {
+            panic!("no row");
+        };
+        row.clone()
+    };
+    let text = |workspace: &Workspace| match &row(workspace).children[0] {
+        Node::Text(text) => text.text.clone(),
+        other => panic!("expected text, got {other:?}"),
+    };
+    assert!(row(&workspace).drag);
+    let platform = Platform::current().name();
+    assert_eq!(text(&workspace), format!("{platform} system false"));
+    workspace.set_window(WindowState {
+        titlebar: Titlebar::Hidden,
+        maximized: true,
+        ..WindowState::default()
+    });
+    assert_eq!(text(&workspace), format!("{platform} hidden true"));
+    let commands: Vec<_> = row(&workspace).children[1..]
+        .iter()
+        .map(|child| match child {
+            Node::Button(button) => button.action.clone(),
+            other => panic!("expected a button, got {other:?}"),
+        })
+        .collect();
+    assert_eq!(commands, [
+        Some(Action::Command(Command::CloseWindow)),
+        Some(Action::Command(Command::Minimize)),
+        Some(Action::Command(Command::Maximize)),
+    ]);
+
+    for (window, expected) in [
+        (r#"{ titlebar = "none" }"#, "unknown `none`"),
+        (r#"{ traffic_lights = { x = 500 } }"#, "traffic_lights.x"),
+        (r#"{ frameless = true }"#, "unknown key `frameless`"),
+    ] {
+        let source =
+            format!("return mod {{ window = {window}, view = function() return ui.text 'x' end }}");
+        write(dir.path(), "main.luau", &source);
+        let workspace = Workspace::open(dir.path(), false);
+        let error = workspace.shell().error().unwrap().to_string();
+        assert!(error.contains(expected), "{window}: {error}");
+    }
+
+    // A mod is not the shell: the window isn't its to set.
+    write(dir.path(), "main.luau", SHELL_SOURCE);
+    let source = r#"return mod { window = { titlebar = "hidden" }, view = function() return ui.text "x" end }"#;
+    write(dir.path(), "mods/sneaky/main.luau", source);
+    let workspace = Workspace::open(dir.path(), false);
+    let error = workspace
+        .slot("sneaky")
+        .unwrap()
+        .error()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("only the shell"), "{error}");
+    assert_eq!(workspace.chrome(), Chrome::default());
+}
+
+#[test]
+fn images_come_only_from_the_app_folders_and_the_cache() {
+    let app = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    write(app.path(), "mods/pic/avatar.png", "png");
+    write(outside.path(), "secret.png", "png");
+    let image = |src: &str| crate::Image {
+        look: crate::Look::default(),
+        src: src.to_owned(),
+        width: None,
+        height: None,
+        fit: crate::Fit::Contain,
+    };
+    let folder = app.path().join("mods/pic");
+    let allowed = [app.path().to_owned()];
+    let shown = |src: &str| image(src).resolve(&folder, None, &allowed).is_some();
+    assert!(shown("avatar.png"));
+    assert!(!shown("missing.png"));
+    // Out of the app's folders, by a path or by `..`: an empty box.
+    let secret = outside.path().join("secret.png");
+    assert!(!shown(secret.to_str().unwrap()));
+    let relative = format!("../../../{}", secret.strip_prefix("/").unwrap().display());
+    assert!(!shown(&relative));
+    // A folder is not a picture.
+    assert!(!shown("."));
+}
+
+#[test]
+fn a_nil_child_does_not_hide_the_ones_after_it() {
+    let source = r#"return mod { view = function()
+  local none = nil
+  return ui.row { "a", none, none, none, "b", false, "c", float = { top = -4, right = -4 }, max_width = 200 }
+end }"#;
+    let Node::Stack(row) = view_of(source).unwrap() else {
+        panic!("expected a row");
+    };
+    let texts: Vec<&str> = row
+        .children
+        .iter()
+        .map(|child| match child {
+            Node::Text(text) => text.text.as_str(),
+            other => panic!("expected text, got {other:?}"),
+        })
+        .collect();
+    assert_eq!(texts, ["a", "b", "c"]);
+    assert_eq!(row.frame.max_width, Some(200.0));
+    let both = r#"return mod { view = function() return ui.column { scroll = "both" } end }"#;
+    let Node::Stack(column) = view_of(both).unwrap() else {
+        panic!("expected a column");
+    };
+    assert_eq!(column.frame.scroll, crate::Scroll::Both);
+    let float = row.frame.float.unwrap();
+    assert_eq!(
+        (float.top, float.right, float.left),
+        (Some(-4.0), Some(-4.0), None)
+    );
+}
+
+#[test]
+fn buttons_take_an_icon_and_text_takes_lines_and_wrap() {
+    let source = r#"return mod { view = function()
+  return ui.row {
+    ui.button { icon = "plus", msg = "add" },
+    ui.text { "a long body", lines = 3 },
+    ui.text { "fn main() {}", wrap = false },
+  }
+end }"#;
+    let Node::Stack(row) = view_of(source).unwrap() else {
+        panic!("expected a row");
+    };
+    let Node::Button(button) = &row.children[0] else {
+        panic!("expected a button");
+    };
+    assert_eq!(button.label, "");
+    assert_eq!(
+        button.icon.as_ref().map(crate::IconName::name),
+        Some("plus")
+    );
+    let (Node::Text(body), Node::Text(code)) = (&row.children[1], &row.children[2]) else {
+        panic!("expected texts");
+    };
+    assert_eq!((body.lines, body.wrap), (Some(3), true));
+    assert!(!code.wrap);
+    let missing = r#"return mod { view = function() return ui.button { msg = "x" } end }"#;
+    assert!(view_of(missing).unwrap_err().contains("label"));
+}
+
+#[test]
+fn a_component_demo_runs_live_and_keeps_to_itself() {
+    let dir = app(&[(
+        "other",
+        "return mod { update = function(s, m) error('reached') end, view = function() return ui.text 'x' end }",
+    )]);
+    write(dir.path(), "components/pill.luau", BADGE_COMPONENT);
+    write(
+        dir.path(),
+        "components/demos/pill.luau",
+        r#"local pill = use "pill"
+return mod {
+  init = function() return { n = 1 } end,
+  update = function(state, msg)
+    if msg == "add" then state.n += 1 end
+    return state, { { to = "other", msg = "hi" } }
+  end,
+  view = function(state) return pill { label = "n", value = state.n } end,
+}"#,
+    );
+    let mut workspace = Workspace::open(dir.path(), false);
+    let value = |workspace: &Workspace| {
+        let (_, slot) = workspace.demo("pill").unwrap();
+        let Some(Node::Stack(row)) = slot.view() else {
+            panic!("expected the pill's row: {:?}", slot.error());
+        };
+        let Node::Badge(badge) = &row.children[1] else {
+            panic!("expected a badge");
+        };
+        badge.text.clone()
+    };
+    assert_eq!(value(&workspace), "1");
+    let send = Action::Send {
+        to: None,
+        msg: Data::from("add"),
+    };
+    assert_eq!(workspace.dispatch("demo:pill", &send), None);
+    assert_eq!(value(&workspace), "2");
+    // It reached no other mod, and runs no app command.
+    assert_eq!(
+        workspace
+            .slot("other")
+            .unwrap()
+            .error()
+            .map(ToString::to_string),
+        None
+    );
+    assert_eq!(
+        workspace.dispatch("demo:pill", &Action::Command(Command::Quit)),
+        None
+    );
+    // The browser shows the file it runs.
+    let component = &workspace.components()[0];
+    assert!(
+        component
+            .demo
+            .as_ref()
+            .unwrap()
+            .source
+            .contains("state.n += 1")
+    );
+}
+
+#[test]
+fn a_component_without_a_demo_gets_one_made_from_its_example() {
+    let dir = app(&[]);
+    write(dir.path(), "components/pill.luau", BADGE_COMPONENT);
+    let workspace = Workspace::open(dir.path(), false);
+    let demo = workspace.components()[0].demo.clone().unwrap();
+    assert!(demo.path.is_none());
+    assert!(
+        demo.source
+            .contains("return pill { label = \"CPU\", value = 12 }"),
+        "{}",
+        demo.source
+    );
+    let (name, slot) = workspace.demo("pill").unwrap();
+    assert_eq!(name, "demo:pill");
+    assert!(
+        matches!(slot.view(), Some(Node::Stack(_))),
+        "{:?}",
+        slot.error()
+    );
+}
+
 #[test]
 fn a_broken_child_is_marked_in_place_and_the_rest_still_draws() {
     let source = r#"return mod { view = function()
@@ -1332,4 +2105,280 @@ fn packages_lie_between_the_app_and_the_user_and_never_replace_the_shell() {
         "extra", "my-clock"
     ]);
     assert_eq!(workspace.stylesheet().radius, Some(7.0));
+}
+
+#[test]
+fn only_web_addresses_count_as_remote() {
+    use crate::{is_file_url, is_remote_url, is_web_url};
+    assert!(is_remote_url("https://example.com/a"));
+    assert!(is_remote_url("HTTP://example.com"));
+    // A file is a page a browser may show, but never one for the system
+    // browser, which would open whatever program it is.
+    assert!(is_web_url("file:///Users/me/notes.html"));
+    assert!(!is_remote_url("file:///Applications/Calculator.app"));
+    assert!(is_file_url("FILE:///tmp/a.html"));
+    assert!(!is_file_url("https://example.com"));
+    assert!(!is_remote_url("javascript:alert(1)"));
+}
+
+/// The one element `view` returns, or the problem reading it.
+fn input_view(view: &str) -> Result<Node, String> {
+    let source = format!("return mod {{ view = function() return {view} end }}");
+    let dir = app(&[("field", &source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    let slot = workspace.slot("field").unwrap();
+    match slot.error() {
+        Some(error) => Err(error.to_string()),
+        None => Ok(slot.view().unwrap().clone()),
+    }
+}
+
+#[test]
+fn inputs_read_their_text_messages_and_keys() {
+    use crate::{Input, KeyChord};
+    let Ok(Node::Input(input)) = input_view(
+        r#"ui.input {
+          id = "search", value = "abc", placeholder = "Search…",
+          change = { query = true }, submit = "go", to = "results",
+          keys = { up = "previous", ["shift-tab"] = { back = 1 }, ["secondary-k"] = "clear" },
+          focus = true, mono = true, width = 240, class = "search",
+        }"#,
+    ) else {
+        panic!("no input");
+    };
+    assert_eq!(input.id.as_deref(), Some("search"));
+    assert_eq!(input.value.as_deref(), Some("abc"));
+    assert_eq!(input.placeholder.as_deref(), Some("Search…"));
+    assert_eq!(input.to.as_deref(), Some("results"));
+    assert_eq!(input.submit, Some(Data::from("go")));
+    assert!(input.focus && input.mono && !input.multiline && !input.disabled);
+    assert_eq!((input.width, input.grow), (Some(240.0), false));
+    assert_eq!(input.look.class, ["search"]);
+    // Sorted by name, so the order is the same on every render.
+    let keys: Vec<_> = input.keys.iter().map(|(chord, _)| chord.clone()).collect();
+    assert_eq!(keys, [
+        KeyChord::parse("secondary-k").unwrap(),
+        KeyChord::parse("shift-tab").unwrap(),
+        KeyChord::parse("up").unwrap(),
+    ]);
+    assert!(keys[0].secondary && keys[0].key == "k");
+    assert!(keys[1].shift && keys[1].key == "tab" && !keys[1].ctrl);
+
+    // A table message gets `value`; anything else is wrapped.
+    let change = input.change.as_ref().unwrap();
+    assert_eq!(
+        Input::message(change, "ab"),
+        Data::Map(
+            [
+                ("query".to_owned(), Data::Bool(true)),
+                ("value".to_owned(), Data::from("ab")),
+            ]
+            .into()
+        )
+    );
+    assert_eq!(
+        Input::message(&Data::from("go"), "ab"),
+        Data::Map(
+            [
+                ("msg".to_owned(), Data::from("go")),
+                ("value".to_owned(), Data::from("ab")),
+            ]
+            .into()
+        )
+    );
+    // A list can't take a named key, so it is wrapped too.
+    let list = Data::List(vec![Data::Integer(1)]);
+    assert_eq!(
+        Input::message(&list, ""),
+        Data::Map(
+            [
+                ("msg".to_owned(), list.clone()),
+                ("value".to_owned(), Data::from("")),
+            ]
+            .into()
+        )
+    );
+
+    let Ok(Node::Input(lines)) = input_view("ui.input { multiline = true, rows = 6, grow = true }")
+    else {
+        panic!("no multiline input");
+    };
+    assert!(lines.multiline && lines.grow);
+    assert_eq!((lines.rows, lines.id.as_deref()), (6, None));
+    let Ok(Node::Input(plain)) = input_view("ui.input {}") else {
+        panic!("no plain input");
+    };
+    assert_eq!(plain.rows, Input::DEFAULT_ROWS);
+    assert!(plain.keys.is_empty() && plain.change.is_none());
+}
+
+#[test]
+fn bad_inputs_are_refused() {
+    for (view, expected) in [
+        ("ui.input { lable = 'x' }", "unknown key `lable`"),
+        (
+            "ui.input { rows = 3 }",
+            "`rows` goes with `multiline = true`",
+        ),
+        (
+            "ui.input { multiline = true, rows = 0 }",
+            "a whole number from 1",
+        ),
+        (
+            "ui.input { multiline = true, rows = 2.5 }",
+            "a whole number from 1",
+        ),
+        ("ui.input { id = 'a b' }", "an id is 1 to 64"),
+        ("ui.input { to = 'x' }", "`to` goes with `change`"),
+        ("ui.input { keys = 'up' }", "expected a table"),
+        ("ui.input { keys = { 'up' } }", "keys are key names"),
+        (
+            "ui.input { keys = { arrowup = 'x' } }",
+            "unknown key `arrowup`",
+        ),
+        (
+            "ui.input { keys = { ['ctl-n'] = 'x' } }",
+            "unknown modifier `ctl`",
+        ),
+        (
+            "ui.input { keys = { ['ctrl-ctrl-n'] = 'x' } }",
+            "`ctrl` twice",
+        ),
+        ("ui.input { keys = { N = 'x' } }", "unknown key `N`"),
+        (
+            "ui.input { keys = { ['ctrl-shift-n'] = 'a', ['shift-ctrl-n'] = 'b' } }",
+            "the same key as",
+        ),
+        (
+            "ui.input { keys = { up = function() end } }",
+            "cannot leave its module",
+        ),
+        (
+            "ui.input { value = true }",
+            "input.value: expected a string",
+        ),
+    ] {
+        let error = input_view(view).err();
+        assert!(
+            error
+                .as_deref()
+                .is_some_and(|error| error.contains(expected)),
+            "{view}: {error:?}"
+        );
+    }
+}
+
+#[test]
+fn key_chords_read_as_gpui_names_them() {
+    use crate::KeyChord;
+    let minus = KeyChord::parse("ctrl--").unwrap();
+    assert!(minus.ctrl && minus.key == "-");
+    let bare = KeyChord::parse("-").unwrap();
+    assert!(!bare.ctrl && bare.key == "-");
+    let every = KeyChord::parse("ctrl-alt-shift-cmd-f5").unwrap();
+    assert!(every.ctrl && every.alt && every.shift && every.cmd && !every.secondary);
+    assert_eq!(every.key, "f5");
+    for good in [
+        "escape",
+        "enter",
+        "pagedown",
+        "space",
+        "/",
+        "1",
+        "secondary-enter",
+    ] {
+        assert!(KeyChord::parse(good).is_ok(), "{good}");
+    }
+    for bad in ["", "--", "ctrl-", "esc", "Enter", "ctrl-ab", "hyper-x"] {
+        assert!(KeyChord::parse(bad).is_err(), "{bad}");
+    }
+}
+
+#[test]
+fn focus_and_disabled_states_layer_over_the_resting_rule() {
+    use crate::States;
+    let style = r#"return style {
+      rules = {
+        input = { background = "muted", border_color = "border" },
+        ["input:hover"] = { border_color = "accent/50" },
+        ["input:focus"] = { border_color = "accent" },
+        ["input:disabled"] = { opacity = 0.5 },
+        [".loud:focus"] = { background = "accent/10" },
+        ["input-placeholder"] = { color = "muted-foreground" },
+        ["terminal:focus"] = { border_color = "accent" },
+      },
+    }"#;
+    let dir = app(&[(
+        "field",
+        "return mod { view = function() return ui.input { class = 'loud' } end }",
+    )]);
+    write(dir.path(), "style.luau", style);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let Some(Node::Input(input)) = workspace.slot("field").unwrap().view() else {
+        panic!("no input");
+    };
+    let sheet = workspace.stylesheet();
+    let at = |focus, disabled| {
+        sheet.resolve_in(
+            Part::Input,
+            &input.look,
+            States {
+                selected: false,
+                focus,
+                disabled,
+            },
+            &Rules::default(),
+        )
+    };
+    let token = |color: Option<Color>| color.map(|color| (color.paint, color.alpha));
+    let resting = at(false, false);
+    assert_eq!(
+        token(resting.base.border_color),
+        Some((Paint::Token(Token::Border), 1.0))
+    );
+    assert_eq!(
+        token(resting.hover.border_color),
+        Some((Paint::Token(Token::Accent), 0.5))
+    );
+    let focused = at(true, false);
+    assert_eq!(
+        token(focused.base.border_color),
+        Some((Paint::Token(Token::Accent), 1.0))
+    );
+    // The class's focus rule comes after the type's.
+    assert_eq!(
+        token(focused.base.background),
+        Some((Paint::Token(Token::Accent), 0.1))
+    );
+    let disabled = at(false, true);
+    assert_eq!(disabled.base.opacity, Some(0.5));
+    assert_eq!(disabled.hover, Default::default());
+    let placeholder = sheet
+        .resolve(
+            Part::InputPlaceholder,
+            &Default::default(),
+            false,
+            &Rules::default(),
+        )
+        .base;
+    assert_eq!(
+        token(placeholder.color),
+        Some((Paint::Token(Token::MutedForeground), 1.0))
+    );
+
+    let dir = app(&[]);
+    write(
+        dir.path(),
+        "style.luau",
+        "return style { rules = { ['input:pressed'] = {} } }",
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let error = workspace.style_error().unwrap().to_string();
+    assert!(error.contains("unknown state `pressed`"), "{error}");
+    assert!(error.contains("focus, disabled"), "{error}");
 }

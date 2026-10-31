@@ -11,8 +11,8 @@
 
 use {
     crate::{
-        Action, Command, Data, Error, Node, Roots, Rules, Stylesheet,
-        component::{Component, Library},
+        Action, Chrome, Command, Data, Error, Node, Roots, Rules, Stylesheet, WindowState,
+        component::{Component, Demo, Library},
         module::{Meta, Module},
         style,
         vm::{self, Meter},
@@ -40,9 +40,13 @@ pub struct Workspace {
     components: Vec<Component>,
     shell: Slot,
     mods: BTreeMap<String, Slot>,
+    /// Each component's live preview, by its module name: `demo:<name>`.
+    demos: BTreeMap<String, Slot>,
     stylesheet: Stylesheet,
     style_error: Option<Error>,
     dark: bool,
+    /// The window as views see it, `app.window`.
+    window: WindowState,
     /// What the host shares with every view under `app`, such as
     /// `app.system`; modules cannot read the machine themselves.
     host: BTreeMap<String, Data>,
@@ -55,6 +59,11 @@ pub struct Workspace {
 
 /// How a message names a provider rather than a mod.
 pub const PROVIDER: &str = "provider:";
+
+/// How a component's live preview is named among modules: `demo:tabs`. A
+/// demo only talks to itself: its messages to other mods and providers, and
+/// its app commands, go nowhere.
+pub const DEMO: &str = "demo:";
 
 /// A module and what it last drew. A module that fails to load keeps
 /// running its previous version, so a broken edit shows its error beside
@@ -135,11 +144,23 @@ impl Slot {
     }
 
     fn load(&mut self, name: &str, path: &Path, library: &Library) {
-        self.source = Some(path.to_owned());
+        match fs::read_to_string(path) {
+            Ok(source) => self.load_source(name, &source, Some(path), library),
+            Err(error) => {
+                self.source = Some(path.to_owned());
+                self.load_error = Some(Error::new(format!(
+                    "cannot read {}: {error}",
+                    path.display()
+                )));
+            },
+        }
+    }
+
+    /// Loads `source`, which came from `path` if it is a file's.
+    fn load_source(&mut self, name: &str, source: &str, path: Option<&Path>, library: &Library) {
+        self.source = path.map(Path::to_owned);
         let previous = self.module.as_ref().and_then(Module::state);
-        let loaded = fs::read_to_string(path)
-            .map_err(|error| Error::new(format!("cannot read {}: {error}", path.display())))
-            .and_then(|source| Module::load(name, &source, previous.as_ref(), library));
+        let loaded = Module::load(name, source, previous.as_ref(), library);
         match loaded {
             Ok(module) => {
                 self.module = Some(module);
@@ -179,9 +200,11 @@ impl Workspace {
             components: Vec::new(),
             shell: Slot::default(),
             mods: BTreeMap::new(),
+            demos: BTreeMap::new(),
             stylesheet: Stylesheet::default(),
             style_error: None,
             dark,
+            window: WindowState::default(),
             host: BTreeMap::new(),
             host_problems: BTreeMap::new(),
             outbox: Vec::new(),
@@ -207,6 +230,12 @@ impl Workspace {
         self.load_style();
         self.library = Library::read(self.roots.entries("components", "luau"));
         self.components = self.library.catalogue(&self.stylesheet);
+        let mut rules = Rules::default();
+        for component in &self.components {
+            rules.layer(&component.rules);
+        }
+        self.stylesheet.components = rules;
+        self.load_demos();
         match self.roots.file("main.luau") {
             Some(_) => {
                 let candidates = self.roots.candidates("main.luau");
@@ -316,14 +345,36 @@ impl Workspace {
         self.render();
     }
 
+    /// What the shell asks of the window; the system title bar when it
+    /// says nothing or fails to load.
+    pub fn chrome(&self) -> Chrome {
+        self.shell
+            .module
+            .as_ref()
+            .and_then(Module::window)
+            .unwrap_or_default()
+    }
+
+    /// Shares the window's state as `app.window`, drawing the views again
+    /// when it changed.
+    pub fn set_window(&mut self, window: WindowState) {
+        if self.window != window {
+            self.window = window;
+            self.render();
+        }
+    }
+
     pub fn shell(&self) -> &Slot {
         &self.shell
     }
 
-    /// The shell for [`SHELL`], else the mod of that name.
+    /// The shell for [`SHELL`], a component's preview for `demo:<name>`,
+    /// else the mod of that name.
     pub fn slot(&self, name: &str) -> Option<&Slot> {
         if name == SHELL {
             Some(&self.shell)
+        } else if name.starts_with(DEMO) {
+            self.demos.get(name)
         } else {
             self.mods.get(name)
         }
@@ -332,9 +383,53 @@ impl Workspace {
     fn slot_mut(&mut self, name: &str) -> Option<&mut Slot> {
         if name == SHELL {
             Some(&mut self.shell)
+        } else if name.starts_with(DEMO) {
+            self.demos.get_mut(name)
         } else {
             self.mods.get_mut(name)
         }
+    }
+
+    /// Loads every component's demo, its file or one made from its example,
+    /// keeping each one's state across reloads.
+    fn load_demos(&mut self) {
+        let files = self.roots.entries("components/demos", "luau");
+        let mut found = BTreeSet::new();
+        for component in &mut self.components {
+            let demo = match files.get(&component.name) {
+                Some(path) => match fs::read_to_string(path) {
+                    Ok(source) => Some(Demo {
+                        source,
+                        path: Some(path.clone()),
+                    }),
+                    Err(error) => {
+                        component.preview = Err(Error::new(format!(
+                            "cannot read {}: {error}",
+                            path.display()
+                        )));
+                        None
+                    },
+                },
+                None => component.demo.take(),
+            };
+            component.demo = demo;
+            let Some(demo) = &component.demo else {
+                continue;
+            };
+            let name = format!("{DEMO}{}", component.name);
+            found.insert(name.clone());
+            let slot = self.demos.entry(name.clone()).or_default();
+            slot.load_source(&name, &demo.source, demo.path.as_deref(), &self.library);
+        }
+        self.demos.retain(|name, _| found.contains(name));
+    }
+
+    /// A component's live preview, and the module name its controls send
+    /// from.
+    pub fn demo(&self, component: &str) -> Option<(&str, &Slot)> {
+        self.demos
+            .get_key_value(&format!("{DEMO}{component}"))
+            .map(|(name, slot)| (name.as_str(), slot))
     }
 
     /// The mods that asked for `region`, in order.
@@ -368,11 +463,22 @@ impl Workspace {
                 .err()
                 .map(|error| (component.path_name(), error))
         });
+        // A demo's problem names its file, or the component it was made for.
+        let demos = self.components.iter().filter_map(|component| {
+            let (_, slot) = self.demo(&component.name)?;
+            let error = slot.error()?;
+            let name = match component.demo.as_ref().and_then(|demo| demo.path.as_ref()) {
+                Some(_) => component.demo_name(),
+                None => component.path_name(),
+            };
+            Some((name, error))
+        });
         self.style_error
             .iter()
             .map(|error| ("style", error))
             .chain(modules)
             .chain(components)
+            .chain(demos)
             .chain(self.host_problems())
             .collect()
     }
@@ -389,7 +495,11 @@ impl Workspace {
     /// to modules here; commands are the app's, so they are handed back.
     pub fn dispatch(&mut self, from: &str, action: &Action) -> Option<Command> {
         match action {
+            // A preview never quits or closes the app.
+            Action::Command(_) if from.starts_with(DEMO) => None,
             Action::Command(command) => Some(*command),
+            // The app runs these on the browser it keeps.
+            Action::Browser { .. } => None,
             Action::Send { to, msg } => {
                 self.send(from, to.as_deref().unwrap_or(from), msg.clone());
                 None
@@ -403,6 +513,10 @@ impl Workspace {
         let mut queue = VecDeque::from([(from.to_owned(), to.to_owned(), msg)]);
         let mut delivered = 0;
         while let Some((from, to, msg)) = queue.pop_front() {
+            // A preview keeps to itself.
+            if from.starts_with(DEMO) && to != from {
+                continue;
+            }
             if let Some(provider) = to.strip_prefix(PROVIDER) {
                 self.outbox.push((provider.to_owned(), msg));
                 continue;
@@ -460,6 +574,7 @@ impl Workspace {
         let mut app = self.host.clone();
         app.extend([
             ("dark".to_owned(), Data::Bool(self.dark)),
+            ("window".to_owned(), self.window.data()),
             (
                 "mods".to_owned(),
                 Data::List(self.mod_names().map(Data::from).collect()),
@@ -480,7 +595,7 @@ impl Workspace {
     fn render(&mut self) {
         let app = self.app();
         self.shell.render(&app, &self.stylesheet);
-        for slot in self.mods.values_mut() {
+        for slot in self.mods.values_mut().chain(self.demos.values_mut()) {
             slot.render(&app, &self.stylesheet);
         }
     }

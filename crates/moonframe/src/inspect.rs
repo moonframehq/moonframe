@@ -162,17 +162,42 @@ fn describe(node: &Node) -> String {
         Node::Item(item) => format!("item{} {}", classes(&item.look), quote(&item.label)),
         Node::Badge(badge) => format!("badge{} {}", classes(&badge.look), quote(&badge.text)),
         Node::Icon(icon) => format!("icon{} {}", classes(&icon.look), icon.name.name()),
+        Node::Image(image) => format!("image{} {}", classes(&image.look), quote(&image.src)),
         Node::Terminal(terminal) => format!(
             "terminal{} {} ({})",
             classes(&terminal.look),
             quote(&terminal.id),
             terminal.engine.name()
         ),
+        Node::Browser(browser) => format!(
+            "browser{} {} {}",
+            classes(&browser.look),
+            quote(&browser.id),
+            browser
+                .url
+                .as_deref()
+                .map_or_else(|| "about:blank".to_owned(), quote)
+        ),
+        Node::Input(input) => {
+            let mut name = format!("input{}", classes(&input.look));
+            if let Some(id) = &input.id {
+                name = format!("{name} {}", quote(id));
+            }
+            if let Some(placeholder) = &input.placeholder {
+                name = format!("{name} {}", quote(placeholder));
+            }
+            name
+        },
         Node::Divider => "divider".to_owned(),
         Node::Spacer => "spacer".to_owned(),
         Node::Region(region) => format!("region {}", quote(&region.name)),
         Node::Mount(name) => format!("mount {}", quote(name)),
         Node::Popover(popover) => format!("popover{}", classes(&popover.look)),
+        Node::Overlay(overlay) => format!(
+            "overlay{} ({})",
+            classes(&overlay.look),
+            overlay.place.name()
+        ),
         Node::Problem(message) => format!("broken element ({})", quote(message)),
     }
 }
@@ -186,8 +211,12 @@ fn line(node: &Node) -> Option<u32> {
         Node::Item(item) => item.look.line,
         Node::Badge(badge) => badge.look.line,
         Node::Icon(icon) => icon.look.line,
+        Node::Image(image) => image.look.line,
         Node::Terminal(terminal) => terminal.look.line,
+        Node::Browser(browser) => browser.look.line,
+        Node::Input(input) => input.look.line,
         Node::Popover(popover) => popover.look.line,
+        Node::Overlay(overlay) => overlay.look.line,
         Node::Split(_)
         | Node::Divider
         | Node::Spacer

@@ -7,8 +7,8 @@
 
 use {
     crate::{
-        Data, Error, IconName, Node, Stylesheet, node,
-        read::{Cx, Fields, NO_NAMES},
+        Data, Error, IconName, Node, Rules, Stylesheet, node,
+        read::{Cx, Fields, NO_NAMES, Read as _},
         vm::{self, Meter},
     },
     mlua::{Function, Lua, Table, Value},
@@ -111,16 +111,30 @@ impl Library {
                     Ok((about, preview)) => (about, preview),
                     Err(error) => (About::default(), Err(error)),
                 };
+                // A component whose styles do not read shows why instead of
+                // a preview drawn without them.
+                let (rules, preview) = match about.rules {
+                    Ok(rules) => (rules, preview),
+                    Err(error) => (Rules::default(), Err(error)),
+                };
                 Component {
                     name: name.clone(),
                     path: source.path.clone(),
                     title: about.title.unwrap_or_else(|| name.clone()),
                     description: about.description.unwrap_or_default(),
                     category: about.category.unwrap_or_else(|| "Other".to_owned()),
+                    when: about.when.unwrap_or_default(),
+                    props: about.props,
                     icon: about.icon,
+                    demo: about
+                        .usage
+                        .is_none()
+                        .then(|| about.example.as_ref().map(|example| demo(name, example)))
+                        .flatten(),
                     usage: about
                         .usage
                         .unwrap_or_else(|| usage(name, about.example.as_ref())),
+                    rules,
                     preview,
                 }
             })
@@ -136,15 +150,35 @@ pub struct Component {
     pub title: String,
     pub description: String,
     pub category: String,
+    /// When to reach for it, and what to use instead when it is not the one.
+    pub when: String,
+    /// Each prop and what it does, by name.
+    pub props: BTreeMap<String, String>,
     /// Shown beside its title in the browser.
     pub icon: Option<IconName>,
     /// Luau that uses it, for the user or an agent to paste into a mod.
     pub usage: String,
+    /// A whole mod that shows it, run live in the browser's preview: the
+    /// file `components/demos/<name>.luau`, else one made from `example`
+    /// (none when the example holds elements, which cannot be written out).
+    pub demo: Option<Demo>,
+    /// Its default `styles`, under every mod's and the stylesheet's.
+    pub rules: Rules,
     /// Its `build(example)`, or why it could not be drawn.
     pub preview: Result<Node, Error>,
 }
 
 impl Component {
+    /// How problems name its demo file.
+    pub fn demo_name(&self) -> &str {
+        self.demo
+            .as_ref()
+            .and_then(|demo| demo.path.as_deref())
+            .and_then(|path| path.to_str())
+            .and_then(|path| path.rsplit_once("/components/").map(|(_, file)| file))
+            .unwrap_or(&self.name)
+    }
+
     /// How problems name it.
     pub fn path_name(&self) -> &str {
         self.path
@@ -154,14 +188,32 @@ impl Component {
     }
 }
 
-#[derive(Default)]
 struct About {
     title: Option<String>,
     description: Option<String>,
     category: Option<String>,
+    when: Option<String>,
+    props: BTreeMap<String, String>,
+    rules: Result<Rules, Error>,
     icon: Option<IconName>,
     usage: Option<String>,
     example: Option<Data>,
+}
+
+impl Default for About {
+    fn default() -> Self {
+        Self {
+            title: None,
+            description: None,
+            category: None,
+            when: None,
+            props: BTreeMap::new(),
+            rules: Ok(Rules::default()),
+            icon: None,
+            usage: None,
+            example: None,
+        }
+    }
 }
 
 /// Loads the component `name` on its own and draws its example.
@@ -177,16 +229,24 @@ fn describe(
         "title",
         "description",
         "category",
+        "when",
+        "props",
+        "styles",
         "icon",
         "usage",
         "example",
         "build",
     ]])?;
+    let styles = fields.raw("styles").cloned().unwrap_or(Value::Nil);
     let example = fields.raw("example").cloned().unwrap_or(Value::Nil);
     let about = About {
         title: fields.get("title")?,
         description: fields.get("description")?,
         category: fields.get("category")?,
+        when: fields.get("when")?,
+        props: fields.get("props")?.unwrap_or_default(),
+        rules: Option::<Rules>::read(&styles, &Cx::root(sheet.names()).key("styles"))
+            .map(Option::unwrap_or_default),
         icon: fields.get("icon")?,
         usage: fields.get("usage")?,
         example: Data::read(&example).ok(),
@@ -207,6 +267,29 @@ fn describe(
             }
         });
     Ok((about, preview))
+}
+
+/// The source of a component's live preview.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Demo {
+    pub source: String,
+    /// Where it was read from; `None` when made from the example.
+    pub path: Option<PathBuf>,
+}
+
+/// A mod that draws the component `name` with its example.
+fn demo(name: &str, example: &Data) -> Demo {
+    let variable = name.replace('-', "_");
+    let props = literal(example);
+    Demo {
+        source: format!(
+            "-- The preview: a mod drawing `{name}` with its example. Write\n\
+             -- components/demos/{name}.luau to make it a demo you can play with.\n\
+             local {variable} = use \"{name}\"\n\n\
+             return mod {{\n\tview = function()\n\t\treturn {variable} {props}\n\tend,\n}}\n"
+        ),
+        path: None,
+    }
 }
 
 /// Luau that uses the component with its example.
@@ -250,3 +333,110 @@ fn literal(data: &Data) -> String {
         },
     }
 }
+
+/// The host's elements, for the catalogue: `ui.*` and when to use each.
+const ELEMENTS: &str = include_str!("catalogue/elements.md");
+
+/// The catalogue agents read before building UI: every host element and
+/// every component, grouped by category, with when to use each, its props,
+/// the classes it styles, and how to call it. `just components` writes it
+/// as the `moonframe-components` skill.
+pub fn catalogue(components: &[Component]) -> String {
+    let mut out = String::from(CATALOGUE_HEAD);
+    out.push_str(ELEMENTS.trim_end());
+    out.push_str("\n\n## Components\n\n");
+    out.push_str(
+        "Call one with `local name = use \"name\"`, then `name { ... }` wherever an \
+         element goes. Its classes can be restyled in `style.luau`.\n\n",
+    );
+    let mut categories: BTreeMap<&str, Vec<&Component>> = BTreeMap::new();
+    for component in components {
+        categories
+            .entry(component.category.as_str())
+            .or_default()
+            .push(component);
+    }
+    out.push_str("| Component | Category | Use it for |\n| --- | --- | --- |\n");
+    for (category, list) in &categories {
+        for component in list {
+            let _ = writeln!(
+                out,
+                "| [`{}`](#{}) | {category} | {} |",
+                component.name,
+                component.name,
+                cell(&component.when_or_description())
+            );
+        }
+    }
+    for (category, list) in &categories {
+        let _ = write!(out, "\n### {category}\n");
+        for component in list {
+            let _ = write!(out, "\n#### `{}`\n\n", component.name);
+            let _ = writeln!(out, "**{}.** {}\n", component.title, component.description);
+            if !component.when.is_empty() {
+                let _ = writeln!(out, "**When:** {}\n", component.when);
+            }
+            if !component.props.is_empty() {
+                out.push_str("| Prop | Meaning |\n| --- | --- |\n");
+                for (name, meaning) in &component.props {
+                    let _ = writeln!(out, "| `{name}` | {} |", cell(meaning));
+                }
+                out.push('\n');
+            }
+            let selectors = component.rules.selectors();
+            if !selectors.is_empty() {
+                let selectors: Vec<String> = selectors
+                    .iter()
+                    .map(|selector| format!("`{selector}`"))
+                    .collect();
+                let _ = writeln!(out, "**Styles:** {}\n", selectors.join(" "));
+            }
+            let _ = writeln!(out, "```lua\n{}\n```", component.usage.trim_end());
+            if component
+                .demo
+                .as_ref()
+                .is_some_and(|demo| demo.path.is_some())
+            {
+                let _ = writeln!(
+                    out,
+                    "\nA whole mod using it, with state: `app/components/demos/{}.luau`.",
+                    component.name
+                );
+            }
+        }
+    }
+    out
+}
+
+impl Component {
+    fn when_or_description(&self) -> String {
+        if self.when.is_empty() {
+            self.description.clone()
+        } else {
+            self.when.clone()
+        }
+    }
+}
+
+/// Text that fits in one table cell.
+fn cell(text: &str) -> String {
+    text.replace('\n', " ").replace('|', "\\|")
+}
+
+const CATALOGUE_HEAD: &str = "\
+---
+name: moonframe-components
+description: The full catalogue of ready-made UI in Moonframe, every host element (`ui.*`) and every component (`use \"name\"`), with when to use each, its props, the classes it styles, and how to call it. Read it before building or changing any UI in Moonframe (a mod, a panel, a sidebar, a dialog, a menu, a status bar item, a settings page), to pick an existing piece instead of writing a new one. Generated by `just components`; pairs with the moonframe skill.
+---
+
+<!-- Generated by `just components` from app/components and
+crates/moonframe-core/src/catalogue/elements.md. Do not edit by hand. -->
+
+# Moonframe components
+
+Everything a mod can draw. Prefer, in order: a component that fits, a
+component with a `class` and a `style.luau` rule, a composition of
+components, and only then new `ui.*` code. See the moonframe skill for
+how mods, styles and providers work.
+
+";

@@ -15,6 +15,13 @@ return component {
 	category = "Data",
 	icon = "chart-pie",
 	description = "Recent samples (0 to 1) as tiny bars, newest on the right, in a fixed width; samples past `hot` turn to the warning color.",
+	when = "Recent samples as tiny bars, like CPU over the last minute, in a status bar or header.",
+	props = {
+		["values"] = "samples from 0 to 1, oldest first",
+		["samples"] = "how many bars to show",
+		["height"] = "pixels",
+		["hot"] = "value past which a bar turns warning",
+	},
 	example = { values = { 0.1, 0.3, 0.2, 0.5, 0.4, 0.9, 0.6, 0.3, 0.2, 0.4, 0.7, 0.5 } },
 
 	build = function(props: Props)

@@ -7,14 +7,19 @@
 //! Each element's look is, lowest first: its default here, the stylesheet's
 //! rules (`Stylesheet::resolve`), and its own keys such as `padding`.
 
+mod browser;
 mod elements;
+mod floating;
 mod gallery;
+mod input;
 mod styling;
 mod terminal;
 
 use {
     crate::{
         app::MoonframeApp,
+        browser::Browsers,
+        input::Inputs,
         inspect::{Crumb, Sink, Tracked},
         motion::{Motion, Shown},
         terminal::Terminals,
@@ -24,13 +29,23 @@ use {
         *,
     },
     moonframe_core::{
-        Action, Data, Direction, Look, Node, Part, Resolved, Rules, SHELL, Slot, Transition,
-        Workspace,
+        Action, Data, Direction, Keys, Look, Node, Part, Resolved, Rules, SHELL, Slot, States,
+        Transition, Workspace,
     },
-    std::{rc::Rc, sync::LazyLock, time::Instant},
+    std::{
+        path::Path,
+        rc::Rc,
+        sync::LazyLock,
+        time::{Duration, Instant},
+    },
 };
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
+
+/// One turn of a spinning icon, before `animation_speed`.
+const SPIN_PERIOD: Duration = Duration::from_secs(1);
+/// When spinning icons started turning: all of them turn together.
+static SPIN_EPOCH: LazyLock<Instant> = LazyLock::new(Instant::now);
 
 /// Mounts deep enough for any real layout; deeper is a mod mounting itself.
 const MAX_MOUNTS: usize = 16;
@@ -39,6 +54,40 @@ const MAX_MOUNTS: usize = 16;
 const MAX_DRAWN: usize = 50_000;
 
 type Cx<'a, 'b> = &'a Context<'b, MoonframeApp>;
+
+/// Where floating layers paint, lowest first. A popover's backdrop and
+/// content sit just above the layer it is drawn in: the window's (0), or an
+/// overlay's. Each open overlay takes the next step up, in tree order, so a
+/// later one is above an earlier one and everything in it.
+const POPOVER_BACKDROP: usize = 1;
+const POPOVER_CONTENT: usize = 2;
+const OVERLAY_BASE: usize = 10;
+const OVERLAY_STEP: usize = 10;
+
+/// An open popover or overlay that may take keystrokes: the topmost one (by
+/// `priority`, then the later in the tree) gets the first say over each key.
+#[derive(Clone, Debug)]
+pub(crate) struct KeyLayer {
+    pub(crate) priority: usize,
+    /// The mod that drew it, whose `update` gets the messages.
+    pub(crate) owner: String,
+    /// The mod its messages go to, if not the owner.
+    pub(crate) to: Option<String>,
+    pub(crate) keys: Keys,
+    /// Also what plain Escape sends, unless `keys` takes Escape.
+    pub(crate) dismiss: Option<Data>,
+    /// It blocks the window behind (a backdrop), so a terminal there gets
+    /// no keys while it is open.
+    pub(crate) modal: bool,
+}
+
+/// What a click outside an open popover sends, and the layer it is in.
+struct Backdrop<'w> {
+    priority: usize,
+    owner: &'w str,
+    to: Option<String>,
+    msg: Data,
+}
 
 /// Something in a view that knows how to draw itself.
 trait Draw<'w> {
@@ -97,6 +146,25 @@ impl<'w> Place<'w> {
         let owner = self.owner.to_owned();
         let action = action.clone();
         cx.listener(move |this, _: &ClickEvent, window, cx| {
+            // The innermost control takes the click: a tab's close button
+            // does not also select the tab.
+            cx.stop_propagation();
+            this.dispatch(&owner, &action, window, cx)
+        })
+    }
+}
+
+impl Place<'_> {
+    /// Sends `action` from this node's mod on a right-click.
+    fn context(
+        &self,
+        action: &Action,
+        cx: Cx,
+    ) -> impl Fn(&MouseDownEvent, &mut Window, &mut App) + 'static {
+        let owner = self.owner.to_owned();
+        let action = action.clone();
+        cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+            cx.stop_propagation();
             this.dispatch(&owner, &action, window, cx)
         })
     }
@@ -113,9 +181,16 @@ pub(crate) struct Painter<'w, 'm> {
     animating: bool,
     /// Elements drawn so far this frame.
     drawn: usize,
-    /// The open popover's mod and `dismiss` message: a click outside it
-    /// sends this.
-    backdrop: Option<(&'w str, Data)>,
+    /// The open popovers' click-outside layers.
+    backdrops: Vec<Backdrop<'w>>,
+    /// Open overlays' layers, in tree order. A slot is taken before the
+    /// overlay's content is drawn, so an overlay inside it comes after.
+    overlays: Vec<Option<AnyElement>>,
+    /// The paint priority of the layer being drawn: 0 for the window, an
+    /// overlay's while drawing its content.
+    layer: usize,
+    /// Open popovers and overlays, for the keys they take.
+    key_layers: Vec<KeyLayer>,
     /// Where nodes record their bounds while inspecting.
     sink: Option<Sink>,
     /// The innermost node being drawn, while inspecting: what a mod mounted
@@ -123,8 +198,16 @@ pub(crate) struct Painter<'w, 'm> {
     outer: Option<Rc<Crumb>>,
     /// The shells terminals show.
     terminals: &'m mut Terminals,
-    /// Drawing a preview (the component browser): nothing starts a shell.
+    /// The text input fields edit.
+    inputs: Inputs,
+    /// Drawing a preview (the component browser): nothing starts a shell,
+    /// and fields can't be edited.
     preview: bool,
+    /// Drawing inside a `drag = true` stack: controls cover it, so a press
+    /// on one is a click and not the start of a window move.
+    in_drag: bool,
+    /// The pages browsers show; none in previews.
+    browsers: Option<&'m mut Browsers>,
 }
 
 impl<'w, 'm> Painter<'w, 'm> {
@@ -132,6 +215,7 @@ impl<'w, 'm> Painter<'w, 'm> {
         workspace: &'w Workspace,
         motion: &'m mut Motion,
         terminals: &'m mut Terminals,
+        inputs: &Inputs,
         sink: Option<Sink>,
     ) -> Self {
         Self {
@@ -141,12 +225,24 @@ impl<'w, 'm> Painter<'w, 'm> {
             now: Instant::now(),
             animating: false,
             drawn: 0,
-            backdrop: None,
+            backdrops: Vec::new(),
+            overlays: Vec::new(),
+            layer: 0,
+            key_layers: Vec::new(),
             sink,
             outer: None,
             terminals,
+            inputs: inputs.clone(),
             preview: false,
+            in_drag: false,
+            browsers: None,
         }
+    }
+
+    /// For the main window, whose browsers show their pages.
+    pub(crate) fn with_browsers(mut self, browsers: &'m mut Browsers) -> Self {
+        self.browsers = Some(browsers);
+        self
     }
 
     /// For previews, which show elements without starting anything.
@@ -159,8 +255,13 @@ impl<'w, 'm> Painter<'w, 'm> {
         self.animating
     }
 
+    /// The open popovers and overlays this frame drew, for their keys.
+    pub(crate) fn take_key_layers(&mut self) -> Vec<KeyLayer> {
+        std::mem::take(&mut self.key_layers)
+    }
+
     /// The whole window: the shell, under the stylesheet's and providers'
-    /// problems if any, and the backdrop of an open popover.
+    /// problems if any, the backdrops of open popovers, and open overlays.
     pub(crate) fn shell(&mut self, cx: Cx) -> AnyElement {
         let shell = self.slot(SHELL, cx);
         // The stylesheet's problem and each provider's, above the shell.
@@ -192,25 +293,33 @@ impl<'w, 'm> Painter<'w, 'm> {
             )
             .with_priority(1)
         });
-        let backdrop = self.backdrop.take().map(|(owner, msg)| {
-            let action = Action::Send { to: None, msg };
-            let owner = owner.to_owned();
-            // Under the popover's content, over everything else.
-            deferred(
-                div()
-                    .id("popover-backdrop")
-                    .absolute()
-                    .inset_0()
-                    .occlude()
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(move |this, _: &MouseDownEvent, window, cx| {
-                            this.dispatch(&owner, &action, window, cx)
-                        }),
-                    ),
-            )
-            .with_priority(1)
-        });
+        let backdrops: Vec<_> = std::mem::take(&mut self.backdrops)
+            .into_iter()
+            .enumerate()
+            .map(|(index, backdrop)| {
+                let action = Action::Send {
+                    to: backdrop.to,
+                    msg: backdrop.msg,
+                };
+                let owner = backdrop.owner.to_owned();
+                // Under the popover's content, over the rest of its layer.
+                deferred(
+                    div()
+                        .id(("popover-backdrop", index))
+                        .absolute()
+                        .inset_0()
+                        .occlude()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                                this.dispatch(&owner, &action, window, cx)
+                            }),
+                        ),
+                )
+                .with_priority(backdrop.priority)
+            })
+            .collect();
+        let overlays = std::mem::take(&mut self.overlays).into_iter().flatten();
         div()
             .relative()
             .size_full()
@@ -218,7 +327,8 @@ impl<'w, 'm> Painter<'w, 'm> {
             .flex_col()
             .child(shell)
             .children(banners)
-            .children(backdrop)
+            .children(backdrops)
+            .children(overlays)
             .into_any_element()
     }
 
@@ -302,8 +412,44 @@ impl<'w, 'm> Painter<'w, 'm> {
         shown
     }
 
+    /// How far round a spinning icon is this frame, from 0 to 1, asking for
+    /// another frame; `None` while `animation_speed` turns animations off.
+    fn spin(&mut self) -> Option<f32> {
+        let period = self.workspace.stylesheet().scaled(SPIN_PERIOD);
+        if period.is_zero() {
+            return None;
+        }
+        self.animating = true;
+        let elapsed = self.now.saturating_duration_since(*SPIN_EPOCH);
+        Some((elapsed.as_secs_f64() / period.as_secs_f64()).fract() as f32)
+    }
+
+    /// The folder of the mod (or component, in the browser) `owner`, which
+    /// relative paths such as an image's `src` start from.
+    fn folder(&self, owner: &str) -> Option<&'w Path> {
+        let source = match self.workspace.slot(owner) {
+            Some(slot) => slot.source(),
+            None => self
+                .workspace
+                .components()
+                .iter()
+                .find(|component| component.name == owner)
+                .map(|component| component.path.as_path()),
+        };
+        source.and_then(Path::parent)
+    }
+
     /// A part's style from the stylesheet and the rules of the mod that drew it.
     fn look(&self, part: Part, look: &Look, selected: bool, place: &Place) -> Resolved {
+        let states = States {
+            selected,
+            ..States::default()
+        };
+        self.look_in(part, look, states, place)
+    }
+
+    /// The same, for a part in `states` (focused, disabled).
+    fn look_in(&self, part: Part, look: &Look, states: States, place: &Place) -> Resolved {
         let local = self
             .workspace
             .slot(place.owner)
@@ -311,7 +457,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             .unwrap_or(&NO_RULES);
         self.workspace
             .stylesheet()
-            .resolve(part, look, selected, local)
+            .resolve_in(part, look, states, local)
     }
 }
 
@@ -367,12 +513,16 @@ fn draw_node<'w>(
         Node::Item(item) => item.draw(painter, place, cx),
         Node::Badge(badge) => badge.draw(painter, place, cx),
         Node::Icon(icon) => icon.draw(painter, place, cx),
+        Node::Image(image) => image.draw(painter, place, cx),
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
+        Node::Browser(browser) => browser.draw(painter, place, cx),
+        Node::Input(input) => input.draw(painter, place, cx),
         Node::Region(region) => region.draw(painter, place, cx),
         Node::Divider => elements::divider(painter, place, cx),
         Node::Spacer => div().flex_1().into_any_element(),
         Node::Mount(name) => painter.slot(name, cx),
         Node::Popover(popover) => popover.draw(painter, place, cx),
+        Node::Overlay(overlay) => overlay.draw(painter, place, cx),
         Node::Problem(message) => broken(message, place, cx),
     }
 }

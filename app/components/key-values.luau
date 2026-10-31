@@ -12,6 +12,11 @@ return component {
 	category = "Data",
 	icon = "file-text",
 	description = "Label and value pairs in two aligned columns, for properties and details.",
+	when = "Read-only properties or details: aligned label/value lines. For editable settings use `settings-row`.",
+	props = {
+		["rows"] = "list of { label, value }",
+		["width"] = "label column width in pixels",
+	},
 	example = { rows = { { "Branch", "main" }, { "Ahead", "2 commits" }, { "Changed", "14 files" } } },
 
 	build = function(props: Props)

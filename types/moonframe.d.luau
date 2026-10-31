@@ -19,7 +19,9 @@ type Edge = "none" | "all" | "top" | "bottom" | "left" | "right"
 type Border = boolean | Edge
 type Direction = "row" | "column"
 type Variant = "normal" | "primary" | "ghost" | "outline" | "danger"
-type Command = "quit" | "reload" | "toggle-theme" | "show-themes"
+type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "minimize" | "maximize" | "close-window" | BrowserCommand
+-- Run on the `ui.browser` the control's `browser` key names.
+type BrowserCommand = "browser-back" | "browser-forward" | "browser-reload" | "browser-stop" | "browser-open"
 
 -- `#rrggbb`, a palette name, or a theme color, optionally `name/NN`.
 type Color = string
@@ -64,6 +66,9 @@ type Style = {
 	shadow: Shadow?,
 	size: TextSize?,
 	weight: Weight?,
+	font: ("sans" | "mono")?,
+	-- Letter case of a text: `upper` for headings.
+	case: ("upper" | "lower" | "none")?,
 	opacity: number?,
 	transition: Transition?,
 }
@@ -85,6 +90,8 @@ type StackProps = {
 	msg: Data,
 	to: string?,
 	command: Command?,
+	-- With a browser command: the `id` of the `ui.browser` (of the mod `to`, else this one).
+	browser: string?,
 	gap: Space?,
 	padding: Space?,
 	grow: boolean?,
@@ -92,10 +99,30 @@ type StackProps = {
 	height: number?,
 	surface: Surface?,
 	border: Border?,
-	scroll: boolean?,
+	-- `true` scrolls along its axis; or "x", "y", "both".
+	scroll: (boolean | "x" | "y" | "both")?,
+	-- false keeps the content's size when the parent is short of space.
+	shrink: boolean?,
+	-- Where it sits across the parent's axis, over the parent's `align`.
+	self_align: Align?,
+	-- Keep its own width in a column; follow a row's `align` as usual.
+	hug: boolean?,
+	max_width: number?,
+	max_height: number?,
+	-- Out of the flow, over the parent at these pixel offsets (negative overhangs).
+	float: { top: number?, right: number?, bottom: number?, left: number? }?,
 	align: Align?,
 	justify: Justify?,
 	wrap: boolean?,
+	-- Matches `:selected` rules, as on an item: tabs, segments, tiles.
+	selected: boolean?,
+	-- Extras: shown under the pointer; sent on a right-click; copied on a click.
+	tooltip: string?,
+	context: Data,
+	copy: string?,
+	-- Moves the window when dragged and zooms it on a double click, like a
+	-- title bar; buttons and clickable stacks inside still take clicks.
+	drag: boolean?,
 	[number]: Child,
 }
 
@@ -109,7 +136,18 @@ type PanelProps = {
 	height: number?,
 	surface: Surface?,
 	border: Border?,
-	scroll: boolean?,
+	-- `true` scrolls along its axis; or "x", "y", "both".
+	scroll: (boolean | "x" | "y" | "both")?,
+	-- false keeps the content's size when the parent is short of space.
+	shrink: boolean?,
+	-- Where it sits across the parent's axis, over the parent's `align`.
+	self_align: Align?,
+	-- Keep its own width in a column; follow a row's `align` as usual.
+	hug: boolean?,
+	max_width: number?,
+	max_height: number?,
+	-- Out of the flow, over the parent at these pixel offsets (negative overhangs).
+	float: { top: number?, right: number?, bottom: number?, left: number? }?,
 	title: string?,
 	actions: { Child }?,
 	[number]: Child,
@@ -126,7 +164,8 @@ type PaneProps = {
 	gap: Space?,
 	padding: Space?,
 	surface: Surface?,
-	scroll: boolean?,
+	-- `true` scrolls along its axis; or "x", "y", "both".
+	scroll: (boolean | "x" | "y" | "both")?,
 	[number]: Child,
 }
 
@@ -143,6 +182,10 @@ type TextProps = {
 	size: TextSize?,
 	weight: Weight?,
 	truncate: boolean?,
+	-- Wrap to at most this many lines, then an ellipsis.
+	lines: number?,
+	-- false keeps each line whole (code in a container that scrolls sideways).
+	wrap: boolean?,
 	[number]: string,
 }
 
@@ -154,10 +197,17 @@ type ButtonProps = {
 	msg: Data,
 	to: string?,
 	command: Command?,
+	-- With a browser command: the `id` of the `ui.browser` (of the mod `to`, else this one).
+	browser: string?,
 	label: string?,
+	-- Drawn before the label; with no label, an icon-only button.
+	icon: IconName?,
 	variant: Variant?,
 	small: boolean?,
 	disabled: boolean?,
+	tooltip: string?,
+	context: Data,
+	copy: string?,
 	[number]: string,
 }
 
@@ -167,10 +217,15 @@ type ItemProps = {
 	msg: Data,
 	to: string?,
 	command: Command?,
+	-- With a browser command: the `id` of the `ui.browser` (of the mod `to`, else this one).
+	browser: string?,
 	label: string?,
 	detail: string?,
 	badge: string?,
 	selected: boolean?,
+	tooltip: string?,
+	context: Data,
+	copy: string?,
 	[number]: string,
 }
 
@@ -185,11 +240,25 @@ type BadgeProps = {
 -- The bundled icons (Lucide); the host refuses any other name.
 type IconName =
 	| "a-large-small"
+	| "activity"
+	| "agent-amp"
+	| "agent-claude"
+	| "agent-codex"
+	| "agent-copilot"
+	| "agent-cursor"
+	| "agent-droid"
+	| "agent-gemini"
+	| "agent-grok"
+	| "agent-kiro"
+	| "agent-opencode"
+	| "agent-qwen"
 	| "arrow-down"
 	| "arrow-left"
 	| "arrow-right"
 	| "arrow-up"
+	| "arrow-up-down"
 	| "asterisk"
+	| "at-sign"
 	| "ban"
 	| "battery"
 	| "battery-charging"
@@ -198,27 +267,55 @@ type IconName =
 	| "battery-medium"
 	| "battery-warning"
 	| "bell"
+	| "bell-off"
 	| "book-open"
+	| "bookmark"
 	| "bot"
+	| "brand-anthropic"
+	| "brand-github"
+	| "brand-gitlab"
+	| "brand-mistral"
+	| "brand-ollama"
+	| "brand-openai"
+	| "bug"
 	| "building-2"
 	| "calendar"
 	| "case-sensitive"
+	| "chart-column"
 	| "chart-pie"
 	| "check"
 	| "chevron-down"
 	| "chevron-left"
 	| "chevron-right"
 	| "chevron-up"
+	| "chevrons-left"
+	| "chevrons-right"
 	| "chevrons-up-down"
+	| "circle"
 	| "circle-alert"
 	| "circle-check"
+	| "circle-dashed"
+	| "circle-dot"
+	| "circle-help"
+	| "circle-pause"
+	| "circle-play"
+	| "circle-question-mark"
+	| "circle-stop"
 	| "circle-user"
 	| "circle-x"
+	| "clock"
 	| "close"
+	| "cloud"
+	| "code"
+	| "coffee"
+	| "columns-2"
+	| "command"
 	| "copy"
 	| "cpu"
 	| "dash"
 	| "delete"
+	| "dot"
+	| "download"
 	| "ellipsis"
 	| "ellipsis-vertical"
 	| "external-link"
@@ -226,29 +323,61 @@ type IconName =
 	| "eye-off"
 	| "file"
 	| "file-text"
+	| "filter"
+	| "flag"
 	| "folder"
 	| "folder-closed"
+	| "folder-git-2"
 	| "folder-open"
 	| "frame"
+	| "funnel"
 	| "gallery-vertical-end"
+	| "git-branch"
+	| "git-commit-horizontal"
+	| "git-compare"
+	| "git-merge"
+	| "git-pull-request"
+	| "git-pull-request-closed"
+	| "git-pull-request-draft"
 	| "github"
+	| "gitlab"
 	| "globe"
+	| "grip-vertical"
 	| "hard-drive"
+	| "hash"
 	| "heart"
 	| "heart-off"
+	| "history"
+	| "house"
 	| "inbox"
 	| "info"
 	| "inspector"
+	| "key-round"
+	| "keyboard"
+	| "laptop"
+	| "layers"
 	| "layout-dashboard"
+	| "link"
+	| "list"
+	| "list-checks"
+	| "list-tree"
 	| "loader"
 	| "loader-circle"
+	| "lock"
+	| "lock-open"
+	| "log-out"
+	| "mail"
 	| "map"
 	| "maximize"
+	| "maximize-2"
 	| "memory-stick"
 	| "menu"
+	| "message-square"
 	| "mic"
 	| "minimize"
+	| "minimize-2"
 	| "minus"
+	| "monitor"
 	| "moon"
 	| "network"
 	| "palette"
@@ -261,35 +390,63 @@ type IconName =
 	| "panel-right-close"
 	| "panel-right-open"
 	| "pause"
+	| "pencil"
+	| "pin"
+	| "pin-off"
 	| "play"
+	| "plug"
 	| "plus"
+	| "power"
 	| "redo"
 	| "redo-2"
+	| "refresh-ccw"
 	| "refresh-cw"
 	| "replace"
 	| "resize-corner"
+	| "rocket"
+	| "rotate-ccw-clock"
 	| "rotate-cw"
+	| "rows-2"
 	| "search"
+	| "send"
+	| "server"
 	| "settings"
 	| "settings-2"
+	| "shield"
 	| "sort-ascending"
 	| "sort-descending"
+	| "sparkles"
+	| "split-square-horizontal"
+	| "split-square-vertical"
 	| "square"
+	| "square-check"
+	| "square-split-horizontal"
+	| "square-split-vertical"
 	| "square-terminal"
 	| "star"
 	| "star-fill"
 	| "star-off"
 	| "sun"
+	| "tag"
+	| "terminal"
 	| "thumbs-down"
 	| "thumbs-up"
+	| "trash"
+	| "trash-2"
 	| "triangle-alert"
 	| "undo"
 	| "undo-2"
+	| "unlock"
+	| "upload"
 	| "user"
+	| "wifi"
+	| "wifi-off"
 	| "window-close"
 	| "window-maximize"
 	| "window-minimize"
 	| "window-restore"
+	| "workflow"
+	| "zap"
 
 -- Drawn at the size and color of text, so `color` and `size` style it.
 type IconProps = {
@@ -298,8 +455,26 @@ type IconProps = {
 	name: IconName?,
 	tone: Tone?,
 	size: TextSize?,
+	-- Turns without end, for a loader (`loader-circle`); `animation_speed`
+	-- paces it and 0 stops it.
+	spin: boolean?,
 	-- Luau doesn't check literals in list positions against a union, so
 	-- write `name = "cpu"` (checked here) rather than `{ "cpu", ... }`.
+	[number]: string,
+}
+
+type Fit = "contain" | "cover" | "fill" | "scale-down" | "none"
+
+-- A picture from a file: relative to the mod's folder, `~/...`, or absolute.
+-- Not a URL: have a provider download it to a cache. A missing file leaves
+-- an empty box of `width` x `height`. `radius` in a rule rounds it.
+type ImageProps = {
+	class: Class?,
+	style: Style?,
+	src: string?,
+	width: number?,
+	height: number?,
+	fit: Fit?,
 	[number]: string,
 }
 
@@ -316,6 +491,56 @@ type TerminalProps = {
 	[number]: string,
 }
 
+-- A web page in a native view, kept by mod and `id`. `url` navigates when
+-- it changes from the last one given; the user's own navigation stands
+-- until then. Only http, https and file addresses.
+type BrowserProps = {
+	class: Class?,
+	style: Style?,
+	id: string?,
+	url: string?,
+	-- The page's zoom factor, 0.25 to 5.
+	zoom: number?,
+	-- Sent as the page navigates or its title changes, with `url` and
+	-- `title` added (a non-table message arrives as `{ msg = ... }`).
+	navigate: Data,
+	-- Sent as a load starts and finishes, with `loading` and `url` added.
+	loading: Data,
+	[number]: string,
+}
+
+-- A text field. The host keeps its text by mod and `id` (else its place in
+-- the tree); `value` replaces the text only when it differs from the last
+-- `value` passed. Messages carry the text: a table `msg` gets a `value`
+-- field, anything else arrives as `{ msg = msg, value = text }`.
+type InputProps = {
+	class: Class?,
+	style: Style?,
+	id: string?,
+	value: string?,
+	placeholder: string?,
+	-- Sent on each edit.
+	change: Data,
+	-- Sent on Enter, or ⌘/Ctrl-Enter when `multiline`.
+	submit: Data,
+	-- While focused, these keys send their message instead of editing:
+	-- `{ up = "prev", escape = "close", ["shift-tab"] = "back",
+	-- ["secondary-k"] = "clear" }` (`secondary` is ⌘ on macOS, Ctrl elsewhere).
+	keys: { [string]: any }?,
+	-- The mod the messages go to; the drawing mod when unset.
+	to: string?,
+	multiline: boolean?,
+	-- Visible lines of a multiline field (default 3); it scrolls past them.
+	rows: number?,
+	disabled: boolean?,
+	-- Take keyboard focus when it appears, or when this turns true.
+	focus: boolean?,
+	-- The monospace font.
+	mono: boolean?,
+	width: number?,
+	grow: boolean?,
+}
+
 type RegionProps = {
 	name: string,
 	direction: Direction?,
@@ -326,6 +551,15 @@ type RegionProps = {
 type Side = "top" | "bottom"
 type Anchor = "start" | "end"
 
+-- Keystrokes an open popover or overlay takes, to the message each sends
+-- to this mod's `update`: `{ escape = "close", down = "next", ["cmd-k"] = "find" }`.
+-- A name is modifiers then a key, joined by `-`: modifiers `ctrl`, `alt`,
+-- `shift`, `cmd` (Super/Windows elsewhere) and `secondary` (cmd on macOS,
+-- ctrl elsewhere); keys `a`-`z`, `0`-`9`, a symbol such as `/`, `f1`-`f24`,
+-- `escape`, `enter`, `tab`, `space`, `backspace`, `delete`, `insert`, `up`,
+-- `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`.
+type Keys = { [string]: Data }
+
 -- Content floating beside its anchor (the list part). While `open`, a click
 -- outside sends `dismiss`. A `popover` stylesheet rule styles and animates it.
 type PopoverProps = {
@@ -333,12 +567,47 @@ type PopoverProps = {
 	style: Style?,
 	open: boolean?,
 	dismiss: Data,
+	-- The mod `dismiss` and `keys` messages go to, if not this one.
+	to: string?,
 	side: Side?,
 	align: Anchor?,
 	gap: number?,
 	width: number?,
+	keys: Keys?,
 	content: Element,
 	[number]: Child,
+}
+
+type Placement =
+	"center"
+	| "top"
+	| "bottom"
+	| "left"
+	| "right"
+	| "top-start"
+	| "top-end"
+	| "bottom-start"
+	| "bottom-end"
+
+-- Content floating over the whole window: a dialog or palette (`center`,
+-- `top`), a sheet along an edge (`bottom`, `left`, `right`), a toast in a
+-- corner. Open overlays stack in tree order above popovers. A click on the
+-- backdrop or outside the content sends `dismiss`, and so does Escape unless
+-- `keys` takes it. An `overlay` rule styles and animates the content, an
+-- `overlay-backdrop` rule the dimmed window behind.
+type OverlayProps = {
+	class: Class?,
+	style: Style?,
+	open: boolean?,
+	dismiss: Data,
+	-- The mod `dismiss` and `keys` messages go to, if not this one.
+	to: string?,
+	place: Placement?,
+	backdrop: boolean?,
+	width: number?,
+	height: number?,
+	keys: Keys?,
+	content: Element,
 }
 
 declare ui: {
@@ -353,12 +622,16 @@ declare ui: {
 	item: (props: ItemProps) -> Element,
 	badge: (props: string | BadgeProps) -> Element,
 	icon: (props: IconName | IconProps) -> Element,
+	image: (props: string | ImageProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,
+	browser: (props: string | BrowserProps) -> Element,
+	input: (props: InputProps) -> Element,
 	divider: () -> Element,
 	spacer: () -> Element,
 	region: (props: string | RegionProps) -> Element,
 	mount: (name: string) -> Element,
 	popover: (props: PopoverProps) -> Element,
+	overlay: (props: OverlayProps) -> Element,
 }
 
 -- This machine's load, sampled by the host once a second.
@@ -375,13 +648,242 @@ type System = {
 	transmitted: number,
 }
 
+type Platform = "macos" | "linux" | "windows"
+type Titlebar = "system" | "hidden"
+
+-- The window, for a title bar the layout draws itself.
+type WindowState = {
+	platform: Platform,
+	-- `hidden` when the shell asked for it and the system agreed (a Linux
+	-- compositor can insist on its own title bar).
+	titlebar: Titlebar,
+	maximized: boolean,
+	fullscreen: boolean,
+	-- The frontmost window.
+	active: boolean,
+}
+
+
+-- `app.git`, from providers/git. When `available` is false only `reason`
+-- is set (and `repository = false`); every other field is there otherwise.
+type GitFile = {
+	path: string,
+	-- "M", "A", "D", "R" (renamed or copied), "?" (untracked) or "U" (conflict).
+	status: string,
+	staged: boolean,
+	unstaged: boolean,
+	-- Lines against HEAD; 0 for binary and untracked files.
+	added: number,
+	deleted: number,
+	-- Renames only.
+	old_path: string?,
+}
+
+type GitWorktree = {
+	path: string,
+	-- "" when detached.
+	branch: string,
+	head: string,
+	current: boolean,
+	-- Files with changes.
+	changed: number,
+	ahead: number,
+	behind: number,
+	detached: boolean,
+	locked: boolean,
+	prunable: boolean,
+	bare: boolean,
+}
+
+type GitBranch = {
+	name: string,
+	-- Short sha.
+	head: string,
+	-- Unix seconds of its last commit.
+	time: number,
+	upstream: string?,
+	ahead: number,
+	behind: number,
+	-- The upstream was deleted.
+	gone: boolean,
+	current: boolean,
+}
+
+type GitRemote = {
+	name: string,
+	url: string,
+	host: string,
+	-- "github", "gitlab" or "other".
+	kind: string,
+	owner: string,
+	repo: string,
+	-- https://host/owner/repo, when the url names a host.
+	web_url: string?,
+}
+
+type GitDiffLine = {
+	-- "add", "del" or "ctx".
+	kind: string,
+	-- Line numbers in the old and new file; `old` is nil on "add" lines,
+	-- `new` on "del" ones.
+	old: number?,
+	new: number?,
+	-- Cut to 300 characters.
+	text: string,
+}
+
+type GitDiff = {
+	path: string,
+	binary: boolean,
+	-- Lines in all hunks; at most 1200, then `truncated`.
+	lines: number,
+	truncated: boolean,
+	hunks: { { header: string, old_start: number, new_start: number, lines: { GitDiffLine } } },
+}
+
+type Git = {
+	available: boolean,
+	reason: string?,
+	repository: boolean,
+	-- "HEAD" when detached.
+	branch: string,
+	-- Files with changes, staged, unstaged or untracked.
+	changed: number,
+	ahead: number,
+	behind: number,
+	root: string,
+	detached: boolean,
+	-- Nil before the first commit.
+	head: { sha: string, short: string, subject: string, author: string, email: string, time: number }?,
+	-- "origin/main", or nil without one.
+	upstream: string?,
+	-- Lines in the working tree against HEAD, tracked files only.
+	added: number,
+	deleted: number,
+	-- At most 300, then `files_truncated`.
+	files: { GitFile },
+	files_truncated: boolean,
+	worktrees: { GitWorktree },
+	-- Recent local branches, newest first, at most 20.
+	branches: { GitBranch },
+	remote: GitRemote?,
+	stashes: number,
+	-- The file asked for with `{ diff = path }`, until `{ diff = false }`.
+	diff: GitDiff?,
+}
+
+-- A forge account; `avatar_path` is a cached image file once downloaded.
+type ForgePerson = {
+	login: string,
+	name: string?,
+	bot: boolean?,
+	avatar_url: string?,
+	avatar_path: string?,
+}
+
+type ForgeChecks = {
+	total: number,
+	passed: number,
+	failed: number,
+	pending: number,
+	skipped: number,
+}
+
+-- A pull request (GitHub) or merge request (GitLab).
+type ForgePr = {
+	number: number,
+	title: string,
+	-- "open", "closed" or "merged".
+	state: string,
+	draft: boolean,
+	url: string,
+	branch: string,
+	base: string,
+	author: ForgePerson?,
+	-- Unix seconds.
+	updated: number?,
+	-- "approved", "changes_requested", "review_required" or "".
+	review_decision: string,
+	-- "mergeable", "conflicting", "unknown" or "".
+	mergeable: string,
+	-- The forge's own merge state, lowercase ("clean", "blocked", ...).
+	merge_state: string,
+	checks: ForgeChecks,
+	-- The badge: "draft", "waiting", "ready", "attention", "merged",
+	-- "closed" or "held".
+	tone: string,
+	-- GitHub only.
+	additions: number?,
+	deletions: number?,
+	-- `current_pr` only: each check by name, at most 50; `outcome` is
+	-- "passed", "failed", "pending" or "skipped".
+	check_list: { { name: string, outcome: string, url: string? } }?,
+}
+
+type ForgeIssue = {
+	number: number,
+	title: string,
+	url: string,
+	author: ForgePerson?,
+	updated: number?,
+	labels: { { name: string, color: string? } },
+	assignees: { string },
+}
+
+-- `app.github` and `app.gitlab`. When `available` is false only `reason`
+-- is set.
+type Forge = {
+	available: boolean,
+	reason: string?,
+	repo: { name_with_owner: string, url: string, default_branch: string? },
+	viewer: ForgePerson?,
+	-- The current branch's, or nil.
+	current_pr: ForgePr?,
+	-- Open ones, most recently updated first, at most 30.
+	prs: { ForgePr },
+	issues: { ForgeIssue },
+}
+
+-- A coding-agent CLI running on this machine.
+type Agent = {
+	pid: number,
+	ppid: number,
+	-- "claude", "codex", "gemini", "cursor", "opencode", "aider", "amp",
+	-- "copilot", "droid", "kiro", "qwen", "goose", "crush", ...
+	name: string,
+	-- Its command line, cut to 200 characters.
+	command: string,
+	cwd: string?,
+	tty: string?,
+	-- Unix seconds.
+	started: number,
+	elapsed_seconds: number,
+	-- Percent of one core.
+	cpu: number,
+	-- Always "running": what it is doing is not visible from outside.
+	status: string,
+}
+
+type Agents = {
+	available: boolean,
+	reason: string?,
+	agents: { Agent },
+	count: number,
+}
+
 -- What every `view` gets as `app`.
 type App = {
 	dark: boolean,
+	window: WindowState,
 	mods: { string },
 	regions: { [string]: { string } },
 	-- Nil until the first sample arrives (from the `system` provider).
 	system: System?,
+	-- Nil until each provider first publishes.
+	git: Git?,
+	github: Forge?,
+	gitlab: Forge?,
+	agents: Agents?,
 	-- What each provider in app/providers/ publishes, as `app.<name>`.
 	[string]: any,
 }
@@ -390,6 +892,14 @@ type App = {
 type Send = {
 	to: string,
 	msg: Data,
+}
+
+-- `titlebar = "hidden"` puts the layout under the title bar (macOS keeps its
+-- traffic lights, at `traffic_lights` from the top left) or drops the system
+-- frame (Linux, Windows). Give the layout a `drag = true` row to move it.
+type Window = {
+	titlebar: Titlebar?,
+	traffic_lights: { x: number?, y: number? }?,
 }
 
 type Mod<State> = {
@@ -404,6 +914,8 @@ type Mod<State> = {
 	title: string?,
 	-- Rules for what this mod draws, by selector.
 	styles: { [string]: Style }?,
+	-- Only in main.luau: the window's frame, read when the app starts.
+	window: Window?,
 }
 
 declare function mod<State>(definition: Mod<State>): Mod<State>
@@ -432,6 +944,13 @@ type Component<Props> = {
 	description: string?,
 	-- The Components menu's submenu.
 	category: string?,
+	-- When to reach for it, and what to use instead; the catalogue's lead.
+	when: string?,
+	-- Each prop and what it does, for the catalogue.
+	props: { [string]: string }?,
+	-- Default rules for the classes it draws, under every mod's and the
+	-- stylesheet's, so `style.luau` restyles it.
+	styles: { [string]: Style }?,
 	-- Shown beside its title in the browser.
 	icon: IconName?,
 	-- Luau that uses it; by default made from `example`.

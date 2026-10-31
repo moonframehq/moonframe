@@ -2,7 +2,7 @@
 
 use {
     super::{
-        Cx, Draw, Painter, Place, Shown,
+        Backdrop, Cx, Draw, KeyLayer, POPOVER_BACKDROP, POPOVER_CONTENT, Painter, Place, Shown,
         styling::{FrameExt as _, LookExt as _, StyleExt as _},
     },
     crate::color::ThemeColor,
@@ -15,10 +15,11 @@ use {
         *,
     },
     moonframe_core::{
-        Align, Anchor, Badge, Button, Color, Direction, Icon, Item, Justify, Look, Paint, Panel,
-        Part, Popover, Region, Resolved, Side, Sides, Space, Split, Stack, Text, Token, Tone,
-        TransitionKind, Variant,
+        Align, Anchor, Badge, Button, Case, Color, Direction, Extras, Fit, Icon, Image, Item,
+        Justify, Look, Paint, Panel, Part, Popover, Region, Resolved, Side, Sides, Space, Split,
+        Stack, States, Text, Token, Tone, TransitionKind, Variant,
     },
+    std::path::{Path, PathBuf},
 };
 
 /// The smallest a pane gets when a module gives a `max` and no `min`.
@@ -30,12 +31,15 @@ const POPOVER_SLIDE: f32 = 8.;
 
 impl<'w> Draw<'w> for Stack {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
+        let in_drag = painter.in_drag;
+        painter.in_drag |= self.drag;
         let children = painter.children(&self.children, place, self.direction, cx);
+        painter.in_drag = in_drag;
         let part = match self.direction {
             Direction::Row => Part::Row,
             Direction::Column => Part::Column,
         };
-        let look = painter.look(part, &self.look, false, place);
+        let look = painter.look(part, &self.look, self.selected, place);
         let theme = cx.theme();
         let element = div()
             .id(place.id())
@@ -66,13 +70,133 @@ impl<'w> Draw<'w> for Stack {
             element
         };
         let element = element.children(children);
-        match &self.action {
-            Some(action) => element
+        // Hugging only says something across a column.
+        let element = if self.frame.hug
+            && self.frame.self_align.is_none()
+            && place.parent == Direction::Column
+        {
+            element.self_start()
+        } else {
+            element
+        };
+        let element = if self.drag {
+            draggable(element, cx)
+        } else {
+            element
+        };
+        let element = match &self.action {
+            Some(action) => covering(element, in_drag)
                 .cursor_pointer()
-                .on_click(place.click(action, cx))
-                .into_any_element(),
-            None => element.into_any_element(),
-        }
+                .on_click(place.click(action, cx)),
+            None => element,
+        };
+        with_extras(element, &self.extras, painter, place, cx).into_any_element()
+    }
+}
+/// A control's tooltip, right-click and copy, on the element that draws it.
+fn with_extras<'w>(
+    mut element: Stateful<Div>,
+    extras: &Extras,
+    painter: &Painter<'w, '_>,
+    place: &Place<'w>,
+    cx: Cx,
+) -> Stateful<Div> {
+    if let Some(text) = &extras.copy {
+        let text = text.clone();
+        element = element.cursor_pointer().on_click(move |_, _, cx| {
+            cx.write_to_clipboard(ClipboardItem::new_string(text.clone()))
+        });
+    }
+    if let Some(action) = &extras.context {
+        element = element.on_mouse_down(MouseButton::Right, place.context(action, cx));
+    }
+    if let Some(text) = &extras.tooltip {
+        let look = painter.look(Part::Tooltip, &Look::default(), false, place);
+        let text = SharedString::from(text.clone());
+        element = element.tooltip(move |_, cx| {
+            let tip = Tip {
+                text: text.clone(),
+                look: look.clone(),
+            };
+            cx.new(|_| tip).into()
+        });
+    }
+    element
+}
+
+/// A tooltip's content, styled by the `tooltip` rule.
+struct Tip {
+    text: SharedString,
+    look: Resolved,
+}
+
+impl Render for Tip {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        div()
+            .px_2()
+            .py_1()
+            .rounded(theme.radius)
+            .border_1()
+            .border_color(theme.border)
+            .bg(theme.popover)
+            .text_color(theme.popover_foreground)
+            .text_xs()
+            .shadow_md()
+            .look(&self.look, theme)
+            .edges(self.look.base.border, &self.look.base, theme)
+            .padded(&self.look.base.padding)
+            .child(self.text.clone())
+    }
+}
+
+/// Makes a stack move the window as a title bar does: drag it to move,
+/// double-click to zoom, and on Linux right-click for the window menu.
+/// Windows does all of that itself for a caption area.
+fn draggable(element: Stateful<Div>, cx: Cx) -> Stateful<Div> {
+    element
+        .window_control_area(WindowControlArea::Drag)
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(|this, event: &MouseDownEvent, window, _| {
+                this.drag = event.click_count < 2;
+                if event.click_count == 2 {
+                    if cfg!(target_os = "macos") {
+                        // Zoom or minimize, as the user's settings say.
+                        window.titlebar_double_click();
+                    } else if !cfg!(target_os = "windows") {
+                        window.zoom_window();
+                    }
+                }
+            }),
+        )
+        .on_mouse_up(
+            MouseButton::Left,
+            cx.listener(|this, _: &MouseUpEvent, _, _| this.drag = false),
+        )
+        .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, window, _| {
+            if this.drag && event.pressed_button == Some(MouseButton::Left) {
+                this.drag = false;
+                window.start_window_move();
+            } else if event.pressed_button.is_none() {
+                this.drag = false;
+            }
+        }))
+        .on_mouse_down(MouseButton::Right, |event, window, _| {
+            if cfg!(any(target_os = "linux", target_os = "freebsd")) {
+                window.show_window_menu(event.position);
+            }
+        })
+}
+
+/// A control inside a drag area covers it, so pressing the control clicks
+/// it rather than moving the window (Windows asks the drag area's hitbox
+/// under the pointer, and the area's listeners check it too).
+fn covering<E: InteractiveElement>(element: E, in_drag: bool) -> E {
+    if in_drag {
+        element.occlude()
+    } else {
+        element
     }
 }
 
@@ -260,15 +384,36 @@ impl<'w> Draw<'w> for Text {
         if self.truncate {
             element = element.min_w_0().truncate();
         }
-        element.child(self.text.clone()).into_any_element()
+        if !self.wrap {
+            element = element.whitespace_nowrap().flex_shrink_0();
+        }
+        if let Some(lines) = self.lines {
+            element = element.min_w_0().line_clamp(usize::from(lines));
+        }
+        let text = match look.base.case {
+            Some(Case::Upper) => self.text.to_uppercase(),
+            Some(Case::Lower) => self.text.to_lowercase(),
+            Some(Case::None) | None => self.text.clone(),
+        };
+        element.child(text).into_any_element()
     }
 }
 
 impl<'w> Draw<'w> for Button {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
-        let look = painter.look(Part::Button, &self.look, false, place);
+        let states = States {
+            disabled: self.disabled,
+            ..States::default()
+        };
+        let look = painter.look_in(Part::Button, &self.look, states, place);
         let theme = cx.theme();
-        let element = GpuiButton::new(place.id()).label(self.label.clone());
+        let mut element = GpuiButton::new(place.id());
+        if !self.label.is_empty() {
+            element = element.label(self.label.clone());
+        }
+        if let Some(icon) = &self.icon {
+            element = element.icon(GpuiIcon::default().path(icon.path()));
+        }
         let mut element = match self.variant {
             Variant::Normal => element,
             Variant::Primary => element.primary(),
@@ -303,7 +448,25 @@ impl<'w> Draw<'w> for Button {
         if let Some(action) = &self.action {
             element = element.on_click(place.click(action, cx));
         }
-        element.disabled(self.disabled).into_any_element()
+        if let Some(text) = self.extras.copy.clone() {
+            element = element.on_click(move |_, _, cx| {
+                cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
+            });
+        }
+        let element = element.disabled(self.disabled);
+        if self.extras.tooltip.is_none() && self.extras.context.is_none() && !painter.in_drag {
+            return element.into_any_element();
+        }
+        // The tooltip and right-click go on a box around the button, which
+        // also keeps its clicks from a drag area.
+        let extras = Extras {
+            copy: None,
+            ..self.extras.clone()
+        };
+        let wrapper = covering(div().id(place.part("control").id()), painter.in_drag)
+            .flex_shrink_0()
+            .child(element);
+        with_extras(wrapper, &extras, painter, place, cx).into_any_element()
     }
 }
 
@@ -360,13 +523,13 @@ impl<'w> Draw<'w> for Item {
             )
             .children(detail)
             .children(badge);
-        match &self.action {
-            Some(action) => element
+        let element = match &self.action {
+            Some(action) => covering(element, painter.in_drag)
                 .cursor_pointer()
-                .on_click(place.click(action, cx))
-                .into_any_element(),
-            None => element.into_any_element(),
-        }
+                .on_click(place.click(action, cx)),
+            None => element,
+        };
+        with_extras(element, &self.extras, painter, place, cx).into_any_element()
     }
 }
 
@@ -397,9 +560,68 @@ impl<'w> Draw<'w> for Icon {
         if let Some(size) = self.size {
             element = element.text_scaled(size, theme);
         }
-        element
-            .child(GpuiIcon::default().path(self.name.path()))
-            .into_any_element()
+        let mut icon = GpuiIcon::default().path(self.name.path());
+        if self.spin
+            && let Some(turned) = painter.spin()
+        {
+            icon = icon.rotate(radians(turned * std::f32::consts::TAU));
+        }
+        element.child(icon).into_any_element()
+    }
+}
+
+impl<'w> Draw<'w> for Image {
+    /// The picture fills its own box, which carries the look: a `radius`
+    /// rounds the picture itself (avatars). Without a file, or with one
+    /// GPUI can't read, the box stays empty at its size.
+    fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
+        let look = painter.look(Part::Image, &self.look, false, place);
+        let theme = cx.theme();
+        let home = std::env::home_dir();
+        let folder = painter.folder(place.owner).unwrap_or(Path::new("."));
+        let mut allowed: Vec<PathBuf> = painter
+            .workspace
+            .roots()
+            .layers()
+            .map(Path::to_owned)
+            .collect();
+        allowed.push(crate::paths::images());
+        let path = self.resolve(folder, home.as_deref(), &allowed);
+        let fit = match self.fit {
+            Fit::Contain => ObjectFit::Contain,
+            Fit::Cover => ObjectFit::Cover,
+            Fit::Fill => ObjectFit::Fill,
+            Fit::ScaleDown => ObjectFit::ScaleDown,
+            Fit::None => ObjectFit::None,
+        };
+        let Some(path) = path else {
+            // Not a picture the view may show: the empty box.
+            let mut element = div()
+                .id(place.id())
+                .flex_shrink_0()
+                .look(&look, theme)
+                .edges(look.base.border, &look.base, theme);
+            if let Some(width) = self.width {
+                element = element.w(px(width));
+            }
+            if let Some(height) = self.height {
+                element = element.h(px(height));
+            }
+            return element.into_any_element();
+        };
+        let mut element = img(path)
+            .object_fit(fit)
+            .id(place.id())
+            .flex_shrink_0()
+            .look(&look, theme)
+            .edges(look.base.border, &look.base, theme);
+        if let Some(width) = self.width {
+            element = element.w(px(width));
+        }
+        if let Some(height) = self.height {
+            element = element.h(px(height));
+        }
+        element.into_any_element()
     }
 }
 
@@ -488,10 +710,25 @@ impl<'w> Draw<'w> for Popover {
         let look = painter.look(Part::Popover, &self.look, false, &content_place);
         let transition = look.base.transition;
         let shown = painter.shown(&content_place, self.open, transition.as_ref());
-        if self.open
-            && let Some(msg) = &self.dismiss
-        {
-            painter.backdrop = Some((place.owner, msg.clone()));
+        if self.open {
+            if let Some(msg) = &self.dismiss {
+                painter.backdrops.push(Backdrop {
+                    priority: painter.layer + POPOVER_BACKDROP,
+                    owner: place.owner,
+                    to: self.to.clone(),
+                    msg: msg.clone(),
+                });
+            }
+            if !self.keys.is_empty() || self.dismiss.is_some() {
+                painter.key_layers.push(KeyLayer {
+                    priority: painter.layer + POPOVER_CONTENT,
+                    owner: place.owner.to_owned(),
+                    to: self.to.clone(),
+                    keys: self.keys.clone(),
+                    dismiss: self.dismiss.clone(),
+                    modal: false,
+                });
+            }
         }
         if shown.hidden() {
             return container.into_any_element();
@@ -538,7 +775,10 @@ impl<'w> Draw<'w> for Popover {
             sheet = sheet.opacity(amount);
         }
         container
-            .child(deferred(sheet.child(content)).with_priority(2))
+            .child(
+                deferred(sheet.child(content).child(crate::browser::cover()))
+                    .with_priority(painter.layer + POPOVER_CONTENT),
+            )
             .into_any_element()
     }
 }

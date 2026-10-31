@@ -10,6 +10,11 @@ return component {
 	category = "Containers",
 	icon = "layout-dashboard",
 	description = "A small muted heading over its content, for grouping inside panels.",
+	when = "A small muted heading over a group of content inside a panel or settings page.",
+	props = {
+		["title"] = "heading text",
+		["[children]"] = "the content",
+	},
 	usage = [[local section = use "section"
 
 section { title = "Worktrees",

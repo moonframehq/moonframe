@@ -26,13 +26,15 @@ local function element(kind: string, primary: string?)
 end
 
 local ui = {}
-for _, kind in { "row", "column", "panel", "hsplit", "vsplit", "pane", "divider", "spacer", "popover" } do
+for _, kind in { "row", "column", "panel", "hsplit", "vsplit", "pane", "divider", "spacer", "popover", "overlay", "input" } do
 	ui[kind] = element(kind)
 end
 ui.text = element("text", "text")
 ui.badge = element("badge", "text")
 ui.icon = element("icon", "name")
+ui.image = element("image", "src")
 ui.terminal = element("terminal", "id")
+ui.browser = element("browser", "url")
 ui.button = element("button", "label")
 ui.item = element("item", "label")
 ui.region = element("region", "name")

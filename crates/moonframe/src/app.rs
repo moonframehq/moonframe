@@ -4,12 +4,14 @@
 use {
     crate::{
         actions::*,
+        browser::Browsers,
         color::rgba_color,
         gallery::Gallery,
+        input::Inputs,
         inspect::{self, Inspector, Placed},
         motion::Motion,
         packages, paths,
-        render::Painter,
+        render::{KeyLayer, Painter},
         settings,
         terminal::Terminals,
         theme_picker::ThemePicker,
@@ -20,7 +22,10 @@ use {
         component::{ActiveTheme, Theme, ThemeMode, ThemeRegistry, ThemeTokens},
         *,
     },
-    moonframe_core::{Action, Command, Error, Roots, Stylesheet, Token, Workspace},
+    moonframe_core::{
+        Action, Chrome, Command, Data, Error, Platform, Roots, Stylesheet, Titlebar, Token,
+        WindowState, Workspace,
+    },
     moonframe_providers::{Event, Providers},
     notify::{RecommendedWatcher, RecursiveMode, Watcher as _},
     std::{
@@ -40,10 +45,21 @@ const DEFAULT_FONT_SIZE: Pixels = px(14.);
 
 pub(crate) struct MoonframeApp {
     pub(crate) workspace: Workspace,
+    /// What the window was opened with; it can't change while it is open.
+    chrome: Chrome,
+    /// What the shell last asked for, to say once that it waits for a restart.
+    asked: Chrome,
+    /// The pointer went down on a `drag = true` stack, and moving it now
+    /// moves the window.
+    pub(crate) drag: bool,
     /// Picking an element for an agent, and what was picked.
     pub(crate) inspector: Inspector,
     /// The shells `ui.terminal` elements show.
     pub(crate) terminals: Terminals,
+    /// The pages `ui.browser` elements show.
+    pub(crate) browsers: Browsers,
+    /// The text `ui.input` fields edit.
+    pub(crate) inputs: Inputs,
     /// The component the browser shows, and its window while it is open.
     chosen: String,
     gallery: Option<WindowHandle<component::Root>>,
@@ -72,7 +88,11 @@ pub(crate) struct MoonframeApp {
     defaults: Defaults,
     /// Dropping it stops the events.
     _watcher: Option<RecommendedWatcher>,
-    /// Sends keys to a focused terminal before key bindings see them.
+    /// The open popovers and overlays the last frame drew, which take
+    /// their `keys` before anything else.
+    pub(crate) key_layers: Vec<KeyLayer>,
+    /// Sends keys to the topmost overlay or popover, else a focused
+    /// terminal, before key bindings see them.
     _terminal_keys: Subscription,
 }
 
@@ -83,7 +103,11 @@ struct Defaults {
 }
 
 impl MoonframeApp {
+    /// The window's view of `workspace`, in a window opened with `chrome`;
+    /// `builtin` and `user` are the folders it was opened from.
     pub(crate) fn new(
+        mut workspace: Workspace,
+        chrome: Chrome,
         builtin: PathBuf,
         user: Option<PathBuf>,
         window: &mut Window,
@@ -95,9 +119,13 @@ impl MoonframeApp {
             font_family: theme.font_family.clone(),
             radius: theme.radius,
         };
-        let workspace =
-            Workspace::open(paths::roots(builtin.clone(), user.clone()), theme.is_dark());
+        workspace.set_dark(theme.is_dark());
+        workspace.set_window(window_state(chrome, window));
         report(&workspace);
+        cx.observe_window_bounds(window, |this, window, cx| this.sync_window(window, cx))
+            .detach();
+        cx.observe_window_activation(window, |this, window, cx| this.sync_window(window, cx))
+            .detach();
         let watcher = watch(&workspace, user.as_deref(), cx)
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
@@ -120,7 +148,12 @@ impl MoonframeApp {
             });
         let mut app = Self {
             terminals,
+            browsers: Browsers::new(crate::browser::wake_on_report(cx)),
+            inputs: Inputs::default(),
             workspace,
+            chrome,
+            asked: chrome,
+            drag: false,
             inspector: Inspector::default(),
             chosen: String::new(),
             gallery: None,
@@ -135,6 +168,7 @@ impl MoonframeApp {
             motion: Motion::default(),
             providers,
             defaults,
+            key_layers: Vec::new(),
             _watcher: watcher,
             _terminal_keys: crate::terminal::intercept_keys(cx),
         };
@@ -289,9 +323,32 @@ impl MoonframeApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if let Action::Browser { to, id, command } = action {
+            let owner = to.as_deref().unwrap_or(from);
+            // Only web addresses reach the system: a `file` one would open
+            // whatever program the file is.
+            if let Some(url) = self.browsers.command(owner, id, *command)
+                && moonframe_core::is_remote_url(&url)
+            {
+                cx.open_url(&url);
+            }
+            return;
+        }
         if let Some(command) = self.workspace.dispatch(from, action) {
             self.run(command, window, cx);
         }
+        self.flush(from, cx);
+    }
+
+    /// Sends `msg` to the mod `owner`'s own `update`, from the host: what
+    /// one of its browsers reported.
+    pub(crate) fn deliver(&mut self, owner: &str, msg: Data, cx: &mut Context<Self>) {
+        self.workspace.send(owner, owner, msg);
+        self.flush(owner, cx);
+    }
+
+    /// Passes on what the mods sent providers, and draws again.
+    fn flush(&mut self, from: &str, cx: &mut Context<Self>) {
         for (provider, message) in self.workspace.take_outbox() {
             if let Err(problem) = self.providers.send(&provider, message) {
                 tracing::warn!("{from}: {problem}");
@@ -319,12 +376,30 @@ impl MoonframeApp {
                 self.apply_theme(cx);
                 cx.notify();
             },
+            Command::Minimize => window.minimize_window(),
+            Command::Maximize => window.zoom_window(),
+            Command::CloseWindow => window.remove_window(),
             Command::ShowThemes => self.show_themes(cx),
         }
     }
 
+    /// Shares the window's state with the views as `app.window`.
+    fn sync_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.workspace.set_window(window_state(self.chrome, window));
+        cx.notify();
+    }
+
     fn reload(&mut self, cx: &mut Context<Self>) {
         self.workspace.reload();
+        let before = std::mem::replace(&mut self.asked, self.workspace.chrome());
+        if self.asked != before && self.asked != self.chrome {
+            tracing::warn!(
+                "main.luau asks for {:?}; the window keeps {:?} until the app restarts",
+                self.asked,
+                self.chrome
+            );
+            self.show_toast("The window's title bar changes when the app restarts", cx);
+        }
         cx.set_menus(menus(self.workspace.components()));
         self.apply_theme(cx);
         report(&self.workspace);
@@ -452,6 +527,7 @@ impl MoonframeApp {
         // browser's own window, which cannot be updated while it is busy,
         // and a new window draws by asking the app.
         match open {
+            Some(_) if crate::background() => {},
             Some(gallery) => cx.defer(move |cx| {
                 let _ = gallery.update(cx, |_, window, _| window.activate_window());
             }),
@@ -466,10 +542,23 @@ impl MoonframeApp {
     }
 
     /// The browser window's content.
-    pub(crate) fn gallery_content(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        Painter::new(&self.workspace, &mut self.motion, &mut self.terminals, None)
-            .previewing()
-            .gallery(&self.chosen, cx)
+    /// The browser window's content, and whether it is still moving.
+    pub(crate) fn gallery_content(
+        &mut self,
+        query: &str,
+        search: AnyElement,
+        cx: &mut Context<Self>,
+    ) -> (AnyElement, bool) {
+        let mut painter = Painter::new(
+            &self.workspace,
+            &mut self.motion,
+            &mut self.terminals,
+            &self.inputs,
+            None,
+        )
+        .previewing();
+        let content = painter.gallery(&self.chosen, query, search, cx);
+        (content, painter.animating())
     }
 
     /// Asks an agent to add the component `name`, at the selection if any.
@@ -504,6 +593,23 @@ impl MoonframeApp {
         } else if self.inspector.selected.is_some() {
             self.select(None, cx);
         }
+    }
+}
+
+/// The window as views see it. The title bar is hidden only where the
+/// system went along: a Linux compositor may keep its own decorations.
+fn window_state(chrome: Chrome, window: &Window) -> WindowState {
+    let platform = Platform::current();
+    let titlebar = match (chrome.titlebar, platform, window.window_decorations()) {
+        (Titlebar::Hidden, Platform::Linux, Decorations::Server) => Titlebar::System,
+        (titlebar, ..) => titlebar,
+    };
+    WindowState {
+        platform,
+        titlebar,
+        maximized: window.is_maximized(),
+        fullscreen: window.is_fullscreen(),
+        active: window.is_window_active(),
     }
 }
 
@@ -569,7 +675,8 @@ fn toast(message: SharedString, cx: &Context<MoonframeApp>) -> AnyElement {
                     .text_color(theme.background)
                     .text_sm()
                     .shadow_md()
-                    .child(message),
+                    .child(message)
+                    .child(crate::browser::cover()),
             ),
     )
     .with_priority(10)
@@ -732,16 +839,21 @@ fn watch(
 
 impl Render for MoonframeApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.inputs.begin_frame();
         let mut painter = Painter::new(
             &self.workspace,
             &mut self.motion,
             &mut self.terminals,
+            &self.inputs,
             self.inspector.sink(),
-        );
+        )
+        .with_browsers(&mut self.browsers);
         let body = painter.shell(cx);
         if painter.animating() {
             window.request_animation_frame();
         }
+        let key_layers = painter.take_key_layers();
+        self.key_layers = key_layers;
         let layers = self.inspector_layers(window.viewport_size(), cx);
         let toast = self
             .toast
@@ -770,5 +882,6 @@ impl Render for MoonframeApp {
             .children(crate::branch_bar::label().map(crate::branch_bar::render))
             .children(layers)
             .children(toast)
+            .child(crate::browser::presenter(self.browsers.pages()))
     }
 }

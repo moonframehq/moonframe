@@ -1,0 +1,8 @@
+# The app repository's GitHub state, shared as `app.github`: the signed-in
+# viewer, the current branch's pull request with its checks, open pull
+# requests and open issues, each pull request with a `tone` for its badge.
+# A process provider: it runs the `gh` CLI with your own access and sign-in
+# (it never reads a token), outside the wasm sandbox. Needs bash and gh;
+# curl for avatars.
+command = ["bash", "github.sh"]
+kind    = "process"

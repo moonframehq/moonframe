@@ -25,14 +25,36 @@ const LIST_MAX: f32 = 420.;
 const DEFAULT_ICON: &str = "square";
 
 impl<'w> Painter<'w, '_> {
-    /// The browser, with `chosen` (a component's name) shown, or the first.
-    pub(crate) fn gallery(&mut self, chosen: &str, cx: Cx) -> AnyElement {
-        let components = self.workspace.components();
+    /// The browser, with `chosen` (a component's name) shown, or the first;
+    /// the list holds those matching `query`, under the `search` field.
+    pub(crate) fn gallery(
+        &mut self,
+        chosen: &str,
+        query: &str,
+        search: AnyElement,
+        cx: Cx,
+    ) -> AnyElement {
         let theme = cx.theme();
+        let components: Vec<&Component> = self
+            .workspace
+            .components()
+            .iter()
+            .filter(|component| matches(component, query))
+            .collect();
+        // The chosen one while it matches, else the first that does.
         let current = components
             .iter()
             .find(|component| component.name == chosen)
-            .or(components.first());
+            .or(components.first())
+            .copied();
+        let empty = components.is_empty().then(|| {
+            div()
+                .px_2()
+                .py_3()
+                .text_sm()
+                .text_color(theme.muted_foreground)
+                .child(format!("No components match “{query}”."))
+        });
         let mut categories: BTreeMap<&str, Vec<&Component>> = BTreeMap::new();
         for component in components {
             categories
@@ -42,7 +64,8 @@ impl<'w> Painter<'w, '_> {
         }
         let list = div()
             .id("gallery-list")
-            .size_full()
+            .flex_1()
+            .min_h_0()
             .overflow_y_scroll()
             .p_2()
             .flex()
@@ -112,20 +135,41 @@ impl<'w> Painter<'w, '_> {
                 resizable_panel()
                     .size(px(LIST_WIDTH))
                     .size_range(px(LIST_MIN)..px(LIST_MAX))
-                    .child(list),
+                    .child(
+                        div()
+                            .size_full()
+                            .flex()
+                            .flex_col()
+                            .bg(theme.sidebar)
+                            .child(div().px_3().pt_3().pb_1().child(search))
+                            .child(list.children(empty)),
+                    ),
             )
             .child(resizable_panel().child(detail))
             .into_any_element()
     }
 
     fn component_detail(&mut self, component: &'w Component, cx: Cx) -> AnyElement {
-        let preview = match &component.preview {
-            Ok(node) => node.draw(self, &Place::root(&component.name), cx),
-            Err(error) => problem(format!("{}: {error}", component.path_name()), cx),
+        // A demo runs live: its controls send to its own `update`. Without
+        // one the example is drawn, and its controls send nowhere.
+        let demo = self.workspace.demo(&component.name);
+        let live = demo.is_some_and(|(_, slot)| slot.view().is_some());
+        let preview = match (&component.preview, demo) {
+            (Err(error), _) => problem(format!("{}: {error}", component.path_name()), cx),
+            (_, Some((_, slot))) if let Some(error) = slot.error() => {
+                problem(format!("{}: {error}", component.demo_name()), cx)
+            },
+            (_, Some((owner, slot))) if let Some(view) = slot.view() => {
+                view.draw(self, &Place::root(owner), cx)
+            },
+            (Ok(node), _) => node.draw(self, &Place::root(&component.name), cx),
         };
         let theme = cx.theme();
         let name = component.name.clone();
-        let usage = component.usage.clone();
+        let usage = component
+            .demo
+            .as_ref()
+            .map_or_else(|| component.usage.clone(), |demo| demo.source.clone());
         div()
             .id("gallery-detail")
             .flex_1()
@@ -165,6 +209,8 @@ impl<'w> Painter<'w, '_> {
             .child(
                 div()
                     .relative()
+                    // Its full height, however tall: the page scrolls.
+                    .flex_none()
                     .p_4()
                     .min_h(px(96.))
                     .flex()
@@ -174,8 +220,10 @@ impl<'w> Painter<'w, '_> {
                     .border_dashed()
                     .border_color(theme.border)
                     .child(preview)
-                    // A preview shows; its controls send to no mod.
-                    .child(div().absolute().inset_0().occlude()),
+                    // A static preview shows; its controls send to no mod.
+                    .when(!live, |this| {
+                        this.child(div().absolute().inset_0().occlude())
+                    }),
             )
             .child(section("Use it in a mod", theme))
             .child(
@@ -186,7 +234,7 @@ impl<'w> Painter<'w, '_> {
                     .font_family("Menlo")
                     .text_xs()
                     .whitespace_normal()
-                    .child(component.usage.clone()),
+                    .child(usage.clone()),
             )
             .child(
                 div()
@@ -230,4 +278,18 @@ fn section(title: &str, theme: &component::Theme) -> AnyElement {
         .text_color(theme.muted_foreground)
         .child(title.to_owned())
         .into_any_element()
+}
+
+/// Whether `component` matches a search: every word of `query`, in any
+/// case, found in its name, title, category, description or `when`.
+fn matches(component: &Component, query: &str) -> bool {
+    let text = format!(
+        "{} {} {} {} {}",
+        component.name, component.title, component.category, component.description, component.when
+    )
+    .to_lowercase();
+    query
+        .to_lowercase()
+        .split_whitespace()
+        .all(|word| text.contains(word))
 }

@@ -110,13 +110,13 @@ local function sheet(state: State)
 	local tabs = {}
 	for index, key in ORDER do
 		tabs[index] = ui.column {
-			class = if key == state.tab then "tab tab-active" else "tab",
+			class = if key == state.tab then "usage-tab usage-tab-active" else "usage-tab",
 			grow = true,
 			align = "center",
 			gap = "none",
 			msg = { tab = key },
 			ui.text { PROVIDERS[key].glyph },
-			ui.text { PROVIDERS[key].name, class = "tab-label" },
+			ui.text { PROVIDERS[key].name, class = "usage-tab-label" },
 		}
 	end
 	return ui.column {
@@ -149,7 +149,7 @@ local function sheet(state: State)
 			ui.item { "↗   Usage Dashboard", msg = "dashboard" },
 			ui.item { "⌁   Status Page", msg = "status" },
 		},
-		ui.row { class = "tabs", gap = "small", table.unpack(tabs) },
+		ui.row { class = "usage-tabs", gap = "small", table.unpack(tabs) },
 	}
 end
 

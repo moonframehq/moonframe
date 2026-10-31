@@ -3,7 +3,7 @@
 //! wakes the window from the session's thread, through a channel.
 
 use {
-    crate::app::MoonframeApp,
+    crate::{app::MoonframeApp, keys::Taken},
     gpui_kit::*,
     moonframe_terminal::{Ansi, Engine, Key, Session, Spawn, encode, paste},
     std::{cell::Cell, collections::HashMap, path::PathBuf, rc::Rc, sync::Arc},
@@ -186,13 +186,24 @@ impl MoonframeApp {
     }
 }
 
-/// Hands keystrokes to the focused terminal before key bindings see them.
+/// Hands keystrokes to the topmost open overlay or popover that takes them,
+/// then to the focused text field (its `keys`), then to the focused terminal
+/// (unless an overlay with a backdrop covers it), before key bindings see
+/// them.
 pub(crate) fn intercept_keys(cx: &mut Context<MoonframeApp>) -> Subscription {
     let app = cx.entity().downgrade();
     cx.intercept_keystrokes(move |event, window, cx| {
         let taken = app
             .update(cx, |app, cx| {
-                app.terminal_keystroke(&event.keystroke, window, cx)
+                match app.layer_keystroke(&event.keystroke, window, cx) {
+                    Taken::Sent => true,
+                    // A field inside the covering overlay keeps its keys.
+                    Taken::Blocked => app.input_keystroke(&event.keystroke, window, cx),
+                    Taken::Free => {
+                        app.input_keystroke(&event.keystroke, window, cx)
+                            || app.terminal_keystroke(&event.keystroke, window, cx)
+                    },
+                }
             })
             .unwrap_or(false);
         if taken {

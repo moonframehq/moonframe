@@ -15,6 +15,12 @@ return component {
 	category = "Terminals",
 	icon = "square-terminal",
 	description = "A live shell on libghostty-vt, Ghostty's own emulator. It keeps running across reloads and while hidden.",
+	when = "A shell drawn by Ghostty's emulator; same as `terminal` with the other engine.",
+	props = {
+		["id"] = "keeps the shell across reloads; one per id",
+		["cwd"] = "starting folder",
+		["style"] = "style table for the box",
+	},
 	example = { id = "shell", cwd = "~" },
 
 	build = function(props: Props)

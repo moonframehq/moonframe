@@ -18,10 +18,24 @@ const MAX_NODES: usize = 10_000;
 /// Key groups elements share. `type` is the tag `ui` sets.
 const TYPE: &[&str] = &["type"];
 const FRAME: &[&str] = &[
-    "gap", "padding", "grow", "width", "height", "surface", "border", "scroll",
+    "gap",
+    "padding",
+    "grow",
+    "width",
+    "height",
+    "surface",
+    "border",
+    "scroll",
+    "shrink",
+    "self_align",
+    "hug",
+    "max_width",
+    "max_height",
+    "float",
 ];
 const LOOK: &[&str] = &["class", "style"];
-const ACTION: &[&str] = &["msg", "to", "command"];
+const ACTION: &[&str] = &["msg", "to", "command", "browser"];
+const EXTRAS: &[&str] = &["tooltip", "context", "copy"];
 
 /// Reads a whole tree; `sheet` resolves the color names in `style` keys.
 /// Reads a view. A broken child becomes a [`Node::Problem`] in its place,
@@ -73,7 +87,10 @@ impl Tree {
             Element::Item => Node::Item(self.build(kind, table, &cx)?),
             Element::Badge => Node::Badge(self.build(kind, table, &cx)?),
             Element::Icon => Node::Icon(self.build(kind, table, &cx)?),
+            Element::Image => Node::Image(self.build(kind, table, &cx)?),
             Element::Terminal => Node::Terminal(self.build(kind, table, &cx)?),
+            Element::Browser => Node::Browser(self.build(kind, table, &cx)?),
+            Element::Input => Node::Input(self.build(kind, table, &cx)?),
             Element::Divider => self
                 .build::<Bare>(kind, table, &cx)
                 .map(|_| Node::Divider)?,
@@ -81,6 +98,7 @@ impl Tree {
             Element::Region => Node::Region(self.build(kind, table, &cx)?),
             Element::Mount => Node::Mount(self.build::<Mount>(kind, table, &cx)?.0),
             Element::Popover => Node::Popover(self.build(kind, table, &cx)?),
+            Element::Overlay => Node::Overlay(self.build(kind, table, &cx)?),
         })
     }
 
@@ -141,8 +159,9 @@ fn kind(table: &Table, cx: &Cx) -> Result<Element, Error> {
 
 impl Build for Stack {
     const CHILDREN: bool = true;
-    const KEYS: &'static [&'static [&'static str]] =
-        &[TYPE, FRAME, LOOK, ACTION, &["align", "justify", "wrap"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, FRAME, LOOK, ACTION, EXTRAS, &[
+        "align", "justify", "wrap", "selected", "drag",
+    ]];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
         Ok(Self {
@@ -155,7 +174,10 @@ impl Build for Stack {
             align: fields.get("align")?.unwrap_or(Align::Stretch),
             justify: fields.get("justify")?.unwrap_or(Justify::Start),
             wrap: fields.get("wrap")?.unwrap_or(false),
+            selected: fields.get("selected")?.unwrap_or(false),
             action: Action::from_fields(fields)?,
+            extras: Extras::from_fields(fields)?,
+            drag: fields.get("drag")?.unwrap_or(false),
             children: tree.children(fields)?,
         })
     }
@@ -239,8 +261,9 @@ impl Build for Pane {
 }
 
 impl Build for Text {
-    const KEYS: &'static [&'static [&'static str]] =
-        &[TYPE, LOOK, &["text", "tone", "size", "weight", "truncate"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
+        "text", "tone", "size", "weight", "truncate", "lines", "wrap",
+    ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
         Ok(Self {
@@ -250,29 +273,40 @@ impl Build for Text {
             size: fields.get("size")?,
             weight: fields.get("weight")?,
             truncate: fields.get("truncate")?.unwrap_or(false),
+            lines: fields
+                .number("lines", 1.0..=100.0)?
+                .map(|lines| lines as u8),
+            wrap: fields.get("wrap")?.unwrap_or(true),
         })
     }
 }
 
 impl Build for Button {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ACTION, &[
-        "label", "variant", "small", "disabled",
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ACTION, EXTRAS, &[
+        "label", "icon", "variant", "small", "disabled",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+        let icon = fields.get("icon")?;
+        let label = match icon {
+            Some(_) => fields.get("label")?.unwrap_or_default(),
+            None => fields.need("label")?,
+        };
         Ok(Self {
             look: Look::from_fields(fields)?,
-            label: fields.need("label")?,
+            label,
+            icon,
             variant: fields.get("variant")?.unwrap_or(Variant::Normal),
             small: fields.get("small")?.unwrap_or(false),
             disabled: fields.get("disabled")?.unwrap_or(false),
             action: Action::from_fields(fields)?,
+            extras: Extras::from_fields(fields)?,
         })
     }
 }
 
 impl Build for Item {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ACTION, &[
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ACTION, EXTRAS, &[
         "label", "detail", "badge", "selected",
     ]];
 
@@ -284,6 +318,7 @@ impl Build for Item {
             badge: fields.get("badge")?,
             selected: fields.get("selected")?.unwrap_or(false),
             action: Action::from_fields(fields)?,
+            extras: Extras::from_fields(fields)?,
         })
     }
 }
@@ -301,7 +336,8 @@ impl Build for Badge {
 }
 
 impl Build for Icon {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &["name", "tone", "size"]];
+    const KEYS: &'static [&'static [&'static str]] =
+        &[TYPE, LOOK, &["name", "tone", "size", "spin"]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
         Ok(Self {
@@ -309,7 +345,52 @@ impl Build for Icon {
             name: fields.need("name")?,
             tone: fields.get("tone")?,
             size: fields.get("size")?,
+            spin: fields.get("spin")?.unwrap_or(false),
         })
+    }
+}
+
+impl Build for Image {
+    const KEYS: &'static [&'static [&'static str]] =
+        &[TYPE, LOOK, &["src", "width", "height", "fit"]];
+
+    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+        Ok(Self {
+            look: Look::from_fields(fields)?,
+            src: fields.need::<ImageSrc>("src")?.0,
+            width: fields.number("width", PIXELS)?,
+            height: fields.number("height", PIXELS)?,
+            fit: fields.get("fit")?.unwrap_or(Fit::Contain),
+        })
+    }
+}
+
+/// An image's `src`: a file. The host has no HTTP client, and a view must
+/// not make the app fetch things, so a URL is refused with what to do.
+struct ImageSrc(String);
+
+impl Read for ImageSrc {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let src = String::read(value, cx)?;
+        let scheme = src
+            .split_once("://")
+            .map(|(scheme, _)| scheme)
+            .filter(|scheme| {
+                !scheme.is_empty()
+                    && scheme
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.')
+            });
+        if let Some(scheme) = scheme {
+            return Err(cx.fail(format!(
+                "images are files, not {scheme}:// URLs; have a provider download it to a \
+                 cache and pass the path"
+            )));
+        }
+        if src.trim().is_empty() {
+            return Err(cx.fail("an empty path"));
+        }
+        Ok(Self(src))
     }
 }
 
@@ -376,24 +457,217 @@ fn edits(a: &str, b: &str) -> usize {
 /// A terminal's `id`: one shell per mod and id, so it is short and plain.
 struct TerminalId(String);
 
-/// Longest a terminal `id` can be.
+/// Longest a terminal or browser `id` can be.
 const MAX_TERMINAL_ID: usize = 64;
 
 impl Read for TerminalId {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
-        let id = String::read(value, cx)?;
-        let plain = !id.is_empty()
-            && id.len() <= MAX_TERMINAL_ID
-            && id
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
-        if plain {
-            Ok(Self(id))
+        plain_id(value, cx).map(Self)
+    }
+}
+
+/// An id the host keeps something by: 1 to 64 of `a-z A-Z 0-9 - _`.
+fn plain_id(value: &Value, cx: &Cx) -> Result<String, Error> {
+    let id = String::read(value, cx)?;
+    let plain = !id.is_empty()
+        && id.len() <= MAX_TERMINAL_ID
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if plain {
+        Ok(id)
+    } else {
+        Err(cx.fail(format!(
+            "an id is 1 to {MAX_TERMINAL_ID} of a-z, A-Z, 0-9, - and _"
+        )))
+    }
+}
+
+impl Build for Browser {
+    const KEYS: &'static [&'static [&'static str]] =
+        &[TYPE, LOOK, &["id", "url", "zoom", "navigate", "loading"]];
+
+    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+        Ok(Self {
+            look: Look::from_fields(fields)?,
+            id: fields
+                .get::<BrowserId>("id")?
+                .map_or_else(|| "browser".to_owned(), |id| id.0),
+            url: fields.get::<WebUrl>("url")?.map(|url| url.0),
+            zoom: fields.number("zoom", 0.25..=5.0)?.unwrap_or(1.0),
+            navigate: fields.get("navigate")?,
+            loading: fields.get("loading")?,
+        })
+    }
+}
+
+/// A browser's `id`, kept by the mod like a terminal's.
+struct BrowserId(String);
+
+impl Read for BrowserId {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        plain_id(value, cx).map(Self)
+    }
+}
+
+/// A browser's `url`: only web and file addresses, never a script or an
+/// app's own scheme.
+struct WebUrl(String);
+
+impl Read for WebUrl {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let url = String::read(value, cx)?;
+        if is_web_url(&url) {
+            Ok(Self(url))
         } else {
             Err(cx.fail(format!(
-                "a terminal id is 1 to {MAX_TERMINAL_ID} of a-z, A-Z, 0-9, - and _"
+                "`{}` is not an http, https or file address",
+                url.chars().take(80).collect::<String>()
             )))
         }
+    }
+}
+
+/// A control's `command`: the app's own, or one for a browser.
+enum AnyCommand {
+    App(Command),
+    Browser(BrowserCommand),
+}
+
+impl Read for AnyCommand {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let name = String::read(value, cx)?;
+        Command::parse(&name)
+            .map(Self::App)
+            .or_else(|| BrowserCommand::parse(&name).map(Self::Browser))
+            .ok_or_else(|| {
+                cx.fail(format!(
+                    "unknown `{name}`; expected one of {}, {}",
+                    Command::NAMES.join(", "),
+                    BrowserCommand::NAMES.join(", ")
+                ))
+            })
+    }
+}
+
+impl Build for Input {
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
+        "id",
+        "value",
+        "placeholder",
+        "to",
+        "change",
+        "submit",
+        "keys",
+        "multiline",
+        "rows",
+        "disabled",
+        "focus",
+        "mono",
+        "width",
+        "grow",
+    ]];
+
+    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+        let multiline = fields.get("multiline")?.unwrap_or(false);
+        let rows = fields.get::<f32>("rows")?;
+        if rows.is_some() && !multiline {
+            return Err(fields
+                .cx()
+                .key("rows")
+                .fail("`rows` goes with `multiline = true`"));
+        }
+        let rows = match rows {
+            None => Self::DEFAULT_ROWS,
+            Some(rows) if rows.fract() == 0.0 && (1.0..=Self::MAX_ROWS as f32).contains(&rows) => {
+                rows as u32
+            },
+            Some(_) => {
+                return Err(fields
+                    .cx()
+                    .key("rows")
+                    .fail(format!("a whole number from 1 to {}", Self::MAX_ROWS)));
+            },
+        };
+        let change = fields.get::<Data>("change")?;
+        let submit = fields.get::<Data>("submit")?;
+        let keys = fields
+            .get::<InputKeys>("keys")?
+            .map(|keys| keys.0)
+            .unwrap_or_default();
+        let to = fields.get::<String>("to")?;
+        if to.is_some() && change.is_none() && submit.is_none() && keys.is_empty() {
+            return Err(fields
+                .cx()
+                .key("to")
+                .fail("`to` goes with `change`, `submit` or `keys`"));
+        }
+        Ok(Self {
+            look: Look::from_fields(fields)?,
+            id: fields.get::<InputId>("id")?.map(|id| id.0),
+            value: fields.get("value")?,
+            placeholder: fields.get("placeholder")?,
+            to,
+            change,
+            submit,
+            keys,
+            multiline,
+            rows,
+            disabled: fields.get("disabled")?.unwrap_or(false),
+            focus: fields.get("focus")?.unwrap_or(false),
+            mono: fields.get("mono")?.unwrap_or(false),
+            width: fields.number("width", PIXELS)?,
+            grow: fields.get("grow")?.unwrap_or(false),
+        })
+    }
+}
+
+/// An input's `keys`: a table from key names to the messages they send.
+struct InputKeys(Vec<(KeyChord, Data)>);
+
+/// Most keys one input can take over.
+const MAX_KEYS: usize = 32;
+
+impl Read for InputKeys {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let Value::Table(table) = value else {
+            return Err(
+                cx.fail("expected a table such as { up = \"previous\", escape = \"close\" }")
+            );
+        };
+        let mut keys: Vec<(String, KeyChord, Data)> = Vec::new();
+        for pair in table.pairs::<Value, Value>() {
+            let (name, msg) = pair?;
+            let Value::String(name) = name else {
+                return Err(cx.fail("keys are key names such as `up` or `ctrl-n`"));
+            };
+            let name = name.to_string_lossy();
+            let cx = cx.quoted(&name);
+            let chord = KeyChord::parse(&name).map_err(|problem| cx.fail(problem))?;
+            if let Some((other, ..)) = keys.iter().find(|(_, other, _)| *other == chord) {
+                return Err(cx.fail(format!("the same key as `{other}`")));
+            }
+            keys.push((name, chord, <Data as Read>::read(&msg, &cx)?));
+            if keys.len() > MAX_KEYS {
+                return Err(cx.fail(format!("more than {MAX_KEYS} keys")));
+            }
+        }
+        // Table order is not the script's; sort so a view reads the same each time.
+        keys.sort_by(|(a, ..), (b, ..)| a.cmp(b));
+        Ok(Self(
+            keys.into_iter()
+                .map(|(_, chord, msg)| (chord, msg))
+                .collect(),
+        ))
+    }
+}
+
+/// An input's `id`, kept by the mod like a terminal's.
+struct InputId(String);
+
+impl Read for InputId {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        plain_id(value, cx).map(Self)
     }
 }
 
@@ -421,25 +695,54 @@ impl Build for Region {
 impl Build for Popover {
     const CHILDREN: bool = true;
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "open", "dismiss", "side", "align", "gap", "width", "content",
+        "open", "dismiss", "to", "side", "align", "gap", "width", "keys", "content",
     ]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
-        let content = fields
-            .raw("content")
-            .ok_or_else(|| fields.cx().key("content").fail("missing"))?;
+        let content = content(fields)?;
         Ok(Self {
             look: Look::from_fields(fields)?,
             open: fields.get("open")?.unwrap_or(false),
             dismiss: fields.get("dismiss")?,
+            to: fields.get("to")?,
             side: fields.get("side")?.unwrap_or(Side::Top),
             align: fields.get("align")?.unwrap_or(Anchor::Start),
             gap: fields.number("gap", 0.0..=1000.0)?.unwrap_or(6.0),
             width: fields.number("width", PIXELS)?,
+            keys: fields.get("keys")?.unwrap_or_default(),
             anchor: tree.children(fields)?,
             content: Box::new(tree.node(content, &fields.cx().key("content"))?),
         })
     }
+}
+
+impl Build for Overlay {
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
+        "open", "dismiss", "to", "place", "backdrop", "width", "height", "keys", "content",
+    ]];
+
+    fn build(_: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
+        let content = content(fields)?;
+        Ok(Self {
+            look: Look::from_fields(fields)?,
+            open: fields.get("open")?.unwrap_or(false),
+            dismiss: fields.get("dismiss")?,
+            to: fields.get("to")?,
+            place: fields.get("place")?.unwrap_or(Placement::Center),
+            backdrop: fields.get("backdrop")?.unwrap_or(false),
+            width: fields.number("width", PIXELS)?,
+            height: fields.number("height", PIXELS)?,
+            keys: fields.get("keys")?.unwrap_or_default(),
+            content: Box::new(tree.node(content, &fields.cx().key("content"))?),
+        })
+    }
+}
+
+/// The element a popover or overlay floats.
+fn content<'f>(fields: &'f Fields) -> Result<&'f Value, Error> {
+    fields
+        .raw("content")
+        .ok_or_else(|| fields.cx().key("content").fail("missing"))
 }
 
 /// `ui.mount "name"`: the mod to draw.
@@ -477,23 +780,102 @@ impl Frame {
             height: fields.number("height", PIXELS)?,
             surface: fields.get("surface")?,
             border: fields.get::<Edges>("border")?.map(|edges| edges.0),
-            scroll: fields.get("scroll")?.unwrap_or(false),
+            scroll: fields
+                .get::<ScrollKey>("scroll")?
+                .map_or(Scroll::No, |key| key.0),
+            shrink: fields.get("shrink")?.unwrap_or(true),
+            self_align: fields.get("self_align")?,
+            hug: fields.get("hug")?.unwrap_or(false),
+            max_width: fields.number("max_width", PIXELS)?,
+            max_height: fields.number("max_height", PIXELS)?,
+            float: fields.get("float")?,
         })
     }
 }
 
 impl Action {
-    /// A control's `msg` (with an optional `to`) or `command`.
+    /// A control's `msg` (with an optional `to`) or `command`; a browser
+    /// command names its browser with `browser` (and its mod with `to`).
     fn from_fields(fields: &Fields) -> Result<Option<Self>, Error> {
+        let browser = fields.get::<BrowserId>("browser")?.map(|id| id.0);
+        let misplaced = || {
+            fields.cx().key("browser").fail(format!(
+                "`browser` goes with a browser command: {}",
+                BrowserCommand::NAMES.join(", ")
+            ))
+        };
         match (
             fields.get::<Data>("msg")?,
             fields.get::<String>("to")?,
-            fields.get::<Command>("command")?,
+            fields.get::<AnyCommand>("command")?,
         ) {
             (Some(_), _, Some(_)) => Err(fields.cx().fail("takes `msg` or `command`, not both")),
+            (Some(_), _, None) if browser.is_some() => Err(misplaced()),
             (Some(msg), to, None) => Ok(Some(Self::Send { to, msg })),
-            (None, Some(_), _) => Err(fields.cx().key("to").fail("`to` goes with a `msg`")),
-            (None, None, command) => Ok(command.map(Self::Command)),
+            (None, to, Some(AnyCommand::Browser(command))) => {
+                let id = browser.ok_or_else(|| {
+                    fields
+                        .cx()
+                        .key("command")
+                        .fail("a browser command needs `browser = \"<id>\"`, its ui.browser's id")
+                })?;
+                Ok(Some(Self::Browser { to, id, command }))
+            },
+            (None, ..) if browser.is_some() => Err(misplaced()),
+            (None, Some(_), _) if fields.raw("context").is_none() => Err(fields
+                .cx()
+                .key("to")
+                .fail("`to` goes with a `msg`, `context` or browser `command`")),
+            (None, _, Some(AnyCommand::App(command))) => Ok(Some(Self::Command(command))),
+            (None, _, None) => Ok(None),
+        }
+    }
+}
+
+impl Extras {
+    /// A control's `tooltip`, `context` (a message sent to `to` like `msg`)
+    /// and `copy`.
+    fn from_fields(fields: &Fields) -> Result<Self, Error> {
+        let context = fields
+            .get::<Data>("context")?
+            .map(|msg| -> Result<Action, Error> {
+                Ok(Action::Send {
+                    to: fields.get("to")?,
+                    msg,
+                })
+            })
+            .transpose()?;
+        Ok(Self {
+            tooltip: fields.get("tooltip")?,
+            context,
+            copy: fields.get("copy")?,
+        })
+    }
+}
+
+/// `float = { top = -4, right = -4 }`: pixels from the parent's edges.
+impl Read for Offsets {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let fields = Fields::read(value, cx, &[&["top", "right", "bottom", "left"]])?;
+        let edge = |key| fields.number(key, -100_000.0..=100_000.0);
+        Ok(Self {
+            top: edge("top")?,
+            right: edge("right")?,
+            bottom: edge("bottom")?,
+            left: edge("left")?,
+        })
+    }
+}
+
+/// `scroll = true` (along the axis), or `"x"`, `"y"`, `"both"`.
+struct ScrollKey(Scroll);
+
+impl Read for ScrollKey {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        match value {
+            Value::Boolean(true) => Ok(Self(Scroll::Along)),
+            Value::Boolean(false) => Ok(Self(Scroll::No)),
+            _ => Scroll::read(value, cx).map(Self),
         }
     }
 }

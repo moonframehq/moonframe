@@ -1,0 +1,8 @@
+# The app repository's GitLab state, shared as `app.gitlab` in the github
+# provider's shape: merge requests under `prs` and `current_pr`, open
+# issues, and the signed-in viewer. It reports `available = false` unless a
+# remote is on GitLab.
+# A process provider: it runs the `glab` CLI with your own access and
+# sign-in (it never reads a token). Needs bash, glab and jq; curl for avatars.
+command = ["bash", "gitlab.sh"]
+kind    = "process"

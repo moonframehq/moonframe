@@ -6,6 +6,8 @@ rust = { components = "clippy,rustfmt", profile = "minimal", version = "1.99.0" 
 # libghostty-vt (the `ghostty` terminal feature) is built from Ghostty's
 # source with Zig; the version Ghostty's build.zig.zon asks for.
 zig = "0.15.2"
+# TOML formatting (`just format`, `just format-check`), with taplo.toml.
+taplo = "0.10.0"
 
 [env]
 # Ahead of mise's zig: works around Zig 0.15 on macOS 27 (see tools/zig/zig).

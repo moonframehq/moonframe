@@ -20,3 +20,10 @@ include = ["**/Cargo.toml"]
 keys    = ["package.metadata.deb"]
 [rule.formatting]
 reorder_arrays = false
+
+# A process provider's `command` is a program and its arguments, in order;
+# never sort arrays in provider manifests.
+[[rule]]
+include = ["**/provider.toml"]
+[rule.formatting]
+reorder_arrays = false

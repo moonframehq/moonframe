@@ -17,6 +17,14 @@ return component {
 	category = "Status bar",
 	icon = "cpu",
 	description = "An icon, an optional label, and a value in a fixed-width box, for status bars and toolbars.",
+	when = "One labelled value with an icon in a status bar or toolbar, kept to a fixed width so it does not jitter.",
+	props = {
+		["icon"] = "icon name",
+		["label"] = "short label",
+		["value"] = "the value text",
+		["width"] = "value width in pixels",
+		["tone"] = "text tone",
+	},
 	example = { icon = "cpu", label = "CPU", value = "12%", width = 32 },
 
 	build = function(props: Props)

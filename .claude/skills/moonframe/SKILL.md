@@ -1,6 +1,6 @@
 ---
 name: moonframe
-description: Build anything in Moonframe, a starter app whose window is laid out entirely by Luau. Covers panels, side panels, splits, toolbars, status bars, popovers, mods and extensions, reusable components (`use`), live terminals (`ui.terminal`), data providers (Wasm or process), icons, and styling through style.luau (colors, corners, shadows, spacing, animations). Also covers acting on the user's Inspect Element selection ("add X here"). Use whenever the task is to add, move, restyle or experiment with any UI in moonframe, to build a widget, component, provider or extension, or to customise the installed app in ~/.config/moonframe. The window reloads live as files change, so no Rust build is needed for Luau work.
+description: Build anything in Moonframe, a starter app whose window is laid out entirely by Luau. Covers panels, side panels, splits, toolbars, status bars, popovers, overlays (dialogs, command palettes, sheets, toasts) and their keys, mods and extensions, reusable components (`use`), live terminals (`ui.terminal`), data providers (Wasm or process), icons, and styling through style.luau (colors, corners, shadows, spacing, animations). Also covers acting on the user's Inspect Element selection ("add X here"). Use whenever the task is to add, move, restyle or experiment with any UI in moonframe, to build a widget, component, provider or extension, or to customise the installed app in ~/.config/moonframe. The window reloads live as files change, so no Rust build is needed for Luau work.
 ---
 
 # Moonframe
@@ -53,9 +53,11 @@ Pick the lowest layer that can do the job:
 | something on screen, from data Luau already has | a **mod** (or edit one) | `mods/<name>/main.luau` | no |
 | the same piece of UI in several places | a **component** | `components/<name>.luau` | no |
 | a shell or command line in the window | `ui.terminal` or `use "terminal"` | in a mod | no |
+| a web page in the window | `ui.browser` | in a mod | no |
+| a text field, search box, prompt or text area | `ui.input` or `use "search-field"` | in a mod | no |
 | data from the machine, files, network or a CLI | a **provider** feeding `app.<name>` | `providers/<name>/` | no (the host builds Wasm providers itself) |
 | a look change | a rule in `style.luau`, or the mod's `styles` | | no |
-| a new kind of element (input field, tree, chart) | a host element | `crates/` | yes, and the app restarts |
+| a new kind of element (tree, chart, image) | a host element | `crates/` | yes, and the app restarts |
 
 Prefer what already exists. Check `app/components/` before writing a widget,
 and the element table before asking for a host change. Live-reloaded Luau
@@ -85,12 +87,42 @@ Never invent the data in Luau unless it is labelled demo data.
 **Something clickable that opens a sheet.** `ui.popover` around the
 widget, with `open` in the mod's state (see "Sheets and menus").
 
+**A dialog, command palette, side sheet or toast.** `ui.overlay` with
+`open` in the mod's state, a `place`, and `keys` for Escape, Enter and the
+arrows (see "Dialogs, palettes, sheets and toasts").
+
 **A reusable piece.** A component with a good `example`, so it previews
 in the Components window, then `use` it from the mod.
+
+**A web page.** `ui.browser { id = "docs", url = "https://example.com" }`
+inside a container with `grow = true`, with buttons sending
+`command = "browser-back", browser = "docs"` (see "Browsers").
 
 **A terminal.** `local terminal = use "terminal"` and
 `terminal { id = "main", cwd = "~/code" }` inside a container with
 `grow = true` (see "Terminals").
+
+**A search field.** Keep the query in state, pass it back as `value`, and
+filter on it (`use "search-field"` wraps this; `mods/explorer` uses it):
+
+```lua
+update = function(state, msg)
+	if msg.msg == "query" then state.query = msg.value          -- each edit
+	elseif msg.msg == "clear" then state.query = ""              -- Esc empties it
+	elseif msg.msg == "open" then return state, { { to = "editor", msg = { open = msg.value } } }
+	end
+end,
+view = function(state)
+	return ui.column {
+		ui.input { id = "query", value = state.query, placeholder = "Search…",
+			change = "query", submit = "open", keys = { escape = "clear" } },
+		-- ...the rows that match state.query
+	}
+end,
+```
+
+For a palette, add `keys = { up = "prev", down = "next" }` and
+`focus = state.open`.
 
 **Mods that talk.** Send `msg = ..., to = "other"` from a control, or
 return sends from `update`. Messages to `provider:<name>` go to a provider.
@@ -157,23 +189,12 @@ return mod {
 }
 ```
 
-Before writing a widget, check `app/components/` for one that fits.
-`just check` lists them all:
-
-| Component | For | Main props |
-| --- | --- | --- |
-| `card` | a titled, bordered box | `title`, `subtitle`, `actions`, children |
-| `section` | a small heading over content | `title`, children |
-| `toolbar` | a row of small buttons | `buttons = { { label, msg or command, variant } }` |
-| `list` | selectable rows; a click sends `{ select = id }` | `rows = { { id, label, detail, badge } }`, `selected`, `to` |
-| `key-values` | aligned label/value pairs | `rows = { { "Label", "value" } }`, `width` |
-| `meter` | a bar filled to a fraction | `value` (0 to 1), `width`, `warn`, `label` |
-| `sparkline` | recent samples as tiny bars | `values` (0 to 1), `samples`, `height`, `hot` |
-| `stat` | icon, label, fixed-width value | `icon`, `label`, `value`, `width`, `tone` |
-| `tags` | wrapping badges | `tags`, `tone` |
-| `empty-state` | nothing to show yet | `icon`, `title`, `message`, `action`, `msg` |
-| `terminal` | a live shell (alacritty) | `id`, `cwd`, `style` |
-| `ghostty-terminal` | a live shell (libghostty) | `id`, `cwd`, `style` |
+Before writing a widget, read the **moonframe-components** skill
+(`.claude/skills/moonframe-components/SKILL.md`): the full catalogue of host
+elements and components, with when to use each, their props, the classes
+they style, and how to call them. `just check` lists the names too. After
+adding or changing a component, run `just components` to regenerate that
+catalogue (`just ci` fails when it is stale).
 
 A new component looks like this:
 
@@ -183,10 +204,19 @@ return component {
 	category = "Status bar",        -- the Components submenu
 	icon = "cpu",                   -- beside its title in the browser
 	description = "One line on what it is for.",
+	-- For the catalogue: when to use it, and what to use instead.
+	when = "One labelled value in a status bar. For a fraction use `meter`.",
+	props = { value = "the text shown" },
+	-- Default rules for its classes. They apply wherever it is used, under
+	-- the mod's own styles and style.luau, which can restyle it.
+	styles = {
+		[".stat"] = { padding = { 2, 6 }, radius = 6 },
+		[".stat:hover"] = { background = "accent/10" },
+	},
 	example = { value = "12%" },    -- props for the preview
 	-- usage = [[...]],             -- Luau to show, when `example` holds elements
 	build = function(props)
-		return ui.row { ui.text { props.value } }
+		return ui.row { class = "stat", ui.text { props.value } }
 	end,
 }
 ```
@@ -195,12 +225,25 @@ return component {
   like a `view`. Clicks it builds go to that mod's `update`.
 - Without `usage`, the gallery shows `local x = use "name"` and a call
   with `example`. Give `usage` when the example has elements or children.
-- Write components to work anywhere: theme colors in `style`, not the
-  app's classes, and nothing a mod must set up.
+- Write components to work anywhere: their look goes in their own
+  `styles` under classes named after them (`.tabs`, `.tabs-tab`,
+  `.tabs-tab:selected`), in theme colors, so `style.luau` can restyle every
+  part. Avoid inline `style` except for values computed from props (a
+  meter's width). Nothing a mod must set up.
+- Always give `when` and `props`; `just components` refuses a component
+  without `when`.
 - The preview is drawn from `example`, and a broken component shows its
   error in the gallery and in `just check`. Previews never start anything:
   a terminal shows a placeholder.
 - A component can `use` another; one that uses itself is an error.
+- **Demos.** The browser's preview is live: it runs a demo, a whole mod
+  that uses the component, and shows that file as the code to copy. Write
+  `components/demos/<name>.luau` (`return mod { init, update, view }`) for
+  any component with clicks or state, so the user can play with it: a
+  segmented control that switches, a dialog a button opens, a tree that
+  folds. Keep it short, realistic and commented. Without one, the preview
+  is a mod made from `example`. A demo runs in the gallery only: its
+  messages reach only its own `update`, and app commands do nothing.
 - Name it after what it is (`branch-list`, not `widget2`); the file name
   is the name `use` takes.
 - Types: the definition file's type names (`IconName`, `Tone`, `Style`)
@@ -233,6 +276,121 @@ live shell. The host runs it, so it can't be written in Luau:
   ids from data (one per list row): each is a process.
 - **In the component browser** a terminal shows a placeholder and starts
   no shell.
+
+## Browsers
+
+`ui.browser` shows a web page in a native web view the host runs (WebKit
+on macOS, WebView2 on Windows). A mod gives it an address and reads back
+where it went; it can't run scripts in the page.
+
+```lua
+ui.browser {
+	id = "docs",                      -- one page per mod and id
+	url = state.url,                  -- http, https or file
+	navigate = { navigated = true },  -- arrives as { navigated = true, url = ..., title = ... }
+	loading = "loading",              -- arrives as { msg = "loading", loading = true|false, url = ... }
+	zoom = 1.25,                      -- 0.25 to 5
+}
+ui.button { "Back", command = "browser-back", browser = "docs" }
+```
+
+- **Lifetime:** the host keeps one page per mod and `id`, like a terminal.
+  It survives reloads and hidden panes (hidden, it keeps its place and
+  history) and ends with the app.
+- **`url`:** the page goes there when the mod passes an address different
+  from the last one it passed. Links the user follows stand until then, so
+  an address bar keeps its own text in state and sets `url` on Enter. To
+  load the same address again, use `browser-reload`. Only `http://`,
+  `https://` and `file://` addresses are read; anything else is an error.
+  The page itself may follow links only to those (and `about:blank`); a
+  link that opens a new window opens in the same page, and downloads are
+  refused.
+- **Messages:** `navigate` is sent as the page goes somewhere or its title
+  changes, `loading` as a load starts and finishes. A table message gets
+  the fields added; any other value arrives as `{ msg = <value>, ... }`.
+  Both go to the drawing mod's `update`.
+- **Chrome:** `command = "browser-back"`, `"browser-forward"`,
+  `"browser-reload"`, `"browser-stop"` or `"browser-open"` (the page's
+  address in the system browser) on a button, item, row or column,
+  with `browser = "<id>"`, runs on that browser of the drawing mod (`to =
+  "mod"` for another mod's). An address bar, back and forward buttons and a
+  title are Luau around it: the `browser` component is one
+  (`app/components/demos/browser.luau` is a mod using it).
+- **Sizing and look:** it fills its container (give it `grow`). The box is
+  styled by the `browser` rule, a class or `style` (`background`, `border`,
+  `padding`, `radius`, ...); the page fills the inside, square-cornered.
+- **Over the page:** the page is a native view above the window's drawing,
+  so nothing the window draws can lie over it. While a popover, the toast,
+  or the inspector's picker or card reaches it, the page hides. Tooltips
+  under the pointer don't hide it.
+- **Input:** click the page to give it the keyboard; a click anywhere else
+  in the window takes it back. While it has it, every key goes to the page
+  (on macOS ⌘X, ⌘C, ⌘V, ⌘A, ⌘Z and ⇧⌘Z are its edit actions), except
+  ⌘Q, ⌘H, ⌥⌘H, ⌘M and ⌘`` ` ``, which stay the app's. A focused terminal
+  never sees them.
+- **Limits:** `id` is 1 to 64 of `a-z A-Z 0-9 - _`. A mod can have 4
+  browsers and the app 16; past that the element shows why.
+- **Linux:** wry has no working GPUI child-view backend there yet, so the
+  element shows its address with an **Open in browser** button that opens
+  it in the system browser.
+- **In the component browser** it shows its address and loads nothing.
+
+## Text input
+
+`ui.input` is a text field: a search box, a palette's query, a rename
+prompt, a settings value, a commit message (`multiline`). The host does the
+editing (caret, selection, IME, undo, copy and paste) the same way on
+macOS, Linux and Windows. Its look comes only from the stylesheet.
+
+```lua
+ui.input {
+	id = "query",              -- keeps the text; default: its place in the tree
+	value = state.query,       -- applied only when it changes (see below)
+	placeholder = "Search…",
+	change = "query",          -- sent on each edit
+	submit = "run",            -- sent on Enter (⌘/Ctrl-Enter when multiline)
+	keys = { up = "prev", down = "next", escape = "close" },
+	focus = true,              -- take focus when it appears or turns true
+}
+```
+
+- **The text is the host's.** It keeps each field's text by the drawing
+  mod and `id` (else the field's place in the tree, which moves when the
+  tree around it changes, so give fields that matter an `id`). It survives
+  re-renders and reloads. `value` replaces the text only when it differs
+  from the last `value` the mod passed, so a mod echoing the text back
+  changes nothing, and `value = ""` after a submit clears it. Without
+  `value`, the user's text stands.
+- **Messages carry the text.** A table `msg` arrives as a copy with
+  `value = <text>` added: `change = { query = true }` sends
+  `{ query = true, value = "ab" }`. Anything else arrives as
+  `{ msg = <msg>, value = <text> }`: `change = "query"` sends
+  `{ msg = "query", value = "ab" }`. `to = "mod"` sends them to another mod.
+  The host's own `value` changes don't send `change`.
+- **`keys`** maps key names to messages. While the field has focus, those
+  keys send their message (shaped the same way) instead of editing, ahead
+  of the app's shortcuts and any terminal. Names are GPUI's keystrokes:
+  modifiers `ctrl` `alt` `shift` `cmd` `secondary` joined by `-`, then a
+  lowercase letter, digit or mark (`/`, `-`) or one of `up` `down` `left`
+  `right` `escape` `tab` `enter` `backspace` `delete` `insert` `home` `end`
+  `pageup` `pagedown` `space` `f1`…`f12`: `["shift-tab"]`, `["ctrl-n"]`,
+  `["secondary-k"]`. `secondary` is ⌘ on macOS and Ctrl elsewhere; use it
+  for shortcuts that should work everywhere. Modifiers must match exactly
+  (`up` is not `shift-up`). A key in `keys` wins over `submit`. Up to 32.
+- **Focus.** Clicking focuses a field; so does `focus = true`, once, when
+  the field appears or `focus` turns from false to true (a field gone for a
+  render and back counts as appearing). Previews in the component browser
+  never take focus or edit.
+- **`multiline = true`** makes a text area: Enter adds a line, ⌘/Ctrl-Enter
+  sends `submit`, and `rows` (default 3, up to 200) sets the visible
+  height; it scrolls past that.
+- **Size.** `width` in pixels, or `grow = true` to take the free space
+  along the parent's axis (in a row, the width). In a column it fills the
+  width anyway. `mono = true` uses the monospace font.
+- **Look.** Style the `input` rule and its states, `:hover`, `:focus` and
+  `:disabled`, and `input-placeholder`, `input-selection` and
+  `input-caret` (see "Stylesheet"). Without a rule it has a 1px border and
+  `{ 4, 8 }` padding, and the caret and selection follow `accent`.
 
 Building the `ghostty` engine needs Zig 0.15 (in `mise.toml`). On macOS 27
 and later, Zig 0.15 can't link natively, so `tools/zig/zig` (first on
@@ -325,6 +483,8 @@ return mod {
 
 	-- Required. Returns one element. `app` is
 	-- { dark = bool, mods = { names }, regions = { name = { mod names } },
+	--   window = { platform = "macos"|"linux"|"windows", titlebar = "system"|"hidden",
+	--              maximized, fullscreen, active },
 	--   <provider> = what each provider last published, e.g.
 	--   system = { cpu, cpu_history, memory, memory_used, memory_total,
 	--              received, transmitted }, git = { repository, branch, changed, ahead, behind } }
@@ -340,7 +500,8 @@ Rules that trip agents up:
 - Unknown element types, keys and token values are errors, not ignored.
   `just check` names them.
 - The keys allowed on the `mod { }` table are only `init`, `update`, `view`,
-  `region`, `order`, `title` and `styles`.
+  `region`, `order`, `title` and `styles`, plus `window` in `main.luau` only
+  (see "Window and title bar").
 - State and messages must be plain data: nil, booleans, numbers, strings,
   lists, and string-keyed tables. Functions in state stop it surviving a
   reload. A table is a list without gaps or has string keys, never both.
@@ -362,21 +523,25 @@ Text-like elements take their main value positionally:
 
 | Element | Keys (besides children) | Notes |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, and `msg`/`to` or `command` | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). Defaults: `gap = "normal"`, `padding = "none"` |
+| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, extras, and `msg`/`to` or `command` | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id` | user-resizable; children must be `ui.pane`. Always grows to fill |
 | `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size` |
-| `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate` | a bare string child is plain text |
-| `ui.button { "Label", ... }` | `label`, `variant`, `small`, `disabled`, and `msg`/`to` or `command` | |
-| `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, and `msg`/`to` or `command` | clickable list row for sidebars |
+| `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap` | a bare string child is plain text |
+| `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
+| `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
 | `ui.badge "..."` | `text`, `tone` | pill |
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
-| `ui.icon "cpu"` | `name`, `tone`, `size` | a bundled Lucide icon at the text's size and color; an unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`) |
+| `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
+| `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
+| `ui.icon "cpu"` | `name`, `tone`, `size`, `spin` | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
+| `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
 | `ui.divider()` | | a line across the parent's axis |
 | `ui.spacer()` | | takes the free space, e.g. to push items right |
 | `ui.region "name"` or `ui.region { name = "x", direction = "row", gap = "large" }` | `name`, `direction`, `gap`, `justify` | draws every mod with `region = name`, in order; `justify = "end"` pushes them to the far edge |
 | `ui.mount "name"` | `mod` | draws one mod's view by name |
-| `ui.popover { ..., content = el }` | `open`, `dismiss`, `side` (`top`/`bottom`), `align` (`start`/`end`), `gap`, `width`, `content` | floats `content` over everything beside its anchor (its children). While `open`, a click anywhere outside sends `dismiss` to this mod. Styled and animated by the `popover` rule |
+| `ui.popover { ..., content = el }` | `open`, `dismiss`, `to`, `side` (`top`/`bottom`), `align` (`start`/`end`), `gap`, `width`, `keys`, `content` | floats `content` over everything beside its anchor (its children). While `open`, a click anywhere outside, or Escape, sends `dismiss` to this mod. Styled and animated by the `popover` rule |
+| `ui.overlay { ..., content = el }` | `open`, `dismiss`, `place`, `backdrop`, `width`, `height`, `keys`, `content`, `class`, `style` | floats `content` over the whole window, above popovers: a dialog, palette, sheet or toast (see "Dialogs, palettes, sheets and toasts"). No children |
 
 **Frame keys** (`row`, `column`, `panel`):
 
@@ -385,8 +550,25 @@ Text-like elements take their main value positionally:
 - `width` and `height` are pixels.
 - `gap` and `padding` take a space token.
 - `surface` sets the background and `border` the edges.
-- `scroll = true` scrolls along the container's axis. Give the container
+- `scroll = true` scrolls along the container's axis; `"x"`, `"y"` or
+  `"both"` pick the axes (long code lines that scroll sideways). Give the container
   `grow = true` or a fixed size so it has something to overflow.
+- `shrink = false` keeps the content's size when the parent is short of
+  space (strips, toolbars), instead of being squeezed.
+- `self_align = "start"` (or `center`, `end`, `stretch`) places it across
+  the parent's axis over the parent's `align`: a column stretches its
+  children by default, so a capsule or track that should keep its own
+  width says `self_align = "start"`.
+- `hug = true` is usually better for small things (pills, badges, dots):
+  its own width in a column, while in a row it follows the row's `align`
+  (`self_align = "start"` in a row lifts it to the top).
+- `max_width` and `max_height` cap it; `grow` with a `width` or `height`
+  grows from that size.
+- `float = { top = -4, right = -4 }` takes it out of the flow and places it
+  over its parent at those pixel offsets (negative overhangs): count
+  bubbles on an icon's corner, badges on avatars.
+- A click goes to the innermost clickable element only: a close button in
+  a clickable tab does not also select the tab.
 
 **Tokens:**
 
@@ -400,11 +582,23 @@ Text-like elements take their main value positionally:
 - border: `true`, `all`, `top`, `bottom`, `left`, `right`, `none`
 - direction: `row` `column`
 - variant (button): `normal` `primary` `ghost` `outline` `danger`
-- command: `quit` `reload` `toggle-theme` `show-themes`
+- command: `quit` `reload` `toggle-theme` `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window`
+- place (overlay): `center` `top` `bottom` `left` `right` `top-start`
+  `top-end` `bottom-start` `bottom-end`
+- browser commands (with `browser = "<id>"`): `browser-back`
+  `browser-forward` `browser-reload` `browser-stop` `browser-open`
+
+**Extras** (`row`, `column`, `button`, `item`): `tooltip = "text"` shows
+under the pointer (styled by the `tooltip` rule); `context = <data>` is sent
+on a right-click, to open a context menu (with `to` like `msg`);
+`copy = "text"` puts the text on the clipboard when clicked. `selected =
+true` on a row or column matches `:selected` rules, for tabs and segments.
 
 **Actions:** `msg = <data>` calls `update(state, msg)` on the mod that drew the
 control. Add `to = "name"` to send it to another mod, or to `"shell"`.
 `command = "..."` runs an app command instead. Use one or the other, not both.
+A browser command also takes `browser = "<id>"` (and `to` for another mod's
+browser).
 
 ## Stylesheet
 
@@ -441,17 +635,34 @@ return style {
 
 **Selectors.**
 - An element type: `row` `column` `panel` `panel-header` `pane` `text`
-  `button` `item` `badge` `icon` `terminal` `divider` `popover`.
-  `panel-header` is a panel's title bar.
+  `button` `item` `badge` `icon` `image` `terminal` `browser` `input` `divider` `popover` `tooltip`
+  `overlay` `overlay-backdrop`. `panel-header` is a panel's title bar;
+  `tooltip` is every tooltip's box; `overlay-backdrop` is what dims the
+  window behind an overlay with `backdrop = true` (its `background` and
+  `opacity`; default black at 35%).
+- Parts of an input the editor paints: `input-placeholder` (its `color`),
+  `input-selection` (its `background`, selected text) and `input-caret`
+  (its `background`, the text cursor). They default to the muted
+  foreground and the accent.
 - A class: `.name`.
-- Either one can take a state: `:hover` or `:selected` (`selected` applies
-  to `ui.item`). Hover rules only change `background`, `color` and
-  `border_color`.
+- Either one can take a state:
+  - `:hover`: under the pointer. Hover rules only change `background`,
+    `color` and `border_color`.
+  - `:selected`: applies to `ui.item` and to a row or column with
+    `selected = true`.
+  - `:focus`: has keyboard focus; applies to `ui.input`. A focused input
+    ignores its hover rules.
+  - `:disabled`: `disabled = true`; applies to `ui.input` and
+    `ui.button`. A disabled element has no hover.
+
+  A state's rule layers over the same selector's resting rule, so
+  `["input:focus"] = { border_color = "accent" }` keeps the `input` rule's
+  background.
 
 **Classes and inline styles.** These elements take `class = "a b"` (or
 `{ "a", "b" }`) and `style = { ...same properties... }`: `row`, `column`,
-`panel`, `pane`, `text`, `button`, `item`, `badge`, `icon`, `terminal`,
-`popover`.
+`panel`, `pane`, `text`, `button`, `item`, `badge`, `icon`, `image`, `terminal`,
+`browser`, `input`, `popover`, `overlay` (on its content).
 
 **Numbers that change.** Text is proportional, so a reading such as a rate
 or a percentage changes width as it ticks and pushes its neighbours. Put it
@@ -488,8 +699,10 @@ Leave an element's own keys off if the stylesheet should decide.
 | `gap` | a space token or pixels |
 | `shadow` | a preset (`small` `medium` `large`, or `none` to remove one set by a lower rule), a CSS box-shadow string, a layer table, or a list of layers (see below) |
 | `size`, `weight` | text tokens (inherited) |
+| `font` | `sans` or `mono` (the terminal font, for code and paths; inherited) |
+| `case` | `upper`, `lower` or `none`: the letter case a `ui.text` shows (headings in capitals, restyleable) |
 | `opacity` | 0 to 1 |
-| `transition` | how a `pane` animates when its `visible` changes (see below) |
+| `transition` | how a `pane`, `popover` or `overlay` animates when it shows or hides (see below) |
 
 **Shadows.** Write them like CSS `box-shadow`. Lengths are pixels, with or
 without `px`, and layers are separated by commas. The color can be any
@@ -558,6 +771,54 @@ element's own `padding = "small"` key sets every edge.
   color overrides its `variant`.
 - `divider` takes only `background`.
 
+## Window and title bar
+
+The shell (`main.luau` only) can ask for a window without the system title
+bar and draw its own:
+
+```lua
+return mod {
+	window = { titlebar = "hidden", traffic_lights = { x = 12, y = 12 } },
+	view = function(state, app)
+		local w = app.window
+		local mac = w.platform == "macos"
+		return ui.column { grow = true, gap = "none",
+			ui.row { class = "titlebar", drag = true, height = 38, align = "center",
+				-- room for macOS's traffic lights (about x + 70), unless fullscreen hides them
+				mac and not w.fullscreen and ui.row { width = 80 },
+				ui.text { "My app", weight = "medium" },
+				ui.spacer(),
+				-- Linux and Windows draw no window buttons when the title bar is hidden.
+				w.titlebar == "hidden" and not mac and ui.row { gap = "none",
+					ui.button { "–", variant = "ghost", small = true, command = "minimize" },
+					ui.button { w.maximized and "❐" or "□", variant = "ghost", small = true, command = "maximize" },
+					ui.button { "×", variant = "ghost", small = true, command = "close-window" },
+				},
+			},
+			-- the rest of the layout
+		}
+	end,
+}
+```
+
+- `titlebar = "hidden"`: on macOS the layout runs under a transparent title
+  bar and the traffic lights stay, at `traffic_lights` (the first button's
+  offset from the top left; the system's place when unset). On Windows the
+  system frame goes. On Linux the window asks for client-side decorations;
+  the app then draws a thin border with resize edges and a shadow, and a
+  compositor that insists on its own frame keeps it (then
+  `app.window.titlebar` says `"system"`). `"system"` (the default) is the
+  normal title bar.
+- **It applies when the window opens.** GPUI can't change a window's frame
+  later, so after editing `window`, restart the app (the window says so).
+- Give the layout a `drag = true` row: with the title bar hidden it is the
+  only way to move the window. Double-clicking it zooms (macOS follows the
+  user's "double-click a title bar" setting); right-click on Linux opens the
+  window menu.
+- `app.window` updates as the window is maximized, goes fullscreen, or
+  gains and loses focus: dim the title bar on `not app.window.active`.
+- `app/main.luau` ships with the system title bar; this is opt-in.
+
 ## Patterns
 
 **Shell with toggleable side panels.** Keep the visibility in the shell's
@@ -602,8 +863,11 @@ restyle an extension from the app side, add a rule for the same selector in
 
 **Live data.** Mods can't read the machine (no `os`, `io` or network).
 Providers share data under `app`: `app.system` (CPU, memory, network, from
-the Wasm provider each second) and `app.git` (branch, changed files, ahead and behind, from a
-process provider). Views re-run with each publish. If a widget needs data
+the Wasm provider each second), `app.git` (branch, files, diffs, worktrees),
+`app.github` and `app.gitlab` (pull requests, checks, issues) and
+`app.agents` (coding agents running here), from process providers; their
+shapes are under "Built-in providers" below and typed in
+`types/moonframe.d.luau` (`Git`, `Forge`, `Agents`). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
 is labelled demo data, as in `mods/usage`.
 
@@ -647,8 +911,65 @@ terminal log. There are two kinds:
     arrives on stdin as a `{"message": ...}` line. Its stderr goes to the log.
   - It has the user's full access, so use it only when a sandbox can't reach
     the data, and say so in `provider.toml`.
-  - It should exit when stdin closes.
-  - `app/providers/git` is the example.
+  - It runs in its own folder (`providers/<name>/`); the built-in ones `cd`
+    to the repository holding the app (`git -C ../.. rev-parse
+    --show-toplevel`), or to `$LAYOUTS_REPO` when set.
+  - If it exits, the provider fails (a banner) and stays stopped until its
+    folder changes, so never exit on an error: publish
+    `{"available":false,"reason":"..."}` and keep polling. Exit only when
+    stdin closes. Under macOS's bash 3.2, `read -t` returns 1 for both a
+    timeout and the end of input; tell them apart by elapsed time (see
+    `git.sh`).
+  - Keep caches out of the provider folder (a change there restarts it);
+    use `~/.cache/moonframe/`.
+  - The host refuses a line over 1 MiB or with over 10,000 values.
+  - `app/providers/git` is the example; it shows how to escape any string
+    for JSON in plain bash, and how to parse a message.
+
+**Built-in providers.** All are process providers in bash (3.2 or later),
+macOS and Linux; on Windows they need a bash such as Git Bash, and
+`agents` does not work there. Each publishes `available` and, when false,
+only `reason` (with `repository = false` for git). Times are Unix seconds.
+
+`app.git` (git): every 5 s when `git status` or the numstat changed;
+worktrees, branches, remote and stashes every 30 s or when HEAD moves.
+Any message refreshes. `{ diff = "<path>" }` adds `diff` for that file and
+keeps it fresh; `{ diff = false }` drops it.
+
+| field | shape |
+|---|---|
+| `repository`, `branch`, `changed`, `ahead`, `behind` | as before; `branch` is `"HEAD"` when `detached` |
+| `root`, `detached`, `upstream` | top folder, boolean, `"origin/main"` or nil |
+| `head` | `{ sha, short, subject, author, email, time }`, nil before a first commit |
+| `added`, `deleted` | lines, working tree against HEAD (`git diff --numstat HEAD`) |
+| `files` | `{ path, status, staged, unstaged, added, deleted, old_path? }`, at most 300 (`files_truncated`); `status` is `"M" "A" "D" "R" "?" "U"`; untracked files count 0 lines |
+| `worktrees` | `{ path, branch, head, current, changed, ahead, behind, detached, locked, prunable, bare }` |
+| `branches` | 20 newest local `{ name, head, time, upstream?, ahead, behind, gone, current }` |
+| `remote` | `{ name, url, host, kind ("github" "gitlab" "other"), owner, repo, web_url? }` or nil |
+| `stashes` | count |
+| `diff` | `{ path, binary, lines, truncated, hunks = { { header, old_start, new_start, lines = { { kind ("add" "del" "ctx"), old?, new?, text } } } } }`, at most 1200 lines of 300 characters |
+
+`app.github` (github, via `gh`) and `app.gitlab` (gitlab, via `glab` and
+`jq`, only for a GitLab remote): every 60 s, and on any message. Same shape;
+GitLab merge requests fill `prs` and `current_pr`.
+
+| field | shape |
+|---|---|
+| `repo` | `{ name_with_owner, url, default_branch }` |
+| `viewer` | person: `{ login, name, bot, avatar_url, avatar_path }`; `avatar_path` is a cached file in `~/.cache/moonframe/images/avatars` (where `ui.image` may read it) once downloaded, else nil |
+| `prs` | 30 open, newest first: `{ number, title, state ("open" "closed" "merged"), draft, url, branch, base, author (person), updated, review_decision, mergeable, merge_state, checks, tone, additions?, deletions? }` |
+| `current_pr` | the same for the current branch plus `check_list = { { name, outcome, url } }`, or nil |
+| `checks` | `{ total, passed, failed, pending, skipped }` (GitLab lists show the head pipeline only on `current_pr`) |
+| `tone` | `"merged"`, `"closed"`, `"draft"`, `"attention"` (conflicts, failed checks, changes requested), `"waiting"` (checks running, review required), `"ready"`, `"held"` (blocked or behind) |
+| `issues` | 30 open: `{ number, title, url, author, updated, labels = { { name, color } }, assignees = { login } }` |
+
+`app.agents` (agents): every 4 s, from `ps` and the agents' folders (`/proc`
+or `lsof`).
+
+| field | shape |
+|---|---|
+| `agents` | `{ pid, ppid, name, command, cwd?, tty?, started, elapsed_seconds, cpu, status }`; `name` is `"claude" "codex" "gemini" "cursor" "opencode" "aider" "amp" "copilot" "droid" "kiro" "qwen" "goose" "crush" "auggie" "cline" "kimi" "grok"`; `status` is always `"running"` |
+| `count` | how many |
 
 `[settings]` in `provider.toml` reaches `start`. `just check` validates the
 manifests, and `just providers` builds and lints the Wasm ones. When a view
@@ -680,6 +1001,64 @@ ui.popover {
 --   shadow = "0 12px 32px -8px #0004", transition = "slide-fade fast ease-out" }
 ```
 
+**Dialogs, palettes, sheets and toasts.** `ui.overlay` floats its
+`content` over the whole window, not beside an anchor. Keep `open` in the
+mod's state:
+
+```lua
+ui.overlay {
+	open = state.palette, dismiss = "close", place = "top", backdrop = true, width = 520,
+	keys = { enter = "run", up = "previous", down = "next", ["secondary-k"] = "close" },
+	content = ui.column { ... },
+}
+-- style.luau: overlay = { background = "card", radius = 12, transition = "slide-fade fast" },
+--   ["overlay-backdrop"] = { background = "#000000/50" }, [".sheet"] = { radius = 0 }
+```
+
+- `place`: `center` (default; dialogs), `top` (hangs from near the top,
+  for palettes), `bottom` `left` `right` (sheets: the window's full width or
+  height along that edge, sized by `height` or `width`), `top-start`
+  `top-end` `bottom-start` `bottom-end` (toasts and notices, in a corner).
+- `backdrop = true` dims the window behind and blocks it: clicks don't
+  reach it, and a focused terminal there gets no keys. Clicking the
+  backdrop, or outside the content when there is no backdrop, sends
+  `dismiss` if given. With neither `backdrop` nor `dismiss` (a toast),
+  clicks go through to the window around it.
+- The content has the `overlay` part (and the overlay's `class` and
+  `style`): `background`, `radius`, `border`, `padding`, `shadow`,
+  `margin` (its distance from the window's edge; `top` hangs 80px down),
+  `transition`. Without rules it is a bordered card on the background color.
+- With a `slide` or `slide-fade` transition a sheet slides in from its edge
+  (across its `width` or `height`), and a floating one rises a little into
+  place. The backdrop fades with it.
+- Open overlays stack in tree order: a later one is drawn over an earlier
+  one, and a popover inside an overlay opens over it. Only the topmost open
+  overlay or popover takes keys.
+- In the Components browser an open overlay is drawn in place, as a card.
+
+**Keys.** `keys = { name = msg, ... }` on `ui.overlay` and `ui.popover`:
+while it is open and the topmost, each named keystroke sends its `msg` to
+this mod's `update`, before anything else sees it (a focused terminal and
+the app's shortcuts included). Plain Escape sends `dismiss` unless `keys`
+has an `escape`. Other keys go on as usual.
+- A name is modifiers and a key joined by `-`, as GPUI writes them:
+  `escape`, `enter`, `shift-tab`, `ctrl-k`, `cmd-shift-p`, `cmd--` (minus).
+- Modifiers: `ctrl`, `alt`, `shift`, `cmd` (⌘ on macOS, Super or the Windows
+  key elsewhere) and `secondary` (⌘ on macOS, Ctrl on Linux and Windows).
+  Prefer `secondary` for shortcuts so they feel native on each.
+- Keys: `a`-`z`, `0`-`9`, a symbol such as `/` or `?` (a symbol matches the
+  character typed, so `?` works whatever the layout), `f1`-`f24`, `escape`,
+  `enter`, `tab`, `space`, `backspace`, `delete`, `insert`, `up`, `down`,
+  `left`, `right`, `home`, `end`, `pageup`, `pagedown`. Names are lowercase:
+  write `shift-a`, not `A`. A wrong name, or two names for the same key, is
+  an error `just check` reports.
+- Keys never take what is typed: a letter, digit, symbol or `space` needs
+  `ctrl`, `alt`, `cmd` or `secondary` (`secondary-k`, `alt-?`), so an
+  overlay cannot read keystrokes meant for a terminal behind it. For typing,
+  use `ui.input` and its own `keys`.
+- Modifiers must match exactly: `down` does not fire for `shift-down`.
+- While the Inspector is picking or showing its card, Escape is its own.
+
 **A new extension.** Create `app/mods/<name>/main.luau` with a `region` the
 shell already draws. It appears without touching the shell. To give it a new
 place, add a `ui.region "<new>"` to the shell. A region with no mods draws
@@ -690,10 +1069,19 @@ examples of each pattern. Read them before larger changes.
 
 ## Extending the host
 
-When a request needs something no element can express (an input field, a
-tree, a chart), add an element in Rust. Say so to the user first: it needs a
-build and an app restart, unlike everything above. `ui.icon` and
-`ui.terminal` are recent examples to copy.
+When a request needs something no element can express (a tree, a chart),
+add an element in Rust. Say so to the user first: it needs a build and an
+app restart, unlike everything above. `ui.icon`, `ui.terminal`, `ui.browser`
+and `ui.input` are recent examples to copy; `ui.input` shows an element
+whose host-side state is kept by mod and `id` and drawn with a `RenderOnce`
+(`crates/moonframe/src/input.rs`, `render/input.rs`).
+
+To add an icon, put its single-color 24×24 SVG (`currentColor`, no fixed
+colors) in `assets/icons/`, credit its source in `assets/icons/LICENSES.md`,
+and add its name to `ICONS` in `crates/moonframe-core/src/node.rs` (sorted)
+and `IconName` in `types/moonframe.d.luau`. The binary embeds the folder and
+looks there before gpui-kit's Lucide set; a test checks every name has a
+file.
 
 1. `crates/moonframe-core/src/node.rs`: add it to the `Element` tokens, and a
    struct and `Node` variant. Give it `look: Look` so classes, `style` and
@@ -717,7 +1105,7 @@ build and an app restart, unlike everything above. `ui.icon` and
 
 Anything that runs code or touches the machine belongs in a provider or
 behind a host element that the mod can only parameterise (as terminals take
-a `cwd`, never a command). The Luau sandbox is the boundary; keep it.
+a `cwd`, never a command, and browsers an address, never a script). The Luau sandbox is the boundary; keep it.
 
 ## Sharing mods
 
@@ -763,9 +1151,10 @@ instead.
 | `just check-builtin` | the same for `app/` alone |
 | `just types` | strict Luau type check against `types/moonframe.d.luau` |
 | `just screenshot OUT PID` | captures the window of the process you started |
+| `just component-shot NAME [OUT]` | captures a component's preview page from a background instance it starts and stops; never takes focus |
 | `just run` | opens the window on `app/` (the user usually has one open) |
 | `just providers` | builds and lints the Wasm providers |
-| `just stage` | stages `app/` as the bundle ships it, Wasm prebuilt |
+| `just stage` | stages `app/` as the bundle ships it, Wasm prebuilt (icons are embedded in the binary, so nothing to stage) |
 | `just bundle` | builds `target/bundle/Moonframe.app` (binary, staged app, icon) |
 | `just install` | builds the app and installs it in `/Applications`; use it to try mods in `~/.config/moonframe` against the app as users get it |
 | `just ci` | format check, lint, tests, types, providers, check |

@@ -17,6 +17,10 @@ return component {
 	category = "Controls",
 	icon = "ellipsis",
 	description = "Small ghost buttons in a row; each sends its msg to the mod drawing it, or runs a command.",
+	when = "A row of small quiet buttons above a panel or list. For icon-only buttons use `icon-button`; for one-of-many choices use `segmented`.",
+	props = {
+		["buttons"] = "list of { label, msg or command, variant }",
+	},
 	example = { buttons = { { label = "New", msg = "new" }, { label = "Refresh", msg = "refresh" }, { label = "Remove", msg = "remove", variant = "danger" } } },
 
 	build = function(props: Props)

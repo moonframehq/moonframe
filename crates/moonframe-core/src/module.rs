@@ -3,7 +3,7 @@
 
 use {
     crate::{
-        Data, Error, Node, Rules, Stylesheet,
+        Chrome, Data, Error, Node, Rules, SHELL, Stylesheet,
         component::Library,
         node,
         read::{Cx, Fields, NO_NAMES, Read},
@@ -30,6 +30,8 @@ struct Definition {
     /// Rules for what this mod draws, read when it renders so color names
     /// follow the current stylesheet.
     styles: Option<Value>,
+    /// The window the shell asks for; only `main.luau` may set it.
+    window: Option<Chrome>,
     meta: Meta,
 }
 
@@ -39,13 +41,14 @@ impl Read for Definition {
             return Err(cx.fail("main.luau must return mod { ... }"));
         }
         let fields = Fields::read(value, cx, &[&[
-            "init", "update", "view", "region", "order", "title", "styles",
+            "init", "update", "view", "region", "order", "title", "styles", "window",
         ]])?;
         Ok(Self {
             init: fields.get("init")?,
             update: fields.get("update")?,
             view: fields.need("view")?,
             styles: fields.raw("styles").cloned(),
+            window: fields.get("window")?,
             meta: Meta {
                 region: fields.get("region")?,
                 order: fields.get("order")?.unwrap_or(0),
@@ -91,6 +94,11 @@ impl Module {
         let lua = vm::open(name, &meter, library)?;
         let value = vm::text(&lua, source, name).eval::<Value>()?;
         let definition = Definition::read(&value, &Cx::root(&NO_NAMES))?;
+        if definition.window.is_some() && name != SHELL {
+            return Err(Error::new(
+                "window: only the shell (main.luau) sets the window",
+            ));
+        }
         let previous = match previous {
             Some(previous) => previous.to_lua(&lua)?,
             None => Value::Nil,
@@ -113,6 +121,11 @@ impl Module {
 
     pub(crate) fn meta(&self) -> &Meta {
         &self.definition.meta
+    }
+
+    /// The window the shell asks for, if it says.
+    pub(crate) fn window(&self) -> Option<Chrome> {
+        self.definition.window
     }
 
     /// Runs `update(state, msg)`. It returns the new state, or nothing to

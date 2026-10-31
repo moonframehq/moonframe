@@ -9,7 +9,10 @@ use {
         app::MoonframeApp,
     },
     gpui_kit::{
-        component::{ActiveTheme as _, Root},
+        component::{
+            ActiveTheme as _, Icon, Root,
+            input::{Input, InputEvent, InputState},
+        },
         *,
     },
 };
@@ -20,7 +23,10 @@ const HEIGHT: f32 = 620.;
 pub(crate) struct Gallery {
     app: Entity<MoonframeApp>,
     focus: FocusHandle,
+    /// The filter over the list.
+    search: Entity<InputState>,
     _changes: Subscription,
+    _search: Subscription,
 }
 
 impl Gallery {
@@ -49,17 +55,45 @@ impl Gallery {
     fn new(app: Entity<MoonframeApp>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search components"));
+        let search_changes = cx.subscribe(&search, |_, _, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                cx.notify();
+            }
+        });
         Self {
             _changes: cx.observe(&app, |_, _, cx| cx.notify()),
+            _search: search_changes,
             app,
             focus,
+            search,
         }
     }
 }
 
 impl Render for Gallery {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let content = self.app.update(cx, |app, cx| app.gallery_content(cx));
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let query = self.search.read(cx).value().to_string();
+        let theme = cx.theme();
+        let search = Input::new(&self.search)
+            .cleanable(true)
+            .prefix(
+                Icon::default()
+                    .path("icons/search.svg")
+                    .text_color(theme.muted_foreground),
+            )
+            .h(px(36.))
+            .px_3()
+            .rounded(px(10.))
+            .bg(theme.background)
+            .shadow_xs()
+            .into_any_element();
+        let (content, animating) = self
+            .app
+            .update(cx, |app, cx| app.gallery_content(&query, search, cx));
+        if animating {
+            window.request_animation_frame();
+        }
         let theme = cx.theme();
         div()
             .key_context("Gallery")

@@ -15,6 +15,14 @@ return component {
 	category = "Feedback",
 	icon = "inbox",
 	description = "A centered icon, title, message and optional button for a panel with nothing to show yet.",
+	when = "A list, panel or page with nothing to show yet, optionally with one action to fix that. For loading use `loading-row`; for failures use `notice`.",
+	props = {
+		["icon"] = "icon name",
+		["title"] = "what is missing",
+		["message"] = "one line on why or what to do",
+		["action"] = "button label",
+		["msg"] = "sent when the button is clicked",
+	},
 	example = { icon = "inbox", title = "No worktrees", message = "Create one to work on two branches at once.", action = "New worktree", msg = "new" },
 
 	build = function(props: Props)

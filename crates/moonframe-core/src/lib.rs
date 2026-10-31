@@ -29,26 +29,30 @@ mod tokens;
 mod component;
 mod data;
 mod error;
+mod keys;
 mod module;
 mod node;
 mod read;
 mod roots;
 mod style;
 mod vm;
+mod window;
 mod workspace;
 
 pub use {
-    component::Component,
+    component::{Component, Demo, catalogue},
     data::Data,
     error::Error,
+    keys::{Chord, Keys, Pressed},
     module::Meta,
     node::*,
     roots::{Roots, mod_name},
     style::{
-        Color, Curve, Look, Paint, Part, Resolved, Rules, Shade, Shadow, ShadowLayer, ShadowPreset,
-        Sides, Style, Stylesheet, Token, Transition, TransitionKind,
+        Case, Color, Curve, Font, Look, Paint, Part, Resolved, Rules, Shade, Shadow, ShadowLayer,
+        ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition, TransitionKind,
     },
     vm::printable,
+    window::{Chrome, Platform, Titlebar, WindowState},
     workspace::{PROVIDER, SHELL, Slot, Workspace},
 };
 

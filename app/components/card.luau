@@ -13,6 +13,13 @@ return component {
 	category = "Containers",
 	icon = "frame",
 	description = "A rounded, bordered box with a title, an optional subtitle and header actions, and any content.",
+	when = "A titled box around related content inside a panel or page; for a whole sidebar section use `ui.panel`, for a plain heading use `section`.",
+	props = {
+		["title"] = "heading text",
+		["subtitle"] = "muted line under the title",
+		["actions"] = "elements on the header's right (buttons, icons)",
+		["[children]"] = "the body",
+	},
 	usage = [[local card = use "card"
 
 card { title = "Worktrees", subtitle = "3 checked out",

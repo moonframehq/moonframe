@@ -10,6 +10,11 @@ return component {
 	category = "Data",
 	icon = "star",
 	description = "Badges in a row that wraps, for labels, states or names.",
+	when = "A wrapping set of small labels: languages, topics, states.",
+	props = {
+		["tags"] = "list of strings",
+		["tone"] = "badge tone",
+	},
 	example = { tags = { "rust", "gpui", "luau", "wasm" } },
 
 	build = function(props: Props)

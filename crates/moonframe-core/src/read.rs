@@ -14,6 +14,9 @@ use {
     std::{fmt::Display, ops::RangeInclusive},
 };
 
+/// The most positions a list may have.
+const MAX_ITEMS: usize = 100_000;
+
 /// Longer strings are refused; no label or color needs more.
 const MAX_TEXT: usize = 16 * 1024;
 
@@ -109,6 +112,26 @@ impl<T: Read> Read for Vec<T> {
     }
 }
 
+/// A table of string keys, such as a component's `props`.
+impl<T: Read> Read for std::collections::BTreeMap<String, T> {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let Value::Table(table) = value else {
+            return Err(cx.fail("expected a table of named values"));
+        };
+        let mut map = Self::new();
+        for pair in table.pairs::<Value, Value>() {
+            let (key, value) = pair?;
+            let Value::String(key) = key else {
+                return Err(cx.fail("expected string keys"));
+            };
+            let key = key.to_string_lossy();
+            let read = T::read(&value, &cx.key(&key))?;
+            map.insert(key, read);
+        }
+        Ok(map)
+    }
+}
+
 impl Read for Value {
     fn read(value: &Value, _: &Cx) -> Result<Self, Error> {
         Ok(value.clone())
@@ -190,8 +213,22 @@ pub(crate) fn within(value: f32, range: RangeInclusive<f32>, cx: &Cx) -> Result<
 
 /// The list part of a table, skipping `nil` and `false`.
 pub(crate) fn list(table: &Table) -> Result<Vec<Value>, Error> {
+    // Up to the highest position, not Lua's length: a `nil` child such as
+    // `cond and ui.icon "x"` leaves a hole, and the length may stop at it
+    // and drop the children after it.
+    let mut last = 0;
+    for pair in table.pairs::<Value, Value>() {
+        if let (Value::Integer(index), _) = pair?
+            && let Ok(index) = usize::try_from(index)
+        {
+            last = last.max(index);
+        }
+    }
+    if last > MAX_ITEMS {
+        return Err(Error::new(format!("more than {MAX_ITEMS} list positions")));
+    }
     let mut items = Vec::new();
-    for index in 1..=table.raw_len() {
+    for index in 1..=last {
         match table.raw_get::<Value>(index)? {
             Value::Nil | Value::Boolean(false) => {},
             value => items.push(value),

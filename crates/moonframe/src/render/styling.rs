@@ -5,22 +5,27 @@ use {
     crate::color::ThemeColor,
     gpui_kit::{component::Theme, *},
     moonframe_core::{
-        Border, Direction, Frame, Resolved, Shadow, ShadowPreset, Sides, Space, Style, TextSize,
-        Weight,
+        Align, Border, Direction, Font, Frame, Resolved, Scroll, Shadow, ShadowPreset, Sides,
+        Space, Style, TextSize, Weight,
     },
 };
 
+/// A text size in pixels: sizes scale from the theme's font size, which a
+/// stylesheet can set. No size is the theme's.
+pub(super) fn text_pixels(size: Option<TextSize>, theme: &Theme) -> Pixels {
+    let scale = match size {
+        Some(TextSize::Small) => 0.85,
+        None | Some(TextSize::Normal) => 1.0,
+        Some(TextSize::Large) => 1.2,
+        Some(TextSize::Title) => 1.5,
+    };
+    theme.font_size * scale
+}
+
 /// Styles that apply to any element.
 pub(super) trait StyleExt: Styled + Sized {
-    /// Sizes scale from the theme's font size, which a stylesheet can set.
     fn text_scaled(self, size: TextSize, theme: &Theme) -> Self {
-        let scale = match size {
-            TextSize::Small => 0.85,
-            TextSize::Normal => 1.0,
-            TextSize::Large => 1.2,
-            TextSize::Title => 1.5,
-        };
-        self.text_size(theme.font_size * scale)
+        self.text_size(text_pixels(Some(size), theme))
     }
 
     fn weighted(self, weight: Weight) -> Self {
@@ -42,7 +47,11 @@ pub(super) trait StyleExt: Styled + Sized {
         if let Some(weight) = style.weight {
             self = self.weighted(weight);
         }
-        self
+        match style.font {
+            Some(Font::Mono) => self.font_family(theme.mono_font_family.clone()),
+            Some(Font::Sans) => self.font_family(theme.font_family.clone()),
+            None => self,
+        }
     }
 
     /// The edges `border` names, in the style's border color.
@@ -168,9 +177,44 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
     /// Size, growth, surface, and border, the frame's keys winning over the
     /// style's.
     fn placed(mut self, frame: &Frame, style: &Style, theme: &Theme) -> Self {
-        self = self.min_w_0().min_h_0();
-        if frame.grow {
+        self = if frame.shrink {
+            self.min_w_0().min_h_0()
+        } else {
+            self.flex_shrink_0()
+        };
+        self = match frame.self_align {
+            None => self,
+            Some(Align::Stretch) => self.self_stretch(),
+            Some(Align::Start) => self.self_start(),
+            Some(Align::Center) => self.self_center(),
+            Some(Align::End) => self.self_end(),
+        };
+        // A fixed size is the basis to grow from, not nothing.
+        if frame.grow && frame.width.is_none() && frame.height.is_none() {
             self = self.flex_1();
+        } else if frame.grow {
+            self = self.flex_grow(1.);
+        }
+        if let Some(width) = frame.max_width {
+            self = self.max_w(px(width));
+        }
+        if let Some(height) = frame.max_height {
+            self = self.max_h(px(height));
+        }
+        if let Some(offsets) = frame.float {
+            self = self.absolute();
+            if let Some(top) = offsets.top {
+                self = self.top(px(top));
+            }
+            if let Some(right) = offsets.right {
+                self = self.right(px(right));
+            }
+            if let Some(bottom) = offsets.bottom {
+                self = self.bottom(px(bottom));
+            }
+            if let Some(left) = offsets.left {
+                self = self.left(px(left));
+            }
         }
         if let Some(width) = frame.width {
             self = self.w(px(width)).flex_shrink_0();
@@ -205,11 +249,15 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
         if let Some(padding) = frame.padding {
             element = element.p(px(padding.pixels()));
         }
+        let element = match direction {
+            Direction::Row => element.flex_row(),
+            Direction::Column => element.flex_col(),
+        };
         match (direction, frame.scroll) {
-            (Direction::Row, false) => element.flex_row(),
-            (Direction::Row, true) => element.flex_row().overflow_x_scroll(),
-            (Direction::Column, false) => element.flex_col(),
-            (Direction::Column, true) => element.flex_col().overflow_y_scroll(),
+            (_, Scroll::No) => element,
+            (Direction::Row, Scroll::Along) | (_, Scroll::X) => element.overflow_x_scroll(),
+            (Direction::Column, Scroll::Along) | (_, Scroll::Y) => element.overflow_y_scroll(),
+            (_, Scroll::Both) => element.overflow_scroll(),
         }
     }
 }

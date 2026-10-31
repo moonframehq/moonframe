@@ -41,6 +41,8 @@ impl MoonframeApp {
                         .inset_0()
                         .occlude()
                         .cursor_crosshair()
+                        // Picking reaches what is under a page too.
+                        .child(crate::browser::cover())
                         .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _, cx| {
                             let hovered = this.inspector.at(event.position);
                             if hovered.as_ref().map(|placed| &placed.path)
@@ -136,6 +138,7 @@ impl MoonframeApp {
                 .bg(theme.popover)
                 .shadow_lg()
                 .text_sm()
+                .child(crate::browser::cover())
                 .child(
                     div()
                         .text_xs()

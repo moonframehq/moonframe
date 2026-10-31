@@ -39,6 +39,16 @@ return style {
 		["item:selected"] = { background = "accent/15", color = "accent", weight = "medium" },
 		["item:hover"] = { background = "accent/8" },
 
+		-- Text fields (ui.input): the frame and its states, then what the
+		-- editor paints inside it. A focused field ignores its hover rule.
+		input = { background = "background", border = true, border_color = "border", radius = 6, padding = { 5, 8 } },
+		["input:hover"] = { border_color = "muted-foreground/50" },
+		["input:focus"] = { border_color = "accent", shadow = "0 0 0 3px accent/20" },
+		["input:disabled"] = { opacity = 0.5 },
+		["input-placeholder"] = { color = "muted-foreground" },
+		["input-selection"] = { background = "accent/25" },
+		["input-caret"] = { background = "accent" },
+
 		badge = { background = "accent/12", color = "accent" },
 		divider = { background = "border" },
 
@@ -63,13 +73,22 @@ return style {
 			shadow = "0 12px 32px -8px #00000040, 0 2px 6px #0000001a",
 			transition = "slide-fade fast ease-out",
 		},
+		-- Overlays (dialogs, palettes, sheets, toasts) float over the window;
+		-- a sheet along an edge slides in from it. `overlay-backdrop` is what
+		-- dims the window behind one with `backdrop = true`.
+		overlay = {
+			background = "card",
+			shadow = "0 24px 48px -12px #00000059, 0 2px 6px #0000001a",
+			transition = "slide-fade fast ease-out",
+		},
+		["overlay-backdrop"] = { background = "#000000/35" },
 		[".sheet-title"] = { weight = "bold", size = "large" },
 		[".muted"] = { size = "small", color = "muted-foreground" },
-		[".tabs"] = { margin = { top = 4 } },
-		[".tab"] = { padding = { 6, 0 }, radius = 8, color = "muted-foreground" },
-		[".tab:hover"] = { background = "accent/8" },
-		[".tab-active"] = { background = "accent/12", color = "accent" },
-		[".tab-label"] = { size = "small" },
+		[".usage-tabs"] = { margin = { top = 4 } },
+		[".usage-tab"] = { padding = { 6, 0 }, radius = 8, color = "muted-foreground" },
+		[".usage-tab:hover"] = { background = "accent/8" },
+		[".usage-tab-active"] = { background = "accent/12", color = "accent" },
+		[".usage-tab-label"] = { size = "small" },
 
 		-- Classes: opt in with `class = "..."` on an element.
 		[".toolbar"] = { background = "card", border = "bottom", padding = { 4, 8 } },

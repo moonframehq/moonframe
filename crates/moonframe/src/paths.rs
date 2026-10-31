@@ -36,6 +36,15 @@ pub(crate) fn builds() -> PathBuf {
         .join("providers")
 }
 
+/// Where providers save pictures for `ui.image` (avatars, previews):
+/// `$XDG_CACHE_HOME/moonframe/images`, by default under `~/.cache`. Views
+/// may show files from here and from the app's own folders, nowhere else.
+pub(crate) fn images() -> PathBuf {
+    xdg("XDG_CACHE_HOME", ".cache")
+        .unwrap_or_else(|| env::temp_dir().join(NAME))
+        .join("images")
+}
+
 /// Where the inspector saves the selected element for agents:
 /// `$XDG_CACHE_HOME/moonframe/selection.md`, by default under `~/.cache`.
 pub(crate) fn selection() -> PathBuf {

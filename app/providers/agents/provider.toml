@@ -1,0 +1,7 @@
+# The coding-agent CLIs running on this machine (claude, codex, gemini,
+# cursor, opencode, aider, amp, copilot, ...), shared as `app.agents`: the
+# pid, folder, start time and CPU of each.
+# A process provider: it reads `ps`, /proc and `lsof` with your own access,
+# which the wasm sandbox cannot. Needs bash; macOS or Linux.
+command = ["bash", "agents.sh"]
+kind    = "process"

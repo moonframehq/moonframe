@@ -13,6 +13,13 @@ return component {
 	category = "Data",
 	icon = "battery-medium",
 	description = "A bar filled to a fraction from 0 to 1, with the percentage beside it; it warns past a threshold.",
+	when = "A fraction (0 to 1) as a bar with its percentage: memory, quota, progress of a known size. For work with no known size use `progress` with `busy`.",
+	props = {
+		["value"] = "0 to 1",
+		["width"] = "bar width in pixels",
+		["warn"] = "fraction past which it shows the warning color",
+		["label"] = "text before the bar",
+	},
 	example = { value = 0.62, width = 48, label = "Memory" },
 
 	build = function(props: Props)
