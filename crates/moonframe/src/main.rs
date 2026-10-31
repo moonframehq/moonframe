@@ -45,12 +45,29 @@ Options:
                 or ~/.config/moonframe)
   --no-user     the built-in app alone
   --check       load every module, report problems, and exit without a window
+  --background  open the window without bringing the app forward (for
+                screenshots and scripts while someone is working)
   -h, --help    show this help";
+
+/// The app's id for the window system: every window's, and the bundle's
+/// (scripts/bundle-app.sh). Change it with the name when you fork.
+pub(crate) const APP_ID: &str = "dev.moonframe.app";
+
+/// Whether this run opens its windows behind others (`--background`): set
+/// once at launch, read by every window the app opens.
+static BACKGROUND: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether windows open without taking focus; see [`BACKGROUND`].
+pub(crate) fn background() -> bool {
+    BACKGROUND.load(std::sync::atomic::Ordering::Relaxed)
+}
 
 struct Args {
     builtin: PathBuf,
     user: Option<PathBuf>,
     check: bool,
+    /// Open without activating the app or focusing its window.
+    background: bool,
     /// The words after `mod`, for the package manager.
     packages: Option<Vec<String>>,
 }
@@ -59,11 +76,13 @@ fn parse_args() -> Result<Option<Args>, String> {
     let mut builtin = None;
     let mut user = paths::user();
     let mut check = false;
+    let mut background = false;
     let mut packages = None;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--check" => check = true,
+            "--background" => background = true,
             "--user" => {
                 user = Some(PathBuf::from(args.next().ok_or("--user needs a folder")?));
             },
@@ -81,6 +100,7 @@ fn parse_args() -> Result<Option<Args>, String> {
         builtin: builtin.unwrap_or_else(paths::builtin),
         user,
         check,
+        background,
         packages,
     }))
 }
@@ -161,7 +181,8 @@ fn main() -> ExitCode {
     {
         tracing::warn!("cannot create {}: {error}", user.display());
     }
-    let (builtin, user) = (args.builtin, args.user);
+    let (builtin, user, background) = (args.builtin, args.user, args.background);
+    BACKGROUND.store(background, std::sync::atomic::Ordering::Relaxed);
     gpui_kit::application()
         .with_assets(gpui_kit::assets::Assets)
         .run(move |cx| {
@@ -181,7 +202,8 @@ fn main() -> ExitCode {
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 window_min_size: Some(size(px(640.), px(400.))),
-                app_id: Some("dev.moonframe.app".into()),
+                app_id: Some(APP_ID.into()),
+                focus: !background,
                 ..Default::default()
             };
             let opened = cx.open_window(options, |window, cx| {
@@ -192,7 +214,9 @@ fn main() -> ExitCode {
                 eprintln!("moonframe: unable to open a window: {error}");
                 cx.quit();
             }
-            cx.activate(true);
+            if !background {
+                cx.activate(true);
+            }
         });
     ExitCode::SUCCESS
 }

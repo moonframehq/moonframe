@@ -105,6 +105,7 @@ impl MoonframeApp {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         cx.set_menus(menus(workspace.components()));
+        menu_actions(cx);
         let terminals = Terminals::new(wake_on_output(cx));
         let settings = user.as_ref().map(|user| user.join("settings.toml"));
         let scheme = settings
@@ -506,6 +507,30 @@ impl MoonframeApp {
     }
 }
 
+/// The menu actions that need no particular window, handled app-wide, so
+/// they work from the menu bar or their shortcut whichever window has focus,
+/// or none (the app in the background, or every window minimized).
+fn menu_actions(cx: &mut Context<MoonframeApp>) {
+    let app = cx.entity().downgrade();
+    // The app's own registry, not the view's of the same name.
+    let cx: &mut App = cx;
+    let on = app.clone();
+    cx.on_action(move |_: &Reload, cx| {
+        let _ = on.update(cx, |app, cx| app.reload(cx));
+    });
+    let on = app.clone();
+    cx.on_action(move |_: &BrowseComponents, cx| {
+        let _ = on.update(cx, |app, cx| app.show_component("", cx));
+    });
+    let on = app.clone();
+    cx.on_action(move |action: &ShowComponent, cx| {
+        let _ = on.update(cx, |app, cx| app.show_component(&action.name, cx));
+    });
+    cx.on_action(move |_: &ShowThemes, cx| {
+        let _ = app.update(cx, |app, cx| app.show_themes(cx));
+    });
+}
+
 /// A callback for terminal sessions, which run on threads of their own: each
 /// call asks for one more frame, and a burst of calls makes one.
 fn wake_on_output(cx: &mut Context<MoonframeApp>) -> Arc<dyn Fn() + Send + Sync> {
@@ -727,19 +752,11 @@ impl Render for MoonframeApp {
             .id("moonframe-app")
             .key_context("MoonframeApp")
             .track_focus(&self.focus)
-            .on_action(cx.listener(|this, _: &Reload, _, cx| this.reload(cx)))
             .on_action(cx.listener(|this, _: &ToggleTheme, window, cx| {
                 this.run(Command::ToggleTheme, window, cx)
             }))
             .on_action(cx.listener(|this, _: &Inspect, _, cx| this.toggle_inspect(cx)))
             .on_action(cx.listener(|this, _: &Dismiss, _, cx| this.dismiss(cx)))
-            .on_action(cx.listener(|this, _: &BrowseComponents, _, cx| {
-                this.show_component("", cx);
-            }))
-            .on_action(cx.listener(|this, action: &ShowComponent, _, cx| {
-                this.show_component(&action.name, cx);
-            }))
-            .on_action(cx.listener(|this, _: &ShowThemes, _, cx| this.show_themes(cx)))
             .size_full()
             .flex()
             .flex_col()

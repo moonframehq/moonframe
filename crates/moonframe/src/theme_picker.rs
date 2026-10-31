@@ -39,13 +39,14 @@ impl ThemePicker {
     pub(crate) fn open(app: Entity<MoonframeApp>, cx: &mut App) -> Option<WindowHandle<Root>> {
         let bounds = Bounds::centered(None, size(px(WIDTH), px(HEIGHT)), cx);
         let options = WindowOptions {
+            focus: !crate::background(),
             window_bounds: Some(WindowBounds::Windowed(bounds)),
             window_min_size: Some(size(px(320.), px(300.))),
             titlebar: Some(TitlebarOptions {
                 title: Some("Themes".into()),
                 ..Default::default()
             }),
-            app_id: Some("dev.moonframe.app".into()),
+            app_id: Some(crate::APP_ID.into()),
             ..Default::default()
         };
         cx.open_window(options, |window, cx| {
