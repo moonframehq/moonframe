@@ -8,7 +8,8 @@ use {
     std::{env, path::PathBuf},
 };
 
-const NAME: &str = "moonframe";
+/// The app's name: its folders, and its document in herdr-core.
+pub(crate) const NAME: &str = "moonframe";
 
 /// The app folder the binary ships with: `Contents/Resources/app` inside a
 /// macOS bundle, else `app` in the current folder (running from the
@@ -51,6 +52,15 @@ pub(crate) fn selection() -> PathBuf {
     xdg("XDG_CACHE_HOME", ".cache")
         .unwrap_or_else(|| env::temp_dir().join(NAME))
         .join("selection.md")
+}
+
+/// Where the app's document is kept when herdr-core does not keep it:
+/// `$XDG_STATE_HOME/moonframe/document.json`, by default under
+/// `~/.local/state`.
+pub(crate) fn document() -> PathBuf {
+    xdg("XDG_STATE_HOME", ".local/state")
+        .unwrap_or_else(|| env::temp_dir().join(NAME))
+        .join("document.json")
 }
 
 /// The built-in app, under the packages the user enabled and the user's

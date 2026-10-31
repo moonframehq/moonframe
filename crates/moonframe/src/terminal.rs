@@ -38,17 +38,17 @@ pub(crate) struct TerminalView {
 
 pub(crate) struct Terminals {
     views: HashMap<String, Rc<TerminalView>>,
-    backends: Backends,
+    backends: Arc<Backends>,
     wake: Arc<dyn Fn() + Send + Sync>,
     /// The theme's 16 colors; xterm's when `None`.
     palette: Option<Ansi>,
 }
 
 impl Terminals {
-    pub(crate) fn new(wake: Arc<dyn Fn() + Send + Sync>) -> Self {
+    pub(crate) fn new(backends: Arc<Backends>, wake: Arc<dyn Fn() + Send + Sync>) -> Self {
         Self {
             views: HashMap::new(),
-            backends: Backends::new(),
+            backends,
             wake,
             palette: None,
         }

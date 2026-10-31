@@ -133,26 +133,73 @@ fn a_herdr_core_terminal_outlives_its_view() {
     let screen = text(&second.screen());
     drop(second);
 
-    // End the terminal, then the test's core.
+    stop_core(&session, &["test.outlives"]);
+    assert!(printed, "the first view never showed its output");
+    assert!(kept, "the second view lost the first's output:\n{screen}");
+    assert!(typed, "the second view takes no keys:\n{screen}");
+}
+
+/// Ends `terminals` and the core of test session `session`, and removes
+/// its state.
+#[cfg(feature = "herdr-core")]
+fn stop_core(session: &str, terminals: &[&str]) {
     if let Some(binary) = crate::herdr_core::installed() {
-        for args in [&["kill", "test.outlives"][..], &["server", "stop"]] {
+        let kills = terminals.iter().map(|terminal| vec!["kill", terminal]);
+        for args in kills.chain([vec!["server", "stop"]]) {
             let _ = Command::new(&binary)
                 .args(args)
-                .env("HC_SESSION", &session)
+                .env("HC_SESSION", session)
                 .output();
         }
     }
     let endpoint = herdr_core_client::Endpoint::resolve(|name| match name {
-        "HC_SESSION" => Some(session.clone().into()),
+        "HC_SESSION" => Some(session.into()),
         _ => std::env::var_os(name),
     });
     if let Ok(endpoint) = endpoint
         && let Some(state) = endpoint.socket.parent()
-        && state.ends_with(&session)
+        && state.ends_with(session)
     {
         let _ = std::fs::remove_dir_all(state);
     }
-    assert!(printed, "the first view never showed its output");
-    assert!(kept, "the second view lost the first's output:\n{screen}");
-    assert!(typed, "the second view takes no keys:\n{screen}");
+}
+
+/// The document round-trips through herdr-core, and a store opened later
+/// writes over what an earlier one saved.
+#[cfg(feature = "herdr-core")]
+#[test]
+fn herdr_core_keeps_the_document() {
+    use {
+        crate::{CoreStore, Document, Store as _},
+        serde_json::json,
+    };
+    let session = format!("moonframe-doc-{}", std::process::id());
+    let Some(core) = crate::HerdrCore::connect_session(Some(&session)) else {
+        eprintln!("herdr-core is not installed; skipped");
+        return;
+    };
+    let core = Arc::new(core);
+    let first = CoreStore::new(core.clone(), "moonframe");
+    let loaded = first.load();
+    let mut document = Document::default();
+    document
+        .mods
+        .insert("shell".into(), json!({ "left": false }));
+    let saved = first.save(&document);
+
+    let second = CoreStore::new(core, "moonframe");
+    let reloaded = second.load();
+    document
+        .mods
+        .insert("shell".into(), json!({ "left": true }));
+    let resaved = second.save(&document).and_then(|()| second.load());
+
+    stop_core(&session, &[]);
+    assert_eq!(loaded, Ok(None));
+    assert_eq!(saved, Ok(()));
+    assert_eq!(
+        reloaded.unwrap().unwrap().mods["shell"],
+        json!({ "left": false })
+    );
+    assert_eq!(resaved, Ok(Some(document)));
 }

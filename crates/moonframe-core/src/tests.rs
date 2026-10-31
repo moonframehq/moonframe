@@ -6,6 +6,8 @@ use {
     std::{fs, path::Path},
 };
 
+mod persist;
+
 const SHELL_SOURCE: &str = r#"
 return mod {
   init = function(previous) return previous or { left = true } end,

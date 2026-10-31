@@ -473,8 +473,10 @@ return mod {
 	},
 	order = 0,         -- optional: position in the region, lower first, then by name
 	title = "Files",   -- optional: informational
+	persist = { "selected" }, -- optional: state kept across launches (see below)
 
-	-- Optional. `previous` is the state from before a reload (nil on first load).
+	-- Optional. `previous` is the state from before a reload, or what
+	-- `persist` kept from the last launch (nil on a fresh start).
 	init = function(previous)
 		return previous or { selected = nil }
 	end,
@@ -507,8 +509,17 @@ Rules that trip agents up:
 - Unknown element types, keys and token values are errors, not ignored.
   `just check` names them.
 - The keys allowed on the `mod { }` table are only `init`, `update`, `view`,
-  `region`, `order`, `title` and `styles`, plus `window` in `main.luau` only
-  (see "Window and title bar").
+  `region`, `order`, `title`, `styles` and `persist`, plus `window` in
+  `main.luau` only (see "Window and title bar").
+- **Keeping state across launches:** `persist = true` keeps the whole
+  state, `persist = { "tabs", "selected" }` only those keys (leave out
+  what is passing: hover, loading, errors). Next launch `init` gets it as
+  `previous`, so `return previous or {...}` covers both reloads and
+  launches. It is saved a couple of seconds after it changes and when the
+  app quits, in the app's document: in herdr-core when it runs here (`hc`,
+  beside the terminals it keeps), else `~/.local/state/moonframe/document.json`.
+  Runs with `--no-user` keep nothing. Keep it small: it is plain data,
+  saved whole.
 - State and messages must be plain data: nil, booleans, numbers, strings,
   lists, and string-keyed tables. Functions in state stop it surviving a
   reload. A table is a list without gaps or has string keys, never both.
@@ -872,8 +883,9 @@ restyle an extension from the app side, add a rule for the same selector in
 Providers share data under `app`: `app.system` (CPU, memory, network, from
 the Wasm provider each second), `app.git` (branch, files, diffs, worktrees),
 `app.github` and `app.gitlab` (pull requests, checks, issues) and
-`app.agents` (coding agents running here) and `app.files` (the project's
-file tree), from process providers; their shapes are under "Built-in
+`app.agents` (coding agents running here), `app.files` (the project's
+file tree) and `app.herdr` (whether herdr-core and tmux are installed),
+from process providers; their shapes are under "Built-in
 providers" below and typed in `types/moonframe.d.luau` (`Git`, `Forge`,
 `Agents`, `Files`). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
@@ -956,6 +968,12 @@ keeps it fresh; `{ diff = false }` drops it.
 | `remote` | `{ name, url, host, kind ("github" "gitlab" "other"), owner, repo, web_url? }` or nil |
 | `stashes` | count |
 | `diff` | `{ path, binary, lines, truncated, hunks = { { header, old_start, new_start, lines = { { kind ("add" "del" "ctx"), old?, new?, text } } } } }`, at most 1200 lines of 300 characters |
+
+`app.herdr` (herdr, from `bash`): `{ installed, version, path, tmux,
+installing, error, fresh }`, every 30 s and on any message. The message
+`"install"` runs herdr-core's own installer (into `~/.local/bin`) and sets
+`fresh` once it has; the `herdr` mod sends it when the user clicks Install
+on its offer, and nothing else should.
 
 `app.github` (github, via `gh`) and `app.gitlab` (gitlab, via `glab` and
 `jq`, only for a GitLab remote): every 60 s, and on any message. Same shape;

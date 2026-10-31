@@ -16,9 +16,11 @@ default = ["herdr-core"]
 herdr-core = ["dep:herdr-core-client"]
 
 [dependencies]
-herdr-core-client  = { optional = true, workspace = true }
-moonframe-terminal = { workspace = true }
-tracing.workspace  = true
+herdr-core-client    = { optional = true, workspace = true }
+moonframe-terminal   = { workspace = true }
+serde_json.workspace = true
+tracing.workspace    = true
 
 [dev-dependencies]
 moonframe-terminal = { features = ["alacritty"], workspace = true }
+tempfile.workspace = true

@@ -8,7 +8,10 @@
 //! [`Backend`], so another runtime can take its place.
 
 use {
-    crate::program,
+    crate::{
+        document::{Document, Store},
+        program,
+    },
     herdr_core_client::{Attachment, Core, Endpoint, PROGRAM, wire},
     moonframe_terminal::{Backend, Open, Opened, Pane, Size},
     std::{
@@ -85,6 +88,64 @@ impl HerdrCore {
         let live = Arc::new(Core::connect(&self.endpoint).map_err(|error| error.to_string())?);
         *core = Some(live.clone());
         Ok(live)
+    }
+}
+
+/// The app's document in herdr-core's document store, under the app's
+/// name. Writes carry the version last read, as the core asks; one that
+/// lost a race reads the version again and writes over it, since one app
+/// writes its own document.
+pub struct CoreStore {
+    core: Arc<HerdrCore>,
+    name: String,
+    version: Mutex<u64>,
+}
+
+impl CoreStore {
+    pub fn new(core: Arc<HerdrCore>, name: &str) -> Self {
+        Self {
+            core,
+            name: name.to_owned(),
+            version: Mutex::new(0),
+        }
+    }
+
+    fn remember(&self, version: u64) {
+        if let Ok(mut current) = self.version.lock() {
+            *current = version;
+        }
+    }
+}
+
+impl Store for CoreStore {
+    fn name(&self) -> &'static str {
+        "herdr-core"
+    }
+
+    fn load(&self) -> Result<Option<Document>, String> {
+        let doc = self
+            .core
+            .core()?
+            .doc_get(&self.name)
+            .map_err(|error| error.to_string())?;
+        self.remember(doc.version);
+        if doc.version == 0 || doc.value.is_null() {
+            return Ok(None);
+        }
+        Document::from_json(&doc.value).map(Some)
+    }
+
+    fn save(&self, document: &Document) -> Result<(), String> {
+        let core = self.core.core()?;
+        let value = document.to_json();
+        let version = self.version.lock().map(|version| *version).unwrap_or(0);
+        let saved = core.doc_set(&self.name, &value, version).or_else(|_| {
+            let current = core.doc_get(&self.name)?.version;
+            core.doc_set(&self.name, &value, current)
+        });
+        let version = saved.map_err(|error| error.to_string())?;
+        self.remember(version);
+        Ok(())
     }
 }
 

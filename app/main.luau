@@ -1,5 +1,8 @@
 -- The shell: lays out the whole window. Mods fill the regions it draws.
 return mod {
+	-- Which panels are open stays as the user left it, launch to launch.
+	persist = true,
+
 	init = function(previous)
 		return previous or { left = true, right = true, bottom = false }
 	end,

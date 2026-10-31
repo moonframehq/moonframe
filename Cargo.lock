@@ -4510,6 +4510,8 @@ version = "0.1.0"
 dependencies = [
  "herdr-core-client",
  "moonframe-terminal",
+ "serde_json",
+ "tempfile",
  "tracing",
 ]
 

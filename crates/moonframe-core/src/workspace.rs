@@ -55,6 +55,8 @@ pub struct Workspace {
     /// Messages for providers (`to = "provider:<name>"`), for the app to
     /// forward: providers run outside the workspace.
     outbox: Vec<(String, Data)>,
+    /// State saved by an earlier launch, by module name, not yet loaded.
+    saved: BTreeMap<String, Data>,
 }
 
 /// How a message names a provider rather than a mod.
@@ -71,6 +73,9 @@ pub const DEMO: &str = "demo:";
 #[derive(Default)]
 pub struct Slot {
     module: Option<Module>,
+    /// State saved by an earlier launch, for `init` when the module first
+    /// loads; dropped once it has.
+    restored: Option<Data>,
     /// The file it was last loaded from.
     source: Option<PathBuf>,
     view: Option<Node>,
@@ -159,11 +164,16 @@ impl Slot {
     /// Loads `source`, which came from `path` if it is a file's.
     fn load_source(&mut self, name: &str, source: &str, path: Option<&Path>, library: &Library) {
         self.source = path.map(Path::to_owned);
-        let previous = self.module.as_ref().and_then(Module::state);
+        let previous = self
+            .module
+            .as_ref()
+            .and_then(Module::state)
+            .or_else(|| self.restored.clone());
         let loaded = Module::load(name, source, previous.as_ref(), library);
         match loaded {
             Ok(module) => {
                 self.module = Some(module);
+                self.restored = None;
                 self.load_error = None;
                 self.update_error = None;
             },
@@ -194,6 +204,13 @@ impl Workspace {
     /// Loads the app from `roots`. Never fails: problems are kept on each
     /// module's [`Slot`] for the window to show.
     pub fn open(roots: impl Into<Roots>, dark: bool) -> Self {
+        Self::open_saved(roots, dark, BTreeMap::new())
+    }
+
+    /// The same, giving each module in `saved` (by name, the shell as
+    /// [`SHELL`]) the state an earlier launch kept, as [`Self::persisted`]
+    /// returned it: its `init` gets it as `previous`.
+    pub fn open_saved(roots: impl Into<Roots>, dark: bool, saved: BTreeMap<String, Data>) -> Self {
         let mut workspace = Self {
             roots: roots.into(),
             library: Library::default(),
@@ -208,9 +225,43 @@ impl Workspace {
             host: BTreeMap::new(),
             host_problems: BTreeMap::new(),
             outbox: Vec::new(),
+            saved,
         };
         workspace.reload();
         workspace
+    }
+
+    /// What the shell and each mod ask to keep across launches (`persist`),
+    /// by module name, for [`Self::open_saved`] next time. Saved state of a
+    /// mod that has not loaded yet is kept, so a broken mod loses nothing.
+    pub fn persisted(&self) -> BTreeMap<String, Data> {
+        let mut persisted: BTreeMap<String, Data> = self
+            .mods
+            .iter()
+            .filter_map(|(name, slot)| match &slot.module {
+                Some(module) => Some((name.clone(), module.persisted()?)),
+                None => Some((name.clone(), slot.restored.clone()?)),
+            })
+            .collect();
+        match &self.shell.module {
+            Some(module) => {
+                if let Some(state) = module.persisted() {
+                    persisted.insert(SHELL.to_owned(), state);
+                }
+            },
+            None => {
+                if let Some(state) = &self.shell.restored {
+                    persisted.insert(SHELL.to_owned(), state.clone());
+                }
+            },
+        }
+        // Mods not found this launch keep what they saved.
+        for (name, state) in &self.saved {
+            persisted
+                .entry(name.clone())
+                .or_insert_with(|| state.clone());
+        }
+        persisted
     }
 
     pub fn roots(&self) -> &Roots {
@@ -239,6 +290,9 @@ impl Workspace {
         match self.roots.file("main.luau") {
             Some(_) => {
                 let candidates = self.roots.candidates("main.luau");
+                if self.shell.module.is_none() {
+                    self.shell.restored = self.saved.remove(SHELL);
+                }
                 self.shell.load_layered(SHELL, &candidates, &self.library);
             },
             None => {
@@ -248,6 +302,11 @@ impl Workspace {
         let found = self.roots.folders("mods", "main.luau");
         for name in found.keys() {
             let slot = self.mods.entry(name.clone()).or_default();
+            if slot.module.is_none()
+                && let Some(saved) = self.saved.remove(name)
+            {
+                slot.restored = Some(saved);
+            }
             if valid_name(name) {
                 // Highest layer first, so the folder found above leads.
                 let candidates = self.roots.mod_candidates(name);

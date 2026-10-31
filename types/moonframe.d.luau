@@ -939,6 +939,9 @@ type Mod<State> = {
 	styles: { [string]: Style }?,
 	-- Only in main.luau: the window's frame, read when the app starts.
 	window: Window?,
+	-- What of the state to keep across launches: `true` for all of it, or
+	-- the keys to keep. `init` gets it back as `previous` next launch.
+	persist: (boolean | { string })?,
 }
 
 declare function mod<State>(definition: Mod<State>): Mod<State>

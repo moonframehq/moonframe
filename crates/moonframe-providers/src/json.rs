@@ -57,6 +57,17 @@ fn convert(value: &Value, depth: usize, entries: &mut usize) -> Result<Data, Err
     })
 }
 
+/// JSON for `data`, as providers and the saved document hold it.
+pub fn to_json(data: &Data) -> Value {
+    json(data)
+}
+
+/// `value` as [`Data`], bounded like a provider's.
+pub fn from_json(value: &Value) -> Result<Data, Error> {
+    let mut entries = 0;
+    convert(value, 0, &mut entries)
+}
+
 pub(crate) fn json(data: &Data) -> Value {
     match data {
         Data::Nil => Value::Null,

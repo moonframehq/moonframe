@@ -30,7 +30,10 @@ mod process;
 mod system;
 mod wasm;
 
-pub use manifest::{Capability, Kind, Manifest, PREBUILT};
+pub use {
+    json::{from_json, to_json},
+    manifest::{Capability, Kind, Manifest, PREBUILT},
+};
 
 use {
     fingerprint::Fingerprint,

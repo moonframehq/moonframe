@@ -10,6 +10,7 @@ use {
         vm::{self, Meter},
     },
     mlua::{Function, Lua, Value},
+    std::collections::BTreeMap,
 };
 
 /// Where a mod asks to be placed.
@@ -33,6 +34,25 @@ struct Definition {
     /// The window the shell asks for; only `main.luau` may set it.
     window: Option<Chrome>,
     meta: Meta,
+    /// What of the state is kept across launches.
+    persist: Option<Persist>,
+}
+
+/// What `persist` keeps: the whole state, or some of its keys.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Persist {
+    All,
+    Keys(Vec<String>),
+}
+
+impl Read for Persist {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        match value {
+            Value::Boolean(true) => Ok(Self::All),
+            Value::Table(_) => Ok(Self::Keys(Vec::<String>::read(value, cx)?)),
+            _ => Err(cx.fail("expected `true` or a list of state keys")),
+        }
+    }
 }
 
 impl Read for Definition {
@@ -41,7 +61,7 @@ impl Read for Definition {
             return Err(cx.fail("main.luau must return mod { ... }"));
         }
         let fields = Fields::read(value, cx, &[&[
-            "init", "update", "view", "region", "order", "title", "styles", "window",
+            "init", "update", "view", "region", "order", "title", "styles", "window", "persist",
         ]])?;
         Ok(Self {
             init: fields.get("init")?,
@@ -49,6 +69,10 @@ impl Read for Definition {
             view: fields.need("view")?,
             styles: fields.raw("styles").cloned(),
             window: fields.get("window")?,
+            persist: match fields.raw("persist") {
+                None | Some(Value::Nil | Value::Boolean(false)) => None,
+                Some(_) => fields.get("persist")?,
+            },
             meta: Meta {
                 region: fields.get("region")?,
                 order: fields.get("order")?.unwrap_or(0),
@@ -178,5 +202,23 @@ impl Module {
     /// something that cannot cross, such as a function.
     pub(crate) fn state(&self) -> Option<Data> {
         Data::read(&self.state).ok()
+    }
+
+    /// What of the state to keep across launches, if the mod asks for it
+    /// with `persist`: all of it, or the keys it names. `None` when it
+    /// does not ask, or its state cannot cross.
+    pub(crate) fn persisted(&self) -> Option<Data> {
+        let persist = self.definition.persist.as_ref()?;
+        let state = self.state()?;
+        match (persist, state) {
+            (Persist::All, state) => Some(state),
+            (Persist::Keys(keys), Data::Map(fields)) => Some(Data::Map(
+                fields
+                    .into_iter()
+                    .filter(|(key, _)| keys.contains(key))
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            (Persist::Keys(_), _) => None,
+        }
     }
 }

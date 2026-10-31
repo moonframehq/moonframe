@@ -11,6 +11,7 @@ use {
         inspect::{self, Inspector, Placed},
         motion::Motion,
         packages, paths,
+        persist::Persistence,
         render::{KeyLayer, Painter},
         settings,
         terminal::Terminals,
@@ -26,6 +27,7 @@ use {
         Action, Chrome, Command, Data, Error, Platform, Roots, Stylesheet, Titlebar, Token,
         WindowState, Workspace,
     },
+    moonframe_mux::Backends,
     moonframe_providers::{Event, Providers},
     notify::{RecommendedWatcher, RecursiveMode, Watcher as _},
     std::{
@@ -40,6 +42,8 @@ use {
 const SETTLE: Duration = Duration::from_millis(120);
 /// How long a toast shows.
 const TOAST: Duration = Duration::from_millis(1600);
+/// How often the window checks whether what mods keep changed.
+const KEEP_EVERY: Duration = Duration::from_secs(2);
 /// gpui-component's stock 16px reads large in a dense tool window.
 const DEFAULT_FONT_SIZE: Pixels = px(14.);
 
@@ -56,6 +60,8 @@ pub(crate) struct MoonframeApp {
     pub(crate) inspector: Inspector,
     /// The shells `ui.terminal` elements show.
     pub(crate) terminals: Terminals,
+    /// Saves what mods keep across launches; `None` keeps nothing.
+    persistence: Option<Persistence>,
     /// The pages `ui.browser` elements show.
     pub(crate) browsers: Browsers,
     /// The text `ui.input` fields edit.
@@ -110,6 +116,8 @@ impl MoonframeApp {
         chrome: Chrome,
         builtin: PathBuf,
         user: Option<PathBuf>,
+        backends: Arc<Backends>,
+        persistence: Option<Persistence>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -134,7 +142,10 @@ impl MoonframeApp {
         focus.focus(window, cx);
         cx.set_menus(menus(workspace.components()));
         menu_actions(cx);
-        let terminals = Terminals::new(wake_on_output(cx));
+        let terminals = Terminals::new(backends, wake_on_output(cx));
+        if persistence.is_some() {
+            keep_state(cx);
+        }
         let settings = user.as_ref().map(|user| user.join("settings.toml"));
         let scheme = settings
             .as_deref()
@@ -148,6 +159,7 @@ impl MoonframeApp {
             });
         let mut app = Self {
             terminals,
+            persistence,
             browsers: Browsers::new(crate::browser::wake_on_report(cx)),
             inputs: Inputs::default(),
             workspace,
@@ -884,4 +896,30 @@ impl Render for MoonframeApp {
             .children(toast)
             .child(crate::browser::presenter(self.browsers.pages()))
     }
+}
+
+/// Saves what mods keep (`persist`) while the app runs, and once more,
+/// waiting for it, as the app quits.
+fn keep_state(cx: &mut Context<MoonframeApp>) {
+    cx.spawn(async move |this, cx| {
+        loop {
+            cx.background_executor().timer(KEEP_EVERY).await;
+            let checked = this.update(cx, |app, _| {
+                if let Some(persistence) = &mut app.persistence {
+                    persistence.check(&app.workspace);
+                }
+            });
+            if checked.is_err() {
+                break;
+            }
+        }
+    })
+    .detach();
+    cx.on_app_quit(|app, _| {
+        if let Some(persistence) = &mut app.persistence {
+            persistence.flush(&app.workspace);
+        }
+        async {}
+    })
+    .detach();
 }
