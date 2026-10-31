@@ -938,9 +938,25 @@ type Mod<State> = {
 
 declare function mod<State>(definition: Mod<State>): Mod<State>
 
+-- The fixed-width font terminals and `font = "mono"` text use.
+type MonoFont = {
+	family: string?,
+	size: number?,
+	-- 100 (thin) to 900 (black); 400 is regular.
+	weight: number?,
+	-- Terminal line height as a multiple of the size.
+	line_height: number?,
+	-- Fonts to look in for characters the family lacks, such as Nerd Font
+	-- icons; by default { "Symbols Nerd Font Mono" }, and {} for none.
+	fallbacks: { string }?,
+	-- false keeps sequences such as `->` from joining.
+	ligatures: boolean?,
+}
+
 type Stylesheet = {
 	font_size: number?,
 	font_family: string?,
+	mono: MonoFont?,
 	radius: number?,
 	-- Each one hex color, or `{ light = ..., dark = ... }`. Typed `any`:
 	-- Luau cannot check a map of unions against a table literal, so the host

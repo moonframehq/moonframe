@@ -99,6 +99,8 @@ pub(crate) struct MoonframeApp {
 struct Defaults {
     font_size: Pixels,
     font_family: SharedString,
+    mono_font_size: Pixels,
+    mono_font_family: SharedString,
     radius: Pixels,
 }
 
@@ -117,6 +119,8 @@ impl MoonframeApp {
         let defaults = Defaults {
             font_size: DEFAULT_FONT_SIZE,
             font_family: theme.font_family.clone(),
+            mono_font_size: theme.mono_font_size,
+            mono_font_family: theme.mono_font_family.clone(),
             radius: theme.radius,
         };
         workspace.set_dark(theme.is_dark());
@@ -177,7 +181,7 @@ impl MoonframeApp {
     }
 
     /// Puts the picked theme (or the one previewed), then the stylesheet's
-    /// font, radius, and color overrides into the global theme, so
+    /// fonts, radius, and color overrides into the global theme, so
     /// gpui-component controls follow them too. Starts from the stock theme
     /// each time, so a removed override goes away. A picked theme brings its
     /// own colors, so the stylesheet's apply to the stock look alone.
@@ -210,6 +214,11 @@ impl MoonframeApp {
             .font_family
             .clone()
             .map_or_else(|| self.defaults.font_family.clone(), SharedString::from);
+        theme.mono_font_size = sheet.mono.size.map_or(self.defaults.mono_font_size, px);
+        theme.mono_font_family = sheet.mono.family.clone().map_or_else(
+            || self.defaults.mono_font_family.clone(),
+            SharedString::from,
+        );
         theme.radius = sheet.radius.map_or(self.defaults.radius, px);
         let dark = theme.is_dark();
         let overrides = if scheme.is_some() {

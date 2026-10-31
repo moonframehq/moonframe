@@ -456,10 +456,29 @@ impl Rules {
     }
 }
 
+/// `mono = { ... }` in the stylesheet: the fixed-width font. What is left
+/// out keeps the app's default.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MonoFont {
+    pub family: Option<String>,
+    pub size: Option<f32>,
+    /// From 100 (thin) to 900 (black); 400 is regular.
+    pub weight: Option<f32>,
+    /// Terminal line height as a multiple of the size.
+    pub line_height: Option<f32>,
+    /// Fonts to look in, in order, for characters the family lacks, such
+    /// as a Nerd Font's icons. `None` keeps the default list.
+    pub fallbacks: Option<Vec<String>>,
+    /// Whether ligatures such as `->` join; `None` keeps the font's own.
+    pub ligatures: Option<bool>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Stylesheet {
     pub font_size: Option<f32>,
     pub font_family: Option<String>,
+    /// The fixed-width font terminals and `font = "mono"` text use.
+    pub mono: MonoFont,
     /// The theme's corner radius, which buttons and other controls use.
     pub radius: Option<f32>,
     /// Theme colors replaced for the whole app.

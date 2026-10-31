@@ -610,6 +610,15 @@ previous one and shows its error at the top of the window, and in
 return style {
 	font_size = 14,      -- base text size; text sizes scale from it
 	font_family = "Inter",
+	-- The fixed-width font: terminals, and `font = "mono"` text (family and size).
+	-- Fallbacks are searched for characters the family lacks, such as Nerd Font
+	-- icons in prompts and status lines; the default is { "Symbols Nerd Font Mono" }.
+	mono = {
+		family = "JetBrainsMono Nerd Font Mono",
+		size = 13, weight = 400, line_height = 1.3,
+		fallbacks = { "Symbols Nerd Font Mono" },
+		ligatures = false,
+	},
 	radius = 8,          -- the theme's corner radius, which buttons use
 	speeds = { drawer = "220ms" }, -- named durations (fast/normal/slow exist already)
 	animation_speed = 1, -- every animation: 2 twice as fast, 0.5 half, 0 off

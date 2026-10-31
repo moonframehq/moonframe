@@ -407,6 +407,8 @@ const STYLE: &str = r##"
 return style {
   radius = 6,
   font_size = 13,
+  mono = { family = "Fira Code", size = 12, weight = 500, line_height = 1.2,
+           fallbacks = { "Symbols Nerd Font Mono" }, ligatures = false },
   colors = {
     accent = { light = "#4f46e5", dark = "#818cf8" },
     paper = { light = "#fff", dark = "#1f1f23" },
@@ -449,6 +451,14 @@ fn stylesheets_layer_type_class_and_inline_rules() {
     );
     let sheet = workspace.stylesheet();
     assert_eq!((sheet.radius, sheet.font_size), (Some(6.0), Some(13.0)));
+    assert_eq!(sheet.mono, crate::MonoFont {
+        family: Some("Fira Code".into()),
+        size: Some(12.0),
+        weight: Some(500.0),
+        line_height: Some(1.2),
+        fallbacks: Some(vec!["Symbols Nerd Font Mono".into()]),
+        ligatures: Some(false),
+    });
     assert_eq!(sheet.overrides, [(Token::Accent, Shade {
         light: 0x4f46e5ff,
         dark: 0x818cf8ff

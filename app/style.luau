@@ -4,6 +4,10 @@
 return style {
 	font_size = 14,
 	radius = 8,
+	-- The fixed-width font terminals use: family, size, weight (100-900),
+	-- line_height, fallbacks, ligatures. Nerd Font icons in prompts and
+	-- status lines come from "Symbols Nerd Font Mono" when it is installed.
+	-- mono = { family = "JetBrainsMono Nerd Font Mono", size = 13, line_height = 1.3 },
 
 	-- Named speeds for transitions; fast (120ms), normal (220ms), and slow
 	-- (400ms) exist already and can be redefined.

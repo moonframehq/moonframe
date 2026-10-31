@@ -48,8 +48,9 @@ pub use {
     node::*,
     roots::{Roots, mod_name},
     style::{
-        Case, Color, Curve, Font, Look, Paint, Part, Resolved, Rules, Shade, Shadow, ShadowLayer,
-        ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition, TransitionKind,
+        Case, Color, Curve, Font, Look, MonoFont, Paint, Part, Resolved, Rules, Shade, Shadow,
+        ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition,
+        TransitionKind,
     },
     vm::printable,
     window::{Chrome, Platform, Titlebar, WindowState},
