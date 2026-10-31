@@ -928,7 +928,9 @@ terminal log. There are two kinds:
   - `app/providers/system` is the example.
 - **`kind = "process"`, `command = [...]`:** any program run in the folder.
   - Each line it prints on stdout is one JSON value to publish. Each message
-    arrives on stdin as a `{"message": ...}` line. Its stderr goes to the log.
+    arrives on stdin as a `{"from":"<mod>","message":...}` line (compact,
+    `from` first): check `from` before doing anything only one mod should
+    ask for, as `providers/herdr` does before installing. Its stderr goes to the log.
   - It has the user's full access, so use it only when a sandbox can't reach
     the data, and say so in `provider.toml`.
   - It runs in its own folder (`providers/<name>/`); the built-in ones `cd`
@@ -972,8 +974,8 @@ keeps it fresh; `{ diff = false }` drops it.
 `app.herdr` (herdr, from `bash`): `{ installed, version, path, tmux,
 installing, error, fresh }`, every 30 s and on any message. The message
 `"install"` runs herdr-core's own installer (into `~/.local/bin`) and sets
-`fresh` once it has; the `herdr` mod sends it when the user clicks Install
-on its offer, and nothing else should.
+`fresh` once it has. Only the `herdr` mod's `"install"` counts: it sends
+it when the user clicks Install on its offer.
 
 `app.github` (github, via `gh`) and `app.gitlab` (gitlab, via `glab` and
 `jq`, only for a GitLab remote): every 60 s, and on any message. Same shape;

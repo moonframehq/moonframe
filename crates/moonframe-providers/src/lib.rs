@@ -15,7 +15,7 @@
 //!   `.cargo/`. A provider from elsewhere ships its source, which can be
 //!   reviewed; packages are refused with any `provider.wasm`.
 //! - **process**: any command that prints one JSON value per line and reads
-//!   messages from stdin. It runs with the user's full access, for data a
+//!   messages from stdin, each with the mod that sent it. It runs with the user's full access, for data a
 //!   sandbox cannot reach.
 //!
 //! What a provider publishes appears to every view as `app.<name>`; a mod
@@ -50,6 +50,14 @@ use {
     },
 };
 
+/// A message for a provider, and the mod that sent it: a process provider
+/// sees both, so it can do what only one mod may ask for.
+#[derive(Debug)]
+pub(crate) struct Message {
+    pub(crate) from: String,
+    pub(crate) data: Data,
+}
+
 /// What a provider reports to the app.
 #[derive(Debug)]
 pub enum Event {
@@ -74,7 +82,7 @@ pub struct Providers {
 
 /// A provider's thread, and how to reach and stop it.
 struct Running {
-    messages: mpsc::Sender<Data>,
+    messages: mpsc::Sender<Message>,
     stop: Arc<AtomicBool>,
     /// Its folder when it started: a reload restarts it only if this changed.
     fingerprint: Fingerprint,
@@ -92,7 +100,7 @@ pub(crate) struct Context {
     pub(crate) dir: PathBuf,
     pub(crate) manifest: Manifest,
     pub(crate) build_dir: PathBuf,
-    pub(crate) messages: mpsc::Receiver<Data>,
+    pub(crate) messages: mpsc::Receiver<Message>,
     pub(crate) stop: Arc<AtomicBool>,
     pub(crate) events: Events,
 }
@@ -203,15 +211,18 @@ impl Providers {
         self.running.keys().map(String::as_str)
     }
 
-    /// Hands `message` to the provider `name`.
-    pub fn send(&self, name: &str, message: Data) -> Result<(), Error> {
+    /// Hands `message`, from the mod `from`, to the provider `name`.
+    pub fn send(&self, name: &str, from: &str, message: Data) -> Result<(), Error> {
         let running = self
             .running
             .get(name)
             .ok_or_else(|| Error::new(format!("no provider named `{name}`")))?;
         running
             .messages
-            .send(message)
+            .send(Message {
+                from: from.to_owned(),
+                data: message,
+            })
             .map_err(|_| Error::new(format!("provider `{name}` has stopped")))
     }
 }

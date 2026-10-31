@@ -54,7 +54,7 @@ pub struct Workspace {
     host_problems: BTreeMap<String, Error>,
     /// Messages for providers (`to = "provider:<name>"`), for the app to
     /// forward: providers run outside the workspace.
-    outbox: Vec<(String, Data)>,
+    outbox: Vec<(String, String, Data)>,
     /// State saved by an earlier launch, by module name, not yet loaded.
     saved: BTreeMap<String, Data>,
 }
@@ -394,8 +394,8 @@ impl Workspace {
     }
 
     /// Messages mods sent to providers since the last call, as
-    /// `(provider, message)`.
-    pub fn take_outbox(&mut self) -> Vec<(String, Data)> {
+    /// `(provider, sending mod, message)`.
+    pub fn take_outbox(&mut self) -> Vec<(String, String, Data)> {
         std::mem::take(&mut self.outbox)
     }
 
@@ -577,7 +577,7 @@ impl Workspace {
                 continue;
             }
             if let Some(provider) = to.strip_prefix(PROVIDER) {
-                self.outbox.push((provider.to_owned(), msg));
+                self.outbox.push((provider.to_owned(), from.clone(), msg));
                 continue;
             }
             delivered += 1;

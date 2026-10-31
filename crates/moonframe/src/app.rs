@@ -361,8 +361,8 @@ impl MoonframeApp {
 
     /// Passes on what the mods sent providers, and draws again.
     fn flush(&mut self, from: &str, cx: &mut Context<Self>) {
-        for (provider, message) in self.workspace.take_outbox() {
-            if let Err(problem) = self.providers.send(&provider, message) {
+        for (provider, sender, message) in self.workspace.take_outbox() {
+            if let Err(problem) = self.providers.send(&provider, &sender, message) {
                 tracing::warn!("{from}: {problem}");
             }
         }

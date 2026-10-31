@@ -145,19 +145,27 @@ fn a_process_publishes_lines_and_answers_messages() {
         Data::Map([("ready".to_owned(), Data::Bool(true))].into())
     );
 
-    providers.send("echo", Data::from("hi")).unwrap();
+    providers
+        .send("echo", "explorer", Data::from("hi"))
+        .unwrap();
     let Event::Published { data, .. } = next() else {
         panic!("not published");
     };
     let expected = Data::Map(
         [(
             "got".to_owned(),
-            Data::Map([("message".to_owned(), Data::from("hi"))].into()),
+            Data::Map(
+                [
+                    ("from".to_owned(), Data::from("explorer")),
+                    ("message".to_owned(), Data::from("hi")),
+                ]
+                .into(),
+            ),
         )]
         .into(),
     );
     assert_eq!(data, expected);
-    assert!(providers.send("nobody", Data::Nil).is_err());
+    assert!(providers.send("nobody", "explorer", Data::Nil).is_err());
 }
 
 #[test]

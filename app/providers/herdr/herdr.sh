@@ -4,9 +4,10 @@
 # every 30 seconds, and at once on any message. The message "install" runs
 # herdr-core's own installer, downloaded from releases.herdr.dev and then
 # run with sh (it installs into ~/.local/bin); `fresh` is true once it has.
-# Only a mod's message starts it: the `herdr` mod sends it when the user
-# clicks Install. Exits when the app closes its stdin. HERDR_RELEASES_URL
-# points the installer elsewhere (tests).
+# Only the `herdr` mod's "install" starts it, which it sends when the user
+# clicks Install; any other message, or mod, only refreshes. Exits when the
+# app closes its stdin. HERDR_RELEASES_URL points the installer elsewhere
+# (tests).
 
 POLL=30
 RELEASES=${HERDR_RELEASES_URL:-https://releases.herdr.dev}
@@ -117,8 +118,11 @@ while true; do
     # `read` that failed early means the app closed stdin.
     started=$SECONDS
     if IFS= read -r -t "$POLL" line; then
+        # Only the `herdr` mod may install, and only with exactly "install":
+        # it sends that when the user clicks Install on its offer, and no
+        # other mod's message runs anything here.
         case $line in
-        *'"install"'*) [ -z "$HC" ] && install ;;
+        '{"from":"herdr","message":"install"}') [ -z "$HC" ] && install ;;
         esac
     elif [ "$?" -le 128 ] && [ $((SECONDS - started)) -lt $((POLL - 1)) ]; then
         exit 0
