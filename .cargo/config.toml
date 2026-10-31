@@ -1,0 +1,6 @@
+# libghostty-vt (the `ghostty` terminal) is built by Zig against the static
+# C runtime (/MT), and MSVC refuses to link it with C code built against the
+# dynamic one (/MD), Rust's default. Build everything with the static runtime,
+# which also spares users of the Windows zips the Visual C++ redistributable.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
