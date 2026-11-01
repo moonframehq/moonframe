@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>moonframe.dev — 10 mockups</title>
+<style>
+  * { box-sizing:border-box; margin:0 }
+  body { background:#14131a; color:#eee; font:15px/1.5 Inter, system-ui, sans-serif; padding:32px }
+  h1 { font-size:24px; letter-spacing:-.02em } .sub { color:#99a; margin:4px 0 28px }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(560px, 1fr)); gap:28px }
+  .card { background:#1d1c25; border:1px solid #ffffff14; border-radius:14px; overflow:hidden }
+  .feat .vp { height:560px } .feat .vp iframe { transform:scale(.55); height:1020px } .feat { grid-template-columns:1fr 1fr }
+  .vp { height:380px; overflow:hidden; position:relative; background:#fff }
+  .vp iframe { width:1440px; height:1000px; border:0; transform:scale(.4); transform-origin:0 0; pointer-events:none; position:absolute }
+  .meta { padding:14px 16px; display:flex; gap:12px; align-items:flex-start }
+  .meta .n { font:600 13px ui-monospace, monospace; color:#a99bff }
+  .meta b { display:block } .meta p { color:#99a; font-size:13.5px }
+  .meta .act { margin-left:auto; display:flex; gap:6px; flex-shrink:0 }
+  .meta a, .meta button { font:600 13px Inter, sans-serif; padding:7px 12px; border-radius:8px; border:1px solid #ffffff22; background:none; color:#eee; cursor:pointer; text-decoration:none }
+  .meta button { background:#6d6bff; border-color:#6d6bff }
+</style>
+<body>
+<h1>moonframe.dev — round 2: your picks, combined</h1>
+<p class="sub">The homepage merges 02's editorial style, 03's "Save the file" hero (now live: the code changes and the window follows), 05's wall of every app, and 08's inspect section. The docs page is 07 restyled to match, for docs.moonframe.dev.</p>
+<div class="grid feat" id="f"></div>
+<h1 style="margin-top:48px">Round 1 — the 10 directions</h1>
+<p class="sub">Kept for reference. ★ marks the ones you liked.</p>
+<div class="grid" id="g"></div>
+<script>
+const M = [
+  ["01-moonlit","Moonlit","Dark indigo→violet glow, centred hero, big product shot, feature grid. The safe, polished dev-tool landing."],
+  ["02-editorial","Editorial","Warm paper, serif headlines, magazine columns and captioned figures. Reads like the README, beautifully."],
+  ["03-live-split","Live split","Hero is the pitch itself: style.luau on the left, the reloaded window on the right, then a 'where to write it' table."],
+  ["04-terminal","Terminal","Monospace, ASCII logo, shell session as the hero. For people who live in a terminal."],
+  ["05-gallery","Gallery wall","Tilted wall of the 25 example apps behind 'Every one of these is a Luau file.' Leads with range."],
+  ["06-bento","Bento","Light bento grid: hero tile, reload, terminals, sandbox, agent chat, components, providers, apps."],
+  ["07-docs-first","Docs-first","The homepage is the docs intro: sidebar, ⌘K search, quick start up top. Minimal marketing."],
+  ["08-agent-first","Agent-first","Inspect Element selection + chat bubble over the window. Sells the inspect → ask → check → watch loop."],
+  ["09-phases","Lunar phases","Night sky, serif, a moon orb; init/update/view/draw shown as moon phases. Most brand-forward."],
+  ["10-blueprint","Blueprint","Engineering drawing: architecture stack, spec sheet, annotated elevation of the window, title block."],
+];
+const LIKED = { "02-editorial":"style", "03-live-split":"hero", "05-gallery":"all the apps", "07-docs-first":"docs site", "08-agent-first":"inspect anything" };
+const F = [
+  ["../site/index","moonframe.dev — home","Masthead and serif type from 02 · live 'Save the file. Watch the window change.' hero from 03 · three steps · 'Point at anything' from 08 · plates of all 23 apps with screenshots from 05 · features · footer."],
+  ["../site/docs/index","docs.moonframe.dev — introduction","07's layout (sidebar, ⌘K search, on-this-page) in the editorial paper, serif and indigo of the homepage."],
+];
+function card(root, id, name, desc) {
+  const c = document.createElement("div"); c.className = "card";
+  c.innerHTML = `<div class="vp"><iframe src="${id}.html" loading="lazy" tabindex="-1"></iframe></div>
+  <div class="meta"><div><b>${name}</b><p>${desc}</p></div>
+  <div class="act"><a href="${id}.html" target="_blank">Open</a></div></div>`;
+  root.appendChild(c);
+}
+for (const [id, name, desc] of F) card(document.getElementById("f"), id, name, desc);
+const g = document.getElementById("g");
+for (const [id, name, desc] of M) {
+  const c = document.createElement("div"); c.className = "card";
+  c.innerHTML = `<div class="vp"><iframe src="${id}.html" loading="lazy" tabindex="-1"></iframe></div>
+  <div class="meta"><div><span class="n">${id.slice(0,2)}</span> <b style="display:inline">${name}</b>${LIKED[id] ? ` <span style="color:#f5d76e">★ ${LIKED[id]}</span>` : ""}<p>${desc}</p></div>
+  <div class="act"><a href="${id}.html" target="_blank">Open</a><button>Pick</button></div></div>`;
+  c.querySelector("button").onclick = () => {
+    const s = `Picked mockup ${id.slice(0,2)} — ${name}`;
+    if (window.herdr && herdr.send) herdr.send(s, { mockup: id }); else navigator.clipboard.writeText(s);
+    c.querySelector("button").textContent = "Picked ✓";
+  };
+  g.appendChild(c);
+}
+</script>
+</body>
+</html>

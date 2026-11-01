@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moonframe · 10 Blueprint</title>
+<style>
+  :root { --bg:#16307a; --ink:#e8efff; --dim:#9fb4e8; --line:#ffffff2e; --hi:#ffd166 }
+  * { box-sizing:border-box; margin:0 }
+  body { background:var(--bg); color:var(--ink); font:15px/1.6 "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    background-image:linear-gradient(#ffffff10 1px, transparent 1px), linear-gradient(90deg, #ffffff10 1px, transparent 1px), linear-gradient(#ffffff08 1px, transparent 1px), linear-gradient(90deg, #ffffff08 1px, transparent 1px);
+    background-size:100px 100px, 100px 100px, 20px 20px, 20px 20px }
+  .wrap { max-width:1120px; margin:0 auto; padding:0 28px 80px }
+  .frame { border:2px solid var(--ink); margin-top:28px; position:relative }
+  .tb { display:grid; grid-template-columns:auto 1fr auto auto; border-bottom:2px solid var(--ink) }
+  .tb > * { padding:12px 18px; border-right:1px solid var(--line); display:flex; align-items:center; gap:10px }
+  .tb > *:last-child { border-right:0 }
+  .tb img { width:22px; border-radius:5px }
+  .tb small { color:var(--dim); font-size:11px; display:block }
+  .hero { padding:56px 40px 48px; display:grid; grid-template-columns:1fr 1fr; gap:40px; border-bottom:1px solid var(--line) }
+  .label { font-size:11px; letter-spacing:.14em; color:var(--hi); text-transform:uppercase }
+  h1 { font:600 52px/1.05 Inter, system-ui, sans-serif; letter-spacing:-.035em; margin:14px 0 18px }
+  .hero p { color:var(--dim) }
+  .cta { margin-top:28px; display:flex; gap:12px }
+  .cta a { border:2px solid var(--ink); padding:10px 16px; font-weight:600 }
+  .cta a.f { background:var(--ink); color:var(--bg) }
+  .dia { position:relative; display:flex; flex-direction:column; gap:14px; justify-content:center }
+  .layer { border:1.5px dashed var(--ink); padding:12px 16px; position:relative; background:#16307acc }
+  .layer b { font-weight:600 }
+  .layer span { display:block; font-size:12px; color:var(--dim) }
+  .layer.lu { border-style:solid; border-color:var(--hi); color:var(--hi) }
+  .layer.lu span { color:#ffe3a3 }
+  .layer::after { content:"▼"; position:absolute; left:50%; bottom:-16px; transform:translateX(-50%); font-size:10px; color:var(--dim) }
+  .layer:last-child::after { display:none }
+  .dim { position:absolute; right:-28px; top:0; bottom:0; border-right:1px solid var(--dim); width:10px; border-top:1px solid var(--dim); border-bottom:1px solid var(--dim) }
+  .dim::after { content:"reload: no rebuild"; position:absolute; right:-6px; top:18%; writing-mode:vertical-rl; font-size:10px; color:var(--dim); transform:translateX(100%) }
+  .specs { display:grid; grid-template-columns:repeat(4, 1fr) }
+  .specs div { padding:22px; border-right:1px solid var(--line); border-bottom:1px solid var(--line) }
+  .specs div:nth-child(4n) { border-right:0 }
+  .specs .n { font-size:11px; color:var(--hi) }
+  .specs h3 { font:600 16px Inter, system-ui, sans-serif; margin:4px 0 6px }
+  .specs p { font-size:12.5px; color:var(--dim) }
+  .plan { padding:40px; position:relative }
+  .plan img { width:100%; display:block; filter:grayscale(1) contrast(1.1) brightness(1.1); mix-blend-mode:screen; opacity:.9; border:1.5px solid var(--ink) }
+  .callout { position:absolute; font-size:11px; background:var(--bg); border:1px solid var(--hi); color:var(--hi); padding:3px 8px }
+  .tree { padding:32px 40px; border-top:1px solid var(--line); display:grid; grid-template-columns:1fr 1fr; gap:40px }
+  .tree pre { font:13px/1.8 inherit; color:var(--dim) } .tree pre b { color:var(--ink); font-weight:500 }
+  .stamp { position:absolute; right:30px; bottom:30px; border:2px solid var(--hi); color:var(--hi); padding:8px 14px; transform:rotate(-6deg); font-weight:700; letter-spacing:.1em }
+</style>
+<body>
+<div class="wrap">
+  <div class="frame">
+    <div class="tb">
+      <div><img src="../site/img/icon.png" alt=""><b>MOONFRAME</b></div>
+      <div><small>PROJECT</small>&nbsp;Native desktop apps in Luau</div>
+      <div><small>SHEET</small>&nbsp;01/01</div>
+      <div><a>DOCS</a>·<a>APPS</a>·<a>GITHUB</a></div>
+    </div>
+
+    <section class="hero">
+      <div>
+        <span class="label">A — Overview</span>
+        <h1>Draw the window in Luau. Rust builds the rest.</h1>
+        <p>Moonframe is a starter for native apps. GPUI renders it, Rust checks every element tree and runs the sandbox, and your Luau — the shell, the mods, the stylesheet — reloads on save.</p>
+        <div class="cta"><a class="f">just run →</a><a>Read the spec</a></div>
+      </div>
+      <div class="dia">
+        <div class="dim"></div>
+        <div class="layer lu"><b>app/ · Luau</b><span>main.luau · mods/ · components/ · style.luau</span></div>
+        <div class="layer"><b>moonframe-core</b><span>reads Luau into checked element trees, styles</span></div>
+        <div class="layer"><b>providers · terminal</b><span>Wasm / process data · alacritty / libghostty-vt</span></div>
+        <div class="layer"><b>moonframe · GPUI</b><span>the window, inspector, menus — native, GPU-drawn</span></div>
+      </div>
+    </section>
+
+    <div class="specs">
+      <div><span class="n">B.1</span><h3>Live reload</h3><p>State kept across saves. Broken mod → last good view.</p></div>
+      <div><span class="n">B.2</span><h3>Stylesheet</h3><p>Type &amp; class rules, hover, transitions, themes.</p></div>
+      <div><span class="n">B.3</span><h3>Sandbox</h3><p>No fs / net / exec. Memory cap. Instruction budget.</p></div>
+      <div><span class="n">B.4</span><h3>Inspector</h3><p>⌥⌘I → file:line, for you or an agent.</p></div>
+      <div><span class="n">B.5</span><h3>Components</h3><p><code>use "stat"</code> — previews in-app.</p></div>
+      <div><span class="n">B.6</span><h3>Mods from git</h3><p>Source only. Pin with @ref.</p></div>
+      <div><span class="n">B.7</span><h3>Profiles</h3><p>Whole apps beside the starter.</p></div>
+      <div><span class="n">B.8</span><h3>Releases</h3><p>macOS · Linux · Windows, Sigstore-signed.</p></div>
+    </div>
+
+    <div class="plan">
+      <span class="label">C — Elevation: the starter window</span>
+      <div style="position:relative;margin-top:14px">
+        <img src="../site/img/window.webp" alt="">
+        <span class="callout" style="left:3%;top:8%">C.1 explorer mod</span>
+        <span class="callout" style="left:40%;top:30%">C.2 ui.terminal</span>
+        <span class="callout" style="right:4%;top:14%">C.3 changes mod</span>
+        <span class="callout" style="left:55%;bottom:5%">C.4 status · providers</span>
+      </div>
+    </div>
+
+    <div class="tree">
+<pre><span class="label">D — Layout</span>
+<b>app/</b>                 shell, mods, style
+<b>crates/moonframe-core/</b>  Luau → element trees
+<b>crates/moonframe/</b>       window, GPUI
+<b>crates/moonframe-providers/</b>
+<b>crates/moonframe-terminal/</b>
+<b>types/moonframe.d.luau</b>
+<b>wit/provider.wit</b></pre>
+<pre><span class="label">E — Procedure</span>
+<b>1</b>  git clone https://github.com/penso/moonframe
+<b>2</b>  mise install
+<b>3</b>  just run
+<b>4</b>  edit app/style.luau → save
+<b>5</b>  just bundle</pre>
+    </div>
+    <div class="stamp">APPROVED · MIT</div>
+  </div>
+</div>
+</body>
+</html>

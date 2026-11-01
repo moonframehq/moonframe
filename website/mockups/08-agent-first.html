@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moonframe · 08 Agent-first</title>
+<style>
+  :root { --bg:#f7f5f2; --ink:#201d1a; --dim:#7a736b; --line:#e6e1da; --acc:#d9622b; --v:#5b4bdb }
+  * { box-sizing:border-box; margin:0 }
+  body { background:var(--bg); color:var(--ink); font:16px/1.55 Inter, system-ui, sans-serif }
+  .wrap { max-width:1200px; margin:0 auto; padding:0 28px }
+  nav { display:flex; align-items:center; gap:10px; height:68px; font-weight:650 }
+  nav img { width:26px; border-radius:7px }
+  nav .r { margin-left:auto; display:flex; gap:22px; font-weight:450; color:var(--dim); font-size:14px }
+  .hero { display:grid; grid-template-columns:1fr 1.15fr; gap:56px; align-items:center; padding:56px 0 80px }
+  h1 { font-size:58px; line-height:1.03; letter-spacing:-.04em; font-weight:700 }
+  h1 span { color:var(--v) }
+  .lede { color:#5a544c; font-size:19px; margin:20px 0 28px; max-width:480px }
+  .btns { display:flex; gap:10px }
+  .btn { padding:12px 18px; border-radius:10px; font-weight:600; background:var(--ink); color:#fff }
+  .btn.o { background:transparent; color:var(--ink); border:1px solid #cfc8bf }
+  .demo { position:relative }
+  .demo .win { border-radius:12px; overflow:hidden; border:1px solid var(--line); box-shadow:0 30px 70px -30px #3a2a1a55; position:relative }
+  .demo .win img { width:100%; display:block }
+  .pick { position:absolute; left:2%; top:16%; width:21%; height:56%; border:2px solid var(--v); border-radius:6px; background:#5b4bdb14 }
+  .pick::before { content:"explorer/main.luau:142"; position:absolute; top:-26px; left:-2px; background:var(--v); color:#fff; font:11px ui-monospace, monospace; padding:3px 7px; border-radius:5px 5px 5px 0; white-space:nowrap }
+  .chat { position:absolute; right:-24px; bottom:-40px; width:330px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow:0 20px 50px -10px #3a2a1a33; font-size:14px }
+  .chat .m { padding:9px 12px; border-radius:10px; margin-bottom:8px }
+  .chat .u { background:var(--ink); color:#fff; margin-left:40px }
+  .chat .a { background:#f3f0eb }
+  .chat .a code { font:12px ui-monospace, monospace; color:var(--v) }
+  .chat .t { font-size:12px; color:var(--dim); display:flex; gap:6px; align-items:center }
+  .chat .t i { width:7px; height:7px; border-radius:50%; background:#3bb273 }
+  .loop { border-top:1px solid var(--line); padding:72px 0 }
+  .loop h2 { font-size:38px; letter-spacing:-.03em; margin-bottom:40px; max-width:640px; line-height:1.1 }
+  .steps { display:grid; grid-template-columns:repeat(4, 1fr); gap:16px }
+  .st { background:#fff; border:1px solid var(--line); border-radius:14px; padding:22px }
+  .st .n { width:28px; height:28px; border-radius:50%; background:var(--v); color:#fff; display:grid; place-items:center; font-size:13px; font-weight:700; margin-bottom:14px }
+  .st h3 { font-size:17px; margin-bottom:6px }
+  .st p { color:var(--dim); font-size:14.5px }
+  kbd { font:12px ui-monospace, monospace; background:#f3f0eb; border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:1px 6px }
+  .mock { display:grid; grid-template-columns:1fr 1.3fr; gap:48px; align-items:center; padding:20px 0 100px }
+  .mock img { width:100%; border-radius:12px; border:1px solid var(--line) }
+  .mock h2 { font-size:34px; letter-spacing:-.03em; line-height:1.1; margin-bottom:14px }
+  .mock p { color:#5a544c }
+  code { font:.88em ui-monospace, "SF Mono", monospace }
+</style>
+<body>
+<div class="wrap">
+  <nav><img src="../site/img/icon.png" alt="">Moonframe<div class="r"><a>How it works</a><a>Docs</a><a>Apps</a><a>GitHub</a></div></nav>
+  <section class="hero">
+    <div>
+      <h1>Point at your app.<br><span>Ask for a change.</span><br>Watch it happen.</h1>
+      <p class="lede">Moonframe is a native app whose window is written in Luau and reloads as it's edited — so an agent can build it while you watch, safely sandboxed.</p>
+      <div class="btns"><a class="btn">Get started</a><a class="btn o">See the skill</a></div>
+    </div>
+    <div class="demo">
+      <div class="win"><img src="../site/img/window.webp" alt=""><div class="pick"></div></div>
+      <div class="chat">
+        <div class="m u">add a list of branches here</div>
+        <div class="m a">Adding a <code>ui.list</code> fed by the <code>git</code> provider to <code>explorer/main.luau</code>… <br><br>✓ <code>just check</code> passed · window reloaded</div>
+        <div class="t"><i></i>Live — state kept</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="loop">
+    <h2>A loop built for working with an agent.</h2>
+    <div class="steps">
+      <div class="st"><div class="n">1</div><h3>Inspect</h3><p><kbd>⌥⌘I</kbd> then click anything. The file and line are saved where the agent reads them.</p></div>
+      <div class="st"><div class="n">2</div><h3>Ask</h3><p>"Add it here." The bundled skill tells the agent where a feature belongs and how to build it.</p></div>
+      <div class="st"><div class="n">3</div><h3>Check</h3><p><code>just check</code> and <code>just types</code> catch mistakes before you see them.</p></div>
+      <div class="st"><div class="n">4</div><h3>Watch</h3><p>The window reloads in place. A broken mod keeps its last good view.</p></div>
+    </div>
+  </section>
+
+  <section class="mock">
+    <div><h2>See it before it's made.</h2><p>Ask for "three takes on the status bar" and live mockups appear side by side in a tab of your window. <b>Pick</b> one; nothing real changes until then.</p></div>
+    <img src="../site/img/mockups.webp" alt="">
+  </section>
+</div>
+</body>
+</html>

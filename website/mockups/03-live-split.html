@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moonframe · 03 Live split</title>
+<style>
+  :root { --bg:#fbfbfd; --ink:#16151d; --dim:#6c6a7a; --line:#e7e6ef; --acc:#5b5bf0 }
+  * { box-sizing:border-box; margin:0 }
+  body { background:var(--bg); color:var(--ink); font:16px/1.55 Inter, system-ui, sans-serif }
+  .wrap { max-width:1240px; margin:0 auto; padding:0 28px }
+  nav { display:flex; align-items:center; gap:10px; height:64px; font-weight:650 }
+  nav img { width:24px; border-radius:6px }
+  nav span.r { margin-left:auto; display:flex; gap:22px; font-weight:450; color:var(--dim); font-size:14px }
+  .hero { padding:56px 0 24px; text-align:center }
+  h1 { font-size:62px; letter-spacing:-.04em; line-height:1.03; font-weight:720 }
+  h1 .cur { display:inline-block; width:4px; height:.85em; background:var(--acc); vertical-align:-4px; margin-left:4px; animation:b 1s steps(1) infinite }
+  @keyframes b { 50% { opacity:0 } }
+  .hero p { color:var(--dim); font-size:19px; max-width:620px; margin:18px auto 0 }
+  .stage { margin:44px 0 0; display:grid; grid-template-columns:420px 1fr; border:1px solid var(--line); border-radius:16px; overflow:hidden; background:#fff; box-shadow:0 30px 80px -40px #2a2a6033 }
+  .ed { background:#15141f; color:#d8d6f0; font:13px/1.75 ui-monospace, "SF Mono", Menlo, monospace; padding:0 0 20px }
+  .ed .tab { display:flex; gap:8px; padding:10px 16px; border-bottom:1px solid #ffffff12; font-size:12px; color:#9a98b8 }
+  .ed .tab b { color:#fff; font-weight:500 }
+  .ed .tab .saved { margin-left:auto; color:#7be3a4 }
+  .ed pre { padding:16px 18px; font:inherit; white-space:pre }
+  .k { color:#c792ea } .s { color:#addb67 } .n { color:#f78c6c } .c { color:#5e5c80 }
+  .hl { background:#5b5bf033; display:inline-block; width:100%; box-shadow:-18px 0 0 #5b5bf033, 18px 0 0 #5b5bf033; border-left:2px solid #8f8dff; margin-left:-2px }
+  .win { position:relative; padding:0 }
+  .win img { display:block; width:100% }
+  .flash { position:absolute; top:16px; right:16px; background:#16151d; color:#fff; font-size:13px; padding:8px 12px; border-radius:8px; display:flex; gap:8px; align-items:center; box-shadow:0 8px 24px #0003 }
+  .flash i { width:8px; height:8px; border-radius:50%; background:#7be3a4; box-shadow:0 0 0 4px #7be3a433 }
+  .steps { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; padding:72px 0 }
+  .steps div { border-top:2px solid var(--ink); padding-top:16px }
+  .steps .num { font:600 13px ui-monospace, monospace; color:var(--acc) }
+  .steps h3 { font-size:20px; letter-spacing:-.02em; margin:6px 0 }
+  .steps p { color:var(--dim) }
+  code { font:.88em ui-monospace, "SF Mono", monospace; background:#5b5bf014; color:#3d3dc0; padding:1px 5px; border-radius:4px }
+  .table { border-top:1px solid var(--line); padding:56px 0 90px; display:grid; grid-template-columns:280px 1fr; gap:40px }
+  .table h2 { font-size:32px; letter-spacing:-.03em; line-height:1.15 }
+  .row { display:grid; grid-template-columns:200px 1fr; padding:14px 0; border-bottom:1px solid var(--line); font-size:15px }
+  .row b { font-weight:600 }
+</style>
+<body>
+<div class="wrap">
+  <nav><img src="../site/img/icon.png" alt="">Moonframe<span class="r"><a>Docs</a><a>Apps</a><a>GitHub</a></span></nav>
+  <header class="hero">
+    <h1>Save the file.<br>Watch the window change.<span class="cur"></span></h1>
+    <p>Moonframe is a native desktop app whose entire window is Luau. Rust and GPUI draw it — your code reloads in place, state kept.</p>
+  </header>
+
+  <div class="stage">
+    <div class="ed">
+      <div class="tab"><b>style.luau</b> · app/<span class="saved">● saved 12ms ago</span></div>
+<pre><span class="c">-- app/style.luau</span>
+<span class="k">return</span> {
+  panel = {
+    radius = <span class="n">12</span>,
+<span class="hl">    shadow = <span class="s">"0 4px 12px #0003"</span>,</span>
+    padding = <span class="n">10</span>,
+  },
+  [<span class="s">"button.primary"</span>] = {
+    background = <span class="s">"#5b5bf0"</span>,
+    hover = { background = <span class="s">"#4a4ae0"</span> },
+    transition = <span class="s">"120ms ease-out"</span>,
+  },
+  status = {
+    font = <span class="s">"JetBrains Mono"</span>,
+    size = <span class="n">11</span>,
+  },
+}</pre>
+    </div>
+    <div class="win">
+      <img src="../site/img/window.webp" alt="">
+      <div class="flash"><i></i>Reloaded · state kept</div>
+    </div>
+  </div>
+
+  <section class="steps">
+    <div><span class="num">01</span><h3>Clone &amp; run</h3><p><code>just run</code> opens the window on <code>app/</code>. That's the whole setup.</p></div>
+    <div><span class="num">02</span><h3>Edit any Luau</h3><p>Mods, components, the shell, the stylesheet. A bad edit shows a warning mark, never a blank window.</p></div>
+    <div><span class="num">03</span><h3>Ship a .app</h3><p><code>just bundle</code> builds a signed bundle with your app inside.</p></div>
+  </section>
+
+  <section class="table">
+    <h2>Every need has one place to write it.</h2>
+    <div>
+      <div class="row"><b>A look</b><span>a rule in <code>style.luau</code></span></div>
+      <div class="row"><b>A reusable piece</b><span><code>components/&lt;name&gt;.luau</code>, used with <code>use "stat"</code></span></div>
+      <div class="row"><b>A shell</b><span><code>ui.terminal { id = "main" }</code></span></div>
+      <div class="row"><b>Data from the machine</b><span>a provider, read as <code>app.&lt;name&gt;</code></span></div>
+      <div class="row"><b>A sheet or menu</b><span><code>ui.popover { open = state.open }</code></span></div>
+      <div class="row"><b>A new kind of element</b><span>Rust in <code>crates/</code> — the one change that needs a rebuild</span></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
