@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- The README's first image, docs/screenshots/hero.png: example apps fanned
+     over the icon's striped sunset, under the headline, with a prompt the
+     front window has just applied (its May bar is the orange one). Rendered
+     at 900x500, twice the density, by scripts/render-hero.sh. -->
+<html lang="en">
+<meta charset="utf-8">
+<style>
+  :root { --cream:#f3e6cc; --brown:#3b2417; --teal:#2e6462; --mustard:#f2b33d; --orange:#e8642c; --red:#c63d26;
+          --serif:"Iowan Old Style", "Palatino Linotype", Georgia, serif; --sans:Inter, system-ui, -apple-system, sans-serif; }
+  * { box-sizing:border-box; margin:0 }
+  html, body { width:900px; height:500px; overflow:hidden }
+  body { font-family:var(--sans); position:relative; background:var(--cream); -webkit-font-smoothing:antialiased }
+  .sun { position:absolute; left:50%; bottom:-330px; width:760px; height:760px; margin-left:-380px; border-radius:50%;
+         background:radial-gradient(circle, var(--red) 0 34%, var(--orange) 34% 52%, var(--mustard) 52% 70%, transparent 70%) }
+  .bands { position:absolute; left:0; right:0; bottom:0; height:220px;
+           background:repeating-linear-gradient(180deg, transparent 0 22px, var(--cream) 22px 30px) }
+  .head { position:absolute; top:18px; left:0; right:0; z-index:6; text-align:center; color:var(--brown) }
+  .brand { display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:6px }
+  .brand img { width:36px; height:36px }
+  .brand b { font:italic 600 26px/1 var(--serif) }
+  h1 { font:500 34px/1.1 var(--serif); letter-spacing:-.02em }
+  .sub { font:15px/1.4 var(--sans); color:#5a4030; margin-top:6px }
+  .fan { position:absolute; inset:0; transform:translateY(42px) }
+  .fan img { position:absolute; width:420px; border-radius:8px; box-shadow:0 18px 40px rgba(20,10,4,.45), 0 0 0 1px rgba(0,0,0,.08) }
+  .chat { position:absolute; left:482px; top:316px; z-index:5; width:226px; padding:12px 14px; border-radius:14px;
+          background:var(--brown); color:var(--cream); box-shadow:0 14px 34px rgba(30,15,5,.45), 0 0 0 1px #f3e6cc22 }
+  .chat:before { content:""; position:absolute; left:-7px; top:22px; width:14px; height:14px; background:var(--brown);
+                 transform:rotate(45deg); border-radius:2px }
+  .chat .u { display:flex; gap:8px; align-items:center; font:italic 500 14.5px/1.25 var(--serif) }
+  .chat .u img { width:20px; height:20px; flex:none }
+  .chat .a { margin-top:9px; display:inline-flex; gap:6px; align-items:center; padding:5px 9px; border-radius:999px;
+             background:var(--teal); color:var(--cream); font:600 11px var(--sans); letter-spacing:.03em }
+  .chat .a i { width:6px; height:6px; border-radius:50%; background:var(--mustard); box-shadow:0 0 0 3px #f2b33d44 }
+  .chips { position:absolute; left:0; right:0; bottom:16px; display:flex; gap:8px; justify-content:center }
+  .chips span { font:600 12px var(--sans); letter-spacing:.04em; padding:6px 10px; border-radius:999px;
+                background:var(--brown); color:var(--cream) }
+</style>
+<body>
+  <div class="sun"></div>
+  <div class="bands"></div>
+  <div class="head">
+    <div class="brand"><img src="../../assets/icon.png" alt=""><b>Moonframe</b></div>
+    <h1>Malleable software.</h1>
+    <p class="sub">Ask for a change and watch the running app reshape itself. No rebuild, no restart.</p>
+  </div>
+  <div class="fan">
+    <img src="../screenshots/apps/duly.png" style="left:30px;top:190px;width:360px;transform:rotate(-10deg)" alt="">
+    <img src="../screenshots/apps/msgvault-chat.png" style="left:510px;top:190px;width:360px;transform:rotate(10deg)" alt="">
+    <img src="../screenshots/apps/gantry.png" style="left:120px;top:150px;transform:rotate(-5deg)" alt="">
+    <img src="../screenshots/apps/hearth.png" style="left:360px;top:150px;transform:rotate(5deg)" alt="">
+    <img src="../screenshots/apps/emberline.png" style="left:235px;top:135px;width:430px" alt="">
+  </div>
+  <div class="chat">
+    <div class="u"><img src="../../assets/icon.png" alt="">“Highlight the best month in orange.”</div>
+    <div class="a"><i></i>applied live · state kept</div>
+  </div>
+  <div class="chips"><span>you or an agent</span><span>changes appear live</span><span>native, GPU-drawn</span><span>MIT</span></div>
+</body>
+</html>
