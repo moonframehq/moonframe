@@ -141,6 +141,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`collapsible`](#collapsible) | Containers | One foldable block of content, such as "No agent yet" or advanced options. For several of them stacked use `accordion`; for a titled sidebar group with a count and actions use `sidebar-section`; for a plain heading use `section`. |
 | [`dashboard-card`](#dashboard-card) | Containers | Each block of a dashboard or overview (a chart, a list of things waiting, a table). For a titled box inside a page use `card`; for a sidebar panel use `ui.panel`; for a tiled pane with controls use `pane-frame`. |
 | [`section`](#section) | Containers | A small muted heading over a group of content inside a panel or settings page. |
+| [`swap-view`](#swap-view) | Containers | The body under a view switcher (`pill-tabs`, `segmented`, `tabs`) whose content is replaced, such as a list's header and rows per filter. Give `width` so the pages can be measured while they move. For panels that open and close use `side-panels`; for items joining a list give the rows a `key` and a transition instead. |
 | [`browser`](#browser) | Content | A web page in a pane, with browser chrome. Keep the page's `navigate` messages in state and pass the latest as `page`; the address bar navigates on its own. For a bare page without a bar use `ui.browser`. |
 | [`button-group`](#button-group) | Controls | Related actions or view modes side by side in a header: Unified \| Split, Uncommitted \| Branch, zoom − \| +. For a settings choice in a track use `segmented`; for separate quiet buttons use `toolbar`; for back/forward use `nav-buttons`. |
 | [`chips`](#chips) | Controls | Filters over a list where any number can be on (Open, Mine, Has agent). For exactly one of a few use `segmented`; for read-only labels use `tags`; for a single on/off setting use `switch`. |
@@ -214,6 +215,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`page`](#page) | Layout | The main area of a settings screen, a detail view or a dashboard: a big title, then sections of content that scroll. Group its content with `section` or `card`; put it beside a `sidebar` in a `split-view`. For a framed pane use `pane-frame`; for a modal use `dialog`; for a panel in a sidebar use `ui.panel`. |
 | [`pane-frame`](#pane-frame) | Layout | Framing each pane of a tiled workspace (a terminal, an agent, a log) with its own header and controls. The panes' sizes come from `ui.hsplit`/`ui.vsplit` (see `split-view`); this only draws the frame inside one. For a titled box of content use `card`; for a sidebar panel use `ui.panel`. |
 | [`settings-page`](#settings-page) | Layout | A whole preferences window or settings tab. It is made of `settings-nav` (the page list) and `settings-row` (each setting); use those directly for a different arrangement, `section` for a plain heading, `card` to box a group. |
+| [`side-panels`](#side-panels) | Layout | A three-column app (notes, mail, writing) whose sidebar and list the user hides to focus on the main area. The mod keeps `left` and `middle` and flips them from buttons in the panes' headers. For resizable panes, an inspector or a bottom panel use `split-view`; for a switcher over the list use `pill-tabs`. |
 | [`split-view`](#split-view) | Layout | The body of a shell or a large mod: a sidebar, the main content and optional inspector and bottom panes the user can resize and toggle. It is plain `ui.hsplit`/`ui.vsplit` with `ui.pane` children; write those directly for any other arrangement. For framing each pane use `pane-frame`; for a scrolling page inside the main area use `page`. |
 | [`board-card`](#board-card) | Lists | Items in a `kanban-column`: deals, tickets, tasks, candidates. For a row in a list use `task-row` or `list`; for a pull request use `pr-row`. |
 | [`group-header`](#group-header) | Lists | A heading inside a list that groups its rows by state or owner ("Needs you 3", "Waiting 3", a machine with its online dot). For a sidebar's own sections use `sidebar-section`; for a heading over arbitrary content use `section`; for nested rows use `tree`. |
@@ -228,6 +230,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`month-grid`](#month-grid) | Navigation | A calendar view or a date picker's body: choosing a day in a month. For a strip of days over a list use `day-strip`; for events in order use `timeline`. |
 | [`nav-buttons`](#nav-buttons) | Navigation | History navigation in a title bar, a browser tab or a pane that keeps a back stack. For onboarding steps use `pager`; for a single icon action use `icon-button`. |
 | [`pager`](#pager) | Navigation | Steps of an onboarding or welcome flow, or pages of a carousel. For history back/forward use `nav-buttons`; for switching views use `tabs` or `segmented`. |
+| [`pill-tabs`](#pill-tabs) | Navigation | Switching the few views of one list from a sidebar or header (Inbox, All, Last 7 Days), where the current view deserves its name and the rest only an icon. For settings choices use `segmented`; for documents or sessions use `tabs`; for the app's main views use `activity-bar`. |
 | [`rail`](#rail) | Navigation | The sidebar folded to a narrow strip, one tile per workspace or agent with its status. For switching the app's views use `activity-bar`; for the full width version use `sidebar`. |
 | [`settings-nav`](#settings-nav) | Navigation | Choosing the page of a settings or preferences window; pair it with `settings-page`, which uses it. For an app's main sidebar use `sidebar`; for a flat list use `list`; for tabs across the top use `tabs`. |
 | [`sidebar`](#sidebar) | Navigation | The whole left column of an app: workspaces, agents, settings categories. One group alone is `sidebar-section`; the narrow collapsed form is `rail`; a VS Code style icon strip beside it is `activity-bar`; nested rows are `tree`. |
@@ -449,6 +452,32 @@ section { title = "Worktrees",
 ```
 
 A whole mod using it, with state: `app/components/demos/section.luau`.
+
+#### `swap-view`
+
+**Swap View.** Content keyed by a view: when the key changes, the old page fades and folds away as the new one fades and slides in.
+
+**When:** The body under a view switcher (`pill-tabs`, `segmented`, `tabs`) whose content is replaced, such as a list's header and rows per filter. Give `width` so the pages can be measured while they move. For panels that open and close use `side-panels`; for items joining a list give the rows a `key` and a transition instead.
+
+| Prop | Meaning |
+| --- | --- |
+| `[children]` | the page for the current key |
+| `grow` | take the free space along the parent's axis |
+| `key` | names the page shown: a new key swaps it |
+| `width` | the page's width in pixels (default 260); the moving pages keep it, clipped |
+
+**Styles:** `.swap-view-page`
+
+```lua
+local swap_view = use "swap-view"
+
+swap_view { key = state.view, width = 260,
+	ui.text { TITLES[state.view], weight = "bold" },
+	-- ...the rows of that view
+}
+```
+
+A whole mod using it, with state: `app/components/demos/swap-view.luau`.
 
 ### Content
 
@@ -2455,6 +2484,40 @@ settings_page {
 
 A whole mod using it, with state: `app/components/demos/settings-page.luau`.
 
+#### `side-panels`
+
+**Side Panels.** Sidebar, list and main area side by side; hiding the sidebar or the list folds it away while it fades, and the rest slides over.
+
+**When:** A three-column app (notes, mail, writing) whose sidebar and list the user hides to focus on the main area. The mod keeps `left` and `middle` and flips them from buttons in the panes' headers. For resizable panes, an inspector or a bottom panel use `split-view`; for a switcher over the list use `pill-tabs`.
+
+| Prop | Meaning |
+| --- | --- |
+| `height` | fixed height in pixels; leave unset to fill the parent |
+| `id` | the split's id (default "side-panels") |
+| `left` | show the sidebar (default true) |
+| `list` | element in the middle pane |
+| `list_size` | list width in pixels (default 280) |
+| `main` | element in the main area |
+| `middle` | show the list (default true) |
+| `sidebar` | element in the left pane |
+| `sidebar_size` | sidebar width in pixels (default 220) |
+
+**Styles:** `.side-panels-list` `.side-panels-main` `.side-panels-sidebar`
+
+```lua
+local side_panels = use "side-panels"
+
+side_panels {
+	left = state.left, middle = state.middle,
+	sidebar = ui.region "left",
+	list = ui.region "list",
+	main = ui.region "main",
+}
+-- update: flip state.left / state.middle from icon buttons in the panes' headers.
+```
+
+A whole mod using it, with state: `app/components/demos/side-panels.luau`.
+
 #### `split-view`
 
 **Split view.** Sidebar, main area, inspector and bottom panel in resizable splits, each side shown or hidden by a prop.
@@ -2900,6 +2963,31 @@ pager { back = "back", count = 4, next = "next", page = 2 }
 ```
 
 A whole mod using it, with state: `app/components/demos/pager.luau`.
+
+#### `pill-tabs`
+
+**Pill Tabs.** A view switcher whose chosen item is a wide pill with icon, label and count while the others are icon circles; switching morphs one into the other. Sends { select = id }.
+
+**When:** Switching the few views of one list from a sidebar or header (Inbox, All, Last 7 Days), where the current view deserves its name and the rest only an icon. For settings choices use `segmented`; for documents or sessions use `tabs`; for the app's main views use `activity-bar`.
+
+| Prop | Meaning |
+| --- | --- |
+| `event` | key of the message a click sends, default "select": { select = id } |
+| `items` | list of { id, icon, label?, count? (after the label), dot? (an unread dot on the circle), tooltip?, label_width? (pixels, when the estimate is off; a longer label ends in …), msg? } |
+| `selected` | id of the current view |
+| `size` | the circles' diameter and the pills' height in pixels (default 34) |
+| `to` | mod to send messages to, if not the drawing one |
+| `width` | the chosen pill's width in pixels (default 112) |
+
+**Styles:** `.pill-tabs` `.pill-tabs-count` `.pill-tabs-dot` `.pill-tabs-idle:hover` `.pill-tabs-item` `.pill-tabs-item:off` `.pill-tabs-item:on` `.pill-tabs-label` `.pill-tabs-label:off` `.pill-tabs-label:on`
+
+```lua
+local pill_tabs = use "pill-tabs"
+
+pill_tabs { items = { { count = 1, dot = true, icon = "inbox", id = "inbox", label = "Inbox" }, { count = 1, icon = "copy", id = "all", label = "All" }, { count = 1, icon = "clock", id = "recent", label = "Last 7 Days" } }, selected = "inbox" }
+```
+
+A whole mod using it, with state: `app/components/demos/pill-tabs.luau`.
 
 #### `rail`
 
