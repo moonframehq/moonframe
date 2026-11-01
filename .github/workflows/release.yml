@@ -252,9 +252,7 @@ jobs:
           for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
             mv "packages/Moonframe-$VERSION-$target.tar.gz" dist/
           done
-          for target in x86_64-pc-windows-msvc aarch64-pc-windows-msvc; do
-            mv "packages/Moonframe-$VERSION-$target.zip" dist/
-          done
+          mv "packages/Moonframe-$VERSION-x86_64-pc-windows-msvc.zip" dist/
           test -s "dist/Moonframe-$VERSION.cdx.json"
           (cd dist && sha256sum -- * > SHA256SUMS)
           cat dist/SHA256SUMS

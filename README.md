@@ -96,7 +96,7 @@ On macOS 27, Zig 0.15 needs the wrapper in `tools/zig`, which mise and the
 justfile put first on `PATH`, and a macOS SDK of version 15 or older.
 
 Moonframe is developed on macOS. CI builds, lints and tests it on macOS,
-Linux and Windows (x86_64 and ARM64), and each release ships a macOS disk
+Linux (x86_64 and ARM64) and Windows (x86_64), and each release ships a macOS disk
 image, Linux tarballs and Windows zips, with checksums, Sigstore signatures
 and GitHub attestations; see [docs/releasing.md](docs/releasing.md).
 
