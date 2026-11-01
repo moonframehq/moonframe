@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moonframe · 09 Phases</title>
+<style>
+  :root { --bg:#07071a; --ink:#f1efe6; --dim:#9693b0; --gold:#f2d48a }
+  * { box-sizing:border-box; margin:0 }
+  body { background:var(--bg); color:var(--ink); font:17px/1.6 "Iowan Old Style", Georgia, serif;
+    background-image:radial-gradient(1px 1px at 10% 20%, #fff9, transparent), radial-gradient(1px 1px at 30% 70%, #fff7, transparent), radial-gradient(1.5px 1.5px at 80% 10%, #fffb, transparent), radial-gradient(1px 1px at 60% 40%, #fff6, transparent), radial-gradient(1px 1px at 90% 80%, #fff8, transparent), radial-gradient(1px 1px at 45% 15%, #fff6, transparent), radial-gradient(1px 1px at 20% 90%, #fff7, transparent);
+    background-size:600px 600px }
+  .sans { font-family:Inter, system-ui, sans-serif }
+  .wrap { max-width:1080px; margin:0 auto; padding:0 28px }
+  nav { display:flex; justify-content:space-between; align-items:center; height:76px; font:14px Inter, system-ui, sans-serif; color:var(--dim) }
+  nav b { color:var(--ink); font:italic 600 22px "Iowan Old Style", Georgia, serif; display:flex; align-items:center; gap:10px }
+  nav b img { width:24px; border-radius:6px }
+  nav div { display:flex; gap:24px }
+  .hero { text-align:center; padding:80px 0 60px }
+  .orb { width:220px; height:220px; margin:0 auto 44px; border-radius:50%; background:radial-gradient(circle at 35% 35%, #fffbe9, #e8dcb3 40%, #a99d7a 75%); box-shadow:0 0 120px #f2d48a55, inset -40px -20px 60px #0004; position:relative }
+  .orb::after { content:""; position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle at 110% 50%, var(--bg) 52%, transparent 53%) }
+  h1 { font-size:76px; line-height:1.02; font-weight:400; letter-spacing:-.02em }
+  h1 i { color:var(--gold) }
+  .hero p { font-size:21px; color:var(--dim); max-width:620px; margin:22px auto 34px }
+  .btn { font:600 15px Inter, system-ui, sans-serif; padding:13px 22px; border-radius:999px; background:var(--gold); color:#1a1608; display:inline-block }
+  .btn.g { background:transparent; color:var(--ink); border:1px solid #ffffff30; margin-left:8px }
+  .phases { display:grid; grid-template-columns:repeat(4, 1fr); gap:0; margin:80px 0; border-top:1px solid #ffffff1a; border-bottom:1px solid #ffffff1a }
+  .ph { padding:36px 24px; border-right:1px solid #ffffff1a; text-align:center }
+  .ph:last-child { border-right:0 }
+  .m { width:54px; height:54px; border-radius:50%; margin:0 auto 18px; background:#e8dcb3; position:relative; overflow:hidden; box-shadow:0 0 30px #f2d48a33 }
+  .m::after { content:""; position:absolute; inset:0; border-radius:50%; background:var(--bg) }
+  .m.new::after { transform:translateX(0) }
+  .m.cres::after { transform:translateX(35%) }
+  .m.half::after { transform:translateX(55%); border-radius:0 }
+  .m.full::after { display:none }
+  .ph h3 { font:600 13px ui-monospace, "SF Mono", monospace; color:var(--gold); letter-spacing:.06em; margin-bottom:8px }
+  .ph p { font-size:16px; color:var(--dim) }
+  .shot { margin:0 auto; border-radius:14px; overflow:hidden; border:1px solid #ffffff22; box-shadow:0 0 0 1px #000, 0 50px 120px #000c }
+  .shot img { width:100%; display:block }
+  .quote { text-align:center; font-size:34px; font-style:italic; max-width:760px; margin:100px auto; line-height:1.3 }
+  .quote span { display:block; font:14px Inter, sans-serif; font-style:normal; color:var(--dim); margin-top:16px }
+  .feat { display:grid; grid-template-columns:repeat(3, 1fr); gap:44px; padding-bottom:100px }
+  .feat h4 { font:600 18px Inter, system-ui, sans-serif; margin-bottom:6px }
+  .feat p { color:var(--dim); font-size:16px }
+  footer { text-align:center; padding:40px; font:13px Inter, sans-serif; color:var(--dim); border-top:1px solid #ffffff14 }
+</style>
+<body>
+<div class="wrap">
+  <nav><b><img src="../site/img/icon.png" alt="">Moonframe</b><div><a>Guide</a><a>Apps</a><a>GitHub</a></div></nav>
+  <header class="hero">
+    <div class="orb"></div>
+    <h1>A window that changes<br><i>like the moon does</i> — in phases.</h1>
+    <p>Native desktop apps written in Luau, drawn by Rust and GPUI. Every mod lives through init, update and view — and survives every reload.</p>
+    <a class="btn">Start building</a><a class="btn g">Read the guide</a>
+  </header>
+
+  <div class="phases">
+    <div class="ph"><div class="m new"></div><h3>init</h3><p>State begins — or is carried over from the last reload.</p></div>
+    <div class="ph"><div class="m cres"></div><h3>update</h3><p>Messages arrive; state moves on.</p></div>
+    <div class="ph"><div class="m half"></div><h3>view</h3><p>Luau returns a tree of elements, checked by Rust.</p></div>
+    <div class="ph"><div class="m full"></div><h3>draw</h3><p>GPUI paints it natively, every frame.</p></div>
+  </div>
+
+  <div class="shot"><img src="../site/img/dark.webp" alt=""></div>
+
+  <p class="quote">“Save the file, and the window redraws in place — keeping each mod's state.”<span>— how Moonframe reloads</span></p>
+
+  <div class="feat">
+    <div><h4>A stylesheet</h4><p>Colors, corners, shadows and animations, by type and class, with themes that reach the terminals.</p></div>
+    <div><h4>Providers</h4><p>Sandboxed WebAssembly or plain processes, for everything Luau can't touch.</p></div>
+    <div><h4>Your sky over ours</h4><p><code>~/.config/moonframe</code> lays your mods over the app. Updates never touch it.</p></div>
+  </div>
+</div>
+<footer>moonframe.dev · MIT · made under a quiet sky</footer>
+</body>
+</html>

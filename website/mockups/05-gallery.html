@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moonframe · 05 Gallery wall</title>
+<style>
+  :root { --bg:#111014; --ink:#f3f2f7; --dim:#8e8b9c }
+  * { box-sizing:border-box; margin:0 }
+  body { background:var(--bg); color:var(--ink); font:16px/1.5 Inter, system-ui, sans-serif; overflow-x:hidden }
+  nav { position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:10; display:flex; gap:22px; align-items:center; padding:8px 10px 8px 14px; background:#1c1a22cc; backdrop-filter:blur(16px); border:1px solid #ffffff14; border-radius:999px; font-size:14px }
+  nav img { width:22px; border-radius:6px }
+  nav b { display:flex; gap:8px; align-items:center }
+  nav a { color:var(--dim) }
+  nav .go { background:var(--ink); color:var(--bg); padding:6px 14px; border-radius:999px; font-weight:600 }
+  .wall { height:100vh; min-height:760px; position:relative; overflow:hidden }
+  .tiles { position:absolute; inset:-120px -200px; display:grid; grid-template-columns:repeat(5, 1fr); gap:18px; transform:rotate(-8deg) scale(1.05); opacity:.55 }
+  .col { display:flex; flex-direction:column; gap:18px }
+  .col:nth-child(even) { margin-top:-140px }
+  .tiles img { width:100%; border-radius:10px; display:block; box-shadow:0 10px 40px #0008 }
+  .wall::after { content:""; position:absolute; inset:0; background:radial-gradient(ellipse at center, #111014f2 22%, #11101499 55%, transparent 80%), linear-gradient(transparent 70%, var(--bg)) }
+  .center { position:absolute; inset:0; z-index:2; display:grid; place-content:center; text-align:center; padding:0 24px }
+  .center .count { font:600 13px Inter, sans-serif; letter-spacing:.14em; text-transform:uppercase; color:#b7a8ff; margin-bottom:18px }
+  h1 { font-size:clamp(46px, 7.5vw, 104px); line-height:.98; letter-spacing:-.05em; font-weight:760 }
+  .center p { max-width:560px; margin:22px auto 30px; color:#c2c0cf; font-size:19px }
+  .center .btns { display:flex; gap:10px; justify-content:center }
+  .btn { padding:12px 20px; border-radius:999px; font-weight:600; background:#fff; color:#111 }
+  .btn.g { background:#ffffff14; color:#fff; border:1px solid #ffffff22 }
+  .list { max-width:1200px; margin:0 auto; padding:40px 28px 100px }
+  .list h2 { font-size:34px; letter-spacing:-.03em; margin-bottom:28px }
+  .cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:24px }
+  .card img { width:100%; border-radius:10px; display:block; border:1px solid #ffffff12 }
+  .card .meta { display:flex; justify-content:space-between; margin-top:12px; font-size:14px }
+  .card .meta span { color:var(--dim) }
+  .card code { font:12px ui-monospace, monospace; color:#9a96ad; background:#ffffff0d; padding:2px 6px; border-radius:4px }
+  .install { margin-top:60px; display:flex; align-items:center; justify-content:space-between; gap:24px; padding:28px 32px; border-radius:16px; background:linear-gradient(120deg, #2a2160, #4a2a6e) }
+  .install pre { font:15px ui-monospace, "SF Mono", monospace; background:#0006; padding:12px 16px; border-radius:8px }
+</style>
+<body>
+<nav><b><img src="../site/img/icon.png" alt="">Moonframe</b><a>Apps</a><a>Docs</a><a>GitHub</a><a class="go">Get started</a></nav>
+
+<header class="wall">
+  <div class="tiles">
+    <div class="col"><img src="../site/img/daybook.webp" alt=""><img src="../site/img/gantry.webp" alt=""><img src="../site/img/tidings.webp" alt=""></div>
+    <div class="col"><img src="../site/img/ledger.webp" alt=""><img src="../site/img/parlance.webp" alt=""><img src="../site/img/vigil.webp" alt=""></div>
+    <div class="col"><img src="../site/img/stage.webp" alt=""><img src="../site/img/window.webp" alt=""><img src="../site/img/trellis.webp" alt=""></div>
+    <div class="col"><img src="../site/img/audience.webp" alt=""><img src="../site/img/lantern.webp" alt=""><img src="../site/img/cadence.webp" alt=""></div>
+    <div class="col"><img src="../site/img/pipeline.webp" alt=""><img src="../site/img/emberline.webp" alt=""><img src="../site/img/tessel.webp" alt=""></div>
+  </div>
+  <div class="center">
+    <p class="count">25 example apps · one engine</p>
+    <h1>Every one of these<br>is a Luau file.</h1>
+    <p>Moonframe is a native desktop app runtime: Rust and GPUI underneath, your app on top, reloading as you save.</p>
+    <div class="btns"><a class="btn">Build your own</a><a class="btn g">Browse the apps</a></div>
+  </div>
+</header>
+
+<section class="list">
+  <h2>Apps, installed as profiles</h2>
+  <div class="cards">
+    <div class="card"><img src="../site/img/sessions.webp" alt=""><div class="meta"><b>Sessions</b><code>--profile sessions</code></div><span style="color:var(--dim);font-size:14px">Coding sessions across your repositories.</span></div>
+    <div class="card"><img src="../site/img/cinder.webp" alt=""><div class="meta"><b>Cinder</b><code>--profile cinder</code></div><span style="color:var(--dim);font-size:14px">Agent CLI transcripts, grouped by repo.</span></div>
+    <div class="card"><img src="../site/img/workbench.webp" alt=""><div class="meta"><b>Workbench</b><code>--profile workbench</code></div><span style="color:var(--dim);font-size:14px">Terminal, editor and files in splits.</span></div>
+    <div class="card"><img src="../site/img/emberline.webp" alt=""><div class="meta"><b>Emberline</b><code>--profile emberline</code></div><span style="color:var(--dim);font-size:14px">A CRM's leads report in the dark.</span></div>
+    <div class="card"><img src="../site/img/tessel.webp" alt=""><div class="meta"><b>Tessel</b><code>--profile tessel</code></div><span style="color:var(--dim);font-size:14px">An agents hub with pixel-icon cards.</span></div>
+    <div class="card"><img src="../site/img/lantern.webp" alt=""><div class="meta"><b>Lantern</b><code>--profile lantern</code></div><span style="color:var(--dim);font-size:14px">A Halloween terminal workspace. With a pumpkin.</span></div>
+  </div>
+  <div class="install"><div><b style="font-size:20px">Install any app from git</b><p style="color:#cfc8f0">Source only, so everything it runs can be read first.</p></div><pre>moonframe app install github.com/owner/some-app</pre></div>
+</section>
+</body>
+</html>

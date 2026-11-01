@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moonframe: native desktop apps in Rust, shaped live in Luau</title>
+<style>
+  :root {
+    --paper:#f6f3ec; --paper2:#efebe1; --ink:#1d1b26; --ink2:#3b3746; --dim:#6b6676; --rule:#1d1b2622; --acc:#4b3fd1;
+    --serif:"Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --sans:Inter, system-ui, -apple-system, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing:border-box; margin:0 }
+  html { scroll-behavior:smooth }
+  body { background:var(--paper); color:var(--ink); font:18px/1.65 var(--serif); -webkit-font-smoothing:antialiased }
+  a { color:inherit; text-decoration:none }
+  code { font:.84em var(--mono); background:#1d1b260d; padding:1px 5px; border-radius:3px }
+  .wrap { max-width:1180px; margin:0 auto; padding:0 32px }
+  .kicker { font:600 12px var(--sans); letter-spacing:.14em; text-transform:uppercase; color:var(--acc); margin-bottom:16px }
+  .cap { font:14px/1.5 var(--sans); color:var(--dim); margin-top:12px } .cap b { color:var(--ink) }
+
+  /* Masthead */
+  .mast { display:grid; grid-template-columns:1fr auto 1fr; align-items:baseline; border-bottom:2px solid var(--ink); padding:22px 0 14px; font:500 13px var(--sans); letter-spacing:.1em; text-transform:uppercase }
+  .mast .name { font:italic 600 28px/1 var(--serif); letter-spacing:0; text-transform:none; display:flex; gap:10px; align-items:center }
+  .mast img { width:28px; border-radius:7px }
+  .mast nav { display:flex; gap:22px; justify-content:flex-end }
+  .mast nav a:hover { color:var(--acc) }
+  .sub { display:flex; justify-content:space-between; font:13px var(--sans); color:var(--dim); padding:8px 0; border-bottom:1px solid var(--rule) }
+  .sub b { color:var(--ink); font-weight:600 }
+
+  /* Hero */
+  .hero { padding:72px 0 40px }
+  .hero .head { text-align:center }
+  h1 { font-size:clamp(52px, 8vw, 96px); line-height:.98; letter-spacing:-.03em; font-weight:500 }
+  h1 i { color:var(--acc) }
+  .deck { font-size:22px; line-height:1.5; color:var(--ink2); max-width:740px; margin:26px auto 0 }
+  .hero .start { display:inline-flex; gap:14px; margin-top:32px; font:14px var(--sans); align-items:center }
+  .btn { padding:13px 20px; border-radius:4px; background:var(--ink); color:var(--paper); font-weight:600 }
+  .btn.o { background:none; color:var(--ink); border:1px solid var(--ink) }
+
+  .stage { display:grid; grid-template-columns:430px 1fr; height:480px; margin:48px 0 0; border:1px solid var(--ink); background:#fff; box-shadow:0 40px 80px -40px #1d1b2666; text-align:left }
+
+  /* Left: an agent working in the app's folder */
+  .agent { background:#1b1a24; color:#d8d6f0; font:13px/1.7 var(--mono); display:flex; flex-direction:column; min-height:0; height:100% }
+  .agent .tab { display:flex; gap:8px; padding:10px 16px; border-bottom:1px solid #ffffff14; font-size:12px; color:#9a98b8 }
+  .agent .tab b { color:#fff; font-weight:500 }
+  .agent .tab .st { margin-left:auto; color:#7be3a4 }
+  .log { padding:16px 18px; flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; gap:10px }
+  .log .q { color:#fff } .log .q::before { content:"› "; color:#9d94ff }
+  .log .a { color:#a9a7c4 } .log .a b { color:#d8d6f0; font-weight:500 }
+  .log .ok { color:#7be3a4 }
+  .log pre { font:12px/1.65 var(--mono); background:#ffffff08; border-left:2px solid #9d94ff; padding:8px 10px 8px 22px; text-indent:-12px; white-space:pre-wrap; overflow:hidden; color:#cfcde6 }
+  .log > * { flex-shrink:0 }
+  .log pre .add { color:#7be3a4 }
+  .log .old { opacity:.35 }
+  .prompt { border-top:1px solid #ffffff14; padding:12px 16px; color:#fff; min-height:46px }
+  .prompt::before { content:"› "; color:#9d94ff }
+  .prompt .caret { display:inline-block; width:7px; height:15px; background:#d8d6f0; vertical-align:-2px; animation:bl 1s steps(1) infinite }
+  @keyframes bl { 50% { opacity:0 } }
+
+  /* Right: an illustration of the window */
+  .win { --a:#4f46e5; position:relative; background:#f4f4f6; display:grid; grid-template-rows:38px 1fr 30px; height:100%; min-height:0; font:13px var(--sans); color:#2a2833 }
+  .tbar { display:flex; align-items:center; gap:8px; padding:0 12px }
+  .tbar i { width:11px; height:11px; border-radius:50% } .tbar i:nth-child(1) { background:#ff5f57 } .tbar i:nth-child(2) { background:#febc2e } .tbar i:nth-child(3) { background:#28c840 }
+  .tbar .pill { margin-left:16px; padding:3px 12px; border-radius:999px; background:#4f46e522; color:var(--a); font-weight:600; font-size:12px }
+  .tbar .pill.g { background:none; color:#777; font-weight:500; margin-left:0 }
+  .body { display:grid; grid-template-columns:190px 1fr 210px; padding:0 4px; min-height:0 }
+  .panel { background:#fff; border:1px solid #e3e2ea; border-radius:12px; margin:6px 4px; overflow:hidden; display:flex; flex-direction:column }
+  .ph { padding:10px 14px 6px; font-weight:600; color:var(--a); font-size:12px }
+  .it { padding:5px 14px; display:flex; gap:8px; align-items:center; color:#444 }
+  .it::before { content:""; width:10px; height:10px; border-radius:3px; background:#dcb67a; flex-shrink:0 }
+  .it.f::before { background:#5b8cff } .it.r::before { background:#dea584 }
+  .it.sel { background:#4f46e522; color:var(--a); font-weight:500; margin:0 6px; padding:5px 8px; border-radius:6px }
+  .term { background:#1e1e22; color:#cfcfd8; font:12px/1.7 var(--mono); padding:12px 14px; flex:1 }
+  .term .p { color:#9d94ff } .term .d { color:#777 }
+  .diff { font:11.5px/1.7 var(--mono); padding:4px 14px } .diff .a { color:#2f9e5b }
+  .sbar { display:flex; gap:18px; align-items:center; justify-content:flex-end; padding:0 14px; font:11px var(--mono); color:#666; border-top:1px solid #e3e2ea; background:#f4f4f6 }
+  .sbar .w { display:none; align-items:center; gap:6px; padding:2px 6px; border-radius:4px; transition:box-shadow .6s, background .6s }
+  .sbar .w.on { display:flex }
+  .sbar .w.new { background:#4b3fd11f; box-shadow:0 0 0 2px var(--acc) }
+  .spark { display:flex; align-items:flex-end; gap:1px; height:12px }
+  .spark i { width:2px; background:#8a87a0; border-radius:1px } .hot .spark i.h { background:#d64545 }
+  .meter { width:28px; height:4px; background:#e3e2ea; border-radius:2px; overflow:hidden } .meter i { display:block; height:100%; width:46%; background:#8a87a0 }
+  .br { color:var(--acc); font-weight:600 }
+  .toast { position:absolute; right:14px; bottom:42px; background:var(--ink); color:#fff; font:12.5px var(--sans); padding:8px 12px; border-radius:6px; display:flex; gap:8px; align-items:center; opacity:0; transform:translateY(6px); transition:all .3s }
+  .toast.on { opacity:1; transform:none }
+  .toast i { width:8px; height:8px; border-radius:50%; background:#7be3a4 }
+  .uptime { margin-right:auto; color:#8a8798 }
+
+  /* Sections */
+  section { padding:88px 0; border-top:1px solid var(--rule) }
+  h2 { font-size:52px; line-height:1.05; letter-spacing:-.025em; font-weight:500; max-width:820px }
+  h2 i { color:var(--acc) }
+  .lead { font-size:20px; color:var(--ink2); max-width:660px; margin-top:18px }
+
+  .three { display:grid; grid-template-columns:repeat(3, 1fr); margin-top:48px; border-top:2px solid var(--ink) }
+  .three > div { padding:22px 28px 0; border-right:1px solid var(--rule) }
+  .three > div:first-child { padding-left:0 } .three > div:last-child { border-right:0 }
+  .three .num { font:600 13px var(--mono); color:var(--acc) }
+  .three h3 { font-size:26px; font-weight:500; margin:4px 0 8px }
+  .three p { font-size:16px; color:var(--ink2) }
+  .three pre { font:13px/1.7 var(--mono); background:var(--ink); color:var(--paper); padding:12px 14px; margin-top:14px; border-radius:3px; white-space:pre-wrap }
+  .three pre .q { color:#b9b0ff }
+  .three pre.prompts { white-space:pre; overflow:hidden; text-overflow:ellipsis; font-size:12.5px }
+
+  /* Inspect */
+  .inspect { display:grid; grid-template-columns:1fr 1.25fr; gap:64px; align-items:center }
+  .shot { position:relative }
+  .shot img { display:block; width:100%; filter:drop-shadow(0 24px 30px #1d1b2640) }
+  .pick { position:absolute; left:.7%; top:6%; width:17.7%; height:89%; border:2px solid var(--acc); border-radius:6px; background:#4b3fd114 }
+  .pick::before { content:"mods/explorer/main.luau"; position:absolute; top:-25px; left:-2px; background:var(--acc); color:#fff; font:11px var(--mono); padding:3px 7px; border-radius:3px 3px 3px 0; white-space:nowrap }
+  .chat { position:absolute; right:-22px; bottom:-36px; width:320px; background:#fff; border:1px solid var(--ink); padding:14px; font:14px/1.5 var(--sans); box-shadow:8px 8px 0 var(--ink) }
+  .chat .m { padding:8px 12px; border-radius:4px; margin-bottom:8px }
+  .chat .u { background:var(--ink); color:#fff; margin-left:40px }
+  .chat .a { background:var(--paper2) }
+  .chat .t { font-size:12px; color:var(--dim) }
+  ol.loop { list-style:none; padding:0; margin-top:32px; counter-reset:s }
+  ol.loop li { counter-increment:s; display:grid; grid-template-columns:44px 1fr; padding:14px 0; border-top:1px solid var(--rule); font-size:17px; color:var(--ink2) }
+  ol.loop li::before { content:counter(s, upper-roman) "."; font:italic 20px var(--serif); color:var(--acc) }
+  ol.loop b { color:var(--ink); font-weight:600 }
+  kbd { font:12px var(--mono); border:1px solid var(--rule); border-bottom-width:2px; border-radius:4px; padding:0 5px; background:#fff }
+  .mockfig { display:grid; grid-template-columns:1.3fr 1fr; gap:48px; align-items:center; margin-top:96px }
+  .mockfig img { width:100%; filter:drop-shadow(0 18px 24px #1d1b2638) }
+  .mockfig h3 { font-size:34px; font-weight:500; line-height:1.1; margin-bottom:12px }
+  .mockfig p { color:var(--ink2); font-size:17px }
+
+  /* Components */
+  .comp-head { display:flex; justify-content:space-between; align-items:flex-end; gap:40px }
+  .big-num { font:italic 140px/0.8 var(--serif); color:var(--acc) }
+  .comp-main { margin-top:44px; border:1px solid var(--ink); box-shadow:0 30px 60px -30px #1d1b2666 }
+
+  .comp-strip { display:grid; grid-template-columns:repeat(4, 1fr); gap:22px; margin-top:28px }
+  .comp-strip img { width:100%; aspect-ratio:900/653; object-fit:cover; object-position:top; display:block; filter:drop-shadow(0 6px 10px #1d1b2626) }
+  .comp-strip p { font:13px/1.45 var(--sans); color:var(--dim); margin-top:8px } .comp-strip b { color:var(--ink) }
+
+  /* Plates */
+  .plates-head { display:flex; justify-content:space-between; align-items:flex-end; gap:40px }
+  .plates { display:grid; grid-template-columns:repeat(4, 1fr); gap:26px 22px; align-items:start; margin-top:48px }
+  .plate { margin:0 }
+  .plate img, .comp-strip img { transition:transform .25s cubic-bezier(.2,.8,.2,1), filter .25s; will-change:transform }
+  .plate img { width:100%; display:block; filter:drop-shadow(0 6px 10px #1d1b2626) }
+  .plate:hover img, .comp-strip img:hover { transform:translateY(-4px) scale(1.025); filter:drop-shadow(0 18px 20px #1d1b2650) }
+  .plate p { font:13px/1.45 var(--sans); color:var(--dim); margin-top:8px }
+  .plate p b { color:var(--ink) } .plate p span { font:11px var(--mono); color:var(--acc); margin-right:6px }
+  .plate img, .comp-strip img { cursor:zoom-in }
+  .lb { position:fixed; inset:0; z-index:50; background:#14121bf2; display:none; flex-direction:column; align-items:center; justify-content:center; padding:40px 60px 30px; font-family:var(--sans); color:#eee }
+  .lb.on { display:flex }
+  .lb-frame { position:relative; max-width:min(1500px, 100%); display:grid }
+  .lb-frame img { grid-area:1/1; max-width:100%; max-height:calc(100vh - 140px); object-fit:contain; display:block; filter:drop-shadow(0 30px 50px #000a) }
+  .lb-frame img.lo { filter:blur(6px) saturate(.8) drop-shadow(0 30px 50px #000a); transition:opacity .3s }
+  .lb-frame img.hi { opacity:0; transition:opacity .35s } .lb-frame img.hi.ready { opacity:1 }
+  .lb-bar { position:absolute; left:0; right:0; bottom:-14px; height:3px; background:#ffffff22; border-radius:2px; overflow:hidden; transition:opacity .4s }
+  .lb-bar i { display:block; height:100%; width:0; background:#9d94ff; transition:width .15s }
+  .lb-bar.indet i { width:30%; animation:lbi 1.1s ease-in-out infinite }
+  @keyframes lbi { from { transform:translateX(-100%) } to { transform:translateX(340%) } }
+  .lb-cap { margin-top:28px; display:flex; gap:16px; align-items:center; font-size:14px; color:#bbb }
+  .lb-cap b { color:#fff; font:italic 500 20px var(--serif) } .lb-cap code { background:#ffffff14; color:#ddd }
+  .lb-pct { font:12px var(--mono); color:#9d94ff; min-width:120px }
+  .lb button { position:absolute; background:#ffffff14; color:#fff; border:0; width:44px; height:44px; border-radius:50%; font-size:20px; cursor:pointer }
+  .lb button:hover { background:#ffffff2a }
+  .lb .x { top:18px; right:18px } .lb .prev { left:14px; top:50% } .lb .next { right:14px; top:50% }
+  .installbar { margin-top:24px; border:2px solid var(--ink); display:flex; justify-content:space-between; align-items:center; padding:20px 26px; gap:24px; font:16px var(--sans) }
+  .installbar pre { font:15px var(--mono); background:var(--ink); color:var(--paper); padding:10px 16px; border-radius:3px }
+
+  .cols { columns:3; column-gap:44px; column-rule:1px solid var(--rule); margin-top:44px }
+  .cols h3 { font:600 13px var(--sans); letter-spacing:.1em; text-transform:uppercase; margin-bottom:6px; break-after:avoid }
+  .cols p { font-size:16px; margin-bottom:26px; break-inside:avoid; color:var(--ink2) }
+  .pull { font-size:42px; line-height:1.2; font-style:italic; text-align:center; max-width:880px; margin:0 auto; padding:56px 0 }
+
+  footer { border-top:2px solid var(--ink); padding:28px 0 56px; display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:32px; font:14px var(--sans); color:var(--dim) }
+  footer b { display:block; color:var(--ink); margin-bottom:8px; font-size:13px; letter-spacing:.08em; text-transform:uppercase }
+  footer a { display:block; padding:2px 0 } footer a:hover { color:var(--acc) }
+  footer .name { font:italic 600 24px var(--serif); color:var(--ink); display:flex; gap:10px; align-items:center; margin-bottom:8px }
+  footer .name img { width:24px; border-radius:6px }
+</style>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <span>Open source · MIT</span>
+    <a class="name" href="#"><img src="img/icon.png" alt="">Moonframe</a>
+    <nav><a href="#components">Components</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a>GitHub</a></nav>
+  </header>
+  <div class="sub"><span>Native desktop apps, <b>written in Rust</b></span><span>macOS · Linux · Windows</span></div>
+
+  <section class="hero" style="border:0">
+    <div class="head">
+      <p class="kicker">A Rust starter for native desktop apps</p>
+      <h1>Ask for it.<br><i>Watch the window change.</i></h1>
+      <p class="deck">Moonframe is a native app in Rust, drawn on the GPU by GPUI. Its panels, toolbars and status bar are Luau files on top, so an agent can change them while the app runs. No rebuild, no restart, and your terminals keep running.</p>
+      <div class="start"><a class="btn" href="/docs/">Get started</a><a class="btn o">★ Star on GitHub</a></div>
+    </div>
+
+    <div class="stage">
+      <div class="agent">
+        <div class="tab"><b>agent</b> · ~/code/my-app<span class="st">● window live</span></div>
+        <div class="log" id="log"></div>
+        <div class="prompt"><span id="typed"></span><span class="caret"></span></div>
+      </div>
+      <div class="win" id="win">
+        <div class="tbar"><i></i><i></i><i></i><span class="pill">zsh</span><span class="pill g">browser</span><span class="pill g">+</span></div>
+        <div class="body">
+          <div class="panel"><div class="ph">Explorer</div>
+            <div class="it">app</div><div class="it">crates</div><div class="it">mods</div><div class="it f">main.luau</div><div class="it f">style.luau</div><div class="it r">Cargo.toml</div><div class="it">README.md</div>
+          </div>
+          <div class="panel"><div class="term"><span class="p">❯</span> cargo test<br><span class="d">running 214 tests</span><br><span class="d">test result: ok. 214 passed</span><br><span class="p">❯</span> tail -f server.log<br><span class="d" id="tail">GET /health 200 1ms</span></div></div>
+          <div class="panel"><div class="ph">Changes</div><div class="it sel f" id="chg">nothing yet</div><div class="diff" id="diff"></div></div>
+        </div>
+        <div class="sbar" id="sbar">
+            <span class="w" id="w-branch"><span class="br">⎇ main</span><span>+3</span></span>
+          <span class="w" id="w-cpu">CPU <span class="spark" id="spark"></span><span id="cpu">12%</span></span>
+          <span class="w" id="w-mem">MEM <span class="meter"><i></i></span>46%</span>
+          <span class="w" id="w-net">↓ 53K ↑ 1.2M</span>
+        </div>
+        <span class="uptime" id="uptime">terminal up 00:00 · never restarted</span>
+        <div class="toast" id="toast"><i></i>Reloaded · state kept</div>
+      </div>
+    </div>
+    <p class="cap"><b>Fig. 1</b> An illustration of the loop. The code the agent writes follows the real status bar mods in <code>app/mods/</code>.</p>
+  </section>
+
+  <section>
+    <p class="kicker">How you work</p>
+    <h2>Describe it, and see it <i>while it's being built.</i></h2>
+    <div class="three">
+      <div><span class="num">I</span><h3>Run it once</h3><p>Clone the starter and open the window. You won't need to close it again.</p><pre>git clone github.com/penso/moonframe
+cd moonframe &amp;&amp; mise install
+just run</pre></div>
+      <div><span class="num">II</span><h3>Prompt, and watch</h3><p>Ask your agent for a panel, a widget, a whole screen. Each file it saves redraws the window in place, with state and terminals kept. A mistake shows as a small warning mark, never a blank window.</p><pre class="prompts"><span class="q">› a CPU sparkline in the status bar</span>
+<span class="q">› move changes to the left</span>
+<span class="q">› a warmer dark theme</span></pre></div>
+      <div><span class="num">III</span><h3>Ship it</h3><p>Build a <code>.app</code>, a Linux prefix or a Windows zip, signed and attested.</p><pre>just bundle
+just install   # into /Applications</pre></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="inspect">
+      <div>
+        <p class="kicker">Inspect anything</p>
+        <h2>Point at it. <i>Ask for a change.</i></h2>
+        <p class="lead">Inspect Element picks any part of the window, like a browser's developer tools, and tells your agent which file and line drew it.</p>
+        <ol class="loop">
+          <li><span><b>Inspect.</b> <kbd>⌥⌘I</kbd>, then click. The selection is saved where the agent reads it.</span></li>
+          <li><span><b>Ask.</b> "Add a list of branches here." The bundled skill tells it where that belongs.</span></li>
+          <li><span><b>Check.</b> <code>just check</code> and <code>just types</code> catch mistakes first.</span></li>
+          <li><span><b>Watch.</b> The window redraws in place, sandboxed throughout.</span></li>
+        </ol>
+      </div>
+      <div class="shot">
+        <img src="img/window.webp" alt="The Moonframe window">
+        <div class="pick"></div>
+        <div class="chat">
+          <div class="m u">add a list of branches here</div>
+          <div class="m a">Adding a <code>ui.list</code> fed by the <code>git</code> provider to the explorer. ✓ <code>just check</code> passed</div>
+          <div class="t">Illustration. The window reloaded, state kept.</div>
+        </div>
+      </div>
+    </div>
+    <div class="mockfig">
+      <img src="img/mockups.webp" alt="Mockups tab">
+      <div><p class="kicker">Mockups</p><h3>See it before it's made.</h3><p>Ask for "three takes on the status bar" and they're drawn live, side by side, in a tab of your window. <b>Pick</b> one; nothing real changes until then.</p></div>
+    </div>
+  </section>
+
+  <section id="components">
+    <div class="comp-head">
+      <div><p class="kicker">Components</p><h2>A whole catalogue, <i>ready to</i> <code style="font-size:.8em">use</code>.</h2>
+        <p class="lead">Calendars, tables, command palettes, charts, chat, diffs, kanban columns and more. Browse them in the app's Components window with a live preview, the Luau to paste, and Copy for agent.</p></div>
+      <div class="big-num">142</div>
+    </div>
+    <div class="comp-main" id="cbrowser" style="border:0;box-shadow:none"></div>
+    <p class="cap"><b>Fig. 2</b> The Components window, here in the page: click any of the 142. Names, descriptions, props and code come from <code>app/components</code>; the ones marked with a dot have a preview here, and the app shows them all live.</p>
+    <div class="comp-strip" id="cstrip">
+      <div><img src="img/c-week-calendar.webp" alt=""><p><b>Week calendar.</b> Day, week and month, with events.</p></div>
+      <div><img src="img/c-palette.webp" alt=""><p><b>Command palette.</b> Spotlight, classic, compact or cards.</p></div>
+      <div><img src="img/c-table.webp" alt=""><p><b>Table.</b> Sortable, filterable, paged.</p></div>
+      <div><img src="img/c-notification-drawer.webp" alt=""><p><b>Notification drawer.</b> Behind a bell, with a badge.</p></div>
+    </div>
+  </section>
+
+  <section id="apps">
+    <div class="plates-head">
+      <div><p class="kicker">The plates</p><h2>Every one of these runs <i>on the same engine.</i></h2>
+        <p class="lead">Whole apps install beside the starter as profiles, each with its own shell, mods, menus, icon and theme, and bundle into a standalone release.</p></div>
+      <div class="big-num">23</div>
+    </div>
+    <div class="plates" id="plates"></div>
+    <div class="installbar"><span><b>Install one from git.</b> Packages ship source only, so everything they run can be read first.</span><pre>moonframe app install github.com/owner/some-app</pre></div>
+  </section>
+
+  <section>
+    <p class="kicker">What you get</p>
+    <h2>Rust underneath, <i>nothing hidden on top.</i></h2>
+    <div class="cols">
+      <h3>Rust and GPUI</h3><p>A native window drawn on the GPU. Rust checks every element tree Luau returns and owns everything that touches the machine.</p>
+      <h3>Laid out in Luau</h3><p>A shell places regions and mods fill them. Each mod is one file with its own state, <code>init</code>, <code>update</code> and <code>view</code>, like an Elm program.</p>
+      <h3>A stylesheet</h3><p>Colors, corners, shadows, spacing, fonts and animations, by type and class, with hover states and transitions.</p>
+      <h3>Themes</h3><p>Bundled color schemes reach the window, its controls and the terminals.</p>
+      <h3>Terminals</h3><p>Your login shell on alacritty_terminal or Ghostty's libghostty-vt.</p>
+      <h3>Providers</h3><p>Sandboxed WebAssembly or plain processes publish JSON that views read as <code>app.&lt;name&gt;</code>.</p>
+      <h3>A sandbox</h3><p>Luau has no files, network or processes; a memory cap and an instruction budget.</p>
+      <h3>Your folder over the app</h3><p><code>~/.config/moonframe</code> holds your own mods and stylesheet; updates never touch it.</p>
+      <h3>A library</h3><p>Or skip the starter and host Moonframe in your own Rust app.</p>
+    </div>
+  </section>
+
+  <p class="pull">“Clone it, rename it, and build anything, by hand or by asking an agent while the app runs.”</p>
+
+  <footer>
+    <div><span class="name"><img src="img/icon.png" alt="">Moonframe</span>Native desktop apps in Rust, shaped live in Luau.<br>MIT licensed.</div>
+    <div><b>Learn</b><a href="/docs/">Docs</a><a>Quick start</a><a href="#components">Components</a></div>
+    <div><b>Build</b><a>Mods from git</a><a>Apps as profiles</a><a>Releases</a></div>
+    <div><b>Project</b><a>GitHub</a><a>Changelog</a><a>License</a></div>
+  </footer>
+</div>
+
+<div class="lb" id="lb">
+  <button class="x" aria-label="Close">✕</button><button class="prev" aria-label="Previous">‹</button><button class="next" aria-label="Next">›</button>
+  <div class="lb-frame"><img class="lo" id="lb-lo" alt=""><img class="hi" id="lb-hi" alt=""><div class="lb-bar" id="lb-bar"><i></i></div></div>
+  <div class="lb-cap"><span id="lb-cap"></span><span class="lb-pct" id="lb-pct"></span></div>
+</div>
+
+<script src="data/components.js"></script>
+<script src="components-browser.js"></script>
+<script>
+mountComponents(document.getElementById("cbrowser"), "week-calendar");
+
+// The apps in examples/ that have a screenshot, with the README's one-liners.
+const APPS = [
+  ["sessions","Sessions","coding sessions across your repositories"],
+  ["workbench","Workbench","a terminal, an editor and files, in tabs and splits"],
+  ["daybook","Daybook","a planner with today, an inbox and a month"],
+  ["ledger","Ledger","cash against a floor, and funds with their curves"],
+  ["audience","Inkwell","a newsletter's audience, signups and sources"],
+  ["pipeline","Tally","a sales kanban with KPIs and an agent panel"],
+  ["stage","Stage","the components on a bento board"],
+  ["parlance","Parlance","a desktop chat app with streaming answers"],
+  ["cinder","Cinder","coding-agent sessions grouped by repository"],
+  ["msgvault","msgvault","a reader for a mail, chat and calendar archive"],
+  ["tidings","Tidings","a mail client in two layouts"],
+  ["trellis","Trellis","a terminal multiplexer around work trees"],
+  ["lantern","Lantern","a Halloween terminal workspace, with a pumpkin"],
+  ["tessel","Tessel","an agents hub with pixel-icon cards"],
+  ["helpdesk","Tandem","an IT help desk inbox"],
+  ["research","Sorrel","an agent's research workspace"],
+  ["cadence","Cadence","a workflow automation dashboard"],
+  ["vigil","Vigil","workflow operations at a glance"],
+  ["duly","Duly","compliance notices for a public buyer"],
+  ["emberline","Emberline","a CRM's leads report in the dark"],
+  ["gantry","Gantry","an infra console, in dark monospace"],
+  ["hearth","Hearth","a code review bot's analytics"],
+  ["storefront","Storefront","a store's admin with its audit log"],
+];
+const ROMAN = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX","XXI","XXII","XXIII"];
+document.getElementById("plates").innerHTML = APPS.map(([id, title, d], i) =>
+  `<figure class="plate" data-i="${i}"><img src="img/${id}.webp" alt="${title}" loading="lazy"><p><span>PL. ${ROMAN[i]}</span><b>${title}.</b> ${d[0].toUpperCase() + d.slice(1)}. <code>--profile ${id}</code></p></figure>`).join("");
+
+// Plates open full size. The thumbnail shows at once, blurred; the full PNG
+// streams in behind it with a progress bar, then fades over it.
+const lb = document.getElementById("lb"), lo = document.getElementById("lb-lo"), hi = document.getElementById("lb-hi"),
+      bar = document.getElementById("lb-bar"), pct = document.getElementById("lb-pct"), cap = document.getElementById("lb-cap");
+const fullCache = new Map();
+let lbIndex = -1, lbToken = 0;
+const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.round(n / 1024) + " KB";
+async function loadFull(url, onProgress) {
+  if (fullCache.has(url)) return fullCache.get(url);
+  try {
+    const res = await fetch(url);
+    if (!res.ok || !res.body) throw 0;
+    const total = +res.headers.get("content-length") || 0, reader = res.body.getReader(), chunks = [];
+    let got = 0;
+    for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); got += value.length; onProgress(got, total); }
+    const blobUrl = URL.createObjectURL(new Blob(chunks, { type:"image/png" }));
+    fullCache.set(url, blobUrl); return blobUrl;
+  } catch { onProgress(0, 0); return url; } // file:// or no streams: the <img> loads it, with an indeterminate bar
+}
+// A set of images the viewer steps through: { lo, full, caption }.
+const PLATES = APPS.map(([id, title, d]) => ({ lo:`img/${id}.webp`, full:`img/full/${id}.png`,
+  caption:`<b>${title}</b> ${d[0].toUpperCase() + d.slice(1)}. <code>moonframe --profile ${id}</code>` }));
+const SHOTS = [["week-calendar","Week calendar","Day, week and month, with events"],["palette","Command palette","Spotlight, classic, compact or cards"],
+  ["table","Table","Sortable, filterable, paged"],["notification-drawer","Notification drawer","Behind a bell, with a badge"]]
+  .map(([id, title, d]) => ({ lo:`img/c-${id}.webp`, full:`img/full/c-${id}.png`, caption:`<b>${title}</b> ${d}.` }));
+let lbSet = PLATES;
+async function openPlate(i, set = lbSet) {
+  lbSet = set; lbIndex = (i + set.length) % set.length; const token = ++lbToken;
+  const item = set[lbIndex];
+  lb.classList.add("on"); document.body.style.overflow = "hidden";
+  lo.src = item.lo; lo.style.opacity = 1; hi.classList.remove("ready"); hi.removeAttribute("src");
+  cap.innerHTML = `${item.caption} · ${lbIndex + 1} of ${set.length}`;
+  bar.style.opacity = 1; bar.classList.remove("indet"); bar.firstElementChild.style.width = "0"; pct.textContent = "Loading full size…";
+  const src = await loadFull(item.full, (got, total) => {
+    if (token !== lbToken) return;
+    if (!total) { bar.classList.add("indet"); pct.textContent = got ? `Loading… ${kb(got)}` : "Loading full size…"; return; }
+    bar.firstElementChild.style.width = (got / total * 100) + "%"; pct.textContent = `${Math.round(got / total * 100)}% · ${kb(got)} of ${kb(total)}`;
+  });
+  if (token !== lbToken) return;
+  hi.onload = () => { if (token !== lbToken) return; hi.classList.add("ready"); lo.style.opacity = 0; bar.style.opacity = 0; pct.textContent = "Full size"; };
+  hi.src = src;
+  // Warm the next one so stepping through feels instant.
+  loadFull(set[(lbIndex + 1) % set.length].full, () => {});
+}
+function closePlate() { lb.classList.remove("on"); document.body.style.overflow = ""; lbToken++; }
+document.getElementById("plates").addEventListener("click", e => { const f = e.target.closest(".plate"); if (f) openPlate(+f.dataset.i, PLATES); });
+[...document.querySelectorAll("#cstrip img")].forEach((img, i) => img.onclick = () => openPlate(i, SHOTS));
+lb.querySelector(".x").onclick = closePlate;
+lb.querySelector(".prev").onclick = () => openPlate(lbIndex - 1);
+lb.querySelector(".next").onclick = () => openPlate(lbIndex + 1);
+lb.addEventListener("click", e => { if (e.target === lb) closePlate(); });
+addEventListener("keydown", e => {
+  if (!lb.classList.contains("on")) return;
+  if (e.key === "Escape") closePlate(); else if (e.key === "ArrowLeft") openPlate(lbIndex - 1); else if (e.key === "ArrowRight") openPlate(lbIndex + 1);
+});
+
+// Fig. 1: an agent adds status bar widgets one prompt at a time; each lands in
+// the running window while the terminal keeps going.
+const $ = id => document.getElementById(id);
+const SCENES = [
+  { q:"add a CPU sparkline to the status bar", w:"w-cpu", file:"mods/system/main.luau", lines:6,
+    code:`<span class="add">+ region = "status-right",</span>
+<span class="add">+ ui.icon { name = "cpu" },</span>
+<span class="add">+ sparkline(system.cpu_history),</span>
+<span class="add">+ fixed(percent(system.cpu), 32, "end"),</span>` },
+  { q:"show the branch and what changed", w:"w-branch", file:"mods/status/main.luau", lines:9,
+    code:`<span class="add">+ local git = app.git</span>
+<span class="add">+ local extra = if git.changed > 0 then &#96; +{git.changed}&#96; else ""</span>
+<span class="add">+ ui.text { &#96;⎇ {git.branch}{extra}&#96;, class = "status-text" },</span>` },
+  { q:"memory as a small meter next to it", w:"w-mem", file:"mods/system/main.luau", lines:5,
+    code:`<span class="add">+ ui.icon { name = "memory-stick" },</span>
+<span class="add">+ bar(system.memory, 28),</span>` },
+  { q:"and network rates, down and up", w:"w-net", file:"mods/system/main.luau", lines:7,
+    code:`<span class="add">+ ui.icon { name = "arrow-down" },</span>
+<span class="add">+ fixed(rate(system.received), 34, "start"),</span>
+<span class="add">+ ui.icon { name = "arrow-up" },</span>` },
+  { q:"turn the sparkline red above 80%", w:"w-cpu", hot:true, file:"mods/system/main.luau", lines:1,
+    code:`<span class="add">+ class = if sample > 0.8 then "spark spark-hot" else "spark",</span>` },
+];
+const log = $("log"), typed = $("typed"), toast = $("toast"), sbar = $("sbar");
+let start = Date.now(), cpu = [3,5,4,7,6,9,5,4,8,11,7,6,10,9,12,8];
+setInterval(() => {
+  const s = Math.floor((Date.now() - start) / 1000);
+  $("uptime").textContent = `terminal up ${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")} · never restarted`;
+  cpu.push(sbar.classList.contains("hot") && Math.random() < .3 ? 11 + Math.random() : 2 + Math.random() * 9); cpu.shift();
+  $("spark").innerHTML = cpu.map(v => `<i class="${v > 10 ? "h" : ""}" style="height:${v}px"></i>`).join("");
+  $("cpu").textContent = Math.round(cpu.at(-1) / 12 * 100) + "%";
+  $("tail").textContent = `GET /health 200 ${1 + (s % 3)}ms`;
+}, 1000);
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function type(text) { typed.textContent = ""; for (const ch of text) { typed.textContent += ch; await wait(38); } }
+function add(html, cls) { const d = document.createElement("div"); d.className = cls; d.innerHTML = html; log.appendChild(d); while (log.children.length > 9) log.firstChild.remove(); return d; }
+
+async function run() {
+  for (;;) {
+    for (const el of document.querySelectorAll(".sbar .w")) el.classList.remove("on", "new");
+    sbar.classList.remove("hot"); log.innerHTML = ""; $("chg").textContent = "nothing yet"; $("diff").innerHTML = "";
+    await wait(800);
+    for (const sc of SCENES) {
+      for (const el of log.children) el.classList.add("old");
+      await type(sc.q); await wait(350);
+      typed.textContent = ""; add(sc.q, "q");
+      await wait(500); add(`Editing <b>${sc.file}</b>`, "a");
+      await wait(500); log.lastChild.insertAdjacentHTML("afterend", `<pre>${sc.code}</pre>`);
+      await wait(700); add("✓ just check · just types", "ok");
+      const w = $(sc.w); w.classList.add("on", "new"); if (sc.hot) sbar.classList.add("hot");
+      $("chg").textContent = sc.file;
+      $("diff").innerHTML = `<span class="a">+${sc.lines} lines</span>`;
+      toast.classList.add("on"); await wait(1500); toast.classList.remove("on");
+      w.classList.remove("new"); await wait(900);
+    }
+    await wait(2500);
+  }
+}
+run();
+</script>
+</body>
+</html>

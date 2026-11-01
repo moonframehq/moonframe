@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moonframe · 01 Moonlit</title>
+<style>
+  :root { --bg:#0b0a1a; --ink:#ecebff; --dim:#a19fc8; --line:#ffffff14; --a:#6d6bff; --b:#b06bff; }
+  * { box-sizing:border-box; margin:0 }
+  body { background:var(--bg); color:var(--ink); font:16px/1.6 Inter, system-ui, -apple-system, sans-serif; -webkit-font-smoothing:antialiased }
+  a { color:inherit; text-decoration:none }
+  .wrap { max-width:1160px; margin:0 auto; padding:0 28px }
+  nav { display:flex; align-items:center; gap:28px; height:72px }
+  nav .logo { display:flex; align-items:center; gap:10px; font-weight:650; letter-spacing:-.01em }
+  nav .logo img { width:28px; height:28px; border-radius:7px }
+  nav .links { display:flex; gap:24px; margin-left:auto; color:var(--dim); font-size:14px }
+  nav .gh { padding:7px 14px; border:1px solid var(--line); border-radius:999px; font-size:14px }
+  .hero { position:relative; text-align:center; padding:96px 0 0; overflow:hidden }
+  .hero::before { content:""; position:absolute; inset:-200px -20% auto; height:700px; background:radial-gradient(closest-side, #6d6bff55, transparent 70%), radial-gradient(closest-side at 70% 40%, #b06bff40, transparent 70%); filter:blur(30px); z-index:-1 }
+  .moon { width:84px; height:84px; margin:0 auto 28px; border-radius:20px; box-shadow:0 0 80px #8a6bff88 }
+  .pill { display:inline-flex; gap:8px; align-items:center; font-size:13px; color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:5px 12px; margin-bottom:24px }
+  .pill b { color:#c9b8ff; font-weight:600 }
+  h1 { font-size:clamp(44px, 7vw, 84px); line-height:1.02; letter-spacing:-.045em; font-weight:700 }
+  h1 em { font-style:normal; background:linear-gradient(90deg, #8f8dff, #d29bff); -webkit-background-clip:text; color:transparent }
+  .lede { max-width:640px; margin:24px auto 36px; color:var(--dim); font-size:19px }
+  .cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap }
+  .btn { padding:12px 20px; border-radius:10px; font-weight:600; font-size:15px }
+  .btn.p { background:linear-gradient(135deg, var(--a), var(--b)); box-shadow:0 8px 30px #7a6bff55 }
+  .btn.s { border:1px solid var(--line); background:#ffffff08; font-family:ui-monospace, "SF Mono", monospace; font-weight:500 }
+  .shot { margin:72px auto 0; max-width:1080px; border-radius:14px; border:1px solid #ffffff1f; box-shadow:0 40px 120px #000a, 0 0 0 8px #ffffff06; overflow:hidden; mask-image:linear-gradient(#000 70%, transparent) }
+  .shot img { display:block; width:100% }
+  .logos { text-align:center; color:var(--dim); font-size:13px; padding:20px 0 80px; letter-spacing:.08em; text-transform:uppercase }
+  .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:16px; overflow:hidden }
+  .grid div { background:var(--bg); padding:32px }
+  .grid h3 { font-size:17px; margin-bottom:8px; letter-spacing:-.01em }
+  .grid p { color:var(--dim); font-size:15px }
+  .ico { width:36px; height:36px; border-radius:9px; background:linear-gradient(135deg, #6d6bff33, #b06bff33); border:1px solid #8f8dff44; display:grid; place-items:center; margin-bottom:18px; font-size:17px }
+  section { padding:100px 0 }
+  .eyebrow { color:#b4a6ff; font-size:13px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; margin-bottom:12px }
+  h2 { font-size:44px; letter-spacing:-.035em; line-height:1.1; margin-bottom:48px; max-width:720px }
+  .code { display:grid; grid-template-columns:1.1fr 1fr; gap:40px; align-items:center }
+  pre { background:#13122a; border:1px solid var(--line); border-radius:14px; padding:24px; font:13.5px/1.7 ui-monospace, "SF Mono", Menlo, monospace; color:#d6d4ff; overflow:auto }
+  .k { color:#c792ea } .s { color:#addb67 } .c { color:#6b6a99 } .n { color:#f78c6c }
+  footer { border-top:1px solid var(--line); padding:40px 0; color:var(--dim); font-size:14px; display:flex; justify-content:space-between }
+</style>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="logo" href="#"><img src="../site/img/icon.png" alt="">Moonframe</a>
+    <div class="links"><a>Docs</a><a>Components</a><a>Apps</a><a>Changelog</a></div>
+    <a class="gh">★ GitHub</a>
+  </nav>
+
+  <header class="hero">
+    <img class="moon" src="../site/img/icon.png" alt="">
+    <div class="pill"><b>New</b> Whole apps install as profiles →</div>
+    <h1>Native apps,<br><em>written in Luau.</em></h1>
+    <p class="lede">Rust and GPUI draw the window. Every panel, split, toolbar and status bar is a Luau file that reloads as you save, with its state kept.</p>
+    <div class="cta">
+      <a class="btn p">Get started</a>
+      <a class="btn s">$ git clone github.com/penso/moonframe</a>
+    </div>
+    <div class="shot"><img src="../site/img/window.webp" alt="The Moonframe window"></div>
+  </header>
+  <p class="logos">macOS · Linux · Windows — signed, attested releases</p>
+
+  <section>
+    <p class="eyebrow">What you get</p>
+    <h2>A whole window you can rewrite while it runs.</h2>
+    <div class="grid">
+      <div><div class="ico">↻</div><h3>Live reload</h3><p>Save and the window redraws in place. A mistake never blanks it: a broken mod keeps its last good view.</p></div>
+      <div><div class="ico">◐</div><h3>A stylesheet</h3><p>Colors, corners, shadows, fonts and transitions in <code>style.luau</code>, with hover states and themes.</p></div>
+      <div><div class="ico">▦</div><h3>Components</h3><p>Ready-made pieces mods <code>use</code>, browsed with a live preview and the code to paste.</p></div>
+      <div><div class="ico">›_</div><h3>Real terminals</h3><p><code>ui.terminal</code> on alacritty or Ghostty's libghostty-vt.</p></div>
+      <div><div class="ico">⬡</div><h3>Providers</h3><p>Sandboxed Wasm components or processes publishing JSON that views read as <code>app.&lt;name&gt;</code>.</p></div>
+      <div><div class="ico">✦</div><h3>Built for agents</h3><p>Inspect Element hands an agent the file and line. A skill teaches it the rest.</p></div>
+    </div>
+  </section>
+
+  <section class="code">
+    <div>
+      <p class="eyebrow">One file per mod</p>
+      <h2 style="margin-bottom:20px">Elm-shaped. <br>Hot-reloaded.</h2>
+      <p style="color:var(--dim)">Each mod has its own state, <code>init</code>, <code>update</code> and <code>view</code>. Mods talk with messages. Save it, and it appears in its region.</p>
+    </div>
+<pre><span class="c">-- app/mods/counter/main.luau</span>
+<span class="k">return</span> mod {
+  region = <span class="s">"left"</span>,
+  init = <span class="k">function</span>(previous)
+    <span class="k">return</span> previous <span class="k">or</span> { count = <span class="n">0</span> }
+  <span class="k">end</span>,
+  update = <span class="k">function</span>(state, msg)
+    <span class="k">if</span> msg == <span class="s">"add"</span> <span class="k">then</span> state.count += <span class="n">1</span> <span class="k">end</span>
+  <span class="k">end</span>,
+  view = <span class="k">function</span>(state)
+    <span class="k">return</span> ui.panel { title = <span class="s">"Counter"</span>,
+      ui.text(<span class="s">`Clicked {state.count} times`</span>),
+      ui.button { <span class="s">"Add"</span>, msg = <span class="s">"add"</span> } }
+  <span class="k">end</span>,
+}</pre>
+  </section>
+
+  <footer><span>© Moonframe · MIT</span><span>moonframe.dev</span></footer>
+</div>
+</body>
+</html>

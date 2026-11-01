@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Introduction · Moonframe docs</title>
+<style>
+  :root {
+    --paper:#f6f3ec; --side:#efebe1; --ink:#1d1b26; --ink2:#3b3746; --dim:#6b6676; --rule:#1d1b2622; --acc:#4b3fd1;
+    --serif:"Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --sans:Inter, system-ui, -apple-system, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing:border-box; margin:0 }
+  body { background:var(--paper); color:var(--ink); font:17px/1.7 var(--serif); -webkit-font-smoothing:antialiased }
+  a { color:inherit; text-decoration:none }
+  .top { height:58px; border-bottom:2px solid var(--ink); display:flex; align-items:center; padding:0 24px; gap:12px; position:sticky; top:0; background:#f6f3ecee; backdrop-filter:blur(8px); z-index:2; font-family:var(--sans) }
+  .top .name { font:italic 600 22px var(--serif); display:flex; gap:9px; align-items:center }
+  .top .name img { width:24px; border-radius:6px }
+  .top .sec { font:600 12px var(--sans); letter-spacing:.12em; text-transform:uppercase; color:var(--acc); border-left:1px solid var(--rule); padding-left:12px }
+  .search { margin-left:28px; width:320px; border:1px solid var(--rule); background:#fff; border-radius:4px; padding:6px 10px; color:#999; font-size:13.5px; display:flex; justify-content:space-between }
+  .search kbd { font:11px var(--mono); border:1px solid var(--rule); border-radius:3px; padding:0 5px }
+  .top .r { margin-left:auto; display:flex; gap:22px; font-size:14px; color:var(--dim) }
+  .top .r a.on { color:var(--ink); font-weight:600 }
+  .layout { display:grid; grid-template-columns:260px minmax(0, 1fr) 220px; max-width:1400px; margin:0 auto }
+  aside { padding:28px 20px 60px 24px; font:14px/1.5 var(--sans); border-right:1px solid var(--rule); min-height:calc(100vh - 58px); position:sticky; top:58px; align-self:start }
+  aside h4 { font:600 11.5px var(--sans); text-transform:uppercase; letter-spacing:.12em; color:var(--dim); margin:22px 0 6px }
+  aside h4:first-child { margin-top:0 }
+  aside a { display:block; padding:4px 10px; border-left:2px solid transparent; color:var(--ink2) }
+  aside a:hover { color:var(--acc) }
+  aside a.on { border-left-color:var(--acc); color:var(--acc); font-weight:600; background:#4b3fd10a }
+  main { padding:52px 64px 120px; max-width:860px }
+  .crumb { font:13px var(--sans); color:var(--dim); margin-bottom:14px }
+  h1 { font-size:54px; font-weight:500; letter-spacing:-.025em; line-height:1.05; margin-bottom:16px }
+  .lead { font-size:21px; line-height:1.55; color:var(--ink2); margin-bottom:30px }
+  h2 { font-size:30px; font-weight:500; letter-spacing:-.015em; margin:52px 0 12px; padding-top:20px; border-top:1px solid var(--rule) }
+  p { margin-bottom:14px; color:var(--ink2) }
+  pre { background:var(--ink); color:#e8e6f5; border-radius:3px; padding:18px 20px; font:13.5px/1.75 var(--mono); margin:16px 0 22px; overflow:auto }
+  pre .c { color:#7f7c99 } pre .k { color:#c792ea } pre .s { color:#addb67 } pre .p { color:#9d94ff } pre .n { color:#f78c6c }
+  code { font:.84em var(--mono); background:#1d1b260d; padding:1px 5px; border-radius:3px }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:0; margin:30px 0 40px; border-top:2px solid var(--ink) }
+  .cards a { padding:18px 20px 18px 0; border-bottom:1px solid var(--rule) }
+  .cards a:nth-child(odd) { border-right:1px solid var(--rule) } .cards a:nth-child(even) { padding-left:20px }
+  .cards a:hover b { color:var(--acc) }
+  .cards b { display:block; font:600 16px var(--sans); margin-bottom:2px }
+  .cards span { color:var(--dim); font:14px var(--sans) }
+  figure { margin:28px 0 }
+  figure img { width:100%; display:block; filter:drop-shadow(0 18px 24px #1d1b2638) }
+  figcaption { font:13.5px var(--sans); color:var(--dim); margin-top:8px } figcaption b { color:var(--ink) }
+  .note { border-left:3px solid var(--acc); background:#4b3fd10a; padding:14px 18px; font-size:16px; margin:22px 0 }
+  .note b { font-family:var(--sans); font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:var(--acc); display:block; margin-bottom:2px }
+  table { width:100%; border-collapse:collapse; font:14.5px/1.5 var(--sans); margin:16px 0 }
+  th { text-align:left; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); border-bottom:2px solid var(--ink); padding:8px 0 }
+  td { border-bottom:1px solid var(--rule); padding:10px 12px 10px 0; vertical-align:top }
+  .pager { display:flex; justify-content:space-between; margin-top:60px; border-top:2px solid var(--ink); padding-top:16px; font-family:var(--sans) }
+  .pager small { display:block; color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.1em }
+  .pager b { font:italic 500 22px var(--serif) }
+  .toc { padding:52px 20px; font:13px/1.5 var(--sans); color:var(--dim); position:sticky; top:58px; align-self:start }
+  .toc b { color:var(--ink); display:block; margin-bottom:10px; font-size:11.5px; text-transform:uppercase; letter-spacing:.12em }
+  .toc a { display:block; padding:4px 0 } .toc a.on { color:var(--acc); font-weight:600 }
+  .toc .edit { margin-top:24px; padding-top:14px; border-top:1px solid var(--rule) }
+</style>
+<body>
+<header class="top">
+  <a class="name" href="https://moonframe.dev/"><img src="/img/icon.png" alt="">Moonframe</a><span class="sec">Docs</span>
+  <div class="search">Search the docs… <kbd>⌘K</kbd></div>
+  <div class="r"><a class="on">Guide</a><a>Luau API</a><a>Components</a><a href="https://moonframe.dev/#apps">Apps</a><a>GitHub</a></div>
+</header>
+<div class="layout">
+  <aside>
+    <h4>Start</h4><a class="on">Introduction</a><a>Quick start</a><a>Make it yours</a>
+    <h4>Building blocks</h4><a>Mods</a><a>The shell</a><a>style.luau</a><a>Components</a><a>Terminals</a><a>Providers</a><a>Popovers &amp; overlays</a><a>Icons</a>
+    <h4>Working with agents</h4><a>The skill</a><a>Inspect Element</a><a>Mockups</a>
+    <h4>Distribute</h4><a>Mods from git</a><a>Apps as profiles</a><a>Bundling a release</a><a>Using the library</a>
+    <h4>Reference</h4><a>Commands</a><a>moonframe.toml</a><a>Element catalogue</a>
+  </aside>
+  <main>
+    <p class="crumb">Start · Introduction</p>
+    <h1>Introduction</h1>
+    <p class="lead">Moonframe is a starter for native desktop apps whose whole window is written in Luau. Rust and GPUI draw it, check it, and keep it safe; every panel, split, toolbar and status bar is a Luau file that reloads as you save, with its state kept.</p>
+<pre><span class="p">$</span> git clone https://github.com/penso/moonframe my-app
+<span class="p">$</span> cd my-app
+<span class="p">$</span> mise install   <span class="c"># Rust, and Zig for the Ghostty terminal</span>
+<span class="p">$</span> just run       <span class="c"># opens the window on app/</span></pre>
+    <div class="cards">
+      <a><b>Quick start →</b><span>Clone, run, edit a file, watch it change.</span></a>
+      <a><b>Your first mod →</b><span>State, init, update, view.</span></a>
+      <a><b>Component catalogue →</b><span>Every <code>ui.*</code> element and <code>use</code> piece.</span></a>
+      <a><b>Build an app →</b><span><code>moonframe.toml</code>, profiles, bundles.</span></a>
+    </div>
+    <figure><img src="/img/window.webp" alt=""><figcaption><b>Fig. 1</b> The window that ships: explorer, terminal tabs, changes, status bar. Each is a mod in <code>app/mods/</code>.</figcaption></figure>
+
+    <h2>A mod is one file</h2>
+    <p>The shell, <code>app/main.luau</code>, places regions, and mods fill them. Each mod has its own state, <code>init</code>, <code>update</code> and <code>view</code>, like an Elm program; mods talk with messages.</p>
+<pre><span class="c">-- app/mods/counter/main.luau</span>
+<span class="k">return</span> mod {
+	region = <span class="s">"left"</span>,
+	init = <span class="k">function</span>(previous)
+		<span class="k">return</span> previous <span class="k">or</span> { count = <span class="n">0</span> }
+	<span class="k">end</span>,
+	update = <span class="k">function</span>(state, msg)
+		<span class="k">if</span> msg == <span class="s">"add"</span> <span class="k">then</span> state.count += <span class="n">1</span> <span class="k">end</span>
+	<span class="k">end</span>,
+	view = <span class="k">function</span>(state, app)
+		<span class="k">return</span> ui.panel { title = <span class="s">"Counter"</span>,
+			ui.text(<span class="s">`Clicked {state.count} times`</span>),
+			ui.button { <span class="s">"Add"</span>, msg = <span class="s">"add"</span>, variant = <span class="s">"primary"</span> } }
+	<span class="k">end</span>,
+}</pre>
+    <p>Save it and it appears in the left region.</p>
+
+    <h2>Where things go</h2>
+    <table>
+      <tr><th>Need</th><th>Write</th></tr>
+      <tr><td>A look</td><td>a rule in <code>style.luau</code></td></tr>
+      <tr><td>A reusable piece</td><td><code>components/&lt;name&gt;.luau</code>, used with <code>use "stat"</code></td></tr>
+      <tr><td>A shell</td><td><code>ui.terminal { id = "main", cwd = "~/code" }</code></td></tr>
+      <tr><td>Data from the machine</td><td>a provider in <code>providers/&lt;name&gt;/</code>, read as <code>app.&lt;name&gt;</code></td></tr>
+      <tr><td>A sheet or menu</td><td><code>ui.popover { open = state.open, dismiss = "close" }</code></td></tr>
+      <tr><td>A new kind of element</td><td>Rust in <code>crates/</code>, the one change that needs a rebuild</td></tr>
+    </table>
+    <div class="note"><b>Sandboxed</b>Luau runs with no files, network or process access, a memory cap and an instruction budget. Anything that reaches the machine goes through a provider or an element the host owns.</div>
+
+    <h2>Platforms</h2>
+    <p>Moonframe is developed on macOS. CI builds, lints and tests it on macOS, Linux (x86_64 and ARM64) and Windows; each release ships a macOS disk image, Linux tarballs and Windows zips, with checksums, Sigstore signatures and GitHub attestations.</p>
+
+    <div class="pager"><span></span><a style="text-align:right"><small>Next</small><b>Quick start →</b></a></div>
+  </main>
+  <nav class="toc"><b>On this page</b><a class="on">Introduction</a><a>A mod is one file</a><a>Where things go</a><a>Platforms</a><div class="edit"><a>Edit this page ↗</a></div></nav>
+</div>
+</body>
+</html>
