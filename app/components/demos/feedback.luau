@@ -1,27 +1,27 @@
 -- Send feedback: the button opens the dialog; type, then Send or ⌘↩ adds a
--- request that "runs" until you stop it. Nothing is sent anywhere here; the
--- real mod (app/mods/feedback) hands it to the `feedback` provider.
+-- run that "works" on it, and clicking a row opens it. Nothing is sent
+-- anywhere here; the real mod (app/mods/feedback) hands it to the `acp`
+-- provider, which runs a coding agent.
 local feedback = use "feedback"
+local checkbox = use "checkbox"
 
 return mod {
 	init = function(previous)
-		local items: { any } = {
+		local runs: { any } = {
 			{
 				id = "1",
+				agent = "claude",
+				agent_title = "Claude",
 				text = "Focus the prompt when I open a session",
 				status = "done",
 				started = 0,
 				finished = 140,
-				result = "New terminal tabs take focus now (app/mods/editor/main.luau).",
+				tool_count = 5,
+				message = "New terminal tabs take focus now (app/mods/editor/main.luau).",
 			},
 		}
-		return previous
-			or {
-				open = true,
-				text = "",
-				count = 1,
-				items = items,
-			}
+		local expanded: string? = nil
+		return previous or { open = true, text = "", count = 1, runs = runs, expanded = expanded, selection = true }
 	end,
 
 	update = function(state, msg)
@@ -29,26 +29,28 @@ return mod {
 			state.open = true
 		elseif msg == "close" then
 			state.open = false
+		elseif msg == "toggle-selection" then
+			state.selection = not state.selection
 		elseif type(msg) == "table" and msg.msg == "type" then
 			state.text = msg.value
 		elseif msg == "send" or (type(msg) == "table" and msg.msg == "send") then
 			state.count += 1
 			local text = if type(msg) == "table" then msg.value else state.text
-			table.insert(state.items, 1, { id = tostring(state.count), text = text, status = "running", started = 0 })
+			local id = tostring(state.count)
+			table.insert(state.runs, 1, {
+				id = id,
+				agent = "claude",
+				agent_title = "Claude",
+				text = text,
+				status = "running",
+				started = 0,
+				tool_count = 1,
+				tools = { { id = "a", title = "Read app/main.luau", kind = "read", status = "in_progress" } },
+			})
+			state.expanded = id
 			state.text = ""
-		elseif type(msg) == "table" and msg.cancel then
-			for _, item in state.items do
-				if item.id == msg.cancel then
-					item.status = "cancelled"
-				end
-			end
-		elseif type(msg) == "table" and msg.forget then
-			for i, item in state.items do
-				if item.id == msg.forget then
-					table.remove(state.items, i)
-					break
-				end
-			end
+		elseif type(msg) == "table" and msg.expand then
+			state.expanded = if state.expanded == msg.expand then nil else msg.expand
 		end
 	end,
 
@@ -62,8 +64,12 @@ return mod {
 				text = state.text,
 				change = "type",
 				send = "send",
-				note = "A background agent implements it and checks it, then reports back under Feedback & fixes.",
-				items = state.items,
+				note = "A background agent implements it, then reports back under Feedback & fixes.",
+				runs = state.runs,
+				expanded = state.expanded,
+				actions = {
+					checkbox { label = "Attach the selected element", checked = state.selection, msg = "toggle-selection" },
+				},
 			},
 		}
 	end,

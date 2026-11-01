@@ -62,6 +62,7 @@ Pick the lowest layer that can do the job:
 | data from the machine, files, network or a CLI | a **provider** feeding `app.<name>` | `providers/<name>/` | no (the host builds Wasm providers itself) |
 | state that survives quitting the app (open panels, tabs, a choice) | nothing to add: every mod's state is saved; shape what comes back in `init` | the mod's `init` | no |
 | git status, a file's diff, commit or push | read `app.git`; send `provider:git` a message | in a mod | no (git is built in) |
+| a coding agent doing a task (Claude, Codex, Gemini...) | send `provider:acp` `{ start = ... }`; show the run with `use "agent-run"` | in a mod | no (acp is built in) |
 | a provider that needs a Rust library or answers actions | a **native provider** | `crates/` + `providers/<name>/provider.toml` | yes, and the app restarts |
 | a look change | a rule in `style.luau`, or the mod's `styles` | | no |
 | a new kind of element (tree, chart, image) | a host element | `crates/` | yes, and the app restarts |
@@ -166,6 +167,32 @@ step. git only takes writes from mods in `providers/git`'s
 `app/providers/git/` to `~/.config/moonframe/providers/git/` and add its
 name to `writers` there (in this repository, edit `app/providers/git`
 itself); otherwise it is refused with a reply saying so. `mods/status` is the full example (a commit sheet on the branch).
+
+**Have a coding agent do something.** The `acp` provider runs Claude,
+Codex, Gemini, OpenCode or Copilot over the Agent Client Protocol in the
+app's repository and publishes each run as `app.acp.runs`; draw one with
+`use "agent-run"` (status, plan, tool calls, its permission question, its
+answer), whose buttons talk to the provider directly:
+
+```lua
+-- in update (the mod must be in providers/acp's `starters`)
+return state, { { to = "provider:acp", msg = {
+	start = state.text, id = "mine", agent = "claude",
+	instructions = "How to do it, from the mod.",   -- before the user's words
+	context = { main_tab = state.tab },             -- fenced as data, never instructions
+} } }
+-- answered as { reply = "mine", action = "start", ok, run | error },
+-- and when it ends { reply = "mine", action = "finished", ok, run, status, message | error }
+-- in view
+for _, run in (app.acp and app.acp.runs) or {} do
+	if run.owner == "mine" then ... agent_run { run = run } ... end
+end
+```
+
+Without `permissions = "allow"`, every tool the agent wants waits on the
+user in `agent-run`; with it the agent does anything as the user, so set it
+only where the user asked for that (`mods/feedback` does). Like git's
+`writers`, a new mod goes in `starters` of a copy of `app/providers/acp`.
 
 **Customising the installed app.** Write to `~/.config/moonframe`
 (same layout as `app/`). Copy a built-in mod's folder there to change it.
@@ -1289,9 +1316,10 @@ the Wasm provider each second), `app.git` (branch, files, diffs, worktrees;
 native, and it commits and pushes on request), and from process providers
 `app.github` and `app.gitlab` (pull requests, checks, issues),
 `app.agents` (coding agents running here), `app.files` (the project's
-file tree) and `app.herdr` (whether herdr-core and tmux are installed).
+file tree) and `app.herdr` (whether herdr-core and tmux are installed),
+and the native `app.acp` (coding agents a mod runs over ACP).
 Their shapes are under "Built-in providers" below and typed in
-`types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`,
+`types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`, `Acp`,
 and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
 is labelled demo data, as in `mods/usage`.
@@ -1442,6 +1470,29 @@ or `lsof`).
 |---|---|
 | `agents` | `{ pid, ppid, name, command, cwd?, tty?, started, elapsed_seconds, cpu, status }`; `name` is `"claude" "codex" "gemini" "cursor" "opencode" "aider" "amp" "copilot" "droid" "kiro" "qwen" "goose" "crush" "auggie" "cline" "kimi" "grok"`; `status` is always `"running"` |
 | `count` | how many |
+
+`app.acp` (acp, native): coding agents run for mods over the Agent Client
+Protocol (crates/moonframe-acp), each in the app's repository (else
+`~/.config/moonframe`; `[settings] cwd` to change), one prompt per run,
+published as it goes (every 0.25 s while something changed). Only mods in
+`[settings] starters` (`feedback` as shipped) may start runs, and a run
+obeys only the mod that started it. Agents are found as herdr-acp finds
+them: `claude-agent-acp`, `codex-acp` (each else through `npx`),
+`gemini --acp`, `opencode acp`, `copilot --acp`; `[settings] commands`
+replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
+runs are kept (30) across launches.
+
+Messages: `{ start = "<words>", id?, agent?, instructions?, context?,
+selection?, permissions? }` (`selection = true` attaches the Inspect
+Element pick to the context; `permissions = "allow"` answers every
+question with the broadest allow), `{ cancel = run }`, `{ forget = run }`
+(finished ones), `{ answer = run, option = "<id>" | false }`.
+
+| field | shape |
+|---|---|
+| `agents` | `{ name, title, installed, fetched }` (`fetched`: only `npx` can start it) |
+| `agent`, `workdir`, `running` | the default agent, where agents work, how many runs go |
+| `runs` | newest first: `{ id, owner, agent, agent_title, text, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
 
 `[settings]` in `provider.toml` reaches `start`. `just check` validates the
 manifests, and `just providers` builds and lints the Wasm ones. When a view

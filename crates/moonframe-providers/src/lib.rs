@@ -92,6 +92,12 @@ pub fn set_profile(name: &str) {
     let _ = PROFILE.set(name.to_owned());
 }
 
+/// The profile this run serves, if any: for a native provider keeping
+/// state of its own per app.
+pub fn profile() -> Option<&'static str> {
+    PROFILE.get().map(String::as_str)
+}
+
 pub struct Providers {
     roots: Roots,
     /// Where wasm providers are built.

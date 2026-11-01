@@ -2,6 +2,7 @@
 exclude = ["app/providers"]
 members = [
   "crates/moonframe",
+  "crates/moonframe-acp",
   "crates/moonframe-core",
   "crates/moonframe-git",
   "crates/moonframe-mux",
@@ -28,6 +29,8 @@ expect_used = "deny"
 unwrap_used = "deny"
 
 [workspace.dependencies]
+# ACP wire types for moonframe-acp; its own transport, so no async runtime.
+acp                = { default-features = false, package = "agent-client-protocol-schema", version = "1.12" }
 alacritty_terminal = "0.26"
 block2             = "0.6"
 futures            = "0.3"
@@ -41,6 +44,7 @@ herdr-github        = { git = "https://github.com/penso/herdr-gpui", rev = "9133
 herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
 libghostty-vt       = "0.2.2"
 mlua                = { features = ["luau"], version = "0.12.2" }
+moonframe-acp       = { path = "crates/moonframe-acp" }
 moonframe-core      = { path = "crates/moonframe-core" }
 moonframe-git       = { path = "crates/moonframe-git" }
 moonframe-mux       = { default-features = false, path = "crates/moonframe-mux" }

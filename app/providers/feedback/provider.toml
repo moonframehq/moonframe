@@ -1,9 +1,0 @@
-# Feedback the user sends from the window, handed to a coding agent that
-# changes the app, shared as `app.feedback`: the agent, the folder it works
-# in, and each request with how it went and what the agent said.
-# A process provider: it runs the agent (Claude Code by default) with your
-# access and every permission, so it implements whatever is sent without
-# asking; only when the `feedback` mod sends a request the user wrote and
-# sent. Needs bash and jq, and the agent.
-command = ["bash", "feedback.sh"]
-kind    = "process"

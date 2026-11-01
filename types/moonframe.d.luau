@@ -1065,32 +1065,64 @@ type Herdr = {
 	fresh: boolean,
 }
 
--- `app.feedback`, from providers/feedback: requests the user sent from the
--- Send feedback dialog, each handed to a coding agent. When `available` is
--- false only `reason` is set.
-type FeedbackItem = {
-	id: string,
-	-- The user's words.
-	text: string,
-	-- "running", "done", "failed", "cancelled" or "lost".
-	status: string,
-	-- Unix seconds.
-	started: number?,
-	finished: number?,
-	-- What the agent said at the end, else the end of its errors.
-	result: string?,
+-- `app.acp`, from providers/acp: coding agents run for mods over the
+-- Agent Client Protocol.
+type AcpAgent = {
+	-- "claude", "codex", "copilot", "gemini" or "opencode".
+	name: string,
+	title: string,
+	-- Its ACP command is installed.
+	installed: boolean,
+	-- Only `npx` can start it, downloading its adapter first.
+	fetched: boolean,
 }
 
-type Feedback = {
-	available: boolean,
-	reason: string?,
-	-- The agent's command name ("claude").
+type AcpTool = {
+	id: string,
+	title: string,
+	-- "read", "edit", "delete", "move", "search", "execute", "think", "fetch", "other"...
+	kind: string,
+	-- "pending", "in_progress", "completed" or "failed".
+	status: string,
+}
+
+type AcpRun = {
+	id: string,
+	-- The mod that started it: the only one it obeys.
+	owner: string,
 	agent: string,
-	-- The folder it works in.
+	agent_title: string,
+	-- The user's words.
+	text: string,
+	-- "starting", "running", "waiting" (a question for the user), "done",
+	-- "failed", "cancelled" or "stopped" (the app quit while it ran).
+	status: string,
+	-- Unix seconds.
+	started: number,
+	finished: number?,
+	error: string?,
+	stop_reason: string?,
+	-- The agent's latest message: its answer once it is done.
+	message: string?,
+	-- The latest tool calls (at most 12), newest last, of `tool_count`.
+	tools: { AcpTool },
+	tool_count: number,
+	plan: { { content: string, status: string } },
+	-- A permission question waiting on the user; answer with
+	-- `{ answer = id, option = option.id }` (or `option = false`).
+	question: { title: string, options: { { id: string, name: string, kind: string } } }?,
+}
+
+type Acp = {
+	available: boolean,
+	agents: { AcpAgent },
+	-- The agent a start without `agent` gets.
+	agent: string,
+	-- The folder agents work in.
 	workdir: string,
 	running: number,
-	-- Newest first, at most 20.
-	items: { FeedbackItem },
+	-- Newest first, at most 30.
+	runs: { AcpRun },
 }
 
 -- A native provider's answer to an action a mod asked for, arriving in that
@@ -1127,7 +1159,7 @@ type App = {
 	agents: Agents?,
 	files: Files?,
 	herdr: Herdr?,
-	feedback: Feedback?,
+	acp: Acp?,
 	-- What tab bars can open: each component and mod with a `tab` entry.
 	kinds: { TabKind },
 	-- The stylesheet's `looks`: which look each kind of component takes.
