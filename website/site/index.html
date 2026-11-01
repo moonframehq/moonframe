@@ -113,13 +113,13 @@
   h2 i { color:var(--acc-hi) }
   .lead { font-size:20px; color:var(--ink2); max-width:660px; margin-top:18px }
 
-  .three { display:grid; grid-template-columns:repeat(3, 1fr); margin-top:48px; border-top:2px solid var(--ink) }
+  .three { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); margin-top:48px; border-top:2px solid var(--ink) }
   .three > div { padding:22px 28px 0; border-right:1px solid var(--rule) }
   .three > div:first-child { padding-left:0 } .three > div:last-child { border-right:0 }
   .three .num { font:600 13px var(--mono); color:var(--acc) }
   .three h3 { font-size:26px; font-weight:500; margin:4px 0 8px }
   .three p { font-size:16px; color:var(--ink2) }
-  .three pre { font:13px/1.7 var(--mono); background:var(--ink); color:var(--paper); padding:12px 14px; margin-top:14px; border-radius:3px; white-space:pre-wrap }
+  .three pre { font:13px/1.7 var(--mono); background:var(--ink); color:var(--paper); padding:12px 14px; margin-top:14px; border-radius:3px; white-space:pre-wrap; overflow-wrap:anywhere }
   .three pre .q { color:#f2b33d }
   .three pre.prompts { white-space:pre; overflow:hidden; text-overflow:ellipsis; font-size:12.5px }
 
@@ -448,8 +448,9 @@ function loadFull(url, onProgress) {
 // A set of images the viewer steps through: { lo, full, caption }.
 const PLATES = APPS.map(([id, title, d]) => ({ lo:`img/${id}.webp`, full:`img/full/${id}.png`,
   caption:`<b>${title}</b> ${d[0].toUpperCase() + d.slice(1)}.`,
-  // Run from a clone: link the example in place, then open its profile.
-  cmd:`moonframe app link examples/${id} --yes && moonframe --profile ${id}` }));
+  // Run from a clone: link the example in place, then open its profile. The
+  // link refuses a profile that already exists, so the open runs either way.
+  cmd:`moonframe app link examples/${id} --yes; moonframe --profile ${id}` }));
 const SHOTS = [["week-calendar","Week calendar","Day, week and month, with events"],["palette","Command palette","Spotlight, classic, compact or cards"],
   ["table","Table","Sortable, filterable, paged"],["notification-drawer","Notification drawer","Behind a bell, with a badge"]]
   .map(([id, title, d]) => ({ lo:`img/c-${id}.webp`, full:`img/full/c-${id}.png`, caption:`<b>${title}</b> ${d}.` }));

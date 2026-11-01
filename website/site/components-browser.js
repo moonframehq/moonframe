@@ -75,7 +75,7 @@
    ${g("Compiling")} moonframe-app v0.4.0
     ${g("Finished")} \`release\` profile [optimized] in 41.2s
 ${a("~/code/moonframe")} ${d("main")} ❯ moonframe app link examples/ledger --yes
-Linked ${g("ledger")} → examples/ledger
+Linked ${g("ledger")} as the profile ledger
 ${a("~/code/moonframe")} ${d("main")} ❯ <i></i></pre></div>`;
   }
 
@@ -83,7 +83,7 @@ ${a("~/code/moonframe")} ${d("main")} ❯ <i></i></pre></div>`;
   .cb { --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace; font:13px/1.45 Inter, system-ui, -apple-system, sans-serif; color:#1f1e26; background:#fff; border:1px solid #1d1b26; box-shadow:0 30px 60px -30px #1d1b2666; display:grid; grid-template-rows:34px 1fr; height:640px; text-align:left }
   .cb-title { background:#2a2933; color:#ddd; display:flex; align-items:center; gap:8px; padding:0 12px; font-weight:600; font-size:12.5px }
   .cb-title i { width:11px; height:11px; border-radius:50%; background:#55545e } .cb-title span { margin-left:8px }
-  .cb-main { display:grid; grid-template-columns:240px 1fr; min-height:0 }
+  .cb-main { display:grid; grid-template-columns:240px minmax(0, 1fr); min-height:0 }
   .cb-side { border-right:1px solid #ececf1; display:flex; flex-direction:column; min-height:0; background:#fbfbfc }
   .cb-search { margin:12px; border:1px solid #e3e2ea; border-radius:8px; padding:7px 10px; font:inherit; outline:none; background:#fff }
   .cb-list { overflow:auto; padding:0 8px 12px; flex:1 }
@@ -96,7 +96,7 @@ ${a("~/code/moonframe")} ${d("main")} ❯ <i></i></pre></div>`;
   .cb-detail .cb-desc { color:#555; margin-bottom:6px; max-width:640px }
   .cb-detail .cb-when { color:#6b6676; font-size:12.5px; max-width:640px }
   .cb-h { font-size:11.5px; color:#8a8798; font-weight:600; margin:18px 0 6px; text-transform:uppercase; letter-spacing:.08em }
-  .cb-prev { border:1px dashed #dddbe5; border-radius:10px; min-height:150px; display:grid; place-items:center; padding:24px; background:repeating-conic-gradient(#fafafc 0 25%, #fff 0 50%) 0 0/16px 16px }
+  .cb-prev { border:1px dashed #dddbe5; border-radius:10px; min-height:150px; display:grid; grid-template-columns:minmax(0, 1fr); place-items:center; padding:24px; background:repeating-conic-gradient(#fafafc 0 25%, #fff 0 50%) 0 0/16px 16px }
   .cb-prev img { width:auto; height:auto; max-width:100%; max-height:380px; object-fit:contain; display:block; filter:drop-shadow(0 6px 14px #0002) }
   .cb-none { text-align:center; color:#8a8798; max-width:360px }
   .cb-none b { color:#2a2833; display:block; margin-bottom:4px }
@@ -140,11 +140,12 @@ ${a("~/code/moonframe")} ${d("main")} ❯ <i></i></pre></div>`;
   .cb-radio { width:16px; height:16px; border-radius:50%; border:1.5px solid #bbb; flex-shrink:0; margin-top:3px } .cb-radio.on { border:5px solid #4b3fd1 }
   .cb-tag { font:12px var(--mono); background:#f0eff4; padding:2px 8px; border-radius:5px }
   .cb-bubble { background:#d64545; color:#fff; font-weight:700; font-size:11.5px; border-radius:999px; padding:2px 8px }
-  .cb-run { width:460px; display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid #e3e2ea; border-radius:12px; padding:14px 16px; box-shadow:0 2px 8px #0000000a }
+  .cb-run { width:460px; max-width:100%; display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid #e3e2ea; border-radius:12px; padding:14px 16px; box-shadow:0 2px 8px #0000000a }
   .cb-plan { background:#f0eff499; border-radius:6px; padding:6px 8px; font-size:12.5px; display:grid; gap:2px } .cb-plan span { color:#8a8798; display:inline-block; width:18px } .cb-plan s { color:#8a8798 }
   .cb-tool { font:12px var(--mono); color:#6b6676; display:flex; gap:6px }
+  .cb-run .cb-row { flex-wrap:wrap }
   .cb-ask { border:1px solid #e59a3580; background:#e59a3514; border-radius:8px; padding:10px; display:grid; gap:8px }
-  .cb-term { width:540px; background:#1b1a24; border-radius:10px; overflow:hidden; box-shadow:0 10px 30px -10px #0006 }
+  .cb-term { width:540px; max-width:100%; background:#1b1a24; border-radius:10px; overflow:hidden; box-shadow:0 10px 30px -10px #0006 }
   .cb-term-bar { display:flex; justify-content:space-between; padding:7px 12px; font-size:11.5px; color:#8a8798; background:#24232e }
   .cb-term pre { margin:0; padding:12px 14px 14px; font:12px/1.6 var(--mono); color:#d8d6f0; white-space:pre-wrap }
   .cb-term pre i { display:inline-block; width:7px; height:14px; background:#d8d6f0; vertical-align:-2px; animation:cbblink 1s steps(1) infinite }
