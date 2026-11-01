@@ -28,8 +28,9 @@ The workflow then:
 2. builds every package (`package.yml`) and the CycloneDX SBOMs, while it
    waits for CI to pass on that same commit; nothing below runs until it has;
 3. signs the app with the Developer ID, notarizes and staples it, and builds
-   the disk image around it, signed, notarized and stapled too (when signing
-   is set up, see below);
+   the disk image around it, signed, notarized and stapled too; and signs
+   the Windows executable with Authenticode (each when its signing is set
+   up, see below);
 4. writes `SHA256SUMS`, signs every file with Sigstore (keyless, as this
    workflow), and records GitHub attestations of SLSA build provenance and
    of the SBOM for every file;
@@ -37,8 +38,8 @@ The workflow then:
    with generated notes, checks the uploaded files against `SHA256SUMS`, and
    publishes it.
 
-Only the `sign-macos`, `attest` and `publish` jobs enter the `release`
-environment. Protect it (Settings → Environments) so it only accepts
+Only the `sign-macos`, `sign-windows`, `attest` and `publish` jobs enter
+the `release` environment. Protect it (Settings → Environments) so it only accepts
 `main`, and add yourself as a required reviewer if releases should wait for
 an approval.
 
@@ -89,3 +90,32 @@ whether to sign, so set it as a repository variable as well.
 The app runs under the hardened runtime with the entitlements in
 `assets/macos/Moonframe.entitlements`: wasmtime compiles the Wasm providers
 to executable memory, which the hardened runtime otherwise refuses.
+
+## Setting up Windows signing
+
+Without it, the zip's `moonframe.exe` is unsigned and SmartScreen warns on
+first launch. It is signed with Azure Artifact Signing, under the publisher
+`Fabien Penso`, by the account and certificate profile every one of the
+author's apps shares. There is no key, certificate or secret to store: the
+`sign-windows` job exchanges the `release` environment's GitHub OIDC token
+for an Azure token as the `moonframe-signing` app registration, whose
+federated credential trusts only `repo:penso/moonframe:environment:release`
+and which holds the *Artifact Signing Certificate Profile Signer* role on
+that profile. Add to the `release` environment, all as variables:
+
+| Name | Value |
+| --- | --- |
+| `AZURE_CLIENT_ID` | the `moonframe-signing` app registration's application ID |
+| `AZURE_TENANT_ID` | its tenant |
+| `AZURE_SUBSCRIPTION_ID` | the subscription holding the signing account |
+| `ARTIFACT_SIGNING_ENDPOINT` | the signing account's regional endpoint |
+| `ARTIFACT_SIGNING_ACCOUNT` | the signing account |
+| `ARTIFACT_SIGNING_PROFILE` | the certificate profile |
+
+and, as a repository variable (setting it turns signing on),
+`WINDOWS_SIGNING_SUBJECT`: the certificate's exact subject, which the job
+requires of every signature, with a timestamp, before it zips the folder
+again.
+
+When the publisher's identity validation in Azure expires, signing fails
+until it is renewed (Artifact Signing account → Identity validations).
