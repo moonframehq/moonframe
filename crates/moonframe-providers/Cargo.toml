@@ -10,16 +10,23 @@ version.workspace      = true
 [lints]
 workspace = true
 
+[features]
+# Native providers written with `async fn` (`AsyncNative`), on a tokio
+# runtime the app's views can use too.
+tokio = ["dep:tokio"]
+
 [dependencies]
 moonframe-core.workspace = true
 serde.workspace          = true
 serde_json.workspace     = true
 sysinfo.workspace        = true
 thiserror.workspace      = true
+tokio                    = { features = ["rt-multi-thread", "time"], optional = true, workspace = true }
 toml.workspace           = true
 tracing.workspace        = true
 wasmtime.workspace       = true
 wasmtime-wasi.workspace  = true
 
 [dev-dependencies]
+futures.workspace  = true
 tempfile.workspace = true

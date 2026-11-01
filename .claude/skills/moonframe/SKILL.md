@@ -1729,10 +1729,15 @@ crate, never in Moonframe:
   `.view("editor", Editor::new)`, placed with `ui.view { name = "editor",
   id = "main", props = {...} }`. It is made on first draw, kept by mod and
   `id`, gets `set_props` when `props` change, and sends the mod's `update`
-  messages with its `Messenger` (`ViewInit::messenger`).
+  messages with its `Messenger` (`ViewInit::messenger`). To await a tokio
+  future from it, wrap it in `moonframe::on_runtime(future)` inside
+  `cx.spawn`.
 - data or actions: a `moonframe::Native` provider, `.native("index",
   Index::default)`, with `app/providers/index/provider.toml` holding
-  `kind = "native"`.
+  `kind = "native"`. For async code (an HTTP client, anything on tokio),
+  a `moonframe::AsyncNative` with `async fn start/tick/receive` instead,
+  registered with `.native_async`; it runs on the app's runtime
+  (`.tokio(handle)`, or the `#[tokio::main]` one), else one Moonframe makes.
 There, `cargo run -- --check` checks the app (not `just check`), its
 user folder is `~/.config/<name>`, and Moonframe's components, providers
 and stylesheet sit under its `app/`, its mods shadowing none of theirs.

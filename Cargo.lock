@@ -4831,12 +4831,14 @@ dependencies = [
 name = "moonframe-providers"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "moonframe-core",
  "serde",
  "serde_json",
  "sysinfo 0.39.6",
  "tempfile",
  "thiserror 2.0.21",
+ "tokio",
  "toml 1.1.8+spec-1.1.0",
  "tracing",
  "wasmtime",

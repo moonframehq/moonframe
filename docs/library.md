@@ -37,9 +37,9 @@ opt-level = 2
 library needs the toolchain in [rust-toolchain.toml](../rust-toolchain.toml)
 or newer.
 
-Features: `alacritty`, `git` and `herdr-core` by default. `ghostty` (a
-second terminal emulator, built from Ghostty's source with Zig; see
-`tools/zig`) is opt-in: `features = ["ghostty"]`.
+Features: `acp`, `alacritty`, `docs`, `git`, `herdr-core` and `tokio` by
+default. `ghostty` (a second terminal emulator, built from Ghostty's source
+with Zig; see `tools/zig`) is opt-in: `features = ["ghostty"]`.
 
 Use the GPUI the library re-exports, `moonframe::gpui_kit` (GPUI with
 gpui-component): one app links one GPUI. If your crates name `gpui`
@@ -72,6 +72,8 @@ fn main() -> std::process::ExitCode {
 | `.embedded_app::<E>()` | its app folder compiled in (`#[derive(moonframe::rust_embed::RustEmbed)]`, `#[crate_path = "moonframe::rust_embed"]`), for a lone executable |
 | `.keep(mods)` | the starter's mods it shows (from `app/mods` here), as a profile's `keep` |
 | `.native(name, make)` | a native provider (below) |
+| `.native_async(name, make)` | a native provider written with `async fn`, on tokio (below) |
+| `.tokio(handle)` | the tokio runtime async providers and `on_runtime` use (below) |
 | `.view(name, make)` | a view (below) |
 | `.log(filter)` | the log filter when `RUST_LOG` is unset |
 | `.run()` | the command line: the window, `--check`, `--release`, `--profile`, `mod`, `app`, `init`, `bundle`; see `--help` |
@@ -121,6 +123,70 @@ github, system, ...) cost an app nothing until it uses them.
 Each call runs on the provider's own thread; `Handle` (`publish`,
 `publish_json`, `send`, `fail`) can be cloned into others. A mod sends it
 messages with `to = "provider:index"`.
+
+### Async and tokio
+
+With the `tokio` feature (on by default), a provider can be written with
+`async fn` and use any tokio library (an HTTP client, a database driver):
+
+```rust
+use moonframe::{AsyncNative, Data, Handle};
+
+#[derive(Default)]
+struct Weather { client: reqwest::Client }
+
+impl AsyncNative for Weather {
+    async fn tick(&mut self, host: &Handle) {
+        match self.client.get(URL).send().await {
+            Ok(reply) => host.publish_json(&reply.json().await.unwrap_or_default()),
+            Err(error) => host.fail(error.to_string()),
+        }
+    }
+
+    async fn receive(&mut self, host: &Handle, from: &str, message: Data) { /* ... */ }
+}
+
+// .native_async("weather", Weather::default)
+```
+
+`start`, `tick` and `receive` keep a native provider's order: each is
+awaited in turn on the provider's own thread, while the runtime's workers
+drive its sockets and timers; each has a default that does nothing. Work
+that should go on past a call goes on the runtime with `tokio::spawn` and
+a clone of the `Handle`.
+
+A view awaits what needs tokio with `moonframe::on_runtime`, from GPUI's
+own executor:
+
+```rust
+cx.spawn(async move |this, cx| {
+    if let Ok(page) = moonframe::on_runtime(fetch(url)).await {
+        let _ = this.update(cx, |view, cx| view.show(page, cx));
+    }
+})
+.detach();
+```
+
+The runtime is the app's own when it gives one, so providers and views
+share its clients and pools. GPUI holds the main thread, so `run` blocks
+there; keep the runtime on other threads:
+
+```rust
+fn main() -> std::process::ExitCode {
+    let runtime = moonframe::tokio::runtime::Runtime::new().expect("a tokio runtime");
+    Moonframe::new("notes")
+        .tokio(runtime.handle().clone())
+        .native_async("weather", Weather::default)
+        .run()
+}
+```
+
+`#[tokio::main]` works too: `run` takes the multi-thread runtime it is
+called in. A current-thread runtime is passed over (the window would starve
+it), and without one, Moonframe makes a multi-thread runtime the first time
+something needs it. `moonframe::tokio` is the tokio it uses, and
+`moonframe::runtime()` the runtime's handle. [examples/host](../examples/host)
+has an async provider (`lookup`) and a view that awaits a tokio timer.
 
 ### Views
 

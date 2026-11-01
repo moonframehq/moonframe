@@ -4,15 +4,18 @@
 //!
 //! - `clock`, a native provider: the time, shared as `app.clock` and
 //!   started by `app/providers/clock/provider.toml`;
+//! - `lookup`, a native provider written with `async fn` on tokio: it
+//!   answers `{ look = "word" }` after an await, as a network call would;
 //! - `counter`, a view the shell places with `ui.view`, which tells the
-//!   shell each time it is clicked.
+//!   shell each time it is clicked, and can count later by awaiting a tokio
+//!   timer from GPUI.
 //!
 //! `cargo run -p moonframe-host-example` opens it; `-- --check` loads it
 //! headlessly; edits to `app/` show live.
 
 use {
     moonframe::{
-        Data, Handle, HostView, Messenger, Moonframe, Native, ViewInit,
+        AsyncNative, Data, Handle, HostView, Messenger, Moonframe, Native, ViewInit,
         gpui_kit::{
             component::{ActiveTheme as _, button::Button},
             *,
@@ -20,7 +23,7 @@ use {
     },
     std::{
         process::ExitCode,
-        time::{SystemTime, UNIX_EPOCH},
+        time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     },
 };
 
@@ -31,6 +34,7 @@ fn main() -> ExitCode {
         .version(env!("CARGO_PKG_VERSION"))
         .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
         .native("clock", Clock::default)
+        .native_async("lookup", Lookup::default)
         .view("counter", Counter::new)
         .run()
 }
@@ -79,6 +83,44 @@ impl Native for Clock {
     }
 }
 
+/// Answers `{ look = "word" }` with `{ word, length, took }` after an
+/// await, the way a provider calling a web service would; `app.lookup`
+/// holds the latest answer and how many it gave.
+#[derive(Default)]
+struct Lookup {
+    answered: i64,
+}
+
+impl AsyncNative for Lookup {
+    async fn start(&mut self, host: &Handle) -> Result<(), String> {
+        host.publish(Data::map([("answered", 0.into())]));
+        Ok(())
+    }
+
+    async fn receive(&mut self, host: &Handle, _from: &str, message: Data) {
+        let Some(word) = message
+            .get("look")
+            .and_then(Data::as_str)
+            .map(str::to_owned)
+        else {
+            return;
+        };
+        let started = Instant::now();
+        // Stands in for a request: the provider's thread waits, the runtime
+        // keeps running everything else.
+        moonframe::tokio::time::sleep(Duration::from_millis(400)).await;
+        self.answered += 1;
+        let took = i64::try_from(started.elapsed().as_millis()).unwrap_or(i64::MAX);
+        let length = i64::try_from(word.chars().count()).unwrap_or(0);
+        host.publish(Data::map([
+            ("word", word.into()),
+            ("length", length.into()),
+            ("took", took.into()),
+            ("answered", self.answered.into()),
+        ]));
+    }
+}
+
 /// A number and a button that adds `step` (a prop) to it, telling the
 /// mod that drew it `{ counted = n }`.
 struct Counter {
@@ -111,6 +153,15 @@ impl Counter {
     }
 }
 
+impl Counter {
+    fn add(&mut self, cx: &mut Context<Self>) {
+        self.count += self.step;
+        self.messenger
+            .send(Data::map([("counted", self.count.into())]));
+        cx.notify();
+    }
+}
+
 impl HostView for Counter {
     fn set_props(&mut self, props: &Data, _: &mut Context<Self>) {
         self.read(props);
@@ -135,14 +186,32 @@ impl Render for Counter {
             )
             .child(div().text_3xl().child(self.count.to_string()))
             .child(
-                Button::new("count")
-                    .label(format!("+{}", self.step))
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.count += this.step;
-                        this.messenger
-                            .send(Data::map([("counted", this.count.into())]));
-                        cx.notify();
-                    })),
+                div()
+                    .flex()
+                    .gap_2()
+                    .child(
+                        Button::new("count")
+                            .label(format!("+{}", self.step))
+                            .on_click(cx.listener(|this, _, _, cx| this.add(cx))),
+                    )
+                    .child(
+                        // Awaits a tokio timer from GPUI: anything that needs
+                        // tokio (an HTTP client, a database) goes the same way.
+                        Button::new("later")
+                            .label(format!("+{} in a second", self.step))
+                            .on_click(cx.listener(|_, _, _, cx| {
+                                cx.spawn(async move |this, cx| {
+                                    let slept = moonframe::on_runtime(
+                                        moonframe::tokio::time::sleep(Duration::from_secs(1)),
+                                    )
+                                    .await;
+                                    if slept.is_ok() {
+                                        let _ = this.update(cx, |this, cx| this.add(cx));
+                                    }
+                                })
+                                .detach();
+                            })),
+                    ),
             )
     }
 }

@@ -38,6 +38,7 @@ alacritty_terminal = "0.26"
 block2             = "0.6"
 futures            = "0.3"
 gpui-kit           = "=0.8.1"
+tokio              = { default-features = false, version = "1.54" }
 # Crates of herdr-gpui (to be renamed), pinned to one commit. To work on
 # them beside this app, patch them to a local checkout:
 #   [patch."https://github.com/penso/herdr-gpui"]

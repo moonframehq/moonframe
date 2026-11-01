@@ -282,6 +282,19 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         )
         .with_writer(std::io::stderr)
         .init();
+    // The app's tokio runtime, else the one `run` is called in
+    // (`#[tokio::main]`), for async providers and views.
+    #[cfg(feature = "tokio")]
+    if let Some(runtime) = launch
+        .runtime
+        .clone()
+        .or_else(|| moonframe_providers::tokio::runtime::Handle::try_current().ok())
+        && !moonframe_providers::set_runtime(runtime)
+    {
+        tracing::warn!(
+            "a current-thread tokio runtime would never run beside the window; using one of Moonframe's own"
+        );
+    }
     let name = &launch.identity.name;
     if !packages::valid_name(name) {
         eprintln!("`{name}` cannot name an app: use a-z, 0-9, - and _");

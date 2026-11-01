@@ -29,6 +29,9 @@ pub struct Moonframe {
     pub(crate) natives: Natives,
     pub(crate) views: Registry,
     pub(crate) log: String,
+    /// The app's own tokio runtime, from [`Moonframe::tokio`].
+    #[cfg(feature = "tokio")]
+    pub(crate) runtime: Option<moonframe_providers::tokio::runtime::Handle>,
 }
 
 /// Where the host's own app folder comes from.
@@ -58,6 +61,8 @@ impl Moonframe {
             keep: Vec::new(),
             natives: crate::natives::natives(),
             views: Registry::default(),
+            #[cfg(feature = "tokio")]
+            runtime: None,
         }
     }
 
@@ -143,6 +148,33 @@ impl Moonframe {
             name.to_owned(),
             Arc::new(move || Box::new(make()) as Box<dyn Native>),
         );
+        self
+    }
+
+    /// A native provider written with `async fn`, as [`Moonframe::native`]
+    /// takes one: each call is awaited in turn on the provider's thread,
+    /// with sockets and timers on the app's tokio runtime.
+    #[cfg(feature = "tokio")]
+    pub fn native_async<N: moonframe_providers::AsyncNative>(
+        mut self,
+        name: &str,
+        make: impl Fn() -> N + Send + Sync + 'static,
+    ) -> Self {
+        self.natives.insert(
+            name.to_owned(),
+            Arc::new(move || moonframe_providers::async_native(make())),
+        );
+        self
+    }
+
+    /// The tokio runtime async providers and [`crate::on_runtime`] use: the
+    /// app's own, so they share its clients and pools. Without one, `run`
+    /// takes the multi-thread runtime it is called in (`#[tokio::main]`),
+    /// else one is made when first needed. A current-thread runtime is
+    /// passed over: the window holds the main thread, so it would never run.
+    #[cfg(feature = "tokio")]
+    pub fn tokio(mut self, runtime: moonframe_providers::tokio::runtime::Handle) -> Self {
+        self.runtime = Some(runtime);
         self
     }
 

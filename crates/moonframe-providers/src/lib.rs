@@ -28,6 +28,8 @@
 //! thread of its own, so a slow one never holds up the window, and a reload
 //! restarts only the providers whose folders changed.
 
+#[cfg(feature = "tokio")]
+mod asynchronous;
 mod fingerprint;
 mod json;
 mod manifest;
@@ -36,6 +38,11 @@ mod process;
 mod system;
 mod wasm;
 
+#[cfg(feature = "tokio")]
+pub use {
+    asynchronous::{AsyncNative, native as async_native, on_runtime, runtime, set_runtime},
+    tokio,
+};
 pub use {
     json::{from_json, to_json},
     manifest::{Capability, Kind, Manifest, PREBUILT, Start},

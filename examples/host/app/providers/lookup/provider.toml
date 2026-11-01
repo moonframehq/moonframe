@@ -1,0 +1,5 @@
+# Looks a word up after an await, shared as `app.lookup`: Rust written with
+# `async fn` on tokio (`Moonframe::native_async("lookup", ...)` in
+# src/main.rs). It only answers messages, so it never ticks.
+interval = 3600.0
+kind     = "native"

@@ -479,6 +479,7 @@ fn main() -> std::process::ExitCode {
         .title("Notes")
         .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
         .native("index", Index::default)          // a native provider: `app.index`
+        .native_async("feed", Feed::default)      // one written with `async fn`, on tokio
         .view("editor", Editor::new)              // a GPUI view: `ui.view { name = "editor" }`
         .run()                                    // the window, --check, mod, app, bundle
 }
@@ -489,6 +490,9 @@ Moonframe's components, providers and stylesheet (compiled into the
 library, so a git dependency needs no checkout beside it). `moonframe init
 DIR` starts one, or adds the app folder, types and agent skills to an
 existing crate; `cargo run --release -- bundle` builds its bundle.
+Providers can be `async fn` on tokio, and views can await tokio futures:
+it uses the app's own runtime (`.tokio(handle)`, or the one
+`#[tokio::main]` runs it in), else makes one.
 [examples/host](examples/host) is a small one, and
 [docs/library.md](docs/library.md) has the rest.
 

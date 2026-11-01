@@ -19,7 +19,7 @@ acp = ["dep:moonframe-acp"]
 # libghostty-vt with Zig (see mise.toml and tools/zig), so an app on the
 # library opts into it; the starter (crates/moonframe-app) has both.
 alacritty = ["moonframe-terminal/alacritty"]
-default   = ["acp", "alacritty", "docs", "git", "herdr-core"]
+default   = ["acp", "alacritty", "docs", "git", "herdr-core", "tokio"]
 # The `docs` native provider: reads and saves the project's text files
 # for the markdown editor.
 docs    = ["dep:moonframe-docs"]
@@ -29,6 +29,9 @@ git = ["dep:moonframe-git"]
 # Terminals kept by herdr-core (`hc`) when it is installed; tmux and a
 # local pty need no feature.
 herdr-core = ["moonframe-mux/herdr-core"]
+# Native providers written with `async fn` (`.native_async`), and a tokio
+# runtime they and the app's views share (`.tokio`, `on_runtime`).
+tokio = ["moonframe-providers/tokio"]
 
 [dependencies]
 futures.workspace             = true

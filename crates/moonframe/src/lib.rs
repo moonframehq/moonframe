@@ -55,6 +55,8 @@ mod terminal;
 mod theme_picker;
 mod themes;
 
+#[cfg(feature = "tokio")]
+pub use moonframe_providers::{AsyncNative, on_runtime, runtime, tokio};
 pub use {
     gpui_kit,
     hosted::{HostView, Messenger, ViewInit},
