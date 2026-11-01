@@ -1300,12 +1300,11 @@ impl Render for MoonframeApp {
             window.request_animation_frame();
         }
         // Building the element tree from the views; GPUI lays it out and
-        // paints it after. Slow frames are worth seeing in the log.
+        // paints it after. Slow frames are worth seeing in the log; fast
+        // ones while animating would flood even `debug`.
         let built = started.elapsed();
-        if built.as_millis() >= 8 {
-            tracing::info!(target: "moonframe::perf", "frame: built in {built:.1?}");
-        } else if !animating {
-            tracing::debug!(target: "moonframe::perf", "frame: built in {built:.1?}");
+        if built >= moonframe_core::perf::SLOW || !animating {
+            moonframe_core::perf!(built, "frame: built in {built:.1?}");
         }
         let key_layers = painter.take_key_layers();
         let requests = painter.take_list_requests();

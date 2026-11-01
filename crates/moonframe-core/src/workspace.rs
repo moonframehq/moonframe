@@ -616,11 +616,8 @@ impl Workspace {
         self.process(deliveries.into());
         self.settle();
         let drawn = self.views_run - before;
-        tracing::info!(
-            target: "moonframe::perf",
-            "provider {key}: published, {drawn} views ran in {:.1?}",
-            started.elapsed()
-        );
+        let elapsed = started.elapsed();
+        crate::perf!(elapsed, "provider {key}: published, {drawn} views ran in {elapsed:.1?}");
         drawn
     }
 
@@ -926,11 +923,12 @@ impl Workspace {
         self.process(VecDeque::from([(from.to_owned(), to.to_owned(), msg)]));
         let updated = started.elapsed();
         self.settle();
-        tracing::info!(
-            target: "moonframe::perf",
+        let elapsed = started.elapsed();
+        crate::perf!(
+            elapsed,
             "message to {to}: updated in {updated:.1?}, {} views ran in {:.1?}",
             self.views_run - before,
-            started.elapsed() - updated,
+            elapsed - updated,
         );
     }
 

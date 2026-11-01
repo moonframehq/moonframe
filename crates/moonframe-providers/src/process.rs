@@ -106,12 +106,12 @@ fn drive(context: &Context, child: &mut Child) -> Result<(), String> {
 fn parse(context: &Context, text: &str) -> Result<Data, Error> {
     let started = std::time::Instant::now();
     let parsed = json::data(text);
-    tracing::debug!(
-        target: "moonframe::perf",
-        "provider {}: {} bytes read in {:.1?}",
+    let elapsed = started.elapsed();
+    moonframe_core::perf!(
+        elapsed,
+        "provider {}: {} bytes read in {elapsed:.1?}",
         context.name,
-        text.len(),
-        started.elapsed()
+        text.len()
     );
     parsed
 }

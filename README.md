@@ -522,7 +522,8 @@ To see where time goes, run with `RUST_LOG=moonframe::perf=debug`: each
 message, provider publish and frame is logged with how long it took and
 which views it ran (`trace` adds each view's Luau and tree time). A message
 runs only the views of the mods it reached, and a publish only those that
-read that provider's data.
+read that provider's data. Work slower than 8 ms is logged at `info` even
+without it, and slower than 16 ms (a whole frame) at `warn`.
 
 ## License
 
