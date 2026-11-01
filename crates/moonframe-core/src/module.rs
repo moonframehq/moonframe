@@ -3,15 +3,96 @@
 
 use {
     crate::{
-        About, AppMenu, Chrome, Data, Error, Node, Rules, SHELL, Stylesheet, TabKind,
+        About, AppMenu, Chrome, Data, Error, ListWindow, Node, Rules, SHELL, Stylesheet, TabKind,
         component::Library,
         menus::Menus,
         node,
         read::{Cx, Fields, NO_NAMES, Read},
         vm::{self, Meter},
     },
-    mlua::{Function, Lua, Value},
+    mlua::{Function, Lua, Table, Value},
+    std::{
+        cell::RefCell,
+        collections::{BTreeMap, BTreeSet},
+        rc::Rc,
+    },
 };
+
+/// What a view gets as `app`, by key.
+pub(crate) type AppData = BTreeMap<String, Data>;
+
+/// The keys of `app` a view read: it is drawn again only when one of
+/// them changes. Going through all of `app` reads every key.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Reads {
+    Keys(BTreeSet<String>),
+    #[default]
+    All,
+}
+
+/// How a view sees `app`: an empty table whose keys are filled in as the
+/// view reads them, so only what it reads crosses into Luau, and the reads
+/// are counted.
+struct Lens {
+    /// The `app` of the view being drawn.
+    app: Rc<RefCell<Rc<AppData>>>,
+    reads: Rc<RefCell<Reads>>,
+    meta: Table,
+}
+
+impl Lens {
+    fn new(lua: &Lua) -> mlua::Result<Self> {
+        let app = Rc::new(RefCell::new(Rc::new(AppData::new())));
+        let reads = Rc::new(RefCell::new(Reads::Keys(BTreeSet::new())));
+        let meta = lua.create_table()?;
+        let (from, seen) = (app.clone(), reads.clone());
+        let index = lua.create_function(move |lua, (table, key): (Table, Value)| {
+            let Value::String(name) = &key else {
+                return Ok(Value::Nil);
+            };
+            let name = name.to_string_lossy();
+            if let Reads::Keys(keys) = &mut *seen.borrow_mut() {
+                keys.insert(name.clone());
+            }
+            let value = match from.borrow().get(&name) {
+                Some(data) => data.to_lua(lua)?,
+                None => Value::Nil,
+            };
+            // Read once per view: the next read finds it in place.
+            table.raw_set(key, value.clone())?;
+            Ok(value)
+        })?;
+        let (from, seen) = (app.clone(), reads.clone());
+        let iter = lua.create_function(move |lua, table: Table| {
+            *seen.borrow_mut() = Reads::All;
+            for (name, data) in from.borrow().iter() {
+                if table.raw_get::<Value>(name.as_str())?.is_nil() {
+                    table.raw_set(name.as_str(), data.to_lua(lua)?)?;
+                }
+            }
+            let next = lua.globals().get::<Function>("next")?;
+            Ok((next, table))
+        })?;
+        meta.raw_set("__index", index)?;
+        meta.raw_set("__iter", iter)?;
+        meta.set_readonly(true);
+        Ok(Self { app, reads, meta })
+    }
+
+    /// A fresh `app` table showing `app`, with no reads yet.
+    fn open(&self, lua: &Lua, app: &Rc<AppData>) -> mlua::Result<Table> {
+        *self.app.borrow_mut() = app.clone();
+        *self.reads.borrow_mut() = Reads::Keys(BTreeSet::new());
+        let table = lua.create_table()?;
+        table.set_metatable(Some(self.meta.clone()))?;
+        Ok(table)
+    }
+
+    /// What the view read since [`Lens::open`].
+    fn reads(&self) -> Reads {
+        self.reads.borrow().clone()
+    }
+}
 
 /// Where a mod asks to be placed.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -105,42 +186,14 @@ impl Read for Send {
 pub(crate) struct Module {
     lua: Lua,
     meter: Meter,
+    lens: Lens,
     definition: Definition,
     state: Value,
-    /// `app` as a table in this module's Luau, and the generation of the
-    /// workspace's `app` it was made from: views after a message see the
-    /// same `app`, so it is converted once per change, not once per view.
-    app: std::cell::RefCell<Option<(u64, Value)>>,
-    /// The keys of `app` the last view read (`app.system`, `app.window`),
-    /// so a provider's publish redraws only the views that read it. `None`
-    /// until a view has run to the end.
-    reads: std::cell::RefCell<Option<std::collections::BTreeSet<String>>>,
     /// What an instance was mounted with; nil for a mod in its own place.
     props: Value,
     /// What `init` sent, for the workspace to deliver once it is loaded.
     pending: Vec<Send>,
 }
-
-/// Wraps `app` so reading `app.<key>` notes the key in `reads`; iterating
-/// and `#` see the real table. Views get it, never the table itself.
-const WATCHED: &str = r#"
-local real, reads = ...
-return setmetatable({}, {
-	__index = function(_, key)
-		reads[key] = true
-		return real[key]
-	end,
-	__iter = function()
-		for key in real do
-			reads[key] = true
-		end
-		return next, real
-	end,
-	__len = function()
-		return #real
-	end,
-})
-"#;
 
 impl Module {
     /// Runs `source` and its `init`. `previous` is the state the module had
@@ -235,12 +288,11 @@ impl Module {
         };
         Ok(Self {
             pending,
+            lens: Lens::new(&lua)?,
             lua,
             meter,
             definition,
             state,
-            app: std::cell::RefCell::new(None),
-            reads: std::cell::RefCell::new(None),
             props,
         })
     }
@@ -309,78 +361,38 @@ impl Module {
         Ok(sends.unwrap_or_default())
     }
 
-    /// Runs `view(state, app)` and checks the tree it returns: the view, and
-    /// the problems of children marked in it.
+    /// Runs `view(state, app)` and checks the tree it returns: the view,
+    /// the problems of children marked in it, and the keys of `app` it read.
+    /// `windows` are the rows each of its lists builds.
     pub(crate) fn view(
         &self,
-        app: &Data,
-        generation: u64,
+        app: &Rc<AppData>,
         sheet: &Stylesheet,
-    ) -> Result<(Node, Vec<Error>), Error> {
+        windows: &BTreeMap<String, ListWindow>,
+    ) -> Result<(Node, Vec<Error>, Reads), Error> {
         self.meter.reset();
-        let started = std::time::Instant::now();
-        let cached = self
-            .app
-            .borrow()
-            .as_ref()
-            .filter(|(made, _)| *made == generation)
-            .map(|(_, table)| table.clone());
-        let table = match cached {
-            Some(table) => table,
-            None => {
-                let table = app.to_lua(&self.lua)?;
-                *self.app.borrow_mut() = Some((generation, table.clone()));
-                table
-            },
-        };
-        let converted = started.elapsed();
-        let reads = self.lua.create_table()?;
-        let watched = self
-            .lua
-            .load(WATCHED)
-            .set_name("=app")
-            .call::<Value>((table, reads.clone()))?;
-        *self.reads.borrow_mut() = None;
+        let app = self.lens.open(&self.lua, app)?;
         let call = if self.definition.component {
             self.definition
                 .view
-                .call::<Value>((self.props.clone(), self.state.clone(), watched))
+                .call::<Value>((self.props.clone(), self.state.clone(), app))
         } else {
             self.definition
                 .view
-                .call::<Value>((self.state.clone(), watched, self.props.clone()))
+                .call::<Value>((self.state.clone(), app, self.props.clone()))
         };
         let tree = call.map_err(|error| Error::from(error).context("view"))?;
-        *self.reads.borrow_mut() = Some(
-            reads
-                .pairs::<String, Value>()
-                .filter_map(Result::ok)
-                .map(|(key, _)| key)
-                .collect(),
-        );
-        let ran = started.elapsed();
-        let (node, problems) = node::read(&tree, sheet).map_err(|error| error.context("view"))?;
-        tracing::trace!(
-            target: "moonframe::perf",
-            "view: app {converted:.1?}, luau {:.1?}, tree {:.1?}",
-            ran - converted,
-            started.elapsed() - ran,
-        );
+        // A list's rows are built as it is read, and may read `app` too.
+        let (node, problems) =
+            node::read(&tree, sheet, windows).map_err(|error| error.context("view"))?;
         Ok((
             node,
             problems
                 .into_iter()
                 .map(|problem| problem.context("view"))
                 .collect(),
+            self.lens.reads(),
         ))
-    }
-
-    /// Whether the last view read `app.<key>`; true when it is not known.
-    pub(crate) fn reads(&self, key: &str) -> bool {
-        self.reads
-            .borrow()
-            .as_ref()
-            .is_none_or(|reads| reads.contains(key))
     }
 
     /// The mod's own `styles`, read against the stylesheet's names.

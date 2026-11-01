@@ -93,14 +93,14 @@ impl<'w> Draw<'w> for Stack {
         with_extras(element, &self.extras, painter, place, cx).into_any_element()
     }
 }
-/// A control's tooltip, right-click and copy, on the element that draws it.
-fn with_extras<'w>(
-    mut element: Stateful<Div>,
+/// An element's tooltip, right-click and copy, on the element that draws it.
+fn with_extras<'w, E: StatefulInteractiveElement + Styled>(
+    mut element: E,
     extras: &Extras,
     painter: &Painter<'w, '_>,
     place: &Place<'w>,
     cx: Cx,
-) -> Stateful<Div> {
+) -> E {
     if let Some(text) = &extras.copy {
         let text = text.clone();
         element = element.cursor_pointer().on_click(move |_, _, cx| {
@@ -433,7 +433,7 @@ impl<'w> Draw<'w> for Text {
             Some(Case::Lower) => self.text.to_lowercase(),
             Some(Case::None) | None => self.text.clone(),
         };
-        element.child(text).into_any_element()
+        with_extras(element.child(text), &self.extras, painter, place, cx).into_any_element()
     }
 }
 
@@ -579,7 +579,8 @@ impl<'w> Draw<'w> for Item {
 impl<'w> Draw<'w> for Badge {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
         let look = painter.look(Part::Badge, &self.look, false, place);
-        pill(&self.text, self.tone, &look, place.id(), cx.theme()).into_any_element()
+        let pill = pill(&self.text, self.tone, &look, place.id(), cx.theme());
+        with_extras(pill, &self.extras, painter, place, cx).into_any_element()
     }
 }
 
@@ -609,7 +610,7 @@ impl<'w> Draw<'w> for Icon {
         {
             icon = icon.rotate(radians(turned * std::f32::consts::TAU));
         }
-        element.child(icon).into_any_element()
+        with_extras(element.child(icon), &self.extras, painter, place, cx).into_any_element()
     }
 }
 
@@ -650,7 +651,7 @@ impl<'w> Draw<'w> for Image {
             if let Some(height) = self.height {
                 element = element.h(px(height));
             }
-            return element.into_any_element();
+            return with_extras(element, &self.extras, painter, place, cx).into_any_element();
         };
         let mut element = img(path)
             .object_fit(fit)
@@ -664,7 +665,7 @@ impl<'w> Draw<'w> for Image {
         if let Some(height) = self.height {
             element = element.h(px(height));
         }
-        element.into_any_element()
+        with_extras(element, &self.extras, painter, place, cx).into_any_element()
     }
 }
 
@@ -701,15 +702,39 @@ fn pill(
 impl<'w> Draw<'w> for Region {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, _: &Place<'w>, cx: Cx) -> AnyElement {
         let members = painter.region(&self.name, cx);
-        let element = div()
-            .flex()
-            .flex_1()
-            .min_h_0()
-            .min_w_0()
-            .gap(px(self.gap.pixels()));
-        let element = match self.direction {
-            Direction::Row => element.flex_row().items_center(),
-            Direction::Column => element.flex_col(),
+        let element = div().flex().min_h_0().min_w_0().gap(px(self.gap.pixels()));
+        let (element, members) = match self.direction {
+            // A row of mods, such as a status bar, never spills onto its
+            // neighbours: it takes room in proportion to what it holds, a
+            // member that does not fit wraps onto a line of its own below,
+            // which is clipped away, and a first member wider than the row
+            // is cut. Each member is as tall as the row, so only the first
+            // line shows; the row needs a parent of definite height.
+            Direction::Row => (
+                element
+                    .flex_auto()
+                    .h_full()
+                    .flex_row()
+                    .flex_wrap()
+                    .items_center()
+                    .content_start()
+                    .overflow_hidden(),
+                members
+                    .into_iter()
+                    .map(|member| {
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .h_full()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .child(member)
+                            .into_any_element()
+                    })
+                    .collect(),
+            ),
+            Direction::Column => (element.flex_1().flex_col(), members),
         };
         match self.justify {
             Justify::Start => element.justify_start(),
@@ -801,10 +826,16 @@ impl<'w> Draw<'w> for Popover {
         sheet = match self.side {
             Side::Top => sheet.bottom_full().mb(px(self.gap - shift)),
             Side::Bottom => sheet.top_full().mt(px(self.gap - shift)),
+            Side::Left => sheet.right_full().mr(px(self.gap - shift)),
+            Side::Right => sheet.left_full().ml(px(self.gap - shift)),
         };
-        sheet = match self.align {
-            Anchor::Start => sheet.left_0(),
-            Anchor::End => sheet.right_0(),
+        // Above or below, it lines up with the anchor's left or right edge;
+        // beside it, with its top or bottom.
+        sheet = match (self.side, self.align) {
+            (Side::Top | Side::Bottom, Anchor::Start) => sheet.left_0(),
+            (Side::Top | Side::Bottom, Anchor::End) => sheet.right_0(),
+            (Side::Left | Side::Right, Anchor::Start) => sheet.top_0(),
+            (Side::Left | Side::Right, Anchor::End) => sheet.bottom_0(),
         };
         if let Some(width) = self.width {
             sheet = sheet.w(px(width));

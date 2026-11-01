@@ -255,7 +255,7 @@ impl Render for ThemePicker {
                     .gap_3()
                     .border_b_1()
                     .border_color(theme.border)
-                    .child(Input::new(&self.search))
+                    .child(Input::new(&self.search).focus_bordered(false))
                     .child(
                         div()
                             .text_sm()

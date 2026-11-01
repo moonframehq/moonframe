@@ -204,6 +204,12 @@ fn describe(node: &Node) -> String {
             classes(&overlay.look),
             overlay.place.name()
         ),
+        Node::List(list) => format!(
+            "list{} {} ({} rows)",
+            classes(&list.look),
+            quote(&list.id),
+            list.count
+        ),
         Node::Problem(message) => format!("broken element ({})", quote(message)),
     }
 }
@@ -225,6 +231,7 @@ fn line(node: &Node) -> Option<u32> {
         Node::Input(input) => input.look.line,
         Node::Popover(popover) => popover.look.line,
         Node::Overlay(overlay) => overlay.look.line,
+        Node::List(list) => list.look.line,
         Node::Split(_)
         | Node::Divider
         | Node::Spacer
