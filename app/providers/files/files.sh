@@ -4,6 +4,7 @@
 # (`to = "provider:files"`). Exits when the app closes its stdin.
 #
 # Output: { root = "<folder name>", path = "<absolute path>",
+#           cwd = "<where a terminal starts: the launch folder, else path>",
 #           dirs = { [""] = entries, ["app/mods"] = entries, ... } }
 # where entries are { name, dir, ignored } with folders first, each group
 # sorted without regard to case. Only the root and the open folders are
@@ -12,8 +13,9 @@
 # Messages: `{ open = "app\napp/mods" }` sets which folders are open (their
 # paths from the root, one per line); anything else looks again.
 #
-# The root is the git repository the app runs from; set MOONFRAME_FILES to
-# show another folder. Without either it publishes `available = false`:
+# The root is the git repository `moonframe` was started in
+# (MOONFRAME_LAUNCH_DIR), else the one the app runs from; set MOONFRAME_FILES
+# to show another folder. Without either it publishes `available = false`:
 # it never falls back to a folder as broad as home. Plain bash (3.2 or later), no
 # jq or python: every string goes through `jstr`.
 
@@ -173,6 +175,7 @@ emit() {
     list_dir "" || return
     jstr "${ROOT##*/}" && out="{\"available\":true,\"root\":$J"
     jstr "$ROOT" && out+=",\"path\":$J"
+    jstr "$CWD" && out+=",\"cwd\":$J"
     out+=",\"dirs\":{\"\":[$ENTRIES_JSON]"
     for dir in "${OPEN[@]}"; do
         count=$((count + 1))
@@ -194,10 +197,19 @@ emit() {
 if [ -n "$MOONFRAME_FILES" ]; then
     ROOT=$MOONFRAME_FILES
 else
-    ROOT=$(git -C ../.. rev-parse --show-toplevel 2>/dev/null)
+    # The repository `moonframe` was started in, unless that is home (a
+    # dotfiles repository), else the one holding the app.
+    [ -n "$MOONFRAME_LAUNCH_DIR" ] &&
+        ROOT=$(git -C "$MOONFRAME_LAUNCH_DIR" rev-parse --show-toplevel 2>/dev/null)
+    if [ -z "$ROOT" ] || [ "$ROOT" -ef "$HOME" ]; then
+        ROOT=$(git -C ../.. rev-parse --show-toplevel 2>/dev/null)
+    fi
 fi
 ROOT=${ROOT%/}
 ROOT_REAL=$(cd "$ROOT" 2>/dev/null && pwd -P)
+# Where a terminal starts: the folder `moonframe` was started in, else the
+# root.
+CWD=${MOONFRAME_LAUNCH_DIR:-$ROOT}
 if [ -z "$ROOT" ] || [ -z "$ROOT_REAL" ]; then
     printf '%s\n' '{"available":false,"reason":"not in a git repository; set MOONFRAME_FILES to the folder to show"}'
     # Stay until the app closes stdin, as a provider should.

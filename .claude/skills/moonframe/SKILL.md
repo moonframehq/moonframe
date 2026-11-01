@@ -1576,8 +1576,9 @@ GitLab merge requests fill `prs` and `current_pr`.
 | `issues` | 30 open: `{ number, title, url, author, updated, labels = { { name, color } }, assignees = { login } }` |
 
 `app.files` (files): the project's files, every 3 s when they changed. The
-root is the git repository the app runs from, or `MOONFRAME_FILES`; with
-neither it is unavailable (never home). Only the root and the open folders are
+root is `MOONFRAME_FILES`, else the git repository `moonframe` was started
+in, else the one the app runs from; with none it is unavailable (never home).
+`cwd` is where a terminal starts: the launch folder, else the root. Only the root and the open folders are
 listed, so a large folder costs nothing until it is opened: send
 `{ open = "app\napp/mods" }`, the open folders' paths one per line, the
 whole set each time (`mods/explorer` does). `.git` and `.DS_Store` are

@@ -592,19 +592,27 @@ fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
     written
 }
 
-/// The project: `MOONFRAME_FILES`, else the git repository holding the app's
-/// folder (two above the provider's), found by its `.git`.
+/// The project: `MOONFRAME_FILES`, else the git repository the app was
+/// started in (unless that is home), else the one holding the app's folder
+/// (two above the provider's), found by its `.git`.
 fn root(dir: &Path) -> Option<PathBuf> {
     if let Some(folder) = std::env::var_os("MOONFRAME_FILES") {
         return PathBuf::from(folder).canonicalize().ok();
     }
     // As the `files` provider finds it, so a path the explorer gives names
     // the same file here.
-    let start = dir.join("..").join("..").canonicalize().ok()?;
-    start
-        .ancestors()
-        .find(|folder| folder.join(".git").exists())
-        .map(Path::to_owned)
+    let repository = |start: &Path| {
+        let start = start.canonicalize().ok()?;
+        start
+            .ancestors()
+            .find(|folder| folder.join(".git").exists())
+            .map(Path::to_owned)
+    };
+    let home = std::env::home_dir().and_then(|home| home.canonicalize().ok());
+    moonframe_providers::launch_dir()
+        .and_then(repository)
+        .filter(|found| Some(found) != home.as_ref())
+        .or_else(|| repository(&dir.join("..").join("..")))
 }
 
 fn writers(settings: &Data) -> Vec<String> {

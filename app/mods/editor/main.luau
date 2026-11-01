@@ -115,14 +115,15 @@ return mod {
 		local kind = kind_of(app.kinds, state.tab and state.tab.kind)
 		local content: any
 		if kind and TERMINALS[kind.kind] and not (kind.props and kind.props.cwd) then
-			-- A terminal starts in the project the explorer shows; it waits
+			-- A terminal starts in the folder `moonframe` was started from,
+			-- else in the project the explorer shows (else home); it waits
 			-- the moment until the files provider says which, as a shell
 			-- started elsewhere would stay there.
 			local files = app.files
 			if files ~= nil then
 				kind = table.clone(kind)
 				kind.props = table.clone(kind.props or {})
-				kind.props.cwd = if files.available then files.path else "~"
+				kind.props.cwd = if files.available then files.cwd or files.path else nil
 				content = tab_view { tab = state.tab, kind = kind }
 			end
 		else
