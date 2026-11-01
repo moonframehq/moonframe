@@ -731,3 +731,27 @@ fn a_static_file_swapped_for_a_link_is_refused_at_read() {
     std::os::unix::fs::symlink(root.join("outside.json"), root.join("linked.json")).unwrap();
     assert!(crate::fixed::read(&root.join("linked.json")).is_err());
 }
+
+#[test]
+fn a_wasm_provider_in_a_hook_free_parent_workspace_passes_the_check() {
+    // Members of one workspace that depend on each other share its root;
+    // each is checked once rather than until the depth limit refuses it.
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "Cargo.toml",
+        "[workspace]\nmembers = ['providers/sys', 'helper']\n[workspace.dependencies]\nhelper = { path = 'helper' }\n",
+    );
+    write(
+        root,
+        "providers/sys/Cargo.toml",
+        "[package]\nname = 'sys'\n[dependencies]\nhelper = { workspace = true }\n",
+    );
+    write(
+        root,
+        "helper/Cargo.toml",
+        "[package]\nname = 'helper'\n[dependencies]\nother = { workspace = true }\n",
+    );
+    crate::wasm::check_hooks(&root.join("providers/sys")).unwrap();
+}

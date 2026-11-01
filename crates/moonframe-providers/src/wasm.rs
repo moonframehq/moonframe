@@ -5,6 +5,7 @@
 use {
     crate::{Capability, Context, PREBUILT, json, system::SystemLoad},
     std::{
+        collections::HashSet,
         env, fs,
         path::{Path, PathBuf},
         process::{Command, Stdio},
@@ -132,7 +133,7 @@ fn cargo() -> Option<PathBuf> {
 /// scripts of published dependencies.
 fn build(context: &Context, cargo: &Path) -> Result<PathBuf, String> {
     tracing::info!(provider = %context.name, "building");
-    refuse_hooks(&context.dir, 0)?;
+    check_hooks(&context.dir)?;
     let toolchain = toolchain(&context.dir)?;
     let manifest = context.dir.join("Cargo.toml");
     let package = read_manifest(&context.dir)?
@@ -192,12 +193,27 @@ fn read_manifest(dir: &Path) -> Result<toml::Table, String> {
 
 /// Refuses build scripts in the crate at `dir` and the local crates it
 /// depends on or patches in: they would run with the user's access.
-fn refuse_hooks(dir: &Path, depth: usize) -> Result<(), String> {
+pub(crate) fn check_hooks(dir: &Path) -> Result<(), String> {
+    refuse_hooks(dir, 0, &mut Checked::default())
+}
+
+/// What was already checked: crates of one workspace depend on each other
+/// and share its root, and each is checked once.
+#[derive(Default)]
+struct Checked {
+    crates: HashSet<PathBuf>,
+    workspaces: HashSet<PathBuf>,
+}
+
+fn refuse_hooks(dir: &Path, depth: usize, checked: &mut Checked) -> Result<(), String> {
     // Cargo resolves `..` in a path dependency before it looks for the
     // workspace above it; walking the path as written could look elsewhere.
     let dir = &dir
         .canonicalize()
         .map_err(|error| format!("cannot read {}: {error}", dir.display()))?;
+    if !checked.crates.insert(dir.clone()) {
+        return Ok(());
+    }
     let hook = |what: &str| {
         Err(format!(
             "a wasm provider cannot have {what}: it would run code with your access while building"
@@ -240,8 +256,8 @@ fn refuse_hooks(dir: &Path, depth: usize) -> Result<(), String> {
         .iter()
         .filter_map(|section| section.get("dependencies").and_then(toml::Value::as_table))
         .collect();
-    refuse_local_crates(dir, tables, depth)?;
-    refuse_workspace_crates(dir, &manifest, depth)?;
+    refuse_local_crates(dir, tables, depth, checked)?;
+    refuse_workspace_crates(dir, &manifest, depth, checked)?;
     // A crate in a workspace of its own sees nothing above it; one that
     // belongs to a parent's inherits that workspace's dependencies
     // (`helper = { workspace = true }`) and its `[patch]`es.
@@ -254,13 +270,21 @@ fn refuse_hooks(dir: &Path, depth: usize) -> Result<(), String> {
     let root = root
         .canonicalize()
         .map_err(|error| format!("cannot read {}: {error}", root.display()))?;
+    if !checked.workspaces.insert(root.clone()) {
+        return Ok(());
+    }
     let parent = read_manifest(&root)?;
-    refuse_workspace_crates(&root, &parent, depth)
+    refuse_workspace_crates(&root, &parent, depth, checked)
 }
 
 /// Refuses hooks in the local crates a workspace root at `dir` lists for
 /// its members or swaps in with `[patch]` or `[replace]`.
-fn refuse_workspace_crates(dir: &Path, manifest: &toml::Table, depth: usize) -> Result<(), String> {
+fn refuse_workspace_crates(
+    dir: &Path,
+    manifest: &toml::Table,
+    depth: usize,
+    checked: &mut Checked,
+) -> Result<(), String> {
     let mut tables: Vec<&toml::Table> = manifest
         .get("workspace")
         .and_then(|workspace| workspace.get("dependencies"))
@@ -276,11 +300,16 @@ fn refuse_workspace_crates(dir: &Path, manifest: &toml::Table, depth: usize) -> 
             .filter_map(toml::Value::as_table),
     );
     tables.extend(manifest.get("replace").and_then(toml::Value::as_table));
-    refuse_local_crates(dir, tables, depth)
+    refuse_local_crates(dir, tables, depth, checked)
 }
 
 /// Follows each `path` dependency in `tables`, relative to `dir`.
-fn refuse_local_crates(dir: &Path, tables: Vec<&toml::Table>, depth: usize) -> Result<(), String> {
+fn refuse_local_crates(
+    dir: &Path,
+    tables: Vec<&toml::Table>,
+    depth: usize,
+    checked: &mut Checked,
+) -> Result<(), String> {
     for path in tables
         .into_iter()
         .flat_map(|table| table.values())
@@ -291,7 +320,7 @@ fn refuse_local_crates(dir: &Path, tables: Vec<&toml::Table>, depth: usize) -> R
                 "local crates nest deeper than {MAX_LOCAL_CRATES} at `{path}`"
             ));
         }
-        refuse_hooks(&dir.join(path), depth + 1)?;
+        refuse_hooks(&dir.join(path), depth + 1, checked)?;
     }
     Ok(())
 }
