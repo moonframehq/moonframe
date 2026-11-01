@@ -1,6 +1,6 @@
 name: Debug Windows ARM (temporary)
 
-# TEMPORARY: a stack trace of the access violation on Windows ARM64.
+# TEMPORARY: which Luau build flags stop the heap corruption on Windows ARM64.
 
 on:
   pull_request:
@@ -13,21 +13,22 @@ defaults:
 
 jobs:
   trace:
+    name: Luau with '${{ matrix.flags }}'
     runs-on: windows-11-arm
     timeout-minutes: 60
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        flags: ['/EHc-', '/DLUA_USE_LONGJMP=1']
+    env:
+      LUAU_CXXFLAGS: ${{ matrix.flags }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install the pinned Rust toolchain
         run: rustup toolchain install
-      - name: Build the core tests
-        run: cargo test --locked -p moonframe-core --no-run
-      - name: Run them under cdb
-        run: |
-          find "/c/Program Files (x86)/Windows Kits/10/Debuggers" -name cdb.exe || true
-          cdb="/c/Program Files (x86)/Windows Kits/10/Debuggers/arm64/cdb.exe"
-          exe=$(find target/debug/deps -name "moonframe_core-*.exe" | head -1)
-          "$cdb" -g -G -c 'sxe -c "r; kn 80; q" av; g' "$exe" --test-threads=1 || true
+      - name: Test the core
+        run: cargo test --locked -p moonframe-core -- --test-threads=1
