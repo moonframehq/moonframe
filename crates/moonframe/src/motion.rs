@@ -14,6 +14,10 @@ use {
     },
 };
 
+mod slow;
+
+pub(crate) use slow::{is_slow, now, set_slow};
+
 #[derive(Default)]
 pub(crate) struct Motion {
     panes: HashMap<String, Track>,
