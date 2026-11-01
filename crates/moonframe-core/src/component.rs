@@ -7,7 +7,7 @@
 
 use {
     crate::{
-        Data, Error, IconName, Node, Rules, Stylesheet, node,
+        Data, Error, IconName, Node, Rules, Stylesheet, TabKind, node,
         read::{Cx, Fields, NO_NAMES, Read as _},
         vm::{self, Meter},
     },
@@ -49,15 +49,41 @@ impl Library {
         ))
     }
 
-    /// `use(name)` for a module's state: the component's `build`.
+    /// `use(name)` for a module's state: the component's `build`. For a
+    /// component that keeps state (it has `update`), a function that mounts
+    /// an instance of it instead: `tabbed { id = "main", ... }` becomes an
+    /// `instance` element, which the app gives state of its own.
     pub(crate) fn install(&self, lua: &Lua) -> mlua::Result<()> {
         let library = self.clone();
         let use_ = lua.create_function(move |lua, name: String| {
-            library
-                .load(lua, &name)
-                .and_then(|table| table.get::<Function>("build"))
+            let table = library.load(lua, &name)?;
+            if table.get::<Option<Function>>("update")?.is_none() {
+                return table.get::<Function>("build");
+            }
+            lua.create_function(move |lua, props: Value| {
+                let id = match &props {
+                    Value::Table(props) => props.get::<Option<String>>("id")?,
+                    _ => None,
+                };
+                let node = lua.create_table()?;
+                node.raw_set("type", "instance")?;
+                node.raw_set("component", name.as_str())?;
+                node.raw_set("id", id.unwrap_or_else(|| "main".to_owned()))?;
+                node.raw_set("props", props)?;
+                Ok(node)
+            })
         })?;
         lua.globals().raw_set("use", use_)
+    }
+
+    /// The file the component `name` comes from.
+    pub(crate) fn path(&self, name: &str) -> Option<PathBuf> {
+        self.0.get(name).map(|source| source.path.clone())
+    }
+
+    /// The component `name`'s definition table, for an instance's own state.
+    pub(crate) fn definition(&self, lua: &Lua, name: &str) -> mlua::Result<Table> {
+        self.load(lua, name)
     }
 
     /// The component `name`'s definition, run once per state.
@@ -131,6 +157,7 @@ impl Library {
                     when: about.when.unwrap_or_default(),
                     props: about.props,
                     icon: about.icon,
+                    tab: about.tab,
                     demo: about
                         .usage
                         .is_none()
@@ -161,6 +188,8 @@ pub struct Component {
     pub props: BTreeMap<String, String>,
     /// Shown beside its title in the browser.
     pub icon: Option<IconName>,
+    /// Offered as a kind of tab, when it says so.
+    pub tab: Option<TabKind>,
     /// Luau that uses it, for the user or an agent to paste into a mod.
     pub usage: String,
     /// A whole mod that shows it, run live in the browser's preview: the
@@ -210,6 +239,7 @@ struct About {
     props: BTreeMap<String, String>,
     rules: Result<Rules, Error>,
     icon: Option<IconName>,
+    tab: Option<TabKind>,
     usage: Option<String>,
     example: Option<Data>,
 }
@@ -224,6 +254,7 @@ impl Default for About {
             props: BTreeMap::new(),
             rules: Ok(Rules::default()),
             icon: None,
+            tab: None,
             usage: None,
             example: None,
         }
@@ -250,6 +281,10 @@ fn describe(
         "usage",
         "example",
         "build",
+        "init",
+        "update",
+        "tab",
+        "subscribe",
     ]])?;
     let styles = fields.raw("styles").cloned().unwrap_or(Value::Nil);
     let example = fields.raw("example").cloned().unwrap_or(Value::Nil);
@@ -262,13 +297,28 @@ fn describe(
         rules: Option::<Rules>::read(&styles, &Cx::root(sheet.names()).key("styles"))
             .map(Option::unwrap_or_default),
         icon: fields.get("icon")?,
+        tab: fields.get("tab")?,
         usage: fields.get("usage")?,
-        example: Data::read(&example).ok(),
+        // No example is no example, not an empty one.
+        example: Data::read(&example)
+            .ok()
+            .filter(|example| *example != Data::Nil),
     };
     meter.reset();
     let preview = table
         .get::<Function>("build")
-        .and_then(|build| build.call::<Value>(example))
+        .and_then(|build| {
+            // One that keeps state is drawn as it starts: `init`, then
+            // `build(props, state)`.
+            if table.get::<Option<Function>>("update")?.is_none() {
+                return build.call::<Value>(example);
+            }
+            let state = match table.get::<Option<Function>>("init")? {
+                Some(init) => init.call::<Value>((Value::Nil, example.clone()))?,
+                None => Value::Nil,
+            };
+            build.call::<Value>((example, state))
+        })
         .map_err(|error| Error::from(error).context("build"))
         .and_then(|tree| {
             // A preview shows its marked children; a problem with them still

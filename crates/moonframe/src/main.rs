@@ -13,6 +13,7 @@ mod gallery;
 mod input;
 mod inspect;
 mod keys;
+mod mod_window;
 mod motion;
 mod overlay;
 mod packages;
@@ -274,10 +275,18 @@ fn main() -> ExitCode {
             })
             .detach();
 
-            // The shell says what window it wants, so it loads first.
-            let workspace = Workspace::open(
+            // The shell says what window it wants, so it loads first. With a
+            // user folder, each mod's state comes back from the last run.
+            let persist = user.as_ref().and_then(|_| {
+                moonframe_store::Store::open(&paths::state())
+                    .inspect_err(|error| tracing::warn!("{error}; state will not be saved"))
+                    .ok()
+                    .map(|store| Box::new(store) as Box<dyn moonframe_core::Persist>)
+            });
+            let workspace = Workspace::open_with(
                 paths::roots(builtin.clone(), user.clone()),
                 cx.theme().is_dark(),
+                persist,
             );
             let chrome = workspace.chrome();
             let bounds = Bounds::centered(None, size(px(1280.), px(820.)), cx);

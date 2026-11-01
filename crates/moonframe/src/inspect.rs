@@ -192,6 +192,10 @@ fn describe(node: &Node) -> String {
         Node::Spacer => "spacer".to_owned(),
         Node::Region(region) => format!("region {}", quote(&region.name)),
         Node::Mount(name) => format!("mount {}", quote(name)),
+        Node::Instance(instance) => match &instance.of {
+            moonframe_core::InstanceOf::Mod(name) => format!("mod {name} #{}", instance.id),
+            moonframe_core::InstanceOf::Component(name) => format!("{name} #{}", instance.id),
+        },
         Node::Popover(popover) => format!("popover{}", classes(&popover.look)),
         Node::Overlay(overlay) => format!(
             "overlay{} ({})",
@@ -222,6 +226,7 @@ fn line(node: &Node) -> Option<u32> {
         | Node::Spacer
         | Node::Region(_)
         | Node::Mount(_)
+        | Node::Instance(_)
         | Node::Problem(_) => None,
     }
 }
