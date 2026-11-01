@@ -1,6 +1,6 @@
 name: Debug Windows ARM (temporary)
 
-# TEMPORARY: which Luau build flags stop the heap corruption on Windows ARM64.
+# TEMPORARY: what corrupts Luau's heap on Windows ARM64.
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ defaults:
 
 jobs:
   trace:
-    name: Luau with '${{ matrix.flags }}'
+    name: Core tests with '${{ matrix.rustflags }}'
     runs-on: windows-11-arm
     timeout-minutes: 60
     permissions:
@@ -21,9 +21,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flags: ['/EHc-', '/DLUA_USE_LONGJMP=1']
+        rustflags: ['-Ctarget-feature=-crt-static', '-Ctarget-feature=+crt-static']
     env:
-      LUAU_CXXFLAGS: ${{ matrix.flags }}
+      RUSTFLAGS: ${{ matrix.rustflags }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -32,3 +32,10 @@ jobs:
         run: rustup toolchain install
       - name: Test the core
         run: cargo test --locked -p moonframe-core -- --test-threads=1
+      - name: Trace an optimized build under cdb
+        if: failure()
+        run: |
+          cargo test --locked --release -p moonframe-core --no-run
+          cdb="/c/Program Files (x86)/Windows Kits/10/Debuggers/arm64/cdb.exe"
+          exe=$(find target/release/deps -name "moonframe_core-*.exe" | head -1)
+          "$cdb" -g -G -c 'sxe -c "r; kn 60; q" av; sxe -c "r; kn 60; q" dz; sxe -c "kn 60; q" bpe; g' "$exe" --test-threads=1 || true
