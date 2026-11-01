@@ -220,3 +220,28 @@ do {
     }
     save(cx, "examples/stage/icon.png")
 }
+
+// Gantry: a dark console, three tick meters (CPU blue, GPU green, memory
+// orange) under an orange chip.
+do {
+    let cx = body([0x3a3a3a, 0x1f1f1f, 0x0d0d0d])
+    fill(cx, CGRect(x: 196, y: 196, width: 632, height: 632), 6, color(0x161616))
+    cx.setStrokeColor(color(0x3a3a3a))
+    cx.setLineWidth(4)
+    cx.stroke(CGRect(x: 196, y: 196, width: 632, height: 632))
+    fill(cx, CGRect(x: 250, y: 640, width: 128, height: 128), 4, color(0xf26b1d))
+    cx.setStrokeColor(color(0xffffff))
+    cx.setLineWidth(10)
+    cx.stroke(CGRect(x: 284, y: 674, width: 60, height: 60))
+    fill(cx, CGRect(x: 410, y: 716, width: 250, height: 26), 2, color(0xe6e6e6))
+    fill(cx, CGRect(x: 410, y: 668, width: 160, height: 20), 2, color(0x8a8a8a))
+    for (row, (tint, lit)) in [(0x3b82f6, 0.57), (0x22c55e, 0.82), (0xf97316, 0.2)].enumerated() {
+        let y = 520 - CGFloat(row) * 120
+        for tick in 0..<26 {
+            let x = 250 + CGFloat(tick) * 20
+            let on = Double(tick) < lit * 26
+            fill(cx, CGRect(x: x, y: y, width: 9, height: 76), 1, color(on ? UInt32(tint) : 0x2e2e2e))
+        }
+    }
+    save(cx, "examples/gantry/icon.png")
+}
