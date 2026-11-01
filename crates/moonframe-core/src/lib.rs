@@ -32,6 +32,7 @@ mod error;
 mod keys;
 mod module;
 mod node;
+mod persist;
 mod read;
 mod roots;
 mod style;
@@ -46,15 +47,16 @@ pub use {
     keys::{Chord, Keys, Pressed},
     module::Meta,
     node::*,
+    persist::Persist,
     roots::{Roots, mod_name},
     style::{
-        Case, Color, Curve, Font, Look, MonoFont, Paint, Part, Resolved, Rules, Shade, Shadow,
-        ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition,
+        Case, Color, Corners, Curve, Font, Look, MonoFont, Paint, Part, Resolved, Rules, Shade,
+        Shadow, ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition,
         TransitionKind,
     },
     vm::printable,
     window::{Chrome, Platform, Titlebar, WindowState},
-    workspace::{PROVIDER, SHELL, Slot, Workspace},
+    workspace::{DEMO, PROVIDER, SHELL, Slot, Workspace},
 };
 
 #[cfg(test)]

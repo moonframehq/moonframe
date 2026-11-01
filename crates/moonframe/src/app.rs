@@ -9,6 +9,7 @@ use {
         gallery::Gallery,
         input::Inputs,
         inspect::{self, Inspector, Placed},
+        mod_window::ModWindow,
         motion::Motion,
         packages, paths,
         render::{KeyLayer, Painter},
@@ -29,6 +30,7 @@ use {
     moonframe_providers::{Event, Providers},
     notify::{RecommendedWatcher, RecursiveMode, Watcher as _},
     std::{
+        collections::HashMap,
         path::{Path, PathBuf},
         rc::Rc,
         sync::Arc,
@@ -69,6 +71,8 @@ pub(crate) struct MoonframeApp {
     scheme: Option<&'static Scheme>,
     preview: Option<Option<&'static Scheme>>,
     themes: Option<WindowHandle<component::Root>>,
+    /// Mods open in windows of their own (`window = "<mod>"`), by name.
+    mod_windows: HashMap<String, WindowHandle<component::Root>>,
     /// The built-in app and the user's folder, from which the app's layers
     /// are found again when the user installs a package.
     builtin: PathBuf,
@@ -164,6 +168,7 @@ impl MoonframeApp {
             scheme,
             preview: None,
             themes: None,
+            mod_windows: HashMap::new(),
             builtin,
             user,
             settings,
@@ -340,6 +345,13 @@ impl MoonframeApp {
                 && moonframe_core::is_remote_url(&url)
             {
                 cx.open_url(&url);
+            }
+            return;
+        }
+        if let Action::Window(name) = action {
+            // A preview opens nothing.
+            if !from.starts_with(moonframe_core::DEMO) {
+                self.show_mod_window(name, cx);
             }
             return;
         }
@@ -548,6 +560,57 @@ impl MoonframeApp {
                 });
             },
         }
+    }
+
+    /// Opens the mod `name` in a window of its own, or raises it.
+    fn show_mod_window(&mut self, name: &str, cx: &mut Context<Self>) {
+        let Some(slot) = self.workspace.slot(name) else {
+            tracing::warn!("no mod `{name}` to open in a window");
+            return;
+        };
+        let title = slot
+            .meta()
+            .and_then(|meta| meta.title.clone())
+            .unwrap_or_else(|| name.to_owned());
+        let open = self.mod_windows.get(name).copied().filter(|handle| {
+            cx.windows()
+                .iter()
+                .any(|window| window.window_id() == handle.window_id())
+        });
+        // After this update, as for the components window: the click may
+        // have come from that window, which is busy until it returns.
+        match open {
+            Some(_) if crate::background() => {},
+            Some(handle) => cx.defer(move |cx| {
+                let _ = handle.update(cx, |_, window, _| window.activate_window());
+            }),
+            None => {
+                let app = cx.entity();
+                let name = name.to_owned();
+                cx.defer(move |cx| {
+                    if let Some(handle) = ModWindow::open(app.clone(), name.clone(), title, cx) {
+                        app.update(cx, |app, _| app.mod_windows.insert(name, handle));
+                    }
+                });
+            },
+        }
+    }
+
+    /// A mod window's content, and whether it is still moving.
+    pub(crate) fn mod_window_content(
+        &mut self,
+        name: &str,
+        cx: &mut Context<Self>,
+    ) -> (AnyElement, bool) {
+        let mut painter = Painter::new(
+            &self.workspace,
+            &mut self.motion,
+            &mut self.terminals,
+            &self.inputs,
+            None,
+        );
+        let content = painter.window(name, cx);
+        (content, painter.animating())
     }
 
     /// The browser window's content.
@@ -849,6 +912,8 @@ fn watch(
 impl Render for MoonframeApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.inputs.begin_frame();
+        let last_keyed = self.motion.begin_frame();
+        self.terminals.begin_frame();
         let mut painter = Painter::new(
             &self.workspace,
             &mut self.motion,
@@ -856,13 +921,19 @@ impl Render for MoonframeApp {
             &self.inputs,
             self.inspector.sink(),
         )
-        .with_browsers(&mut self.browsers);
+        .with_browsers(&mut self.browsers)
+        .with_keyed(&last_keyed);
         let body = painter.shell(cx);
         if painter.animating() {
             window.request_animation_frame();
         }
         let key_layers = painter.take_key_layers();
         self.key_layers = key_layers;
+        // A terminal that just appeared (a new tab, or one selected) takes
+        // the keyboard, once it is drawn.
+        if let Some(focus) = self.terminals.take_appeared() {
+            window.defer(cx, move |window, cx| focus.focus(window, cx));
+        }
         let layers = self.inspector_layers(window.viewport_size(), cx);
         let toast = self
             .toast

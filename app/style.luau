@@ -15,6 +15,13 @@ return style {
 	-- Every animation at once: 2 is twice as fast, 0.5 half, 0 turns them off.
 	animation_speed = 1,
 
+	-- The look each kind of component takes, unless its code picks one.
+	-- Tabs: pills, underline, outline, cards, compact, classic, square,
+	-- curved (the selected tab runs on into the main card, and the title bar
+	-- moves over it), or your own: define `.tabs-<name>` and
+	-- `.tabs-<name>-tab` rules below.
+	looks = { tabs = "pills" },
+
 	colors = {
 		-- Names the theme already has re-theme the whole app, buttons included,
 		-- in the Default theme; one picked in View > Themes brings its own.
@@ -27,8 +34,10 @@ return style {
 	rules = {
 		-- Panels float as rounded cards on the sidebar background.
 		panel = { background = "card", radius = 12, margin = { 8, 6 }, border = true },
-		-- A terminal takes its panel's color, so it runs on into the header.
-		terminal = { background = "card" },
+		-- A terminal takes its panel's color, so it runs on into the header,
+		-- and its corners, inside the panel's border, so its background stays
+		-- within the card's rounded corners.
+		terminal = { background = "card", radius = 11 },
 		-- Padding and margin take one value, { y, x }, { top, right, bottom, left },
 		-- or named edges such as { x = 14, top = 10 }.
 		["panel-header"] = { border = "none", padding = { top = 10, x = 14 }, color = "accent" },
@@ -95,7 +104,13 @@ return style {
 		[".usage-tab-label"] = { size = "small" },
 
 		-- Classes: opt in with `class = "..."` on an element.
-		[".toolbar"] = { background = "card", border = "bottom", padding = { 4, 8 } },
+		[".toolbar"] = { background = "sidebar", border = "bottom", padding = { 0, 8 } },
+		-- Under curved tabs: no line where the selected tab meets the card,
+		-- and the card starts right under the strip.
+		[".toolbar-joined"] = { border = "none" },
+		[".tab-card-joined"] = { margin = { top = 0 }, border = "none" },
+		-- A window in the background dims its title bar, as the system's does.
+		[".toolbar-inactive"] = { opacity = 0.75 },
 		[".toolbar-title"] = { size = "small", color = "muted-foreground" },
 		[".tool"] = { padding = 6, radius = 6, color = "muted-foreground" },
 		[".tool:hover"] = { background = "accent/10", color = "foreground" },

@@ -59,7 +59,9 @@ type Style = {
 	color: Color?,
 	border: Border?,
 	border_color: Color?,
-	radius: number?,
+	-- One radius, or each corner's clockwise from the top left as in CSS:
+	-- { 8, 8, 0, 0 } rounds the top only.
+	radius: (number | { number })?,
 	padding: Sides?,
 	gap: Spacing?,
 	margin: Sides?,
@@ -123,6 +125,13 @@ type StackProps = {
 	-- Moves the window when dragged and zooms it on a double click, like a
 	-- title bar; buttons and clickable stacks inside still take clicks.
 	drag: boolean?,
+	-- Names it among its siblings (1 to 64 of a-z, 0-9, - and _), so it stays
+	-- itself as they come and go: with a `transition` rule it grows in when
+	-- it appears and shrinks away when it goes, as tabs open and close.
+	key: string?,
+	-- Opens the mod named this in a window of its own (or raises it) when
+	-- clicked: a tool that stays open beside the main window. Takes no `msg`.
+	window: string?,
 	[number]: Child,
 }
 
@@ -629,7 +638,8 @@ declare ui: {
 	divider: () -> Element,
 	spacer: () -> Element,
 	region: (props: string | RegionProps) -> Element,
-	mount: (name: string) -> Element,
+	-- With an `id`, an instance of the mod with state of its own.
+	mount: (name: string | MountProps) -> Element,
 	popover: (props: PopoverProps) -> Element,
 	overlay: (props: OverlayProps) -> Element,
 }
@@ -880,12 +890,24 @@ type FileEntry = {
 }
 
 type Files = {
+	-- False outside a git repository unless MOONFRAME_FILES is set; then
+	-- only `reason` comes with it.
+	available: boolean,
+	reason: string?,
 	-- The root folder's name, and its absolute path.
 	root: string,
 	path: string,
 	-- Entries of the root (key "") and of each open folder (its path from
 	-- the root), folders first, each group sorted without regard to case.
 	dirs: { [string]: { FileEntry } },
+}
+
+-- `ui.mount { "explorer", id = "files-2", props = { ... } }`.
+type MountProps = {
+	mod: string?,
+	id: string?,
+	props: any,
+	[number]: string,
 }
 
 -- What every `view` gets as `app`.
@@ -902,6 +924,10 @@ type App = {
 	gitlab: Forge?,
 	agents: Agents?,
 	files: Files?,
+	-- What tab bars can open: each component and mod with a `tab` entry.
+	kinds: { TabKind },
+	-- The stylesheet's `looks`: which look each kind of component takes.
+	looks: { [string]: string },
 	-- What each provider in app/providers/ publishes, as `app.<name>`.
 	[string]: any,
 }
@@ -920,13 +946,42 @@ type Window = {
 	traffic_lights: { x: number?, y: number? }?,
 }
 
+-- What a component or mod offers tab bars (`tabbed`): its + menu lists it,
+-- and a new tab of it starts with `props`. `report` names the prop a tab
+-- passes as a message, whose `url` and `title` the tab keeps (a browser's
+-- `navigate`).
+type TabEntry = {
+	title: string?,
+	icon: IconName?,
+	props: any,
+	report: string?,
+}
+
+-- One of `app.kinds`: what a tab bar can open.
+type TabKind = {
+	-- "component:terminal" or "mod:explorer".
+	kind: string,
+	title: string,
+	icon: string?,
+	props: any,
+	report: string?,
+}
+
 type Mod<State> = {
-	init: ((previous: State?) -> State)?,
+	-- `props` is what an instance was mounted with (`ui.mount { "name",
+	-- id = ..., props = ... }`), nil for a mod in its own place.
+	init: ((previous: State?, props: any?) -> State)?,
 	-- Returns nothing to keep the state it changed in place, or the new
 	-- state and optionally a list of `Send`s. Its results are left untyped
-	-- so it may return nothing on some paths; the host checks them.
-	update: ((state: State, msg: any) -> ...any)?,
-	view: (state: State, app: App) -> Child,
+	-- so it may return nothing on some paths; the host checks them. A
+	-- subscribed topic arrives as `{ topic = "<name>", value = ... }`.
+	update: ((state: State, msg: any, props: any?) -> ...any)?,
+	view: (state: State, app: App, props: any?) -> Child,
+	-- Topics it hears in `update`: names, or prefixes ending in `*`.
+	-- `provider/<name>` carries a provider's data as it changes.
+	subscribe: { string }?,
+	-- Offered as a kind of tab: each tab mounts an instance of it.
+	tab: TabEntry?,
 	region: string?,
 	order: number?,
 	title: string?,
@@ -958,6 +1013,9 @@ type Stylesheet = {
 	font_family: string?,
 	mono: MonoFont?,
 	radius: number?,
+	-- The look each kind of component takes unless its code picks one:
+	-- `{ tabs = "cards" }`. Views read it as `app.looks`.
+	looks: { [string]: string }?,
 	-- Each one hex color, or `{ light = ..., dark = ... }`. Typed `any`:
 	-- Luau cannot check a map of unions against a table literal, so the host
 	-- checks each entry when it loads the stylesheet.
@@ -991,7 +1049,14 @@ type Component<Props> = {
 	usage: string?,
 	-- Props for the preview.
 	example: any,
-	build: (props: Props) -> Child,
+	-- With `update`, it keeps state: each `use` call with an `id` mounts an
+	-- instance, and `build` gets `(props, state, app)`.
+	build: (props: Props, state: any?, app: App?) -> Child,
+	init: ((previous: any?, props: Props) -> any)?,
+	-- Sends `to = "parent"` reach the module that drew it.
+	update: ((state: any, msg: any, props: Props) -> ...any)?,
+	subscribe: { string }?,
+	tab: TabEntry?,
 }
 
 declare function component<Props>(definition: Component<Props>): Component<Props>

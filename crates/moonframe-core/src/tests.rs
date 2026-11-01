@@ -1,7 +1,7 @@
 use {
     crate::{
-        Action, Border, Color, Command, Data, Direction, Node, Paint, Part, Rules, SHELL, Shade,
-        Shadow, ShadowLayer, ShadowPreset, Sides, Token, Workspace,
+        Action, Border, Color, Command, Corners, Data, Direction, Node, Paint, Part, Rules, SHELL,
+        Shade, Shadow, ShadowLayer, ShadowPreset, Sides, Token, Workspace,
     },
     std::{fs, path::Path},
 };
@@ -469,7 +469,7 @@ fn stylesheets_layer_type_class_and_inline_rules() {
         .resolve(Part::Panel, &panel.look, false, &Rules::default())
         .base;
     // The class overrides the type's padding; the element's own style wins.
-    assert_eq!(style.radius, Some(2.0));
+    assert_eq!(style.radius, Some(Corners::all(2.0)));
     assert_eq!(style.padding, Sides::all(3.0));
     assert_eq!(style.shadow, Some(Shadow::Preset(ShadowPreset::Small)));
     assert_eq!(
@@ -655,6 +655,58 @@ fn padding_and_margin_take_each_edge() {
 }
 
 #[test]
+fn radius_takes_one_value_or_each_corner() {
+    let corners = |value: &str| {
+        let dir = app(&[]);
+        let sheet = format!("return style {{ rules = {{ panel = {{ radius = {value} }} }} }}");
+        write(dir.path(), "style.luau", &sheet);
+        let workspace = Workspace::open(dir.path(), false);
+        match workspace.style_error() {
+            Some(error) => Err(error.to_string()),
+            None => Ok(workspace
+                .stylesheet()
+                .resolve(
+                    Part::Panel,
+                    &crate::Look::default(),
+                    false,
+                    &Rules::default(),
+                )
+                .base
+                .radius),
+        }
+    };
+    let each = |top_left, top_right, bottom_right, bottom_left| {
+        Ok(Some(Corners {
+            top_left,
+            top_right,
+            bottom_right,
+            bottom_left,
+        }))
+    };
+    assert_eq!(corners("6"), Ok(Some(Corners::all(6.0))));
+    assert_eq!(corners("{ 8, 8, 0, 0 }"), each(8.0, 8.0, 0.0, 0.0));
+    assert_eq!(corners("{ 4, 0 }"), each(4.0, 0.0, 4.0, 0.0));
+    assert_eq!(Corners::all(3.0).uniform(), Some(3.0));
+    assert_eq!(
+        Corners {
+            top_left: 1.0,
+            ..Corners::all(0.0)
+        }
+        .uniform(),
+        None
+    );
+    for (value, expected) in [
+        ("{ 1, 2, 3 }", "1, 2, or 4 values"),
+        ("{ 1, top = 2 }", "only numbers"),
+        ("-1", "from 0 to 1000"),
+        ("'round'", "a radius in pixels"),
+    ] {
+        let error = corners(value).err().unwrap_or_default();
+        assert!(error.contains(expected), "{value}: {error}");
+    }
+}
+
+#[test]
 fn mods_bring_styles_scoped_to_what_they_draw() {
     let fancy = r#"return mod {
       styles = {
@@ -694,7 +746,7 @@ fn mods_bring_styles_scoped_to_what_they_draw() {
     let fancy = style("fancy");
     // The stylesheet outranks the mod at the same step; the mod keeps the
     // rest, and its class rule outranks the stylesheet's type rule.
-    assert_eq!(fancy.radius, Some(9.0));
+    assert_eq!(fancy.radius, Some(Corners::all(9.0)));
     assert_eq!(fancy.padding, Sides::all(2.0));
     assert_eq!(fancy.weight, Some(crate::Weight::Medium));
     assert_eq!(
@@ -1021,6 +1073,8 @@ fn the_type_definitions_cover_what_the_host_accepts() {
     let definitions = include_str!("../../../types/moonframe.d.luau");
     let missing: Vec<String> = Element::NAMES
         .iter()
+        // `use` and `ui.mount { id = ... }` build instances; no mod calls it.
+        .filter(|name| **name != "instance")
         .filter(|name| !definitions.contains(&format!("\t{name}: (")))
         .map(|name| format!("ui.{name}"))
         .chain(
@@ -1200,7 +1254,7 @@ fn the_users_folder_goes_over_the_apps() {
         )
         .base;
     // The user's radius, over the app's background and shadow.
-    assert_eq!(style.radius, Some(4.0));
+    assert_eq!(style.radius, Some(Corners::all(4.0)));
     assert_eq!(style.shadow, Some(Shadow::Preset(ShadowPreset::Small)));
     assert!(style.background.is_some());
 }
@@ -1382,7 +1436,7 @@ fn component_styles_sit_under_the_stylesheet_and_reach_every_mod() {
         .resolve(Part::Row, &tab.look, tab.selected, slot.rules());
     // The stylesheet's radius wins; the component's padding and selected
     // color stand where nothing overrides them.
-    assert_eq!(resolved.base.radius, Some(9.0));
+    assert_eq!(resolved.base.radius, Some(Corners::all(9.0)));
     assert_eq!(resolved.base.padding, Sides::all(6.0));
     assert!(resolved.base.color.is_some());
 
@@ -1671,7 +1725,7 @@ fn overlay_parts_are_selectors() {
     let overlay = workspace
         .stylesheet()
         .resolve(Part::Overlay, &look, false, &Rules::default());
-    assert_eq!(overlay.base.radius, Some(12.0));
+    assert_eq!(overlay.base.radius, Some(Corners::all(12.0)));
     assert!(overlay.base.transition.is_some());
     let backdrop =
         workspace
@@ -2396,4 +2450,741 @@ fn focus_and_disabled_states_layer_over_the_resting_rule() {
     let error = workspace.style_error().unwrap().to_string();
     assert!(error.contains("unknown state `pressed`"), "{error}");
     assert!(error.contains("focus, disabled"), "{error}");
+}
+
+/// Keeps saved state in memory, and counts the saves.
+#[derive(Clone, Default)]
+struct Memory(std::rc::Rc<std::cell::RefCell<(std::collections::BTreeMap<String, Data>, usize)>>);
+
+impl crate::Persist for Memory {
+    fn state(&self, key: &str) -> Option<Data> {
+        self.0.borrow().0.get(key).cloned()
+    }
+
+    fn save_state(&self, key: &str, value: &Data) {
+        let mut inner = self.0.borrow_mut();
+        inner.0.insert(key.to_owned(), value.clone());
+        inner.1 += 1;
+    }
+
+    fn topics(&self) -> std::collections::BTreeMap<String, Data> {
+        self.0
+            .borrow()
+            .0
+            .iter()
+            .filter_map(|(key, value)| {
+                Some((key.strip_prefix("topic:")?.to_owned(), value.clone()))
+            })
+            .collect()
+    }
+
+    fn save_topic(&self, name: &str, value: &Data) {
+        self.0
+            .borrow_mut()
+            .0
+            .insert(format!("topic:{name}"), value.clone());
+    }
+}
+
+#[test]
+fn mod_state_outlives_the_workspace() {
+    let dir = app(&[("counter", COUNTER)]);
+    let memory = Memory::default();
+    let mut workspace = Workspace::open_with(dir.path(), false, Some(Box::new(memory.clone())));
+    workspace.send("counter", "counter", Data::from("add"));
+    workspace.send("counter", "counter", Data::from("add"));
+    let saved = memory.0.borrow().0.get("mod:counter").cloned();
+    assert_eq!(
+        saved,
+        Some(Data::Map([("count".to_owned(), Data::Integer(2))].into()))
+    );
+    // A change saves once; an unchanged state is not saved again.
+    let saves = memory.0.borrow().1;
+    workspace.reload();
+    assert_eq!(memory.0.borrow().1, saves);
+
+    // A new workspace, as at the next launch, starts where the last one left off.
+    drop(workspace);
+    let workspace = Workspace::open_with(dir.path(), false, Some(Box::new(memory)));
+    assert_eq!(panel_text(&workspace, "counter"), "count 2");
+}
+
+/// A mod that counts, shows the label it was mounted with, and starts from
+/// its props' `start`.
+const TALLY: &str = r#"
+return mod {
+  init = function(previous, props)
+    return previous or { count = props and props.start or 0 }
+  end,
+  update = function(state, msg)
+    if msg == "add" then state.count += 1 end
+  end,
+  view = function(state, app, props)
+    return ui.text(`{props and props.label or "?"} {state.count}`)
+  end,
+}
+"#;
+
+/// The text an instance's view draws.
+fn instance_text(workspace: &Workspace, key: &str) -> String {
+    match workspace.slot(key).and_then(crate::Slot::view) {
+        Some(Node::Text(text)) => text.text.clone(),
+        other => panic!("{key}: {other:?}"),
+    }
+}
+
+#[test]
+fn a_mod_mounted_twice_keeps_two_states() {
+    let dir = app(&[("tally", TALLY)]);
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod { view = function()
+            return ui.column {
+              ui.mount { "tally", id = "a", props = { label = "A" } },
+              ui.mount { "tally", id = "b", props = { label = "B", start = 10 } },
+            }
+        end }"#,
+    );
+    let mut workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    assert_eq!(instance_text(&workspace, "tally#a"), "A 0");
+    assert_eq!(instance_text(&workspace, "tally#b"), "B 10");
+    // A click inside an instance goes to that instance only.
+    workspace.send("tally#a", "tally#a", Data::from("add"));
+    assert_eq!(instance_text(&workspace, "tally#a"), "A 1");
+    assert_eq!(instance_text(&workspace, "tally#b"), "B 10");
+}
+
+const CLICKER: &str = r#"
+return component {
+  title = "Clicker",
+  example = { name = "demo" },
+  init = function(previous, props) return previous or { clicks = 0 } end,
+  update = function(state, msg, props)
+    if msg == "click" then
+      state.clicks += 1
+      return state, { { to = "parent", msg = { clicked = props.name, clicks = state.clicks } } }
+    elseif msg == "reset" then
+      state.clicks = 0
+    end
+  end,
+  build = function(props, state)
+    return ui.button { `{props.name} {state.clicks}`, msg = "click" }
+  end,
+}
+"#;
+
+const USES_CLICKER: &str = r#"
+local clicker = use "clicker"
+return mod {
+  init = function(previous) return previous or { heard = "" } end,
+  update = function(state, msg)
+    if type(msg) == "table" and msg.clicked then
+      state.heard = `{msg.clicked} {msg.clicks}`
+      if msg.clicks == 2 then
+        return state, { { to = "clicker#one", msg = "reset" } }
+      end
+    end
+  end,
+  view = function(state)
+    return ui.column {
+      clicker { id = "one", name = "one" },
+      clicker { id = "two", name = "two" },
+      ui.text(state.heard),
+    }
+  end,
+}
+"#;
+
+fn button_label(workspace: &Workspace, key: &str) -> String {
+    match workspace.slot(key).and_then(crate::Slot::view) {
+        Some(Node::Button(button)) => button.label.clone(),
+        other => panic!("{key}: {other:?}"),
+    }
+}
+
+#[test]
+fn a_component_with_state_keeps_its_own_and_talks_to_its_parent() {
+    let dir = app(&[("host", USES_CLICKER)]);
+    write(dir.path(), "components/clicker.luau", CLICKER);
+    let mut workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    // Each is the drawing mod's own, under its key.
+    assert_eq!(button_label(&workspace, "host/clicker#one"), "one 0");
+    assert_eq!(button_label(&workspace, "host/clicker#two"), "two 0");
+
+    workspace.send("host/clicker#one", "host/clicker#one", Data::from("click"));
+    assert_eq!(button_label(&workspace, "host/clicker#one"), "one 1");
+    assert_eq!(button_label(&workspace, "host/clicker#two"), "two 0");
+    // `to = "parent"` reached the mod that drew it.
+    let Some(Node::Stack(column)) = workspace.slot("host").and_then(crate::Slot::view) else {
+        panic!("no column");
+    };
+    assert!(matches!(&column.children[2], Node::Text(text) if text.text == "one 1"));
+
+    // The parent reaches its instance by `clicker#one`, and it resets.
+    workspace.send("host/clicker#one", "host/clicker#one", Data::from("click"));
+    assert_eq!(button_label(&workspace, "host/clicker#one"), "one 0");
+}
+
+#[test]
+fn an_instance_resumes_its_saved_state_when_drawn_again() {
+    let dir = app(&[("tally", TALLY)]);
+    // The shell draws the instance only while `shown`.
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod {
+          init = function(previous) return previous or { shown = true } end,
+          update = function(state, msg) if msg == "flip" then state.shown = not state.shown end end,
+          view = function(state)
+            return ui.column { state.shown and ui.mount { "tally", id = "kept" } }
+          end,
+        }"#,
+    );
+    let memory = Memory::default();
+    let mut workspace = Workspace::open_with(dir.path(), false, Some(Box::new(memory.clone())));
+    workspace.send("tally#kept", "tally#kept", Data::from("add"));
+    workspace.send("tally#kept", "tally#kept", Data::from("add"));
+    assert!(memory.0.borrow().0.contains_key("mod:tally#kept"));
+
+    // Hidden: the instance is dropped, its state kept.
+    workspace.send(SHELL, SHELL, Data::from("flip"));
+    assert!(workspace.slot("tally#kept").is_none());
+    workspace.send(SHELL, SHELL, Data::from("flip"));
+    assert_eq!(instance_text(&workspace, "tally#kept"), "? 2");
+
+    // And across a restart.
+    drop(workspace);
+    let workspace = Workspace::open_with(dir.path(), false, Some(Box::new(memory)));
+    assert_eq!(instance_text(&workspace, "tally#kept"), "? 2");
+}
+
+#[test]
+fn a_stateless_component_cannot_be_mounted_with_an_id() {
+    let dir = app(&[]);
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod { view = function()
+            return ui.column { ui.mount { "nope", id = "x" } }
+        end }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let problems: Vec<String> = workspace
+        .problems()
+        .iter()
+        .map(|(name, error)| format!("{name}: {error}"))
+        .collect();
+    assert!(
+        problems
+            .iter()
+            .any(|problem| problem.contains("nope#x") && problem.contains("no mod named `nope`")),
+        "{problems:?}"
+    );
+}
+
+/// Publishes what it is sent on `topic:<msg.topic>`.
+const PUBLISHER: &str = r#"
+return mod {
+  update = function(state, msg)
+    return state, { { to = "topic:" .. msg.topic, msg = msg.value } }
+  end,
+  view = function() return ui.text "publisher" end,
+}
+"#;
+
+/// Shows the last thing it heard on the topics it subscribes to.
+fn listener(subscribe: &str) -> String {
+    format!(
+        r#"return mod {{
+          subscribe = {{ {subscribe} }},
+          init = function(previous) return previous or {{ heard = "nothing" }} end,
+          update = function(state, msg)
+            if type(msg) == "table" and msg.topic then
+              state.heard = msg.topic .. "=" .. tostring(type(msg.value) == "table" and msg.value.branch or msg.value)
+            end
+          end,
+          view = function(state, app, props) return ui.text(state.heard) end,
+        }}"#
+    )
+}
+
+fn publish(workspace: &mut Workspace, topic: &str, value: Data) {
+    let msg = Data::Map(
+        [
+            ("topic".to_owned(), Data::from(topic)),
+            ("value".to_owned(), value),
+        ]
+        .into(),
+    );
+    workspace.send("publisher", "publisher", msg);
+}
+
+#[test]
+fn a_topic_pushes_to_its_subscribers_and_is_saved() {
+    let exact = listener(r#""tabs/main""#);
+    let prefix = listener(r#""tabs/*""#);
+    let other = listener(r#""theme""#);
+    let dir = app(&[
+        ("publisher", PUBLISHER),
+        ("exact", &exact),
+        ("prefix", &prefix),
+        ("other", &other),
+    ]);
+    let memory = Memory::default();
+    let mut workspace = Workspace::open_with(dir.path(), false, Some(Box::new(memory.clone())));
+    publish(&mut workspace, "tabs/main", Data::from("3 tabs"));
+    let text = |workspace: &Workspace, name: &str| match workspace
+        .slot(name)
+        .and_then(crate::Slot::view)
+    {
+        Some(Node::Text(text)) => text.text.clone(),
+        other => panic!("{name}: {other:?}"),
+    };
+    assert_eq!(text(&workspace, "exact"), "tabs/main=3 tabs");
+    assert_eq!(text(&workspace, "prefix"), "tabs/main=3 tabs");
+    assert_eq!(text(&workspace, "other"), "nothing");
+    assert_eq!(
+        memory.0.borrow().0.get("topic:tabs/main"),
+        Some(&Data::from("3 tabs"))
+    );
+
+    // Provider data is pushed on `provider/<name>`.
+    let git = listener(r#""provider/git""#);
+    write(dir.path(), "mods/git-watch/main.luau", &git);
+    workspace.reload();
+    workspace.set_host(
+        "git",
+        Data::Map([("branch".to_owned(), Data::from("main"))].into()),
+    );
+    assert_eq!(text(&workspace, "git-watch"), "provider/git=main");
+
+    // A bad name is the sender's problem, and a provider's topic is not a mod's to publish.
+    publish(&mut workspace, "has space", Data::Bool(true));
+    let error = workspace
+        .slot("publisher")
+        .unwrap()
+        .error()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("a topic is 1 to"), "{error}");
+    publish(&mut workspace, "provider/git", Data::Bool(true));
+    assert!(workspace.slot("publisher").unwrap().error().is_some());
+
+    // At the next launch the topic is there, and a subscriber hears it as it loads.
+    drop(workspace);
+    let fresh = Workspace::open_with(dir.path(), false, Some(Box::new(memory)));
+    assert_eq!(text(&fresh, "exact"), "tabs/main=3 tabs");
+}
+
+#[test]
+fn an_instance_mounted_late_catches_up_on_its_topics() {
+    let watcher = listener(r#""tabs/main""#);
+    let dir = app(&[("publisher", PUBLISHER), ("watcher", &watcher)]);
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod {
+          init = function(previous) return previous or { shown = false } end,
+          update = function(state, msg) if msg == "show" then state.shown = true end end,
+          view = function(state)
+            return ui.column { state.shown and ui.mount { "watcher", id = "late" } }
+          end,
+        }"#,
+    );
+    let mut workspace = Workspace::open(dir.path(), false);
+    publish(&mut workspace, "tabs/main", Data::from("early"));
+    workspace.send(SHELL, SHELL, Data::from("show"));
+    assert_eq!(instance_text(&workspace, "watcher#late"), "tabs/main=early");
+}
+
+/// Copies the folder `from` into `to`, as the app is shipped.
+fn copy_folder(from: &Path, to: &Path) {
+    fs::create_dir_all(to).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_folder(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+
+/// Every stack in `node`, depth first.
+fn stacks<'n>(node: &'n Node, found: &mut Vec<&'n crate::Stack>) {
+    match node {
+        Node::Stack(stack) => {
+            found.push(stack);
+            for child in &stack.children {
+                stacks(child, found);
+            }
+        },
+        Node::Panel(panel) => panel.children.iter().for_each(|child| stacks(child, found)),
+        Node::Popover(popover) => popover.anchor.iter().for_each(|child| stacks(child, found)),
+        Node::Split(split) => split
+            .panes
+            .iter()
+            .flat_map(|pane| &pane.children)
+            .for_each(|child| stacks(child, found)),
+        _ => {},
+    }
+}
+
+#[test]
+fn the_apps_tabs_are_keyed_and_the_curved_look_joins_the_main_card() {
+    let shipped = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
+    for look in ["pills", "curved"] {
+        let dir = tempfile::tempdir().unwrap();
+        copy_folder(&shipped, dir.path());
+        let sheet = dir.path().join("style.luau");
+        let source = fs::read_to_string(&sheet).unwrap();
+        assert!(source.contains(r#"looks = { tabs = "pills" }"#));
+        let source = source.replace(
+            r#"looks = { tabs = "pills" }"#,
+            &format!(r#"looks = {{ tabs = "{look}" }}"#),
+        );
+        fs::write(&sheet, source).unwrap();
+        let workspace = Workspace::open_with(dir.path(), false, Some(Box::new(Memory::default())));
+        assert!(
+            workspace.problems().is_empty() && workspace.style_error().is_none(),
+            "{look}: {:?} {:?}",
+            workspace.problems(),
+            workspace.style_error()
+        );
+
+        let strip = workspace.slot("shell/tabbed#main").unwrap().view().unwrap();
+        let mut found = Vec::new();
+        stacks(strip, &mut found);
+        let keys: Vec<_> = found
+            .iter()
+            .filter_map(|stack| stack.key.as_deref())
+            .collect();
+        assert_eq!(keys, ["main-1", "_add"], "{look}");
+        let shoulders = found
+            .iter()
+            .filter(|stack| {
+                stack
+                    .look
+                    .class
+                    .iter()
+                    .any(|class| class == "tabs-shoulder")
+            })
+            .count();
+        assert_eq!(
+            shoulders,
+            if look == "curved" {
+                2
+            } else {
+                0
+            },
+            "{look}"
+        );
+
+        let shell = workspace.slot(SHELL).unwrap().view().unwrap();
+        let mut found = Vec::new();
+        stacks(shell, &mut found);
+        let joined = found
+            .iter()
+            .filter(|stack| {
+                stack
+                    .look
+                    .class
+                    .iter()
+                    .any(|class| class == "toolbar-joined")
+            })
+            .count();
+        // The center's bar, and one over each side panel.
+        assert_eq!(
+            joined,
+            if look == "curved" {
+                3
+            } else {
+                0
+            },
+            "{look}"
+        );
+    }
+}
+
+#[test]
+fn the_layout_menu_picks_the_tab_look_and_moves_the_title_bar() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
+    let mut workspace =
+        Workspace::open_with(root.as_path(), false, Some(Box::new(Memory::default())));
+    let classes = |workspace: &Workspace, name: &str, class: &str| {
+        let mut found = Vec::new();
+        stacks(workspace.slot(name).unwrap().view().unwrap(), &mut found);
+        found
+            .iter()
+            .filter(|stack| stack.look.class.iter().any(|own| own == class))
+            .count()
+    };
+    let joined_card = |workspace: &Workspace| {
+        matches!(workspace.slot("editor").unwrap().view(),
+            Some(Node::Panel(panel)) if panel.look.class.iter().any(|class| class == "tab-card-joined"))
+    };
+    assert_eq!(classes(&workspace, SHELL, "toolbar-joined"), 0);
+    assert!(!joined_card(&workspace));
+
+    // The title bar's button opens the picker in a window of its own.
+    let mut found = Vec::new();
+    stacks(workspace.slot(SHELL).unwrap().view().unwrap(), &mut found);
+    assert!(
+        found
+            .iter()
+            .any(|stack| stack.action == Some(Action::Window("looks".to_owned())))
+    );
+
+    let pick = |key: &str, value: &str| Data::Map([(key.to_owned(), Data::from(value))].into());
+    workspace.send("looks", "looks", pick("look", "curved"));
+    assert_eq!(classes(&workspace, SHELL, "toolbar-joined"), 3);
+    assert_eq!(classes(&workspace, "shell/tabbed#main", "tabs-shoulder"), 2);
+    assert!(joined_card(&workspace), "{:?}", workspace.problems());
+
+    // Back to the stylesheet's look, but with the bar over the editor.
+    workspace.send("looks", "looks", pick("look", "stylesheet"));
+    workspace.send("looks", "looks", pick("layout", "joined"));
+    assert_eq!(classes(&workspace, "shell/tabbed#main", "tabs-shoulder"), 0);
+    assert_eq!(classes(&workspace, SHELL, "toolbar-joined"), 3);
+    assert!(joined_card(&workspace));
+
+    // A mount names a mod, never a path.
+    let dir = app(&[(
+        "escape",
+        r#"return mod { view = function() return ui.column { ui.mount { "../../etc", id = "x" } } end }"#,
+    )]);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(broken(&workspace, "escape").contains("is not a mod name"));
+    assert!(workspace.roots().mod_candidates("../escape").is_empty());
+
+    // `window` stands alone on a control.
+    let dir = app(&[(
+        "bad",
+        r#"return mod { view = function() return ui.row { window = "looks", msg = "x" } end }"#,
+    )]);
+    let workspace = Workspace::open(dir.path(), false);
+    let error = workspace
+        .slot("bad")
+        .unwrap()
+        .error()
+        .map(ToString::to_string);
+    assert!(
+        error
+            .as_deref()
+            .is_some_and(|error| error.contains("takes no `msg`")),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
+    let memory = Memory::default();
+    let mut workspace = Workspace::open_with(root.as_path(), false, Some(Box::new(memory.clone())));
+    // The title bar's strip is the shell's; the main area draws its content.
+    let key = "shell/tabbed#main";
+    let tabs = |workspace: &Workspace| -> Vec<(String, String)> {
+        let Some(Data::Map(state)) = memory.0.borrow().0.get(&format!("mod:{key}")).cloned() else {
+            panic!("no saved tabs; problems: {:?}", workspace.problems());
+        };
+        let Some(Data::List(tabs)) = state.get("tabs").cloned() else {
+            panic!("no tabs: {state:?}");
+        };
+        tabs.into_iter()
+            .map(|tab| match tab {
+                Data::Map(tab) => match (tab.get("id"), tab.get("kind")) {
+                    (Some(Data::String(id)), Some(Data::String(kind))) => {
+                        (id.clone(), kind.clone())
+                    },
+                    other => panic!("{other:?}"),
+                },
+                other => panic!("{other:?}"),
+            })
+            .collect()
+    };
+    // It starts with a terminal, and its kinds include the browser and the explorer.
+    assert_eq!(tabs(&workspace), [(
+        "main-1".to_owned(),
+        "component:terminal".to_owned()
+    )]);
+    assert!(workspace.slot(key).is_some(), "{:?}", workspace.problems());
+
+    // + then a pick opens a browser tab, selected, drawn as the browser component.
+    workspace.send(key, key, Data::from("add"));
+    let pick = Data::Map([("pick".to_owned(), Data::from("component:browser"))].into());
+    workspace.send(key, key, pick);
+    assert_eq!(
+        tabs(&workspace)[1],
+        ("main-2".to_owned(), "component:browser".to_owned())
+    );
+    // The change is published on its topic.
+    let topic = memory.0.borrow().0.get("topic:tabs/main").cloned();
+    assert!(
+        matches!(&topic, Some(Data::Map(fields)) if fields.get("count") == Some(&Data::Integer(2))),
+        "{topic:?}"
+    );
+
+    // The main area followed the strip over `tabs/main`: it draws the browser.
+    let editor = memory.0.borrow().0.get("mod:editor").cloned();
+    assert!(
+        matches!(&editor, Some(Data::Map(state)) if matches!(state.get("tab"), Some(Data::Map(tab)) if tab.get("id") == Some(&Data::from("main-2")))),
+        "{editor:?}"
+    );
+    // What the browser reports there comes back to the strip, on the topic.
+    let report = Data::Map(
+        [
+            ("tab_report".to_owned(), Data::from("main-2")),
+            ("url".to_owned(), Data::from("https://example.com/")),
+            ("title".to_owned(), Data::from("Example")),
+        ]
+        .into(),
+    );
+    workspace.send("editor", "editor", report);
+    let strip = memory.0.borrow().0.get(&format!("mod:{key}")).cloned();
+    assert!(format!("{strip:?}").contains("Example"), "{strip:?}");
+
+    // A mod kind: the explorer opens as an instance of its own.
+    let pick = Data::Map([("pick".to_owned(), Data::from("mod:explorer"))].into());
+    workspace.send(key, key, pick);
+    assert!(
+        workspace.slot("explorer#main-3").is_some(),
+        "{:?}",
+        workspace.problems()
+    );
+
+    // Closing the browser keeps the others; and they come back at the next launch.
+    workspace.send(
+        key,
+        key,
+        Data::Map([("close".to_owned(), Data::from("main-2"))].into()),
+    );
+    assert_eq!(tabs(&workspace).len(), 2);
+    drop(workspace);
+    let workspace = Workspace::open_with(root.as_path(), false, Some(Box::new(memory.clone())));
+    assert_eq!(tabs(&workspace).len(), 2);
+    assert!(
+        workspace.slot("explorer#main-3").is_some(),
+        "the selected explorer tab is drawn again"
+    );
+}
+
+#[test]
+fn looks_come_from_the_stylesheet_and_layer_like_colors() {
+    let shows_look = r#"return mod { view = function(state, app)
+        return ui.text(app.looks.tabs or "none")
+    end }"#;
+    let builtin = app(&[("look", shows_look)]);
+    write(
+        builtin.path(),
+        "style.luau",
+        r#"return style { looks = { tabs = "classic", menus = "flat" } }"#,
+    );
+    let text = |workspace: &Workspace| match workspace.slot("look").and_then(crate::Slot::view) {
+        Some(Node::Text(text)) => text.text.clone(),
+        other => panic!("{other:?}"),
+    };
+    let workspace = Workspace::open(builtin.path(), false);
+    assert_eq!(text(&workspace), "classic");
+
+    // The user's stylesheet changes one look and keeps the others.
+    let user = tempfile::tempdir().unwrap();
+    write(
+        user.path(),
+        "style.luau",
+        r#"return style { looks = { tabs = "square" } }"#,
+    );
+    let roots = crate::Roots::new([builtin.path().to_owned(), user.path().to_owned()]);
+    let workspace = Workspace::open(roots, false);
+    assert_eq!(text(&workspace), "square");
+    assert_eq!(
+        workspace
+            .stylesheet()
+            .looks
+            .get("menus")
+            .map(String::as_str),
+        Some("flat")
+    );
+
+    // A look becomes a class, so it is a plain name.
+    write(
+        user.path(),
+        "style.luau",
+        r#"return style { looks = { tabs = "big tabs" } }"#,
+    );
+    let mut workspace = workspace;
+    workspace.reload();
+    let error = workspace.style_error().unwrap().to_string();
+    assert!(error.contains("looks"), "{error}");
+}
+
+#[test]
+fn a_previews_instances_stay_inside_the_preview() {
+    // Sends everywhere it should not, when told to.
+    let leaky = r#"return mod {
+      update = function(state, msg)
+        if msg == "go" then
+          return state, {
+            { to = "topic:leak", msg = true },
+            { to = "tally#kept", msg = "add" },
+            { to = "provider:files", msg = { open = "/" } },
+          }
+        end
+      end,
+      view = function() return ui.text "leaky" end,
+    }"#;
+    let dir = app(&[("tally", TALLY), ("leaky", leaky)]);
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod { view = function() return ui.column { ui.mount { "tally", id = "kept" } } end }"#,
+    );
+    // A component whose preview mounts the same ids as the real app.
+    write(
+        dir.path(),
+        "components/mounter.luau",
+        r#"return component {
+          example = { label = "x" },
+          build = function(props)
+            return ui.column { ui.mount { "tally", id = "kept" }, ui.mount { "leaky", id = "one" } }
+          end,
+        }"#,
+    );
+    let memory = Memory::default();
+    let mut workspace = Workspace::open_with(dir.path(), false, Some(Box::new(memory.clone())));
+    workspace.send("tally#kept", "tally#kept", Data::from("add"));
+    assert_eq!(instance_text(&workspace, "tally#kept"), "? 1");
+    // The preview's copy is its own, not the real instance.
+    assert_eq!(instance_text(&workspace, "demo:mounter/tally#kept"), "? 0");
+
+    workspace.send(
+        "demo:mounter/leaky#one",
+        "demo:mounter/leaky#one",
+        Data::from("go"),
+    );
+    assert_eq!(
+        instance_text(&workspace, "tally#kept"),
+        "? 1",
+        "the real instance heard it"
+    );
+    assert!(
+        !memory.0.borrow().0.contains_key("topic:leak"),
+        "the topic was published"
+    );
+    assert!(workspace.take_outbox().is_empty(), "a provider was sent to");
+    assert!(
+        !memory.0.borrow().0.keys().any(|key| key.contains("demo:")),
+        "a preview's state was saved"
+    );
 }

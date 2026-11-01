@@ -4,6 +4,7 @@ members = [
   "crates/moonframe",
   "crates/moonframe-core",
   "crates/moonframe-providers",
+  "crates/moonframe-store",
   "crates/moonframe-terminal",
 ]
 resolver = "2"
@@ -33,6 +34,7 @@ libghostty-vt       = "0.2.2"
 mlua                = { features = ["luau"], version = "0.12.2" }
 moonframe-core      = { path = "crates/moonframe-core" }
 moonframe-providers = { path = "crates/moonframe-providers" }
+moonframe-store     = { path = "crates/moonframe-store" }
 moonframe-terminal  = { default-features = false, path = "crates/moonframe-terminal" }
 notify              = "8"
 objc2               = "0.6"
@@ -40,6 +42,7 @@ objc2-app-kit       = { default-features = false, features = ["NSApplication", "
 objc2-foundation    = { default-features = false, features = ["NSData", "std"], version = "0.3" }
 objc2-web-kit       = { default-features = false, features = ["WKWebView", "objc2-app-kit", "std"], version = "0.3" }
 portable-pty        = "0.9"
+rusqlite            = { features = ["bundled"], version = "0.41" }
 rust-embed          = { features = ["include-exclude"], version = "8.7" }
 serde               = { features = ["derive"], version = "1" }
 serde_json          = "1"

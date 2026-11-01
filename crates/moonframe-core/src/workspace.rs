@@ -11,9 +11,11 @@
 
 use {
     crate::{
-        Action, Chrome, Command, Data, Error, Node, Roots, Rules, Stylesheet, WindowState,
+        Action, Chrome, Command, Data, Error, Instance, InstanceOf, Node, Roots, Rules, Stylesheet,
+        WindowState,
         component::{Component, Demo, Library},
         module::{Meta, Module},
+        persist::{Persist, state_key},
         style,
         vm::{self, Meter},
     },
@@ -42,6 +44,9 @@ pub struct Workspace {
     mods: BTreeMap<String, Slot>,
     /// Each component's live preview, by its module name: `demo:<name>`.
     demos: BTreeMap<String, Slot>,
+    /// Mod and component instances drawn in the last render, by key
+    /// ([`Instance::key`]).
+    instances: BTreeMap<String, Mounted>,
     stylesheet: Stylesheet,
     style_error: Option<Error>,
     dark: bool,
@@ -55,7 +60,35 @@ pub struct Workspace {
     /// Messages for providers (`to = "provider:<name>"`), for the app to
     /// forward: providers run outside the workspace.
     outbox: Vec<(String, Data)>,
+    /// Where state outlives the app; nothing is saved without it.
+    persist: Option<Box<dyn Persist>>,
+    /// The last value published on each topic (`to = "topic:<name>"`).
+    topics: BTreeMap<String, Data>,
 }
+
+/// An instance the app keeps: its module, and what it is an instance of.
+struct Mounted {
+    slot: Slot,
+    of: InstanceOf,
+    /// The module that drew it, which `to = "parent"` reaches.
+    owner: String,
+}
+
+/// Instances one render may hold: each is a Luau state of its own.
+const MAX_INSTANCES: usize = 256;
+
+/// What an instance calls the module that drew it in a send's `to`.
+pub const PARENT: &str = "parent";
+
+/// How a message names a topic: `to = "topic:tabs/main"` publishes `msg`
+/// to every module subscribed to `tabs/main`.
+pub const TOPIC: &str = "topic:";
+
+/// The topic a provider's data is published on: `provider/git`.
+const PROVIDER_TOPIC: &str = "provider/";
+
+/// Longest a topic name can be.
+const MAX_TOPIC: usize = 128;
 
 /// How a message names a provider rather than a mod.
 pub const PROVIDER: &str = "provider:";
@@ -81,6 +114,14 @@ pub struct Slot {
     view_error: Option<Error>,
     /// Children of the view that could not be read, each marked in place.
     broken: Vec<Error>,
+    /// The state saved from an earlier run, for its first load.
+    restored: Option<Data>,
+    /// The state last saved, so an unchanged one is not saved again.
+    saved: Option<Data>,
+    /// What an instance is drawn with; nil for a mod in its own place.
+    props: Data,
+    /// Loaded since its topics were last handed to it.
+    fresh: bool,
 }
 
 impl Slot {
@@ -159,15 +200,56 @@ impl Slot {
     /// Loads `source`, which came from `path` if it is a file's.
     fn load_source(&mut self, name: &str, source: &str, path: Option<&Path>, library: &Library) {
         self.source = path.map(Path::to_owned);
-        let previous = self.module.as_ref().and_then(Module::state);
-        let loaded = Module::load(name, source, previous.as_ref(), library);
+        // A reload keeps the running state; a first load takes the saved one.
+        let previous = self
+            .module
+            .as_ref()
+            .and_then(Module::state)
+            .or_else(|| self.restored.take());
+        let props = (self.props != Data::Nil).then_some(&self.props);
+        let loaded = Module::load(name, source, previous.as_ref(), props, library);
         match loaded {
             Ok(module) => {
                 self.module = Some(module);
+                self.fresh = true;
                 self.load_error = None;
                 self.update_error = None;
             },
             Err(error) => self.load_error = Some(error),
+        }
+    }
+
+    /// Loads an instance of the component `component`, keeping its state
+    /// across reloads like a mod's.
+    fn load_component(&mut self, key: &str, component: &str, library: &Library) {
+        self.source = library.path(component);
+        let previous = self
+            .module
+            .as_ref()
+            .and_then(Module::state)
+            .or_else(|| self.restored.take());
+        let props = (self.props != Data::Nil).then_some(&self.props);
+        match Module::load_component(key, component, previous.as_ref(), props, library) {
+            Ok(module) => {
+                self.module = Some(module);
+                self.fresh = true;
+                self.load_error = None;
+                self.update_error = None;
+            },
+            Err(error) => self.load_error = Some(error),
+        }
+    }
+
+    /// Draws it with `props` from now on.
+    fn set_props(&mut self, props: &Data) {
+        if self.props == *props {
+            return;
+        }
+        self.props = props.clone();
+        if let Some(module) = &mut self.module
+            && let Err(error) = module.set_props(props)
+        {
+            self.view_error = Some(error);
         }
     }
 
@@ -194,6 +276,16 @@ impl Workspace {
     /// Loads the app from `roots`. Never fails: problems are kept on each
     /// module's [`Slot`] for the window to show.
     pub fn open(roots: impl Into<Roots>, dark: bool) -> Self {
+        Self::open_with(roots, dark, None)
+    }
+
+    /// The same, restoring each mod's state from `persist` and saving it
+    /// there as it changes.
+    pub fn open_with(
+        roots: impl Into<Roots>,
+        dark: bool,
+        persist: Option<Box<dyn Persist>>,
+    ) -> Self {
         let mut workspace = Self {
             roots: roots.into(),
             library: Library::default(),
@@ -201,6 +293,7 @@ impl Workspace {
             shell: Slot::default(),
             mods: BTreeMap::new(),
             demos: BTreeMap::new(),
+            instances: BTreeMap::new(),
             stylesheet: Stylesheet::default(),
             style_error: None,
             dark,
@@ -208,9 +301,49 @@ impl Workspace {
             host: BTreeMap::new(),
             host_problems: BTreeMap::new(),
             outbox: Vec::new(),
+            topics: persist
+                .as_ref()
+                .map(|persist| persist.topics())
+                .unwrap_or_default(),
+            persist,
         };
+        workspace.shell.restored = workspace.restore(SHELL);
         workspace.reload();
         workspace
+    }
+
+    /// The state `module` saved in an earlier run.
+    fn restore(&self, module: &str) -> Option<Data> {
+        self.persist.as_ref()?.state(&state_key(module))
+    }
+
+    /// Saves every module's state that changed since it was last saved.
+    fn save(&mut self) {
+        let Some(persist) = &self.persist else {
+            return;
+        };
+        let slots = std::iter::once((SHELL, &mut self.shell))
+            .chain(
+                self.mods
+                    .iter_mut()
+                    .map(|(name, slot)| (name.as_str(), slot)),
+            )
+            // A preview's instances are as passing as the preview.
+            .chain(
+                self.instances
+                    .iter_mut()
+                    .filter(|(_, mounted)| !mounted.owner.starts_with(DEMO))
+                    .map(|(key, mounted)| (key.as_str(), &mut mounted.slot)),
+            );
+        for (name, slot) in slots {
+            let Some(state) = slot.module.as_ref().and_then(Module::state) else {
+                continue;
+            };
+            if slot.saved.as_ref() != Some(&state) {
+                persist.save_state(&state_key(name), &state);
+                slot.saved = Some(state);
+            }
+        }
     }
 
     pub fn roots(&self) -> &Roots {
@@ -247,7 +380,13 @@ impl Workspace {
         }
         let found = self.roots.folders("mods", "main.luau");
         for name in found.keys() {
-            let slot = self.mods.entry(name.clone()).or_default();
+            if !self.mods.contains_key(name) {
+                let restored = self.restore(name);
+                self.mods.entry(name.clone()).or_default().restored = restored;
+            }
+            let Some(slot) = self.mods.get_mut(name) else {
+                continue;
+            };
             if valid_name(name) {
                 // Highest layer first, so the folder found above leads.
                 let candidates = self.roots.mod_candidates(name);
@@ -259,7 +398,33 @@ impl Workspace {
             }
         }
         self.mods.retain(|name, _| found.contains_key(name));
-        self.render();
+        // Instances run the new source too, keeping their state.
+        let keys: Vec<String> = self.instances.keys().cloned().collect();
+        for key in keys {
+            self.load_instance(&key);
+        }
+        self.settle();
+    }
+
+    /// Loads (or reloads) the instance at `key` from its mod or component.
+    fn load_instance(&mut self, key: &str) {
+        let Some(mounted) = self.instances.get_mut(key) else {
+            return;
+        };
+        match &mounted.of {
+            InstanceOf::Mod(name) => {
+                let candidates = self.roots.mod_candidates(name);
+                if candidates.is_empty() {
+                    mounted.slot.load_error = Some(Error::new(format!("no mod named `{name}`")));
+                } else {
+                    mounted.slot.load_layered(key, &candidates, &self.library);
+                }
+            },
+            InstanceOf::Component(name) => {
+                let name = name.clone();
+                mounted.slot.load_component(key, &name, &self.library);
+            },
+        }
     }
 
     /// Reads every layer's `style.luau`, each laid over the ones below it
@@ -312,9 +477,13 @@ impl Workspace {
 
     /// Shares `value` with every view as `app.<key>`, and draws them again.
     pub fn set_host(&mut self, key: &str, value: Data) {
+        // Pushed to whoever subscribes to `provider/<key>`, then drawn.
+        let topic = format!("{PROVIDER_TOPIC}{key}");
+        let deliveries = self.deliveries(&topic, &value);
         self.host.insert(key.to_owned(), value);
         self.host_problems.remove(key);
-        self.render();
+        self.process(deliveries.into());
+        self.settle();
     }
 
     /// Stops sharing `app.<key>`, with the reason when there is one.
@@ -373,6 +542,8 @@ impl Workspace {
     pub fn slot(&self, name: &str) -> Option<&Slot> {
         if name == SHELL {
             Some(&self.shell)
+        } else if let Some(mounted) = self.instances.get(name) {
+            Some(&mounted.slot)
         } else if name.starts_with(DEMO) {
             self.demos.get(name)
         } else {
@@ -383,11 +554,39 @@ impl Workspace {
     fn slot_mut(&mut self, name: &str) -> Option<&mut Slot> {
         if name == SHELL {
             Some(&mut self.shell)
+        } else if let Some(mounted) = self.instances.get_mut(name) {
+            Some(&mut mounted.slot)
         } else if name.starts_with(DEMO) {
             self.demos.get_mut(name)
         } else {
             self.mods.get_mut(name)
         }
+    }
+
+    /// The instance `instance`, drawn by `owner`, and its key as the app
+    /// keeps it: what the window draws in its place.
+    pub fn instance(&self, owner: &str, instance: &Instance) -> Option<(&str, &Slot)> {
+        self.instances
+            .get_key_value(&instance.key(owner))
+            .map(|(key, mounted)| (key.as_str(), &mounted.slot))
+    }
+
+    /// Who a send from `from` to `to` reaches: `parent` is the module that
+    /// drew an instance, and `tabbed#main` names an instance the sender drew
+    /// before an instance of the app's of that name.
+    fn resolve(&self, from: &str, to: &str) -> String {
+        if to == PARENT
+            && let Some(mounted) = self.instances.get(from)
+        {
+            return mounted.owner.clone();
+        }
+        if to.contains('#') && !to.contains('/') {
+            let own = format!("{from}/{to}");
+            if self.instances.contains_key(&own) {
+                return own;
+            }
+        }
+        to.to_owned()
     }
 
     /// Loads every component's demo, its file or one made from its example,
@@ -450,6 +649,12 @@ impl Workspace {
     pub fn problems(&self) -> Vec<(&str, &Error)> {
         let modules = std::iter::once((SHELL, &self.shell))
             .chain(self.mods.iter().map(|(name, slot)| (name.as_str(), slot)))
+            .chain(
+                self.instances
+                    .iter()
+                    .filter(|(_, mounted)| !mounted.owner.starts_with(DEMO))
+                    .map(|(key, mounted)| (key.as_str(), &mounted.slot)),
+            )
             .flat_map(|(name, slot)| {
                 slot.error()
                     .into_iter()
@@ -498,8 +703,8 @@ impl Workspace {
             // A preview never quits or closes the app.
             Action::Command(_) if from.starts_with(DEMO) => None,
             Action::Command(command) => Some(*command),
-            // The app runs these on the browser it keeps.
-            Action::Browser { .. } => None,
+            // The app runs these on the browser it keeps, and opens windows.
+            Action::Browser { .. } | Action::Window(_) => None,
             Action::Send { to, msg } => {
                 self.send(from, to.as_deref().unwrap_or(from), msg.clone());
                 None
@@ -510,15 +715,34 @@ impl Workspace {
     /// Delivers `msg` to the module `to`, then whatever it sends on, and
     /// draws every module again.
     pub fn send(&mut self, from: &str, to: &str, msg: Data) {
-        let mut queue = VecDeque::from([(from.to_owned(), to.to_owned(), msg)]);
+        self.process(VecDeque::from([(from.to_owned(), to.to_owned(), msg)]));
+        self.settle();
+    }
+
+    /// Delivers each message in `queue`, and what the modules send on.
+    fn process(&mut self, mut queue: VecDeque<(String, String, Data)>) {
         let mut delivered = 0;
         while let Some((from, to, msg)) = queue.pop_front() {
-            // A preview keeps to itself.
-            if from.starts_with(DEMO) && to != from {
+            let to = self.resolve(&from, &to);
+            // A preview, and every instance it drew at any depth, keeps to
+            // itself: no other mod, provider or topic hears it.
+            let root = self.root_owner(&from);
+            if root.starts_with(DEMO) && to != from && to != root && !self.owned_by(&to, &root) {
                 continue;
             }
             if let Some(provider) = to.strip_prefix(PROVIDER) {
                 self.outbox.push((provider.to_owned(), msg));
+                continue;
+            }
+            if let Some(topic) = to.strip_prefix(TOPIC) {
+                match self.publish(topic, msg) {
+                    Ok(deliveries) => queue.extend(deliveries),
+                    Err(error) => {
+                        if let Some(slot) = self.slot_mut(&from) {
+                            slot.update_error = Some(error);
+                        }
+                    },
+                }
                 continue;
             }
             delivered += 1;
@@ -553,7 +777,114 @@ impl Workspace {
                 Err(error) => *update_error = Some(error),
             }
         }
-        self.render();
+    }
+
+    /// Keeps `value` as the topic `name`'s, saves it, and returns a message
+    /// for each module that hears it.
+    fn publish(&mut self, name: &str, value: Data) -> Result<Vec<(String, String, Data)>, Error> {
+        let plain = !name.is_empty()
+            && name.len() <= MAX_TOPIC
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'));
+        if !plain || name.starts_with(PROVIDER_TOPIC) {
+            return Err(Error::new(format!(
+                "`topic:{name}`: a topic is 1 to {MAX_TOPIC} of a-z, A-Z, 0-9, - _ . /, and provider/ topics are the providers'"
+            )));
+        }
+        let deliveries = self.deliveries(name, &value);
+        if let Some(persist) = &self.persist {
+            persist.save_topic(name, &value);
+        }
+        self.topics.insert(name.to_owned(), value);
+        Ok(deliveries)
+    }
+
+    /// A message for each module subscribed to the topic `name`, carrying
+    /// `value`. Previews hear nothing: they keep to themselves.
+    fn deliveries(&self, name: &str, value: &Data) -> Vec<(String, String, Data)> {
+        self.listeners()
+            .filter(|(_, slot)| {
+                slot.module
+                    .as_ref()
+                    .is_some_and(|module| module.subscribes(name))
+            })
+            .map(|(key, _)| {
+                (
+                    format!("{TOPIC}{name}"),
+                    key.to_owned(),
+                    topic_message(name, value),
+                )
+            })
+            .collect()
+    }
+
+    /// Every module that may subscribe: the shell, the mods, and the
+    /// instances not drawn by a preview.
+    fn listeners(&self) -> impl Iterator<Item = (&str, &Slot)> {
+        std::iter::once((SHELL, &self.shell))
+            .chain(self.mods.iter().map(|(name, slot)| (name.as_str(), slot)))
+            .chain(
+                self.instances
+                    .iter()
+                    .filter(|(_, mounted)| !mounted.owner.starts_with(DEMO))
+                    .map(|(key, mounted)| (key.as_str(), &mounted.slot)),
+            )
+    }
+
+    /// Draws everything, hands each module loaded since the last time the
+    /// current value of the topics it hears (so one that joins late starts
+    /// in step), draws again if that changed anything, and saves state.
+    fn settle(&mut self) {
+        // Each round can mount instances, which then hear their topics.
+        for _ in 0..4 {
+            self.render();
+            // What each module loaded since the last round hears now.
+            let catch_up: VecDeque<(String, String, Data)> = self
+                .listeners()
+                .filter(|(_, slot)| slot.fresh)
+                .filter_map(|(key, slot)| Some((key, slot.module.as_ref()?)))
+                .flat_map(|(key, module)| {
+                    let topics = self
+                        .topics
+                        .iter()
+                        .map(|(name, value)| (name.clone(), value));
+                    let providers = self
+                        .host
+                        .iter()
+                        .map(|(name, value)| (format!("{PROVIDER_TOPIC}{name}"), value));
+                    topics
+                        .chain(providers)
+                        .filter(|(name, _)| module.subscribes(name))
+                        .map(|(name, value)| {
+                            (
+                                format!("{TOPIC}{name}"),
+                                key.to_owned(),
+                                topic_message(&name, value),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            let fresh: Vec<String> = self
+                .listeners()
+                .filter(|(_, slot)| slot.fresh)
+                .map(|(key, _)| key.to_owned())
+                .collect();
+            for key in fresh {
+                if let Some(slot) = self.slot_mut(&key) {
+                    slot.fresh = false;
+                }
+            }
+            // What modules sent from `init`, after the catch-up.
+            let mut catch_up = catch_up;
+            catch_up.extend(self.take_pending());
+            if catch_up.is_empty() {
+                break;
+            }
+            self.process(catch_up);
+        }
+        self.save();
     }
 
     /// What every `view` gets as `app`: what the host shares, the mods,
@@ -572,6 +903,17 @@ impl Workspace {
             );
         }
         let mut app = self.host.clone();
+        app.insert("kinds".to_owned(), self.kinds());
+        app.insert(
+            "looks".to_owned(),
+            Data::Map(
+                self.stylesheet
+                    .looks
+                    .iter()
+                    .map(|(kind, look)| (kind.clone(), Data::from(look.as_str())))
+                    .collect(),
+            ),
+        );
         app.extend([
             ("dark".to_owned(), Data::Bool(self.dark)),
             ("window".to_owned(), self.window.data()),
@@ -592,12 +934,165 @@ impl Workspace {
         Data::Map(app)
     }
 
+    /// What a tab bar's `+` menu offers, `app.kinds`: each component and mod
+    /// with a `tab` entry, as `{ kind = "component:terminal" | "mod:explorer",
+    /// title, icon, props, report }`, by title.
+    fn kinds(&self) -> Data {
+        let components = self.components.iter().filter_map(|component| {
+            Some((
+                format!("component:{}", component.name),
+                &component.title,
+                component.tab.as_ref()?,
+            ))
+        });
+        let mods = self.mods.iter().filter_map(|(name, slot)| {
+            let meta = slot.meta()?;
+            Some((
+                format!("mod:{name}"),
+                meta.title.as_ref().unwrap_or(name),
+                meta.tab.as_ref()?,
+            ))
+        });
+        let mut kinds: Vec<(String, Data)> = components
+            .chain(mods)
+            .map(|(kind, title, tab)| {
+                let title = tab.title.clone().unwrap_or_else(|| title.clone());
+                let mut fields = BTreeMap::from([
+                    ("kind".to_owned(), Data::from(kind.as_str())),
+                    ("title".to_owned(), Data::from(title.as_str())),
+                    ("props".to_owned(), tab.props.clone()),
+                ]);
+                if let Some(icon) = &tab.icon {
+                    fields.insert("icon".to_owned(), Data::from(icon.name()));
+                }
+                if let Some(report) = &tab.report {
+                    fields.insert("report".to_owned(), Data::from(report.as_str()));
+                }
+                (title, Data::Map(fields))
+            })
+            .collect();
+        kinds.sort_by(|a, b| a.0.cmp(&b.0));
+        Data::List(kinds.into_iter().map(|(_, kind)| kind).collect())
+    }
+
     fn render(&mut self) {
         let app = self.app();
         self.shell.render(&app, &self.stylesheet);
         for slot in self.mods.values_mut().chain(self.demos.values_mut()) {
             slot.render(&app, &self.stylesheet);
         }
+        self.render_instances(&app);
+    }
+
+    /// What every module sent from `init` and is not yet delivered.
+    fn take_pending(&mut self) -> Vec<(String, String, Data)> {
+        let slots = std::iter::once((SHELL, &mut self.shell))
+            .chain(
+                self.mods
+                    .iter_mut()
+                    .map(|(name, slot)| (name.as_str(), slot)),
+            )
+            .chain(
+                self.demos
+                    .iter_mut()
+                    .map(|(name, slot)| (name.as_str(), slot)),
+            )
+            .chain(
+                self.instances
+                    .iter_mut()
+                    .map(|(key, mounted)| (key.as_str(), &mut mounted.slot)),
+            );
+        let mut sends = Vec::new();
+        for (key, slot) in slots {
+            if let Some(module) = &mut slot.module {
+                sends.extend(
+                    module
+                        .take_pending()
+                        .into_iter()
+                        .map(|send| (key.to_owned(), send.to, send.msg)),
+                );
+            }
+        }
+        sends
+    }
+
+    /// The module at the top of `key`'s chain of owners: itself, for a mod.
+    fn root_owner(&self, key: &str) -> String {
+        let mut at = key;
+        while let Some(mounted) = self.instances.get(at) {
+            at = &mounted.owner;
+        }
+        at.to_owned()
+    }
+
+    /// Whether `key` is an instance drawn, at any depth, by `owner`.
+    fn owned_by(&self, key: &str, owner: &str) -> bool {
+        let mut at = key;
+        while let Some(mounted) = self.instances.get(at) {
+            if mounted.owner == owner {
+                return true;
+            }
+            at = &mounted.owner;
+        }
+        false
+    }
+
+    /// Draws every instance the views hold: creating the new ones (with the
+    /// state they saved), handing each its props, and following instances
+    /// drawn inside instances. Those no longer drawn are dropped; their
+    /// state stays saved, so they resume where they were if drawn again.
+    fn render_instances(&mut self, app: &Data) {
+        let mut queue: Vec<(String, Instance)> = Vec::new();
+        let collect = |owner: &str, view: Option<&Node>, queue: &mut Vec<(String, Instance)>| {
+            if let Some(view) = view {
+                view.instances(&mut |instance| queue.push((owner.to_owned(), instance.clone())));
+            }
+        };
+        collect(SHELL, self.shell.view(), &mut queue);
+        for (name, slot) in self.mods.iter().chain(&self.demos) {
+            collect(name, slot.view(), &mut queue);
+        }
+        let mut drawn = BTreeSet::new();
+        while let Some((owner, instance)) = queue.pop() {
+            let key = instance.key(&owner);
+            if drawn.contains(&key) {
+                continue;
+            }
+            if drawn.len() == MAX_INSTANCES {
+                if let Some(slot) = self.slot_mut(&owner) {
+                    slot.view_error = Some(Error::new(format!(
+                        "more than {MAX_INSTANCES} instances; is an id made from data?"
+                    )));
+                }
+                break;
+            }
+            drawn.insert(key.clone());
+            if !self.instances.contains_key(&key) {
+                let restored = if owner.starts_with(DEMO) {
+                    None
+                } else {
+                    self.restore(&key)
+                };
+                let slot = Slot {
+                    restored,
+                    props: instance.props.clone(),
+                    ..Slot::default()
+                };
+                self.instances.insert(key.clone(), Mounted {
+                    slot,
+                    of: instance.of.clone(),
+                    owner: owner.clone(),
+                });
+                self.load_instance(&key);
+            }
+            let Some(mounted) = self.instances.get_mut(&key) else {
+                continue;
+            };
+            mounted.slot.set_props(&instance.props);
+            mounted.slot.render(app, &self.stylesheet);
+            collect(&key, mounted.slot.view(), &mut queue);
+        }
+        self.instances.retain(|key, _| drawn.contains(key));
     }
 }
 
@@ -606,7 +1101,13 @@ impl Workspace {
 /// replace those of the same rule, so a user's `panel = { radius = 4 }`
 /// keeps the app's panel background, and `mono = { size = 14 }` keeps its
 /// family. Any other key replaces the value below.
-const MERGED: &[(&str, usize)] = &[("colors", 1), ("speeds", 1), ("mono", 1), ("rules", 2)];
+const MERGED: &[(&str, usize)] = &[
+    ("colors", 1),
+    ("speeds", 1),
+    ("looks", 1),
+    ("mono", 1),
+    ("rules", 2),
+];
 
 /// Lays the stylesheet `sheet` over `merged`.
 fn layer(merged: &Table, sheet: &Table) -> mlua::Result<()> {
@@ -634,6 +1135,17 @@ fn merge(into: &Table, key: Value, value: Value, depth: usize) -> mlua::Result<(
         },
         (_, _, value) => into.raw_set(key, value),
     }
+}
+
+/// What a module hears on a topic: `{ topic = "<name>", value = ... }`.
+fn topic_message(name: &str, value: &Data) -> Data {
+    Data::Map(
+        [
+            ("topic".to_owned(), Data::from(name)),
+            ("value".to_owned(), value.clone()),
+        ]
+        .into(),
+    )
 }
 
 fn valid_name(name: &str) -> bool {
