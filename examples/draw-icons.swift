@@ -544,3 +544,30 @@ do {
     }
     save(cx, "examples/cinder/icon.png")
 }
+
+// msgvault: a mail archive's three panes, a sidebar, a list with unread
+// dots and avatars, and the open message.
+do {
+    let cx = body([0x60a5fa, 0x2563eb, 0x1e3a8a])
+    let ink = 0x1e3a8a as UInt32
+    // The sidebar, on the gradient: the inbox's row raised, then mailboxes.
+    fill(cx, CGRect(x: 176, y: 712, width: 132, height: 40), 14, color(0xffffff, 0.9))
+    for row in 0..<6 {
+        fill(cx, CGRect(x: 190, y: 640 - CGFloat(row) * 64, width: row % 2 == 0 ? 96 : 76, height: 18), 9, color(0xffffff, 0.55))
+    }
+    // The list: rows with an avatar, the first unread.
+    card(cx, CGRect(x: 336, y: 196, width: 512, height: 632), 0x172554)
+    for row in 0..<4 {
+        let y = 708 - CGFloat(row) * 148
+        if row < 2 {
+            fill(cx, CGRect(x: 360, y: y + 34, width: 18, height: 18), 9, color(0x2563eb))
+        }
+        fill(cx, CGRect(x: 392, y: y + 8, width: 76, height: 76), 38, color([0xf9a8d4, 0x93c5fd, 0xa7f3d0, 0xfde68a][row]))
+        fill(cx, CGRect(x: 492, y: y + 58, width: row < 2 ? 200 : 160, height: 22), 11, color(ink, row < 2 ? 0.85 : 0.45))
+        fill(cx, CGRect(x: 492, y: y + 14, width: 300, height: 16), 8, color(ink, 0.2))
+        if row < 3 {
+            fill(cx, CGRect(x: 360, y: y - 30, width: 464, height: 4), 2, color(ink, 0.08))
+        }
+    }
+    save(cx, "examples/msgvault/icon.png")
+}
