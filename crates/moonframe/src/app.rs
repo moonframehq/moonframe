@@ -108,6 +108,9 @@ pub(crate) struct MoonframeApp {
     /// The notification a toast shows in place of the system's (by the
     /// toast's id): who posted it and its `id`, told when it is clicked.
     toast_notice: Option<(u64, String, Option<String>)>,
+    /// How many toasts have shown: each takes the next number as its id,
+    /// never one an earlier toast (or its timer, or its notice) had.
+    toasts: u64,
     /// A bundle is being built (Build App Bundle).
     building: bool,
     /// Checking for, or installing, an update.
@@ -254,6 +257,7 @@ impl MoonframeApp {
             settings,
             toast: None,
             toast_notice: None,
+            toasts: 0,
             building: false,
             updating: false,
             requested_reload: None,
@@ -1119,7 +1123,7 @@ impl MoonframeApp {
         };
         self.building = true;
         // Stays up until the build ends: cargo can take minutes.
-        let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
+        let id = self.next_toast();
         self.toast = Some((id, format!("Building {}…", crate::title()).into()));
         cx.notify();
         cx.spawn(async move |this, cx| {
@@ -1260,7 +1264,7 @@ impl MoonframeApp {
         cx: &mut Context<Self>,
     ) {
         // Stays up until the download ends.
-        let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
+        let id = self.next_toast();
         self.toast = Some((
             id,
             format!("Downloading {} {}…", crate::title(), release.version).into(),
@@ -1294,12 +1298,20 @@ impl MoonframeApp {
         .detach();
     }
 
+    /// A new toast's id, replacing the one showing: a notice it carried
+    /// goes with it.
+    fn next_toast(&mut self) -> u64 {
+        self.toasts += 1;
+        self.toast_notice = None;
+        self.toasts
+    }
+
     fn show_toast_text(&mut self, message: SharedString, cx: &mut Context<Self>) {
         self.show_toast_for(message, TOAST, cx);
     }
 
     fn show_toast_for(&mut self, message: SharedString, shown: Duration, cx: &mut Context<Self>) {
-        let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
+        let id = self.next_toast();
         self.toast = Some((id, message));
         cx.notify();
         cx.spawn(async move |this, cx| {
@@ -1307,6 +1319,7 @@ impl MoonframeApp {
             let _ = this.update(cx, |this, cx| {
                 if this.toast.as_ref().is_some_and(|(shown, _)| *shown == id) {
                     this.toast = None;
+                    this.toast_notice = None;
                     cx.notify();
                 }
             });
