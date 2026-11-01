@@ -197,13 +197,17 @@ emit() {
 if [ -n "$MOONFRAME_FILES" ]; then
     ROOT=$MOONFRAME_FILES
 else
-    # The repository `moonframe` was started in, unless that is home (a
-    # dotfiles repository), else the one holding the app.
-    [ -n "$MOONFRAME_LAUNCH_DIR" ] &&
-        ROOT=$(git -C "$MOONFRAME_LAUNCH_DIR" rev-parse --show-toplevel 2>/dev/null)
-    if [ -z "$ROOT" ] || [ "$ROOT" -ef "$HOME" ]; then
-        ROOT=$(git -C ../.. rev-parse --show-toplevel 2>/dev/null)
-    fi
+    # The repository `moonframe` was started in, else the one holding the
+    # app; never home (a dotfiles repository). The docs provider finds the
+    # same root, so the editor opens the file the explorer names.
+    repository() {
+        local top
+        top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) || return 1
+        [ -n "$top" ] && ! [ "$top" -ef "$HOME" ] && printf '%s' "$top"
+    }
+    ROOT=
+    [ -n "$MOONFRAME_LAUNCH_DIR" ] && ROOT=$(repository "$MOONFRAME_LAUNCH_DIR")
+    [ -n "$ROOT" ] || ROOT=$(repository ../..)
 fi
 ROOT=${ROOT%/}
 ROOT_REAL=$(cd "$ROOT" 2>/dev/null && pwd -P)

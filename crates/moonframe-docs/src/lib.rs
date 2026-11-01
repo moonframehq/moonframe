@@ -593,26 +593,37 @@ fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
 }
 
 /// The project: `MOONFRAME_FILES`, else the git repository the app was
-/// started in (unless that is home), else the one holding the app's folder
-/// (two above the provider's), found by its `.git`.
+/// started in, else the one holding the app's folder (two above the
+/// provider's); never home. Found as the `files` provider finds it (git's
+/// own answer, so a repository git refuses is skipped by both), so a path
+/// the explorer gives names the same file here.
 fn root(dir: &Path) -> Option<PathBuf> {
     if let Some(folder) = std::env::var_os("MOONFRAME_FILES") {
         return PathBuf::from(folder).canonicalize().ok();
     }
-    // As the `files` provider finds it, so a path the explorer gives names
-    // the same file here.
-    let repository = |start: &Path| {
-        let start = start.canonicalize().ok()?;
-        start
-            .ancestors()
-            .find(|folder| folder.join(".git").exists())
-            .map(Path::to_owned)
-    };
     let home = std::env::home_dir().and_then(|home| home.canonicalize().ok());
+    let repository = |start: &Path| toplevel(start).filter(|found| Some(found) != home.as_ref());
     moonframe_providers::launch_dir()
         .and_then(repository)
-        .filter(|found| Some(found) != home.as_ref())
         .or_else(|| repository(&dir.join("..").join("..")))
+}
+
+/// The git repository holding `dir`, as `git rev-parse --show-toplevel`
+/// says.
+fn toplevel(dir: &Path) -> Option<PathBuf> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["rev-parse", "--show-toplevel"])
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()
+        .filter(|output| output.status.success())?;
+    let found = String::from_utf8(output.stdout).ok()?;
+    PathBuf::from(found.trim_end_matches('\n'))
+        .canonicalize()
+        .ok()
 }
 
 fn writers(settings: &Data) -> Vec<String> {
