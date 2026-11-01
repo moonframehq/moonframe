@@ -89,6 +89,28 @@ impl App {
                 printable(&app.name)
             ));
         }
+        // A bundle is a folder named after the title, and its plist and
+        // .desktop file hold it, so it must be a plain file name.
+        if let Some(title) = &app.title
+            && !valid_title(title)
+        {
+            return Err(format!(
+                "{}: `{}` is not an app title: up to 64 characters, without \
+                 control characters, / \\ < > & or a leading dot",
+                path.display(),
+                printable(title)
+            ));
+        }
+        // The icon must stay inside the app's folder.
+        if let Some(icon) = &app.icon
+            && !valid_icon(icon)
+        {
+            return Err(format!(
+                "{}: `{}` is not an icon path: a file inside the app's folder",
+                path.display(),
+                printable(icon)
+            ));
+        }
         Ok(Some(app))
     }
 }
@@ -99,6 +121,25 @@ pub(crate) fn valid_name(name: &str) -> bool {
         && name
             .chars()
             .all(|c| matches!(c, 'a'..='z' | '0'..='9' | '-' | '_'))
+}
+
+/// Whether `title` can name a bundle folder and sit in a plist unescaped.
+fn valid_title(title: &str) -> bool {
+    !title.trim().is_empty()
+        && title.chars().count() <= 64
+        && !title.starts_with('.')
+        && !title
+            .chars()
+            .any(|c| c.is_control() || matches!(c, '/' | '\\' | '<' | '>' | '&' | ':'))
+}
+
+/// Whether `icon` is a relative path that stays inside the app's folder.
+fn valid_icon(icon: &str) -> bool {
+    !icon.is_empty()
+        && !icon.chars().any(char::is_control)
+        && Path::new(icon)
+            .components()
+            .all(|part| matches!(part, std::path::Component::Normal(_)))
 }
 
 /// `packages.toml`.

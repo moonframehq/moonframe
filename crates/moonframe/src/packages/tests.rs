@@ -493,3 +493,24 @@ fn an_app_without_a_shell_or_a_name_is_refused() {
     .unwrap_err();
     assert!(problem.contains("not an app name"), "{problem}");
 }
+
+#[test]
+fn an_app_title_or_icon_that_leaves_its_folder_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let read = |manifest: &str| {
+        fs::write(dir.path().join("moonframe.toml"), manifest).unwrap();
+        App::read(dir.path())
+    };
+    assert!(read("[app]\nname = \"ok\"\ntitle = \"Fine App\"\nicon = \"art/icon.png\"\n").is_ok());
+    for bad in [
+        "title = \"../../evil\"",
+        "title = \".hidden\"",
+        "title = \"a<b\"",
+        "title = \"two\\nlines\"",
+        "icon = \"../icon.png\"",
+        "icon = \"/etc/passwd\"",
+    ] {
+        let problem = read(&format!("[app]\nname = \"ok\"\n{bad}\n")).unwrap_err();
+        assert!(problem.contains("is not an app title") || problem.contains("is not an icon"), "{bad}: {problem}");
+    }
+}

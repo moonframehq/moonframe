@@ -41,6 +41,12 @@ if [ -n "$profile" ]; then
         esac
     done < <("target/release/$exe" ${MOONFRAME_USER:+--user "$MOONFRAME_USER"} app paths "$profile")
     [ -n "$app" ] || { echo "no app in the profile $profile" >&2; exit 1; }
+    case $title in
+        "" | .* | */* | *'\'* | *'<'* | *'>'* | *'&'* | *:*)
+            echo "the app's title \`$title\` cannot name a bundle" >&2
+            exit 1
+            ;;
+    esac
 fi
 
 # Stages the app, and the profile's app with its packages, under $1.
