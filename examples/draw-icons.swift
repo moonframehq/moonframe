@@ -220,3 +220,33 @@ do {
     }
     save(cx, "examples/stage/icon.png")
 }
+
+// Trellis: a project's work trees nested beside a terminal split in two.
+do {
+    let cx = body([0xa855f7, 0x7e22ce, 0x3b0764])
+    // The tree, on the gradient: a project tile, its work trees indented.
+    fill(cx, CGRect(x: 190, y: 700, width: 72, height: 72), 18, color(0xffffff, 0.95))
+    fill(cx, CGRect(x: 280, y: 724, width: 110, height: 24), 12, color(0xffffff, 0.8))
+    fill(cx, CGRect(x: 222, y: 452, width: 8, height: 248), 4, color(0xffffff, 0.45))
+    for row in 0..<3 {
+        let y = 616 - CGFloat(row) * 84
+        fill(cx, CGRect(x: 222, y: y + 8, width: 46, height: 8), 4, color(0xffffff, 0.45))
+        fill(cx, CGRect(x: 280, y: y, width: row == 1 ? 120 : 96, height: 24), 12, color(0xffffff, row == 1 ? 0.95 : 0.6))
+    }
+    // The terminal: two panes, a prompt in each.
+    let pane = color(0x1c1b22, 0.96)
+    cx.saveGState()
+    cx.setShadow(offset: CGSize(width: 0, height: -8), blur: 20, color: color(0x2e1065, 0.5))
+    fill(cx, CGRect(x: 450, y: 220, width: 384, height: 584), 34, pane)
+    cx.restoreGState()
+    fill(cx, CGRect(x: 640, y: 248, width: 4, height: 528), 2, color(0xffffff, 0.18))
+    for (column, x) in [482.0, 670].enumerated() {
+        fill(cx, CGRect(x: x, y: 728, width: 34, height: 20), 10, color(0xc084fc))
+        for (row, width) in [120.0, 90, 130, 70].enumerated() {
+            fill(cx, CGRect(x: x, y: 668 - CGFloat(row) * 50, width: width - CGFloat(column) * 10, height: 14), 7,
+                 color(0xffffff, 0.3))
+        }
+        fill(cx, CGRect(x: x, y: 300, width: 18, height: 30), 4, color(0xffffff, 0.85))
+    }
+    save(cx, "examples/trellis/icon.png")
+}

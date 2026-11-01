@@ -7,7 +7,11 @@ A Moonframe package for apps that work across many repositories, which the
   (`~/code`, `~/dev`, `~/src`, `~/Projects`, `~/work`, herdr worktrees, or
   `MOONFRAME_PROJECTS`), with branch and changes; and for the one an app
   opens, its changed files, folders and a file's text. Shared as
-  `app.projects`; see `projects.pl` for the shape. A process provider in
+  `app.projects`; see `projects.pl` for the shape. Each project lists its
+  git work trees, the open one its last commits, and on request its pull
+  requests and workflow runs from `gh`. It also commits, pulls, pushes and
+  adds work trees, in the background, for the mods named in
+  `MOONFRAME_PROJECTS_WRITERS` (by default [trellis](../trellis)'s). A process provider in
   Perl: it runs git and reads files with your access.
 - `components/`: `file-tree`, `change-tree`, `code` (syntax-coloured
   source) and `file-icon`.
