@@ -58,7 +58,7 @@ jobs:
           fallback: none
       - name: Check each provider's lockfile against the advisory database
         run: |
-          for manifest in app/providers/*/Cargo.toml; do
+          for manifest in app/providers/*/Cargo.toml examples/*/providers/*/Cargo.toml; do
             [ -e "$manifest" ] || continue
             echo "provider: $(dirname "$manifest")"
             cargo deny --manifest-path "$manifest" check advisories

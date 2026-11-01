@@ -83,16 +83,28 @@ components-check dir="app":
 stage out="target/stage/app":
     scripts/stage-app.sh {{out}}
 
-# Build and lint every wasm provider in app/providers, as the app would.
+# Build and lint every wasm provider in app/providers, as the app would
+# (`just providers "examples/*"` for the example apps').
 providers dir="app":
     #!/usr/bin/env bash
     set -euo pipefail
     for manifest in {{dir}}/providers/*/Cargo.toml; do
         [ -e "$manifest" ] || continue
         echo "provider: $(basename "$(dirname "$manifest")")"
+        # A provider carries its own copy of the interface, to build wherever
+        # its app is copied; it must stay the one the host implements.
+        local="$(dirname "$manifest")/wit/provider.wit"
+        if [ -e "$local" ] && ! cmp -s "$local" wit/provider.wit; then
+            echo "$local differs from wit/provider.wit; copy it again" >&2
+            exit 1
+        fi
         cargo clippy --quiet --release --target wasm32-wasip2 --manifest-path "$manifest" --target-dir target/providers -- -D warnings
         cargo build --quiet --release --target wasm32-wasip2 --manifest-path "$manifest" --target-dir target/providers
     done
+
+# Build and lint the example apps' wasm providers.
+providers-examples:
+    just providers "examples/*"
 
 # Download the pinned luau-lsp that `just types` uses (into target/tools).
 setup-luau:
@@ -167,4 +179,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check lint test types providers check-builtin components-check check-examples
+ci: format-check lint test types providers providers-examples check-builtin components-check check-examples

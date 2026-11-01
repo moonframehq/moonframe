@@ -11,10 +11,10 @@ moonframe app link examples/vigil
 moonframe --profile vigil
 ```
 
-- **Live.** The `vigil` provider (Perl, `providers/vigil`) publishes once
-  a second: a run starts every few seconds, running ones finish (now and
-  then with an error), finished runs count towards the success figures, and
-  the charts' latest points drift. The red dot beside Live feed breathes on
+- **Live.** The `vigil` provider (Rust built to WebAssembly,
+  `providers/vigil`) publishes once a second: a run starts every few
+  seconds, running ones finish (now and then with an error), finished runs
+  count towards the success figures, and the charts' latest points drift. The red dot beside Live feed breathes on
   each tick.
 - **Range.** 1H to 30D switch the figures (a message to the provider, kept
   across launches). The View menu has them too.

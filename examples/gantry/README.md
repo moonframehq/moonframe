@@ -25,11 +25,11 @@ moonframe --profile gantry
 - **Home, Tasks, Docs, Status, Changelog** in the top bar, in the same
   style; Go in the menu bar has them on ⌘1 to ⌘6.
 
-The data is **simulated sample telemetry** from
-`providers/telemetry/telemetry.pl` (perl 5, as macOS ships): a new sample
+The data is **simulated sample telemetry** from `providers/telemetry`, a
+Rust crate built to a WebAssembly component and run sandboxed: a new sample
 every 3 seconds stands for 15 minutes, so the meters and the chart move.
-Replace that script to read a real platform; its header documents the shape
-of `app.telemetry`.
+Replace it to read a real platform; the header of its `src/lib.rs`
+documents the shape of `app.telemetry`.
 
 It uses the shared `tick-meter` and `series-chart` components, and three of
 its own in `components/` (`frame-box`, `square-button`, `tag`). The face is

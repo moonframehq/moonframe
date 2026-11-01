@@ -1,4 +1,6 @@
 {
+  "available": true,
+  "sample": true,
   "org": { "name": "Pemberton Row", "detail": "Capital · Boston", "initials": "PR" },
   "person": { "name": "Ines Hartley", "role": "Head of Capital" },
   "synced": "Bank feeds synced 08:36 · Fund admin synced 07:00",

@@ -1,0 +1,36 @@
+// The contract between Moonframe and a WebAssembly provider: a module
+// written in Rust (or any language that targets the component model) that
+// produces data for Luau views. What a provider publishes appears to every
+// view as `app.<name>`; mods send it messages with `to = "provider:<name>"`.
+//
+// The component runs sandboxed, but building it runs Cargo and the crate's
+// proc macros with the user's access: a provider's source is trusted code.
+//
+// Data crosses as JSON text, because WIT types cannot be recursive. The host
+// checks it like any other value a module hands over.
+package moonframe:provider;
+
+interface host {
+    // Writes a line to the terminal that runs the app.
+    log: func(message: string);
+
+    // This machine's load as JSON:
+    // { "cpu", "memory", "memory_used", "memory_total", "received", "transmitted" },
+    // fractions from 0 to 1 except bytes and bytes per second. Only for
+    // providers whose provider.toml grants `capabilities = ["system"]`.
+    system-load: func() -> result<string, string>;
+}
+
+world provider {
+    import host;
+
+    // Called once, with the `[settings]` table of provider.toml as JSON.
+    export start: func(settings: string) -> result<_, string>;
+
+    // Called every `interval` seconds; returns JSON to publish, or nothing
+    // to keep what was published last.
+    export tick: func() -> option<string>;
+
+    // A message from a mod, as JSON; may return JSON to publish at once.
+    export receive: func(message: string) -> option<string>;
+}

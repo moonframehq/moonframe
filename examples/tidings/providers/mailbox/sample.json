@@ -1,4 +1,5 @@
 {
+  "available": true,
   "account": { "name": "Robin Hale", "email": "robin@fernhill.studio", "workspace": "Fernhill Studio" },
   "groups": [
     { "id": "today", "label": "Today" },

@@ -18,10 +18,11 @@
   caret, the cells still to come as grey skeleton bars. The grid is the
   `spreadsheet` component (`app/components/spreadsheet.luau`).
 
-The agent is a **scripted demo**, not a model: `providers/research`, a Perl
-process provider, reads the sample apps from `sample.json` and plays the run
-on a clock (a tick every 0.4 s), publishing it as `app.research.run`. A real
-agent would publish its plan and cells the same way.
+The agent is a **scripted demo**, not a model: `providers/research`, a Rust
+provider built to WebAssembly, builds in the sample apps from `sample.json`
+and plays the run on a clock (a tick every 0.4 s), publishing it as
+`app.research.run`. A real agent would publish its plan and cells the same
+way. `start_tick` in its `provider.toml` starts the run part way through.
 
 ```sh
 moonframe app link examples/research   # from the repository

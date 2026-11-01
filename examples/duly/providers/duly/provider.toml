@@ -1,6 +1,7 @@
 # Duly's register, shared as `app.duly`: SAMPLE data from sample.json in
 # this folder, for the demo (notices, contracts, payments, reports). Point
-# it at your contract register and payment ledger by replacing duly.pl.
-# A process provider (perl 5, as macOS ships).
-command = ["perl", "duly.pl"]
-kind    = "process"
+# it at your contract register and payment ledger by replacing this
+# provider. A static provider: the file is published as it is, and again
+# when it changes.
+file = "sample.json"
+kind = "static"

@@ -1,6 +1,7 @@
 # Gantry's services and their telemetry, shared as `app.telemetry`: SAMPLE
-# data, simulated by telemetry.pl (a new sample every 3 seconds stands for
-# 15 minutes). Replace telemetry.pl to read a real platform. A process
-# provider (perl 5, as macOS ships).
-command = ["perl", "telemetry.pl"]
-kind    = "process"
+# data, simulated by this crate (a new sample every 3 seconds stands for 15
+# minutes). Replace it to read a real platform. A Rust crate built to a
+# WebAssembly component and run sandboxed: it needs nothing from the
+# machine but the clock.
+interval = 3.0
+kind     = "wasm"

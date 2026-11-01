@@ -26,7 +26,8 @@ thread; Assign toggles; "Show 1 earlier message" unfolds the thread. Ticket >
 Next and Previous (⌘↓, ⌘↑) step through the list.
 
 Everything is **sample data** (`providers/desk/sample.json`), kept in memory
-by a Perl process provider (`providers/desk`), so each launch starts over.
+by a Rust provider built to WebAssembly (`providers/desk`), so each launch
+starts over.
 Point the provider at a real help desk's API to make it live.
 
 ```sh

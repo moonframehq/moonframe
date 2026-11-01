@@ -24,7 +24,7 @@ relates to, when it was made, participants, notes. Reschedule moves it a
 day on; Join Meeting copies its link; Create and Schedule add an hour at
 9 AM on the day in view. The meetings live in
 `~/.local/share/moonframe/pipeline/meetings.json` (`providers/meetings`, a
-Perl process provider that also says what today is), started with sample
+Python process provider that also says what today is), started with sample
 meetings around the current week.
 
 **Moving deals:** Luau views cannot take drag and drop yet, so click or
@@ -32,7 +32,7 @@ right-click a card for its menu: move it to another stage, mark it won, or
 flag it at risk. "Add deal" and "New deal" add one to a column.
 
 The deals live in `~/.local/share/moonframe/pipeline/deals.json`
-(`providers/deals`, a Perl process provider), started with sample deals.
+(`providers/deals`, a Python process provider), started with sample deals.
 
 ```sh
 moonframe app link examples/pipeline   # from the repository

@@ -1,5 +1,5 @@
 # Daybook's tasks, events and notes, and today's date, shared as
 # `app.planner`. A process provider: it keeps them in a JSON file under
-# ~/.local/share/moonframe with your access. Needs perl 5 (as macOS ships).
-command = ["perl", "planner.pl"]
+# ~/.local/share/moonframe with your access. Needs python3.
+command = ["python3", "planner.py"]
 kind    = "process"

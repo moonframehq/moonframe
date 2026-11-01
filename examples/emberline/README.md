@@ -18,8 +18,9 @@ It uses two components made for it, both in `app/components`:
 `level-row` (a label, a gradient fill on a track, a count). Both rest on the
 stylesheet's `gradient` property and the `display` text size.
 
-The figures are **sample data**: `providers/leads` (a Perl process provider)
-publishes `sample.json` as `app.leads`. Point it at your CRM to make it real.
+The figures are **sample data**: `providers/leads` (a static provider, no
+code) publishes `sample.json` as `app.leads`. Point
+it at your CRM to make it real.
 
 Numbers are set in Geist Mono (`GeistMono Nerd Font Mono`); without it they
 fall back to another monospace face.

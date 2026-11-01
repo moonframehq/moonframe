@@ -1,4 +1,5 @@
 {
+  "available": true,
   "note": "Sample data for the Inkwell example app; replace this file or the provider with your own source.",
   "kpis": [
     { "id": "total", "title": "Total readers", "icon": "user", "tint": "#7c5cff", "value": "24,816", "delta": "+6.4%", "good": true, "caption": "All active subscribers" },

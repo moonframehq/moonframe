@@ -1,4 +1,5 @@
 {
+ "available": true,
  "note": "Sample data for the Hearth example app; replace this file or the provider with your own source.",
  "org": {
   "name": "Hearth",

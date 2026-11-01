@@ -1,5 +1,5 @@
 # Emberline's leads report, shared as `app.leads`. SAMPLE DATA from
-# sample.json; replace it, or this provider, with your CRM. A process
-# provider: it reads that file. Needs perl 5 (as macOS ships).
-command = ["perl", "leads.pl"]
-kind    = "process"
+# sample.json; replace it, or this provider, with your CRM. A static
+# provider: the file is published as it is, and again when it changes.
+file = "sample.json"
+kind = "static"
