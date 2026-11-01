@@ -1,0 +1,255 @@
+{
+  "account": { "name": "Robin Hale", "email": "robin@fernhill.studio", "workspace": "Fernhill Studio" },
+  "groups": [
+    { "id": "today", "label": "Today" },
+    { "id": "yesterday", "label": "Yesterday" },
+    { "id": "week", "label": "This week" }
+  ],
+  "threads": [
+    {
+      "id": "nora-september", "sender": "Nora Feld", "domain": "tallybook.co", "color": "#c08457",
+      "group": "today", "time": "10:05", "unread": true, "buckets": ["needs"],
+      "tag": "Finance", "subject": "September transactions to categorize",
+      "preview": "Here are September's 23 card transactions. Can you sort them before Friday's close?",
+      "action": "Categorize 23 transactions",
+      "messages": [
+        { "from": "Nora Feld", "time": "Mon 16:40", "body": "Quick heads-up: September closes on Friday, and the card export is ready." },
+        { "from": "Nora Feld", "time": "10:05", "body": "Here are September's 23 card transactions. Can you sort them before Friday's close?\n\nMost are software and travel. The three over $1,000 need a note on what they were for, so the books balance without a follow-up from me.\n\nThanks!\nNora" }
+      ]
+    },
+    {
+      "id": "stackwise-receipt", "sender": "Stackwise", "domain": "stackwise.app", "color": "#18181b", "logo": true,
+      "group": "today", "time": "9:58", "unread": true, "buckets": ["needs"],
+      "tag": "Finance", "subject": "Your Stackwise receipt",
+      "preview": "$14 a month for the Team plan, billed to the card ending 2291.",
+      "action": "Keep or cancel?",
+      "messages": [
+        { "from": "Stackwise", "time": "9:58", "body": "Thanks for staying with Stackwise.\n\n$14 a month for the Team plan, billed to the card ending 2291. Your next payment is on November 30.\n\nNobody on your team has signed in since August. You can pause the plan from Settings at any time." }
+      ]
+    },
+    {
+      "id": "iris-thursday", "sender": "Iris Mendel", "domain": "harborlight.io", "color": "#7c6f64",
+      "group": "today", "time": "9:41", "unread": true, "buckets": ["needs", "sales"],
+      "tag": "Sales", "subject": "Re: Thursday demo",
+      "preview": "Thursday at 15:30 works. I'm bringing Theo, our CTO, since he signs off on anything we roll out.",
+      "action": "Answer SSO and 40-seat pricing",
+      "messages": [
+        { "from": "Iris Mendel", "time": "Tue 11:02", "body": "Could we see the product with real data this week? Thursday afternoon is best for us." },
+        { "from": "me", "time": "Tue 14:20", "body": "Of course. Would 15:30 on Thursday work? I'll bring a workspace with sample projects so your team can click around." },
+        { "from": "Iris Mendel", "time": "9:41", "body": "Thursday at 15:30 works. I'm bringing Theo, our CTO, since he signs off on anything we roll out.\n\nTwo things he will ask about: whether you support SSO with Okta, and what 40 seats would cost on an annual plan. If you can send that before the call, we can spend the hour on the product.\n\nIris" }
+      ]
+    },
+    {
+      "id": "quarry-invoice", "sender": "Accounts Payable", "domain": "quarrybank.com", "color": "#2f6f62", "logo": true,
+      "group": "today", "time": "9:12", "unread": true, "buckets": ["needs"],
+      "tag": "Finance", "subject": "Invoice INV-0231",
+      "preview": "We need a W-9 on file before we can release the $68,000 payment.",
+      "action": "Send the W-9",
+      "messages": [
+        { "from": "Accounts Payable", "time": "9:12", "body": "Hello,\n\nWe need a W-9 on file before we can release the $68,000 payment for invoice INV-0231.\n\nPlease reply with the signed form attached. Payments run every Tuesday and Thursday." }
+      ]
+    },
+    {
+      "id": "felix-seats", "sender": "Felix Amano", "domain": "gridline.io", "color": "#5b7ea4",
+      "group": "today", "time": "8:30", "unread": true, "buckets": ["needs", "sales"],
+      "tag": "Sales", "subject": "Seats for November",
+      "preview": "We're going down to 20 seats in November and would like to talk about an annual plan.",
+      "action": "Offer an annual price for 20 seats",
+      "messages": [
+        { "from": "Felix Amano", "time": "Mon 09:15", "body": "Our contractors finish at the end of October, so we'll need fewer seats." },
+        { "from": "Felix Amano", "time": "8:30", "body": "We're going down to 20 seats in November and would like to talk about an annual plan.\n\nIf the price is right we'd commit for the year now rather than month to month. Could you send a number before Friday?\n\nFelix" }
+      ]
+    },
+    {
+      "id": "ruth-trial", "sender": "Ruth Okafor", "domain": "birchclinic.com", "color": "#8a6d8f",
+      "group": "today", "time": "8:02", "unread": false, "buckets": ["needs", "sales"],
+      "tag": "Sales", "subject": "Trial for the clinic",
+      "preview": "Twelve of our designers want to try it before we commit. Could you set up a trial for the team?",
+      "action": "Set up a 12-seat trial",
+      "messages": [
+        { "from": "Ruth Okafor", "time": "Oct 21", "body": "Thanks for the walkthrough last week, the team liked it." },
+        { "from": "me", "time": "Oct 22", "body": "Glad to hear it! Happy to set up anything you need to try it properly." },
+        { "from": "Ruth Okafor", "time": "Oct 27", "body": "We've talked it over internally and would like a trial." },
+        { "from": "Ruth Okafor", "time": "8:02", "body": "Twelve of our designers want to try it before we commit. Could you set up a trial for the team?\n\nTwo weeks would be ideal, starting Monday if possible." }
+      ]
+    },
+    {
+      "id": "selma-catchup", "sender": "Selma Varga", "domain": "lanternvc.com", "color": "#b0654a",
+      "group": "yesterday", "time": "16:20", "unread": true, "buckets": ["needs", "vip", "investors"],
+      "tag": "Investors", "subject": "Catch up next week?",
+      "preview": "Would love 30 minutes next week on the Fernhill Pro launch. Does Tuesday or Wednesday work?",
+      "action": "Offer two times next week",
+      "messages": [
+        { "from": "Selma Varga", "time": "Yesterday 16:20", "body": "Hi Robin,\n\nWould love 30 minutes next week on the Fernhill Pro launch. Does Tuesday or Wednesday work? Morning is easiest on my side.\n\nSelma" }
+      ]
+    },
+    {
+      "id": "tomas-sso", "sender": "Tomas Reyes", "domain": "pinegate.com", "color": "#4d6b57",
+      "group": "yesterday", "time": "14:05", "unread": false, "buckets": ["needs", "sales"],
+      "tag": "Sales", "subject": "SSO setup for the pilot",
+      "preview": "Before Thursday, could you share how SAML is set up on your side? Our IT team needs it for the review.",
+      "action": "Send the SSO guide",
+      "messages": [
+        { "from": "Tomas Reyes", "time": "Yesterday 14:05", "body": "Before Thursday, could you share how SAML is set up on your side? Our IT team needs it for the review.\n\nA short doc is fine, they mostly want the metadata URL and the attributes you map." }
+      ]
+    },
+    {
+      "id": "hana-launch", "sender": "Hana Mori", "domain": "fernhill.studio", "color": "#6b8f8a",
+      "group": "yesterday", "time": "11:30", "unread": false, "buckets": ["needs"],
+      "tag": "Team", "subject": "v3.4 launch post",
+      "preview": "The draft is in the doc. Would love your eyes on the intro before Monday.",
+      "action": "Review the intro",
+      "messages": [
+        { "from": "me", "time": "Yesterday 09:10", "body": "Is the launch post ready for a read?" },
+        { "from": "Hana Mori", "time": "Yesterday 11:30", "body": "The draft is in the doc. Would love your eyes on the intro before Monday.\n\nThe rest is close; the intro still reads like a changelog." }
+      ]
+    },
+    {
+      "id": "clara-redlines", "sender": "Clara Benz", "domain": "saltmarsh.health", "color": "#946b52",
+      "group": "yesterday", "time": "10:12", "unread": false, "buckets": ["needs", "sales"],
+      "tag": "Sales", "subject": "Contract redlines",
+      "preview": "Legal flagged two clauses in section 4, mostly about how long you keep patient data.",
+      "action": "Reply on two clauses",
+      "messages": [
+        { "from": "Clara Benz", "time": "Oct 20", "body": "Sending the contract over to legal today." },
+        { "from": "me", "time": "Oct 20", "body": "Perfect, thank you. Let me know if anything comes up." },
+        { "from": "Clara Benz", "time": "Oct 24", "body": "Legal is still reviewing; should be early next week." },
+        { "from": "me", "time": "Oct 24", "body": "No rush. I'm around if they want a call." },
+        { "from": "Clara Benz", "time": "Yesterday 10:12", "body": "Legal flagged two clauses in section 4, mostly about how long you keep patient data.\n\nThey'd like retention capped at 90 days after the contract ends, and a written note on where backups live." }
+      ]
+    },
+    {
+      "id": "arjun-update", "sender": "Arjun Patel", "domain": "northgate.vc", "color": "#5c5f8f",
+      "group": "yesterday", "time": "9:03", "unread": false, "buckets": ["needs", "investors"],
+      "tag": "Investors", "subject": "Q3 investor update",
+      "preview": "Thanks for the update. Quick question on the churn number in the second chart: is that logo or revenue churn?",
+      "action": "Explain the churn number",
+      "messages": [
+        { "from": "Arjun Patel", "time": "Yesterday 9:03", "body": "Thanks for the update. Quick question on the churn number in the second chart: is that logo or revenue churn?\n\nThe rest reads great." }
+      ]
+    },
+    {
+      "id": "wren-bank", "sender": "Wren Castillo", "domain": "maplefreight.com", "color": "#8f7a4e",
+      "group": "week", "time": "Mon", "unread": false, "buckets": ["needs"],
+      "tag": "Finance", "subject": "New account details",
+      "preview": "We're moving banks. Can you confirm the new details before the next payment run?",
+      "action": "Confirm by phone first",
+      "messages": [
+        { "from": "Wren Castillo", "time": "Mon 10:44", "body": "We're moving banks. Can you confirm the new details before the next payment run?\n\nThe new account is attached. Please update it in your system by the 1st." }
+      ]
+    },
+    {
+      "id": "oskar-renewal", "sender": "Oskar Lund", "domain": "fjordworks.no", "color": "#6f7d8c",
+      "group": "week", "time": "Mon", "unread": false, "buckets": ["needs", "sales"],
+      "tag": "Sales", "subject": "Renewal quote",
+      "preview": "Could you resend the renewal quote with the annual price on it? Finance wants it in one place.",
+      "action": "Resend with the annual price",
+      "messages": [
+        { "from": "Oskar Lund", "time": "Oct 23", "body": "Renewal is coming up. Could you send us a quote?" },
+        { "from": "me", "time": "Oct 23", "body": "Attached! Same seats as this year." },
+        { "from": "Oskar Lund", "time": "Mon 15:02", "body": "Could you resend the renewal quote with the annual price on it? Finance wants it in one place." }
+      ]
+    },
+    {
+      "id": "mae-podcast", "sender": "Mae Whitfield", "domain": "slowtalk.fm", "color": "#a0607a",
+      "group": "week", "time": "Mon", "unread": false, "buckets": ["needs"],
+      "tag": "Press", "subject": "Podcast intro",
+      "preview": "Would you be up for 40 minutes on our show next month? Happy to work around your launch.",
+      "action": "Pick a date",
+      "messages": [
+        { "from": "Mae Whitfield", "time": "Mon 12:30", "body": "Would you be up for 40 minutes on our show next month? Happy to work around your launch.\n\nWe record remotely, Tuesdays or Thursdays." }
+      ]
+    },
+    {
+      "id": "tracklet-digest", "sender": "Tracklet", "domain": "tracklet.dev", "color": "#4f46e5", "logo": true,
+      "group": "today", "time": "7:00", "unread": true, "buckets": ["fyi"],
+      "tag": "Updates", "subject": "Weekly digest: 18 issues closed",
+      "preview": "Your team closed 18 issues and opened 9. The Editor project is two days ahead of plan.",
+      "messages": [ { "from": "Tracklet", "time": "7:00", "body": "Your team closed 18 issues and opened 9 this week.\n\nThe Editor project is two days ahead of plan; Billing is on track." } ]
+    },
+    {
+      "id": "canvasly-comments", "sender": "Canvasly", "domain": "canvasly.com", "color": "#e0573a", "logo": true,
+      "group": "today", "time": "6:41", "unread": true, "buckets": ["fyi"],
+      "tag": "Updates", "subject": "3 comments on Launch hero",
+      "preview": "Hana and Leif left comments on the Launch hero frame.",
+      "messages": [ { "from": "Canvasly", "time": "6:41", "body": "Hana and Leif left comments on the Launch hero frame.\n\n\"Can the headline wrap on two lines?\" and two more." } ]
+    },
+    {
+      "id": "forge-build", "sender": "Forgehub", "domain": "forgehub.dev", "color": "#27272a", "logo": true,
+      "group": "today", "time": "6:12", "unread": true, "buckets": ["fyi"],
+      "tag": "Updates", "subject": "Build passed on main",
+      "preview": "fernhill/web · 4 checks passed in 6m 12s after merging \"Trim the pricing page\".",
+      "messages": [ { "from": "Forgehub", "time": "6:12", "body": "fernhill/web · 4 checks passed in 6m 12s after merging \"Trim the pricing page\"." } ]
+    },
+    {
+      "id": "shiplog", "sender": "The Ship Log", "domain": "shiplog.news", "color": "#0f766e", "logo": true,
+      "group": "today", "time": "5:30", "unread": true, "buckets": ["fyi"],
+      "tag": "Newsletter", "subject": "Pricing pages that convert",
+      "preview": "This week: five pricing pages we keep coming back to, and why annual toggles work.",
+      "messages": [ { "from": "The Ship Log", "time": "5:30", "body": "This week: five pricing pages we keep coming back to, and why annual toggles work." } ]
+    },
+    {
+      "id": "calendar-review", "sender": "Calendar", "domain": "fernhill.studio", "color": "#2563eb", "logo": true,
+      "group": "yesterday", "time": "18:02", "unread": true, "buckets": ["fyi"],
+      "tag": "Updates", "subject": "Updated invitation: Design review",
+      "preview": "Design review moved to Thursday 11:00 by Hana Mori.",
+      "messages": [ { "from": "Calendar", "time": "Yesterday 18:02", "body": "Design review moved to Thursday 11:00 by Hana Mori." } ]
+    },
+    {
+      "id": "paylane-payout", "sender": "Paylane", "domain": "paylane.com", "color": "#16a34a", "logo": true,
+      "group": "yesterday", "time": "15:44", "unread": true, "buckets": ["fyi"],
+      "tag": "Receipts", "subject": "Payout of $12,480 on its way",
+      "preview": "Your payout should reach the account ending 0841 in 1 to 2 business days.",
+      "messages": [ { "from": "Paylane", "time": "Yesterday 15:44", "body": "Your payout of $12,480 should reach the account ending 0841 in 1 to 2 business days." } ]
+    },
+    {
+      "id": "leif-notes", "sender": "Leif Sorensen", "domain": "fernhill.studio", "color": "#6d7f5c",
+      "group": "yesterday", "time": "13:10", "unread": true, "buckets": ["fyi"],
+      "tag": "Team", "subject": "Notes from the offsite",
+      "preview": "Photos and the whiteboard notes are in the shared folder. No action needed.",
+      "messages": [ { "from": "Leif Sorensen", "time": "Yesterday 13:10", "body": "Photos and the whiteboard notes are in the shared folder. No action needed." } ]
+    },
+    {
+      "id": "domainly-renew", "sender": "Domainly", "domain": "domainly.com", "color": "#0284c7", "logo": true,
+      "group": "yesterday", "time": "9:20", "unread": true, "buckets": ["fyi"],
+      "tag": "Receipts", "subject": "fernhill.studio renewed",
+      "preview": "Your domain renewed for another year. $32 charged to the card ending 2291.",
+      "messages": [ { "from": "Domainly", "time": "Yesterday 9:20", "body": "Your domain renewed for another year. $32 charged to the card ending 2291." } ]
+    },
+    {
+      "id": "tracklet-cycle", "sender": "Tracklet", "domain": "tracklet.dev", "color": "#4f46e5", "logo": true,
+      "group": "week", "time": "Tue", "unread": true, "buckets": ["fyi"],
+      "tag": "Updates", "subject": "Cycle 42 starts Monday",
+      "preview": "14 issues are planned. 3 have no estimate yet.",
+      "messages": [ { "from": "Tracklet", "time": "Tue 8:00", "body": "Cycle 42 starts Monday. 14 issues are planned; 3 have no estimate yet." } ]
+    },
+    {
+      "id": "airbridge-trip", "sender": "Airbridge", "domain": "airbridge.travel", "color": "#0891b2", "logo": true,
+      "group": "week", "time": "Tue", "unread": true, "buckets": ["fyi"],
+      "tag": "Receipts", "subject": "Your trip to Lisbon",
+      "preview": "Check-in opens 24 hours before departure. Seat 14C is confirmed.",
+      "messages": [ { "from": "Airbridge", "time": "Tue 7:12", "body": "Check-in opens 24 hours before departure. Seat 14C is confirmed." } ]
+    },
+    {
+      "id": "frontline", "sender": "Frontline Weekly", "domain": "frontline.email", "color": "#9333ea", "logo": true,
+      "group": "week", "time": "Mon", "unread": true, "buckets": ["fyi"],
+      "tag": "Newsletter", "subject": "Small teams, big launches",
+      "preview": "How four studios under ten people ship like companies ten times their size.",
+      "messages": [ { "from": "Frontline Weekly", "time": "Mon 6:00", "body": "How four studios under ten people ship like companies ten times their size." } ]
+    },
+    {
+      "id": "canvasly-seat", "sender": "Canvasly", "domain": "canvasly.com", "color": "#e0573a", "logo": true,
+      "group": "week", "time": "Mon", "unread": false, "buckets": ["fyi"],
+      "tag": "Receipts", "subject": "A seat was added to your team",
+      "preview": "Leif Sorensen joined Fernhill Studio as an editor.",
+      "messages": [ { "from": "Canvasly", "time": "Mon 5:40", "body": "Leif Sorensen joined Fernhill Studio as an editor." } ]
+    },
+    {
+      "id": "forge-security", "sender": "Forgehub", "domain": "forgehub.dev", "color": "#27272a", "logo": true,
+      "group": "week", "time": "Sun", "unread": false, "buckets": ["fyi"],
+      "tag": "Updates", "subject": "A new sign-in to your account",
+      "preview": "We noticed a sign-in from Safari on macOS in Porto. If this was you, there is nothing to do.",
+      "messages": [ { "from": "Forgehub", "time": "Sun 21:14", "body": "We noticed a sign-in from Safari on macOS in Porto. If this was you, there is nothing to do." } ]
+    }
+  ]
+}

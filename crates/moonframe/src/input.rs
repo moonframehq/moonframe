@@ -281,6 +281,11 @@ impl Inputs {
         field.map(|field| field.editor.clone())
     }
 
+    /// Whether a field has keyboard focus in `window`.
+    pub(crate) fn any_focused(&self, window: &Window, cx: &App) -> bool {
+        self.focused(window, cx).is_some()
+    }
+
     /// The field with keyboard focus in `window`, if any.
     fn focused(&self, window: &Window, cx: &App) -> Option<(Wiring, String)> {
         let registry = self.0.borrow();

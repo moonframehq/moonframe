@@ -220,3 +220,29 @@ do {
     }
     save(cx, "examples/stage/icon.png")
 }
+
+// Tidings: a list of emails, unread ones dotted, beside the open one.
+do {
+    let cx = body([0x818cf8, 0x6366f1, 0x4338ca])
+    card(cx, CGRect(x: 196, y: 216, width: 268, height: 592), 0x312e81)
+    for row in 0..<4 {
+        let y = 690 - CGFloat(row) * 136
+        if row == 1 {
+            fill(cx, CGRect(x: 214, y: y - 30, width: 232, height: 112), 24, color(0xeef2ff))
+        }
+        if row < 3 {
+            fill(cx, CGRect(x: 232, y: y + 52, width: 22, height: 22), 11, color(0x6366f1))
+        }
+        fill(cx, CGRect(x: 272, y: y + 54, width: 140, height: 18), 9, color(0x1e1b4b, 0.8))
+        fill(cx, CGRect(x: 272, y: y + 18, width: 156, height: 14), 7, color(0x1e1b4b, 0.3))
+        fill(cx, CGRect(x: 272, y: y - 10, width: 108, height: 14), 7, color(0x1e1b4b, 0.3))
+    }
+    card(cx, CGRect(x: 486, y: 216, width: 342, height: 592), 0x312e81)
+    fill(cx, CGRect(x: 520, y: 730, width: 230, height: 26), 13, color(0x1e1b4b, 0.85))
+    for line in 0..<5 {
+        fill(cx, CGRect(x: 520, y: 650 - CGFloat(line) * 48, width: line == 4 ? 170 : 270, height: 16), 8, color(0x1e1b4b, 0.25))
+    }
+    fill(cx, CGRect(x: 520, y: 256, width: 274, height: 86), 22, color(0xeef2ff))
+    fill(cx, CGRect(x: 716, y: 276, width: 60, height: 44), 14, color(0x4338ca))
+    save(cx, "examples/tidings/icon.png")
+}

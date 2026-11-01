@@ -1233,6 +1233,11 @@ return mod {
 - `shortcut` is a key named as `keys` names them (`secondary-t` is ⌘T on
   macOS, Ctrl-T elsewhere); it shows in the menu and works while the window
   has focus. A focused terminal keeps plain and Ctrl keys, not ⌘ ones.
+- A menu `shortcut` may also be one key that types text (`j`, `/`,
+  `shift-u`), as a mail client's keys are: it works only while no text
+  field or terminal has focus, so typing is never taken, and the menu does
+  not show it (name it in the label or a hint). `examples/tidings` uses J
+  and K this way. Overlay and field `keys` still refuse such keys.
 - About opens macOS's own About panel (the app's icon and name, `version`,
   `description` and `website` as credits, `copyright`), and a toast
   elsewhere.
