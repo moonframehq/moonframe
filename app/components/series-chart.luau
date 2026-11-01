@@ -30,7 +30,7 @@ return component {
 	category = "Data",
 	icon = "activity",
 	description = "Lines for several series over a value and a time axis, with a legend, a hover hairline with values, and a pinned dashed crosshair with a card.",
-	when = "Several readings over the same period compared on one scale (CPU, GPU and memory over 24 hours; requests and errors by hour), where the reader wants a sample's exact values. For counts stacked per bucket use `bar-chart`; for one small trend use `ui.line` or `sparkline`; for a balance against a floor use `forecast-chart`.",
+	when = "Several readings over the same period compared on one scale (CPU, GPU and memory over 24 hours; requests and errors by hour), where the reader wants a sample's exact values. For counts stacked per bucket use `bar-chart`; for periods against a forecast with a picked day's card use `line-chart`; for one small trend use `ui.line` or `sparkline`; for a balance against a floor use `forecast-chart`.",
 	props = {
 		["series"] = "list of { name, color, points }: the same number of points in each, oldest first",
 		["width"] = "the plot's width in pixels (default 640); the axis adds 50",

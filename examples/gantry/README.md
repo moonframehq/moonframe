@@ -31,7 +31,7 @@ every 3 seconds stands for 15 minutes, so the meters and the chart move.
 Replace that script to read a real platform; its header documents the shape
 of `app.telemetry`.
 
-It uses the shared `tick-meter` and `line-chart` components, and three of
+It uses the shared `tick-meter` and `series-chart` components, and three of
 its own in `components/` (`frame-box`, `square-button`, `tag`). The face is
 IBM Plex Mono as the Nerd Font build `BlexMono Nerd Font Mono`
 (`brew install --cask font-blex-mono-nerd-font`); without it the text falls

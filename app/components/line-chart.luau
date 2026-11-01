@@ -29,7 +29,7 @@ return component {
 	category = "Data",
 	icon = "activity",
 	description = "Solid and dashed lines over periods with faint columns behind, an axis, labels, and a picked period with a rule, dots and a floating card.",
-	when = "A measure over days or weeks compared with a forecast or a target (actual against predicted, this year against last), where the user picks a day to read its figures. For bars against a floor use `forecast-chart`; for stacked counts use `bar-chart`; for a bare trend use `ui.line` or `sparkline`.",
+	when = "A measure over days or weeks compared with a forecast or a target (actual against predicted, this year against last), where the user picks a day to read its figures. For several readings on one scale with a legend and a crosshair use `series-chart`; for bars against a floor use `forecast-chart`; for stacked counts use `bar-chart`; for a bare trend use `ui.line` or `sparkline`.",
 	props = {
 		["labels"] = "one label per period, under the plot",
 		["series"] = "list of { name?, points (one per period), color? (default accent), dashed? }; the first is drawn under the next",
