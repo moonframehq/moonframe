@@ -89,7 +89,9 @@ publish() {
         jstr "$ERROR"
         error=$J
     fi
-    jstr "${TARGET/#$HOME/~}"
+    # The tilde from a variable: bash 5 would expand a bare one back.
+    local tilde="~"
+    jstr "${TARGET/#"$HOME"/$tilde}"
     local out="{\"available\":$available,\"skills\":$skills,\"target\":$J,\"status\":$status,\"version\":$version,\"installing\":$INSTALLING,\"error\":$error,\"fresh\":$FRESH}"
     [ "$out" = "$LAST" ] && return
     printf '%s\n' "$out"
