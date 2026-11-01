@@ -6,7 +6,7 @@ use {
     super::{Cx, Draw, Painter, Place, problem, styling::StyleExt as _},
     crate::{color::ThemeColor as _, terminal::TerminalView},
     gpui_kit::{component::ActiveTheme as _, *},
-    moonframe_core::{Part, Terminal, TerminalBackend, TerminalEngine},
+    moonframe_core::{MonoFont, Part, Terminal, TerminalBackend, TerminalEngine},
     moonframe_mux::Preference,
     moonframe_terminal::{Cell, Color, Engine, Screen, Size},
     std::rc::Rc,
@@ -16,6 +16,10 @@ const FONT: &str = "Menlo";
 const FONT_SIZE: f32 = 13.;
 /// Line height as a multiple of the font size.
 const LINE: f32 = 1.3;
+/// Where characters the font lacks are looked for first, unless the
+/// stylesheet names its own: the icons Nerd Font prompts and status lines
+/// draw, when that font is installed.
+const FALLBACKS: &[&str] = &["Symbols Nerd Font Mono"];
 /// Space between the grid and the element's edge.
 const PADDING: f32 = 8.;
 /// The least room a terminal asks for.
@@ -37,6 +41,7 @@ impl<'w> Draw<'w> for Terminal {
             TerminalEngine::Alacritty => Engine::Alacritty,
             TerminalEngine::Ghostty => Engine::Ghostty,
         };
+        let typeface = Typeface::new(&painter.workspace.stylesheet().mono);
         let frame = div()
             .id(place.id())
             .flex()
@@ -57,8 +62,8 @@ impl<'w> Draw<'w> for Terminal {
             // A preview shows what it is; it starts no shell.
             return frame
                 .p(px(PADDING))
-                .font_family(FONT)
-                .text_size(px(FONT_SIZE))
+                .font(typeface.font)
+                .text_size(typeface.size)
                 .child(format!("$ a live {} terminal goes here", engine.name()))
                 .into_any_element();
         }
@@ -79,6 +84,7 @@ impl<'w> Draw<'w> for Terminal {
         let focus = view.focus.clone();
         let scroll_view = view.clone();
         let hint = hint(view.backend, theme.muted_foreground);
+        let line = typeface.line;
         frame
             .relative()
             .key_context("Terminal")
@@ -87,8 +93,7 @@ impl<'w> Draw<'w> for Terminal {
             .on_mouse_down(MouseButton::Left, move |_, window, cx| {
                 focus.focus(window, cx)
             })
-            .on_scroll(move |event: &ScrollEvent, window, _| {
-                let line = line_height(window);
+            .on_scroll(move |event: &ScrollEvent, _, _| {
                 let moved = scroll_view.scrolled.get() + event.delta.pixel_delta(line).y / line;
                 let lines = moved.trunc();
                 scroll_view.scrolled.set(moved - lines);
@@ -99,7 +104,7 @@ impl<'w> Draw<'w> for Terminal {
                     session.scroll(-(lines as i32));
                 }
             })
-            .child(grid(view, background, foreground))
+            .child(grid(view, typeface, background, foreground))
             .child(hint)
             .into_any_element()
     }
@@ -119,11 +124,16 @@ fn hint(backend: &'static str, muted: Hsla) -> impl IntoElement {
 }
 
 /// The cell grid, fitted to the space it gets.
-fn grid(view: Rc<TerminalView>, background: Hsla, foreground: Hsla) -> impl IntoElement {
+fn grid(
+    view: Rc<TerminalView>,
+    typeface: Typeface,
+    background: Hsla,
+    foreground: Hsla,
+) -> impl IntoElement {
     let resize = view.clone();
     canvas(
         move |bounds, window, _| {
-            let metrics = Metrics::measure(window);
+            let metrics = Metrics::measure(typeface, window);
             if let Ok(session) = &resize.session {
                 session.resize(metrics.fit(bounds));
             }
@@ -159,6 +169,38 @@ fn grid(view: Rc<TerminalView>, background: Hsla, foreground: Hsla) -> impl Into
     .size_full()
 }
 
+/// The font a terminal draws in, from the stylesheet's `mono`.
+struct Typeface {
+    font: Font,
+    size: Pixels,
+    line: Pixels,
+}
+
+impl Typeface {
+    fn new(mono: &MonoFont) -> Self {
+        let mut font = font(mono.family.clone().unwrap_or_else(|| FONT.to_owned()));
+        if let Some(weight) = mono.weight {
+            font.weight = FontWeight(weight);
+        }
+        let fallbacks = mono
+            .fallbacks
+            .clone()
+            .unwrap_or_else(|| FALLBACKS.iter().map(|name| (*name).to_owned()).collect());
+        if !fallbacks.is_empty() {
+            font.fallbacks = Some(FontFallbacks::from_fonts(fallbacks));
+        }
+        if mono.ligatures == Some(false) {
+            font.features = FontFeatures::disable_ligatures();
+        }
+        let size = mono.size.unwrap_or(FONT_SIZE);
+        Self {
+            font,
+            size: px(size),
+            line: px((size * mono.line_height.unwrap_or(LINE)).round()),
+        }
+    }
+}
+
 /// The font and the size of one cell.
 struct Metrics {
     font: Font,
@@ -167,9 +209,8 @@ struct Metrics {
 }
 
 impl Metrics {
-    fn measure(window: &Window) -> Self {
-        let font = font(FONT);
-        let size = px(FONT_SIZE);
+    fn measure(typeface: Typeface, window: &Window) -> Self {
+        let Typeface { font, size, line } = typeface;
         let width = window
             .text_system()
             .shape_line("M".into(), size, &[run(1, &font, black())], None)
@@ -177,7 +218,7 @@ impl Metrics {
         Self {
             font,
             size,
-            cell: gpui_kit::size(width, line_height(window)),
+            cell: gpui_kit::size(width, line),
         }
     }
 
@@ -195,10 +236,6 @@ impl Metrics {
             cell_height: f32::from(self.cell.height).round() as u16,
         }
     }
-}
-
-fn line_height(_: &Window) -> Pixels {
-    px((FONT_SIZE * LINE).round())
 }
 
 /// What painting one screen needs.

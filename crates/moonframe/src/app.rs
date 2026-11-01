@@ -12,7 +12,7 @@ use {
         mod_window::ModWindow,
         motion::Motion,
         packages, paths,
-        render::{KeyLayer, Painter},
+        render::{KeyLayer, ListRequest, Painter},
         settings,
         terminal::Terminals,
         theme_picker::ThemePicker,
@@ -105,6 +105,8 @@ pub(crate) struct MoonframeApp {
 struct Defaults {
     font_size: Pixels,
     font_family: SharedString,
+    mono_font_size: Pixels,
+    mono_font_family: SharedString,
     radius: Pixels,
 }
 
@@ -124,6 +126,8 @@ impl MoonframeApp {
         let defaults = Defaults {
             font_size: DEFAULT_FONT_SIZE,
             font_family: theme.font_family.clone(),
+            mono_font_size: theme.mono_font_size,
+            mono_font_family: theme.mono_font_family.clone(),
             radius: theme.radius,
         };
         workspace.set_dark(theme.is_dark());
@@ -186,7 +190,7 @@ impl MoonframeApp {
     }
 
     /// Puts the picked theme (or the one previewed), then the stylesheet's
-    /// font, radius, and color overrides into the global theme, so
+    /// fonts, radius, and color overrides into the global theme, so
     /// gpui-component controls follow them too. Starts from the stock theme
     /// each time, so a removed override goes away. A picked theme brings its
     /// own colors, so the stylesheet's apply to the stock look alone.
@@ -219,6 +223,11 @@ impl MoonframeApp {
             .font_family
             .clone()
             .map_or_else(|| self.defaults.font_family.clone(), SharedString::from);
+        theme.mono_font_size = sheet.mono.size.map_or(self.defaults.mono_font_size, px);
+        theme.mono_font_family = sheet.mono.family.clone().map_or_else(
+            || self.defaults.mono_font_family.clone(),
+            SharedString::from,
+        );
         theme.radius = sheet.radius.map_or(self.defaults.radius, px);
         let dark = theme.is_dark();
         let overrides = if scheme.is_some() {
@@ -361,6 +370,27 @@ impl MoonframeApp {
     pub(crate) fn deliver(&mut self, owner: &str, msg: Data, cx: &mut Context<Self>) {
         self.workspace.send(owner, owner, msg);
         self.flush(owner, cx);
+    }
+
+    /// Has each mod build the list rows the frame just drawn showed without,
+    /// once the frame is done, and draws again if any changed.
+    fn request_list_rows(&self, requests: Vec<ListRequest>, cx: &mut Context<Self>) {
+        if requests.is_empty() {
+            return;
+        }
+        let this = cx.entity().downgrade();
+        cx.defer(move |cx| {
+            this.update(cx, |this, cx| {
+                let mut changed = false;
+                for (owner, id, window) in &requests {
+                    changed |= this.workspace.set_list_window(owner, id, *window);
+                }
+                if changed {
+                    this.flush("list", cx);
+                }
+            })
+            .ok();
+        });
     }
 
     /// Passes on what the mods sent providers, and draws again.
@@ -603,9 +633,13 @@ impl MoonframeApp {
             &mut self.terminals,
             &self.inputs,
             None,
+            cx.theme(),
         );
         let content = painter.window(name, cx);
-        (content, painter.animating())
+        let requests = painter.take_list_requests();
+        let animating = painter.animating();
+        self.request_list_rows(requests, cx);
+        (content, animating)
     }
 
     /// The browser window's content.
@@ -622,10 +656,14 @@ impl MoonframeApp {
             &mut self.terminals,
             &self.inputs,
             None,
+            cx.theme(),
         )
         .previewing();
         let content = painter.gallery(&self.chosen, query, search, cx);
-        (content, painter.animating())
+        let requests = painter.take_list_requests();
+        let animating = painter.animating();
+        self.request_list_rows(requests, cx);
+        (content, animating)
     }
 
     /// Asks an agent to add the component `name`, at the selection if any.
@@ -922,6 +960,7 @@ impl Render for MoonframeApp {
             &mut self.terminals,
             &self.inputs,
             self.inspector.sink(),
+            cx.theme(),
         )
         .with_browsers(&mut self.browsers)
         .with_keyed(&last_keyed);
@@ -930,7 +969,9 @@ impl Render for MoonframeApp {
             window.request_animation_frame();
         }
         let key_layers = painter.take_key_layers();
+        let requests = painter.take_list_requests();
         self.key_layers = key_layers;
+        self.request_list_rows(requests, cx);
         // A terminal that just appeared (a new tab, or one selected) takes
         // the keyboard, once it is drawn.
         if let Some(focus) = self.terminals.take_appeared() {

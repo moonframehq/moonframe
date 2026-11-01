@@ -407,6 +407,8 @@ const STYLE: &str = r##"
 return style {
   radius = 6,
   font_size = 13,
+  mono = { family = "Fira Code", size = 12, weight = 500, line_height = 1.2,
+           fallbacks = { "Symbols Nerd Font Mono" }, ligatures = false },
   colors = {
     accent = { light = "#4f46e5", dark = "#818cf8" },
     paper = { light = "#fff", dark = "#1f1f23" },
@@ -449,6 +451,14 @@ fn stylesheets_layer_type_class_and_inline_rules() {
     );
     let sheet = workspace.stylesheet();
     assert_eq!((sheet.radius, sheet.font_size), (Some(6.0), Some(13.0)));
+    assert_eq!(sheet.mono, crate::MonoFont {
+        family: Some("Fira Code".into()),
+        size: Some(12.0),
+        weight: Some(500.0),
+        line_height: Some(1.2),
+        fallbacks: Some(vec!["Symbols Nerd Font Mono".into()]),
+        ligatures: Some(false),
+    });
     assert_eq!(sheet.overrides, [(Token::Accent, Shade {
         light: 0x4f46e5ff,
         dark: 0x818cf8ff
@@ -518,8 +528,8 @@ fn bad_styles_are_refused() {
     for (sheet, expected) in [
         ("rules = { pannel = {} }", "`pannel` is not an element"),
         (
-            "rules = { ['item:pressed'] = {} }",
-            "unknown state `pressed`",
+            "rules = { ['item:Pressed!'] = {} }",
+            "`Pressed!` is not a state",
         ),
         (
             "rules = { panel = { rounded = 4 } }",
@@ -1207,7 +1217,7 @@ fn the_users_folder_goes_over_the_apps() {
     write(
         user.path(),
         "style.luau",
-        r##"return style { radius = 9, colors = { accent = "#ff0000" }, rules = { panel = { radius = 4 } } }"##,
+        r##"return style { radius = 9, mono = { size = 15 }, colors = { accent = "#ff0000" }, rules = { panel = { radius = 4 } } }"##,
     );
     let roots = crate::Roots::new([builtin.path().to_owned(), user.path().to_owned()]);
     let workspace = Workspace::open(roots, false);
@@ -1226,6 +1236,11 @@ fn the_users_folder_goes_over_the_apps() {
 
     let sheet = workspace.stylesheet();
     assert_eq!((sheet.radius, sheet.font_size), (Some(9.0), Some(13.0)));
+    // The user's size, over the app's family.
+    assert_eq!(
+        (sheet.mono.size, sheet.mono.family.as_deref()),
+        (Some(15.0), Some("Fira Code"))
+    );
     assert_eq!(sheet.overrides, [(Token::Accent, Shade {
         light: 0xff0000ff,
         dark: 0xff0000ff
@@ -1894,6 +1909,7 @@ fn images_come_only_from_the_app_folders_and_the_cache() {
         width: None,
         height: None,
         fit: crate::Fit::Contain,
+        extras: crate::Extras::default(),
     };
     let folder = app.path().join("mods/pic");
     let allowed = [app.path().to_owned()];
@@ -2429,11 +2445,11 @@ fn focus_and_disabled_states_layer_over_the_resting_rule() {
     write(
         dir.path(),
         "style.luau",
-        "return style { rules = { ['input:pressed'] = {} } }",
+        "return style { rules = { ['input:Pressed'] = {} } }",
     );
     let workspace = Workspace::open(dir.path(), false);
     let error = workspace.style_error().unwrap().to_string();
-    assert!(error.contains("unknown state `pressed`"), "{error}");
+    assert!(error.contains("`Pressed` is not a state"), "{error}");
     assert!(error.contains("focus, disabled"), "{error}");
 }
 
@@ -3172,4 +3188,402 @@ fn a_previews_instances_stay_inside_the_preview() {
         !memory.0.borrow().0.keys().any(|key| key.contains("demo:")),
         "a preview's state was saved"
     );
+}
+
+fn text_of(node: &Node) -> &str {
+    match node {
+        Node::Text(text) => &text.text,
+        other => panic!("not a text: {other:?}"),
+    }
+}
+
+/// The text of the first child of mod `name`'s column.
+fn first_text(workspace: &Workspace, name: &str) -> String {
+    let Some(Node::Stack(column)) = workspace.slot(name).unwrap().view() else {
+        panic!("{name} drew no column");
+    };
+    let Node::Text(text) = &column.children[0] else {
+        panic!("no text");
+    };
+    text.text.clone()
+}
+
+#[test]
+fn a_view_runs_again_only_when_what_it_read_changes() {
+    // `calls` counts the view's runs; it lives as long as the mod's state.
+    let source = r#"
+local calls = 0
+return mod {
+  init = function() return { n = 0 } end,
+  update = function(state, msg) state.n += 1 end,
+  view = function(state, app)
+    calls += 1
+    local branch = app.git and app.git.branch or "-"
+    return ui.column { ui.text(`{calls} {branch} {state.n}`) }
+  end,
+}"#;
+    let dir = app(&[("watch", source)]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    let start = first_text(&workspace, "watch");
+    assert!(start.ends_with(" - 0"), "{start}");
+    let calls = |workspace: &Workspace| -> u32 {
+        first_text(workspace, "watch")
+            .split(' ')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap()
+    };
+    let before = calls(&workspace);
+    // A key it never read: the view keeps what it drew.
+    workspace.set_host(
+        "system",
+        Data::Map([("cpu".to_owned(), Data::Number(0.5))].into()),
+    );
+    workspace.set_dark(true);
+    assert_eq!(calls(&workspace), before);
+    // A key it read, even one that was missing: it runs again.
+    workspace.set_host(
+        "git",
+        Data::Map([("branch".to_owned(), Data::from("main"))].into()),
+    );
+    assert_eq!(calls(&workspace), before + 1);
+    assert!(first_text(&workspace, "watch").ends_with(" main 0"));
+    // The same value again changes nothing.
+    workspace.set_host(
+        "git",
+        Data::Map([("branch".to_owned(), Data::from("main"))].into()),
+    );
+    assert_eq!(calls(&workspace), before + 1);
+    // A message to it: its state may have changed.
+    workspace.send("watch", "watch", Data::from("bump"));
+    assert_eq!(calls(&workspace), before + 2);
+    assert!(first_text(&workspace, "watch").ends_with(" main 1"));
+    // A reload runs the new source, which starts counting again.
+    workspace.reload();
+    assert_eq!(calls(&workspace), 1);
+}
+
+#[test]
+fn a_view_that_goes_through_all_of_app_runs_on_any_change() {
+    let source = r#"
+local calls = 0
+return mod {
+  view = function(state, app)
+    calls += 1
+    local keys = 0
+    for _ in app do keys += 1 end
+    return ui.column { ui.text(`{calls} {keys}`) }
+  end,
+}"#;
+    let dir = app(&[("all", source)]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    let before = first_text(&workspace, "all");
+    workspace.set_host(
+        "system",
+        Data::Map([("cpu".to_owned(), Data::Number(0.5))].into()),
+    );
+    let after = first_text(&workspace, "all");
+    assert_ne!(before, after);
+    // It saw the new key among the rest.
+    let count = |text: &str| -> usize { text.split(' ').nth(1).unwrap().parse().unwrap() };
+    assert_eq!(count(&after), count(&before) + 1);
+}
+
+#[test]
+fn a_list_builds_only_the_rows_it_is_asked_for() {
+    let source = r#"
+return mod {
+  view = function()
+    return ui.column {
+      ui.list { id = "rows", count = 100000, row_height = 20,
+        row = function(i) return ui.text(`row {i}`) end },
+    }
+  end,
+}"#;
+    let dir = app(&[("long", source)]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let list = |workspace: &Workspace| -> crate::List {
+        let Some(Node::Stack(column)) = workspace.slot("long").unwrap().view() else {
+            panic!("no column");
+        };
+        let Node::List(list) = &column.children[0] else {
+            panic!("no list");
+        };
+        list.clone()
+    };
+    let first = list(&workspace);
+    assert_eq!(
+        (first.count, first.row_height, first.start),
+        (100_000, 20.0, 0)
+    );
+    assert_eq!(first.rows.len(), crate::ListWindow::FIRST.len);
+    assert_eq!(text_of(&first.rows[0]), "row 1");
+    let window = crate::ListWindow {
+        start: 5000,
+        len: 30,
+    };
+    assert!(workspace.set_list_window("long", "rows", window));
+    assert!(!workspace.set_list_window("long", "rows", window));
+    let scrolled = list(&workspace);
+    assert_eq!((scrolled.start, scrolled.rows.len()), (5000, 30));
+    assert_eq!(text_of(&scrolled.rows[0]), "row 5001");
+    // Past the end, it stops at the last row.
+    workspace.set_list_window("long", "rows", crate::ListWindow {
+        start: 99_990,
+        len: 30,
+    });
+    assert_eq!(list(&workspace).rows.len(), 10);
+}
+
+#[test]
+fn lists_are_checked() {
+    for (list, expected) in [
+        (
+            "ui.list { count = 3, row_height = 20, row = function(i) return 'x' end }, ui.list { count = 1, row_height = 20, row = function() return 'y' end }",
+            "two lists with the id `list`",
+        ),
+        (
+            "ui.list { count = -1, row_height = 20, row = function() end }",
+            "expected 0 to",
+        ),
+        (
+            "ui.list { count = 3, row = function() return 'x' end }",
+            "row_height: missing",
+        ),
+        ("ui.list { count = 3, row_height = 20 }", "row: missing"),
+        (
+            "ui.list { count = 3, row_height = 20, row = function(i) error('no row ' .. i) end }",
+            "no row 1",
+        ),
+    ] {
+        let source =
+            format!("return mod {{ view = function() return ui.column {{ {list} }} end }}");
+        let dir = app(&[("bad", &source)]);
+        let workspace = Workspace::open(dir.path(), false);
+        let slot = workspace.slot("bad").unwrap();
+        let problem = slot
+            .error()
+            .map(ToString::to_string)
+            .or_else(|| slot.broken().first().map(ToString::to_string))
+            .unwrap_or_default();
+        assert!(problem.contains(expected), "{list}: {problem}");
+    }
+}
+
+#[test]
+fn memo_keeps_what_it_built_while_its_dependencies_stay_the_same() {
+    let source = r#"
+local builds = 0
+return mod {
+  init = function() return { a = 1, b = 1 } end,
+  update = function(state, msg) state[msg] += 1 end,
+  view = function(state)
+    local part = ui.memo("part", { state.a }, function()
+      builds += 1
+      return ui.text(`a {state.a}`)
+    end)
+    return ui.column { part, ui.text(`{builds}`) }
+  end,
+}"#;
+    let dir = app(&[("memo", source)]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    let shown = |workspace: &Workspace| -> (String, String) {
+        let Some(Node::Stack(column)) = workspace.slot("memo").unwrap().view() else {
+            panic!("no column");
+        };
+        let text = |node: &Node| match node {
+            Node::Text(text) => text.text.clone(),
+            other => panic!("{other:?}"),
+        };
+        (text(&column.children[0]), text(&column.children[1]))
+    };
+    assert_eq!(shown(&workspace), ("a 1".to_owned(), "1".to_owned()));
+    workspace.send("memo", "memo", Data::from("b"));
+    assert_eq!(shown(&workspace), ("a 1".to_owned(), "1".to_owned()));
+    workspace.send("memo", "memo", Data::from("a"));
+    assert_eq!(shown(&workspace), ("a 2".to_owned(), "2".to_owned()));
+}
+
+#[test]
+fn named_states_match_rules_of_the_same_name() {
+    let dir = app(&[(
+        "drawer",
+        r#"return mod {
+  init = function() return { open = false } end,
+  update = function(state) state.open = not state.open end,
+  view = function(state)
+    return ui.column { class = "drawer", state = state.open and "open" or "closed", ui.text "x" }
+  end,
+}"#,
+    )]);
+    write(
+        dir.path(),
+        "style.luau",
+        "return style { rules = { ['.drawer'] = { opacity = 0.5 }, ['.drawer:open'] = { width = 300, opacity = 1 }, ['.drawer:closed'] = { width = 40 } } }",
+    );
+    let mut workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let resolved = |workspace: &Workspace| {
+        let Some(Node::Stack(column)) = workspace.slot("drawer").unwrap().view() else {
+            panic!("no column");
+        };
+        let style = workspace
+            .stylesheet()
+            .resolve(Part::Column, &column.look, false, &Rules::default())
+            .base;
+        (column.look.state.clone(), style.width, style.opacity)
+    };
+    assert_eq!(
+        resolved(&workspace),
+        (Some("closed".to_owned()), Some(40.0), Some(0.5))
+    );
+    workspace.send("drawer", "drawer", Data::from("toggle"));
+    assert_eq!(
+        resolved(&workspace),
+        (Some("open".to_owned()), Some(300.0), Some(1.0))
+    );
+
+    let source = "return mod { view = function() return ui.column { state = 'Not ok' } end }";
+    let dir = app(&[("bad", source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    let error = workspace.slot("bad").unwrap().error().unwrap().to_string();
+    assert!(error.contains("state: use a-z"), "{error}");
+}
+
+#[test]
+fn float_pins_to_an_edge_or_corner() {
+    use crate::Offsets;
+    let float = |value: &str| -> Result<Option<Offsets>, String> {
+        let source = format!(
+            "return mod {{ view = function() return ui.column {{ ui.row {{ float = {value} }} }} end }}"
+        );
+        let dir = app(&[("f", &source)]);
+        let workspace = Workspace::open(dir.path(), false);
+        let slot = workspace.slot("f").unwrap();
+        if let Some(problem) = slot.broken().first() {
+            return Err(problem.to_string());
+        }
+        let Some(Node::Stack(column)) = slot.view() else {
+            panic!("no column");
+        };
+        let Node::Stack(row) = &column.children[0] else {
+            panic!("no row");
+        };
+        Ok(row.frame.float)
+    };
+    let at = |top, right, bottom, left| Offsets {
+        top,
+        right,
+        bottom,
+        left,
+    };
+    assert_eq!(
+        float("'top-right'"),
+        Ok(Some(at(Some(0.0), Some(0.0), None, None)))
+    );
+    assert_eq!(
+        float("{ at = 'bottom', inset = 8 }"),
+        Ok(Some(at(None, Some(8.0), Some(8.0), Some(8.0))))
+    );
+    assert_eq!(
+        float("{ top = -4 }"),
+        Ok(Some(at(Some(-4.0), None, None, None)))
+    );
+    assert!(
+        float("'middle'")
+            .unwrap_err()
+            .contains("`middle` is not a place")
+    );
+    assert!(
+        float("{ at = 'top', top = 1 }")
+            .unwrap_err()
+            .contains("not both")
+    );
+}
+
+#[test]
+fn tooltips_and_context_menus_go_on_any_element() {
+    let source = r#"return mod { view = function()
+  return ui.column {
+    ui.text { "t", tooltip = "a text" },
+    ui.icon { "bell", tooltip = "an icon", context = "menu" },
+    ui.badge { "3", copy = "3" },
+  }
+end }"#;
+    let dir = app(&[("tips", source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let Some(Node::Stack(column)) = workspace.slot("tips").unwrap().view() else {
+        panic!("no column");
+    };
+    let (Node::Text(text), Node::Icon(icon), Node::Badge(badge)) = (
+        &column.children[0],
+        &column.children[1],
+        &column.children[2],
+    ) else {
+        panic!("{:?}", column.children);
+    };
+    assert_eq!(text.extras.tooltip.as_deref(), Some("a text"));
+    assert_eq!(
+        icon.extras.context,
+        Some(Action::Send {
+            to: None,
+            msg: Data::from("menu")
+        })
+    );
+    assert_eq!(badge.extras.copy.as_deref(), Some("3"));
+}
+
+#[test]
+fn a_lazy_pane_starts_what_it_mounts_when_it_shows_and_keeps_it_hidden() {
+    let host = r#"
+return mod {
+  init = function() return { open = false } end,
+  update = function(state) state.open = not state.open end,
+  view = function(state)
+    return ui.hsplit {
+      ui.pane { ui.text "main" },
+      ui.pane { lazy = true, visible = state.open, ui.mount { "counter", id = "side" } },
+    }
+  end,
+}"#;
+    let dir = app(&[("host", host), ("counter", COUNTER)]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    assert!(
+        workspace.slot("counter#side").is_none(),
+        "started before it showed"
+    );
+    workspace.send("host", "host", Data::from("toggle"));
+    assert!(
+        workspace.slot("counter#side").is_some(),
+        "not started when shown"
+    );
+    // Its state moves on while it shows...
+    workspace.send("host", "counter#side", Data::from("add"));
+    workspace.send("host", "host", Data::from("toggle"));
+    // ...and it sleeps, kept, once hidden.
+    let slot = workspace.slot("counter#side").expect("dropped when hidden");
+    let Some(Node::Panel(panel)) = slot.view() else {
+        panic!("no panel");
+    };
+    assert_eq!(text_of(&panel.children[0]), "count 1");
 }

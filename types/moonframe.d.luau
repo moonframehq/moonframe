@@ -72,6 +72,13 @@ type Style = {
 	-- Letter case of a text: `upper` for headings.
 	case: ("upper" | "lower" | "none")?,
 	opacity: number?,
+	-- Pixels, under the element's own `width` and `height`: what a named
+	-- state's rule can change (`[".drawer:closed"] = { width = 48 }`).
+	width: number?,
+	height: number?,
+	-- How a pane, popover or overlay shows and hides, a keyed child arrives
+	-- and goes, and an element with a `state` moves to its next state's look
+	-- (colors, opacity, width and height ease between the two).
 	transition: Transition?,
 }
 
@@ -82,6 +89,27 @@ type Child = Element | string | false | nil
 -- Class names: `"a b"` or `{ "a", "b" }`.
 type Class = string | { string }
 
+-- Where `float` pins an element over its parent.
+type FloatAt =
+	"top-left"
+	| "top-right"
+	| "bottom-left"
+	| "bottom-right"
+	| "top"
+	| "bottom"
+	| "left"
+	| "right"
+	| "fill"
+-- Out of the flow, over the parent: pinned to an edge or corner
+-- (`"top-right"`), set in from it (`{ at = "top-right", inset = 4 }`), or at
+-- pixel offsets from its edges (`{ top = -4, right = -4 }`, negative overhangs).
+type Float = FloatAt | { at: FloatAt, inset: number? } | {
+	top: number?,
+	right: number?,
+	bottom: number?,
+	left: number?,
+}
+
 -- Each props type is spelled out rather than combined with `&`, so string
 -- literals such as `variant = "ghost"` check against their unions.
 
@@ -89,6 +117,8 @@ type Class = string | { string }
 type StackProps = {
 	class: Class?,
 	style: Style?,
+	-- A state of the view's own naming, which `:<state>` rules match.
+	state: string?,
 	msg: Data,
 	to: string?,
 	command: Command?,
@@ -111,8 +141,8 @@ type StackProps = {
 	hug: boolean?,
 	max_width: number?,
 	max_height: number?,
-	-- Out of the flow, over the parent at these pixel offsets (negative overhangs).
-	float: { top: number?, right: number?, bottom: number?, left: number? }?,
+	-- Out of the flow, over the parent: see `Float`.
+	float: Float?,
 	align: Align?,
 	justify: Justify?,
 	wrap: boolean?,
@@ -138,6 +168,7 @@ type StackProps = {
 type PanelProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	gap: Space?,
 	padding: Space?,
 	grow: boolean?,
@@ -155,8 +186,8 @@ type PanelProps = {
 	hug: boolean?,
 	max_width: number?,
 	max_height: number?,
-	-- Out of the flow, over the parent at these pixel offsets (negative overhangs).
-	float: { top: number?, right: number?, bottom: number?, left: number? }?,
+	-- Out of the flow, over the parent: see `Float`.
+	float: Float?,
 	title: string?,
 	actions: { Child }?,
 	[number]: Child,
@@ -165,11 +196,15 @@ type PanelProps = {
 type PaneProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	size: number?,
 	min: number?,
 	max: number?,
 	fixed: boolean?,
 	visible: boolean?,
+	-- Start what it mounts only once it first shows, and keep it asleep
+	-- (neither drawn nor run) while it is hidden.
+	lazy: boolean?,
 	gap: Space?,
 	padding: Space?,
 	surface: Surface?,
@@ -186,6 +221,7 @@ type SplitProps = {
 type TextProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	text: string?,
 	tone: Tone?,
 	size: TextSize?,
@@ -195,6 +231,12 @@ type TextProps = {
 	lines: number?,
 	-- false keeps each line whole (code in a container that scrolls sideways).
 	wrap: boolean?,
+	-- Shown under the pointer; sent on a right-click (to the mod `to`, else
+	-- this one); copied on a click.
+	tooltip: string?,
+	context: Data,
+	copy: string?,
+	to: string?,
 	[number]: string,
 }
 
@@ -203,6 +245,7 @@ type TextProps = {
 type ButtonProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	msg: Data,
 	to: string?,
 	command: Command?,
@@ -223,6 +266,7 @@ type ButtonProps = {
 type ItemProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	msg: Data,
 	to: string?,
 	command: Command?,
@@ -241,8 +285,15 @@ type ItemProps = {
 type BadgeProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	text: string?,
 	tone: Tone?,
+	-- Shown under the pointer; sent on a right-click (to the mod `to`, else
+	-- this one); copied on a click.
+	tooltip: string?,
+	context: Data,
+	copy: string?,
+	to: string?,
 	[number]: string,
 }
 
@@ -461,12 +512,19 @@ type IconName =
 type IconProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	name: IconName?,
 	tone: Tone?,
 	size: TextSize?,
 	-- Turns without end, for a loader (`loader-circle`); `animation_speed`
 	-- paces it and 0 stops it.
 	spin: boolean?,
+	-- Shown under the pointer; sent on a right-click (to the mod `to`, else
+	-- this one); copied on a click.
+	tooltip: string?,
+	context: Data,
+	copy: string?,
+	to: string?,
 	-- Luau doesn't check literals in list positions against a union, so
 	-- write `name = "cpu"` (checked here) rather than `{ "cpu", ... }`.
 	[number]: string,
@@ -480,10 +538,17 @@ type Fit = "contain" | "cover" | "fill" | "scale-down" | "none"
 type ImageProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	src: string?,
 	width: number?,
 	height: number?,
 	fit: Fit?,
+	-- Shown under the pointer; sent on a right-click (to the mod `to`, else
+	-- this one); copied on a click.
+	tooltip: string?,
+	context: Data,
+	copy: string?,
+	to: string?,
 	[number]: string,
 }
 
@@ -497,6 +562,7 @@ type TerminalBackend = "auto" | "herdr-core" | "tmux" | "pty"
 type TerminalProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	id: string?,
 	-- Where it starts: a path or `~/...`; the home folder when unset.
 	cwd: string?,
@@ -511,6 +577,7 @@ type TerminalProps = {
 type BrowserProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	id: string?,
 	url: string?,
 	-- The page's zoom factor, 0.25 to 5.
@@ -530,6 +597,7 @@ type BrowserProps = {
 type InputProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	id: string?,
 	value: string?,
 	placeholder: string?,
@@ -562,7 +630,10 @@ type RegionProps = {
 	justify: Justify?,
 }
 
-type Side = "top" | "bottom"
+-- Which side of its anchor a popover opens on.
+type Side = "top" | "bottom" | "left" | "right"
+-- The anchor's edge it lines up with: left or right above and below, top or
+-- bottom beside.
 type Anchor = "start" | "end"
 
 -- Keystrokes an open popover or overlay takes, to the message each sends
@@ -579,6 +650,7 @@ type Keys = { [string]: Data }
 type PopoverProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	open: boolean?,
 	dismiss: Data,
 	-- The mod `dismiss` and `keys` messages go to, if not this one.
@@ -612,6 +684,7 @@ type Placement =
 type OverlayProps = {
 	class: Class?,
 	style: Style?,
+	state: string?,
 	open: boolean?,
 	dismiss: Data,
 	-- The mod `dismiss` and `keys` messages go to, if not this one.
@@ -622,6 +695,33 @@ type OverlayProps = {
 	height: number?,
 	keys: Keys?,
 	content: Element,
+}
+
+-- Rows of one height, of which only those showing are built and drawn, so
+-- a list of any length costs a screenful. `row(i)` builds row `i` (from 1)
+-- and is called again as the list scrolls; keep it cheap and pure.
+type ListProps = {
+	class: Class?,
+	style: Style?,
+	state: string?,
+	-- Names it among this mod's lists (default "list"); two need two ids.
+	id: string?,
+	count: number,
+	-- Each row's height in pixels.
+	row_height: number,
+	row: (index: number) -> Child,
+	gap: Space?,
+	padding: Space?,
+	grow: boolean?,
+	width: number?,
+	height: number?,
+	surface: Surface?,
+	border: Border?,
+	shrink: boolean?,
+	self_align: Align?,
+	max_width: number?,
+	max_height: number?,
+	float: Float?,
 }
 
 declare ui: {
@@ -647,6 +747,10 @@ declare ui: {
 	mount: (name: string | MountProps) -> Element,
 	popover: (props: PopoverProps) -> Element,
 	overlay: (props: OverlayProps) -> Element,
+	list: (props: ListProps) -> Element,
+	-- What `build()` returned the last time this view asked for `key` with
+	-- the same `deps` (compared with `==`), or `build()` now.
+	memo: <T>(key: string, deps: { any }, build: () -> T) -> T,
 }
 
 -- This machine's load, sampled by the host once a second.
@@ -1024,9 +1128,25 @@ type Mod<State> = {
 
 declare function mod<State>(definition: Mod<State>): Mod<State>
 
+-- The fixed-width font terminals and `font = "mono"` text use.
+type MonoFont = {
+	family: string?,
+	size: number?,
+	-- 100 (thin) to 900 (black); 400 is regular.
+	weight: number?,
+	-- Terminal line height as a multiple of the size.
+	line_height: number?,
+	-- Fonts to look in for characters the family lacks, such as Nerd Font
+	-- icons; by default { "Symbols Nerd Font Mono" }, and {} for none.
+	fallbacks: { string }?,
+	-- false keeps sequences such as `->` from joining.
+	ligatures: boolean?,
+}
+
 type Stylesheet = {
 	font_size: number?,
 	font_family: string?,
+	mono: MonoFont?,
 	radius: number?,
 	-- The look each kind of component takes unless its code picks one:
 	-- `{ tabs = "cards" }`. Views read it as `app.looks`.
