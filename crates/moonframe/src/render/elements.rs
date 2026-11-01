@@ -127,11 +127,10 @@ fn with_extras<'w, E: StatefulInteractiveElement + Styled>(
         if let Some(wait) = wait {
             element = element.tooltip_show_delay(wait);
         }
-        let stylesheet = painter.workspace.stylesheet();
-        let motion = transition
-            .filter(|transition| transition.kind != TransitionKind::None)
-            .map(|transition| (transition, stylesheet.scaled(transition.duration)))
-            .filter(|(_, duration)| !duration.is_zero());
+        // Read durations already run at `animation_speed`.
+        let motion = transition.filter(|transition| {
+            transition.kind != TransitionKind::None && !transition.duration.is_zero()
+        });
         let text = SharedString::from(text.clone());
         element = element.tooltip(move |_, cx| {
             let tip = Tip {
@@ -153,8 +152,8 @@ const TIP_RISE: f32 = 4.;
 struct Tip {
     text: SharedString,
     look: Resolved,
-    /// The transition and how long it runs, after `animation_speed`.
-    motion: Option<(moonframe_core::Transition, std::time::Duration)>,
+    /// How it eases in, `None` when it shows at once.
+    motion: Option<moonframe_core::Transition>,
 }
 
 impl Render for Tip {
@@ -175,7 +174,7 @@ impl Render for Tip {
             .edges(self.look.base.border, &self.look.base, theme)
             .padded(&self.look.base.padding)
             .child(self.text.clone());
-        let Some((transition, duration)) = self.motion else {
+        let Some(transition) = self.motion else {
             return tip.into_any_element();
         };
         let opacity = self.look.base.opacity.unwrap_or(1.0);
@@ -184,7 +183,7 @@ impl Render for Tip {
         tip.relative()
             .with_animation(
                 "tooltip-in",
-                Animation::new(duration).with_easing(move |time| curve.at(time)),
+                Animation::new(transition.duration).with_easing(move |time| curve.at(time)),
                 move |tip, amount| {
                     let tip = match kind {
                         TransitionKind::Slide | TransitionKind::SlideFade => {
