@@ -1,0 +1,8 @@
+[app]
+# Compliance notices for a public buyer: what is due this week, exceptions
+# against the forecast, the contract register, a payments notice getting
+# ready to sign, and reports for the audit committee. Sample data.
+keep     = []
+name     = "duly"
+requires = []
+title    = "Duly"

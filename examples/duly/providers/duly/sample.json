@@ -1,0 +1,229 @@
+{
+  "org": { "name": "Duly" },
+  "person": { "name": "Tamsin", "initials": "TA" },
+  "folders": [
+    { "id": "apr-sep", "label": "Apr to Sep payments", "color": "#6f9bd1", "items": ["Payments notice", "Invoice evidence"] },
+    { "id": "q2", "label": "Q2 large payments", "color": "#8b8d93", "items": ["Large payments, Q2", "Upload log"] },
+    { "id": "ratings", "label": "2026 annual ratings", "color": "#e0573d", "items": ["Tarrant Highways", "Ashcombe Environmental"] }
+  ],
+  "reminder": {
+    "title": "Notice due Friday!",
+    "lines": ["Apr to Sep payment figures", "Petra Linwood signs next"]
+  },
+
+  "today": {
+    "kpis": [
+      { "title": "Due this week", "dot": "amber", "value": "5", "caption": "notices owed",
+        "bar": [{ "share": 1, "color": "red" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }],
+        "legend": [{ "text": "1 overdue", "color": "red" }, { "text": "4 on track", "color": "blue" }] },
+      { "title": "Published on time", "dot": "green", "value": "96%", "caption": "notices since April",
+        "bar": [{ "share": 24, "color": "blue" }, { "share": 1, "color": "red", "dot": true }],
+        "legend": [{ "text": "24 on time", "color": "blue" }, { "text": "1 late", "color": "red" }] },
+      { "title": "Under the Act", "dot": "blue", "value": "168", "caption": "of 412 live contracts",
+        "bar": [{ "share": 168, "color": "blue" }, { "share": 244, "color": "track" }],
+        "legend": [{ "text": "168 Act", "color": "blue" }, { "text": "244 earlier", "color": "track" }] },
+      { "title": "Exceptions open", "dot": "amber", "value": "9", "caption": "of 55 invoices left",
+        "bar": [{ "share": 46, "color": "blue" }, { "share": 9, "color": "amber" }],
+        "legend": [{ "text": "46 fixed", "color": "blue" }, { "text": "9 open", "color": "amber" }] },
+      { "title": "Gaps to fix", "dot": "red", "value": "7", "caption": "oldest 137 days late",
+        "bar": [{ "share": 161, "color": "blue" }, { "share": 3, "color": "red", "dot": true }],
+        "legend": [{ "text": "161 published", "color": "blue" }, { "text": "7 missing", "color": "red" }] }
+    ],
+    "forecast": {
+      "title": "AI exceptions forecast",
+      "labels": ["21 Oct", "22 Oct", "23 Oct", "24 Oct", "25 Oct", "26 Oct", "27 Oct", "28 Oct"],
+      "days": ["Wed 21 Oct", "Thu 22 Oct", "Fri 23 Oct", "Sat 24 Oct", "Sun 25 Oct", "Mon 26 Oct", "Tue 27 Oct", "Wed 28 Oct"],
+      "actual": [3, 6, 11, 9, 8, 9, 9, 3],
+      "predicted": [6, 4, 6, 7, 5, 3, 5, 4],
+      "bars": [6, 5, 6, 7, 6, 6, 6, 5],
+      "confidence": ["Medium", "High", "High", "High", "Medium", "High", "High", "Medium"],
+      "max": 15,
+      "ticks": ["15", "12", "9", "6", "3", "0"],
+      "selected": 4,
+      "insight": {
+        "text": "Exceptions are running 29% above forecast since the 24 Oct ledger sync, mostly Ashcombe Environmental invoices with no received date. Recommend:",
+        "link": "read the dates from invoice scans",
+        "after": "and review the 9 unclear disputes."
+      }
+    },
+    "due": [
+      { "id": "speed", "title": "Payment speed notice", "owner": "Ruth Calder", "initials": "RC" },
+      { "id": "large", "title": "Large payments, Q2", "owner": "Ruth Calder", "initials": "RC" },
+      { "id": "pellow", "title": "Pellow Coaches", "owner": "Tamsin", "initials": "TA", "me": true },
+      { "id": "cobb", "title": "Cobb Street depot roof", "owner": "Tamsin", "initials": "TA", "me": true },
+      { "id": "ashcombe", "title": "Ashcombe rating", "owner": "Idris Fenwick", "initials": "IF" },
+      { "id": "tarrant", "title": "Tarrant Highways rating", "owner": "Hollis Brandt", "initials": "HB" },
+      { "id": "marrable", "title": "Marrable Security details", "owner": "Ruth Calder", "initials": "RC" }
+    ],
+    "exceptions": {
+      "label": "Received dates confirmed",
+      "count": "46 of 55 invoices",
+      "value": "83.6%",
+      "chip": "+31 this week",
+      "fixed": 46,
+      "outstanding": 9,
+      "with": [{ "name": "Ruth Calder", "initials": "RC", "count": 4 }, { "name": "Suppliers", "icon": "building-2", "count": 5 }],
+      "week": "31 fixed · 9 to go",
+      "days": [
+        { "label": "Mon 26", "value": 6, "max": 14 },
+        { "label": "Tue 27", "value": 12, "max": 14 },
+        { "label": "Today", "value": 13, "max": 14, "today": true },
+        { "label": "Thu 29", "value": 9, "max": 14, "togo": true }
+      ],
+      "foot": "Due Thu 29 Oct, owner Ruth Calder",
+      "chasers": "5 supplier chasers sent"
+    },
+    "deadlines": [
+      { "id": "d1", "item": "Payment notice · Apr to Sep figures", "owner": "Petra Linwood", "due": "Thu 29 Oct", "status": "Waiting approval", "tone": "grey", "page": "payments" },
+      { "id": "d2", "item": "Exceptions · 9 still open", "owner": "Ruth Calder", "due": "Thu 29 Oct", "status": "Checking", "tone": "amber", "page": "today" },
+      { "id": "d3", "item": "Contract details · Pellow Coaches", "owner": "Tamsin", "due": "Fri 30 Oct", "status": "Draft ready", "tone": "grey", "page": "contracts" },
+      { "id": "d4", "item": "Large payments · Q2 upload", "owner": "Ruth Calder", "due": "Fri 30 Oct", "status": "Checking", "tone": "amber", "page": "payments" },
+      { "id": "d5", "item": "Contract details · Cobb Street depot", "owner": "Tamsin", "due": "Sun 1 Nov", "status": "Draft ready", "tone": "grey", "page": "contracts" },
+      { "id": "d6", "item": "Rating · Tarrant Highways", "owner": "Hollis Brandt", "due": "Was 21 Oct", "status": "7 days late", "tone": "red", "page": "contracts" },
+      { "id": "d7", "item": "Rating · Ashcombe Environmental", "owner": "Idris Fenwick", "due": "Was 30 Sep", "status": "28 days late", "tone": "red", "page": "contracts" }
+    ]
+  },
+
+  "contracts": {
+    "subtitle": "412 live contracts. 168 fall under the Act, and 6 are missing data that decides which notices they owe.",
+    "kpis": [
+      { "title": "Live contracts", "dot": "grey", "value": "412", "caption": "£186.4m in value",
+        "bar": [{ "share": 1, "color": "grey" }], "legend": [] },
+      { "title": "Under the Act", "dot": "blue", "value": "168", "caption": "41% of live",
+        "bar": [{ "share": 168, "color": "blue" }, { "share": 244, "color": "track" }], "legend": [] },
+      { "title": "Earlier rules", "dot": "grey", "value": "244", "caption": "no Act notices owed",
+        "bar": [{ "share": 244, "color": "grey" }, { "share": 168, "color": "track" }], "legend": [] },
+      { "title": "Over £5 million", "dot": "amber", "value": "9", "caption": "3 ratings late", "caption_tone": "red",
+        "bar": [{ "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "red" }, { "share": 1, "color": "red" }, { "share": 1, "color": "red" }], "legend": [] },
+      { "title": "Missing data", "dot": "red", "value": "6", "caption": "value or dates blank", "caption_tone": "red",
+        "bar": [{ "share": 406, "color": "blue" }, { "share": 6, "color": "red", "dot": true }], "legend": [] }
+    ],
+    "filters": [
+      { "id": "all", "label": "All", "count": 412 },
+      { "id": "act", "label": "Under the Act", "count": 168 },
+      { "id": "earlier", "label": "Earlier rules", "count": 244 },
+      { "id": "missing", "label": "Missing data", "count": 6 }
+    ],
+    "insight": "6 contracts have no value or end date in the register, so Duly cannot tell which notices they owe. Suggested values come from the matching purchase orders; each one needs your confirmation.",
+    "rows": [
+      { "id": "c1", "contract": "Waste collection and street cleansing", "supplier": "Ashcombe Environmental", "value": "£40.2m", "regime": "act", "signed": "3 Jun 2025", "next": "Rating, 28 days late", "late": true },
+      { "id": "c2", "contract": "Highways maintenance term", "supplier": "Tarrant Highways", "value": "£18.6m", "regime": "act", "signed": "14 Jul 2025", "next": "Rating, 7 days late", "late": true },
+      { "id": "c3", "contract": "Home care, east locality", "supplier": "Brightwell Care Partnership", "value": "£9.8m", "regime": "act", "signed": "21 Apr 2025", "next": "Rating, 13 days late", "late": true },
+      { "id": "c4", "contract": "Schools facilities management", "supplier": "Hartfield Facilities", "value": "£11.4m", "regime": "act", "signed": "2 Sep 2025", "next": "Breach notice by 18 Nov", "late": false },
+      { "id": "c5", "contract": "School transport call-off", "supplier": "Pellow Coaches", "value": "£0.4m", "regime": "act", "signed": "30 Sep 2026", "next": "Contract details, Fri 30 Oct", "late": false },
+      { "id": "c6", "contract": "CCTV monitoring", "supplier": "Marrable Security", "value": "£0.2m", "regime": "act", "signed": "22 Jul 2026", "next": "Contract details, 68 days late", "late": true },
+      { "id": "c7", "contract": "Revenues and benefits hosting", "supplier": "Quillon Digital", "value": "£6.3m", "regime": "act", "signed": "9 Jun 2025", "next": "Rating, Jun 2027", "late": false },
+      { "id": "c8", "contract": "Parks planting", "supplier": "Fernmoor Nurseries", "value": "-", "regime": "missing", "signed": "2 Jun 2026", "next": "Value needed", "late": true },
+      { "id": "c9", "contract": "Leisure centre operation", "supplier": "Ridgeway Leisure Trust", "value": "£22.0m", "regime": "earlier", "signed": "12 Mar 2019", "next": "None owed under the Act", "late": false },
+      { "id": "c10", "contract": "Refuse vehicle lease", "supplier": "Corbel Fleet Leasing", "value": "£5.7m", "regime": "act", "signed": "28 Aug 2025", "next": "Rating, Aug 2027", "late": false },
+      { "id": "c11", "contract": "Library stock supply", "supplier": "Pagewell Books", "value": "£1.2m", "regime": "earlier", "signed": "4 Feb 2022", "next": "None owed under the Act", "late": false },
+      { "id": "c12", "contract": "Temporary staffing", "supplier": "Halden Recruitment", "value": "-", "regime": "missing", "signed": "-", "next": "Dates needed", "late": true },
+      { "id": "c13", "contract": "Street lighting energy", "supplier": "Northvolt Supply", "value": "£3.9m", "regime": "act", "signed": "1 Apr 2026", "next": "Rating, Apr 2027", "late": false },
+      { "id": "c14", "contract": "Grounds maintenance", "supplier": "Greenway Landscapes", "value": "£2.6m", "regime": "earlier", "signed": "17 Nov 2023", "next": "None owed under the Act", "late": false },
+      { "id": "c15", "contract": "Adult learning courses", "supplier": "Crestfield College", "value": "£0.8m", "regime": "act", "signed": "8 Jan 2026", "next": "Contract details, done", "late": false },
+      { "id": "c16", "contract": "Pothole repairs framework", "supplier": "Tarrant Highways", "value": "£7.1m", "regime": "act", "signed": "12 May 2026", "next": "Rating, May 2027", "late": false }
+    ]
+  },
+
+  "payments": {
+    "crumb": "Apr to Sep 2026 notice",
+    "title": "Payments compliance notice",
+    "subtitle": "1 Apr to 30 Sep 2026. 9 exceptions left, then Petra Linwood signs. Due Fri 30 Oct, 2 days left.",
+    "kpis": [
+      { "title": "Average days to pay", "dot": "blue", "value": "17.4", "mono": true, "caption": "days, simple mean",
+        "bar": [{ "share": 58, "color": "blue" }, { "share": 42, "color": "track" }], "legend": [] },
+      { "title": "Paid in 30 days", "dot": "blue", "value": "92.7%", "mono": true, "caption": "1,124 of 1,212",
+        "bar": [{ "share": 92.7, "color": "blue" }, { "share": 7.3, "color": "amber" }], "legend": [] },
+      { "title": "On time under terms", "dot": "green", "value": "91.8%", "mono": true, "caption": "1,113 of 1,212", "caption_tone": "green",
+        "bar": [{ "share": 91.8, "color": "blue" }, { "share": 8.2, "color": "red" }], "legend": [] },
+      { "title": "Due but unpaid", "dot": "amber", "value": "3.0%", "mono": true, "caption": "37 of 1,249",
+        "bar": [{ "share": 97, "color": "blue" }, { "share": 3, "color": "red", "dot": true }], "legend": [] },
+      { "title": "Exceptions open", "dot": "red", "value": "9", "caption": "46 of 55 fixed", "caption_tone": "red",
+        "bar": [{ "share": 46, "color": "blue" }, { "share": 9, "color": "amber" }], "legend": [] }
+    ],
+    "speed": {
+      "title": "How fast 1,212 invoices were paid", "rule": "Rule v1.2",
+      "shares": [{ "share": 92.7, "color": "blue", "label": "1 to 30 days", "value": "92.7%" }, { "share": 5.7, "color": "amber", "label": "31 to 60 days", "value": "5.7%" }, { "share": 1.6, "color": "red", "label": "61 days or more", "value": "1.6%" }]
+    },
+    "figures": [
+      { "id": "f1", "figure": "Average days to pay", "value": "17.4", "how": "Mean of 1,212 invoices, received to paid", "source": "1,212" },
+      { "id": "f2", "figure": "Paid in 1 to 30 days", "value": "92.7%", "how": "1,124 invoices", "source": "1,124" },
+      { "id": "f3", "figure": "Paid in 31 to 60 days", "value": "5.7%", "how": "69 invoices", "source": "69" },
+      { "id": "f4", "figure": "Paid in 61 days or more", "value": "1.6%", "how": "19 invoices", "source": "19" },
+      { "id": "f5", "figure": "Paid in line with the 30-day term", "value": "91.8%", "how": "11 disputed invoices count as late", "source": "1,113" },
+      { "id": "f6", "figure": "Due but unpaid at 30 Sep", "value": "3.0%", "how": "37 of 1,249 invoices due", "source": "37" }
+    ],
+    "months": [
+      { "label": "Apr", "value": 89.4, "text": "89.4%" },
+      { "label": "May", "value": 90.7, "text": "90.7%" },
+      { "label": "Jun", "value": 92.1, "text": "92.1%" },
+      { "label": "Jul", "value": 91.5, "text": "91.5%" },
+      { "label": "Aug", "value": 93.0, "text": "93.0%" },
+      { "label": "Sep", "value": 93.6, "text": "93.6%" }
+    ],
+    "statement": "\"I confirm these figures were calculated in line with the payments compliance guidance and are accurate to the best of my knowledge.\"",
+    "signer": "Petra Linwood",
+    "evidence": [{ "label": "Invoice evidence", "value": "CSV, 1,212 rows" }, { "label": "Rule set", "value": "Payments guidance v1.2" }],
+    "steps": [
+      { "title": "Scope matched", "detail": "1,212 invoices, 168 contracts", "icon": "circle-check", "status": "Done", "tone": "green" },
+      { "title": "Rules applied", "detail": "Payments guidance v1.2", "icon": "circle-check", "status": "Done", "tone": "green" },
+      { "title": "Exceptions fixed", "detail": "9 left with Ruth Calder", "icon": "circle-alert", "status": "9 open", "tone": "red" },
+      { "title": "Finance director approval", "detail": "Petra Linwood, Thu 9:00", "icon": "pencil", "status": "Next", "tone": "grey" },
+      { "title": "Publish on the central platform", "detail": "Tamsin, by Fri 30 Oct", "icon": "send", "status": "Waiting", "tone": "grey" }
+    ],
+    "insight": "The 4 missing dates can be read from invoice scans. The 5 dispute questions are with suppliers and due back Thursday morning.",
+    "scope": [
+      { "label": "Paid in the period", "value": "4,836" },
+      { "label": "Minus earlier-rules contracts", "value": "3,481" },
+      { "label": "Minus grant payments", "value": "143" },
+      { "label": "In scope for this notice", "value": "1,212" }
+    ]
+  },
+
+  "reports": {
+    "subtitle": "On-time rates, payment speed and gaps closed, for the audit committee and the compliance file.",
+    "range": "Apr to Oct 2026",
+    "kpis": [
+      { "title": "Notices on time", "dot": "green", "value": "96%", "caption": "24 of 25", "caption_tone": "green",
+        "bar": [{ "share": 24, "color": "blue" }, { "share": 1, "color": "red", "dot": true }], "legend": [] },
+      { "title": "Paid on time", "dot": "blue", "value": "91.8%", "mono": true, "caption": "Apr to Sep",
+        "bar": [{ "share": 91.8, "color": "blue" }, { "share": 8.2, "color": "red" }], "legend": [] },
+      { "title": "Average days to pay", "dot": "blue", "value": "17.4", "mono": true, "caption": "days",
+        "bar": [{ "share": 58, "color": "blue" }, { "share": 42, "color": "track" }], "legend": [] },
+      { "title": "Ratings on time", "dot": "amber", "value": "67%", "caption": "6 of 9",
+        "bar": [{ "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "blue" }, { "share": 1, "color": "red" }, { "share": 1, "color": "red" }, { "share": 1, "color": "red" }], "legend": [] },
+      { "title": "Gaps closed", "dot": "amber", "value": "3", "caption": "of 10 this quarter",
+        "bar": [{ "share": 1, "color": "green" }, { "share": 1, "color": "green" }, { "share": 1, "color": "green" }, { "share": 1, "color": "red" }, { "share": 1, "color": "red" }, { "share": 1, "color": "red" }, { "share": 1, "color": "red" }, { "share": 1, "color": "red" }, { "share": 1, "color": "red" }, { "share": 1, "color": "red" }], "legend": [] }
+    ],
+    "types": [
+      { "label": "Contract details", "done": 14, "total": 15 },
+      { "label": "Contract changes", "done": 5, "total": 5 },
+      { "label": "Performance", "done": 4, "total": 4 },
+      { "label": "Termination", "done": 2, "total": 2 },
+      { "label": "Large payments", "done": 1, "total": 1 },
+      { "label": "Ratings", "done": 6, "total": 9 },
+      { "label": "Payment speed", "done": 0, "total": 0, "due": "Due 30 Oct" }
+    ],
+    "months": [
+      { "label": "Apr", "value": 89.4, "text": "89.4%", "days": "18.9 days" },
+      { "label": "May", "value": 90.7, "text": "90.7%", "days": "18.1 days" },
+      { "label": "Jun", "value": 92.1, "text": "92.1%", "days": "17 days" },
+      { "label": "Jul", "value": 91.5, "text": "91.5%", "days": "17.6 days" },
+      { "label": "Aug", "value": 93.0, "text": "93.0%", "days": "16.8 days" },
+      { "label": "Sep", "value": 93.6, "text": "93.6%", "days": "16.2 days" }
+    ],
+    "gaps": [
+      { "label": "Open at 1 Jul", "value": "10" },
+      { "label": "Closed this quarter", "value": "3", "tone": "green" },
+      { "label": "New this quarter", "value": "0" },
+      { "label": "Open now", "value": "7", "tone": "red" }
+    ],
+    "gaps_insight": "All 7 open gaps share one cause: contracts signed outside the tendering tool. Routing those signatures through Duly would stop new gaps.",
+    "exports": [
+      { "id": "summary", "label": "Audit committee summary", "value": "PDF, 4 pages" },
+      { "id": "register", "label": "Notice register", "value": "CSV, 31 rows" },
+      { "id": "evidence", "label": "Invoice evidence", "value": "CSV, 1,212 rows" },
+      { "id": "log", "label": "Audit log", "value": "CSV, every change" }
+    ]
+  }
+}
