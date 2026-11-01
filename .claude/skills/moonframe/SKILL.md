@@ -72,6 +72,12 @@ keeps the user's window running; Rust changes don't.
 
 ### Recipes
 
+**"Show me some ideas first."** When the user wants options or mockups
+before a change, use the **moonframe-mockups** skill
+(`.claude/skills/moonframe-mockups`): variants drawn live in a throwaway
+`mods/mockup` in the user's folder, opened in a tab, applied only once the
+user picks one.
+
 **"Add X here."** Read `~/.cache/moonframe/selection.md`
 (see "Here: the user's selection"). Open the file at the line it gives,
 use a component if one fits, `just check`, and tell the user what you added
@@ -576,6 +582,15 @@ tab = { title = "Terminal", icon = "terminal", props = { cwd = "~" } },
 -- `url` and `title` that come back:
 tab = { title = "Browser", icon = "globe", props = { url = "https://luau.org" }, report = "navigate" },
 ```
+
+A mod brings up a main tab of a kind by sending the shell
+`{ to = "shell", msg = { open_tab = "mod:mockup" } }`: the open tab of that
+kind is selected, else a new one opens (the shell sends `tabbed#main`
+`{ open = kind }`). Send it from `init` when `props` is nil (the mod in its
+own place, not its tabs) and only once, or every tab opens another.
+`{ close_tab = "mod:mockup" }` closes every tab of the kind (`tabbed`'s
+`{ close_kind = kind }`): send it before the mod's folder is deleted. A tab
+whose mod is gone says so and waits to be closed.
 
 A component kind is drawn with its tab's props and `id` (so a terminal or
 browser is the tab's own); a mod kind is mounted as an instance per tab.
@@ -1405,7 +1420,19 @@ that something runs until the reply comes.
 installing, error, fresh }`, every 30 s and on any message. The message
 `"install"` runs herdr-core's own installer (into `~/.local/bin`) and sets
 `fresh` once it has. Only the `herdr` mod's `"install"` counts: it sends
-it when the user clicks Install on its offer.
+it when the user clicks Install on its offer. Whether that offer is up goes
+out on the topic `offers/herdr` (a boolean), so another offer in the same
+corner can wait for it, as `mods/skills` does.
+
+`app.skills` (skills, from `bash`): `{ available, skills, target, status,
+version, installing, error, fresh }`, every 60 s and on any message. The
+agent skills the app ships (`skills/` beside the provider in a bundle, the
+repository's `.claude/skills` from a checkout), against
+`~/.config/moonframe/.claude/skills`: `status` is `"missing"`, `"stale"` or
+`"current"`, `version` a checksum of the shipped ones. Only the `skills`
+mod's `"install"` copies them, each skill folder replaced whole; it sends
+that when the user agrees on its offer, which comes back when an update
+ships newer skills.
 
 `app.github` (github, via `gh`) and `app.gitlab` (gitlab, via `glab` and
 `jq`, only for a GitLab remote): every 60 s, and on any message. Same shape;

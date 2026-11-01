@@ -71,7 +71,10 @@ Whole apps run on it too, beside the starter: see [Example apps](#example-apps).
   providers and stylesheet, laid over the built-in app; updates never touch
   it, and mods install from git into it.
 - **A skill for agents** in `.claude/skills/moonframe` that teaches them to
-  build with all of the above.
+  build with all of the above. The app offers to copy its skills to
+  `~/.config/moonframe/.claude/skills` (only if you agree, and again when an
+  update brings newer ones), so an agent working on your own mods knows
+  them too.
 - **A sandbox.** Luau runs with no files, network or process access, a
   memory cap and an instruction budget; anything that reaches the machine
   goes through a provider or an element the host owns.
@@ -184,6 +187,10 @@ The window reloads while an agent edits it, so you can watch it work.
   file and line, is saved where the agent reads it.
 - **Pick a component.** In the Components window, <b>Copy for agent</b>
   copies a request to add that component at your selection.
+- **See it before it is made.** Ask for ideas ("show me three takes on the
+  status bar") and the `moonframe-mockups` skill draws them live, side by
+  side, in a Mockups tab of your window. <b>Pick</b> copies your choice for
+  the agent; nothing real changes until then.
 
 ## Mods from git
 
