@@ -276,6 +276,10 @@ pub(crate) enum Provider {
     /// A Rust crate the app builds with Cargo, which runs its build code
     /// with the user's access; the component it builds runs sandboxed.
     Source,
+    /// The app's own built-in provider of that name, run with the
+    /// package's `[settings]`, which may widen what it does (git's
+    /// `writers`).
+    Native(String),
     Broken(String),
 }
 
@@ -300,6 +304,11 @@ impl Contents {
                     kind: Kind::Process { command },
                     ..
                 }) => Provider::Process(command),
+                Ok(Manifest {
+                    kind: Kind::Native,
+                    settings,
+                    ..
+                }) => Provider::Native(settings.to_string()),
                 Ok(_) => Provider::Source,
                 Err(problem) => Provider::Broken(problem.to_string()),
             };
@@ -323,11 +332,26 @@ impl Contents {
         Ok(contents)
     }
 
+    /// Its mods named in `writers`, the mods the git provider lets commit
+    /// and push: a package's mod of that name takes the place of the
+    /// user's, and with it that right.
+    pub(crate) fn writers<'a>(&'a self, writers: &'a [String]) -> impl Iterator<Item = &'a str> {
+        self.mods
+            .iter()
+            .filter(|name| writers.contains(name))
+            .map(String::as_str)
+    }
+
     /// The providers that would run code with the user's access.
     pub(crate) fn trusted(&self) -> impl Iterator<Item = (&str, &Provider)> {
         self.providers
             .iter()
-            .filter(|(_, how)| matches!(how, Provider::Process(_) | Provider::Source))
+            .filter(|(_, how)| {
+                matches!(
+                    how,
+                    Provider::Process(_) | Provider::Source | Provider::Native(_)
+                )
+            })
             .map(|(name, how)| (name.as_str(), how))
     }
 }
@@ -508,9 +532,55 @@ impl fmt::Display for Provider {
                 write!(f, "runs [{}] with your access", words.join(" "))
             },
             Self::Source => f.write_str("built with Cargo, with your access"),
+            Self::Native(settings) => write!(
+                f,
+                "replaces the app's built-in provider of this name, with settings {}",
+                printable(settings)
+            ),
             Self::Broken(problem) => write!(f, "broken: {}", printable(problem)),
         }
     }
+}
+
+/// The built-in git provider's manifest, compiled in so its `writers` are
+/// known wherever the command runs from.
+const BUILTIN_GIT: &str = include_str!("../../../app/providers/git/provider.toml");
+
+/// Every mod a git provider here may let commit and push: `[settings]
+/// writers` in the built-in `providers/git`, the user's, and every installed
+/// package's, enabled or not (one can be enabled without asking). Which
+/// layer wins depends on what is installed, so all of them count.
+pub(crate) fn git_writers(user: &Path) -> Vec<String> {
+    let mut texts = vec![BUILTIN_GIT.to_owned()];
+    let mut folders = vec![user.to_owned()];
+    if let Ok(list) = List::read(user) {
+        folders.extend(
+            list.package
+                .iter()
+                .map(|(id, entry)| entry.folder(user, id)),
+        );
+    }
+    texts.extend(
+        folders.iter().filter_map(|folder| {
+            fs::read_to_string(folder.join("providers/git/provider.toml")).ok()
+        }),
+    );
+    let mut writers: Vec<String> = texts
+        .iter()
+        .filter_map(|text| text.parse::<toml::Table>().ok())
+        .filter_map(|manifest| {
+            manifest
+                .get("settings")?
+                .get("writers")?
+                .as_array()
+                .cloned()
+        })
+        .flatten()
+        .filter_map(|name| name.as_str().map(str::to_owned))
+        .collect();
+    writers.sort();
+    writers.dedup();
+    writers
 }
 
 /// Asked before a package's code may run: `Err` refuses it.

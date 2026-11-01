@@ -426,7 +426,8 @@ impl Read for ImageSrc {
 }
 
 impl Build for Terminal {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &["id", "cwd", "engine"]];
+    const KEYS: &'static [&'static [&'static str]] =
+        &[TYPE, LOOK, &["id", "cwd", "engine", "backend"]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
@@ -436,6 +437,7 @@ impl Build for Terminal {
                 .map_or_else(|| "terminal".to_owned(), |id| id.0),
             cwd: fields.get("cwd")?,
             engine: fields.get("engine")?.unwrap_or(TerminalEngine::Alacritty),
+            backend: fields.get("backend")?.unwrap_or(TerminalBackend::Auto),
         })
     }
 }

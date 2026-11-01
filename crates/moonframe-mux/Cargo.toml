@@ -1,0 +1,26 @@
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-mux"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["herdr-core"]
+# Terminals kept by herdr-core (`hc`), through herdr-gpui's client.
+herdr-core = ["dep:herdr-core-client"]
+
+[dependencies]
+herdr-core-client    = { optional = true, workspace = true }
+moonframe-terminal   = { workspace = true }
+serde_json.workspace = true
+tracing.workspace    = true
+
+[dev-dependencies]
+moonframe-terminal = { features = ["alacritty"], workspace = true }
+tempfile.workspace = true

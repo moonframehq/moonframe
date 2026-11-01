@@ -660,11 +660,7 @@ fn pill(
 impl<'w> Draw<'w> for Region {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, _: &Place<'w>, cx: Cx) -> AnyElement {
         let members = painter.region(&self.name, cx);
-        let element = div()
-            .flex()
-            .min_h_0()
-            .min_w_0()
-            .gap(px(self.gap.pixels()));
+        let element = div().flex().min_h_0().min_w_0().gap(px(self.gap.pixels()));
         let (element, members) = match self.direction {
             // A row of mods, such as a status bar, never spills onto its
             // neighbours: it takes room in proportion to what it holds, a

@@ -623,15 +623,30 @@ tokens! {
     }
 }
 
-/// A shell the host runs on a pseudo-terminal. The host keeps it by the
-/// mod and `id`, so it lives across reloads and while its pane is hidden;
-/// a mod picks where it starts, never what runs.
+tokens! {
+    /// What keeps a terminal's shell running.
+    TerminalBackend {
+        /// The best this machine has: herdr-core, then tmux, then a pty.
+        Auto = "auto",
+        /// herdr-core (`hc`): the shell outlives the app.
+        HerdrCore = "herdr-core",
+        /// A tmux session on the app's own server: the shell outlives the app.
+        Tmux = "tmux",
+        /// A local pseudo-terminal: the shell ends with the app.
+        Pty = "pty",
+    }
+}
+
+/// A shell the host runs. The host keeps it by the mod and `id`, so it
+/// lives across reloads and while its pane is hidden, and with herdr-core
+/// or tmux across launches; a mod picks where it starts, never what runs.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Terminal {
     pub look: Look,
     pub id: String,
     pub cwd: Option<String>,
     pub engine: TerminalEngine,
+    pub backend: TerminalBackend,
 }
 
 /// A web page the host shows in a native web view (WebKit on macOS,

@@ -68,7 +68,7 @@ fn serve(context: &Context) -> Result<(), String> {
         let call = match context.messages.recv_timeout(context.manifest.interval) {
             Ok(message) => {
                 refuel(&mut store)?;
-                provider.call_receive(&mut store, &json::json(&message).to_string())
+                provider.call_receive(&mut store, &json::json(&message.data).to_string())
             },
             Err(RecvTimeoutError::Timeout) => {
                 refuel(&mut store)?;

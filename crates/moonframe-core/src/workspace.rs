@@ -60,7 +60,7 @@ pub struct Workspace {
     host_problems: BTreeMap<String, Error>,
     /// Messages for providers (`to = "provider:<name>"`), for the app to
     /// forward: providers run outside the workspace.
-    outbox: Vec<(String, Data)>,
+    outbox: Vec<(String, String, Data)>,
     /// Where state outlives the app; nothing is saved without it.
     persist: Option<Box<dyn Persist>>,
     /// The last value published on each topic (`to = "topic:<name>"`).
@@ -445,6 +445,14 @@ impl Workspace {
         }
     }
 
+    /// Saves what changed and waits until it is kept: for quitting.
+    pub fn flush(&mut self) {
+        self.save();
+        if let Some(persist) = &self.persist {
+            persist.flush();
+        }
+    }
+
     pub fn roots(&self) -> &Roots {
         &self.roots
     }
@@ -604,8 +612,8 @@ impl Workspace {
     }
 
     /// Messages mods sent to providers since the last call, as
-    /// `(provider, message)`.
-    pub fn take_outbox(&mut self) -> Vec<(String, Data)> {
+    /// `(provider, sending module, message)`.
+    pub fn take_outbox(&mut self) -> Vec<(String, String, Data)> {
         std::mem::take(&mut self.outbox)
     }
 
@@ -831,7 +839,7 @@ impl Workspace {
                 continue;
             }
             if let Some(provider) = to.strip_prefix(PROVIDER) {
-                self.outbox.push((provider.to_owned(), msg));
+                self.outbox.push((provider.to_owned(), from.clone(), msg));
                 continue;
             }
             if let Some(topic) = to.strip_prefix(TOPIC) {

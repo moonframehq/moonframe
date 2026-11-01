@@ -1,17 +1,15 @@
-//! A shell on a pseudo-terminal with an emulator reading it.
+//! A terminal's program, whatever [`Backend`](crate::Backend) runs it, with
+//! an emulator reading it.
 //!
-//! Three threads per session: one reads the shell's output, one runs the
+//! Three threads per session: one reads the pane's output, one runs the
 //! emulator (it owns it: libghostty's types cannot change threads), and the
 //! window's, which reads the latest [`Screen`] and writes keys straight to
-//! the shell. The emulator thread drains every chunk waiting before it
+//! the pane. The emulator thread drains every chunk waiting before it
 //! publishes, so a burst of output costs one snapshot.
 
 use {
-    crate::{Ansi, Engine, Screen, Size},
-    portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system},
+    crate::{Ansi, Engine, Opened, Pane, Screen, Size},
     std::{
-        io::{Read, Write},
-        path::PathBuf,
         sync::{
             Arc, Mutex,
             mpsc::{self, Receiver, Sender},
@@ -20,36 +18,12 @@ use {
     },
 };
 
-/// How much output is read at once.
-const CHUNK: usize = 64 * 1024;
-
-/// Where and how to start a shell.
-#[derive(Clone, Debug)]
-pub struct Spawn {
-    pub engine: Engine,
-    /// The folder the shell starts in; the home folder when `None`.
-    pub cwd: Option<PathBuf>,
-    pub size: Size,
-}
-
 pub struct Session {
     engine: Engine,
     commands: Sender<Command>,
-    writer: Arc<Mutex<Box<dyn Write + Send>>>,
-    master: Mutex<Box<dyn MasterPty + Send>>,
+    pane: Arc<dyn Pane>,
     screen: Arc<Mutex<Screen>>,
     size: Mutex<Size>,
-    /// Ends the shell when the session goes: the reader keeps the terminal
-    /// open, so closing it alone would not.
-    killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
-}
-
-impl Drop for Session {
-    fn drop(&mut self) {
-        if let Ok(killer) = self.killer.get_mut() {
-            let _ = killer.kill();
-        }
-    }
 }
 
 /// What the emulator thread is asked to do.
@@ -62,90 +36,59 @@ enum Command {
 }
 
 impl Session {
-    /// Starts the user's login shell. `wake` is called, from another thread,
-    /// whenever there is a new screen to paint.
-    pub fn spawn(spawn: Spawn, wake: Arc<dyn Fn() + Send + Sync>) -> Result<Self, String> {
-        if !spawn.engine.available() {
+    /// Emulates `opened`, which is `size` now, on `engine`. `wake` is called,
+    /// from another thread, whenever there is a new screen to paint.
+    pub fn start(
+        opened: Opened,
+        engine: Engine,
+        size: Size,
+        wake: Arc<dyn Fn() + Send + Sync>,
+    ) -> Result<Self, String> {
+        if !engine.available() {
             return Err(format!(
                 "this build has no `{}` terminal; enable the `{}` feature",
-                spawn.engine.name(),
-                spawn.engine.name()
+                engine.name(),
+                engine.name()
             ));
         }
-        let pair = native_pty_system()
-            .openpty(pty_size(spawn.size))
-            .map_err(|error| format!("cannot open a terminal: {error}"))?;
-        let mut command = CommandBuilder::new_default_prog();
-        command.env("TERM", "xterm-256color");
-        command.env("COLORTERM", "truecolor");
-        if let Some(cwd) = spawn.cwd.filter(|cwd| cwd.is_dir()) {
-            command.cwd(cwd);
-        } else if let Some(home) = std::env::var_os("HOME") {
-            command.cwd(home);
-        }
-        let mut child = pair
-            .slave
-            .spawn_command(command)
-            .map_err(|error| format!("cannot start the shell: {error}"))?;
-        let killer = Mutex::new(child.clone_killer());
-        drop(pair.slave);
-        let mut reader = pair
-            .master
-            .try_clone_reader()
-            .map_err(|error| format!("cannot read the terminal: {error}"))?;
-        let writer: Arc<Mutex<Box<dyn Write + Send>>> =
-            Arc::new(Mutex::new(pair.master.take_writer().map_err(|error| {
-                format!("cannot write to the terminal: {error}")
-            })?));
-
+        let Opened { pane, output } = opened;
+        let pane: Arc<dyn Pane> = Arc::from(pane);
         let (commands, received) = mpsc::channel();
         let screen = Arc::new(Mutex::new(Screen::default()));
 
-        let output = commands.clone();
+        let sender = commands.clone();
         thread::Builder::new()
             .name("terminal-read".into())
             .spawn(move || {
-                let mut buffer = vec![0; CHUNK];
-                loop {
-                    match reader.read(&mut buffer) {
-                        Ok(0) | Err(_) => break,
-                        Ok(read) => {
-                            if output
-                                .send(Command::Output(buffer[..read].to_vec()))
-                                .is_err()
-                            {
-                                return;
-                            }
-                        },
+                for chunk in output {
+                    if sender.send(Command::Output(chunk)).is_err() {
+                        return;
                     }
                 }
-                // Reap the shell so it does not linger as a zombie.
-                let _ = child.wait();
-                let _ = output.send(Command::Exited);
+                let _ = sender.send(Command::Exited);
             })
             .map_err(|error| format!("cannot start a thread: {error}"))?;
 
         let emulate = Emulate {
-            engine: spawn.engine,
-            size: spawn.size,
+            engine,
+            size,
             received,
-            writer: writer.clone(),
+            // A backend that answers queries itself must not hear them twice.
+            answers: (!pane.answers_queries()).then(|| pane.clone()),
             screen: screen.clone(),
             wake,
         };
         thread::Builder::new()
-            .name(format!("terminal-{}", spawn.engine.name()))
+            .name(format!("terminal-{}", engine.name()))
             .spawn(move || emulate.run())
             .map_err(|error| format!("cannot start a thread: {error}"))?;
 
         Ok(Self {
-            engine: spawn.engine,
+            engine,
             commands,
-            writer,
-            master: Mutex::new(pair.master),
+            pane,
             screen,
-            size: Mutex::new(spawn.size),
-            killer,
+            size: Mutex::new(size),
         })
     }
 
@@ -161,14 +104,12 @@ impl Session {
             .unwrap_or_default()
     }
 
-    /// Sends what the user typed or pasted to the shell.
+    /// Sends what the user typed or pasted to the program.
     pub fn write(&self, bytes: &[u8]) {
-        if let Ok(mut writer) = self.writer.lock() {
-            let _ = writer.write_all(bytes).and_then(|()| writer.flush());
-        }
+        self.pane.write(bytes);
     }
 
-    /// Fits the shell and the emulator to `size`, if it changed.
+    /// Fits the program and the emulator to `size`, if it changed.
     pub fn resize(&self, size: Size) {
         let Ok(mut current) = self.size.lock() else {
             return;
@@ -177,9 +118,7 @@ impl Session {
             return;
         }
         *current = size;
-        if let Ok(master) = self.master.lock() {
-            let _ = master.resize(pty_size(size));
-        }
+        self.pane.resize(size);
         let _ = self.commands.send(Command::Resize(size));
     }
 
@@ -199,7 +138,9 @@ struct Emulate {
     engine: Engine,
     size: Size,
     received: Receiver<Command>,
-    writer: Arc<Mutex<Box<dyn Write + Send>>>,
+    /// Where the emulator's answers to queries go, unless the backend
+    /// answers them itself.
+    answers: Option<Arc<dyn Pane>>,
     screen: Arc<Mutex<Screen>>,
     wake: Arc<dyn Fn() + Send + Sync>,
 }
@@ -222,9 +163,9 @@ impl Emulate {
             }
             let replies = emulator.replies();
             if !replies.is_empty()
-                && let Ok(mut writer) = self.writer.lock()
+                && let Some(pane) = &self.answers
             {
-                let _ = writer.write_all(&replies).and_then(|()| writer.flush());
+                pane.write(&replies);
             }
             let mut screen = emulator.screen();
             screen.exited = exited;
@@ -233,14 +174,5 @@ impl Emulate {
             }
             (self.wake)();
         }
-    }
-}
-
-fn pty_size(size: Size) -> PtySize {
-    PtySize {
-        rows: size.rows,
-        cols: size.cols,
-        pixel_width: size.cols.saturating_mul(size.cell_width),
-        pixel_height: size.rows.saturating_mul(size.cell_height),
     }
 }
