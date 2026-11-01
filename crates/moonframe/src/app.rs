@@ -851,8 +851,17 @@ fn menu_actions(cx: &mut Context<MoonframeApp>) {
     cx.on_action(move |_: &AboutApp, cx| {
         let _ = on.update(cx, |app, cx| app.show_about(cx));
     });
+    let on = app.clone();
     cx.on_action(move |_: &BuildApp, cx| {
-        let _ = app.update(cx, |app, cx| app.build_app(cx));
+        let _ = on.update(cx, |app, cx| app.build_app(cx));
+    });
+    cx.on_action(move |_: &ToggleSlowAnimations, cx| {
+        crate::motion::set_slow(!crate::motion::is_slow());
+        // The menu shows the switch checked while it is on.
+        let _ = app.update(cx, |app, cx| {
+            cx.set_menus(menus(app.workspace.components(), app.workspace.menus()));
+        });
+        cx.refresh_windows();
     });
 }
 

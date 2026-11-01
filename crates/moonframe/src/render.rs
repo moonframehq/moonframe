@@ -246,7 +246,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             workspace,
             mounted: Vec::new(),
             motion,
-            now: Instant::now(),
+            now: crate::motion::now(),
             animating: false,
             drawn: 0,
             backdrops: Vec::new(),
