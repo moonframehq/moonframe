@@ -4,8 +4,10 @@
 Each page's card is website/og/card.html, rendered at 1200x630 by headless
 Chrome. The image is named by a hash of its bytes (social/home-1a2b3c4d5e.png),
 so a new card has a new URL and X, Slack, LinkedIn and the rest fetch it
-instead of serving the one they cached. Old cards are removed, and the tags
-between <!-- social --> and <!-- /social --> in each page are rewritten.
+instead of serving the one they cached. Old cards stay published, so links
+shared before a change keep their image. The tags between <!-- social -->
+and <!-- /social --> in each page are rewritten from PAGES below: edit the
+social title and description there, not in the page.
 
 Run from the repo root: python3 website/tools/og-images.py
 Set CHROME to a Chrome or Chromium binary if none is found.
@@ -97,9 +99,6 @@ OG.mkdir(parents=True, exist_ok=True)
 for page, info in PAGES.items():
     data = render(page)
     name = f"{page}-{hashlib.sha256(data).hexdigest()[:10]}.png"
-    for old in OG.glob(f"{page}-*.png"):
-        if old.name != name:
-            old.unlink()
     (OG / name).write_bytes(data)
     image = f"https://moonframe.dev/social/{name}"
     source = info["file"].read_text(encoding="utf-8")

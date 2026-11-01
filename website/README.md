@@ -26,8 +26,12 @@ repo root:
 python3 website/tools/components-data.py
 ```
 
-After changing a page's title, description or card, re-render the cards
-(needs Chrome or Chromium; set `CHROME` if it isn't found):
+The social title, description and image alt text live in `PAGES` in
+`tools/og-images.py`; the tool writes them into each page's
+`<!-- social -->` block, so edit them there, not in the page (the page's
+`<title>` is separate). After changing that copy or `og/card.html`,
+re-render the cards (needs Chrome or Chromium; set `CHROME` if it isn't
+found):
 
 ```sh
 python3 website/tools/og-images.py
@@ -35,7 +39,8 @@ python3 website/tools/og-images.py
 
 Each card is named by a hash of its bytes (`social/home-1a2b3c4d5e.png`), so
 a changed card gets a new URL and social sites fetch it instead of a cached
-copy.
+copy. Old cards are kept, so links shared before a change keep their image;
+delete one only once nothing should point at it.
 
 ## Hosting
 
