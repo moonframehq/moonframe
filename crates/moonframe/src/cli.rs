@@ -153,16 +153,16 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
     // An app on the library: DIR is its own folder, over the toolbox.
     let (builtin, host) = match host {
         Some(source) => {
-            let app = builtin.unwrap_or_else(|| paths::host_app(source));
+            let app = builtin.unwrap_or_else(|| crate::embed::host_app(source));
             (
-                paths::toolbox(),
+                crate::embed::toolbox_folder(),
                 Some(AppLayer {
                     path: app,
                     keep: keep.to_vec(),
                 }),
             )
         },
-        None => (builtin.unwrap_or_else(paths::builtin), None),
+        None => (builtin.unwrap_or_else(crate::embed::builtin), None),
     };
     Ok(Some(Args {
         folders: Folders {

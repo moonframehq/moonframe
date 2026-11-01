@@ -4741,6 +4741,7 @@ dependencies = [
  "moonframe-docs",
  "moonframe-git",
  "moonframe-mux",
+ "moonframe-packages",
  "moonframe-providers",
  "moonframe-store",
  "moonframe-terminal",
@@ -4828,6 +4829,20 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tracing",
+]
+
+[[package]]
+name = "moonframe-packages"
+version = "0.1.0"
+dependencies = [
+ "moonframe-core",
+ "moonframe-providers",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml 1.1.8+spec-1.1.0",
+ "tracing",
+ "ureq",
 ]
 
 [[package]]

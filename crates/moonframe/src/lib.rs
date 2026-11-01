@@ -29,7 +29,6 @@ mod assets;
 mod branch_bar;
 mod browser;
 mod build;
-mod bundle;
 mod cli;
 mod color;
 mod demos;
@@ -46,8 +45,6 @@ mod mod_window;
 mod motion;
 mod natives;
 mod overlay;
-mod packages;
-mod paths;
 mod persist;
 mod profiles;
 mod render;
@@ -55,7 +52,6 @@ mod settings;
 mod terminal;
 mod theme_picker;
 mod themes;
-mod update;
 
 #[cfg(feature = "tokio")]
 pub use moonframe_providers::{AsyncNative, on_runtime, runtime, tokio};
@@ -68,59 +64,16 @@ pub use {
     rust_embed,
 };
 
-use std::sync::{
-    OnceLock,
-    atomic::{AtomicBool, Ordering},
+// Packages, the app's folders, updates and bundles: GPUI-free, in
+// crates/moonframe-packages, used here under their old module names.
+pub(crate) use moonframe_packages::{APP_ID, IDENTITY, Identity, identity};
+use {
+    moonframe_packages::{bundle, packages, paths, update},
+    std::sync::{
+        OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
 };
-
-/// The starter's id for the window system, and its bundle's
-/// (scripts/bundle-app.sh). A profile adds its name, so each app shows as
-/// its own.
-pub(crate) const APP_ID: &str = "dev.moonframe.app";
-
-/// Who this run is: set once at launch from [`Moonframe`], read wherever
-/// the app names itself or its folders.
-#[derive(Clone, Debug)]
-pub(crate) struct Identity {
-    /// Names its folders (`~/.config/<name>`, `~/.cache/<name>`), its state
-    /// and its document in herdr-core.
-    pub(crate) name: String,
-    /// Its id for the window system; a profile adds its own name.
-    pub(crate) id: String,
-    /// Its name for people, unless the app's manifest says another.
-    pub(crate) title: String,
-    /// Its icon (a PNG), unless its app folder has one.
-    pub(crate) icon: Option<&'static [u8]>,
-    /// Its version, for its bundle.
-    pub(crate) version: String,
-    /// The GitHub repository (`owner/repo`) whose releases update it:
-    /// Check for Updates in the app menu.
-    pub(crate) updates: Option<String>,
-    /// Built on the library by another app rather than the starter: the
-    /// built-in app is only a toolbox under the host's own.
-    pub(crate) hosted: bool,
-}
-
-impl Identity {
-    pub(crate) fn starter() -> Self {
-        Self {
-            name: "moonframe".to_owned(),
-            id: APP_ID.to_owned(),
-            title: "Moonframe".to_owned(),
-            icon: None,
-            version: env!("CARGO_PKG_VERSION").to_owned(),
-            updates: Some("penso/moonframe".to_owned()),
-            hosted: false,
-        }
-    }
-}
-
-pub(crate) static IDENTITY: OnceLock<Identity> = OnceLock::new();
-
-/// This run's identity; the starter's until one is set (tests, tools).
-pub(crate) fn identity() -> &'static Identity {
-    IDENTITY.get_or_init(Identity::starter)
-}
 
 /// This run's app id, set once at launch: a profile's adds its name.
 pub(crate) static RUNNING_ID: OnceLock<String> = OnceLock::new();

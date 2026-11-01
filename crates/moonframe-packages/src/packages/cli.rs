@@ -46,7 +46,7 @@ To publish a package, push its repository anywhere git can clone from and
 share `moonframe mod install <where>`.";
 
 /// Runs `args`, the words after `mod`, on the user's folder `user`.
-pub(crate) fn run(user: &Path, args: &[String]) -> ExitCode {
+pub fn run(user: &Path, args: &[String]) -> ExitCode {
     let yes = args.iter().any(|arg| arg == "--yes" || arg == "-y");
     let words: Vec<&str> = args
         .iter()
@@ -150,11 +150,7 @@ fn list(user: &Path) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn update(
-    user: &Path,
-    name: Option<&str>,
-    approve: super::Approve,
-) -> Result<(), String> {
+pub fn update(user: &Path, name: Option<&str>, approve: super::Approve) -> Result<(), String> {
     let mut failed = 0;
     for (id, updated) in super::update(user, name, approve)? {
         match updated {
@@ -179,7 +175,7 @@ pub(crate) fn update(
 /// components, and styles are Luau the app runs sandboxed. An app's
 /// approval covers the packages it ships beside it, which its updates
 /// change with it.
-pub(crate) fn approve(contents: &Contents, writers: &[String], yes: bool) -> Result<(), String> {
+pub fn approve(contents: &Contents, writers: &[String], yes: bool) -> Result<(), String> {
     let mut trusted = Vec::new();
     let mut writing = Vec::new();
     for (from, part) in contents.parts() {

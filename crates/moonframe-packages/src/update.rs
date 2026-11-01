@@ -5,7 +5,7 @@
 //! starts again; anywhere else, the release's page opens to download from.
 //!
 //! The repository is the one a library app names with
-//! [`Moonframe::updates`](crate::Moonframe::updates) (the starter's is
+//! `moonframe::Moonframe::updates` (the starter's is
 //! `penso/moonframe`), or in a profile its manifest's `updates`, with its
 //! `version`. Releases follow GitHub's usual path: a tag `v1.2.3` (the `v`
 //! is optional), published (not a draft or pre-release), with the builds as
@@ -28,28 +28,28 @@ use {
 
 /// Where this run's updates come from.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Source {
+pub struct Source {
     /// The GitHub repository, `owner/repo`.
     pub(crate) repo: String,
     /// The version running now.
-    pub(crate) version: String,
+    pub version: String,
     /// The `.app` this run can replace with a newer one: set only on macOS,
     /// when the bundle running is the app being updated.
     pub(crate) bundle: Option<PathBuf>,
 }
 
 /// This run's source of updates, set once at launch.
-pub(crate) static SOURCE: OnceLock<Option<Source>> = OnceLock::new();
+pub static SOURCE: OnceLock<Option<Source>> = OnceLock::new();
 
 /// Where this run's updates come from, if anywhere: the menu shows Check
 /// for Updates only then.
-pub(crate) fn source() -> Option<&'static Source> {
+pub fn source() -> Option<&'static Source> {
     SOURCE.get().and_then(Option::as_ref)
 }
 
 /// Whether `repo` names a GitHub repository: `owner/repo`, of letters,
 /// digits, `-`, `_` and `.`.
-pub(crate) fn valid_repo(repo: &str) -> bool {
+pub fn valid_repo(repo: &str) -> bool {
     let part = |part: &str| {
         !part.is_empty()
             && !part.starts_with('.')
@@ -79,23 +79,23 @@ pub(crate) fn running_bundle() -> Option<PathBuf> {
 
 /// A release newer than the running version.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Release {
+pub struct Release {
     /// Its version, without the tag's `v`.
-    pub(crate) version: String,
+    pub version: String,
     /// Its page on GitHub, with the notes and every download.
-    pub(crate) page: String,
+    pub page: String,
     /// The download for this platform, if it has one.
-    pub(crate) asset: Option<Asset>,
+    pub asset: Option<Asset>,
     /// Its `SHA256SUMS`, if it has one.
     sums: Option<String>,
 }
 
 /// A file attached to a release.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-pub(crate) struct Asset {
+pub struct Asset {
     pub(crate) name: String,
     #[serde(rename = "browser_download_url")]
-    pub(crate) url: String,
+    pub url: String,
 }
 
 /// What GitHub says of a release.
@@ -109,7 +109,7 @@ struct GithubRelease {
 
 /// What a check found.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Found {
+pub enum Found {
     /// The running version is the newest (or newer: a build from source).
     UpToDate {
         latest: String,
@@ -122,7 +122,7 @@ pub(crate) enum Found {
 impl Release {
     /// Whether it can replace the running app: on macOS, from its `.app`,
     /// with a disk image or zip to install from.
-    pub(crate) fn installable(&self, source: &Source) -> bool {
+    pub fn installable(&self, source: &Source) -> bool {
         source.bundle.is_some()
             && self
                 .asset
@@ -155,7 +155,7 @@ const ANSWER: Duration = Duration::from_secs(60);
 const DOWNLOAD: Duration = Duration::from_secs(30 * 60);
 
 /// Asks GitHub for `source`'s newest release. Blocks on the network.
-pub(crate) fn check(source: &Source) -> Result<Found, String> {
+pub fn check(source: &Source) -> Result<Found, String> {
     let url = format!(
         "https://api.github.com/repos/{}/releases/latest",
         source.repo
@@ -355,18 +355,18 @@ const EVERY: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// How often an open app asks whether the daily check is due: it may stay
 /// open for days, and sleep through some of them.
-pub(crate) const POLL: Duration = Duration::from_secs(60 * 60);
+pub const POLL: Duration = Duration::from_secs(60 * 60);
 
 /// Whether this run checks by itself: an installed app (a bundle, or a
 /// Linux prefix), or an app on the library built for release. A run from
 /// source checks only when asked, and Developer Mode changes neither.
-pub(crate) fn checks_by_itself() -> bool {
+pub fn checks_by_itself() -> bool {
     crate::paths::in_bundle() || (crate::identity().hosted && !cfg!(debug_assertions))
 }
 
 /// Whether the automatic check is due: a day after the last check that
 /// reached GitHub.
-pub(crate) fn due(profile: Option<&str>) -> bool {
+pub fn due(profile: Option<&str>) -> bool {
     !fs::metadata(stamp(profile))
         .and_then(|meta| meta.modified())
         .ok()
@@ -375,7 +375,7 @@ pub(crate) fn due(profile: Option<&str>) -> bool {
 }
 
 /// Notes that a check reached GitHub, so the next is a day away.
-pub(crate) fn checked(profile: Option<&str>) {
+pub fn checked(profile: Option<&str>) {
     let file = stamp(profile);
     let written = file
         .parent()
@@ -391,7 +391,7 @@ pub(crate) fn checked(profile: Option<&str>) {
 
 /// The new app, copied beside the running one, ready to take its place.
 #[derive(Debug)]
-pub(crate) struct Staged {
+pub struct Staged {
     new: PathBuf,
     target: PathBuf,
     /// Held until the swap is done: the helper that makes it removes it.
@@ -460,7 +460,7 @@ impl Drop for Lock {
 
 /// Downloads `release`'s build, checks it, and copies the `.app` inside
 /// beside `source`'s bundle. Blocks for as long as the download takes.
-pub(crate) fn stage(release: &Release, source: &Source) -> Result<Staged, String> {
+pub fn stage(release: &Release, source: &Source) -> Result<Staged, String> {
     let target = source
         .bundle
         .clone()
@@ -581,7 +581,7 @@ rm -rf "$lock"
 
 /// Swaps the staged app in once this process exits, then opens it. The
 /// caller quits the app right after.
-pub(crate) fn relaunch(staged: Staged) -> Result<(), String> {
+pub fn relaunch(staged: Staged) -> Result<(), String> {
     let Staged { new, target, lock } = staged;
     let spawned = helper(
         std::process::id(),

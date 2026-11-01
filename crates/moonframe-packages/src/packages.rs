@@ -19,7 +19,7 @@
 
 mod cli;
 
-pub(crate) use cli::{approve, run, update as print_update};
+pub use cli::{approve, run, update as print_update};
 
 use {
     moonframe_core::{AppLayer, mod_name},
@@ -35,11 +35,11 @@ use {
 };
 
 /// The list of installed packages, in the user's folder.
-pub(crate) const FILE: &str = "packages.toml";
+pub const FILE: &str = "packages.toml";
 /// Where packages are cloned, in the user's folder.
 const DIR: &str = "packages";
 /// What makes a package a whole app, at its root.
-pub(crate) const MANIFEST: &str = "moonframe.toml";
+pub const MANIFEST: &str = "moonframe.toml";
 
 /// `moonframe.toml`.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -51,27 +51,27 @@ struct ManifestFile {
 /// An app package's `[app]`.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct App {
+pub struct App {
     /// The profile it installs as, unless the user names another.
-    pub(crate) name: String,
+    pub name: String,
     /// Its name for people: the menu bar's, and a bundle's. The name if
     /// none.
     #[serde(default)]
-    pub(crate) title: Option<String>,
+    pub title: Option<String>,
     /// Its icon, a PNG in the app's folder (best 1024 pixels square): the
     /// Dock's and a bundle's. `icon.png` if none is named.
     #[serde(default)]
-    pub(crate) icon: Option<String>,
+    pub icon: Option<String>,
     /// Built-in mods it keeps; it brings every other mod it shows.
     #[serde(default)]
     pub(crate) keep: Vec<String>,
     /// Packages it needs, as `moonframe mod install` takes them.
     #[serde(default)]
-    pub(crate) requires: Vec<String>,
+    pub requires: Vec<String>,
     /// Its version (`1.2.0`): the About panel's, a bundle's, and the one
     /// Check for Updates compares with its releases.
     #[serde(default)]
-    pub(crate) version: Option<String>,
+    pub version: Option<String>,
     /// The GitHub repository (`owner/repo`) whose releases update it: the
     /// app menu gets Check for Updates. Needs `version`.
     #[serde(default)]
@@ -80,7 +80,7 @@ pub(crate) struct App {
 
 impl App {
     /// The `[app]` of the package in `folder`, if it is an app.
-    pub(crate) fn read(folder: &Path) -> Result<Option<Self>, String> {
+    pub fn read(folder: &Path) -> Result<Option<Self>, String> {
         let path = folder.join(MANIFEST);
         let text = match fs::read_to_string(&path) {
             Ok(text) => text,
@@ -164,7 +164,7 @@ fn valid_version(version: &str) -> bool {
 }
 
 /// A name for a profile or app: lowercase letters, digits, `-` and `_`.
-pub(crate) fn valid_name(name: &str) -> bool {
+pub fn valid_name(name: &str) -> bool {
     !name.is_empty()
         && name
             .chars()
@@ -313,7 +313,7 @@ impl List {
 /// A broken `packages.toml` is logged and loads none. An app package is
 /// laid on its own, above the others, when `apps` allows one (in a
 /// profile); otherwise it is left out.
-pub(crate) fn enabled_layers(user: &Path, apps: bool) -> (Vec<PathBuf>, Option<AppLayer>) {
+pub fn enabled_layers(user: &Path, apps: bool) -> (Vec<PathBuf>, Option<AppLayer>) {
     let list = match List::read(user) {
         Ok(list) => list,
         Err(problem) => {
@@ -350,22 +350,22 @@ pub(crate) fn enabled_layers(user: &Path, apps: bool) -> (Vec<PathBuf>, Option<A
 }
 
 /// The id `source` installs as, as `moonframe mod list` shows it.
-pub(crate) fn source_id(source: &str) -> Result<String, String> {
+pub fn source_id(source: &str) -> Result<String, String> {
     Source::parse(source).map(|source| source.id)
 }
 
 /// Whether the package `id` is installed in `user`.
-pub(crate) fn has(user: &Path, id: &str) -> Result<bool, String> {
+pub fn has(user: &Path, id: &str) -> Result<bool, String> {
     Ok(List::read(user)?.package.contains_key(id))
 }
 
 /// Whether `folder` is linked as a package in `user`.
-pub(crate) fn linked(user: &Path, folder: &Path) -> Result<bool, String> {
+pub fn linked(user: &Path, folder: &Path) -> Result<bool, String> {
     Ok(List::read(user)?.linked(folder).is_some())
 }
 
 /// Whether every package in `user` is a linked folder: none was cloned.
-pub(crate) fn links_only(user: &Path) -> Result<bool, String> {
+pub fn links_only(user: &Path) -> Result<bool, String> {
     Ok(List::read(user)?.package.values().all(|entry| entry.link))
 }
 
@@ -493,7 +493,7 @@ fn split_reference(text: &str) -> (&str, Option<&str>) {
 /// outside one), so a downloaded app cannot reach the user's other folders.
 /// `None` for a repository to clone. Other folders, `~` and `file://` are
 /// refused: what an app requires must come with it, or from a repository.
-pub(crate) fn beside(folder: Option<&Path>, source: &str) -> Result<Option<PathBuf>, String> {
+pub fn beside(folder: Option<&Path>, source: &str) -> Result<Option<PathBuf>, String> {
     let source = source.trim();
     let shown = printable(source);
     if !(source.starts_with("./") || source.starts_with("../")) {
@@ -562,9 +562,9 @@ fn expand_home(path: &str) -> PathBuf {
 
 /// What a package holds.
 #[derive(Debug, Default, PartialEq)]
-pub(crate) struct Contents {
+pub struct Contents {
     /// An app's `[app]`: it brings a shell, and runs in a profile.
-    pub(crate) app: Option<App>,
+    pub app: Option<App>,
     mods: Vec<String>,
     providers: Vec<(String, Provider)>,
     components: Vec<String>,
@@ -873,7 +873,7 @@ fn names(dir: &Path, keep: impl Fn(&Path) -> bool) -> Vec<String> {
 /// terminal escape that could redraw the approval prompt, and invisible
 /// ones, such as a right-to-left override that could disguise a name, are
 /// shown escaped instead of sent to the terminal.
-pub(crate) fn printable(text: &str) -> String {
+pub fn printable(text: &str) -> String {
     let mut shown = String::with_capacity(text.len());
     for c in text.chars() {
         if c.is_control() || invisible(c) {
@@ -971,7 +971,7 @@ const BUILTIN_GIT: &str = include_str!("../../../app/providers/git/provider.toml
 /// writers` in the built-in `providers/git`, the user's, and every installed
 /// package's, enabled or not (one can be enabled without asking). Which
 /// layer wins depends on what is installed, so all of them count.
-pub(crate) fn git_writers(user: &Path) -> Vec<String> {
+pub fn git_writers(user: &Path) -> Vec<String> {
     let mut texts = vec![BUILTIN_GIT.to_owned()];
     let mut folders = vec![user.to_owned()];
     if let Ok(list) = List::read(user) {
@@ -1008,11 +1008,7 @@ pub(crate) fn git_writers(user: &Path) -> Vec<String> {
 pub(crate) type Approve<'a> = &'a dyn Fn(&Contents) -> Result<(), String>;
 
 /// Clones `source` into the user's folder and enables it.
-pub(crate) fn install(
-    user: &Path,
-    source: &str,
-    approve: Approve,
-) -> Result<(String, Contents), String> {
+pub fn install(user: &Path, source: &str, approve: Approve) -> Result<(String, Contents), String> {
     let source = Source::parse(source)?;
     let mut list = List::read(user)?;
     if list.package.contains_key(&source.id) {
@@ -1075,11 +1071,7 @@ pub(crate) fn install(
 }
 
 /// Uses `folder` in place as a package, so edits show as they are made.
-pub(crate) fn link(
-    user: &Path,
-    folder: &str,
-    approve: Approve,
-) -> Result<(String, Contents), String> {
+pub fn link(user: &Path, folder: &str, approve: Approve) -> Result<(String, Contents), String> {
     let folder = expand_home(folder);
     let folder = folder
         .canonicalize()
@@ -1244,17 +1236,17 @@ pub(crate) fn set_enabled(user: &Path, query: &str, enabled: bool) -> Result<Str
 }
 
 /// One installed package, for `mod list`.
-pub(crate) struct Installed {
-    pub(crate) id: String,
+pub struct Installed {
+    pub id: String,
     pub(crate) enabled: bool,
-    pub(crate) link: bool,
-    pub(crate) reference: Option<String>,
+    pub link: bool,
+    pub reference: Option<String>,
     /// The checked-out commit, abbreviated.
-    pub(crate) commit: Option<String>,
-    pub(crate) contents: Result<Contents, String>,
+    pub commit: Option<String>,
+    pub contents: Result<Contents, String>,
 }
 
-pub(crate) fn installed(user: &Path) -> Result<Vec<Installed>, String> {
+pub fn installed(user: &Path) -> Result<Vec<Installed>, String> {
     Ok(List::read(user)?
         .package
         .into_iter()
@@ -1312,7 +1304,7 @@ pub(crate) fn create(folder: &Path) -> Result<String, String> {
 }
 
 /// Makes `folder` a new git repository.
-pub(crate) fn git_init(folder: &Path) -> Result<(), String> {
+pub fn git_init(folder: &Path) -> Result<(), String> {
     git(folder, &["init", "--quiet"]).map(drop)
 }
 
