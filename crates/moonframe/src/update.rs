@@ -621,33 +621,57 @@ fn helper(
     command
 }
 
-/// This run's arguments, for the new app to open with, but for the
-/// process serial number old macOS adds to a Finder launch. A relative
-/// path becomes absolute: `open` starts the app in `/`.
+/// This run's arguments, for the new app to open with; see
+/// [`relaunch_args`].
 fn launch_args() -> Vec<std::ffi::OsString> {
-    let cwd = std::env::current_dir().ok();
-    std::env::args_os()
-        .skip(1)
-        .filter(|arg| !arg.to_string_lossy().starts_with("-psn_"))
-        .map(|arg| absolute(arg, cwd.as_deref()))
-        .collect()
+    relaunch_args(
+        std::env::args_os().skip(1),
+        std::env::current_dir().ok().as_deref(),
+    )
 }
 
-/// `arg` from `cwd` when it names a file or folder there by a relative
-/// path; anything else (a flag, a name, an absolute path) as it is.
-fn absolute(arg: std::ffi::OsString, cwd: Option<&Path>) -> std::ffi::OsString {
-    let path = Path::new(&arg);
-    match cwd {
-        Some(cwd) if path.is_relative() && !arg.to_string_lossy().starts_with('-') => {
-            let joined = cwd.join(path);
-            if joined.exists() {
-                joined.into_os_string()
-            } else {
-                arg
-            }
-        },
-        _ => arg,
+/// `args` as the relaunched app takes them: but for the process serial
+/// number old macOS adds to a Finder launch, and with the paths among them
+/// (`--user DIR`, the app folder) made absolute, as `open` starts the app
+/// in `/`. Names (`--profile NAME`, `--component NAME`) and flags stay as
+/// they are, whatever files the folder holds.
+fn relaunch_args(
+    args: impl IntoIterator<Item = std::ffi::OsString>,
+    cwd: Option<&Path>,
+) -> Vec<std::ffi::OsString> {
+    /// What the next argument is, after a flag that takes one.
+    enum Next {
+        Path,
+        Name,
     }
+    let absolute = |arg: std::ffi::OsString| match cwd {
+        Some(cwd) if Path::new(&arg).is_relative() => cwd.join(arg).into_os_string(),
+        _ => arg,
+    };
+    let mut next = None;
+    let mut out = Vec::new();
+    for arg in args {
+        let text = arg.to_string_lossy().into_owned();
+        match next.take() {
+            Some(Next::Path) => out.push(absolute(arg)),
+            Some(Next::Name) => out.push(arg),
+            None if text.starts_with("-psn_") => {},
+            None => {
+                match text.as_str() {
+                    "--user" => next = Some(Next::Path),
+                    "--profile" | "--component" => next = Some(Next::Name),
+                    _ => {},
+                }
+                // Anything else not a flag is the app folder.
+                out.push(if text.starts_with('-') {
+                    arg
+                } else {
+                    absolute(arg)
+                });
+            },
+        }
+    }
+    out
 }
 
 fn ensure(dir: PathBuf) -> Result<PathBuf, String> {
@@ -915,17 +939,42 @@ mod tests {
     }
 
     #[test]
-    fn relative_paths_survive_the_relaunch() {
-        let dir = tempfile::tempdir().expect("a folder");
-        fs::create_dir(dir.path().join("user")).expect("user");
-        let cwd = Some(dir.path());
+    fn the_relaunch_keeps_names_and_makes_paths_absolute() {
+        let cwd = Path::new("/home/me/work");
+        let args = |list: &[&str]| -> Vec<std::ffi::OsString> {
+            list.iter().map(std::ffi::OsString::from).collect()
+        };
+        // A profile named like a folder beside it stays a name.
         assert_eq!(
-            absolute("user".into(), cwd),
-            dir.path().join("user").into_os_string()
+            relaunch_args(
+                args(&[
+                    "--profile",
+                    "notes",
+                    "--user",
+                    "conf",
+                    "--component",
+                    "app",
+                    "my-app"
+                ]),
+                Some(cwd)
+            ),
+            args(&[
+                "--profile",
+                "notes",
+                "--user",
+                "/home/me/work/conf",
+                "--component",
+                "app",
+                "/home/me/work/my-app",
+            ])
         );
-        for kept in ["--profile", "notes", "/abs/user", "missing"] {
-            assert_eq!(absolute(kept.into(), cwd), std::ffi::OsString::from(kept));
-        }
+        assert_eq!(
+            relaunch_args(
+                args(&["-psn_0_1234", "--background", "--user", "/abs"]),
+                Some(cwd)
+            ),
+            args(&["--background", "--user", "/abs"])
+        );
     }
 
     #[test]
