@@ -124,7 +124,7 @@ pub(crate) fn valid_name(name: &str) -> bool {
 }
 
 /// Whether `title` can name a bundle folder and sit in a plist unescaped.
-fn valid_title(title: &str) -> bool {
+pub(crate) fn valid_title(title: &str) -> bool {
     !title.trim().is_empty()
         && title.chars().count() <= 64
         && !title.starts_with('.')
@@ -204,6 +204,14 @@ impl List {
         fs::create_dir_all(user).map_err(|error| format!("{}: {error}", user.display()))?;
         fs::write(&path, format!("# Written by `moonframe mod`.\n\n{text}"))
             .map_err(|error| format!("{}: {error}", path.display()))
+    }
+
+    /// The id of the package linked from `folder`, if one is.
+    fn linked(&self, folder: &Path) -> Option<String> {
+        self.package
+            .iter()
+            .find(|(_, entry)| entry.link && Path::new(&entry.url) == folder)
+            .map(|(id, _)| id.clone())
     }
 
     /// The id `query` names: an id, a source, or the end of one id, such as
@@ -289,6 +297,16 @@ pub(crate) fn has(user: &Path, id: &str) -> Result<bool, String> {
     Ok(List::read(user)?.package.contains_key(id))
 }
 
+/// Whether `folder` is linked as a package in `user`.
+pub(crate) fn linked(user: &Path, folder: &Path) -> Result<bool, String> {
+    Ok(List::read(user)?.linked(folder).is_some())
+}
+
+/// Whether every package in `user` is a linked folder: none was cloned.
+pub(crate) fn links_only(user: &Path) -> Result<bool, String> {
+    Ok(List::read(user)?.package.values().all(|entry| entry.link))
+}
+
 /// What `install` was given: where to clone from, and the id it goes by.
 #[derive(Debug, PartialEq)]
 struct Source {
@@ -303,20 +321,16 @@ impl Source {
     /// `@<ref>`: a branch, tag, or commit.
     fn parse(text: &str) -> Result<Self, String> {
         let text = text.trim();
-        // The ref's `@` comes after the last `/` (or Windows' `\`), unlike
-        // `git@host:`'s.
-        let (text, reference) = match text.rsplit_once(['/', '\\']) {
-            Some((_, last)) if last.contains('@') => {
-                let (text, reference) = text.rsplit_once('@').unwrap_or((text, ""));
-                if reference.is_empty() {
-                    return Err(format!("`{text}@` names no ref"));
-                }
-                (text, Some(reference.to_owned()))
+        let (text, reference) = split_reference(text);
+        let reference = match reference {
+            Some("") => return Err(format!("`{text}@` names no ref")),
+            // Git would read it as one of its options.
+            Some(reference) if reference.starts_with('-') => {
+                return Err(format!("`{}` is not a ref", printable(reference)));
             },
-            _ => (text, None),
+            reference => reference.map(str::to_owned),
         };
-        // `C:\` and `\\server\` are folders too, on Windows.
-        if text.starts_with(['/', '.', '~']) || Path::new(text).is_absolute() {
+        if is_folder(text) {
             let folder = expand_home(text);
             let folder = std::path::absolute(&folder).unwrap_or(folder);
             let name = folder
@@ -375,8 +389,97 @@ impl Source {
 
     /// The folder name the package is cloned to, which names a single mod.
     fn name(&self) -> &str {
-        self.id.rsplit('/').next().unwrap_or(&self.id)
+        package_name(&self.id)
     }
+}
+
+/// The last part of a package's id: the folder name it is cloned to.
+fn package_name(id: &str) -> &str {
+    id.rsplit('/').next().unwrap_or(id)
+}
+
+/// Whether `text` names a folder rather than a repository. `C:\` and
+/// `\\server\` are folders too, on Windows.
+fn is_folder(text: &str) -> bool {
+    text.starts_with(['/', '.', '~']) || Path::new(text).is_absolute()
+}
+
+/// `text` without its `@<ref>`, and the ref. A repository's ref follows the
+/// first `@` in its path, so a branch may hold `/` (`owner/repo@feature/x`),
+/// unlike `git@host:` or `ssh://user@host/`, whose `@` comes before it. A
+/// folder's is in its last part, since a folder may hold `@` anywhere.
+fn split_reference(text: &str) -> (&str, Option<&str>) {
+    let at = if is_folder(text) {
+        let last = text.rfind(['/', '\\']).map_or(0, |slash| slash + 1);
+        text[last..].rfind('@').map(|at| last + at)
+    } else {
+        let body = text.find("://").map_or(0, |scheme| scheme + 3);
+        text[body..].find('/').and_then(|slash| {
+            let path = body + slash;
+            text[path..].find('@').map(|at| path + at)
+        })
+    };
+    match at {
+        Some(at) => (&text[..at], Some(&text[at + 1..])),
+        None => (text, None),
+    }
+}
+
+/// Where `source`, a requirement in the moonframe.toml of the app in
+/// `folder`, points when it is a package shipped beside the app: a `./` or
+/// `../` path, which must stay inside the app's git repository (its folder,
+/// outside one), so a downloaded app cannot reach the user's other folders.
+/// `None` for a repository to clone. Other folders, `~` and `file://` are
+/// refused: what an app requires must come with it, or from a repository.
+pub(crate) fn beside(folder: Option<&Path>, source: &str) -> Result<Option<PathBuf>, String> {
+    let source = source.trim();
+    let shown = printable(source);
+    if !(source.starts_with("./") || source.starts_with("../")) {
+        if is_folder(source) || source.starts_with("file:") {
+            return Err(format!(
+                "`{shown}`: an app requires repositories, or packages shipped inside its own \
+                 repository as ./ or ../ paths"
+            ));
+        }
+        return Ok(None);
+    }
+    let folder = folder.ok_or_else(|| format!("`{shown}`: no app folder to find it beside"))?;
+    let folder = folder
+        .canonicalize()
+        .map_err(|error| format!("{}: {error}", folder.display()))?;
+    let root = git(&folder, &["rev-parse", "--show-toplevel"])
+        .ok()
+        .and_then(|root| PathBuf::from(root).canonicalize().ok())
+        .filter(|root| folder.starts_with(root))
+        .unwrap_or_else(|| folder.clone());
+    let path = normalize(&folder.join(source));
+    // Through any link it holds, where it really is.
+    let path = path.canonicalize().unwrap_or(path);
+    if !path.starts_with(&root) {
+        return Err(format!(
+            "`{shown}` leaves the app's repository, {}",
+            root.display()
+        ));
+    }
+    if path == folder {
+        return Err(format!("`{shown}` is the app itself"));
+    }
+    Ok(Some(path))
+}
+
+/// `path` with its `.` and `..` parts worked out, without touching disk.
+fn normalize(path: &Path) -> PathBuf {
+    let mut normal = PathBuf::new();
+    for part in path.components() {
+        match part {
+            std::path::Component::CurDir => {},
+            std::path::Component::ParentDir => {
+                normal.pop();
+            },
+            part => normal.push(part),
+        }
+    }
+    normal
 }
 
 fn strip_git(path: &str) -> &str {
@@ -404,6 +507,10 @@ pub(crate) struct Contents {
     providers: Vec<(String, Provider)>,
     components: Vec<String>,
     style: bool,
+    /// What an app ships beside it and requires (`./shared`), by the
+    /// requirement: approved with the app, since a new version of the app
+    /// brings a new version of them.
+    beside: Vec<(String, Contents)>,
 }
 
 /// How a provider in a package would run.
@@ -424,8 +531,32 @@ pub(crate) enum Provider {
 }
 
 impl Contents {
-    /// Reads the package in `folder`, which is installed as `name`.
+    /// Reads the package in `folder`, which is installed as `name`, and an
+    /// app's, what it ships beside it.
     fn read(folder: &Path, name: &str) -> Result<Self, String> {
+        let mut contents = Self::read_one(folder, name)?;
+        let requires = contents
+            .app
+            .as_ref()
+            .map(|app| app.requires.clone())
+            .unwrap_or_default();
+        for source in requires {
+            if let Some(path) = beside(Some(folder), &source)?
+                && path.is_dir()
+            {
+                let name = path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or(&source)
+                    .to_owned();
+                let shipped = Self::read_one(&path, &name)?;
+                contents.beside.push((source, shipped));
+            }
+        }
+        Ok(contents)
+    }
+
+    fn read_one(folder: &Path, name: &str) -> Result<Self, String> {
         refuse_binaries(folder)?;
         let mut contents = Self {
             app: App::read(folder)?,
@@ -507,6 +638,16 @@ impl Contents {
             })
             .map(|(name, how)| (name.as_str(), how))
     }
+
+    /// This package, then each one it ships beside it, with the requirement
+    /// that names it.
+    pub(crate) fn parts(&self) -> impl Iterator<Item = (Option<&str>, &Self)> {
+        std::iter::once((None, self)).chain(
+            self.beside
+                .iter()
+                .map(|(source, contents)| (Some(source.as_str()), contents)),
+        )
+    }
 }
 
 /// Files a package may hold that are not text: images, which a reviewer can
@@ -521,16 +662,13 @@ const IMAGES: &[(&[&str], &[u8])] = &[
     (&["icns"], b"icns"),
 ];
 
-/// Whether the file at `path`, named with `extension`, is the image its
-/// name says.
-fn is_image(path: &Path, extension: &str) -> bool {
+/// Whether `bytes`, a file named with `extension`, are the image its name
+/// says.
+fn is_image(bytes: &[u8], extension: &str) -> bool {
     let Some((_, magic)) = IMAGES
         .iter()
         .find(|(extensions, _)| extensions.contains(&extension))
     else {
-        return false;
-    };
-    let Ok(bytes) = fs::read(path) else {
         return false;
     };
     bytes.starts_with(magic) && (extension != "webp" || bytes.get(8..12) == Some(b"WEBP"))
@@ -540,22 +678,31 @@ fn is_image(path: &Path, extension: &str) -> bool {
 /// prebuilt `provider.wasm` or an executable a provider's command could
 /// run: everything a package runs must be readable, by its users and their
 /// agents, before it is installed. A wasm provider ships its crate, which
-/// the app builds.
+/// the app builds. A link is refused too: what it points to, outside the
+/// package, is not what was reviewed.
 fn refuse_binaries(folder: &Path) -> Result<(), String> {
     let mut opaque: Vec<String> = files(folder)
         .into_iter()
-        .filter(|relative| {
-            let path = folder.join(relative);
+        .filter_map(|relative| {
+            let path = folder.join(&relative);
+            let shown = printable(&relative.display().to_string());
+            if path.symlink_metadata().is_ok_and(|meta| meta.is_symlink()) {
+                return Some(format!("{shown} (a link)"));
+            }
             let extension = path
                 .extension()
                 .and_then(|extension| extension.to_str())
                 .map(str::to_ascii_lowercase);
             if extension.as_deref() == Some("wasm") {
-                return true;
+                return Some(shown);
             }
-            !is_text(&path) && !extension.is_some_and(|extension| is_image(&path, &extension))
+            let Ok(bytes) = fs::read(&path) else {
+                return Some(shown);
+            };
+            let readable =
+                is_text(&bytes) || extension.is_some_and(|extension| is_image(&bytes, &extension));
+            (!readable).then_some(shown)
         })
-        .map(|relative| printable(&relative.display().to_string()))
         .collect();
     if opaque.is_empty() {
         return Ok(());
@@ -569,9 +716,10 @@ fn refuse_binaries(folder: &Path) -> Result<(), String> {
     ))
 }
 
-/// Every file in `folder`, relative to it: in a git repository, those it
-/// tracks and those it would (all of them, in a fresh clone), so a linked
-/// folder's ignored build output does not count; elsewhere, every file.
+/// Every file and link in `folder`, relative to it: in a git repository,
+/// those it tracks and those it would (all of them, in a fresh clone), so a
+/// linked folder's ignored build output does not count; elsewhere, every
+/// one. A link is listed, not followed.
 fn files(folder: &Path) -> Vec<PathBuf> {
     let listed = git(folder, &[
         "ls-files",
@@ -588,7 +736,12 @@ fn files(folder: &Path) -> Vec<PathBuf> {
             .filter(|path| !path.is_empty())
             .map(PathBuf::from)
             // Deleted but not yet committed.
-            .filter(|path| folder.join(path).is_file())
+            .filter(|path| {
+                folder
+                    .join(path)
+                    .symlink_metadata()
+                    .is_ok_and(|meta| meta.is_file() || meta.is_symlink())
+            })
             .collect();
     }
     let mut found = Vec::new();
@@ -601,7 +754,7 @@ fn files(folder: &Path) -> Vec<PathBuf> {
             let path = relative.join(entry.file_name());
             match entry.file_type() {
                 Ok(kind) if kind.is_dir() && entry.file_name() != ".git" => pending.push(path),
-                Ok(kind) if kind.is_file() => found.push(path),
+                Ok(kind) if kind.is_file() || kind.is_symlink() => found.push(path),
                 _ => {},
             }
         }
@@ -609,9 +762,9 @@ fn files(folder: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// Whether a file reads as text: valid UTF-8 without NUL bytes.
-fn is_text(path: &Path) -> bool {
-    fs::read(path).is_ok_and(|bytes| !bytes.contains(&0) && std::str::from_utf8(&bytes).is_ok())
+/// Whether a file's `bytes` read as text: valid UTF-8 without NUL bytes.
+fn is_text(bytes: &[u8]) -> bool {
+    !bytes.contains(&0) && std::str::from_utf8(bytes).is_ok()
 }
 
 /// The entries of `dir` that `keep` accepts, by name.
@@ -630,19 +783,34 @@ fn names(dir: &Path, keep: impl Fn(&Path) -> bool) -> Vec<String> {
 }
 
 /// `text`, from a package, safe to print: control characters, such as a
-/// terminal escape that could redraw the approval prompt, are shown
-/// escaped instead of sent to the terminal.
+/// terminal escape that could redraw the approval prompt, and invisible
+/// ones, such as a right-to-left override that could disguise a name, are
+/// shown escaped instead of sent to the terminal.
 pub(crate) fn printable(text: &str) -> String {
-    text.chars()
-        .flat_map(|c| {
-            let escaped: Vec<char> = if c.is_control() {
-                c.escape_unicode().collect()
-            } else {
-                vec![c]
-            };
-            escaped
-        })
-        .collect()
+    let mut shown = String::with_capacity(text.len());
+    for c in text.chars() {
+        if c.is_control() || invisible(c) {
+            shown.extend(c.escape_unicode());
+        } else {
+            shown.push(c);
+        }
+    }
+    shown
+}
+
+/// Characters that print as nothing but change what is around them:
+/// direction marks, overrides and isolates, and zero-width ones.
+fn invisible(c: char) -> bool {
+    matches!(
+        c,
+        '\u{00AD}'
+            | '\u{061C}'
+            | '\u{180E}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{2069}'
+            | '\u{FEFF}'
+    )
 }
 
 impl fmt::Display for Contents {
@@ -680,6 +848,9 @@ impl fmt::Display for Contents {
         }
         if let Some(app) = self.app.as_ref().filter(|app| !app.requires.is_empty()) {
             parts.push(format!("requires: {}", list(&app.requires)));
+        }
+        for (source, contents) in &self.beside {
+            parts.push(format!("ships {}, with {contents}", printable(source)));
         }
         f.write_str(&parts.join("; "))
     }
@@ -808,7 +979,11 @@ pub(crate) fn install(
         link: false,
         enabled: true,
     });
-    list.write(user)?;
+    // Unlisted, the folder would only block the next install.
+    if let Err(problem) = list.write(user) {
+        let _ = fs::remove_dir_all(&target);
+        return Err(problem);
+    }
     Ok((source.id, contents))
 }
 
@@ -826,15 +1001,23 @@ pub(crate) fn link(
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| format!("{} has no name", folder.display()))?;
-    let id = format!("local/{name}");
+    let url = folder.display().to_string();
     let mut list = List::read(user)?;
-    if list.package.contains_key(&id) {
+    if let Some(id) = list.linked(&folder) {
         return Err(format!("{id} is already installed"));
+    }
+    // Two folders of one name, such as `a/shared` and `b/shared`, are two
+    // packages.
+    let mut id = format!("local/{name}");
+    let mut n = 1;
+    while list.package.contains_key(&id) {
+        n += 1;
+        id = format!("local/{name}-{n}");
     }
     let contents = Contents::read(&folder, name)?;
     approve(&contents)?;
     list.package.insert(id.clone(), Entry {
-        url: folder.display().to_string(),
+        url,
         reference: None,
         link: true,
         enabled: true,
@@ -869,7 +1052,7 @@ pub(crate) fn update(
         .map(|id| {
             let entry = &list.package[&id];
             let folder = entry.folder(user, &id);
-            let name = id.rsplit('/').next().unwrap_or(&id);
+            let name = package_name(&id);
             let updated = if entry.link {
                 Ok(Updated::Linked)
             } else {
@@ -930,7 +1113,8 @@ pub(crate) fn remove(user: &Path, query: &str) -> Result<String, String> {
     let Some(entry) = list.package.remove(&id) else {
         return Err(format!("no package `{id}`"));
     };
-    list.write(user)?;
+    // The folder goes first: listed but missing, `update` names it; unlisted
+    // but there, it would block the next install.
     if !entry.link {
         let folder = entry.folder(user, &id);
         match fs::remove_dir_all(&folder) {
@@ -950,6 +1134,7 @@ pub(crate) fn remove(user: &Path, query: &str) -> Result<String, String> {
             }
         }
     }
+    list.write(user)?;
     Ok(id)
 }
 
@@ -981,7 +1166,7 @@ pub(crate) fn installed(user: &Path) -> Result<Vec<Installed>, String> {
         .into_iter()
         .map(|(id, entry)| {
             let folder = entry.folder(user, &id);
-            let name = id.rsplit('/').next().unwrap_or(&id).to_owned();
+            let name = package_name(&id).to_owned();
             Installed {
                 commit: head(&folder).ok().map(|commit| short(&commit)),
                 contents: if folder.is_dir() {
@@ -1028,8 +1213,13 @@ pub(crate) fn create(folder: &Path) -> Result<String, String> {
             .replace("{name}", &name)
             .replace("{repository}", env!("CARGO_PKG_REPOSITORY")),
     )?;
-    git(folder, &["init", "--quiet"])?;
+    git_init(folder)?;
     Ok(name)
+}
+
+/// Makes `folder` a new git repository.
+pub(crate) fn git_init(folder: &Path) -> Result<(), String> {
+    git(folder, &["init", "--quiet"]).map(drop)
 }
 
 const MAIN: &str = r#"-- {name}: a mod for moonframe. `region` picks where the shell draws it:
@@ -1111,6 +1301,10 @@ fn checkout(dir: &Path, reference: Option<&str>) -> Result<(), String> {
 
 /// The commit `reference` names, as [`checkout`] picks it.
 fn resolve(dir: &Path, reference: Option<&str>) -> Result<String, String> {
+    // From a hand-edited packages.toml, git would read it as an option.
+    if let Some(reference) = reference.filter(|reference| reference.starts_with('-')) {
+        return Err(format!("`{}` is not a ref", printable(reference)));
+    }
     let target = match reference {
         None => "origin/HEAD".to_owned(),
         Some(reference) => {

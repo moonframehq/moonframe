@@ -110,6 +110,28 @@ fn sources_name_a_repository_and_a_ref() {
     assert_eq!(https.id, "gitlab.com/group/sub/mod");
     assert_eq!(https.reference.as_deref(), Some("main"));
     assert!(parse("/tmp/some/my-mod").id == "local/my-mod");
+    // A branch may hold `/`; `git@` and `user@` are not refs.
+    let branch = parse("penso/my-super-mod@feature/x");
+    assert_eq!(
+        (branch.id.as_str(), branch.reference.as_deref()),
+        ("github.com/penso/my-super-mod", Some("feature/x"))
+    );
+    let ssh = parse("git@github.com:penso/my-super-mod@feature/x");
+    assert_eq!(
+        (ssh.url.as_str(), ssh.reference.as_deref()),
+        ("git@github.com:penso/my-super-mod", Some("feature/x"))
+    );
+    let ssh = parse("ssh://git@host.com/a/b@v2");
+    assert_eq!(
+        (ssh.id.as_str(), ssh.reference.as_deref()),
+        ("host.com/a/b", Some("v2"))
+    );
+    // A folder may hold `@` before its last part.
+    let folder = parse("/tmp/@scope/my-mod@v1");
+    assert_eq!(
+        (folder.id.as_str(), folder.reference.as_deref()),
+        ("local/my-mod", Some("v1"))
+    );
 
     for bad in [
         "github.com/../etc",
@@ -117,6 +139,8 @@ fn sources_name_a_repository_and_a_ref() {
         "ftp://host/a/b",
         "github.com/a/b@",
         "github.com/a b/c",
+        // Git would read the ref as an option.
+        "github.com/a/b@--upload-pack=touch",
     ] {
         assert!(Source::parse(bad).is_err(), "{bad}");
     }
@@ -421,6 +445,8 @@ fn package_text_cannot_drive_the_terminal() {
     let shown = format!("{provider}");
     assert!(!shown.contains('\x1b'), "{shown}");
     assert_eq!(printable("a\x1b[2Kb"), "a\\u{1b}[2Kb");
+    // A right-to-left override or a zero-width space could disguise a name.
+    assert_eq!(printable("a\u{202e}b\u{200b}c"), "a\\u{202e}b\\u{200b}c");
 }
 
 #[test]
@@ -591,4 +617,137 @@ fn a_mod_that_shadows_a_git_writer_is_named() {
     )]);
     install(&user, widening.to_str().unwrap(), &yes).unwrap();
     assert!(git_writers(&user).contains(&"later".to_owned()));
+}
+
+/// An update of an app is approved with what it ships beside it: a
+/// requirement such as `./shared` is linked in place, so a new version of
+/// the app that adds a provider there would otherwise run it unasked.
+#[test]
+fn an_app_update_asks_about_providers_it_ships_beside_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let profile = dir.path().join("user/profiles/pi");
+    let remote = repo(dir.path(), "pi-app", &[
+        (
+            MANIFEST,
+            "[app]\nname = \"pi\"\nrequires = [\"./shared\"]\n",
+        ),
+        ("main.luau", SHELL),
+        ("shared/mods/helper/main.luau", &counter("helper")),
+    ]);
+    let (_, contents) = install(&profile, remote.to_str().unwrap(), &yes).unwrap();
+    assert_eq!(contents.parts().count(), 2, "{contents:?}");
+
+    commit(
+        &remote,
+        &[(
+            "shared/providers/x/provider.toml",
+            "kind = \"process\"\ncommand = [\"sh\", \"-c\", \"evil\"]\n",
+        )],
+        "Add a provider beside the app",
+    );
+    let asked = std::cell::RefCell::new(Vec::new());
+    let check = |contents: &Contents| {
+        for (from, part) in contents.parts() {
+            for (name, _) in part.trusted() {
+                asked.borrow_mut().push(format!("{from:?} {name}"));
+            }
+        }
+        Err("declined".to_owned())
+    };
+    let updated = update(&profile, None, &check).unwrap();
+    assert_eq!(updated[0].1, Err("declined".to_owned()));
+    assert_eq!(*asked.borrow(), [r#"Some("./shared") x"#]);
+    let folder = profile.join("packages/local/pi-app");
+    assert!(
+        !folder.join("shared/providers/x").exists(),
+        "the declined provider reached the live folder"
+    );
+}
+
+/// A requirement shipped beside an app stays inside the app's repository,
+/// so a downloaded app cannot link the user's own folders into its profile.
+#[test]
+fn an_app_requires_only_what_ships_in_its_repository() {
+    let dir = tempfile::tempdir().unwrap();
+    let mono = repo(dir.path(), "mono", &[
+        ("examples/pi/main.luau", SHELL),
+        ("examples/projects/main.luau", &counter("projects")),
+    ]);
+    let app = mono.join("examples/pi");
+    let projects = mono.join("examples/projects").canonicalize().unwrap();
+    assert_eq!(beside(Some(&app), "../projects").unwrap(), Some(projects));
+    assert_eq!(beside(Some(&app), "owner/repo@v1").unwrap(), None);
+    for bad in [
+        "../../..",
+        "../../../outside",
+        "./",
+        "~/code/private",
+        "/etc",
+        "file:///etc",
+        ".hidden",
+    ] {
+        assert!(beside(Some(&app), bad).is_err(), "{bad}");
+    }
+    // Outside a repository, the app's own folder is the bound.
+    let loose = dir.path().join("loose/app");
+    fs::create_dir_all(&loose).unwrap();
+    fs::create_dir_all(dir.path().join("loose/other")).unwrap();
+    assert!(beside(Some(&loose), "../other").is_err());
+
+    // An app whose requirement leaves its repository does not install.
+    let user = dir.path().join("user/profiles/x");
+    let remote = repo(dir.path(), "x-app", &[
+        (MANIFEST, "[app]\nname = \"x\"\nrequires = [\"../..\"]\n"),
+        ("main.luau", SHELL),
+    ]);
+    let problem = install(&user, remote.to_str().unwrap(), &yes).unwrap_err();
+    assert!(problem.contains("leaves the app's repository"), "{problem}");
+}
+
+/// A link could point anywhere outside the package, at what was never
+/// reviewed.
+#[cfg(unix)]
+#[test]
+fn a_package_holding_a_link_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let user = dir.path().join("user");
+    let outside = dir.path().join("outside");
+    write(
+        &outside,
+        "provider.toml",
+        "kind = \"process\"\ncommand = [\"sh\"]\n",
+    );
+    let remote = repo(dir.path(), "linky", &[("mods/a/main.luau", &counter("a"))]);
+    fs::create_dir_all(remote.join("providers")).unwrap();
+    std::os::unix::fs::symlink(&outside, remote.join("providers/x")).unwrap();
+    commit(&remote, &[], "A link");
+    let problem = install(&user, remote.to_str().unwrap(), &yes).unwrap_err();
+    assert!(problem.contains("providers/x (a link)"), "{problem}");
+
+    // A linked folder outside git is walked, and its links are seen too.
+    let loose = dir.path().join("loose");
+    write(&loose, "mods/a/main.luau", &counter("a"));
+    std::os::unix::fs::symlink(&outside, loose.join("mods/b")).unwrap();
+    let problem = link(&user, loose.to_str().unwrap(), &yes).unwrap_err();
+    assert!(problem.contains("(a link)"), "{problem}");
+}
+
+/// Two linked folders of one name are two packages, and a folder is linked
+/// once.
+#[test]
+fn folders_of_one_name_link_as_two_packages() {
+    let dir = tempfile::tempdir().unwrap();
+    let user = dir.path().join("user");
+    let (a, b) = (dir.path().join("a/shared"), dir.path().join("b/shared"));
+    write(&a, "main.luau", &counter("a"));
+    write(&b, "main.luau", &counter("b"));
+    let (first, _) = link(&user, a.to_str().unwrap(), &yes).unwrap();
+    let (second, _) = link(&user, b.to_str().unwrap(), &yes).unwrap();
+    assert_eq!(
+        (first.as_str(), second.as_str()),
+        ("local/shared", "local/shared-2")
+    );
+    assert!(link(&user, a.to_str().unwrap(), &yes).is_err());
+    assert!(linked(&user, &b.canonicalize().unwrap()).unwrap());
+    assert!(links_only(&user).unwrap());
 }
