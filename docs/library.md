@@ -41,6 +41,17 @@ Features: `acp`, `alacritty`, `docs`, `git`, `herdr-core` and `tokio` by
 default. `ghostty` (a second terminal emulator, built from Ghostty's source
 with Zig; see `tools/zig`) is opt-in: `features = ["ghostty"]`.
 
+An app that needs none of git, the markdown editor or kept terminals can
+leave them out, and with them the herdr-gpui crates they build on:
+
+```toml
+moonframe = { default-features = false, features = ["acp", "alacritty", "tokio"], git = "..." }
+```
+
+A built-in provider a feature leaves out (`git`, `docs`, `acp`) publishes
+nothing: the starter's mods reading `app.git` see nil and carry on, and only
+a message to it reports that the feature is off.
+
 Use the GPUI the library re-exports, `moonframe::gpui_kit` (GPUI with
 gpui-component): one app links one GPUI. If your crates name `gpui`
 directly, pin the same version (`gpui-pre` 0.3.10 today).
@@ -235,8 +246,13 @@ cargo run --release -- bundle   # target/bundle/<Title>.app, or a Linux prefix
 
 `bundle` ships the running binary with the app's folder and the toolbox,
 each with its Wasm providers prebuilt and no sources, plus an icon and an
-Info.plist, signed ad hoc. A bundle runs as a release, without the
-Components menu or Inspect Element.
+Info.plist, signed ad hoc.
+
+The developer tools (the Components menu, Inspect Element, Reload Modules)
+show in a debug build only: `cargo run` has them, while `cargo run
+--release`, an installed binary and a bundle run as a release, as the app's
+users see it. `--dev` brings them back; `--release` hides them in a debug
+build.
 
 ## Moving an existing GPUI app over
 

@@ -59,8 +59,9 @@ Options:
                 style.luau and theme follow you into it
   --check       load every module, report problems, and exit without a window
   --release     run as the app's users see it: no Components menu, Inspect
-                Element, or Reload Modules (an app bundle always does)
-  --dev         the tools again, in an app bundle
+                Element, or Reload Modules (an app bundle always does, and so
+                does an app on the library built with --release)
+  --dev         the tools again, in an app bundle or a release build
   --background  open the window without bringing the app forward (for
                 screenshots and scripts while someone is working)
   --component NAME
@@ -370,9 +371,15 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     {
         tracing::warn!("cannot create {}: {error}", own.display());
     }
+    // The developer tools (Components, Inspect Element, Reload Modules)
+    // are for whoever builds the app: an app on the library shows them in
+    // a debug build (`cargo run`), not in a release one (`cargo run
+    // --release`, an install, a bundle). The starter always shows them
+    // outside a bundle, as building apps is what it is for.
+    let hosted_release = folders.host.is_some() && (paths::in_bundle() || !cfg!(debug_assertions));
     crate::RELEASE.store(
         args.release
-            .unwrap_or(folders.bundled.is_some() || (folders.host.is_some() && paths::in_bundle())),
+            .unwrap_or(folders.bundled.is_some() || hosted_release),
         Ordering::Relaxed,
     );
     let _ = crate::TITLE.set(folders.title());
