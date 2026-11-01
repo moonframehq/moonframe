@@ -8,6 +8,23 @@ type Props = {
 	[number]: any,
 }
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Card",
 	category = "Containers",
@@ -26,7 +43,11 @@ card { title = "Worktrees", subtitle = "3 checked out",
 	actions = { ui.button { "Add", small = true, variant = "ghost", msg = "add" } },
 	ui.text "Content goes here.",
 }]],
-	example = { title = "Worktrees", subtitle = "3 checked out" },
+	example = {
+		title = "Worktrees",
+		subtitle = "3 checked out",
+		ui.text { "Content goes here.", size = "small", tone = "muted" },
+	},
 
 	build = function(props: Props)
 		local header = ui.row {
@@ -40,17 +61,11 @@ card { title = "Worktrees", subtitle = "3 checked out",
 			},
 			table.unpack(props.actions or {}),
 		}
-		local children = { header }
-		for _, child in ipairs(props) do
-			children[#children + 1] = child
-		end
-		if #children == 1 then
-			children[2] = ui.text { "Content goes here.", size = "small", tone = "muted" }
-		end
 		return ui.column {
 			gap = "small",
 			style = { background = "background", border = "all", radius = 10, padding = 12 },
-			table.unpack(children),
+			header,
+			table.unpack(positional(props)),
 		}
 	end,
 }

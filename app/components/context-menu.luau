@@ -28,6 +28,23 @@ local EXAMPLE: { any } = {
 	{ id = "delete", label = "Move to Trash", icon = "trash-2", shortcut = "cmd-backspace", danger = true },
 }
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Context Menu",
 	category = "Overlays",
@@ -81,10 +98,7 @@ context_menu {
 		for key, msg in pairs(props.keys or {}) do
 			keys[key] = msg
 		end
-		local children = {}
-		for _, child in ipairs(props) do
-			children[#children + 1] = child
-		end
+		local children = positional(props)
 		if #children == 0 then
 			children[1] = ui.item { "README.md", detail = "Right-click for actions" }
 		end

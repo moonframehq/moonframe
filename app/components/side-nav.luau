@@ -334,7 +334,7 @@ side_nav {
 					msg = if collapsed then props.toggle else account.menu,
 					to = to,
 					tooltip = if collapsed and props.toggle ~= nil then "Expand sidebar" else nil,
-					ui.text { account.initial or string.upper(string.sub(account.name, 1, 1)) },
+					ui.text { account.initial or string.upper(string.match(account.name, utf8.charpattern) or "") },
 				},
 				fading_column {
 					gap = "none",

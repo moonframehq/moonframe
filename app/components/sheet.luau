@@ -19,6 +19,23 @@ type Props = {
 	[number]: any,
 }
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Sheet",
 	category = "Overlays",
@@ -126,7 +143,7 @@ sheet { open = state.details, dismiss = "close-details", title = "Pull request #
 				gap = "none",
 				grow = true,
 				header,
-				ui.column { class = "sheet-body", grow = true, scroll = true, table.unpack(props) },
+				ui.column { class = "sheet-body", grow = true, scroll = true, table.unpack(positional(props)) },
 				props.footer ~= nil and ui.column { class = "sheet-footer", shrink = false, props.footer },
 			},
 		}

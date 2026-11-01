@@ -16,11 +16,15 @@ local MINUTE, HOUR, DAY, WEEK, MONTH, YEAR = 60, 3600, 86400, 604800, 2629800, 3
 local function long(seconds: number): string
 	if seconds < 45 then
 		return "just now"
-	elseif seconds < HOUR then
-		local minutes = math.max(1, math.floor(seconds / MINUTE + 0.5))
+	end
+	-- Rounded before the unit is picked, so 59.5 minutes is an hour, not
+	-- "60 min ago", and 23.6 hours is "yesterday", not "24 hours ago".
+	local minutes = math.max(1, math.floor(seconds / MINUTE + 0.5))
+	if minutes < 60 then
 		return `{minutes} min ago`
-	elseif seconds < DAY then
-		local hours = math.floor(seconds / HOUR + 0.5)
+	end
+	local hours = math.floor(seconds / HOUR + 0.5)
+	if hours < 24 then
 		return if hours == 1 then "an hour ago" else `{hours} hours ago`
 	elseif seconds < 2 * DAY then
 		return "yesterday"

@@ -16,6 +16,23 @@ type Props = {
 	[number]: any,
 }
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Collapsible",
 	category = "Containers",
@@ -73,8 +90,9 @@ collapsible { title = "No agent yet", summary = "dispatch one", open = state.age
 			props.summary ~= nil and ui.text { props.summary, class = "collapsible-summary" },
 		}
 		local body = nil
-		if open and #props > 0 then
-			body = ui.column { class = "collapsible-body", table.unpack(props) }
+		local children = positional(props)
+		if open and #children > 0 then
+			body = ui.column { class = "collapsible-body", table.unpack(children) }
 		end
 		return ui.column {
 			class = props.flat and "collapsible collapsible-flat" or "collapsible",

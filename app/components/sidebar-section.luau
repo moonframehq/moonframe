@@ -16,6 +16,23 @@ type Props = {
 	[number]: any,
 }
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Sidebar section",
 	category = "Navigation",
@@ -93,8 +110,9 @@ section { title = "Agents", count = 3, collapsed = state.agents_folded, toggle =
 			table.unpack(props.actions or {}),
 		}
 		local body = nil
-		if not collapsed and #props > 0 then
-			body = ui.column { class = "sidebar-section-body", table.unpack(props) }
+		local children = positional(props)
+		if not collapsed and #children > 0 then
+			body = ui.column { class = "sidebar-section-body", table.unpack(children) }
 		end
 		return ui.column { class = "sidebar-section", header, body or false }
 	end,

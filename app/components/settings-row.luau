@@ -18,6 +18,23 @@ type Props = {
 	[number]: any,
 }
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Settings row",
 	category = "Forms",
@@ -106,8 +123,9 @@ settings_row { title = "Show agents", description = "List running agents under t
 		}
 
 		local control: any = false
-		if #props > 0 then
-			control = ui.row { class = "settings-row-control", shrink = false, align = "center", table.unpack(props) }
+		local children = positional(props)
+		if #children > 0 then
+			control = ui.row { class = "settings-row-control", shrink = false, align = "center", table.unpack(children) }
 		end
 
 		if props.stacked then

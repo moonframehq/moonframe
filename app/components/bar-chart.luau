@@ -144,14 +144,19 @@ bar_chart {
 		local max = props.max or 0
 		if not props.max then
 			for _, bucket in props.buckets do
+				-- Bars below zero draw as nothing, so they add nothing.
 				local total = 0
 				for _, value in bucket.values do
-					total += value
+					total += math.max(value, 0)
 				end
 				max = math.max(max, total)
 			end
 		end
-		max = math.max(max, 1)
+		-- Only an all-zero chart needs a scale made up: fractions keep
+		-- their own, so 0.2 to 0.4 fills the height.
+		if max <= 0 then
+			max = 1
+		end
 
 		local ticks = props.ticks
 		local function swatch(index: number, width: number, h: number, dim: boolean?)
