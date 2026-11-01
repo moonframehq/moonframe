@@ -1,15 +1,18 @@
 -- The bar over the sheet: the sidebar toggle and where you are, then the
--- bell, a search field, the agent panel's toggle and "New chat".
+-- bell, a search field, the agent panel's toggle and "New chat". On the
+-- meetings page (`tally/page`) the search is the toolbar's, and there is no
+-- agent.
 
 local breadcrumbs = use "breadcrumbs"
 local icon_button = use "icon-button"
 local kbd = use "kbd"
 
-type State = { query: string, focus: boolean }
+type State = { query: string, focus: boolean, page: string }
 
 return mod {
 	region = "top",
 	title = "Top bar",
+	subscribe = { "tally/page" },
 
 	styles = {
 		[".bar"] = { padding = { 0, 14, 0, 8 }, gap = 8 },
@@ -20,11 +23,15 @@ return mod {
 	},
 
 	init = function(previous: State?): State
-		return { query = previous and previous.query or "", focus = false }
+		return { query = previous and previous.query or "", focus = false, page = previous and previous.page or "pipeline" }
 	end,
 
 	update = function(state: State, msg)
-		if msg == "focus" then
+		if type(msg) == "table" and msg.topic == "tally/page" then
+			state.page = msg.value or "pipeline"
+		elseif msg == "focus" and state.page == "meetings" then
+			return state, { { to = "meetings", msg = "focus" } }
+		elseif msg == "focus" then
 			state.focus = true
 		elseif type(msg) == "table" and msg.msg == "query" then
 			state.query = msg.value
@@ -37,6 +44,19 @@ return mod {
 	end,
 
 	view = function(state: State, app)
+		if state.page == "meetings" then
+			return ui.row {
+				class = "bar",
+				drag = true,
+				grow = true,
+				height = 52,
+				align = "center",
+				icon_button { icon = "panel-left", tooltip = "Show or hide the sidebar", msg = "toggle-left", to = "shell" },
+				breadcrumbs { crumbs = { { label = "Sales" }, { label = "Meetings" } } },
+				ui.spacer(),
+				icon_button { icon = "bell", tooltip = "Notifications (not in this example)", msg = "noop" },
+			}
+		end
 		return ui.row {
 			class = "bar",
 			drag = true,

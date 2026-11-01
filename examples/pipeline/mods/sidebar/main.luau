@@ -1,10 +1,14 @@
--- The sidebar: the workspace, its sections (only Pipeline is in this
--- example), the quarter's quota, and who is signed in.
+-- The sidebar: the workspace, its sections (Pipeline and Meetings are in
+-- this example), the quarter's quota, and who is signed in. Picking a page
+-- publishes it on `tally/page`, which the shell and the top bar follow.
 
 local avatar = use "avatar"
 local icon_button = use "icon-button"
 
 type State = { selected: string }
+
+-- The pages this example has; the other rows only light up.
+local PAGES: { [string]: boolean } = { pipeline = true, meetings = true }
 
 local SECTIONS = {
 	{
@@ -21,8 +25,9 @@ local SECTIONS = {
 			{ id = "deals", label = "Deals", icon = "building-2" },
 			{ id = "contacts", label = "Contacts", icon = "user" },
 			{ id = "companies", label = "Companies", icon = "building-2" },
-			{ id = "activities", label = "Activities", icon = "calendar" },
-			{ id = "forecast", label = "Forecast", icon = "activity" },
+			{ id = "meetings", label = "Meetings", icon = "calendar" },
+			{ id = "activities", label = "Activities", icon = "activity" },
+			{ id = "forecast", label = "Forecast", icon = "chart-pie" },
 		},
 	},
 	{
@@ -63,12 +68,15 @@ return mod {
 	},
 
 	init = function(previous: State?): State
-		return previous or { selected = "pipeline" }
+		local state = previous or { selected = "pipeline" }
+		-- Start the shell and the top bar on the page last shown.
+		return state, { { to = "topic:tally/page", msg = if PAGES[state.selected] then state.selected else "pipeline" } }
 	end,
 
 	update = function(state: State, msg)
-		if type(msg) == "table" and msg.select then
+		if type(msg) == "table" and msg.select and PAGES[msg.select] then
 			state.selected = msg.select
+			return state, { { to = "topic:tally/page", msg = msg.select } }
 		end
 	end,
 
@@ -84,7 +92,7 @@ return mod {
 					align = "center",
 					selected = state.selected == item.id,
 					msg = { select = item.id },
-					tooltip = if item.id == "pipeline" then nil else "Only the pipeline is in this example",
+					tooltip = if PAGES[item.id] then nil else "Only the pipeline and meetings are in this example",
 					ui.icon { name = item.icon :: any },
 					ui.text { item.label, class = "side-label" },
 				})
