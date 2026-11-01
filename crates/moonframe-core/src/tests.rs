@@ -1547,6 +1547,54 @@ fn component_styles_sit_under_the_stylesheet_and_reach_every_mod() {
 }
 
 #[test]
+fn a_component_is_animated_by_a_transition_or_what_the_stylesheet_moves() {
+    let component = |styles: &str, build: &str| {
+        format!(
+            "return component {{ title = \"x\", when = \"w\", props = {{}}, example = {{}},\n  styles = {{ {styles} }},\n  build = function() return {build} end }}\n"
+        )
+    };
+    let dir = app(&[]);
+    write(
+        dir.path(),
+        "components/a-moving.luau",
+        &component(
+            r#"[".m"] = { transition = "fade fast" }"#,
+            "ui.row { class = \"m\" }",
+        ),
+    );
+    write(
+        dir.path(),
+        "components/b-sheet.luau",
+        &component(
+            "",
+            "ui.column { ui.overlay { open = true, content = ui.text \"s\" } }",
+        ),
+    );
+    write(
+        dir.path(),
+        "components/c-still.luau",
+        &component(r#"[".s"] = { radius = 4 }"#, "ui.text \"s\""),
+    );
+    write(
+        dir.path(),
+        "components/d-off.luau",
+        &component(r#"[".o"] = { transition = "none" }"#, "ui.text \"o\""),
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let animated: Vec<_> = workspace
+        .components()
+        .iter()
+        .map(|component| (component.name.as_str(), component.animated()))
+        .collect();
+    assert_eq!(animated, [
+        ("a-moving", true),
+        ("b-sheet", true),
+        ("c-still", false),
+        ("d-off", false),
+    ]);
+}
+
+#[test]
 fn controls_take_a_tooltip_a_context_message_and_text_to_copy() {
     let source = r#"return mod { view = function()
   return ui.row {

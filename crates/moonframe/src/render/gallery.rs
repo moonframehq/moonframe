@@ -9,6 +9,7 @@ use {
             ActiveTheme as _, Icon, Sizable as _,
             button::{Button, ButtonVariants as _},
             h_resizable, resizable_panel,
+            tooltip::Tooltip,
         },
         prelude::FluentBuilder as _,
         *,
@@ -115,6 +116,27 @@ impl<'w> Painter<'w, '_> {
                             theme.muted_foreground
                         }))
                         .child(component.title.clone())
+                        // Components that move get a mark, so they can be
+                        // found to play with.
+                        .when(component.animated(), |item| {
+                            item.child(
+                                div()
+                                    .id(SharedString::from(format!(
+                                        "gallery-animated-{}",
+                                        component.name
+                                    )))
+                                    .tooltip(|window, cx| Tooltip::new("Animated").build(window, cx))
+                                    .ml_auto()
+                                    .flex_none()
+                                    .child(Icon::default().path("icons/sparkles.svg").xsmall().text_color(
+                                        if selected {
+                                            theme.primary
+                                        } else {
+                                            theme.muted_foreground.opacity(0.7)
+                                        },
+                                    )),
+                            )
+                        })
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.show_component(&name, cx);
                         }))
@@ -191,12 +213,23 @@ impl<'w> Painter<'w, '_> {
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(component.title.clone()),
                     )
+                    // An icon in a square of its own, so its hover fills a
+                    // neat tile beside the title.
                     .child(
-                        Button::new("gallery-close")
-                            .small()
-                            .ghost()
-                            .label("Close")
-                            .on_click(|_, window, _| window.remove_window()),
+                        div()
+                            .id("gallery-close")
+                            .size(px(28.))
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(6.))
+                            .cursor_pointer()
+                            .text_color(theme.muted_foreground)
+                            .hover(|close| close.bg(theme.list_hover).text_color(theme.foreground))
+                            .tooltip(|window, cx| Tooltip::new("Close").build(window, cx))
+                            .on_click(|_, window, _| window.remove_window())
+                            .child(Icon::default().path("icons/close.svg").small()),
                     ),
             )
             .child(
