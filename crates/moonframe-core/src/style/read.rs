@@ -29,6 +29,7 @@ const SHEET_KEYS: &[&str] = &[
 ];
 const STYLE_KEYS: &[&str] = &[
     "background",
+    "gradient",
     "color",
     "border",
     "border_color",
@@ -228,6 +229,7 @@ impl Read for Style {
         let fields = Fields::read(value, cx, &[STYLE_KEYS])?;
         Ok(Self {
             background: fields.get("background")?,
+            gradient: fields.get("gradient")?,
             color: fields.get("color")?,
             border: fields.get::<Edges>("border")?.map(|edges| edges.0),
             border_color: fields.get("border_color")?,
@@ -438,6 +440,51 @@ impl Read for Shadow {
             return Err(cx.fail(format!("more than {MAX_SHADOW_LAYERS} layers")));
         }
         Ok(Self::Layers(layers))
+    }
+}
+
+/// A gradient as a CSS-like string, `"180deg, #ffa53a, #ff6200"` (the angle
+/// optional, top to bottom by default), or `{ from, to, angle }`.
+impl Read for Gradient {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        match value {
+            Value::String(text) => {
+                let text = text.to_string_lossy();
+                let parts: Vec<&str> = text.split(',').map(str::trim).collect();
+                let (angle, colors) = match parts.split_first() {
+                    Some((first, rest)) if first.ends_with("deg") => {
+                        let angle = first
+                            .trim_end_matches("deg")
+                            .trim()
+                            .parse::<f32>()
+                            .ok()
+                            .filter(|angle| angle.is_finite())
+                            .ok_or_else(|| cx.fail(format!("`{first}` is not an angle")))?;
+                        (angle, rest)
+                    },
+                    _ => (180.0, &parts[..]),
+                };
+                match colors {
+                    [from, to] => Ok(Self {
+                        angle: angle.rem_euclid(360.0),
+                        from: Color::named(from, cx)?,
+                        to: Color::named(to, cx)?,
+                    }),
+                    _ => Err(cx.fail(
+                        "a gradient is \"[angle deg,] from, to\", such as \"180deg, #ffa53a, #ff6200\"",
+                    )),
+                }
+            },
+            Value::Table(_) => {
+                let fields = Fields::read(value, cx, &[&["from", "to", "angle"]])?;
+                Ok(Self {
+                    angle: fields.get::<f32>("angle")?.unwrap_or(180.0).rem_euclid(360.0),
+                    from: fields.need("from")?,
+                    to: fields.need("to")?,
+                })
+            },
+            _ => Err(cx.fail("expected a gradient string such as \"180deg, #ffa53a, #ff6200\", or { from, to, angle }")),
+        }
     }
 }
 

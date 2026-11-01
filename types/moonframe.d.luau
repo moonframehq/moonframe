@@ -56,6 +56,9 @@ type Transition = string | {
 
 type Style = {
 	background: Color?,
+	-- A linear gradient over the background: `"180deg, #ffa53a, #ff6200"`
+	-- (0 runs up, 90 right, 180 down, the default), or `{ from, to, angle }`.
+	gradient: (string | { from: Color, to: Color, angle: number? })?,
 	color: Color?,
 	border: Border?,
 	border_color: Color?,

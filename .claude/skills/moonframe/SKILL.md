@@ -1059,6 +1059,7 @@ Leave an element's own keys off if the stylesheet should decide.
 | `size`, `weight` | text tokens (inherited) |
 | `font` | `sans` or `mono` (the terminal font, for code and paths; inherited) |
 | `case` | `upper`, `lower` or `none`: the letter case a `ui.text` shows (headings in capitals, restyleable) |
+| `gradient` | a linear gradient over the background: `"180deg, #ffa53a, #ff6200"` (CSS angles: 0 runs up, 180 down, the default; the angle is optional), or `{ from, to, angle }`. On any element `background` takes; `:hover` and `:selected` rules can set one too |
 | `opacity` | 0 to 1 |
 | `width`, `height` | pixels, under the element's own `width`/`height`; on rows, columns, panels and lists. What a named state changes: `[".drawer:closed"] = { width = 48 }` |
 | `transition` | how a `pane`, `popover` or `overlay` animates when it shows or hides, how a keyed row or column arrives and goes, and how an element with a `state` eases between states (see below) |
