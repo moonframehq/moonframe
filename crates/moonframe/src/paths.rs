@@ -95,7 +95,29 @@ pub(crate) fn in_bundle() -> bool {
 
 /// `$XDG_CACHE_HOME/<name>`, by default `~/.cache/<name>`.
 pub(crate) fn cache() -> PathBuf {
-    xdg("XDG_CACHE_HOME", ".cache").unwrap_or_else(|| env::temp_dir().join(name()))
+    xdg("XDG_CACHE_HOME", ".cache").unwrap_or_else(|| private().join("cache"))
+}
+
+/// Where the cache and state go when there is no home to put them in: a
+/// folder of this run's own, made with a name no one can guess and only
+/// this user's access. Never a fixed path in the shared temporary folder,
+/// where another user could leave providers (code the app runs) or state
+/// for the app to pick up.
+fn private() -> PathBuf {
+    static PRIVATE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    PRIVATE
+        .get_or_init(|| {
+            tempfile::Builder::new()
+                .prefix(&format!("{}-", name()))
+                .tempdir()
+                .map(tempfile::TempDir::keep)
+                .unwrap_or_else(|error| {
+                    // Nowhere safe to write: the current folder, the user's own.
+                    tracing::error!("cannot make a private folder: {error}");
+                    PathBuf::from(".").join(format!(".{}", name()))
+                })
+        })
+        .clone()
 }
 
 /// `$XDG_CONFIG_HOME/<name>`, by default `~/.config/<name>`: the user's
@@ -133,7 +155,7 @@ pub(crate) fn state(profile: Option<&str>) -> PathBuf {
         None => "state.sqlite".to_owned(),
     };
     xdg("XDG_STATE_HOME", ".local/state")
-        .unwrap_or_else(|| env::temp_dir().join(name()))
+        .unwrap_or_else(|| private().join("state"))
         .join(file)
 }
 
