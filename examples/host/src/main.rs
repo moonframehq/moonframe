@@ -32,6 +32,9 @@ fn main() -> ExitCode {
         .title("Host Example")
         .app_id("dev.moonframe.host-example")
         .version(env!("CARGO_PKG_VERSION"))
+        // Check for Updates in the app menu, from this repository's GitHub
+        // releases (`cargo run --release -- bundle --dist dist` writes them):
+        // .updates("owner/repo")
         .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
         .native("clock", Clock::default)
         .native_async("lookup", Lookup::default)

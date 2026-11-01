@@ -61,6 +61,12 @@ bundle out="target/bundle":
 bundle-app profile out="target/bundle":
     scripts/bundle-app.sh {{out}} {{profile}}
 
+# Build a profile's app and write what its GitHub release carries to DIST:
+# the bundle as <Title>-<version>-<target>.zip (.tar.gz on Linux) and
+# SHA256SUMS, the files Check for Updates looks for (docs/updates.md).
+release-app profile dist="target/dist":
+    DIST={{dist}} scripts/bundle-app.sh target/bundle {{profile}}
+
 # Build the app and install it in /Applications, to try mods that live in
 # ~/.config/moonframe against the app as users get it.
 install:

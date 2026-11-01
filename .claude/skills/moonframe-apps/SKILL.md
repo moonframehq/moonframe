@@ -212,9 +212,11 @@ repository it is released from (`updates` and `version` in `moonframe.toml`;
 release (tag `v1.2.3`); on macOS a bundle installs its `.dmg` in place and
 starts again, elsewhere the download opens. A release build checks once a
 day by itself. A shell can place it too: `command = "check-for-updates"`.
-Releases need assets named for their platform
-(`App-1.2.3-universal-apple-darwin.dmg`) and optionally `SHA256SUMS`; see
-`docs/updates.md`.
+`just release-app NAME` (an app package) or `cargo run --release -- bundle
+--dist dist` (a library app) writes the release files: the build as
+`<Title>-<version>-<target>.zip` (`.tar.gz` on Linux) and `SHA256SUMS`;
+attach them to a GitHub release tagged `v<version>`. See `docs/updates.md`,
+which also has a release workflow to copy.
 
 ## Release mode and bundles
 

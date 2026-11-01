@@ -503,6 +503,11 @@ name = "{name}"
 keep = []
 # Packages it installs with it, as `moonframe mod install` takes them.
 requires = []
+# Its version: its bundle's, and what Check for Updates compares with.
+version = "0.1.0"
+# The GitHub repository it is released from: the app menu gets Check for
+# Updates. Release with `just release-app {name}`; see docs/updates.md.
+# updates = "you/{name}"
 "#;
 
 const SHELL: &str = r#"-- {name}'s shell: lays out the whole window. Mods fill the regions it

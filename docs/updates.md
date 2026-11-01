@@ -58,9 +58,95 @@ command `check-for-updates`:
 { title = "Help", items = { { label = "Check for Updates…", command = "check-for-updates" } } }
 ```
 
-## Releasing so apps find the update
+## Releasing your app
 
-Follow GitHub's usual release path:
+Moonframe writes the release files for you: each build as an archive named
+for its version and platform, and `SHA256SUMS`, which the update is checked
+against. Attach everything in the folder to a GitHub release tagged with the
+version (`v1.2.3`).
+
+**An app on the library** (its own crate, `moonframe init`):
+
+```sh
+cargo run --release -- bundle --dist dist
+# dist/Notes-1.2.3-aarch64-apple-darwin.zip, dist/SHA256SUMS
+gh release create v1.2.3 dist/*
+```
+
+**An app package** (a profile, `moonframe app new`), from a Moonframe
+checkout:
+
+```sh
+just release-app notes            # or: DIST=dist scripts/bundle-app.sh target/bundle notes
+gh release create v1.2.3 target/dist/*
+```
+
+Each run adds its build to the folder and its line to `SHA256SUMS`, so a
+release can gather the Mac and Linux builds made on each system. On macOS
+the archive is a zip of the `.app` (`universal-apple-darwin` when its binary
+holds both architectures, built with `lipo`); on Linux a `.tar.gz` of the
+prefix.
+
+To release on each tag pushed, a workflow like this one is enough (an app
+on the library; for an app package, check out Moonframe beside it and run
+`just release-app` instead). Each system builds its archive; the last job
+writes `SHA256SUMS` over all of them and publishes the release:
+
+```yaml
+# .github/workflows/release.yml
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions: {}
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [macos-15, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      # Linux also needs GPUI's system packages: see Moonframe's
+      # scripts/install-linux-deps.sh.
+      - run: rustup target add wasm32-wasip2
+      - run: cargo run --locked --release -- bundle --dist dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: dist/*
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist && rm -f SHA256SUMS && sha256sum -- * > SHA256SUMS && cd ..
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --generate-notes
+```
+
+`macos-15` builds for Apple silicon only: Intel Macs find no build in that
+release. For both, build each target and join the binaries with `lipo`
+before bundling, as Moonframe's own `package.yml` does.
+
+Moonframe itself releases through [releasing.md](releasing.md)'s workflow,
+which publishes a disk image and the Linux and Windows archives named this
+way, with `SHA256SUMS`; its Homebrew cask is marked `auto_updates`, so
+`brew upgrade` leaves an app that updates itself alone.
+
+### By hand
+
+Any release that follows GitHub's usual path works:
 
 1. Bump the version (`Cargo.toml`, or the manifest's `version`).
 2. Tag the commit `v1.2.3` (the `v` is optional) and publish a release for
@@ -76,9 +162,6 @@ Follow GitHub's usual release path:
    A build naming only another architecture is never picked.
 4. Optionally attach `SHA256SUMS` (`sha256sum * > SHA256SUMS`): a download
    that does not match its line is refused.
-
-Moonframe's own release workflow (see [releasing.md](releasing.md)) already
-publishes assets named this way, with `SHA256SUMS`.
 
 The disk image must hold the `.app` at its top, with the same bundle id as
 the running one (`dev.moonframe.app.NAME` for a profile's bundle) and a

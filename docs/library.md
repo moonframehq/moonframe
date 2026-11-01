@@ -244,11 +244,15 @@ numbers, booleans and lists.
 cargo run                       # the window, reloading app/ as it changes
 cargo run -- --check            # load every module headlessly: run after each edit
 cargo run --release -- bundle   # target/bundle/<Title>.app, or a Linux prefix
+cargo run --release -- bundle --dist dist   # and dist/<Title>-<version>-<target>.zip + SHA256SUMS
 ```
 
 `bundle` ships the running binary with the app's folder and the toolbox,
 each with its Wasm providers prebuilt and no sources, plus an icon and an
-Info.plist, signed ad hoc.
+Info.plist, signed ad hoc. `--dist DIR` also writes what a GitHub release
+carries: the bundle archived under a name with its version and platform,
+and `SHA256SUMS`. With [`.updates("owner/repo")`](updates.md), the app
+finds and installs those releases itself.
 
 **Developer Mode**, in the app menu beside About, switches the tools for
 changing the app as it runs (the Components menu, Inspect Element ⌥⌘I,
