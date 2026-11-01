@@ -902,6 +902,28 @@ type Appearance = {
 	mode: AppearanceMode,
 	-- Whether the window is dark now (as `app.dark`).
 	dark: boolean,
+	-- The theme showing: `light_theme` or `dark_theme`, as the window is.
+	theme: string,
+	-- The theme light windows show and the one dark windows show, kept
+	-- across launches; set with `{ to = "app:theme", msg = { dark = "Nord" } }`.
+	-- "Default" is the stock look with the stylesheet's colors.
+	light_theme: string,
+	dark_theme: string,
+	-- Every theme, for a picker of the app's own: "Default" first, once for
+	-- light and once for dark, then the rest by name.
+	themes: { ThemeInfo },
+}
+
+-- A theme as `app.appearance.themes` lists it. Colors are `#rrggbb`.
+type ThemeInfo = {
+	name: string,
+	-- Made for dark windows: only such a theme can be the `dark_theme`.
+	dark: boolean,
+	background: string,
+	foreground: string,
+	accent: string,
+	-- Six of its colors: red, green, yellow, blue, magenta, cyan.
+	colors: { string },
 }
 
 
@@ -1274,7 +1296,7 @@ type App = {
 -- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,
 -- `"provider:<name>"`, `"topic:<name>"`, or the app itself:
 -- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
--- `AppearanceMode`).
+-- `AppearanceMode`), `"app:theme"` (`msg` `{ light: string?, dark: string? }`).
 type Send = {
 	to: string,
 	msg: Data,

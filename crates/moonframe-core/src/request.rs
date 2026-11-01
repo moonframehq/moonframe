@@ -19,6 +19,13 @@ pub enum Request {
     /// `app:appearance`: light, dark, or following the system; kept
     /// across launches.
     Appearance(Appearance),
+    /// `app:theme`: the theme light windows show, the one dark windows
+    /// show, or both, by name; kept across launches. The app checks the
+    /// names.
+    Theme {
+        light: Option<String>,
+        dark: Option<String>,
+    },
 }
 
 tokens! {
@@ -56,6 +63,7 @@ impl Request {
             "appearance" => {
                 token(what, msg, Appearance::parse, Appearance::NAMES).map(Self::Appearance)
             },
+            "theme" => theme(msg),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -69,7 +77,31 @@ impl Request {
 }
 
 /// What a module can send to, after `app:`.
-pub const NAMES: &[&str] = &["command", "appearance"];
+pub const NAMES: &[&str] = &["command", "appearance", "theme"];
+
+/// `{ light = "<theme>", dark = "<theme>" }`, either or both.
+fn theme(msg: &Data) -> Result<Request, Error> {
+    let fail = || {
+        Error::new(format!(
+            "`{APP}theme` takes {{ light = \"<theme>\", dark = \"<theme>\" }}, either or both"
+        ))
+    };
+    let Data::Map(fields) = msg else {
+        return Err(fail());
+    };
+    if fields.is_empty() || fields.keys().any(|key| key != "light" && key != "dark") {
+        return Err(fail());
+    }
+    let name = |key: &str| match fields.get(key) {
+        None => Ok(None),
+        Some(Data::String(name)) => Ok(Some(name.clone())),
+        Some(_) => Err(fail()),
+    };
+    Ok(Request::Theme {
+        light: name("light")?,
+        dark: name("dark")?,
+    })
+}
 
 /// `msg` read as one of `names`, for the request `app:<what>`.
 fn token<T>(

@@ -663,6 +663,39 @@ end
 return ui.row { table.unpack(buttons) }
 ```
 
+- `app:theme`, `msg` `{ light = "<theme>", dark = "<theme>" }` (either or
+  both): the theme light windows show and the one dark windows show, each
+  kept across launches for the app and profile and applied as the
+  appearance says. A dark theme can only be the dark one and a light theme
+  the light one; `"Default"` (the stock look with the stylesheet's colors)
+  is either. A name that does not fit is the sender's error. View > Themes
+  lists the themes for the appearance the window is in and picks for it.
+  Views read `app.appearance.theme` (showing now), `light_theme`,
+  `dark_theme`, and `themes`: every theme as `{ name, dark, background,
+  foreground, accent, colors }` (hex strings; `colors` is red, green,
+  yellow, blue, magenta, cyan), `"Default"` listed once for each, so a mod
+  can draw its own picker:
+
+```lua
+-- cards for the dark themes, with color dots; a click picks one
+local cards = {}
+for _, theme in app.appearance.themes do
+	if theme.dark then
+		local dots = {}
+		for _, color in theme.colors do
+			table.insert(dots, ui.row { class = "dot", style = { background = color } })
+		end
+		table.insert(cards, ui.column { class = "theme-card",
+			selected = theme.name == app.appearance.dark_theme,
+			style = { background = theme.background },
+			to = "app:theme", msg = { dark = theme.name },
+			ui.text { theme.name, style = { color = theme.foreground } },
+			ui.row { gap = "small", table.unpack(dots) },
+		})
+	end
+end
+```
+
 - A request the app cannot read (an unknown command, a misspelled
   `app:<what>`) is the sender's error, shown as an `update` error.
 - Previews (the Components window) ask nothing, and a provider's answer
@@ -823,7 +856,8 @@ return mod {
 	end,
 
 	-- Required. Returns one element. `app` is
-	-- { dark = bool, appearance = { mode = "system"|"light"|"dark", dark },
+	-- { dark = bool, appearance = { mode = "system"|"light"|"dark", dark, theme,
+	--   light_theme, dark_theme, themes = { { name, dark, background, ... } } },
 	--   mods = { names }, regions = { name = { mod names } },
 	--   kinds = what tab bars can open (see "Tabs"), looks = the stylesheet's looks,
 	--   window = { platform = "macos"|"linux"|"windows", titlebar = "system"|"hidden",

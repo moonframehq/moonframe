@@ -78,10 +78,12 @@ pub(crate) struct MoonframeApp {
     /// The component the browser shows, and its window while it is open.
     chosen: String,
     gallery: Option<WindowHandle<component::Root>>,
-    /// The theme picked in View > Themes (`None`: the stock look), the one
-    /// the picker shows while the pointer is over another, and the picker's
-    /// window while it is open.
-    scheme: Option<&'static Scheme>,
+    /// The theme light windows show and the one dark windows show
+    /// (`None`: the stock look), picked in View > Themes or by a mod; the
+    /// one the picker shows while the pointer is over another; and the
+    /// picker's window while it is open.
+    light_scheme: Option<&'static Scheme>,
+    dark_scheme: Option<&'static Scheme>,
     preview: Option<Option<&'static Scheme>>,
     /// Light, dark, or as the system is; and whether the system is dark.
     appearance: Appearance,
@@ -187,6 +189,7 @@ impl MoonframeApp {
                 .iter()
                 .find_map(|path| settings::get(path, key))
         };
+        // The one theme kept before light and dark had one each.
         let scheme = saved(settings::THEME).and_then(|name| {
             let scheme = themes::find(&name);
             if scheme.is_none() && name != themes::DEFAULT {
@@ -194,6 +197,18 @@ impl MoonframeApp {
             }
             scheme
         });
+        let slot = |key, dark: bool| match saved(key) {
+            Some(name) => themes::fits(&name, dark)
+                .inspect_err(|problem| {
+                    tracing::warn!("{key}: {problem}; using {}", themes::DEFAULT);
+                })
+                .unwrap_or(None),
+            None => scheme.filter(|scheme| scheme.dark() == dark),
+        };
+        let (light_scheme, dark_scheme) = (
+            slot(settings::LIGHT_THEME, false),
+            slot(settings::DARK_THEME, true),
+        );
         // Before the appearance was kept, a theme picked set it.
         let appearance = match saved(settings::APPEARANCE) {
             Some(name) => Appearance::named(&name).unwrap_or_else(|| {
@@ -219,7 +234,8 @@ impl MoonframeApp {
             inspector: Inspector::default(),
             chosen: String::new(),
             gallery: None,
-            scheme,
+            light_scheme,
+            dark_scheme,
             preview: None,
             appearance,
             system_dark: is_dark(window.appearance()),
@@ -284,7 +300,7 @@ impl MoonframeApp {
         // stock look does, and the theme stays picked.
         let scheme = self
             .preview
-            .unwrap_or(self.scheme)
+            .unwrap_or(self.scheme(dark))
             .filter(|scheme| scheme.dark() == dark);
         let config = scheme.map(|scheme| Rc::new(scheme.config()));
         let was_dark = cx.theme().is_dark();
@@ -372,8 +388,23 @@ impl MoonframeApp {
         if dark != was_dark {
             self.workspace.set_dark(dark);
         }
-        self.workspace
-            .set_appearance(self.appearance, std::collections::BTreeMap::new());
+        let stock = |dark| stock_preview(&self.workspace.stylesheet().overrides, dark);
+        let fields = std::collections::BTreeMap::from([
+            ("theme".to_owned(), Data::from(self.theme_name())),
+            (
+                "light_theme".to_owned(),
+                Data::from(name_of(self.light_scheme)),
+            ),
+            (
+                "dark_theme".to_owned(),
+                Data::from(name_of(self.dark_scheme)),
+            ),
+            (
+                "themes".to_owned(),
+                themes::listing(stock(false), stock(true)),
+            ),
+        ]);
+        self.workspace.set_appearance(self.appearance, fields);
     }
 
     /// Makes the window light, dark, or follow the system, keeping the
@@ -391,9 +422,23 @@ impl MoonframeApp {
         cx.notify();
     }
 
-    /// The picked theme's name.
+    /// Whether the window is dark.
+    pub(crate) fn dark(&self) -> bool {
+        self.appearance.is_dark(self.system_dark)
+    }
+
+    /// The theme picked for dark windows, or for light ones.
+    fn scheme(&self, dark: bool) -> Option<&'static Scheme> {
+        if dark {
+            self.dark_scheme
+        } else {
+            self.light_scheme
+        }
+    }
+
+    /// The name of the theme picked for the appearance the window is in.
     pub(crate) fn theme_name(&self) -> &'static str {
-        self.scheme.map_or(themes::DEFAULT, |scheme| scheme.name)
+        name_of(self.scheme(self.dark()))
     }
 
     /// Shows the theme `name` without picking it, or the picked one again
@@ -408,17 +453,48 @@ impl MoonframeApp {
         cx.notify();
     }
 
-    /// Picks the theme `name` and saves it for the next run.
+    /// Picks the theme `name` for the appearance the window is in (View >
+    /// Themes lists only those that fit it), and saves it for the next run.
     pub(crate) fn pick_theme(&mut self, name: &str, cx: &mut Context<Self>) {
         self.preview = None;
-        self.scheme = themes::find(name);
+        let (light, dark) = if self.dark() {
+            (None, Some(name))
+        } else {
+            (Some(name), None)
+        };
+        if let Err(problem) = self.set_themes(light, dark, cx) {
+            tracing::warn!("{problem}");
+        }
+    }
+
+    /// Picks the theme light windows show, the one dark windows show, or
+    /// both, and saves them for the next run. Neither changes when a name
+    /// is not a theme of its kind.
+    pub(crate) fn set_themes(
+        &mut self,
+        light: Option<&str>,
+        dark: Option<&str>,
+        cx: &mut Context<Self>,
+    ) -> Result<(), String> {
+        let light = light.map(|name| themes::fits(name, false)).transpose()?;
+        let dark = dark.map(|name| themes::fits(name, true)).transpose()?;
+        if let Some(scheme) = light {
+            self.light_scheme = scheme;
+        }
+        if let Some(scheme) = dark {
+            self.dark_scheme = scheme;
+        }
         self.apply_theme(cx);
         if let Some(path) = &self.settings
-            && let Err(problem) = settings::save(path, &[(settings::THEME, self.theme_name())])
+            && let Err(problem) = settings::save(path, &[
+                (settings::LIGHT_THEME, name_of(self.light_scheme)),
+                (settings::DARK_THEME, name_of(self.dark_scheme)),
+            ])
         {
-            tracing::warn!("cannot save the theme: {problem}");
+            tracing::warn!("cannot save the themes: {problem}");
         }
         cx.notify();
+        Ok(())
     }
 
     /// Opens the theme picker's window, or raises it.
@@ -624,6 +700,12 @@ impl MoonframeApp {
             },
             Request::Command(command) => self.run(command, window, cx),
             Request::Appearance(appearance) => self.set_appearance(appearance, cx),
+            Request::Theme { light, dark } => {
+                if let Err(problem) = self.set_themes(light.as_deref(), dark.as_deref(), cx) {
+                    self.workspace
+                        .refuse(from, Error::new(format!("`app:theme`: {problem}")));
+                }
+            },
         }
     }
 
@@ -1383,6 +1465,36 @@ fn menu_actions(cx: &mut Context<MoonframeApp>) {
         });
         cx.refresh_windows();
     });
+}
+
+/// A theme's name; the stock look's for `None`.
+fn name_of(scheme: Option<&Scheme>) -> &'static str {
+    scheme.map_or(themes::DEFAULT, |scheme| scheme.name)
+}
+
+/// The stock look as a theme picker shows it, in dark windows or light
+/// ones: gpui-component's colors with the stylesheet's over them.
+fn stock_preview(overrides: &[(Token, moonframe_core::Shade)], dark: bool) -> themes::Preview {
+    let mut preview = if dark {
+        themes::STOCK_DARK
+    } else {
+        themes::STOCK_LIGHT
+    };
+    for (token, shade) in overrides {
+        // `0xRRGGBBAA`, without the alpha.
+        let color = if dark {
+            shade.dark
+        } else {
+            shade.light
+        } >> 8;
+        match token {
+            Token::Background => preview.background = color,
+            Token::Foreground => preview.foreground = color,
+            Token::Accent => preview.accent = color,
+            _ => {},
+        }
+    }
+    preview
 }
 
 /// Whether the system's appearance is a dark one.

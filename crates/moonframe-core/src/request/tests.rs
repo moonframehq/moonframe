@@ -171,3 +171,53 @@ fn views_read_the_appearance() {
         "the window says"
     );
 }
+
+#[test]
+fn update_picks_the_light_and_dark_themes() {
+    let (_dir, mut workspace) = workspace();
+    let both = Data::Map(
+        [
+            ("light".to_owned(), Data::from("Rose Pine Dawn")),
+            ("dark".to_owned(), Data::from("Rose Pine")),
+        ]
+        .into(),
+    );
+    ask(&mut workspace, "app:theme", both);
+    assert_eq!(workspace.take_requests(), [(
+        "asker".to_owned(),
+        Request::Theme {
+            light: Some("Rose Pine Dawn".to_owned()),
+            dark: Some("Rose Pine".to_owned()),
+        }
+    )]);
+    let dark = Data::Map([("dark".to_owned(), Data::from("Nord"))].into());
+    ask(&mut workspace, "app:theme", dark);
+    assert_eq!(workspace.take_requests(), [(
+        "asker".to_owned(),
+        Request::Theme {
+            light: None,
+            dark: Some("Nord".to_owned()),
+        }
+    )]);
+    for wrong in [
+        Data::from("Nord"),
+        Data::Map(BTreeMap::new()),
+        Data::Map([("sepia".to_owned(), Data::from("Nord"))].into()),
+        Data::Map([("dark".to_owned(), Data::Integer(1))].into()),
+    ] {
+        ask(&mut workspace, "app:theme", wrong);
+        assert!(
+            error(&workspace).contains("`app:theme` takes"),
+            "{}",
+            error(&workspace)
+        );
+    }
+    assert!(workspace.take_requests().is_empty());
+}
+
+#[test]
+fn the_app_can_refuse_a_request() {
+    let (_dir, mut workspace) = workspace();
+    workspace.refuse("asker", Error::new("no theme called `Nope`"));
+    assert_eq!(error(&workspace), "no theme called `Nope`");
+}

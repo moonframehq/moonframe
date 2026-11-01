@@ -7,6 +7,9 @@ use std::{fs, io::ErrorKind, path::Path};
 /// The theme picked before light and dark kept one each: read once, to
 /// carry it over.
 pub(crate) const THEME: &str = "theme";
+/// The theme light windows show, and the one dark windows show.
+pub(crate) const LIGHT_THEME: &str = "light_theme";
+pub(crate) const DARK_THEME: &str = "dark_theme";
 /// `system`, `light` or `dark`.
 pub(crate) const APPEARANCE: &str = "appearance";
 

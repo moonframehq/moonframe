@@ -730,6 +730,14 @@ impl Workspace {
         std::mem::take(&mut self.outbox)
     }
 
+    /// Makes `problem` the module `name`'s update error: what it asked of
+    /// the app could not be done.
+    pub fn refuse(&mut self, name: &str, problem: Error) {
+        if let Some(slot) = self.slot_mut(name) {
+            slot.update_error = Some(problem);
+        }
+    }
+
     /// What modules asked of the app since the last call, as `(sending
     /// module, request)`, in the order they asked.
     pub fn take_requests(&mut self) -> Vec<(String, Request)> {
@@ -1239,7 +1247,14 @@ impl Workspace {
             ("dark".to_owned(), Data::Bool(self.dark)),
             ("appearance".to_owned(), {
                 let (mode, fields) = &self.appearance;
-                let mut appearance = fields.clone();
+                // Until the app says (and in checks), the stock look in both.
+                let mut appearance = BTreeMap::from([
+                    ("theme".to_owned(), Data::from("Default")),
+                    ("light_theme".to_owned(), Data::from("Default")),
+                    ("dark_theme".to_owned(), Data::from("Default")),
+                    ("themes".to_owned(), Data::List(Vec::new())),
+                ]);
+                appearance.extend(fields.clone());
                 appearance.insert("mode".to_owned(), Data::from(mode.name()));
                 appearance.insert("dark".to_owned(), Data::Bool(self.dark));
                 Data::Map(appearance)
