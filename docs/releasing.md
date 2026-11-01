@@ -93,6 +93,15 @@ environment:
 `MACOS_SIGNING_IDENTITY` is read outside the environment too, to decide
 whether to sign, so set it as a repository variable as well.
 
+The disk image opens on a laid-out window: the app and an Applications
+shortcut over a background with an arrow between them, no toolbar, and the
+app's icon on the volume. `scripts/release/make-dmg.sh` builds it with
+dmgbuild, pinned by hash in `assets/macos/dmg/requirements.txt` and
+installed as wheels into a throwaway virtualenv, because only a layout
+written against the volume being built keeps its background. The window is
+`assets/macos/dmg/settings.py`; the background is drawn by
+`scripts/draw-dmg-background.swift`.
+
 The app runs under the hardened runtime with the entitlements in
 `assets/macos/Moonframe.entitlements`: wasmtime compiles the Wasm providers
 to executable memory, which the hardened runtime otherwise refuses.
