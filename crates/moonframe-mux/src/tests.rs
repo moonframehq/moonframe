@@ -35,7 +35,16 @@ fn wait_for(session: &Session, needle: &str) -> bool {
 #[test]
 fn keys_name_tmux_sessions() {
     assert_eq!(session_name("terminal/main"), "terminal+main");
-    assert_eq!(session_name("my mod/a.b:c"), "my_mod+a_b_c");
+    assert!(session_name("my mod/a.b:c").starts_with("my_mod+a_b_c~"));
+    assert!(!session_name("my mod/a.b:c").contains([' ', '.', ':']));
+    // Keys that read the same once cleaned still get sessions of their own.
+    let names: std::collections::BTreeSet<String> = ["a.b", "a b", "a_b", "a+b", "a/b"]
+        .into_iter()
+        .map(session_name)
+        .collect();
+    assert_eq!(names.len(), 5, "{names:?}");
+    assert_eq!(session_name("a_b"), "a_b");
+    assert_eq!(session_name("a.b"), session_name("a.b"));
 }
 
 /// Each app's terminals are on a tmux server of its own: one app never

@@ -30,7 +30,7 @@ use {
     herdr_github::pull_request::Input,
     herdr_vcs::git::{self as vcs, Action},
     moonframe_core::Data,
-    moonframe_providers::{Handle, Native},
+    moonframe_providers::{Handle, Mods, Native},
     serde_json::{Value, json},
     status::{Numstat, Status},
     std::{
@@ -53,6 +53,8 @@ const READ_LIMIT: usize = 8 << 20;
 const LOOK_EVERY: u32 = 5;
 /// Looks between reads of worktrees, branches, remote and stashes.
 const SLOW_EVERY: u32 = 6;
+/// The least time between two messages each reading everything.
+const MIN_FORCED: Duration = Duration::from_millis(500);
 
 /// Makes the provider, for the app's registry.
 pub fn native() -> Box<dyn Native> {
@@ -98,13 +100,12 @@ impl Repo {
 
     /// What git printed, whatever its exit status (`diff --no-index`
     /// exits 1 when the files differ), bounded and with a deadline like
-    /// every other read.
-    pub(crate) fn text_any_status(
-        &self,
-        args: &[&str],
-        _operation: &'static str,
-    ) -> Option<String> {
+    /// every other read, and set up as herdr-vcs sets up its own git.
+    pub(crate) fn text_any_status(&self, args: &[&str]) -> Option<String> {
         let mut command = std::process::Command::new("git");
+        // No console window of its own on Windows, as herdr-vcs's commands.
+        #[cfg(windows)]
+        std::os::windows::process::CommandExt::creation_flags(&mut command, 0x0800_0000);
         command
             .args(["-c", "core.fsmonitor=false", "--no-optional-locks", "-C"])
             .arg(&self.root)
@@ -126,7 +127,10 @@ impl Repo {
 pub struct Git {
     root: Option<PathBuf>,
     /// The mods that may commit and push (`[settings] writers`).
-    writers: Vec<String>,
+    writers: Mods,
+    /// When a message last made it read everything; one coming sooner
+    /// reads the status alone.
+    forced_at: Option<Instant>,
     /// Status and numstat bytes last read: a look that finds them the same
     /// publishes nothing.
     last_look: Vec<u8>,
@@ -150,7 +154,7 @@ pub struct Git {
 impl Native for Git {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         self.root = repository(host.dir());
-        self.writers = writers(host.settings());
+        self.writers = Mods::from_settings(host.settings(), "writers");
         self.refresh(host, true);
         Ok(())
     }
@@ -180,7 +184,17 @@ impl Native for Git {
         } else if let Some(Data::Bool(true)) = field("push") {
             self.act(host, from, field("id"), Action::Push);
         }
-        self.refresh(host, true);
+        // Worktrees, branches, remote and stashes are some 60 git commands
+        // with many worktrees: a mod sending a message each frame gets them
+        // read once, and the status alone after that.
+        let now = Instant::now();
+        let read_refs = self
+            .forced_at
+            .is_none_or(|at| now.duration_since(at) >= MIN_FORCED);
+        if read_refs {
+            self.forced_at = Some(now);
+        }
+        self.look(host, true, read_refs);
     }
 }
 
@@ -188,6 +202,12 @@ impl Git {
     /// Looks at the repository and publishes what changed; `force` reads
     /// everything and publishes even when nothing did.
     fn refresh(&mut self, host: &Handle, force: bool) {
+        self.look(host, force, force);
+    }
+
+    /// [`Git::refresh`], reading worktrees, branches, remote and stashes on
+    /// `force` only when `read_refs` is set too.
+    fn look(&mut self, host: &Handle, force: bool, read_refs: bool) {
         let Some(root) = self.root.clone() else {
             self.publish(
                 host,
@@ -219,7 +239,8 @@ impl Git {
         let look = [state.as_slice(), &numstat].concat();
         let (old_oid, old_branch) = (self.status.oid.clone(), self.status.branch.clone());
         let mut changed = force || self.last.is_none();
-        if changed || look != self.last_look {
+        let looked_new = look != self.last_look;
+        if changed || looked_new {
             changed = true;
             self.status = Status::parse(&state, &Numstat::parse(&numstat));
             self.last_look = look;
@@ -228,7 +249,9 @@ impl Git {
             }
         }
         self.looks += 1;
-        if changed
+        if (read_refs && changed)
+            || looked_new
+            || self.last.is_none()
             || self.looks >= SLOW_EVERY
             || self.status.oid != old_oid
             || self.status.branch != old_branch
@@ -314,7 +337,7 @@ impl Git {
         };
         // A write changes the user's history and remote; a mod from
         // elsewhere must not do it unasked.
-        if !self.writers.iter().any(|writer| writer == from) {
+        if !self.writers.allows(from) {
             answer(Err(format!(
                 "`{from}` may not {name}: only the mods in providers/git's `writers` may"
             )));
@@ -365,23 +388,6 @@ fn run(input: Input, action: Action) -> Result<String, String> {
         (Some(outcome), _) => Ok(outcome.message.clone()),
         (None, Some(error)) => Err(error.to_owned()),
         (None, None) => Err("git stopped without saying why".to_owned()),
-    }
-}
-
-/// The mods `[settings] writers` names; none when it is missing.
-fn writers(settings: &Data) -> Vec<String> {
-    let Data::Map(settings) = settings else {
-        return Vec::new();
-    };
-    match settings.get("writers") {
-        Some(Data::List(names)) => names
-            .iter()
-            .filter_map(|name| match name {
-                Data::String(name) => Some(name.clone()),
-                _ => None,
-            })
-            .collect(),
-        _ => Vec::new(),
     }
 }
 

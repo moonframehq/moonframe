@@ -41,18 +41,15 @@ pub(crate) fn read(repo: &Repo, base: &str, path: &str) -> Value {
     if untracked {
         // `--no-index` exits 1 when the files differ, which they do.
         text = repo
-            .text_any_status(
-                &[
-                    "diff",
-                    "--no-index",
-                    "--no-color",
-                    "--no-ext-diff",
-                    "--",
-                    "/dev/null",
-                    path,
-                ],
-                "diff a new file",
-            )
+            .text_any_status(&[
+                "diff",
+                "--no-index",
+                "--no-color",
+                "--no-ext-diff",
+                "--",
+                "/dev/null",
+                path,
+            ])
             .unwrap_or_default();
     }
     parse(path, &text)

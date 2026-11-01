@@ -9,11 +9,24 @@ pub(crate) fn to_text(data: &Data) -> String {
 }
 
 pub(crate) fn from_text(text: &str) -> Option<Data> {
-    serde_json::from_str::<Value>(text)
+    let value = serde_json::from_str::<Value>(text)
         .inspect_err(|error| tracing::warn!("a saved value does not parse: {error}"))
-        .ok()
-        .map(|value| from_json(&value))
+        .ok()?;
+    let mut entries = 0;
+    let data = from_json(&value, 0, &mut entries);
+    if data.is_none() {
+        tracing::warn!(
+            "a saved value is larger than a state may be ({MAX_ENTRIES} values, {MAX_DEPTH} deep)"
+        );
+    }
+    data
 }
+
+/// Well past what a state can hold (10,000 values, 16 deep, as
+/// `moonframe-core` reads one from Luau): a saved value past this was not
+/// saved by the app, and is not read into memory whole.
+const MAX_ENTRIES: usize = 40_000;
+const MAX_DEPTH: usize = 32;
 
 fn to_json(data: &Data) -> Value {
     match data {
@@ -35,8 +48,12 @@ fn to_json(data: &Data) -> Value {
     }
 }
 
-fn from_json(value: &Value) -> Data {
-    match value {
+fn from_json(value: &Value, depth: usize, entries: &mut usize) -> Option<Data> {
+    *entries += 1;
+    if *entries > MAX_ENTRIES || depth > MAX_DEPTH {
+        return None;
+    }
+    Some(match value {
         Value::Null => Data::Nil,
         Value::Bool(value) => Data::Bool(*value),
         Value::Number(number) => number
@@ -45,12 +62,17 @@ fn from_json(value: &Value) -> Data {
             .or_else(|| number.as_f64().map(Data::Number))
             .unwrap_or(Data::Nil),
         Value::String(text) => Data::String(text.clone()),
-        Value::Array(items) => Data::List(items.iter().map(from_json).collect()),
+        Value::Array(items) => Data::List(
+            items
+                .iter()
+                .map(|item| from_json(item, depth + 1, entries))
+                .collect::<Option<_>>()?,
+        ),
         Value::Object(fields) => Data::Map(
             fields
                 .iter()
-                .map(|(key, value)| (key.clone(), from_json(value)))
-                .collect(),
+                .map(|(key, value)| Some((key.clone(), from_json(value, depth + 1, entries)?)))
+                .collect::<Option<_>>()?,
         ),
-    }
+    })
 }

@@ -150,10 +150,16 @@ pub(crate) fn run(context: &Context, factory: Option<Factory>) {
             return;
         }
         let result = match context.messages.recv_timeout(context.manifest.interval) {
-            Ok(message) => guarded(&mut || {
-                provider.receive(&host, &message.from, message.data.clone());
-                Ok(())
-            }),
+            Ok(message) => {
+                // `guarded` takes an `FnMut`; the message is moved in once.
+                let mut data = Some(message.data);
+                guarded(&mut || {
+                    if let Some(data) = data.take() {
+                        provider.receive(&host, &message.from, data);
+                    }
+                    Ok(())
+                })
+            },
             Err(RecvTimeoutError::Timeout) => guarded(&mut || {
                 provider.tick(&host);
                 Ok(())

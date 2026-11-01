@@ -242,6 +242,154 @@ fn a_wasm_provider_with_a_build_hook_is_not_built() {
 }
 
 #[test]
+fn a_wasm_provider_with_a_hook_elsewhere_is_not_built() {
+    let package = "[package]\nname = 'sys'\n";
+    for (case, manifest, files) in [
+        (
+            "package.build",
+            "[package]\nname = 'sys'\nbuild = 'src/gen.rs'\n",
+            &[][..],
+        ),
+        (
+            "build-dependencies",
+            "[package]\nname = 'sys'\n[build-dependencies]\ncc = '1'\n",
+            &[],
+        ),
+        (
+            "a target's build-dependencies",
+            "[package]\nname = 'sys'\n[target.'cfg(unix)'.build-dependencies]\ncc = '1'\n",
+            &[],
+        ),
+        (
+            "a local crate's build script",
+            "[package]\nname = 'sys'\n[dependencies]\nlocal = { path = 'local' }\n",
+            &[("local/Cargo.toml", package), ("local/build.rs", "")][..],
+        ),
+        (
+            "a patched-in crate's build script",
+            "[package]\nname = 'sys'\n[patch.crates-io]\nserde = { path = 'local' }\n",
+            &[("local/Cargo.toml", package), ("local/build.rs", "")][..],
+        ),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(root, "providers/sys/provider.toml", "kind = 'wasm'\n");
+        write(root, "providers/sys/Cargo.toml", manifest);
+        for (path, text) in files {
+            write(root, &format!("providers/sys/{path}"), text);
+        }
+        let (events, received) = events();
+        let _providers = Providers::start(root.into(), root.join("build"), events);
+        let Event::Failed { problem, .. } = received.recv_timeout(Duration::from_secs(5)).unwrap()
+        else {
+            panic!("{case}: built");
+        };
+        assert!(
+            problem.to_string().contains("cannot have"),
+            "{case}: {problem}"
+        );
+    }
+}
+
+#[test]
+fn a_wasm_provider_cannot_name_its_toolchain_by_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(root, "providers/sys/provider.toml", "kind = 'wasm'\n");
+    write(
+        root,
+        "providers/sys/Cargo.toml",
+        "[package]\nname = 'sys'\n",
+    );
+    write(
+        root,
+        "providers/sys/rust-toolchain.toml",
+        "[toolchain]\npath = './tc'\n",
+    );
+    let (events, received) = events();
+    let _providers = Providers::start(root.into(), root.join("build"), events);
+    let Event::Failed { problem, .. } = received.recv_timeout(Duration::from_secs(5)).unwrap()
+    else {
+        panic!("built");
+    };
+    assert!(problem.to_string().contains("by path"), "{problem}");
+}
+
+/// A process that never reads its messages holds up nothing: what it
+/// prints is still published, however many messages it is sent.
+#[test]
+fn a_process_that_never_reads_its_messages_still_publishes() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/deaf/provider.toml",
+        "kind = 'process'\ncommand = ['sh', 'deaf.sh']\n",
+    );
+    write(
+        root,
+        "providers/deaf/deaf.sh",
+        "echo '{\"n\": 1}'\nsleep 2\necho '{\"n\": 2}'\nsleep 30\n",
+    );
+    let (events, received) = events();
+    let mut providers = Providers::start(root.into(), root.join("build"), events);
+    let next = || received.recv_timeout(Duration::from_secs(10)).unwrap();
+    let Event::Published { .. } = next() else {
+        panic!("not published");
+    };
+    // Far more than a pipe holds: writing it all at once would block.
+    let big = Data::from("x".repeat(4096));
+    for _ in 0..2_000 {
+        providers.send("deaf", "explorer", big.clone()).unwrap();
+    }
+    let Event::Published { data, .. } = next() else {
+        panic!("not published");
+    };
+    assert_eq!(data, Data::Map([("n".to_owned(), Data::Integer(2))].into()));
+}
+
+#[test]
+fn log_lines_are_cut_and_the_rest_dropped() {
+    let mut text = "a".repeat(crate::lines::MAX_LOG_LINE * 100);
+    text.push_str("\nnext\r\nlast");
+    let mut lines = Vec::new();
+    crate::lines::log_lines(text.as_bytes(), |line| lines.push(line));
+    assert_eq!(
+        lines.len(),
+        3,
+        "{:?}",
+        lines.iter().map(String::len).collect::<Vec<_>>()
+    );
+    assert_eq!(lines[0].len(), crate::lines::MAX_LOG_LINE);
+    assert_eq!(lines[1..], ["next", "last"]);
+}
+
+#[test]
+fn a_mod_list_counts_a_mods_instances_and_components_as_it() {
+    let settings = Data::Map(
+        [(
+            "writers".to_owned(),
+            Data::List(vec![Data::from("editor"), Data::Integer(3)]),
+        )]
+        .into(),
+    );
+    let writers = crate::Mods::from_settings(&settings, "writers");
+    for from in [
+        "editor",
+        "editor#2",
+        "editor/markdown-editor#main",
+        "editor#2/tabs#a",
+    ] {
+        assert!(writers.allows(from), "{from}");
+    }
+    for from in ["editorx", "edit", "other/editor", "other#editor", "", "3"] {
+        assert!(!writers.allows(from), "{from}");
+    }
+    assert!(!crate::Mods::from_settings(&settings, "starters").allows("editor"));
+    assert!(!crate::Mods::from_settings(&Data::Nil, "writers").allows("editor"));
+}
+
+#[test]
 fn a_reload_restarts_only_providers_that_changed() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();

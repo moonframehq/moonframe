@@ -32,7 +32,7 @@
 
 use {
     moonframe_core::{Data, MAX_DOCUMENT},
-    moonframe_providers::{Handle, Native},
+    moonframe_providers::{Handle, Mods, Native},
     std::{
         collections::BTreeMap,
         fs,
@@ -58,7 +58,7 @@ pub struct Docs {
     /// The project's folder, with links resolved.
     root: Option<PathBuf>,
     /// The mods that may save (`[settings] writers`).
-    writers: Vec<String>,
+    writers: Mods,
     /// The files mods read, by mod and path.
     open: BTreeMap<(String, String), Watch>,
     /// Counts reads and saves, to tell which watch is the oldest.
@@ -75,7 +75,7 @@ struct Watch {
 impl Native for Docs {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         self.root = root(host.dir());
-        self.writers = writers(host.settings());
+        self.writers = Mods::from_settings(host.settings(), "writers");
         host.publish(match &self.root {
             Some(root) => map([
                 ("available", Data::Bool(true)),
@@ -233,8 +233,8 @@ impl Docs {
         // Saving changes the user's files; a mod from elsewhere must not do
         // it unasked. A component's instance is named after the mod that
         // drew it (`editor/markdown-editor#main-2`), and counts as that mod.
-        let owner = from.split('/').next().unwrap_or(from);
-        if !self.writers.iter().any(|writer| writer == owner) {
+        let owner = moonframe_providers::owner(from);
+        if !self.writers.allows(from) {
             return Err(format!(
                 "`{owner}` may not save files: only the mods in providers/docs's `writers` may"
             )
@@ -605,22 +605,6 @@ fn root(dir: &Path) -> Option<PathBuf> {
         .ancestors()
         .find(|folder| folder.join(".git").exists())
         .map(Path::to_owned)
-}
-
-fn writers(settings: &Data) -> Vec<String> {
-    let Data::Map(settings) = settings else {
-        return Vec::new();
-    };
-    match settings.get("writers") {
-        Some(Data::List(names)) => names
-            .iter()
-            .filter_map(|name| match name {
-                Data::String(name) => Some(name.clone()),
-                _ => None,
-            })
-            .collect(),
-        _ => Vec::new(),
-    }
 }
 
 #[cfg(test)]

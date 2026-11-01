@@ -187,15 +187,35 @@ impl Backend for Tmux {
 }
 
 /// A session's name for `key`: tmux refuses `.` and `:`, and `=name`
-/// targets read better without spaces or quotes.
+/// targets read better without spaces or quotes. A key of letters, digits,
+/// `-`, `_` and `/` keeps the name it always had; any other key would share
+/// its name with another (`a.b`, `a b`, `a_b`), so it gets a hash of the
+/// whole key after a `~`, which the plain names never have.
 pub fn session_name(key: &str) -> String {
-    key.chars()
+    let mut lossy = false;
+    let mut name: String = key
+        .chars()
         .map(|char| match char {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => char,
             '/' => '+',
-            _ => '_',
+            _ => {
+                lossy = true;
+                '_'
+            },
         })
-        .collect()
+        .collect();
+    if lossy {
+        name.push_str(&format!("~{:016x}", fnv1a(key.as_bytes())));
+    }
+    name
+}
+
+/// FNV-1a: a hash that stays the same across builds and Rust versions, as a
+/// session's name must to be found again at the next launch.
+fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
+    })
 }
 
 fn resize_command(size: Size) -> String {
