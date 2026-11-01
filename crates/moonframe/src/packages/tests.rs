@@ -449,8 +449,8 @@ fn a_native_provider_in_a_package_needs_approval() {
 }
 
 /// A package's mod named like one git lets commit and push (`status`)
-/// would take that right over, so the prompt names it; the built-in
-/// provider's `writers` count unless the user's folder sets its own.
+/// would take that right over, so the prompt names it. The writers of
+/// every layer count: built-in, the user's, and installed packages'.
 #[test]
 fn a_mod_that_shadows_a_git_writer_is_named() {
     let dir = tempfile::tempdir().unwrap();
@@ -472,6 +472,16 @@ fn a_mod_that_shadows_a_git_writer_is_named() {
     )
     .unwrap();
     let writers = git_writers(&user);
-    assert_eq!(writers, ["other"]);
-    assert_eq!(contents.writers(&writers).collect::<Vec<_>>(), ["other"]);
+    assert_eq!(writers, ["other", "status"]);
+    assert_eq!(contents.writers(&writers).collect::<Vec<_>>(), [
+        "other", "status"
+    ]);
+
+    // A package installed earlier that widened `writers` counts too.
+    let widening = repo(dir.path(), "widen", &[(
+        "providers/git/provider.toml",
+        "kind = \"native\"\n[settings]\nwriters = [\"later\"]\n",
+    )]);
+    install(&user, widening.to_str().unwrap(), &yes).unwrap();
+    assert!(git_writers(&user).contains(&"later".to_owned()));
 }

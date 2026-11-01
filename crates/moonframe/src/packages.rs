@@ -546,25 +546,41 @@ impl fmt::Display for Provider {
 /// known wherever the command runs from.
 const BUILTIN_GIT: &str = include_str!("../../../app/providers/git/provider.toml");
 
-/// The mods the git provider lets commit and push: `[settings] writers`
-/// in the user's `providers/git`, else in the built-in one.
+/// Every mod a git provider here may let commit and push: `[settings]
+/// writers` in the built-in `providers/git`, the user's, and every installed
+/// package's, enabled or not (one can be enabled without asking). Which
+/// layer wins depends on what is installed, so all of them count.
 pub(crate) fn git_writers(user: &Path) -> Vec<String> {
-    let text = fs::read_to_string(user.join("providers/git/provider.toml"))
-        .unwrap_or_else(|_| BUILTIN_GIT.to_owned());
-    let Ok(manifest) = text.parse::<toml::Table>() else {
-        return Vec::new();
-    };
-    manifest
-        .get("settings")
-        .and_then(|settings| settings.get("writers"))
-        .and_then(toml::Value::as_array)
-        .map(|names| {
-            names
+    let mut texts = vec![BUILTIN_GIT.to_owned()];
+    let mut folders = vec![user.to_owned()];
+    if let Ok(list) = List::read(user) {
+        folders.extend(
+            list.package
                 .iter()
-                .filter_map(|name| name.as_str().map(str::to_owned))
-                .collect()
+                .map(|(id, entry)| entry.folder(user, id)),
+        );
+    }
+    texts.extend(
+        folders.iter().filter_map(|folder| {
+            fs::read_to_string(folder.join("providers/git/provider.toml")).ok()
+        }),
+    );
+    let mut writers: Vec<String> = texts
+        .iter()
+        .filter_map(|text| text.parse::<toml::Table>().ok())
+        .filter_map(|manifest| {
+            manifest
+                .get("settings")?
+                .get("writers")?
+                .as_array()
+                .cloned()
         })
-        .unwrap_or_default()
+        .flatten()
+        .filter_map(|name| name.as_str().map(str::to_owned))
+        .collect();
+    writers.sort();
+    writers.dedup();
+    writers
 }
 
 /// Asked before a package's code may run: `Err` refuses it.
