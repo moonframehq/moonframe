@@ -188,6 +188,8 @@ return component {
 			selected = state.selected,
 			variant = props.variant or (app and app.looks and app.looks.tabs) or "classic",
 			add = "add",
+			-- The bar it is drawn in has its own line.
+			in_bar = props.show == "bar",
 			add_menu = { open = state.menu, dismiss = "close_menu", content = menu { items = offered } },
 		}
 

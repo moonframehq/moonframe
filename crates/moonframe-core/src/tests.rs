@@ -2945,6 +2945,15 @@ fn the_layout_menu_picks_the_tab_look_and_moves_the_title_bar() {
     assert_eq!(classes(&workspace, SHELL, "toolbar-joined"), 3);
     assert!(joined_card(&workspace));
 
+    // A mount names a mod, never a path.
+    let dir = app(&[(
+        "escape",
+        r#"return mod { view = function() return ui.column { ui.mount { "../../etc", id = "x" } } end }"#,
+    )]);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(broken(&workspace, "escape").contains("is not a mod name"));
+    assert!(workspace.roots().mod_candidates("../escape").is_empty());
+
     // `window` stands alone on a control.
     let dir = app(&[(
         "bad",

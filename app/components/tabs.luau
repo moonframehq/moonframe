@@ -28,6 +28,8 @@ type Props = {
 	closable: boolean?,
 	grow: boolean?,
 	to: string?,
+	-- Drawn in a bar that has a line of its own: the strip draws none.
+	in_bar: boolean?,
 }
 
 -- A look is a pair of classes, `tabs-<look>` on the strip and
@@ -78,6 +80,7 @@ return component {
 		["closable"] = "show × on every tab, not only the selected one",
 		["grow"] = "stretch the tabs to share the width equally",
 		["to"] = "mod to send messages to, if not the drawing one",
+		["in_bar"] = "drawn in a title bar or toolbar with its own bottom line: the strip draws no line of its own (`.tabs-in-bar`)",
 	},
 	styles = {
 		[".tabs"] = { gap = 2, padding = 0, margin = 0 },
@@ -135,6 +138,9 @@ return component {
 		[".tabs-square-tab"] = { radius = 0, padding = { 7, 12 } },
 		[".tabs-square-tab:hover"] = { background = "list-hover" },
 		[".tabs-square-tab:selected"] = { background = "accent/15", color = "foreground" },
+
+		-- In a bar with a line of its own, the strip's would double it.
+		[".tabs-in-bar"] = { border = "none" },
 
 		-- curved: the selected tab is a body in the card's color, square at
 		-- its foot, whose shoulders flare out into the card under the strip;
@@ -250,6 +256,10 @@ tabs {
 					else button,
 			}
 		end
-		return ui.row { class = { "tabs", "tabs-" .. variant }, align = "center", table.unpack(cells) }
+		local classes = { "tabs", "tabs-" .. variant }
+		if props.in_bar then
+			table.insert(classes, "tabs-in-bar")
+		end
+		return ui.row { class = classes, align = "center", table.unpack(cells) }
 	end,
 }

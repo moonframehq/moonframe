@@ -763,6 +763,14 @@ impl Build for Mount {
 
     fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
         let name: String = fields.need("mod")?;
+        // A mod's name is its folder's, never a path: an instance loads
+        // `mods/<name>/main.luau`.
+        if !crate::style::valid_name(&name) {
+            return Err(fields
+                .cx()
+                .key("mod")
+                .fail(format!("`{name}` is not a mod name: use a-z, 0-9, - and _")));
+        }
         match fields.get::<PlainId>("id")? {
             Some(PlainId(id)) => Ok(Self::Instance(Instance {
                 of: InstanceOf::Mod(name),

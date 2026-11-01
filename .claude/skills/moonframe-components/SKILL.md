@@ -2301,12 +2301,13 @@ tabbed { id = "example", start = "component:terminal" }
 | `context` | key of the message a right-click sends, default "tab_menu": { tab_menu = id } |
 | `event` | key of the message a click sends, default "select": { select = id } |
 | `grow` | stretch the tabs to share the width equally |
+| `in_bar` | drawn in a title bar or toolbar with its own bottom line: the strip draws no line of its own (`.tabs-in-bar`) |
 | `selected` | id of the selected tab |
 | `tabs` | list of { id, label, icon?, status? ("working" spinner, "blocked", "done", "idle" dot), badge? (count or text), closable?, tooltip?, msg? (sent instead of the select message) } |
 | `to` | mod to send messages to, if not the drawing one |
 | `variant` | "pills" (default), "underline", "outline", "cards", "compact", "classic", "square" or "curved" (the selected tab joins what is under the strip: put the strip right on top of a card of the same color); or any look a stylesheet defines with `.tabs-<look>` and `.tabs-<look>-tab` rules |
 
-**Styles:** `.tabs` `.tabs-add` `.tabs-add:hover` `.tabs-badge` `.tabs-cards` `.tabs-cards-tab` `.tabs-cards-tab:hover` `.tabs-cards-tab:selected` `.tabs-classic` `.tabs-classic-tab` `.tabs-classic-tab:hover` `.tabs-classic-tab:selected` `.tabs-close` `.tabs-close:hover` `.tabs-compact` `.tabs-compact-tab` `.tabs-compact-tab:selected` `.tabs-curved` `.tabs-curved-tab` `.tabs-curved-tab:hover` `.tabs-curved-tab:selected` `.tabs-dot` `.tabs-dot-blocked` `.tabs-dot-done` `.tabs-dot-idle` `.tabs-icon` `.tabs-label` `.tabs-outline-tab` `.tabs-outline-tab:selected` `.tabs-pills-tab` `.tabs-pills-tab:selected` `.tabs-shoulder` `.tabs-shoulder-left` `.tabs-shoulder-right` `.tabs-spinner` `.tabs-square` `.tabs-square-tab` `.tabs-square-tab:hover` `.tabs-square-tab:selected` `.tabs-tab` `.tabs-tab:hover` `.tabs-tab:selected` `.tabs-underline` `.tabs-underline-tab` `.tabs-underline-tab:hover` `.tabs-underline-tab:selected`
+**Styles:** `.tabs` `.tabs-add` `.tabs-add:hover` `.tabs-badge` `.tabs-cards` `.tabs-cards-tab` `.tabs-cards-tab:hover` `.tabs-cards-tab:selected` `.tabs-classic` `.tabs-classic-tab` `.tabs-classic-tab:hover` `.tabs-classic-tab:selected` `.tabs-close` `.tabs-close:hover` `.tabs-compact` `.tabs-compact-tab` `.tabs-compact-tab:selected` `.tabs-curved` `.tabs-curved-tab` `.tabs-curved-tab:hover` `.tabs-curved-tab:selected` `.tabs-dot` `.tabs-dot-blocked` `.tabs-dot-done` `.tabs-dot-idle` `.tabs-icon` `.tabs-in-bar` `.tabs-label` `.tabs-outline-tab` `.tabs-outline-tab:selected` `.tabs-pills-tab` `.tabs-pills-tab:selected` `.tabs-shoulder` `.tabs-shoulder-left` `.tabs-shoulder-right` `.tabs-spinner` `.tabs-square` `.tabs-square-tab` `.tabs-square-tab:hover` `.tabs-square-tab:selected` `.tabs-tab` `.tabs-tab:hover` `.tabs-tab:selected` `.tabs-underline` `.tabs-underline-tab` `.tabs-underline-tab:hover` `.tabs-underline-tab:selected`
 
 ```lua
 local tabs = use "tabs"

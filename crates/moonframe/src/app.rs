@@ -904,6 +904,7 @@ impl Render for MoonframeApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.inputs.begin_frame();
         let last_keyed = self.motion.begin_frame();
+        self.terminals.begin_frame();
         let mut painter = Painter::new(
             &self.workspace,
             &mut self.motion,
@@ -919,6 +920,11 @@ impl Render for MoonframeApp {
         }
         let key_layers = painter.take_key_layers();
         self.key_layers = key_layers;
+        // A terminal that just appeared (a new tab, or one selected) takes
+        // the keyboard, once it is drawn.
+        if let Some(focus) = self.terminals.take_appeared() {
+            window.defer(cx, move |window, cx| focus.focus(window, cx));
+        }
         let layers = self.inspector_layers(window.viewport_size(), cx);
         let toast = self
             .toast
