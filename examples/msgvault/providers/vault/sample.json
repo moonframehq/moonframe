@@ -1,0 +1,4808 @@
+{
+ "accounts": [
+  {
+   "count": 5,
+   "id": 5,
+   "identifier": "alex.morgan@gmail.com",
+   "kind": "gcal",
+   "name": "Google Calendar"
+  },
+  {
+   "count": 78,
+   "id": 1,
+   "identifier": "alex.morgan@gmail.com",
+   "kind": "gmail",
+   "name": "Alex Morgan (Gmail)"
+  },
+  {
+   "count": 9,
+   "id": 2,
+   "identifier": "alex@morgan.studio",
+   "kind": "imap",
+   "name": "Morgan Studio"
+  },
+  {
+   "count": 6,
+   "id": 4,
+   "identifier": "morgan-studio.slack.com",
+   "kind": "slack",
+   "name": "Morgan Studio Slack"
+  },
+  {
+   "count": 15,
+   "id": 3,
+   "identifier": "+14155550123",
+   "kind": "whatsapp",
+   "name": "WhatsApp"
+  }
+ ],
+ "labels": [
+  {
+   "color": null,
+   "name": "CATEGORY_PROMOTIONS",
+   "type": "system"
+  },
+  {
+   "color": null,
+   "name": "CATEGORY_SOCIAL",
+   "type": "system"
+  },
+  {
+   "color": null,
+   "name": "CATEGORY_UPDATES",
+   "type": "system"
+  },
+  {
+   "color": "#e66550",
+   "name": "Family",
+   "type": "user"
+  },
+  {
+   "color": "#3dc789",
+   "name": "Home",
+   "type": "user"
+  },
+  {
+   "color": null,
+   "name": "IMPORTANT",
+   "type": "system"
+  },
+  {
+   "color": null,
+   "name": "INBOX",
+   "type": "system"
+  },
+  {
+   "color": "#a479e2",
+   "name": "Legal",
+   "type": "user"
+  },
+  {
+   "color": "#8e63ce",
+   "name": "Projects/Atlas",
+   "type": "user"
+  },
+  {
+   "color": "#f2a60c",
+   "name": "Receipts",
+   "type": "user"
+  },
+  {
+   "color": null,
+   "name": "SENT",
+   "type": "system"
+  },
+  {
+   "color": null,
+   "name": "Sent",
+   "type": "system"
+  },
+  {
+   "color": null,
+   "name": "STARRED",
+   "type": "system"
+  },
+  {
+   "color": "#16a766",
+   "name": "Travel",
+   "type": "user"
+  },
+  {
+   "color": null,
+   "name": "UNREAD",
+   "type": "system"
+  },
+  {
+   "color": "#4a86e8",
+   "name": "Work",
+   "type": "user"
+  }
+ ],
+ "messages": [
+  {
+   "address": "priya@lumen.dev",
+   "ago": 88757,
+   "att": 1,
+   "conv": 1,
+   "conv_title": "Q3 roadmap review — notes and next steps",
+   "id": 3,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "INBOX",
+    "Projects/Atlas",
+    "UNREAD",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Priya Raman",
+   "removed": 0,
+   "snippet": "Agreed on the migration week. Added it to the plan. Talk Thursday!",
+   "src": 1,
+   "subject": "Re: Q3 roadmap review — notes and next steps",
+   "thread": 3
+  },
+  {
+   "address": "+14155551005",
+   "ago": 90017,
+   "att": 0,
+   "conv": 52,
+   "conv_title": "Weekend Climbing 🧗",
+   "id": 97,
+   "kind": "whatsapp",
+   "mine": 0,
+   "name": "Diego Alvarez",
+   "removed": 0,
+   "snippet": "Always tacos after",
+   "src": 3,
+   "subject": "Weekend Climbing 🧗",
+   "thread": 10
+  },
+  {
+   "address": "+14155551007",
+   "ago": 90377,
+   "att": 0,
+   "conv": 52,
+   "conv_title": "Weekend Climbing 🧗",
+   "id": 96,
+   "kind": "whatsapp",
+   "mine": 0,
+   "name": "Tomás Rivera",
+   "removed": 0,
+   "snippet": "Tacos after?",
+   "src": 3,
+   "subject": "Weekend Climbing 🧗",
+   "thread": 10
+  },
+  {
+   "address": "+14155550123",
+   "ago": 90737,
+   "att": 0,
+   "conv": 52,
+   "conv_title": "Weekend Climbing 🧗",
+   "id": 95,
+   "kind": "whatsapp",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "No promises 😂",
+   "src": 3,
+   "subject": "Weekend Climbing 🧗",
+   "thread": 10
+  },
+  {
+   "address": "+14155551005",
+   "ago": 91097,
+   "att": 0,
+   "conv": 52,
+   "conv_title": "Weekend Climbing 🧗",
+   "id": 94,
+   "kind": "whatsapp",
+   "mine": 0,
+   "name": "Diego Alvarez",
+   "removed": 0,
+   "snippet": "Only if you promise not to laugh at me again",
+   "src": 3,
+   "subject": "Weekend Climbing 🧗",
+   "thread": 10
+  },
+  {
+   "address": "+14155551007",
+   "ago": 91457,
+   "att": 0,
+   "conv": 52,
+   "conv_title": "Weekend Climbing 🧗",
+   "id": 93,
+   "kind": "whatsapp",
+   "mine": 0,
+   "name": "Tomás Rivera",
+   "removed": 0,
+   "snippet": "Anyone want to try the new V5 in the cave?",
+   "src": 3,
+   "subject": "Weekend Climbing 🧗",
+   "thread": 10
+  },
+  {
+   "address": "alex@morgan.studio",
+   "ago": 91457,
+   "att": 1,
+   "conv": 47,
+   "conv_title": "Kickoff: Fjord Outdoor brand refresh",
+   "id": 80,
+   "imap_starred": 0,
+   "imap_unread": 0,
+   "kind": "email",
+   "labels": [
+    "Sent"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Hi Ingrid, thanks for the thorough brief. Wednesday 10:00 CET works. I'll send an invite with a short agenda.",
+   "src": 2,
+   "subject": "Re: Kickoff: Fjord Outdoor brand refresh",
+   "thread": 2
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 91577,
+   "att": 0,
+   "conv": 1,
+   "conv_title": "Q3 roadmap review — notes and next steps",
+   "id": 2,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "Projects/Atlas",
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Thanks Priya, great summary. I'll draft the write-up tomorrow morning and share it before lunch. One thing to add: we should budget a week f",
+   "src": 1,
+   "subject": "Re: Q3 roadmap review — notes and next steps",
+   "thread": 3
+  },
+  {
+   "address": "+14155550123",
+   "ago": 91817,
+   "att": 0,
+   "conv": 52,
+   "conv_title": "Weekend Climbing 🧗",
+   "id": 92,
+   "kind": "whatsapp",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "🔥🔥",
+   "src": 3,
+   "subject": "Weekend Climbing 🧗",
+   "thread": 10
+  },
+  {
+   "address": "+14155551005",
+   "ago": 92177,
+   "att": 0,
+   "conv": 52,
+   "conv_title": "Weekend Climbing 🧗",
+   "id": 91,
+   "kind": "whatsapp",
+   "mine": 0,
+   "name": "Diego Alvarez",
+   "removed": 0,
+   "snippet": "Booked a 6:30 slot for 3",
+   "src": 3,
+   "subject": "Weekend Climbing 🧗",
+   "thread": 10
+  },
+  {
+   "address": "+14155551007",
+   "ago": 92537,
+   "att": 0,
+   "conv": 52,
+   "conv_title": "Weekend Climbing 🧗",
+   "id": 90,
+   "kind": "whatsapp",
+   "mine": 0,
+   "name": "Tomás Rivera",
+   "removed": 0,
+   "snippet": "Count me in, need to work on my heel hooks",
+   "src": 3,
+   "subject": "Weekend Climbing 🧗",
+   "thread": 10
+  },
+  {
+   "address": "+14155550123",
+   "ago": 92897,
+   "att": 0,
+   "conv": 52,
+   "conv_title": "Weekend Climbing 🧗",
+   "id": 89,
+   "kind": "whatsapp",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Me! After 6 works best",
+   "src": 3,
+   "subject": "Weekend Climbing 🧗",
+   "thread": 10
+  },
+  {
+   "address": "+14155551005",
+   "ago": 93257,
+   "att": 0,
+   "conv": 52,
+   "conv_title": "Weekend Climbing 🧗",
+   "id": 88,
+   "kind": "whatsapp",
+   "mine": 0,
+   "name": "Diego Alvarez",
+   "removed": 0,
+   "snippet": "Who's in for bouldering Thursday? 🧗",
+   "src": 3,
+   "subject": "Weekend Climbing 🧗",
+   "thread": 10
+  },
+  {
+   "address": "ingrid@fjord.no",
+   "ago": 94277,
+   "att": 0,
+   "conv": 47,
+   "conv_title": "Kickoff: Fjord Outdoor brand refresh",
+   "id": 79,
+   "imap_starred": 0,
+   "imap_unread": 0,
+   "kind": "email",
+   "labels": [
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Ingrid Solberg",
+   "removed": 0,
+   "snippet": "Hi Alex, Excited to get started! Attached is our brief. The big goals: modernise the wordmark, build a flexible color system for seasonal ca",
+   "src": 2,
+   "subject": "Kickoff: Fjord Outdoor brand refresh",
+   "thread": 2
+  },
+  {
+   "address": "priya@lumen.dev",
+   "ago": 94397,
+   "att": 0,
+   "conv": 1,
+   "conv_title": "Q3 roadmap review — notes and next steps",
+   "id": 1,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "INBOX",
+    "Projects/Atlas",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Priya Raman",
+   "removed": 0,
+   "snippet": "Hi Alex, Thanks for running the roadmap review today. Summary of what we agreed: 1. Atlas sync engine ships behind a flag on the 14th. 2. Se",
+   "src": 1,
+   "subject": "Q3 roadmap review — notes and next steps",
+   "thread": 3
+  },
+  {
+   "address": "alex@morgan.studio",
+   "ago": 99017,
+   "att": 0,
+   "conv": 54,
+   "conv_title": "#design-review",
+   "id": 108,
+   "kind": "slack",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Ship it 🚀",
+   "src": 4,
+   "subject": "#design-review",
+   "thread": 6
+  },
+  {
+   "address": "mara@okafor.design",
+   "ago": 99377,
+   "att": 0,
+   "conv": 54,
+   "conv_title": "#design-review",
+   "id": 107,
+   "kind": "slack",
+   "mine": 0,
+   "name": "Mara Okafor",
+   "removed": 0,
+   "snippet": "Yes, updated ✅",
+   "src": 4,
+   "subject": "#design-review",
+   "thread": 6
+  },
+  {
+   "address": "jonas.becker@northwind.io",
+   "ago": 99737,
+   "att": 0,
+   "conv": 54,
+   "conv_title": "#design-review",
+   "id": 106,
+   "kind": "slack",
+   "mine": 0,
+   "name": "Jonas Becker",
+   "removed": 0,
+   "snippet": "Can we make the progress indicator sticky on mobile?",
+   "src": 4,
+   "subject": "#design-review",
+   "thread": 6
+  },
+  {
+   "address": "mara@okafor.design",
+   "ago": 100097,
+   "att": 0,
+   "conv": 54,
+   "conv_title": "#design-review",
+   "id": 105,
+   "kind": "slack",
+   "mine": 0,
+   "name": "Mara Okafor",
+   "removed": 0,
+   "snippet": "Good call, I'll try one of the spot illustrations from the brand kit",
+   "src": 4,
+   "subject": "#design-review",
+   "thread": 6
+  },
+  {
+   "address": "alex@morgan.studio",
+   "ago": 100457,
+   "att": 0,
+   "conv": 54,
+   "conv_title": "#design-review",
+   "id": 104,
+   "kind": "slack",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Looks great. The empty state on step 3 feels a bit bare, maybe an illustration?",
+   "src": 4,
+   "subject": "#design-review",
+   "thread": 6
+  },
+  {
+   "address": "mara@okafor.design",
+   "ago": 100817,
+   "att": 0,
+   "conv": 54,
+   "conv_title": "#design-review",
+   "id": 103,
+   "kind": "slack",
+   "mine": 0,
+   "name": "Mara Okafor",
+   "removed": 0,
+   "snippet": "Posted the new onboarding flow in Figma — feedback welcome before Friday",
+   "src": 4,
+   "subject": "#design-review",
+   "thread": 6
+  },
+  {
+   "address": "diego@fieldnotes.co",
+   "ago": 121757,
+   "att": 1,
+   "conv": 2,
+   "conv_title": "Your flight to Lisbon is confirmed ✈️",
+   "id": 4,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Travel",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Diego Alvarez",
+   "removed": 0,
+   "snippet": "Booking confirmed Hi Alex, your trip is all set. Flight TP 202 · SFO → LIS Departs Fri 18:45 Seat 24A (window) Confirmation QX7LMP Check in",
+   "src": 1,
+   "subject": "Your flight to Lisbon is confirmed ✈️",
+   "thread": 1
+  },
+  {
+   "address": "+14155550123",
+   "ago": 123017,
+   "att": 0,
+   "conv": 53,
+   "conv_title": "Hannah Lee",
+   "id": 102,
+   "kind": "whatsapp",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "The best recipes are",
+   "src": 3,
+   "subject": "Hannah Lee",
+   "thread": 5
+  },
+  {
+   "address": "+14155551006",
+   "ago": 123377,
+   "att": 0,
+   "conv": 53,
+   "conv_title": "Hannah Lee",
+   "id": 101,
+   "kind": "whatsapp",
+   "mine": 0,
+   "name": "Hannah Lee",
+   "removed": 0,
+   "snippet": "It's mostly butter tbh",
+   "src": 3,
+   "subject": "Hannah Lee",
+   "thread": 5
+  },
+  {
+   "address": "+14155551006",
+   "ago": 123737,
+   "att": 0,
+   "conv": 53,
+   "conv_title": "Hannah Lee",
+   "id": 100,
+   "kind": "whatsapp",
+   "mine": 0,
+   "name": "Hannah Lee",
+   "removed": 0,
+   "snippet": "Haha I'll send you the recipe",
+   "src": 3,
+   "subject": "Hannah Lee",
+   "thread": 5
+  },
+  {
+   "address": "+14155550123",
+   "ago": 124097,
+   "att": 0,
+   "conv": 53,
+   "conv_title": "Hannah Lee",
+   "id": 99,
+   "kind": "whatsapp",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Yep! Thanks again for dinner, that risotto was unreal",
+   "src": 3,
+   "subject": "Hannah Lee",
+   "thread": 5
+  },
+  {
+   "address": "+14155551006",
+   "ago": 124457,
+   "att": 0,
+   "conv": 53,
+   "conv_title": "Hannah Lee",
+   "id": 98,
+   "kind": "whatsapp",
+   "mine": 0,
+   "name": "Hannah Lee",
+   "removed": 0,
+   "snippet": "Did you get home ok?",
+   "src": 3,
+   "subject": "Hannah Lee",
+   "thread": 5
+  },
+  {
+   "address": "diego@fieldnotes.co",
+   "ago": 149417,
+   "att": 0,
+   "conv": 48,
+   "conv_title": "Website launch checklist",
+   "id": 83,
+   "imap_starred": 0,
+   "imap_unread": 1,
+   "kind": "email",
+   "labels": [
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Diego Alvarez",
+   "removed": 0,
+   "snippet": "Consent banner is live on staging. Analytics events verified.",
+   "src": 2,
+   "subject": "Re: Website launch checklist",
+   "thread": 3
+  },
+  {
+   "address": "diego@fieldnotes.co",
+   "ago": 152237,
+   "att": 0,
+   "conv": 48,
+   "conv_title": "Website launch checklist",
+   "id": 82,
+   "imap_starred": 0,
+   "imap_unread": 0,
+   "kind": "email",
+   "labels": [
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Diego Alvarez",
+   "removed": 0,
+   "snippet": "Copy review done, two small fixes pushed. 👍",
+   "src": 2,
+   "subject": "Re: Website launch checklist",
+   "thread": 3
+  },
+  {
+   "address": "alex@morgan.studio",
+   "ago": 155057,
+   "att": 0,
+   "conv": 48,
+   "conv_title": "Website launch checklist",
+   "id": 81,
+   "imap_starred": 0,
+   "imap_unread": 0,
+   "kind": "email",
+   "labels": [
+    "Sent"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Team, launch is Monday. Remaining items: - Final copy review (Kenji) - 301 redirects from the old domain (me) - Analytics + consent banner (",
+   "src": 2,
+   "subject": "Website launch checklist",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 158657,
+   "att": 0,
+   "conv": 55,
+   "conv_title": "Leadership sync",
+   "id": 109,
+   "kind": "calendar_event",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Weekly sync with the leadership team. Agenda in the shared doc.",
+   "src": 5,
+   "subject": "Leadership sync",
+   "thread": 1
+  },
+  {
+   "address": "linda.morgan@outlook.com",
+   "ago": 179897,
+   "att": 0,
+   "conv": 3,
+   "conv_title": "Dinner on Saturday?",
+   "id": 7,
+   "kind": "email",
+   "labels": [
+    "Family",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Mom",
+   "removed": 0,
+   "snippet": "Perfect. Can't wait to see you ❤️",
+   "src": 1,
+   "subject": "Re: Dinner on Saturday?",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 182717,
+   "att": 0,
+   "conv": 3,
+   "conv_title": "Dinner on Saturday?",
+   "id": 6,
+   "kind": "email",
+   "labels": [
+    "Family",
+    "SENT"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Saturday works! 7pm? I'll book a table for three.",
+   "src": 1,
+   "subject": "Re: Dinner on Saturday?",
+   "thread": 3
+  },
+  {
+   "address": "linda.morgan@outlook.com",
+   "ago": 185537,
+   "att": 0,
+   "conv": 3,
+   "conv_title": "Dinner on Saturday?",
+   "id": 5,
+   "kind": "email",
+   "labels": [
+    "Family",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Mom",
+   "removed": 0,
+   "snippet": "Hi sweetheart! Dad and I are in town this weekend. Are you free for dinner Saturday? We were thinking that little Italian place on Valencia.",
+   "src": 1,
+   "subject": "Dinner on Saturday?",
+   "thread": 3
+  },
+  {
+   "address": "kenji@watanabe.jp",
+   "ago": 217037,
+   "att": 0,
+   "conv": 49,
+   "conv_title": "Quote request: packaging design for Watanabe Tea",
+   "id": 84,
+   "imap_starred": 0,
+   "imap_unread": 1,
+   "kind": "email",
+   "labels": [
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Kenji Watanabe",
+   "removed": 0,
+   "snippet": "Hello Morgan Studio, We're a small tea company in Shizuoka looking for packaging design for a new line of four seasonal blends . We'd need:",
+   "src": 2,
+   "subject": "Quote request: packaging design for Watanabe Tea",
+   "thread": 1
+  },
+  {
+   "address": "sam.whitfield@gmail.com",
+   "ago": 224177,
+   "att": 1,
+   "conv": 4,
+   "conv_title": "Invoice #2024-118 from Okafor Design",
+   "id": 8,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "INBOX",
+    "Receipts",
+    "UNREAD",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Sam Whitfield",
+   "removed": 0,
+   "snippet": "Hi Alex, Please find attached the invoice for the brand refresh work in August (logo system, typography and the icon set). Total: $4,800.00",
+   "src": 1,
+   "subject": "Invoice #2024-118 from Okafor Design",
+   "thread": 1
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 238517,
+   "att": 0,
+   "conv": 5,
+   "conv_title": "Re: API rate limits for the partner integration",
+   "id": 12,
+   "kind": "email",
+   "labels": [
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Platform says 150 req/s is safe today, bulk endpoint in two sprints. I'll send them the details.",
+   "src": 1,
+   "subject": "Re: API rate limits for the partner integration",
+   "thread": 4
+  },
+  {
+   "address": "ingrid@fjord.no",
+   "ago": 241337,
+   "att": 0,
+   "conv": 5,
+   "conv_title": "Re: API rate limits for the partner integration",
+   "id": 11,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Ingrid Solberg",
+   "removed": 0,
+   "snippet": "Sounds good. They're flexible as long as the batch finishes before 06:00.",
+   "src": 1,
+   "subject": "Re: API rate limits for the partner integration",
+   "thread": 4
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 244157,
+   "att": 0,
+   "conv": 5,
+   "conv_title": "Re: API rate limits for the partner integration",
+   "id": 10,
+   "kind": "email",
+   "labels": [
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "We can, but I'd rather give them a bulk endpoint. Let me check with the platform team on capacity first.",
+   "src": 1,
+   "subject": "Re: API rate limits for the partner integration",
+   "thread": 4
+  },
+  {
+   "address": "ingrid@fjord.no",
+   "ago": 246977,
+   "att": 0,
+   "conv": 5,
+   "conv_title": "Re: API rate limits for the partner integration",
+   "id": 9,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Ingrid Solberg",
+   "removed": 0,
+   "snippet": "Alex — our partner is hitting 429s during their nightly batch. Can we raise their limit from 50 to 200 req/s for the 02:00–04:00 UTC window?",
+   "src": 1,
+   "subject": "Re: API rate limits for the partner integration",
+   "thread": 4
+  },
+  {
+   "address": "alex@morgan.studio",
+   "ago": 253397,
+   "att": 1,
+   "conv": 50,
+   "conv_title": "Studio retreat — venue options",
+   "id": 86,
+   "imap_starred": 0,
+   "imap_unread": 0,
+   "kind": "email",
+   "labels": [
+    "Sent"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "The Sonoma farmhouse looks perfect. Can you check availability for the 17th–19th?",
+   "src": 2,
+   "subject": "Re: Studio retreat — venue options",
+   "thread": 2
+  },
+  {
+   "address": "mara@okafor.design",
+   "ago": 256217,
+   "att": 0,
+   "conv": 50,
+   "conv_title": "Studio retreat — venue options",
+   "id": 85,
+   "imap_starred": 0,
+   "imap_unread": 0,
+   "kind": "email",
+   "labels": [
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Mara Okafor",
+   "removed": 0,
+   "snippet": "Found three options for the October retreat: a farmhouse in Sonoma, a cabin cluster near Tahoe, and a surf lodge in Pacifica. Pros/cons in t",
+   "src": 2,
+   "subject": "Studio retreat — venue options",
+   "thread": 2
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 265877,
+   "att": 1,
+   "conv": 6,
+   "conv_title": "Photos from the coast trip 📸",
+   "id": 14,
+   "kind": "email",
+   "labels": [
+    "Family",
+    "SENT",
+    "STARRED"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "These are gorgeous. Number 7 and 12 please, maybe 8x10?",
+   "src": 1,
+   "subject": "Re: Photos from the coast trip 📸",
+   "thread": 2
+  },
+  {
+   "address": "jonas.becker@northwind.io",
+   "ago": 268697,
+   "att": 0,
+   "conv": 6,
+   "conv_title": "Photos from the coast trip 📸",
+   "id": 13,
+   "kind": "email",
+   "labels": [
+    "Family",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Jonas Becker",
+   "removed": 0,
+   "snippet": "Finally edited the photos from Big Sur! Here's a contact sheet — let me know which ones you want printed.",
+   "src": 1,
+   "subject": "Photos from the coast trip 📸",
+   "thread": 2
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 270257,
+   "att": 0,
+   "conv": 56,
+   "conv_title": "1:1 with Priya",
+   "id": 110,
+   "kind": "calendar_event",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Career growth, Atlas launch, hiring plan.",
+   "src": 5,
+   "subject": "1:1 with Priya",
+   "thread": 1
+  },
+  {
+   "address": "jonas.becker@northwind.io",
+   "ago": 288377,
+   "att": 0,
+   "conv": 51,
+   "conv_title": "Payment received — thank you!",
+   "id": 87,
+   "imap_starred": 0,
+   "imap_unread": 0,
+   "kind": "email",
+   "labels": [
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Jonas Becker",
+   "removed": 0,
+   "snippet": "Hi Alex, just confirming we've received payment for invoice MS-0142. Thanks for the fantastic work on the annual report — the board loved it",
+   "src": 2,
+   "subject": "Payment received — thank you!",
+   "thread": 1
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 303317,
+   "att": 1,
+   "conv": 7,
+   "conv_title": "Contract redlines — Morgan Studio / Northwind",
+   "id": 16,
+   "kind": "email",
+   "labels": [
+    "Legal",
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Thanks Elena. §4 looks fine. On §9 we'd like the cap at 12 months of fees rather than 6. Can you propose that?",
+   "src": 1,
+   "subject": "Re: Contract redlines — Morgan Studio / Northwind",
+   "thread": 2
+  },
+  {
+   "address": "hannah.lee@icloud.com",
+   "ago": 306137,
+   "att": 0,
+   "conv": 7,
+   "conv_title": "Contract redlines — Morgan Studio / Northwind",
+   "id": 15,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Legal",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Hannah Lee",
+   "removed": 0,
+   "snippet": "Alex, Attached are our redlines on the services agreement. The main changes are in §4 (IP assignment) and §9 (limitation of liability). Happ",
+   "src": 1,
+   "subject": "Contract redlines — Morgan Studio / Northwind",
+   "thread": 2
+  },
+  {
+   "address": "chris.morgan@gmail.com",
+   "ago": 360257,
+   "att": 0,
+   "conv": 8,
+   "conv_title": "Climbing gym membership renewal",
+   "id": 17,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "INBOX",
+    "Receipts",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Chris Morgan",
+   "removed": 0,
+   "snippet": "Your annual membership at Mission Cliffs has been renewed. Plan: Annual Unlimited Amount: $1,020.00 Next renewal: next year See you on the w",
+   "src": 1,
+   "subject": "Climbing gym membership renewal",
+   "thread": 1
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 381857,
+   "att": 0,
+   "conv": 57,
+   "conv_title": "Dentist",
+   "id": 111,
+   "kind": "calendar_event",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Dr. Kim — cleaning. 2200 Mission St.",
+   "src": 5,
+   "subject": "Dentist",
+   "thread": 1
+  },
+  {
+   "address": "elena@petrova.law",
+   "ago": 405137,
+   "att": 0,
+   "conv": 9,
+   "conv_title": "Code review: incremental FTS backfill",
+   "id": 20,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "INBOX",
+    "Projects/Atlas",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Elena Petrova",
+   "removed": 0,
+   "snippet": "LGTM now 🚢 Nice work.",
+   "src": 1,
+   "subject": "Re: Code review: incremental FTS backfill",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 407957,
+   "att": 0,
+   "conv": 9,
+   "conv_title": "Code review: incremental FTS backfill",
+   "id": 19,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "Projects/Atlas",
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Good catch. Added `fts_checkpoints` with the last rowid per batch; resuming picks up from there. Mind taking another look?",
+   "src": 1,
+   "subject": "Re: Code review: incremental FTS backfill",
+   "thread": 3
+  },
+  {
+   "address": "elena@petrova.law",
+   "ago": 410777,
+   "att": 0,
+   "conv": 9,
+   "conv_title": "Code review: incremental FTS backfill",
+   "id": 18,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "INBOX",
+    "Projects/Atlas",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Elena Petrova",
+   "removed": 0,
+   "snippet": "Left a few comments on the PR. The batching looks right, but I think we need a checkpoint table so a crash mid-backfill doesn't restart from",
+   "src": 1,
+   "subject": "Code review: incremental FTS backfill",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 426857,
+   "att": 1,
+   "conv": 10,
+   "conv_title": "Apartment lease renewal",
+   "id": 22,
+   "kind": "email",
+   "labels": [
+    "Home",
+    "SENT"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Thanks! I'd like to renew for 12 months. Is there any flexibility on the rate if I sign this week?",
+   "src": 1,
+   "subject": "Re: Apartment lease renewal",
+   "thread": 2
+  },
+  {
+   "address": "kenji@watanabe.jp",
+   "ago": 429677,
+   "att": 0,
+   "conv": 10,
+   "conv_title": "Apartment lease renewal",
+   "id": 21,
+   "kind": "email",
+   "labels": [
+    "Home",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Kenji Watanabe",
+   "removed": 0,
+   "snippet": "Hi Alex, your lease ends on the 30th of next month. We'd love to have you stay! The renewal rate for a 12-month term is attached. Please let",
+   "src": 1,
+   "subject": "Apartment lease renewal",
+   "thread": 2
+  },
+  {
+   "address": "mara@okafor.design",
+   "ago": 482837,
+   "att": 0,
+   "conv": 11,
+   "conv_title": "Conference talk accepted: \"Local-first archives\"",
+   "id": 23,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "INBOX",
+    "Travel",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Mara Okafor",
+   "removed": 0,
+   "snippet": "Dear Alex, We're delighted to let you know that your talk Local-first archives: owning your communication history has been accepted for Stra",
+   "src": 1,
+   "subject": "Conference talk accepted: \"Local-first archives\"",
+   "thread": 1
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 493457,
+   "att": 0,
+   "conv": 58,
+   "conv_title": "Design crit",
+   "id": 112,
+   "kind": "calendar_event",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Onboarding flow v3 walkthrough.",
+   "src": 5,
+   "subject": "Design crit",
+   "thread": 1
+  },
+  {
+   "address": "tomas@rivera.photo",
+   "ago": 537437,
+   "att": 0,
+   "conv": 12,
+   "conv_title": "Hiking this weekend?",
+   "id": 26,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Tomás Rivera",
+   "removed": 0,
+   "snippet": "Legend. See you there.",
+   "src": 1,
+   "subject": "Re: Hiking this weekend?",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 540257,
+   "att": 0,
+   "conv": 12,
+   "conv_title": "Hiking this weekend?",
+   "id": 25,
+   "kind": "email",
+   "labels": [
+    "SENT"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "I'm in. I'll bring coffee.",
+   "src": 1,
+   "subject": "Re: Hiking this weekend?",
+   "thread": 3
+  },
+  {
+   "address": "tomas@rivera.photo",
+   "ago": 543077,
+   "att": 0,
+   "conv": 12,
+   "conv_title": "Hiking this weekend?",
+   "id": 24,
+   "kind": "email",
+   "labels": [
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Tomás Rivera",
+   "removed": 0,
+   "snippet": "Weather looks perfect for Mount Tam on Sunday. Early start, 7am at the Pantoll lot?",
+   "src": 1,
+   "subject": "Hiking this weekend?",
+   "thread": 3
+  },
+  {
+   "address": "hello@rustweekly.dev",
+   "ago": 583157,
+   "att": 0,
+   "conv": 13,
+   "conv_title": "The Rust Weekly — issue #180",
+   "id": 27,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_UPDATES",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "The Rust Weekly",
+   "removed": 0,
+   "snippet": "The Rust Weekly Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Comm",
+   "src": 1,
+   "subject": "The Rust Weekly — issue #180",
+   "thread": 1
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 605057,
+   "att": 0,
+   "conv": 59,
+   "conv_title": "Flight TP 202 to Lisbon",
+   "id": 113,
+   "kind": "calendar_event",
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "SFO → LIS. Confirmation QX7LMP.",
+   "src": 5,
+   "subject": "Flight TP 202 to Lisbon",
+   "thread": 1
+  },
+  {
+   "address": "no-reply@figma.com",
+   "ago": 631157,
+   "att": 0,
+   "conv": 14,
+   "conv_title": "Figma — issue #181",
+   "id": 28,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_UPDATES",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Figma",
+   "removed": 0,
+   "snippet": "Figma Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spot",
+   "src": 1,
+   "subject": "Figma — issue #181",
+   "thread": 1
+  },
+  {
+   "address": "news@patagonia.com",
+   "ago": 675197,
+   "att": 0,
+   "conv": 15,
+   "conv_title": "Patagonia: up to 40% off — this weekend only",
+   "id": 29,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_PROMOTIONS",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Patagonia",
+   "removed": 0,
+   "snippet": "Patagonia Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community",
+   "src": 1,
+   "subject": "Patagonia: up to 40% off — this weekend only",
+   "thread": 1
+  },
+  {
+   "address": "no-reply@strava.com",
+   "ago": 694097,
+   "att": 0,
+   "conv": 16,
+   "conv_title": "Strava: your weekly recap is here",
+   "id": 30,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_SOCIAL",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Strava",
+   "removed": 0,
+   "snippet": "Strava Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+   "src": 1,
+   "subject": "Strava: your weekly recap is here",
+   "thread": 1
+  },
+  {
+   "address": "changelog@linear.app",
+   "ago": 735017,
+   "att": 0,
+   "conv": 17,
+   "conv_title": "Linear — issue #184",
+   "id": 31,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_UPDATES",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Linear",
+   "removed": 0,
+   "snippet": "Linear Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+   "src": 1,
+   "subject": "Linear — issue #184",
+   "thread": 1
+  },
+  {
+   "address": "automated@airbnb.com",
+   "ago": 756557,
+   "att": 0,
+   "conv": 18,
+   "conv_title": "Airbnb: up to 40% off — this weekend only",
+   "id": 32,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_PROMOTIONS",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Airbnb",
+   "removed": 0,
+   "snippet": "Airbnb Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+   "src": 1,
+   "subject": "Airbnb: up to 40% off — this weekend only",
+   "thread": 1
+  },
+  {
+   "address": "sam.whitfield@gmail.com",
+   "ago": 802397,
+   "att": 1,
+   "conv": 19,
+   "conv_title": "Q3 roadmap review — notes and next steps (follow-up)",
+   "id": 35,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "INBOX",
+    "Projects/Atlas",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Sam Whitfield",
+   "removed": 0,
+   "snippet": "Agreed on the migration week. Added it to the plan. Talk Thursday!",
+   "src": 1,
+   "subject": "Re: Q3 roadmap review — notes and next steps (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 807077,
+   "att": 0,
+   "conv": 19,
+   "conv_title": "Q3 roadmap review — notes and next steps (follow-up)",
+   "id": 34,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "Projects/Atlas",
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Thanks Priya, great summary. I'll draft the write-up tomorrow morning and share it before lunch. One thing to add: we should budget a week f",
+   "src": 1,
+   "subject": "Re: Q3 roadmap review — notes and next steps (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "sam.whitfield@gmail.com",
+   "ago": 811757,
+   "att": 0,
+   "conv": 19,
+   "conv_title": "Q3 roadmap review — notes and next steps (follow-up)",
+   "id": 33,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "INBOX",
+    "Projects/Atlas",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Sam Whitfield",
+   "removed": 0,
+   "snippet": "Hi Alex, Thanks for running the roadmap review today. Summary of what we agreed: 1. Atlas sync engine ships behind a flag on the 14th. 2. Se",
+   "src": 1,
+   "subject": "Q3 roadmap review — notes and next steps (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "ingrid@fjord.no",
+   "ago": 842177,
+   "att": 1,
+   "conv": 20,
+   "conv_title": "Your flight to Lisbon is confirmed ✈️ (follow-up)",
+   "id": 36,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "INBOX",
+    "Travel"
+   ],
+   "mine": 0,
+   "name": "Ingrid Solberg",
+   "removed": 0,
+   "snippet": "Booking confirmed Hi Alex, your trip is all set. Flight TP 202 · SFO → LIS Departs Fri 18:45 Seat 24A (window) Confirmation QX7LMP Check in",
+   "src": 1,
+   "subject": "Your flight to Lisbon is confirmed ✈️ (follow-up)",
+   "thread": 1
+  },
+  {
+   "address": "jonas.becker@northwind.io",
+   "ago": 872837,
+   "att": 0,
+   "conv": 21,
+   "conv_title": "Dinner on Saturday? (follow-up)",
+   "id": 39,
+   "kind": "email",
+   "labels": [
+    "Family",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Jonas Becker",
+   "removed": 0,
+   "snippet": "Perfect. Can't wait to see you ❤️",
+   "src": 1,
+   "subject": "Re: Dinner on Saturday? (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 877517,
+   "att": 0,
+   "conv": 21,
+   "conv_title": "Dinner on Saturday? (follow-up)",
+   "id": 38,
+   "kind": "email",
+   "labels": [
+    "Family",
+    "SENT"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Saturday works! 7pm? I'll book a table for three.",
+   "src": 1,
+   "subject": "Re: Dinner on Saturday? (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "jonas.becker@northwind.io",
+   "ago": 882197,
+   "att": 0,
+   "conv": 21,
+   "conv_title": "Dinner on Saturday? (follow-up)",
+   "id": 37,
+   "kind": "email",
+   "labels": [
+    "Family",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Jonas Becker",
+   "removed": 0,
+   "snippet": "Hi sweetheart! Dad and I are in town this weekend. Are you free for dinner Saturday? We were thinking that little Italian place on Valencia.",
+   "src": 1,
+   "subject": "Dinner on Saturday? (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "hannah.lee@icloud.com",
+   "ago": 914177,
+   "att": 1,
+   "conv": 22,
+   "conv_title": "Invoice #2024-118 from Okafor Design (follow-up)",
+   "id": 40,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Receipts",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Hannah Lee",
+   "removed": 0,
+   "snippet": "Hi Alex, Please find attached the invoice for the brand refresh work in August (logo system, typography and the icon set). Total: $4,800.00",
+   "src": 1,
+   "subject": "Invoice #2024-118 from Okafor Design (follow-up)",
+   "thread": 1
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 942557,
+   "att": 0,
+   "conv": 23,
+   "conv_title": "Re: API rate limits for the partner integration (follow-up)",
+   "id": 44,
+   "kind": "email",
+   "labels": [
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Platform says 150 req/s is safe today, bulk endpoint in two sprints. I'll send them the details.",
+   "src": 1,
+   "subject": "Re: API rate limits for the partner integration (follow-up)",
+   "thread": 4
+  },
+  {
+   "address": "chris.morgan@gmail.com",
+   "ago": 947237,
+   "att": 0,
+   "conv": 23,
+   "conv_title": "Re: API rate limits for the partner integration (follow-up)",
+   "id": 43,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Chris Morgan",
+   "removed": 0,
+   "snippet": "Sounds good. They're flexible as long as the batch finishes before 06:00.",
+   "src": 1,
+   "subject": "Re: API rate limits for the partner integration (follow-up)",
+   "thread": 4
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 951917,
+   "att": 0,
+   "conv": 23,
+   "conv_title": "Re: API rate limits for the partner integration (follow-up)",
+   "id": 42,
+   "kind": "email",
+   "labels": [
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "We can, but I'd rather give them a bulk endpoint. Let me check with the platform team on capacity first.",
+   "src": 1,
+   "subject": "Re: API rate limits for the partner integration (follow-up)",
+   "thread": 4
+  },
+  {
+   "address": "chris.morgan@gmail.com",
+   "ago": 956597,
+   "att": 0,
+   "conv": 23,
+   "conv_title": "Re: API rate limits for the partner integration (follow-up)",
+   "id": 41,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Chris Morgan",
+   "removed": 0,
+   "snippet": "Alex — our partner is hitting 429s during their nightly batch. Can we raise their limit from 50 to 200 req/s for the 02:00–04:00 UTC window?",
+   "src": 1,
+   "subject": "Re: API rate limits for the partner integration (follow-up)",
+   "thread": 4
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 957437,
+   "att": 1,
+   "conv": 24,
+   "conv_title": "Photos from the coast trip 📸 (follow-up)",
+   "id": 46,
+   "kind": "email",
+   "labels": [
+    "Family",
+    "SENT"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "These are gorgeous. Number 7 and 12 please, maybe 8x10?",
+   "src": 1,
+   "subject": "Re: Photos from the coast trip 📸 (follow-up)",
+   "thread": 2
+  },
+  {
+   "address": "elena@petrova.law",
+   "ago": 962117,
+   "att": 0,
+   "conv": 24,
+   "conv_title": "Photos from the coast trip 📸 (follow-up)",
+   "id": 45,
+   "kind": "email",
+   "labels": [
+    "Family",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Elena Petrova",
+   "removed": 0,
+   "snippet": "Finally edited the photos from Big Sur! Here's a contact sheet — let me know which ones you want printed.",
+   "src": 1,
+   "subject": "Photos from the coast trip 📸 (follow-up)",
+   "thread": 2
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 981017,
+   "att": 1,
+   "conv": 25,
+   "conv_title": "Contract redlines — Morgan Studio / Northwind (follow-up)",
+   "id": 48,
+   "kind": "email",
+   "labels": [
+    "Legal",
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Thanks Elena. §4 looks fine. On §9 we'd like the cap at 12 months of fees rather than 6. Can you propose that?",
+   "src": 1,
+   "subject": "Re: Contract redlines — Morgan Studio / Northwind (follow-up)",
+   "thread": 2
+  },
+  {
+   "address": "kenji@watanabe.jp",
+   "ago": 985697,
+   "att": 0,
+   "conv": 25,
+   "conv_title": "Contract redlines — Morgan Studio / Northwind (follow-up)",
+   "id": 47,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Legal",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Kenji Watanabe",
+   "removed": 0,
+   "snippet": "Alex, Attached are our redlines on the services agreement. The main changes are in §4 (IP assignment) and §9 (limitation of liability). Happ",
+   "src": 1,
+   "subject": "Contract redlines — Morgan Studio / Northwind (follow-up)",
+   "thread": 2
+  },
+  {
+   "address": "mara@okafor.design",
+   "ago": 1024097,
+   "att": 0,
+   "conv": 26,
+   "conv_title": "Climbing gym membership renewal (follow-up)",
+   "id": 49,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Receipts",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Mara Okafor",
+   "removed": 0,
+   "snippet": "Your annual membership at Mission Cliffs has been renewed. Plan: Annual Unlimited Amount: $1,020.00 Next renewal: next year See you on the w",
+   "src": 1,
+   "subject": "Climbing gym membership renewal (follow-up)",
+   "thread": 1
+  },
+  {
+   "address": "tomas@rivera.photo",
+   "ago": 1058657,
+   "att": 0,
+   "conv": 27,
+   "conv_title": "Code review: incremental FTS backfill (follow-up)",
+   "id": 52,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Projects/Atlas",
+    "STARRED",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Tomás Rivera",
+   "removed": 0,
+   "snippet": "LGTM now 🚢 Nice work.",
+   "src": 1,
+   "subject": "Re: Code review: incremental FTS backfill (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 1063337,
+   "att": 0,
+   "conv": 27,
+   "conv_title": "Code review: incremental FTS backfill (follow-up)",
+   "id": 51,
+   "kind": "email",
+   "labels": [
+    "Projects/Atlas",
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Good catch. Added `fts_checkpoints` with the last rowid per batch; resuming picks up from there. Mind taking another look?",
+   "src": 1,
+   "subject": "Re: Code review: incremental FTS backfill (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "tomas@rivera.photo",
+   "ago": 1068017,
+   "att": 0,
+   "conv": 27,
+   "conv_title": "Code review: incremental FTS backfill (follow-up)",
+   "id": 50,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "Projects/Atlas",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Tomás Rivera",
+   "removed": 0,
+   "snippet": "Left a few comments on the PR. The batching looks right, but I think we need a checkpoint table so a crash mid-backfill doesn't restart from",
+   "src": 1,
+   "subject": "Code review: incremental FTS backfill (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 1098377,
+   "att": 1,
+   "conv": 28,
+   "conv_title": "Apartment lease renewal (follow-up)",
+   "id": 54,
+   "kind": "email",
+   "labels": [
+    "Home",
+    "SENT"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Thanks! I'd like to renew for 12 months. Is there any flexibility on the rate if I sign this week?",
+   "src": 1,
+   "subject": "Re: Apartment lease renewal (follow-up)",
+   "thread": 2
+  },
+  {
+   "address": "priya@lumen.dev",
+   "ago": 1103057,
+   "att": 0,
+   "conv": 28,
+   "conv_title": "Apartment lease renewal (follow-up)",
+   "id": 53,
+   "kind": "email",
+   "labels": [
+    "Home",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Priya Raman",
+   "removed": 0,
+   "snippet": "Hi Alex, your lease ends on the 30th of next month. We'd love to have you stay! The renewal rate for a 12-month term is attached. Please let",
+   "src": 1,
+   "subject": "Apartment lease renewal (follow-up)",
+   "thread": 2
+  },
+  {
+   "address": "diego@fieldnotes.co",
+   "ago": 1153997,
+   "att": 0,
+   "conv": 29,
+   "conv_title": "Conference talk accepted: \"Local-first archives\" (follow-up)",
+   "id": 55,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "STARRED",
+    "Travel",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Diego Alvarez",
+   "removed": 0,
+   "snippet": "Dear Alex, We're delighted to let you know that your talk Local-first archives: owning your communication history has been accepted for Stra",
+   "src": 1,
+   "subject": "Conference talk accepted: \"Local-first archives\" (follow-up)",
+   "thread": 1
+  },
+  {
+   "address": "linda.morgan@outlook.com",
+   "ago": 1169537,
+   "att": 0,
+   "conv": 30,
+   "conv_title": "Hiking this weekend? (follow-up)",
+   "id": 58,
+   "kind": "email",
+   "labels": [
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Mom",
+   "removed": 0,
+   "snippet": "Legend. See you there.",
+   "src": 1,
+   "subject": "Re: Hiking this weekend? (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 1174217,
+   "att": 0,
+   "conv": 30,
+   "conv_title": "Hiking this weekend? (follow-up)",
+   "id": 57,
+   "kind": "email",
+   "labels": [
+    "SENT"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "I'm in. I'll bring coffee.",
+   "src": 1,
+   "subject": "Re: Hiking this weekend? (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "linda.morgan@outlook.com",
+   "ago": 1178897,
+   "att": 0,
+   "conv": 30,
+   "conv_title": "Hiking this weekend? (follow-up)",
+   "id": 56,
+   "kind": "email",
+   "labels": [
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Mom",
+   "removed": 0,
+   "snippet": "Weather looks perfect for Mount Tam on Sunday. Early start, 7am at the Pantoll lot?",
+   "src": 1,
+   "subject": "Hiking this weekend? (follow-up)",
+   "thread": 3
+  },
+  {
+   "address": "hello@rustweekly.dev",
+   "ago": 1218077,
+   "att": 0,
+   "conv": 31,
+   "conv_title": "The Rust Weekly — issue #186",
+   "id": 59,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_UPDATES",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "The Rust Weekly",
+   "removed": 0,
+   "snippet": "The Rust Weekly Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Comm",
+   "src": 1,
+   "subject": "The Rust Weekly — issue #186",
+   "thread": 1
+  },
+  {
+   "address": "no-reply@figma.com",
+   "ago": 1237337,
+   "att": 0,
+   "conv": 32,
+   "conv_title": "Figma — issue #187",
+   "id": 60,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_UPDATES",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Figma",
+   "removed": 0,
+   "snippet": "Figma Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spot",
+   "src": 1,
+   "subject": "Figma — issue #187",
+   "thread": 1
+  },
+  {
+   "address": "news@patagonia.com",
+   "ago": 1280717,
+   "att": 0,
+   "conv": 33,
+   "conv_title": "Patagonia: up to 40% off — this weekend only",
+   "id": 61,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_PROMOTIONS",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Patagonia",
+   "removed": 0,
+   "snippet": "Patagonia Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community",
+   "src": 1,
+   "subject": "Patagonia: up to 40% off — this weekend only",
+   "thread": 1
+  },
+  {
+   "address": "no-reply@strava.com",
+   "ago": 1312637,
+   "att": 0,
+   "conv": 34,
+   "conv_title": "Strava: your weekly recap is here",
+   "id": 62,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_SOCIAL",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Strava",
+   "removed": 0,
+   "snippet": "Strava Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+   "src": 1,
+   "subject": "Strava: your weekly recap is here",
+   "thread": 1
+  },
+  {
+   "address": "changelog@linear.app",
+   "ago": 1335317,
+   "att": 0,
+   "conv": 35,
+   "conv_title": "Linear — issue #190",
+   "id": 63,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_UPDATES",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Linear",
+   "removed": 0,
+   "snippet": "Linear Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+   "src": 1,
+   "subject": "Linear — issue #190",
+   "thread": 1
+  },
+  {
+   "address": "automated@airbnb.com",
+   "ago": 1384157,
+   "att": 0,
+   "conv": 36,
+   "conv_title": "Airbnb: up to 40% off — this weekend only",
+   "id": 64,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_PROMOTIONS",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Airbnb",
+   "removed": 0,
+   "snippet": "Airbnb Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+   "src": 1,
+   "subject": "Airbnb: up to 40% off — this weekend only",
+   "thread": 1
+  },
+  {
+   "address": "hannah.lee@icloud.com",
+   "ago": 1414217,
+   "att": 1,
+   "conv": 37,
+   "conv_title": "Q3 roadmap review — notes and next steps (archive)",
+   "id": 67,
+   "kind": "email",
+   "labels": [
+    "Projects/Atlas",
+    "STARRED",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Hannah Lee",
+   "removed": 0,
+   "snippet": "Agreed on the migration week. Added it to the plan. Talk Thursday!",
+   "src": 1,
+   "subject": "Re: Q3 roadmap review — notes and next steps (archive)",
+   "thread": 3
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 1420757,
+   "att": 0,
+   "conv": 37,
+   "conv_title": "Q3 roadmap review — notes and next steps (archive)",
+   "id": 66,
+   "kind": "email",
+   "labels": [
+    "Projects/Atlas",
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Thanks Priya, great summary. I'll draft the write-up tomorrow morning and share it before lunch. One thing to add: we should budget a week f",
+   "src": 1,
+   "subject": "Re: Q3 roadmap review — notes and next steps (archive)",
+   "thread": 3
+  },
+  {
+   "address": "hannah.lee@icloud.com",
+   "ago": 1427297,
+   "att": 0,
+   "conv": 37,
+   "conv_title": "Q3 roadmap review — notes and next steps (archive)",
+   "id": 65,
+   "kind": "email",
+   "labels": [
+    "Projects/Atlas",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Hannah Lee",
+   "removed": 1,
+   "snippet": "Hi Alex, Thanks for running the roadmap review today. Summary of what we agreed: 1. Atlas sync engine ships behind a flag on the 14th. 2. Se",
+   "src": 1,
+   "subject": "Q3 roadmap review — notes and next steps (archive)",
+   "thread": 3
+  },
+  {
+   "address": "kenji@watanabe.jp",
+   "ago": 1476797,
+   "att": 1,
+   "conv": 38,
+   "conv_title": "Invoice #2024-118 from Okafor Design (archive)",
+   "id": 68,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "Receipts",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Kenji Watanabe",
+   "removed": 1,
+   "snippet": "Hi Alex, Please find attached the invoice for the brand refresh work in August (logo system, typography and the icon set). Total: $4,800.00",
+   "src": 1,
+   "subject": "Invoice #2024-118 from Okafor Design (archive)",
+   "thread": 1
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 1529357,
+   "att": 1,
+   "conv": 39,
+   "conv_title": "Contract redlines — Morgan Studio / Northwind (archive)",
+   "id": 70,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "Legal",
+    "SENT",
+    "Work"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Thanks Elena. §4 looks fine. On §9 we'd like the cap at 12 months of fees rather than 6. Can you propose that?",
+   "src": 1,
+   "subject": "Re: Contract redlines — Morgan Studio / Northwind (archive)",
+   "thread": 2
+  },
+  {
+   "address": "priya@lumen.dev",
+   "ago": 1535897,
+   "att": 0,
+   "conv": 39,
+   "conv_title": "Contract redlines — Morgan Studio / Northwind (archive)",
+   "id": 69,
+   "kind": "email",
+   "labels": [
+    "IMPORTANT",
+    "Legal",
+    "Work"
+   ],
+   "mine": 0,
+   "name": "Priya Raman",
+   "removed": 0,
+   "snippet": "Alex, Attached are our redlines on the services agreement. The main changes are in §4 (IP assignment) and §9 (limitation of liability). Happ",
+   "src": 1,
+   "subject": "Contract redlines — Morgan Studio / Northwind (archive)",
+   "thread": 2
+  },
+  {
+   "address": "alex.morgan@gmail.com",
+   "ago": 1579097,
+   "att": 1,
+   "conv": 40,
+   "conv_title": "Apartment lease renewal (archive)",
+   "id": 72,
+   "kind": "email",
+   "labels": [
+    "Home",
+    "IMPORTANT",
+    "SENT"
+   ],
+   "mine": 1,
+   "name": "Alex Morgan",
+   "removed": 0,
+   "snippet": "Thanks! I'd like to renew for 12 months. Is there any flexibility on the rate if I sign this week?",
+   "src": 1,
+   "subject": "Re: Apartment lease renewal (archive)",
+   "thread": 2
+  },
+  {
+   "address": "sam.whitfield@gmail.com",
+   "ago": 1585637,
+   "att": 0,
+   "conv": 40,
+   "conv_title": "Apartment lease renewal (archive)",
+   "id": 71,
+   "kind": "email",
+   "labels": [
+    "Home",
+    "IMPORTANT"
+   ],
+   "mine": 0,
+   "name": "Sam Whitfield",
+   "removed": 1,
+   "snippet": "Hi Alex, your lease ends on the 30th of next month. We'd love to have you stay! The renewal rate for a 12-month term is attached. Please let",
+   "src": 1,
+   "subject": "Apartment lease renewal (archive)",
+   "thread": 2
+  },
+  {
+   "address": "hello@rustweekly.dev",
+   "ago": 1618457,
+   "att": 0,
+   "conv": 41,
+   "conv_title": "The Rust Weekly — issue #192",
+   "id": 73,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_UPDATES",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "The Rust Weekly",
+   "removed": 0,
+   "snippet": "The Rust Weekly Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Comm",
+   "src": 1,
+   "subject": "The Rust Weekly — issue #192",
+   "thread": 1
+  },
+  {
+   "address": "no-reply@figma.com",
+   "ago": 1644437,
+   "att": 0,
+   "conv": 42,
+   "conv_title": "Figma — issue #193",
+   "id": 74,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_UPDATES",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Figma",
+   "removed": 0,
+   "snippet": "Figma Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spot",
+   "src": 1,
+   "subject": "Figma — issue #193",
+   "thread": 1
+  },
+  {
+   "address": "news@patagonia.com",
+   "ago": 1661657,
+   "att": 0,
+   "conv": 43,
+   "conv_title": "Patagonia: up to 40% off — this weekend only",
+   "id": 75,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_PROMOTIONS",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Patagonia",
+   "removed": 0,
+   "snippet": "Patagonia Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community",
+   "src": 1,
+   "subject": "Patagonia: up to 40% off — this weekend only",
+   "thread": 1
+  },
+  {
+   "address": "no-reply@strava.com",
+   "ago": 1703477,
+   "att": 0,
+   "conv": 44,
+   "conv_title": "Strava: your weekly recap is here",
+   "id": 76,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_SOCIAL",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Strava",
+   "removed": 0,
+   "snippet": "Strava Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+   "src": 1,
+   "subject": "Strava: your weekly recap is here",
+   "thread": 1
+  },
+  {
+   "address": "changelog@linear.app",
+   "ago": 1725737,
+   "att": 0,
+   "conv": 45,
+   "conv_title": "Linear — issue #196",
+   "id": 77,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_UPDATES",
+    "INBOX"
+   ],
+   "mine": 0,
+   "name": "Linear",
+   "removed": 0,
+   "snippet": "Linear Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+   "src": 1,
+   "subject": "Linear — issue #196",
+   "thread": 1
+  },
+  {
+   "address": "automated@airbnb.com",
+   "ago": 1753277,
+   "att": 0,
+   "conv": 46,
+   "conv_title": "Airbnb: up to 40% off — this weekend only",
+   "id": 78,
+   "kind": "email",
+   "labels": [
+    "CATEGORY_PROMOTIONS",
+    "INBOX",
+    "UNREAD"
+   ],
+   "mine": 0,
+   "name": "Airbnb",
+   "removed": 0,
+   "snippet": "Airbnb Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+   "src": 1,
+   "subject": "Airbnb: up to 40% off — this weekend only",
+   "thread": 1
+  }
+ ],
+ "stats": {
+  "attachments": 18,
+  "messages": 113,
+  "size": 2461696,
+  "threads": 59
+ },
+ "threads": {
+  "1": [
+   {
+    "address": "priya@lumen.dev",
+    "ago": 94397,
+    "att": 0,
+    "conv": 1,
+    "conv_title": "Q3 roadmap review — notes and next steps",
+    "id": 1,
+    "kind": "email",
+    "mine": 0,
+    "name": "Priya Raman",
+    "removed": 0,
+    "snippet": "Hi Alex, Thanks for running the roadmap review today. Summary of what we agreed: 1. Atlas sync engine ships behind a flag on the 14th. 2. Se",
+    "src": 1,
+    "subject": "Q3 roadmap review — notes and next steps",
+    "text": "Hi Alex,\n\nThanks for running the roadmap review today. Summary of what we agreed:\n\n1. Atlas sync engine ships behind a flag on the 14th.\n2. Search v2 moves to Q4 so we can fix indexing latency first.\n3. We hire one more infra engineer before October.\n\nCould you own the write-up for the leadership sync on Thursday?\n\nPriya",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 91577,
+    "att": 0,
+    "conv": 1,
+    "conv_title": "Q3 roadmap review — notes and next steps",
+    "id": 2,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Thanks Priya, great summary. I'll draft the write-up tomorrow morning and share it before lunch. One thing to add: we should budget a week f",
+    "src": 1,
+    "subject": "Re: Q3 roadmap review — notes and next steps",
+    "text": "Thanks Priya, great summary. I'll draft the write-up tomorrow morning and share it before lunch.\n\nOne thing to add: we should budget a week for migration tooling before the flag flips.\n\nAlex",
+    "thread": 3,
+    "to": [
+     "Priya Raman"
+    ]
+   },
+   {
+    "address": "priya@lumen.dev",
+    "ago": 88757,
+    "att": 1,
+    "conv": 1,
+    "conv_title": "Q3 roadmap review — notes and next steps",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "atlas-roadmap-q3.pdf",
+      "size": 614
+     }
+    ],
+    "id": 3,
+    "kind": "email",
+    "mine": 0,
+    "name": "Priya Raman",
+    "removed": 0,
+    "snippet": "Agreed on the migration week. Added it to the plan. Talk Thursday!",
+    "src": 1,
+    "subject": "Re: Q3 roadmap review — notes and next steps",
+    "text": "Agreed on the migration week. Added it to the plan. Talk Thursday!",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "10": [
+   {
+    "address": "kenji@watanabe.jp",
+    "ago": 429677,
+    "att": 0,
+    "conv": 10,
+    "conv_title": "Apartment lease renewal",
+    "id": 21,
+    "kind": "email",
+    "mine": 0,
+    "name": "Kenji Watanabe",
+    "removed": 0,
+    "snippet": "Hi Alex, your lease ends on the 30th of next month. We'd love to have you stay! The renewal rate for a 12-month term is attached. Please let",
+    "src": 1,
+    "subject": "Apartment lease renewal",
+    "text": "Hi Alex, your lease ends on the 30th of next month. We'd love to have you stay! The renewal rate for a 12-month term is attached. Please let us know by the 15th.",
+    "thread": 2,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 426857,
+    "att": 1,
+    "conv": 10,
+    "conv_title": "Apartment lease renewal",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "lease-renewal-offer.pdf",
+      "size": 598
+     }
+    ],
+    "id": 22,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Thanks! I'd like to renew for 12 months. Is there any flexibility on the rate if I sign this week?",
+    "src": 1,
+    "subject": "Re: Apartment lease renewal",
+    "text": "Thanks! I'd like to renew for 12 months. Is there any flexibility on the rate if I sign this week?",
+    "thread": 2,
+    "to": [
+     "Kenji Watanabe"
+    ]
+   }
+  ],
+  "11": [
+   {
+    "address": "mara@okafor.design",
+    "ago": 482837,
+    "att": 0,
+    "cc": [
+     "Kenji Watanabe"
+    ],
+    "conv": 11,
+    "conv_title": "Conference talk accepted: \"Local-first archives\"",
+    "html": "<p>Dear Alex,</p><p>We're delighted to let you know that your talk <b>Local-first archives: owning your communication history</b> has been accepted for <i>StrangeLoop Revival</i>.</p><ul><li>Slot: 30 minutes + 10 minutes Q&amp;A</li><li>Speaker dinner: the evening before</li><li>Travel and hotel covered</li></ul><p>Please confirm by replying to this email.</p><p>— The Program Committee</p>",
+    "id": 23,
+    "kind": "email",
+    "mine": 0,
+    "name": "Mara Okafor",
+    "removed": 0,
+    "snippet": "Dear Alex, We're delighted to let you know that your talk Local-first archives: owning your communication history has been accepted for Stra",
+    "src": 1,
+    "subject": "Conference talk accepted: \"Local-first archives\"",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "12": [
+   {
+    "address": "tomas@rivera.photo",
+    "ago": 543077,
+    "att": 0,
+    "cc": [
+     "Diego Alvarez"
+    ],
+    "conv": 12,
+    "conv_title": "Hiking this weekend?",
+    "id": 24,
+    "kind": "email",
+    "mine": 0,
+    "name": "Tomás Rivera",
+    "removed": 0,
+    "snippet": "Weather looks perfect for Mount Tam on Sunday. Early start, 7am at the Pantoll lot?",
+    "src": 1,
+    "subject": "Hiking this weekend?",
+    "text": "Weather looks perfect for Mount Tam on Sunday. Early start, 7am at the Pantoll lot?",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 540257,
+    "att": 0,
+    "conv": 12,
+    "conv_title": "Hiking this weekend?",
+    "id": 25,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "I'm in. I'll bring coffee.",
+    "src": 1,
+    "subject": "Re: Hiking this weekend?",
+    "text": "I'm in. I'll bring coffee.",
+    "thread": 3,
+    "to": [
+     "Tomás Rivera"
+    ]
+   },
+   {
+    "address": "tomas@rivera.photo",
+    "ago": 537437,
+    "att": 0,
+    "conv": 12,
+    "conv_title": "Hiking this weekend?",
+    "id": 26,
+    "kind": "email",
+    "mine": 0,
+    "name": "Tomás Rivera",
+    "removed": 0,
+    "snippet": "Legend. See you there.",
+    "src": 1,
+    "subject": "Re: Hiking this weekend?",
+    "text": "Legend. See you there.",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "13": [
+   {
+    "address": "hello@rustweekly.dev",
+    "ago": 583157,
+    "att": 0,
+    "conv": 13,
+    "conv_title": "The Rust Weekly — issue #180",
+    "html": "<h1>The Rust Weekly</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 27,
+    "kind": "email",
+    "mine": 0,
+    "name": "The Rust Weekly",
+    "removed": 0,
+    "snippet": "The Rust Weekly Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Comm",
+    "src": 1,
+    "subject": "The Rust Weekly — issue #180",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "14": [
+   {
+    "address": "no-reply@figma.com",
+    "ago": 631157,
+    "att": 0,
+    "conv": 14,
+    "conv_title": "Figma — issue #181",
+    "html": "<h1>Figma</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 28,
+    "kind": "email",
+    "mine": 0,
+    "name": "Figma",
+    "removed": 0,
+    "snippet": "Figma Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spot",
+    "src": 1,
+    "subject": "Figma — issue #181",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "15": [
+   {
+    "address": "news@patagonia.com",
+    "ago": 675197,
+    "att": 0,
+    "conv": 15,
+    "conv_title": "Patagonia: up to 40% off — this weekend only",
+    "html": "<h1>Patagonia</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 29,
+    "kind": "email",
+    "mine": 0,
+    "name": "Patagonia",
+    "removed": 0,
+    "snippet": "Patagonia Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community",
+    "src": 1,
+    "subject": "Patagonia: up to 40% off — this weekend only",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "16": [
+   {
+    "address": "no-reply@strava.com",
+    "ago": 694097,
+    "att": 0,
+    "conv": 16,
+    "conv_title": "Strava: your weekly recap is here",
+    "html": "<h1>Strava</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 30,
+    "kind": "email",
+    "mine": 0,
+    "name": "Strava",
+    "removed": 0,
+    "snippet": "Strava Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+    "src": 1,
+    "subject": "Strava: your weekly recap is here",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "17": [
+   {
+    "address": "changelog@linear.app",
+    "ago": 735017,
+    "att": 0,
+    "conv": 17,
+    "conv_title": "Linear — issue #184",
+    "html": "<h1>Linear</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 31,
+    "kind": "email",
+    "mine": 0,
+    "name": "Linear",
+    "removed": 0,
+    "snippet": "Linear Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+    "src": 1,
+    "subject": "Linear — issue #184",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "18": [
+   {
+    "address": "automated@airbnb.com",
+    "ago": 756557,
+    "att": 0,
+    "conv": 18,
+    "conv_title": "Airbnb: up to 40% off — this weekend only",
+    "html": "<h1>Airbnb</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 32,
+    "kind": "email",
+    "mine": 0,
+    "name": "Airbnb",
+    "removed": 0,
+    "snippet": "Airbnb Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+    "src": 1,
+    "subject": "Airbnb: up to 40% off — this weekend only",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "19": [
+   {
+    "address": "sam.whitfield@gmail.com",
+    "ago": 811757,
+    "att": 0,
+    "conv": 19,
+    "conv_title": "Q3 roadmap review — notes and next steps (follow-up)",
+    "id": 33,
+    "kind": "email",
+    "mine": 0,
+    "name": "Sam Whitfield",
+    "removed": 0,
+    "snippet": "Hi Alex, Thanks for running the roadmap review today. Summary of what we agreed: 1. Atlas sync engine ships behind a flag on the 14th. 2. Se",
+    "src": 1,
+    "subject": "Q3 roadmap review — notes and next steps (follow-up)",
+    "text": "Hi Alex,\n\nThanks for running the roadmap review today. Summary of what we agreed:\n\n1. Atlas sync engine ships behind a flag on the 14th.\n2. Search v2 moves to Q4 so we can fix indexing latency first.\n3. We hire one more infra engineer before October.\n\nCould you own the write-up for the leadership sync on Thursday?\n\nPriya",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 807077,
+    "att": 0,
+    "conv": 19,
+    "conv_title": "Q3 roadmap review — notes and next steps (follow-up)",
+    "id": 34,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Thanks Priya, great summary. I'll draft the write-up tomorrow morning and share it before lunch. One thing to add: we should budget a week f",
+    "src": 1,
+    "subject": "Re: Q3 roadmap review — notes and next steps (follow-up)",
+    "text": "Thanks Priya, great summary. I'll draft the write-up tomorrow morning and share it before lunch.\n\nOne thing to add: we should budget a week for migration tooling before the flag flips.\n\nAlex",
+    "thread": 3,
+    "to": [
+     "Sam Whitfield"
+    ]
+   },
+   {
+    "address": "sam.whitfield@gmail.com",
+    "ago": 802397,
+    "att": 1,
+    "conv": 19,
+    "conv_title": "Q3 roadmap review — notes and next steps (follow-up)",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "atlas-roadmap-q3.pdf",
+      "size": 624
+     }
+    ],
+    "id": 35,
+    "kind": "email",
+    "mine": 0,
+    "name": "Sam Whitfield",
+    "removed": 0,
+    "snippet": "Agreed on the migration week. Added it to the plan. Talk Thursday!",
+    "src": 1,
+    "subject": "Re: Q3 roadmap review — notes and next steps (follow-up)",
+    "text": "Agreed on the migration week. Added it to the plan. Talk Thursday!",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "2": [
+   {
+    "address": "diego@fieldnotes.co",
+    "ago": 121757,
+    "att": 1,
+    "conv": 2,
+    "conv_title": "Your flight to Lisbon is confirmed ✈️",
+    "files": [
+     {
+      "mime": "text/calendar",
+      "name": "itinerary-QX7LMP.ics",
+      "size": 236
+     }
+    ],
+    "html": "<h2>Booking confirmed</h2><p>Hi Alex, your trip is all set.</p><table><tr><td><b>Flight</b></td><td>TP 202 · SFO → LIS</td></tr><tr><td><b>Departs</b></td><td>Fri 18:45</td></tr><tr><td><b>Seat</b></td><td>24A (window)</td></tr><tr><td><b>Confirmation</b></td><td>QX7LMP</td></tr></table><p>Check in opens 24 hours before departure. Have a great trip!</p><p><a href=\"https://example.com/manage\">Manage booking</a></p>",
+    "id": 4,
+    "kind": "email",
+    "mine": 0,
+    "name": "Diego Alvarez",
+    "removed": 0,
+    "snippet": "Booking confirmed Hi Alex, your trip is all set. Flight TP 202 · SFO → LIS Departs Fri 18:45 Seat 24A (window) Confirmation QX7LMP Check in",
+    "src": 1,
+    "subject": "Your flight to Lisbon is confirmed ✈️",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "20": [
+   {
+    "address": "ingrid@fjord.no",
+    "ago": 842177,
+    "att": 1,
+    "conv": 20,
+    "conv_title": "Your flight to Lisbon is confirmed ✈️ (follow-up)",
+    "files": [
+     {
+      "mime": "text/calendar",
+      "name": "itinerary-QX7LMP.ics",
+      "size": 248
+     }
+    ],
+    "html": "<h2>Booking confirmed</h2><p>Hi Alex, your trip is all set.</p><table><tr><td><b>Flight</b></td><td>TP 202 · SFO → LIS</td></tr><tr><td><b>Departs</b></td><td>Fri 18:45</td></tr><tr><td><b>Seat</b></td><td>24A (window)</td></tr><tr><td><b>Confirmation</b></td><td>QX7LMP</td></tr></table><p>Check in opens 24 hours before departure. Have a great trip!</p><p><a href=\"https://example.com/manage\">Manage booking</a></p>",
+    "id": 36,
+    "kind": "email",
+    "mine": 0,
+    "name": "Ingrid Solberg",
+    "removed": 0,
+    "snippet": "Booking confirmed Hi Alex, your trip is all set. Flight TP 202 · SFO → LIS Departs Fri 18:45 Seat 24A (window) Confirmation QX7LMP Check in",
+    "src": 1,
+    "subject": "Your flight to Lisbon is confirmed ✈️ (follow-up)",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "21": [
+   {
+    "address": "jonas.becker@northwind.io",
+    "ago": 882197,
+    "att": 0,
+    "conv": 21,
+    "conv_title": "Dinner on Saturday? (follow-up)",
+    "id": 37,
+    "kind": "email",
+    "mine": 0,
+    "name": "Jonas Becker",
+    "removed": 0,
+    "snippet": "Hi sweetheart! Dad and I are in town this weekend. Are you free for dinner Saturday? We were thinking that little Italian place on Valencia.",
+    "src": 1,
+    "subject": "Dinner on Saturday? (follow-up)",
+    "text": "Hi sweetheart! Dad and I are in town this weekend. Are you free for dinner Saturday? We were thinking that little Italian place on Valencia.\n\nLove, Mom",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 877517,
+    "att": 0,
+    "conv": 21,
+    "conv_title": "Dinner on Saturday? (follow-up)",
+    "id": 38,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Saturday works! 7pm? I'll book a table for three.",
+    "src": 1,
+    "subject": "Re: Dinner on Saturday? (follow-up)",
+    "text": "Saturday works! 7pm? I'll book a table for three.",
+    "thread": 3,
+    "to": [
+     "Jonas Becker"
+    ]
+   },
+   {
+    "address": "jonas.becker@northwind.io",
+    "ago": 872837,
+    "att": 0,
+    "conv": 21,
+    "conv_title": "Dinner on Saturday? (follow-up)",
+    "id": 39,
+    "kind": "email",
+    "mine": 0,
+    "name": "Jonas Becker",
+    "removed": 0,
+    "snippet": "Perfect. Can't wait to see you ❤️",
+    "src": 1,
+    "subject": "Re: Dinner on Saturday? (follow-up)",
+    "text": "Perfect. Can't wait to see you ❤️",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "22": [
+   {
+    "address": "hannah.lee@icloud.com",
+    "ago": 914177,
+    "att": 1,
+    "cc": [
+     "Sam Whitfield"
+    ],
+    "conv": 22,
+    "conv_title": "Invoice #2024-118 from Okafor Design (follow-up)",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "invoice-2024-118.pdf",
+      "size": 621
+     }
+    ],
+    "id": 40,
+    "kind": "email",
+    "mine": 0,
+    "name": "Hannah Lee",
+    "removed": 0,
+    "snippet": "Hi Alex, Please find attached the invoice for the brand refresh work in August (logo system, typography and the icon set). Total: $4,800.00",
+    "src": 1,
+    "subject": "Invoice #2024-118 from Okafor Design (follow-up)",
+    "text": "Hi Alex,\n\nPlease find attached the invoice for the brand refresh work in August (logo system, typography and the icon set).\n\nTotal: $4,800.00 — due within 30 days.\n\nThank you, it was a joy working on this.\n\nMara",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "23": [
+   {
+    "address": "chris.morgan@gmail.com",
+    "ago": 956597,
+    "att": 0,
+    "conv": 23,
+    "conv_title": "Re: API rate limits for the partner integration (follow-up)",
+    "id": 41,
+    "kind": "email",
+    "mine": 0,
+    "name": "Chris Morgan",
+    "removed": 0,
+    "snippet": "Alex — our partner is hitting 429s during their nightly batch. Can we raise their limit from 50 to 200 req/s for the 02:00–04:00 UTC window?",
+    "src": 1,
+    "subject": "Re: API rate limits for the partner integration (follow-up)",
+    "text": "Alex — our partner is hitting 429s during their nightly batch. Can we raise their limit from 50 to 200 req/s for the 02:00–04:00 UTC window?",
+    "thread": 4,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 951917,
+    "att": 0,
+    "conv": 23,
+    "conv_title": "Re: API rate limits for the partner integration (follow-up)",
+    "id": 42,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "We can, but I'd rather give them a bulk endpoint. Let me check with the platform team on capacity first.",
+    "src": 1,
+    "subject": "Re: API rate limits for the partner integration (follow-up)",
+    "text": "We can, but I'd rather give them a bulk endpoint. Let me check with the platform team on capacity first.",
+    "thread": 4,
+    "to": [
+     "Chris Morgan"
+    ]
+   },
+   {
+    "address": "chris.morgan@gmail.com",
+    "ago": 947237,
+    "att": 0,
+    "conv": 23,
+    "conv_title": "Re: API rate limits for the partner integration (follow-up)",
+    "id": 43,
+    "kind": "email",
+    "mine": 0,
+    "name": "Chris Morgan",
+    "removed": 0,
+    "snippet": "Sounds good. They're flexible as long as the batch finishes before 06:00.",
+    "src": 1,
+    "subject": "Re: API rate limits for the partner integration (follow-up)",
+    "text": "Sounds good. They're flexible as long as the batch finishes before 06:00.",
+    "thread": 4,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 942557,
+    "att": 0,
+    "conv": 23,
+    "conv_title": "Re: API rate limits for the partner integration (follow-up)",
+    "id": 44,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Platform says 150 req/s is safe today, bulk endpoint in two sprints. I'll send them the details.",
+    "src": 1,
+    "subject": "Re: API rate limits for the partner integration (follow-up)",
+    "text": "Platform says 150 req/s is safe today, bulk endpoint in two sprints. I'll send them the details.",
+    "thread": 4,
+    "to": [
+     "Chris Morgan"
+    ]
+   }
+  ],
+  "24": [
+   {
+    "address": "elena@petrova.law",
+    "ago": 962117,
+    "att": 0,
+    "conv": 24,
+    "conv_title": "Photos from the coast trip 📸 (follow-up)",
+    "id": 45,
+    "kind": "email",
+    "mine": 0,
+    "name": "Elena Petrova",
+    "removed": 0,
+    "snippet": "Finally edited the photos from Big Sur! Here's a contact sheet — let me know which ones you want printed.",
+    "src": 1,
+    "subject": "Photos from the coast trip 📸 (follow-up)",
+    "text": "Finally edited the photos from Big Sur! Here's a contact sheet — let me know which ones you want printed.",
+    "thread": 2,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 957437,
+    "att": 1,
+    "conv": 24,
+    "conv_title": "Photos from the coast trip 📸 (follow-up)",
+    "files": [
+     {
+      "mime": "image/png",
+      "name": "big-sur-contact-sheet.png",
+      "size": 46462
+     }
+    ],
+    "id": 46,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "These are gorgeous. Number 7 and 12 please, maybe 8x10?",
+    "src": 1,
+    "subject": "Re: Photos from the coast trip 📸 (follow-up)",
+    "text": "These are gorgeous. Number 7 and 12 please, maybe 8x10?",
+    "thread": 2,
+    "to": [
+     "Elena Petrova"
+    ]
+   }
+  ],
+  "25": [
+   {
+    "address": "kenji@watanabe.jp",
+    "ago": 985697,
+    "att": 0,
+    "conv": 25,
+    "conv_title": "Contract redlines — Morgan Studio / Northwind (follow-up)",
+    "id": 47,
+    "kind": "email",
+    "mine": 0,
+    "name": "Kenji Watanabe",
+    "removed": 0,
+    "snippet": "Alex, Attached are our redlines on the services agreement. The main changes are in §4 (IP assignment) and §9 (limitation of liability). Happ",
+    "src": 1,
+    "subject": "Contract redlines — Morgan Studio / Northwind (follow-up)",
+    "text": "Alex,\n\nAttached are our redlines on the services agreement. The main changes are in §4 (IP assignment) and §9 (limitation of liability). Happy to walk through them on a call.\n\nElena Petrova\nPetrova Law",
+    "thread": 2,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 981017,
+    "att": 1,
+    "conv": 25,
+    "conv_title": "Contract redlines — Morgan Studio / Northwind (follow-up)",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "northwind-msa-redlines.pdf",
+      "size": 629
+     }
+    ],
+    "id": 48,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Thanks Elena. §4 looks fine. On §9 we'd like the cap at 12 months of fees rather than 6. Can you propose that?",
+    "src": 1,
+    "subject": "Re: Contract redlines — Morgan Studio / Northwind (follow-up)",
+    "text": "Thanks Elena. §4 looks fine. On §9 we'd like the cap at 12 months of fees rather than 6. Can you propose that?",
+    "thread": 2,
+    "to": [
+     "Kenji Watanabe"
+    ]
+   }
+  ],
+  "26": [
+   {
+    "address": "mara@okafor.design",
+    "ago": 1024097,
+    "att": 0,
+    "conv": 26,
+    "conv_title": "Climbing gym membership renewal (follow-up)",
+    "id": 49,
+    "kind": "email",
+    "mine": 0,
+    "name": "Mara Okafor",
+    "removed": 0,
+    "snippet": "Your annual membership at Mission Cliffs has been renewed. Plan: Annual Unlimited Amount: $1,020.00 Next renewal: next year See you on the w",
+    "src": 1,
+    "subject": "Climbing gym membership renewal (follow-up)",
+    "text": "Your annual membership at Mission Cliffs has been renewed.\n\nPlan: Annual Unlimited\nAmount: $1,020.00\nNext renewal: next year\n\nSee you on the wall!",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "27": [
+   {
+    "address": "tomas@rivera.photo",
+    "ago": 1068017,
+    "att": 0,
+    "cc": [
+     "Chris Morgan"
+    ],
+    "conv": 27,
+    "conv_title": "Code review: incremental FTS backfill (follow-up)",
+    "id": 50,
+    "kind": "email",
+    "mine": 0,
+    "name": "Tomás Rivera",
+    "removed": 0,
+    "snippet": "Left a few comments on the PR. The batching looks right, but I think we need a checkpoint table so a crash mid-backfill doesn't restart from",
+    "src": 1,
+    "subject": "Code review: incremental FTS backfill (follow-up)",
+    "text": "Left a few comments on the PR. The batching looks right, but I think we need a checkpoint table so a crash mid-backfill doesn't restart from zero.",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 1063337,
+    "att": 0,
+    "conv": 27,
+    "conv_title": "Code review: incremental FTS backfill (follow-up)",
+    "id": 51,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Good catch. Added `fts_checkpoints` with the last rowid per batch; resuming picks up from there. Mind taking another look?",
+    "src": 1,
+    "subject": "Re: Code review: incremental FTS backfill (follow-up)",
+    "text": "Good catch. Added `fts_checkpoints` with the last rowid per batch; resuming picks up from there. Mind taking another look?",
+    "thread": 3,
+    "to": [
+     "Tomás Rivera"
+    ]
+   },
+   {
+    "address": "tomas@rivera.photo",
+    "ago": 1058657,
+    "att": 0,
+    "conv": 27,
+    "conv_title": "Code review: incremental FTS backfill (follow-up)",
+    "id": 52,
+    "kind": "email",
+    "mine": 0,
+    "name": "Tomás Rivera",
+    "removed": 0,
+    "snippet": "LGTM now 🚢 Nice work.",
+    "src": 1,
+    "subject": "Re: Code review: incremental FTS backfill (follow-up)",
+    "text": "LGTM now 🚢 Nice work.",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "28": [
+   {
+    "address": "priya@lumen.dev",
+    "ago": 1103057,
+    "att": 0,
+    "cc": [
+     "Priya Raman"
+    ],
+    "conv": 28,
+    "conv_title": "Apartment lease renewal (follow-up)",
+    "id": 53,
+    "kind": "email",
+    "mine": 0,
+    "name": "Priya Raman",
+    "removed": 0,
+    "snippet": "Hi Alex, your lease ends on the 30th of next month. We'd love to have you stay! The renewal rate for a 12-month term is attached. Please let",
+    "src": 1,
+    "subject": "Apartment lease renewal (follow-up)",
+    "text": "Hi Alex, your lease ends on the 30th of next month. We'd love to have you stay! The renewal rate for a 12-month term is attached. Please let us know by the 15th.",
+    "thread": 2,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 1098377,
+    "att": 1,
+    "conv": 28,
+    "conv_title": "Apartment lease renewal (follow-up)",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "lease-renewal-offer.pdf",
+      "size": 608
+     }
+    ],
+    "id": 54,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Thanks! I'd like to renew for 12 months. Is there any flexibility on the rate if I sign this week?",
+    "src": 1,
+    "subject": "Re: Apartment lease renewal (follow-up)",
+    "text": "Thanks! I'd like to renew for 12 months. Is there any flexibility on the rate if I sign this week?",
+    "thread": 2,
+    "to": [
+     "Priya Raman"
+    ]
+   }
+  ],
+  "29": [
+   {
+    "address": "diego@fieldnotes.co",
+    "ago": 1153997,
+    "att": 0,
+    "conv": 29,
+    "conv_title": "Conference talk accepted: \"Local-first archives\" (follow-up)",
+    "html": "<p>Dear Alex,</p><p>We're delighted to let you know that your talk <b>Local-first archives: owning your communication history</b> has been accepted for <i>StrangeLoop Revival</i>.</p><ul><li>Slot: 30 minutes + 10 minutes Q&amp;A</li><li>Speaker dinner: the evening before</li><li>Travel and hotel covered</li></ul><p>Please confirm by replying to this email.</p><p>— The Program Committee</p>",
+    "id": 55,
+    "kind": "email",
+    "mine": 0,
+    "name": "Diego Alvarez",
+    "removed": 0,
+    "snippet": "Dear Alex, We're delighted to let you know that your talk Local-first archives: owning your communication history has been accepted for Stra",
+    "src": 1,
+    "subject": "Conference talk accepted: \"Local-first archives\" (follow-up)",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "3": [
+   {
+    "address": "linda.morgan@outlook.com",
+    "ago": 185537,
+    "att": 0,
+    "cc": [
+     "Jonas Becker"
+    ],
+    "conv": 3,
+    "conv_title": "Dinner on Saturday?",
+    "id": 5,
+    "kind": "email",
+    "mine": 0,
+    "name": "Mom",
+    "removed": 0,
+    "snippet": "Hi sweetheart! Dad and I are in town this weekend. Are you free for dinner Saturday? We were thinking that little Italian place on Valencia.",
+    "src": 1,
+    "subject": "Dinner on Saturday?",
+    "text": "Hi sweetheart! Dad and I are in town this weekend. Are you free for dinner Saturday? We were thinking that little Italian place on Valencia.\n\nLove, Mom",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 182717,
+    "att": 0,
+    "conv": 3,
+    "conv_title": "Dinner on Saturday?",
+    "id": 6,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Saturday works! 7pm? I'll book a table for three.",
+    "src": 1,
+    "subject": "Re: Dinner on Saturday?",
+    "text": "Saturday works! 7pm? I'll book a table for three.",
+    "thread": 3,
+    "to": [
+     "Mom"
+    ]
+   },
+   {
+    "address": "linda.morgan@outlook.com",
+    "ago": 179897,
+    "att": 0,
+    "conv": 3,
+    "conv_title": "Dinner on Saturday?",
+    "id": 7,
+    "kind": "email",
+    "mine": 0,
+    "name": "Mom",
+    "removed": 0,
+    "snippet": "Perfect. Can't wait to see you ❤️",
+    "src": 1,
+    "subject": "Re: Dinner on Saturday?",
+    "text": "Perfect. Can't wait to see you ❤️",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "30": [
+   {
+    "address": "linda.morgan@outlook.com",
+    "ago": 1178897,
+    "att": 0,
+    "conv": 30,
+    "conv_title": "Hiking this weekend? (follow-up)",
+    "id": 56,
+    "kind": "email",
+    "mine": 0,
+    "name": "Mom",
+    "removed": 0,
+    "snippet": "Weather looks perfect for Mount Tam on Sunday. Early start, 7am at the Pantoll lot?",
+    "src": 1,
+    "subject": "Hiking this weekend? (follow-up)",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 1174217,
+    "att": 0,
+    "conv": 30,
+    "conv_title": "Hiking this weekend? (follow-up)",
+    "id": 57,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "I'm in. I'll bring coffee.",
+    "src": 1,
+    "subject": "Re: Hiking this weekend? (follow-up)",
+    "thread": 3,
+    "to": [
+     "Mom"
+    ]
+   },
+   {
+    "address": "linda.morgan@outlook.com",
+    "ago": 1169537,
+    "att": 0,
+    "conv": 30,
+    "conv_title": "Hiking this weekend? (follow-up)",
+    "id": 58,
+    "kind": "email",
+    "mine": 0,
+    "name": "Mom",
+    "removed": 0,
+    "snippet": "Legend. See you there.",
+    "src": 1,
+    "subject": "Re: Hiking this weekend? (follow-up)",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "31": [
+   {
+    "address": "hello@rustweekly.dev",
+    "ago": 1218077,
+    "att": 0,
+    "conv": 31,
+    "conv_title": "The Rust Weekly — issue #186",
+    "html": "<h1>The Rust Weekly</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 59,
+    "kind": "email",
+    "mine": 0,
+    "name": "The Rust Weekly",
+    "removed": 0,
+    "snippet": "The Rust Weekly Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Comm",
+    "src": 1,
+    "subject": "The Rust Weekly — issue #186",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "32": [
+   {
+    "address": "no-reply@figma.com",
+    "ago": 1237337,
+    "att": 0,
+    "conv": 32,
+    "conv_title": "Figma — issue #187",
+    "html": "<h1>Figma</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 60,
+    "kind": "email",
+    "mine": 0,
+    "name": "Figma",
+    "removed": 0,
+    "snippet": "Figma Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spot",
+    "src": 1,
+    "subject": "Figma — issue #187",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "33": [
+   {
+    "address": "news@patagonia.com",
+    "ago": 1280717,
+    "att": 0,
+    "conv": 33,
+    "conv_title": "Patagonia: up to 40% off — this weekend only",
+    "html": "<h1>Patagonia</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 61,
+    "kind": "email",
+    "mine": 0,
+    "name": "Patagonia",
+    "removed": 0,
+    "snippet": "Patagonia Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community",
+    "src": 1,
+    "subject": "Patagonia: up to 40% off — this weekend only",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "34": [
+   {
+    "address": "no-reply@strava.com",
+    "ago": 1312637,
+    "att": 0,
+    "conv": 34,
+    "conv_title": "Strava: your weekly recap is here",
+    "html": "<h1>Strava</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 62,
+    "kind": "email",
+    "mine": 0,
+    "name": "Strava",
+    "removed": 0,
+    "snippet": "Strava Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+    "src": 1,
+    "subject": "Strava: your weekly recap is here",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "35": [
+   {
+    "address": "changelog@linear.app",
+    "ago": 1335317,
+    "att": 0,
+    "conv": 35,
+    "conv_title": "Linear — issue #190",
+    "html": "<h1>Linear</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 63,
+    "kind": "email",
+    "mine": 0,
+    "name": "Linear",
+    "removed": 0,
+    "snippet": "Linear Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+    "src": 1,
+    "subject": "Linear — issue #190",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "36": [
+   {
+    "address": "automated@airbnb.com",
+    "ago": 1384157,
+    "att": 0,
+    "conv": 36,
+    "conv_title": "Airbnb: up to 40% off — this weekend only",
+    "html": "<h1>Airbnb</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 64,
+    "kind": "email",
+    "mine": 0,
+    "name": "Airbnb",
+    "removed": 0,
+    "snippet": "Airbnb Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+    "src": 1,
+    "subject": "Airbnb: up to 40% off — this weekend only",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "37": [
+   {
+    "address": "hannah.lee@icloud.com",
+    "ago": 1427297,
+    "att": 0,
+    "conv": 37,
+    "conv_title": "Q3 roadmap review — notes and next steps (archive)",
+    "id": 65,
+    "kind": "email",
+    "mine": 0,
+    "name": "Hannah Lee",
+    "removed": 1,
+    "snippet": "Hi Alex, Thanks for running the roadmap review today. Summary of what we agreed: 1. Atlas sync engine ships behind a flag on the 14th. 2. Se",
+    "src": 1,
+    "subject": "Q3 roadmap review — notes and next steps (archive)",
+    "text": "Hi Alex,\n\nThanks for running the roadmap review today. Summary of what we agreed:\n\n1. Atlas sync engine ships behind a flag on the 14th.\n2. Search v2 moves to Q4 so we can fix indexing latency first.\n3. We hire one more infra engineer before October.\n\nCould you own the write-up for the leadership sync on Thursday?\n\nPriya",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 1420757,
+    "att": 0,
+    "conv": 37,
+    "conv_title": "Q3 roadmap review — notes and next steps (archive)",
+    "id": 66,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Thanks Priya, great summary. I'll draft the write-up tomorrow morning and share it before lunch. One thing to add: we should budget a week f",
+    "src": 1,
+    "subject": "Re: Q3 roadmap review — notes and next steps (archive)",
+    "text": "Thanks Priya, great summary. I'll draft the write-up tomorrow morning and share it before lunch.\n\nOne thing to add: we should budget a week for migration tooling before the flag flips.\n\nAlex",
+    "thread": 3,
+    "to": [
+     "Hannah Lee"
+    ]
+   },
+   {
+    "address": "hannah.lee@icloud.com",
+    "ago": 1414217,
+    "att": 1,
+    "conv": 37,
+    "conv_title": "Q3 roadmap review — notes and next steps (archive)",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "atlas-roadmap-q3.pdf",
+      "size": 622
+     }
+    ],
+    "id": 67,
+    "kind": "email",
+    "mine": 0,
+    "name": "Hannah Lee",
+    "removed": 0,
+    "snippet": "Agreed on the migration week. Added it to the plan. Talk Thursday!",
+    "src": 1,
+    "subject": "Re: Q3 roadmap review — notes and next steps (archive)",
+    "text": "Agreed on the migration week. Added it to the plan. Talk Thursday!",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "38": [
+   {
+    "address": "kenji@watanabe.jp",
+    "ago": 1476797,
+    "att": 1,
+    "conv": 38,
+    "conv_title": "Invoice #2024-118 from Okafor Design (archive)",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "invoice-2024-118.pdf",
+      "size": 619
+     }
+    ],
+    "id": 68,
+    "kind": "email",
+    "mine": 0,
+    "name": "Kenji Watanabe",
+    "removed": 1,
+    "snippet": "Hi Alex, Please find attached the invoice for the brand refresh work in August (logo system, typography and the icon set). Total: $4,800.00",
+    "src": 1,
+    "subject": "Invoice #2024-118 from Okafor Design (archive)",
+    "text": "Hi Alex,\n\nPlease find attached the invoice for the brand refresh work in August (logo system, typography and the icon set).\n\nTotal: $4,800.00 — due within 30 days.\n\nThank you, it was a joy working on this.\n\nMara",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "39": [
+   {
+    "address": "priya@lumen.dev",
+    "ago": 1535897,
+    "att": 0,
+    "cc": [
+     "Mom"
+    ],
+    "conv": 39,
+    "conv_title": "Contract redlines — Morgan Studio / Northwind (archive)",
+    "id": 69,
+    "kind": "email",
+    "mine": 0,
+    "name": "Priya Raman",
+    "removed": 0,
+    "snippet": "Alex, Attached are our redlines on the services agreement. The main changes are in §4 (IP assignment) and §9 (limitation of liability). Happ",
+    "src": 1,
+    "subject": "Contract redlines — Morgan Studio / Northwind (archive)",
+    "text": "Alex,\n\nAttached are our redlines on the services agreement. The main changes are in §4 (IP assignment) and §9 (limitation of liability). Happy to walk through them on a call.\n\nElena Petrova\nPetrova Law",
+    "thread": 2,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 1529357,
+    "att": 1,
+    "conv": 39,
+    "conv_title": "Contract redlines — Morgan Studio / Northwind (archive)",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "northwind-msa-redlines.pdf",
+      "size": 627
+     }
+    ],
+    "id": 70,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Thanks Elena. §4 looks fine. On §9 we'd like the cap at 12 months of fees rather than 6. Can you propose that?",
+    "src": 1,
+    "subject": "Re: Contract redlines — Morgan Studio / Northwind (archive)",
+    "text": "Thanks Elena. §4 looks fine. On §9 we'd like the cap at 12 months of fees rather than 6. Can you propose that?",
+    "thread": 2,
+    "to": [
+     "Priya Raman"
+    ]
+   }
+  ],
+  "4": [
+   {
+    "address": "sam.whitfield@gmail.com",
+    "ago": 224177,
+    "att": 1,
+    "conv": 4,
+    "conv_title": "Invoice #2024-118 from Okafor Design",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "invoice-2024-118.pdf",
+      "size": 611
+     }
+    ],
+    "id": 8,
+    "kind": "email",
+    "mine": 0,
+    "name": "Sam Whitfield",
+    "removed": 0,
+    "snippet": "Hi Alex, Please find attached the invoice for the brand refresh work in August (logo system, typography and the icon set). Total: $4,800.00",
+    "src": 1,
+    "subject": "Invoice #2024-118 from Okafor Design",
+    "text": "Hi Alex,\n\nPlease find attached the invoice for the brand refresh work in August (logo system, typography and the icon set).\n\nTotal: $4,800.00 — due within 30 days.\n\nThank you, it was a joy working on this.\n\nMara",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "40": [
+   {
+    "address": "sam.whitfield@gmail.com",
+    "ago": 1585637,
+    "att": 0,
+    "conv": 40,
+    "conv_title": "Apartment lease renewal (archive)",
+    "id": 71,
+    "kind": "email",
+    "mine": 0,
+    "name": "Sam Whitfield",
+    "removed": 1,
+    "snippet": "Hi Alex, your lease ends on the 30th of next month. We'd love to have you stay! The renewal rate for a 12-month term is attached. Please let",
+    "src": 1,
+    "subject": "Apartment lease renewal (archive)",
+    "text": "Hi Alex, your lease ends on the 30th of next month. We'd love to have you stay! The renewal rate for a 12-month term is attached. Please let us know by the 15th.",
+    "thread": 2,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 1579097,
+    "att": 1,
+    "conv": 40,
+    "conv_title": "Apartment lease renewal (archive)",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "lease-renewal-offer.pdf",
+      "size": 606
+     }
+    ],
+    "id": 72,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Thanks! I'd like to renew for 12 months. Is there any flexibility on the rate if I sign this week?",
+    "src": 1,
+    "subject": "Re: Apartment lease renewal (archive)",
+    "text": "Thanks! I'd like to renew for 12 months. Is there any flexibility on the rate if I sign this week?",
+    "thread": 2,
+    "to": [
+     "Sam Whitfield"
+    ]
+   }
+  ],
+  "41": [
+   {
+    "address": "hello@rustweekly.dev",
+    "ago": 1618457,
+    "att": 0,
+    "conv": 41,
+    "conv_title": "The Rust Weekly — issue #192",
+    "html": "<h1>The Rust Weekly</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 73,
+    "kind": "email",
+    "mine": 0,
+    "name": "The Rust Weekly",
+    "removed": 0,
+    "snippet": "The Rust Weekly Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Comm",
+    "src": 1,
+    "subject": "The Rust Weekly — issue #192",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "42": [
+   {
+    "address": "no-reply@figma.com",
+    "ago": 1644437,
+    "att": 0,
+    "conv": 42,
+    "conv_title": "Figma — issue #193",
+    "html": "<h1>Figma</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 74,
+    "kind": "email",
+    "mine": 0,
+    "name": "Figma",
+    "removed": 0,
+    "snippet": "Figma Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spot",
+    "src": 1,
+    "subject": "Figma — issue #193",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "43": [
+   {
+    "address": "news@patagonia.com",
+    "ago": 1661657,
+    "att": 0,
+    "conv": 43,
+    "conv_title": "Patagonia: up to 40% off — this weekend only",
+    "html": "<h1>Patagonia</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 75,
+    "kind": "email",
+    "mine": 0,
+    "name": "Patagonia",
+    "removed": 0,
+    "snippet": "Patagonia Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community",
+    "src": 1,
+    "subject": "Patagonia: up to 40% off — this weekend only",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "44": [
+   {
+    "address": "no-reply@strava.com",
+    "ago": 1703477,
+    "att": 0,
+    "conv": 44,
+    "conv_title": "Strava: your weekly recap is here",
+    "html": "<h1>Strava</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 76,
+    "kind": "email",
+    "mine": 0,
+    "name": "Strava",
+    "removed": 0,
+    "snippet": "Strava Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+    "src": 1,
+    "subject": "Strava: your weekly recap is here",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "45": [
+   {
+    "address": "changelog@linear.app",
+    "ago": 1725737,
+    "att": 0,
+    "conv": 45,
+    "conv_title": "Linear — issue #196",
+    "html": "<h1>Linear</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 77,
+    "kind": "email",
+    "mine": 0,
+    "name": "Linear",
+    "removed": 0,
+    "snippet": "Linear Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+    "src": 1,
+    "subject": "Linear — issue #196",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "46": [
+   {
+    "address": "automated@airbnb.com",
+    "ago": 1753277,
+    "att": 0,
+    "conv": 46,
+    "conv_title": "Airbnb: up to 40% off — this weekend only",
+    "html": "<h1>Airbnb</h1><p>Hi Alex, here's what's new this week.</p><h3>Highlights</h3><ul><li>A deep dive into <b>zero-copy parsing</b></li><li>Five tools we couldn't live without</li><li>Community spotlight: local-first software</li></ul><blockquote>“The best archive is the one you own.”</blockquote><p><a href=\"https://example.com/read\">Read the full issue →</a></p><p><small>You're receiving this because you subscribed. <a href=\"https://example.com/unsubscribe\">Unsubscribe</a></small></p>",
+    "id": 78,
+    "kind": "email",
+    "mine": 0,
+    "name": "Airbnb",
+    "removed": 0,
+    "snippet": "Airbnb Hi Alex, here's what's new this week. Highlights A deep dive into zero-copy parsing Five tools we couldn't live without Community spo",
+    "src": 1,
+    "subject": "Airbnb: up to 40% off — this weekend only",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "47": [
+   {
+    "address": "ingrid@fjord.no",
+    "ago": 94277,
+    "att": 0,
+    "conv": 47,
+    "conv_title": "Kickoff: Fjord Outdoor brand refresh",
+    "id": 79,
+    "kind": "email",
+    "mine": 0,
+    "name": "Ingrid Solberg",
+    "removed": 0,
+    "snippet": "Hi Alex, Excited to get started! Attached is our brief. The big goals: modernise the wordmark, build a flexible color system for seasonal ca",
+    "src": 2,
+    "subject": "Kickoff: Fjord Outdoor brand refresh",
+    "text": "Hi Alex,\n\nExcited to get started! Attached is our brief. The big goals: modernise the wordmark, build a flexible color system for seasonal campaigns, and make the site feel as calm as a walk in the mountains.\n\nCould we do a kickoff call Tuesday or Wednesday?\n\nIngrid",
+    "thread": 2,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex@morgan.studio",
+    "ago": 91457,
+    "att": 1,
+    "conv": 47,
+    "conv_title": "Kickoff: Fjord Outdoor brand refresh",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "fjord-brand-brief.pdf",
+      "size": 611
+     }
+    ],
+    "id": 80,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Hi Ingrid, thanks for the thorough brief. Wednesday 10:00 CET works. I'll send an invite with a short agenda.",
+    "src": 2,
+    "subject": "Re: Kickoff: Fjord Outdoor brand refresh",
+    "text": "Hi Ingrid, thanks for the thorough brief. Wednesday 10:00 CET works. I'll send an invite with a short agenda.",
+    "thread": 2,
+    "to": [
+     "Ingrid Solberg"
+    ]
+   }
+  ],
+  "48": [
+   {
+    "address": "alex@morgan.studio",
+    "ago": 155057,
+    "att": 0,
+    "conv": 48,
+    "conv_title": "Website launch checklist",
+    "id": 81,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Team, launch is Monday. Remaining items: - Final copy review (Kenji) - 301 redirects from the old domain (me) - Analytics + consent banner (",
+    "src": 2,
+    "subject": "Website launch checklist",
+    "text": "Team, launch is Monday. Remaining items:\n\n- Final copy review (Kenji)\n- 301 redirects from the old domain (me)\n- Analytics + consent banner (Diego)\n- Social cards for each case study (Mara)\n\nShout if anything is blocked.",
+    "thread": 3,
+    "to": [
+     "Diego Alvarez"
+    ]
+   },
+   {
+    "address": "diego@fieldnotes.co",
+    "ago": 152237,
+    "att": 0,
+    "conv": 48,
+    "conv_title": "Website launch checklist",
+    "id": 82,
+    "kind": "email",
+    "mine": 0,
+    "name": "Diego Alvarez",
+    "removed": 0,
+    "snippet": "Copy review done, two small fixes pushed. 👍",
+    "src": 2,
+    "subject": "Re: Website launch checklist",
+    "text": "Copy review done, two small fixes pushed. 👍",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "diego@fieldnotes.co",
+    "ago": 149417,
+    "att": 0,
+    "conv": 48,
+    "conv_title": "Website launch checklist",
+    "id": 83,
+    "kind": "email",
+    "mine": 0,
+    "name": "Diego Alvarez",
+    "removed": 0,
+    "snippet": "Consent banner is live on staging. Analytics events verified.",
+    "src": 2,
+    "subject": "Re: Website launch checklist",
+    "text": "Consent banner is live on staging. Analytics events verified.",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "49": [
+   {
+    "address": "kenji@watanabe.jp",
+    "ago": 217037,
+    "att": 0,
+    "conv": 49,
+    "conv_title": "Quote request: packaging design for Watanabe Tea",
+    "html": "<p>Hello Morgan Studio,</p><p>We're a small tea company in Shizuoka looking for packaging design for a new line of <b>four seasonal blends</b>. We'd need:</p><ul><li>Tin label system (4 variants)</li><li>Outer carton</li><li>A simple product sheet</li></ul><p>Could you share a rough quote and timeline?</p><p>Best regards,<br>Kenji Watanabe</p>",
+    "id": 84,
+    "kind": "email",
+    "mine": 0,
+    "name": "Kenji Watanabe",
+    "removed": 0,
+    "snippet": "Hello Morgan Studio, We're a small tea company in Shizuoka looking for packaging design for a new line of four seasonal blends . We'd need:",
+    "src": 2,
+    "subject": "Quote request: packaging design for Watanabe Tea",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "5": [
+   {
+    "address": "ingrid@fjord.no",
+    "ago": 246977,
+    "att": 0,
+    "cc": [
+     "Sam Whitfield"
+    ],
+    "conv": 5,
+    "conv_title": "Re: API rate limits for the partner integration",
+    "id": 9,
+    "kind": "email",
+    "mine": 0,
+    "name": "Ingrid Solberg",
+    "removed": 0,
+    "snippet": "Alex — our partner is hitting 429s during their nightly batch. Can we raise their limit from 50 to 200 req/s for the 02:00–04:00 UTC window?",
+    "src": 1,
+    "subject": "Re: API rate limits for the partner integration",
+    "text": "Alex — our partner is hitting 429s during their nightly batch. Can we raise their limit from 50 to 200 req/s for the 02:00–04:00 UTC window?",
+    "thread": 4,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 244157,
+    "att": 0,
+    "conv": 5,
+    "conv_title": "Re: API rate limits for the partner integration",
+    "id": 10,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "We can, but I'd rather give them a bulk endpoint. Let me check with the platform team on capacity first.",
+    "src": 1,
+    "subject": "Re: API rate limits for the partner integration",
+    "text": "We can, but I'd rather give them a bulk endpoint. Let me check with the platform team on capacity first.",
+    "thread": 4,
+    "to": [
+     "Ingrid Solberg"
+    ]
+   },
+   {
+    "address": "ingrid@fjord.no",
+    "ago": 241337,
+    "att": 0,
+    "conv": 5,
+    "conv_title": "Re: API rate limits for the partner integration",
+    "id": 11,
+    "kind": "email",
+    "mine": 0,
+    "name": "Ingrid Solberg",
+    "removed": 0,
+    "snippet": "Sounds good. They're flexible as long as the batch finishes before 06:00.",
+    "src": 1,
+    "subject": "Re: API rate limits for the partner integration",
+    "text": "Sounds good. They're flexible as long as the batch finishes before 06:00.",
+    "thread": 4,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 238517,
+    "att": 0,
+    "conv": 5,
+    "conv_title": "Re: API rate limits for the partner integration",
+    "id": 12,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Platform says 150 req/s is safe today, bulk endpoint in two sprints. I'll send them the details.",
+    "src": 1,
+    "subject": "Re: API rate limits for the partner integration",
+    "text": "Platform says 150 req/s is safe today, bulk endpoint in two sprints. I'll send them the details.",
+    "thread": 4,
+    "to": [
+     "Ingrid Solberg"
+    ]
+   }
+  ],
+  "50": [
+   {
+    "address": "mara@okafor.design",
+    "ago": 256217,
+    "att": 0,
+    "cc": [
+     "Diego Alvarez"
+    ],
+    "conv": 50,
+    "conv_title": "Studio retreat — venue options",
+    "id": 85,
+    "kind": "email",
+    "mine": 0,
+    "name": "Mara Okafor",
+    "removed": 0,
+    "snippet": "Found three options for the October retreat: a farmhouse in Sonoma, a cabin cluster near Tahoe, and a surf lodge in Pacifica. Pros/cons in t",
+    "src": 2,
+    "subject": "Studio retreat — venue options",
+    "text": "Found three options for the October retreat: a farmhouse in Sonoma, a cabin cluster near Tahoe, and a surf lodge in Pacifica. Pros/cons in the sheet!",
+    "thread": 2,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex@morgan.studio",
+    "ago": 253397,
+    "att": 1,
+    "conv": 50,
+    "conv_title": "Studio retreat — venue options",
+    "files": [
+     {
+      "mime": "text/csv",
+      "name": "retreat-venues.csv",
+      "size": 33
+     }
+    ],
+    "id": 86,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "The Sonoma farmhouse looks perfect. Can you check availability for the 17th–19th?",
+    "src": 2,
+    "subject": "Re: Studio retreat — venue options",
+    "text": "The Sonoma farmhouse looks perfect. Can you check availability for the 17th–19th?",
+    "thread": 2,
+    "to": [
+     "Mara Okafor"
+    ]
+   }
+  ],
+  "51": [
+   {
+    "address": "jonas.becker@northwind.io",
+    "ago": 288377,
+    "att": 0,
+    "cc": [
+     "Elena Petrova"
+    ],
+    "conv": 51,
+    "conv_title": "Payment received — thank you!",
+    "id": 87,
+    "kind": "email",
+    "mine": 0,
+    "name": "Jonas Becker",
+    "removed": 0,
+    "snippet": "Hi Alex, just confirming we've received payment for invoice MS-0142. Thanks for the fantastic work on the annual report — the board loved it",
+    "src": 2,
+    "subject": "Payment received — thank you!",
+    "text": "Hi Alex, just confirming we've received payment for invoice MS-0142. Thanks for the fantastic work on the annual report — the board loved it.\n\nJonas",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "52": [
+   {
+    "address": "+14155551005",
+    "ago": 93257,
+    "att": 0,
+    "conv": 52,
+    "conv_title": "Weekend Climbing 🧗",
+    "id": 88,
+    "kind": "whatsapp",
+    "mine": 0,
+    "name": "Diego Alvarez",
+    "removed": 0,
+    "snippet": "Who's in for bouldering Thursday? 🧗",
+    "src": 3,
+    "subject": "Weekend Climbing 🧗",
+    "text": "Who's in for bouldering Thursday? 🧗",
+    "thread": 10
+   },
+   {
+    "address": "+14155550123",
+    "ago": 92897,
+    "att": 0,
+    "conv": 52,
+    "conv_title": "Weekend Climbing 🧗",
+    "id": 89,
+    "kind": "whatsapp",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Me! After 6 works best",
+    "src": 3,
+    "subject": "Weekend Climbing 🧗",
+    "text": "Me! After 6 works best",
+    "thread": 10
+   },
+   {
+    "address": "+14155551007",
+    "ago": 92537,
+    "att": 0,
+    "conv": 52,
+    "conv_title": "Weekend Climbing 🧗",
+    "id": 90,
+    "kind": "whatsapp",
+    "mine": 0,
+    "name": "Tomás Rivera",
+    "removed": 0,
+    "snippet": "Count me in, need to work on my heel hooks",
+    "src": 3,
+    "subject": "Weekend Climbing 🧗",
+    "text": "Count me in, need to work on my heel hooks",
+    "thread": 10
+   },
+   {
+    "address": "+14155551005",
+    "ago": 92177,
+    "att": 0,
+    "conv": 52,
+    "conv_title": "Weekend Climbing 🧗",
+    "id": 91,
+    "kind": "whatsapp",
+    "mine": 0,
+    "name": "Diego Alvarez",
+    "removed": 0,
+    "snippet": "Booked a 6:30 slot for 3",
+    "src": 3,
+    "subject": "Weekend Climbing 🧗",
+    "text": "Booked a 6:30 slot for 3",
+    "thread": 10
+   },
+   {
+    "address": "+14155550123",
+    "ago": 91817,
+    "att": 0,
+    "conv": 52,
+    "conv_title": "Weekend Climbing 🧗",
+    "id": 92,
+    "kind": "whatsapp",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "🔥🔥",
+    "src": 3,
+    "subject": "Weekend Climbing 🧗",
+    "text": "🔥🔥",
+    "thread": 10
+   },
+   {
+    "address": "+14155551007",
+    "ago": 91457,
+    "att": 0,
+    "conv": 52,
+    "conv_title": "Weekend Climbing 🧗",
+    "id": 93,
+    "kind": "whatsapp",
+    "mine": 0,
+    "name": "Tomás Rivera",
+    "removed": 0,
+    "snippet": "Anyone want to try the new V5 in the cave?",
+    "src": 3,
+    "subject": "Weekend Climbing 🧗",
+    "text": "Anyone want to try the new V5 in the cave?",
+    "thread": 10
+   },
+   {
+    "address": "+14155551005",
+    "ago": 91097,
+    "att": 0,
+    "conv": 52,
+    "conv_title": "Weekend Climbing 🧗",
+    "id": 94,
+    "kind": "whatsapp",
+    "mine": 0,
+    "name": "Diego Alvarez",
+    "removed": 0,
+    "snippet": "Only if you promise not to laugh at me again",
+    "src": 3,
+    "subject": "Weekend Climbing 🧗",
+    "text": "Only if you promise not to laugh at me again",
+    "thread": 10
+   },
+   {
+    "address": "+14155550123",
+    "ago": 90737,
+    "att": 0,
+    "conv": 52,
+    "conv_title": "Weekend Climbing 🧗",
+    "id": 95,
+    "kind": "whatsapp",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "No promises 😂",
+    "src": 3,
+    "subject": "Weekend Climbing 🧗",
+    "text": "No promises 😂",
+    "thread": 10
+   },
+   {
+    "address": "+14155551007",
+    "ago": 90377,
+    "att": 0,
+    "conv": 52,
+    "conv_title": "Weekend Climbing 🧗",
+    "id": 96,
+    "kind": "whatsapp",
+    "mine": 0,
+    "name": "Tomás Rivera",
+    "removed": 0,
+    "snippet": "Tacos after?",
+    "src": 3,
+    "subject": "Weekend Climbing 🧗",
+    "text": "Tacos after?",
+    "thread": 10
+   },
+   {
+    "address": "+14155551005",
+    "ago": 90017,
+    "att": 0,
+    "conv": 52,
+    "conv_title": "Weekend Climbing 🧗",
+    "id": 97,
+    "kind": "whatsapp",
+    "mine": 0,
+    "name": "Diego Alvarez",
+    "removed": 0,
+    "snippet": "Always tacos after",
+    "src": 3,
+    "subject": "Weekend Climbing 🧗",
+    "text": "Always tacos after",
+    "thread": 10
+   }
+  ],
+  "53": [
+   {
+    "address": "+14155551006",
+    "ago": 124457,
+    "att": 0,
+    "conv": 53,
+    "conv_title": "Hannah Lee",
+    "id": 98,
+    "kind": "whatsapp",
+    "mine": 0,
+    "name": "Hannah Lee",
+    "removed": 0,
+    "snippet": "Did you get home ok?",
+    "src": 3,
+    "subject": "Hannah Lee",
+    "text": "Did you get home ok?",
+    "thread": 5
+   },
+   {
+    "address": "+14155550123",
+    "ago": 124097,
+    "att": 0,
+    "conv": 53,
+    "conv_title": "Hannah Lee",
+    "id": 99,
+    "kind": "whatsapp",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Yep! Thanks again for dinner, that risotto was unreal",
+    "src": 3,
+    "subject": "Hannah Lee",
+    "text": "Yep! Thanks again for dinner, that risotto was unreal",
+    "thread": 5
+   },
+   {
+    "address": "+14155551006",
+    "ago": 123737,
+    "att": 0,
+    "conv": 53,
+    "conv_title": "Hannah Lee",
+    "id": 100,
+    "kind": "whatsapp",
+    "mine": 0,
+    "name": "Hannah Lee",
+    "removed": 0,
+    "snippet": "Haha I'll send you the recipe",
+    "src": 3,
+    "subject": "Hannah Lee",
+    "text": "Haha I'll send you the recipe",
+    "thread": 5
+   },
+   {
+    "address": "+14155551006",
+    "ago": 123377,
+    "att": 0,
+    "conv": 53,
+    "conv_title": "Hannah Lee",
+    "id": 101,
+    "kind": "whatsapp",
+    "mine": 0,
+    "name": "Hannah Lee",
+    "removed": 0,
+    "snippet": "It's mostly butter tbh",
+    "src": 3,
+    "subject": "Hannah Lee",
+    "text": "It's mostly butter tbh",
+    "thread": 5
+   },
+   {
+    "address": "+14155550123",
+    "ago": 123017,
+    "att": 0,
+    "conv": 53,
+    "conv_title": "Hannah Lee",
+    "id": 102,
+    "kind": "whatsapp",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "The best recipes are",
+    "src": 3,
+    "subject": "Hannah Lee",
+    "text": "The best recipes are",
+    "thread": 5
+   }
+  ],
+  "54": [
+   {
+    "address": "mara@okafor.design",
+    "ago": 100817,
+    "att": 0,
+    "conv": 54,
+    "conv_title": "#design-review",
+    "id": 103,
+    "kind": "slack",
+    "mine": 0,
+    "name": "Mara Okafor",
+    "removed": 0,
+    "snippet": "Posted the new onboarding flow in Figma — feedback welcome before Friday",
+    "src": 4,
+    "subject": "#design-review",
+    "text": "Posted the new onboarding flow in Figma — feedback welcome before Friday",
+    "thread": 6
+   },
+   {
+    "address": "alex@morgan.studio",
+    "ago": 100457,
+    "att": 0,
+    "conv": 54,
+    "conv_title": "#design-review",
+    "id": 104,
+    "kind": "slack",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Looks great. The empty state on step 3 feels a bit bare, maybe an illustration?",
+    "src": 4,
+    "subject": "#design-review",
+    "text": "Looks great. The empty state on step 3 feels a bit bare, maybe an illustration?",
+    "thread": 6
+   },
+   {
+    "address": "mara@okafor.design",
+    "ago": 100097,
+    "att": 0,
+    "conv": 54,
+    "conv_title": "#design-review",
+    "id": 105,
+    "kind": "slack",
+    "mine": 0,
+    "name": "Mara Okafor",
+    "removed": 0,
+    "snippet": "Good call, I'll try one of the spot illustrations from the brand kit",
+    "src": 4,
+    "subject": "#design-review",
+    "text": "Good call, I'll try one of the spot illustrations from the brand kit",
+    "thread": 6
+   },
+   {
+    "address": "jonas.becker@northwind.io",
+    "ago": 99737,
+    "att": 0,
+    "conv": 54,
+    "conv_title": "#design-review",
+    "id": 106,
+    "kind": "slack",
+    "mine": 0,
+    "name": "Jonas Becker",
+    "removed": 0,
+    "snippet": "Can we make the progress indicator sticky on mobile?",
+    "src": 4,
+    "subject": "#design-review",
+    "text": "Can we make the progress indicator sticky on mobile?",
+    "thread": 6
+   },
+   {
+    "address": "mara@okafor.design",
+    "ago": 99377,
+    "att": 0,
+    "conv": 54,
+    "conv_title": "#design-review",
+    "id": 107,
+    "kind": "slack",
+    "mine": 0,
+    "name": "Mara Okafor",
+    "removed": 0,
+    "snippet": "Yes, updated ✅",
+    "src": 4,
+    "subject": "#design-review",
+    "text": "Yes, updated ✅",
+    "thread": 6
+   },
+   {
+    "address": "alex@morgan.studio",
+    "ago": 99017,
+    "att": 0,
+    "conv": 54,
+    "conv_title": "#design-review",
+    "id": 108,
+    "kind": "slack",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Ship it 🚀",
+    "src": 4,
+    "subject": "#design-review",
+    "text": "Ship it 🚀",
+    "thread": 6
+   }
+  ],
+  "55": [
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 158657,
+    "att": 0,
+    "conv": 55,
+    "conv_title": "Leadership sync",
+    "id": 109,
+    "kind": "calendar_event",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Weekly sync with the leadership team. Agenda in the shared doc.",
+    "src": 5,
+    "subject": "Leadership sync",
+    "text": "Weekly sync with the leadership team. Agenda in the shared doc.",
+    "thread": 1
+   }
+  ],
+  "56": [
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 270257,
+    "att": 0,
+    "conv": 56,
+    "conv_title": "1:1 with Priya",
+    "id": 110,
+    "kind": "calendar_event",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Career growth, Atlas launch, hiring plan.",
+    "src": 5,
+    "subject": "1:1 with Priya",
+    "text": "Career growth, Atlas launch, hiring plan.",
+    "thread": 1
+   }
+  ],
+  "57": [
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 381857,
+    "att": 0,
+    "conv": 57,
+    "conv_title": "Dentist",
+    "id": 111,
+    "kind": "calendar_event",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Dr. Kim — cleaning. 2200 Mission St.",
+    "src": 5,
+    "subject": "Dentist",
+    "text": "Dr. Kim — cleaning. 2200 Mission St.",
+    "thread": 1
+   }
+  ],
+  "58": [
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 493457,
+    "att": 0,
+    "conv": 58,
+    "conv_title": "Design crit",
+    "id": 112,
+    "kind": "calendar_event",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Onboarding flow v3 walkthrough.",
+    "src": 5,
+    "subject": "Design crit",
+    "text": "Onboarding flow v3 walkthrough.",
+    "thread": 1
+   }
+  ],
+  "59": [
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 605057,
+    "att": 0,
+    "conv": 59,
+    "conv_title": "Flight TP 202 to Lisbon",
+    "id": 113,
+    "kind": "calendar_event",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "SFO → LIS. Confirmation QX7LMP.",
+    "src": 5,
+    "subject": "Flight TP 202 to Lisbon",
+    "text": "SFO → LIS. Confirmation QX7LMP.",
+    "thread": 1
+   }
+  ],
+  "6": [
+   {
+    "address": "jonas.becker@northwind.io",
+    "ago": 268697,
+    "att": 0,
+    "conv": 6,
+    "conv_title": "Photos from the coast trip 📸",
+    "id": 13,
+    "kind": "email",
+    "mine": 0,
+    "name": "Jonas Becker",
+    "removed": 0,
+    "snippet": "Finally edited the photos from Big Sur! Here's a contact sheet — let me know which ones you want printed.",
+    "src": 1,
+    "subject": "Photos from the coast trip 📸",
+    "text": "Finally edited the photos from Big Sur! Here's a contact sheet — let me know which ones you want printed.",
+    "thread": 2,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 265877,
+    "att": 1,
+    "conv": 6,
+    "conv_title": "Photos from the coast trip 📸",
+    "files": [
+     {
+      "mime": "image/png",
+      "name": "big-sur-contact-sheet.png",
+      "size": 46462
+     }
+    ],
+    "id": 14,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "These are gorgeous. Number 7 and 12 please, maybe 8x10?",
+    "src": 1,
+    "subject": "Re: Photos from the coast trip 📸",
+    "text": "These are gorgeous. Number 7 and 12 please, maybe 8x10?",
+    "thread": 2,
+    "to": [
+     "Jonas Becker"
+    ]
+   }
+  ],
+  "7": [
+   {
+    "address": "hannah.lee@icloud.com",
+    "ago": 306137,
+    "att": 0,
+    "cc": [
+     "Elena Petrova"
+    ],
+    "conv": 7,
+    "conv_title": "Contract redlines — Morgan Studio / Northwind",
+    "id": 15,
+    "kind": "email",
+    "mine": 0,
+    "name": "Hannah Lee",
+    "removed": 0,
+    "snippet": "Alex, Attached are our redlines on the services agreement. The main changes are in §4 (IP assignment) and §9 (limitation of liability). Happ",
+    "src": 1,
+    "subject": "Contract redlines — Morgan Studio / Northwind",
+    "text": "Alex,\n\nAttached are our redlines on the services agreement. The main changes are in §4 (IP assignment) and §9 (limitation of liability). Happy to walk through them on a call.\n\nElena Petrova\nPetrova Law",
+    "thread": 2,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 303317,
+    "att": 1,
+    "conv": 7,
+    "conv_title": "Contract redlines — Morgan Studio / Northwind",
+    "files": [
+     {
+      "mime": "application/pdf",
+      "name": "northwind-msa-redlines.pdf",
+      "size": 619
+     }
+    ],
+    "id": 16,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Thanks Elena. §4 looks fine. On §9 we'd like the cap at 12 months of fees rather than 6. Can you propose that?",
+    "src": 1,
+    "subject": "Re: Contract redlines — Morgan Studio / Northwind",
+    "text": "Thanks Elena. §4 looks fine. On §9 we'd like the cap at 12 months of fees rather than 6. Can you propose that?",
+    "thread": 2,
+    "to": [
+     "Hannah Lee"
+    ]
+   }
+  ],
+  "8": [
+   {
+    "address": "chris.morgan@gmail.com",
+    "ago": 360257,
+    "att": 0,
+    "conv": 8,
+    "conv_title": "Climbing gym membership renewal",
+    "id": 17,
+    "kind": "email",
+    "mine": 0,
+    "name": "Chris Morgan",
+    "removed": 0,
+    "snippet": "Your annual membership at Mission Cliffs has been renewed. Plan: Annual Unlimited Amount: $1,020.00 Next renewal: next year See you on the w",
+    "src": 1,
+    "subject": "Climbing gym membership renewal",
+    "text": "Your annual membership at Mission Cliffs has been renewed.\n\nPlan: Annual Unlimited\nAmount: $1,020.00\nNext renewal: next year\n\nSee you on the wall!",
+    "thread": 1,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ],
+  "9": [
+   {
+    "address": "elena@petrova.law",
+    "ago": 410777,
+    "att": 0,
+    "conv": 9,
+    "conv_title": "Code review: incremental FTS backfill",
+    "id": 18,
+    "kind": "email",
+    "mine": 0,
+    "name": "Elena Petrova",
+    "removed": 0,
+    "snippet": "Left a few comments on the PR. The batching looks right, but I think we need a checkpoint table so a crash mid-backfill doesn't restart from",
+    "src": 1,
+    "subject": "Code review: incremental FTS backfill",
+    "text": "Left a few comments on the PR. The batching looks right, but I think we need a checkpoint table so a crash mid-backfill doesn't restart from zero.",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   },
+   {
+    "address": "alex.morgan@gmail.com",
+    "ago": 407957,
+    "att": 0,
+    "conv": 9,
+    "conv_title": "Code review: incremental FTS backfill",
+    "id": 19,
+    "kind": "email",
+    "mine": 1,
+    "name": "Alex Morgan",
+    "removed": 0,
+    "snippet": "Good catch. Added `fts_checkpoints` with the last rowid per batch; resuming picks up from there. Mind taking another look?",
+    "src": 1,
+    "subject": "Re: Code review: incremental FTS backfill",
+    "text": "Good catch. Added `fts_checkpoints` with the last rowid per batch; resuming picks up from there. Mind taking another look?",
+    "thread": 3,
+    "to": [
+     "Elena Petrova"
+    ]
+   },
+   {
+    "address": "elena@petrova.law",
+    "ago": 405137,
+    "att": 0,
+    "conv": 9,
+    "conv_title": "Code review: incremental FTS backfill",
+    "id": 20,
+    "kind": "email",
+    "mine": 0,
+    "name": "Elena Petrova",
+    "removed": 0,
+    "snippet": "LGTM now 🚢 Nice work.",
+    "src": 1,
+    "subject": "Re: Code review: incremental FTS backfill",
+    "text": "LGTM now 🚢 Nice work.",
+    "thread": 3,
+    "to": [
+     "Alex Morgan"
+    ]
+   }
+  ]
+ }
+}
