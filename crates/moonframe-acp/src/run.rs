@@ -127,8 +127,8 @@ pub(crate) struct Run {
     tool_count: usize,
     plan: Vec<(String, String)>,
     question: Option<Question>,
-    /// Permission questions are answered "allow" without asking.
-    allow: bool,
+    /// Which permission questions are answered without asking.
+    allow: Allow,
     cwd: PathBuf,
     session: Option<String>,
     next: i64,
@@ -139,6 +139,42 @@ pub(crate) struct Run {
     host: Option<Handle>,
 }
 
+/// Which permission questions a run answers itself, as the user set for
+/// its mod in provider.toml's `[settings] allow`; never a mod's own choice.
+/// Each is answered "allow once", never "always": the agent asks again
+/// next time, and nothing it was allowed outlives the run.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Allow {
+    /// Every question waits on the user.
+    #[default]
+    Ask,
+    /// Tools that only look (read, search, think); the rest wait.
+    Read,
+    /// Every tool.
+    All,
+}
+
+impl Allow {
+    pub(crate) fn parse(name: &str) -> Option<Self> {
+        match name {
+            "ask" => Some(Self::Ask),
+            "read" => Some(Self::Read),
+            "all" => Some(Self::All),
+            _ => None,
+        }
+    }
+
+    /// Whether a tool of `kind` is answered without asking. A tool whose
+    /// kind is unknown counts as one that changes things.
+    pub(crate) fn covers(self, kind: Option<&str>) -> bool {
+        match self {
+            Self::Ask => false,
+            Self::Read => matches!(kind, Some("read" | "search" | "think")),
+            Self::All => true,
+        }
+    }
+}
+
 /// What a mod asked to start.
 pub(crate) struct Start {
     pub(crate) id: String,
@@ -147,7 +183,7 @@ pub(crate) struct Start {
     pub(crate) agent: &'static crate::agents::Agent,
     pub(crate) text: String,
     pub(crate) prompt: String,
-    pub(crate) allow: bool,
+    pub(crate) allow: Allow,
     pub(crate) cwd: PathBuf,
     pub(crate) now: u64,
 }
@@ -430,6 +466,19 @@ impl Run {
             );
         };
         let call = request.tool_call.tool_call_id.0.to_string();
+        // The kind the question says, else the one its tool call said.
+        let kind = request
+            .tool_call
+            .fields
+            .kind
+            .as_ref()
+            .map(enum_name)
+            .or_else(|| {
+                self.tools
+                    .iter()
+                    .find(|tool| tool.id == call && !tool.kind.is_empty())
+                    .map(|tool| tool.kind.clone())
+            });
         let title = request
             .tool_call
             .fields
@@ -452,16 +501,12 @@ impl Run {
                 )
             })
             .collect();
-        if self.allow {
-            // Every permission: the broadest "allow" there is.
-            let pick = ["allow_always", "allow_once"]
-                .iter()
-                .find_map(|kind| options.iter().find(|option| option.2 == *kind))
-                .or_else(|| options.first());
-            return match pick {
-                Some((option, ..)) => self.respond(&id, Ok(selected(option))),
-                None => self.respond(&id, Ok(cancelled())),
-            };
+        // Allowed once, never always; without an "allow once" option the
+        // user decides.
+        if self.allow.covers(kind.as_deref())
+            && let Some((option, ..)) = options.iter().find(|option| option.2 == "allow_once")
+        {
+            return self.respond(&id, Ok(selected(option)));
         }
         // A question already waiting is withdrawn: the agent asks again.
         if let Some(question) = self.question.take() {
@@ -664,7 +709,7 @@ impl Run {
                 agent,
                 text: text("text").unwrap_or_default(),
                 prompt: String::new(),
-                allow: false,
+                allow: Allow::Ask,
                 cwd: PathBuf::new(),
                 now: value.get("started").and_then(Value::as_u64).unwrap_or(0),
             },

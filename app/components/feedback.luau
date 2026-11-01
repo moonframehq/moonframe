@@ -172,7 +172,7 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 		text = "",
 		inspect = true,
 		attached = { element = 'text.status-text "⎇ main +29"', at = "/code/moonframe/app/mods/status/main.luau:33" },
-		note = "A background agent (Claude) in ~/code/moonframe implements it with every permission, then reports back under Feedback & fixes. It gets what you're looking at, your window and the build.",
+		note = "A background agent (Claude) in ~/code/moonframe implements it, asking you here before each change, then reports back under Feedback & fixes. It gets what you're looking at, your window and the build.",
 		expanded = "2",
 		runs = ({
 			{

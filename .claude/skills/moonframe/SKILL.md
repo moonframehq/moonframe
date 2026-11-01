@@ -207,9 +207,11 @@ for _, run in (app.acp and app.acp.runs) or {} do
 end
 ```
 
-Without `permissions = "allow"`, every tool the agent wants waits on the
-user in `agent-run`; with it the agent does anything as the user, so set it
-only where the user asked for that (`mods/feedback` does). Like git's
+Every tool the agent wants waits on the user in `agent-run`, unless the
+user set the mod in `providers/acp`'s `[settings] allow`: `"read"` lets
+tools that only look go without asking, `"all"` every tool, each allowed
+once, never always. A mod can't ask for more; leave that setting to the
+user (as shipped, `feedback = "read"`). Like git's
 `writers`, a new mod goes in `starters` of a copy of `app/providers/acp`.
 
 **Customising the installed app.** Write to `~/.config/moonframe`
@@ -1568,8 +1570,8 @@ replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
 runs are kept (30) across launches.
 
 Messages: `{ start = "<words>", id?, agent?, instructions?, context?,
-permissions? }` (`permissions = "allow"` answers every question with the
-broadest allow), `{ cancel = run }`, `{ forget = run }`
+}` (permission questions wait on the user, except those the
+user's `[settings] allow` covers for the mod), `{ cancel = run }`, `{ forget = run }`
 (finished ones), `{ answer = run, option = "<id>" | false }`.
 
 | field | shape |
