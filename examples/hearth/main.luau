@@ -45,7 +45,11 @@ return mod {
 		end
 	end,
 
-	view = function(state)
+	view = function(state, app)
+		-- With the sidebar hidden, the bar starts under macOS's traffic lights:
+		-- keep room for them (x 16 plus about 54, and a gap), unless fullscreen hides them.
+		local w = app.window
+		local lights = not state.left and w.platform == "macos" and w.titlebar == "hidden" and not w.fullscreen
 		local body = ui.hsplit {
 			id = "body",
 			divider = false,
@@ -58,7 +62,13 @@ return mod {
 					gap = "none",
 					-- Mounted rather than a region: a region row keeps each member to
 					-- its own width, and the bar spans the page.
-					ui.row { height = 61, shrink = false, gap = "none", ui.mount "topbar" },
+					ui.row {
+						height = 61,
+						shrink = false,
+						gap = "none",
+						lights and ui.row { class = "top-lights", width = 80, drag = true },
+						ui.mount "topbar",
+					},
 					ui.region "main",
 				},
 			},

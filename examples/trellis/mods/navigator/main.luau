@@ -413,7 +413,7 @@ return mod {
 			ui.row {
 				class = "nav-top",
 				drag = true,
-				height = 32,
+				height = 44,
 				shrink = false,
 				align = "center",
 				mac and ui.row { width = 72 },

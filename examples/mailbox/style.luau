@@ -18,7 +18,8 @@ return style {
 
 	rules = {
 		[".frame"] = { background = "sidebar" },
-		[".titlebar"] = { padding = { 0, 10 }, gap = 6 },
+		-- 2 at the top puts the toggle's centre on the traffic lights' (y 14, 14 high).
+		[".titlebar"] = { padding = { 2, 10, 0, 10 }, gap = 6 },
 		[".titlebar-button"] = { radius = 6, padding = 5, color = "muted-foreground" },
 		[".titlebar-button:hover"] = { background = "list-hover", color = "foreground" },
 		-- The sidebar sits on the frame: no line of its own.

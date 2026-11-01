@@ -56,7 +56,9 @@ return mod {
 			id = "body",
 			-- The cards meet with no line; a handle shows on hover.
 			divider = false,
-			ui.pane { size = 560, min = 320, class = "card-pane", ui.region "left" },
+			-- Fixed while the editor shows, so showing the files narrows the
+			-- editor and leaves the terminal card's width alone.
+			ui.pane { size = 560, min = 320, fixed = state.editor, class = "card-pane", ui.region "left" },
 			ui.pane { min = 320, visible = state.editor, class = "card-pane", ui.region "main" },
 			ui.pane { size = 340, min = 240, max = 560, fixed = true, visible = state.right, class = "side", ui.region "right" },
 			-- With the files hidden, a slim strip at the right edge brings them back.

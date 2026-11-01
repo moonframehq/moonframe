@@ -58,6 +58,7 @@ return mod {
 			},
 		}
 		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
-		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
+		-- It sits at the title bar's right end, clear of the pagination under the log.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { top = 8, right = 16 }, ui.mount "feedback" } }
 	end,
 }

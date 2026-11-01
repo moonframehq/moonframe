@@ -35,6 +35,8 @@ return style {
 		[".app"] = { font = "mono" },
 		[".frame-side"] = { background = "sidebar", border = "right", border_color = "border" },
 		[".frame-main"] = { background = "background" },
+		-- Room for the traffic lights before the top bar, carrying its rule.
+		[".top-lights"] = { border = "bottom", border_color = "border" },
 		[".card"] = { background = "card", border = true, border_color = "border", radius = 6 },
 		[".bare-input"] = { background = "#00000000", border = "none", shadow = "none", padding = { 4, 0 } },
 		["input-placeholder"] = { color = "muted-foreground" },
