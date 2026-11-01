@@ -50,8 +50,8 @@ pub use {
     persist::Persist,
     roots::{Roots, mod_name},
     style::{
-        Case, Color, Corners, Curve, Font, Look, Paint, Part, Resolved, Rules, Shade, Shadow,
-        ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition,
+        Case, Color, Corners, Curve, Font, Look, MonoFont, Paint, Part, Resolved, Rules, Shade,
+        Shadow, ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition,
         TransitionKind,
     },
     vm::printable,

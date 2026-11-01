@@ -3,7 +3,7 @@
 -- is mounted as an instance of its own. `tabbed` draws it under its strip;
 -- with the strip elsewhere (`tabbed { show = "bar" }`, as in the title bar),
 -- a mod draws it from the `tabs/<id>` topic. What a kind reports (a browser's
--- page) arrives at the drawing mod as `{ tab_report = <tab id>, url, title }`;
+-- page) arrives at the drawing mod as `{ tab_report = <tab id>, url, title, ... }`;
 -- publish it on `tabs/<id>/report` and the tab keeps it.
 
 type Props = {

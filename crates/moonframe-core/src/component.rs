@@ -323,8 +323,8 @@ fn describe(
         .and_then(|tree| {
             // A preview shows its marked children; a problem with them still
             // counts as the component's.
-            let (node, problems) =
-                node::read(&tree, sheet).map_err(|error| error.context("build"))?;
+            let (node, problems) = node::read(&tree, sheet, &Default::default())
+                .map_err(|error| error.context("build"))?;
             match problems.into_iter().next() {
                 Some(problem) => Err(problem.context("build")),
                 None => Ok(node),

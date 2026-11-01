@@ -26,7 +26,7 @@ local function element(kind: string, primary: string?)
 end
 
 local ui = {}
-for _, kind in { "row", "column", "panel", "hsplit", "vsplit", "pane", "divider", "spacer", "popover", "overlay", "input" } do
+for _, kind in { "row", "column", "panel", "hsplit", "vsplit", "pane", "divider", "spacer", "popover", "overlay", "input", "list" } do
 	ui[kind] = element(kind)
 end
 ui.text = element("text", "text")
@@ -39,6 +39,50 @@ ui.button = element("button", "label")
 ui.item = element("item", "label")
 ui.region = element("region", "name")
 ui.mount = element("mount", "mod")
+
+-- `ui.memo(key, deps, build)`: what `build()` returned the last time this
+-- view asked for `key` with equal `deps`, or `build()` now. Dependencies
+-- compare with `==`, so a table counts as the same while it is the same
+-- table, even if changed inside.
+local memos = {}
+local memo_count = 0
+local MAX_MEMOS = 512
+
+local function same(a: { any }, b: { any }): boolean
+	if #a ~= #b then
+		return false
+	end
+	for index = 1, #a do
+		if a[index] ~= b[index] then
+			return false
+		end
+	end
+	return true
+end
+
+function ui.memo(key: string, deps: { any }, build: () -> any)
+	if type(key) ~= "string" then
+		error("ui.memo takes a key (a string), its dependencies (a list), and a function", 2)
+	end
+	if type(deps) ~= "table" or type(build) ~= "function" then
+		error("ui.memo takes a key, its dependencies (a list), and a function", 2)
+	end
+	local kept = memos[key]
+	if kept and same(kept.deps, deps) then
+		return kept.tree
+	end
+	local tree = build()
+	if not kept then
+		-- Keys made from data could grow without end: start over instead.
+		if memo_count >= MAX_MEMOS then
+			memos = {}
+			memo_count = 0
+		end
+		memo_count += 1
+	end
+	memos[key] = { deps = table.clone(deps), tree = tree }
+	return tree
+end
 
 local function define(definition)
 	if type(definition) ~= "table" then

@@ -85,12 +85,17 @@ local function keep_report(state: State, msg)
 	if not tab then
 		return false
 	end
-	if msg.url then
-		tab.props.at = msg.url
-	end
+	-- The whole report, as the browser takes it back: address, title,
+	-- loading and history.
+	tab.props.page = {
+		url = msg.url,
+		title = msg.title,
+		loading = msg.loading,
+		back = msg.back,
+		forward = msg.forward,
+	}
 	if msg.title and msg.title ~= "" then
 		tab.title = msg.title
-		tab.props.title = msg.title
 	end
 	return true
 end

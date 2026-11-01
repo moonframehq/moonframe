@@ -158,6 +158,15 @@ mod platform {
             self.view.url().ok()
         }
 
+        /// Whether the page can go back, and forward; None where the
+        /// platform can't say.
+        pub(crate) fn history(&self) -> Option<(bool, bool)> {
+            #[cfg(target_os = "macos")]
+            return Some(macos::history(&self.view));
+            #[cfg(windows)]
+            None
+        }
+
         /// Draws the page at `factor`; only a change reaches the platform.
         pub(crate) fn zoom(&self, factor: f32) {
             if self.zoom.get() == factor {
@@ -323,6 +332,13 @@ mod platform {
             clip.setFrameOrigin(AWAY);
         }
 
+        /// Whether the page can go back, and forward.
+        pub(super) fn history(view: &wry::WebView) -> (bool, bool) {
+            let page = view.webview();
+            // SAFETY: property reads on the page's view, on the main thread.
+            unsafe { (page.canGoBack(), page.canGoForward()) }
+        }
+
         /// Whether the page is its window's first responder, which takes keys.
         pub(super) fn holds_keyboard(view: &wry::WebView) -> bool {
             let page: Retained<NSView> = Retained::into_super(Retained::into_super(view.webview()));
@@ -419,6 +435,10 @@ mod unsupported {
         pub(crate) fn script(&self, _: &'static str) {}
 
         pub(crate) fn url(&self) -> Option<String> {
+            None
+        }
+
+        pub(crate) fn history(&self) -> Option<(bool, bool)> {
             None
         }
 

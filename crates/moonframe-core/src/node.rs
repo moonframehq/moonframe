@@ -37,6 +37,7 @@ tokens! {
         Instance = "instance",
         Popover = "popover",
         Overlay = "overlay",
+        List = "list",
     }
 }
 
@@ -154,11 +155,14 @@ tokens! {
     Side {
         Top = "top",
         Bottom = "bottom",
+        Left = "left",
+        Right = "right",
     }
 }
 
 tokens! {
-    /// Which edge of its anchor a popover lines up with.
+    /// Which edge of its anchor a popover lines up with: the left or right
+    /// one above or below it, the top or bottom one beside it.
     Anchor {
         Start = "start",
         End = "end",
@@ -235,6 +239,8 @@ pub enum Node {
     Instance(Instance),
     Popover(Popover),
     Overlay(Overlay),
+    /// Rows the host draws only while they show.
+    List(List),
     /// A child that could not be read, drawn as a small marker in its
     /// place; the message says what is wrong.
     Problem(String),
@@ -257,7 +263,7 @@ impl Node {
                 all(&panel.children, found);
             },
             Self::Split(split) => {
-                for pane in &split.panes {
+                for pane in split.panes.iter().filter(|pane| !pane.asleep()) {
                     all(&pane.children, found);
                 }
             },
@@ -266,6 +272,43 @@ impl Node {
                 popover.content.instances(found);
             },
             Self::Overlay(overlay) => overlay.content.instances(found),
+            Self::List(list) => all(&list.rows, found),
+            _ => {},
+        }
+    }
+
+    /// Calls `found` with each instance inside a hidden `lazy` pane: they
+    /// are kept as they are, neither started nor drawn, until it shows.
+    pub fn asleep(&self, found: &mut dyn FnMut(&Instance)) {
+        let all = |nodes: &[Node], found: &mut dyn FnMut(&Instance)| {
+            for node in nodes {
+                node.asleep(found);
+            }
+        };
+        match self {
+            Self::Stack(stack) => all(&stack.children, found),
+            Self::Panel(panel) => {
+                all(&panel.actions, found);
+                all(&panel.children, found);
+            },
+            Self::Split(split) => {
+                for pane in &split.panes {
+                    if pane.asleep() {
+                        for node in &pane.children {
+                            node.instances(found);
+                            node.asleep(found);
+                        }
+                    } else {
+                        all(&pane.children, found);
+                    }
+                }
+            },
+            Self::Popover(popover) => {
+                all(&popover.anchor, found);
+                popover.content.asleep(found);
+            },
+            Self::Overlay(overlay) => overlay.content.asleep(found),
+            Self::List(list) => all(&list.rows, found),
             _ => {},
         }
     }
@@ -298,6 +341,7 @@ pub struct Frame {
     pub max_height: Option<f32>,
     /// Out of the flow, over the parent at these offsets in pixels (each
     /// edge optional, negative overhangs): a count bubble on an icon's corner.
+    /// `float = "top-right"` pins it to an edge or corner.
     pub float: Option<Offsets>,
 }
 
@@ -376,8 +420,18 @@ pub struct Pane {
     /// Keep its size when the window resizes, as a sidebar does.
     pub fixed: bool,
     pub visible: bool,
+    /// Start what it mounts only once it first shows, and keep it, asleep,
+    /// while it is hidden: neither its view nor its drawing runs.
+    pub lazy: bool,
     pub frame: Frame,
     pub children: Vec<Node>,
+}
+
+impl Pane {
+    /// Hidden and `lazy`: what it mounts sleeps.
+    pub fn asleep(&self) -> bool {
+        self.lazy && !self.visible
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -394,6 +448,7 @@ pub struct Text {
     /// Wrap long lines (the default); `false` keeps each line whole, for
     /// code in a container that scrolls sideways.
     pub wrap: bool,
+    pub extras: Extras,
 }
 
 impl Text {
@@ -408,6 +463,7 @@ impl Text {
             truncate: false,
             lines: None,
             wrap: true,
+            extras: Extras::default(),
         }
     }
 }
@@ -434,7 +490,8 @@ pub enum Action {
     Window(String),
 }
 
-/// What a control does besides its click, on stacks, buttons and items.
+/// What an element does besides its click: on stacks, buttons and items,
+/// and on texts, badges, icons and images, which take no click.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Extras {
     /// Text shown under the pointer after it rests on the control.
@@ -476,6 +533,7 @@ pub struct Badge {
     pub look: Look,
     pub text: String,
     pub tone: Option<Tone>,
+    pub extras: Extras,
 }
 
 /// A symbol from the bundled set, drawn at the text's size and color.
@@ -487,6 +545,7 @@ pub struct Icon {
     pub size: Option<TextSize>,
     /// Turns without end, for a loader; `animation_speed` paces it.
     pub spin: bool,
+    pub extras: Extras,
 }
 
 tokens! {
@@ -517,6 +576,7 @@ pub struct Image {
     pub width: Option<f32>,
     pub height: Option<f32>,
     pub fit: Fit,
+    pub extras: Extras,
 }
 
 /// Largest picture file `ui.image` opens.
@@ -629,6 +689,49 @@ pub fn is_web_url(url: &str) -> bool {
     host_given && url.len() <= MAX && !url.chars().any(|c| c.is_control() || c.is_whitespace())
 }
 
+/// Where text typed in a browser's address field goes, as a browser does
+/// it: an address as written, a host (`example.com`, `localhost:3000`)
+/// over https (http for the machine itself), and anything else as a web
+/// search. None for blank text.
+pub fn typed_address(text: &str) -> Option<String> {
+    const SEARCH: &str = "https://duckduckgo.com/?q=";
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    if text.contains("://") {
+        return is_web_url(text).then(|| text.to_owned());
+    }
+    if !text.chars().any(char::is_whitespace) {
+        let host = text.split(['/', '?', '#']).next().unwrap_or_default();
+        let name = host.rsplit_once(':').map_or(host, |(name, _)| name);
+        let local =
+            matches!(name, "localhost" | "127.0.0.1" | "[::1]") || name.ends_with(".localhost");
+        if local || name.contains('.') && !name.starts_with('.') && !name.ends_with('.') {
+            let scheme = if local {
+                "http"
+            } else {
+                "https"
+            };
+            let url = format!("{scheme}://{text}");
+            if is_web_url(&url) {
+                return Some(url);
+            }
+        }
+    }
+    let mut query = String::with_capacity(text.len());
+    for byte in text.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                query.push(byte as char);
+            },
+            b' ' => query.push('+'),
+            _ => query.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    Some(format!("{SEARCH}{query}")).filter(|url| is_web_url(url))
+}
+
 /// A text field the host edits: single-line, or several lines with
 /// `multiline`. The host keeps what the user typed by the drawing mod and
 /// `id` (or the field's place in the tree), so it survives re-renders and
@@ -659,6 +762,10 @@ pub struct Input {
     pub focus: bool,
     /// Use the monospace font.
     pub mono: bool,
+    /// The `ui.browser` this field is the address bar of: Enter loads the
+    /// typed address there (see [`typed_address`]), focus selects the
+    /// text, and Escape puts back the page's address.
+    pub browser: Option<String>,
     pub width: Option<f32>,
     pub grow: bool,
 }
@@ -1133,4 +1240,44 @@ pub struct Overlay {
     pub height: Option<f32>,
     pub keys: Keys,
     pub content: Box<Node>,
+}
+
+/// Rows of the same height, of which the host draws only those that show,
+/// so a list of any length costs what one screenful does. The view gives a
+/// `row` function rather than the rows; it is called for the rows around
+/// the ones showing, and the host asks again as the list scrolls.
+#[derive(Clone, Debug, PartialEq)]
+pub struct List {
+    pub look: Look,
+    pub frame: Frame,
+    /// Names it among the mod's lists, so its place survives re-renders.
+    pub id: String,
+    /// How many rows there are in all.
+    pub count: usize,
+    /// Each row's height in pixels.
+    pub row_height: f32,
+    /// The position of `rows[0]`, from 0.
+    pub start: usize,
+    /// The rows from `start` the view built.
+    pub rows: Vec<Node>,
+}
+
+/// The rows of a list a view builds: from `start`, `len` of them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ListWindow {
+    pub start: usize,
+    pub len: usize,
+}
+
+impl ListWindow {
+    /// Rows built before the host says which show: a tall window's worth.
+    pub const FIRST: Self = Self { start: 0, len: 64 };
+    /// The most rows one window builds.
+    pub const MAX: usize = 1000;
+
+    /// The positions in it, of `count` rows.
+    pub fn range(self, count: usize) -> std::ops::Range<usize> {
+        let start = self.start.min(count);
+        start..(start + self.len.min(Self::MAX)).min(count)
+    }
 }
