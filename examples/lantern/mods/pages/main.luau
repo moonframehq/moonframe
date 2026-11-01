@@ -147,7 +147,7 @@ return mod {
 						height = 22,
 						align = "center",
 						justify = "center",
-						ui.text { string.upper(string.sub(name, 1, 1)), weight = "bold" },
+						ui.text { string.upper((string.match(name, "^" .. utf8.charpattern) or "")), weight = "bold" },
 					},
 					ui.text { name, class = "pages-name", truncate = true },
 					ui.spacer(),

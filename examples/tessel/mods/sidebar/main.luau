@@ -165,7 +165,7 @@ return mod {
 					align = "center",
 					justify = "center",
 					style = { background = user.color, radius = 999, color = "#ffffff" },
-					ui.text { string.sub(user.name, 1, 1), weight = "bold" },
+					ui.text { (string.match(user.name, "^" .. utf8.charpattern) or ""), weight = "bold" },
 				},
 				ui.column {
 					gap = "none",

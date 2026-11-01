@@ -144,7 +144,7 @@
       const shown = all.filter(c => !q || (c.title + " " + c.name + " " + c.category + " " + c.description).toLowerCase().includes(q));
       const cats = [...new Set(shown.map(c => c.category))].sort();
       list.innerHTML = cats.map(cat => `<div class="cb-cat">${esc(cat)}</div>` + shown.filter(c => c.category === cat)
-        .map(c => `<div class="cb-item ${c.name === current ? "on" : ""}" data-n="${c.name}">${esc(c.title)}${SHOTS[c.name] || PREVIEWS[c.name] ? '<span class="cb-has" title="Preview"></span>' : ""}</div>`).join("")).join("")
+        .map(c => `<div class="cb-item ${c.name === current ? "on" : ""}" data-n="${esc(c.name)}">${esc(c.title)}${SHOTS[c.name] || PREVIEWS[c.name] ? '<span class="cb-has" title="Preview"></span>' : ""}</div>`).join("")).join("")
         || `<div class="cb-muted" style="padding:12px">No component matches.</div>`;
     }
     function drawDetail() {

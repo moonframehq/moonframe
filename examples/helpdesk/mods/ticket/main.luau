@@ -25,8 +25,8 @@ local LABEL = 168
 local BAR = 228
 
 local function initials(name: string): string
-	local first, last = string.match(name, "^(%S)%S*%s+(%S)")
-	return if first and last then first .. last else string.sub(name, 1, 1)
+	local first, last = string.match(name, `^({utf8.charpattern})%S*%s+({utf8.charpattern})`)
+	return if first and last then first .. last else (string.match(name, "^" .. utf8.charpattern) or "")
 end
 
 local function first_name(name: string): string

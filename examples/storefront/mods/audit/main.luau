@@ -280,7 +280,7 @@ return mod {
 				author = ui.row {
 					class = "audit-author",
 					align = "center",
-					avatar { name = author.name, size = "small", color = author.color, initial = string.sub(author.name, 1, 1) },
+					avatar { name = author.name, size = "small", color = author.color, initial = (string.match(author.name, "^" .. utf8.charpattern) or "") },
 					ui.text { author.name, truncate = true },
 				},
 				time = rich_text { parts = stamp },

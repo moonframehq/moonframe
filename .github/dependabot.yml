@@ -34,9 +34,14 @@ updates:
       - dependency-name: gpui-kit
       - dependency-name: lb-wry
 
-  # The Wasm provider builds outside the workspace, with its own lockfile.
+  # The Wasm providers build outside the workspace, each with its own lockfile.
   - package-ecosystem: cargo
-    directory: /app/providers/system
+    directories:
+      - /app/providers/system
+      - /examples/gantry/providers/telemetry
+      - /examples/helpdesk/providers/desk
+      - /examples/research/providers/research
+      - /examples/vigil/providers/vigil
     schedule:
       interval: weekly
     cooldown:
@@ -45,4 +50,17 @@ updates:
       prefix: chore
     groups:
       provider:
+        patterns: ["*"]
+
+  # dmgbuild and its hash-pinned dependencies, used to build the release DMG.
+  - package-ecosystem: pip
+    directory: /assets/macos/dmg
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+    groups:
+      dmg:
         patterns: ["*"]

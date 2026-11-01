@@ -62,7 +62,14 @@ stage() {
     if [ -n "$app" ]; then
         scripts/stage-app.sh "$1/bundle/app" "$app" >/dev/null
         for package in "${packages[@]}"; do
-            scripts/stage-app.sh "$1/bundle/packages/$(basename "$package")" "$package" >/dev/null
+            staged="$1/bundle/packages/$(basename "$package")"
+            # Two packages of one name would land in one folder, the second
+            # quietly over the first.
+            if [ -e "$staged" ]; then
+                echo "two required packages are named \`$(basename "$package")\`; a bundle needs distinct names" >&2
+                exit 1
+            fi
+            scripts/stage-app.sh "$staged" "$package" >/dev/null
         done
         # What git keeps for itself is no part of the app.
         find "$1/bundle" -name .git -prune -exec rm -rf {} +

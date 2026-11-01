@@ -154,7 +154,7 @@ return mod {
 						align = "center",
 						justify = "center",
 						style = { background = item.color },
-						ui.text { string.sub(item.initials, 1, 1), size = "small" },
+						ui.text { (string.match(item.initials, "^" .. utf8.charpattern) or ""), size = "small" },
 					}
 					else ui.icon { name = item.icon, size = "small", style = { color = item.color } }
 				table.insert(rows, row(

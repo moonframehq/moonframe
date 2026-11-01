@@ -227,7 +227,7 @@ return mod {
 					height = 32,
 					align = "center",
 					justify = "center",
-					ui.text { string.sub(deal.company, 1, 1), weight = "medium" },
+					ui.text { (string.match(deal.company, "^" .. utf8.charpattern) or ""), weight = "medium" },
 				},
 				ui.column {
 					gap = "none",
