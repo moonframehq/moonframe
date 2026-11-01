@@ -1,0 +1,9 @@
+[app]
+# A terminal multiplexer around projects and their work trees: each work
+# tree keeps its own tabs of split terminals, with its source control
+# beside them. `moonframe --profile trellis` opens it.
+keep  = []
+name  = "trellis"
+title = "Trellis"
+# The projects provider (repositories, work trees, changes, commits).
+requires = ["../projects"]
