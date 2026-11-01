@@ -1379,6 +1379,8 @@ type Stylesheet = {
 	colors: { [string]: any }?,
 	-- Named durations: milliseconds, or `"220ms"`; `any` as for colors.
 	speeds: { [string]: any }?,
+	-- Divides every duration: 2 is twice as fast, 0 turns animations off;
+	-- otherwise 0.01 to 10.
 	animation_speed: number?,
 	-- Styles by selector: `panel`, `.class`, `item:selected`.
 	rules: { [string]: Style }?,

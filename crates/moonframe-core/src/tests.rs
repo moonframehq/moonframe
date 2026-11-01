@@ -4318,3 +4318,180 @@ fn gradients_take_strings_and_tables() {
     let workspace = Workspace::open(bad.path(), false);
     assert!(!workspace.problems().is_empty());
 }
+
+/// Runs `test` with the stack the app reads views on: the main thread's
+/// 8 MiB, not a test thread's 2, which a debug build's frames can outgrow
+/// well inside the depth limit.
+fn on_a_main_thread_stack(test: impl FnOnce() + Send + 'static) {
+    std::thread::Builder::new()
+        .stack_size(8 * 1024 * 1024)
+        .spawn(test)
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn floating_content_counts_toward_how_deep_a_view_goes() {
+    on_a_main_thread_stack(|| {
+        // A popover holding itself, and a long chain of overlays, used to
+        // recurse until the stack overflowed and the app aborted.
+        let deep = |view: &str| {
+            let error =
+                view_of(&format!("return mod {{ view = function() {view} end }}")).unwrap_err();
+            assert!(error.contains("nested deeper"), "{error}");
+        };
+        deep(r#"local o = ui.popover { ui.text "a" }; o.content = o; return o"#);
+        deep(
+            r#"local n = ui.text "x"; for _ = 1, 9000 do n = ui.overlay { content = n } end; return n"#,
+        );
+        deep(r#"local n = ui.text "x"; for _ = 1, 60 do n = ui.column { n } end; return n"#);
+    });
+}
+
+#[test]
+fn a_tiny_animation_speed_is_refused_rather_than_crashing() {
+    use std::time::Duration;
+    let dir = app(&[]);
+    write(
+        dir.path(),
+        "style.luau",
+        r#"return style { animation_speed = 1e-30, rules = { panel = { transition = "fade" } } }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let error = workspace.style_error().unwrap().to_string();
+    assert!(error.contains("animation_speed"), "{error}");
+    // Off is still allowed.
+    write(
+        dir.path(),
+        "style.luau",
+        "return style { animation_speed = 0 }",
+    );
+    let mut workspace = workspace;
+    workspace.reload();
+    assert!(workspace.style_error().is_none());
+    // And scaling never panics, whatever the speed.
+    let names = crate::style::Names {
+        animation_speed: 1e-30,
+        ..crate::style::Names::NONE
+    };
+    assert_eq!(names.scaled(Duration::from_secs(1)), Duration::MAX);
+}
+
+#[test]
+fn sends_to_providers_and_topics_count_toward_the_limit() {
+    // Each update sends a pile to a provider and a topic, then itself again.
+    let flood = r#"return mod {
+      update = function(state, msg)
+        local sends = {}
+        for i = 1, 100 do
+          table.insert(sends, { to = "provider:git", msg = i })
+          table.insert(sends, { to = "topic:flood", msg = i })
+        end
+        table.insert(sends, { to = "flood", msg = "again" })
+        return state, sends
+      end,
+      view = function() return ui.text "flood" end,
+    }"#;
+    let wide = r#"return mod {
+      update = function(state, msg)
+        local sends = {}
+        for i = 1, 50000 do table.insert(sends, { to = "provider:git", msg = i }) end
+        return state, sends
+      end,
+      view = function() return ui.text "wide" end,
+    }"#;
+    let dir = app(&[("flood", flood), ("wide", wide)]);
+    let mut workspace = Workspace::open(dir.path(), false);
+
+    workspace.send("flood", "flood", Data::from("go"));
+    let sent = workspace.take_outbox().len();
+    assert!(sent < 1024, "{sent} provider messages from one action");
+    let error = workspace
+        .slot("flood")
+        .unwrap()
+        .error()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("1024"), "{error}");
+
+    workspace.send("wide", "wide", Data::from("go"));
+    assert!(workspace.take_outbox().is_empty());
+    let error = workspace.slot("wide").unwrap().error().unwrap().to_string();
+    assert!(error.contains("may send up to"), "{error}");
+}
+
+#[test]
+fn a_stylesheet_cannot_rewrite_style_for_the_layers_above_it() {
+    let builtin = app(&[]);
+    write(
+        builtin.path(),
+        "style.luau",
+        "style = function() return { font_size = 7 } end\nreturn {}",
+    );
+    let user = tempfile::tempdir().unwrap();
+    write(user.path(), "style.luau", "return style { font_size = 20 }");
+    let roots = crate::Roots::new([builtin.path().to_owned(), user.path().to_owned()]);
+    let workspace = Workspace::open(roots, false);
+    assert_eq!(workspace.stylesheet().font_size, Some(20.0));
+}
+
+#[test]
+fn siblings_cannot_share_a_key() {
+    let dir = app(&[(
+        "keys",
+        r#"return mod { view = function()
+          return ui.row { ui.column { key = "a" }, ui.column { key = "b" }, ui.column { key = "a" } }
+        end }"#,
+    )]);
+    let workspace = Workspace::open(dir.path(), false);
+    let error = broken(&workspace, "keys");
+    assert!(error.contains("`a`"), "{error}");
+}
+
+#[test]
+fn state_that_cannot_be_kept_says_so() {
+    let dir = app(&[(
+        "keeps",
+        r#"return mod {
+          init = function() return { callback = function() end } end,
+          view = function() return ui.text "keeps" end,
+        }"#,
+    )]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    workspace.reload();
+    let error = workspace
+        .slot("keeps")
+        .unwrap()
+        .error()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("not kept"), "{error}");
+}
+
+#[test]
+fn numbers_too_big_for_the_app_are_refused() {
+    let dir = app(&[]);
+    write(
+        dir.path(),
+        "style.luau",
+        r##"return style { rules = { panel = { gradient = { from = "#000", to = "#fff", angle = 1e300 } } } }"##,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let error = workspace.style_error().unwrap().to_string();
+    assert!(error.contains("finite"), "{error}");
+}
+
+#[test]
+fn component_file_names_are_checked() {
+    let dir = app(&[]);
+    write(dir.path(), "components/My Card.luau", BADGE_COMPONENT);
+    let workspace = Workspace::open(dir.path(), false);
+    let component = workspace
+        .components()
+        .iter()
+        .find(|component| component.name == "My Card")
+        .unwrap();
+    let error = component.preview.as_ref().unwrap_err().to_string();
+    assert!(error.contains("a-z"), "{error}");
+}

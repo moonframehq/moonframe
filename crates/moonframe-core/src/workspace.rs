@@ -36,6 +36,14 @@ pub const SHELL: &str = "shell";
 /// that answer each other cannot hang the window.
 const MAX_MESSAGES: usize = 64;
 
+/// Every message one click may cause, including those to providers and
+/// topics, which do not run an `update` here but still cost: a provider's
+/// queue fills, a topic is saved.
+const MAX_SENDS: usize = 1024;
+
+/// The most messages one `update` may send.
+const MAX_SENDS_PER_UPDATE: usize = 256;
+
 pub struct Workspace {
     roots: Roots,
     /// The components mods can `use`.
@@ -146,6 +154,11 @@ struct Mounted {
     of: InstanceOf,
     /// The module that drew it, which `to = "parent"` reaches.
     owner: String,
+}
+
+/// Why a module's state was not kept: it holds what cannot be saved.
+fn lost_state(error: Error) -> Error {
+    error.context("state is not kept across reloads or launches")
 }
 
 /// Instances one render may hold: each is a Luau state of its own.
@@ -284,43 +297,41 @@ impl Slot {
     /// Loads `source`, which came from `path` if it is a file's.
     fn load_source(&mut self, name: &str, source: &str, path: Option<&Path>, library: &Library) {
         self.source = path.map(Path::to_owned);
-        // A reload keeps the running state; a first load takes the saved one.
-        let previous = self
-            .module
-            .as_ref()
-            .and_then(Module::state)
-            .or_else(|| self.restored.take());
+        let (previous, lost) = self.previous();
         let props = (self.props != Data::Nil).then_some(&self.props);
         let loaded = Module::load(name, source, previous.as_ref(), props, library);
-        match loaded {
-            Ok(module) => {
-                self.module = Some(module);
-                self.fresh = true;
-                self.dirty = true;
-                self.load_error = None;
-                self.update_error = None;
-            },
-            Err(error) => self.load_error = Some(error),
-        }
+        self.loaded(loaded, lost);
     }
 
     /// Loads an instance of the component `component`, keeping its state
     /// across reloads like a mod's.
     fn load_component(&mut self, key: &str, component: &str, library: &Library) {
         self.source = library.path(component);
-        let previous = self
-            .module
-            .as_ref()
-            .and_then(Module::state)
-            .or_else(|| self.restored.take());
+        let (previous, lost) = self.previous();
         let props = (self.props != Data::Nil).then_some(&self.props);
-        match Module::load_component(key, component, previous.as_ref(), props, library) {
+        let loaded = Module::load_component(key, component, previous.as_ref(), props, library);
+        self.loaded(loaded, lost);
+    }
+
+    /// The state a load starts from: a reload keeps the running state, a
+    /// first load takes the saved one. With why the running state could not
+    /// be kept, when it could not.
+    fn previous(&mut self) -> (Option<Data>, Option<Error>) {
+        match self.module.as_ref().map(Module::state) {
+            Some(Ok(state)) => (Some(state), None),
+            Some(Err(error)) => (None, Some(lost_state(error))),
+            None => (self.restored.take(), None),
+        }
+    }
+
+    fn loaded(&mut self, loaded: Result<Module, Error>, lost: Option<Error>) {
+        match loaded {
             Ok(module) => {
                 self.module = Some(module);
                 self.fresh = true;
                 self.dirty = true;
                 self.load_error = None;
-                self.update_error = None;
+                self.update_error = lost;
             },
             Err(error) => self.load_error = Some(error),
         }
@@ -455,8 +466,13 @@ impl Workspace {
                     .map(|(key, mounted)| (key.as_str(), &mut mounted.slot)),
             );
         for (name, slot) in slots {
-            let Some(state) = slot.module.as_ref().and_then(Module::state) else {
-                continue;
+            let state = match slot.module.as_ref().map(Module::state) {
+                Some(Ok(state)) => state,
+                Some(Err(error)) => {
+                    slot.update_error.get_or_insert_with(|| lost_state(error));
+                    continue;
+                },
+                None => continue,
             };
             if slot.saved.as_ref() != Some(&state) {
                 persist.save_state(&state_key(name), &state);
@@ -567,14 +583,19 @@ impl Workspace {
         }
         let loaded = (|| {
             let meter = Meter::default();
-            let lua = vm::open("style", &meter, &Library::default())?;
+            let lua = vm::open("style", &meter, &Library::default(), vm::SMALL_MEMORY)?;
             let merged = lua.create_table()?;
             for path in &files {
                 let within = |error: Error| Error::new(format!("{}: {error}", path.display()));
                 let source = fs::read_to_string(path)
                     .map_err(|error| Error::new(format!("cannot read: {error}")))
                     .map_err(within)?;
+                // Each file gets globals of its own and the whole budget,
+                // so a package's stylesheet cannot replace `style` for the
+                // layers above it.
+                meter.reset();
                 let value = vm::text(&lua, &source, "style")
+                    .set_environment(vm::own_globals(&lua)?)
                     .eval::<Value>()
                     .map_err(|error| within(error.into()))?;
                 match value {
@@ -947,8 +968,17 @@ impl Workspace {
 
     /// Delivers each message in `queue`, and what the modules send on.
     fn process(&mut self, mut queue: VecDeque<(String, String, Data)>) {
-        let mut delivered = 0;
+        let (mut delivered, mut sent) = (0, 0);
         while let Some((from, to, msg)) = queue.pop_front() {
+            sent += 1;
+            if sent > MAX_SENDS {
+                if let Some(slot) = self.slot_mut(&from) {
+                    slot.update_error = Some(Error::new(format!(
+                        "more than {MAX_SENDS} messages from one action, counting those to providers and topics"
+                    )));
+                }
+                break;
+            }
             let to = self.resolve(&from, &to);
             // A preview, and every instance it drew at any depth, keeps to
             // itself: no other mod, provider or topic hears it.
@@ -1005,6 +1035,12 @@ impl Workspace {
             // `update` may change the state in place, so the view runs again.
             *dirty = true;
             match module.update(&msg) {
+                Ok(sends) if sends.len() > MAX_SENDS_PER_UPDATE => {
+                    *update_error = Some(Error::new(format!(
+                        "update sent {} messages; it may send up to {MAX_SENDS_PER_UPDATE}",
+                        sends.len()
+                    )));
+                },
                 Ok(sends) => {
                     *update_error = None;
                     queue.extend(

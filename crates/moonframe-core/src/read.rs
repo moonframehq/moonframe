@@ -64,6 +64,16 @@ impl<'p> Cx<'p> {
         Self { at, ..self.clone() }
     }
 
+    /// A named key that holds an element, one level down: a popover's
+    /// `content`. It counts toward the tree's depth as a list position
+    /// does, so a chain of them cannot recurse past the limit.
+    pub(crate) fn nested(&self, key: &str) -> Self {
+        Self {
+            depth: self.depth + 1,
+            ..self.key(key)
+        }
+    }
+
     /// A list position, counted from 1 as Lua does: `column[2]`.
     pub(crate) fn index(&self, index: usize) -> Self {
         Self {
@@ -145,6 +155,10 @@ impl Read for Value {
 impl Read for String {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
         let text = match value {
+            // Measured before it is copied out of Luau.
+            Value::String(text) if text.as_bytes().len() > MAX_TEXT => {
+                return Err(cx.fail(format!("longer than {MAX_TEXT} bytes")));
+            },
             Value::String(text) => text.to_string_lossy(),
             // A number where a label goes is its text.
             Value::Integer(number) => number.to_string(),
@@ -167,11 +181,10 @@ impl Read for Document {
         let Value::String(text) = value else {
             return Err(cx.fail("expected a string"));
         };
-        let text = text.to_string_lossy();
-        if text.len() > MAX_DOCUMENT {
+        if text.as_bytes().len() > MAX_DOCUMENT {
             return Err(cx.fail(format!("longer than {MAX_DOCUMENT} bytes")));
         }
-        Ok(Self(text))
+        Ok(Self(text.to_string_lossy()))
     }
 }
 
@@ -188,10 +201,15 @@ impl Read for f32 {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
         let number = match value {
             Value::Integer(number) => *number as f64,
-            Value::Number(number) if number.is_finite() => *number,
+            Value::Number(number) => *number,
             _ => return Err(cx.fail("expected a number")),
         };
-        Ok(number as f32)
+        // Finite as a Lua number may still overflow to infinity as an f32.
+        let number = number as f32;
+        if !number.is_finite() {
+            return Err(cx.fail("expected a finite number"));
+        }
+        Ok(number)
     }
 }
 
@@ -239,12 +257,21 @@ pub(crate) fn list(table: &Table) -> Result<Vec<Value>, Error> {
     // and drop the children after it.
     let mut last = 0;
     for pair in table.pairs::<Value, Value>() {
-        if let (Value::Integer(index), _) = pair?
-            && let Ok(index) = usize::try_from(index)
-        {
-            last = last.max(index);
+        if let (Value::Integer(index), _) = pair? {
+            last = last.max(position(index));
         }
     }
+    list_to(table, last)
+}
+
+/// A list position as a count; one below 1 is no position.
+pub(crate) fn position(index: i64) -> usize {
+    usize::try_from(index).unwrap_or(0)
+}
+
+/// The list part of a table up to `last`, its highest position, skipping
+/// `nil` and `false`.
+pub(crate) fn list_to(table: &Table, last: usize) -> Result<Vec<Value>, Error> {
     if last > MAX_ITEMS {
         return Err(Error::new(format!("more than {MAX_ITEMS} list positions")));
     }

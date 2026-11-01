@@ -476,7 +476,10 @@ impl Names {
         if self.animation_speed == 0.0 {
             Duration::ZERO
         } else {
-            duration.div_f32(self.animation_speed)
+            // `div_f32` panics past `Duration::MAX`; the reader keeps the
+            // speed off tiny values, and this keeps a slip from crashing.
+            Duration::try_from_secs_f64(duration.as_secs_f64() / f64::from(self.animation_speed))
+                .unwrap_or(Duration::MAX)
         }
     }
 }
