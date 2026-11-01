@@ -45,7 +45,7 @@ return component {
 		[".sheet"] = { background = "background", border = "all", border_color = "border", radius = 0, padding = 0 },
 		[".sheet-header"] = { padding = { 12, 14 }, gap = 10, border = "bottom", border_color = "border" },
 		[".sheet-icon"] = { color = "muted-foreground" },
-		[".sheet-title"] = { weight = "bold" },
+		[".sheet-title"] = { weight = "semibold" },
 		[".sheet-subtitle"] = { size = "small", color = "muted-foreground" },
 		[".sheet-close"] = { padding = 4, radius = 6, color = "muted-foreground" },
 		[".sheet-close:hover"] = { background = "list-hover", color = "foreground" },

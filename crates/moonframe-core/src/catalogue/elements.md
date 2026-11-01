@@ -22,7 +22,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 | Element | Use it for | Keys |
 | --- | --- | --- |
-| `ui.text "..."` | any text; a bare string child is plain text | `text`, `tone`, `size`, `weight`, `truncate` (one line), `lines` (at most N lines), `wrap = false` (keep lines whole, for code that scrolls sideways), extras |
+| `ui.text "..."` | any text; a bare string child is plain text | `text`, `tone`, `size`, `weight` (`light` `normal` `medium` `semibold` `bold`), `truncate` (one line), `lines` (at most N lines), `wrap = false` (keep lines whole, for code that scrolls sideways), extras |
 | `ui.icon "name"` | a bundled icon at the text's size and color; `spin = true` turns it (loaders). Lucide glyphs (git: `git-branch` `git-commit-horizontal` `git-merge` `git-pull-request` `git-pull-request-draft` `git-pull-request-closed` `git-compare` `circle-dot`), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, brands `brand-github` `brand-gitlab` `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama`; the full list is `IconName` in types/moonframe.d.luau | `name`, `tone`, `size`, `spin`, extras |
 | `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras |
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone`, extras |
@@ -106,7 +106,7 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
 ### Style keys
 
 `background`, `color`, `border`, `border_color`, `radius`, `padding`, `gap`,
-`margin`, `shadow`, `size`, `weight`, `font` (`sans`, `mono`), `case`
+`margin`, `shadow`, `size`, `weight` (`light` to `bold`, `semibold` between `medium` and `bold`), `font` (`sans`, `mono`), `case`
 (`upper`, `lower`, on text), `opacity`, `width` and `height` (under the
 element's own; on containers),
 `transition`. Selectors: a part (`row`, `item`, `list`, `popover`, `overlay`, `overlay-backdrop`, `tooltip`, `image`, ...),

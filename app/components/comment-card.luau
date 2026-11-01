@@ -52,7 +52,7 @@ return component {
 	},
 	styles = {
 		[".comment-card"] = { gap = 10, padding = 12, radius = 8, border = "all", border_color = "border", background = "background" },
-		[".comment-card-author"] = { weight = "bold", size = "small" },
+		[".comment-card-author"] = { weight = "semibold", size = "small" },
 		[".comment-card-meta"] = { size = "small", color = "muted-foreground" },
 		[".comment-card-badge"] = { radius = 999, padding = { 0, 6 }, border = "all", border_color = "border" },
 		[".comment-card-badge-text"] = { size = "small", color = "muted-foreground" },

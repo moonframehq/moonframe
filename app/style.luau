@@ -95,7 +95,7 @@ return style {
 			transition = "slide-fade fast ease-out",
 		},
 		["overlay-backdrop"] = { background = "#000000/35" },
-		[".sheet-title"] = { weight = "bold", size = "large" },
+		[".sheet-title"] = { weight = "semibold", size = "large" },
 		[".muted"] = { size = "small", color = "muted-foreground" },
 		[".usage-tabs"] = { margin = { top = 4 } },
 		[".usage-tab"] = { padding = { 6, 0 }, radius = 8, color = "muted-foreground" },

@@ -36,8 +36,10 @@ pub(super) trait StyleExt: Styled + Sized {
 
     fn weighted(self, weight: Weight) -> Self {
         self.font_weight(match weight {
+            Weight::Light => FontWeight::LIGHT,
             Weight::Normal => FontWeight::NORMAL,
             Weight::Medium => FontWeight::MEDIUM,
+            Weight::Semibold => FontWeight::SEMIBOLD,
             Weight::Bold => FontWeight::BOLD,
         })
     }

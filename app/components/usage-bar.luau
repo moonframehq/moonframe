@@ -32,7 +32,7 @@ return component {
 	},
 	styles = {
 		[".usage-bar"] = { gap = 6 },
-		[".usage-bar-title"] = { weight = "bold" },
+		[".usage-bar-title"] = { weight = "semibold" },
 		[".usage-bar-resets"] = { size = "small", color = "muted-foreground" },
 		[".usage-bar-note"] = { size = "small", color = "muted-foreground" },
 		[".usage-bar-track"] = { background = "muted-foreground/20", radius = 999 },
