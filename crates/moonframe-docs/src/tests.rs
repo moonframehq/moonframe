@@ -434,3 +434,28 @@ fn without_a_swap_the_file_is_moved_aside_and_only_ever_linked_over_nothing() {
     // Only the file is left: nothing aside, no temporary one.
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
 }
+
+#[test]
+fn placing_never_replaces_a_file_and_the_original_comes_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let from = dir.path().join("from");
+    let to = dir.path().join("to");
+    fs::write(&from, "mine").unwrap();
+    fs::write(&to, "theirs").unwrap();
+    let error = place(&from, &to).unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists);
+    assert_eq!(fs::read_to_string(&to).unwrap(), "theirs");
+    assert_eq!(fs::read_to_string(&from).unwrap(), "mine");
+
+    // Put back where nothing is; when a newer one took the place, it stays.
+    let aside = dir.path().join("aside");
+    fs::write(&aside, "original").unwrap();
+    let gone = dir.path().join("gone");
+    put_back(&aside, &gone).unwrap();
+    assert_eq!(fs::read_to_string(&gone).unwrap(), "original");
+    assert!(!aside.exists());
+    fs::write(&aside, "older").unwrap();
+    put_back(&aside, &to).unwrap();
+    assert_eq!(fs::read_to_string(&to).unwrap(), "theirs");
+    assert!(!aside.exists());
+}

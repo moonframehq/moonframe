@@ -435,10 +435,10 @@ fn replace(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> {
 
 /// [`replace`] without a swap: the file is moved aside in one step, so a
 /// save made elsewhere from then on is a new file in its place; what was
-/// moved is looked at, and the new text is linked in only where nothing
-/// is (a link never replaces a file). Anything but `expected`, or a file
-/// that appeared, is left as it is and refused; the original is put back
-/// where it can be. The file is briefly missing meanwhile.
+/// moved is looked at, and the new text is put in only where nothing is
+/// ([`place`]). Anything but `expected`, or a file that appeared, is left
+/// as it is and refused, and the original is put back unless a newer one
+/// took its place. The file is briefly missing meanwhile.
 fn replace_aside(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> {
     let aside = temp.with_extension("old");
     match fs::rename(file, &aside) {
@@ -448,37 +448,68 @@ fn replace_aside(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> 
         },
         Err(error) => return Err(error.into()),
     }
-    // Back where it was, unless a save elsewhere already took its place.
-    let put_back = || match fs::hard_link(&aside, file) {
-        Ok(()) => fs::remove_file(&aside),
-        Err(_) => Ok(()),
-    };
     let was = aside.metadata().ok().map(|meta| version(&meta));
-    if was.as_deref() != Some(expected) {
-        put_back()?;
-        return Err(Saved::Conflict(CHANGED));
-    }
-    match fs::hard_link(temp, file) {
+    let placed = if was.as_deref() == Some(expected) {
+        place(temp, file)
+    } else {
+        Err(std::io::ErrorKind::AlreadyExists.into())
+    };
+    match placed {
         Ok(()) => {
-            fs::remove_file(temp)?;
             fs::remove_file(&aside)?;
             Ok(())
         },
-        // A save elsewhere landed meanwhile: it stays.
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            fs::remove_file(&aside)?;
-            Err(Saved::Conflict(CHANGED))
-        },
-        // A folder without links: the original back, then a rename.
-        Err(_) => match fs::rename(temp, file) {
-            Ok(()) => {
-                fs::remove_file(&aside)?;
-                Ok(())
-            },
-            Err(error) => {
-                put_back()?;
+        Err(error) => {
+            put_back(&aside, file)?;
+            if error.kind() == std::io::ErrorKind::AlreadyExists {
+                Err(Saved::Conflict(CHANGED))
+            } else {
                 Err(error.into())
-            },
+            }
+        },
+    }
+}
+
+/// The original, moved aside by [`replace_aside`], back in its place;
+/// when a save elsewhere already took it, that newer one stays and the old
+/// is dropped. A failure names where the original still is.
+fn put_back(aside: &Path, file: &Path) -> std::io::Result<()> {
+    match place(aside, file) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => fs::remove_file(aside),
+        Err(error) => Err(std::io::Error::new(
+            error.kind(),
+            format!("{error}; the file is kept at {}", aside.display()),
+        )),
+    }
+}
+
+/// Moves `from` to `to` only if nothing is at `to`, failing with
+/// `AlreadyExists` otherwise: never over another file. A hard link does it
+/// in one step; on a drive without links (FAT, exFAT), `to` is created new,
+/// which fails if anything is there, and the text copied in.
+fn place(from: &Path, to: &Path) -> std::io::Result<()> {
+    match fs::hard_link(from, to) {
+        Ok(()) => return fs::remove_file(from),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => return Err(error),
+        Err(_) => {},
+    }
+    let mut out = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(to)?;
+    let copied = (|| {
+        std::io::copy(&mut fs::File::open(from)?, &mut out)?;
+        out.sync_all()?;
+        fs::set_permissions(to, from.metadata()?.permissions())
+    })();
+    match copied {
+        Ok(()) => fs::remove_file(from),
+        Err(error) => {
+            // Ours, half written: gone, so `from` is still the whole one.
+            drop(out);
+            fs::remove_file(to).ok();
+            Err(error)
         },
     }
 }
@@ -487,7 +518,8 @@ fn replace_aside(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> 
 /// is never seen half written. It keeps the original's permissions. What is
 /// there is checked against `over` again just before, after the slow part,
 /// so a save made elsewhere meanwhile is refused rather than lost; a new
-/// file is linked into place, which fails if one appeared.
+/// file is put in only where nothing is ([`place`]), so one that appeared
+/// stays.
 fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
     let name = file
         .file_name()
@@ -522,14 +554,12 @@ fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
                 }
                 replace(&temp, file, expected)?;
             },
-            Over::Nothing => match fs::hard_link(&temp, file) {
-                Ok(()) => fs::remove_file(&temp)?,
+            Over::Nothing => match place(&temp, file) {
+                Ok(()) => {},
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
                     return Err(Saved::Conflict(EXISTS));
                 },
-                // A folder without links (some USB drives): only a last look.
-                Err(_) if file.symlink_metadata().is_err() => fs::rename(&temp, file)?,
-                Err(_) => return Err(Saved::Conflict(EXISTS)),
+                Err(error) => return Err(error.into()),
             },
             Over::Anything => fs::rename(&temp, file)?,
         }
