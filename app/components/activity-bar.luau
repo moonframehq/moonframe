@@ -1,7 +1,8 @@
--- A vertical strip of icon tiles at the window's edge, as in VS Code or
--- A left bar, as in an IDE: one per view (terminals, pull requests, issues, agents),
--- the current one on an accent tile, settings pinned to the bottom, and a
--- count bubble on a tile's corner. A click sends `{ activity = id }`.
+-- A vertical strip of icon tiles at the window's edge, as in VS Code: one
+-- per view (terminals, pull requests, issues, agents), the current one on an
+-- accent tile, settings pinned to the bottom, and a count bubble on a tile's
+-- corner. A click sends `{ activity = id }`. The starter's shell does not
+-- draw one; an app's shell that wants one uses it as in `usage` below.
 
 type Item = {
 	id: string,
@@ -80,6 +81,46 @@ return component {
 			margin = { top = 1, right = 0 },
 		},
 	},
+	usage = [[-- An app's main.luau: the bar picks which region the side pane shows.
+-- Each view's mods declare that region (`region = "files"`), and keep
+-- their state while hidden. Clicking the current view folds the pane.
+local activity_bar = use "activity-bar"
+
+local VIEWS = {
+	{ id = "files", icon = "file-text", tooltip = "Explorer" },
+	{ id = "search", icon = "search", tooltip = "Search" },
+	{ id = "changes", icon = "git-branch", tooltip = "Changes" },
+}
+
+return mod {
+	init = function(previous)
+		return previous or { activity = "files", open = true }
+	end,
+
+	update = function(state, msg)
+		if typeof(msg) == "table" and msg.activity then
+			state.open = not (state.open and state.activity == msg.activity)
+			state.activity = msg.activity
+		end
+	end,
+
+	view = function(state)
+		return ui.row {
+			gap = "none",
+			grow = true,
+			activity_bar {
+				items = VIEWS,
+				selected = state.open and state.activity or nil,
+				bottom = { { id = "settings", icon = "settings", tooltip = "Settings" } },
+			},
+			ui.hsplit {
+				id = "body",
+				ui.pane { size = 260, min = 160, max = 480, fixed = true, visible = state.open, surface = "sidebar", ui.region(state.activity) },
+				ui.pane { ui.region "main" },
+			},
+		}
+	end,
+}]],
 	example = {
 		selected = "pulls",
 		height = 440,
