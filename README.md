@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.png" alt="Moonframe icon: a brown rounded square holding a round teal badge with a cream ring, and in it a moon striped in mustard, orange and red like a 70s sunset" width="176" height="176">
+  <img src="docs/screenshots/hero.png" alt="Moonframe: Malleable software. Ask for a change and watch the running app reshape itself. No rebuild, no restart. Example apps built on Moonframe fanned over a striped sunset; in front, a leads report whose May bar is orange, beside the prompt that asked for it, 'Highlight the best month in orange', marked applied live, state kept" width="900">
 </p>
 
 <h1 align="center">Moonframe</h1>
