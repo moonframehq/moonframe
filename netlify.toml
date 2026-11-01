@@ -1,11 +1,11 @@
 # moonframe.dev and docs.moonframe.dev: a static site in website/site, no build.
 [build]
-  publish = "website/site"
-  command = ""
-  # Skip a deploy when nothing under website/ changed.
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- website/ netlify.toml"
+command = ""
+publish = "website/site"
+# Skip a deploy when nothing under website/ changed.
+ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- website/ netlify.toml"
 
 [[headers]]
-  for = "/img/*"
-  [headers.values]
-    Cache-Control = "public, max-age=604800"
+for = "/img/*"
+[headers.values]
+Cache-Control = "public, max-age=604800"
