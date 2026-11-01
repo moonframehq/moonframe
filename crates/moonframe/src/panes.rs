@@ -195,8 +195,22 @@ impl Shell {
     /// ends the command. `None` for a shell whose rules are unknown.
     fn quote(self, text: &str) -> Option<String> {
         Some(match self {
-            Self::Posix => format!("'{}'", text.replace('\'', r"'\''")),
-            Self::Fish => format!("'{}'", text.replace('\\', r"\\").replace('\'', r"\'")),
+            // One form both read alike, as tmux's or herdr-core's shell may
+            // not be $SHELL: single quotes, closed around a quote (`'\''`)
+            // and around a backslash (`'\\'`), which fish would otherwise
+            // read as an escape inside them.
+            Self::Posix | Self::Fish => {
+                let mut quoted = String::from("'");
+                for c in text.chars() {
+                    match c {
+                        '\'' => quoted.push_str(r"'\''"),
+                        '\\' => quoted.push_str(r"'\\'"),
+                        c => quoted.push(c),
+                    }
+                }
+                quoted.push('\'');
+                quoted
+            },
             // PowerShell also ends a single-quoted string at the curly
             // single quotes; each is doubled to stay literal.
             Self::Pwsh => {
@@ -492,7 +506,7 @@ mod tests {
             typed(Shell::Posix),
             "claude 'it'\\''s $HOME `and`  [2Jthis'\r"
         );
-        assert_eq!(typed(Shell::Fish), "claude 'it\\'s $HOME `and`  [2Jthis'\r");
+        assert_eq!(typed(Shell::Fish), typed(Shell::Posix));
         assert_eq!(typed(Shell::Pwsh), "claude 'it''s $HOME `and`  [2Jthis'\r");
         assert_eq!(typed(Shell::Cmd), "claude \"it's $HOME `and`  [2Jthis\"\r");
         // A shell it cannot quote for starts the agent without the prompt.
@@ -519,12 +533,14 @@ mod tests {
             "claude 'a \"b\" & del %TEMP% | c ‘‘d’’'\r"
         );
         let fish = Request {
-            prompt: Some(r"back\slash".into()),
+            prompt: Some(r"back\slash\".into()),
             ..request
         };
+        // Read as `back\slash\` by sh and fish alike: no backslash is ever
+        // inside the quotes, so none escapes the closing one.
         assert_eq!(
             String::from_utf8(fish.typed(Shell::Fish).unwrap()).unwrap(),
-            "claude 'back\\\\slash'\r"
+            r"claude 'back'\\'slash'\\''".to_owned() + "\r"
         );
     }
 
