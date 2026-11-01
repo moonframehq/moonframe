@@ -11,7 +11,7 @@ return component {
 	when = "Attachments in msgvault's reader and its attachments browser. Elsewhere use `record-card` or a row of your own.",
 	props = {
 		file = "{ id, name, size, icon, thumb? (a picture's path in the image cache) }",
-		width = "pixels (default 240)",
+		width = "pixels (default 300)",
 		large = "a big preview, for the attachments browser's detail",
 	},
 	example = { file = { id = "s1", name = "atlas-roadmap-q3.pdf", size = "614 B", icon = "file-text" } },
@@ -32,7 +32,7 @@ return component {
 
 	build = function(props)
 		local file = props.file
-		local width = props.width or 240
+		local width = props.width or 300
 		local function button(icon: string, tooltip: string, msg: any)
 			return ui.row {
 				class = "vf-button",
