@@ -154,6 +154,10 @@ struct Refusal {
 
 const CHANGED: &str = "the file changed on disk since it was opened";
 const EXISTS: &str = "the file already exists";
+/// A drive that can neither swap files nor link them (FAT, exFAT) can't
+/// refuse a save made elsewhere meanwhile, so it saves only with `force`.
+const UNCHECKED: &str = "this drive can't check for a save made elsewhere while saving; \
+                         overwrite to save anyway";
 
 impl Refusal {
     fn conflict(error: &str) -> Self {
@@ -440,6 +444,9 @@ fn replace(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> {
 /// as it is and refused, and the original is put back unless a newer one
 /// took its place. The file is briefly missing meanwhile.
 fn replace_aside(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> {
+    if !linkable(temp) {
+        return Err(Saved::Conflict(UNCHECKED));
+    }
     let aside = temp.with_extension("old");
     match fs::rename(file, &aside) {
         Ok(()) => {},
@@ -484,34 +491,21 @@ fn put_back(aside: &Path, file: &Path) -> std::io::Result<()> {
     }
 }
 
-/// Moves `from` to `to` only if nothing is at `to`, failing with
-/// `AlreadyExists` otherwise: never over another file. A hard link does it
-/// in one step; on a drive without links (FAT, exFAT), `to` is created new,
-/// which fails if anything is there, and the text copied in.
+/// Moves `from` to `to` in one step, only if nothing is at `to`: a hard
+/// link fails with `AlreadyExists` rather than replace a file. A drive
+/// without links fails too, with another error; [`linkable`] tells first.
 fn place(from: &Path, to: &Path) -> std::io::Result<()> {
-    match fs::hard_link(from, to) {
-        Ok(()) => return fs::remove_file(from),
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => return Err(error),
-        Err(_) => {},
-    }
-    let mut out = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(to)?;
-    let copied = (|| {
-        std::io::copy(&mut fs::File::open(from)?, &mut out)?;
-        out.sync_all()?;
-        fs::set_permissions(to, from.metadata()?.permissions())
-    })();
-    match copied {
-        Ok(()) => fs::remove_file(from),
-        Err(error) => {
-            // Ours, half written: gone, so `from` is still the whole one.
-            drop(out);
-            fs::remove_file(to).ok();
-            Err(error)
-        },
-    }
+    fs::hard_link(from, to)?;
+    fs::remove_file(from)
+}
+
+/// Whether files beside `temp` can be hard linked, which a save needs to
+/// refuse a competing one without a swap. FAT and exFAT drives can't.
+fn linkable(temp: &Path) -> bool {
+    let probe = temp.with_extension("link");
+    let linked = fs::hard_link(temp, &probe).is_ok();
+    fs::remove_file(&probe).ok();
+    linked
 }
 
 /// Writes `text` to a file beside `file`, then puts it in place, so the file
@@ -519,7 +513,7 @@ fn place(from: &Path, to: &Path) -> std::io::Result<()> {
 /// there is checked against `over` again just before, after the slow part,
 /// so a save made elsewhere meanwhile is refused rather than lost; a new
 /// file is put in only where nothing is ([`place`]), so one that appeared
-/// stays.
+/// stays. A drive that can do neither refuses, until the user overwrites.
 fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
     let name = file
         .file_name()
@@ -554,6 +548,7 @@ fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
                 }
                 replace(&temp, file, expected)?;
             },
+            Over::Nothing if !linkable(&temp) => return Err(Saved::Conflict(UNCHECKED)),
             Over::Nothing => match place(&temp, file) {
                 Ok(()) => {},
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
