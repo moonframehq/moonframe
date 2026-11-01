@@ -399,6 +399,42 @@ impl From<std::io::Error> for Saved {
     }
 }
 
+/// Puts `temp` in place of `file` if `file` is still at version `expected`.
+/// Where the system can swap two files in one step (macOS, Linux), it
+/// swaps them, then looks at what came out: a save made elsewhere since
+/// the last look is swapped back, whole, and refused. Elsewhere the last
+/// look was just before, and it renames.
+fn replace(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        use rustix::{
+            fs::{CWD, RenameFlags, renameat_with},
+            io::Errno,
+        };
+        let swap = || renameat_with(CWD, temp, CWD, file, RenameFlags::EXCHANGE);
+        match swap() {
+            Ok(()) => {
+                // `temp` now holds what was in place.
+                let was = temp.metadata().ok().map(|meta| version(&meta));
+                if was.as_deref() == Some(expected) {
+                    fs::remove_file(temp)?;
+                    return Ok(());
+                }
+                swap().map_err(std::io::Error::from)?;
+                return Err(Saved::Conflict(CHANGED));
+            },
+            // Gone since the last look.
+            Err(Errno::NOENT) => return Err(Saved::Conflict(CHANGED)),
+            // A filesystem that can't swap: rename, as elsewhere.
+            Err(Errno::INVAL | Errno::NOTSUP | Errno::NOSYS) => {},
+            Err(error) => return Err(std::io::Error::from(error).into()),
+        }
+    }
+    let _ = expected;
+    fs::rename(temp, file)?;
+    Ok(())
+}
+
 /// Writes `text` to a file beside `file`, then puts it in place, so the file
 /// is never seen half written. It keeps the original's permissions. What is
 /// there is checked against `over` again just before, after the slow part,
@@ -436,7 +472,7 @@ fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
                 if now.as_ref().map(version).as_deref() != Some(expected.as_str()) {
                     return Err(Saved::Conflict(CHANGED));
                 }
-                fs::rename(&temp, file)?;
+                replace(&temp, file, expected)?;
             },
             Over::Nothing => match fs::hard_link(&temp, file) {
                 Ok(()) => fs::remove_file(&temp)?,

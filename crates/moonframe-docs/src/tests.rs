@@ -385,3 +385,25 @@ fn past_the_limit_the_oldest_watch_makes_room() {
     changed.sort();
     assert_eq!(changed, ["0.md".to_owned(), last]);
 }
+
+#[test]
+fn a_save_that_lands_after_the_last_look_is_swapped_back() {
+    // `replace` looks only once the new text is in place: here the file
+    // has already moved on, as when a save elsewhere lands between the last
+    // look and the swap.
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("a.md");
+    let temp = dir.path().join(".a.md.tmp");
+    fs::write(&file, "theirs").unwrap();
+    fs::write(&temp, "mine").unwrap();
+    assert!(matches!(
+        replace(&temp, &file, "0:1"),
+        Err(Saved::Conflict(CHANGED))
+    ));
+    assert_eq!(fs::read_to_string(&file).unwrap(), "theirs");
+
+    let current = version(&file.metadata().unwrap());
+    replace(&temp, &file, &current).unwrap_or_else(|_| panic!("not replaced"));
+    assert_eq!(fs::read_to_string(&file).unwrap(), "mine");
+    assert!(!temp.exists());
+}
