@@ -1292,6 +1292,7 @@ pub const ICONS: &[&str] = &[
     "user",
     "user-plus",
     "users",
+    "wand-sparkles",
     "wifi",
     "wifi-off",
     "window-close",

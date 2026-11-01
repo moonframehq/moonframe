@@ -945,6 +945,9 @@ fn transitions_take_css_words_or_a_table() {
       [".fading"] = { transition = "0.3s fade cubic-bezier(0.2, 0, 0, 1)" },
       [".table"] = { transition = { kind = "slide-fade", duration = 150, curve = "linear" } },
       [".bare"] = { transition = "fade" },
+      [".late"] = { transition = "fade 150ms ease-out 40ms" },
+      [".late-table"] = { transition = { kind = "fade", duration = 150, delay = "0.05s" } },
+      [".staggered"] = { transition = "fade 150ms", delay = 60, clip = true },
     } }"#;
     let dir = app(&[]);
     write(dir.path(), "style.luau", sheet);
@@ -970,17 +973,51 @@ fn transitions_take_css_words_or_a_table() {
         kind: TransitionKind::Slide,
         duration: Duration::from_millis(220),
         curve: Curve::EASE_OUT,
+        delay: Duration::ZERO,
     });
     assert_eq!(transition(Some("fading")), Transition {
         kind: TransitionKind::Fade,
         duration: Duration::from_millis(300),
         curve: Curve::CubicBezier(0.2, 0.0, 0.0, 1.0),
+        delay: Duration::ZERO,
     });
     assert_eq!(transition(Some("table")), Transition {
         kind: TransitionKind::SlideFade,
         duration: Duration::from_millis(150),
         curve: Curve::Linear,
+        delay: Duration::ZERO,
     });
+    // A second duration is the delay, as in CSS.
+    assert_eq!(transition(Some("late")).delay, Duration::from_millis(40));
+    assert_eq!(
+        transition(Some("late")).duration,
+        Duration::from_millis(150)
+    );
+    assert_eq!(
+        transition(Some("late-table")).delay,
+        Duration::from_millis(50)
+    );
+    // `delay` on its own sits beside the transition, for staggered items.
+    let staggered = crate::Look {
+        class: vec!["staggered".to_owned()],
+        ..Default::default()
+    };
+    assert_eq!(
+        workspace
+            .stylesheet()
+            .resolve(Part::Pane, &staggered, false, &Rules::default())
+            .base
+            .delay,
+        Some(Duration::from_millis(60))
+    );
+    assert_eq!(
+        workspace
+            .stylesheet()
+            .resolve(Part::Pane, &staggered, false, &Rules::default())
+            .base
+            .clip,
+        Some(true)
+    );
     // Missing parts take the defaults: the `normal` speed, `ease`.
     assert_eq!(
         transition(Some("bare")).duration,
@@ -992,6 +1029,7 @@ fn transitions_take_css_words_or_a_table() {
         ("'slide 220ms bouncy'", "unknown `bouncy`"),
         ("'slide 20s'", "expected 0 to 10000"),
         ("'cubic-bezier(1, 2, 3)'", "four numbers"),
+        ("'fade 1ms 2ms 3ms'", "at most two durations"),
         ("'cubic-bezier(2, 0, 0, 1)'", "x values must be from 0 to 1"),
         ("'cubic-bezier(0, 0, 1, 1'", "missing its `)`"),
         ("{ speed = 3 }", "unknown key `speed`"),
