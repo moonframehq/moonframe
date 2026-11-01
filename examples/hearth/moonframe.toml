@@ -2,7 +2,7 @@
 # A code review bot's analytics in an observability tool: pull requests
 # reviewed, issues caught, CI and the repositories behind them, on a warm
 # black, monospace page. `moonframe --profile hearth` opens it.
-keep     = []
+keep     = ["feedback"]
 name     = "hearth"
 requires = []
 title    = "Hearth"

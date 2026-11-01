@@ -2,7 +2,7 @@
 # A store's admin with its audit log: browser-style tabs in the title bar,
 # grouped settings in the sidebar, and a filterable, paged table of every
 # activity. Sample data.
-keep     = []
+keep     = ["feedback"]
 name     = "storefront"
 requires = []
 title    = "Storefront"

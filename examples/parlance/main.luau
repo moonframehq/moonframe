@@ -56,7 +56,7 @@ return mod {
 		local mac = window.platform == "macos" and window.titlebar == "hidden" and not window.fullscreen
 		local chats = app.chats
 		local title = if chats and chats.chat then chats.chat.title else ""
-		return ui.column {
+		local body = ui.column {
 			class = "pl-frame",
 			grow = true,
 			gap = "none",
@@ -132,5 +132,7 @@ return mod {
 				},
 			},
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

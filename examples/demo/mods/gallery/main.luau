@@ -30,7 +30,7 @@ local function card(app: any): any
 			ui.text { app.description ~= "" and app.description or app.folder, tone = "muted", size = "small", lines = 3 },
 			ui.row {
 				align = "center",
-				ui.text { `--profile {app.name}`, tone = "muted", size = "small", class = "demo-profile" },
+				ui.text { if app.starter then "just run" else `--profile {app.name}`, tone = "muted", size = "small", class = "demo-profile" },
 				ui.spacer(),
 				open and ui.button { "Close", msg = { close = app.name }, to = "provider:demos" },
 			},

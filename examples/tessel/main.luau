@@ -58,7 +58,7 @@ return mod {
 
 	view = function(state: State)
 		local full = state.left and state.detail == ""
-		return ui.hsplit {
+		local body = ui.hsplit {
 			id = "body",
 			divider = false,
 			ui.pane { size = 56, fixed = true, visible = not full, class = "side-frame", ui.region "rail" },
@@ -70,5 +70,7 @@ return mod {
 				ui.mount "workflow",
 			},
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

@@ -307,7 +307,7 @@ return mod {
 
 		local cwd = if folder and folder ~= "" and not gone then folder else "~"
 
-		return ui.hsplit {
+		local body = ui.hsplit {
 			id = "body",
 			divider = false,
 			ui.pane {
@@ -359,5 +359,7 @@ return mod {
 				},
 			},
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

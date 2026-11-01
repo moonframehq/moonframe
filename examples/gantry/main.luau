@@ -40,12 +40,14 @@ return mod {
 	menus = MENUS,
 
 	view = function()
-		return ui.column {
+		local body = ui.column {
 			grow = true,
 			gap = "none",
 			class = "window",
 			ui.row { class = "topline", height = 56, shrink = false, gap = "none", ui.region { name = "top", direction = "row" } },
 			ui.column { grow = true, gap = "none", ui.region { name = "main", gap = "none" } },
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

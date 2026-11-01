@@ -1,7 +1,7 @@
 [app]
 # msgvault: a reader for a msgvault archive (mail, chats, calendar), after
 # msgvault-gpui. `moonframe --profile msgvault` opens it.
-keep     = []
+keep     = ["feedback"]
 name     = "msgvault"
 requires = []
 title    = "msgvault"

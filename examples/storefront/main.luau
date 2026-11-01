@@ -45,7 +45,7 @@ return mod {
 	end,
 
 	view = function(state)
-		return ui.column {
+		local body = ui.column {
 			class = "frame",
 			grow = true,
 			gap = "none",
@@ -57,5 +57,7 @@ return mod {
 				ui.pane { class = { "frame", "sheet-pane" }, ui.column { class = "sheet", grow = true, ui.region "main" } },
 			},
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

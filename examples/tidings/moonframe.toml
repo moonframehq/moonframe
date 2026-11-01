@@ -1,7 +1,7 @@
 [app]
 # A mail client in two layouts: the list beside the open email, or one line
 # per email across the window. `moonframe --profile tidings` opens it.
-keep     = []
+keep     = ["feedback"]
 name     = "tidings"
 requires = []
 title    = "Tidings"

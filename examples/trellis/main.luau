@@ -91,7 +91,7 @@ return mod {
 				justify = "center",
 				ui.text { "Pick a work tree", tone = "muted" },
 			}
-		return ui.hsplit {
+		local body = ui.hsplit {
 			id = "body",
 			divider = false,
 			ui.pane { size = 256, min = 200, max = 420, fixed = true, visible = state.left, class = "trellis-side", ui.region "left" },
@@ -110,5 +110,7 @@ return mod {
 				},
 			},
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

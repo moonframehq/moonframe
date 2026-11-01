@@ -2,7 +2,7 @@
 # Workflow operations at a glance: time within SLA, latency and lag against
 # their limits, what fails most, and a live feed of runs as they start and
 # finish. `moonframe --profile vigil` opens it.
-keep     = []
+keep     = ["feedback"]
 name     = "vigil"
 requires = []
 title    = "Vigil"

@@ -52,11 +52,13 @@ return mod {
 		local page = if PAGES[state.page]
 			then ui.mount(state.page)
 			else ui.mount { "elsewhere", id = state.page, props = { title = state.label } }
-		return ui.hsplit {
+		local body = ui.hsplit {
 			id = "body",
 			divider = false,
 			ui.pane { size = 238, min = 200, max = 340, fixed = true, visible = state.left, class = "side-pane", ui.region "left" },
 			ui.pane { class = "frame", ui.column { class = "frame", grow = true, gap = "none", page } },
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

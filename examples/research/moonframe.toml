@@ -2,7 +2,7 @@
 # An agent's research workspace: a thread with the agent's plan on the left,
 # the sheet it fills cell by cell on the right (a scripted, labelled demo).
 # `moonframe --profile research` opens it.
-keep     = []
+keep     = ["feedback"]
 name     = "research"
 requires = []
 title    = "Sorrel"

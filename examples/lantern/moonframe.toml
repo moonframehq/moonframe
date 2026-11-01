@@ -2,7 +2,7 @@
 # A Halloween terminal workspace: pages of projects on the left, a grid of
 # framed panes (terminals, files, processes, changes) in tabs, a pumpkin.
 # `moonframe --profile lantern` opens it.
-keep  = []
+keep  = ["feedback"]
 name  = "lantern"
 title = "Lantern"
 # The projects provider and the file-tree component.

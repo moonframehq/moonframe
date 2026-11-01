@@ -28,7 +28,7 @@ return mod {
 	view = function(state, app)
 		local window = app.window
 		local lights = window.platform == "macos" and window.titlebar == "hidden" and not window.fullscreen
-		return ui.column {
+		local body = ui.column {
 			class = "frame",
 			grow = true,
 			gap = "none",
@@ -56,5 +56,7 @@ return mod {
 				ui.column { class = "sheet-pane", grow = true, ui.column { class = "sheet", grow = true, ui.mount "inbox" } },
 			},
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

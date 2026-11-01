@@ -5,7 +5,10 @@
 //! run uses, and runs on this same binary, so any number can be open at
 //! once and edits to their folders reload them live.
 //!
-//! Publishes `{ available, apps = { { name, title, description, folder,
+//! The first app is the built-in one (`app/` of the repository), which
+//! opens as the starter app, with no profile.
+//!
+//! Publishes `{ available, apps = { { name, starter, title, description, folder,
 //! picture?, open } }, user }`. `picture` is the app's screenshot
 //! (`[settings] pictures`, by default `docs/screenshots/apps/<name>.png` in
 //! the repository) or else its icon, copied into the image cache where
@@ -38,6 +41,8 @@ pub(crate) fn native() -> Box<dyn Native> {
 struct Demos {
     /// The app this provider is in, whose siblings it lists.
     app: PathBuf,
+    /// The repository the gallery is in.
+    repo: PathBuf,
     /// Where the apps are: the folder holding `app`.
     folder: PathBuf,
     /// Screenshots, `<name>.png`.
@@ -53,6 +58,8 @@ struct Demos {
 
 /// An app package found beside the gallery.
 struct App {
+    /// The built-in app, run without a profile.
+    starter: bool,
     name: String,
     title: String,
     description: String,
@@ -87,8 +94,12 @@ impl Native for Demos {
             }
         };
         self.folder = inside("apps", self.app.join(".."))?;
-        self.folder = self.folder.canonicalize().unwrap_or_else(|_| self.folder.clone());
+        self.folder = self
+            .folder
+            .canonicalize()
+            .unwrap_or_else(|_| self.folder.clone());
         self.pictures = Some(inside("pictures", repo.join("docs/screenshots/apps"))?);
+        self.repo = repo;
         self.openers = settings
             .get("openers")
             .and_then(Value::as_array)
@@ -164,23 +175,40 @@ impl Demos {
             .filter(|path| path.is_dir())
             .collect();
         folders.sort();
-        folders
+        let builtin = self.repo.join("app");
+        let starter = builtin.join("main.luau").is_file().then(|| App {
+            starter: true,
+            name: "moonframe".to_owned(),
+            title: "Moonframe".to_owned(),
+            description: "The starter app: a terminal, the project's files and changes, \
+                          and a status bar, all laid out by Luau."
+                .to_owned(),
+            folder: builtin,
+            icon: self.repo.join("docs/screenshots/window.png"),
+        });
+        starter
             .into_iter()
-            .filter(|folder| folder.canonicalize().ok().as_ref() != Some(&self.app))
-            .filter_map(|folder| {
-                let manifest = packages::App::read(&folder).ok()??;
-                let text = fs::read_to_string(folder.join("moonframe.toml")).unwrap_or_default();
-                Some(App {
-                    title: manifest
-                        .title
-                        .clone()
-                        .unwrap_or_else(|| manifest.name.clone()),
-                    description: about(&text),
-                    icon: folder.join(manifest.icon.as_deref().unwrap_or("icon.png")),
-                    name: manifest.name,
-                    folder,
-                })
-            })
+            .chain(
+                folders
+                    .into_iter()
+                    .filter(|folder| folder.canonicalize().ok().as_ref() != Some(&self.app))
+                    .filter_map(|folder| {
+                        let manifest = packages::App::read(&folder).ok()??;
+                        let text =
+                            fs::read_to_string(folder.join("moonframe.toml")).unwrap_or_default();
+                        Some(App {
+                            starter: false,
+                            title: manifest
+                                .title
+                                .clone()
+                                .unwrap_or_else(|| manifest.name.clone()),
+                            description: about(&text),
+                            icon: folder.join(manifest.icon.as_deref().unwrap_or("icon.png")),
+                            name: manifest.name,
+                            folder,
+                        })
+                    }),
+            )
             .collect()
     }
 
@@ -191,6 +219,7 @@ impl Demos {
             .map(|app| {
                 json!({
                     "name": app.name,
+                    "starter": app.starter,
                     "title": app.title,
                     "description": app.description,
                     "folder": app.folder,
@@ -254,16 +283,25 @@ impl Demos {
         let Some(user) = self.user.clone() else {
             return;
         };
-        let result = link(&user, app).and_then(|()| {
+        let linked = if app.starter {
+            Ok(())
+        } else {
+            link(&user, app)
+        };
+        let result = linked.and_then(|()| {
             let log = paths::cache().join("demos");
             fs::create_dir_all(&log).map_err(|error| error.to_string())?;
             let log = fs::File::create(log.join(format!("{}.log", app.name)))
                 .map_err(|error| error.to_string())?;
             let errors = log.try_clone().map_err(|error| error.to_string())?;
-            Command::new(binary()?)
-                .arg("--user")
-                .arg(&user)
-                .args(["--profile", &app.name])
+            let mut command = Command::new(binary()?);
+            command.arg("--user").arg(&user);
+            if app.starter {
+                command.arg(&app.folder);
+            } else {
+                command.args(["--profile", &app.name]);
+            }
+            command
                 .stdin(Stdio::null())
                 .stdout(log)
                 .stderr(errors)
