@@ -234,13 +234,14 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`title-bar`](#title-bar) | Navigation | The top row of a window whose shell sets `titlebar = "hidden"`: pass `window = app.window` and it leaves room for macOS's traffic lights or draws its own window buttons elsewhere. Put `tabs` in its content. For a bar along the bottom use `status-bar`; for a path inside a pane use `breadcrumbs`; for a plain row of buttons use `toolbar`. |
 | [`about`](#about) | Overlays | Help > About, or the top of a settings General page (`inline`). For the changes in a version use `release-notes`; for other properties use `key-values`; for a first-run welcome use `onboarding`. |
 | [`action-tiles`](#action-tiles) | Overlays | The menu a workspace, worktree or agent opens on click, when its few main actions deserve big targets (new worktree, fan out, rename, close). Wrap it in `ui.popover`. For a plain list of commands use `menu` or `context-menu`; for a yes/no question use `confirm`; for picking one of several options use `choice-cards`. |
+| [`command-palette`](#command-palette) | Overlays | Run any of the app's or a mod's commands from the keyboard (⌘K, ⌘⇧P), or jump to a file, branch or workspace by name. For a menu under a button use `dropdown`; for right-click actions use `context-menu`; for a list of shortcuts to read use `shortcuts`; for a search box over a list in a pane use `search-field`. |
 | [`confirm`](#confirm) | Overlays | Ask before doing something, especially destructive (close a window with running agents, delete a branch). For a modal with a form or custom body use `dialog`; for an undo-able action prefer doing it and showing a `toast` with an Undo action. |
 | [`context-menu`](#context-menu) | Overlays | Right-click actions on a row, tab, tile or file. It anchors the menu to the wrapped content, not the pointer. For a menu opened by a button use `dropdown`; for the menu rows alone use `menu`. On `tabs`, use its `context` (each tab already sends { tab_menu = id }) and put this around the strip, or a `ui.popover` with `menu`. |
 | [`dialog`](#dialog) | Overlays | Any modal that asks for attention: a form, a choice, details. For a yes/no question use `confirm`; for a panel sliding from an edge use `sheet`; for a non-blocking message use `toast` or `notice`; for content beside a control use `ui.popover`. |
-| [`menu`](#menu) | Overlays | The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `ui.overlay` with your own rows. |
+| [`menu`](#menu) | Overlays | The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `command-palette`. |
 | [`onboarding`](#onboarding) | Overlays | A short guided tour or welcome on first launch or after a big update. For one release's changes use `release-notes`; for a single question use `confirm`; for any other modal use `dialog`. |
 | [`sheet`](#sheet) | Overlays | Side content that needs room but should keep the window in view: details, an inspector, a settings pane, logs. For a centred modal use `dialog`; for a permanent side panel use a `ui.pane` in a split; for a small floating card by a control use `ui.popover`. |
-| [`shortcuts`](#shortcuts) | Overlays | Show the app's or a mod's keybindings (a ? or ⌘/ help overlay, a Shortcuts page). For one shortcut use `kbd`; for a line of hints under a list or palette use `key-hints`; for a command palette use `dialog` with `place = "top"`. |
+| [`shortcuts`](#shortcuts) | Overlays | Show the app's or a mod's keybindings (a ? or ⌘/ help overlay, a Shortcuts page). For one shortcut use `kbd`; for a line of hints under a list or palette use `key-hints`; for a command palette use `command-palette`. |
 | [`status-dot`](#status-dot) | Status | Show the state of an agent, job or session beside its name: in sidebar rows, tabs and lists. Use `chip = true` where the state must catch the eye (a blocked agent). For a count use `count-bubble`; for a PR's state use `pr-badge`; for CI results use `checks`. |
 | [`stat`](#stat) | Status bar | One labelled value with an icon in a status bar or toolbar, kept to a fixed width so it does not jitter. |
 | [`status-bar`](#status-bar) | Status bar | The window's bottom bar: machine, branch, agent counts on the left; CPU, theme, shortcuts on the right. Put `stat`, `meter` or `sparkline` in it for live readings. For a coloured strip announcing something use `banner`; for a top row use `title-bar`; for an extensible bar, give it a `ui.region` as an item. |
@@ -3154,6 +3155,46 @@ ui.popover { open = state.menu == id, dismiss = "close-menu", width = 344,
 
 A whole mod using it, with state: `app/components/demos/action-tiles.luau`.
 
+#### `command-palette`
+
+**Command Palette.** A search field over commands that filters as you type, with ↑↓, ↩ and Esc; grouped while empty, ranked while filtering, in several looks.
+
+**When:** Run any of the app's or a mod's commands from the keyboard (⌘K, ⌘⇧P), or jump to a file, branch or workspace by name. For a menu under a button use `dropdown`; for right-click actions use `context-menu`; for a list of shortcuts to read use `shortcuts`; for a search box over a list in a pane use `search-field`.
+
+| Prop | Meaning |
+| --- | --- |
+| `commands` | list of { id, label, icon?, detail?, shortcut? (kbd keys, "cmd-t"), group?, keywords?, disabled? } |
+| `dismiss` | message sent to the parent on Esc or a click outside |
+| `empty` | text when nothing matches (default "No matching commands") |
+| `event` | key of the message sent to the parent when a command runs, default "run": { run = id } |
+| `id` | keeps its query and highlight; one per id (default "main") |
+| `look` | spotlight (default), classic, compact or cards, or a look the stylesheet defines; else the stylesheet's `looks.palette` |
+| `open` | show it; reopening starts with an empty query |
+| `placeholder` | grey text in the empty field (default "Type a command…") |
+| `prefix` | a scope chip before the field, such as "Go to file" |
+| `rows` | most rows shown before the list scrolls (default 8) |
+| `width` | pixels (default per look, 560 for spotlight) |
+
+**Styles:** `.command-palette` `.command-palette-cards` `.command-palette-cards-field` `.command-palette-cards-input` `.command-palette-cards-list` `.command-palette-cards-row` `.command-palette-cards-row:selected` `.command-palette-classic` `.command-palette-classic-field` `.command-palette-classic-input` `.command-palette-classic-list` `.command-palette-classic-row` `.command-palette-classic-row:selected` `.command-palette-compact` `.command-palette-compact-field` `.command-palette-compact-input` `.command-palette-compact-list` `.command-palette-compact-row` `.command-palette-detail` `.command-palette-disabled` `.command-palette-empty` `.command-palette-field` `.command-palette-field-icon` `.command-palette-footer` `.command-palette-heading` `.command-palette-icon` `.command-palette-input` `.command-palette-list` `.command-palette-prefix` `.command-palette-row` `.command-palette-row:hover` `.command-palette-row:selected` `.command-palette-spotlight` `.command-palette-spotlight-field` `.command-palette-spotlight-input` `.command-palette-tag` `.command-palette-tile` `.command-palette-tile:selected`
+
+```lua
+local command_palette = use "command-palette"
+
+-- in view (the mod opens it from a shortcut or a menu):
+command_palette {
+	open = state.palette, dismiss = "close-palette",
+	look = "spotlight", -- classic, compact, cards
+	commands = {
+		{ id = "new-tab", label = "New terminal tab", icon = "terminal", shortcut = "cmd-t", group = "Terminal" },
+		{ id = "branch", label = "Switch branch…", icon = "git-branch", detail = "main", group = "Git" },
+	},
+}
+-- in update: msg.run is the chosen command's id (close it there);
+-- "close-palette" closes it.
+```
+
+A whole mod using it, with state: `app/components/demos/command-palette.luau`.
+
 #### `confirm`
 
 **Confirm.** A small modal question with a message, optional detail and affected items, and Cancel / Confirm buttons.
@@ -3279,7 +3320,7 @@ A whole mod using it, with state: `app/components/demos/dialog.luau`.
 
 **Menu.** Menu rows (icon, label, check, detail, shortcut, danger) with separators and headings; a click sends { pick = id }.
 
-**When:** The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `ui.overlay` with your own rows.
+**When:** The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `command-palette`.
 
 | Prop | Meaning |
 | --- | --- |
@@ -3372,7 +3413,7 @@ A whole mod using it, with state: `app/components/demos/sheet.luau`.
 
 **Shortcuts.** A keyboard shortcut reference: groups of key caps and labels laid out in columns in a large modal.
 
-**When:** Show the app's or a mod's keybindings (a ? or ⌘/ help overlay, a Shortcuts page). For one shortcut use `kbd`; for a line of hints under a list or palette use `key-hints`; for a command palette use `dialog` with `place = "top"`.
+**When:** Show the app's or a mod's keybindings (a ? or ⌘/ help overlay, a Shortcuts page). For one shortcut use `kbd`; for a line of hints under a list or palette use `key-hints`; for a command palette use `command-palette`.
 
 | Prop | Meaning |
 | --- | --- |
