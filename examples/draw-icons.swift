@@ -366,3 +366,39 @@ do {
     }
     save(cx, "examples/tessel/icon.png")
 }
+
+// Research (Sorrel): a sheet being filled, the current row blue, one cell
+// outlined, the rows still to come as grey bars.
+do {
+    let cx = body([0x60a5fa, 0x3b82f6, 0x1d4ed8])
+    card(cx, CGRect(x: 196, y: 216, width: 632, height: 592), 0x1e3a8a)
+    let rowHeight = 88.0
+    for row in 0..<6 {
+        let y = 712 - CGFloat(row) * rowHeight
+        if row == 3 {
+            fill(cx, CGRect(x: 196, y: y - 8, width: 632, height: rowHeight - 8), 0, color(0x3b82f6, 0.16))
+        }
+        let logo: [UInt32] = [0x22c55e, 0x8b5cf6, 0xf97316, 0x0ea5e9, 0xf59e0b, 0xef4444]
+        fill(cx, CGRect(x: 232, y: y + 12, width: 44, height: 44), 12, color(logo[row]))
+        let written = row < 3
+        for column in 0..<3 {
+            let x = 312 + CGFloat(column) * 168
+            let width: CGFloat = column == 0 ? 120 : 96
+            if row == 3 && column == 1 { continue }
+            if written || (row == 3 && column == 0) {
+                fill(cx, CGRect(x: x, y: y + 24, width: width, height: 20), 10, color(0x1e293b, 0.75))
+            } else {
+                fill(cx, CGRect(x: x, y: y + 26, width: width, height: 16), 8, color(0x94a3b8, 0.35))
+            }
+        }
+        if row == 3 {
+            cx.setStrokeColor(color(0x2563eb))
+            cx.setLineWidth(7)
+            cx.addPath(rounded(CGRect(x: 464, y: y + 2, width: 152, height: 64), 8))
+            cx.strokePath()
+            fill(cx, CGRect(x: 488, y: y + 24, width: 40, height: 20), 10, color(0x1e293b, 0.75))
+            fill(cx, CGRect(x: 540, y: y + 16, width: 6, height: 36), 2, color(0x2563eb))
+        }
+    }
+    save(cx, "examples/research/icon.png")
+}
