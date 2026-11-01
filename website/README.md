@@ -8,9 +8,11 @@ site/                 what Netlify publishes (netlify.toml at the repo root)
   docs/index.html     docs.moonframe.dev (served by a host rewrite in site/_redirects)
   components-browser.js, data/components.js   the Components browser on the home page
   img/                thumbnails (WebP, transparent corners) and img/full/ PNGs for the viewer
+  film/               the tour film, its muted preview loop, posters and chapters
 mockups/              the ten design directions the site was picked from, for reference
 tools/components-data.py   regenerates data/components.js from app/components/*.luau
 tools/og-images.py   renders the social cards from og/card.html and writes the Open Graph and X tags
+tools/film/          draws and encodes the tour film (gen.mjs, render.sh)
 ```
 
 Preview locally with any static server, from `site/`:
@@ -41,6 +43,30 @@ Each card is named by a hash of its bytes (`social/home-1a2b3c4d5e.png`), so
 a changed card gets a new URL and social sites fetch it instead of a cached
 copy. Old cards are kept, so links shared before a change keep their image;
 delete one only once nothing should point at it.
+
+## The tour film
+
+The film under the hero is a stylised motion graphic, not a screen recording:
+`tools/film/gen.mjs` draws each frame as SVG around the real screenshots in
+`docs/screenshots/`, the agent icons in `assets/icons/` and the names in
+`app/components/`. After changing a scene or a screenshot it uses, re-render
+from the repo root (needs node, librsvg, ffmpeg with libx264,
+and cwebp; about two minutes, with frames kept in `target/film`):
+
+```sh
+website/tools/film/render.sh
+```
+
+To check a scene first, draw only some frames (30 a second) and look at them:
+
+```sh
+node website/tools/film/gen.mjs 300 605 && rsvg-convert target/film/frames/f0605.svg -o /tmp/f.png
+```
+
+It writes `film.mp4`, its poster, and the muted `loop`
+that previews the film (the first two scenes). Chapter times live in both
+`film/chapters.vtt` and the chapter buttons in `index.html`; move them
+together when a scene's timing changes.
 
 ## Hosting
 
