@@ -4,7 +4,7 @@
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| `ci.yml` | every pull request, pushes to `main` | zizmor on the workflows; formatting, `Cargo.lock`, Luau types (the app and the examples) and Wasm providers; clippy, tests, the headless `--check` of the app and every example app, and the component catalogue on macOS, Linux x86_64/ARM64 and Windows x86_64 |
+| `ci.yml` | every pull request, pushes to `main` | only what the changed files can affect (a `Changes` job decides; a website- or docs-only change runs no build): zizmor on the workflows; formatting, `Cargo.lock`, Luau types (the app and the examples) and Wasm providers; clippy, tests, the headless `--check` of the app and every example app, and the component catalogue on macOS, Linux x86_64/ARM64 and Windows x86_64 |
 | `package.yml` | pull requests touching packaging, each release | optimized builds and the unsigned packages for every platform, each checked headlessly against the app it ships |
 | `supply-chain.yml` | dependency changes, weekly | cargo-deny: advisories, bans, licenses, sources; advisories for the Wasm providers' own lockfiles |
 | `release.yml` | `just release` | the release, below |
@@ -26,7 +26,9 @@ The workflow then:
 
 1. runs zizmor on itself and checks the requested commit is `main`'s HEAD;
 2. builds every package (`package.yml`) and the CycloneDX SBOMs, while it
-   waits for CI to pass on that same commit; nothing below runs until it has;
+   waits for CI to pass on that same commit; nothing below runs until it has.
+   To get macOS runners sooner, it cancels the CI runs of `main`'s other
+   commits, and re-runs its own commit's once if it finds it cancelled;
 3. signs the app with the Developer ID, notarizes and staples it, and builds
    the disk image around it, signed, notarized and stapled too; and signs
    the Windows executable with Authenticode (each when its signing is set

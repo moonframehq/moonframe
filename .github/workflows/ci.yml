@@ -27,10 +27,93 @@ defaults:
     shell: bash
 
 jobs:
+  # Decides which jobs below run, from the files changed since code this CI
+  # last checked, so that a website-only change does not wait for (or
+  # occupy) macOS runners. The run itself always happens and passes with
+  # skipped jobs, because a release waits for a passing CI run on its exact
+  # commit.
+  #
+  # On main the comparison starts at the newest earlier commit whose CI run
+  # passed, not at the previous push: when that push's run was cancelled,
+  # failed or has not finished, its changes count here too. Every passing
+  # run thereby vouches for all the code before it. A pull request compares
+  # the commits its event recorded, so re-running an old run checks the
+  # code that run checks out.
+  #
+  # `build` lists what cannot affect the lints, tests or app checks, rather
+  # than what can: a path nobody thought of runs everything.
+  changes:
+    name: Changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read # compare commits
+      actions: read # find main's commits whose CI passed
+    outputs:
+      workflows: ${{ steps.classify.outputs.workflows }}
+      build: ${{ steps.classify.outputs.build }}
+    steps:
+      - id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          all() {
+            echo "$1: running every job"
+            printf 'workflows=true\nbuild=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          case $EVENT in
+            pull_request) from=$BASE to=$HEAD ;;
+            push)
+              to=$SHA
+              # main's commits whose CI passed, from its newest 100 passing runs.
+              gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=100" \
+                --jq '.workflow_runs[].head_sha' | sort -u > passed
+              # The newest of this commit's ancestors among them.
+              from=$(gh api "repos/$GITHUB_REPOSITORY/commits?sha=$SHA&per_page=100" --jq '.[1:][].sha' |
+                grep -Fxf passed -m1 || true)
+              [[ -n $from ]] || all "no passing CI run among this commit's last 100 ancestors"
+              ;;
+            *) all "$EVENT" ;;
+          esac
+          echo "Changes from $from to $to:"
+          compare=$(gh api "repos/$GITHUB_REPOSITORY/compare/$from...$to")
+          # The API lists at most 300 files.
+          (( $(jq '.files | length' <<<"$compare") < 300 )) || all "300 files or more"
+          # Renames count under both names.
+          files=$(jq -r '.files[] | .filename, (.previous_filename // empty)' <<<"$compare")
+          echo "$files"
+          workflows=false
+          build=false
+          while IFS= read -r file; do
+            [[ -n $file ]] || continue
+            [[ $file != .github/* ]] || workflows=true
+            case $file in
+              # TOML anywhere is formatted by the lint job (taplo).
+              *.toml) build=true ;;
+              # Read by nothing that is built, linted or checked here.
+              website/* | homebrew/* | LICENSE | README.md | AGENTS.md | CLAUDE.md) ;;
+              docs/*.md | docs/hero/*) ;;
+              # Packaging: package.yml checks these.
+              scripts/release/* | assets/macos/*) ;;
+              # Other workflows: zizmor checks these.
+              .github/*) [[ $file != .github/workflows/ci.yml ]] || build=true ;;
+              *) build=true ;;
+            esac
+          done <<<"$files"
+          printf 'workflows=%s\nbuild=%s\n' "$workflows" "$build" | tee -a "$GITHUB_OUTPUT"
+
   # Audits the workflows themselves: template injection, over-broad
   # permissions, unpinned actions, persisted credentials, cache poisoning.
   zizmor:
     name: Workflow security
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -48,7 +131,10 @@ jobs:
   # Wasm providers.
   lint:
     name: Format, Luau types, and providers
-    needs: zizmor
+    needs: [changes, zizmor]
+    if: >-
+      !cancelled() && needs.changes.outputs.build == 'true' &&
+      (needs.zizmor.result == 'success' || needs.zizmor.result == 'skipped')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -89,7 +175,10 @@ jobs:
   # ships for.
   checks:
     name: Lint and test (${{ matrix.runner }})
-    needs: zizmor
+    needs: [changes, zizmor]
+    if: >-
+      !cancelled() && needs.changes.outputs.build == 'true' &&
+      (needs.zizmor.result == 'success' || needs.zizmor.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
@@ -135,19 +224,22 @@ jobs:
           # --strip-trailing-cr: Git for Windows checks the skill out with CRLF.
           diff -u --strip-trailing-cr .claude/skills/moonframe-components/SKILL.md target/components.md
 
-  # One stable context for branch protection, requiring every job above.
+  # One stable context for branch protection: every job above passed, or
+  # was skipped because Changes found nothing for it to check.
   ci-passed:
     name: CI passed
-    needs: [zizmor, lint, checks]
+    needs: [changes, zizmor, lint, checks]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
     steps:
-      - name: Require every job
+      - name: Require every job to pass or be skipped
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
+          CHANGES: ${{ needs.changes.result }}
         run: |
+          test "$CHANGES" = success
           for result in $RESULTS; do
-            test "$result" = success
+            [[ $result == success || $result == skipped ]]
           done
