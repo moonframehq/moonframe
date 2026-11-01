@@ -69,7 +69,7 @@ return component {
 	description = "A tab strip in several looks (pills, underline, outline, cards, compact, classic, square, curved) with icons, agent status, badges, close and add buttons; tabs grow in as they open and shrink away as they close.",
 	when = "Switch between open documents, terminals or agent sessions, or between views of one panel. For 2 to 4 settings choices use `segmented`; for joined action buttons use `button-group`; for onboarding steps use `pager`.",
 	props = {
-		["tabs"] = "list of { id, label, icon?, status? (\"working\" spinner, \"blocked\", \"done\", \"idle\" dot), badge? (count or text), closable?, tooltip?, msg? (sent instead of the select message) }",
+		["tabs"] = "list of { id, label, icon?, status? (\"working\" spinner, \"blocked\", \"done\", \"idle\" dot), badge? (count or text), closable? (false: never a ×), tooltip?, msg? (sent instead of the select message) }",
 		["selected"] = "id of the selected tab",
 		["variant"] = "\"pills\" (default), \"underline\", \"outline\", \"cards\", \"compact\", \"classic\", \"square\" or \"curved\" (the selected tab joins what is under the strip: put the strip right on top of a card of the same color); or any look a stylesheet defines with `.tabs-<look>` and `.tabs-<look>-tab` rules",
 		["add"] = "message for a + button after the tabs; no button when unset",
@@ -201,7 +201,8 @@ tabs {
 			elseif tab.status then
 				status = ui.row { class = { "tabs-dot", "tabs-dot-" .. tab.status }, width = 6, height = 6 }
 			end
-			local closable = tab.closable or props.closable or selected
+			-- A tab's own `closable = false` keeps it without a ×, selected or not.
+			local closable = if tab.closable ~= nil then tab.closable else (props.closable or selected)
 			local joined = selected and variant == "curved"
 			cells[#cells + 1] = ui.row {
 				key = key_of(id),

@@ -402,3 +402,41 @@ do {
     }
     save(cx, "examples/research/icon.png")
 }
+
+// Hearth: orange bars over dashed gridlines on warm black, the last one
+// still filling; and the sidebar's mascot, a round ember with two eyes.
+do {
+    let cx = body([0x3a2f27, 0x241c16, 0x120e0b])
+    cx.setStrokeColor(color(0xffffff, 0.16))
+    cx.setLineWidth(5)
+    cx.setLineDash(phase: 0, lengths: [14, 12])
+    for row in 0..<4 {
+        let y = 250 + CGFloat(row) * 150
+        cx.move(to: CGPoint(x: 200, y: y)); cx.addLine(to: CGPoint(x: 824, y: y))
+    }
+    cx.strokePath()
+    for (index, height) in [150.0, 250, 190, 360, 290, 470, 400].enumerated() {
+        let x = 214 + CGFloat(index) * 86
+        fill(cx, CGRect(x: x, y: 250, width: 56, height: height), 8, color(0xd98a52, index == 6 ? 0.42 : 1))
+    }
+    save(cx, "examples/hearth/icon.png")
+
+    let side = 256
+    let mascot = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+                           space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    mascot.setFillColor(color(0xe8803f))
+    mascot.fillEllipse(in: CGRect(x: 34, y: 150, width: 64, height: 86))
+    mascot.fillEllipse(in: CGRect(x: 158, y: 150, width: 64, height: 86))
+    mascot.fillEllipse(in: CGRect(x: 28, y: 14, width: 200, height: 186))
+    mascot.setFillColor(color(0xf6a66a, 0.55))
+    mascot.fillEllipse(in: CGRect(x: 76, y: 128, width: 104, height: 56))
+    for x in [86.0, 140] {
+        mascot.setFillColor(color(0x1b1410))
+        mascot.fillEllipse(in: CGRect(x: x, y: 92, width: 30, height: 44))
+        mascot.setFillColor(color(0xffffff))
+        mascot.fillEllipse(in: CGRect(x: x + 14, y: 116, width: 10, height: 12))
+    }
+    mascot.setFillColor(color(0x1b1410))
+    mascot.fillEllipse(in: CGRect(x: 116, y: 62, width: 24, height: 14))
+    save(mascot, "examples/hearth/mods/sidebar/mascot.png")
+}
