@@ -10,16 +10,18 @@ Updates…**, under About:
 - If the release is newer, a dialog offers it. On macOS, an app running from
   its own `.app` gets **Install and Relaunch**: the release's disk image (or
   zip) downloads, is checked against the release's `SHA256SUMS` when there is
-  one, must hold an app with the same bundle id and a valid signature, and
-  takes the old app's place once it quits; then the new one opens. Anywhere
-  else (Linux, Windows, a run from source) the dialog offers **Download**,
-  which opens the build for this platform in the browser, and **Release
-  Notes**, which opens the release's page.
+  one, must hold an app with the same bundle id, signed by the same team as
+  the running app, and takes the old app's place once it quits; then the
+  new one opens. Anywhere else (Linux, Windows, a run from source) the
+  dialog offers **Download**, which opens the build for this platform in
+  the browser, and **Release Notes**, which opens the release's page.
 - A release build (a bundle, an install) also checks by itself once a day,
   and says something only when there is a newer release. Runs from source
   check only when asked.
 
 The starter checks `penso/moonframe`.
+
+<img src="screenshots/check-for-updates.png" alt="The update dialog: Moonframe 20261028.1 is available, You have 0.1.0, with Download, Release Notes and Later buttons" width="380">
 
 ## Naming the repository
 
@@ -80,7 +82,11 @@ publishes assets named this way, with `SHA256SUMS`.
 
 The disk image must hold the `.app` at its top, with the same bundle id as
 the running one (`dev.moonframe.app.NAME` for a profile's bundle) and a
-signature `codesign --verify` accepts (ad hoc is enough for that check;
-Gatekeeper wants Developer ID and notarization for apps others download).
+signature `codesign --verify` accepts. When the running app is signed with
+a Developer ID, the update must be signed by the same team: an update from
+anyone else, or one signed ad hoc, is refused. An app signed ad hoc names no
+signer to hold its updates to, so for it the checksum and bundle id are the
+only checks: sign apps others download with a Developer ID (Gatekeeper
+wants that and notarization anyway).
 The app's folder must be writable by the user for the swap; when it is
 not, the release's page opens instead.

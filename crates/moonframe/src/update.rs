@@ -436,9 +436,24 @@ pub(crate) fn stage(release: &Release, source: &Source) -> Result<Staged, String
     if want != got {
         return Err(format!("the download is {got}, not {want}"));
     }
-    run(Command::new("codesign")
-        .args(["--verify", "--deep", "--strict"])
-        .arg(&app))?;
+    // Intact, and from whoever signed the running app: a Developer ID
+    // app takes only an update its own team signed (never one signed ad
+    // hoc). An app signed ad hoc names no signer to hold the update to;
+    // the checksum and bundle id are all it has.
+    let mut signature = Command::new("codesign");
+    signature.args(["--verify", "--deep", "--strict"]);
+    if let Some(team) = team(&target) {
+        signature.arg(format!(
+            "-R=anchor apple generic and certificate leaf[subject.OU] = \"{team}\""
+        ));
+    } else {
+        tracing::warn!(
+            "{} has no Developer ID: the update is not held to its signer",
+            target.display()
+        );
+    }
+    run(signature.arg(&app))
+        .map_err(|problem| format!("the download's signature is refused: {problem}"))?;
     // Beside the old one, on the same volume, so it moves into place.
     let parent = target.parent().ok_or("the app has no folder")?;
     let new = parent.join(format!(
@@ -560,6 +575,27 @@ fn find_app(folder: &Path, target: &Path) -> Result<PathBuf, String> {
         .or_else(|| apps.first().filter(|_| apps.len() == 1))
         .cloned()
         .ok_or_else(|| "the download holds no app".to_owned())
+}
+
+/// The team that signed `app` with a Developer ID, if one did.
+fn team(app: &Path) -> Option<String> {
+    let output = Command::new("codesign")
+        .args(["-d", "--verbose=2"])
+        .arg(app)
+        .output()
+        .ok()?;
+    // codesign describes the signature on stderr.
+    team_in(&String::from_utf8_lossy(&output.stderr)).map(str::to_owned)
+}
+
+/// The `TeamIdentifier` in `codesign -dv`'s description: ten letters and
+/// digits, never "not set".
+fn team_in(description: &str) -> Option<&str> {
+    let team = description
+        .lines()
+        .find_map(|line| line.strip_prefix("TeamIdentifier="))?
+        .trim();
+    (team.len() == 10 && team.chars().all(|c| c.is_ascii_alphanumeric())).then_some(team)
 }
 
 fn bundle_id(app: &Path) -> Result<String, String> {
@@ -715,6 +751,16 @@ mod tests {
         );
         assert_eq!(expected_sum(&listing, "App"), None);
         assert_eq!(expected_sum("short  App.dmg", "App.dmg"), None);
+    }
+
+    #[test]
+    fn reads_the_signing_team() {
+        let signed =
+            "Executable=/A.app/Contents/MacOS/a\nIdentifier=so.pen.a\nTeamIdentifier=VJAHQVZ96V\n";
+        assert_eq!(team_in(signed), Some("VJAHQVZ96V"));
+        assert_eq!(team_in("Signature=adhoc\nTeamIdentifier=not set\n"), None);
+        assert_eq!(team_in("TeamIdentifier=AB\"CD\" or 1\n"), None);
+        assert_eq!(team_in("code object is not signed at all\n"), None);
     }
 
     #[test]
