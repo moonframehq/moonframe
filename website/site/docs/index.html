@@ -157,7 +157,7 @@
       <tr><td>A sheet or menu</td><td><code>ui.popover { open = state.open, dismiss = "close" }</code></td></tr>
       <tr><td>A new kind of element</td><td>Rust in <code>crates/</code>, the one change that needs a rebuild</td></tr>
     </table>
-    <div class="note"><b>Sandboxed</b>Luau runs with no files, network or process access, a memory cap and an instruction budget. Anything that reaches the machine goes through a provider or an element the host owns.</div>
+    <div class="note"><b>Sandboxed</b>Luau runs with no files, network or process access, a memory cap and an instruction budget. Anything that reaches the machine goes through a provider or an element the host owns. A WebAssembly provider is sandboxed the same way and reaches only the host calls its manifest lists; process and native providers run as you, for what a sandbox cannot reach. <a href="https://github.com/penso/moonframe#what-runs-with-what-access">What runs with what access</a></div>
 
     <h2 id="platforms">Platforms</h2>
     <p>Moonframe is developed on macOS. CI builds, lints and tests it on macOS, Linux (x86_64 and ARM64) and Windows; each release ships a macOS disk image, Linux tarballs and Windows zips, with checksums, Sigstore signatures and GitHub attestations.</p>

@@ -299,6 +299,10 @@ fn command(command: &mut Command) -> Result<(), String> {
 /// place of its Rust sources, so users need no toolchain.
 fn stage(from: &Path, to: &Path, builds: &Path) -> Result<(), String> {
     copy_tree(from, to).map_err(|error| format!("cannot copy {}: {error}", from.display()))?;
+    // A build without the runtime never runs them: none is worth building.
+    if !cfg!(feature = "wasm") {
+        return Ok(());
+    }
     let Ok(providers) = fs::read_dir(to.join("providers")) else {
         return Ok(());
     };

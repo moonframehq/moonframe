@@ -216,6 +216,7 @@ fn a_process_that_exits_or_prints_garbage_fails() {
     }
 }
 
+#[cfg(feature = "wasm")]
 #[test]
 fn a_wasm_provider_with_a_build_hook_is_not_built() {
     for hook in ["build.rs", ".cargo/config.toml"] {
@@ -241,6 +242,7 @@ fn a_wasm_provider_with_a_build_hook_is_not_built() {
     }
 }
 
+#[cfg(feature = "wasm")]
 #[test]
 fn a_wasm_provider_with_a_hook_elsewhere_is_not_built() {
     let package = "[package]\nname = 'sys'\n";
@@ -337,6 +339,7 @@ fn a_wasm_provider_with_a_hook_elsewhere_is_not_built() {
     }
 }
 
+#[cfg(feature = "wasm")]
 #[test]
 fn a_wasm_provider_cannot_name_its_toolchain_by_path() {
     let dir = tempfile::tempdir().unwrap();
@@ -732,6 +735,7 @@ fn a_static_file_swapped_for_a_link_is_refused_at_read() {
     assert!(crate::fixed::read(&root.join("linked.json")).is_err());
 }
 
+#[cfg(feature = "wasm")]
 #[test]
 fn a_wasm_provider_in_a_hook_free_parent_workspace_passes_the_check() {
     // Members of one workspace that depend on each other share its root;
@@ -758,6 +762,7 @@ fn a_wasm_provider_in_a_hook_free_parent_workspace_passes_the_check() {
 
 /// Cargo works out `..` on the path's text, not through links: so does the
 /// check, or a link could point it at a workspace Cargo never uses.
+#[cfg(feature = "wasm")]
 #[cfg(unix)]
 #[test]
 fn a_wasm_provider_reached_through_a_link_is_checked_where_cargo_looks() {
@@ -807,6 +812,7 @@ fn a_wasm_provider_reached_through_a_link_is_checked_where_cargo_looks() {
 /// Links can make one crate look like many: seven levels of three links
 /// each, never deeper than allowed, would be 3^7 paths. The check stops
 /// at a total instead.
+#[cfg(feature = "wasm")]
 #[cfg(unix)]
 #[test]
 fn a_wasm_provider_with_crates_multiplied_by_links_is_refused() {
@@ -838,4 +844,32 @@ fn a_wasm_provider_with_crates_multiplied_by_links_is_refused() {
     }
     let problem = crate::wasm::check_hooks(&root.join("providers/sys")).unwrap_err();
     assert!(problem.contains("at most"), "{problem}");
+}
+
+#[cfg(not(feature = "wasm"))]
+#[test]
+fn a_wasm_provider_left_out_stays_quiet_until_asked() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/sys/provider.toml",
+        "kind = 'wasm'\ninterval = 0.1\nstart = 'always'\n",
+    );
+    write(root, "providers/sys/provider.wasm", "");
+    let (events, received) = events();
+    let mut providers = Providers::start(root.into(), root.join("build"), events);
+    if let Ok(event) = received.recv_timeout(Duration::from_millis(300)) {
+        panic!("it published or failed: {event:?}");
+    }
+    providers
+        .send("sys", "main", Data::from("refresh"))
+        .unwrap();
+    match received.recv_timeout(Duration::from_secs(5)).unwrap() {
+        Event::Failed { provider, problem } => {
+            assert_eq!(provider, "sys");
+            assert!(problem.to_string().contains("`wasm` feature"), "{problem}");
+        },
+        other => panic!("{other:?}"),
+    }
 }

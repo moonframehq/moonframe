@@ -112,7 +112,10 @@ Moonframe as a library.
   them too.
 - **A sandbox.** Luau runs with no files, network or process access, a
   memory cap and an instruction budget; anything that reaches the machine
-  goes through a provider or an element the host owns.
+  goes through a provider or an element the host owns. WebAssembly
+  providers run sandboxed too, so a provider you install from someone else
+  can have no access to your machine at all. See
+  [What runs with what access](#what-runs-with-what-access).
 
 ## Install
 
@@ -270,6 +273,31 @@ moonframe mod list | update | remove NAME | enable NAME | disable NAME
 ```
 
 Packages ship source only, so everything they run can be read first.
+
+## What runs with what access
+
+| Code | Runs | It can reach |
+|---|---|---|
+| Mods (Luau) | in the host's Luau sandbox, with a memory cap and an instruction budget | no files, network or processes: only the elements and providers the host offers |
+| Wasm providers (`kind = "wasm"`) | on [wasmtime](https://wasmtime.dev), with 64 MiB of memory and a fresh instruction budget for every call | no files, network or environment: only the host calls its `provider.toml` lists under `capabilities` (today `system`, the machine's load) |
+| Process and native providers | as your user | what you can: git, forges, coding agents, your files |
+
+So a provider that only shapes data, or that you take from someone else,
+is best written as a Wasm component: a bug or a bad actor in it cannot
+read your files or reach the network. Process and native providers are
+for what a sandbox cannot reach; read them as you would any script.
+
+The sandbox holds the running component. Building one from its crate runs
+Cargo, with its proc macros and its published dependencies' build scripts,
+as your user. The host refuses the provider's own build hooks (a build
+script in it or a local crate it uses, a toolchain named by path), and runs
+Cargo outside its folders so no Cargo config there applies. A package is
+refused if it ships a `provider.wasm` or any other binary, so what it runs
+is always source you can read. A bundled app ships its Wasm providers
+prebuilt, and builds nothing on your machine.
+
+An app on the library with no Wasm providers can leave the runtime out
+(the `wasm` feature, on by default; see [docs/library.md](docs/library.md)).
 
 ## Whole apps as profiles
 
