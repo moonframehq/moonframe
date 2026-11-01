@@ -27,6 +27,7 @@ type Props = {
 	context: string?,
 	closable: boolean?,
 	grow: boolean?,
+	width: number?,
 	to: string?,
 	-- Drawn in a bar that has a line of its own: the strip draws none.
 	in_bar: boolean?,
@@ -66,12 +67,12 @@ return component {
 	title = "Tabs",
 	category = "Navigation",
 	icon = "gallery-vertical-end",
-	description = "A tab strip in several looks (pills, underline, outline, cards, compact, classic, square, curved) with icons, agent status, badges, close and add buttons; tabs grow in as they open and shrink away as they close.",
+	description = "A tab strip in several looks (pills, underline, outline, cards, compact, classic, square, curved, browser) with icons, agent status, badges, close and add buttons; tabs grow in as they open and shrink away as they close.",
 	when = "Switch between open documents, terminals or agent sessions, or between views of one panel. For 2 to 4 settings choices use `segmented`; for joined action buttons use `button-group`; for onboarding steps use `pager`.",
 	props = {
 		["tabs"] = "list of { id, label, icon?, status? (\"working\" spinner, \"blocked\", \"done\", \"idle\" dot), badge? (count or text), closable?, tooltip?, msg? (sent instead of the select message) }",
 		["selected"] = "id of the selected tab",
-		["variant"] = "\"pills\" (default), \"underline\", \"outline\", \"cards\", \"compact\", \"classic\", \"square\" or \"curved\" (the selected tab joins what is under the strip: put the strip right on top of a card of the same color); or any look a stylesheet defines with `.tabs-<look>` and `.tabs-<look>-tab` rules",
+		["variant"] = "\"pills\" (default), \"underline\", \"outline\", \"cards\", \"compact\", \"classic\", \"square\" \"curved\" (the selected tab joins what is under the strip: put the strip right on top of a card of the same color) or \"browser\" (grey fixed-width tabs, the selected one white and raised: give `width`); or any look a stylesheet defines with `.tabs-<look>` and `.tabs-<look>-tab` rules",
 		["add"] = "message for a + button after the tabs; no button when unset",
 		["add_menu"] = "a menu the + button opens under itself: { open, dismiss (message on a click outside), content, width? }",
 		["event"] = "key of the message a click sends, default \"select\": { select = id }",
@@ -79,6 +80,7 @@ return component {
 		["context"] = "key of the message a right-click sends, default \"tab_menu\": { tab_menu = id }",
 		["closable"] = "show × on every tab, not only the selected one",
 		["grow"] = "stretch the tabs to share the width equally",
+		["width"] = "each tab's width in pixels: labels truncate and the × sits at the far end, as in a browser",
 		["to"] = "mod to send messages to, if not the drawing one",
 		["in_bar"] = "drawn in a title bar or toolbar with its own bottom line: the strip draws no line of its own (`.tabs-in-bar`)",
 	},
@@ -139,6 +141,13 @@ return component {
 		[".tabs-square-tab:hover"] = { background = "list-hover" },
 		[".tabs-square-tab:selected"] = { background = "accent/15", color = "foreground" },
 
+		-- browser: grey tabs of one width, the selected one white and
+		-- lifted, as a browser's tab strip in a light title bar.
+		[".tabs-browser"] = { gap = 8 },
+		[".tabs-browser-tab"] = { radius = 7, padding = { 6, 10 }, gap = 8, background = "foreground/6", color = "muted-foreground" },
+		[".tabs-browser-tab:hover"] = { background = "foreground/9", color = "foreground" },
+		[".tabs-browser-tab:selected"] = { background = "background", color = "foreground", shadow = "0 1px 2px #0000000f" },
+
 		-- In a bar with a line of its own, the strip's would double it.
 		[".tabs-in-bar"] = { border = "none" },
 
@@ -173,7 +182,7 @@ return component {
 	usage = [[local tabs = use "tabs"
 
 tabs {
-	variant = "pills", -- underline, outline, cards, compact, classic, square, curved
+	variant = "pills", -- underline, outline, cards, compact, classic, square, curved, browser (with width = 200)
 	selected = state.tab, add = "new-tab",
 	tabs = {
 		{ id = "api", label = "ledger-api", icon = "square-terminal", status = "working" },
@@ -209,6 +218,8 @@ tabs {
 				align = "center",
 				justify = if props.grow then "center" else nil,
 				grow = props.grow,
+				width = props.width,
+				shrink = if props.width then false else nil,
 				selected = selected,
 				msg = tab.msg or { [event] = id },
 				context = { [context] = id },
@@ -216,7 +227,9 @@ tabs {
 				to = props.to,
 				status,
 				tab.icon and ui.icon { name = tab.icon :: any, class = "tabs-icon" },
-				ui.text { tab.label, class = "tabs-label", truncate = true },
+				if props.width
+					then ui.row { grow = true, ui.text { tab.label, class = "tabs-label", truncate = true } }
+					else ui.text { tab.label, class = "tabs-label", truncate = true },
 				tab.badge ~= nil and ui.row { class = "tabs-badge", ui.text { tostring(tab.badge) } },
 				closable and ui.row {
 					class = "tabs-close",
