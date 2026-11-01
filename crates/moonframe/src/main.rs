@@ -15,9 +15,11 @@ mod inspect;
 mod keys;
 mod mod_window;
 mod motion;
+mod natives;
 mod overlay;
 mod packages;
 mod paths;
+mod persist;
 mod profiles;
 mod render;
 mod settings;
@@ -33,8 +35,14 @@ use {
         point, px, size,
     },
     moonframe_core::{Chrome, Roots, Titlebar, Workspace},
+    moonframe_mux::Backends,
     paths::Folders,
-    std::{fs, path::PathBuf, process::ExitCode, sync::OnceLock},
+    std::{
+        fs,
+        path::PathBuf,
+        process::ExitCode,
+        sync::{Arc, OnceLock},
+    },
 };
 
 const USAGE: &str = "\
@@ -397,14 +405,16 @@ fn main() -> ExitCode {
             })
             .detach();
 
-            // The shell says what window it wants, so it loads first. With a
-            // user folder, each mod's state comes back from the last run.
-            let persist = folders.user.as_ref().and_then(|_| {
-                moonframe_store::Store::open(&paths::state(folders.profile.as_deref()))
-                    .inspect_err(|error| tracing::warn!("{error}; state will not be saved"))
-                    .ok()
-                    .map(|store| Box::new(store) as Box<dyn moonframe_core::Persist>)
-            });
+            // Each mod's state and the topics come back from the last run:
+            // from herdr-core when it runs here, else SQLite, each profile
+            // its own. Only with the user's folder: `--no-user` runs
+            // (checks, screenshots) start fresh and keep nothing.
+            let backends = Arc::new(Backends::new());
+            let persist = folders
+                .user
+                .as_ref()
+                .and_then(|_| persist::open(&backends, folders.profile.as_deref()));
+            // The shell says what window it wants, so it loads first.
             let workspace = Workspace::open_with(folders.roots(), cx.theme().is_dark(), persist);
             let chrome = workspace.chrome();
             // The shell's size if it asks, kept within the screen.
@@ -427,7 +437,8 @@ fn main() -> ExitCode {
             };
             let opened = cx.open_window(options, |window, cx| {
                 let view = cx.new(|cx| {
-                    let mut app = MoonframeApp::new(workspace, chrome, folders.clone(), window, cx);
+                    let mut app =
+                        MoonframeApp::new(workspace, chrome, folders.clone(), backends, window, cx);
                     if let Some(name) = &component {
                         app.show_component(name, cx);
                     }

@@ -364,4 +364,8 @@ impl moonframe_core::Persist for Store {
     fn save_topic(&self, name: &str, value: &Data) {
         Store::save_topic(self, name, value);
     }
+
+    fn flush(&self) {
+        Store::flush(self);
+    }
 }

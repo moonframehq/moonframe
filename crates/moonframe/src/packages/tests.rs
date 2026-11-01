@@ -517,3 +517,72 @@ fn an_app_title_or_icon_that_leaves_its_folder_is_refused() {
         );
     }
 }
+
+/// A package's native provider runs no code of its own, but it replaces the
+/// app's built-in one with its settings (git's `writers`), so it is asked
+/// about, and the prompt says what it changes.
+#[test]
+fn a_native_provider_in_a_package_needs_approval() {
+    let dir = tempfile::tempdir().unwrap();
+    let user = dir.path().join("user");
+    let remote = repo(dir.path(), "writer", &[
+        ("mods/writer/main.luau", &counter("w")),
+        (
+            "providers/git/provider.toml",
+            "kind = \"native\"\n[settings]\nwriters = [\"writer\"]\n",
+        ),
+    ]);
+    assert_eq!(
+        install(&user, remote.to_str().unwrap(), &no).unwrap_err(),
+        "declined"
+    );
+    let (_, contents) = install(&user, remote.to_str().unwrap(), &yes).unwrap();
+    let trusted: Vec<String> = contents
+        .trusted()
+        .map(|(name, how)| format!("{name}: {how}"))
+        .collect();
+    assert_eq!(trusted.len(), 1);
+    assert!(
+        trusted[0].starts_with("git: replaces the app's built-in"),
+        "{trusted:?}"
+    );
+    assert!(trusted[0].contains("writer"), "{trusted:?}");
+}
+
+/// A package's mod named like one git lets commit and push (`status`)
+/// would take that right over, so the prompt names it. The writers of
+/// every layer count: built-in, the user's, and installed packages'.
+#[test]
+fn a_mod_that_shadows_a_git_writer_is_named() {
+    let dir = tempfile::tempdir().unwrap();
+    let user = dir.path().join("user");
+    let remote = repo(dir.path(), "bar", &[
+        ("mods/status/main.luau", &counter("s")),
+        ("mods/other/main.luau", &counter("o")),
+    ]);
+    let (_, contents) = install(&user, remote.to_str().unwrap(), &yes).unwrap();
+    let builtin = git_writers(&user);
+    assert!(builtin.contains(&"status".to_owned()), "{builtin:?}");
+    assert_eq!(contents.writers(&builtin).collect::<Vec<_>>(), ["status"]);
+
+    let git = user.join("providers/git");
+    fs::create_dir_all(&git).unwrap();
+    fs::write(
+        git.join("provider.toml"),
+        "kind = \"native\"\n[settings]\nwriters = [\"other\"]\n",
+    )
+    .unwrap();
+    let writers = git_writers(&user);
+    assert_eq!(writers, ["other", "status"]);
+    assert_eq!(contents.writers(&writers).collect::<Vec<_>>(), [
+        "other", "status"
+    ]);
+
+    // A package installed earlier that widened `writers` counts too.
+    let widening = repo(dir.path(), "widen", &[(
+        "providers/git/provider.toml",
+        "kind = \"native\"\n[settings]\nwriters = [\"later\"]\n",
+    )]);
+    install(&user, widening.to_str().unwrap(), &yes).unwrap();
+    assert!(git_writers(&user).contains(&"later".to_owned()));
+}

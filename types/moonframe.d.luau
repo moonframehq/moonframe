@@ -585,6 +585,10 @@ type HatchProps = {
 }
 
 type TerminalEngine = "alacritty" | "ghostty"
+-- What keeps the shell running: `auto` (default) is herdr-core, else tmux,
+-- else a pty. herdr-core and tmux keep it across launches; a pty ends with
+-- the app. One that isn't installed falls back to the next.
+type TerminalBackend = "auto" | "herdr-core" | "tmux" | "pty"
 
 -- A live shell (your login shell). The host keeps it by mod and `id`.
 type TerminalProps = {
@@ -595,6 +599,7 @@ type TerminalProps = {
 	-- Where it starts: a path or `~/...`; the home folder when unset.
 	cwd: string?,
 	engine: TerminalEngine?,
+	backend: TerminalBackend?,
 	[number]: string,
 }
 
@@ -609,8 +614,10 @@ type BrowserProps = {
 	url: string?,
 	-- The page's zoom factor, 0.25 to 5.
 	zoom: number?,
-	-- Sent as the page navigates or its title changes, with `url` and
-	-- `title` added (a non-table message arrives as `{ msg = ... }`).
+	-- Sent as the page navigates, its title changes or a load starts or
+	-- ends, with `url`, `title` and `loading` added, and `back` and
+	-- `forward` (whether it can go there) where the platform says (a
+	-- non-table message arrives as `{ msg = ... }`).
 	navigate: Data,
 	-- Sent as a load starts and finishes, with `loading` and `url` added.
 	loading: Data,
@@ -648,6 +655,10 @@ type InputProps = {
 	mono: boolean?,
 	width: number?,
 	grow: boolean?,
+	-- Make it the address bar of this mod's `ui.browser` with this id (or
+	-- `to`'s): Enter loads the text (a host over https, words as a web
+	-- search), focus selects it, and Escape puts back the page's address.
+	browser: string?,
 }
 
 type RegionProps = {
@@ -1040,6 +1051,31 @@ type Files = {
 	dirs: { [string]: { FileEntry } },
 }
 
+-- What this machine has for keeping terminals (the `herdr` provider).
+type Herdr = {
+	installed: boolean,
+	version: string?,
+	path: string?,
+	tmux: boolean,
+	-- herdr-core's installer is running.
+	installing: boolean,
+	-- Why the last install failed.
+	error: string?,
+	-- Installed during this run.
+	fresh: boolean,
+}
+
+-- A native provider's answer to an action a mod asked for, arriving in that
+-- mod's `update`: `reply` is the `id` the mod sent, else the action's name.
+type Reply = {
+	reply: any,
+	action: string,
+	ok: boolean,
+	-- What happened, when it worked; why not, when it did not.
+	message: string?,
+	error: string?,
+}
+
 -- `ui.mount { "explorer", id = "files-2", props = { ... } }`.
 type MountProps = {
 	mod: string?,
@@ -1062,6 +1098,7 @@ type App = {
 	gitlab: Forge?,
 	agents: Agents?,
 	files: Files?,
+	herdr: Herdr?,
 	-- What tab bars can open: each component and mod with a `tab` entry.
 	kinds: { TabKind },
 	-- The stylesheet's `looks`: which look each kind of component takes.

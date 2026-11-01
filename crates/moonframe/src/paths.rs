@@ -11,7 +11,8 @@ use {
     },
 };
 
-const NAME: &str = "moonframe";
+/// The app's name: its folders, and its document in herdr-core.
+pub(crate) const NAME: &str = "moonframe";
 
 /// The app folder the binary ships with: `Contents/Resources/app` inside a
 /// macOS bundle, `share/<binary>/app` beside `bin/` in a Linux one (each

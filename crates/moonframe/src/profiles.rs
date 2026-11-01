@@ -136,7 +136,8 @@ fn fail(problem: String) -> ExitCode {
 }
 
 /// Asks as `moonframe mod` does, and refuses anything but an app.
-fn approve_app(contents: &Contents, yes: bool) -> Result<(), String> {
+/// `writers` are the mods git lets commit and push in the profile.
+fn approve_app(contents: &Contents, writers: &[String], yes: bool) -> Result<(), String> {
     if contents.app.is_none() {
         return Err(
             "this is a package of mods, not an app (it has no moonframe.toml): \
@@ -145,15 +146,15 @@ fn approve_app(contents: &Contents, yes: bool) -> Result<(), String> {
                 .to_owned(),
         );
     }
-    packages::approve(contents, yes)
+    packages::approve(contents, writers, yes)
 }
 
 /// Asks as `moonframe mod` does, and refuses a second app.
-fn approve_mod(contents: &Contents, yes: bool) -> Result<(), String> {
+fn approve_mod(contents: &Contents, writers: &[String], yes: bool) -> Result<(), String> {
     if contents.app.is_some() {
         return Err("an app cannot require another app".to_owned());
     }
-    packages::approve(contents, yes)
+    packages::approve(contents, writers, yes)
 }
 
 /// Clones the app into a profile being made, moves the profile into place
@@ -166,8 +167,10 @@ fn install(user: &Path, source: &str, name: Option<&str>, yes: bool) -> Result<(
     let incoming = profiles.join(format!(".incoming-{}", std::process::id()));
     let _ = fs::remove_dir_all(&incoming);
     println!("Cloning {source}…");
+    // A new profile: git's writers are the built-in ones.
+    let writers = packages::git_writers(&incoming);
     let installed = packages::install(&incoming, source, &|contents| {
-        approve_app(contents, yes)?;
+        approve_app(contents, &writers, yes)?;
         match name {
             Some(_) => Ok(()),
             None => refuse_taken(user, &app_name(contents)),
@@ -209,7 +212,10 @@ fn link(user: &Path, folder: &str, name: Option<&str>, yes: bool) -> Result<(), 
     let name = name.map_or(manifest.name, str::to_owned);
     refuse_taken(user, &name)?;
     let profile = paths::profile(user, &name);
-    let linked = packages::link(&profile, folder, &|contents| approve_app(contents, yes));
+    let writers = packages::git_writers(&profile);
+    let linked = packages::link(&profile, folder, &|contents| {
+        approve_app(contents, &writers, yes)
+    });
     let (id, contents) = match linked {
         Ok(linked) => linked,
         Err(problem) => {
@@ -270,6 +276,7 @@ fn install_requires(
         return 0;
     };
     let mut failed = 0;
+    let writers = packages::git_writers(profile);
     for source in &app.requires {
         let beside = (source.starts_with("./") || source.starts_with("../"))
             .then(|| folder.map(|folder| folder.join(source)))
@@ -284,11 +291,15 @@ fn install_requires(
             Ok(true) => continue,
             Ok(false) if local.is_some() => {
                 println!("Linking {source}, which it requires…");
-                packages::link(profile, source, &|contents| approve_mod(contents, yes))
+                packages::link(profile, source, &|contents| {
+                    approve_mod(contents, &writers, yes)
+                })
             },
             Ok(false) => {
                 println!("Cloning {source}, which it requires…");
-                packages::install(profile, source, &|contents| approve_mod(contents, yes))
+                packages::install(profile, source, &|contents| {
+                    approve_mod(contents, &writers, yes)
+                })
             },
             Err(problem) => Err(problem),
         };
@@ -341,11 +352,12 @@ fn list(user: &Path) -> Result<(), String> {
 
 fn update(user: &Path, name: &str, yes: bool) -> Result<(), String> {
     let profile = existing(user, name)?;
+    let writers = packages::git_writers(&profile);
     let updated = packages::print_update(&profile, None, &|contents| {
         // The app may change its requirements; its kind may not change.
         match contents.app {
-            Some(_) => packages::approve(contents, yes),
-            None => approve_mod(contents, yes),
+            Some(_) => packages::approve(contents, &writers, yes),
+            None => approve_mod(contents, &writers, yes),
         }
     });
     // What the app requires now, which may be new.

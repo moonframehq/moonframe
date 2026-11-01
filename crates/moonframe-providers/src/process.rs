@@ -1,9 +1,10 @@
 //! Process providers: a command run in the provider's folder that prints one
-//! JSON value per line on stdout and reads messages as `{"message": ...}`
+//! JSON value per line on stdout and reads messages as
+//! `{"from": "<mod>", "message": ...}`
 //! lines on stdin. Its stderr goes to the app's log.
 
 use {
-    crate::{Context, Kind, json},
+    crate::{Context, Kind, Message, json},
     moonframe_core::{Data, Error},
     std::{
         io::{BufRead, BufReader, Read, Write},
@@ -69,7 +70,7 @@ fn drive(context: &Context, child: &mut Child) -> Result<(), String> {
     loop {
         match context.messages.recv_timeout(POLL) {
             Ok(message) => {
-                let line = serde_json::json!({ "message": json::json(&message) });
+                let line = line(&message);
                 // A process that stopped reading is noticed when its output ends.
                 let _ = writeln!(stdin, "{line}");
             },
@@ -131,5 +132,30 @@ fn read_lines(stdout: impl Read, lines: &mpsc::Sender<Line>) {
         if lines.send(line).is_err() || end {
             return;
         }
+    }
+}
+
+/// The line a message is written as: compact JSON, `from` first, so a
+/// script can match a whole line exactly (the `herdr` provider does).
+fn line(message: &Message) -> String {
+    serde_json::json!({
+        "from": message.from,
+        "message": json::json(&message.data),
+    })
+    .to_string()
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use {super::*, moonframe_core::Data};
+
+    #[test]
+    fn a_message_is_one_compact_line_with_its_sender_first() {
+        let message = Message {
+            from: "herdr".into(),
+            data: Data::from("install"),
+        };
+        assert_eq!(line(&message), r#"{"from":"herdr","message":"install"}"#);
     }
 }

@@ -1,4 +1,5 @@
-//! Terminals for moonframe: a shell on a pseudo-terminal, read by a
+//! Terminals for moonframe: a program a [`Backend`] runs (a shell on a
+//! local [`Pty`] here; tmux and herdr-core in `moonframe-mux`), read by a
 //! terminal emulator, and published as [`Screen`] snapshots for the window
 //! to paint. Two emulators sit behind one [`Emulator`] interface, each
 //! behind a feature (both on by default):
@@ -18,11 +19,15 @@ mod ghostty;
 mod keys;
 #[cfg(feature = "alacritty")]
 mod palette;
+mod pane;
+mod pty;
 mod session;
 
 pub use {
     keys::{Key, encode, paste},
-    session::{Session, Spawn},
+    pane::{Backend, Open, Opened, Output, Pane},
+    pty::Pty,
+    session::Session,
 };
 
 /// Which emulator reads the shell's output.

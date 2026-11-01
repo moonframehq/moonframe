@@ -14,8 +14,11 @@
 //!   refuses the most direct build hooks, a `build.rs` or a folder-local
 //!   `.cargo/`. A provider from elsewhere ships its source, which can be
 //!   reviewed; packages are refused with any `provider.wasm`.
+//! - **native**: Rust built into the app (see [`native`]), for git, forges
+//!   and the like: the user's own access, real libraries, and replies to
+//!   the mod that asked.
 //! - **process**: any command that prints one JSON value per line and reads
-//!   messages from stdin. It runs with the user's full access, for data a
+//!   messages from stdin, each with the mod that sent it. It runs with the user's full access, for data a
 //!   sandbox cannot reach.
 //!
 //! What a provider publishes appears to every view as `app.<name>`; a mod
@@ -26,11 +29,16 @@
 mod fingerprint;
 mod json;
 mod manifest;
+pub mod native;
 mod process;
 mod system;
 mod wasm;
 
-pub use manifest::{Capability, Kind, Manifest, PREBUILT};
+pub use {
+    json::{from_json, to_json},
+    manifest::{Capability, Kind, Manifest, PREBUILT},
+    native::{Handle, Native, Natives},
+};
 
 use {
     fingerprint::Fingerprint,
@@ -47,6 +55,14 @@ use {
     },
 };
 
+/// A message for a provider, and the mod that sent it: a process provider
+/// sees both, so it can do what only one mod may ask for.
+#[derive(Debug)]
+pub(crate) struct Message {
+    pub(crate) from: String,
+    pub(crate) data: Data,
+}
+
 /// What a provider reports to the app.
 #[derive(Debug)]
 pub enum Event {
@@ -55,6 +71,12 @@ pub enum Event {
     /// The provider stopped or could not start; it shares nothing until it
     /// is reloaded.
     Failed { provider: String, problem: Error },
+    /// A native provider's message for the mod `to`: a reply to an action.
+    Sent {
+        provider: String,
+        to: String,
+        msg: Data,
+    },
 }
 
 /// Where events go: called on provider threads.
@@ -76,11 +98,13 @@ pub struct Providers {
     build_dir: PathBuf,
     events: Events,
     running: BTreeMap<String, Running>,
+    /// The native providers built into the app, by name.
+    natives: Natives,
 }
 
 /// A provider's thread, and how to reach and stop it.
 struct Running {
-    messages: mpsc::Sender<Data>,
+    messages: mpsc::Sender<Message>,
     stop: Arc<AtomicBool>,
     /// Its folder when it started: a reload restarts it only if this changed.
     fingerprint: Fingerprint,
@@ -98,7 +122,7 @@ pub(crate) struct Context {
     pub(crate) dir: PathBuf,
     pub(crate) manifest: Manifest,
     pub(crate) build_dir: PathBuf,
-    pub(crate) messages: mpsc::Receiver<Data>,
+    pub(crate) messages: mpsc::Receiver<Message>,
     pub(crate) stop: Arc<AtomicBool>,
     pub(crate) events: Events,
 }
@@ -127,12 +151,23 @@ impl Providers {
     /// Starts every provider in `roots`. Wasm providers build into
     /// `build_dir`.
     pub fn start(roots: Roots, build_dir: impl Into<PathBuf>, events: Events) -> Self {
+        Self::start_with(roots, build_dir, events, Natives::new())
+    }
+
+    /// The same, with the native providers this build has.
+    pub fn start_with(
+        roots: Roots,
+        build_dir: impl Into<PathBuf>,
+        events: Events,
+        natives: Natives,
+    ) -> Self {
         let build_dir = build_dir.into();
         let mut providers = Self {
             roots,
             build_dir: std::path::absolute(&build_dir).unwrap_or(build_dir),
             events,
             running: BTreeMap::new(),
+            natives,
         };
         providers.reload();
         providers
@@ -176,11 +211,13 @@ impl Providers {
                 stop: stop.clone(),
                 events: self.events.clone(),
             };
+            let native = self.natives.get(name.as_str()).copied();
             let spawned = thread::Builder::new()
                 .name(format!("provider-{name}"))
                 .spawn(move || match context.manifest.kind {
                     Kind::Wasm => wasm::run(&context),
                     Kind::Process { .. } => process::run(&context),
+                    Kind::Native => native::run(&context, native),
                 });
             match spawned {
                 Ok(_) => {
@@ -209,15 +246,18 @@ impl Providers {
         self.running.keys().map(String::as_str)
     }
 
-    /// Hands `message` to the provider `name`.
-    pub fn send(&self, name: &str, message: Data) -> Result<(), Error> {
+    /// Hands `message`, from the mod `from`, to the provider `name`.
+    pub fn send(&self, name: &str, from: &str, message: Data) -> Result<(), Error> {
         let running = self
             .running
             .get(name)
             .ok_or_else(|| Error::new(format!("no provider named `{name}`")))?;
         running
             .messages
-            .send(message)
+            .send(Message {
+                from: from.to_owned(),
+                data: message,
+            })
             .map_err(|_| Error::new(format!("provider `{name}` has stopped")))
     }
 }

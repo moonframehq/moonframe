@@ -13,6 +13,8 @@ pub trait Persist {
     /// Every topic's last value.
     fn topics(&self) -> BTreeMap<String, Data>;
     fn save_topic(&self, name: &str, value: &Data);
+    /// Waits until every save so far is kept: for quitting.
+    fn flush(&self) {}
 }
 
 /// Where a module's state is kept.
