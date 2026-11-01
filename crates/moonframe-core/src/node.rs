@@ -61,6 +61,7 @@ tokens! {
         Normal = "normal",
         Large = "large",
         Title = "title",
+        Display = "display",
     }
 }
 
@@ -1067,6 +1068,7 @@ pub const ICONS: &[&str] = &[
     "arrow-right",
     "arrow-up",
     "arrow-up-down",
+    "arrow-up-right",
     "asterisk",
     "at-sign",
     "ban",
@@ -1092,6 +1094,7 @@ pub const ICONS: &[&str] = &[
     "calendar",
     "case-sensitive",
     "chart-column",
+    "chart-line",
     "chart-pie",
     "check",
     "chevron-down",
@@ -1167,6 +1170,7 @@ pub const ICONS: &[&str] = &[
     "laptop",
     "layers",
     "layout-dashboard",
+    "layout-grid",
     "link",
     "list",
     "list-checks",
@@ -1249,6 +1253,7 @@ pub const ICONS: &[&str] = &[
     "unlock",
     "upload",
     "user",
+    "user-plus",
     "wifi",
     "wifi-off",
     "window-close",

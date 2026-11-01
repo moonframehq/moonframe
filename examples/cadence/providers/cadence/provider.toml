@@ -1,0 +1,6 @@
+# Cadence's workflow operations, shared as `app.cadence`. SAMPLE DATA from
+# sample.json, with a simulated live feed that ticks once a second; replace
+# it, or this provider, with your own source. A process provider: it reads
+# that file. Needs perl 5 (as macOS ships).
+command = ["perl", "cadence.pl"]
+kind    = "process"

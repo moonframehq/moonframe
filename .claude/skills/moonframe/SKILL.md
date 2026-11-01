@@ -806,7 +806,7 @@ Text-like elements take their main value positionally:
 
 - space: `none` `small` (4px) `normal` (8px) `large` (16px)
 - tone: `normal` `muted` `accent` `success` `warning` `danger`
-- size (text): `small` `normal` `large` `title`
+- size (text): `small` `normal` `large` `title` `display` (3x, hero figures on dashboards)
 - weight: `normal` `medium` `bold`
 - align: `stretch` `start` `center` `end`
 - justify: `start` `center` `end` `between`

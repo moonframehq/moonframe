@@ -1,0 +1,8 @@
+[app]
+# Workflow operations at a glance: time within SLA, latency and lag against
+# their limits, what fails most, and a live feed of runs as they start and
+# finish. `moonframe --profile cadence` opens it.
+keep     = []
+name     = "cadence"
+requires = []
+title    = "Cadence"
