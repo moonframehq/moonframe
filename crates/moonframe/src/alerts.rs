@@ -40,7 +40,8 @@ const SEPARATOR: char = '\u{1f}';
 /// How a notification was shown.
 #[derive(Debug, PartialEq)]
 pub(crate) enum Posted {
-    /// By the system.
+    /// By the system (macOS, in a bundle).
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     System,
     /// Not by the system: the app shows it as a toast.
     Toast,
@@ -188,6 +189,7 @@ fn identifier(sequence: u64, from: &str, id: Option<&str>) -> String {
 }
 
 /// Who posted the notification `identifier`, and its `id`.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn parse_identifier(identifier: &str) -> Option<(String, Option<String>)> {
     let mut parts = identifier.split(SEPARATOR);
     if parts.next()? != "moonframe" {
@@ -201,6 +203,7 @@ fn parse_identifier(identifier: &str) -> Option<(String, Option<String>)> {
 
 /// A short two-note chime as a WAV file: 16-bit mono at 44.1 kHz, made
 /// here rather than shipped.
+#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
 pub(crate) fn chime() -> Vec<u8> {
     const RATE: u32 = 44_100;
     let notes = [(880.0_f32, 0.0_f32), (1318.5, 0.11)];
