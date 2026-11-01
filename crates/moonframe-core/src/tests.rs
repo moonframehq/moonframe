@@ -1163,7 +1163,7 @@ fn the_users_folder_goes_over_the_apps() {
     write(
         user.path(),
         "style.luau",
-        r##"return style { radius = 9, colors = { accent = "#ff0000" }, rules = { panel = { radius = 4 } } }"##,
+        r##"return style { radius = 9, mono = { size = 15 }, colors = { accent = "#ff0000" }, rules = { panel = { radius = 4 } } }"##,
     );
     let roots = crate::Roots::new([builtin.path().to_owned(), user.path().to_owned()]);
     let workspace = Workspace::open(roots, false);
@@ -1182,6 +1182,11 @@ fn the_users_folder_goes_over_the_apps() {
 
     let sheet = workspace.stylesheet();
     assert_eq!((sheet.radius, sheet.font_size), (Some(9.0), Some(13.0)));
+    // The user's size, over the app's family.
+    assert_eq!(
+        (sheet.mono.size, sheet.mono.family.as_deref()),
+        (Some(15.0), Some("Fira Code"))
+    );
     assert_eq!(sheet.overrides, [(Token::Accent, Shade {
         light: 0xff0000ff,
         dark: 0xff0000ff
