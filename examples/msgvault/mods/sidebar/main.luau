@@ -86,6 +86,10 @@ return mod {
 		for _, box in MAILBOXES do
 			table.insert(rows, row(box.id, box.title, box.icon, if box.count then vault.counts[box.count] else nil, box.strong))
 		end
+		if vault.total_files > 0 then
+			table.insert(rows, ui.text { "Files", class = "sb-group" })
+			table.insert(rows, row("files", "All Attachments", "folder-open", vault.total_files))
+		end
 		if #vault.labels > 0 then
 			table.insert(rows, ui.text { "Labels", class = "sb-group" })
 			for _, label in vault.labels do

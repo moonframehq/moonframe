@@ -3,14 +3,30 @@
 -- click opens one), the newest is open, as a card with the sender, the
 -- recipients, the body and the attachments. Chats are bubbles: the others'
 -- on the left under their names, yours on the right in the accent.
+--
+-- HTML mail shows rendered, in a web view on a page the provider writes
+-- (no scripts, no remote pictures until "Load remote images"), or as plain
+-- text with the toolbar's toggle. In the attachments browser it shows the
+-- chosen file instead.
 
 local avatar = use "vault-avatar"
+local file_card = use "vault-file"
 
-type State = { thread: number, open: { [string]: boolean? }, all: boolean }
+type State = {
+	thread: number,
+	open: { [string]: boolean? },
+	all: boolean,
+	rich: boolean,
+	away: { [string]: string? },
+	seen: number,
+}
 
 local function fresh(): State
-	return { thread = 0, open = {}, all = false }
+	return { thread = 0, open = {}, all = false, rich = true, away = {}, seen = 0 }
 end
+
+-- The most pages drawn at once: a mod may hold four web views.
+local PAGES = 3
 
 return mod {
 	region = "main",
@@ -34,29 +50,60 @@ return mod {
 		[".rd-muted"] = { color = "muted-foreground" },
 		[".rd-small"] = { size = "small", color = "muted-foreground" },
 		[".rd-text"] = { padding = { 0, 16, 20, 68 } },
-		[".rd-files"] = { padding = { 0, 16, 16, 68 }, gap = 8 },
-		[".rd-file"] = { border = true, border_color = "border", radius = 8, background = "muted/50", padding = { 6, 4, 6, 12 }, gap = 10 },
-		[".rd-file:hover"] = { background = "muted" },
-		[".rd-file-tile"] = { background = "background", radius = 6, color = "accent" },
+		[".rd-files"] = { padding = { 0, 16, 16, 68 }, gap = 10 },
 		[".rd-star"] = { color = "warning" },
 		[".rd-sender"] = { size = "small", weight = "medium", color = "muted-foreground" },
 		[".rd-group"] = { padding = { 12, 0, 2, 0 } },
 		[".rd-bubble"] = { radius = 16, padding = { 6, 12 }, background = "muted" },
 		[".rd-bubble-mine"] = { background = "accent", color = "accent-foreground" },
 		[".rd-empty-tile"] = { background = "muted", radius = 999, color = "muted-foreground" },
+		[".rd-tool:selected"] = { background = "muted" },
+		[".rd-page"] = { padding = { 0, 16, 16, 68 }, gap = 8 },
+		[".rd-web"] = { background = "background", border = "none", padding = 0 },
+		[".rd-remote"] = { background = "muted/60", radius = 8, padding = { 6, 6, 6, 10 }, gap = 8, size = "small", color = "muted-foreground" },
+		[".rd-remote-load"] = { radius = 6, padding = { 3, 8 }, color = "accent", weight = "medium" },
+		[".rd-remote-load:hover"] = { background = "accent/10" },
+		[".rd-detail"] = { padding = { 24, 32, 32, 32 }, gap = 16 },
+		[".rd-field"] = { gap = 12 },
+		[".rd-label"] = { size = "small", color = "muted-foreground" },
+		[".rd-action"] = { radius = 8, padding = { 7, 14 }, gap = 8, border = true, border_color = "border", weight = "medium" },
+		[".rd-action:hover"] = { background = "list-hover" },
+		[".rd-action-primary"] = { background = "accent", color = "accent-foreground", border_color = "accent" },
+		[".rd-action-primary:hover"] = { background = "accent/90" },
+		[".rd-link"] = { color = "accent" },
+		[".rd-toast"] = { padding = { 10, 10, 10, 14 }, gap = 10 },
 	},
 
 	init = function(previous: State?): State
-		return previous or fresh()
+		local state = fresh()
+		if previous then
+			state.thread = previous.thread or 0
+			state.open = previous.open or {}
+			state.all = previous.all or false
+			state.rich = previous.rich ~= false
+			state.seen = previous.seen or 0
+		end
+		return state
 	end,
 
 	update = function(state: State, msg)
+		if msg == "toggle-rich" then
+			state.rich = not state.rich
+			return
+		end
 		if type(msg) ~= "table" and msg ~= "expand-all" then
 			return
 		end
 		if msg == "expand-all" then
 			state.all = not state.all
 			state.open = {}
+		elseif msg.dismiss then
+			state.seen = msg.dismiss
+		elseif msg.page then
+			-- A page left the message (a link was clicked): offer the way back.
+			local key = tostring(msg.page)
+			local url = msg.url or ""
+			state.away[key] = if string.sub(url, 1, 7) ~= "file://" and url ~= "" and url ~= "about:blank" then url else nil
 		elseif msg.topic == "provider/vault" then
 			local thread = msg.value and msg.value.thread
 			local id = thread and thread.id or 0
@@ -64,6 +111,7 @@ return mod {
 				state.thread = id
 				state.open = {}
 				state.all = false
+				state.away = {}
 			end
 		elseif msg.toggle then
 			local key = tostring(msg.toggle)
@@ -73,6 +121,113 @@ return mod {
 
 	view = function(state: State, app)
 		local vault = app.vault
+		-- What Open and Save did, in a corner until dismissed.
+		local notice = vault and vault.notice
+		local toast = notice and notice.seq > state.seen and ui.overlay {
+			open = true,
+			place = "bottom-end",
+			width = 340,
+			content = ui.row {
+				class = "rd-toast",
+				align = "center",
+				ui.icon { name = if notice.ok then "circle-check" else "circle-alert", tone = if notice.ok then "success" else "danger" },
+				ui.row { grow = true, ui.text { notice.text, wrap = true } },
+				ui.row {
+					class = "rd-tool",
+					width = 24,
+					height = 24,
+					align = "center",
+					justify = "center",
+					msg = { dismiss = notice.seq },
+					ui.icon { name = "close", size = "small" },
+				},
+			},
+		}
+
+		if vault and vault.available and vault.mailbox == "files" and vault.files then
+			local file = vault.files.file
+			if not file then
+				return ui.column {
+					grow = true,
+					align = "center",
+					justify = "center",
+					gap = "normal",
+					ui.row {
+						class = "rd-empty-tile",
+						width = 56,
+						height = 56,
+						align = "center",
+						justify = "center",
+						ui.icon { name = "paperclip", size = "large" },
+					},
+					ui.text { "No attachment selected", weight = "bold" },
+					ui.text { "Pick a file to see it, open it or save it.", tone = "muted", size = "small" },
+					toast,
+				}
+			end
+			local function field(label: string, value: any)
+				return ui.row {
+					class = "rd-field",
+					align = "start",
+					ui.row { width = 90, shrink = false, ui.text { label, class = "rd-label" } },
+					ui.row { grow = true, if type(value) == "string" then ui.text { value, wrap = true } else value },
+				}
+			end
+			return ui.column {
+				grow = true,
+				scroll = true,
+				gap = "none",
+				ui.row {
+					class = "rd-detail",
+					justify = "center",
+					shrink = false,
+					ui.column {
+						grow = true,
+						max_width = 720,
+						gap = "large",
+						file_card { file = file, large = true },
+						ui.column {
+							gap = "small",
+							ui.text { file.name, class = "rd-subject" },
+							ui.text { `{file.type} · {file.size}`, class = "rd-meta" },
+						},
+						ui.row {
+							gap = "normal",
+							ui.row {
+								class = { "rd-action", "rd-action-primary" },
+								align = "center",
+								msg = { open_file = file.id },
+								to = "provider:vault",
+								ui.icon { name = "external-link", size = "small" },
+								ui.text { "Open" },
+							},
+							ui.row {
+								class = "rd-action",
+								align = "center",
+								msg = { save_file = file.id },
+								to = "provider:vault",
+								ui.icon { name = "download", size = "small" },
+								ui.text { "Save to Downloads" },
+							},
+						},
+						ui.divider(),
+						ui.column {
+							gap = "normal",
+							field("From", file.from),
+							field("Message", ui.row {
+								msg = { show = file.message },
+								to = "provider:vault",
+								tooltip = "Show the message",
+								ui.text { file.subject, class = "rd-link", wrap = true },
+							}),
+							field("Received", file.date),
+						},
+					},
+				},
+				toast,
+			}
+		end
+
 		local thread = vault and vault.available and vault.thread
 		if not thread then
 			return ui.column {
@@ -90,6 +245,7 @@ return mod {
 				},
 				ui.text { "No message selected", weight = "bold" },
 				ui.text { "Pick a conversation from the list, or search with / and ⌘F.", tone = "muted", size = "small" },
+				toast,
 			}
 		end
 
@@ -130,7 +286,9 @@ return mod {
 			end
 		else
 			local many = #messages > 1
-			for index, m in messages do
+			local pages = 0
+			for index = #messages, 1, -1 do
+				local m = messages[index]
 				local open = not many or index == #messages or state.all or state.open[tostring(m.id)] == true
 				if not open then
 					table.insert(items, ui.row {
@@ -157,35 +315,51 @@ return mod {
 					end
 					local files = {}
 					for _, file in m.files do
-						table.insert(files, ui.row {
-							class = "rd-file",
-							align = "center",
-							width = 288,
-							tooltip = "msgvault-gpui opens this from the archive; this example shows it only",
-							ui.row {
-								class = "rd-file-tile",
-								width = 30,
-								height = 30,
+						table.insert(files, file_card { file = file })
+					end
+					local html = m.html
+					local body
+					if html and state.rich and pages < PAGES then
+						pages += 1
+						local id = `page-{m.id}`
+						local away = state.away[tostring(m.id)]
+						body = ui.column {
+							class = "rd-page",
+							html.remote and not html.allowed and ui.row {
+								class = "rd-remote",
 								align = "center",
-								justify = "center",
-								shrink = false,
-								ui.icon { name = file.icon :: any },
+								ui.icon { name = "image", size = "small" },
+								ui.row { grow = true, ui.text { "Remote images are blocked to protect your privacy." } },
+								ui.row {
+									class = "rd-remote-load",
+									msg = { remote = m.id },
+									to = "provider:vault",
+									ui.text { "Load remote images" },
+								},
+							},
+							away and ui.row {
+								class = "rd-remote",
+								align = "center",
+								ui.icon { name = "external-link", size = "small" },
+								ui.row { grow = true, ui.text { away, truncate = true } },
+								ui.row { class = "rd-remote-load", command = "browser-open", browser = id, ui.text { "Open in browser" } },
+								ui.row { class = "rd-remote-load", command = "browser-back", browser = id, ui.text { "Back to message" } },
 							},
 							ui.column {
-								grow = true,
-								gap = "none",
-								ui.text { file.name, weight = "medium", truncate = true },
-								ui.text { file.size, class = "rd-small" },
+								height = html.height,
+								ui.browser {
+									id = id,
+									url = if app.dark then html.dark else html.light,
+									navigate = { page = m.id },
+									class = "rd-web",
+								},
 							},
-							ui.row {
-								class = "rd-tool",
-								width = 22,
-								height = 22,
-								align = "center",
-								justify = "center",
-								ui.icon { name = "download", size = "small" },
-							},
-						})
+						}
+					else
+						body = ui.column {
+							class = "rd-text",
+							ui.text { if m.body ~= "" then m.body else "This message has no archived body." },
+						}
 					end
 					table.insert(items, ui.column {
 						class = "rd-card",
@@ -214,14 +388,20 @@ return mod {
 								m.starred and ui.icon { name = "star", size = "small", class = "rd-star" },
 							},
 						},
-						ui.column {
-							class = "rd-text",
-							ui.text { if m.body ~= "" then m.body else "This message has no archived body." },
-						},
+						body,
 						#files > 0 and ui.row { class = "rd-files", wrap = true, table.unpack(files) },
 					})
 				end
 			end
+		end
+
+		if not thread.chat then
+			-- Built newest first (so the newest pages get the web views): put back in order.
+			local ordered = {}
+			for i = #items, 1, -1 do
+				table.insert(ordered, items[i])
+			end
+			items = ordered
 		end
 
 		local chips = {}
@@ -237,6 +417,12 @@ return mod {
 		end
 
 		local many_emails = not thread.chat and #messages > 1
+		local has_html = false
+		for _, m in messages do
+			if m.html then
+				has_html = true
+			end
+		end
 		return ui.column {
 			grow = true,
 			scroll = true,
@@ -255,6 +441,16 @@ return mod {
 							align = "start",
 							gap = "large",
 							ui.row { grow = true, ui.text { thread.subject, class = "rd-subject" } },
+							has_html and ui.row {
+								class = "rd-tool",
+								width = 26,
+								height = 26,
+								align = "center",
+								justify = "center",
+								msg = "toggle-rich",
+								tooltip = if state.rich then "Show plain text (⌘⇧H)" else "Show formatted (⌘⇧H)",
+								ui.icon { name = if state.rich then "code" else "file-text", size = "small" },
+							},
 							many_emails and ui.row {
 								class = "rd-tool",
 								width = 26,
@@ -277,6 +473,7 @@ return mod {
 					ui.column { gap = if thread.chat then "small" else "normal", table.unpack(items) },
 				},
 			},
+			toast,
 		}
 	end,
 }

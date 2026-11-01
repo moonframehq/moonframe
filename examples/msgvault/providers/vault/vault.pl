@@ -12,8 +12,14 @@
 # What it publishes is shaped for the views: the sidebar's counts, labels
 # and accounts, the list of the mailbox in view, and the open thread. Mods
 # change the view by message: { mailbox = "inbox" | "label:Work" |
-# "kind:whatsapp" | ... }, { account = id (0 for all) }, { query = "text" },
-# { open = message id }. The view is kept in ~/.cache/moonframe/msgvault.
+# "kind:whatsapp" | "files" | ... }, { account = id (0 for all) },
+# { query = "text" }, { open = message id }, { remote = message id } (load
+# its remote pictures), and in the attachments browser { file = id },
+# { kind = "image" | ... }, { fquery = true, value = "text" }, { show =
+# message id }. The view is kept in ~/.cache/moonframe/msgvault, with the
+# HTML pages it writes for the reader. Only the reader and the list may ask
+# for { open_file = id } (a temporary copy, opened in the system's app) and
+# { save_file = id } (into ~/Downloads), each on a click.
 #
 # `perl vault.pl --dump` prints a sample.json from the archive it finds
 # (msgvault-fixture's demo archive made this one).
@@ -25,6 +31,9 @@ use IO::Select;
 use IO::Handle;
 use File::Path qw(make_path);
 use POSIX qw(floor);
+use Digest::SHA qw(sha256_hex);
+use Compress::Zlib ();
+use File::Temp qw(tempfile);
 
 binmode STDOUT, ':raw';
 STDOUT->autoflush(1);
@@ -43,6 +52,16 @@ my $vault_home = $ENV{MSGVAULT_HOME} || "$home/.msgvault";
 my $db_path = "$vault_home/msgvault.db";
 my $cache_dir = ($ENV{XDG_CACHE_HOME} || "$home/.cache") . '/moonframe/msgvault';
 my $view_file = "$cache_dir/view.json";
+my $html_dir = "$cache_dir/html";
+# Pictures go where ui.image may read them: the app's image cache.
+my $images_dir = ($ENV{XDG_CACHE_HOME} || "$home/.cache") . '/moonframe/images/msgvault';
+my $blob_root = "$vault_home/attachments";
+my $OPEN_LIMIT = 512 * 1024 * 1024;   # largest attachment read, as msgvault-gpui
+my $THUMB_LIMIT = 8 * 1024 * 1024;    # largest picture shown inline
+
+# What was read (the archive or the sample), and what the user looks at.
+my ($data, $mode, $read_at) = (undef, '', 0);
+my %view = (mailbox => 'inbox', account => 0, query => '', open => 0, fkind => 'all', fquery => '', file => '', remote => {});
 
 sub have_sqlite {
     for my $dir (split /:/, $ENV{PATH} // '') {
@@ -354,13 +373,404 @@ sub read_thread {
     }
     my $role = grep({ $_->{name} eq 'attachment_role' } @{ sql("PRAGMA table_info(attachments)") })
         ? 'attachment_role' : 'NULL';
-    for my $row (@{ sql("SELECT message_id AS id, COALESCE(filename, '') AS name,
-            COALESCE(mime_type, '') AS mime, COALESCE(size, 0) AS size, $role AS role
+    for my $row (@{ sql("SELECT id AS aid, message_id AS id, COALESCE(filename, '') AS name,
+            COALESCE(mime_type, '') AS mime, COALESCE(size, 0) AS size, $role AS role,
+            content_hash AS hash, storage_path AS path
             FROM attachments WHERE message_id IN ($ids) ORDER BY id") }) {
         next if defined $row->{role} && $row->{role} =~ /^(inline|avatar|thumbnail|preview|ui_asset)$/;
-        push @{ $by_id{ $row->{id} }{files} }, { name => $row->{name}, mime => $row->{mime}, size => $row->{size} };
+        push @{ $by_id{ $row->{id} }{files} }, {
+            aid => "a$row->{aid}", name => $row->{name}, mime => $row->{mime}, size => $row->{size},
+            hash => $row->{hash}, path => $row->{path},
+        };
     }
     return $messages;
+}
+
+# ---- attachments -----------------------------------------------------------
+
+# Every attachment in the archive (the newest $LIMIT), with the message it
+# came in, for the attachments browser.
+sub read_files {
+    my $role = grep({ $_->{name} eq 'attachment_role' } @{ sql("PRAGMA table_info(attachments)") })
+        ? 'a.attachment_role' : 'NULL';
+    my $files = sql("SELECT a.id AS aid, a.message_id AS msg, COALESCE(a.filename, '') AS name,
+        COALESCE(a.mime_type, '') AS mime, COALESCE(a.size, 0) AS size, $role AS role,
+        a.content_hash AS hash, a.storage_path AS path
+        FROM attachments a JOIN messages m ON m.id = a.message_id
+        WHERE m.deleted_at IS NULL ORDER BY a.id DESC LIMIT $LIMIT");
+    @$files = grep { !(defined $_->{role} && $_->{role} =~ /^(inline|avatar|thumbnail|preview|ui_asset)$/) } @$files;
+    return [] unless @$files;
+    my $ids = join ', ', map { int $_->{msg} } @$files;
+    my %messages = map { $_->{id} => $_ } @{ sql("$SUMMARY WHERE m.id IN ($ids)") };
+    for my $f (@$files) {
+        $f->{aid} = "a$f->{aid}";
+        my $m = $messages{ $f->{msg} } or next;
+        @$f{qw(from subject ts conv)} = (person($m), $m->{subject}, $m->{ts}, $m->{conv});
+        $f->{subject_for_content} = $m->{subject};
+    }
+    return [ sort { ($b->{ts} // 0) <=> ($a->{ts} // 0) } @$files ];
+}
+
+# The sample's attachments, from its threads: ids made from the message's.
+sub sample_files {
+    my ($d) = @_;
+    my @files;
+    for my $thread (values %{ $d->{threads} }) {
+        for my $m (@$thread) {
+            my $i = 0;
+            for my $f (@{ $m->{files} // [] }) {
+                $f->{aid} //= "s$m->{id}-" . $i++;
+                $f->{subject_for_content} = $m->{conv_title} // $m->{subject};
+                push @files, { %$f, msg => $m->{id}, from => person($m), subject => $m->{subject}, ts => $m->{ts}, conv => $m->{conv} };
+            }
+        }
+    }
+    return [ sort { ($b->{ts} // 0) <=> ($a->{ts} // 0) || $a->{name} cmp $b->{name} } @files ];
+}
+
+# What kind of file it is, for the browser's filters and the icon.
+my @FILE_KINDS = (
+    [ image => 'Images', 'image' ],
+    [ pdf => 'PDFs', 'file-text' ],
+    [ document => 'Documents', 'file-text' ],
+    [ calendar => 'Calendar', 'calendar-days' ],
+    [ archive => 'Archives', 'file-archive' ],
+    [ other => 'Other', 'file' ],
+);
+my %KIND_ICON = map { $_->[0] => $_->[2] } @FILE_KINDS;
+
+sub file_kind {
+    my ($f) = @_;
+    my $mime = lc($f->{mime} // '');
+    my $name = lc($f->{name} // '');
+    return 'image' if $mime =~ m{^image/} || $name =~ /\.(png|jpe?g|gif|webp|heic|bmp|tiff?)$/;
+    return 'pdf' if $mime =~ /pdf/ || $name =~ /\.pdf$/;
+    return 'calendar' if $mime eq 'text/calendar' || $name =~ /\.ics$/;
+    return 'archive' if $mime =~ /zip|compressed|tar|gzip|7z|rar/ || $name =~ /\.(zip|tar|gz|tgz|7z|rar)$/;
+    return 'document' if $mime =~ m{^text/|document|sheet|presentation|msword|excel|powerpoint|rtf|json|xml|csv}
+        || $name =~ /\.(txt|md|csv|docx?|xlsx?|pptx?|pages|numbers|key|rtf|odt|ods|json)$/;
+    return 'other';
+}
+
+# Filenames from mail headers are untrusted: keep a safe last component.
+sub safe_filename {
+    my ($raw) = @_;
+    my $name = (split m{[/\\]}, $raw // '')[-1] // '';
+    $name =~ s/[[:cntrl:]:*?"<>|]/_/g;
+    $name =~ s/^[\s.]+|\s+$//g;
+    return $name eq '' ? 'attachment' : $name;
+}
+
+# The SHA-256 the bytes are filed under: content_hash, else storage_path's name.
+sub content_hash {
+    my ($f) = @_;
+    for my $candidate ($f->{hash}, (split m{/}, $f->{path} // '')[-1]) {
+        return lc $candidate if defined $candidate && $candidate =~ /^[0-9a-fA-F]{64}$/;
+    }
+    return undef;
+}
+
+sub slurp {
+    my ($path, $offset, $length) = @_;
+    open my $fh, '<:raw', $path or return undef;
+    seek $fh, $offset, 0 if $offset;
+    my $bytes = '';
+    if (defined $length) { read $fh, $bytes, $length }
+    else { local $/; $bytes = <$fh> // '' }
+    close $fh;
+    return $bytes;
+}
+
+# An attachment's bytes, read the way msgvault stores them (internal/store):
+# a sealed pack found through attachment_pack_index (a zstd frame when flag
+# bit 0 is set), else a loose file at attachments/<sha[:2]>/<sha>; checked
+# against their SHA-256. The sample's are made as msgvault-gpui's fixture
+# makes them. Returns (bytes), or (undef, why).
+sub file_bytes {
+    my ($f) = @_;
+    return synthesize($f) if $mode ne 'archive';
+    return (undef, "it is stored remotely") if ($f->{path} // '') =~ m{^https?://};
+    my $hash = content_hash($f) or return (undef, 'msgvault has no content for it');
+    return (undef, 'it is larger than 512 MB') if ($f->{size} // 0) > $OPEN_LIMIT;
+    my $bytes;
+    if (has_table('attachment_pack_index')) {
+        my ($entry) = @{ sql("SELECT pack_id AS pack, pack_offset AS offset, stored_len AS stored,
+            raw_len AS raw, flags FROM attachment_pack_index WHERE blob_hash = '$hash'") };
+        if ($entry && ($entry->{pack} // '') =~ /^[0-9A-Za-z_-]{2,}$/) {
+            my $pack = "$blob_root/packs/" . substr($entry->{pack}, 0, 2) . "/$entry->{pack}.mvpack";
+            my $stored = slurp($pack, $entry->{offset}, $entry->{stored});
+            return (undef, 'its pack is missing: ' . tilde($pack)) unless defined $stored;
+            if (($entry->{flags} // 0) & 1) {
+                my ($zstd) = grep { -x "$_/zstd" } split /:/, $ENV{PATH} // '';
+                return (undef, 'it is compressed with zstd, which is not installed') unless $zstd;
+                my ($tmp, $tmp_path) = tempfile(UNLINK => 1);
+                binmode $tmp;
+                print $tmp $stored;
+                close $tmp;
+                open my $pipe, '-|', "$zstd/zstd", '-dcq', $tmp_path or return (undef, "zstd: $!");
+                binmode $pipe;
+                local $/;
+                $bytes = <$pipe>;
+                close $pipe;
+                unlink $tmp_path;
+            } else {
+                $bytes = $stored;
+            }
+        }
+    }
+    unless (defined $bytes) {
+        my @candidates = ("$blob_root/" . substr($hash, 0, 2) . "/$hash");
+        push @candidates, "$blob_root/$f->{path}" if defined $f->{path} && $f->{path} !~ m{\.\.|^/};
+        for my $path (@candidates) {
+            next unless -f $path;
+            $bytes = slurp($path);
+            last;
+        }
+    }
+    return (undef, 'its content is not in the archive') unless defined $bytes;
+    return (undef, 'its content does not match its checksum') unless sha256_hex($bytes) eq $hash;
+    return ($bytes);
+}
+
+# The sample's files: msgvault-gpui's fixture content (a one-page PDF, an
+# event, a gradient picture, a line of text).
+sub synthesize {
+    my ($f) = @_;
+    my $title = $f->{subject_for_content} // $f->{name};
+    my $mime = $f->{mime} // '';
+    if ($mime eq 'application/pdf') {
+        (my $text = $title) =~ s/[^\x20-\x7e]|[()\\]//g;
+        my $stream = "BT /F1 18 Tf 72 720 Td ($text) Tj ET";
+        my @objects = (
+            '<< /Type /Catalog /Pages 2 0 R >>',
+            '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+            "<< /Length " . length($stream) . " >>\nstream\n$stream\nendstream",
+            '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+        );
+        my $out = "%PDF-1.4\n";
+        my @offsets;
+        for my $i (0 .. $#objects) {
+            push @offsets, length $out;
+            $out .= ($i + 1) . " 0 obj\n$objects[$i]\nendobj\n";
+        }
+        my $xref = length $out;
+        $out .= "xref\n0 " . (@objects + 1) . "\n0000000000 65535 f \n";
+        $out .= sprintf("%010d 00000 n \n", $_) for @offsets;
+        $out .= "trailer\n<< /Size " . (@objects + 1) . " /Root 1 0 R >>\nstartxref\n$xref\n%%EOF\n";
+        return ($out);
+    }
+    if ($mime eq 'text/calendar') {
+        my $summary = $title;
+        utf8::encode($summary);
+        return ("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//msgvault-gpui//fixture//EN\r\nBEGIN:VEVENT\r\nUID:$f->{name}\r\nSUMMARY:$summary\r\nDTSTART:20240920T184500Z\r\nDTEND:20240921T140000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n");
+    }
+    if ($mime =~ m{^image/}) {
+        my ($w, $h) = (320, 200);
+        my $raw = '';
+        for my $y (0 .. $h - 1) {
+            $raw .= "\0";
+            for my $x (0 .. $w - 1) {
+                $raw .= pack 'C3', 40 + 180 * $x / $w, 90 + 100 * $y / $h, 200 - 90 * $x / $w;
+            }
+        }
+        my $chunk = sub {
+            my ($kind, $body) = @_;
+            return pack('N', length $body) . $kind . $body . pack('N', Compress::Zlib::crc32($kind . $body));
+        };
+        return ("\x89PNG\r\n\x1a\n" . $chunk->('IHDR', pack('NNC5', $w, $h, 8, 2, 0, 0, 0))
+            . $chunk->('IDAT', Compress::Zlib::compress($raw)) . $chunk->('IEND', ''));
+    }
+    my $text = "$title\n";
+    utf8::encode($text);
+    return ($text);
+}
+
+sub find_file {
+    my ($aid) = @_;
+    for my $f (@{ $data->{files} // [] }) {
+        return $f if $f->{aid} eq $aid;
+    }
+    return undef;
+}
+
+# A picture attachment as a file in the image cache, for ui.image; undef
+# when it is not a picture, is too large, or can't be read.
+my %thumb_failed;
+sub thumbnail {
+    my ($f) = @_;
+    return undef unless file_kind($f) eq 'image' && ($f->{size} // 0) <= $THUMB_LIMIT;
+    my ($ext) = lc($f->{name} // '') =~ /\.(png|jpe?g|gif|webp|bmp|tiff?|heic)$/;
+    $ext //= (($f->{mime} // '') =~ m{^image/(\w+)} ? $1 : 'png');
+    my $key = content_hash($f) // $f->{aid};
+    $key =~ s/[^0-9A-Za-z_-]//g;
+    my $path = "$images_dir/$key.$ext";
+    return $path if -f $path;
+    return undef if $thumb_failed{$key};
+    my ($bytes) = file_bytes($f);
+    unless (defined $bytes) { $thumb_failed{$key} = 1; return undef }
+    make_path($images_dir) unless -d $images_dir;
+    open my $fh, '>:raw', "$path.tmp" or return undef;
+    print $fh $bytes;
+    close $fh;
+    rename "$path.tmp", $path;
+    return $path;
+}
+
+sub file_card {
+    my ($f, $now) = @_;
+    my $kind = file_kind($f);
+    return {
+        id => $f->{aid},
+        name => ($f->{name} // '') ne '' ? $f->{name} : 'attachment',
+        size => ($f->{path} // '') =~ m{^https?://} ? 'Remote file' : bytes($f->{size} // 0),
+        kind => $kind,
+        type => (grep { $_->[0] eq $kind } @FILE_KINDS)[0][1] =~ s/s$//r,
+        icon => $KIND_ICON{$kind},
+        thumb => thumbnail($f),
+        from => $f->{from} // '',
+        subject => $f->{subject} // '',
+        message => ($f->{msg} // 0) + 0,
+        date => $now ? list_date($f->{ts}, $now) : full_date($f->{ts}),
+    };
+}
+
+# Open (in the system's app for it) or save (to Downloads, then shown in the
+# file manager) an attachment: only ever on the user's click.
+my $notice_seq = 0;
+my $notice;
+sub tell_user {
+    my ($ok, $text) = @_;
+    $notice = { seq => ++$notice_seq, ok => $ok ? $TRUE : $FALSE, text => $text };
+}
+
+sub system_open {
+    my (@args) = @_;
+    my $opener = $^O eq 'darwin' ? 'open' : 'xdg-open';
+    my $pid = fork;
+    return unless defined $pid;
+    if ($pid == 0) {
+        open STDIN, '<', '/dev/null';
+        open STDOUT, '>', '/dev/null';
+        exec $opener, @args;
+        exit 1;
+    }
+    waitpid $pid, 0;
+}
+
+sub unique_path {
+    my ($dir, $name) = @_;
+    my ($stem, $ext) = $name =~ /^(.*?)(\.[^.]*)?$/;
+    $ext //= '';
+    my $path = "$dir/$name";
+    my $n = 1;
+    $path = "$dir/$stem (" . $n++ . ")$ext" while -e $path;
+    return $path;
+}
+
+sub deliver {
+    my ($aid, $save) = @_;
+    my $f = find_file($aid) or return tell_user(0, 'That attachment is no longer in the archive');
+    my $name = safe_filename($f->{name});
+    if (($f->{path} // '') =~ m{^https?://} && $mode eq 'archive') {
+        system_open($f->{path});
+        return tell_user(1, "Opened $name in the browser");
+    }
+    my ($bytes, $error) = file_bytes($f);
+    return tell_user(0, "Can't open $name: $error") unless defined $bytes;
+    my $dir = $save ? ($ENV{MSGVAULT_DOWNLOADS} || "$home/Downloads")
+        : ($ENV{TMPDIR} || '/tmp') . "/msgvault-moonframe/$f->{aid}";
+    make_path($dir) unless -d $dir;
+    my $path = $save ? unique_path($dir, $name) : "$dir/$name";
+    open my $fh, '>:raw', $path or return tell_user(0, "Can't write " . tilde($path) . ": $!");
+    print $fh $bytes;
+    close $fh;
+    if ($save) {
+        system_open('-R', $path) if $^O eq 'darwin' && !$ENV{MSGVAULT_NO_OPEN};
+        (my $saved = $path) =~ s{.*/}{};
+        return tell_user(1, "Saved $saved to Downloads");
+    }
+    system_open($path) unless $ENV{MSGVAULT_NO_OPEN};
+    return tell_user(1, "Opened $name");
+}
+
+# ---- HTML mail as a page ---------------------------------------------------
+
+# Whether the HTML loads anything from the network (pictures, backgrounds).
+sub remote_content {
+    my ($html) = @_;
+    return ($html =~ /(?:src|background|srcset)\s*=\s*["']?\s*(?:https?:)?\/\//i
+        || $html =~ /url\(\s*['"]?\s*(?:https?:)?\/\//i) ? 1 : 0;
+}
+
+# A message's HTML as a page for the reader's web view: its body and styles
+# kept; scripts, frames, forms and refreshes dropped; under a
+# Content-Security-Policy that runs no script and loads nothing from the
+# network (remote pictures neither, until the user asks); in the window's
+# light or dark colours. Returns its file:// address.
+sub page {
+    my ($id, $html, $dark, $remote) = @_;
+    my $file = "$html_dir/$id-" . ($dark ? 'dark' : 'light') . ($remote ? '-remote' : '') . '.html';
+    return "file://$file" if -f $file;
+    my @styles = $html =~ m{(<style\b.*?</style\s*>)}gis;
+    s{\@import[^;]*;}{}gi for @styles;
+    my $body = $html =~ m{<body\b[^>]*>(.*)</body\s*>}is ? $1 : $html;
+    $body =~ s{<(script|style|head|title|iframe|object|embed|form|noscript)\b.*?</\1\s*>}{}gis;
+    $body =~ s{<(script|meta|link|base|iframe|object|embed)\b[^>]*>}{}gi;
+    $body =~ s{\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)}{}gi;
+    my $images = $remote ? 'data: cid: https: http:' : 'data: cid:';
+    my ($bg, $fg, $muted, $link, $rule) = $dark
+        ? ('#0a0a0a', '#fafafa', '#a3a3a3', '#60a5fa', '#262626')
+        : ('#ffffff', '#0a0a0a', '#737373', '#2563eb', '#e5e5e5');
+    my $scheme = $dark ? 'dark' : 'light';
+    my $kept = join "\n", @styles;
+    my $page = <<"HTML";
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src $images; style-src 'unsafe-inline'; font-src data:; form-action 'none'; base-uri 'none'">
+<meta name="color-scheme" content="$scheme">
+<style>
+html, body { margin: 0; padding: 0; background: $bg; color: $fg; }
+body { font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; overflow-wrap: anywhere; }
+a { color: $link; }
+h1 { font-size: 2.15em; line-height: 1.2; margin: 0.15em 0 0.35em; }
+h2, h3 { line-height: 1.3; margin: 0.5em 0 0.3em; }
+p { margin: 0 0 0.5em; }
+ul, ol { margin: 0 0 0.5em; padding-left: 1.1em; }
+blockquote { margin: 0.3em 0 0.5em; padding-left: 1.4em; border-left: 3px solid $rule; color: $muted; }
+img { max-width: 100%; height: auto; }
+table { border-collapse: collapse; max-width: 100%; }
+td, th { padding: 2px 12px 2px 0; vertical-align: top; text-align: left; }
+small { color: $muted; }
+</style>
+$kept
+</head><body>$body</body></html>
+HTML
+    make_path($html_dir) unless -d $html_dir;
+    utf8::encode($page) if utf8::is_utf8($page);
+    open my $fh, '>:raw', "$file.tmp" or return undef;
+    print $fh $page;
+    close $fh;
+    rename "$file.tmp", $file;
+    return "file://$file";
+}
+
+# How tall the page draws, roughly: a view can't measure it.
+sub page_height {
+    my ($html) = @_;
+    my $height = 6;
+    for my $line (split /\n/, html_to_text($html)) {
+        $height += $line =~ /\S/ ? 23 * (1 + int(length($line) / 95)) : 6;
+    }
+    $height += 38 * (() = $html =~ /<h1\b/gi);
+    $height += 12 * (() = $html =~ /<h[23]\b/gi);
+    # Pictures: their stated height, else a guess.
+    for my $img ($html =~ /<img\b[^>]*>/gi) {
+        $height += $img =~ /height\s*=\s*["']?(\d+)/i ? $1 + 8 : 160;
+    }
+    $height = 60 if $height < 60;
+    $height = 1400 if $height > 1400;
+    return $height;
 }
 
 # ---- the sample ----------------------------------------------------------
@@ -383,12 +793,12 @@ sub read_sample {
 
 # ---- the model -----------------------------------------------------------
 
-my ($data, $mode, $read_at) = (undef, '', 0);
 
 sub load {
     if (-f $db_path && have_sqlite()) {
         my $archive = eval { read_archive() };
         if ($archive) {
+            $archive->{files} = eval { read_files() } || [];
             ($data, $mode, $read_at) = ($archive, 'archive', time);
             decorate($data);
             return;
@@ -396,7 +806,9 @@ sub load {
         print STDERR "vault: reading $db_path failed: $@";
     }
     ($data, $mode, $read_at) = (read_sample(), 'sample', time);
-    decorate($data) if $data;
+    return unless $data;
+    decorate($data);
+    $data->{files} = sample_files($data);
 }
 
 sub has_label {
@@ -592,7 +1004,8 @@ sub thread_view {
             attachments => $m->{att} ? $TRUE : $FALSE,
             initials => $initials,
             hue => hue($initials),
-            files => [ map { { name => $_->{name} ne '' ? $_->{name} : 'attachment', size => bytes($_->{size}), icon => attachment_icon($_->{mime}) } } @{ $m->{files} // [] } ],
+            files => [ map { file_card(find_file($_->{aid}) // $_) } @{ $m->{files} // [] } ],
+            html => html_view($m),
         };
     }
     return {
@@ -605,9 +1018,58 @@ sub thread_view {
     };
 }
 
+# The rendered form of a message with an HTML part: a page for each look,
+# with remote pictures only when the user let them load for it.
+sub html_view {
+    my ($m) = @_;
+    return undef unless defined $m->{html} && ($m->{kind} // '') =~ /^(|email)$/;
+    my $remote = remote_content($m->{html});
+    my $allowed = $remote && $view{remote}{ $m->{id} } ? 1 : 0;
+    return {
+        light => page($m->{id}, $m->{html}, 0, $allowed),
+        dark => page($m->{id}, $m->{html}, 1, $allowed),
+        height => page_height($m->{html}),
+        remote => $remote ? $TRUE : $FALSE,
+        allowed => $allowed ? $TRUE : $FALSE,
+    };
+}
+
+# The attachments browser: every file, filtered by kind and a search.
+sub files_view {
+    my ($now) = @_;
+    my @all = @{ $data->{files} // [] };
+    @all = grep { my $f = $_; grep { $_->{id} == ($f->{msg} // 0) && ($_->{src} // 0) == $view{account} } @{ $data->{messages} } } @all
+        if $view{account};
+    my %count;
+    $count{ file_kind($_) }++ for @all;
+    my @kinds = ({ id => 'all', title => 'All', count => scalar @all });
+    push @kinds, { id => $_->[0], title => $_->[1], count => $count{ $_->[0] } } for grep { $count{ $_->[0] } } @FILE_KINDS;
+    my $kind = $view{fkind} // 'all';
+    $kind = 'all' unless grep { $_->{id} eq $kind } @kinds;
+    my $query = lc($view{fquery} // '');
+    my @rows = grep {
+        ($kind eq 'all' || file_kind($_) eq $kind)
+            && ($query eq '' || index(lc(join ' ', $_->{name} // '', $_->{from} // '', $_->{subject} // ''), $query) >= 0)
+    } @all;
+    my $size = 0;
+    $size += $_->{size} // 0 for @rows;
+    my $more = @rows > $ROWS;
+    @rows = @rows[0 .. $ROWS - 1] if $more;
+    my ($selected) = grep { $_->{aid} eq ($view{file} // '') } @all;
+    return {
+        title => 'All Attachments',
+        subtitle => plural(scalar @rows, 'file', 'files') . ($more ? '+' : '') . ' · ' . bytes($size),
+        kinds => \@kinds,
+        kind => $kind,
+        query => $view{fquery} // '',
+        rows => [ map { file_card($_, $now) } @rows ],
+        selected => $selected ? $selected->{aid} : '',
+        file => $selected ? file_card($selected) : undef,
+    };
+}
+
 # ---- the view ------------------------------------------------------------
 
-my %view = (mailbox => 'inbox', account => 0, query => '', open => 0);
 
 sub read_view {
     open my $fh, '<:raw', $view_file or return;
@@ -699,6 +1161,7 @@ sub publish {
     @rows = @rows[0 .. $ROWS - 1] if $more;
 
     my $stats = $data->{stats};
+    my $files = $view{mailbox} eq 'files' ? files_view($now) : undef;
     print $JSON->encode({
         available => $TRUE,
         sample => $data->{sample} ? $TRUE : $FALSE,
@@ -722,6 +1185,9 @@ sub publish {
         list => { title => $title, subtitle => $subtitle . ($more ? '+' : ''), rows => [ map { row($_, $now) } @rows ] },
         selected => $view{open} + 0,
         thread => $view{open} ? thread_view($view{open}, $now) : undef,
+        total_files => scalar @{ $data->{files} // [] },
+        files => $files,
+        notice => $notice,
     }), "\n";
 }
 
@@ -735,8 +1201,29 @@ sub receive {
         $view{query} = '';
     }
     $view{account} = int $msg->{account} if defined $msg->{account};
-    $view{query} = "$msg->{query}" if defined $msg->{query};
+    if (defined $msg->{query}) {
+        $view{query} = "$msg->{query}";
+        # A search is over messages: leave the attachments browser for it.
+        $view{mailbox} = 'all' if $view{query} =~ /\S/ && $view{mailbox} eq 'files';
+    }
     $view{open} = int $msg->{open} if defined $msg->{open};
+    $view{fkind} = "$msg->{kind}" if defined $msg->{kind};
+    # The browser's search field sends its text as `value`.
+    $view{fquery} = defined $msg->{value} ? "$msg->{value}" : '' if defined $msg->{fquery};
+    $view{fquery} = '' if $msg->{fquery_clear};
+    $view{file} = "$msg->{file}" if defined $msg->{file};
+    if (defined $msg->{show}) {
+        # From the attachments browser to the message a file came in.
+        $view{mailbox} = 'all';
+        $view{query} = '';
+        $view{open} = int $msg->{show};
+    }
+    $view{remote}{ int $msg->{remote} } = 1 if $msg->{remote};
+    my $from = $envelope->{from} // '';
+    if ($from =~ /^(reader|list)$/) {
+        deliver("$msg->{open_file}", 0) if defined $msg->{open_file};
+        deliver("$msg->{save_file}", 1) if defined $msg->{save_file};
+    }
     load() if $msg->{refresh};
     save_view();
 }
