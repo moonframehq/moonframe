@@ -220,3 +220,23 @@ do {
     }
     save(cx, "examples/stage/icon.png")
 }
+
+// Cadence: a dashboard dimmed behind a notification drawer, its cards
+// marked red, green and blue.
+do {
+    let cx = body([0x52525b, 0x3f3f46, 0x18181b])
+    fill(cx, CGRect(x: 200, y: 220, width: 624, height: 584), 34, color(0xffffff, 0.18))
+    for (index, height) in [150.0, 230, 190].enumerated() {
+        fill(cx, CGRect(x: 236 + CGFloat(index) * 70, y: 270, width: 44, height: height), 12, color(0xffffff, 0.3))
+    }
+    card(cx, CGRect(x: 470, y: 220, width: 354, height: 584), 0x09090b)
+    for (index, dot) in [0xef4444, 0x22c55e, 0x4f6bed].enumerated() {
+        let y = 640 - CGFloat(index) * 150
+        fill(cx, CGRect(x: 496, y: y, width: 304, height: 124), 24, color(0xf4f4f5))
+        fill(cx, CGRect(x: 516, y: y + 74, width: 32, height: 32), 16, color(UInt32(dot)))
+        fill(cx, CGRect(x: 564, y: y + 82, width: 190, height: 16), 8, color(0x18181b, 0.75))
+        fill(cx, CGRect(x: 564, y: y + 44, width: 140, height: 14), 7, color(0x18181b, 0.3))
+        fill(cx, CGRect(x: 564, y: y + 16, width: 64, height: 16), 8, color(UInt32(dot), 0.3))
+    }
+    save(cx, "examples/cadence/icon.png")
+}
