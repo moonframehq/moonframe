@@ -103,6 +103,9 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
 - **Extras** (`row`, `column`, `button`, `item`, `text`, `icon`, `image`,
   `badge`):
   - `tooltip = "text"` shows under the pointer, styled by the `tooltip` rule.
+    The rule's `transition` eases it in (`fade`, `slide` rises it a little,
+    `slide-fade`), and its delay (`"fade fast 400ms"`, or `delay`) is how
+    long the pointer rests before it shows (500ms without one).
   - `context = <data>` is sent on a right-click, to open a context menu
     (to `to = "mod"` if given).
   - `copy = "text"` puts the text on the clipboard when clicked.

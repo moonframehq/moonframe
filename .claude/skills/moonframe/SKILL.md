@@ -900,7 +900,9 @@ Text-like elements take their main value positionally:
 
 **Extras** (`row`, `column`, `button`, `item`, `text`, `icon`, `image`,
 `badge`): `tooltip = "text"` shows
-under the pointer (styled by the `tooltip` rule); `context = <data>` is sent
+under the pointer (styled by the `tooltip` rule, whose `transition` eases
+it in and whose delay, `"slide-fade fast ease-out 400ms"`, is how long the
+pointer rests before it shows); `context = <data>` is sent
 on a right-click, to open a context menu (with `to` like `msg`);
 `copy = "text"` puts the text on the clipboard when clicked. `selected =
 true` on a row or column matches `:selected` rules, for tabs and segments.
