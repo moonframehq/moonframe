@@ -11,6 +11,7 @@
   <a href="#working-with-an-agent">Working with an agent</a> ·
   <a href="#mods-from-git">Mods from git</a> ·
   <a href="#whole-apps-as-profiles">Apps</a> ·
+  <a href="#example-apps">Example apps</a> ·
   <a href="#your-own-app-on-the-library">Library</a> ·
   <a href="#commands">Commands</a> ·
   <a href="#license">License</a>
@@ -20,14 +21,20 @@ A starter for native desktop apps whose whole window is written in
 [Luau](https://luau.org). Rust and [GPUI](https://www.gpui.rs) draw it, check
 it, and keep it safe; every panel, split, toolbar and status bar is a Luau
 file that reloads as you save, with its state kept. Clone it, rename it, and
-build anything, by hand or by asking an agent while the app runs.
+build anything, by hand or by asking an agent while the app runs, even from
+inside the app: its **Send feedback** button hands what you write to a coding
+agent, which changes the app in front of you.
+
+Whole apps run on it too, each as a profile of its own: `examples/` holds
+25 of them, from a mail client to an infra console, all in one gallery with
+`just demo`. A Rust app can also use it as a library.
 
 ## Gallery
 
 <p align="center">
   <img src="docs/screenshots/window.png" alt="The Moonframe window: a title bar with panel toggles and a terminal tab; an Explorer panel listing the repository's files on the left; a terminal in the middle; a Changes panel with the changed files as a tree and one file's diff on the right; and a status bar with usage meters, the git branch, a CPU sparkline, a memory meter and network rates" width="900">
   <br>
-  <sub><b>The window that ships.</b> Every part of it is a mod in <code>app/mods/</code>: the explorer, the terminal tabs, the changes and their diffs, and the status bar widgets, whose CPU, memory and git data come from providers. <b>+</b> opens more tabs: terminals, browsers, files.</sub>
+  <sub><b>The window that ships.</b> Every part of it is a mod in <code>app/mods/</code>: the explorer, the terminal tabs, the changes and their diffs, and the status bar widgets, whose CPU, memory and git data come from providers. <b>+</b> opens more tabs: terminals, browsers, files; a markdown file opens in an editor with a live preview.</sub>
 </p>
 
 <table>
@@ -45,7 +52,11 @@ build anything, by hand or by asking an agent while the app runs.
   </tr>
 </table>
 
-Whole apps run on it too, beside the starter: see [Example apps](#example-apps).
+<p align="center">
+  <img src="docs/screenshots/apps/demo.png" alt="The demo gallery: cards for the example apps, each with a screenshot, its title, what it is and the profile it runs as; Emberline, Gantry, Hearth, Tandem, Lantern and Ledger show, with Open all at the top right" width="900">
+  <br>
+  <sub><b>The example apps</b>, in the gallery <code>just demo</code> opens: a click opens one as a window of its own, beside the others. See <a href="#example-apps">Example apps</a>.</sub>
+</p>
 
 ## What you get
 
@@ -58,13 +69,27 @@ Whole apps run on it too, beside the starter: see [Example apps](#example-apps).
 - **A stylesheet.** Colors, corners, shadows, spacing, fonts and animations
   in `app/style.luau`, with rules by element type and class, hover states,
   transitions on panels, and styles a mod brings for itself.
-- **Components** that mods share with `use "name"`, each with a preview in
-  the Components window.
+- **Over 140 components** that mods share with `use "name"`: tabs, tables,
+  charts, a command palette, a markdown editor, dialogs, sheets, toasts,
+  calendars, chat messages and more, each with a live preview in the
+  Components window.
 - **Terminals.** `ui.terminal` runs your login shell on
   [`alacritty_terminal`](https://crates.io/crates/alacritty_terminal) or on
-  Ghostty's [libghostty-vt](https://crates.io/crates/libghostty-vt).
-- **Providers** for data Luau can't reach: sandboxed WebAssembly components,
-  or plain processes, publishing JSON that views read as `app.<name>`.
+  Ghostty's [libghostty-vt](https://crates.io/crates/libghostty-vt). With
+  herdr-core or tmux installed, terminals keep running after the app quits
+  and come back on the next launch.
+- **Providers** for data Luau can't reach, publishing what views read as
+  `app.<name>`: sandboxed WebAssembly components, plain processes, or Rust
+  built into the app. The built-in ones cover git (status, diffs, commit and
+  push), GitHub and GitLab, the project's files and markdown documents, the
+  system's load, and coding agents.
+- **Coding agents in the app.** The `acp` provider runs Claude, Codex,
+  Gemini, OpenCode or Copilot over the
+  [Agent Client Protocol](https://agentclientprotocol.com) for any mod, and
+  `agent-run` shows what each is doing: its plan, tool calls, permission
+  questions and answer.
+- **State that lasts.** Each mod's state is kept in SQLite across launches,
+  and survives a reload.
 - **An inspector.** <b>View &gt; Inspect Element</b> picks anything in the
   window, like a browser's developer tools, and tells an agent which file
   and line drew it.
@@ -173,8 +198,14 @@ app/                    the built-in app: shell, mods, components, providers, st
 crates/moonframe-core/  reads Luau into checked element trees, styles, components
 crates/moonframe/       the library: the window, drawn with GPUI, inspector, menus
 crates/moonframe-app/   the `moonframe` binary: the starter, on the library
-crates/moonframe-providers/  runs Wasm and process providers
+crates/moonframe-providers/  runs Wasm, process and native providers
 crates/moonframe-terminal/   shells on alacritty_terminal and libghostty-vt
+crates/moonframe-mux/   keeps terminals in herdr-core or tmux, else a local pty
+crates/moonframe-store/ the state kept across launches, in SQLite
+crates/moonframe-git/   the native git provider
+crates/moonframe-acp/   coding agents over the Agent Client Protocol
+crates/moonframe-docs/  reads and saves the project's documents for the editor
+examples/               apps built on it, and a package they share
 types/moonframe.d.luau  types for the Luau API, used by `just types` and editors
 wit/provider.wit        the interface a Wasm provider implements
 ```
@@ -183,6 +214,14 @@ wit/provider.wit        the interface a Wasm provider implements
 
 The window reloads while an agent edits it, so you can watch it work.
 
+- **Send feedback.** The `?` in the title bar (or in a corner of an example
+  app) opens a box: write what should change, attach an element picked with
+  Inspect if it helps, and send. A coding agent in the background changes
+  that app's own files with every permission, checks them, then screenshots
+  your window and looks at the result before it answers; the window reloads
+  with the change. Each request becomes a conversation under **Feedback &
+  fixes**, so when something is not quite right you reply and the agent
+  carries on from there.
 - **The skill.** Claude Code picks up `.claude/skills/moonframe`, which
   tells an agent where a feature belongs, how to build it, and how to check
   it with `just check` and `just types`.
@@ -254,44 +293,52 @@ description, website, copyright }`); the menu bar carries the app's title.
 
 ### Example apps
 
-`examples/` holds apps built this way, each with its own name, icon, menus
-and About panel. The dashboards run on sample data from a provider.
+`examples/` holds apps built this way, each with its own name, icon, menus,
+About panel and Send feedback button. The dashboards and chats run on sample
+data or a scripted agent, labelled as such.
+
+`just demo` opens them all in one gallery (the screenshot at the top): a
+picture of each, and a click opens it as a window of its own, or brings it
+forward; **Open all** opens every one to compare them. Their profiles go in
+`~/.local/share/moonframe/demo`, so your own folder stays as it is. Each app
+runs from its folder in place, so a change, yours or an agent's from Send
+feedback, shows at once.
 
 <table>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/sessions.png" alt="Sessions: a list of projects with their branch and changes on the left, a shell in the open project in the middle, and its uncommitted files on the right">
       <br>
-      <sub><b>sessions</b>: coding sessions across your repositories, each with a shell, its branch, and its changes by commit, uncommitted or branch.</sub>
+      <sub><b>Sessions</b> (<code>sessions</code>): coding sessions across your repositories, each with a shell, its branch, and its changes by commit, uncommitted or branch.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/workbench.png" alt="Workbench in a dark theme: a terminal with tabs on the left, an editor in the middle, and the project's files on the right">
       <br>
-      <sub><b>workbench</b>: a terminal, an editor and the project's files, in tabs and splits.</sub>
+      <sub><b>Workbench</b> (<code>workbench</code>): a terminal, an editor and the project's files, in tabs and splits.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/daybook.png" alt="Daybook: a sidebar of views, favorites and folders; today's tasks and events under a week strip; and an inbox of tasks by section">
       <br>
-      <sub><b>daybook</b>: a planner with today's tasks and events, an inbox, a month, notes, and three looks.</sub>
+      <sub><b>Daybook</b> (<code>daybook</code>): a planner with today's tasks and events, an inbox, a month, notes, and three looks.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/ledger.png" alt="Ledger: a fund overview with a 13-week cash forecast against a floor, items waiting with date tiles, a raise as a stacked bar, and a table of funds with curves">
       <br>
-      <sub><b>ledger</b>: a fund overview: cash against a floor, what is waiting on you, a raise, and funds with their curves.</sub>
+      <sub><b>Ledger</b> (<code>ledger</code>): a fund overview: cash against a floor, what is waiting on you, a raise, and funds with their curves.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/audience.png" alt="Audience: a newsletter dashboard with KPI cells, a dot chart of daily signups, acquisition sources with bars, and locations, devices and engagement tiers">
       <br>
-      <sub><b>audience</b>: a newsletter's audience: KPIs, signups per day, where readers come from, and how engaged they are.</sub>
+      <sub><b>Inkwell</b> (<code>audience</code>): a newsletter's audience: KPIs, signups per day, where readers come from, and how engaged they are; and Learn, with courses, lessons, guides and live sessions.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/pipeline.png" alt="Pipeline: a sales kanban with KPIs above five columns of deal cards, and an agent chat panel on the right">
       <br>
-      <sub><b>pipeline</b>: a sales kanban with KPIs, deal cards, a list view, and a scripted agent panel labelled demo.</sub>
+      <sub><b>Tally</b> (<code>pipeline</code>): a sales kanban with KPIs, deal cards, a list view, a week of meetings, and a scripted agent panel labelled demo.</sub>
     </td>
   </tr>
 </table>
@@ -299,7 +346,7 @@ and About panel. The dashboards run on sample data from a provider.
 <p align="center">
   <img src="docs/screenshots/apps/stage.png" alt="Stage: a bento board of components: a forecast chart, KPI cells, a month grid, a dot chart, share bars, a day strip with tasks, a progress stack and date tiles" width="900">
   <br>
-  <sub><b>stage</b>: the components on a bento board, with sample data, for stills. View hides the captions and changes the backdrop.</sub>
+  <sub><b>Stage</b> (<code>stage</code>): the components on a bento board, with sample data, for stills. View hides the captions and changes the backdrop.</sub>
 </p>
 
 <p>More, each a study of a kind of app:</p>
@@ -309,112 +356,110 @@ and About panel. The dashboards run on sample data from a provider.
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/parlance.png" alt="Parlance">
       <br>
-      <sub><b>parlance</b> (Parlance): a desktop chat app with a scripted demo agent: chats, pinned chats and folders, projects and recents in a sidebar, rich markdown answers that stream in.</sub>
+      <sub><b>Parlance</b> (<code>parlance</code>): a desktop chat app with a scripted demo agent: chats, pinned chats and folders, projects and recents in a sidebar, rich markdown answers that stream in.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/cinder.png" alt="Cinder">
       <br>
-      <sub><b>cinder</b> (Cinder): a desktop agent app in code mode: your coding-agent CLI sessions grouped by repository (read-only), their transcripts, and a scripted demo agent for new sessions.</sub>
+      <sub><b>Cinder</b> (<code>cinder</code>): a desktop agent app in code mode: your coding-agent CLI sessions grouped by repository (read-only), their transcripts, and a scripted demo agent for new sessions.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/msgvault.png" alt="msgvault">
       <br>
-      <sub><b>msgvault</b> (msgvault): a reader for a msgvault archive (mail, chats, calendar), after msgvault-gpui.</sub>
+      <sub><b>msgvault</b> (<code>msgvault</code>): a reader for a msgvault archive (mail, chats, calendar), after msgvault-gpui.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/tidings.png" alt="Tidings">
       <br>
-      <sub><b>tidings</b> (Tidings): a mail client in two layouts: the list beside the open email, or one line per email across the window.</sub>
+      <sub><b>Tidings</b> (<code>tidings</code>): a mail client in two layouts: the list beside the open email, or one line per email across the window.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <sub><b>mailbox</b> (Mailbox): a mail client's frame: a sidebar of folders and labels that folds to an icon rail (labels fade out one after another, the icons stay put) and the folder's messages beside it. Sample data.</sub>
+      <img src="docs/screenshots/apps/mailbox.png" alt="Mailbox: a sidebar of views and labels beside an inbox of seven conversations">
+      <br>
+      <sub><b>Mailbox</b> (<code>mailbox</code>): a mail client's frame: a sidebar of folders and labels that folds to an icon rail (labels fade out one after another, the icons stay put) and the folder's messages beside it. Sample data.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/trellis.png" alt="Trellis">
       <br>
-      <sub><b>trellis</b> (Trellis): a terminal multiplexer around projects and their work trees: each work tree keeps its own tabs of split terminals, with its source control beside them.</sub>
+      <sub><b>Trellis</b> (<code>trellis</code>): a terminal multiplexer around projects and their work trees: each work tree keeps its own tabs of split terminals, with its source control beside them.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/lantern.png" alt="Lantern">
       <br>
-      <sub><b>lantern</b> (Lantern): a Halloween terminal workspace: pages of projects on the left, a grid of framed panes (terminals, files, processes, changes) in tabs, a pumpkin.</sub>
+      <sub><b>Lantern</b> (<code>lantern</code>): a Halloween terminal workspace: pages of projects on the left, a grid of framed panes (terminals, files, processes, changes) in tabs, a pumpkin.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/tessel.png" alt="Tessel">
       <br>
-      <sub><b>tessel</b> (Tessel): an agents hub: your agents as pixel-icon cards or a table, the hub's runs with their steps, and a workflow to fix a failed one. Sample data.</sub>
+      <sub><b>Tessel</b> (<code>tessel</code>): an agents hub: your agents as pixel-icon cards or a table, the hub's runs with their steps, and a workflow to fix a failed one. Sample data.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/helpdesk.png" alt="Tandem">
       <br>
-      <sub><b>helpdesk</b> (Tandem): an IT help desk inbox: tickets by priority, and the open ticket with the assistant's health check and the chat thread it came from.</sub>
+      <sub><b>Tandem</b> (<code>helpdesk</code>): an IT help desk inbox: tickets by priority, and the open ticket with the assistant's health check and the chat thread it came from.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/research.png" alt="Sorrel">
       <br>
-      <sub><b>research</b> (Sorrel): an agent's research workspace: a thread with the agent's plan on the left, the sheet it fills cell by cell on the right (a scripted, labelled demo).</sub>
+      <sub><b>Sorrel</b> (<code>research</code>): an agent's research workspace: a thread with the agent's plan on the left, the sheet it fills cell by cell on the right (a scripted, labelled demo).</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/cadence.png" alt="Cadence">
       <br>
-      <sub><b>cadence</b> (Cadence): a workflow automation dashboard: runs, success, tokens, the active workflows and templates, and a notification drawer behind the bell. Sample data.</sub>
+      <sub><b>Cadence</b> (<code>cadence</code>): a workflow automation dashboard: runs, success, tokens, the active workflows and templates, and a notification drawer behind the bell. Sample data.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/vigil.png" alt="Vigil">
       <br>
-      <sub><b>vigil</b> (Vigil): workflow operations at a glance: time within SLA, latency and lag against their limits, what fails most, and a live feed of runs as they start and finish.</sub>
+      <sub><b>Vigil</b> (<code>vigil</code>): workflow operations at a glance: time within SLA, latency and lag against their limits, what fails most, and a live feed of runs as they start and finish.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/duly.png" alt="Duly">
       <br>
-      <sub><b>duly</b> (Duly): compliance notices for a public buyer: what is due this week, exceptions against the forecast, the contract register, a payments notice getting ready to sign, and reports for the audit committee. Sample data.</sub>
+      <sub><b>Duly</b> (<code>duly</code>): compliance notices for a public buyer: what is due this week, exceptions against the forecast, the contract register, a payments notice getting ready to sign, and reports for the audit committee. Sample data.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/emberline.png" alt="Emberline">
       <br>
-      <sub><b>emberline</b> (Emberline): a CRM's leads report in the dark: pipeline figures, revenue by month, leads by status, visits, deals and sources.</sub>
+      <sub><b>Emberline</b> (<code>emberline</code>): a CRM's leads report in the dark: pipeline figures, revenue by month, leads by status, visits, deals and sources.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/gantry.png" alt="Gantry">
       <br>
-      <sub><b>gantry</b> (Gantry): an infra console: services, and one service's resources, usage history and alerts, in a dark monospace look. Sample telemetry that moves.</sub>
+      <sub><b>Gantry</b> (<code>gantry</code>): an infra console: services, and one service's resources, usage history and alerts, in a dark monospace look. Sample telemetry that moves.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/hearth.png" alt="Hearth">
       <br>
-      <sub><b>hearth</b> (Hearth): a code review bot's analytics in an observability tool: pull requests reviewed, issues caught, CI and the repositories behind them, on a warm black, monospace page.</sub>
+      <sub><b>Hearth</b> (<code>hearth</code>): a code review bot's analytics in an observability tool: pull requests reviewed, issues caught, CI and the repositories behind them, on a warm black, monospace page.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/storefront.png" alt="Storefront">
       <br>
-      <sub><b>storefront</b> (Storefront): a store's admin with its audit log: browser-style tabs in the title bar, grouped settings in the sidebar, and a filterable, paged table of every activity. Sample data.</sub>
+      <sub><b>Storefront</b> (<code>storefront</code>): a store's admin with its audit log: browser-style tabs in the title bar, grouped settings in the sidebar, and a filterable, paged table of every activity. Sample data.</sub>
     </td>
   </tr>
 </table>
 
-sessions, workbench, stage, trellis and lantern require the `projects` package beside them.
-`moonframe app link` runs an app in place, so its files reload as you edit
-them:
-
-`just demo` opens them all in one gallery: a picture of each, a click
-opens it as a window of its own (any number at once, to compare), and each
-has the Send feedback `?` to have a coding agent change it. One by hand:
+Sessions, Workbench, Stage, Trellis and Lantern require the `projects`
+package beside them (`examples/projects`). To run one by hand, link it in
+place and open its profile:
 
 ```sh
 cargo build --release -p moonframe-app

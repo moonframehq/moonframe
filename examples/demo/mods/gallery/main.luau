@@ -5,6 +5,12 @@
 
 local WIDTH = 380
 
+-- A path with the home folder as ~.
+local function short(path: string): string
+	local home = string.match(path, "^(/Users/[^/]+)") or string.match(path, "^(/home/[^/]+)")
+	return if home then "~" .. string.sub(path, #home + 1) else path
+end
+
 local function card(app: any): any
 	local open = app.open == true
 	return ui.column {
@@ -60,7 +66,7 @@ return mod {
 		local summary = if demos == nil
 			then "Looking for apps…"
 			elseif not demos.available then demos.reason
-			else `{#apps} apps · {open} open · profiles in {demos.user}`
+			else `{#apps} apps · {open} open · profiles in {short(demos.user)}`
 
 		return ui.column {
 			grow = true,
