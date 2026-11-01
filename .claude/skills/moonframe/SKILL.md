@@ -198,6 +198,7 @@ return state, { { to = "provider:acp", msg = {
 	start = state.text, id = "mine", agent = "claude",
 	instructions = "How to do it, from the mod.",   -- before the user's words
 	context = { main_tab = state.tab },             -- fenced as data, never instructions
+	thread = previous.id,                           -- optional: a follow-up, shown with the run it continues
 } } }
 -- answered as { reply = "mine", action = "start", ok, run | error },
 -- and when it ends { reply = "mine", action = "finished", ok, run, status, message | error }
@@ -883,8 +884,8 @@ Text-like elements take their main value positionally:
 
 - space: `none` `small` (4px) `normal` (8px) `large` (16px)
 - tone: `normal` `muted` `accent` `success` `warning` `danger`
-- size (text): `small` `normal` `large` `title`
-- weight: `normal` `medium` `bold`
+- size (text): `small` `normal` `large` `title` (1.5x) `headline` (1.75x) `display` (2.25x: a page's greeting) `hero` (3x: hero figures on dashboards)
+- weight: `light` (300) `normal` (400) `medium` (500) `semibold` (600) `bold` (700)
 - align: `stretch` `start` `center` `end`
 - justify: `start` `center` `end` `between`
 - surface: `background` `sidebar` `muted` `secondary`
@@ -1078,9 +1079,12 @@ Leave an element's own keys off if the stylesheet should decide.
 | `size`, `weight` | text tokens (inherited) |
 | `font` | `sans` or `mono` (the terminal font, for code and paths; inherited) |
 | `case` | `upper`, `lower` or `none`: the letter case a `ui.text` shows (headings in capitals, restyleable) |
+| `gradient` | a linear gradient over the background: `"180deg, #ffa53a, #ff6200"` (CSS angles: 0 runs up, 180 down, the default; the angle is optional), or `{ from, to, angle }`. On any element `background` takes; `:hover` and `:selected` rules can set one too |
 | `opacity` | 0 to 1 |
 | `width`, `height` | pixels, under the element's own `width`/`height`; on rows, columns, panels and lists. What a named state changes: `[".drawer:closed"] = { width = 48 }` |
 | `transition` | how a `pane`, `popover` or `overlay` animates when it shows or hides, how a keyed row or column arrives and goes, and how an element with a `state` eases between states (see below) |
+| `delay` | milliseconds or `"40ms"`: replaces the transition's delay for a change of `state`. Set it inline from an item's index so a list's items move one after another (see "Staggered states") |
+| `clip` | `true` hides what overflows the box instead of drawing it past its edges: a column whose width eases down (a sidebar folding to a rail) |
 
 **Shadows.** Write them like CSS `box-shadow`. Lengths are pixels, with or
 without `px`, and layers are separated by commas. The color can be any
@@ -1123,12 +1127,35 @@ pane = { transition = "slide 220ms ease-out" },                   -- every pane
 - **`animation_speed`:** at the top of `style.luau`, it divides every
   duration (mod `styles` and inline `style` included): `2` is twice as fast,
   `0` turns animations off.
-- **Defaults:** slide, the `normal` speed, `ease`.
+- **Delay:** a second duration, as in CSS, waits before a change of `state`
+  starts moving: `"fade 150ms ease-out 40ms"`, or `delay = 40` in the
+  table. (Panes, popovers and keyed children ignore it.)
+- **Defaults:** slide, the `normal` speed, `ease`, no delay.
 
 Words can come in any order. Toggling again mid-animation turns back from
 where the pane is. A slide moves across the pane's `size` (or `max`), not a
 width the user dragged it to. Put the transition on the pane (type rule,
 class, or `style`), not on what is inside it.
+
+**Staggered states.** Items that change state together (labels fading as a
+sidebar folds) can move one after another: keep the transition in the
+rules, and give each item its place in line as an inline `delay`, which
+replaces the transition's. Each state's rule may bring its own transition,
+so going one way can be quicker than coming back:
+
+```lua
+for index, entry in entries do
+	ui.text { entry.label, class = "label", state = if folded then "hidden" else "shown",
+		style = { delay = (index - 1) * 16 } }
+end
+-- styles: [".label"] = { transition = "fade 180ms ease-out" },
+--   [".label:shown"] = { opacity = 1 },
+--   [".label:hidden"] = { opacity = 0, transition = "fade 90ms ease-in" },
+```
+
+The `side-nav` component does this for a whole sidebar, with the column's
+width easing between `.side-nav:full` and `.side-nav:rail` (and `clip` on
+it, so the labels do not spill past the narrowing edge).
 
 **Arriving and leaving.** A `ui.row` or `ui.column` with a `key` (1 to 64 of
 a-z, 0-9, `-` and `_`, unique among its siblings) stays itself as its
@@ -1252,6 +1279,11 @@ return mod {
 - `shortcut` is a key named as `keys` names them (`secondary-t` is ⌘T on
   macOS, Ctrl-T elsewhere); it shows in the menu and works while the window
   has focus. A focused terminal keeps plain and Ctrl keys, not ⌘ ones.
+- A menu `shortcut` may also be one key that types text (`j`, `/`,
+  `shift-u`), as a mail client's keys are: it works only while no text
+  field or terminal has focus, so typing is never taken, and the menu does
+  not show it (name it in the label or a hint). `examples/tidings` uses J
+  and K this way. Overlay and field `keys` still refuse such keys.
 - About opens macOS's own About panel (the app's icon and name, `version`,
   `description` and `website` as credits, `copyright`), and a toast
   elsewhere.
@@ -1578,7 +1610,9 @@ user's `[settings] allow` covers for the mod), `{ cancel = run }`, `{ forget = r
 |---|---|
 | `agents` | `{ name, title, installed, fetched }` (`fetched`: only `npx` can start it) |
 | `agent`, `workdir`, `running` | the default agent, where agents work, how many runs go |
-| `runs` | newest first: `{ id, owner, agent, agent_title, text, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
+| `app` | the app folder the provider is in, from `workdir` (`app`, `examples/ledger`); nil when outside it |
+| `pid` | this app's process, for an agent to screenshot the window (`just screenshot OUT PID`) |
+| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
 
 `[settings]` in `provider.toml` reaches `start`. `just check` validates the
 manifests, and `just providers` builds and lints the Wasm ones. When a view

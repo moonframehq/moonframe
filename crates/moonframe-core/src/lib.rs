@@ -53,9 +53,9 @@ pub use {
     read::MAX_DOCUMENT,
     roots::{AppLayer, Roots, mod_name},
     style::{
-        Case, Color, Corners, Curve, Font, Look, MonoFont, Paint, Part, Resolved, Rules, Shade,
-        Shadow, ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition,
-        TransitionKind,
+        Case, Color, Corners, Curve, Font, Gradient, Look, MonoFont, Paint, Part, Resolved, Rules,
+        Shade, Shadow, ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token,
+        Transition, TransitionKind,
     },
     vm::printable,
     window::{Chrome, Platform, Titlebar, WindowState},

@@ -1,0 +1,5 @@
+# Tidings's mailbox, shared as `app.mailbox`. SAMPLE DATA from sample.json;
+# replace it, or this provider, with your own account. A process provider: it
+# reads that file. Needs perl 5 (as macOS ships).
+command = ["perl", "mailbox.pl"]
+kind    = "process"

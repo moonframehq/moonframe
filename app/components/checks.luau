@@ -46,7 +46,7 @@ return component {
 		[".checks"] = { gap = 0, border = "all", border_color = "border", radius = 8 },
 		[".checks-header"] = { gap = 8, padding = { 8, 12 } },
 		[".checks-header:hover"] = { background = "list-hover" },
-		[".checks-title"] = { weight = "bold", size = "small" },
+		[".checks-title"] = { weight = "semibold", size = "small" },
 		[".checks-summary"] = { size = "small", color = "muted-foreground" },
 		[".checks-row"] = { gap = 8, padding = { 6, 12 }, border = "top", border_color = "border/70" },
 		[".checks-row:hover"] = { background = "list-hover" },

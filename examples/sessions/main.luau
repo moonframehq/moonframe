@@ -52,7 +52,7 @@ return mod {
 	end,
 
 	view = function(state)
-		return ui.hsplit {
+		local body = ui.hsplit {
 			id = "body",
 			-- The cards meet with no line; a handle shows on hover.
 			divider = false,
@@ -60,5 +60,7 @@ return mod {
 			ui.pane { class = "middle", ui.region "main" },
 			ui.pane { size = 380, min = 260, max = 600, fixed = true, visible = state.right, class = "side", ui.region "right" },
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

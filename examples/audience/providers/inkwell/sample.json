@@ -40,5 +40,112 @@
     { "label": "Engaged", "count": "11,166", "share": 45, "color": "#60a5fa" },
     { "label": "At risk", "count": "4,467", "share": 18, "color": "#fb923c" },
     { "label": "Dormant", "count": "3,573", "share": 14, "color": "#d4d4d8" }
-  ]
+  ],
+  "learn": {
+    "categories": [
+      { "id": "growth", "label": "Growth", "color": "#14a38b" },
+      { "id": "writing", "label": "Writing", "color": "#7c5cff" },
+      { "id": "monetization", "label": "Monetization", "color": "#f08a24" },
+      { "id": "deliverability", "label": "Deliverability", "color": "#3b82f6" },
+      { "id": "automation", "label": "Automation", "color": "#8b5cf6" }
+    ],
+    "course": {
+      "title": "The Reader Growth Playbook",
+      "meta": "8 lessons · 46 min · Beginner",
+      "activity": [1, 0, 2, 1, 1, 2, 3, 2, 3, 4, 4, 5, 5, 6],
+      "lessons": [
+        { "title": "Find your one reader", "kind": "Video", "time": "04:20", "seconds": 260, "completed": "Completed Oct 12",
+          "hook": "Write for one reader, and the rest follow.", "chart": "Open rate by audience focus, last 10 weeks",
+          "summary": "Pick the one person each issue is for, and let every choice follow from them: the subject line, the length, the send time." },
+        { "title": "Write a sign-up page that converts", "kind": "Video + template", "time": "06:10", "seconds": 370, "completed": "Completed Oct 15",
+          "hook": "A promise, a proof, a single field.", "chart": "Sign-up page conversion, last 10 weeks",
+          "summary": "Rebuild your sign-up page around one promise, one piece of proof and one field, then measure it for a week." },
+        { "title": "Your first 100 subscribers", "kind": "Video", "time": "05:05", "seconds": 305, "completed": "Completed Oct 21",
+          "hook": "The first hundred come by hand.", "chart": "New subscribers per week, first 10 weeks",
+          "summary": "Ask people you know, one at a time, and turn each yes into two more introductions." },
+        { "title": "Turn readers into referrers", "kind": "Video + 3 resources", "time": "09:30", "seconds": 570, "watched": 0.44,
+          "hook": "Every reader can bring the next one.", "chart": "Referral signups, last 10 weeks",
+          "summary": "Referral programs work when the reward feels earned and the ask feels natural. In this lesson you set up a three-step referral ladder, write the one-line ask that closes every issue, and see how The Margin Notes now gets 21% of its signups from readers sharing it.",
+          "more": "We also cover where the referral link should sit, how to choose rewards that cost nothing to deliver, and the two numbers to watch in Analytics each week: share rate and referral conversion.",
+          "takeaways": ["Ask once per issue, right after your most useful paragraph.", "Reward milestones at 1, 3 and 10 referrals, digital rewards first.", "Check share rate weekly and aim for 2% of opens."],
+          "transcript": [
+            { "at": "00:00", "text": "Most of your next readers already know one of your current ones." },
+            { "at": "01:12", "text": "The ask: one line, at the end of your most useful paragraph, every issue." },
+            { "at": "03:40", "text": "The ladder: a thank-you at one referral, a bonus issue at three, a call at ten." },
+            { "at": "06:05", "text": "In Analytics, watch share rate and referral conversion; ignore the rest for now." },
+            { "at": "08:30", "text": "Your homework: write the ask, set the first rung, and send it Thursday." }
+          ] },
+        { "title": "Grow with cross-promotions", "kind": "Video + worksheet", "time": "06:45", "seconds": 405,
+          "hook": "Borrow an audience, lend yours back.", "chart": "Signups from swaps, last 10 weeks",
+          "summary": "Find three newsletters your readers also read, and trade a recommendation that sounds like you." },
+        { "title": "Keep out of the promotions tab", "kind": "Video + checklist", "time": "05:40", "seconds": 340,
+          "hook": "Land in the inbox, not the tab.", "chart": "Inbox placement, last 10 weeks",
+          "summary": "Fewer links, plainer text, a reply from new readers: the habits that keep each issue in the primary inbox." },
+        { "title": "Launch a paid tier", "kind": "Video + pricing calculator", "time": "04:50", "seconds": 290,
+          "hook": "Charge for the part they'd miss.", "chart": "Paid conversion, last 10 weeks",
+          "summary": "Decide what stays free, what is worth paying for, and the one price to start with." },
+        { "title": "Measure what matters", "kind": "Video + dashboard tour", "time": "03:40", "seconds": 220,
+          "hook": "Three numbers, every Monday.", "chart": "Weekly review streak, last 10 weeks",
+          "summary": "Set up a Monday review of growth, engagement and revenue, and drop every figure that doesn't change a decision." }
+      ],
+      "resources": [
+        { "title": "Referral ask templates", "detail": "PDF · 4 pages", "icon": "file-text", "color": "#e5484d", "action": "download" },
+        { "title": "Reward ideas checklist", "detail": "Doc · Duplicate", "icon": "list-checks", "color": "#26262b", "action": "external-link" },
+        { "title": "Referral tracking sheet", "detail": "Spreadsheet · Copy", "icon": "layout-dashboard", "color": "#16a35a", "action": "external-link" }
+      ]
+    },
+    "guides": [
+      { "id": "subject-lines", "title": "Write subject lines people open", "category": "writing", "icon": "a-large-small", "minutes": 6, "progress": 1, "rank": 1,
+        "summary": "Curiosity, a number, and the reader's own words: three patterns that lift opens without tricks.",
+        "steps": ["Write five subject lines for every issue, then pick by reading them aloud.", "Lead with the reader's problem, not your topic.", "Test one change at a time on a tenth of the list."] },
+      { "id": "referral", "title": "Grow with a referral program", "category": "growth", "icon": "rocket", "minutes": 9, "progress": 0.4, "rank": 2,
+        "summary": "A referral ladder readers want to climb, and the one-line ask that keeps it moving.",
+        "steps": ["Put the referral link right after your most useful paragraph.", "Reward the first referral at once, with something digital.", "Show each reader how close they are to the next reward."] },
+      { "id": "paid-tier", "title": "Price your paid tier", "category": "monetization", "icon": "tag", "minutes": 12, "progress": 0, "new": true, "rank": 3,
+        "summary": "Find the part of your newsletter readers would miss, and the price that matches it.",
+        "steps": ["List what readers reply about most: that is what they value.", "Start with one monthly and one yearly price, two months free.", "Raise prices for new readers only, and say so."] },
+      { "id": "spam", "title": "Fix spam-folder placement", "category": "deliverability", "icon": "inbox", "minutes": 8, "progress": 0, "rank": 4,
+        "summary": "SPF, DKIM, list hygiene and inbox placement checks.",
+        "steps": ["Check SPF, DKIM and DMARC on your sending domain.", "Remove readers who haven't opened in 90 days, after one last note.", "Send a test to a seed list before every issue."] },
+      { "id": "welcome", "title": "Build a welcome series", "category": "automation", "icon": "workflow", "minutes": 10, "progress": 0.7, "rank": 5,
+        "summary": "Three emails that turn a new subscriber into a reader who expects you.",
+        "steps": ["Send the first email at once, with your best issue.", "Ask a question in the second, and answer every reply.", "Point to the archive and the referral program in the third."] },
+      { "id": "sponsorships", "title": "Sell sponsorships that renew", "category": "monetization", "icon": "message-square", "minutes": 7, "progress": 0, "new": true, "rank": 6,
+        "summary": "Price by the readers who click, report like a partner, and get the second booking before the first runs.",
+        "steps": ["Price per thousand engaged readers, not per thousand sent.", "Send every sponsor a one-page report within a week.", "Offer the renewal with the report."] },
+      { "id": "warmup", "title": "Warm up a new sending domain", "category": "deliverability", "icon": "mail", "minutes": 5, "progress": 0, "rank": 7,
+        "summary": "Ramp volume slowly so a new domain stays out of spam.",
+        "steps": ["Start with your most engaged readers.", "Double the volume every few sends while bounces stay low.", "Watch complaints more than opens."] },
+      { "id": "voice", "title": "Find a voice readers come back for", "category": "writing", "icon": "pencil", "minutes": 7, "progress": 0.2, "rank": 8,
+        "summary": "Write the way you talk to one friend, and keep the habits that make you recognisable.",
+        "steps": ["Read your last issue aloud and cut what you wouldn't say.", "Keep a list of phrases you overuse.", "Open with a scene, not a summary."] },
+      { "id": "social", "title": "Turn social posts into signups", "category": "growth", "icon": "at-sign", "minutes": 6, "progress": 0, "rank": 9,
+        "summary": "Share one useful idea from each issue, with a link that promises the rest.",
+        "steps": ["Pull one idea per issue into a post that stands alone.", "End with what the newsletter adds, not a plain link.", "Track which posts bring readers who stay."] }
+    ],
+    "help": [
+      { "title": "Why my emails land in spam", "where": "Help Center" },
+      { "title": "Set up a custom sending domain", "where": "Help Center" },
+      { "title": "Import subscribers from a CSV file", "where": "Help Center" }
+    ],
+    "stats": { "lessons": 11, "lessons_total": 24, "streak": 4, "certificates": 1, "courses": 3 },
+    "weeks": [1, 0, 1, 0, 0, 2, 1, 0, 3, 1, 1, 1],
+    "weeks_from": "Aug 10",
+    "enrolled": [
+      { "title": "The Reader Growth Playbook", "done": 3, "total": 8, "color": "#7c5cff" },
+      { "title": "Deliverability essentials", "done": 6, "total": 6, "color": "#3b82f6", "certificate": "Earned Oct 3" },
+      { "title": "Paid newsletters, step by step", "done": 2, "total": 10, "color": "#f08a24" }
+    ],
+    "sessions": [
+      { "id": "sponsorship", "month": "Nov", "day": "12", "title": "Sponsorship pricing workshop", "when": "5:00 PM · 45 min", "host": "Ines Moreau", "role": "Partnerships lead",
+        "date": "Thu, Nov 12 · 5:00–5:45 PM GMT", "where": "Live video · Free for Inkwell writers", "length": "45 min", "registered": 214,
+        "people": ["Maya Cole", "Jun Sato", "Ada Lund", "Rui Kato"] },
+      { "id": "qa", "month": "Nov", "day": "19", "title": "Q&A: Growing past 20k readers", "when": "4:00 PM · 60 min", "host": "Tomas Lind", "role": "Writer, The Margin Notes",
+        "date": "Thu, Nov 19 · 4:00–5:00 PM GMT", "where": "Live video · Free for Inkwell writers", "length": "60 min", "registered": 388,
+        "people": ["Lea Brun", "Omar Haddad", "Kim Park"] },
+      { "id": "clinic", "month": "Dec", "day": "3", "title": "Deliverability clinic", "when": "5:30 PM · 30 min", "host": "Aiko Hara", "role": "Deliverability team",
+        "date": "Thu, Dec 3 · 5:30–6:00 PM GMT", "where": "Live video · Bring your domain", "length": "30 min", "registered": 97,
+        "people": ["Sam Ortiz", "Noor Ali"] }
+    ]
+  }
 }

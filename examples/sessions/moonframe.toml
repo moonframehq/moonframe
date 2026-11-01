@@ -1,7 +1,7 @@
 [app]
 # Coding sessions across your repositories: a list of them, a shell in the
 # one you pick, and its changes. `moonframe --profile sessions` opens it.
-keep  = []
+keep  = ["feedback"]
 name  = "sessions"
 title = "Sessions"
 # The projects provider and the file, change and code components.

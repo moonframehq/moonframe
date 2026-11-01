@@ -7,7 +7,7 @@ local MENUS: { { title: string, items: { any } } } = {
 		{ label = "Overview", msg = { page = "overview" }, to = "sidebar", shortcut = "secondary-1" },
 		{ label = "Audience", msg = { page = "audience" }, to = "sidebar", shortcut = "secondary-2" },
 		{ label = "Campaigns", msg = { page = "campaigns" }, to = "sidebar", shortcut = "secondary-3" },
-	} },
+		{ label = "Learn", msg = { page = "learn" }, to = "sidebar", shortcut = "secondary-4" },	} },
 	{ title = "View", items = {
 		{ label = "Show or Hide the Sidebar", msg = "toggle-left", shortcut = "secondary-s" },
 		"-",
@@ -26,7 +26,7 @@ return mod {
 
 	about = {
 		version = "0.1",
-		description = "A newsletter's audience at a glance: readers, growth, sources and reading habits. Sample data.",
+		description = "A newsletter's audience at a glance: readers, growth, sources and reading habits, and Learn: a course, guides and live sessions. Sample data.",
 		website = "https://github.com/penso/moonframe",
 		copyright = "MIT licensed",
 	},
@@ -44,7 +44,7 @@ return mod {
 	end,
 
 	view = function(state)
-		return ui.hsplit {
+		local body = ui.hsplit {
 			id = "body",
 			divider = false,
 			ui.pane { size = 252, min = 200, max = 360, fixed = true, visible = state.left, class = "frame", ui.region "left" },
@@ -59,5 +59,7 @@ return mod {
 				},
 			},
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

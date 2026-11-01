@@ -192,6 +192,11 @@ impl Terminals {
 
 impl Terminals {
     /// The terminal with keyboard focus in `window`, by key.
+    /// Whether a terminal has keyboard focus in `window`.
+    pub(crate) fn any_focused(&self, window: &Window) -> bool {
+        self.focused(window).is_some()
+    }
+
     fn focused(&self, window: &Window) -> Option<(String, Rc<TerminalView>)> {
         self.views
             .iter()
@@ -253,7 +258,8 @@ impl MoonframeApp {
 
 /// Hands keystrokes to the topmost open overlay or popover that takes them,
 /// then to the focused text field (its `keys`), then to the focused terminal
-/// (unless an overlay with a backdrop covers it), before key bindings see
+/// (unless an overlay with a backdrop covers it), then to a shell menu item
+/// whose shortcut is a single typing key (`j`), before key bindings see
 /// them.
 pub(crate) fn intercept_keys(cx: &mut Context<MoonframeApp>) -> Subscription {
     let app = cx.entity().downgrade();
@@ -267,6 +273,7 @@ pub(crate) fn intercept_keys(cx: &mut Context<MoonframeApp>) -> Subscription {
                     Taken::Free => {
                         app.input_keystroke(&event.keystroke, window, cx)
                             || app.terminal_keystroke(&event.keystroke, window, cx)
+                            || app.menu_keystroke(&event.keystroke, window, cx)
                     },
                 }
             })

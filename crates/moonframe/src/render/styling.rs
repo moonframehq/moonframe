@@ -3,10 +3,16 @@
 
 use {
     crate::color::ThemeColor,
-    gpui_kit::{component::Theme, *},
+    gpui_kit::{
+        component::{
+            Theme,
+            scroll::{Scrollbar, ScrollbarAxis},
+        },
+        *,
+    },
     moonframe_core::{
-        Align, Border, Corners, Direction, Font, Frame, Resolved, Scroll, Shadow, ShadowPreset,
-        Sides, Space, Style, TextSize, Weight,
+        Align, Border, Corners, Direction, Font, Frame, Gradient, Resolved, Scroll, Shadow,
+        ShadowPreset, Sides, Space, Style, TextSize, Weight,
     },
 };
 
@@ -18,8 +24,20 @@ pub(super) fn text_pixels(size: Option<TextSize>, theme: &Theme) -> Pixels {
         None | Some(TextSize::Normal) => 1.0,
         Some(TextSize::Large) => 1.2,
         Some(TextSize::Title) => 1.5,
+        Some(TextSize::Headline) => 1.75,
+        Some(TextSize::Display) => 2.25,
+        Some(TextSize::Hero) => 3.0,
     };
     theme.font_size * scale
+}
+
+/// A gradient as GPUI paints it.
+fn paint(gradient: Gradient, theme: &Theme) -> Background {
+    linear_gradient(
+        gradient.angle,
+        linear_color_stop(gradient.from.hsla(theme), 0.0),
+        linear_color_stop(gradient.to.hsla(theme), 1.0),
+    )
 }
 
 /// Styles that apply to any element.
@@ -30,8 +48,10 @@ pub(super) trait StyleExt: Styled + Sized {
 
     fn weighted(self, weight: Weight) -> Self {
         self.font_weight(match weight {
+            Weight::Light => FontWeight::LIGHT,
             Weight::Normal => FontWeight::NORMAL,
             Weight::Medium => FontWeight::MEDIUM,
+            Weight::Semibold => FontWeight::SEMIBOLD,
             Weight::Bold => FontWeight::BOLD,
         })
     }
@@ -149,6 +169,9 @@ pub(super) trait LookExt: StyleExt + InteractiveElement {
         if let Some(color) = style.background {
             self = self.bg(color.hsla(theme));
         }
+        if let Some(gradient) = style.gradient {
+            self = self.bg(paint(gradient, theme));
+        }
         self = self.typography(style, theme).margined(&style.margin);
         if let Some(radius) = style.radius {
             self = self.cornered(radius);
@@ -159,17 +182,24 @@ pub(super) trait LookExt: StyleExt + InteractiveElement {
         if let Some(opacity) = style.opacity {
             self = self.opacity(opacity);
         }
+        if style.clip == Some(true) {
+            self = self.overflow_hidden();
+        }
         // GPUI takes one hover style per element: everything goes in it.
         let hover = &look.hover;
         let background = hover.background.map(|color| color.hsla(theme));
+        let gradient = hover.gradient.map(|gradient| paint(gradient, theme));
         let color = hover.color.map(|color| color.hsla(theme));
         let border = hover.border_color.map(|color| color.hsla(theme));
-        if background.is_none() && color.is_none() && border.is_none() {
+        if background.is_none() && gradient.is_none() && color.is_none() && border.is_none() {
             return self;
         }
         self.hover(move |mut style| {
             if let Some(background) = background {
                 style = style.bg(background);
+            }
+            if let Some(gradient) = gradient {
+                style = style.bg(gradient);
             }
             if let Some(color) = color {
                 style = style.text_color(color);
@@ -274,6 +304,35 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
             (Direction::Column, Scroll::Along) | (_, Scroll::Y) => element.overflow_y_scroll(),
             (_, Scroll::Both) => element.overflow_scroll(),
         }
+    }
+
+    /// A scrolling frame's scrollbars, shown while it scrolls and faded out
+    /// after, kept at `handle`. Add them after the children, to draw over
+    /// them. They hang from a box of no size where the content starts, so
+    /// they add nothing to what scrolls, and take the frame's bounds from
+    /// `handle`.
+    fn scrollbars(
+        self,
+        frame: &Frame,
+        direction: Direction,
+        handle: &ScrollHandle,
+        id: ElementId,
+    ) -> Self
+    where
+        Self: ParentElement,
+    {
+        let axis = match (direction, frame.scroll) {
+            (_, Scroll::No) => return self,
+            (Direction::Row, Scroll::Along) | (_, Scroll::X) => ScrollbarAxis::Horizontal,
+            (Direction::Column, Scroll::Along) | (_, Scroll::Y) => ScrollbarAxis::Vertical,
+            (_, Scroll::Both) => ScrollbarAxis::Both,
+        };
+        self.track_scroll(handle).child(
+            div()
+                .absolute()
+                .size_0()
+                .child(Scrollbar::new(handle).id(id).axis(axis)),
+        )
     }
 }
 

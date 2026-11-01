@@ -1,0 +1,78 @@
+{
+  "current": "c-naming",
+  "dot": 4,
+  "pinned": ["c-savings", "c-lisbon", "c-sourdough", "c-roadtrip"],
+  "folders": [
+    { "id": "f-homelab", "title": "home lab", "chats": ["c-nas", "c-vlan"] },
+    { "id": "f-visas", "title": "Visas", "chats": ["c-passport"] },
+    { "id": "f-climbing", "title": "Climbing", "chats": ["c-fingers"] }
+  ],
+  "projects": [
+    { "id": "p-moonframe", "title": "lattice", "chats": ["c-icons", "c-panic", "c-restart", "c-plus", "c-flicker", "c-fonts", "c-zoom"] },
+    { "id": "p-ledger", "title": "ledger-cli", "chats": ["c-init", "c-dot1", "c-dot2", "c-dot3"] },
+    { "id": "p-notes", "title": "field-notes", "chats": ["c-mobile"] },
+    { "id": "p-intro", "title": "Introspection", "chats": ["c-journal"] },
+    { "id": "p-careers", "title": "Careers", "chats": ["c-offer"] },
+    { "id": "p-garden", "title": "Garden", "chats": ["c-tomatoes"] }
+  ],
+  "recents": ["c-naming", "c-spending", "c-fatigue", "c-passport", "c-sourdough", "c-roadtrip"],
+  "status": { "c-spending": "pending" },
+  "chats": {
+    "c-naming": {
+      "title": "Naming Shapeshifting Apps",
+      "messages": [
+        { "role": "user", "text": "what would you call software that I can reshape to my needs by talking to an agent, with the changes showing up live? A friend of mine calls it clay software." },
+        { "role": "assistant", "text": "I'd call it **Shape-Shifting Software**.\n\nThe idea is software you keep reshaping in plain language, with an agent rewriting the application underneath and each change showing up as you talk.\n\nA few terms worth telling apart:\n\n| Term | Emphasis |\n|---|---|\n| Clay Software | Software that keeps taking the shape of your needs |\n| Pliable Software | Software users can bend themselves |\n| Agentic Software | Software driven by autonomous agents |\n| Generative UI | Interfaces drawn on the fly by a model |\n| Live Software | Changes land at once, with no redeploy |\n| Personal Software | Software made for one person rather than a market |\n\nYour friend's phrase fits a longer tradition: research groups have been writing about **“pliable software”** for years, a term with a whole body of essays behind it at small independent labs. [Loomwell +1](cite:loomwell)\n\nMy preference:\n\n- **Clay Software** — the most memorable, easy to say out loud.\n- **Shape-Shifting Software** — the best technical description.\n- **Self-Rewriting Software** — the most literal, but it sounds a little alarming.\n\nThe key distinction: **you don't just configure the software; you change what the software is.**" }
+      ]
+    },
+    "c-savings": {
+      "title": "Compare savings rates",
+      "messages": [
+        { "role": "user", "text": "Is a 12-month deposit at 4.1% better than a high-yield account at 3.8%?" },
+        { "role": "assistant", "text": "Over a year the fixed deposit earns a little more **if rates fall**, and a little less if they rise.\n\n| | 12-month deposit | High-yield account |\n|---|---|---|\n| Rate | 4.1%, fixed | 3.8%, variable |\n| On $10,000 | $410 | about $380 |\n| Access | Locked, with a penalty | Any time |\n\nIf you might need the money before next autumn, keep it in the account." }
+      ]
+    },
+    "c-lisbon": {
+      "title": "Rent vs buy in Lisbon",
+      "messages": [
+        { "role": "user", "text": "Rent or buy a two-bedroom in Lisbon if I stay five years?" },
+        { "role": "assistant", "text": "Five years is about the break-even point once you count the **purchase tax**, notary fees and the agent's cut on resale.\n\n- **Buy** if you are fairly sure you stay longer than five years.\n- **Rent** if a move abroad is a real possibility." }
+      ]
+    },
+    "c-sourdough": {
+      "title": "Sourdough schedule",
+      "messages": [
+        { "role": "user", "text": "Give me a weekend sourdough schedule that works with a 9am start." },
+        { "role": "assistant", "text": "1. **Friday 22:00** — feed the starter.\n2. **Saturday 9:00** — mix, then autolyse for an hour.\n3. **10:00 to 13:00** — four sets of stretch and folds.\n4. **18:00** — shape and put it in the fridge.\n5. **Sunday 9:00** — bake at 250 °C, lid on for 20 minutes." }
+      ]
+    },
+    "c-roadtrip": {
+      "title": "Autumn road trip ideas",
+      "messages": [
+        { "role": "user", "text": "Four days, leaving from the city, autumn colours. Ideas?" },
+        { "role": "assistant", "text": "Three loops that fit four days:\n\n- **The lakes** — short drives, cabins by the water.\n- **The vineyard valley** — harvest season, slow roads.\n- **The coast road** — fewer colours, better sunsets." }
+      ]
+    },
+    "c-nas": { "title": "Pick a NAS for backups", "messages": [ { "role": "user", "text": "Two-bay or four-bay NAS for photo backups?" }, { "role": "assistant", "text": "Go **four-bay**: you start with two drives mirrored and grow without moving everything." } ] },
+    "c-vlan": { "title": "Split IoT onto a VLAN", "messages": [ { "role": "user", "text": "How do I put the smart plugs on their own network?" }, { "role": "assistant", "text": "Make a VLAN for them, give it its own SSID, and only allow it to reach the **home server**, not the rest of the LAN." } ] },
+    "c-passport": { "title": "Passport Renewal Timing", "messages": [ { "role": "user", "text": "My passport expires in seven months. Renew now?" }, { "role": "assistant", "text": "Yes. Many countries want **six months of validity** on arrival, so renew before you book anything." } ] },
+    "c-fingers": { "title": "Finger strength plan", "messages": [ { "role": "user", "text": "A hangboard plan for twice a week?" }, { "role": "assistant", "text": "Keep it short: **7 seconds on, 3 off**, six reps, three sets, and stop well before your fingers feel it." } ] },
+    "c-icons": { "title": "I see ? instead of proper icons for some tabs", "messages": [ { "role": "user", "text": "I see ? instead of proper icons for some tabs." }, { "role": "assistant", "text": "That glyph is the font's fallback. The tab names an icon the bundle does not ship: check the name against `IconName`." } ] },
+    "c-panic": { "title": "thread 'tokio-rt-worker' (88213) panicked", "messages": [ { "role": "user", "text": "thread 'tokio-rt-worker' (88213) panicked at src/net.rs:42" }, { "role": "assistant", "text": "Line 42 unwraps a socket read. Return the error instead:\n\n```rust\nlet read = socket.read(&mut buffer).await?;\n```" } ] },
+    "c-restart": { "title": "I restarted and it did not bring my tabs back", "messages": [ { "role": "user", "text": "I restarted and it did not bring my tabs back." }, { "role": "assistant", "text": "Tabs are saved when they change. If the app was killed before the first save, there was nothing to restore yet." } ] },
+    "c-plus": { "title": "When using the + to add a new terminal", "messages": [ { "role": "user", "text": "When using the + to add a new terminal, it opens in my home folder." }, { "role": "assistant", "text": "The new tab takes the kind's default `cwd`. Pass the current tab's folder as a prop instead." } ] },
+    "c-flicker": { "title": "When an agent finishes, the sidebar flickers", "messages": [ { "role": "user", "text": "When an agent finishes, the sidebar flickers." }, { "role": "assistant", "text": "The list is rebuilt without keys. Give each row a `key` so it stays itself." } ] },
+    "c-fonts": { "title": "Nerd Font icons as boxes", "messages": [ { "role": "user", "text": "Starship shows boxes." }, { "role": "assistant", "text": "Install **Symbols Nerd Font Mono**; it is the default fallback." } ] },
+    "c-zoom": { "title": "Zoom resets on reload", "messages": [ { "role": "user", "text": "Zoom resets on reload." }, { "role": "assistant", "text": "Keep the zoom in the mod's state; state outlives reloads." } ] },
+    "c-init": { "title": "In ledger/src/main.rs I initialize the logger twice", "messages": [ { "role": "user", "text": "In ledger/src/main.rs I initialize the logger twice." }, { "role": "assistant", "text": "Call `init` once in `main` and pass nothing down; the second call returns an error you can drop." } ] },
+    "c-dot1": { "title": ".", "messages": [ { "role": "user", "text": "." }, { "role": "assistant", "text": "Did you mean to send something?" } ] },
+    "c-dot2": { "title": ".", "messages": [ { "role": "user", "text": "." }, { "role": "assistant", "text": "Still here." } ] },
+    "c-dot3": { "title": ".", "messages": [ { "role": "user", "text": "." }, { "role": "assistant", "text": "Take your time." } ] },
+    "c-mobile": { "title": "On mobile, the reading width is too narrow", "messages": [ { "role": "user", "text": "On mobile, the reading width is too narrow." }, { "role": "assistant", "text": "Drop the side margins under 600 px and let the column take the full width." } ] },
+    "c-journal": { "title": "Weekly review questions", "messages": [ { "role": "user", "text": "Five questions for a weekly review?" }, { "role": "assistant", "text": "1. What went well?\n2. What drained me?\n3. What did I avoid?\n4. Who helped?\n5. What is the one thing next week?" } ] },
+    "c-offer": { "title": "Comparing two offers", "messages": [ { "role": "user", "text": "Equity or salary?" }, { "role": "assistant", "text": "Count the equity at **zero** first. If the salary alone works, the equity is upside." } ] },
+    "c-tomatoes": { "title": "Tomatoes splitting", "messages": [ { "role": "user", "text": "Why are my tomatoes splitting?" }, { "role": "assistant", "text": "Uneven watering: a dry spell, then a lot at once. Water deeply and regularly." } ] },
+    "c-spending": { "title": "Review your spending spike and what caused it", "messages": [ { "role": "user", "text": "Why did spending jump in September?" }, { "role": "assistant", "text": "Two annual renewals and the flights landed in the same month. Without them, September is in line with the summer." } ] },
+    "c-fatigue": { "title": "Fatigue and Training Load", "messages": [ { "role": "user", "text": "Tired every afternoon since I added a fourth run." }, { "role": "assistant", "text": "Make one of the four runs **easy**, and check sleep before adding volume again." } ] }
+  }
+}

@@ -17,7 +17,7 @@ return component {
 	category = "Content",
 	icon = "book-open",
 	description = "A markdown document: headings, emphasis, lists, task lists, tables, quotes and highlighted code; links send a message instead of opening.",
-	when = "Show markdown read-only: a README, notes, an agent's answer, release notes written in markdown. For editing a file use `markdown-editor`; for code alone use `code-view`; for one line of text use `ui.text`.",
+	when = "Show markdown read-only: a README, notes, an agent's answer, release notes written in markdown. For editing a file use `markdown-editor`; for a chat answer streaming in, or one with source chips, use `chat-markdown`; for code alone use `code-view`; for one line of text use `ui.text`.",
 	props = {
 		["text"] = "the markdown, up to 1 MiB",
 		["link"] = "message a link click sends, with `url` added (a table gets the field; anything else arrives as { msg = link, url })",

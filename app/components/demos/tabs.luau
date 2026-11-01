@@ -69,10 +69,12 @@ return mod {
 					{ id = "cards", label = "Cards" },
 					{ id = "compact", label = "Compact" },
 					{ id = "classic", label = "Classic" },
+					{ id = "browser", label = "Browser" },
 				},
 			},
 			tabs {
 				variant = state.variant,
+				width = if state.variant == "browser" then 170 else nil,
 				selected = state.selected,
 				add = "new-tab",
 				tabs = state.tabs,

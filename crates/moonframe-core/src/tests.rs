@@ -777,6 +777,62 @@ fn mods_bring_styles_scoped_to_what_they_draw() {
 }
 
 #[test]
+fn text_takes_the_whole_weight_scale_inline_and_in_rules() {
+    use crate::Weight;
+    let source = r#"return mod { view = function()
+  return ui.panel {
+    ui.text { "a", weight = "semibold" },
+    ui.text { "b", weight = "light" },
+    ui.text { "c", style = { weight = "semibold" } },
+    ui.item { "d", selected = true, class = "nav" },
+  }
+end }"#;
+    let dir = app(&[("probe", source)]);
+    write(
+        dir.path(),
+        "style.luau",
+        r#"return style { rules = {
+          [".nav"] = { weight = "medium" },
+          [".nav:selected"] = { weight = "semibold" },
+          [".nav:hover"] = { weight = "light" },
+        } }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let Some(Node::Panel(panel)) = workspace.slot("probe").unwrap().view() else {
+        panic!("no panel");
+    };
+    let (Node::Text(a), Node::Text(b), Node::Text(c), Node::Item(d)) = (
+        &panel.children[0],
+        &panel.children[1],
+        &panel.children[2],
+        &panel.children[3],
+    ) else {
+        panic!("expected three texts and an item");
+    };
+    assert_eq!(
+        (a.weight, b.weight),
+        (Some(Weight::Semibold), Some(Weight::Light))
+    );
+    let sheet = workspace.stylesheet();
+    let inline = sheet.resolve(Part::Text, &c.look, false, &Rules::default());
+    assert_eq!(inline.base.weight, Some(Weight::Semibold));
+    let selected = sheet.resolve(Part::Item, &d.look, true, &Rules::default());
+    assert_eq!(selected.base.weight, Some(Weight::Semibold));
+    assert_eq!(selected.hover.weight, Some(Weight::Light));
+    let resting = sheet.resolve(Part::Item, &d.look, false, &Rules::default());
+    assert_eq!(resting.base.weight, Some(Weight::Medium));
+
+    let heavy = r#"return mod { view = function() return ui.text { "x", weight = "heavy" } end }"#;
+    let error = view_of(heavy).unwrap_err();
+    assert!(error.contains("semibold"), "{error}");
+}
+
+#[test]
 fn shadows_take_css_strings_tables_and_presets() {
     let sheet = r##"return style {
       colors = { glow = "#ff0000" },
@@ -889,6 +945,9 @@ fn transitions_take_css_words_or_a_table() {
       [".fading"] = { transition = "0.3s fade cubic-bezier(0.2, 0, 0, 1)" },
       [".table"] = { transition = { kind = "slide-fade", duration = 150, curve = "linear" } },
       [".bare"] = { transition = "fade" },
+      [".late"] = { transition = "fade 150ms ease-out 40ms" },
+      [".late-table"] = { transition = { kind = "fade", duration = 150, delay = "0.05s" } },
+      [".staggered"] = { transition = "fade 150ms", delay = 60, clip = true },
     } }"#;
     let dir = app(&[]);
     write(dir.path(), "style.luau", sheet);
@@ -914,17 +973,51 @@ fn transitions_take_css_words_or_a_table() {
         kind: TransitionKind::Slide,
         duration: Duration::from_millis(220),
         curve: Curve::EASE_OUT,
+        delay: Duration::ZERO,
     });
     assert_eq!(transition(Some("fading")), Transition {
         kind: TransitionKind::Fade,
         duration: Duration::from_millis(300),
         curve: Curve::CubicBezier(0.2, 0.0, 0.0, 1.0),
+        delay: Duration::ZERO,
     });
     assert_eq!(transition(Some("table")), Transition {
         kind: TransitionKind::SlideFade,
         duration: Duration::from_millis(150),
         curve: Curve::Linear,
+        delay: Duration::ZERO,
     });
+    // A second duration is the delay, as in CSS.
+    assert_eq!(transition(Some("late")).delay, Duration::from_millis(40));
+    assert_eq!(
+        transition(Some("late")).duration,
+        Duration::from_millis(150)
+    );
+    assert_eq!(
+        transition(Some("late-table")).delay,
+        Duration::from_millis(50)
+    );
+    // `delay` on its own sits beside the transition, for staggered items.
+    let staggered = crate::Look {
+        class: vec!["staggered".to_owned()],
+        ..Default::default()
+    };
+    assert_eq!(
+        workspace
+            .stylesheet()
+            .resolve(Part::Pane, &staggered, false, &Rules::default())
+            .base
+            .delay,
+        Some(Duration::from_millis(60))
+    );
+    assert_eq!(
+        workspace
+            .stylesheet()
+            .resolve(Part::Pane, &staggered, false, &Rules::default())
+            .base
+            .clip,
+        Some(true)
+    );
     // Missing parts take the defaults: the `normal` speed, `ease`.
     assert_eq!(
         transition(Some("bare")).duration,
@@ -936,6 +1029,7 @@ fn transitions_take_css_words_or_a_table() {
         ("'slide 220ms bouncy'", "unknown `bouncy`"),
         ("'slide 20s'", "expected 0 to 10000"),
         ("'cubic-bezier(1, 2, 3)'", "four numbers"),
+        ("'fade 1ms 2ms 3ms'", "at most two durations"),
         ("'cubic-bezier(2, 0, 0, 1)'", "x values must be from 0 to 1"),
         ("'cubic-bezier(0, 0, 1, 1'", "missing its `)`"),
         ("{ speed = 3 }", "unknown key `speed`"),
@@ -2863,7 +2957,7 @@ fn the_shell_names_its_menus_and_about() {
         dir.path(),
         "main.luau",
         r#"return mod {
-          menus = { { title = "File", items = { { label = "New", msg = "new", shortcut = "t" } } } },
+          menus = { { title = "File", items = { { label = "New", msg = "new", shortcut = "hyper-t" } } } },
           view = function() return ui.text "shell" end,
         }"#,
     );
@@ -2882,9 +2976,56 @@ fn the_shell_names_its_menus_and_about() {
     assert!(
         problems
             .iter()
-            .any(|problem| problem.contains("shortcut") && problem.contains("types text")),
+            .any(|problem| problem.contains("shortcut") && problem.contains("unknown modifier")),
         "{problems:?}"
     );
+}
+
+#[test]
+fn a_menu_shortcut_may_be_one_typing_key() {
+    use crate::{Chord, Pressed};
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod {
+          menus = { { title = "Mail", items = {
+            { label = "Next", msg = "next", shortcut = "j" },
+            { label = "Compose", msg = "compose", shortcut = "shift-c" },
+            { label = "Find", msg = "find", shortcut = "secondary-f" },
+          } } },
+          view = function() return ui.text "shell" end,
+        }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let typed: Vec<bool> = workspace.menus()[0]
+        .items
+        .iter()
+        .map(|entry| match entry {
+            crate::MenuEntry::Item(item) => item.shortcut.as_ref().unwrap().types_text(),
+            crate::MenuEntry::Separator => false,
+        })
+        .collect();
+    assert_eq!(typed, [true, true, false]);
+    let j = Pressed {
+        key: "j",
+        text: Some("j"),
+        ctrl: false,
+        alt: false,
+        shift: false,
+        cmd: false,
+    };
+    let crate::MenuEntry::Item(next) = &workspace.menus()[0].items[0] else {
+        unreachable!()
+    };
+    assert!(next.shortcut.as_ref().unwrap().matches(&j, true));
+    // Overlays and fields still never take what a key types.
+    assert!(Chord::parse("j").is_err());
 }
 
 #[test]
@@ -4133,4 +4274,47 @@ fn providers_are_wanted_by_what_views_read_and_mods_hear() {
     assert_eq!(Workspace::open(dir.path(), false).wanted_providers(), None);
     let dir = app(&[("hears", &listener(r#""provider/*""#))]);
     assert_eq!(Workspace::open(dir.path(), false).wanted_providers(), None);
+}
+
+#[test]
+fn gradients_take_strings_and_tables() {
+    let sheet = r##"return style {
+      rules = {
+        panel = { gradient = "#ffa53a, accent/50" },
+        row = { gradient = "90deg, #000, #fff" },
+        column = { gradient = { from = "accent", to = "#ff0000", angle = -90 } },
+      },
+    }"##;
+    let dir = app(&[]);
+    write(dir.path(), "style.luau", sheet);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let sheet = workspace.stylesheet();
+    let gradient = |part| {
+        sheet
+            .resolve(part, &Default::default(), false, &Rules::default())
+            .base
+            .gradient
+            .unwrap()
+    };
+    let panel = gradient(Part::Panel);
+    assert_eq!(panel.angle, 180.0);
+    assert_eq!(panel.to.alpha, 0.5);
+    assert_eq!(gradient(Part::Row).angle, 90.0);
+    let column = gradient(Part::Column);
+    assert_eq!(column.angle, 270.0);
+    assert_eq!(column.from.paint, Paint::Token(Token::Accent));
+
+    let bad = app(&[]);
+    write(
+        bad.path(),
+        "style.luau",
+        r##"return style { rules = { row = { gradient = "#000" } } }"##,
+    );
+    let workspace = Workspace::open(bad.path(), false);
+    assert!(!workspace.problems().is_empty());
 }

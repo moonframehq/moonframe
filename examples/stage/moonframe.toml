@@ -1,7 +1,7 @@
 [app]
 # A stage for stills: Moonframe's components set out as a bento board with
 # sample data, to screenshot, compare and show. Nothing on it is live data.
-keep     = []
+keep     = ["feedback"]
 name     = "stage"
 requires = ["../projects"]
 title    = "Stage"

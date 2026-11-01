@@ -53,7 +53,7 @@ return component {
 	styles = {
 		[".settings-nav"] = { background = "sidebar", border = "right", border_color = "border", padding = { 14, 10 }, gap = 0 },
 		[".settings-nav-head"] = { padding = { 4, 8, 12, 8 }, gap = 0 },
-		[".settings-nav-title"] = { weight = "bold", size = "large" },
+		[".settings-nav-title"] = { weight = "semibold", size = "large" },
 		[".settings-nav-subtitle"] = { size = "small", color = "muted-foreground" },
 		[".settings-nav-search"] = { padding = { 0, 0, 8, 0 } },
 		[".settings-nav-groups"] = { gap = 0 },

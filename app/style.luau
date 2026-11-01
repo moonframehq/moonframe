@@ -99,7 +99,7 @@ return style {
 			transition = "slide-fade fast ease-out",
 		},
 		["overlay-backdrop"] = { background = "#000000/35" },
-		[".sheet-title"] = { weight = "bold", size = "large" },
+		[".sheet-title"] = { weight = "semibold", size = "large" },
 		[".muted"] = { size = "small", color = "muted-foreground" },
 		[".usage-tabs"] = { margin = { top = 4 } },
 		[".usage-tab"] = { padding = { 6, 0 }, radius = 8, color = "muted-foreground" },
@@ -120,6 +120,11 @@ return style {
 		[".tool:hover"] = { background = "accent/10", color = "foreground" },
 		[".tool-on"] = { color = "accent" },
 		[".tool-on:hover"] = { background = "accent/12", color = "accent" },
+		-- The Send feedback `?` (mods/feedback) where an app without a title
+		-- bar of tools floats it over a corner of the window.
+		[".feedback-corner"] = { background = "card", border = "all", border_color = "border", radius = 999, padding = 2, shadow = "0 4px 12px -4px #00000033" },
+		-- Its button is round, so its hover fits a round corner.
+		[".feedback-button"] = { radius = 999 },
 		[".hero"] = { color = "accent", size = "title", weight = "bold" },
 	},
 }

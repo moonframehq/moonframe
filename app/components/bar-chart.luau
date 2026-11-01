@@ -1,7 +1,10 @@
 -- Vertical bars, one per bucket, each stacked from its series' values,
 -- with labels under them, an optional scale on the left and a legend.
 -- Series take a tone (accent, success, warning, danger, muted, or one of
--- the chart's palette `c1`..`c6`) or a hex colour.
+-- the chart's palette `c1`..`c6`) or a hex colour. With `ticks`, the
+-- scale labels each step and dashed gridlines run behind the bars; with
+-- `grow`, the buckets share the width they are given; a `dim` bucket (a
+-- period still running) is drawn faded.
 
 type Series = {
 	name: string,
@@ -13,6 +16,7 @@ type Bucket = {
 	label: string?,
 	values: { number },
 	tooltip: string?,
+	dim: boolean?,
 }
 
 type Props = {
@@ -27,6 +31,9 @@ type Props = {
 	unit: string?,
 	every: number?,
 	slot: number?,
+	ticks: number?,
+	grid: boolean?,
+	grow: boolean?,
 }
 
 local TONES = {
@@ -55,7 +62,7 @@ return component {
 	description = "Vertical bars per bucket, stacked by series with toned colours, axis labels, an optional scale, and a legend.",
 	when = "Counts over time or per category: tokens per day, runs per hour, alerts per device, stacked by kind. For a tiny live trend in a status bar use `sparkline`; for one fraction use `meter`; for one headline number use `stat-tile`.",
 	props = {
-		["buckets"] = "list of { label, values = { one number per series }, tooltip }",
+		["buckets"] = "list of { label, values = { one number per series }, tooltip, dim (drawn faded: a period still running) }",
 		["series"] = "list of { name, tone (accent|success|warning|danger|muted|c1..c6), color (hex) }; bottom of the stack first",
 		["height"] = "plot height in pixels (default 120)",
 		["bar"] = "bar width in pixels (default 18)",
@@ -66,11 +73,16 @@ return component {
 		["unit"] = "suffix for the scale, e.g. \"k\" or \"%\"",
 		["legend"] = "false hides the legend",
 		["every"] = "label every Nth bucket (default 1)",
+		["ticks"] = "steps on the scale: labels from 0 to `max` at each step, with dashed gridlines (implies `axis`)",
+		["grid"] = "false hides the gridlines `ticks` draws",
+		["grow"] = "the buckets share the width given instead of taking `slot` pixels each",
 	},
 	styles = {
 		[".bar-chart"] = { gap = 8 },
 		[".bar-chart-plot"] = { border = "bottom", border_color = "border" },
 		[".bar-chart-bar"] = { radius = 2 },
+		[".bar-chart-dim"] = { opacity = 0.45 },
+		[".bar-chart-grid"] = { color = "muted-foreground/25" },
 		[".bar-chart-empty"] = { background = "muted-foreground/10", radius = 2 },
 		[".bar-chart-label"] = { size = "small", color = "muted-foreground" },
 		[".bar-chart-scale"] = { size = "small", color = "muted-foreground", font = "mono" },
@@ -141,11 +153,16 @@ bar_chart {
 		end
 		max = math.max(max, 1)
 
-		local function swatch(index: number, width: number, h: number)
+		local ticks = props.ticks
+		local function swatch(index: number, width: number, h: number, dim: boolean?)
 			local item = series[index] or {} :: any
 			local tone = item.tone or "accent"
+			local class = { "bar-chart-bar", if TONES[tone] then `bar-chart-{tone}` else "bar-chart-accent" }
+			if dim then
+				table.insert(class, "bar-chart-dim")
+			end
 			return ui.row {
-				class = { "bar-chart-bar", if TONES[tone] then `bar-chart-{tone}` else "bar-chart-accent" },
+				class = class,
 				width = width,
 				height = h,
 				style = if item.color then { background = item.color } else nil,
@@ -162,7 +179,7 @@ bar_chart {
 				total += value
 				local h = math.floor(value / max * height + 0.5)
 				if h > 0 then
-					table.insert(pieces, swatch(s, bar, h))
+					table.insert(pieces, swatch(s, bar, h, bucket.dim))
 				end
 			end
 			if #pieces == 0 then
@@ -173,7 +190,8 @@ bar_chart {
 				tip = `{bucket.label or ""} {format(total, props.unit)}`
 			end
 			columns[index] = ui.row {
-				width = slot,
+				width = if props.grow then nil else slot,
+				grow = props.grow,
 				height = height,
 				justify = "center",
 				align = "end",
@@ -194,19 +212,54 @@ bar_chart {
 			local shown = bucket.label and (index - 1) % every == 0
 			labelled = labelled or shown == true
 			labels[index] = ui.row {
-				width = slot,
+				width = if props.grow then nil else slot,
+				grow = props.grow,
 				justify = "center",
-				shown and ui.text { bucket.label :: string, class = "bar-chart-label" },
+				shown and ui.text { bucket.label :: string, class = "bar-chart-label", wrap = false },
 			}
+		end
+
+		-- Gridlines: one-pixel rows spread from the top to the bottom, each
+		-- holding a dashed line, floated behind the bars.
+		local grid = nil
+		local steps = {}
+		if ticks and ticks > 0 then
+			local lines = {}
+			for step = ticks, 0, -1 do
+				table.insert(steps, ui.row {
+					height = 1,
+					align = "center",
+					justify = "end",
+					ui.text { format(max * step / ticks, props.unit), class = "bar-chart-scale", wrap = false },
+				})
+				table.insert(lines, ui.column {
+					height = 1,
+					justify = "center",
+					ui.line { points = { 0, 0 }, dashed = true, stroke = 1, height = 1, class = "bar-chart-grid" },
+				})
+			end
+			if props.grid ~= false then
+				grid = ui.column { float = "fill", justify = "between", gap = "none", table.unpack(lines) }
+			end
 		end
 
 		local plot = ui.row {
 			class = "bar-chart-plot",
 			align = "end",
+			height = height,
 			style = { gap = gap },
+			grid,
 			table.unpack(columns),
 		}
-		local scale = if props.axis
+		local scale = if #steps > 0
+			then ui.column {
+				height = height,
+				justify = "between",
+				shrink = false,
+				style = { padding = { 0, 2, 0, 0 } },
+				table.unpack(steps),
+			}
+			elseif props.axis
 			then ui.column {
 				height = height,
 				justify = "between",
@@ -229,13 +282,16 @@ bar_chart {
 		end
 
 		return ui.row {
+			grow = props.grow,
 			ui.column {
 				class = "bar-chart",
+				grow = props.grow,
 				ui.row {
-					gap = "small",
+					gap = if #steps > 0 then "normal" else "small",
 					scale,
 					ui.column {
 						gap = "small",
+						grow = props.grow,
 						plot,
 						labelled and ui.row { style = { gap = gap }, table.unpack(labels) },
 					},

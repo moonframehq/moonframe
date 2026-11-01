@@ -1,0 +1,8 @@
+[app]
+# A CRM's leads report in the dark: pipeline figures, revenue by month,
+# leads by status, visits, deals and sources. `moonframe --profile emberline`
+# opens it.
+keep     = ["feedback"]
+name     = "emberline"
+requires = []
+title    = "Emberline"

@@ -1,7 +1,8 @@
 [app]
 # A newsletter's audience at a glance: readers, growth, where they come
-# from, and how they read. `moonframe --profile audience` opens it.
-keep     = []
+# from, and how they read; and Learn: courses, lessons, guides and live
+# sessions. `moonframe --profile audience` opens it.
+keep     = ["feedback"]
 name     = "audience"
 requires = []
 title    = "Inkwell"

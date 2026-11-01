@@ -17,6 +17,7 @@ local RANGES = { ["7"] = "Last 7 Days", ["30"] = "Last 30 Days", ["90"] = "Last 
 return mod {
 	region = "main",
 	title = "Audience",
+	subscribe = { "inkwell/page" },
 
 	styles = {
 		[".page"] = { gap = 0 },
@@ -57,8 +58,8 @@ return mod {
 		elseif msg == "close-every" then
 			state.picking_every = false
 		elseif type(msg) == "table" then
-			if msg.page then
-				state.page = msg.page
+			if msg.topic == "inkwell/page" then
+				state.page = msg.value
 			elseif msg.range then
 				state.range = msg.range
 				state.picking = false
@@ -71,6 +72,10 @@ return mod {
 
 	view = function(state: State, app)
 		local data = app.inkwell
+		-- Learn draws itself (mods/learn); this mod stands aside.
+		if state.page == "learn" then
+			return ui.column {}
+		end
 		if state.page ~= "audience" then
 			return ui.column {
 				class = "placeholder",
@@ -78,7 +83,7 @@ return mod {
 				align = "center",
 				justify = "center",
 				ui.icon { name = "layout-dashboard", size = "title", tone = "muted" },
-				ui.text { "Only Audience is drawn in this example.", tone = "muted" },
+				ui.text { "Only Audience and Learn are drawn in this example.", tone = "muted" },
 			}
 		end
 		if not data then

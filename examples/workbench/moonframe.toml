@@ -1,7 +1,7 @@
 [app]
 # An agent's terminal, an editor and the project's files side by side.
 # `moonframe --profile workbench` opens it.
-keep  = []
+keep  = ["feedback"]
 name  = "workbench"
 title = "Workbench"
 # The projects provider and the file, change and code components.

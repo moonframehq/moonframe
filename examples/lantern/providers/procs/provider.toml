@@ -1,0 +1,7 @@
+# What runs on this machine, for Lantern's process monitor: processes
+# grouped by name with their CPU and memory, the CPU split and load, and
+# memory in use. Shared as `app.procs`. A process provider: it runs `ps`,
+# `iostat`, `vm_stat` and `sysctl` with your access (macOS). See procs.pl
+# for what it publishes.
+command = ["perl", "procs.pl"]
+kind    = "process"

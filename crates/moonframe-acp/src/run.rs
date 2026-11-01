@@ -112,6 +112,9 @@ pub(crate) struct Run {
     pub(crate) agent: &'static crate::agents::Agent,
     /// The user's words, shown back.
     text: String,
+    /// The run this one follows up, the first of a conversation: a mod
+    /// shows them together.
+    thread: Option<String>,
     /// What the agent is sent: the mod's instructions, the words, context.
     prompt: String,
     pub(crate) status: Status,
@@ -182,6 +185,7 @@ pub(crate) struct Start {
     pub(crate) request: Value,
     pub(crate) agent: &'static crate::agents::Agent,
     pub(crate) text: String,
+    pub(crate) thread: Option<String>,
     pub(crate) prompt: String,
     pub(crate) allow: Allow,
     pub(crate) cwd: PathBuf,
@@ -196,6 +200,7 @@ impl Run {
             request: start.request,
             agent: start.agent,
             text: start.text,
+            thread: start.thread,
             prompt: start.prompt,
             status: Status::Starting,
             started: start.now,
@@ -677,6 +682,7 @@ impl Run {
             "agent": self.agent.name,
             "agent_title": self.agent.title,
             "text": self.text,
+            "thread": self.thread,
             "status": self.status.name(),
             "started": self.started,
             "finished": self.finished,
@@ -708,6 +714,7 @@ impl Run {
                 request: Value::Null,
                 agent,
                 text: text("text").unwrap_or_default(),
+                thread: text("thread"),
                 prompt: String::new(),
                 allow: Allow::Ask,
                 cwd: PathBuf::new(),

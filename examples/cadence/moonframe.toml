@@ -1,0 +1,8 @@
+[app]
+# A workflow automation dashboard: runs, success, tokens, the active
+# workflows and templates, and a notification drawer behind the bell.
+# Sample data. `moonframe --profile cadence` opens it.
+keep     = ["feedback"]
+name     = "cadence"
+requires = []
+title    = "Cadence"

@@ -302,17 +302,124 @@ and About panel. The dashboards run on sample data from a provider.
   <sub><b>stage</b>: the components on a bento board, with sample data, for stills. View hides the captions and changes the backdrop.</sub>
 </p>
 
-sessions, workbench and stage require the `projects` package beside them.
+<p>More, each a study of a kind of app:</p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/parlance.png" alt="Parlance">
+      <br>
+      <sub><b>parlance</b> (Parlance): a desktop chat app with a scripted demo agent: chats, pinned chats and folders, projects and recents in a sidebar, rich markdown answers that stream in.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/cinder.png" alt="Cinder">
+      <br>
+      <sub><b>cinder</b> (Cinder): a desktop agent app in code mode: your coding-agent CLI sessions grouped by repository (read-only), their transcripts, and a scripted demo agent for new sessions.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/msgvault.png" alt="msgvault">
+      <br>
+      <sub><b>msgvault</b> (msgvault): a reader for a msgvault archive (mail, chats, calendar), after msgvault-gpui.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/tidings.png" alt="Tidings">
+      <br>
+      <sub><b>tidings</b> (Tidings): a mail client in two layouts: the list beside the open email, or one line per email across the window.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <sub><b>mailbox</b> (Mailbox): a mail client's frame: a sidebar of folders and labels that folds to an icon rail (labels fade out one after another, the icons stay put) and the folder's messages beside it. Sample data.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/trellis.png" alt="Trellis">
+      <br>
+      <sub><b>trellis</b> (Trellis): a terminal multiplexer around projects and their work trees: each work tree keeps its own tabs of split terminals, with its source control beside them.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/lantern.png" alt="Lantern">
+      <br>
+      <sub><b>lantern</b> (Lantern): a Halloween terminal workspace: pages of projects on the left, a grid of framed panes (terminals, files, processes, changes) in tabs, a pumpkin.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/tessel.png" alt="Tessel">
+      <br>
+      <sub><b>tessel</b> (Tessel): an agents hub: your agents as pixel-icon cards or a table, the hub's runs with their steps, and a workflow to fix a failed one. Sample data.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/helpdesk.png" alt="Tandem">
+      <br>
+      <sub><b>helpdesk</b> (Tandem): an IT help desk inbox: tickets by priority, and the open ticket with the assistant's health check and the chat thread it came from.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/research.png" alt="Sorrel">
+      <br>
+      <sub><b>research</b> (Sorrel): an agent's research workspace: a thread with the agent's plan on the left, the sheet it fills cell by cell on the right (a scripted, labelled demo).</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/cadence.png" alt="Cadence">
+      <br>
+      <sub><b>cadence</b> (Cadence): a workflow automation dashboard: runs, success, tokens, the active workflows and templates, and a notification drawer behind the bell. Sample data.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/vigil.png" alt="Vigil">
+      <br>
+      <sub><b>vigil</b> (Vigil): workflow operations at a glance: time within SLA, latency and lag against their limits, what fails most, and a live feed of runs as they start and finish.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/duly.png" alt="Duly">
+      <br>
+      <sub><b>duly</b> (Duly): compliance notices for a public buyer: what is due this week, exceptions against the forecast, the contract register, a payments notice getting ready to sign, and reports for the audit committee. Sample data.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/emberline.png" alt="Emberline">
+      <br>
+      <sub><b>emberline</b> (Emberline): a CRM's leads report in the dark: pipeline figures, revenue by month, leads by status, visits, deals and sources.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/gantry.png" alt="Gantry">
+      <br>
+      <sub><b>gantry</b> (Gantry): an infra console: services, and one service's resources, usage history and alerts, in a dark monospace look. Sample telemetry that moves.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/hearth.png" alt="Hearth">
+      <br>
+      <sub><b>hearth</b> (Hearth): a code review bot's analytics in an observability tool: pull requests reviewed, issues caught, CI and the repositories behind them, on a warm black, monospace page.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/storefront.png" alt="Storefront">
+      <br>
+      <sub><b>storefront</b> (Storefront): a store's admin with its audit log: browser-style tabs in the title bar, grouped settings in the sidebar, and a filterable, paged table of every activity. Sample data.</sub>
+    </td>
+  </tr>
+</table>
+
+sessions, workbench, stage, trellis and lantern require the `projects` package beside them.
 `moonframe app link` runs an app in place, so its files reload as you edit
 them:
 
+`just demo` opens them all in one gallery: a picture of each, a click
+opens it as a window of its own (any number at once, to compare), and each
+has the Send feedback `?` to have a coding agent change it. One by hand:
+
 ```sh
 cargo build --release -p moonframe-app
-for app in sessions workbench daybook ledger audience pipeline stage; do
-  target/release/moonframe app link examples/$app --yes
-done
+target/release/moonframe app link examples/ledger --yes
 target/release/moonframe --profile ledger &
-target/release/moonframe --profile pipeline &
 ```
 
 ## Your own app, on the library
@@ -351,6 +458,7 @@ existing crate; `cargo run --release -- bundle` builds its bundle.
 | `just bundle` | builds `target/bundle/Moonframe.app` |
 | `just bundle-app NAME` | builds the profile NAME's app as a standalone release |
 | `just check-examples` | loads and type-checks the apps in `examples/` |
+| `just demo` | opens the gallery of every example app, to open and compare them |
 | `just install` | builds the app and installs it in `/Applications` |
 | `just ci` | formatting, lints, tests, types, providers and check |
 | `just audit` | zizmor and actionlint on the workflows, cargo-deny on the dependencies |

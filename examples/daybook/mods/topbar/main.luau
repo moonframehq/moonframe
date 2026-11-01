@@ -13,7 +13,9 @@ return mod {
 	title = "Top bar",
 
 	styles = {
-		[".topbar"] = { padding = { 0, 14, 0, 0 }, gap = 6 },
+		[".topbar"] = { gap = 6 },
+		-- Two equal sides keep the field centered on the whole bar.
+		[".topbar-side"] = { gap = 6 },
 		[".topbar-button"] = { radius = 18 },
 		[".topbar-dark"] = { background = "#ffffff14" },
 		[".topbar-pale"] = { background = "#00000008" },
@@ -82,11 +84,16 @@ return mod {
 			grow = true,
 			height = 60,
 			align = "center",
-			inset and ui.row { width = 82 },
-			button("panel-left", "Show or hide the sidebar", "toggle-left", "shell"),
-			button("pencil", "New task", "focus"),
-			ui.row { class = { "nav-wrap", `nav-{tint}` }, nav_buttons { back = "back", forward = "forward", to = "sidebar" } },
-			ui.spacer(),
+			ui.row {
+				class = "topbar-side",
+				width = 0,
+				grow = true,
+				align = "center",
+				inset and ui.row { width = 82 },
+				button("panel-left", "Show or hide the sidebar", "toggle-left", "shell"),
+				button("pencil", "New task", "focus"),
+				ui.row { class = { "nav-wrap", `nav-{tint}` }, nav_buttons { back = "back", forward = "forward", to = "sidebar" } },
+			},
 			ui.row {
 				class = { "omni", `omni-{tint}` },
 				width = 580,
@@ -106,8 +113,7 @@ return mod {
 				},
 				kbd { keys = "cmd-k", small = true, plain = true },
 			},
-			ui.spacer(),
-			ui.row { width = 160 },
+			ui.row { class = "topbar-side", width = 0, grow = true },
 		}
 	end,
 }

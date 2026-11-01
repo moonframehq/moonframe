@@ -1,5 +1,6 @@
 -- Devices: click a header to sort by it (again to reverse), click a row to
--- select it; the switch toggles zebra stripes.
+-- select it, tick rows (or all of them from the header); the switches
+-- toggle zebra stripes and the bordered card look.
 local table_view = use "table"
 local switch = use "switch"
 
@@ -20,14 +21,41 @@ local function ago(seconds: number): string
 	return `{math.floor(seconds / 3600)}h`
 end
 
+type State = {
+	sort: string,
+	descending: boolean,
+	selected: string,
+	zebra: boolean,
+	bordered: boolean?,
+	checks: { [string]: boolean? }?,
+}
+
 return mod {
-	init = function(previous)
-		return previous or { sort = "cpu", descending = true, selected = "studio", zebra = true }
+	init = function(previous: State?): State
+		local state: State = previous or { sort = "cpu", descending = true, selected = "studio", zebra = true }
+		local first: { [string]: boolean? } = { build = true }
+		state.checks = state.checks or first
+		return state
 	end,
 
-	update = function(state, msg)
+	update = function(state: State, msg)
+		local checks: { [string]: boolean? } = state.checks or {}
+		state.checks = checks
 		if msg == "toggle-zebra" then
 			state.zebra = not state.zebra
+		elseif msg == "toggle-bordered" then
+			state.bordered = not state.bordered
+		elseif type(msg) == "table" and msg.check then
+			checks[msg.check] = if checks[msg.check] then nil else true
+		elseif type(msg) == "table" and msg.check_all then
+			-- All on unless every device already is, then all off.
+			local every = true
+			for _, device in DEVICES do
+				every = every and checks[device.id] == true
+			end
+			for _, device in DEVICES do
+				checks[device.id] = if every then nil else true
+			end
 		elseif type(msg) == "table" and msg.sort then
 			if state.sort == msg.sort then
 				state.descending = not state.descending
@@ -40,7 +68,7 @@ return mod {
 		end
 	end,
 
-	view = function(state)
+	view = function(state: State)
 		local sorted = table.clone(DEVICES)
 		table.sort(sorted, function(a, b)
 			local x, y = a[state.sort], b[state.sort]
@@ -62,12 +90,19 @@ return mod {
 		end
 		return ui.column {
 			gap = "normal",
-			ui.row { switch { on = state.zebra, label = "Zebra stripes", small = true, msg = "toggle-zebra" } },
+			ui.row {
+				gap = "large",
+				switch { on = state.zebra, label = "Zebra stripes", small = true, msg = "toggle-zebra" },
+				switch { on = state.bordered, label = "Bordered", small = true, msg = "toggle-bordered" },
+			},
 			table_view {
 				sort = state.sort,
 				descending = state.descending,
 				selected = state.selected,
 				zebra = state.zebra,
+				bordered = state.bordered,
+				checkable = true,
+				checks = state.checks,
 				columns = {
 					{ key = "name", title = "Device" },
 					{ key = "os", title = "OS", width = 110, muted = true },

@@ -1,0 +1,7 @@
+[app]
+# An infra console: services, and one service's resources, usage history
+# and alerts, in a dark monospace look. Sample telemetry that moves.
+keep     = ["feedback"]
+name     = "gantry"
+requires = []
+title    = "Gantry"

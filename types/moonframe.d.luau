@@ -10,8 +10,8 @@ type Data = nil | boolean | number | string | { [any]: any }
 
 type Space = "none" | "small" | "normal" | "large"
 type Tone = "normal" | "muted" | "accent" | "success" | "warning" | "danger"
-type TextSize = "small" | "normal" | "large" | "title"
-type Weight = "normal" | "medium" | "bold"
+type TextSize = "small" | "normal" | "large" | "title" | "headline" | "display" | "hero"
+type Weight = "light" | "normal" | "medium" | "semibold" | "bold"
 type Align = "stretch" | "start" | "center" | "end"
 type Justify = "start" | "center" | "end" | "between"
 type Surface = "background" | "sidebar" | "muted" | "secondary"
@@ -52,10 +52,15 @@ type Transition = string | {
 	kind: TransitionKind?,
 	duration: (number | string)?,
 	curve: string?,
+	-- Wait before moving, as CSS's transition-delay.
+	delay: (number | string)?,
 }
 
 type Style = {
 	background: Color?,
+	-- A linear gradient over the background: `"180deg, #ffa53a, #ff6200"`
+	-- (0 runs up, 90 right, 180 down, the default), or `{ from, to, angle }`.
+	gradient: (string | { from: Color, to: Color, angle: number? })?,
 	color: Color?,
 	border: Border?,
 	border_color: Color?,
@@ -80,6 +85,11 @@ type Style = {
 	-- and goes, and an element with a `state` moves to its next state's look
 	-- (colors, opacity, width and height ease between the two).
 	transition: Transition?,
+	-- Replaces the transition's delay (ms, or "40ms"): set from an item's
+	-- index so a list's items move one after another (a staggered fade).
+	delay: (number | string)?,
+	-- Hide what overflows the box instead of drawing it outside.
+	clip: boolean?,
 }
 
 -- What a `ui` function returns; the host reads its fields.
@@ -316,11 +326,13 @@ type IconName =
 	| "agent-kiro"
 	| "agent-opencode"
 	| "agent-qwen"
+	| "archive"
 	| "arrow-down"
 	| "arrow-left"
 	| "arrow-right"
 	| "arrow-up"
 	| "arrow-up-down"
+	| "arrow-up-right"
 	| "asterisk"
 	| "at-sign"
 	| "ban"
@@ -344,8 +356,10 @@ type IconName =
 	| "bug"
 	| "building-2"
 	| "calendar"
+	| "calendar-days"
 	| "case-sensitive"
 	| "chart-column"
+	| "chart-line"
 	| "chart-pie"
 	| "check"
 	| "chevron-down"
@@ -370,6 +384,7 @@ type IconName =
 	| "clock"
 	| "close"
 	| "cloud"
+	| "cloud-off"
 	| "code"
 	| "coffee"
 	| "columns-2"
@@ -377,6 +392,7 @@ type IconName =
 	| "copy"
 	| "cpu"
 	| "dash"
+	| "database"
 	| "delete"
 	| "dot"
 	| "download"
@@ -386,6 +402,7 @@ type IconName =
 	| "eye"
 	| "eye-off"
 	| "file"
+	| "file-archive"
 	| "file-text"
 	| "filter"
 	| "flag"
@@ -409,10 +426,12 @@ type IconName =
 	| "grip-vertical"
 	| "hard-drive"
 	| "hash"
+	| "headphones"
 	| "heart"
 	| "heart-off"
 	| "history"
 	| "house"
+	| "image"
 	| "inbox"
 	| "info"
 	| "inspector"
@@ -421,6 +440,7 @@ type IconName =
 	| "laptop"
 	| "layers"
 	| "layout-dashboard"
+	| "layout-grid"
 	| "link"
 	| "list"
 	| "list-checks"
@@ -431,12 +451,15 @@ type IconName =
 	| "lock-open"
 	| "log-out"
 	| "mail"
+	| "mail-open"
+	| "mails"
 	| "map"
 	| "maximize"
 	| "maximize-2"
 	| "memory-stick"
 	| "menu"
 	| "message-square"
+	| "messages-square"
 	| "mic"
 	| "minimize"
 	| "minimize-2"
@@ -444,6 +467,7 @@ type IconName =
 	| "monitor"
 	| "moon"
 	| "network"
+	| "octagon-alert"
 	| "palette"
 	| "panel-bottom"
 	| "panel-bottom-open"
@@ -453,6 +477,7 @@ type IconName =
 	| "panel-right"
 	| "panel-right-close"
 	| "panel-right-open"
+	| "paperclip"
 	| "pause"
 	| "pencil"
 	| "pin"
@@ -466,6 +491,7 @@ type IconName =
 	| "refresh-ccw"
 	| "refresh-cw"
 	| "replace"
+	| "reply"
 	| "resize-corner"
 	| "rocket"
 	| "rotate-ccw-clock"
@@ -484,6 +510,7 @@ type IconName =
 	| "split-square-vertical"
 	| "square"
 	| "square-check"
+	| "square-pen"
 	| "square-split-horizontal"
 	| "square-split-vertical"
 	| "square-terminal"
@@ -492,6 +519,7 @@ type IconName =
 	| "star-off"
 	| "sun"
 	| "tag"
+	| "tags"
 	| "terminal"
 	| "thumbs-down"
 	| "thumbs-up"
@@ -503,6 +531,9 @@ type IconName =
 	| "unlock"
 	| "upload"
 	| "user"
+	| "user-plus"
+	| "users"
+	| "wand-sparkles"
 	| "wifi"
 	| "wifi-off"
 	| "window-close"
@@ -1142,6 +1173,9 @@ type AcpRun = {
 	agent_title: string,
 	-- The user's words.
 	text: string,
+	-- The run it follows up (`thread` in its start): the first of a
+	-- conversation.
+	thread: string?,
 	-- "starting", "running", "waiting" (a question for the user), "done",
 	-- "failed", "cancelled" or "stopped" (the app quit while it ran).
 	status: string,
@@ -1168,6 +1202,11 @@ type Acp = {
 	agent: string,
 	-- The folder agents work in.
 	workdir: string,
+	-- The app folder they change, from `workdir` (`app`, `examples/ledger`),
+	-- when it is inside it.
+	app: string?,
+	-- This app's process: an agent screenshots the window with it.
+	pid: number,
 	running: number,
 	-- Newest first, at most 30.
 	runs: { AcpRun },

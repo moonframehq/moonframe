@@ -1,7 +1,7 @@
 [app]
 # A sales pipeline: deals on a board by stage, the quarter's figures over
 # it, and a demo agent beside it. `moonframe --profile pipeline` opens it.
-keep     = []
+keep     = ["feedback"]
 name     = "pipeline"
 requires = []
 title    = "Tally"

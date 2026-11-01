@@ -182,6 +182,10 @@ pub struct Transition {
     pub kind: TransitionKind,
     pub duration: Duration,
     pub curve: Curve,
+    /// How long a change of state waits before it starts moving, as CSS's
+    /// `transition-delay`: the second duration in `"fade 150ms 40ms"`.
+    /// Staggered items each wait a little longer (see `Style::delay`).
+    pub delay: Duration,
 }
 
 /// An easing curve, as in CSS: progress over time, both from 0 to 1.
@@ -244,10 +248,22 @@ pub struct Color {
     pub alpha: f32,
 }
 
+/// A linear gradient from one color to another, painted over the
+/// background: `"180deg, #ffa53a, #ff6200"`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Gradient {
+    /// The direction in degrees, as in CSS: 0 runs up, 90 right, 180 down.
+    pub angle: f32,
+    pub from: Color,
+    pub to: Color,
+}
+
 /// Visual properties; each one unset unless a rule or the element sets it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Style {
     pub background: Option<Color>,
+    /// A linear gradient instead of the flat background.
+    pub gradient: Option<Gradient>,
     /// Text color; children inherit it.
     pub color: Option<Color>,
     pub border: Option<Border>,
@@ -274,6 +290,13 @@ pub struct Style {
     /// a keyed row or column arrives and goes, and how an element with a
     /// `state` moves from one state's look to the next.
     pub transition: Option<Transition>,
+    /// Replaces the `transition`'s delay: what a component sets on each of
+    /// a list's items, from its index, so they move one after another while
+    /// the rules keep the transition itself.
+    pub delay: Option<Duration>,
+    /// Hides what overflows its box instead of drawing it outside: a
+    /// sidebar whose width eases down to a rail clips its labels.
+    pub clip: Option<bool>,
 }
 
 impl Style {
@@ -288,6 +311,7 @@ impl Style {
         }
         take!(
             background,
+            gradient,
             color,
             border,
             border_color,
@@ -301,7 +325,9 @@ impl Style {
             opacity,
             width,
             height,
-            transition
+            transition,
+            delay,
+            clip
         );
         self.padding.layer(&over.padding);
         self.margin.layer(&over.margin);

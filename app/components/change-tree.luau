@@ -14,11 +14,15 @@ type Props = {
 	pick: string?,
 	to: string?,
 	indent: number?,
+	counts: boolean?,
+	mark: string?,
+	plain: boolean?,
 }
 
 type Folder = { name: string, path: string, folders: { [string]: Folder }, files: { any } }
 
-local TONES = { M = "warning", A = "success", D = "danger", R = "accent", ["?"] = "success", U = "danger" }
+-- Each status letter's class, which the stylesheet colours.
+local KINDS = { M = "modified", A = "added", D = "deleted", R = "renamed", ["?"] = "added", U = "conflict" }
 
 local function folder(name: string, path: string): Folder
 	return { name = name, path = path, folders = {}, files = {} }
@@ -81,13 +85,24 @@ return component {
 		["pick"] = "key of the message a file sends, default \"pick\": { pick = path }",
 		["to"] = "the mod to send them to, if not the drawing one",
 		["indent"] = "pixels per level (default 14)",
+		["counts"] = "show each file's +added −deleted at the right",
+		["mark"] = "where the status letter goes: \"end\" (default, at the right) or \"start\" (before the icon)",
+		["plain"] = "outline folder and file icons instead of coloured ones by type",
 	},
 	styles = {
 		[".change-tree-row"] = { padding = { 3, 8 }, radius = 8, gap = 6 },
 		[".change-tree-row:hover"] = { background = "list-hover" },
 		[".change-tree-row:selected"] = { background = "card", shadow = "0 1px 2px #0000000f" },
 		[".change-tree-chevron"] = { color = "muted-foreground" },
-		[".change-tree-mark"] = { size = "small", weight = "bold", font = "mono" },
+		[".change-tree-mark"] = { size = "small", weight = "bold", font = "mono", color = "muted-foreground" },
+		[".change-tree-mark-modified"] = { color = "warning" },
+		[".change-tree-mark-added"] = { color = "success" },
+		[".change-tree-mark-deleted"] = { color = "danger" },
+		[".change-tree-mark-renamed"] = { color = "accent" },
+		[".change-tree-mark-conflict"] = { color = "danger" },
+		[".change-tree-icon"] = { color = "muted-foreground" },
+		[".change-tree-added"] = { size = "small", weight = "medium", font = "mono", color = "success" },
+		[".change-tree-deleted"] = { size = "small", weight = "medium", font = "mono", color = "danger" },
 	},
 	example = {
 		files = {
@@ -130,7 +145,9 @@ return component {
 						class = "change-tree-chevron",
 						size = "small",
 					},
-					file_icon { name = label, dir = true, open = open },
+					if props.plain
+						then ui.icon { name = "folder", class = "change-tree-icon", size = "small" }
+						else file_icon { name = label, dir = true, open = open },
 					ui.text { label, truncate = true },
 				})
 				if open then
@@ -141,22 +158,28 @@ return component {
 				return string.lower(a.name) < string.lower(b.name)
 			end)
 			for _, file in at.files do
+				local mark = ui.text {
+					file.status,
+					class = { "change-tree-mark", `change-tree-mark-{KINDS[file.status] or "other"}` },
+				}
+				local start = props.mark == "start"
 				table.insert(rows, ui.row {
 					class = "change-tree-row",
 					align = "center",
 					selected = file.path == props.selected,
 					msg = { [pick] = file.path },
 					to = props.to,
-					tooltip = `+{file.added} −{file.deleted}`,
+					tooltip = if props.counts then nil else `+{file.added} −{file.deleted}`,
 					ui.row { width = indent * depth + 14 },
-					file_icon { name = file.name },
+					start and mark,
+					if props.plain
+						then ui.icon { name = "file-text", class = "change-tree-icon", size = "small" }
+						else file_icon { name = file.name },
 					ui.text { file.name, truncate = true },
 					ui.spacer(),
-					ui.text {
-						file.status,
-						class = "change-tree-mark",
-						tone = (TONES[file.status] or "muted") :: any,
-					},
+					props.counts and ui.text { `+{file.added}`, class = "change-tree-added" },
+					props.counts and ui.text { `−{file.deleted}`, class = "change-tree-deleted" },
+					not start and mark,
 				})
 			end
 		end

@@ -1,0 +1,8 @@
+[app]
+# Every example app in one gallery: a picture of each, a click opens it as
+# its own window, and any number can be open at once to compare. Each has
+# the Send feedback `?` to have an agent fix it. `just demo` opens it.
+keep     = ["feedback"]
+name     = "demo"
+requires = []
+title    = "Moonframe Demos"
