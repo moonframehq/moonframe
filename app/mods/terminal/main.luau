@@ -1,5 +1,6 @@
--- A Ghostty shell in the bottom pane, starting in the home folder.
-local ghostty = use "ghostty-terminal"
+-- The bottom pane: a second tab bar of its own (`tabbed`), starting with a
+-- Ghostty shell in the home folder.
+local tabbed = use "tabbed"
 
 return mod {
 	region = "bottom",
@@ -7,10 +8,11 @@ return mod {
 
 	view = function(state, app)
 		return ui.panel {
-			title = "Terminal",
 			grow = true,
 			padding = "none",
-			ghostty { id = "bottom", cwd = "~" },
+			gap = "none",
+			-- Denser than the main bar: its own look wins over `looks.tabs`.
+			tabbed { id = "bottom", start = "component:ghostty-terminal", variant = "compact" },
 		}
 	end,
 }

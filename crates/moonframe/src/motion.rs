@@ -3,9 +3,12 @@
 //! plays the pane's stylesheet transition instead of jumping.
 
 use {
-    moonframe_core::{Transition, TransitionKind},
+    gpui_kit::{Pixels, Size},
+    moonframe_core::{Node, Transition, TransitionKind},
     std::{
+        cell::Cell,
         collections::HashMap,
+        rc::Rc,
         time::{Duration, Instant},
     },
 };
@@ -13,6 +16,34 @@ use {
 #[derive(Default)]
 pub(crate) struct Motion {
     panes: HashMap<String, Track>,
+    /// What each container with keyed children drew in the frame being
+    /// drawn, or the last one until the next begins.
+    keyed: Keyed,
+    /// Each animated keyed child's size at rest, measured as it is drawn,
+    /// for how far it grows or shrinks.
+    sizes: HashMap<String, Rc<Cell<Option<Size<Pixels>>>>>,
+}
+
+/// The keyed children containers drew in one frame, by container path.
+#[derive(Default)]
+pub(crate) struct Keyed {
+    pub(crate) containers: HashMap<String, Drawn>,
+}
+
+/// One container's keyed children: every key, and a copy of each animated
+/// child, so one that goes can still be drawn while it leaves.
+#[derive(Default)]
+pub(crate) struct Drawn {
+    pub(crate) keys: Vec<String>,
+    pub(crate) kept: Vec<Kept>,
+}
+
+pub(crate) struct Kept {
+    pub(crate) key: String,
+    /// Where it was among its siblings.
+    pub(crate) index: usize,
+    pub(crate) node: Node,
+    pub(crate) transition: Transition,
 }
 
 /// One pane's last visibility, and when it started moving toward it.
@@ -55,6 +86,37 @@ impl Track {
 }
 
 impl Motion {
+    /// Starts a frame: what keyed containers drew in the last one, which
+    /// the new frame compares against and records anew.
+    pub(crate) fn begin_frame(&mut self) -> Keyed {
+        std::mem::take(&mut self.keyed)
+    }
+
+    /// Records what a keyed container drew this frame.
+    pub(crate) fn drew(&mut self, container: String, drawn: Drawn) {
+        self.keyed.containers.insert(container, drawn);
+    }
+
+    /// The pane at `key` has just appeared: it starts hidden, so being
+    /// shown plays its way in.
+    pub(crate) fn enter(&mut self, key: &str) {
+        self.panes.insert(key.to_owned(), Track {
+            visible: false,
+            started: None,
+        });
+    }
+
+    /// The pane at `key` is gone for good.
+    pub(crate) fn forget(&mut self, key: &str) {
+        self.panes.remove(key);
+        self.sizes.remove(key);
+    }
+
+    /// Where the size of the keyed child at `key` is kept.
+    pub(crate) fn size(&mut self, key: &str) -> Rc<Cell<Option<Size<Pixels>>>> {
+        self.sizes.entry(key.to_owned()).or_default().clone()
+    }
+
     /// How much of the pane at `key` shows at `now`, given what the view
     /// says it should be and how it moves.
     pub(crate) fn pane(
@@ -139,6 +201,40 @@ mod tests {
         moving(pane(false, 10), 1.0);
         moving(pane(false, 60), 0.5);
         assert_eq!(pane(false, 110), Shown::Settled(false));
+    }
+
+    #[test]
+    fn an_entering_pane_grows_from_nothing_and_a_forgotten_one_starts_over() {
+        let mut motion = Motion::default();
+        let start = Instant::now();
+        let at = |ms| start + Duration::from_millis(ms);
+        motion.enter("tab");
+        moving(motion.pane("tab", true, Some(&SLIDE), at(0)), 0.0);
+        moving(motion.pane("tab", true, Some(&SLIDE), at(50)), 0.5);
+        assert_eq!(
+            motion.pane("tab", true, Some(&SLIDE), at(100)),
+            Shown::Settled(true)
+        );
+        motion.size("tab").set(Some(Size::default()));
+        motion.forget("tab");
+        assert_eq!(motion.size("tab").get(), None);
+        // Seen again without `enter`, it is simply there.
+        assert_eq!(
+            motion.pane("tab", true, Some(&SLIDE), at(200)),
+            Shown::Settled(true)
+        );
+    }
+
+    #[test]
+    fn a_frame_hands_over_what_the_last_one_drew() {
+        let mut motion = Motion::default();
+        motion.drew("strip".to_owned(), Drawn {
+            keys: vec!["a".to_owned()],
+            kept: Vec::new(),
+        });
+        let last = motion.begin_frame();
+        assert_eq!(last.containers["strip"].keys, ["a"]);
+        assert!(motion.begin_frame().containers.is_empty());
     }
 
     #[test]

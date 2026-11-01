@@ -54,13 +54,13 @@ pub(crate) fn selection() -> PathBuf {
         .join("selection.md")
 }
 
-/// Where the app's document is kept when herdr-core does not keep it:
-/// `$XDG_STATE_HOME/moonframe/document.json`, by default under
-/// `~/.local/state`.
-pub(crate) fn document() -> PathBuf {
+/// Where state outlives the app (each mod's state, and topics):
+/// `$XDG_STATE_HOME/moonframe/state.sqlite`, by default under
+/// `~/.local/state`; outside the user's folder, which the window watches.
+pub(crate) fn state() -> PathBuf {
     xdg("XDG_STATE_HOME", ".local/state")
         .unwrap_or_else(|| env::temp_dir().join(NAME))
-        .join("document.json")
+        .join("state.sqlite")
 }
 
 /// The built-in app, under the packages the user enabled and the user's

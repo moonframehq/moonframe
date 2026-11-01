@@ -8,10 +8,7 @@
 //! [`Backend`], so another runtime can take its place.
 
 use {
-    crate::{
-        document::{Document, Store},
-        program,
-    },
+    crate::{document::Store, program},
     herdr_core_client::{Attachment, Core, Endpoint, PROGRAM, wire},
     moonframe_terminal::{Backend, Open, Opened, Pane, Size},
     std::{
@@ -122,7 +119,7 @@ impl Store for CoreStore {
         "herdr-core"
     }
 
-    fn load(&self) -> Result<Option<Document>, String> {
+    fn load(&self) -> Result<Option<serde_json::Value>, String> {
         let doc = self
             .core
             .core()?
@@ -132,16 +129,15 @@ impl Store for CoreStore {
         if doc.version == 0 || doc.value.is_null() {
             return Ok(None);
         }
-        Document::from_json(&doc.value).map(Some)
+        Ok(Some(doc.value))
     }
 
-    fn save(&self, document: &Document) -> Result<(), String> {
+    fn save(&self, value: &serde_json::Value) -> Result<(), String> {
         let core = self.core.core()?;
-        let value = document.to_json();
         let version = self.version.lock().map(|version| *version).unwrap_or(0);
-        let saved = core.doc_set(&self.name, &value, version).or_else(|_| {
+        let saved = core.doc_set(&self.name, value, version).or_else(|_| {
             let current = core.doc_get(&self.name)?.version;
-            core.doc_set(&self.name, &value, current)
+            core.doc_set(&self.name, value, current)
         });
         let version = saved.map_err(|error| error.to_string())?;
         self.remember(version);

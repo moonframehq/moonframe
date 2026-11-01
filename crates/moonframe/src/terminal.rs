@@ -9,7 +9,13 @@ use {
     gpui_kit::*,
     moonframe_mux::{Backends, Preference},
     moonframe_terminal::{Ansi, Engine, Key, Open, Session, encode, paste},
-    std::{cell::Cell, collections::HashMap, path::PathBuf, rc::Rc, sync::Arc},
+    std::{
+        cell::Cell,
+        collections::{HashMap, HashSet},
+        path::PathBuf,
+        rc::Rc,
+        sync::Arc,
+    },
 };
 
 /// Shells one mod can have, and the whole app: each is a process, and a mod
@@ -42,6 +48,13 @@ pub(crate) struct Terminals {
     wake: Arc<dyn Fn() + Send + Sync>,
     /// The theme's 16 colors; xterm's when `None`.
     palette: Option<Ansi>,
+    /// The terminals the main window drew in its last frame, and in the
+    /// one being drawn: one that appears (a new tab, or a tab selected
+    /// again) takes the keyboard, ready to type in.
+    last_drawn: HashSet<String>,
+    drawn: HashSet<String>,
+    /// The last terminal that appeared since the window last looked.
+    appeared: Option<FocusHandle>,
 }
 
 impl Terminals {
@@ -51,6 +64,9 @@ impl Terminals {
             backends,
             wake,
             palette: None,
+            last_drawn: HashSet::new(),
+            drawn: HashSet::new(),
+            appeared: None,
         }
     }
 
@@ -137,6 +153,25 @@ impl Terminals {
             self.views.insert(key.to_owned(), view.clone());
         }
         view
+    }
+
+    /// Starts the main window's frame: what it drew last is what the new
+    /// frame compares against.
+    pub(crate) fn begin_frame(&mut self) {
+        self.last_drawn = std::mem::take(&mut self.drawn);
+    }
+
+    /// The terminal at `key` is drawn this frame; if it was not in the
+    /// last one, it is the one to focus.
+    pub(crate) fn drawn(&mut self, key: &str, view: &TerminalView) {
+        if self.drawn.insert(key.to_owned()) && !self.last_drawn.contains(key) {
+            self.appeared = Some(view.focus.clone());
+        }
+    }
+
+    /// The terminal that appeared since the last call, to focus.
+    pub(crate) fn take_appeared(&mut self) -> Option<FocusHandle> {
+        self.appeared.take()
     }
 
     /// Starts the shell at `key` again, after it exited.

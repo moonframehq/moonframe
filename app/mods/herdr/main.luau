@@ -2,7 +2,7 @@
 -- window's corner, from what the `herdr` provider sees. herdr-core keeps
 -- terminals and what mods keep across launches; without it terminals run on
 -- tmux, or end with the app. Install runs herdr-core's own installer; ×
--- hides the offer for good (`persist`).
+-- hides the offer for good: the state is saved, and `init` keeps only that.
 local toast = use "toast"
 
 type State = { dismissed: boolean, asked: boolean }
@@ -10,7 +10,6 @@ type State = { dismissed: boolean, asked: boolean }
 return mod {
 	region = "status-right",
 	order = 100,
-	persist = { "dismissed" },
 
 	init = function(previous: State?): State
 		return { dismissed = previous ~= nil and previous.dismissed or false, asked = false }

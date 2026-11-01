@@ -13,6 +13,7 @@ mod gallery;
 mod input;
 mod inspect;
 mod keys;
+mod mod_window;
 mod motion;
 mod natives;
 mod overlay;
@@ -276,25 +277,17 @@ fn main() -> ExitCode {
             })
             .detach();
 
-            // What mods kept last time, from herdr-core when it runs here,
-            // else a file. Only with the user's folder: `--no-user` runs
-            // (checks, screenshots) start fresh and keep nothing.
+            // Each mod's state and the topics come back from the last run:
+            // from herdr-core when it runs here, else SQLite. Only with the
+            // user's folder: `--no-user` runs (checks, screenshots) start
+            // fresh and keep nothing.
             let backends = Arc::new(Backends::new());
-            let (kept, persistence) = match &user {
-                Some(_) => {
-                    let store = backends.store(paths::NAME, paths::document());
-                    let (kept, writable) = persist::load(&*store);
-                    let persistence =
-                        writable.then(|| persist::Persistence::start(store, kept.clone()));
-                    (kept, persistence)
-                },
-                None => (persist::Kept::new(), None),
-            };
+            let persist = user.as_ref().and_then(|_| persist::open(&backends));
             // The shell says what window it wants, so it loads first.
-            let workspace = Workspace::open_saved(
+            let workspace = Workspace::open_with(
                 paths::roots(builtin.clone(), user.clone()),
                 cx.theme().is_dark(),
-                kept,
+                persist,
             );
             let chrome = workspace.chrome();
             let bounds = Bounds::centered(None, size(px(1280.), px(820.)), cx);
@@ -307,16 +300,8 @@ fn main() -> ExitCode {
             };
             let opened = cx.open_window(options, |window, cx| {
                 let view = cx.new(|cx| {
-                    let mut app = MoonframeApp::new(
-                        workspace,
-                        chrome,
-                        builtin,
-                        user,
-                        backends,
-                        persistence,
-                        window,
-                        cx,
-                    );
+                    let mut app =
+                        MoonframeApp::new(workspace, chrome, builtin, user, backends, window, cx);
                     if let Some(name) = &component {
                         app.show_component(name, cx);
                     }

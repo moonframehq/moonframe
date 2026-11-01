@@ -96,6 +96,10 @@ impl Roots {
     /// Every layer's `main.luau` for the mod `name`, highest first: under
     /// `mods/<name>/`, or the root of a single-mod package of that name.
     pub fn mod_candidates(&self, name: &str) -> Vec<PathBuf> {
+        // Only a mod name, never a path out of the `mods` folders.
+        if !crate::style::valid_name(name) {
+            return Vec::new();
+        }
         let relative = format!("mods/{name}/main.luau");
         self.layers
             .iter()

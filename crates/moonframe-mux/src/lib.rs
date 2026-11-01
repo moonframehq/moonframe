@@ -19,15 +19,11 @@ mod tmux;
 
 #[cfg(feature = "herdr-core")]
 pub use herdr_core::{CoreStore, HerdrCore};
-pub use {
-    document::{Document, FileStore, Store},
-    tmux::Tmux,
-};
+pub use {document::Store, tmux::Tmux};
 
 use {
     moonframe_terminal::{Backend, Open, Opened, Pty},
     std::{
-        path::PathBuf,
         sync::{Arc, Mutex},
         time::{Duration, Instant},
     },
@@ -145,30 +141,20 @@ impl Backends {
         Err(problems.join("; "))
     }
 
-    /// Where the app's document (`name`) lives: herdr-core, when it runs
-    /// here, else the JSON file at `file`. Moving to herdr-core brings the
-    /// file's document along the first time. Blocks on first use.
-    pub fn store(&self, name: &str, file: PathBuf) -> Arc<dyn Store> {
-        let file = FileStore::new(file);
+    /// herdr-core's document `name`, when herdr-core runs here (started
+    /// if it is installed). Blocks on first use.
+    pub fn store(&self, name: &str) -> Option<Arc<dyn Store>> {
         #[cfg(feature = "herdr-core")]
         if let Some(core) = self.herdr_core.get(HerdrCore::connect) {
             let store = CoreStore::new(core, name);
             match store.load() {
-                Ok(None) => {
-                    if let Ok(Some(document)) = file.load()
-                        && let Err(problem) = store.save(&document)
-                    {
-                        tracing::warn!("cannot move the document to herdr-core: {problem}");
-                    }
-                    return Arc::new(store);
-                },
-                Ok(Some(_)) => return Arc::new(store),
+                Ok(_) => return Some(Arc::new(store)),
                 Err(problem) => tracing::warn!("herdr-core keeps no document: {problem}"),
             }
         }
         #[cfg(not(feature = "herdr-core"))]
         let _ = name;
-        Arc::new(file)
+        None
     }
 }
 

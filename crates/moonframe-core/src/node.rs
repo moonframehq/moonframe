@@ -34,6 +34,7 @@ tokens! {
         Spacer = "spacer",
         Region = "region",
         Mount = "mount",
+        Instance = "instance",
         Popover = "popover",
         Overlay = "overlay",
     }
@@ -230,11 +231,44 @@ pub enum Node {
     Region(Region),
     /// One mod's view, by name.
     Mount(String),
+    /// A mod or component with state of its own, kept by its key.
+    Instance(Instance),
     Popover(Popover),
     Overlay(Overlay),
     /// A child that could not be read, drawn as a small marker in its
     /// place; the message says what is wrong.
     Problem(String),
+}
+
+impl Node {
+    /// Calls `found` with each instance in the tree, outermost first. It does
+    /// not look inside instances: each draws its own view.
+    pub fn instances(&self, found: &mut dyn FnMut(&Instance)) {
+        let all = |nodes: &[Node], found: &mut dyn FnMut(&Instance)| {
+            for node in nodes {
+                node.instances(found);
+            }
+        };
+        match self {
+            Self::Instance(instance) => found(instance),
+            Self::Stack(stack) => all(&stack.children, found),
+            Self::Panel(panel) => {
+                all(&panel.actions, found);
+                all(&panel.children, found);
+            },
+            Self::Split(split) => {
+                for pane in &split.panes {
+                    all(&pane.children, found);
+                }
+            },
+            Self::Popover(popover) => {
+                all(&popover.anchor, found);
+                popover.content.instances(found);
+            },
+            Self::Overlay(overlay) => overlay.content.instances(found),
+            _ => {},
+        }
+    }
 }
 
 /// The box around a container's children. Unset values fall back to the
@@ -306,6 +340,10 @@ pub struct Stack {
     /// Dragging it moves the window and a double click zooms it, as a
     /// title bar does; controls inside it still take their clicks.
     pub drag: bool,
+    /// Names it among its siblings, so it stays itself as they come and
+    /// go: with a `transition` rule it grows in when it appears and shrinks
+    /// away when it goes, as tabs open and close.
+    pub key: Option<String>,
     pub children: Vec<Node>,
 }
 
@@ -391,6 +429,9 @@ pub enum Action {
         id: String,
         command: BrowserCommand,
     },
+    /// Opens the mod named this in a window of its own, or raises it: a
+    /// tool that stays open beside the main window.
+    Window(String),
 }
 
 /// What a control does besides its click, on stacks, buttons and items.
@@ -770,6 +811,52 @@ impl KeyChord {
         }
         chord.key = key.to_owned();
         Ok(chord)
+    }
+}
+
+/// What a component or mod offers a tab bar: the `+` menu lists it, and a
+/// new tab of it starts with `props`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TabKind {
+    pub title: Option<String>,
+    pub icon: Option<IconName>,
+    pub props: Data,
+    /// The prop a tab hands it as a message for reports, such as a browser's
+    /// `navigate`: what comes back (`url`, `title`) is kept in the tab.
+    pub report: Option<String>,
+}
+
+/// What an instance runs: a mod, as `ui.mount { "explorer", id = ... }`
+/// mounts it, or a component that keeps state, as `use` mounts it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum InstanceOf {
+    Mod(String),
+    Component(String),
+}
+
+/// A mod or component instance in a view: its own state, kept by the app
+/// under [`Instance::key`], and drawn where this node is.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Instance {
+    pub of: InstanceOf,
+    pub id: String,
+    /// What it is drawn with, as its `init`, `update` and view see it.
+    pub props: Data,
+}
+
+impl Instance {
+    /// Where the app keeps it. A mod instance is the app's own (`explorer#2`,
+    /// the same wherever it is mounted); a component's belongs to the module
+    /// that drew it (`editor/tabbed#main`), so two mods' tab bars differ.
+    pub fn key(&self, owner: &str) -> String {
+        match &self.of {
+            // A preview's instances stay inside it: never a real one's state.
+            InstanceOf::Mod(name) if owner.starts_with(crate::workspace::DEMO) => {
+                format!("{owner}/{name}#{}", self.id)
+            },
+            InstanceOf::Mod(name) => format!("{name}#{}", self.id),
+            InstanceOf::Component(name) => format!("{owner}/{name}#{}", self.id),
+        }
     }
 }
 

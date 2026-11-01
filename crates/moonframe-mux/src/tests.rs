@@ -170,7 +170,7 @@ fn stop_core(session: &str, terminals: &[&str]) {
 #[test]
 fn herdr_core_keeps_the_document() {
     use {
-        crate::{CoreStore, Document, Store as _},
+        crate::{CoreStore, Store as _},
         serde_json::json,
     };
     let session = format!("moonframe-doc-{}", std::process::id());
@@ -181,24 +181,18 @@ fn herdr_core_keeps_the_document() {
     let core = Arc::new(core);
     let first = CoreStore::new(core.clone(), "moonframe");
     let loaded = first.load();
-    let mut document = Document::default();
-    document
-        .mods
-        .insert("shell".into(), json!({ "left": false }));
-    let saved = first.save(&document);
+    let saved = first.save(&json!({ "state": { "mod:shell": { "left": false } } }));
 
     let second = CoreStore::new(core, "moonframe");
     let reloaded = second.load();
-    document
-        .mods
-        .insert("shell".into(), json!({ "left": true }));
+    let document = json!({ "state": { "mod:shell": { "left": true } } });
     let resaved = second.save(&document).and_then(|()| second.load());
 
     stop_core(&session, &[]);
     assert_eq!(loaded, Ok(None));
     assert_eq!(saved, Ok(()));
     assert_eq!(
-        reloaded.unwrap().unwrap().mods["shell"],
+        reloaded.unwrap().unwrap()["state"]["mod:shell"],
         json!({ "left": false })
     );
     assert_eq!(resaved, Ok(Some(document)));
