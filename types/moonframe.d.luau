@@ -1065,6 +1065,34 @@ type Herdr = {
 	fresh: boolean,
 }
 
+-- `app.feedback`, from providers/feedback: requests the user sent from the
+-- Send feedback dialog, each handed to a coding agent. When `available` is
+-- false only `reason` is set.
+type FeedbackItem = {
+	id: string,
+	-- The user's words.
+	text: string,
+	-- "running", "done", "failed", "cancelled" or "lost".
+	status: string,
+	-- Unix seconds.
+	started: number?,
+	finished: number?,
+	-- What the agent said at the end, else the end of its errors.
+	result: string?,
+}
+
+type Feedback = {
+	available: boolean,
+	reason: string?,
+	-- The agent's command name ("claude").
+	agent: string,
+	-- The folder it works in.
+	workdir: string,
+	running: number,
+	-- Newest first, at most 20.
+	items: { FeedbackItem },
+}
+
 -- A native provider's answer to an action a mod asked for, arriving in that
 -- mod's `update`: `reply` is the `id` the mod sent, else the action's name.
 type Reply = {
@@ -1099,6 +1127,7 @@ type App = {
 	agents: Agents?,
 	files: Files?,
 	herdr: Herdr?,
+	feedback: Feedback?,
 	-- What tab bars can open: each component and mod with a `tab` entry.
 	kinds: { TabKind },
 	-- The stylesheet's `looks`: which look each kind of component takes.

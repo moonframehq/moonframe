@@ -237,6 +237,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`confirm`](#confirm) | Overlays | Ask before doing something, especially destructive (close a window with running agents, delete a branch). For a modal with a form or custom body use `dialog`; for an undo-able action prefer doing it and showing a `toast` with an Undo action. |
 | [`context-menu`](#context-menu) | Overlays | Right-click actions on a row, tab, tile or file. It anchors the menu to the wrapped content, not the pointer. For a menu opened by a button use `dropdown`; for the menu rows alone use `menu`. On `tabs`, use its `context` (each tab already sends { tab_menu = id }) and put this around the strip, or a `ui.popover` with `menu`. |
 | [`dialog`](#dialog) | Overlays | Any modal that asks for attention: a form, a choice, details. For a yes/no question use `confirm`; for a panel sliding from an edge use `sheet`; for a non-blocking message use `toast` or `notice`; for content beside a control use `ui.popover`. |
+| [`feedback`](#feedback) | Overlays | Let the user ask for a change to the app itself, from inside it, and see what came of it. For a plain form use `dialog`; for chatting with an agent use `composer`. |
 | [`menu`](#menu) | Overlays | The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `ui.overlay` with your own rows. |
 | [`onboarding`](#onboarding) | Overlays | A short guided tour or welcome on first launch or after a big update. For one release's changes use `release-notes`; for a single question use `confirm`; for any other modal use `dialog`. |
 | [`sheet`](#sheet) | Overlays | Side content that needs room but should keep the window in view: details, an inspector, a settings pane, logs. For a centred modal use `dialog`; for a permanent side panel use a `ui.pane` in a split; for a small floating card by a control use `ui.popover`. |
@@ -3274,6 +3275,38 @@ dialog { open = state.renaming, dismiss = "close", title = "Rename workspace",
 ```
 
 A whole mod using it, with state: `app/components/demos/dialog.luau`.
+
+#### `feedback`
+
+**Send Feedback.** A dialog to ask an agent for a change to the app: a text area, a note on who acts on it, Cancel and Send, and what came of earlier requests.
+
+**When:** Let the user ask for a change to the app itself, from inside it, and see what came of it. For a plain form use `dialog`; for chatting with an agent use `composer`.
+
+| Prop | Meaning |
+| --- | --- |
+| `change` | sent on each edit, with `value` set to the text |
+| `dismiss` | msg sent by Cancel, Escape or a backdrop click |
+| `id` | keeps the text across renders (default "feedback") |
+| `items` | earlier requests { { id, text, status, started?, finished?, result? } }, newest first; each row sends `{ cancel = id }` while running, else `{ forget = id }` |
+| `note` | muted lines under the field: who acts on the feedback, and what goes with it |
+| `open` | show it |
+| `placeholder` | grey text while empty (default: two examples) |
+| `send` | sent by Send and ⌘↩, with `value` set to the text from ⌘↩ |
+| `text` | the text the mod has from `change`; Send is greyed out while it is blank |
+| `to` | mod its messages go to, if not the drawing one |
+| `value` | the text; set it to "" after sending to clear the field |
+
+**Styles:** `.feedback` `.feedback-action` `.feedback-action:hover` `.feedback-body` `.feedback-detail` `.feedback-done` `.feedback-failed` `.feedback-heading` `.feedback-history` `.feedback-item` `.feedback-item:hover` `.feedback-muted` `.feedback-note` `.feedback-request` `.feedback-result` `.feedback-running` `.feedback-title`
+
+```lua
+local feedback = use "feedback"
+
+feedback { open = state.open, dismiss = "close", value = state.text, text = state.text,
+	change = "type", send = "send", items = app.feedback and app.feedback.items,
+	note = "A background agent changes the app and reports back below." }
+```
+
+A whole mod using it, with state: `app/components/demos/feedback.luau`.
 
 #### `menu`
 
