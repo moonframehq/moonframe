@@ -40,6 +40,8 @@ title = "My App"               # the menu bar's and bundle's name
 icon = "icon.png"              # default icon.png
 keep = ["terminal"]            # built-in mods it shows (default none)
 requires = ["owner/repo@v1"]   # packages installed with it; "../shared" is one beside it, linked
+version = "1.0.0"              # its version: the bundle's, and what updates compare with
+updates = "owner/my-app"       # GitHub repo it is released from: Check for Updates (needs version)
 ```
 
 What a profile loads, lowest first: the built-in app (its providers and
@@ -203,6 +205,18 @@ An item sends `msg` to `to` (the shell without it) or runs a `command`;
 `shortcut` is a key as `keys` name them (`secondary` is ⌘ on macOS, Ctrl
 elsewhere). The receiving mod handles the message in `update` like a click.
 About is macOS's own panel (icon, name, version, credits); a toast elsewhere.
+
+**Check for Updates…** sits under About when the app names the GitHub
+repository it is released from (`updates` and `version` in `moonframe.toml`;
+`.updates("owner/repo")` for a library app). It offers the newest published
+release (tag `v1.2.3`); on macOS a bundle installs its `.dmg` in place and
+starts again, elsewhere the download opens. A release build checks once a
+day by itself. A shell can place it too: `command = "check-for-updates"`.
+`just release-app NAME` (an app package) or `cargo run --release -- bundle
+--dist dist` (a library app) writes the release files: the build as
+`<Title>-<version>-<target>.zip` (`.tar.gz` on Linux) and `SHA256SUMS`;
+attach them to a GitHub release tagged `v<version>`. See `docs/updates.md`,
+which also has a release workflow to copy.
 
 ## Release mode and bundles
 

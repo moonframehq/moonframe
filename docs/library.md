@@ -66,6 +66,7 @@ fn main() -> std::process::ExitCode {
         .title("Notes")
         .app_id("com.example.notes")
         .version(env!("CARGO_PKG_VERSION"))
+        .updates("example/notes")
         .icon(include_bytes!("../assets/icon.png"))
         .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
         .keep(["terminal"])
@@ -79,6 +80,7 @@ fn main() -> std::process::ExitCode {
 | --- | --- |
 | `Moonframe::new(name)` | the app's name: `~/.config/<name>`, `~/.cache/<name>`, `~/.local/state/<name>`, its document in herdr-core, its default id `dev.moonframe.<name>` |
 | `.title`, `.app_id`, `.version`, `.icon` | how the menu bar, About panel, Dock and bundle name it; an `icon.png` (or a `moonframe.toml` `[app]` title and icon) in its app folder wins |
+| `.updates("owner/repo")` | the GitHub repository it is released from: **Check for Updates…** in the app menu, a daily check in a release build, and on macOS an install over the running `.app`; see [updates.md](updates.md) |
 | `.app_dir(path)` | its app folder while it runs from source; edits reload live |
 | `.embedded_app::<E>()` | its app folder compiled in (`#[derive(moonframe::rust_embed::RustEmbed)]`, `#[crate_path = "moonframe::rust_embed"]`), for a lone executable |
 | `.keep(mods)` | the starter's mods it shows (from `app/mods` here), as a profile's `keep` |
@@ -242,11 +244,15 @@ numbers, booleans and lists.
 cargo run                       # the window, reloading app/ as it changes
 cargo run -- --check            # load every module headlessly: run after each edit
 cargo run --release -- bundle   # target/bundle/<Title>.app, or a Linux prefix
+cargo run --release -- bundle --dist dist   # and dist/<Title>-<version>-<target>.zip + SHA256SUMS
 ```
 
 `bundle` ships the running binary with the app's folder and the toolbox,
 each with its Wasm providers prebuilt and no sources, plus an icon and an
-Info.plist, signed ad hoc.
+Info.plist, signed ad hoc. `--dist DIR` also writes what a GitHub release
+carries: the bundle archived under a name with its version and platform,
+and `SHA256SUMS`. With [`.updates("owner/repo")`](updates.md), the app
+finds and installs those releases itself.
 
 **Developer Mode**, in the app menu beside About, switches the tools for
 changing the app as it runs (the Components menu, Inspect Element ⌥⌘I,

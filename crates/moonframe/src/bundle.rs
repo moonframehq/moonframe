@@ -11,6 +11,10 @@
 //! an icon) to copy under `/usr/local` or `~/.local`.
 //!
 //! A bundle runs as a release: no Components menu or Inspect Element.
+//!
+//! With `--dist DIR` it is also packaged for a GitHub release: an archive
+//! named for its version and platform, and its line in `SHA256SUMS`, what
+//! Check for Updates (`Moonframe::updates`) looks for.
 
 use {
     crate::paths::{self, Folders},
@@ -22,30 +26,55 @@ use {
 };
 
 const USAGE: &str = "\
-Usage: <app> bundle [OUT]
+Usage: <app> bundle [--dist DIR] [OUT]
 
 Builds this app as a standalone bundle in OUT (default target/bundle), from
 the running binary: run it from a release build, `cargo run --release --
 bundle`. Its title, id, version and icon are the ones the app was launched
-with (an icon.png in its app folder wins).";
+with (an icon.png in its app folder wins).
+
+  --dist DIR   also write what a GitHub release of it carries to DIR: the
+               bundle as <Title>-<version>-<target>.zip (macOS) or .tar.gz
+               (Linux), and its line in DIR/SHA256SUMS, which Check for
+               Updates verifies downloads with";
 
 /// Moonframe's icon, for an app that has none.
 const ICON: &[u8] = include_bytes!("../../../assets/icon.png");
 
 pub(crate) fn run(folders: &Folders, words: &[String]) -> ExitCode {
-    let out = match words {
-        [] => PathBuf::from("target/bundle"),
-        [word] if matches!(word.as_str(), "help" | "-h" | "--help") => {
-            println!("{USAGE}");
-            return ExitCode::SUCCESS;
+    if matches!(words, [word] if matches!(word.as_str(), "help" | "-h" | "--help")) {
+        println!("{USAGE}");
+        return ExitCode::SUCCESS;
+    }
+    let mut out = None;
+    let mut dist = None;
+    let mut words = words.iter();
+    while let Some(word) = words.next() {
+        match word.as_str() {
+            "--dist" => match words.next() {
+                Some(dir) if dist.is_none() => dist = Some(PathBuf::from(dir)),
+                _ => {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                },
+            },
+            _ if out.is_none() && !word.starts_with('-') => out = Some(PathBuf::from(word)),
+            _ => {
+                eprintln!("{USAGE}");
+                return ExitCode::from(2);
+            },
+        }
+    }
+    let out = out.unwrap_or_else(|| PathBuf::from("target/bundle"));
+    let built = bundle(folders, &out).and_then(|bundle| match &dist {
+        Some(dist) => {
+            let archive = package(&bundle, &crate::identity().version, dist)?;
+            println!("{}", archive.display());
+            Ok(bundle)
         },
-        [out] => PathBuf::from(out),
-        _ => {
-            eprintln!("{USAGE}");
-            return ExitCode::from(2);
-        },
-    };
-    match bundle(folders, &out) {
+        None => Ok(bundle),
+    });
+    match built {
         Ok(bundle) => {
             println!("{}", bundle.display());
             ExitCode::SUCCESS
@@ -139,6 +168,130 @@ fn bundle(folders: &Folders, out: &Path) -> Result<PathBuf, String> {
     )
     .map_err(text)?;
     Ok(bundle)
+}
+
+/// Writes `bundle` to `dist` as a GitHub release of `version` carries it:
+/// `<Title>-<version>-<target>.zip` on macOS (`universal-apple-darwin` when
+/// its binary has several architectures), `.tar.gz` on Linux, named so
+/// Check for Updates picks it for its platform, and its line in
+/// `dist/SHA256SUMS`, which it verifies the download with.
+fn package(bundle: &Path, version: &str, dist: &Path) -> Result<PathBuf, String> {
+    let file = bundle
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("the bundle has no name")?;
+    let title = file.strip_suffix(".app").unwrap_or(file).replace(' ', "-");
+    fs::create_dir_all(dist).map_err(text)?;
+    let archive = if cfg!(target_os = "macos") {
+        let exe = fs::read_dir(bundle.join("Contents/MacOS"))
+            .map_err(text)?
+            .flatten()
+            .map(|entry| entry.path())
+            .next()
+            .ok_or("the bundle has no executable")?;
+        let archs = Command::new("lipo")
+            .arg("-archs")
+            .arg(&exe)
+            .output()
+            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+            .unwrap_or_default();
+        let archs: Vec<&str> = archs.split_whitespace().collect();
+        let target = match archs.as_slice() {
+            [one] => format!("{}-apple-darwin", rust_arch(one)),
+            [] => format!("{}-apple-darwin", env::consts::ARCH),
+            _ => "universal-apple-darwin".to_owned(),
+        };
+        let archive = dist.join(format!("{title}-{version}-{target}.zip"));
+        remove(&archive)?;
+        // ditto keeps the bundle's signature, links and permissions.
+        command(
+            Command::new("ditto")
+                .args(["-c", "-k", "--sequesterRsrc", "--keepParent"])
+                .arg(bundle)
+                .arg(&archive),
+        )?;
+        archive
+    } else {
+        let target = format!("{}-unknown-linux-gnu", env::consts::ARCH);
+        let archive = dist.join(format!("{title}-{version}-{target}.tar.gz"));
+        remove(&archive)?;
+        let parent = bundle.parent().ok_or("the bundle has no folder")?;
+        command(
+            Command::new("tar")
+                .arg("-C")
+                .arg(parent)
+                .arg("-czf")
+                .arg(&archive)
+                .arg(file),
+        )?;
+        archive
+    };
+    let name = archive
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("the archive has no name")?
+        .to_owned();
+    let sum = sha256(&archive)?;
+    let sums = dist.join("SHA256SUMS");
+    let mut lines: Vec<String> = fs::read_to_string(&sums)
+        .unwrap_or_default()
+        .lines()
+        .filter(|line| {
+            line.split_whitespace()
+                .nth(1)
+                .is_none_or(|listed| listed.trim_start_matches('*') != name)
+        })
+        .map(str::to_owned)
+        .collect();
+    lines.push(format!("{sum}  {name}"));
+    lines.sort_by(|a, b| {
+        a.split_whitespace()
+            .nth(1)
+            .cmp(&b.split_whitespace().nth(1))
+    });
+    fs::write(&sums, lines.join("\n") + "\n").map_err(text)?;
+    Ok(archive)
+}
+
+/// Rust's name for a Mach-O architecture.
+fn rust_arch(arch: &str) -> &str {
+    match arch {
+        "arm64" => "aarch64",
+        other => other,
+    }
+}
+
+/// `file`'s SHA-256, in hex, from the system's tool.
+fn sha256(file: &Path) -> Result<String, String> {
+    let (tool, args): (&str, &[&str]) = if cfg!(target_os = "macos") {
+        ("shasum", &["-a", "256"])
+    } else {
+        ("sha256sum", &[])
+    };
+    let output = Command::new(tool)
+        .args(args)
+        .arg(file)
+        .output()
+        .map_err(|error| format!("cannot run {tool}: {error}"))?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    let sum = text.split_whitespace().next().unwrap_or_default();
+    if !output.status.success() || sum.len() != 64 {
+        return Err(format!("{tool} cannot read {}", file.display()));
+    }
+    Ok(sum.to_owned())
+}
+
+fn command(command: &mut Command) -> Result<(), String> {
+    let output = command
+        .output()
+        .map_err(|error| format!("cannot run {command:?}: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "{command:?} failed: {}",
+        String::from_utf8_lossy(&output.stderr).trim()
+    ))
 }
 
 /// Copies the app folder `from` to `to` as it ships: without what git and

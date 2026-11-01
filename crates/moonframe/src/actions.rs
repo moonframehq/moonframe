@@ -14,6 +14,7 @@ gpui_kit::actions!(moonframe, [
     ShowThemes,
     AboutApp,
     BuildApp,
+    CheckForUpdates,
     ToggleSlowAnimations,
     ToggleDeveloperMode
 ]);
@@ -67,21 +68,26 @@ pub(crate) fn bind_keys(cx: &mut App) {
     ]);
 }
 
-/// The menu bar: the app menu (About, Quit), the shell's `menus`, then
+/// The menu bar: the app menu (About, Check for Updates when the app
+/// names its repository, Quit), the shell's `menus`, then
 /// View, into which a shell menu called View merges, the Components menu
 /// listing `components` by category, and the shell's Window and Help.
 /// Outside Developer Mode only what the app's users need shows: no
 /// Components menu, Inspect Element, Reload Modules, or Slow Animations.
 pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
     let title = crate::title();
+    let mut app_items = vec![MenuItem::action(format!("About {title}"), AboutApp)];
+    // An app that names the GitHub repository it is released from.
+    if crate::update::source().is_some() {
+        app_items.push(MenuItem::action("Check for Updates…", CheckForUpdates));
+    }
     // Developer Mode: the tools for changing the app as it runs, which
     // its users can turn on too; the choice is kept.
-    let mut app_items = vec![
-        MenuItem::action(format!("About {title}"), AboutApp),
+    app_items.extend([
         MenuItem::separator(),
         MenuItem::action("Developer Mode", ToggleDeveloperMode).checked(!crate::release()),
         MenuItem::separator(),
-    ];
+    ]);
     // Outside a release, the starter builds itself as one; an app on the
     // library bundles with its own `bundle` command.
     if !crate::release() && !crate::identity().hosted {

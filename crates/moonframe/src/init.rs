@@ -191,6 +191,8 @@ fn init(options: &Options) -> Result<(), String> {
             "Then run the app from `main` (src/main.rs in a new crate shows the rest: a \
              native provider and a view):\n\n  fn main() -> std::process::ExitCode {{\n      \
              moonframe::Moonframe::new({name:?})\n          .title({title:?})\n          \
+             .version(env!(\"CARGO_PKG_VERSION\"))\n          \
+             // .updates(\"owner/repo\") // Check for Updates from its GitHub releases\n          \
              .app_dir(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/app\"))\n          \
              .run()\n  }}\n"
         );
@@ -205,6 +207,10 @@ fn init(options: &Options) -> Result<(), String> {
     }
     println!("Check it after each edit:  cargo run -- --check");
     println!("Bundle it:  cargo run --release -- bundle");
+    println!(
+        "Release it:  cargo run --release -- bundle --dist dist, then attach dist/* to a \
+         GitHub release; with `.updates(\"owner/repo\")` the app finds it (docs/updates.md)"
+    );
     Ok(())
 }
 

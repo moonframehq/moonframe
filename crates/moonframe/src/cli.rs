@@ -35,7 +35,7 @@ Usage: moonframe [OPTIONS] [DIR]
        moonframe init [DIR] [--name NAME] [--path CHECKOUT]
                                          start an app of your own on the Moonframe
                                          library, or add one to a crate; see `init help`
-       moonframe bundle [OUT]
+       moonframe bundle [--dist DIR] [OUT]
                                          build this app's bundle (for apps on the
                                          library; the starter's is `just bundle`)
 
@@ -397,6 +397,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         Ordering::Relaxed,
     );
     let _ = crate::TITLE.set(folders.title());
+    let _ = crate::update::SOURCE.set(folders.updates());
     crate::dock::set_name(&crate::title());
     tracing::info!(
         "starting {} ({}{}) on {}",

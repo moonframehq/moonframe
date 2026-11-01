@@ -550,6 +550,34 @@ fn an_app_title_or_icon_that_leaves_its_folder_is_refused() {
     }
 }
 
+#[test]
+fn an_app_updated_from_github_names_its_repository_and_version() {
+    let dir = tempfile::tempdir().unwrap();
+    let read = |manifest: &str| {
+        fs::write(dir.path().join("moonframe.toml"), manifest).unwrap();
+        App::read(dir.path())
+    };
+    let app = read("[app]\nname = \"ok\"\nversion = \"1.2.0\"\nupdates = \"me/ok\"\n")
+        .unwrap()
+        .unwrap();
+    assert_eq!(app.version.as_deref(), Some("1.2.0"));
+    assert_eq!(app.updates.as_deref(), Some("me/ok"));
+    assert!(read("[app]\nname = \"ok\"\nversion = \"2.0.0-beta.1\"\n").is_ok());
+    for (bad, says) in [
+        ("updates = \"me/ok\"", "needs the app's `version`"),
+        (
+            "version = \"1\"\nupdates = \"https://github.com/me/ok\"",
+            "not a GitHub repository",
+        ),
+        ("version = \"1.0</string>\"", "is not a version"),
+        ("version = \"v1.0\"", "is not a version"),
+        ("version = \"1.0-\"", "is not a version"),
+    ] {
+        let problem = read(&format!("[app]\nname = \"ok\"\n{bad}\n")).unwrap_err();
+        assert!(problem.contains(says), "{bad}: {problem}");
+    }
+}
+
 /// A package's native provider runs no code of its own, but it replaces the
 /// app's built-in one with its settings (git's `writers`), so it is asked
 /// about, and the prompt says what it changes.

@@ -11,14 +11,20 @@
 #
 # With PROFILE it is that profile's app, standalone: its app package and the
 # packages it requires are staged in Contents/Resources/bundle, it takes the
-# app's title, id (dev.moonframe.app.NAME) and icon (its manifest's `icon`,
-# else icon.png), and it runs as a release, without the Components menu or
+# app's title, id (dev.moonframe.app.NAME), version (its manifest's
+# `version`, else Moonframe's) and icon (its manifest's `icon`, else
+# icon.png), and it runs as a release, without the Components menu or
 # Inspect Element. What its users add goes in
 # ~/.config/moonframe/profiles/NAME. MOONFRAME_USER names another user
 # folder to find the profile in.
 #
 # MOONFRAME_BINARY bundles a prebuilt executable (the release's universal
 # one) instead of building for this Mac.
+#
+# DIST=DIR also writes what a GitHub release of the app carries to DIR: the
+# bundle as TITLE-VERSION-TARGET.zip (macOS; TARGET is universal-apple-darwin
+# for a universal binary) or .tar.gz (Linux), and its line in DIR/SHA256SUMS,
+# so Check for Updates finds the build for each platform and verifies it.
 set -euo pipefail
 
 out=${1:-target/bundle}
@@ -44,6 +50,7 @@ if [ -n "$profile" ]; then
             title) title=$value ;;
             app) app=$value ;;
             icon) icon=$value ;;
+            version) version=$value ;;
             package) packages+=("$value") ;;
         esac
     done < <("$binary" ${MOONFRAME_USER:+--user "$MOONFRAME_USER"} app paths "$profile")
@@ -55,6 +62,38 @@ if [ -n "$profile" ]; then
             ;;
     esac
 fi
+
+# Archives the bundle $1 into $DIST for a release, with its checksum.
+dist() {
+    [ -n "${DIST:-}" ] || return 0
+    local bundle=$1 name target archive
+    name=$(basename "$bundle")
+    mkdir -p "$DIST"
+    if [ "$(uname)" = Darwin ]; then
+        case $(lipo -archs "$bundle/Contents/MacOS/$exe") in
+            *" "*) target=universal-apple-darwin ;;
+            arm64) target=aarch64-apple-darwin ;;
+            *) target=$(uname -m)-apple-darwin ;;
+        esac
+        archive="${name%.app}-$version-$target.zip"
+        archive=${archive// /-}
+        rm -f "$DIST/$archive"
+        ditto -c -k --sequesterRsrc --keepParent "$bundle" "$DIST/$archive"
+        sum=$(shasum -a 256 "$DIST/$archive" | cut -d' ' -f1)
+    else
+        archive="$name-$version-$(uname -m)-unknown-linux-gnu.tar.gz"
+        archive=${archive// /-}
+        rm -f "$DIST/$archive"
+        tar -C "$(dirname "$bundle")" -czf "$DIST/$archive" "$name"
+        sum=$(sha256sum "$DIST/$archive" | cut -d' ' -f1)
+    fi
+    touch "$DIST/SHA256SUMS"
+    # Every line but this archive's (by its exact name), then its own.
+    { awk -v name="$archive" '$2 != name && $2 != "*" name' "$DIST/SHA256SUMS"; echo "$sum  $archive"; } |
+        sort -k2 > "$DIST/SHA256SUMS.new"
+    mv "$DIST/SHA256SUMS.new" "$DIST/SHA256SUMS"
+    echo "$DIST/$archive" >&2
+}
 
 # Stages the app, and the profile's app with its packages, under $1.
 stage() {
@@ -98,6 +137,7 @@ Icon=$id
 StartupWMClass=$id
 Categories=Development;
 DESKTOP
+    dist "$bundle"
     echo "$bundle"
     exit 0
 fi
@@ -141,4 +181,5 @@ PLIST
 cp LICENSE "$bundle/Contents/Resources/LICENSE"
 
 codesign --force --deep --sign - "$bundle" 2>/dev/null
+dist "$bundle"
 echo "$bundle"

@@ -75,8 +75,10 @@ thiserror          = "2"
 toml               = "1"
 tracing            = "0.1"
 tracing-subscriber = { default-features = false, features = ["ansi", "env-filter", "fmt", "std"], version = "0.3" }
-wasmtime           = "50"
-wasmtime-wasi      = "50"
+# Check for Updates: GitHub's releases API and the download (moonframe).
+ureq          = "3.5"
+wasmtime      = "50"
+wasmtime-wasi = "50"
 # The native web views behind `ui.browser` (WebKit, WebView2): a fork of
 # wry that renders under GPUI.
 wry = { default-features = false, package = "lb-wry", version = "=0.53.3" }

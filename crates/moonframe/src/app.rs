@@ -98,6 +98,8 @@ pub(crate) struct MoonframeApp {
     toast: Option<(u64, SharedString)>,
     /// A bundle is being built (Build App Bundle).
     building: bool,
+    /// Checking for, or installing, an update.
+    updating: bool,
     focus: FocusHandle,
     /// Where each animated pane is in its transition.
     motion: Motion,
@@ -196,6 +198,7 @@ impl MoonframeApp {
             settings,
             toast: None,
             building: false,
+            updating: false,
             focus,
             motion: Motion::default(),
             providers,
@@ -208,6 +211,33 @@ impl MoonframeApp {
         app.apply_theme(cx);
         // What the mods' `init` sent providers as they started.
         app.forward("start");
+        // An installed app looks for updates by itself, once a day, also
+        // while it stays open, whatever Developer Mode says; runs from
+        // source and runs without the user's folder (checks, screenshots)
+        // never do.
+        if crate::update::checks_by_itself()
+            && crate::update::source().is_some()
+            && app.folders.user.is_some()
+        {
+            let profile = app.folders.profile.clone();
+            cx.spawn(async move |this, cx| {
+                loop {
+                    if crate::update::due(profile.as_deref())
+                        && this
+                            .update(cx, |app, cx| app.check_for_updates(false, cx))
+                            .is_err()
+                    {
+                        break;
+                    }
+                    cx.background_executor().timer(crate::update::POLL).await;
+                    // The window is gone: so is the app.
+                    if this.update(cx, |_, _| ()).is_err() {
+                        break;
+                    }
+                }
+            })
+            .detach();
+        }
         app
     }
 
@@ -449,6 +479,7 @@ impl MoonframeApp {
             Command::CloseWindow => window.remove_window(),
             Command::ShowThemes => self.show_themes(cx),
             Command::Inspect => self.inspect_for(SHELL, cx),
+            Command::CheckForUpdates => self.check_for_updates(true, cx),
         }
     }
 
@@ -806,6 +837,153 @@ impl MoonframeApp {
         .detach();
     }
 
+    /// Asks the app's repository for a newer release and offers it. `asked`:
+    /// the user chose Check for Updates, so every outcome is told; the
+    /// daily check speaks only of a newer release.
+    pub(crate) fn check_for_updates(&mut self, asked: bool, cx: &mut Context<Self>) {
+        let Some(source) = crate::update::source().cloned() else {
+            if asked {
+                self.show_toast("This app names no repository to update from", cx);
+            }
+            return;
+        };
+        if self.updating {
+            if asked {
+                self.show_toast("Already checking for updates", cx);
+            }
+            return;
+        }
+        self.updating = true;
+        if asked {
+            self.show_toast("Checking for updates…", cx);
+        }
+        let profile = self.folders.profile.clone();
+        cx.spawn(async move |this, cx| {
+            let looked = source.clone();
+            let found = cx
+                .background_executor()
+                .spawn(async move { crate::update::check(&looked) })
+                .await;
+            // Only a check that reached GitHub counts as the day's: one that
+            // failed (offline, rate limited) is tried again within the hour.
+            if found.is_ok() {
+                crate::update::checked(profile.as_deref());
+            }
+            let title = crate::title();
+            let release = match found {
+                Ok(crate::update::Found::Newer(release)) => release,
+                other => {
+                    let _ = this.update(cx, |this, cx| {
+                        this.updating = false;
+                        let message = match other {
+                            Ok(crate::update::Found::UpToDate { latest }) => {
+                                format!("{title} is up to date ({latest})")
+                            },
+                            Ok(_) => format!("{title} has no release yet"),
+                            Err(problem) => {
+                                tracing::warn!("checking for updates: {problem}");
+                                format!("Cannot check for updates: {problem}")
+                            },
+                        };
+                        if asked {
+                            this.show_toast_text(message.into(), cx);
+                        }
+                    });
+                    return;
+                },
+            };
+            let installable = release.installable(&source);
+            let answers: &[&str] = match (installable, &release.asset) {
+                (true, _) => &["Install and Relaunch", "Release Notes", "Later"],
+                (false, Some(_)) => &["Download", "Release Notes", "Later"],
+                (false, None) => &["Release Notes", "Later"],
+            };
+            let message = format!("{title} {} is available", release.version);
+            let detail = if installable {
+                format!(
+                    "You have {}. It downloads and replaces this copy, then {title} starts again.",
+                    source.version
+                )
+            } else {
+                format!("You have {}.", source.version)
+            };
+            let window =
+                cx.update(|cx| cx.active_window().or_else(|| cx.windows().first().copied()));
+            let prompt = window.and_then(|window| {
+                cx.update_window(window, |_, window, cx| {
+                    window.prompt(PromptLevel::Info, &message, Some(&detail), answers, cx)
+                })
+                .ok()
+            });
+            let choice = match prompt {
+                Some(answer) => answer
+                    .await
+                    .ok()
+                    .and_then(|index| answers.get(index).copied()),
+                None => None,
+            };
+            match choice {
+                Some("Install and Relaunch") => {
+                    let _ = this.update(cx, |this, cx| this.install_update(release, source, cx));
+                    return;
+                },
+                Some("Download") => {
+                    if let Some(asset) = &release.asset {
+                        cx.update(|cx| cx.open_url(&asset.url));
+                    }
+                },
+                Some("Release Notes") => cx.update(|cx| cx.open_url(&release.page)),
+                _ => {},
+            }
+            let _ = this.update(cx, |this, _| this.updating = false);
+        })
+        .detach();
+    }
+
+    /// Downloads `release` and puts it in place of the running app, which
+    /// quits and starts again; on a failure, says why and opens the
+    /// release's page to download it from.
+    fn install_update(
+        &mut self,
+        release: crate::update::Release,
+        source: crate::update::Source,
+        cx: &mut Context<Self>,
+    ) {
+        // Stays up until the download ends.
+        let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
+        self.toast = Some((
+            id,
+            format!("Downloading {} {}…", crate::title(), release.version).into(),
+        ));
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let staged = cx
+                .background_executor()
+                .spawn({
+                    let release = release.clone();
+                    async move {
+                        crate::update::stage(&release, &source).and_then(crate::update::relaunch)
+                    }
+                })
+                .await;
+            match staged {
+                Ok(()) => {
+                    tracing::info!("installing {} and starting again", release.version);
+                    cx.update(|cx| cx.quit());
+                },
+                Err(problem) => {
+                    tracing::warn!("installing the update: {problem}");
+                    cx.update(|cx| cx.open_url(&release.page));
+                    let _ = this.update(cx, |this, cx| {
+                        this.updating = false;
+                        this.show_toast_text(format!("The update failed: {problem}").into(), cx);
+                    });
+                },
+            }
+        })
+        .detach();
+    }
+
     fn show_toast_text(&mut self, message: SharedString, cx: &mut Context<Self>) {
         let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
         self.toast = Some((id, message));
@@ -1044,6 +1222,10 @@ fn menu_actions(cx: &mut Context<MoonframeApp>) {
     let on = app.clone();
     cx.on_action(move |_: &BuildApp, cx| {
         let _ = on.update(cx, |app, cx| app.build_app(cx));
+    });
+    let on = app.clone();
+    cx.on_action(move |_: &CheckForUpdates, cx| {
+        let _ = on.update(cx, |app, cx| app.check_for_updates(true, cx));
     });
     let on = app.clone();
     cx.on_action(move |_: &ToggleDeveloperMode, cx| {

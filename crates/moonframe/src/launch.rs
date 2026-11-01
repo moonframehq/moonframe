@@ -54,6 +54,7 @@ impl Moonframe {
         identity.id = format!("dev.moonframe.{name}");
         identity.title = name.to_owned();
         identity.hosted = true;
+        identity.updates = None;
         Self {
             log: format!("error,moonframe=info,{}=info", name.replace('-', "_")),
             identity,
@@ -98,6 +99,20 @@ impl Moonframe {
     /// Its version, for its bundle: usually `env!("CARGO_PKG_VERSION")`.
     pub fn version(mut self, version: &str) -> Self {
         version.clone_into(&mut self.identity.version);
+        self
+    }
+
+    /// The GitHub repository whose releases update it, `owner/repo`: the
+    /// app menu gets **Check for Updates…**, which compares the newest
+    /// release's tag (`v1.2.3`) with [`version`](Self::version), and on
+    /// macOS installs its `.dmg` over the running `.app` and starts again.
+    /// An installed or release build also checks by itself once a day.
+    pub fn updates(mut self, repo: &str) -> Self {
+        if crate::update::valid_repo(repo) {
+            self.identity.updates = Some(repo.to_owned());
+        } else {
+            eprintln!("`{repo}` is no GitHub repository (owner/repo): no updates");
+        }
         self
     }
 
