@@ -755,3 +755,51 @@ fn a_wasm_provider_in_a_hook_free_parent_workspace_passes_the_check() {
     );
     crate::wasm::check_hooks(&root.join("providers/sys")).unwrap();
 }
+
+/// Cargo works out `..` on the path's text, not through links: so does the
+/// check, or a link could point it at a workspace Cargo never uses.
+#[cfg(unix)]
+#[test]
+fn a_wasm_provider_reached_through_a_link_is_checked_where_cargo_looks() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    // `providers/sys/via` links to `elsewhere/deep`. To Cargo,
+    // `via/../../member` is `providers/member`, in the workspace whose
+    // helper has a build script; through the link it is a harmless
+    // `member` at the top.
+    write(
+        root,
+        "providers/sys/Cargo.toml",
+        "[package]\nname = 'sys'\n[workspace]\n[dependencies]\nmember = { path = 'via/../../member' }\n",
+    );
+    write(
+        root,
+        "elsewhere/deep/Cargo.toml",
+        "[package]\nname = 'deep'\n",
+    );
+    std::os::unix::fs::symlink(root.join("elsewhere/deep"), root.join("providers/sys/via"))
+        .unwrap();
+    write(
+        root,
+        "providers/Cargo.toml",
+        "[workspace]\nmembers = ['member']\n[workspace.dependencies]\nhelper = { path = 'helper' }\n",
+    );
+    write(
+        root,
+        "providers/member/Cargo.toml",
+        "[package]\nname = 'member'\n[dependencies]\nhelper = { workspace = true }\n",
+    );
+    write(
+        root,
+        "providers/helper/Cargo.toml",
+        "[package]\nname = 'helper'\n",
+    );
+    write(root, "providers/helper/build.rs", "");
+    write(
+        root,
+        "member/Cargo.toml",
+        "[package]\nname = 'member'\n[workspace]\n",
+    );
+    let problem = crate::wasm::check_hooks(&root.join("providers/sys")).unwrap_err();
+    assert!(problem.contains("cannot have"), "{problem}");
+}

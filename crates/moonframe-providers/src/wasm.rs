@@ -7,7 +7,7 @@ use {
     std::{
         collections::HashSet,
         env, fs,
-        path::{Path, PathBuf},
+        path::{Component as Part, Path, PathBuf},
         process::{Command, Stdio},
         sync::mpsc::RecvTimeoutError,
     },
@@ -208,9 +208,7 @@ struct Checked {
 fn refuse_hooks(dir: &Path, depth: usize, checked: &mut Checked) -> Result<(), String> {
     // Cargo resolves `..` in a path dependency before it looks for the
     // workspace above it; walking the path as written could look elsewhere.
-    let dir = &dir
-        .canonicalize()
-        .map_err(|error| format!("cannot read {}: {error}", dir.display()))?;
+    let dir = &normalize(dir)?;
     if !checked.crates.insert(dir.clone()) {
         return Ok(());
     }
@@ -267,9 +265,7 @@ fn refuse_hooks(dir: &Path, depth: usize, checked: &mut Checked) -> Result<(), S
     let Some(root) = workspace_root(dir, &manifest) else {
         return Ok(());
     };
-    let root = root
-        .canonicalize()
-        .map_err(|error| format!("cannot read {}: {error}", root.display()))?;
+    let root = normalize(&root)?;
     if !checked.workspaces.insert(root.clone()) {
         return Ok(());
     }
@@ -323,6 +319,26 @@ fn refuse_local_crates(
         refuse_hooks(&dir.join(path), depth + 1, checked)?;
     }
     Ok(())
+}
+
+/// `path` made absolute with its `.` and `..` worked out on the text, as
+/// Cargo does (`normalize_path`): following links instead, as
+/// `canonicalize` would, could find a workspace other than the one Cargo
+/// uses.
+fn normalize(path: &Path) -> Result<PathBuf, String> {
+    let absolute = std::path::absolute(path)
+        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let mut normal = PathBuf::new();
+    for part in absolute.components() {
+        match part {
+            Part::CurDir => {},
+            Part::ParentDir => {
+                normal.pop();
+            },
+            part => normal.push(part),
+        }
+    }
+    Ok(normal)
 }
 
 /// The folder of the workspace Cargo puts the crate at `dir` in, when it
