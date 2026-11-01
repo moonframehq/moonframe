@@ -1,0 +1,8 @@
+[app]
+# A desktop agent app in code mode: your coding-agent CLI sessions grouped by
+# repository (read-only), their transcripts, and a scripted demo agent for new
+# sessions. `moonframe --profile ember` opens it.
+keep     = []
+name     = "ember"
+requires = []
+title    = "Ember"
