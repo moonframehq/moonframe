@@ -317,3 +317,25 @@ do {
     }
     save(cx, "examples/cadence/icon.png")
 }
+
+// Helpdesk: tickets with coloured edges by priority, one resolved, one picked.
+do {
+    let cx = body([0x8b7cf6, 0x6d5df0, 0x4c3fd0])
+    card(cx, CGRect(x: 196, y: 216, width: 632, height: 592), 0x312e81)
+    let edges: [UInt32] = [0xef5350, 0xf5a524, 0xcbc7f4, 0xf5a524]
+    for (row, edge) in edges.enumerated() {
+        let y = 676 - CGFloat(row) * 136
+        if row == 3 {
+            fill(cx, CGRect(x: 216, y: y - 22, width: 592, height: 124), 22, color(0xeeecfd))
+        }
+        fill(cx, CGRect(x: 240, y: y - 6, width: 12, height: 92), 6, color(edge))
+        fill(cx, CGRect(x: 280, y: y + 52, width: 300, height: 24), 12, color(0x1c1c22, 0.85))
+        fill(cx, CGRect(x: 280, y: y + 6, width: 180, height: 18), 9, color(0x7d7d8a, 0.45))
+        if row == 1 {
+            fill(cx, CGRect(x: 620, y: y + 2, width: 160, height: 28), 14, color(0xc4ef5a))
+        } else {
+            fill(cx, CGRect(x: 700, y: y + 8, width: 80, height: 16), 8, color(0x7d7d8a, 0.3))
+        }
+    }
+    save(cx, "examples/helpdesk/icon.png")
+}
