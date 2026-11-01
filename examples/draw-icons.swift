@@ -495,3 +495,23 @@ do {
     }
     save(cx, "examples/trellis/icon.png")
 }
+
+// Parlance: a chat, a light bubble on the right over an answer's lines.
+do {
+    let cx = body([0x52525b, 0x2f2f33, 0x18181b])
+    // The user's bubble, top right.
+    fill(cx, CGRect(x: 420, y: 650, width: 380, height: 120), 60, color(0xffffff, 0.92))
+    fill(cx, CGRect(x: 470, y: 698, width: 230, height: 24), 12, color(0x27272a, 0.55))
+    // The answer: lines of text, one of them bold, and a blue send dot.
+    for (row, (width, alpha)) in [(500.0, 0.85), (420, 0.5), (460, 0.5), (300, 0.5)].enumerated() {
+        fill(cx, CGRect(x: 224, y: 540 - CGFloat(row) * 70, width: width, height: 28), 14, color(0xffffff, alpha))
+    }
+    fill(cx, CGRect(x: 704, y: 236, width: 96, height: 96), 48, color(0x5c96f2))
+    cx.setStrokeColor(color(0xffffff))
+    cx.setLineWidth(12)
+    cx.setLineCap(.round)
+    cx.move(to: CGPoint(x: 752, y: 260)); cx.addLine(to: CGPoint(x: 752, y: 308))
+    cx.move(to: CGPoint(x: 732, y: 288)); cx.addLine(to: CGPoint(x: 752, y: 308)); cx.addLine(to: CGPoint(x: 772, y: 288))
+    cx.strokePath()
+    save(cx, "examples/parlance/icon.png")
+}
