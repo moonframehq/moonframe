@@ -153,6 +153,11 @@ pub(crate) fn bind_menu_keys(shell: &[AppMenu], cx: &mut App) {
             let Some(chord) = &item.shortcut else {
                 continue;
             };
+            // A key that types text is no binding (it would take the key
+            // from text fields): `menu_keystroke` offers it instead.
+            if chord.types_text() {
+                continue;
+            }
             let keystroke = keystroke(chord);
             let id = item.id(&menu.title);
             let fresh =

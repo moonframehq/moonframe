@@ -2685,7 +2685,7 @@ fn the_shell_names_its_menus_and_about() {
         dir.path(),
         "main.luau",
         r#"return mod {
-          menus = { { title = "File", items = { { label = "New", msg = "new", shortcut = "t" } } } },
+          menus = { { title = "File", items = { { label = "New", msg = "new", shortcut = "hyper-t" } } } },
           view = function() return ui.text "shell" end,
         }"#,
     );
@@ -2704,9 +2704,56 @@ fn the_shell_names_its_menus_and_about() {
     assert!(
         problems
             .iter()
-            .any(|problem| problem.contains("shortcut") && problem.contains("types text")),
+            .any(|problem| problem.contains("shortcut") && problem.contains("unknown modifier")),
         "{problems:?}"
     );
+}
+
+#[test]
+fn a_menu_shortcut_may_be_one_typing_key() {
+    use crate::{Chord, Pressed};
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod {
+          menus = { { title = "Mail", items = {
+            { label = "Next", msg = "next", shortcut = "j" },
+            { label = "Compose", msg = "compose", shortcut = "shift-c" },
+            { label = "Find", msg = "find", shortcut = "secondary-f" },
+          } } },
+          view = function() return ui.text "shell" end,
+        }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let typed: Vec<bool> = workspace.menus()[0]
+        .items
+        .iter()
+        .map(|entry| match entry {
+            crate::MenuEntry::Item(item) => item.shortcut.as_ref().unwrap().types_text(),
+            crate::MenuEntry::Separator => false,
+        })
+        .collect();
+    assert_eq!(typed, [true, true, false]);
+    let j = Pressed {
+        key: "j",
+        text: Some("j"),
+        ctrl: false,
+        alt: false,
+        shift: false,
+        cmd: false,
+    };
+    let crate::MenuEntry::Item(next) = &workspace.menus()[0].items[0] else {
+        unreachable!()
+    };
+    assert!(next.shortcut.as_ref().unwrap().matches(&j, true));
+    // Overlays and fields still never take what a key types.
+    assert!(Chord::parse("j").is_err());
 }
 
 #[test]

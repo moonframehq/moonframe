@@ -78,6 +78,21 @@ pub struct Pressed<'a> {
 impl Chord {
     /// Reads a key name such as `ctrl-shift-p`; the problem says why not.
     pub fn parse(name: &str) -> Result<Self, String> {
+        let chord = Self::parse_typed(name)?;
+        if chord.types_text() {
+            return Err(format!(
+                "`{name}` types text, which keys never take; add ctrl, alt, cmd or \
+                 secondary, or use ui.input for typing"
+            ));
+        }
+        Ok(chord)
+    }
+
+    /// Reads a key name as [`Chord::parse`] does, also taking a key that
+    /// types text (`j`, `shift-c`): a shell menu's single-key shortcut,
+    /// which the host offers only while no text field or terminal has
+    /// focus, so it never takes what the user types.
+    pub fn parse_typed(name: &str) -> Result<Self, String> {
         // A trailing `-` is the minus key itself: `cmd--`, or `-`.
         let (modifiers, key) = match name.strip_suffix("--") {
             Some(modifiers) => (modifiers, "-"),
@@ -114,14 +129,14 @@ impl Chord {
             *flag = true;
         }
         check_key(key)?;
-        let typed = key == "space" || key.chars().count() == 1;
-        if typed && !(chord.ctrl || chord.alt || chord.cmd || chord.secondary) {
-            return Err(format!(
-                "`{name}` types text, which keys never take; add ctrl, alt, cmd or \
-                 secondary, or use ui.input for typing"
-            ));
-        }
         Ok(chord)
+    }
+
+    /// Whether pressing it types text: a letter, digit, symbol or `space`
+    /// without ctrl, alt, cmd or secondary.
+    pub fn types_text(&self) -> bool {
+        let typed = self.key == "space" || self.key.chars().count() == 1;
+        typed && !(self.ctrl || self.alt || self.cmd || self.secondary)
     }
 
     /// Whether `pressed` is this chord, on macOS (`mac`) or elsewhere,

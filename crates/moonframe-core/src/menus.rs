@@ -48,7 +48,9 @@ pub struct MenuCommand {
     pub label: String,
     /// A message for a mod (the shell, without `to`), or an app command.
     pub action: Action,
-    /// A key such as `secondary-t`, checked as `keys` are.
+    /// A key such as `secondary-t`, checked as `keys` are; or a single key
+    /// that types text (`j`), which works only while no text field or
+    /// terminal has focus.
     pub shortcut: Option<Chord>,
 }
 
@@ -146,7 +148,7 @@ fn entry(item: &mlua::Value, cx: &Cx) -> Result<MenuEntry, Error> {
     }
     let shortcut = fields
         .get::<String>("shortcut")?
-        .map(|name| Chord::parse(&name).map_err(|problem| cx.key("shortcut").fail(problem)))
+        .map(|name| Chord::parse_typed(&name).map_err(|problem| cx.key("shortcut").fail(problem)))
         .transpose()?;
     Ok(MenuEntry::Item(MenuCommand {
         label,

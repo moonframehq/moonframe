@@ -558,6 +558,50 @@ impl MoonframeApp {
     }
 
     /// Runs the shell menu item `id`, as a click from the shell would.
+    /// A keystroke no overlay, field or terminal took: a shell menu item
+    /// whose shortcut is a single typing key (`j`, `shift-c`) runs, as a
+    /// mail client's keys do, but only while no text field or terminal has
+    /// focus, so typing is never taken. Returns whether one ran.
+    pub(crate) fn menu_keystroke(
+        &mut self,
+        keystroke: &Keystroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.inputs.any_focused(window, cx) || self.terminals.any_focused(window) {
+            return false;
+        }
+        let modifiers = keystroke.modifiers;
+        let pressed = moonframe_core::Pressed {
+            key: &keystroke.key,
+            text: keystroke.key_char.as_deref(),
+            ctrl: modifiers.control,
+            alt: modifiers.alt,
+            shift: modifiers.shift,
+            cmd: modifiers.platform,
+        };
+        let mac = cfg!(target_os = "macos");
+        let id = self.workspace.menus().iter().find_map(|menu| {
+            menu.items.iter().find_map(|entry| match entry {
+                moonframe_core::MenuEntry::Item(item)
+                    if item.shortcut.as_ref().is_some_and(|chord| {
+                        chord.types_text() && chord.matches(&pressed, mac)
+                    }) =>
+                {
+                    Some(item.id(&menu.title))
+                },
+                _ => None,
+            })
+        });
+        match id {
+            Some(id) => {
+                self.run_menu_item(&id, window, cx);
+                true
+            },
+            None => false,
+        }
+    }
+
     fn run_menu_item(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
         let action = self.workspace.menus().iter().find_map(|menu| {
             menu.items.iter().find_map(|entry| match entry {
