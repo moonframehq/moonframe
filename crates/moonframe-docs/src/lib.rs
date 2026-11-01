@@ -399,11 +399,11 @@ impl From<std::io::Error> for Saved {
     }
 }
 
-/// Puts `temp` in place of `file` if `file` is still at version `expected`.
+/// Puts `temp` in place of `file` if `file` is still at version `expected`,
+/// never over a save made elsewhere meanwhile, which is refused instead.
 /// Where the system can swap two files in one step (macOS, Linux), it
-/// swaps them, then looks at what came out: a save made elsewhere since
-/// the last look is swapped back, whole, and refused. Elsewhere the last
-/// look was just before, and it renames.
+/// swaps them, then looks at what came out: anything but `expected` is
+/// swapped back, whole. Elsewhere, see [`replace_aside`].
 fn replace(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     {
@@ -425,14 +425,62 @@ fn replace(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> {
             },
             // Gone since the last look.
             Err(Errno::NOENT) => return Err(Saved::Conflict(CHANGED)),
-            // A filesystem that can't swap: rename, as elsewhere.
+            // A filesystem that can't swap: as elsewhere.
             Err(Errno::INVAL | Errno::NOTSUP | Errno::NOSYS) => {},
             Err(error) => return Err(std::io::Error::from(error).into()),
         }
     }
-    let _ = expected;
-    fs::rename(temp, file)?;
-    Ok(())
+    replace_aside(temp, file, expected)
+}
+
+/// [`replace`] without a swap: the file is moved aside in one step, so a
+/// save made elsewhere from then on is a new file in its place; what was
+/// moved is looked at, and the new text is linked in only where nothing
+/// is (a link never replaces a file). Anything but `expected`, or a file
+/// that appeared, is left as it is and refused; the original is put back
+/// where it can be. The file is briefly missing meanwhile.
+fn replace_aside(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> {
+    let aside = temp.with_extension("old");
+    match fs::rename(file, &aside) {
+        Ok(()) => {},
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(Saved::Conflict(CHANGED));
+        },
+        Err(error) => return Err(error.into()),
+    }
+    // Back where it was, unless a save elsewhere already took its place.
+    let put_back = || match fs::hard_link(&aside, file) {
+        Ok(()) => fs::remove_file(&aside),
+        Err(_) => Ok(()),
+    };
+    let was = aside.metadata().ok().map(|meta| version(&meta));
+    if was.as_deref() != Some(expected) {
+        put_back()?;
+        return Err(Saved::Conflict(CHANGED));
+    }
+    match fs::hard_link(temp, file) {
+        Ok(()) => {
+            fs::remove_file(temp)?;
+            fs::remove_file(&aside)?;
+            Ok(())
+        },
+        // A save elsewhere landed meanwhile: it stays.
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            fs::remove_file(&aside)?;
+            Err(Saved::Conflict(CHANGED))
+        },
+        // A folder without links: the original back, then a rename.
+        Err(_) => match fs::rename(temp, file) {
+            Ok(()) => {
+                fs::remove_file(&aside)?;
+                Ok(())
+            },
+            Err(error) => {
+                put_back()?;
+                Err(error.into())
+            },
+        },
+    }
 }
 
 /// Writes `text` to a file beside `file`, then puts it in place, so the file

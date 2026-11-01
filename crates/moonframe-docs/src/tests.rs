@@ -407,3 +407,30 @@ fn a_save_that_lands_after_the_last_look_is_swapped_back() {
     assert_eq!(fs::read_to_string(&file).unwrap(), "mine");
     assert!(!temp.exists());
 }
+
+#[test]
+fn without_a_swap_the_file_is_moved_aside_and_only_ever_linked_over_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("a.md");
+    let temp = dir.path().join(".a.md.tmp");
+    fs::write(&file, "theirs").unwrap();
+    fs::write(&temp, "mine").unwrap();
+    assert!(matches!(
+        replace_aside(&temp, &file, "0:1"),
+        Err(Saved::Conflict(CHANGED))
+    ));
+    assert_eq!(fs::read_to_string(&file).unwrap(), "theirs");
+    // Gone meanwhile: nothing is written.
+    let gone = dir.path().join("gone.md");
+    assert!(matches!(
+        replace_aside(&temp, &gone, "0:1"),
+        Err(Saved::Conflict(CHANGED))
+    ));
+    assert!(!gone.exists());
+
+    let current = version(&file.metadata().unwrap());
+    replace_aside(&temp, &file, &current).unwrap_or_else(|_| panic!("not replaced"));
+    assert_eq!(fs::read_to_string(&file).unwrap(), "mine");
+    // Only the file is left: nothing aside, no temporary one.
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+}
