@@ -289,9 +289,9 @@ can't reach, and read them as you would any script.
 
 The sandbox only covers the running component. Building it runs Cargo as
 your user, including proc macros and dependency build scripts. The host
-refuses the provider's own build hooks (build scripts, local crates,
-toolchains named by path) and runs Cargo outside its folders, so no Cargo
-config there applies. It also refuses any package that ships a binary, so
+refuses build scripts in the provider or its local crates, and toolchains
+named by path, and runs Cargo outside its folders, so no Cargo config there
+applies. It also refuses any package that ships a binary, so
 what runs is always source you can read. Bundled apps ship their Wasm
 providers prebuilt and build nothing on your machine.
 
