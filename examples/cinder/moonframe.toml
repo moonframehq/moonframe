@@ -1,8 +1,8 @@
 [app]
 # A desktop agent app in code mode: your coding-agent CLI sessions grouped by
 # repository (read-only), their transcripts, and a scripted demo agent for new
-# sessions. `moonframe --profile ember` opens it.
+# sessions. `moonframe --profile cinder` opens it.
 keep     = []
-name     = "ember"
+name     = "cinder"
 requires = []
-title    = "Ember"
+title    = "Cinder"

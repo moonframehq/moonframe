@@ -1,4 +1,4 @@
--- Ember's look: dark, quiet and flat. A charcoal sidebar beside a nearly
+-- Cinder's look: dark, quiet and flat. A charcoal sidebar beside a nearly
 -- black canvas, light text, raised rows in a lighter grey, one blue for
 -- links and one orange for the mascot. The app is dark in both modes.
 return style {
@@ -19,14 +19,14 @@ return style {
 		success = "#6bd45f",
 		["list-hover"] = "#ffffff0d",
 		["list-active"] = "#ffffff14",
-		-- Ember's own.
+		-- Cinder's own.
 		["em-raised"] = "#464647",
 		["em-faint"] = "#7c7c7d",
 		["em-link"] = "#6ea8fe",
 		["em-line"] = "#2c2c2d",
 		["em-field"] = "#303030",
 		["em-field-line"] = "#404040",
-		["em-ember"] = "#d9774b",
+		["em-cinder"] = "#d9774b",
 	},
 
 	rules = {

@@ -1,4 +1,4 @@
--- Ember's shell: a charcoal sidebar (with the traffic lights, the sidebar
+-- Cinder's shell: a charcoal sidebar (with the traffic lights, the sidebar
 -- toggle, back and forward and the chat / code switch over it) beside the
 -- canvas, whose own title row holds the session's title and the tools on
 -- the right. The terminal folds out under the canvas, a preview page beside
@@ -6,7 +6,7 @@
 --
 -- The shell owns where you are: the mode, the session open ("" for a new
 -- one) and the history behind back and forward. It shares them with the
--- sidebar and the canvas on the `ember/nav` topic, and tells the history
+-- sidebar and the canvas on the `cinder/nav` topic, and tells the history
 -- provider which transcript to read.
 
 local menu = use "menu"
@@ -64,7 +64,7 @@ local HOME = "https://github.com/penso/moonframe"
 -- What the sidebar and the canvas hear, and what the provider reads.
 local function share(state: State): { any }
 	return {
-		{ to = "topic:ember/nav", msg = { mode = state.mode, open = state.open } },
+		{ to = "topic:cinder/nav", msg = { mode = state.mode, open = state.open } },
 		{ to = "provider:history", msg = if state.open ~= "" then { open = state.open } else { close = true } },
 	}
 end
@@ -277,7 +277,7 @@ return mod {
 				content = ui.column {
 					class = "em-whatsnew",
 					release_notes {
-						name = "Ember",
+						name = "Cinder",
 						version = "0.1",
 						badge = "Demo",
 						date = "October 31, 2026",

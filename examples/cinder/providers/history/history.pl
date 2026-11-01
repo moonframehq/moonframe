@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Ember's sessions: the coding-agent CLI sessions in ~/.claude/projects, read
+# Cinder's sessions: the coding-agent CLI sessions in ~/.claude/projects, read
 # only. Prints one JSON line whenever what it shares changes; reads the app's
 # messages, one `{"from": ..., "message": ...}` per line, on stdin. Exits when
 # the app closes stdin. It never writes a file.
@@ -30,7 +30,7 @@ my $in = JSON::PP->new->utf8(1);
 
 my $HOME = $ENV{HOME} // '';
 my $ROOT = "$HOME/.claude/projects";
-my $SAMPLE = ($ENV{EMBER_SAMPLE} // '') ne '' || !-d $ROOT;
+my $SAMPLE = ($ENV{CINDER_SAMPLE} // '') ne '' || !-d $ROOT;
 my $MOST = 60;          # sessions listed
 my $TURNS = 150;        # turns kept from a transcript, the latest
 my $TEXT = 5000;        # characters per text part
@@ -286,7 +286,7 @@ sub transcript {
         hidden => $hidden, turns => \@turns };
 }
 
-# Sessions to show when there are none to read (or EMBER_SAMPLE is set).
+# Sessions to show when there are none to read (or CINDER_SAMPLE is set).
 sub sample {
     my $n = 0;
     my $s = sub {

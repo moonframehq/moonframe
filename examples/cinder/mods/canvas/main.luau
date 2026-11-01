@@ -6,7 +6,7 @@
 -- history provider. The demo agent is scripted: it answers from rules in
 -- this file, says so, and never calls a model or writes anything.
 
-local sprite = use "ember-sprite"
+local sprite = use "cinder-sprite"
 local menu = use "menu"
 
 type Tool = { name: string, detail: string }
@@ -63,7 +63,7 @@ local function reply(request: string, folder: string): Turn
 	return { from = "assistant", parts = {
 		text_part(`I'll start by looking around {place}.`),
 		tools_part({ { "Bash", "List the project files" }, { "Read", "README.md" }, { "Grep", "TODO" } }),
-		text_part(`Here is how I would go about "{request}":\n\n- Read how it works today and note what it touches\n- Make the change in small steps, with a test for each\n- Run the checks, then summarise what changed\n\nThis is Ember's scripted demo agent: it calls no model and changes nothing. Ask about tests or a bug for other answers.`),
+		text_part(`Here is how I would go about "{request}":\n\n- Read how it works today and note what it touches\n- Make the change in small steps, with a test for each\n- Run the checks, then summarise what changed\n\nThis is Cinder's scripted demo agent: it calls no model and changes nothing. Ask about tests or a bug for other answers.`),
 	} }
 end
 
@@ -179,7 +179,7 @@ end
 
 return mod {
 	title = "Canvas",
-	subscribe = { "ember/nav" },
+	subscribe = { "cinder/nav" },
 
 	styles = {
 		[".em-canvas"] = { padding = { 0, 24, 3, 24 } },
@@ -257,7 +257,7 @@ return mod {
 		if type(msg) ~= "table" then
 			return
 		end
-		if msg.topic == "ember/nav" and msg.value then
+		if msg.topic == "cinder/nav" and msg.value then
 			state.mode = msg.value.mode or "code"
 			state.open = msg.value.open or ""
 			state.popup = ""

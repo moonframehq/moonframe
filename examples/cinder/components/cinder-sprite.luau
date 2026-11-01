@@ -1,10 +1,10 @@
 -- A pixel drawing from a grid of characters, one per pixel, each mapped to a
--- colour: Ember's mascot by default. Runs of one colour in a row are drawn
+-- colour: Cinder's mascot by default. Runs of one colour in a row are drawn
 -- as one box, so a 12 by 10 sprite is a few dozen elements.
 
 type Sprite = { rows: { string }, colors: { [string]: string } }
 
--- Cinder, Ember's mascot: a little ember with a flame on its head, two
+-- Cinder, Cinder's mascot: a little cinder with a flame on its head, two
 -- eyes, stubby arms and two feet.
 local CINDER: Sprite = {
 	rows = {
@@ -19,14 +19,14 @@ local CINDER: Sprite = {
 		"..ooo..ooo..",
 		"..oo....oo..",
 	},
-	colors = { o = "em-ember", f = "#f2a65a", k = "#141414" },
+	colors = { o = "em-cinder", f = "#f2a65a", k = "#141414" },
 }
 
 return component {
-	title = "Ember Sprite",
+	title = "Cinder Sprite",
 	category = "Data",
 	icon = "sparkles",
-	description = "A small pixel drawing from rows of characters, one colour per character; Ember's mascot by default.",
+	description = "A small pixel drawing from rows of characters, one colour per character; Cinder's mascot by default.",
 	when = "A mascot or a tiny pixel-art mark drawn from a grid (an empty state, a header). For a bundled glyph use `ui.icon`; for a picture file use `ui.image`.",
 	props = {
 		rows = "list of strings, one per row; each character is a pixel, `.` or a space is empty",
@@ -61,6 +61,6 @@ return component {
 			end
 			table.insert(lines, ui.row { gap = "none", shrink = false, table.unpack(runs) })
 		end
-		return ui.column { class = "ember-sprite", gap = "none", hug = true, tooltip = props.tooltip, table.unpack(lines) }
+		return ui.column { class = "cinder-sprite", gap = "none", hug = true, tooltip = props.tooltip, table.unpack(lines) }
 	end,
 }

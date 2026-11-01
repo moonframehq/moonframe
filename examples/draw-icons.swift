@@ -516,7 +516,7 @@ do {
     save(cx, "examples/parlance/icon.png")
 }
 
-// Ember: Cinder, the pixel mascot, on a charcoal tile.
+// Cinder: its pixel mascot on a charcoal tile.
 do {
     let cx = body([0x3a3a3c, 0x262627, 0x161617])
     let rows = [
@@ -542,5 +542,5 @@ do {
             cx.fill(CGRect(x: left + CGFloat(column) * pixel, y: top - CGFloat(row + 1) * pixel, width: pixel, height: pixel))
         }
     }
-    save(cx, "examples/ember/icon.png")
+    save(cx, "examples/cinder/icon.png")
 }

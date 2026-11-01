@@ -6,7 +6,7 @@
 -- Sessions come from the history provider (`app.history`): your coding-agent
 -- CLI sessions, read-only, or samples when there are none. Each row says
 -- whether the session opened a pull request, ran on this computer, or ran
--- in a folder that is gone. The chats are sample data: Ember has no chat
+-- in a folder that is gone. The chats are sample data: Cinder has no chat
 -- history to read.
 
 type State = {
@@ -44,7 +44,7 @@ end
 
 return mod {
 	title = "Sidebar",
-	subscribe = { "ember/nav" },
+	subscribe = { "cinder/nav" },
 
 	styles = {
 		[".em-nav"] = { padding = { 4, 8, 0, 8 }, gap = 0 },
@@ -91,7 +91,7 @@ return mod {
 			state.searching = false
 			state.query = ""
 		elseif type(msg) == "table" then
-			if msg.topic == "ember/nav" and msg.value then
+			if msg.topic == "cinder/nav" and msg.value then
 				state.mode = msg.value.mode or "code"
 				state.open = msg.value.open or ""
 			elseif msg.msg == "query" then

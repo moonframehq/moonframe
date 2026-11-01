@@ -1,8 +1,8 @@
-# ember
+# cinder
 
-**Ember**, a [Moonframe](../..) app in the style of a desktop coding-agent app
-in code mode, dark. Its mascot is Cinder, a little pixel ember drawn from a
-grid (`components/ember-sprite.luau`).
+**Cinder**, a [Moonframe](../..) app in the style of a desktop coding-agent app
+in code mode, dark. Its mascot is Cinder, a little pixel cinder drawn from a
+grid (`components/cinder-sprite.luau`).
 
 - **Title bar:** the traffic lights, the sidebar toggle, back and forward
   through the sessions you opened, and a chat / code switch; the session's
@@ -30,12 +30,12 @@ session), **read-only**: the 60 most recent sessions, titled by the CLI's
 own title, a summary, or the first thing typed, and grouped by the
 repository they ran in (worktrees under their repository). Opening one
 reads its transcript (the last 150 turns). It never writes a file. With no
-such folder, or `EMBER_SAMPLE=1` in the environment, it shares sample
+such folder, or `CINDER_SAMPLE=1` in the environment, it shares sample
 sessions (the screenshot uses them).
 
 ```sh
-moonframe app link examples/ember   # from the repository
-moonframe --profile ember
-EMBER_SAMPLE=1 moonframe --profile ember   # sample sessions only
-just bundle-app ember                # target/bundle/Ember.app
+moonframe app link examples/cinder   # from the repository
+moonframe --profile cinder
+CINDER_SAMPLE=1 moonframe --profile cinder   # sample sessions only
+just bundle-app cinder                # target/bundle/Cinder.app
 ```
