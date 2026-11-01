@@ -708,8 +708,8 @@ end
   allow notifications the first time; it shows even when the window is in
   front, so check `app.window.active` to alert only when the user is not
   looking. A run from source (`just run`, a bare binary), Linux and Windows
-  show it as a toast in the window instead. Clicking it brings the app and
-  its window forward and tells the mod that posted it, if it subscribes to
+  show it as a toast in the window instead, for 5 s. Clicking either brings
+  the app and its window forward and tells the mod that posted it, if it subscribes to
   `app/notification`: `{ topic = "app/notification", value = { id, clicked
   = true } }`. At most 5 notifications in 10 s are posted.
 

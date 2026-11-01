@@ -135,6 +135,22 @@ pub(crate) fn names_for(dark: bool) -> impl Iterator<Item = &'static str> {
     names().filter(move |name| find(name).is_none_or(|scheme| scheme.dark() == dark))
 }
 
+/// The theme a window shows when it is `dark`: the one `previewed` in the
+/// Themes window (`Some(None)` for the stock look), unless that is a theme for
+/// the other appearance; else the one `picked` for this. `None` is the
+/// stock look.
+pub(crate) fn shown(
+    previewed: Option<Option<&'static Scheme>>,
+    picked: Option<&'static Scheme>,
+    dark: bool,
+) -> Option<&'static Scheme> {
+    let fits = |scheme: Option<&Scheme>| scheme.is_none_or(|scheme| scheme.dark() == dark);
+    previewed
+        .filter(|scheme| fits(*scheme))
+        .unwrap_or(picked)
+        .filter(|scheme| scheme.dark() == dark)
+}
+
 /// Whether `name` is a theme for dark windows (or for light ones, when
 /// `dark` is false): the stock look is for both.
 pub(crate) fn fits(name: &str, dark: bool) -> Result<Option<&'static Scheme>, String> {
@@ -442,6 +458,21 @@ mod tests {
         assert_eq!(fits("Nord", true).unwrap().unwrap().name, "Nord");
         assert!(fits("Nord", false).unwrap_err().contains("is a dark theme"));
         assert!(fits("Nope", false).unwrap_err().contains("no theme called"));
+    }
+
+    #[test]
+    fn a_preview_for_the_other_appearance_gives_way_to_the_picked_theme() {
+        let nord = find("Nord");
+        let dawn = find("Rose Pine Dawn");
+        // Previewing in the appearance it is for.
+        assert_eq!(shown(Some(dawn), None, false), dawn);
+        // The stock look previewed fits either.
+        assert_eq!(shown(Some(None), nord, true), None);
+        // The window turned dark while a light theme was previewed.
+        assert_eq!(shown(Some(dawn), nord, true), nord);
+        // No preview: the picked one, only where it fits.
+        assert_eq!(shown(None, nord, true), nord);
+        assert_eq!(shown(None, nord, false), None);
     }
 
     #[test]

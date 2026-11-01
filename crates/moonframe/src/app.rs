@@ -24,6 +24,7 @@ use {
     futures::StreamExt as _,
     gpui_kit::{
         component::{ActiveTheme, Theme, ThemeMode, ThemeRegistry, ThemeTokens},
+        prelude::FluentBuilder as _,
         *,
     },
     moonframe_core::{
@@ -104,6 +105,9 @@ pub(crate) struct MoonframeApp {
     /// A short note at the bottom, such as "Copied", and which one it is,
     /// so an older note's timer does not hide a newer one.
     toast: Option<(u64, SharedString)>,
+    /// The notification a toast shows in place of the system's (by the
+    /// toast's id): who posted it and its `id`, told when it is clicked.
+    toast_notice: Option<(u64, String, Option<String>)>,
     /// A bundle is being built (Build App Bundle).
     building: bool,
     /// Checking for, or installing, an update.
@@ -249,6 +253,7 @@ impl MoonframeApp {
             folders,
             settings,
             toast: None,
+            toast_notice: None,
             building: false,
             updating: false,
             requested_reload: None,
@@ -305,10 +310,7 @@ impl MoonframeApp {
         let dark = self.appearance.is_dark(self.system_dark);
         // A theme shows in the appearance it is made for; in the other the
         // stock look does, and the theme stays picked.
-        let scheme = self
-            .preview
-            .unwrap_or(self.scheme(dark))
-            .filter(|scheme| scheme.dark() == dark);
+        let scheme = themes::shown(self.preview, self.scheme(dark), dark);
         let config = scheme.map(|scheme| Rc::new(scheme.config()));
         let was_dark = cx.theme().is_dark();
         let mode = if dark {
@@ -418,6 +420,7 @@ impl MoonframeApp {
     /// themes picked, and saves the choice for the next run.
     pub(crate) fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
         self.appearance = appearance;
+        self.preview = None;
         self.apply_theme(cx);
         show_appearance(appearance);
         cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
@@ -680,6 +683,42 @@ impl MoonframeApp {
         });
     }
 
+    /// A notification the mod `from` posted was clicked: brings the app
+    /// and its window forward and tells the mod, on `app/notification`:
+    /// `{ id, clicked = true }`.
+    fn notification_clicked(&mut self, from: &str, id: Option<String>, cx: &mut Context<Self>) {
+        cx.activate(true);
+        let main = self.main_window;
+        if let Some(window) = cx
+            .windows()
+            .into_iter()
+            .find(|window| window.window_id() == main)
+        {
+            let _ = window.update(cx, |_, window, _| window.activate_window());
+        }
+        let clicked = std::collections::BTreeMap::from([
+            ("id".to_owned(), id.map_or(Data::Nil, Data::String)),
+            ("clicked".to_owned(), Data::Bool(true)),
+        ]);
+        self.workspace
+            .app_topic("notification", from, Data::Map(clicked));
+        self.flush("notification", cx);
+    }
+
+    /// The toast was clicked: when it shows a notification, as a click on
+    /// the system's one would be.
+    fn click_toast(&mut self, cx: &mut Context<Self>) {
+        let shown = self.toast.as_ref().map(|(id, _)| *id);
+        let Some((id, from, notice)) = self.toast_notice.take() else {
+            return;
+        };
+        if Some(id) != shown {
+            return;
+        }
+        self.toast = None;
+        self.notification_clicked(&from, notice, cx);
+    }
+
     /// Plays what the mod `from` asked for: a file in the app's folders
     /// (as `ui.image` finds one), or the chime.
     fn play(&mut self, from: &str, sound: &Sound) {
@@ -754,11 +793,15 @@ impl MoonframeApp {
                 Ok(Posted::System) => {},
                 Ok(Posted::Toast) => {
                     let text = if notification.body.is_empty() {
-                        notification.title
+                        notification.title.clone()
                     } else {
                         format!("{}: {}", notification.title, notification.body)
                     };
                     self.show_toast_for(text.into(), NOTICE, cx);
+                    // A click on it does what one on the system's would.
+                    if let Some((shown, _)) = &self.toast {
+                        self.toast_notice = Some((*shown, from.to_owned(), notification.id));
+                    }
                 },
                 Err(problem) => tracing::warn!("{from}: {problem}"),
             },
@@ -1573,24 +1616,7 @@ fn hear_notification_clicks(cx: &mut Context<MoonframeApp>) {
     });
     cx.spawn(async move |this, cx| {
         while let Some((from, id)) = clicks.next().await {
-            let heard = this.update(cx, |app, cx| {
-                cx.activate(true);
-                let main = app.main_window;
-                if let Some(window) = cx
-                    .windows()
-                    .into_iter()
-                    .find(|window| window.window_id() == main)
-                {
-                    let _ = window.update(cx, |_, window, _| window.activate_window());
-                }
-                let clicked = std::collections::BTreeMap::from([
-                    ("id".to_owned(), id.map_or(Data::Nil, Data::String)),
-                    ("clicked".to_owned(), Data::Bool(true)),
-                ]);
-                app.workspace
-                    .app_topic("notification", &from, Data::Map(clicked));
-                app.flush("notification", cx);
-            });
+            let heard = this.update(cx, |app, cx| app.notification_clicked(&from, id, cx));
             if heard.is_err() {
                 break;
             }
@@ -1625,8 +1651,9 @@ fn wake_on_output(cx: &mut Context<MoonframeApp>) -> Arc<dyn Fn() + Send + Sync>
     })
 }
 
-/// A pill at the bottom center, over everything.
-fn toast(message: SharedString, cx: &Context<MoonframeApp>) -> AnyElement {
+/// A pill at the bottom center, over everything; a `notice` (a
+/// notification shown here) is clickable, as the system's would be.
+fn toast(message: SharedString, notice: bool, cx: &Context<MoonframeApp>) -> AnyElement {
     let theme = cx.theme();
     deferred(
         div()
@@ -1638,6 +1665,7 @@ fn toast(message: SharedString, cx: &Context<MoonframeApp>) -> AnyElement {
             .justify_center()
             .child(
                 div()
+                    .id("toast")
                     .px_3()
                     .py_1()
                     .rounded_full()
@@ -1646,7 +1674,11 @@ fn toast(message: SharedString, cx: &Context<MoonframeApp>) -> AnyElement {
                     .text_sm()
                     .shadow_md()
                     .child(message)
-                    .child(crate::browser::cover()),
+                    .child(crate::browser::cover())
+                    .when(notice, |pill| {
+                        pill.cursor_pointer()
+                            .on_click(cx.listener(|app, _, _, cx| app.click_toast(cx)))
+                    }),
             ),
     )
     .with_priority(10)
@@ -1912,10 +1944,13 @@ impl Render for MoonframeApp {
             window.defer(cx, move |window, cx| focus.focus(window, cx));
         }
         let layers = self.inspector_layers(window.viewport_size(), cx);
-        let toast = self
-            .toast
-            .as_ref()
-            .map(|(_, message)| toast(message.clone(), cx));
+        let toast = self.toast.as_ref().map(|(id, message)| {
+            let notice = self
+                .toast_notice
+                .as_ref()
+                .is_some_and(|(shown, ..)| shown == id);
+            toast(message.clone(), notice, cx)
+        });
         let theme = cx.theme();
         div()
             .id("moonframe-app")

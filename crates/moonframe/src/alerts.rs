@@ -98,20 +98,30 @@ impl Alerts {
                 path
             },
         };
-        // PulseAudio's (PipeWire's too), then ALSA's; no shell between.
-        for program in ["paplay", "aplay"] {
-            let spawned = std::process::Command::new(program)
-                .arg(&path)
-                .stdin(std::process::Stdio::null())
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .spawn();
-            if let Ok(mut child) = spawned {
-                std::thread::spawn(move || child.wait());
-                return Ok(());
+        // PulseAudio's (PipeWire's too), then ALSA's when the first is
+        // missing or fails (no sound server), with no shell between. They
+        // run to the end off the main thread, and what failed is logged.
+        std::thread::spawn(move || {
+            let mut problems = Vec::new();
+            for program in ["paplay", "aplay"] {
+                let output = std::process::Command::new(program)
+                    .arg(&path)
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::piped())
+                    .output();
+                match output {
+                    Ok(output) if output.status.success() => return,
+                    Ok(output) => problems.push(format!(
+                        "{program}: {}",
+                        String::from_utf8_lossy(&output.stderr).trim()
+                    )),
+                    Err(error) => problems.push(format!("{program}: {error}")),
+                }
             }
-        }
-        Err("no sound player (paplay or aplay) is installed".to_owned())
+            tracing::warn!("no sound played: {}", problems.join("; "));
+        });
+        Ok(())
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
