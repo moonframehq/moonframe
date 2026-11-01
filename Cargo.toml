@@ -5,6 +5,7 @@ members = [
   "crates/moonframe-acp",
   "crates/moonframe-app",
   "crates/moonframe-core",
+  "crates/moonframe-docs",
   "crates/moonframe-git",
   "crates/moonframe-mux",
   "crates/moonframe-providers",
@@ -49,6 +50,7 @@ mlua                = { features = ["luau"], version = "0.12.2" }
 moonframe           = { path = "crates/moonframe" }
 moonframe-acp       = { path = "crates/moonframe-acp" }
 moonframe-core      = { path = "crates/moonframe-core" }
+moonframe-docs      = { path = "crates/moonframe-docs" }
 moonframe-git       = { path = "crates/moonframe-git" }
 moonframe-mux       = { default-features = false, path = "crates/moonframe-mux" }
 moonframe-providers = { path = "crates/moonframe-providers" }

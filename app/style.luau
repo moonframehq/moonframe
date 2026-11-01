@@ -62,6 +62,10 @@ return style {
 		["input-selection"] = { background = "accent/25" },
 		["input-caret"] = { background = "accent" },
 
+		-- Markdown (ui.markdown): its code, in blocks and inline, and quotes.
+		["markdown-code"] = { background = "muted-foreground/8", radius = 6, padding = { 8, 12 }, font = "mono" },
+		["markdown-quote"] = { border = "left", border_color = "border", color = "muted-foreground", padding = { 0, 12 } },
+
 		badge = { background = "accent/12", color = "accent" },
 		divider = { background = "border" },
 

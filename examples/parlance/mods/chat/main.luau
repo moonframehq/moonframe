@@ -5,7 +5,7 @@
 -- being written). The answers come from a scripted demo agent in
 -- `providers/chats`, which streams them word by word.
 
-local markdown = use "markdown"
+local markdown = use "chat-markdown"
 local dropdown = use "dropdown"
 
 type State = { draft: string, mode: string, mode_open: boolean, copied: number? }

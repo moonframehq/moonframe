@@ -1,0 +1,18 @@
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-docs"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[dependencies]
+moonframe-core.workspace      = true
+moonframe-providers.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

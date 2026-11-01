@@ -6,8 +6,8 @@
 # forget their own (see crates/moonframe-acp).
 # A native provider: Rust built into the app (crates/moonframe-acp, the
 # `acp` feature). The agents run with your access, in the app's repository
-# (else ~/.config/moonframe), and a starter may let one answer every
-# permission question itself.
+# (else ~/.config/moonframe), and ask you before what `allow` doesn't
+# cover.
 interval = 0.25
 kind     = "native"
 
@@ -15,8 +15,16 @@ kind     = "native"
 # The agent a start without `agent` gets.
 agent = "claude"
 # The mods that may start agents; any other is refused. `feedback` sends
-# what the user writes in its dialog, with every permission.
+# what the user writes in its dialog.
 starters = ["feedback"]
+# The permission questions a mod's agents answer themselves, always
+# "allow once" (never "always"); every other question waits on you in the
+# run. "read": tools that only look (read, search, think). "all": every
+# tool, so the agent edits files and runs commands as you without asking.
+# Only this file sets it; a mod can't ask for more. To let Send feedback
+# change the app without asking, copy this folder to
+# ~/.config/moonframe/providers/acp and set feedback = "all" there.
+allow = { feedback = "read" }
 # Commands replacing an agent's own ACP command, e.g.
 # commands = { claude = ["claude-agent-acp"] }
 # Where agents work, instead of the app's repository:

@@ -20,6 +20,10 @@ const MAX_ITEMS: usize = 100_000;
 /// Longer strings are refused; no label or color needs more.
 const MAX_TEXT: usize = 16 * 1024;
 
+/// The longest document a view can pass: a `ui.markdown`'s text, or a
+/// multiline `ui.input`'s value. Files past it are not opened as text.
+pub const MAX_DOCUMENT: usize = 1024 * 1024;
+
 /// No stylesheet names, for values that cannot use any.
 pub(crate) static NO_NAMES: Names = Names::NONE;
 
@@ -151,6 +155,23 @@ impl Read for String {
             return Err(cx.fail(format!("longer than {MAX_TEXT} bytes")));
         }
         Ok(text)
+    }
+}
+
+/// A whole document, up to [`MAX_DOCUMENT`] bytes, where a label's
+/// [`MAX_TEXT`] would be too short: a markdown file, a text area's value.
+pub(crate) struct Document(pub String);
+
+impl Read for Document {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let Value::String(text) = value else {
+            return Err(cx.fail("expected a string"));
+        };
+        let text = text.to_string_lossy();
+        if text.len() > MAX_DOCUMENT {
+            return Err(cx.fail(format!("longer than {MAX_DOCUMENT} bytes")));
+        }
+        Ok(Self(text))
     }
 }
 

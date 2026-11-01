@@ -43,6 +43,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone`, extras |
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
+| `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; links send `link` instead of opening, pictures are not loaded; styled by `markdown`, `markdown-code` and `markdown-quote` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width` |
 | `ui.view { name = "chart", id = "sales", props = {...} }` | a view the app writes in Rust and registers by `name` (apps on the Moonframe library; the starter registers none): what Luau can't draw, such as an editor or a canvas. Kept by mod and `id`, it gets `props` again when they change, and sends this mod's `update` messages of its own | `name`, `id`, `props`, `class`, `style` |
 
 ### Controls
@@ -126,7 +127,7 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
 element's own; on containers),
 `transition` (a second duration is its delay: `"fade 150ms 40ms"`), `delay`
 (replaces the transition's delay, set inline per item to stagger a list),
-`clip = true` (hide what overflows the box). Selectors: a part (`row`, `item`, `list`, `popover`, `overlay`, `overlay-backdrop`, `tooltip`, `image`, ...),
+`clip = true` (hide what overflows the box). Selectors: a part (`row`, `item`, `list`, `popover`, `overlay`, `overlay-backdrop`, `tooltip`, `image`, `markdown`, `markdown-code`, `markdown-quote`, ...),
 a class (`.tab`), and a state: `:hover`, `:selected`, `:focus`,
 `:disabled`, or one the view names with `state = "..."` (`.drawer:open`).
 
@@ -145,7 +146,9 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`section`](#section) | Containers | A small muted heading over a group of content inside a panel or settings page. |
 | [`swap-view`](#swap-view) | Containers | The body under a view switcher (`pill-tabs`, `segmented`, `tabs`) whose content is replaced, such as a list's header and rows per filter. Give `width` so the pages can be measured while they move. For panels that open and close use `side-panels`; for items joining a list give the rows a `key` and a transition instead. |
 | [`browser`](#browser) | Content | A web page in a pane, with browser chrome. Keep the page's `navigate` messages in state and pass the latest as `page`; the address bar navigates on its own. For a bare page without a bar use `ui.browser`. |
-| [`markdown`](#markdown) | Content | A chat answer, a note, a README or any text written in markdown, including text still streaming in (pass `cursor` while it grows). For plain text use `ui.text`; for a file's source use `code-view`; for ordered steps alone use `numbered-list`. |
+| [`chat-markdown`](#chat-markdown) | Content | A chat answer in markdown, including one still streaming in (pass `cursor` while it grows) or citing its sources with `[label](cite:source)` chips. For a whole document, a note or a README use `markdown` (drawn by the host, with links the mod handles); for a file to edit use `markdown-editor`; for plain text use `ui.text`; for a file's source use `code-view`; for ordered steps alone use `numbered-list`. |
+| [`markdown`](#markdown) | Content | Show markdown read-only: a README, notes, an agent's answer, release notes written in markdown. For editing a file use `markdown-editor`; for a chat answer streaming in, or one with source chips, use `chat-markdown`; for code alone use `code-view`; for one line of text use `ui.text`. |
+| [`markdown-editor`](#markdown-editor) | Content | Editing a markdown file of the project in a tab or a pane. For showing markdown without editing use `markdown`; for code read-only use `code-view`; for a short text field use `ui.input`. |
 | [`button-group`](#button-group) | Controls | Related actions or view modes side by side in a header: Unified \| Split, Uncommitted \| Branch, zoom − \| +. For a settings choice in a track use `segmented`; for separate quiet buttons use `toolbar`; for back/forward use `nav-buttons`. |
 | [`chips`](#chips) | Controls | Filters over a list where any number can be on (Open, Mine, Has agent). For exactly one of a few use `segmented`; for read-only labels use `tags`; for a single on/off setting use `switch`. |
 | [`copy-field`](#copy-field) | Controls | Text the user will paste elsewhere: an install command, a token, a URL, a path. For read-only label/value pairs use `key-values`; for an editable field wait for `ui.input`. |
@@ -533,11 +536,11 @@ browser { id = "docs", url = state.url, page = state.page, navigate = { navigate
 
 A whole mod using it, with state: `app/components/demos/browser.luau`.
 
-#### `markdown`
+#### `chat-markdown`
 
-**Markdown.** Markdown drawn as rich text: bold, italic, code and links in the line, headings, lists, tables, code blocks, quotes, and source chips.
+**Chat Markdown.** Markdown drawn as rich text: bold, italic, code and links in the line, headings, lists, tables, code blocks, quotes, and source chips.
 
-**When:** A chat answer, a note, a README or any text written in markdown, including text still streaming in (pass `cursor` while it grows). For plain text use `ui.text`; for a file's source use `code-view`; for ordered steps alone use `numbered-list`.
+**When:** A chat answer in markdown, including one still streaming in (pass `cursor` while it grows) or citing its sources with `[label](cite:source)` chips. For a whole document, a note or a README use `markdown` (drawn by the host, with links the mod handles); for a file to edit use `markdown-editor`; for plain text use `ui.text`; for a file's source use `code-view`; for ordered steps alone use `numbered-list`.
 
 | Prop | Meaning |
 | --- | --- |
@@ -545,15 +548,67 @@ A whole mod using it, with state: `app/components/demos/browser.luau`.
 | `text` | the markdown; a `[label](cite:source)` link draws a source chip |
 | `to` | unused for now: links show their target as a tooltip |
 
-**Styles:** `.markdown` `.markdown-bold` `.markdown-cell` `.markdown-cite` `.markdown-cite-letter` `.markdown-cite-mark` `.markdown-cite-text` `.markdown-code` `.markdown-cursor` `.markdown-gap` `.markdown-h1` `.markdown-h2` `.markdown-h3` `.markdown-italic` `.markdown-item` `.markdown-line` `.markdown-link` `.markdown-list` `.markdown-marker` `.markdown-pre` `.markdown-pre-body` `.markdown-pre-copy` `.markdown-pre-copy:hover` `.markdown-pre-head` `.markdown-pre-language` `.markdown-pre-line` `.markdown-quote` `.markdown-rule` `.markdown-space` `.markdown-table` `.markdown-th` `.markdown-thead` `.markdown-tr`
+**Styles:** `.chat-markdown` `.chat-markdown-bold` `.chat-markdown-cell` `.chat-markdown-cite` `.chat-markdown-cite-letter` `.chat-markdown-cite-mark` `.chat-markdown-cite-text` `.chat-markdown-code` `.chat-markdown-cursor` `.chat-markdown-gap` `.chat-markdown-h1` `.chat-markdown-h2` `.chat-markdown-h3` `.chat-markdown-italic` `.chat-markdown-item` `.chat-markdown-line` `.chat-markdown-link` `.chat-markdown-list` `.chat-markdown-marker` `.chat-markdown-pre` `.chat-markdown-pre-body` `.chat-markdown-pre-copy` `.chat-markdown-pre-copy:hover` `.chat-markdown-pre-head` `.chat-markdown-pre-language` `.chat-markdown-pre-line` `.chat-markdown-quote` `.chat-markdown-rule` `.chat-markdown-space` `.chat-markdown-table` `.chat-markdown-th` `.chat-markdown-thead` `.chat-markdown-tr`
+
+```lua
+local chat_markdown = use "chat-markdown"
+
+chat_markdown { text = "A reply with **bold**, _italic_ and `code` in the line, a [link](https://example.com) and a source chip [Loomwell +1](cite:loomwell).\n\n| Term | Emphasis |\n|---|---|\n| Clay Software | Software that keeps taking the shape of your needs |\n| Live Software | Changes land at once, with no redeploy |\n\n- **Clay Software** — the most memorable.\n- **Self-Rewriting Software** — the most literal.\n\n```lua\nlocal markdown = use \"chat-markdown\"\n```" }
+```
+
+A whole mod using it, with state: `app/components/demos/chat-markdown.luau`.
+
+#### `markdown`
+
+**Markdown.** A markdown document: headings, emphasis, lists, task lists, tables, quotes and highlighted code; links send a message instead of opening.
+
+**When:** Show markdown read-only: a README, notes, an agent's answer, release notes written in markdown. For editing a file use `markdown-editor`; for a chat answer streaming in, or one with source chips, use `chat-markdown`; for code alone use `code-view`; for one line of text use `ui.text`.
+
+| Prop | Meaning |
+| --- | --- |
+| `grow` | fill the parent's free space |
+| `link` | message a link click sends, with `url` added (a table gets the field; anything else arrives as { msg = link, url }) |
+| `max_width` | pixels: a readable measure for long prose |
+| `scroll` | scroll its own content (with `grow` or a fixed height around it) |
+| `text` | the markdown, up to 1 MiB |
+| `to` | mod to send `link` to, if not the drawing one |
+
+**Styles:** `.markdown`
 
 ```lua
 local markdown = use "markdown"
 
-markdown { text = "A reply with **bold**, _italic_ and `code` in the line, a [link](https://example.com) and a source chip [Loomwell +1](cite:loomwell).\n\n| Term | Emphasis |\n|---|---|\n| Clay Software | Software that keeps taking the shape of your needs |\n| Live Software | Changes land at once, with no redeploy |\n\n- **Clay Software** — the most memorable.\n- **Self-Rewriting Software** — the most literal.\n\n```lua\nlocal markdown = use \"markdown\"\n```" }
+markdown { text = state.notes, grow = true, scroll = true, link = "open-link" }
+-- update: msg.msg == "open-link" carries the address in msg.url
 ```
 
 A whole mod using it, with state: `app/components/demos/markdown.luau`.
+
+#### `markdown-editor`
+
+**Markdown Editor.** A markdown file's source and its rendered preview, side by side or alone, with Save; it never overwrites a file that changed on disk.
+
+**When:** Editing a markdown file of the project in a tab or a pane. For showing markdown without editing use `markdown`; for code read-only use `code-view`; for a short text field use `ui.input`.
+
+| Prop | Meaning |
+| --- | --- |
+| `id` | keeps the edits apart from another editor's; a tab passes its own |
+| `mode` | how it opens: "split" (default), "edit" or "view" |
+| `path` | the file, relative to the project's root (as the explorer names it) |
+| `text` | without `path`: a scratch note to start from, edited in place and never saved |
+
+**Styles:** `.md-editor-bar` `.md-editor-dirty` `.md-editor-notice` `.md-editor-path` `.md-editor-source` `.md-editor-status`
+
+```lua
+local markdown_editor = use "markdown-editor"
+
+-- In a pane that fills its space; Save needs the drawing mod in
+-- providers/docs's `writers` (as shipped, `editor`).
+markdown_editor { id = "readme", path = "README.md" }
+-- update: msg.open_link is a clicked link's address, msg.from the file it is in
+```
+
+A whole mod using it, with state: `app/components/demos/markdown-editor.luau`.
 
 ### Controls
 
