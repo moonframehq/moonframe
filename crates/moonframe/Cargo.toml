@@ -1,4 +1,5 @@
 [package]
+description            = "A window laid out by Luau: the library apps build on"
 edition.workspace      = true
 license.workspace      = true
 name                   = "moonframe"
@@ -11,10 +12,14 @@ version.workspace      = true
 workspace = true
 
 [features]
-# The terminal emulators `ui.terminal` can run on; both by default. `ghostty`
-# builds libghostty-vt with Zig (see mise.toml and tools/zig).
+# The `acp` native provider (`app.acp`): coding agents run for mods over
+# the Agent Client Protocol.
+acp = ["dep:moonframe-acp"]
+# The terminal emulators `ui.terminal` can run on. `ghostty` builds
+# libghostty-vt with Zig (see mise.toml and tools/zig), so an app on the
+# library opts into it; the starter (crates/moonframe-app) has both.
 alacritty = ["moonframe-terminal/alacritty"]
-default   = ["alacritty", "docs", "ghostty", "git", "herdr-core"]
+default   = ["acp", "alacritty", "docs", "git", "herdr-core"]
 # The `docs` native provider: reads and saves the project's text files
 # for the markdown editor.
 docs    = ["dep:moonframe-docs"]
@@ -28,6 +33,7 @@ herdr-core = ["moonframe-mux/herdr-core"]
 [dependencies]
 futures.workspace             = true
 gpui-kit.workspace            = true
+moonframe-acp                 = { optional = true, workspace = true }
 moonframe-core.workspace      = true
 moonframe-docs                = { optional = true, workspace = true }
 moonframe-git                 = { optional = true, workspace = true }
@@ -39,6 +45,7 @@ notify.workspace              = true
 rust-embed.workspace          = true
 serde.workspace               = true
 serde_json.workspace          = true
+tempfile.workspace            = true
 toml.workspace                = true
 tracing.workspace             = true
 tracing-subscriber.workspace  = true

@@ -1,9 +1,13 @@
 //! Where the app's folders are. The built-in app is read-only (inside a
 //! macOS bundle it is signed, and each update replaces it); what the user
-//! and their agents write goes in `~/.config/moonframe`, laid over it.
+//! and their agents write goes in `~/.config/<name>`, laid over it.
+//!
+//! An app on the library ([`crate::Moonframe`]) has its own folder over
+//! the toolbox, the starter's `app/`: from its bundle, from this checkout,
+//! or compiled in (see `crate::embed`).
 
 use {
-    crate::packages,
+    crate::{launch::AppSource, packages},
     moonframe_core::{AppLayer, Roots},
     std::{
         env,
@@ -12,60 +16,143 @@ use {
 };
 
 /// The app's name: its folders, and its document in herdr-core.
-pub(crate) const NAME: &str = "moonframe";
-
-/// The app folder the binary ships with: `Contents/Resources/app` inside a
-/// macOS bundle, `share/<binary>/app` beside `bin/` in a Linux one (each
-/// bundled app's binary has its own name), else `app` in the current
-/// folder (running from the repository).
-pub(crate) fn builtin() -> PathBuf {
-    let exe = env::current_exe().and_then(|exe| exe.canonicalize()).ok();
-    exe.and_then(|exe| {
-        let name = exe.file_name()?.to_str()?.to_owned();
-        let root = exe.parent()?.parent()?.to_owned();
-        [
-            root.join("Resources/app"),
-            root.join("share").join(name).join("app"),
-        ]
-        .into_iter()
-        .find(|app| app.is_dir())
-    })
-    .unwrap_or_else(|| PathBuf::from("app"))
+pub(crate) fn name() -> &'static str {
+    &crate::identity().name
 }
 
-/// `$XDG_CONFIG_HOME/moonframe`, by default `~/.config/moonframe`:
-/// the user's mods, providers, and stylesheet.
+/// What keeps this run's things apart from every other app's and
+/// profile's: its document in herdr-core, its tmux server, its terminals'
+/// label. The app's name, with the profile's after it.
+pub(crate) fn namespace(profile: Option<&str>) -> String {
+    match profile {
+        Some(profile) => format!("{}-{profile}", name()),
+        None => name().to_owned(),
+    }
+}
+
+/// The bundle's folder for the app's files: `Contents/Resources` inside a
+/// macOS bundle, `share/<binary>` beside `bin/` in a Linux one (each bundled
+/// app's binary has its own name), or the executable's own folder in the
+/// Linux and Windows release archives. Only when it holds an `app` folder.
+fn resources() -> Option<PathBuf> {
+    let exe = env::current_exe().and_then(|exe| exe.canonicalize()).ok()?;
+    let name = exe.file_name()?.to_str()?.to_owned();
+    let dir = exe.parent()?;
+    let root = dir.parent()?;
+    [
+        root.join("Resources"),
+        root.join("share").join(name),
+        dir.to_owned(),
+    ]
+    .into_iter()
+    .find(|folder| folder.join("app").is_dir())
+}
+
+/// The starter's app folder: the bundle's, else `app` in the current
+/// folder (running from the repository), else the toolbox.
+pub(crate) fn builtin() -> PathBuf {
+    if let Some(app) = resources().map(|folder| folder.join("app")) {
+        return app;
+    }
+    let here = PathBuf::from("app");
+    if here.join("main.luau").is_file() {
+        return here;
+    }
+    toolbox()
+}
+
+/// What an app on the library stands on: the toolbox its bundle ships,
+/// else this checkout's `app/` (edits show live), else the copy compiled
+/// into the binary, written to the cache.
+pub(crate) fn toolbox() -> PathBuf {
+    if let Some(toolbox) = resources()
+        .map(|folder| folder.join("toolbox"))
+        .filter(|toolbox| toolbox.is_dir())
+    {
+        return toolbox;
+    }
+    if let Some(source) = crate::embed::toolbox_source() {
+        return source;
+    }
+    crate::embed::toolbox(&cache())
+        .inspect_err(|error| tracing::warn!("cannot write the toolbox: {error}"))
+        .unwrap_or_else(|_| PathBuf::from("app"))
+}
+
+/// An app on the library's own folder: its bundle's, else where `source`
+/// says.
+pub(crate) fn host_app(source: &AppSource) -> PathBuf {
+    if let Some(app) = resources().map(|folder| folder.join("app")) {
+        return app;
+    }
+    match source {
+        AppSource::Dir(dir) => dir.clone(),
+        AppSource::Embedded(write) => write(&cache()).unwrap_or_else(|error| {
+            tracing::warn!("cannot write the app's files: {error}");
+            PathBuf::from("app")
+        }),
+    }
+}
+
+/// Whether the binary runs from a bundle.
+pub(crate) fn in_bundle() -> bool {
+    resources().is_some()
+}
+
+/// `$XDG_CACHE_HOME/<name>`, by default `~/.cache/<name>`.
+pub(crate) fn cache() -> PathBuf {
+    xdg("XDG_CACHE_HOME", ".cache").unwrap_or_else(|| private().join("cache"))
+}
+
+/// Where the cache and state go when there is no home to put them in: a
+/// folder of this run's own, made with a name no one can guess and only
+/// this user's access. Never a fixed path in the shared temporary folder,
+/// where another user could leave providers (code the app runs) or state
+/// for the app to pick up.
+fn private() -> PathBuf {
+    static PRIVATE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    PRIVATE
+        .get_or_init(|| {
+            tempfile::Builder::new()
+                .prefix(&format!("{}-", name()))
+                .tempdir()
+                .map(tempfile::TempDir::keep)
+                .unwrap_or_else(|error| {
+                    // Nowhere safe to write: the current folder, the user's own.
+                    tracing::error!("cannot make a private folder: {error}");
+                    PathBuf::from(".").join(format!(".{}", name()))
+                })
+        })
+        .clone()
+}
+
+/// `$XDG_CONFIG_HOME/<name>`, by default `~/.config/<name>`: the user's
+/// mods, providers, and stylesheet.
 pub(crate) fn user() -> Option<PathBuf> {
     xdg("XDG_CONFIG_HOME", ".config")
 }
 
-/// Where wasm providers are built: `$XDG_CACHE_HOME/moonframe/providers`,
+/// Where wasm providers are built: `$XDG_CACHE_HOME/<name>/providers`,
 /// by default under `~/.cache`.
 pub(crate) fn builds() -> PathBuf {
-    xdg("XDG_CACHE_HOME", ".cache")
-        .unwrap_or_else(|| env::temp_dir().join(NAME))
-        .join("providers")
+    cache().join("providers")
 }
 
 /// Where providers save pictures for `ui.image` (avatars, previews):
-/// `$XDG_CACHE_HOME/moonframe/images`, by default under `~/.cache`. Views
+/// `$XDG_CACHE_HOME/<name>/images`, by default under `~/.cache`. Views
 /// may show files from here and from the app's own folders, nowhere else.
 pub(crate) fn images() -> PathBuf {
-    xdg("XDG_CACHE_HOME", ".cache")
-        .unwrap_or_else(|| env::temp_dir().join(NAME))
-        .join("images")
+    cache().join("images")
 }
 
 /// Where the inspector saves the selected element for agents:
-/// `$XDG_CACHE_HOME/moonframe/selection.md`, by default under `~/.cache`.
+/// `$XDG_CACHE_HOME/<name>/selection.md`, by default under `~/.cache`.
 pub(crate) fn selection() -> PathBuf {
-    xdg("XDG_CACHE_HOME", ".cache")
-        .unwrap_or_else(|| env::temp_dir().join(NAME))
-        .join("selection.md")
+    cache().join("selection.md")
 }
 
 /// Where state outlives the app (each mod's state, and topics):
-/// `$XDG_STATE_HOME/moonframe/state.sqlite`, by default under
+/// `$XDG_STATE_HOME/<name>/state.sqlite`, by default under
 /// `~/.local/state`; outside the user's folder, which the window watches.
 /// Each profile keeps its own, `state-<profile>.sqlite`.
 pub(crate) fn state(profile: Option<&str>) -> PathBuf {
@@ -74,7 +161,7 @@ pub(crate) fn state(profile: Option<&str>) -> PathBuf {
         None => "state.sqlite".to_owned(),
     };
     xdg("XDG_STATE_HOME", ".local/state")
-        .unwrap_or_else(|| env::temp_dir().join(NAME))
+        .unwrap_or_else(|| private().join("state"))
         .join(file)
 }
 
@@ -94,7 +181,7 @@ pub(crate) struct Bundled {
 
 /// The app bundled beside the binary, if any.
 pub(crate) fn bundled() -> Option<Bundled> {
-    let bundle = builtin().parent()?.join("bundle");
+    let bundle = resources()?.join("bundle");
     let app = bundle.join("app");
     let manifest = packages::App::read(&app)
         .inspect_err(|problem| tracing::warn!("the bundled app: {problem}"))
@@ -120,8 +207,10 @@ pub(crate) fn bundled() -> Option<Bundled> {
 /// The folders one window runs on.
 #[derive(Clone, Debug)]
 pub(crate) struct Folders {
-    /// The built-in app.
+    /// The built-in app: the starter's, or the toolbox under a host's.
     pub(crate) builtin: PathBuf,
+    /// An app on the library's own folder, over the toolbox.
+    pub(crate) host: Option<AppLayer>,
     /// The user's folder, unless `--no-user`.
     pub(crate) user: Option<PathBuf>,
     /// The profile, if any: another app, kept in `profiles/<name>` in the
@@ -156,6 +245,8 @@ impl Folders {
                     packages.splice(0..0, bundled.packages.iter().cloned());
                     app = Some(bundled.app.clone());
                 }
+                // A profile with no app of its own runs the host's.
+                let app = app.or_else(|| self.host.clone());
                 Roots::profile(self.builtin.clone(), packages, app, Some(user.clone()), own)
             },
             (user, _) => {
@@ -163,7 +254,12 @@ impl Folders {
                     .as_deref()
                     .map(|user| packages::enabled_layers(user, false).0)
                     .unwrap_or_default();
-                Roots::with_packages(self.builtin.clone(), packages, user.clone())
+                match &self.host {
+                    Some(host) => {
+                        Roots::hosted(self.builtin.clone(), host.clone(), packages, user.clone())
+                    },
+                    None => Roots::with_packages(self.builtin.clone(), packages, user.clone()),
+                }
             },
         }
     }
@@ -183,12 +279,14 @@ impl Folders {
         if let Some(bundled) = &self.bundled {
             return Some(bundled.app.path.clone());
         }
-        let own = self.own().filter(|_| self.profile.is_some())?;
-        packages::enabled_layers(&own, true).1.map(|app| app.path)
+        let own = self.own().filter(|_| self.profile.is_some());
+        own.and_then(|own| packages::enabled_layers(&own, true).1)
+            .or_else(|| self.host.clone())
+            .map(|app| app.path)
     }
 
     /// The app's name for people: its manifest's title, else its name, else
-    /// Moonframe.
+    /// the profile's, else the one the app was launched with.
     pub(crate) fn title(&self) -> String {
         let manifest = self
             .app()
@@ -196,7 +294,7 @@ impl Folders {
         manifest
             .and_then(|app| app.title.or(Some(app.name)))
             .or_else(|| self.profile.clone())
-            .unwrap_or_else(|| "Moonframe".to_owned())
+            .unwrap_or_else(|| crate::identity().title.clone())
     }
 
     /// The app's own icon, for the Dock, if it has one: the one its
@@ -212,9 +310,10 @@ impl Folders {
 
     /// The app id for the window system: each profile is an app of its own.
     pub(crate) fn app_id(&self) -> String {
+        let id = &crate::identity().id;
         match &self.profile {
-            Some(name) => format!("{}.{name}", crate::APP_ID),
-            None => crate::APP_ID.to_owned(),
+            Some(name) => format!("{id}.{name}"),
+            None => id.clone(),
         }
     }
 }
@@ -249,5 +348,5 @@ fn xdg(variable: &str, fallback: &str) -> Option<PathBuf> {
         // The spec ignores relative values.
         .filter(|dir| dir.is_absolute())
         .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(fallback)))
-        .map(|dir| dir.join(NAME))
+        .map(|dir| dir.join(name()))
 }

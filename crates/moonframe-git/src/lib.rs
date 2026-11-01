@@ -59,6 +59,11 @@ pub fn native() -> Box<dyn Native> {
     Box::new(Git::default())
 }
 
+/// Before every read. Git's stderr comes back mixed into what it prints,
+/// and with `core.autocrlf` (Git for Windows' default) every diff warns
+/// that LF will become CRLF, in front of the numbers it is read for.
+const QUIET: &[&str] = &["-c", "core.safecrlf=false"];
+
 /// A repository, where git runs.
 pub(crate) struct Repo {
     root: PathBuf,
@@ -73,7 +78,7 @@ impl Repo {
         let checkout = self.root.to_string_lossy();
         vcs::git_bytes(
             &checkout,
-            args,
+            &[QUIET, args].concat(),
             operation,
             Instant::now() + READ_TIMEOUT,
             &|| false,
@@ -103,6 +108,7 @@ impl Repo {
         command
             .args(["-c", "core.fsmonitor=false", "--no-optional-locks", "-C"])
             .arg(&self.root)
+            .args(QUIET)
             .args(args)
             .env("GIT_TERMINAL_PROMPT", "0");
         let (_, bytes) = herdr_github::pull_request::run_bytes(

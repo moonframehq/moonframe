@@ -91,6 +91,7 @@ tokens! {
         Hatch = "hatch",
         Terminal = "terminal",
         Browser = "browser",
+        View = "view",
         Input = "input",
         /// An input's placeholder; its `color` colors it.
         InputPlaceholder = "input-placeholder",
@@ -510,6 +511,16 @@ impl Rules {
                 }
             })
             .collect()
+    }
+
+    /// Whether any rule moves: a transition that plays, on a pane, an
+    /// overlay, a keyed stack or a change of state.
+    pub fn animated(&self) -> bool {
+        self.0.values().any(|style| {
+            style.transition.is_some_and(|transition| {
+                transition.kind != TransitionKind::None && !transition.duration.is_zero()
+            })
+        })
     }
 
     /// Takes every rule `over` has, each laid over the same selector's here.

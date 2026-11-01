@@ -39,6 +39,13 @@ return mod {
 			state.right = not state.right
 		elseif msg == "toggle-bottom" then
 			state.bottom = not state.bottom
+		elseif type(msg) == "table" and type(msg.open_tab) == "string" then
+			-- Any mod can bring up a main tab of a kind (`mod:mockup`): the
+			-- open one, else a new one.
+			return state, { { to = "tabbed#main", msg = { open = msg.open_tab } } }
+		elseif type(msg) == "table" and type(msg.close_tab) == "string" then
+			-- And close every tab of a kind, before its mod is deleted.
+			return state, { { to = "tabbed#main", msg = { close_kind = msg.close_tab } } }
 		end
 	end,
 
@@ -111,6 +118,8 @@ return mod {
 				tooltip = "Layout",
 				ui.icon { "layout-dashboard" },
 			}),
+			-- Send feedback (mods/feedback): ask an agent to change the app.
+			cell(ui.mount "feedback"),
 			cell(ui.row {
 				class = "tool",
 				align = "center",

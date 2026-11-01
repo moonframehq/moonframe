@@ -67,7 +67,7 @@ impl Render for ModWindow {
         let name = self.name.clone();
         let (content, animating) = self
             .app
-            .update(cx, |app, cx| app.mod_window_content(&name, cx));
+            .update(cx, |app, cx| app.mod_window_content(&name, window, cx));
         if animating {
             window.request_animation_frame();
         }

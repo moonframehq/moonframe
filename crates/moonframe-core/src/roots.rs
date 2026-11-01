@@ -149,6 +149,32 @@ impl Roots {
         Self { layers }
     }
 
+    /// An app built on the library: `toolbox` (the built-in app, which
+    /// brings only the mods `app` keeps, and never its shell), the host's
+    /// own `app` over it, the `packages` the user installed over that, and
+    /// the user's folder on top: the host takes the place the built-in app
+    /// has in [`Roots::with_packages`].
+    pub fn hosted(
+        toolbox: PathBuf,
+        app: AppLayer,
+        packages: impl IntoIterator<Item = PathBuf>,
+        user: Option<PathBuf>,
+    ) -> Self {
+        let layers = [
+            Layer::new(toolbox, Role::Toolbox(app.keep)),
+            Layer::new(app.path, Role::App),
+        ]
+        .into_iter()
+        .chain(
+            packages
+                .into_iter()
+                .map(|path| Layer::new(path, Role::Package)),
+        )
+        .chain(user.map(|path| Layer::new(path, Role::App)))
+        .collect();
+        Self { layers }
+    }
+
     /// Every folder, lowest first.
     pub fn layers(&self) -> impl Iterator<Item = &Path> {
         self.layers.iter().map(|layer| layer.path.as_path())

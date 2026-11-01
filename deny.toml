@@ -1,0 +1,68 @@
+# cargo-deny configuration. Run locally with `cargo deny check`.
+#
+# Evaluate every shipped target: both macOS architectures, x86_64/ARM64
+# GNU/Linux, and x86_64 Windows, the same set .github/workflows/package.yml
+# builds.
+
+[graph]
+all-features = true
+targets = [
+  "aarch64-apple-darwin",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+]
+
+[advisories]
+version = 2
+yanked  = "deny"
+# zstd reaches the build only through wasmtime's compilation cache
+# (wasmtime-internal-cache), which moonframe-providers never turns on: its
+# Config sets no cache, so no zstd stream is ever opened. wasmtime 50 pins
+# zstd 0.13 and zstd-safe 7, so the fixed releases need a wasmtime upgrade.
+# Drop these when wasmtime moves.
+ignore = [
+  { id = "RUSTSEC-2026-0391", reason = "zstd only via wasmtime's compilation cache, which is never enabled" },
+  { id = "RUSTSEC-2026-0398", reason = "zstd only via wasmtime's compilation cache, which is never enabled" },
+  { id = "RUSTSEC-2026-0403", reason = "zstd only via wasmtime's compilation cache, which is never enabled" },
+]
+# Security vulnerabilities always fail. "Unmaintained" is scoped to crates
+# this workspace depends on directly: GPUI's own tree carries discontinued
+# crates we cannot act on without changing the pinned gpui-kit.
+unmaintained = "workspace"
+
+[licenses]
+allow = [
+  "0BSD",
+  "Apache-2.0 WITH LLVM-exception",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MIT-0",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+confidence-threshold = 0.9
+version = 2
+
+[bans]
+multiple-versions = "warn"
+wildcards         = "deny"
+# Workspace path dependencies carry no version.
+allow-wildcard-paths = true
+
+[sources]
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# herdr-gpui's crates (terminals in herdr-core, the git provider), each
+# pinned to a commit in Cargo.toml.
+allow-git        = ["https://github.com/penso/herdr-gpui"]
+unknown-git      = "deny"
+unknown-registry = "deny"

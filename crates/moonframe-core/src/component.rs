@@ -12,7 +12,12 @@ use {
         vm::{self, Meter},
     },
     mlua::{Function, Lua, Table, Value},
-    std::{collections::BTreeMap, fmt::Write as _, path::PathBuf, rc::Rc},
+    std::{
+        collections::BTreeMap,
+        fmt::Write as _,
+        path::{Path, PathBuf},
+        rc::Rc,
+    },
 };
 
 /// Every component's source, by name, as the reload found them.
@@ -198,23 +203,38 @@ pub struct Component {
 }
 
 impl Component {
+    /// Whether it moves: a transition in its own styles, or a popover,
+    /// overlay or split in its preview, which the stylesheet animates.
+    pub fn animated(&self) -> bool {
+        self.rules.animated() || self.preview.as_ref().is_ok_and(Node::moves)
+    }
+
     /// How problems name its demo file.
     pub fn demo_name(&self) -> &str {
         self.demo
             .as_ref()
             .and_then(|demo| demo.path.as_deref())
-            .and_then(|path| path.to_str())
-            .and_then(|path| path.rsplit_once("/components/").map(|(_, file)| file))
+            .and_then(after_components)
             .unwrap_or(&self.name)
     }
 
     /// How problems name it.
     pub fn path_name(&self) -> &str {
-        self.path
-            .to_str()
-            .and_then(|path| path.rsplit_once("/components/").map(|(_, file)| file))
-            .unwrap_or(&self.name)
+        after_components(&self.path).unwrap_or(&self.name)
     }
+}
+
+/// The part of `path` under its last `components` folder, with either
+/// separator, so Windows paths name their file too.
+fn after_components(path: &Path) -> Option<&str> {
+    const FOLDER: &str = "components";
+    let path = path.to_str()?;
+    path.rmatch_indices(FOLDER)
+        .map(|(at, _)| at)
+        .find(|&at| {
+            path[..at].ends_with(['/', '\\']) && path[at + FOLDER.len()..].starts_with(['/', '\\'])
+        })
+        .map(|at| &path[at + FOLDER.len() + 1..])
 }
 
 struct About {

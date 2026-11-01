@@ -19,7 +19,7 @@ type Edge = "none" | "all" | "top" | "bottom" | "left" | "right"
 type Border = boolean | Edge
 type Direction = "row" | "column"
 type Variant = "normal" | "primary" | "ghost" | "outline" | "danger"
-type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "minimize" | "maximize" | "close-window" | BrowserCommand
+type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | BrowserCommand
 -- Run on the `ui.browser` the control's `browser` key names.
 type BrowserCommand = "browser-back" | "browser-forward" | "browser-reload" | "browser-stop" | "browser-open"
 
@@ -647,6 +647,21 @@ type BrowserProps = {
 	[number]: string,
 }
 
+-- A view the app writes in Rust and registers by `name` (an app on the
+-- Moonframe library; the starter has none). The host keeps it by mod and
+-- `id`, so it lives across reloads and while hidden, and hands it `props`,
+-- telling it when they change. What the user does in it comes back to this
+-- mod's `update` as messages the view chooses.
+type ViewProps = {
+	class: Class?,
+	style: Style?,
+	state: string?,
+	name: string?,
+	id: string?,
+	props: Data,
+	[number]: string,
+}
+
 -- A text field. The host keeps its text by mod and `id` (else its place in
 -- the tree); `value` replaces the text only when it differs from the last
 -- `value` passed. Messages carry the text: a table `msg` gets a `value`
@@ -802,6 +817,7 @@ declare ui: {
 	hatch: (props: HatchProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,
 	browser: (props: string | BrowserProps) -> Element,
+	view: (props: string | ViewProps) -> Element,
 	input: (props: InputProps) -> Element,
 	markdown: (props: string | MarkdownProps) -> Element,
 	divider: () -> Element,
@@ -1097,6 +1113,66 @@ type Herdr = {
 	fresh: boolean,
 }
 
+-- `app.acp`, from providers/acp: coding agents run for mods over the
+-- Agent Client Protocol.
+type AcpAgent = {
+	-- "claude", "codex", "copilot", "gemini" or "opencode".
+	name: string,
+	title: string,
+	-- Its ACP command is installed.
+	installed: boolean,
+	-- Only `npx` can start it, downloading its adapter first.
+	fetched: boolean,
+}
+
+type AcpTool = {
+	id: string,
+	title: string,
+	-- "read", "edit", "delete", "move", "search", "execute", "think", "fetch", "other"...
+	kind: string,
+	-- "pending", "in_progress", "completed" or "failed".
+	status: string,
+}
+
+type AcpRun = {
+	id: string,
+	-- The mod that started it: the only one it obeys.
+	owner: string,
+	agent: string,
+	agent_title: string,
+	-- The user's words.
+	text: string,
+	-- "starting", "running", "waiting" (a question for the user), "done",
+	-- "failed", "cancelled" or "stopped" (the app quit while it ran).
+	status: string,
+	-- Unix seconds.
+	started: number,
+	finished: number?,
+	error: string?,
+	stop_reason: string?,
+	-- The agent's latest message: its answer once it is done.
+	message: string?,
+	-- The latest tool calls (at most 12), newest last, of `tool_count`.
+	tools: { AcpTool },
+	tool_count: number,
+	plan: { { content: string, status: string } },
+	-- A permission question waiting on the user; answer with
+	-- `{ answer = id, option = option.id }` (or `option = false`).
+	question: { title: string, options: { { id: string, name: string, kind: string } } }?,
+}
+
+type Acp = {
+	available: boolean,
+	agents: { AcpAgent },
+	-- The agent a start without `agent` gets.
+	agent: string,
+	-- The folder agents work in.
+	workdir: string,
+	running: number,
+	-- Newest first, at most 30.
+	runs: { AcpRun },
+}
+
 -- A native provider's answer to an action a mod asked for, arriving in that
 -- mod's `update`: `reply` is the `id` the mod sent, else the action's name.
 type Reply = {
@@ -1132,6 +1208,7 @@ type App = {
 	files: Files?,
 	docs: Docs?,
 	herdr: Herdr?,
+	acp: Acp?,
 	-- What tab bars can open: each component and mod with a `tab` entry.
 	kinds: { TabKind },
 	-- The stylesheet's `looks`: which look each kind of component takes.

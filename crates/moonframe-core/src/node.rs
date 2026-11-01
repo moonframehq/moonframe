@@ -31,6 +31,7 @@ tokens! {
         Hatch = "hatch",
         Terminal = "terminal",
         Browser = "browser",
+        View = "view",
         Input = "input",
         Markdown = "markdown",
         Divider = "divider",
@@ -203,6 +204,9 @@ tokens! {
         Maximize = "maximize",
         CloseWindow = "close-window",
         ShowThemes = "show-themes",
+        /// Starts Inspect Element for the mod that asked: the pick, or
+        /// Escape, comes back to it on the topic `app/inspect`.
+        Inspect = "inspect",
     }
 }
 
@@ -233,6 +237,8 @@ pub enum Node {
     Hatch(Hatch),
     Terminal(Terminal),
     Browser(Browser),
+    /// A view the app writes in Rust, by name.
+    View(View),
     Input(Input),
     Markdown(Markdown),
     Divider,
@@ -280,6 +286,19 @@ impl Node {
             Self::Overlay(overlay) => overlay.content.instances(found),
             Self::List(list) => all(&list.rows, found),
             _ => {},
+        }
+    }
+
+    /// Whether the tree holds what the stylesheet animates as it shows and
+    /// hides: a popover, an overlay or a split's panes.
+    pub fn moves(&self) -> bool {
+        let any = |nodes: &[Node]| nodes.iter().any(Node::moves);
+        match self {
+            Self::Popover(_) | Self::Overlay(_) | Self::Split(_) => true,
+            Self::Stack(stack) => any(&stack.children),
+            Self::Panel(panel) => any(&panel.actions) || any(&panel.children),
+            Self::List(list) => any(&list.rows),
+            _ => false,
         }
     }
 
@@ -762,6 +781,18 @@ pub struct Browser {
     pub navigate: Option<Data>,
     /// Sent as a load starts and finishes, with `loading` and `url` added.
     pub loading: Option<Data>,
+}
+
+/// A view the app on Moonframe writes in Rust and registers by `name`
+/// (`Moonframe::view`), kept by the mod and `id` like a terminal; the host
+/// hands it `props` and tells it when they change. Only the app's own
+/// views: Luau never names a Rust type.
+#[derive(Clone, Debug, PartialEq)]
+pub struct View {
+    pub look: Look,
+    pub name: String,
+    pub id: String,
+    pub props: Data,
 }
 
 /// Whether `url` is an `http` or `https` address: what may go to the system

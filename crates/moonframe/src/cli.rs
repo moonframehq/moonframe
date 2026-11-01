@@ -1,48 +1,26 @@
-//! A window whose whole layout comes from Luau modules: the app's own
-//! folder with the user's `~/.config/moonframe` over it, reloaded as
-//! they change.
-
-mod actions;
-mod app;
-mod assets;
-mod branch_bar;
-mod browser;
-mod build;
-mod color;
-mod dock;
-mod gallery;
-mod input;
-mod inspect;
-mod keys;
-mod mod_window;
-mod motion;
-mod natives;
-mod overlay;
-mod packages;
-mod paths;
-mod persist;
-mod profiles;
-mod render;
-mod settings;
-mod terminal;
-mod theme_picker;
-mod themes;
+//! The command line every app on Moonframe takes: the window, `--check`,
+//! `--catalogue`, and the `mod`, `app`, `init` and `bundle` commands.
 
 use {
-    app::MoonframeApp,
+    crate::{
+        app::MoonframeApp,
+        launch::{AppSource, Moonframe},
+        packages,
+        paths::{self, Folders},
+        profiles,
+    },
     gpui_kit::{
         AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowDecorations, WindowOptions,
         component::{ActiveTheme as _, Root},
         point, px, size,
     },
-    moonframe_core::{Chrome, Roots, Titlebar, Workspace},
+    moonframe_core::{AppLayer, Chrome, Roots, Titlebar, Workspace},
     moonframe_mux::Backends,
-    paths::Folders,
     std::{
         fs,
         path::PathBuf,
         process::ExitCode,
-        sync::{Arc, OnceLock},
+        sync::{Arc, atomic::Ordering},
     },
 };
 
@@ -54,9 +32,16 @@ Usage: moonframe [OPTIONS] [DIR]
                                          install and share mods; see `mod help`
        moonframe [--user DIR] app <COMMAND>
                                          install whole apps as profiles; see `app help`
+       moonframe init [DIR] [--name NAME] [--path CHECKOUT]
+                                         start an app of your own on the Moonframe
+                                         library, or add one to a crate; see `init help`
+       moonframe bundle [OUT]
+                                         build this app's bundle (for apps on the
+                                         library; the starter's is `just bundle`)
 
   DIR           the built-in app folder: main.luau, style.luau, mods/, providers/
-                (default: Contents/Resources/app in the bundle, else ./app)
+                (default: Contents/Resources/app in the bundle, else app
+                beside the executable, else ./app)
 
 The user's folder goes over it: a mod or provider there replaces the
 built-in one of the same name, a main.luau replaces the shell, and a
@@ -84,51 +69,6 @@ Options:
                 component is broken or says nothing of when to use it
   -h, --help    show this help";
 
-/// The app's id for the window system: every window's, and the bundle's
-/// (scripts/bundle-app.sh). Change it with the name when you fork. A
-/// profile adds its name, so each app shows as its own.
-pub(crate) const APP_ID: &str = "dev.moonframe.app";
-
-/// This run's app id, set once at launch; see [`APP_ID`].
-static RUNNING_ID: OnceLock<String> = OnceLock::new();
-
-/// The app id every window of this run opens with.
-pub(crate) fn app_id() -> String {
-    RUNNING_ID
-        .get()
-        .cloned()
-        .unwrap_or_else(|| APP_ID.to_owned())
-}
-
-/// Whether this run is a release (`--release`, or an app bundle): set once
-/// at launch, read by the menus and key bindings.
-static RELEASE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-/// Whether developer tools are left out; see [`RELEASE`].
-pub(crate) fn release() -> bool {
-    RELEASE.load(std::sync::atomic::Ordering::Relaxed)
-}
-
-/// This run's name for the menu bar: the app's title in a profile.
-static TITLE: OnceLock<String> = OnceLock::new();
-
-/// The app's name in the menu bar; see [`TITLE`].
-pub(crate) fn title() -> String {
-    TITLE
-        .get()
-        .cloned()
-        .unwrap_or_else(|| "Moonframe".to_owned())
-}
-
-/// Whether this run opens its windows behind others (`--background`): set
-/// once at launch, read by every window the app opens.
-static BACKGROUND: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-/// Whether windows open without taking focus; see [`BACKGROUND`].
-pub(crate) fn background() -> bool {
-    BACKGROUND.load(std::sync::atomic::Ordering::Relaxed)
-}
-
 struct Args {
     folders: Folders,
     check: bool,
@@ -142,9 +82,13 @@ struct Args {
     packages: Option<Vec<String>>,
     /// The words after `app`, for profiles.
     apps: Option<Vec<String>>,
+    /// The words after `init`, to start an app on the library.
+    init: Option<Vec<String>>,
+    /// The words after `bundle`, to bundle an app on the library.
+    bundle: Option<Vec<String>>,
 }
 
-fn parse_args() -> Result<Option<Args>, String> {
+fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>, String> {
     let mut builtin = None;
     let mut user = paths::user();
     let bundled = paths::bundled();
@@ -155,6 +99,8 @@ fn parse_args() -> Result<Option<Args>, String> {
     let mut component = None;
     let mut packages = None;
     let mut apps = None;
+    let mut init = None;
+    let mut bundle = None;
     let mut profile = None;
     let mut args = std::env::args().skip(1).collect::<Vec<_>>().into_iter();
     while let Some(arg) = args.next() {
@@ -183,6 +129,8 @@ fn parse_args() -> Result<Option<Args>, String> {
             "mod" | "mods" if builtin.is_none() => {
                 packages = Some(args.by_ref().collect());
             },
+            "init" if builtin.is_none() => init = Some(args.by_ref().collect()),
+            "bundle" if builtin.is_none() => bundle = Some(args.by_ref().collect()),
             // `app` is also the app folder's usual name (`moonframe app`),
             // so it is the command only before one of its words.
             "app" | "apps" if builtin.is_none() => {
@@ -201,9 +149,24 @@ fn parse_args() -> Result<Option<Args>, String> {
             extra => return Err(format!("unexpected argument: {extra}")),
         }
     }
+    // An app on the library: DIR is its own folder, over the toolbox.
+    let (builtin, host) = match host {
+        Some(source) => {
+            let app = builtin.unwrap_or_else(|| paths::host_app(source));
+            (
+                paths::toolbox(),
+                Some(AppLayer {
+                    path: app,
+                    keep: keep.to_vec(),
+                }),
+            )
+        },
+        None => (builtin.unwrap_or_else(paths::builtin), None),
+    };
     Ok(Some(Args {
         folders: Folders {
-            builtin: builtin.unwrap_or_else(paths::builtin),
+            builtin,
+            host,
             user,
             profile: profile.or_else(|| bundled.as_ref().map(|bundle| bundle.name.clone())),
             bundled,
@@ -215,6 +178,8 @@ fn parse_args() -> Result<Option<Args>, String> {
         component,
         packages,
         apps,
+        init,
+        bundle,
     }))
 }
 
@@ -308,29 +273,50 @@ fn framed(chrome: Chrome) -> WindowOptions {
     }
 }
 
-fn main() -> ExitCode {
+/// What `Moonframe::run` does.
+pub(crate) fn main(launch: Moonframe) -> ExitCode {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("error,moonframe=info")),
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(&launch.log)),
         )
         .with_writer(std::io::stderr)
         .init();
-    let args = match parse_args() {
+    let name = &launch.identity.name;
+    if !packages::valid_name(name) {
+        eprintln!("`{name}` cannot name an app: use a-z, 0-9, - and _");
+        return ExitCode::from(2);
+    }
+    let _ = crate::IDENTITY.set(launch.identity.clone());
+    let host = launch.app.as_ref().filter(|_| launch.identity.hosted);
+    if launch.identity.hosted && host.is_none() {
+        eprintln!("{name}: the app names no folder: call `Moonframe::app_dir` or `embedded_app`");
+        return ExitCode::from(2);
+    }
+    let args = match parse_args(host, &launch.keep) {
         Ok(Some(args)) => args,
         Ok(None) => {
-            println!("{USAGE}");
+            println!("{}", branded(USAGE));
             return ExitCode::SUCCESS;
         },
         Err(message) => {
-            eprintln!("{message}\n\n{USAGE}");
+            eprintln!("{message}\n\n{}", branded(USAGE));
             return ExitCode::from(2);
         },
     };
+    if let Some(words) = &args.init {
+        return crate::init::run(words);
+    }
+    if let Some(words) = &args.bundle {
+        return crate::bundle::run(&args.folders, words);
+    }
     let folders = args.folders;
     if let Some(words) = &args.apps {
         let Some(user) = &folders.user else {
-            eprintln!("moonframe app: profiles go in the user's folder; drop --no-user");
+            eprintln!(
+                "{} app: profiles go in the user's folder; drop --no-user",
+                paths::name()
+            );
             return ExitCode::from(2);
         };
         return profiles::run(user, words);
@@ -339,15 +325,19 @@ fn main() -> ExitCode {
         && !paths::profile(user, name).is_dir()
     {
         eprintln!(
-            "moonframe: no profile `{name}` in {}; `moonframe app list` shows them, \
-             `moonframe app install` adds one",
-            user.display()
+            "{app}: no profile `{name}` in {}; `{app} app list` shows them, \
+             `{app} app install` adds one",
+            user.display(),
+            app = paths::name(),
         );
         return ExitCode::from(2);
     }
     if let Some(words) = &args.packages {
         let Some(own) = folders.own() else {
-            eprintln!("moonframe mod: packages go in the user's folder; drop --no-user");
+            eprintln!(
+                "{} mod: packages go in the user's folder; drop --no-user",
+                paths::name()
+            );
             return ExitCode::from(2);
         };
         return packages::run(&own, words);
@@ -366,17 +356,18 @@ fn main() -> ExitCode {
     {
         tracing::warn!("cannot create {}: {error}", own.display());
     }
-    RELEASE.store(
-        args.release.unwrap_or(folders.bundled.is_some()),
-        std::sync::atomic::Ordering::Relaxed,
+    crate::RELEASE.store(
+        args.release
+            .unwrap_or(folders.bundled.is_some() || (folders.host.is_some() && paths::in_bundle())),
+        Ordering::Relaxed,
     );
-    let _ = TITLE.set(folders.title());
-    dock::set_name(&title());
+    let _ = crate::TITLE.set(folders.title());
+    crate::dock::set_name(&crate::title());
     tracing::info!(
         "starting {} ({}{}) on {}",
-        title(),
+        crate::title(),
         folders.app_id(),
-        if release() {
+        if crate::release() {
             ", release"
         } else {
             ""
@@ -385,20 +376,21 @@ fn main() -> ExitCode {
     );
     let icon = folders.icon();
     let background = args.background;
-    BACKGROUND.store(background, std::sync::atomic::Ordering::Relaxed);
-    let _ = RUNNING_ID.set(folders.app_id());
+    crate::BACKGROUND.store(background, Ordering::Relaxed);
+    let _ = crate::RUNNING_ID.set(folders.app_id());
     if let Some(profile) = &folders.profile {
         moonframe_providers::set_profile(profile);
     }
-    let component = args.component.filter(|_| !release());
+    let component = args.component.filter(|_| !crate::release());
+    let (natives, views) = (launch.natives, launch.views);
     gpui_kit::application()
-        .with_assets(assets::Assets)
+        .with_assets(crate::assets::Assets)
         .run(move |cx| {
             gpui_kit::init(cx);
-            dock::set_icon(icon.as_deref());
-            actions::bind_keys(cx);
-            cx.set_menus(actions::menus(&[], &[]));
-            cx.on_action(|_: &actions::Quit, cx| cx.quit());
+            crate::dock::set_icon(icon.as_deref());
+            crate::actions::bind_keys(cx);
+            cx.set_menus(crate::actions::menus(&[], &[]));
+            cx.on_action(|_: &crate::actions::Quit, cx| cx.quit());
             cx.on_window_closed(|cx, _| {
                 if cx.windows().is_empty() {
                     cx.quit();
@@ -410,11 +402,13 @@ fn main() -> ExitCode {
             // from herdr-core when it runs here, else SQLite, each profile
             // its own. Only with the user's folder: `--no-user` runs
             // (checks, screenshots) start fresh and keep nothing.
-            let backends = Arc::new(Backends::new());
+            let backends = Arc::new(Backends::for_app(&paths::namespace(
+                folders.profile.as_deref(),
+            )));
             let persist = folders
                 .user
                 .as_ref()
-                .and_then(|_| persist::open(&backends, folders.profile.as_deref()));
+                .and_then(|_| crate::persist::open(&backends, folders.profile.as_deref()));
             // The shell says what window it wants, so it loads first.
             let workspace = Workspace::open_with(folders.roots(), cx.theme().is_dark(), persist);
             let chrome = workspace.chrome();
@@ -432,14 +426,21 @@ fn main() -> ExitCode {
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 window_min_size: Some(size(px(640.), px(400.))),
-                app_id: Some(app_id()),
+                app_id: Some(crate::app_id()),
                 focus: !background,
                 ..framed(chrome)
             };
             let opened = cx.open_window(options, |window, cx| {
                 let view = cx.new(|cx| {
-                    let mut app =
-                        MoonframeApp::new(workspace, chrome, folders.clone(), backends, window, cx);
+                    let mut app = MoonframeApp::new(
+                        workspace,
+                        chrome,
+                        folders.clone(),
+                        backends,
+                        crate::app::Parts { natives, views },
+                        window,
+                        cx,
+                    );
                     if let Some(name) = &component {
                         app.show_component(name, cx);
                     }
@@ -448,7 +449,7 @@ fn main() -> ExitCode {
                 cx.new(|cx| Root::new(view, window, cx))
             });
             if let Err(error) = opened {
-                eprintln!("moonframe: unable to open a window: {error}");
+                eprintln!("{}: unable to open a window: {error}", paths::name());
                 cx.quit();
             }
             if !background {
@@ -456,4 +457,18 @@ fn main() -> ExitCode {
             }
         });
     ExitCode::SUCCESS
+}
+
+/// `text` for this app: its command and folders by its own name.
+pub(crate) fn branded(text: &str) -> String {
+    let name = paths::name();
+    if name == "moonframe" {
+        return text.to_owned();
+    }
+    text.replace("Usage: moonframe", &format!("Usage: {name}"))
+        .replace("moonframe: a window", &format!("{name}: a window"))
+        .replace("       moonframe ", &format!("       {name} "))
+        .replace("`moonframe ", &format!("`{name} "))
+        .replace("config/moonframe", &format!("config/{name}"))
+        .replace("cache/moonframe", &format!("cache/{name}"))
 }

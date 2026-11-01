@@ -1,0 +1,25 @@
+# An app of its own on the Moonframe library, as `moonframe init` starts
+# one. It lives in this workspace so CI builds it against the library as it
+# is; outside this repository the dependency is
+#   moonframe = { git = "https://github.com/penso/moonframe", rev = "..." }
+# and the crate's own Cargo.toml adds the dev profile below (GPUI and Luau
+# are unusably slow unoptimised):
+#   [profile.dev.package."*"]
+#   opt-level = 2
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-host-example"
+publish                = false
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "host-example"
+path = "src/main.rs"
+
+[dependencies]
+moonframe.workspace = true

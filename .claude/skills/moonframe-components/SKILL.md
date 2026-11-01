@@ -44,6 +44,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
 | `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; links send `link` instead of opening, pictures are not loaded; styled by `markdown`, `markdown-code` and `markdown-quote` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width` |
+| `ui.view { name = "chart", id = "sales", props = {...} }` | a view the app writes in Rust and registers by `name` (apps on the Moonframe library; the starter registers none): what Luau can't draw, such as an editor or a canvas. Kept by mod and `id`, it gets `props` again when they change, and sends this mod's `update` messages of its own | `name`, `id`, `props`, `class`, `style` |
 
 ### Controls
 
@@ -134,11 +135,14 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 
 | Component | Category | Use it for |
 | --- | --- | --- |
+| [`agent-run`](#agent-run) | Agents | Show what an agent started through `app.acp` is doing or did, with Stop and the answers to its permission questions. For the Send feedback dialog, which lists runs with this, use `feedback`; for a chat transcript use `chat-message`. |
+| [`feedback`](#feedback) | Agents | Let the user ask for a change to the app itself, from inside it, and follow what the agent does (`app.acp`). For one run on its own use `agent-run`; for a plain form use `dialog`; for chatting with an agent use `composer`. |
 | [`accordion`](#accordion) | Containers | A stack of foldable sections of the same kind: a merge request's checks, files and activity, or groups of settings. The mod decides whether opening one closes the others. For one foldable block use `collapsible`; for sidebar groups use `sidebar-section`; for switching between views use `tabs`. |
 | [`card`](#card) | Containers | A titled box around related content inside a panel or page; for a whole sidebar section use `ui.panel`, for a plain heading use `section`. |
 | [`collapsible`](#collapsible) | Containers | One foldable block of content, such as "No agent yet" or advanced options. For several of them stacked use `accordion`; for a titled sidebar group with a count and actions use `sidebar-section`; for a plain heading use `section`. |
 | [`dashboard-card`](#dashboard-card) | Containers | Each block of a dashboard or overview (a chart, a list of things waiting, a table). For a titled box inside a page use `card`; for a sidebar panel use `ui.panel`; for a tiled pane with controls use `pane-frame`. |
 | [`section`](#section) | Containers | A small muted heading over a group of content inside a panel or settings page. |
+| [`swap-view`](#swap-view) | Containers | The body under a view switcher (`pill-tabs`, `segmented`, `tabs`) whose content is replaced, such as a list's header and rows per filter. Give `width` so the pages can be measured while they move. For panels that open and close use `side-panels`; for items joining a list give the rows a `key` and a transition instead. |
 | [`browser`](#browser) | Content | A web page in a pane, with browser chrome. Keep the page's `navigate` messages in state and pass the latest as `page`; the address bar navigates on its own. For a bare page without a bar use `ui.browser`. |
 | [`markdown`](#markdown) | Content | Show markdown read-only: a README, notes, an agent's answer, release notes written in markdown. For editing a file use `markdown-editor`; for code alone use `code-view`; for one line of text use `ui.text`. |
 | [`markdown-editor`](#markdown-editor) | Content | Editing a markdown file of the project in a tab or a pane. For showing markdown without editing use `markdown`; for code read-only use `code-view`; for a short text field use `ui.input`. |
@@ -210,9 +214,11 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`diff-view`](#diff-view) | Git | Show a file's changes for review: a review pane, a checkpoint, a commit. Stack one per file in a scrolling column. For only the size of a change use `diff-counts`; for a file without changes use `code-view`. |
 | [`pr-badge`](#pr-badge) | Git | A pull or merge request referenced inline: beside a branch in a sidebar, in a title bar, in a tab. For a full list row use `pr-row`; for CI details use `checks`; for an agent's state use `status-dot`. |
 | [`pr-row`](#pr-row) | Git | Lists of pull requests, merge requests or issues, as in an orchestrator or review queue; stack rows in a scrolling column, under `section` headings per group. For a PR referenced inline use `pr-badge`; for a generic data grid use `table`; for its CI use `checks`. |
+| [`mockups`](#mockups) | Layout | Showing the user a few ideas for a change before making it, so they can pick one: the moonframe-mockups skill builds a throwaway mod around it. Not for real content; for choosing between options inside the app use `choice-cards`. |
 | [`page`](#page) | Layout | The main area of a settings screen, a detail view or a dashboard: a big title, then sections of content that scroll. Group its content with `section` or `card`; put it beside a `sidebar` in a `split-view`. For a framed pane use `pane-frame`; for a modal use `dialog`; for a panel in a sidebar use `ui.panel`. |
 | [`pane-frame`](#pane-frame) | Layout | Framing each pane of a tiled workspace (a terminal, an agent, a log) with its own header and controls. The panes' sizes come from `ui.hsplit`/`ui.vsplit` (see `split-view`); this only draws the frame inside one. For a titled box of content use `card`; for a sidebar panel use `ui.panel`. |
 | [`settings-page`](#settings-page) | Layout | A whole preferences window or settings tab. It is made of `settings-nav` (the page list) and `settings-row` (each setting); use those directly for a different arrangement, `section` for a plain heading, `card` to box a group. |
+| [`side-panels`](#side-panels) | Layout | A three-column app (notes, mail, writing) whose sidebar and list the user hides to focus on the main area. The mod keeps `left` and `middle` and flips them from buttons in the panes' headers. For resizable panes, an inspector or a bottom panel use `split-view`; for a switcher over the list use `pill-tabs`. |
 | [`split-view`](#split-view) | Layout | The body of a shell or a large mod: a sidebar, the main content and optional inspector and bottom panes the user can resize and toggle. It is plain `ui.hsplit`/`ui.vsplit` with `ui.pane` children; write those directly for any other arrangement. For framing each pane use `pane-frame`; for a scrolling page inside the main area use `page`. |
 | [`board-card`](#board-card) | Lists | Items in a `kanban-column`: deals, tickets, tasks, candidates. For a row in a list use `task-row` or `list`; for a pull request use `pr-row`. |
 | [`group-header`](#group-header) | Lists | A heading inside a list that groups its rows by state or owner ("Needs you 3", "Waiting 3", a machine with its online dot). For a sidebar's own sections use `sidebar-section`; for a heading over arbitrary content use `section`; for nested rows use `tree`. |
@@ -227,6 +233,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`month-grid`](#month-grid) | Navigation | A calendar view or a date picker's body: choosing a day in a month. For a strip of days over a list use `day-strip`; for events in order use `timeline`. |
 | [`nav-buttons`](#nav-buttons) | Navigation | History navigation in a title bar, a browser tab or a pane that keeps a back stack. For onboarding steps use `pager`; for a single icon action use `icon-button`. |
 | [`pager`](#pager) | Navigation | Steps of an onboarding or welcome flow, or pages of a carousel. For history back/forward use `nav-buttons`; for switching views use `tabs` or `segmented`. |
+| [`pill-tabs`](#pill-tabs) | Navigation | Switching the few views of one list from a sidebar or header (Inbox, All, Last 7 Days), where the current view deserves its name and the rest only an icon. For settings choices use `segmented`; for documents or sessions use `tabs`; for the app's main views use `activity-bar`. |
 | [`rail`](#rail) | Navigation | The sidebar folded to a narrow strip, one tile per workspace or agent with its status. For switching the app's views use `activity-bar`; for the full width version use `sidebar`. |
 | [`settings-nav`](#settings-nav) | Navigation | Choosing the page of a settings or preferences window; pair it with `settings-page`, which uses it. For an app's main sidebar use `sidebar`; for a flat list use `list`; for tabs across the top use `tabs`. |
 | [`sidebar`](#sidebar) | Navigation | The whole left column of an app: workspaces, agents, settings categories. One group alone is `sidebar-section`; the narrow collapsed form is `rail`; a VS Code style icon strip beside it is `activity-bar`; nested rows are `tree`. |
@@ -237,18 +244,81 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`title-bar`](#title-bar) | Navigation | The top row of a window whose shell sets `titlebar = "hidden"`: pass `window = app.window` and it leaves room for macOS's traffic lights or draws its own window buttons elsewhere. Put `tabs` in its content. For a bar along the bottom use `status-bar`; for a path inside a pane use `breadcrumbs`; for a plain row of buttons use `toolbar`. |
 | [`about`](#about) | Overlays | Help > About, or the top of a settings General page (`inline`). For the changes in a version use `release-notes`; for other properties use `key-values`; for a first-run welcome use `onboarding`. |
 | [`action-tiles`](#action-tiles) | Overlays | The menu a workspace, worktree or agent opens on click, when its few main actions deserve big targets (new worktree, fan out, rename, close). Wrap it in `ui.popover`. For a plain list of commands use `menu` or `context-menu`; for a yes/no question use `confirm`; for picking one of several options use `choice-cards`. |
+| [`command-palette`](#command-palette) | Overlays | Run any of the app's or a mod's commands from the keyboard (⌘K, ⌘⇧P), or jump to a file, branch or workspace by name. For a menu under a button use `dropdown`; for right-click actions use `context-menu`; for a list of shortcuts to read use `shortcuts`; for a search box over a list in a pane use `search-field`. |
 | [`confirm`](#confirm) | Overlays | Ask before doing something, especially destructive (close a window with running agents, delete a branch). For a modal with a form or custom body use `dialog`; for an undo-able action prefer doing it and showing a `toast` with an Undo action. |
 | [`context-menu`](#context-menu) | Overlays | Right-click actions on a row, tab, tile or file. It anchors the menu to the wrapped content, not the pointer. For a menu opened by a button use `dropdown`; for the menu rows alone use `menu`. On `tabs`, use its `context` (each tab already sends { tab_menu = id }) and put this around the strip, or a `ui.popover` with `menu`. |
 | [`dialog`](#dialog) | Overlays | Any modal that asks for attention: a form, a choice, details. For a yes/no question use `confirm`; for a panel sliding from an edge use `sheet`; for a non-blocking message use `toast` or `notice`; for content beside a control use `ui.popover`. |
-| [`menu`](#menu) | Overlays | The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `ui.overlay` with your own rows. |
+| [`menu`](#menu) | Overlays | The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `command-palette`. |
 | [`onboarding`](#onboarding) | Overlays | A short guided tour or welcome on first launch or after a big update. For one release's changes use `release-notes`; for a single question use `confirm`; for any other modal use `dialog`. |
 | [`sheet`](#sheet) | Overlays | Side content that needs room but should keep the window in view: details, an inspector, a settings pane, logs. For a centred modal use `dialog`; for a permanent side panel use a `ui.pane` in a split; for a small floating card by a control use `ui.popover`. |
-| [`shortcuts`](#shortcuts) | Overlays | Show the app's or a mod's keybindings (a ? or ⌘/ help overlay, a Shortcuts page). For one shortcut use `kbd`; for a line of hints under a list or palette use `key-hints`; for a command palette use `dialog` with `place = "top"`. |
+| [`shortcuts`](#shortcuts) | Overlays | Show the app's or a mod's keybindings (a ? or ⌘/ help overlay, a Shortcuts page). For one shortcut use `kbd`; for a line of hints under a list or palette use `key-hints`; for a command palette use `command-palette`. |
 | [`status-dot`](#status-dot) | Status | Show the state of an agent, job or session beside its name: in sidebar rows, tabs and lists. Use `chip = true` where the state must catch the eye (a blocked agent). For a count use `count-bubble`; for a PR's state use `pr-badge`; for CI results use `checks`. |
 | [`stat`](#stat) | Status bar | One labelled value with an icon in a status bar or toolbar, kept to a fixed width so it does not jitter. |
 | [`status-bar`](#status-bar) | Status bar | The window's bottom bar: machine, branch, agent counts on the left; CPU, theme, shortcuts on the right. Put `stat`, `meter` or `sparkline` in it for live readings. For a coloured strip announcing something use `banner`; for a top row use `title-bar`; for an extensible bar, give it a `ui.region` as an item. |
 | [`ghostty-terminal`](#ghostty-terminal) | Terminals | A shell drawn by Ghostty's emulator; same as `terminal` with the other engine. |
 | [`terminal`](#terminal) | Terminals | A live shell (alacritty engine) filling its space: a pane, a bottom panel. |
+
+### Agents
+
+#### `agent-run`
+
+**Agent Run.** One coding agent's run: status, plan, its latest tool calls, a permission question with the agent's options, and its answer.
+
+**When:** Show what an agent started through `app.acp` is doing or did, with Stop and the answers to its permission questions. For the Send feedback dialog, which lists runs with this, use `feedback`; for a chat transcript use `chat-message`.
+
+| Prop | Meaning |
+| --- | --- |
+| `lines` | lines of the agent's message shown (default 6; 0 hides it) |
+| `request` | show the user's words above |
+| `run` | a run from `app.acp.runs` { id, agent, agent_title, text, status, started, finished, error, message, tools, tool_count, plan, question } |
+| `to` | where its buttons send, default `provider:acp` |
+| `tools` | tool calls listed, newest last (default 4) |
+
+**Styles:** `.agent-run` `.agent-run-accent` `.agent-run-danger` `.agent-run-error` `.agent-run-head` `.agent-run-message` `.agent-run-meta` `.agent-run-muted` `.agent-run-plan` `.agent-run-question` `.agent-run-request` `.agent-run-status` `.agent-run-step` `.agent-run-success` `.agent-run-tool` `.agent-run-tool-title` `.agent-run-warning`
+
+```lua
+local agent_run = use "agent-run"
+
+agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id = "1", message = "The status bar is the row at the bottom of app/main.luau; I'll raise its height.", plan = { { content = "Find the status bar's row", status = "completed" }, { content = "Make it 36px tall", status = "in_progress" }, { content = "Run just check", status = "pending" } }, question = { options = { { id = "allow", kind = "allow_once", name = "Allow" }, { id = "always", kind = "allow_always", name = "Always allow" }, { id = "reject", kind = "reject_once", name = "Reject" } }, title = "Edit app/main.luau" }, started = 0, status = "waiting", text = "Make the status bar taller", tool_count = 3, tools = { { id = "a", kind = "read", status = "completed", title = "Read app/main.luau" }, { id = "b", kind = "edit", status = "pending", title = "Edit app/main.luau" } } } }
+```
+
+#### `feedback`
+
+**Send Feedback.** A dialog to ask an agent for a change to the app: a text area, a note on who acts on it, Cancel and Send, and the agent runs that came of earlier requests.
+
+**When:** Let the user ask for a change to the app itself, from inside it, and follow what the agent does (`app.acp`). For one run on its own use `agent-run`; for a plain form use `dialog`; for chatting with an agent use `composer`.
+
+| Prop | Meaning |
+| --- | --- |
+| `actions` | elements on the footer's left, such as an agent `dropdown` |
+| `attached` | the element attached to the request, `{ element, at }`, shown as a chip |
+| `change` | sent on each edit, with `value` set to the text |
+| `detach` | msg the chip's × sends |
+| `dismiss` | msg sent by Cancel, Escape or a backdrop click |
+| `error` | why the last send failed, shown above the buttons |
+| `expanded` | id of the run shown open, with `agent-run`; one waiting on an answer is always open |
+| `id` | keeps the text across renders (default "feedback") |
+| `inspect` | show an Inspect button that starts Inspect Element for the mod (`command = "inspect"`); the pick comes back on the topic `app/inspect` |
+| `note` | muted lines under the field: who acts on the feedback, and what goes with it |
+| `open` | show it |
+| `placeholder` | grey text while empty (default: two examples) |
+| `runs` | runs from `app.acp.runs` the mod started, newest first; a row sends `{ expand = id }`, its × `{ forget = id }` to `provider:acp` |
+| `send` | sent by Send and ⌘↩, with `value` set to the text from ⌘↩ |
+| `text` | the text the mod has from `change`; Send is greyed out while it is blank |
+| `to` | mod its own messages go to, if not the drawing one |
+| `value` | the text; set it to "" after sending to clear the field |
+
+**Styles:** `.feedback` `.feedback-action` `.feedback-action:hover` `.feedback-body` `.feedback-chip` `.feedback-chip-at` `.feedback-chip-element` `.feedback-detail` `.feedback-done` `.feedback-error` `.feedback-failed` `.feedback-heading` `.feedback-history` `.feedback-item` `.feedback-item-head` `.feedback-item-head:hover` `.feedback-muted` `.feedback-note` `.feedback-request` `.feedback-run` `.feedback-running` `.feedback-title` `.feedback-waiting`
+
+```lua
+local feedback = use "feedback"
+
+feedback { open = state.open, dismiss = "close", value = state.text, text = state.text,
+	change = "type", send = "send", runs = app.acp and app.acp.runs, expanded = state.expanded,
+	note = "A background agent changes the app and reports back below." }
+```
+
+A whole mod using it, with state: `app/components/demos/feedback.luau`.
 
 ### Containers
 
@@ -385,6 +455,32 @@ section { title = "Worktrees",
 ```
 
 A whole mod using it, with state: `app/components/demos/section.luau`.
+
+#### `swap-view`
+
+**Swap View.** Content keyed by a view: when the key changes, the old page fades and folds away as the new one fades and slides in.
+
+**When:** The body under a view switcher (`pill-tabs`, `segmented`, `tabs`) whose content is replaced, such as a list's header and rows per filter. Give `width` so the pages can be measured while they move. For panels that open and close use `side-panels`; for items joining a list give the rows a `key` and a transition instead.
+
+| Prop | Meaning |
+| --- | --- |
+| `[children]` | the page for the current key |
+| `grow` | take the free space along the parent's axis |
+| `key` | names the page shown: a new key swaps it |
+| `width` | the page's width in pixels (default 260); the moving pages keep it, clipped |
+
+**Styles:** `.swap-view-page`
+
+```lua
+local swap_view = use "swap-view"
+
+swap_view { key = state.view, width = 260,
+	ui.text { TITLES[state.view], weight = "bold" },
+	-- ...the rows of that view
+}
+```
+
+A whole mod using it, with state: `app/components/demos/swap-view.luau`.
 
 ### Content
 
@@ -2301,6 +2397,30 @@ A whole mod using it, with state: `app/components/demos/pr-row.luau`.
 
 ### Layout
 
+#### `mockups`
+
+**Mockups.** Variants of one change side by side, each live in a lettered card with a Pick button that copies which one to apply.
+
+**When:** Showing the user a few ideas for a change before making it, so they can pick one: the moonframe-mockups skill builds a throwaway mod around it. Not for real content; for choosing between options inside the app use `choice-cards`.
+
+| Prop | Meaning |
+| --- | --- |
+| `ask` | what the user asked for, shown on top and quoted in the pick |
+| `file` | the mockup's file, quoted in the pick so the agent finds it |
+| `variants` | list of { name, note?, body (an element or a list of elements) } |
+| `width` | each card's width in pixels; default 360 |
+
+**Styles:** `.mockups-card` `.mockups-letter` `.mockups-stage`
+
+```lua
+local mockups = use "mockups"
+
+mockups { ask = "a busier status bar", file = "~/.config/moonframe/mods/mockup/main.luau", variants = {
+	{ name = "Pills", note = "Each value in a pill.", body = ui.row { gap = "small", ui.badge "main", ui.badge "+3" } },
+	{ name = "Plain", note = "Muted text, no chrome.", body = ui.text { "main · +3", tone = "muted" } },
+} }
+```
+
 #### `page`
 
 **Page.** A scrolling page with a title, subtitle and header actions over its content, and an optional pinned footer.
@@ -2418,6 +2538,40 @@ settings_page {
 ```
 
 A whole mod using it, with state: `app/components/demos/settings-page.luau`.
+
+#### `side-panels`
+
+**Side Panels.** Sidebar, list and main area side by side; hiding the sidebar or the list folds it away while it fades, and the rest slides over.
+
+**When:** A three-column app (notes, mail, writing) whose sidebar and list the user hides to focus on the main area. The mod keeps `left` and `middle` and flips them from buttons in the panes' headers. For resizable panes, an inspector or a bottom panel use `split-view`; for a switcher over the list use `pill-tabs`.
+
+| Prop | Meaning |
+| --- | --- |
+| `height` | fixed height in pixels; leave unset to fill the parent |
+| `id` | the split's id (default "side-panels") |
+| `left` | show the sidebar (default true) |
+| `list` | element in the middle pane |
+| `list_size` | list width in pixels (default 280) |
+| `main` | element in the main area |
+| `middle` | show the list (default true) |
+| `sidebar` | element in the left pane |
+| `sidebar_size` | sidebar width in pixels (default 220) |
+
+**Styles:** `.side-panels-list` `.side-panels-main` `.side-panels-sidebar`
+
+```lua
+local side_panels = use "side-panels"
+
+side_panels {
+	left = state.left, middle = state.middle,
+	sidebar = ui.region "left",
+	list = ui.region "list",
+	main = ui.region "main",
+}
+-- update: flip state.left / state.middle from icon buttons in the panes' headers.
+```
+
+A whole mod using it, with state: `app/components/demos/side-panels.luau`.
 
 #### `split-view`
 
@@ -2865,6 +3019,31 @@ pager { back = "back", count = 4, next = "next", page = 2 }
 
 A whole mod using it, with state: `app/components/demos/pager.luau`.
 
+#### `pill-tabs`
+
+**Pill Tabs.** A view switcher whose chosen item is a wide pill with icon, label and count while the others are icon circles; switching morphs one into the other. Sends { select = id }.
+
+**When:** Switching the few views of one list from a sidebar or header (Inbox, All, Last 7 Days), where the current view deserves its name and the rest only an icon. For settings choices use `segmented`; for documents or sessions use `tabs`; for the app's main views use `activity-bar`.
+
+| Prop | Meaning |
+| --- | --- |
+| `event` | key of the message a click sends, default "select": { select = id } |
+| `items` | list of { id, icon, label?, count? (after the label), dot? (an unread dot on the circle), tooltip?, label_width? (pixels, when the estimate is off; a longer label ends in …), msg? } |
+| `selected` | id of the current view |
+| `size` | the circles' diameter and the pills' height in pixels (default 34) |
+| `to` | mod to send messages to, if not the drawing one |
+| `width` | the chosen pill's width in pixels (default 112) |
+
+**Styles:** `.pill-tabs` `.pill-tabs-count` `.pill-tabs-dot` `.pill-tabs-idle:hover` `.pill-tabs-item` `.pill-tabs-item:off` `.pill-tabs-item:on` `.pill-tabs-label` `.pill-tabs-label:off` `.pill-tabs-label:on`
+
+```lua
+local pill_tabs = use "pill-tabs"
+
+pill_tabs { items = { { count = 1, dot = true, icon = "inbox", id = "inbox", label = "Inbox" }, { count = 1, icon = "copy", id = "all", label = "All" }, { count = 1, icon = "clock", id = "recent", label = "Last 7 Days" } }, selected = "inbox" }
+```
+
+A whole mod using it, with state: `app/components/demos/pill-tabs.luau`.
+
 #### `rail`
 
 **Rail.** A collapsed sidebar: compact numbered or icon tiles with a status mark, the selected one highlighted.
@@ -3209,6 +3388,46 @@ ui.popover { open = state.menu == id, dismiss = "close-menu", width = 344,
 
 A whole mod using it, with state: `app/components/demos/action-tiles.luau`.
 
+#### `command-palette`
+
+**Command Palette.** A search field over commands that filters as you type, with ↑↓, ↩ and Esc; grouped while empty, ranked while filtering, in several looks.
+
+**When:** Run any of the app's or a mod's commands from the keyboard (⌘K, ⌘⇧P), or jump to a file, branch or workspace by name. For a menu under a button use `dropdown`; for right-click actions use `context-menu`; for a list of shortcuts to read use `shortcuts`; for a search box over a list in a pane use `search-field`.
+
+| Prop | Meaning |
+| --- | --- |
+| `commands` | list of { id, label, icon?, detail?, shortcut? (kbd keys, "cmd-t"), group?, keywords?, disabled? } |
+| `dismiss` | message sent to the parent on Esc or a click outside |
+| `empty` | text when nothing matches (default "No matching commands") |
+| `event` | key of the message sent to the parent when a command runs, default "run": { run = id } |
+| `id` | keeps its query and highlight; one per id (default "main") |
+| `look` | spotlight (default), classic, compact or cards, or a look the stylesheet defines; else the stylesheet's `looks.palette` |
+| `open` | show it; reopening starts with an empty query |
+| `placeholder` | grey text in the empty field (default "Type a command…") |
+| `prefix` | a scope chip before the field, such as "Go to file" |
+| `rows` | most rows shown before the list scrolls (default 8) |
+| `width` | pixels (default per look, 560 for spotlight) |
+
+**Styles:** `.command-palette` `.command-palette-cards` `.command-palette-cards-field` `.command-palette-cards-input` `.command-palette-cards-list` `.command-palette-cards-row` `.command-palette-cards-row:selected` `.command-palette-classic` `.command-palette-classic-field` `.command-palette-classic-input` `.command-palette-classic-list` `.command-palette-classic-row` `.command-palette-classic-row:selected` `.command-palette-compact` `.command-palette-compact-field` `.command-palette-compact-input` `.command-palette-compact-list` `.command-palette-compact-row` `.command-palette-detail` `.command-palette-disabled` `.command-palette-empty` `.command-palette-field` `.command-palette-field-icon` `.command-palette-footer` `.command-palette-heading` `.command-palette-icon` `.command-palette-input` `.command-palette-list` `.command-palette-prefix` `.command-palette-row` `.command-palette-row:hover` `.command-palette-row:selected` `.command-palette-spotlight` `.command-palette-spotlight-field` `.command-palette-spotlight-input` `.command-palette-tag` `.command-palette-tile` `.command-palette-tile:selected`
+
+```lua
+local command_palette = use "command-palette"
+
+-- in view (the mod opens it from a shortcut or a menu):
+command_palette {
+	open = state.palette, dismiss = "close-palette",
+	look = "spotlight", -- classic, compact, cards
+	commands = {
+		{ id = "new-tab", label = "New terminal tab", icon = "terminal", shortcut = "cmd-t", group = "Terminal" },
+		{ id = "branch", label = "Switch branch…", icon = "git-branch", detail = "main", group = "Git" },
+	},
+}
+-- in update: msg.run is the chosen command's id (close it there);
+-- "close-palette" closes it.
+```
+
+A whole mod using it, with state: `app/components/demos/command-palette.luau`.
+
 #### `confirm`
 
 **Confirm.** A small modal question with a message, optional detail and affected items, and Cancel / Confirm buttons.
@@ -3334,7 +3553,7 @@ A whole mod using it, with state: `app/components/demos/dialog.luau`.
 
 **Menu.** Menu rows (icon, label, check, detail, shortcut, danger) with separators and headings; a click sends { pick = id }.
 
-**When:** The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `ui.overlay` with your own rows.
+**When:** The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `command-palette`.
 
 | Prop | Meaning |
 | --- | --- |
@@ -3427,7 +3646,7 @@ A whole mod using it, with state: `app/components/demos/sheet.luau`.
 
 **Shortcuts.** A keyboard shortcut reference: groups of key caps and labels laid out in columns in a large modal.
 
-**When:** Show the app's or a mod's keybindings (a ? or ⌘/ help overlay, a Shortcuts page). For one shortcut use `kbd`; for a line of hints under a list or palette use `key-hints`; for a command palette use `dialog` with `place = "top"`.
+**When:** Show the app's or a mod's keybindings (a ? or ⌘/ help overlay, a Shortcuts page). For one shortcut use `kbd`; for a line of hints under a list or palette use `key-hints`; for a command palette use `command-palette`.
 
 | Prop | Meaning |
 | --- | --- |

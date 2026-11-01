@@ -3,7 +3,10 @@ use {
         Action, Border, Color, Command, Corners, Data, Direction, Node, Paint, Part, Rules, SHELL,
         Shade, Shadow, ShadowLayer, ShadowPreset, Sides, Token, Workspace,
     },
-    std::{fs, path::Path},
+    std::{
+        fs,
+        path::{Path, PathBuf},
+    },
 };
 
 const SHELL_SOURCE: &str = r#"
@@ -1465,6 +1468,54 @@ fn component_styles_sit_under_the_stylesheet_and_reach_every_mod() {
 }
 
 #[test]
+fn a_component_is_animated_by_a_transition_or_what_the_stylesheet_moves() {
+    let component = |styles: &str, build: &str| {
+        format!(
+            "return component {{ title = \"x\", when = \"w\", props = {{}}, example = {{}},\n  styles = {{ {styles} }},\n  build = function() return {build} end }}\n"
+        )
+    };
+    let dir = app(&[]);
+    write(
+        dir.path(),
+        "components/a-moving.luau",
+        &component(
+            r#"[".m"] = { transition = "fade fast" }"#,
+            "ui.row { class = \"m\" }",
+        ),
+    );
+    write(
+        dir.path(),
+        "components/b-sheet.luau",
+        &component(
+            "",
+            "ui.column { ui.overlay { open = true, content = ui.text \"s\" } }",
+        ),
+    );
+    write(
+        dir.path(),
+        "components/c-still.luau",
+        &component(r#"[".s"] = { radius = 4 }"#, "ui.text \"s\""),
+    );
+    write(
+        dir.path(),
+        "components/d-off.luau",
+        &component(r#"[".o"] = { transition = "none" }"#, "ui.text \"o\""),
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let animated: Vec<_> = workspace
+        .components()
+        .iter()
+        .map(|component| (component.name.as_str(), component.animated()))
+        .collect();
+    assert_eq!(animated, [
+        ("a-moving", true),
+        ("b-sheet", true),
+        ("c-still", false),
+        ("d-off", false),
+    ]);
+}
+
+#[test]
 fn controls_take_a_tooltip_a_context_message_and_text_to_copy() {
     let source = r#"return mod { view = function()
   return ui.row {
@@ -1935,7 +1986,13 @@ fn images_come_only_from_the_app_folders_and_the_cache() {
     // Out of the app's folders, by a path or by `..`: an empty box.
     let secret = outside.path().join("secret.png");
     assert!(!shown(secret.to_str().unwrap()));
-    let relative = format!("../../../{}", secret.strip_prefix("/").unwrap().display());
+    let named = |path: &Path| {
+        path.components()
+            .filter(|part| matches!(part, std::path::Component::Normal(_)))
+            .collect::<PathBuf>()
+    };
+    let up = "../".repeat(named(&folder).components().count());
+    let relative = format!("{up}{}", named(&secret).display());
     assert!(!shown(&relative));
     // A folder is not a picture.
     assert!(!shown("."));
@@ -2216,6 +2273,48 @@ fn an_app_package_brings_its_shell_and_keeps_only_the_builtin_mods_it_names() {
     assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
         "explorer", "terminal"
     ]);
+}
+
+#[test]
+fn a_hosted_app_stands_on_the_toolbox_under_its_packages_and_the_user() {
+    const PANEL: &str = r#"return mod { view = function() return ui.text "x" end }"#;
+    let toolbox = app(&[("explorer", PANEL), ("terminal", PANEL)]);
+    write(toolbox.path(), "components/card.luau", BADGE_COMPONENT);
+    let dir = tempfile::tempdir().unwrap();
+    let (host, package, user) = (
+        dir.path().join("host"),
+        dir.path().join("extras"),
+        dir.path().join("user"),
+    );
+    write(&host, "main.luau", SHELL_SOURCE);
+    write(&host, "mods/sessions/main.luau", PANEL);
+    write(&host, "mods/notes/main.luau", "error('the host notes')");
+    // A package the user installed replaces the host's mod of its name.
+    write(&package, "mods/notes/main.luau", PANEL);
+    write(&user, "style.luau", "return style { radius = 7 }");
+
+    let roots = crate::Roots::hosted(
+        toolbox.path().to_owned(),
+        crate::AppLayer {
+            path: host.clone(),
+            keep: vec!["terminal".to_owned()],
+        },
+        [package],
+        Some(user),
+    );
+    assert_eq!(roots.file("main.luau"), Some(host.join("main.luau")));
+    assert!(roots.entries("components", "luau").contains_key("card"));
+    let workspace = Workspace::open(roots, false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    // The toolbox's explorer stays out; its terminal is kept.
+    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
+        "notes", "sessions", "terminal"
+    ]);
+    assert_eq!(workspace.stylesheet().radius, Some(7.0));
 }
 
 #[test]
@@ -3163,6 +3262,50 @@ fn a_topic_pushes_to_its_subscribers_and_is_saved() {
 }
 
 #[test]
+fn the_apps_own_topics_reach_only_their_mod_and_no_mod_forges_them() {
+    let picker = listener(r#""app/inspect""#);
+    let dir = app(&[
+        ("publisher", PUBLISHER),
+        ("picker", &picker),
+        ("bystander", &picker),
+    ]);
+    let mut workspace = Workspace::open_with(dir.path(), false, None);
+    let heard = |workspace: &Workspace, name: &str| match workspace
+        .slot(name)
+        .and_then(crate::Slot::view)
+    {
+        Some(Node::Text(text)) => text.text.clone(),
+        other => panic!("{other:?}"),
+    };
+    let pick = |what: &str| Data::Map([("branch".to_owned(), Data::from(what))].into());
+    workspace.app_topic("inspect", "picker", pick("picked"));
+    assert_eq!(heard(&workspace, "picker"), "app/inspect=picked");
+    assert_eq!(heard(&workspace, "bystander"), "nothing");
+
+    // Sent straight to a mod, looking like topic news, it is refused.
+    let forged = Data::Map(
+        [
+            ("topic".to_owned(), Data::from("app/inspect")),
+            ("value".to_owned(), pick("forged")),
+        ]
+        .into(),
+    );
+    workspace.send("publisher", "picker", forged);
+    assert_eq!(heard(&workspace, "picker"), "app/inspect=picked");
+    assert!(workspace.slot("publisher").unwrap().error().is_some());
+
+    publish(&mut workspace, "app/inspect", Data::Bool(true));
+    let error = workspace
+        .slot("publisher")
+        .unwrap()
+        .error()
+        .unwrap()
+        .to_string();
+    // Refused either way: published, or handed to the publisher as news.
+    assert!(error.contains("app/"), "{error}");
+}
+
+#[test]
 fn an_instance_mounted_late_catches_up_on_its_topics() {
     let watcher = listener(r#""tabs/main""#);
     let dir = app(&[("publisher", PUBLISHER), ("watcher", &watcher)]);
@@ -3960,4 +4103,34 @@ return mod {
         panic!("no panel");
     };
     assert_eq!(text_of(&panel.children[0]), "count 1");
+}
+
+#[test]
+fn providers_are_wanted_by_what_views_read_and_mods_hear() {
+    let reader = r#"return mod { region = "left", view = function(state, app)
+        return ui.text(app.git and app.git.branch or "none") end }"#;
+    let dir = app(&[
+        ("reader", reader),
+        (
+            "hears",
+            &listener(r#""provider/files", "provider/gh*", "tabs/main""#),
+        ),
+    ]);
+    let workspace = Workspace::open(dir.path(), false);
+    let wanted = workspace.wanted_providers().unwrap();
+    for name in ["git", "files", "gh*"] {
+        assert!(wanted.contains(name), "{name} is not wanted: {wanted:?}");
+    }
+    assert!(!wanted.contains("tabs/main"));
+    assert!(!wanted.contains("system"));
+
+    // A view that goes through every key wants them all.
+    let all = r#"return mod { region = "left", view = function(state, app)
+        local count = 0
+        for _ in app do count += 1 end
+        return ui.text(tostring(count)) end }"#;
+    let dir = app(&[("all", all)]);
+    assert_eq!(Workspace::open(dir.path(), false).wanted_providers(), None);
+    let dir = app(&[("hears", &listener(r#""provider/*""#))]);
+    assert_eq!(Workspace::open(dir.path(), false).wanted_providers(), None);
 }

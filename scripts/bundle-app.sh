@@ -16,6 +16,9 @@
 # Inspect Element. What its users add goes in
 # ~/.config/moonframe/profiles/NAME. MOONFRAME_USER names another user
 # folder to find the profile in.
+#
+# MOONFRAME_BINARY bundles a prebuilt executable (the release's universal
+# one) instead of building for this Mac.
 set -euo pipefail
 
 out=${1:-target/bundle}
@@ -25,8 +28,12 @@ title=Moonframe
 id=dev.moonframe.app
 icon=assets/icon.png
 version=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
+binary=${MOONFRAME_BINARY:-}
 
-cargo build --quiet --release --locked -p moonframe
+if [ -z "$binary" ]; then
+    cargo build --quiet --release --locked -p moonframe-app
+    binary="target/release/$exe"
+fi
 
 app=
 packages=()
@@ -39,7 +46,7 @@ if [ -n "$profile" ]; then
             icon) icon=$value ;;
             package) packages+=("$value") ;;
         esac
-    done < <("target/release/$exe" ${MOONFRAME_USER:+--user "$MOONFRAME_USER"} app paths "$profile")
+    done < <("$binary" ${MOONFRAME_USER:+--user "$MOONFRAME_USER"} app paths "$profile")
     [ -n "$app" ] || { echo "no app in the profile $profile" >&2; exit 1; }
     case $title in
         "" | .* | */* | *'\'* | *'<'* | *'>'* | *'&'* | *:*)
@@ -72,7 +79,7 @@ if [ "$(uname)" != Darwin ]; then
     rm -rf "$bundle"
     mkdir -p "$bundle/bin" "$bundle/share/$bin" "$bundle/share/applications" \
         "$bundle/share/icons/hicolor/512x512/apps"
-    cp "target/release/$exe" "$bundle/bin/$bin"
+    cp "$binary" "$bundle/bin/$bin"
     stage "$bundle/share/$bin"
     cp "$icon" "$bundle/share/icons/hicolor/512x512/apps/$id.png"
     cat > "$bundle/share/applications/$id.desktop" <<DESKTOP
@@ -91,7 +98,7 @@ fi
 bundle="$out/$title.app"
 rm -rf "$bundle"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
-cp "target/release/$exe" "$bundle/Contents/MacOS/$exe"
+cp "$binary" "$bundle/Contents/MacOS/$exe"
 stage "$bundle/Contents/Resources"
 
 # The icon, at every size Finder and the Dock ask for.
@@ -123,6 +130,8 @@ cat > "$bundle/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+
+cp LICENSE "$bundle/Contents/Resources/LICENSE"
 
 codesign --force --deep --sign - "$bundle" 2>/dev/null
 echo "$bundle"

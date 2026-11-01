@@ -1,0 +1,9 @@
+# The agent skills this app ships (moonframe, moonframe-components,
+# moonframe-apps, moonframe-mockups), shared as `app.skills`: whether the
+# user's folder has them, at this version. The `skills` mod offers to copy
+# them to ~/.config/moonframe/.claude/skills, where an agent working on the
+# user's mods finds them.
+# A process provider: it copies files with your access, only when a mod
+# sends "install". Needs bash.
+command = ["bash", "skills.sh"]
+kind    = "process"

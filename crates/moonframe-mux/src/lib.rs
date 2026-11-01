@@ -3,7 +3,7 @@
 //! 1. **herdr-core** (`hc`), when installed: it keeps terminals running
 //!    and streams their output; started if it isn't running.
 //! 2. **tmux**, when installed: a session per terminal on the app's own
-//!    server.
+//!    server (`tmux -L <app>`).
 //! 3. **pty**: the login shell on a local pseudo-terminal, always there;
 //!    it ends with the app.
 //!
@@ -70,26 +70,59 @@ impl<T> Found<T> {
     }
 }
 
-/// The backends this machine has, found on first use.
-#[derive(Default)]
+/// The namespace of the starter app, whose terminals predate namespaces.
+pub const STARTER: &str = "moonframe";
+
+/// The backends this machine has, found on first use, for one app's
+/// terminals: each app (and each profile) keeps its own, apart from any
+/// other's, on a tmux server of its own and under its own label in
+/// herdr-core.
 pub struct Backends {
+    namespace: String,
     #[cfg(feature = "herdr-core")]
     herdr_core: Found<HerdrCore>,
     tmux: Found<Tmux>,
 }
 
+impl Default for Backends {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Backends {
+    /// The starter's.
     pub fn new() -> Self {
-        Self::default()
+        Self::for_app(STARTER)
+    }
+
+    /// The terminals of the app `namespace` (`notes`, or `moonframe-ledger`
+    /// for a profile): its tmux server is `tmux -L <namespace>`.
+    pub fn for_app(namespace: &str) -> Self {
+        Self {
+            namespace: namespace.to_owned(),
+            #[cfg(feature = "herdr-core")]
+            herdr_core: Found::default(),
+            tmux: Found::default(),
+        }
+    }
+
+    /// Whose terminals these are.
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    #[cfg(feature = "herdr-core")]
+    fn core(&self) -> Option<Arc<HerdrCore>> {
+        self.herdr_core
+            .get(|| HerdrCore::connect().map(|core| core.for_app(&self.namespace)))
     }
 
     /// herdr-core, when it is installed and starts. Blocks on first use.
     pub fn herdr_core(&self) -> Option<Arc<dyn Backend>> {
         #[cfg(feature = "herdr-core")]
         {
-            self.herdr_core
-                .get(HerdrCore::connect)
-                .map(|core| core as Arc<dyn Backend>)
+            self.core().map(|core| core as Arc<dyn Backend>)
         }
         #[cfg(not(feature = "herdr-core"))]
         None
@@ -98,7 +131,7 @@ impl Backends {
     /// tmux, when it is installed. Blocks on first use.
     pub fn tmux(&self) -> Option<Arc<dyn Backend>> {
         self.tmux
-            .get(Tmux::find)
+            .get(|| Tmux::find().map(|tmux| tmux.on_socket(&self.namespace)))
             .map(|tmux| tmux as Arc<dyn Backend>)
     }
 
@@ -145,7 +178,7 @@ impl Backends {
     /// if it is installed). Blocks on first use.
     pub fn store(&self, name: &str) -> Option<Arc<dyn Store>> {
         #[cfg(feature = "herdr-core")]
-        if let Some(core) = self.herdr_core.get(HerdrCore::connect) {
+        if let Some(core) = self.core() {
             let store = CoreStore::new(core, name);
             match store.load() {
                 Ok(_) => return Some(Arc::new(store)),

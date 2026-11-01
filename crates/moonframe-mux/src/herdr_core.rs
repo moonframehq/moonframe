@@ -24,6 +24,9 @@ use {
 
 /// The label that holds a terminal's key.
 const LABEL: &str = "moonframe";
+/// The label that holds the app a terminal belongs to; the starter's
+/// terminals from before it existed have none.
+const APP: &str = "moonframe-app";
 /// Scrollback lines the core paints first when a terminal attaches.
 const HISTORY: u32 = 2000;
 /// How long a read waits before checking the stream again.
@@ -34,6 +37,8 @@ const START: Duration = Duration::from_secs(5);
 /// A herdr-core session, reached through its socket.
 pub struct HerdrCore {
     endpoint: Endpoint,
+    /// Whose terminals it opens; see [`HerdrCore::for_app`].
+    app: String,
     /// The connection, made again when it is lost.
     core: Mutex<Option<Arc<Core>>>,
 }
@@ -73,8 +78,17 @@ impl HerdrCore {
         };
         Some(Self {
             endpoint,
+            app: crate::STARTER.to_owned(),
             core: Mutex::new(Some(Arc::new(core))),
         })
+    }
+
+    /// The same core, opening the terminals of the app `namespace` only.
+    pub fn for_app(self, namespace: &str) -> Self {
+        Self {
+            app: namespace.to_owned(),
+            ..self
+        }
     }
 
     fn core(&self) -> Result<Arc<Core>, String> {
@@ -164,6 +178,15 @@ fn terminal_name(key: &str) -> Option<String> {
     (first.is_ascii_alphanumeric() && !like_address).then_some(name)
 }
 
+/// Whether a terminal labelled `labels` belongs to the app `app`: the
+/// starter also owns the unlabelled ones it made before apps had labels.
+pub(crate) fn owns(app: &str, labels: &BTreeMap<String, String>) -> bool {
+    match labels.get(APP) {
+        Some(owner) => owner == app,
+        None => app == crate::STARTER,
+    }
+}
+
 /// The installed `herdr-core`, if any: a candidate counts only if its
 /// version says so, since some window managers ship an unrelated `hc`.
 pub fn installed() -> Option<PathBuf> {
@@ -188,6 +211,7 @@ impl Backend for HerdrCore {
             .find(|terminal| {
                 terminal.state == wire::TerminalState::Live
                     && terminal.labels.get(LABEL) == Some(&open.key)
+                    && owns(&self.app, &terminal.labels)
             });
         let address = match running {
             Some(terminal) => terminal.address,
@@ -198,11 +222,16 @@ impl Backend for HerdrCore {
                     .filter(|cwd| cwd.is_dir())
                     .map(|cwd| cwd.to_string_lossy().into_owned())
                     .or_else(|| std::env::var("HOME").ok());
-                let name = terminal_name(&open.key);
+                // Another app's names start with its own, in `hc ls`.
+                let name = if self.app == crate::STARTER {
+                    terminal_name(&open.key)
+                } else {
+                    terminal_name(&format!("{}/{}", self.app, open.key))
+                };
                 let mut run = wire::Run {
                     cwd: cwd.as_deref(),
                     env: BTreeMap::from([("COLORTERM", "truecolor")]),
-                    labels: BTreeMap::from([(LABEL, open.key.as_str())]),
+                    labels: BTreeMap::from([(LABEL, open.key.as_str()), (APP, self.app.as_str())]),
                     name: name.as_deref(),
                     ..wire::Run::default()
                 };

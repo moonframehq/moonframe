@@ -63,6 +63,7 @@ Pick the lowest layer that can do the job:
 | state that survives quitting the app (open panels, tabs, a choice) | nothing to add: every mod's state is saved; shape what comes back in `init` | the mod's `init` | no |
 | git status, a file's diff, commit or push | read `app.git`; send `provider:git` a message | in a mod | no (git is built in) |
 | markdown shown, or a project file read and saved | `ui.markdown` or `use "markdown"`; `use "markdown-editor"`, which reads and saves through `provider:docs` | in a mod | no (docs is built in) |
+| a coding agent doing a task (Claude, Codex, Gemini...) | send `provider:acp` `{ start = ... }`; show the run with `use "agent-run"` | in a mod | no (acp is built in) |
 | a provider that needs a Rust library or answers actions | a **native provider** | `crates/` + `providers/<name>/provider.toml` | yes, and the app restarts |
 | a look change | a rule in `style.luau`, or the mod's `styles` | | no |
 | a new kind of element (tree, chart, image) | a host element | `crates/` | yes, and the app restarts |
@@ -72,6 +73,12 @@ and the element table before asking for a host change. Live-reloaded Luau
 keeps the user's window running; Rust changes don't.
 
 ### Recipes
+
+**"Show me some ideas first."** When the user wants options or mockups
+before a change, use the **moonframe-mockups** skill
+(`.claude/skills/moonframe-mockups`): variants drawn live in a throwaway
+`mods/mockup` in the user's folder, opened in a tab, applied only once the
+user picks one.
 
 **"Add X here."** Read `~/.cache/moonframe/selection.md`
 (see "Here: the user's selection"). Open the file at the line it gives,
@@ -179,6 +186,32 @@ step. git only takes writes from mods in `providers/git`'s
 name to `writers` there (in this repository, edit `app/providers/git`
 itself); otherwise it is refused with a reply saying so. `mods/status` is the full example (a commit sheet on the branch).
 
+**Have a coding agent do something.** The `acp` provider runs Claude,
+Codex, Gemini, OpenCode or Copilot over the Agent Client Protocol in the
+app's repository and publishes each run as `app.acp.runs`; draw one with
+`use "agent-run"` (status, plan, tool calls, its permission question, its
+answer), whose buttons talk to the provider directly:
+
+```lua
+-- in update (the mod must be in providers/acp's `starters`)
+return state, { { to = "provider:acp", msg = {
+	start = state.text, id = "mine", agent = "claude",
+	instructions = "How to do it, from the mod.",   -- before the user's words
+	context = { main_tab = state.tab },             -- fenced as data, never instructions
+} } }
+-- answered as { reply = "mine", action = "start", ok, run | error },
+-- and when it ends { reply = "mine", action = "finished", ok, run, status, message | error }
+-- in view
+for _, run in (app.acp and app.acp.runs) or {} do
+	if run.owner == "mine" then ... agent_run { run = run } ... end
+end
+```
+
+Without `permissions = "allow"`, every tool the agent wants waits on the
+user in `agent-run`; with it the agent does anything as the user, so set it
+only where the user asked for that (`mods/feedback` does). Like git's
+`writers`, a new mod goes in `starters` of a copy of `app/providers/acp`.
+
 **Customising the installed app.** Write to `~/.config/moonframe`
 (same layout as `app/`). Copy a built-in mod's folder there to change it.
 Personal mods belong there, never in this repository. `just install` puts
@@ -208,6 +241,17 @@ the mod that used the component. Change or add next to that line. "Inside"
 lists every element around it, outermost first, so "add a list here" on a
 row means adding a child to that row; on a text, add a sibling. If the file
 is missing, nothing is selected: ask, or pick a sensible place and say which.
+
+**A mod can ask for a pick.** A button with `command = "inspect"` starts
+picking for the mod that drew it, without the card. That mod hears it on the
+topic `app/inspect` (subscribe to it): `{ asker, picking = true }` as it
+starts (hide a dialog then), and `{ asker, picking = false, picked, element?,
+mod?, at?, report? }` when the user clicks an element (`picked = true`;
+`report` is the text above) or presses Escape. Only the mod that asked
+hears it; if another mod starts a pick meanwhile, the first hears
+`picked = false`. `mods/feedback` attaches the pick to a request this way.
+`app/` topics are the app's: a mod can't publish them, nor send another mod
+a message passing for `app/` or `provider/` topic news.
 
 "Copy for agent" copies that text and closes the card, but the file stays,
 so the selection is still there for you. "Clear" (or Esc) deletes it. The
@@ -318,12 +362,15 @@ live shell. The host runs it, so it can't be written in Luau:
   shell exits (Enter starts another). Two `id`s are two shells.
 - **Backends:** `backend = "auto"` (default) runs it on herdr-core (`hc`)
   when installed (starting its server if needed), else tmux (a session per
-  terminal on the app's own server: `tmux -L moonframe ls`), else a local
+  terminal on the app's own server: `tmux -L moonframe ls`, `tmux -L
+  moonframe-<profile> ls` for a profile, `tmux -L <name> ls` for an app on
+  the library; herdr-core labels each app's apart), else a local
   pty that ends with the app. `"herdr-core"`, `"tmux"` or `"pty"` asks for
   one; one that is missing falls back to the next. A faint label in the
   terminal's bottom-right corner names the backend in use.
 - **Engines:** `engine = "alacritty"` (default, pure Rust) or `"ghostty"`
-  (libghostty-vt). Both are cargo features of `moonframe`, on by default.
+  (libghostty-vt). Both are cargo features of the `moonframe` crate; the
+  starter builds both, an app on the library opts into `ghostty`.
   A build without one shows why in the element's place.
 - **Sizing:** it grows to fill its container (give the container `grow`),
   and the shell is resized to match. Style it with a `terminal` rule or
@@ -571,7 +618,7 @@ return mod {
 - `provider/<name>` carries a provider's data each time it publishes, for a
   mod that must react (not only redraw); views still read `app.<name>`.
 - Names are 1 to 128 of `a-z A-Z 0-9 - _ . /`; `provider/` is the
-  providers'. Previews (the Components window) hear nothing.
+  providers', and `app/` the app's own (`app/inspect`). Previews (the Components window) hear nothing.
 - Use a topic when several modules share a value; use `to = "<mod>"` when
   one module tells another.
 
@@ -593,6 +640,15 @@ tab = { title = "Terminal", icon = "terminal", props = { cwd = "~" } },
 -- `url` and `title` that come back:
 tab = { title = "Browser", icon = "globe", props = { url = "https://luau.org" }, report = "navigate" },
 ```
+
+A mod brings up a main tab of a kind by sending the shell
+`{ to = "shell", msg = { open_tab = "mod:mockup" } }`: the open tab of that
+kind is selected, else a new one opens (the shell sends `tabbed#main`
+`{ open = kind }`). Send it from `init` when `props` is nil (the mod in its
+own place, not its tabs) and only once, or every tab opens another.
+`{ close_tab = "mod:mockup" }` closes every tab of the kind (`tabbed`'s
+`{ close_kind = kind }`): send it before the mod's folder is deleted. A tab
+whose mod is gone says so and waits to be closed.
 
 A component kind is drawn with its tab's props and `id` (so a terminal or
 browser is the tab's own); a mod kind is mounted as an instance per tab.
@@ -775,6 +831,7 @@ Text-like elements take their main value positionally:
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
 | `ui.badge "..."` | `text`, `tone`, extras | pill |
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
+| `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
 | `ui.markdown "# Notes"` | `text`, `link`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures are not loaded |
 | `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
@@ -832,7 +889,7 @@ Text-like elements take their main value positionally:
 - border: `true`, `all`, `top`, `bottom`, `left`, `right`, `none`
 - direction: `row` `column`
 - variant (button): `normal` `primary` `ghost` `outline` `danger`
-- command: `quit` `reload` `toggle-theme` `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window`
+- command: `quit` `reload` `toggle-theme` `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `inspect` (Inspect Element for the mod: see "Here")
 - place (overlay): `center` `top` `bottom` `left` `right` `top-start`
   `top-end` `bottom-start` `bottom-end`
 - browser commands (with `browser = "<id>"`): `browser-back`
@@ -1308,9 +1365,10 @@ native, and it commits and pushes on request), and from process providers
 `app.github` and `app.gitlab` (pull requests, checks, issues),
 `app.agents` (coding agents running here), `app.files` (the project's
 file tree), `app.docs` (native: reads and saves the project's text files
-for a mod, answering it) and `app.herdr` (whether herdr-core and tmux are installed).
+for a mod, answering it), `app.herdr` (whether herdr-core and tmux are
+installed), and the native `app.acp` (coding agents a mod runs over ACP).
 Their shapes are under "Built-in providers" below and typed in
-`types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`,
+`types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`, `Acp`,
 and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
 is labelled demo data, as in `mods/usage`.
@@ -1320,7 +1378,12 @@ is labelled demo data, as in `mods/usage`.
 publishes appears to every view as `app.<name>`, and a mod messages it with
 `msg = ..., to = "provider:<name>"`. Adding, editing or removing a provider
 folder starts, restarts or stops only that provider, while the window keeps
-running; the others keep their state. A failed provider shows a banner, and its error appears in the
+running; the others keep their state. A provider starts only once
+something wants it: a drawn view reads `app.<name>` (a view that loops
+over all of `app` wants every one), a mod subscribes to
+`provider/<name>`, or a mod sends it a message; once started it keeps
+running. `start = "always"` in provider.toml starts it with the app
+instead, for one whose work matters before anything shows it. A failed provider shows a banner, and its error appears in the
 terminal log. There are three kinds:
 
 - **`kind = "wasm"`:** a WebAssembly component implementing
@@ -1443,7 +1506,19 @@ and a string in a message or in state up to 1 MiB (4 MiB of text per value).
 installing, error, fresh }`, every 30 s and on any message. The message
 `"install"` runs herdr-core's own installer (into `~/.local/bin`) and sets
 `fresh` once it has. Only the `herdr` mod's `"install"` counts: it sends
-it when the user clicks Install on its offer.
+it when the user clicks Install on its offer. Whether that offer is up goes
+out on the topic `offers/herdr` (a boolean), so another offer in the same
+corner can wait for it, as `mods/skills` does.
+
+`app.skills` (skills, from `bash`): `{ available, skills, target, status,
+version, installing, error, fresh }`, every 60 s and on any message. The
+agent skills the app ships (`skills/` beside the provider in a bundle, the
+repository's `.claude/skills` from a checkout), against
+`~/.config/moonframe/.claude/skills`: `status` is `"missing"`, `"stale"` or
+`"current"`, `version` a checksum of the shipped ones. Only the `skills`
+mod's `"install"` copies them, each skill folder replaced whole; it sends
+that when the user agrees on its offer, which comes back when an update
+ships newer skills.
 
 `app.github` (github, via `gh`) and `app.gitlab` (gitlab, via `glab` and
 `jq`, only for a GitLab remote): every 60 s, and on any message. Same shape;
@@ -1480,6 +1555,28 @@ or `lsof`).
 |---|---|
 | `agents` | `{ pid, ppid, name, command, cwd?, tty?, started, elapsed_seconds, cpu, status }`; `name` is `"claude" "codex" "gemini" "cursor" "opencode" "aider" "amp" "copilot" "droid" "kiro" "qwen" "goose" "crush" "auggie" "cline" "kimi" "grok"`; `status` is always `"running"` |
 | `count` | how many |
+
+`app.acp` (acp, native): coding agents run for mods over the Agent Client
+Protocol (crates/moonframe-acp), each in the app's repository (else
+`~/.config/moonframe`; `[settings] cwd` to change), one prompt per run,
+published as it goes (every 0.25 s while something changed). Only mods in
+`[settings] starters` (`feedback` as shipped) may start runs, and a run
+obeys only the mod that started it. Agents are found as herdr-acp finds
+them: `claude-agent-acp`, `codex-acp` (each else through `npx`),
+`gemini --acp`, `opencode acp`, `copilot --acp`; `[settings] commands`
+replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
+runs are kept (30) across launches.
+
+Messages: `{ start = "<words>", id?, agent?, instructions?, context?,
+permissions? }` (`permissions = "allow"` answers every question with the
+broadest allow), `{ cancel = run }`, `{ forget = run }`
+(finished ones), `{ answer = run, option = "<id>" | false }`.
+
+| field | shape |
+|---|---|
+| `agents` | `{ name, title, installed, fetched }` (`fetched`: only `npx` can start it) |
+| `agent`, `workdir`, `running` | the default agent, where agents work, how many runs go |
+| `runs` | newest first: `{ id, owner, agent, agent_title, text, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
 
 `[settings]` in `provider.toml` reaches `start`. `just check` validates the
 manifests, and `just providers` builds and lints the Wasm ones. When a view
@@ -1587,8 +1684,26 @@ examples of each pattern. Read them before larger changes.
 
 ## Extending the host
 
-When a request needs something no element can express (a tree, a chart),
-add an element in Rust. Say so to the user first: it needs a build and an
+**In an app built on the library** (a crate whose `main` calls
+`moonframe::Moonframe::new(...)`, with its own `app/` folder; see
+`docs/library.md` in the Moonframe repository), Rust goes in the app's own
+crate, never in Moonframe:
+- a view Luau can't draw (an editor, a canvas, an existing GPUI view):
+  a type implementing `moonframe::HostView` and `Render`, registered with
+  `.view("editor", Editor::new)`, placed with `ui.view { name = "editor",
+  id = "main", props = {...} }`. It is made on first draw, kept by mod and
+  `id`, gets `set_props` when `props` change, and sends the mod's `update`
+  messages with its `Messenger` (`ViewInit::messenger`).
+- data or actions: a `moonframe::Native` provider, `.native("index",
+  Index::default)`, with `app/providers/index/provider.toml` holding
+  `kind = "native"`.
+There, `cargo run -- --check` checks the app (not `just check`), its
+user folder is `~/.config/<name>`, and Moonframe's components, providers
+and stylesheet sit under its `app/`, its mods shadowing none of theirs.
+Rebuild and restart after Rust changes; Luau still reloads live.
+
+**In Moonframe itself**, when a request needs something no element can
+express (a tree, a chart), add an element in Rust. Say so to the user first: it needs a build and an
 app restart, unlike everything above. `ui.icon`, `ui.terminal`, `ui.browser`
 and `ui.input` are recent examples to copy; `ui.input` shows an element
 whose host-side state is kept by mod and `id` and drawn with a `RenderOnce`

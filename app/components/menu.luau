@@ -41,7 +41,7 @@ return component {
 	category = "Overlays",
 	icon = "menu",
 	description = "Menu rows (icon, label, check, detail, shortcut, danger) with separators and headings; a click sends { pick = id }.",
-	when = "The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `ui.overlay` with your own rows.",
+	when = "The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `command-palette`.",
 	props = {
 		["items"] = "list of { id, label, icon?, shortcut? (kbd keys, \"cmd-s\"), checked? (true/false shows the check column), danger?, disabled?, detail? (muted text on the right), msg? (sent instead of the default) }, the string \"separator\", or { heading = \"Text\" }",
 		["highlighted"] = "the keyboard-highlighted row: an item id, or its index in `items`",

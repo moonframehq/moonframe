@@ -1,0 +1,4 @@
+# The time, shared as `app.clock` each second: Rust built into the app
+# (`Moonframe::native("clock", ...)` in src/main.rs).
+interval = 1.0
+kind     = "native"

@@ -160,6 +160,8 @@ pub const TOPIC: &str = "topic:";
 
 /// The topic a provider's data is published on: `provider/git`.
 const PROVIDER_TOPIC: &str = "provider/";
+/// Topics only the app itself publishes: `app/inspect`.
+const APP_TOPIC: &str = "app/";
 
 /// Longest a topic name can be.
 const MAX_TOPIC: usize = 128;
@@ -622,6 +624,19 @@ impl Workspace {
         drawn
     }
 
+    /// Tells the module `to`, if it subscribes to the app's own topic
+    /// `app/<name>` (which no mod can publish or forge), and draws again.
+    /// Only `to` hears it, and it is not kept.
+    pub fn app_topic(&mut self, name: &str, to: &str, value: Data) {
+        let deliveries: VecDeque<_> = self
+            .deliveries(&format!("{APP_TOPIC}{name}"), &value)
+            .into_iter()
+            .filter(|(_, key, _)| key == to)
+            .collect();
+        self.process(deliveries);
+        self.settle();
+    }
+
     /// Stops sharing `app.<key>`, with the reason when there is one.
     pub fn clear_host(&mut self, key: &str, problem: Option<Error>) {
         self.host.remove(key);
@@ -630,6 +645,47 @@ impl Workspace {
             None => self.host_problems.remove(key),
         };
         self.render();
+    }
+
+    /// The providers something here wants running: those whose
+    /// `app.<name>` a view read when last drawn, and those whose topic
+    /// (`provider/<name>`) a module hears. `None` when one wants them all:
+    /// a view that went through every key of `app`, or a module that hears
+    /// every provider's topic. A name ending in `*` stands for every
+    /// provider it starts. A provider no one wants need not start.
+    pub fn wanted_providers(&self) -> Option<BTreeSet<String>> {
+        let mut wanted = BTreeSet::new();
+        let slots = std::iter::once(&self.shell)
+            .chain(self.mods.values())
+            .chain(self.instances.values().map(|mounted| &mounted.slot));
+        for slot in slots {
+            match slot.drawn.as_ref().map(|drawn| &drawn.stamp) {
+                Some(Stamp::All(_)) => return None,
+                Some(Stamp::Keys(keys)) => wanted.extend(keys.iter().map(|(key, _)| key.clone())),
+                None => {},
+            }
+            let Some(module) = &slot.module else {
+                continue;
+            };
+            for pattern in module.subscriptions() {
+                match pattern.strip_suffix('*') {
+                    // `provider/*`, `prov*`, `*`: every provider's topic.
+                    Some(prefix) if PROVIDER_TOPIC.starts_with(prefix) => return None,
+                    // `provider/gi*`: every provider whose name starts so.
+                    Some(prefix) => {
+                        if let Some(start) = prefix.strip_prefix(PROVIDER_TOPIC) {
+                            wanted.insert(format!("{start}*"));
+                        }
+                    },
+                    None => {
+                        if let Some(name) = pattern.strip_prefix(PROVIDER_TOPIC) {
+                            wanted.insert(name.to_owned());
+                        }
+                    },
+                }
+            }
+        }
+        Some(wanted)
     }
 
     /// Why each source of shared data has nothing to share.
@@ -914,6 +970,16 @@ impl Workspace {
                 }
                 continue;
             }
+            // What arrives as `provider/` or `app/` topic news comes from
+            // the host only: a mod cannot pass one off to another.
+            if !from.starts_with(TOPIC) && forged_topic(&msg) {
+                if let Some(slot) = self.slot_mut(&from) {
+                    slot.update_error = Some(Error::new(format!(
+                        "a message to `{to}` looks like `{PROVIDER_TOPIC}` or `{APP_TOPIC}` topic news, which only the app sends"
+                    )));
+                }
+                continue;
+            }
             delivered += 1;
             if delivered > MAX_MESSAGES {
                 if let Some(slot) = self.slot_mut(&from) {
@@ -959,9 +1025,9 @@ impl Workspace {
             && name
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'));
-        if !plain || name.starts_with(PROVIDER_TOPIC) {
+        if !plain || name.starts_with(PROVIDER_TOPIC) || name.starts_with(APP_TOPIC) {
             return Err(Error::new(format!(
-                "`topic:{name}`: a topic is 1 to {MAX_TOPIC} of a-z, A-Z, 0-9, - _ . /, and provider/ topics are the providers'"
+                "`topic:{name}`: a topic is 1 to {MAX_TOPIC} of a-z, A-Z, 0-9, - _ . /; provider/ topics are the providers' and app/ ones the app's"
             )));
         }
         let deliveries = self.deliveries(name, &value);
@@ -1373,6 +1439,15 @@ fn merge(into: &Table, key: Value, value: Value, depth: usize) -> mlua::Result<(
 }
 
 /// What a module hears on a topic: `{ topic = "<name>", value = ... }`.
+/// A message with a `topic` the host alone publishes.
+fn forged_topic(msg: &Data) -> bool {
+    let Data::Map(fields) = msg else {
+        return false;
+    };
+    matches!(fields.get("topic"), Some(Data::String(topic))
+        if topic.starts_with(PROVIDER_TOPIC) || topic.starts_with(APP_TOPIC))
+}
+
 fn topic_message(name: &str, value: &Data) -> Data {
     Data::Map(
         [

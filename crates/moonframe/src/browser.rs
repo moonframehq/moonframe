@@ -49,6 +49,8 @@ const BACKLOG: usize = 256;
 const BLANK: &str = "about:blank";
 
 /// What a page reported, on its platform's callbacks.
+// Only the native web views' callbacks report; Linux has none yet.
+#[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
 #[derive(Debug)]
 pub(crate) enum Event {
     /// A load started, at this address.
@@ -61,6 +63,8 @@ pub(crate) enum Event {
 
 /// Where a page's callbacks queue what it reports, and how they wake the
 /// window to read it.
+// Only the native web views' callbacks report; Linux has none yet.
+#[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
 #[derive(Clone)]
 pub(crate) struct Outbox {
     key: String,
@@ -69,6 +73,7 @@ pub(crate) struct Outbox {
 }
 
 impl Outbox {
+    #[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
     pub(crate) fn report(&self, event: Event) {
         if self.sender.send((self.key.clone(), event)).is_ok() {
             (self.wake)();

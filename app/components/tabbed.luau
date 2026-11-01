@@ -172,6 +172,32 @@ return component {
 		elseif msg.pick then
 			open(state, props, msg.pick)
 			state.menu = false
+		elseif msg.open then
+			-- A tab of this kind, from a mod rather than the menu: the one
+			-- already open if there is one, else a new one.
+			local tab = find(state.tabs, "kind", msg.open)
+			if tab then
+				state.selected = tab.id
+			else
+				open(state, props, msg.open)
+			end
+		elseif msg.close_kind then
+			-- Every tab of a kind, from a mod about to go away (a mockup).
+			local kept = {}
+			for _, tab in state.tabs do
+				if tab.kind ~= msg.close_kind then
+					table.insert(kept, tab)
+				end
+			end
+			if #kept == #state.tabs then
+				return
+			end
+			local _, index = find(state.tabs, "id", state.selected)
+			state.tabs = kept
+			if not find(kept, "id", state.selected) then
+				local neighbour = kept[math.min(index or 1, #kept)]
+				state.selected = neighbour and neighbour.id
+			end
 		elseif msg.close then
 			local _, index = find(state.tabs, "id", msg.close)
 			if index then

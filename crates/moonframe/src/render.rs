@@ -18,12 +18,14 @@ mod markdown;
 mod plot;
 mod styling;
 mod terminal;
+mod view;
 
 use {
     crate::{
         app::MoonframeApp,
         browser::Browsers,
         color::ThemeColor,
+        hosted::Views,
         input::Inputs,
         inspect::{Crumb, Sink, Tracked},
         motion::{Keyed, Motion, Shown, Snapshot},
@@ -214,6 +216,8 @@ pub(crate) struct Painter<'w, 'm> {
     in_drag: bool,
     /// The pages browsers show; none in previews.
     browsers: Option<&'m mut Browsers>,
+    /// The app's own views; none in previews.
+    views: Option<&'m mut Views>,
     /// What keyed containers drew last frame, for children that arrive or
     /// go; none in previews, which draw them as they are.
     last_keyed: Option<&'w Keyed>,
@@ -247,7 +251,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             workspace,
             mounted: Vec::new(),
             motion,
-            now: Instant::now(),
+            now: crate::motion::now(),
             animating: false,
             drawn: 0,
             backdrops: Vec::new(),
@@ -261,6 +265,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             preview: false,
             in_drag: false,
             browsers: None,
+            views: None,
             last_keyed: None,
         }
     }
@@ -275,6 +280,12 @@ impl<'w, 'm> Painter<'w, 'm> {
     /// For the main window, whose browsers show their pages.
     pub(crate) fn with_browsers(mut self, browsers: &'m mut Browsers) -> Self {
         self.browsers = Some(browsers);
+        self
+    }
+
+    /// For windows that show the app's own views.
+    pub(crate) fn with_views(mut self, views: &'m mut Views) -> Self {
+        self.views = Some(views);
         self
     }
 
@@ -612,6 +623,7 @@ fn draw_node<'w>(
         Node::Hatch(hatch) => hatch.draw(painter, place, cx),
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
         Node::Browser(browser) => browser.draw(painter, place, cx),
+        Node::View(view) => view.draw(painter, place, cx),
         Node::Input(input) => input.draw(painter, place, cx),
         Node::Markdown(markdown) => markdown.draw(painter, place, cx),
         Node::Region(region) => region.draw(painter, place, cx),
