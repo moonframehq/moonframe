@@ -151,6 +151,11 @@ format-check:
     cargo +{{nightly_toolchain}} fmt --all -- --check
     taplo fmt --check
 
+# Fail when a source file (Rust, Python, shell, Swift, Luau) is over 1,000
+# lines; split it by responsibility instead (AGENTS.md).
+check-file-size:
+    scripts/check-file-size.sh
+
 # Verify Cargo.lock is in sync with workspace manifests.
 lockfile-check:
     cargo fetch --locked
@@ -189,4 +194,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check lint test types providers providers-examples check-builtin components-check check-examples
+ci: format-check check-file-size lint test types providers providers-examples check-builtin components-check check-examples

@@ -96,6 +96,9 @@ jobs:
             case $file in
               # TOML anywhere is formatted by the lint job (taplo).
               *.toml) build=true ;;
+              # The checks job holds the file size limit, which covers these
+              # wherever they are, the paths skipped below included.
+              *.rs | *.py | *.sh | *.swift | *.luau) build=true ;;
               # Read by nothing that is built, linted or checked here.
               website/* | homebrew/* | LICENSE | README.md | AGENTS.md | CLAUDE.md) ;;
               docs/*.md | docs/hero/*) ;;
@@ -191,6 +194,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Check the file size limit
+        # The checks job has no `just`; this is the script `just check-file-size` runs.
+        run: scripts/check-file-size.sh
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: scripts/install-linux-deps.sh
