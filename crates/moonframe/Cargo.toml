@@ -61,9 +61,11 @@ tempfile.workspace = true
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
 block2.workspace           = true
 objc2.workspace            = true
-objc2-app-kit              = { features = ["NSEvent", "NSRunningApplication", "NSView", "NSWindow", "block2"], workspace = true }
+objc2-app-kit              = { features = ["NSEvent", "NSRunningApplication", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
 objc2-foundation.workspace = true
-objc2-web-kit.workspace    = true
+# `app:notify`: system notifications, and hearing their clicks.
+objc2-user-notifications.workspace = true
+objc2-web-kit.workspace            = true
 
 # wry has no working GPUI child-view backend on Linux yet; a `ui.browser`
 # there shows its address and opens it in the system browser.

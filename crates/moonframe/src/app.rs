@@ -4,6 +4,7 @@
 use {
     crate::{
         actions::*,
+        alerts::{Alerts, Posted},
         browser::Browsers,
         color::rgba_color,
         gallery::Gallery,
@@ -26,7 +27,7 @@ use {
         *,
     },
     moonframe_core::{
-        Action, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL,
+        Action, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL, Sound,
         Stylesheet, Titlebar, Token, WindowState, Workspace,
     },
     moonframe_mux::Backends,
@@ -45,6 +46,8 @@ use {
 const SETTLE: Duration = Duration::from_millis(120);
 /// How long a toast shows.
 const TOAST: Duration = Duration::from_millis(1600);
+/// How long a notification shown as a toast does: it has more to read.
+const NOTICE: Duration = Duration::from_secs(5);
 /// gpui-component's stock 16px reads large in a dense tool window.
 const DEFAULT_FONT_SIZE: Pixels = px(14.);
 
@@ -107,6 +110,8 @@ pub(crate) struct MoonframeApp {
     updating: bool,
     /// When a mod last asked for a reload (`app:command`).
     requested_reload: Option<std::time::Instant>,
+    /// The sounds and notifications mods ask for.
+    alerts: Alerts,
     focus: FocusHandle,
     /// Where each animated pane is in its transition.
     motion: Motion,
@@ -247,6 +252,7 @@ impl MoonframeApp {
             building: false,
             updating: false,
             requested_reload: None,
+            alerts: Alerts::default(),
             focus,
             motion: Motion::default(),
             providers,
@@ -257,6 +263,7 @@ impl MoonframeApp {
             _terminal_keys: crate::terminal::intercept_keys(cx),
         };
         app.apply_theme(cx);
+        hear_notification_clicks(cx);
         // What the mods' `init` sent providers as they started.
         app.forward("start", cx);
         // An installed app looks for updates by itself, once a day, also
@@ -673,6 +680,48 @@ impl MoonframeApp {
         });
     }
 
+    /// Plays what the mod `from` asked for: a file in the app's folders
+    /// (as `ui.image` finds one), or the chime.
+    fn play(&mut self, from: &str, sound: &Sound) {
+        let file = match sound {
+            Sound::Chime => None,
+            Sound::File(src) => {
+                let folder = self
+                    .workspace
+                    .slot(from)
+                    .and_then(|slot| slot.source())
+                    .and_then(Path::parent)
+                    .unwrap_or(Path::new("."));
+                let allowed: Vec<PathBuf> = self
+                    .workspace
+                    .roots()
+                    .layers()
+                    .map(Path::to_owned)
+                    .collect();
+                let home = std::env::home_dir();
+                let Some(file) = moonframe_core::resolve_file(
+                    src,
+                    folder,
+                    home.as_deref(),
+                    &allowed,
+                    crate::alerts::MAX_SOUND_BYTES,
+                ) else {
+                    self.workspace.refuse(
+                        from,
+                        Error::new(format!(
+                            "`app:sound`: no sound file `{src}` of at most 2 MiB in the app's folders"
+                        )),
+                    );
+                    return;
+                };
+                Some(file)
+            },
+        };
+        if let Err(problem) = self.alerts.play(file.as_deref()) {
+            tracing::warn!("{from}: {problem}");
+        }
+    }
+
     /// Does one thing the mod `from` asked of the app.
     fn request(
         &mut self,
@@ -700,6 +749,19 @@ impl MoonframeApp {
             },
             Request::Command(command) => self.run(command, window, cx),
             Request::Appearance(appearance) => self.set_appearance(appearance, cx),
+            Request::Sound(sound) => self.play(from, &sound),
+            Request::Notify(notification) => match self.alerts.notify(from, &notification) {
+                Ok(Posted::System) => {},
+                Ok(Posted::Toast) => {
+                    let text = if notification.body.is_empty() {
+                        notification.title
+                    } else {
+                        format!("{}: {}", notification.title, notification.body)
+                    };
+                    self.show_toast_for(text.into(), NOTICE, cx);
+                },
+                Err(problem) => tracing::warn!("{from}: {problem}"),
+            },
             Request::Theme { light, dark } => {
                 if let Err(problem) = self.set_themes(light.as_deref(), dark.as_deref(), cx) {
                     self.workspace
@@ -1190,11 +1252,15 @@ impl MoonframeApp {
     }
 
     fn show_toast_text(&mut self, message: SharedString, cx: &mut Context<Self>) {
+        self.show_toast_for(message, TOAST, cx);
+    }
+
+    fn show_toast_for(&mut self, message: SharedString, shown: Duration, cx: &mut Context<Self>) {
         let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
         self.toast = Some((id, message));
         cx.notify();
         cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(TOAST).await;
+            cx.background_executor().timer(shown).await;
             let _ = this.update(cx, |this, cx| {
                 if this.toast.as_ref().is_some_and(|(shown, _)| *shown == id) {
                     this.toast = None;
@@ -1495,6 +1561,42 @@ fn stock_preview(overrides: &[(Token, moonframe_core::Shade)], dark: bool) -> th
         }
     }
     preview
+}
+
+/// Hears the clicks on the notifications mods posted: each brings the
+/// app and its window forward and tells the mod that posted it, on
+/// `app/notification`: `{ id, clicked = true }`.
+fn hear_notification_clicks(cx: &mut Context<MoonframeApp>) {
+    let (sender, mut clicks) = futures::channel::mpsc::unbounded::<(String, Option<String>)>();
+    crate::alerts::listen(move |from, id| {
+        let _ = sender.unbounded_send((from, id));
+    });
+    cx.spawn(async move |this, cx| {
+        while let Some((from, id)) = clicks.next().await {
+            let heard = this.update(cx, |app, cx| {
+                cx.activate(true);
+                let main = app.main_window;
+                if let Some(window) = cx
+                    .windows()
+                    .into_iter()
+                    .find(|window| window.window_id() == main)
+                {
+                    let _ = window.update(cx, |_, window, _| window.activate_window());
+                }
+                let clicked = std::collections::BTreeMap::from([
+                    ("id".to_owned(), id.map_or(Data::Nil, Data::String)),
+                    ("clicked".to_owned(), Data::Bool(true)),
+                ]);
+                app.workspace
+                    .app_topic("notification", &from, Data::Map(clicked));
+                app.flush("notification", cx);
+            });
+            if heard.is_err() {
+                break;
+            }
+        }
+    })
+    .detach();
 }
 
 /// Whether the system's appearance is a dark one.

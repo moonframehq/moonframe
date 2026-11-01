@@ -621,7 +621,7 @@ return mod {
 - `provider/<name>` carries a provider's data each time it publishes, for a
   mod that must react (not only redraw); views still read `app.<name>`.
 - Names are 1 to 128 of `a-z A-Z 0-9 - _ . /`; `provider/` is the
-  providers', and `app/` the app's own (`app/inspect`). Previews (the Components window) hear nothing.
+  providers', and `app/` the app's own (`app/inspect`, `app/notification`). Previews (the Components window) hear nothing.
 - Use a topic when several modules share a value; use `to = "<mod>"` when
   one module tells another.
 
@@ -694,6 +694,41 @@ for _, theme in app.appearance.themes do
 		})
 	end
 end
+```
+
+- `app:sound`, `msg` `"default"` (a short chime the app makes) or a sound
+  file (`.wav` `.aiff` `.aif` `.caf` `.mp3` `.m4a`, at most 2 MiB), named
+  as `ui.image` names pictures: relative to the mod's folder, `~/...` or
+  absolute, and inside the app's folders. Never a URL. Sounds closer than
+  150 ms apart are dropped. macOS plays them (`NSSound`); Linux with
+  `paplay` or `aplay` when installed; Windows plays none yet (logged).
+- `app:notify`, `msg` `{ title, body?, id? }`: a system notification. macOS
+  posts it through the Notification Center when the app runs as a bundle
+  (an installed app, `just bundle`, `just bundle-app`), asking the user to
+  allow notifications the first time; it shows even when the window is in
+  front, so check `app.window.active` to alert only when the user is not
+  looking. A run from source (`just run`, a bare binary), Linux and Windows
+  show it as a toast in the window instead. Clicking it brings the app and
+  its window forward and tells the mod that posted it, if it subscribes to
+  `app/notification`: `{ topic = "app/notification", value = { id, clicked
+  = true } }`. At most 5 notifications in 10 s are posted.
+
+```lua
+return mod {
+	subscribe = { "app/notification" },
+	update = function(state, msg, props)
+		if type(msg) == "table" and msg.topic == "app/notification" then
+			state.focused = msg.value.id      -- jump to the agent that finished
+		elseif type(msg) == "table" and msg.finished then
+			-- told by whatever watches the agents (a provider, another mod)
+			return state, {
+				{ to = "app:sound", msg = "default" },
+				{ to = "app:notify", msg = { title = "Agent done", body = msg.finished.title, id = msg.finished.pane } },
+			}
+		end
+	end,
+	view = function(state) return ui.text "agents" end,
+}
 ```
 
 - A request the app cannot read (an unknown command, a misspelled

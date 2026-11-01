@@ -221,3 +221,82 @@ fn the_app_can_refuse_a_request() {
     workspace.refuse("asker", Error::new("no theme called `Nope`"));
     assert_eq!(error(&workspace), "no theme called `Nope`");
 }
+
+#[test]
+fn update_plays_a_sound_file_or_the_chime() {
+    let (_dir, mut workspace) = workspace();
+    ask(&mut workspace, "app:sound", Data::from("default"));
+    ask(&mut workspace, "app:sound", Data::from("sounds/Done.WAV"));
+    assert_eq!(workspace.take_requests(), [
+        ("asker".to_owned(), Request::Sound(Sound::Chime)),
+        (
+            "asker".to_owned(),
+            Request::Sound(Sound::File("sounds/Done.WAV".to_owned()))
+        ),
+    ]);
+    for (wrong, problem) in [
+        ("https://example.com/a.wav", "is an address"),
+        ("notes.txt", "is not a sound file"),
+        ("", "is not a sound file"),
+    ] {
+        ask(&mut workspace, "app:sound", Data::from(wrong));
+        assert!(error(&workspace).contains(problem), "{}", error(&workspace));
+    }
+    ask(&mut workspace, "app:sound", Data::Bool(true));
+    assert!(error(&workspace).contains("takes \"default\""));
+    assert!(workspace.take_requests().is_empty());
+}
+
+#[test]
+fn update_posts_a_notification() {
+    let (_dir, mut workspace) = workspace();
+    let map = |entries: &[(&str, &str)]| {
+        Data::Map(
+            entries
+                .iter()
+                .map(|(key, value)| ((*key).to_owned(), Data::from(*value)))
+                .collect(),
+        )
+    };
+    ask(
+        &mut workspace,
+        "app:notify",
+        map(&[
+            ("title", "Agent done"),
+            ("body", "claude finished"),
+            ("id", "pane-3"),
+        ]),
+    );
+    ask(&mut workspace, "app:notify", map(&[("title", "Hi")]));
+    assert_eq!(workspace.take_requests(), [
+        (
+            "asker".to_owned(),
+            Request::Notify(Notification {
+                title: "Agent done".to_owned(),
+                body: "claude finished".to_owned(),
+                id: Some("pane-3".to_owned()),
+            })
+        ),
+        (
+            "asker".to_owned(),
+            Request::Notify(Notification {
+                title: "Hi".to_owned(),
+                body: String::new(),
+                id: None,
+            })
+        ),
+    ]);
+    let long = "x".repeat(MAX_TITLE + 1);
+    for (wrong, problem) in [
+        (map(&[("body", "no title")]), "needs a `title`"),
+        (map(&[("title", " ")]), "needs a `title`"),
+        (map(&[("title", &long)]), "longer than 256"),
+        (map(&[("title", "a"), ("id", "a b")]), "`id` is 1 to"),
+        (map(&[("title", "a"), ("url", "x")]), "unknown key `url`"),
+        (Data::from("hello"), "takes {"),
+    ] {
+        ask(&mut workspace, "app:notify", wrong);
+        assert!(error(&workspace).contains(problem), "{}", error(&workspace));
+    }
+    assert!(workspace.take_requests().is_empty());
+}

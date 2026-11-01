@@ -26,7 +26,42 @@ pub enum Request {
         light: Option<String>,
         dark: Option<String>,
     },
+    /// `app:sound`: plays a short sound file from the app's folders, or
+    /// the app's own chime.
+    Sound(Sound),
+    /// `app:notify`: posts a system notification (a toast where there is
+    /// none); a click on it brings the window forward and tells the mod
+    /// that posted it, on `app/notification`, with its `id`.
+    Notify(Notification),
 }
+
+/// What `app:sound` plays.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Sound {
+    /// `"default"`: a chime the app makes itself.
+    Chime,
+    /// A file, as `ui.image` names one: relative to the sending mod's
+    /// folder, `~/...`, or absolute, and inside the app's folders.
+    File(String),
+}
+
+/// What `app:notify` posts.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Notification {
+    pub title: String,
+    pub body: String,
+    /// What the mod hears back when it is clicked.
+    pub id: Option<String>,
+}
+
+/// Longest a notification's title, its body and its id can be, in bytes.
+pub const MAX_TITLE: usize = 256;
+pub const MAX_BODY: usize = 2048;
+pub const MAX_ID: usize = 128;
+/// Longest a sound file's name can be.
+const MAX_PATH: usize = 1024;
+/// The sound files `app:sound` plays, by extension.
+pub const SOUND_TYPES: &[&str] = &["wav", "aiff", "aif", "caf", "mp3", "m4a"];
 
 tokens! {
     /// Whether the window is light or dark: as the system is (and as it
@@ -64,6 +99,8 @@ impl Request {
                 token(what, msg, Appearance::parse, Appearance::NAMES).map(Self::Appearance)
             },
             "theme" => theme(msg),
+            "sound" => sound(msg).map(Self::Sound),
+            "notify" => notification(msg).map(Self::Notify),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -77,7 +114,77 @@ impl Request {
 }
 
 /// What a module can send to, after `app:`.
-pub const NAMES: &[&str] = &["command", "appearance", "theme"];
+pub const NAMES: &[&str] = &["command", "appearance", "theme", "sound", "notify"];
+
+/// `"default"`, or a sound file's path: never an address.
+fn sound(msg: &Data) -> Result<Sound, Error> {
+    let types = SOUND_TYPES.join(", ");
+    let Data::String(name) = msg else {
+        return Err(Error::new(format!(
+            "`{APP}sound` takes \"default\" or a sound file's path ({types})"
+        )));
+    };
+    if name == "default" {
+        return Ok(Sound::Chime);
+    }
+    if name.contains("://") {
+        return Err(Error::new(format!(
+            "`{APP}sound`: `{name}` is an address; it plays files in the app's folders"
+        )));
+    }
+    let known = std::path::Path::new(name)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| SOUND_TYPES.contains(&extension.to_lowercase().as_str()));
+    if name.is_empty() || name.len() > MAX_PATH || !known {
+        return Err(Error::new(format!(
+            "`{APP}sound`: `{name}` is not a sound file ({types})"
+        )));
+    }
+    Ok(Sound::File(name.clone()))
+}
+
+/// `{ title = "...", body = "...", id = "..." }`, `body` and `id` optional.
+fn notification(msg: &Data) -> Result<Notification, Error> {
+    let fail = |problem: &str| Error::new(format!("`{APP}notify`: {problem}"));
+    let Data::Map(fields) = msg else {
+        return Err(fail(
+            "takes { title = \"...\", body = \"...\", id = \"...\" }",
+        ));
+    };
+    if let Some(key) = fields
+        .keys()
+        .find(|key| !matches!(key.as_str(), "title" | "body" | "id"))
+    {
+        return Err(fail(&format!(
+            "unknown key `{key}`; it takes title, body and id"
+        )));
+    }
+    let text = |key: &str, max: usize| match fields.get(key) {
+        None => Ok(None),
+        Some(Data::String(text)) if text.len() <= max => Ok(Some(text.clone())),
+        Some(Data::String(_)) => Err(fail(&format!("`{key}` is longer than {max} bytes"))),
+        Some(_) => Err(fail(&format!("`{key}` is not a string"))),
+    };
+    let title = text("title", MAX_TITLE)?.filter(|title| !title.trim().is_empty());
+    let id = text("id", MAX_ID)?;
+    // It travels with the notification, and comes back as it was.
+    if id.as_ref().is_some_and(|id| {
+        id.is_empty()
+            || !id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':' | '/'))
+    }) {
+        return Err(fail(&format!(
+            "`id` is 1 to {MAX_ID} of a-z, A-Z, 0-9, - _ . : /"
+        )));
+    }
+    Ok(Notification {
+        title: title.ok_or_else(|| fail("needs a `title`"))?,
+        body: text("body", MAX_BODY)?.unwrap_or_default(),
+        id,
+    })
+}
 
 /// `{ light = "<theme>", dark = "<theme>" }`, either or both.
 fn theme(msg: &Data) -> Result<Request, Error> {

@@ -1293,10 +1293,29 @@ type App = {
 	[string]: any,
 }
 
+-- What `{ to = "app:notify", msg = ... }` posts. A click on it brings the
+-- window forward and sends the posting mod, if it subscribes to
+-- `app/notification`, `{ topic = "app/notification", value = NotificationClick }`.
+type NotifyMsg = {
+	-- At most 256 bytes.
+	title: string,
+	-- At most 2048 bytes.
+	body: string?,
+	-- 1 to 128 of a-z A-Z 0-9 - _ . : /, handed back on a click.
+	id: string?,
+}
+
+type NotificationClick = {
+	id: string?,
+	clicked: boolean,
+}
+
 -- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,
 -- `"provider:<name>"`, `"topic:<name>"`, or the app itself:
 -- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
--- `AppearanceMode`), `"app:theme"` (`msg` `{ light: string?, dark: string? }`).
+-- `AppearanceMode`), `"app:theme"` (`msg` `{ light: string?, dark: string? }`),
+-- `"app:sound"` (`msg` `"default"` or a sound file's path) and
+-- `"app:notify"` (`msg` a `NotifyMsg`).
 type Send = {
 	to: string,
 	msg: Data,
