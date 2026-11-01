@@ -617,7 +617,10 @@ impl Workspace {
         self.settle();
         let drawn = self.views_run - before;
         let elapsed = started.elapsed();
-        crate::perf!(elapsed, "provider {key}: published, {drawn} views ran in {elapsed:.1?}");
+        crate::perf!(
+            elapsed,
+            "provider {key}: published, {drawn} views ran in {elapsed:.1?}"
+        );
         drawn
     }
 
