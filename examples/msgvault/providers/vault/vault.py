@@ -32,6 +32,7 @@ import os
 import re
 import select
 import sqlite3
+import stat
 import subprocess
 import sys
 import time
@@ -798,6 +799,30 @@ def system_open(*args):
         pass
 
 
+def private_dir(path):
+    """`path` as a folder only this user can enter, or None when it is
+    someone else's or a link: /tmp is shared on Linux, and a folder left
+    there by another user could catch what is written in it."""
+    try:
+        os.mkdir(path, 0o700)
+    except FileExistsError:
+        pass
+    except OSError:
+        return None
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return None
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+        return None
+    if info.st_mode & 0o077:
+        try:
+            os.chmod(path, 0o700)
+        except OSError:
+            return None
+    return path
+
+
 def unique_path(directory, name):
     stem, ext = re.match(r"^(.*?)(\.[^.]*)?$", name).groups()
     ext = ext or ""
@@ -823,11 +848,16 @@ def deliver(aid, save):
     if save:
         directory = os.environ.get("MSGVAULT_DOWNLOADS") or home + "/Downloads"
     else:
-        directory = (os.environ.get("TMPDIR") or "/tmp") + "/msgvault-moonframe/" + f["aid"]
+        scratch = private_dir((os.environ.get("TMPDIR") or "/tmp") + "/msgvault-moonframe")
+        if scratch is None:
+            return tell_user(False, "Can't open %s: the temporary folder is not yours alone" % name)
+        directory = scratch + "/" + f["aid"]
     make_dir(directory)
     path = unique_path(directory, name) if save else "%s/%s" % (directory, name)
     try:
-        with open(path, "wb") as out:
+        # Never through a link someone left in its place.
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o666)
+        with os.fdopen(fd, "wb") as out:
             out.write(content)
     except OSError as error:
         return tell_user(False, "Can't write %s: %s" % (tilde(path), error.strerror or error))

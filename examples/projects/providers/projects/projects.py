@@ -442,6 +442,13 @@ def inside(rel):
     return rel is not None and not re.search(r"(^|/)\.\.(/|$)", rel) and not rel.startswith("/")
 
 
+def contained(root, full):
+    """Whether `full`, links followed, is still inside the repository: a link
+    in a cloned repository could point anywhere the user can read."""
+    base = os.path.realpath(root)
+    return os.path.commonpath([os.path.realpath(full), base]) == base
+
+
 def list_dir(root, rel):
     base = root if rel == "" else root + "/" + rel
     try:
@@ -488,7 +495,7 @@ def read_file(root, rel):
     if cached and cached["mtime"] == when:
         return cached["data"]
     data = {"path": rel, "lines": [], "total": 0, "truncated": False, "binary": False, "missing": False}
-    if not os.path.isfile(full):
+    if not os.path.isfile(full) or not contained(root, full):
         data["missing"] = True
     else:
         try:
