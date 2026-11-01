@@ -20,6 +20,9 @@ type Props = {
 	zoom: any,
 	close: any,
 	actions: { any }?,
+	leading: { any }?,
+	menu: any,
+	click_focus: boolean?,
 	to: string?,
 	height: number?,
 	[number]: any,
@@ -45,6 +48,9 @@ return component {
 		["zoom"] = "msg for the zoom button (omit to hide it)",
 		["close"] = "msg for the close button (omit to hide it)",
 		["actions"] = "more elements before the built-in buttons",
+		["leading"] = "elements before the icon (a status dot)",
+		["menu"] = "msg for a chevron after the title (a menu of what the pane shows); omit for none",
+		["click_focus"] = "a click anywhere in the body that no control takes sends `focus` too",
 		["to"] = "mod to send the msgs to, if not the drawing one",
 		["height"] = "fixed height in pixels; leave unset to fill the parent",
 		["[children]"] = "the body: a `ui.terminal`, a log, any content",
@@ -60,6 +66,9 @@ return component {
 		[".pane-frame-title"] = { weight = "medium" },
 		[".pane-frame-subtitle"] = { color = "muted-foreground", font = "mono" },
 		[".pane-frame-body"] = { padding = 8 },
+		[".pane-frame-menu"] = { gap = 6, padding = { 2, 4 }, radius = 6 },
+		[".pane-frame-menu:hover"] = { background = "list-hover" },
+		[".pane-frame-chevron"] = { color = "muted-foreground" },
 	},
 	usage = [[local pane_frame = use "pane-frame"
 
@@ -122,15 +131,31 @@ pane_frame { title = "claude", icon = "agent-claude", subtitle = "~/code/ledger-
 				align = "center",
 				msg = props.focus,
 				to = props.to,
+				props.leading ~= nil and ui.row { gap = "small", align = "center", shrink = false, table.unpack(props.leading) },
 				props.icon ~= nil and ui.icon { name = props.icon :: any, class = "pane-frame-icon" },
-				ui.text { props.title, class = "pane-frame-title", truncate = true },
+				if props.menu ~= nil
+					then ui.row {
+						class = "pane-frame-menu",
+						align = "center",
+						msg = props.menu,
+						to = props.to,
+						ui.text { props.title, class = "pane-frame-title", truncate = true },
+						ui.icon { name = "chevron-down", class = "pane-frame-chevron", size = "small" },
+					}
+					else ui.text { props.title, class = "pane-frame-title", truncate = true },
 				props.subtitle ~= nil and ui.text { props.subtitle, class = "pane-frame-subtitle", truncate = true },
 				ui.spacer(),
 				status or false,
 			},
 			#buttons > 0 and ui.row { class = "pane-frame-actions", gap = "none", align = "center", table.unpack(buttons) },
 		}
-		local body = ui.column { class = "pane-frame-body", grow = true, table.unpack(props) }
+		local body = ui.column {
+			class = "pane-frame-body",
+			grow = true,
+			msg = if props.click_focus then props.focus else nil,
+			to = if props.click_focus then props.to else nil,
+			table.unpack(props),
+		}
 
 		return ui.column {
 			class = if props.focused then "pane-frame pane-frame-focused" else "pane-frame",
