@@ -29,11 +29,11 @@ PAGES = {
     "home": {
         "file": SITE / "index.html",
         "url": "https://moonframe.dev/",
-        "title": "Moonframe: native desktop apps in Rust, shaped live in Luau",
-        "description": "Native desktop apps in Rust, with every panel and toolbar in Luau. "
-        "Ask an agent for a change and watch the running window update, no restart.",
-        "alt": "Moonframe. Ask for it, watch the window change: the Moonframe window beside an agent "
-        "adding a CPU sparkline to its status bar.",
+        "title": "Moonframe: malleable desktop software, in Rust and Luau",
+        "description": "Native desktop apps in Rust, with every panel in Luau. "
+        "Ask for a change and watch the running app reshape itself: no rebuild, no restart.",
+        "alt": "Moonframe. Malleable software: the Moonframe window over a striped sunset, beside the "
+        "prompt 'Make busy CPU bars warmer', applied live with its state kept.",
     },
     "docs": {
         "file": SITE / "docs" / "index.html",

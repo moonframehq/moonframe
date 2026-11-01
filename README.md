@@ -38,7 +38,7 @@ Whole apps run on it too, each as a profile of its own: `examples/` holds
 ## Gallery
 
 <p align="center">
-  <img src="docs/screenshots/window.png" alt="The Moonframe window: a title bar with panel toggles and a terminal tab; an Explorer panel listing the repository's files on the left; a terminal in the middle; a Changes panel with the changed files as a tree and one file's diff on the right; and a status bar with usage meters, the git branch, a CPU sparkline, a memory meter and network rates" width="900">
+  <img src="docs/screenshots/window.png" alt="The Moonframe window in the Tokyo Night theme, open on the Moonframe repository: the Explorer on the left with app/mods/system unfolded; a terminal in the middle showing the git history as a colored graph, and a second terminal below it with the branch status; on the right the Changes panel with one modified Luau file and its diff, three lines added and one removed; and a status bar with usage meters, the git branch, a CPU sparkline, a memory meter and network rates" width="900">
   <br>
   <sub><b>The window that ships.</b> Every part of it is a mod in <code>app/mods/</code>: the explorer, the terminal tabs, the changes and their diffs, and the status bar widgets, whose CPU, memory and git data come from providers. <b>+</b> opens more tabs: terminals, browsers, files; a markdown file opens in an editor with a live preview.</sub>
 </p>
