@@ -7,6 +7,7 @@ mod app;
 mod assets;
 mod branch_bar;
 mod browser;
+mod build;
 mod color;
 mod dock;
 mod gallery;

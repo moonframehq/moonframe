@@ -156,6 +156,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`country-code`](#country-code) | Data | Beside a country's name in lists of locations or settings, in place of a flag (no flag images ship). For any short label use `ui.badge` or `pill`. |
 | [`date-tile`](#date-tile) | Data | Beside dated items in a list (deadlines, calls, distributions, events) where the date leads. For a date inside a line of text use plain text; for picking a day use `day-strip` or `month-grid`. |
 | [`dot-chart`](#dot-chart) | Data | A daily or weekly count compared with the period before (signups, orders), where the squares' rhythm reads better than smooth bars. For stacked counts by kind use `bar-chart`; for a balance against a floor use `forecast-chart`; for a trend line use `ui.line`. |
+| [`file-icon`](#file-icon) | Data | Beside a file name in a tree, a tab or a list of changes. For a generic icon use `ui.icon`. |
 | [`forecast-chart`](#forecast-chart) | Data | A balance or capacity projected over weeks or months against a minimum (cash against a floor, stock against a reorder point). For counts per bucket, stacked by kind, use `bar-chart`; for a small trend use `sparkline` or `ui.line`. |
 | [`kbd`](#kbd) | Data | Show a keyboard shortcut: in a menu row, a palette result, a tooltip line or a help sheet. Inside menus `menu` already draws one from an item's `shortcut`; for a word-like tag use `ui.badge`. |
 | [`key-values`](#key-values) | Data | Read-only properties or details: aligned label/value lines. For editable settings use `settings-row`. |
@@ -200,6 +201,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`switch`](#switch) | Forms | A setting that takes effect at once, on or off ("High contrast"). For a choice that is confirmed later or part of a list of options use `checkbox`; for one of several values use `segmented` or `radio-group`. |
 | [`task-check`](#task-check) | Forms | The check at the start of a task or to-do row; a click sends `msg` for the mod to flip it. For a form option use `checkbox`; for an agent's state use `status-dot`. |
 | [`ahead-behind`](#ahead-behind) | Git | A branch's sync state beside its name: sidebars, title bars, branch lists. For lines changed use `diff-counts`. |
+| [`change-tree`](#change-tree) | Git | The changed files of a repository or a review, as the right pane's Changes shows `app.git.files`. For every file in a folder use `tree`; for a file's lines use `diff-view`. |
 | [`checks`](#checks) | Git | CI runs or readiness factors for a pull request or branch: a PR detail pane, a merge dialog. For a single summary dot use `pr-badge` or `pr-row` with `checks`; for an agent's state use `status-dot`. |
 | [`diff-counts`](#diff-counts) | Git | The size of a change beside a file, commit, branch or PR: file lists, rows, title bars. For commits ahead and behind use `ahead-behind`; for a whole diff use `diff-view`. |
 | [`diff-view`](#diff-view) | Git | Show a file's changes for review: a review pane, a checkpoint, a commit. Stack one per file in a scrolling column. For only the size of a change use `diff-counts`; for a file without changes use `code-view`. |
@@ -875,6 +877,24 @@ date_tile { day = "9", month = "Nov", tone = "danger" }
 local dot_chart = use "dot-chart"
 
 dot_chart { columns = { { current = 48, previous = 60 }, { current = 70, previous = 61 }, { current = 55, previous = 66 }, { current = 90, previous = 85 }, { current = 82, previous = 74 }, { current = 104, previous = 118 } }, labels = { "Oct 2", "Oct 5", "Oct 8" }, max = 120, rows = 8, ticks = { "120", "60", "0" } }
+```
+
+#### `file-icon`
+
+**File Icon.** A file's or folder's icon, coloured by its type, as an editor's file tree shows it.
+
+**When:** Beside a file name in a tree, a tab or a list of changes. For a generic icon use `ui.icon`.
+
+| Prop | Meaning |
+| --- | --- |
+| `dir` | a folder |
+| `name` | the file's name, which picks the icon and colour |
+| `open` | an open folder |
+
+```lua
+local file_icon = use "file-icon"
+
+file_icon { name = "app.go" }
 ```
 
 #### `forecast-chart`
@@ -2035,6 +2055,30 @@ ahead_behind { ahead = 2, behind = 1 }
 ```
 
 A whole mod using it, with state: `app/components/demos/ahead-behind.luau`.
+
+#### `change-tree`
+
+**Change Tree.** Changed files nested in their folders, single-child folders joined, with A, M or D at the right.
+
+**When:** The changed files of a repository or a review, as the right pane's Changes shows `app.git.files`. For every file in a folder use `tree`; for a file's lines use `diff-view`.
+
+| Prop | Meaning |
+| --- | --- |
+| `files` | lines of "<status>\t<added>\t<deleted>\t<path>" (`app.projects.current.files`, or made from `app.git.files`) |
+| `fold` | key of the message a folder sends, default "fold": { fold = path } |
+| `folded` | folders folded shut: { [path] = true } |
+| `indent` | pixels per level (default 14) |
+| `pick` | key of the message a file sends, default "pick": { pick = path } |
+| `selected` | the chosen file's path |
+| `to` | the mod to send them to, if not the drawing one |
+
+**Styles:** `.change-tree-chevron` `.change-tree-mark` `.change-tree-row` `.change-tree-row:hover` `.change-tree-row:selected`
+
+```lua
+local change_tree = use "change-tree"
+
+change_tree { files = { "A\t40\t0\tappleauth/appleauth.go", "M\t12\t3\tcmd/ryui/android.go", "M\t2\t1\tcmd/ryui/config.go", "M\t5\t0\tplatform/android/app/build.gradle.kts" }, selected = "cmd/ryui/config.go" }
+```
 
 #### `checks`
 

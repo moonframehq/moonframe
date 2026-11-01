@@ -67,7 +67,7 @@ local FOLDER = "#6b7280"
 
 return component {
 	title = "File Icon",
-	category = "Projects",
+	category = "Data",
 	icon = "file",
 	description = "A file's or folder's icon, coloured by its type, as an editor's file tree shows it.",
 	when = "Beside a file name in a tree, a tab or a list of changes. For a generic icon use `ui.icon`.",

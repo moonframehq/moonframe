@@ -24,9 +24,9 @@ build anything, by hand or by asking an agent while the app runs.
 ## Gallery
 
 <p align="center">
-  <img src="docs/screenshots/window.png" alt="The Moonframe window: an icon toolbar; an Explorer panel listing files on the left; a Terminal panel with a shell prompt in the middle; an Inspector panel with the selected file and the loaded mods on the right; and a status bar with usage meters, the git branch, a CPU sparkline, a memory meter and network rates" width="900">
+  <img src="docs/screenshots/window.png" alt="The Moonframe window: a title bar with panel toggles and a terminal tab; an Explorer panel listing the repository's files on the left; a terminal in the middle; a Changes panel with the changed files as a tree and one file's diff on the right; and a status bar with usage meters, the git branch, a CPU sparkline, a memory meter and network rates" width="900">
   <br>
-  <sub><b>The window that ships.</b> Every part of it is a mod in <code>app/mods/</code>: the explorer, the terminal, the inspector, and the status bar widgets, whose CPU, memory and git data come from providers.</sub>
+  <sub><b>The window that ships.</b> Every part of it is a mod in <code>app/mods/</code>: the explorer, the terminal tabs, the changes and their diffs, and the status bar widgets, whose CPU, memory and git data come from providers. <b>+</b> opens more tabs: terminals, browsers, files.</sub>
 </p>
 
 <table>
@@ -107,7 +107,7 @@ Moonframe is meant to be copied and renamed:
 
 1. **The app.** Replace what's in `app/`: `main.luau` lays out the window,
    `mods/` fills it, `style.luau` styles it. Keep what helps and delete the
-   rest; the explorer and inspector are examples.
+   rest; the explorer, the tabs and the changes are a place to start.
 2. **The name.** The crate names and `repository` in `Cargo.toml`, the
    app id `APP_ID` in `crates/moonframe/src/main.rs`, the user folder's name
    in `crates/moonframe/src/paths.rs`, the bundle's name in
@@ -233,7 +233,9 @@ into each.
 `target/bundle/<Title>.app` on macOS, or a prefix with a `.desktop` file
 on Linux, with the app's title, id and icon. A release leaves out the
 Components menu, Inspect Element and Reload; `--release` runs any window
-that way, and `--dev` brings the tools back in a bundle.
+that way, and `--dev` brings the tools back in a bundle. Outside a release,
+**Build App Bundle** in the app menu builds the window's own app the same
+way and shows it in Finder.
 
 An app's `main.luau` can also add `menus` to the menu bar, with
 shortcuts, and say what its About panel shows (`about = { version,

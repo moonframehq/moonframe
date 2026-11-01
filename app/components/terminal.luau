@@ -18,7 +18,7 @@ return component {
 	category = "Terminals",
 	icon = "square-terminal",
 	-- Offered by tab bars' + menu; a new tab starts in the home folder.
-	tab = { title = "Terminal", icon = "terminal", props = { cwd = "~" } },
+	tab = { title = "Terminal", icon = "terminal", props = {} },
 	description = "A live shell on alacritty_terminal, the pure-Rust emulator. It keeps running across reloads and while hidden.",
 	when = "A live shell (alacritty engine) filling its space: a pane, a bottom panel.",
 	props = {

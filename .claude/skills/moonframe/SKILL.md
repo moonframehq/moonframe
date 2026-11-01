@@ -699,7 +699,7 @@ return mod {
 	update = function(state, msg)
 		if type(msg) == "table" and msg.open then
 			state.selected = msg.open
-			return state, { { to = "inspector", msg = { select = msg.open } } }
+			return state, { { to = "preview", msg = { show = msg.open } } }
 		end
 	end,
 
@@ -1225,7 +1225,7 @@ that are replaced when they change (provider data is a new table each
 time it changes; a state table changed in place stays the same table).
 
 **Lazy panes.** `ui.pane { lazy = true, visible = state.right, ui.mount {
-"inspector", id = "side" } }` starts nothing until the pane first shows,
+"changes", id = "side" } }` starts nothing until the pane first shows,
 and while it is hidden again the instances in it sleep: their state stays,
 but they neither run nor draw.
 
@@ -1279,7 +1279,7 @@ wherever the shell puts it, whether or not it has a `region`.
 **Restyling.** Change `style.luau`, not the modules: for example, make
 panels flat with `panel = { radius = 0, margin = 0, border = "none", shadow = "none" }`.
 For dark-only tweaks, give palette colors `{ light, dark }`. Give a mod its
-own look with `styles` in the mod itself (see `app/mods/inspector`). To
+own look with `styles` in the mod itself (see `app/mods/changes`). To
 restyle an extension from the app side, add a rule for the same selector in
 `style.luau`, which wins.
 

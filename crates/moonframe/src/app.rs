@@ -86,6 +86,8 @@ pub(crate) struct MoonframeApp {
     /// A short note at the bottom, such as "Copied", and which one it is,
     /// so an older note's timer does not hide a newer one.
     toast: Option<(u64, SharedString)>,
+    /// A bundle is being built (Build App Bundle).
+    building: bool,
     focus: FocusHandle,
     /// Where each animated pane is in its transition.
     motion: Motion,
@@ -178,6 +180,7 @@ impl MoonframeApp {
             folders,
             settings,
             toast: None,
+            building: false,
             focus,
             motion: Motion::default(),
             providers,
@@ -187,6 +190,8 @@ impl MoonframeApp {
             _terminal_keys: crate::terminal::intercept_keys(cx),
         };
         app.apply_theme(cx);
+        // What the mods' `init` sent providers as they started.
+        app.forward("start");
         app
     }
 
@@ -396,11 +401,7 @@ impl MoonframeApp {
 
     /// Passes on what the mods sent providers, and draws again.
     fn flush(&mut self, from: &str, cx: &mut Context<Self>) {
-        for (provider, sender, message) in self.workspace.take_outbox() {
-            if let Err(problem) = self.providers.send(&provider, &sender, message) {
-                tracing::warn!("{from}: {problem}");
-            }
-        }
+        self.forward(from);
         report(&self.workspace);
         cx.notify();
     }
@@ -436,8 +437,20 @@ impl MoonframeApp {
         cx.notify();
     }
 
+    /// Passes on what the mods sent providers: after a click, and after
+    /// whatever else runs mods (a start, a reload, a provider's data), so a
+    /// request from `init` or a topic is not left waiting for a click.
+    fn forward(&mut self, from: &str) {
+        for (provider, sender, message) in self.workspace.take_outbox() {
+            if let Err(problem) = self.providers.send(&provider, &sender, message) {
+                tracing::warn!("{from}: {problem}");
+            }
+        }
+    }
+
     fn reload(&mut self, cx: &mut Context<Self>) {
         self.workspace.reload();
+        self.forward("reload");
         let before = std::mem::replace(&mut self.asked, self.workspace.chrome());
         if self.asked != before && self.asked != self.chrome {
             tracing::warn!(
@@ -464,6 +477,7 @@ impl MoonframeApp {
         }
         tracing::info!("packages changed: {roots}");
         self.workspace.set_roots(roots.clone());
+        self.forward("packages");
         self._watcher = watch(&self.workspace, &self.folders, cx)
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
@@ -580,6 +594,55 @@ impl MoonframeApp {
     /// Shows `message` at the bottom for a moment.
     fn show_toast(&mut self, message: &'static str, cx: &mut Context<Self>) {
         self.show_toast_text(message.into(), cx);
+    }
+
+    /// Builds the app this window runs as a release bundle, in the
+    /// background, and shows it in Finder when it is done.
+    pub(crate) fn build_app(&mut self, cx: &mut Context<Self>) {
+        if self.building {
+            self.show_toast("The app is already being built", cx);
+            return;
+        }
+        let Some(checkout) = crate::build::checkout(&self.folders.builtin) else {
+            self.show_toast(
+                "Building needs the app's sources: run it from its checkout",
+                cx,
+            );
+            return;
+        };
+        let build = crate::build::Build {
+            checkout,
+            profile: self.folders.profile.clone(),
+            user: self.folders.user.clone(),
+        };
+        self.building = true;
+        // Stays up until the build ends: cargo can take minutes.
+        let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
+        self.toast = Some((id, format!("Building {}…", crate::title()).into()));
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let built = cx
+                .background_executor()
+                .spawn(async move { build.run() })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.building = false;
+                match built {
+                    Ok(bundle) => {
+                        let name = bundle
+                            .file_name()
+                            .map(|name| name.to_string_lossy().into_owned())
+                            .unwrap_or_default();
+                        crate::build::reveal(&bundle);
+                        this.show_toast_text(format!("Built {name}").into(), cx);
+                    },
+                    Err(problem) => {
+                        this.show_toast_text(format!("The build failed: {problem}").into(), cx);
+                    },
+                }
+            });
+        })
+        .detach();
     }
 
     fn show_toast_text(&mut self, message: SharedString, cx: &mut Context<Self>) {
@@ -784,8 +847,12 @@ fn menu_actions(cx: &mut Context<MoonframeApp>) {
     cx.on_action(move |_: &ShowThemes, cx| {
         let _ = on.update(cx, |app, cx| app.show_themes(cx));
     });
+    let on = app.clone();
     cx.on_action(move |_: &AboutApp, cx| {
-        let _ = app.update(cx, |app, cx| app.show_about(cx));
+        let _ = on.update(cx, |app, cx| app.show_about(cx));
+    });
+    cx.on_action(move |_: &BuildApp, cx| {
+        let _ = app.update(cx, |app, cx| app.build_app(cx));
     });
 }
 
@@ -852,7 +919,10 @@ fn start_providers(workspace: &Workspace, cx: &mut Context<MoonframeApp>) -> Pro
                 match event {
                     Event::Published { provider, data } => {
                         // No view read it: the window looks the same.
-                        if this.workspace.set_host(&provider, data) > 0 {
+                        let drawn = this.workspace.set_host(&provider, data);
+                        // Mods that heard it may have asked a provider.
+                        this.forward(&provider);
+                        if drawn > 0 {
                             // A view may fail on the new data: say so.
                             report(&this.workspace);
                             cx.notify();

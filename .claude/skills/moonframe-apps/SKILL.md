@@ -208,6 +208,10 @@ About is macOS's own panel (icon, name, version, credits); a toast elsewhere.
   prefix with `bin/moonframe-NAME`, `share/moonframe-NAME/` and a `.desktop`
   file and icon. `MOONFRAME_USER=DIR` finds the profile in another user
   folder. What its users change goes in `~/.config/moonframe/profiles/NAME`.
+- **Build App Bundle** in the app menu (outside a release, when the app
+  runs from its checkout) does the same for the window's own app, the
+  profile's or the starter's, in the background, then shows the bundle in
+  Finder. The build's output goes to the log.
 - The app's name in the menu bar and Dock is its `title`, also when run
   from a terminal.
 

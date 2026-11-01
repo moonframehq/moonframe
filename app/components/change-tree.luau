@@ -1,6 +1,6 @@
 -- Changed files as a tree of their folders, as a review shows them: a
 -- folder holding a single folder joins it ("cmd/ryui"), and each file has
--- its status letter at the right. It draws `app.projects.current.files`
+-- its status letter at the right. It draws a list of changed files
 -- ("<status>\t<added>\t<deleted>\t<path>"); folders start open, and the mod
 -- keeps the ones folded.
 
@@ -18,7 +18,7 @@ type Props = {
 
 type Folder = { name: string, path: string, folders: { [string]: Folder }, files: { any } }
 
-local TONES = { M = "warning", A = "success", D = "danger", R = "accent" }
+local TONES = { M = "warning", A = "success", D = "danger", R = "accent", ["?"] = "success", U = "danger" }
 
 local function folder(name: string, path: string): Folder
 	return { name = name, path = path, folders = {}, files = {} }
@@ -28,10 +28,13 @@ end
 local function nest(lines: { string }): Folder
 	local root = folder("", "")
 	for _, line in lines do
-		local status, added, deleted, path = string.match(line, "^(%a)\t(%d+)\t(%d+)\t(.+)$")
+		local status, added, deleted, path = string.match(line, "^(%S)\t(%d+)\t(%d+)\t(.+)$")
 		if path then
 			local at = root
-			local parts = string.split(path, "/")
+			-- A new folder git lists whole (`docs/new/`) is one entry,
+			-- named with its slash.
+			local whole = string.sub(path, -1) == "/"
+			local parts = string.split(if whole then string.sub(path, 1, -2) else path, "/")
 			for index = 1, #parts - 1 do
 				local part = parts[index]
 				local below = at.folders[part]
@@ -42,7 +45,7 @@ local function nest(lines: { string }): Folder
 				at = below
 			end
 			table.insert(at.files, {
-				name = parts[#parts],
+				name = if whole then parts[#parts] .. "/" else parts[#parts],
 				path = path,
 				status = status,
 				added = tonumber(added),
@@ -66,12 +69,12 @@ end
 
 return component {
 	title = "Change Tree",
-	category = "Projects",
+	category = "Git",
 	icon = "git-compare",
 	description = "Changed files nested in their folders, single-child folders joined, with A, M or D at the right.",
-	when = "The Changes view of a project or review: what `app.projects.current.files` lists. For every file use `file-tree`; for a file's lines use `diff-view`.",
+	when = "The changed files of a repository or a review, as the right pane's Changes shows `app.git.files`. For every file in a folder use `tree`; for a file's lines use `diff-view`.",
 	props = {
-		["files"] = "`app.projects.current.files`: \"<status>\\t<added>\\t<deleted>\\t<path>\"",
+		["files"] = "lines of \"<status>\\t<added>\\t<deleted>\\t<path>\" (`app.projects.current.files`, or made from `app.git.files`)",
 		["selected"] = "the chosen file's path",
 		["folded"] = "folders folded shut: { [path] = true }",
 		["fold"] = "key of the message a folder sends, default \"fold\": { fold = path }",

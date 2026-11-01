@@ -12,7 +12,8 @@ gpui_kit::actions!(moonframe, [
     Dismiss,
     BrowseComponents,
     ShowThemes,
-    AboutApp
+    AboutApp,
+    BuildApp
 ]);
 
 /// Runs a shell menu item, found by its id (menu title and label).
@@ -58,11 +59,19 @@ pub(crate) fn bind_keys(cx: &mut App) {
 /// app's users need: no Components menu, Inspect Element, or Reload Modules.
 pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
     let title = crate::title();
-    let mut bar = vec![Menu::new(title.clone()).items([
+    let mut app_items = vec![
         MenuItem::action(format!("About {title}"), AboutApp),
         MenuItem::separator(),
-        MenuItem::action(format!("Quit {title}"), Quit),
-    ])];
+    ];
+    // Outside a release, the app builds itself as one.
+    if !crate::release() {
+        app_items.extend([
+            MenuItem::action("Build App Bundle", BuildApp),
+            MenuItem::separator(),
+        ]);
+    }
+    app_items.push(MenuItem::action(format!("Quit {title}"), Quit));
+    let mut bar = vec![Menu::new(title.clone()).items(app_items)];
     let mut view_items = Vec::new();
     // Window and Help go last, after View, as macOS orders them.
     let mut last = Vec::new();
