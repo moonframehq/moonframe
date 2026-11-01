@@ -662,13 +662,41 @@ impl<'w> Draw<'w> for Region {
         let members = painter.region(&self.name, cx);
         let element = div()
             .flex()
-            .flex_1()
             .min_h_0()
             .min_w_0()
             .gap(px(self.gap.pixels()));
-        let element = match self.direction {
-            Direction::Row => element.flex_row().items_center(),
-            Direction::Column => element.flex_col(),
+        let (element, members) = match self.direction {
+            // A row of mods, such as a status bar, never spills onto its
+            // neighbours: it takes room in proportion to what it holds, a
+            // member that does not fit wraps onto a line of its own below,
+            // which is clipped away, and a first member wider than the row
+            // is cut. Each member is as tall as the row, so only the first
+            // line shows; the row needs a parent of definite height.
+            Direction::Row => (
+                element
+                    .flex_auto()
+                    .h_full()
+                    .flex_row()
+                    .flex_wrap()
+                    .items_center()
+                    .content_start()
+                    .overflow_hidden(),
+                members
+                    .into_iter()
+                    .map(|member| {
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .h_full()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .child(member)
+                            .into_any_element()
+                    })
+                    .collect(),
+            ),
+            Direction::Column => (element.flex_1().flex_col(), members),
         };
         match self.justify {
             Justify::Start => element.justify_start(),
