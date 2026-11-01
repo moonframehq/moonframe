@@ -1,5 +1,6 @@
 # Ledger's numbers, shared as `app.fund`: SAMPLE data from sample.json in
 # this folder, for the demo. Point it at your fund admin and bank feeds by
-# replacing fund.pl. A process provider (perl 5, as macOS ships).
-command = ["perl", "fund.pl"]
-kind    = "process"
+# replacing this provider. A static provider: the file is published as it
+# is, and again when it changes.
+file = "sample.json"
+kind = "static"

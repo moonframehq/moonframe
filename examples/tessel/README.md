@@ -25,7 +25,7 @@ pixel-art face:
 
 The chats are **scripted demos**, not models: replies come from a few rules.
 The agents, runs and chats are **sample data** in
-`providers/tessel/sample.json`, published by a small Perl process provider;
+`providers/tessel/sample.json`, published as it is by a static provider;
 point it at your agent platform to make it real. The sprites are drawn by the
 `pixel-icon` component from a few rows of digits.
 

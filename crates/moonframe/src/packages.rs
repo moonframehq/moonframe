@@ -418,6 +418,8 @@ pub(crate) enum Provider {
     /// package's `[settings]`, which may widen what it does (git's
     /// `writers`).
     Native(String),
+    /// A JSON file it publishes as it is; nothing runs.
+    Static(String),
     Broken(String),
 }
 
@@ -450,6 +452,10 @@ impl Contents {
                     settings,
                     ..
                 }) => Provider::Native(settings.to_string()),
+                Ok(Manifest {
+                    kind: Kind::Static { file },
+                    ..
+                }) => Provider::Static(file),
                 Ok(_) => Provider::Source,
                 Err(problem) => Provider::Broken(problem.to_string()),
             };
@@ -693,6 +699,7 @@ impl fmt::Display for Provider {
                 "replaces the app's built-in provider of this name, with settings {}",
                 printable(settings)
             ),
+            Self::Static(file) => write!(f, "publishes {}, running nothing", printable(file)),
             Self::Broken(problem) => write!(f, "broken: {}", printable(problem)),
         }
     }

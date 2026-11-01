@@ -1,6 +1,6 @@
 # Vigil's workflow operations, shared as `app.vigil`. SAMPLE DATA from
 # sample.json, with a simulated live feed that ticks once a second; replace
-# it, or this provider, with your own source. A process provider: it reads
-# that file. Needs perl 5 (as macOS ships).
-command = ["perl", "vigil.pl"]
-kind    = "process"
+# it, or this provider, with your own source. A Rust crate built to a
+# WebAssembly component and run sandboxed: the sample is built in.
+interval = 1.0
+kind     = "wasm"

@@ -216,6 +216,12 @@ fn providers_that_run_as_the_user_need_approval() {
             "providers/forecast/provider.toml",
             "kind = \"process\"\ncommand = [\"sh\", \"fetch.sh\"]\n",
         ),
+        // Runs nothing, so it is not among those to approve.
+        (
+            "providers/sample/provider.toml",
+            "kind = \"static\"\nfile = \"sample.json\"\n",
+        ),
+        ("providers/sample/sample.json", "{\"sunny\": true}"),
     ]);
     let problem = install(&user, remote.to_str().unwrap(), &no).unwrap_err();
     assert_eq!(problem, "declined");

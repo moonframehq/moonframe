@@ -1,4 +1,6 @@
 {
+  "available": true,
+  "sample": true,
   "org": { "name": "Duly" },
   "person": { "name": "Tamsin", "initials": "TA" },
   "folders": [

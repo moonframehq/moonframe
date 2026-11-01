@@ -1,5 +1,5 @@
 # Parlance's conversations and its scripted demo agent, shared as
 # `app.chats`. A process provider: it keeps the chats in a JSON file under
-# ~/.local/share/moonframe with your access. Needs perl 5 (as macOS ships).
-command = ["perl", "chats.pl"]
+# ~/.local/share/moonframe with your access. Needs python3.
+command = ["python3", "chats.py"]
 kind    = "process"

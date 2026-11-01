@@ -19,7 +19,7 @@ audit log, to show off the data-table components.
   items-per-page menu. **Export as CSV** writes the ticked rows, or every
   row the filters show, to `~/Downloads/storefront-audit-log.csv`.
 
-The activities are **sample data**: `providers/store` (a Perl process
+The activities are **sample data**: `providers/store` (a Python process
 provider) makes 232 of them from templates with a fixed seed, ending on
 Oct 30, 2026, and writes the CSV the page exports.
 

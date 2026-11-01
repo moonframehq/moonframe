@@ -4,7 +4,8 @@
 //! ```toml
 //! kind = "wasm"            # or "process" with `command = ["bash", "github.sh"]`,
 //!                          # or "native": the Rust one the app built in
-//!                          # under this folder's name
+//!                          # under this folder's name, or "static" with
+//!                          # `file = "sample.json"`: that file, published
 //! interval = 1.0           # seconds between ticks (wasm)
 //! capabilities = ["system"]
 //!
@@ -43,6 +44,8 @@ pub enum Kind {
     Process { command: Vec<String> },
     /// Rust the app was built with, registered under the folder's name.
     Native,
+    /// A JSON file in the folder, published as it is: no code runs.
+    Static { file: String },
 }
 
 /// When a provider starts.
@@ -75,6 +78,7 @@ struct File {
     start: Start,
     #[serde(default)]
     command: Vec<String>,
+    file: Option<String>,
     interval: Option<f64>,
     #[serde(default)]
     capabilities: Vec<Capability>,
@@ -112,12 +116,58 @@ impl Manifest {
             ("native", false) => {
                 return Err(problem("a native provider takes no `command`".to_owned()));
             },
+            ("static", true) => Kind::Static {
+                file: file
+                    .file
+                    .clone()
+                    .ok_or_else(|| problem("a static provider needs a `file`".to_owned()))?,
+            },
+            ("static", false) => {
+                return Err(problem("a static provider takes no `command`".to_owned()));
+            },
             (other, _) => {
                 return Err(problem(format!(
-                    "unknown kind `{other}`; expected wasm, process or native"
+                    "unknown kind `{other}`; expected wasm, process, native or static"
                 )));
             },
         };
+        match &kind {
+            Kind::Static { file: name } => {
+                // A name in the folder: never a path out of it.
+                if name.is_empty()
+                    || name.starts_with('.')
+                    || name.contains(['/', '\\'])
+                    || Path::new(name).is_absolute()
+                {
+                    return Err(problem(format!(
+                        "`file` is a file name in the provider's folder, not `{name}`"
+                    )));
+                }
+                // Never a link: it could reach any file the user can read, and
+                // a static provider is installed without asking.
+                match fs::symlink_metadata(dir.join(name)) {
+                    Ok(meta) if meta.is_file() => {},
+                    Ok(meta) if meta.file_type().is_symlink() => {
+                        return Err(problem(format!(
+                            "{name} is a link; a static provider publishes a file of its own"
+                        )));
+                    },
+                    _ => {
+                        return Err(problem(format!("there is no {name} beside provider.toml")));
+                    },
+                }
+                if file.interval.is_some() {
+                    return Err(problem(
+                        "a static provider publishes its file as it changes; it takes no `interval`"
+                            .to_owned(),
+                    ));
+                }
+            },
+            _ if file.file.is_some() => {
+                return Err(problem("only a static provider takes a `file`".to_owned()));
+            },
+            _ => {},
+        }
         if kind == Kind::Wasm && !dir.join(PREBUILT).is_file() && !dir.join("Cargo.toml").is_file()
         {
             return Err(problem(format!(

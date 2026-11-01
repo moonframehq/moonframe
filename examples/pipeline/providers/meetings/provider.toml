@@ -1,5 +1,5 @@
 # Tally's meetings, shared as `app.meetings`: the calendar's today and now,
 # and the meetings kept in a JSON file under ~/.local/share/moonframe. A
-# process provider: it runs with your access. Needs perl 5 (as macOS ships).
-command = ["perl", "meetings.pl"]
+# process provider: it runs with your access. Needs python3.
+command = ["python3", "meetings.py"]
 kind    = "process"

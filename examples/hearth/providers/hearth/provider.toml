@@ -1,5 +1,5 @@
 # Hearth's code review figures, shared as `app.hearth`. SAMPLE DATA from
-# sample.json; replace it, or this provider, with your own source. A process
-# provider: it reads that file. Needs perl 5 (as macOS ships).
-command = ["perl", "hearth.pl"]
-kind    = "process"
+# sample.json; replace it, or this provider, with your own source. A static
+# provider: the file is published as it is, and again when it changes.
+file = "sample.json"
+kind = "static"

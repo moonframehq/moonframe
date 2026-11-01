@@ -18,7 +18,7 @@ manner of the big assistants' own desktop clients.
 - **Composer:** +, the field, a mode menu (Instant, Thinking, Research),
   the mic, and send, which becomes stop while an answer is written.
 
-The agent is a **scripted demo**, not a model: `providers/chats` (a Perl
+The agent is a **scripted demo**, not a model: `providers/chats` (a Python
 process provider) answers with one of a few prepared markdown answers,
 picked by the message's words, and streams it a few words at a time. A real
 agent would be a provider like it that streams a model's tokens. The chats

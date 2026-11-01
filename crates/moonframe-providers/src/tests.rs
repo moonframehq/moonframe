@@ -64,10 +64,30 @@ fn manifests_are_checked() {
             "unknown field",
         ),
         ("Bad", "kind = 'process'\ncommand = ['x']", "use a-z"),
+        ("h", "kind = 'static'", "needs a `file`"),
+        (
+            "i",
+            "kind = 'static'\nfile = '../x.json'",
+            "a file name in the provider's folder",
+        ),
+        ("j", "kind = 'static'\nfile = 'gone.json'", "no gone.json"),
+        #[cfg(unix)]
+        ("l", "kind = 'static'\nfile = 'linked.json'", "is a link"),
+        (
+            "k",
+            "kind = 'process'\ncommand = ['x']\nfile = 'x.json'",
+            "only a static provider",
+        ),
     ];
     for (name, toml, _) in cases {
         write(root, &format!("providers/{name}/provider.toml"), toml);
     }
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(
+        root.join("providers/sys/Cargo.toml"),
+        root.join("providers/l/linked.json"),
+    )
+    .unwrap();
     let problems = check(&root.into());
     for (name, _, expected) in cases {
         let problem = problems
@@ -451,4 +471,44 @@ fn providers_start_once_wanted_unless_they_always_start() {
     // Wanting less stops nothing.
     providers.want(Some(std::collections::BTreeSet::new()));
     assert_eq!(running(&providers).len(), 4);
+}
+
+#[test]
+fn a_static_provider_publishes_its_file_on_messages_and_changes() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/sample/provider.toml",
+        "kind = 'static'\nfile = 'sample.json'\n",
+    );
+    write(root, "providers/sample/sample.json", r#"{"n": 1}"#);
+    let (events, received) = events();
+    let mut providers = Providers::start(root.into(), root.join("build"), events);
+    let next = || match received.recv_timeout(Duration::from_secs(5)).unwrap() {
+        Event::Published { provider, data } => (provider, data),
+        other => panic!("{other:?}"),
+    };
+    let one = Data::map([("n", Data::Integer(1))]);
+    assert_eq!(next(), ("sample".to_owned(), one.clone()));
+    // A message publishes it again, so a mod's refresh hears back.
+    providers
+        .send("sample", "main", Data::from("refresh"))
+        .unwrap();
+    assert_eq!(next(), ("sample".to_owned(), one));
+
+    write(root, "providers/sample/sample.json", r#"{"n": 22}"#);
+    providers.reload();
+    let two = Data::map([("n", Data::Integer(22))]);
+    assert_eq!(next(), ("sample".to_owned(), two));
+
+    write(root, "providers/sample/sample.json", "{");
+    providers.reload();
+    match received.recv_timeout(Duration::from_secs(5)).unwrap() {
+        Event::Failed { provider, problem } => {
+            assert_eq!(provider, "sample");
+            assert!(problem.to_string().contains("sample.json"), "{problem}");
+        },
+        other => panic!("{other:?}"),
+    }
 }

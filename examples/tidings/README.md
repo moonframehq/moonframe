@@ -32,7 +32,7 @@ Single keys work while no text field has focus (they are shell menu
 shortcuts that type text, which Moonframe offers only then).
 
 The mailbox is **sample data** (`providers/mailbox/sample.json`, published
-by a small Perl process provider as `app.mailbox`). What you read, mark done
+as it is by a static provider as `app.mailbox`). What you read, mark done
 or reply is kept in the mail mod's state, so it comes back next launch.
 
 ```sh

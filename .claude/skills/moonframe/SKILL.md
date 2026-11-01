@@ -1418,7 +1418,7 @@ over all of `app` wants every one), a mod subscribes to
 `provider/<name>`, or a mod sends it a message; once started it keeps
 running. `start = "always"` in provider.toml starts it with the app
 instead, for one whose work matters before anything shows it. A failed provider shows a banner, and its error appears in the
-terminal log. There are three kinds:
+terminal log. There are four kinds:
 
 - **`kind = "wasm"`:** a WebAssembly component implementing
   `wit/provider.wit`, shipped as `provider.wasm` in the folder, or as the
@@ -1447,6 +1447,11 @@ terminal log. There are three kinds:
     `provider.wasm` alone.
     The host refuses to build a folder with a `build.rs` or a `.cargo/`.
   - `app/providers/system` is the example.
+- **`kind = "static"`, `file = "sample.json"`:** a JSON file in the
+  folder, published as it is: no code runs, so it needs no approval when
+  installed. It is published again when the file changes and on any
+  message (a mod's Refresh hears back). The file is checked like anything
+  a provider publishes. Use it for sample data; `examples/tessel` does.
 - **`kind = "process"`, `command = [...]`:** any program run in the folder.
   - Each line it prints on stdout is one JSON value to publish. Each message
     arrives on stdin as a `{"from":"<mod>","message":...}` line (compact,

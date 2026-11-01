@@ -17,6 +17,9 @@
 //! - **native**: Rust built into the app (see [`native`]), for git, forges
 //!   and the like: the user's own access, real libraries, and replies to
 //!   the mod that asked.
+//! - **static**: a JSON file in the folder (`file = "sample.json"`),
+//!   published as it is, again when it changes and on any message: sample
+//!   data with no code at all.
 //! - **process**: any command that prints one JSON value per line and reads
 //!   messages from stdin, each with the mod that sent it. It runs with the user's full access, for data a
 //!   sandbox cannot reach.
@@ -31,6 +34,7 @@
 #[cfg(feature = "tokio")]
 mod asynchronous;
 mod fingerprint;
+mod fixed;
 mod json;
 mod manifest;
 pub mod native;
@@ -310,6 +314,7 @@ impl Providers {
                     Kind::Wasm => wasm::run(&context),
                     Kind::Process { .. } => process::run(&context),
                     Kind::Native => native::run(&context, native),
+                    Kind::Static { .. } => fixed::run(&context),
                 });
             match spawned {
                 Ok(_) => {

@@ -1,4 +1,5 @@
 {
+  "available": true,
   "user": { "name": "Nora Vale", "plan": "Enterprise", "color": "#2f9e8f" },
   "people": {
     "me": { "name": "me", "color": "#2f9e8f" },

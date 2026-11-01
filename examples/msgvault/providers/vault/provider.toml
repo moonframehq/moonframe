@@ -1,7 +1,8 @@
 # msgvault's archive, shared as `app.vault`. With a msgvault archive on this
-# machine ($MSGVAULT_HOME, else ~/.msgvault, holding msgvault.db) and the
-# sqlite3 command, it reads the newest messages from it, read-only (PRAGMA
-# query_only). Otherwise it shows SAMPLE data from sample.json in this folder.
-# A process provider (perl 5 with JSON::PP), as it reads a file of the user's.
-command = ["perl", "vault.pl"]
+# machine ($MSGVAULT_HOME, else ~/.msgvault, holding msgvault.db) it reads the
+# newest messages from it, read-only (mode=ro, PRAGMA query_only). Otherwise
+# it shows SAMPLE data from sample.json in this folder.
+# A process provider, as it reads a file of the user's. Needs python3 (3.9 or
+# later; macOS gets it with the Command Line Tools), standard library only.
+command = ["python3", "vault.py"]
 kind    = "process"

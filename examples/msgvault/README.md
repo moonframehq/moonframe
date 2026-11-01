@@ -35,9 +35,9 @@ account, label, thread and chat msgvault keeps, read-only.
   archive, with filters by kind and a search; picking one shows it with its
   message ("Show the message" goes there).
 
-**Where the data comes from** (`providers/vault`, a Perl process provider):
-when `$MSGVAULT_HOME/msgvault.db` (else `~/.msgvault/msgvault.db`) exists and
-`sqlite3` is installed, it reads the newest 2,000 messages from it, never
+**Where the data comes from** (`providers/vault`, a Python 3 process
+provider): when `$MSGVAULT_HOME/msgvault.db` (else `~/.msgvault/msgvault.db`)
+exists, it reads the newest 2,000 messages from it, opened read-only, never
 writing (`PRAGMA query_only`), and again every minute or on ⌘R. Otherwise it
 shows `sample.json`, a snapshot of msgvault-gpui's demo archive with its
 times kept relative to now, and the title bar says "Sample". Attachment bytes
@@ -51,7 +51,7 @@ to show the blocking. The view (mailbox, account, search, open message) is kept 
 `~/.cache/moonframe/msgvault`.
 
 To make `sample.json` again: `msgvault-fixture DIR` (in msgvault-gpui), then
-`MSGVAULT_HOME=DIR perl vault.pl --dump > sample.json` in `providers/vault`
+`MSGVAULT_HOME=DIR python3 vault.py --dump > sample.json` in `providers/vault`
 (the one here is then made a day older, so its rows read "Yesterday").
 
 ```sh

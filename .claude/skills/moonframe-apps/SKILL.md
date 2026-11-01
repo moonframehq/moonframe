@@ -79,8 +79,9 @@ temporary one to try things without touching the user's).
    header row (row centre minus about 6) and the row has `drag = true` and
    room (about 70 px) for them.
 3. Fill it with mods; data comes from providers. If the app needs data the
-   built-ins lack, write a provider (process providers in Perl or bash are
-   quickest), or put shared ones in a package the app `requires` (see
+   built-ins lack, write a provider (a Rust Wasm provider for sample data
+   or anything the sandbox allows; a process provider in Python or bash for
+   files, commands and databases), or put shared ones in a package the app `requires` (see
    `examples/projects`).
 4. Before writing UI, read the **moonframe-components** catalogue; when a
    piece the design needs is missing and reusable, add it as a component
@@ -244,7 +245,7 @@ Frames over 8 ms are logged at `info` always. Measure in a release build
 - **daybook**: a planner: a top bar with one search-or-create field, a
   sidebar, a day card (day strip, a summary of pills, tasks and events) and
   an inbox card; Upcoming, a month, notes; three looks the provider keeps.
-  Its own Perl provider stores the data in `~/.local/share/moonframe`.
+  Its own Python provider stores the data in `~/.local/share/moonframe`.
 - **ledger**: a fund overview: a forecast against a floor, things waiting
   with date tiles, a raise in stacked progress, funds with curves in a table.
 - **audience**: a newsletter dashboard: KPI cells, a dot chart, sources as
@@ -253,7 +254,7 @@ Frames over 8 ms are logged at `info` always. Measure in a release build
   chat panel; deals move through a card's menu.
 - **stage**: the components on a bento board with sample data, for stills
   (View > Show or Hide Captions, backdrops).
-- **projects**: a Perl provider for repositories, their files and changes,
+- **projects**: a Python provider for repositories, their files and changes,
   and the `file-tree`, `change-tree`, `code` and `file-icon` components.
 
 `just check-examples` loads them all and type-checks them; `swift

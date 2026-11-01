@@ -1,6 +1,12 @@
 # Sorrel's research run, shared as `app.research`: SAMPLE DATA from
-# sample.json, and a SCRIPTED DEMO of an agent filling the sheet, played on a
-# clock. Not a model: a real agent would publish its plan and cells here. A
-# process provider: it only reads that file. Needs perl 5 (as macOS ships).
-command = ["perl", "research.pl"]
-kind    = "process"
+# sample.json, and a SCRIPTED DEMO of an agent filling the sheet, played one
+# tick per interval. Not a model: a real agent would publish its plan and
+# cells here. A Rust crate built to a WebAssembly component and run
+# sandboxed: the sample is built in.
+interval = 0.4
+kind     = "wasm"
+
+[settings]
+# The tick the run starts at, 0 to 143 (for stills: 61 is step 2, row 10,
+# the monthly fee being typed).
+start_tick = 0
