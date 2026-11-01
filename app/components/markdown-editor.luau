@@ -264,7 +264,8 @@ markdown_editor { id = "readme", path = "README.md" }
 				"Save",
 				small = true,
 				variant = if state.dirty then "primary" else "ghost",
-				disabled = not state.dirty or state.saving ~= nil or state.text == nil,
+				-- A deleted file is written again even unedited.
+				disabled = (not state.dirty and not state.missing) or state.saving ~= nil or state.text == nil,
 				msg = "save",
 				tooltip = "Save (⌘S while editing)",
 			},

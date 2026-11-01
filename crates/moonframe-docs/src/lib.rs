@@ -22,7 +22,11 @@
 //! Paths are relative to the root, without `.`, `..` or empty parts, never
 //! inside `.git`, and must stay in the root after following links. Files are
 //! UTF-8 text of at most [`MAX_DOCUMENT`] bytes. Saving writes a temporary
-//! file beside the original and renames it over, keeping its permissions.
+//! file beside the original and renames it over, keeping its permissions;
+//! the version is checked again just before, so a save made elsewhere
+//! meanwhile is refused as a conflict rather than lost. At most
+//! [`MAX_OPEN`] files are watched; past that the one read longest ago
+//! stops being.
 //! Anyone may read; only the mods in provider.toml's `writers` (and the
 //! components they draw) may write.
 
@@ -39,7 +43,9 @@ use {
     },
 };
 
-/// Most files watched at once, over every mod.
+/// Most files watched at once, over every mod. Past it, the one read or
+/// saved longest ago stops being watched: a tab shown again reads its file,
+/// and is watched again.
 const MAX_OPEN: usize = 64;
 
 /// Makes the provider, for the app's registry.
@@ -53,8 +59,17 @@ pub struct Docs {
     root: Option<PathBuf>,
     /// The mods that may save (`[settings] writers`).
     writers: Vec<String>,
-    /// The files mods read, by mod and path, with the version each last saw.
-    open: BTreeMap<(String, String), String>,
+    /// The files mods read, by mod and path.
+    open: BTreeMap<(String, String), Watch>,
+    /// Counts reads and saves, to tell which watch is the oldest.
+    uses: u64,
+}
+
+/// A file a mod reads: the version it last saw, and when it last read or
+/// saved it (in [`Docs::uses`]).
+struct Watch {
+    version: String,
+    used: u64,
 }
 
 impl Native for Docs {
@@ -84,7 +99,7 @@ impl Native for Docs {
         let Some(root) = &self.root else {
             return;
         };
-        for ((owner, path), seen) in &mut self.open {
+        for ((owner, path), watch) in &mut self.open {
             let now = root
                 .join(path)
                 .metadata()
@@ -92,10 +107,10 @@ impl Native for Docs {
                 .filter(fs::Metadata::is_file)
                 .map(|meta| version(&meta));
             let current = now.clone().unwrap_or_default();
-            if current == *seen {
+            if current == watch.version {
                 continue;
             }
-            *seen = current;
+            watch.version = current;
             let mut msg = vec![("changed", Data::String(path.clone()))];
             match now {
                 Some(version) => msg.push(("version", Data::String(version))),
@@ -137,6 +152,18 @@ struct Refusal {
     conflict: bool,
 }
 
+const CHANGED: &str = "the file changed on disk since it was opened";
+const EXISTS: &str = "the file already exists";
+
+impl Refusal {
+    fn conflict(error: &str) -> Self {
+        Self {
+            error: error.to_owned(),
+            conflict: true,
+        }
+    }
+}
+
 impl From<&str> for Refusal {
     fn from(error: &str) -> Self {
         error.to_owned().into()
@@ -153,6 +180,27 @@ impl From<String> for Refusal {
 }
 
 impl Docs {
+    /// Watches `path` for `from`, at `version`; when full, the watch used
+    /// longest ago makes room.
+    fn watch(&mut self, from: &str, path: &str, version: &str) {
+        self.uses += 1;
+        let key = (from.to_owned(), path.to_owned());
+        if !self.open.contains_key(&key)
+            && self.open.len() >= MAX_OPEN
+            && let Some(oldest) = self
+                .open
+                .iter()
+                .min_by_key(|(_, watch)| watch.used)
+                .map(|(key, _)| key.clone())
+        {
+            self.open.remove(&oldest);
+        }
+        self.open.insert(key, Watch {
+            version: version.to_owned(),
+            used: self.uses,
+        });
+    }
+
     fn read(&mut self, from: &str, path: &str) -> Answer {
         let root = self.root.as_deref().ok_or("no project folder")?;
         let file = existing(root, path)?;
@@ -163,10 +211,7 @@ impl Docs {
         let bytes = fs::read(&file).map_err(|error| error.to_string())?;
         let text = String::from_utf8(bytes).map_err(|_| "not a text file".to_owned())?;
         let version = version(&meta);
-        let key = (from.to_owned(), path.to_owned());
-        if self.open.contains_key(&key) || self.open.len() < MAX_OPEN {
-            self.open.insert(key, version.clone());
-        }
+        self.watch(from, path, &version);
         Ok(vec![
             ("text", Data::String(text)),
             ("version", Data::String(version)),
@@ -197,28 +242,29 @@ impl Docs {
             return Err(format!("larger than {} KiB", MAX_DOCUMENT / 1024).into());
         }
         let file = writable(root, path)?;
-        if let Ok(meta) = file.metadata()
-            && !force
-        {
-            let current = version(&meta);
-            if expected != Some(current.as_str()) {
-                return Err(Refusal {
-                    error: match expected {
-                        Some(_) => "the file changed on disk since it was opened".to_owned(),
-                        None => "the file already exists".to_owned(),
-                    },
-                    conflict: true,
-                });
-            }
-        }
-        save(&file, text).map_err(|error| format!("could not save: {error}"))?;
+        let over = match file.metadata() {
+            _ if force => Over::Anything,
+            Ok(meta) => {
+                let current = version(&meta);
+                if expected != Some(current.as_str()) {
+                    return Err(match expected {
+                        Some(_) => Refusal::conflict(CHANGED),
+                        None => Refusal::conflict(EXISTS),
+                    });
+                }
+                Over::Version(current)
+            },
+            // Gone, or never there: written new, unless it appears meanwhile.
+            Err(_) => Over::Nothing,
+        };
+        save(&file, text, &over).map_err(|error| match error {
+            Saved::Conflict(error) => Refusal::conflict(error),
+            Saved::Failed(error) => format!("could not save: {error}").into(),
+        })?;
         let meta = file.metadata().map_err(|error| error.to_string())?;
         let version = version(&meta);
         // Its own save is not news to the mod that made it.
-        let key = (from.to_owned(), path.to_owned());
-        if self.open.contains_key(&key) || self.open.len() < MAX_OPEN {
-            self.open.insert(key, version.clone());
-        }
+        self.watch(from, path, &version);
         Ok(vec![
             ("version", Data::String(version)),
             ("message", Data::String(format!("Saved {path}"))),
@@ -333,9 +379,32 @@ fn writable(root: &Path, path: &str) -> Result<PathBuf, String> {
     Ok(file)
 }
 
-/// Writes `text` to a file beside `file`, then renames it over, so the file
-/// is never seen half written. It keeps the original's permissions.
-fn save(file: &Path, text: &str) -> std::io::Result<()> {
+/// What a save may replace: the file as it was when checked, nothing (a
+/// new file), or whatever is there (`force`).
+enum Over {
+    Version(String),
+    Nothing,
+    Anything,
+}
+
+enum Saved {
+    /// The file changed after it was checked; nothing was written.
+    Conflict(&'static str),
+    Failed(std::io::Error),
+}
+
+impl From<std::io::Error> for Saved {
+    fn from(error: std::io::Error) -> Self {
+        Self::Failed(error)
+    }
+}
+
+/// Writes `text` to a file beside `file`, then puts it in place, so the file
+/// is never seen half written. It keeps the original's permissions. What is
+/// there is checked against `over` again just before, after the slow part,
+/// so a save made elsewhere meanwhile is refused rather than lost; a new
+/// file is linked into place, which fails if one appeared.
+fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
     let name = file
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
@@ -358,10 +427,29 @@ fn save(file: &Path, text: &str) -> std::io::Result<()> {
     let written = (|| {
         out.write_all(text.as_bytes())?;
         out.sync_all()?;
-        if let Ok(meta) = file.metadata() {
+        let now = file.metadata().ok();
+        if let Some(meta) = &now {
             fs::set_permissions(&temp, meta.permissions())?;
         }
-        fs::rename(&temp, file)
+        match over {
+            Over::Version(expected) => {
+                if now.as_ref().map(version).as_deref() != Some(expected.as_str()) {
+                    return Err(Saved::Conflict(CHANGED));
+                }
+                fs::rename(&temp, file)?;
+            },
+            Over::Nothing => match fs::hard_link(&temp, file) {
+                Ok(()) => fs::remove_file(&temp)?,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    return Err(Saved::Conflict(EXISTS));
+                },
+                // A folder without links (some USB drives): only a last look.
+                Err(_) if file.symlink_metadata().is_err() => fs::rename(&temp, file)?,
+                Err(_) => return Err(Saved::Conflict(EXISTS)),
+            },
+            Over::Anything => fs::rename(&temp, file)?,
+        }
+        Ok(())
     })();
     if written.is_err() {
         fs::remove_file(&temp).ok();
@@ -375,10 +463,9 @@ fn root(dir: &Path) -> Option<PathBuf> {
     if let Some(folder) = std::env::var_os("MOONFRAME_FILES") {
         return PathBuf::from(folder).canonicalize().ok();
     }
-    let start = std::env::var_os("LAYOUTS_REPO")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| dir.join("..").join(".."));
-    let start = start.canonicalize().ok()?;
+    // As the `files` provider finds it, so a path the explorer gives names
+    // the same file here.
+    let start = dir.join("..").join("..").canonicalize().ok()?;
     start
         .ancestors()
         .find(|folder| folder.join(".git").exists())
