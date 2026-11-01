@@ -597,6 +597,7 @@ impl Build for Input {
         "mono",
         "width",
         "grow",
+        "browser",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
@@ -627,11 +628,17 @@ impl Build for Input {
             .map(|keys| keys.0)
             .unwrap_or_default();
         let to = fields.get::<String>("to")?;
-        if to.is_some() && change.is_none() && submit.is_none() && keys.is_empty() {
+        let browser = fields.get::<BrowserId>("browser")?.map(|id| id.0);
+        if to.is_some()
+            && change.is_none()
+            && submit.is_none()
+            && keys.is_empty()
+            && browser.is_none()
+        {
             return Err(fields
                 .cx()
                 .key("to")
-                .fail("`to` goes with `change`, `submit` or `keys`"));
+                .fail("`to` goes with `change`, `submit`, `keys` or `browser`"));
         }
         Ok(Self {
             look: Look::from_fields(fields)?,
@@ -649,6 +656,7 @@ impl Build for Input {
             mono: fields.get("mono")?.unwrap_or(false),
             width: fields.number("width", PIXELS)?,
             grow: fields.get("grow")?.unwrap_or(false),
+            browser,
         })
     }
 }

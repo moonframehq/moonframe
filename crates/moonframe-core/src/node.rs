@@ -689,6 +689,49 @@ pub fn is_web_url(url: &str) -> bool {
     host_given && url.len() <= MAX && !url.chars().any(|c| c.is_control() || c.is_whitespace())
 }
 
+/// Where text typed in a browser's address field goes, as a browser does
+/// it: an address as written, a host (`example.com`, `localhost:3000`)
+/// over https (http for the machine itself), and anything else as a web
+/// search. None for blank text.
+pub fn typed_address(text: &str) -> Option<String> {
+    const SEARCH: &str = "https://duckduckgo.com/?q=";
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    if text.contains("://") {
+        return is_web_url(text).then(|| text.to_owned());
+    }
+    if !text.chars().any(char::is_whitespace) {
+        let host = text.split(['/', '?', '#']).next().unwrap_or_default();
+        let name = host.rsplit_once(':').map_or(host, |(name, _)| name);
+        let local =
+            matches!(name, "localhost" | "127.0.0.1" | "[::1]") || name.ends_with(".localhost");
+        if local || name.contains('.') && !name.starts_with('.') && !name.ends_with('.') {
+            let scheme = if local {
+                "http"
+            } else {
+                "https"
+            };
+            let url = format!("{scheme}://{text}");
+            if is_web_url(&url) {
+                return Some(url);
+            }
+        }
+    }
+    let mut query = String::with_capacity(text.len());
+    for byte in text.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                query.push(byte as char);
+            },
+            b' ' => query.push('+'),
+            _ => query.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    Some(format!("{SEARCH}{query}")).filter(|url| is_web_url(url))
+}
+
 /// A text field the host edits: single-line, or several lines with
 /// `multiline`. The host keeps what the user typed by the drawing mod and
 /// `id` (or the field's place in the tree), so it survives re-renders and
@@ -719,6 +762,10 @@ pub struct Input {
     pub focus: bool,
     /// Use the monospace font.
     pub mono: bool,
+    /// The `ui.browser` this field is the address bar of: Enter loads the
+    /// typed address there (see [`typed_address`]), focus selects the
+    /// text, and Escape puts back the page's address.
+    pub browser: Option<String>,
     pub width: Option<f32>,
     pub grow: bool,
 }

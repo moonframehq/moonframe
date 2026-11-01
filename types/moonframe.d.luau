@@ -577,8 +577,10 @@ type BrowserProps = {
 	url: string?,
 	-- The page's zoom factor, 0.25 to 5.
 	zoom: number?,
-	-- Sent as the page navigates or its title changes, with `url` and
-	-- `title` added (a non-table message arrives as `{ msg = ... }`).
+	-- Sent as the page navigates, its title changes or a load starts or
+	-- ends, with `url`, `title` and `loading` added, and `back` and
+	-- `forward` (whether it can go there) where the platform says (a
+	-- non-table message arrives as `{ msg = ... }`).
 	navigate: Data,
 	-- Sent as a load starts and finishes, with `loading` and `url` added.
 	loading: Data,
@@ -616,6 +618,10 @@ type InputProps = {
 	mono: boolean?,
 	width: number?,
 	grow: boolean?,
+	-- Make it the address bar of this mod's `ui.browser` with this id (or
+	-- `to`'s): Enter loads the text (a host over https, words as a web
+	-- search), focus selects it, and Escape puts back the page's address.
+	browser: string?,
 }
 
 type RegionProps = {
