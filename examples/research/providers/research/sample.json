@@ -1,0 +1,35 @@
+{
+  "project": "Savings launch, Q1",
+  "sheet": "Competitor research",
+  "prompt": "Compare the savings apps we compete with. Cite every number.",
+  "intro": "I split this into 4 steps. Step 2 runs on 3 agents at once, and the sheet fills as they go.",
+  "approved": "10:42",
+  "sources": 42,
+  "steps": [
+    "Find savings apps in the US",
+    "Collect APY, fees and minimums",
+    "Pull app store reviews",
+    "Summarize gaps against Sorrel"
+  ],
+  "agents": [
+    { "id": "banks", "label": "Banks", "color": "#22c55e" },
+    { "id": "neobanks", "label": "Neobanks", "color": "#8b5cf6" },
+    { "id": "apps", "label": "Apps", "color": "#f5b544" }
+  ],
+  "apps": [
+    { "name": "Bayline", "type": "Bank", "agent": "banks", "apy": "4.35%", "fee": "$0", "deposit": "$0", "rating": "4.7", "source": "bayline.com", "icon": "globe", "color": "#3b82f6" },
+    { "name": "Kestrel", "type": "Neobank", "agent": "neobanks", "apy": "4.60%", "fee": "$0", "deposit": "$1", "rating": "4.8", "source": "kestrel.app", "icon": "send", "color": "#8b5cf6" },
+    { "name": "Northgate", "type": "Bank", "agent": "banks", "apy": "4.10%", "fee": "$0", "deposit": "$100", "rating": "4.5", "source": "northgate.com", "icon": "shield", "color": "#f97316" },
+    { "name": "Tendril", "type": "App", "agent": "apps", "apy": "3.90%", "fee": "$3", "deposit": "$5", "rating": "4.6", "source": "tendril.app", "icon": "sparkles", "color": "#14b8a6" },
+    { "name": "Ridgeway", "type": "Credit union", "agent": "banks", "apy": "4.25%", "fee": "$0", "deposit": "$25", "rating": "4.4", "source": "ridgeway.org", "icon": "flag", "color": "#e11d48" },
+    { "name": "Copperjar", "type": "App", "agent": "apps", "apy": "4.00%", "fee": "$2", "deposit": "$0", "rating": "4.7", "source": "copperjar.com", "icon": "coffee", "color": "#b45309" },
+    { "name": "Indigo Save", "type": "Neobank", "agent": "neobanks", "apy": "4.50%", "fee": "$0", "deposit": "$0", "rating": "4.3", "source": "indigosave.com", "icon": "star-fill", "color": "#1d4ed8" },
+    { "name": "Fernway", "type": "Neobank", "agent": "neobanks", "apy": "4.40%", "fee": "$0", "deposit": "$10", "rating": "4.6", "source": "fernway.io", "icon": "zap", "color": "#22c55e" },
+    { "name": "Greenmark", "type": "Bank", "agent": "banks", "apy": "3.75%", "fee": "$5", "deposit": "$500", "rating": "4.1", "source": "greenmark.com", "icon": "circle-dot", "color": "#059669" },
+    { "name": "Stillwater", "type": "Bank", "agent": "banks", "apy": "4.20%", "fee": "$0", "deposit": "$250", "rating": "4.2", "source": "stillwater.com", "icon": "cloud", "color": "#0ea5e9" },
+    { "name": "Daybreak", "type": "App", "agent": "apps", "apy": "4.05%", "fee": "$0", "deposit": "$0", "rating": "4.5", "source": "daybreak.app", "icon": "sun", "color": "#f59e0b" },
+    { "name": "Quayside", "type": "Neobank", "agent": "neobanks", "apy": "4.30%", "fee": "$0", "deposit": "$50", "rating": "4.4", "source": "quayside.co", "icon": "rocket", "color": "#334155" },
+    { "name": "Emberly", "type": "App", "agent": "apps", "apy": "3.85%", "fee": "$1", "deposit": "$0", "rating": "4.0", "source": "emberly.money", "icon": "heart", "color": "#ef4444" },
+    { "name": "Petalpay", "type": "Neobank", "agent": "neobanks", "apy": "4.15%", "fee": "$0", "deposit": "$20", "rating": "4.6", "source": "petalpay.com", "icon": "layers", "color": "#06b6d4" }
+  ]
+}
