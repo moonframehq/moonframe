@@ -56,7 +56,28 @@
     "breadcrumbs": () => `<div class="cb-row"><span class="cb-muted">‹</span><span>group/sub/app</span><span class="cb-muted">/</span><span>Merge requests</span><span class="cb-muted">/</span><b>!2 Draft: cache MR pages</b><span class="cb-muted" style="margin-left:14px">2 of 3</span></div>`,
     "search-field": () => `<div class="cb-input" style="width:260px">⌕ <span class="cb-muted">Search…</span></div>`,
     "spotlight-bars": null,
+    // Drawn from the component's own example in app/components/agent-run.luau.
+    "agent-run": () => `<div class="cb-run">
+      <b>Make the status bar taller</b>
+      <div class="cb-row"><span class="cb-ic" style="background:#d9775722;color:#c4623f">✳</span><span style="color:#c77d12">⚠</span><span style="color:#c77d12;font-weight:500">Needs your answer</span><span class="cb-muted">Claude · 3 steps</span><span class="cb-btn" style="margin-left:auto;border-color:transparent">◼ Stop</span></div>
+      <div class="cb-plan"><div><span>✓</span><s>Find the status bar's row</s></div><div><span>◉</span>Make it 36px tall</div><div><span>○</span>Run just check</div></div>
+      <div class="cb-tool"><span class="cb-good">✓</span>Read app/main.luau</div><div class="cb-tool"><span class="cb-muted">◌</span>Edit app/main.luau</div>
+      <div class="cb-ask"><div class="cb-row"><span style="color:#c77d12">⚠</span><b>Claude asks to: Edit app/main.luau</b></div><div class="cb-row"><span class="cb-btn p">Allow</span><span class="cb-btn">Always allow</span><span class="cb-btn" style="border-color:transparent">Reject</span></div></div>
+      <div class="cb-muted">The status bar is the row at the bottom of app/main.luau; I'll raise its height.</div></div>`,
+    "terminal": () => term("alacritty_terminal"),
+    "ghostty-terminal": () => term("libghostty-vt"),
   };
+  // A shell mid-session; the engine named in the corner is the only difference.
+  function term(engine) {
+    const g = s => `<span style="color:#7ec699">${s}</span>`, d = s => `<span style="color:#7d7a8c">${s}</span>`, a = s => `<span style="color:#f2b33d">${s}</span>`;
+    return `<div class="cb-term"><div class="cb-term-bar"><span>zsh — ~/code/moonframe</span><span>${engine}</span></div><pre>${a("~/code/moonframe")} ${d("main")} ❯ cargo build --release
+   ${g("Compiling")} moonframe-luau v0.4.0
+   ${g("Compiling")} moonframe-app v0.4.0
+    ${g("Finished")} \`release\` profile [optimized] in 41.2s
+${a("~/code/moonframe")} ${d("main")} ❯ moonframe app link examples/ledger --yes
+Linked ${g("ledger")} → examples/ledger
+${a("~/code/moonframe")} ${d("main")} ❯ <i></i></pre></div>`;
+  }
 
   const STYLE = `
   .cb { --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace; font:13px/1.45 Inter, system-ui, -apple-system, sans-serif; color:#1f1e26; background:#fff; border:1px solid #1d1b26; box-shadow:0 30px 60px -30px #1d1b2666; display:grid; grid-template-rows:34px 1fr; height:640px; text-align:left }
@@ -86,7 +107,7 @@
   @media (max-width:720px) {
     .cb { height:auto } .cb-main { grid-template-columns:1fr }
     .cb-side { border-right:0; border-bottom:1px solid #ececf1; max-height:240px }
-    .cb-detail { padding:18px 16px 24px } .cb-banner { width:auto; flex-wrap:wrap }
+    .cb-detail { padding:18px 16px 24px } .cb-banner, .cb-run, .cb-term { width:auto; flex-wrap:wrap }
   }
   .cb-props { width:100%; border-collapse:collapse; font-size:12.5px }
   .cb-props td { border-top:1px solid #ececf1; padding:6px 10px 6px 0; vertical-align:top } .cb-props td:first-child { font-family:var(--mono); color:#4b3fd1; white-space:nowrap; width:1% }
@@ -119,6 +140,15 @@
   .cb-radio { width:16px; height:16px; border-radius:50%; border:1.5px solid #bbb; flex-shrink:0; margin-top:3px } .cb-radio.on { border:5px solid #4b3fd1 }
   .cb-tag { font:12px var(--mono); background:#f0eff4; padding:2px 8px; border-radius:5px }
   .cb-bubble { background:#d64545; color:#fff; font-weight:700; font-size:11.5px; border-radius:999px; padding:2px 8px }
+  .cb-run { width:460px; display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid #e3e2ea; border-radius:12px; padding:14px 16px; box-shadow:0 2px 8px #0000000a }
+  .cb-plan { background:#f0eff499; border-radius:6px; padding:6px 8px; font-size:12.5px; display:grid; gap:2px } .cb-plan span { color:#8a8798; display:inline-block; width:18px } .cb-plan s { color:#8a8798 }
+  .cb-tool { font:12px var(--mono); color:#6b6676; display:flex; gap:6px }
+  .cb-ask { border:1px solid #e59a3580; background:#e59a3514; border-radius:8px; padding:10px; display:grid; gap:8px }
+  .cb-term { width:540px; background:#1b1a24; border-radius:10px; overflow:hidden; box-shadow:0 10px 30px -10px #0006 }
+  .cb-term-bar { display:flex; justify-content:space-between; padding:7px 12px; font-size:11.5px; color:#8a8798; background:#24232e }
+  .cb-term pre { margin:0; padding:12px 14px 14px; font:12px/1.6 var(--mono); color:#d8d6f0; white-space:pre-wrap }
+  .cb-term pre i { display:inline-block; width:7px; height:14px; background:#d8d6f0; vertical-align:-2px; animation:cbblink 1s steps(1) infinite }
+  @keyframes cbblink { 50% { opacity:0 } }
   .cb-input { border:1px solid #e3e2ea; border-radius:8px; padding:7px 10px; background:#fff }
   `;
 
@@ -137,7 +167,7 @@
     root.innerHTML = `<div class="cb"><div class="cb-title"><i></i><i></i><i></i><span>Components</span></div>
       <div class="cb-main"><div class="cb-side"><input class="cb-search" placeholder="Search ${all.length} components"><div class="cb-list"></div></div><div class="cb-detail"></div></div></div>`;
     const list = root.querySelector(".cb-list"), detail = root.querySelector(".cb-detail"), search = root.querySelector(".cb-search");
-    let current = initial || "week-calendar";
+    let current = initial || "agent-run";
 
     function drawList() {
       const q = search.value.trim().toLowerCase();

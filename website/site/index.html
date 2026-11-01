@@ -168,7 +168,7 @@
   .lb { position:fixed; inset:0; z-index:50; background:#1c120bf2; display:none; flex-direction:column; align-items:center; justify-content:center; padding:40px 60px 30px; font-family:var(--sans); color:#eee }
   .lb.on { display:flex }
   .lb-frame { position:relative; max-width:min(1500px, 100%); display:grid }
-  .lb-frame img { grid-area:1/1; max-width:100%; max-height:calc(100vh - 140px); object-fit:contain; display:block; filter:drop-shadow(0 30px 50px #000a) }
+  .lb-frame img { grid-area:1/1; max-width:100%; max-height:calc(100vh - 190px); object-fit:contain; display:block; filter:drop-shadow(0 30px 50px #000a) }
   .lb-frame img.lo { filter:blur(6px) saturate(.8) drop-shadow(0 30px 50px #000a); transition:opacity .3s }
   .lb-frame img.hi { opacity:0; transition:opacity .35s } .lb-frame img.hi.ready { opacity:1 }
   .lb-bar { position:absolute; left:0; right:0; bottom:-14px; height:3px; background:#ffffff22; border-radius:2px; overflow:hidden; transition:opacity .4s }
@@ -177,6 +177,10 @@
   @keyframes lbi { from { transform:translateX(-100%) } to { transform:translateX(340%) } }
   .lb-cap { margin-top:28px; display:flex; gap:16px; align-items:center; font-size:14px; color:#bbb }
   .lb-cap b { color:#fff; font:italic 500 20px var(--serif) } .lb-cap code { background:#ffffff14; color:#ddd }
+  .lb .lb-cmd { position:static; width:auto; height:auto; border-radius:4px; margin-top:12px; display:flex; gap:12px; align-items:center; padding:8px 10px 8px 14px; font:13px var(--mono); color:#ddd; background:#ffffff14 }
+  .lb .lb-cmd[hidden] { display:none }
+  .lb-cmd code { background:none; color:inherit; padding:0; user-select:all }
+  .lb-cmd span { font:600 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:#f2b33d }
   .lb-pct { font:12px var(--mono); color:#f2b33d; min-width:120px }
   .lb-pct .retry { position:static; width:auto; height:auto; border-radius:4px; font:600 12px var(--sans); padding:4px 10px; margin-left:8px; background:#f2b33d; color:#1c120b }
   .lb button { position:absolute; background:#ffffff14; color:#fff; border:0; width:44px; height:44px; border-radius:50%; font-size:20px; cursor:pointer }
@@ -187,8 +191,8 @@
 
   .cols { columns:3; column-gap:44px; column-rule:1px solid var(--rule); margin-top:44px }
   .cols h3 { font:600 13px var(--sans); letter-spacing:.1em; text-transform:uppercase; margin-bottom:6px; break-after:avoid }
-  .cols > div { break-inside:avoid }
-  .cols p { font-size:16px; margin-bottom:26px; color:var(--ink2) }
+  .cols > div { break-inside:avoid; padding-bottom:26px }
+  .cols p { font-size:16px; color:var(--ink2) }
   .pull { font-size:42px; line-height:1.2; font-style:italic; text-align:center; max-width:880px; margin:0 auto; padding:56px 0 }
 
   footer { border-top:2px solid var(--ink); padding:28px 0 56px; display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:32px; font:14px var(--sans); color:var(--dim) }
@@ -226,7 +230,7 @@
     .installbar { flex-direction:column; align-items:flex-start } .installbar pre { white-space:pre-wrap; word-break:break-all; font-size:13px }
     .pull { font-size:28px; padding:40px 0 }
     footer { grid-template-columns:1fr 1fr }
-    .lb { padding:56px 10px 20px } .lb .prev, .lb .next { top:auto; bottom:14px } .lb-cap { flex-direction:column; text-align:center; gap:6px }
+    .lb { padding:56px 10px 20px } .lb .prev, .lb .next { top:auto; bottom:14px } .lb-cap { flex-direction:column; text-align:center; gap:6px } .lb .lb-cmd { max-width:100%; text-align:left } .lb-cmd code { white-space:normal; word-break:break-all }
   }
 </style>
 <body>
@@ -373,12 +377,13 @@ just install   # into /Applications</pre></div>
   <button class="x" aria-label="Close">✕</button><button class="prev" aria-label="Previous">‹</button><button class="next" aria-label="Next">›</button>
   <div class="lb-frame"><img class="lo" id="lb-lo" alt=""><img class="hi" id="lb-hi" alt=""><div class="lb-bar" id="lb-bar"><i></i></div></div>
   <div class="lb-cap"><span id="lb-cap"></span><span class="lb-pct" id="lb-pct"></span></div>
+  <button class="lb-cmd" id="lb-cmd" title="Copy the command" hidden><code></code><span>Copy</span></button>
 </div>
 
 <script src="data/components.js"></script>
 <script src="components-browser.js"></script>
 <script>
-mountComponents(document.getElementById("cbrowser"), "week-calendar");
+mountComponents(document.getElementById("cbrowser"), "agent-run");
 
 // The apps in examples/ that have a screenshot, with the README's one-liners.
 const APPS = [
@@ -408,12 +413,12 @@ const APPS = [
 ];
 const ROMAN = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX","XXI","XXII","XXIII"];
 document.getElementById("plates").innerHTML = APPS.map(([id, title, d], i) =>
-  `<figure class="plate" data-i="${i}"><img src="img/${id}.webp" alt="${title}" loading="lazy"><p><span>PL. ${ROMAN[i]}</span><b>${title}.</b> ${d[0].toUpperCase() + d.slice(1)}. <code>--profile ${id}</code></p></figure>`).join("");
+  `<figure class="plate" data-i="${i}"><img src="img/${id}.webp" alt="${title}" loading="lazy"><p><span>PL. ${ROMAN[i]}</span><b>${title}.</b> ${d[0].toUpperCase() + d.slice(1)}.</p></figure>`).join("");
 
 // Plates open full size. The thumbnail shows at once, blurred; the full PNG
 // streams in behind it with a progress bar, then fades over it.
 const lb = document.getElementById("lb"), lo = document.getElementById("lb-lo"), hi = document.getElementById("lb-hi"),
-      bar = document.getElementById("lb-bar"), pct = document.getElementById("lb-pct"), cap = document.getElementById("lb-cap");
+      bar = document.getElementById("lb-bar"), pct = document.getElementById("lb-pct"), cap = document.getElementById("lb-cap"), cmd = document.getElementById("lb-cmd");
 let lbIndex = -1, lbToken = 0;
 const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.round(n / 1024) + " KB";
 // One download per image, shared by everyone who asks for it (the viewer and
@@ -442,7 +447,9 @@ function loadFull(url, onProgress) {
 }
 // A set of images the viewer steps through: { lo, full, caption }.
 const PLATES = APPS.map(([id, title, d]) => ({ lo:`img/${id}.webp`, full:`img/full/${id}.png`,
-  caption:`<b>${title}</b> ${d[0].toUpperCase() + d.slice(1)}. <code>moonframe --profile ${id}</code>` }));
+  caption:`<b>${title}</b> ${d[0].toUpperCase() + d.slice(1)}.`,
+  // Run from a clone: link the example in place, then open its profile.
+  cmd:`moonframe app link examples/${id} --yes && moonframe --profile ${id}` }));
 const SHOTS = [["week-calendar","Week calendar","Day, week and month, with events"],["palette","Command palette","Spotlight, classic, compact or cards"],
   ["table","Table","Sortable, filterable, paged"],["notification-drawer","Notification drawer","Behind a bell, with a badge"]]
   .map(([id, title, d]) => ({ lo:`img/c-${id}.webp`, full:`img/full/c-${id}.png`, caption:`<b>${title}</b> ${d}.` }));
@@ -453,6 +460,7 @@ async function openPlate(i, set = lbSet) {
   lb.classList.add("on"); document.body.style.overflow = "hidden";
   lo.src = item.lo; lo.style.opacity = 1; lo.style.filter = ""; hi.classList.remove("ready"); hi.removeAttribute("src");
   cap.innerHTML = `${item.caption} · ${lbIndex + 1} of ${set.length}`;
+  cmd.hidden = !item.cmd; cmd.firstElementChild.textContent = item.cmd || ""; cmd.lastElementChild.textContent = "Copy";
   bar.style.opacity = 1; bar.classList.remove("indet"); bar.firstElementChild.style.width = "0"; pct.textContent = "Loading full size…";
   const src = await loadFull(item.full, (got, total) => {
     if (token !== lbToken) return;
@@ -478,6 +486,10 @@ function closePlate() { lb.classList.remove("on"); document.body.style.overflow 
 document.getElementById("plates").addEventListener("click", e => { const f = e.target.closest(".plate"); if (f) openPlate(+f.dataset.i, PLATES); });
 [...document.querySelectorAll("#cstrip img")].forEach((img, i) => img.onclick = () => openPlate(i, SHOTS));
 lb.querySelector(".x").onclick = closePlate;
+cmd.onclick = async () => {
+  try { await navigator.clipboard.writeText(cmd.firstElementChild.textContent); cmd.lastElementChild.textContent = "Copied"; }
+  catch { getSelection().selectAllChildren(cmd.firstElementChild); }
+};
 lb.querySelector(".prev").onclick = () => openPlate(lbIndex - 1);
 lb.querySelector(".next").onclick = () => openPlate(lbIndex + 1);
 lb.addEventListener("click", e => { if (e.target === lb) closePlate(); });
