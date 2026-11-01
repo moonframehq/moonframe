@@ -53,7 +53,7 @@ pub use {
     node::*,
     persist::Persist,
     read::MAX_DOCUMENT,
-    request::{APP, Request},
+    request::{APP, Appearance, Request},
     roots::{AppLayer, Roots, mod_name},
     style::{
         Case, Color, Corners, Curve, Font, Gradient, Look, MonoFont, Paint, Part, Resolved, Rules,

@@ -645,6 +645,24 @@ end,
   does, with the same commands (`quit` `reload` `toggle-theme`
   `show-themes` `minimize` `maximize` `close-window` `check-for-updates`
   `inspect`) and nothing else. It runs once the update that asked is done.
+- `app:appearance`, `msg` `"system"`, `"light"` or `"dark"`: whether the
+  window follows the system's light or dark (and switches live as it
+  does) or stays one. It is kept across launches for the app and profile
+  (`settings.toml`, as the theme), and changing it keeps the themes picked.
+  Views read it as `app.appearance = { mode, dark }` (`dark` is what the
+  window is now, as `app.dark`). `toggle-theme` sets the other of light and
+  dark; the View menu's Appearance submenu offers all three.
+
+```lua
+-- in view(state, app): System / Light / Dark
+local buttons = {}
+for _, mode in { "system", "light", "dark" } do
+	table.insert(buttons, ui.button { mode, to = "app:appearance", msg = mode,
+		variant = if app.appearance.mode == mode then "primary" else "ghost" })
+end
+return ui.row { table.unpack(buttons) }
+```
+
 - A request the app cannot read (an unknown command, a misspelled
   `app:<what>`) is the sender's error, shown as an `update` error.
 - Previews (the Components window) ask nothing, and a provider's answer
@@ -805,7 +823,8 @@ return mod {
 	end,
 
 	-- Required. Returns one element. `app` is
-	-- { dark = bool, mods = { names }, regions = { name = { mod names } },
+	-- { dark = bool, appearance = { mode = "system"|"light"|"dark", dark },
+	--   mods = { names }, regions = { name = { mod names } },
 	--   kinds = what tab bars can open (see "Tabs"), looks = the stylesheet's looks,
 	--   window = { platform = "macos"|"linux"|"windows", titlebar = "system"|"hidden",
 	--              maximized, fullscreen, active },
@@ -917,7 +936,7 @@ Text-like elements take their main value positionally:
 - border: `true`, `all`, `top`, `bottom`, `left`, `right`, `none`
 - direction: `row` `column`
 - variant (button): `normal` `primary` `ghost` `outline` `danger`
-- command: `quit` `reload` `toggle-theme` `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `inspect` (Inspect Element for the mod: see "Here")
+- command: `quit` `reload` `toggle-theme` (light to dark or back, keeping the themes) `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `inspect` (Inspect Element for the mod: see "Here")
 - place (overlay): `center` `top` `bottom` `left` `right` `top-start`
   `top-end` `bottom-start` `bottom-end`
 - browser commands (with `browser = "<id>"`): `browser-back`

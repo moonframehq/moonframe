@@ -1,7 +1,7 @@
 use {
     super::*,
     crate::{Action, Workspace},
-    std::{fs, path::Path},
+    std::{collections::BTreeMap, fs, path::Path},
 };
 
 const SHELL: &str = r#"
@@ -88,7 +88,7 @@ fn a_command_outside_the_allow_list_is_the_senders_error() {
         error(&workspace)
     );
     ask(&mut workspace, "app:command", Data::Integer(1));
-    assert!(error(&workspace).contains("takes a command's name"));
+    assert!(error(&workspace).contains("`app:command` takes one of quit"));
     ask(&mut workspace, "app:shell", Data::from("ls"));
     assert!(
         error(&workspace).contains("no `app:shell`"),
@@ -124,4 +124,50 @@ fn previews_and_providers_ask_nothing() {
     };
     assert_eq!(workspace.dispatch("demo:pill", &send), None);
     assert!(workspace.take_requests().is_empty());
+}
+
+#[test]
+fn update_sets_the_appearance() {
+    let (_dir, mut workspace) = workspace();
+    for (name, appearance) in [
+        ("system", Appearance::System),
+        ("light", Appearance::Light),
+        ("dark", Appearance::Dark),
+    ] {
+        ask(&mut workspace, "app:appearance", Data::from(name));
+        assert_eq!(workspace.take_requests(), [(
+            "asker".to_owned(),
+            Request::Appearance(appearance)
+        )]);
+    }
+    ask(&mut workspace, "app:appearance", Data::from("sepia"));
+    assert!(
+        error(&workspace).contains("unknown `sepia`"),
+        "{}",
+        error(&workspace)
+    );
+    assert!(workspace.take_requests().is_empty());
+}
+
+#[test]
+fn the_dark_appearance_follows_the_system_only_when_asked() {
+    assert!(Appearance::System.is_dark(true));
+    assert!(!Appearance::System.is_dark(false));
+    assert!(Appearance::Dark.is_dark(false));
+    assert!(!Appearance::Light.is_dark(true));
+}
+
+#[test]
+fn views_read_the_appearance() {
+    let (_dir, mut workspace) = workspace();
+    workspace.set_appearance(Appearance::Dark, BTreeMap::new());
+    let Some(Data::Map(appearance)) = workspace.app_data().get("appearance").cloned() else {
+        panic!("no app.appearance");
+    };
+    assert_eq!(appearance.get("mode"), Some(&Data::from("dark")));
+    assert_eq!(
+        appearance.get("dark"),
+        Some(&Data::Bool(false)),
+        "the window says"
+    );
 }

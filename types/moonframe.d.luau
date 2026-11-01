@@ -893,6 +893,17 @@ type WindowState = {
 	active: boolean,
 }
 
+-- Light, dark, or as the system is (switching as it does).
+type AppearanceMode = "system" | "light" | "dark"
+
+-- `app.appearance`: set it with `{ to = "app:appearance", msg = "dark" }`.
+type Appearance = {
+	-- What the user chose, kept across launches for the app and profile.
+	mode: AppearanceMode,
+	-- Whether the window is dark now (as `app.dark`).
+	dark: boolean,
+}
+
 
 -- `app.git`, from providers/git. When `available` is false only `reason`
 -- is set (and `repository = false`); every other field is there otherwise.
@@ -1237,6 +1248,7 @@ type MountProps = {
 -- What every `view` gets as `app`.
 type App = {
 	dark: boolean,
+	appearance: Appearance,
 	window: WindowState,
 	mods: { string },
 	regions: { [string]: { string } },
@@ -1261,7 +1273,8 @@ type App = {
 
 -- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,
 -- `"provider:<name>"`, `"topic:<name>"`, or the app itself:
--- `"app:command"` (`msg` a `Command`).
+-- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
+-- `AppearanceMode`).
 type Send = {
 	to: string,
 	msg: Data,

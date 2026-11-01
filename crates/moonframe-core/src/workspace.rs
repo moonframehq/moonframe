@@ -11,8 +11,8 @@
 
 use {
     crate::{
-        APP, Action, Chrome, Command, Data, Error, Instance, InstanceOf, ListWindow, Node, Request,
-        Roots, Rules, Stylesheet, WindowState,
+        APP, Action, Appearance, Chrome, Command, Data, Error, Instance, InstanceOf, ListWindow,
+        Node, Request, Roots, Rules, Stylesheet, WindowState,
         component::{Component, Demo, Library},
         module::{AppData, Meta, Module, Reads},
         persist::{Persist, state_key},
@@ -60,6 +60,9 @@ pub struct Workspace {
     stylesheet: Stylesheet,
     style_error: Option<Error>,
     dark: bool,
+    /// The appearance the user chose, and what the app adds about it
+    /// (the themes), as views see them in `app.appearance`.
+    appearance: (Appearance, BTreeMap<String, Data>),
     /// The window as views see it, `app.window`.
     window: WindowState,
     /// What the host shares with every view under `app`, such as
@@ -428,6 +431,7 @@ impl Workspace {
             host_problems: BTreeMap::new(),
             outbox: Vec::new(),
             requests: Vec::new(),
+            appearance: (Appearance::System, BTreeMap::new()),
             topics: persist
                 .as_ref()
                 .map(|persist| persist.topics())
@@ -730,6 +734,17 @@ impl Workspace {
     /// module, request)`, in the order they asked.
     pub fn take_requests(&mut self) -> Vec<(String, Request)> {
         std::mem::take(&mut self.requests)
+    }
+
+    /// Shares the appearance the user chose as `app.appearance.mode`,
+    /// beside `dark` (what the window is) and the app's `fields`, drawing
+    /// the views again when it changed.
+    pub fn set_appearance(&mut self, mode: Appearance, fields: BTreeMap<String, Data>) {
+        let appearance = (mode, fields);
+        if self.appearance != appearance {
+            self.appearance = appearance;
+            self.render();
+        }
     }
 
     pub fn set_dark(&mut self, dark: bool) {
@@ -1187,6 +1202,12 @@ impl Workspace {
         self.save();
     }
 
+    /// What views get as `app`, for tests.
+    #[cfg(test)]
+    pub(crate) fn app_data(&self) -> AppData {
+        self.app()
+    }
+
     /// What every `view` gets as `app`: what the host shares, the mods,
     /// which regions they asked for, and the theme.
     fn app(&self) -> AppData {
@@ -1216,6 +1237,13 @@ impl Workspace {
         );
         app.extend([
             ("dark".to_owned(), Data::Bool(self.dark)),
+            ("appearance".to_owned(), {
+                let (mode, fields) = &self.appearance;
+                let mut appearance = fields.clone();
+                appearance.insert("mode".to_owned(), Data::from(mode.name()));
+                appearance.insert("dark".to_owned(), Data::Bool(self.dark));
+                Data::Map(appearance)
+            }),
             ("window".to_owned(), self.window.data()),
             (
                 "mods".to_owned(),

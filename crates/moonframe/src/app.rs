@@ -26,8 +26,8 @@ use {
         *,
     },
     moonframe_core::{
-        Action, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL, Stylesheet,
-        Titlebar, Token, WindowState, Workspace,
+        Action, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL,
+        Stylesheet, Titlebar, Token, WindowState, Workspace,
     },
     moonframe_mux::Backends,
     moonframe_providers::{Event, Natives, Providers},
@@ -83,6 +83,9 @@ pub(crate) struct MoonframeApp {
     /// window while it is open.
     scheme: Option<&'static Scheme>,
     preview: Option<Option<&'static Scheme>>,
+    /// Light, dark, or as the system is; and whether the system is dark.
+    appearance: Appearance,
+    system_dark: bool,
     themes: Option<WindowHandle<component::Root>>,
     /// Mods open in windows of their own (`window = "<mod>"`), by name.
     mod_windows: HashMap<String, WindowHandle<component::Root>>,
@@ -100,6 +103,8 @@ pub(crate) struct MoonframeApp {
     building: bool,
     /// Checking for, or installing, an update.
     updating: bool,
+    /// When a mod last asked for a reload (`app:command`).
+    requested_reload: Option<std::time::Instant>,
     focus: FocusHandle,
     /// Where each animated pane is in its transition.
     motion: Motion,
@@ -154,6 +159,15 @@ impl MoonframeApp {
             .detach();
         cx.observe_window_activation(window, |this, window, cx| this.sync_window(window, cx))
             .detach();
+        // The system's appearance, which `system` follows as it changes.
+        cx.observe_window_appearance(window, |this, window, cx| {
+            this.system_dark = is_dark(window.appearance());
+            if this.appearance == Appearance::System {
+                this.apply_theme(cx);
+                cx.notify();
+            }
+        })
+        .detach();
         let watcher = watch(&workspace, &folders, cx)
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
@@ -167,17 +181,32 @@ impl MoonframeApp {
         let terminals = Terminals::new(backends, wake_on_output(cx));
         flush_on_quit(cx);
         let settings = folders.settings().into_iter().next();
-        let scheme = folders
-            .settings()
-            .iter()
-            .find_map(|path| settings::theme(path))
-            .and_then(|name| {
-                let scheme = themes::find(&name);
-                if scheme.is_none() && name != themes::DEFAULT {
-                    tracing::warn!("no theme called {name:?}; using {}", themes::DEFAULT);
-                }
-                scheme
-            });
+        let saved = |key| {
+            folders
+                .settings()
+                .iter()
+                .find_map(|path| settings::get(path, key))
+        };
+        let scheme = saved(settings::THEME).and_then(|name| {
+            let scheme = themes::find(&name);
+            if scheme.is_none() && name != themes::DEFAULT {
+                tracing::warn!("no theme called {name:?}; using {}", themes::DEFAULT);
+            }
+            scheme
+        });
+        // Before the appearance was kept, a theme picked set it.
+        let appearance = match saved(settings::APPEARANCE) {
+            Some(name) => Appearance::named(&name).unwrap_or_else(|| {
+                tracing::warn!("no appearance called {name:?}; following the system");
+                Appearance::System
+            }),
+            None => match scheme {
+                Some(scheme) if scheme.dark() => Appearance::Dark,
+                Some(_) => Appearance::Light,
+                None => Appearance::System,
+            },
+        };
+        show_appearance(appearance);
         let mut app = Self {
             terminals,
             browsers: Browsers::new(crate::browser::wake_on_report(cx)),
@@ -192,6 +221,8 @@ impl MoonframeApp {
             gallery: None,
             scheme,
             preview: None,
+            appearance,
+            system_dark: is_dark(window.appearance()),
             themes: None,
             mod_windows: HashMap::new(),
             folders,
@@ -199,6 +230,7 @@ impl MoonframeApp {
             toast: None,
             building: false,
             updating: false,
+            requested_reload: None,
             focus,
             motion: Motion::default(),
             providers,
@@ -247,12 +279,20 @@ impl MoonframeApp {
     /// each time, so a removed override goes away. A picked theme brings its
     /// own colors, so the stylesheet's apply to the stock look alone.
     fn apply_theme(&mut self, cx: &mut App) {
-        let scheme = self.preview.unwrap_or(self.scheme);
+        let dark = self.appearance.is_dark(self.system_dark);
+        // A theme shows in the appearance it is made for; in the other the
+        // stock look does, and the theme stays picked.
+        let scheme = self
+            .preview
+            .unwrap_or(self.scheme)
+            .filter(|scheme| scheme.dark() == dark);
         let config = scheme.map(|scheme| Rc::new(scheme.config()));
         let was_dark = cx.theme().is_dark();
-        let mode = config
-            .as_ref()
-            .map_or(cx.theme().mode, |config| config.mode);
+        let mode = if dark {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        };
         let registry = ThemeRegistry::global(cx);
         let (light, dark) = (
             registry.default_light_theme().clone(),
@@ -332,6 +372,23 @@ impl MoonframeApp {
         if dark != was_dark {
             self.workspace.set_dark(dark);
         }
+        self.workspace
+            .set_appearance(self.appearance, std::collections::BTreeMap::new());
+    }
+
+    /// Makes the window light, dark, or follow the system, keeping the
+    /// themes picked, and saves the choice for the next run.
+    pub(crate) fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
+        self.appearance = appearance;
+        self.apply_theme(cx);
+        show_appearance(appearance);
+        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        if let Some(path) = &self.settings
+            && let Err(problem) = settings::save(path, &[(settings::APPEARANCE, appearance.name())])
+        {
+            tracing::warn!("cannot save the appearance: {problem}");
+        }
+        cx.notify();
     }
 
     /// The picked theme's name.
@@ -357,7 +414,7 @@ impl MoonframeApp {
         self.scheme = themes::find(name);
         self.apply_theme(cx);
         if let Some(path) = &self.settings
-            && let Err(problem) = settings::save_theme(path, self.theme_name())
+            && let Err(problem) = settings::save(path, &[(settings::THEME, self.theme_name())])
         {
             tracing::warn!("cannot save the theme: {problem}");
         }
@@ -460,20 +517,15 @@ impl MoonframeApp {
         match command {
             Command::Quit => cx.quit(),
             Command::Reload => self.reload(cx),
-            Command::ToggleTheme => {
-                // Back to the stock look, in the other mode.
-                let mode = if cx.theme().is_dark() {
-                    ThemeMode::Light
+            // The other of light and dark, whatever the system is.
+            Command::ToggleTheme => self.set_appearance(
+                if self.appearance.is_dark(self.system_dark) {
+                    Appearance::Light
                 } else {
-                    ThemeMode::Dark
-                };
-                if self.scheme.is_some() {
-                    self.pick_theme(themes::DEFAULT, cx);
-                }
-                Theme::change(mode, Some(window), cx);
-                self.apply_theme(cx);
-                cx.notify();
-            },
+                    Appearance::Dark
+                },
+                cx,
+            ),
             Command::Minimize => window.minimize_window(),
             Command::Maximize => window.zoom_window(),
             Command::CloseWindow => window.remove_window(),
@@ -502,7 +554,19 @@ impl MoonframeApp {
                 tracing::warn!("{from}: {problem}");
             }
         }
-        let requests = self.workspace.take_requests();
+        let mut requests = self.workspace.take_requests();
+        // A reload runs every `init` again: one that asks for a reload
+        // would loop, so what `init` asks as the app starts or reloads
+        // reloads nothing.
+        if matches!(from, "start" | "reload" | "packages") {
+            requests.retain(|(asker, request)| {
+                let reload = *request == Request::Command(Command::Reload);
+                if reload {
+                    tracing::warn!("{asker}: a reload asked for as the app loads is ignored");
+                }
+                !reload
+            });
+        }
         if !requests.is_empty() {
             self.carry_out(requests, cx);
         }
@@ -543,7 +607,23 @@ impl MoonframeApp {
     ) {
         match request {
             Request::Command(Command::Inspect) => self.inspect_for(from, cx),
+            Request::Command(Command::Reload) => {
+                // At most one a second, however mods ask.
+                let now = std::time::Instant::now();
+                if self
+                    .requested_reload
+                    .is_some_and(|at| now.duration_since(at) < Duration::from_secs(1))
+                {
+                    tracing::warn!(
+                        "{from}: reloads asked for less than a second apart are ignored"
+                    );
+                    return;
+                }
+                self.requested_reload = Some(now);
+                self.reload(cx);
+            },
             Request::Command(command) => self.run(command, window, cx),
+            Request::Appearance(appearance) => self.set_appearance(appearance, cx),
         }
     }
 
@@ -1259,6 +1339,10 @@ fn menu_actions(cx: &mut Context<MoonframeApp>) {
         let _ = on.update(cx, |app, cx| app.show_themes(cx));
     });
     let on = app.clone();
+    cx.on_action(move |action: &SetAppearance, cx| {
+        let _ = on.update(cx, |app, cx| app.set_appearance(action.appearance, cx));
+    });
+    let on = app.clone();
     cx.on_action(move |_: &AboutApp, cx| {
         let _ = on.update(cx, |app, cx| app.show_about(cx));
     });
@@ -1299,6 +1383,14 @@ fn menu_actions(cx: &mut Context<MoonframeApp>) {
         });
         cx.refresh_windows();
     });
+}
+
+/// Whether the system's appearance is a dark one.
+fn is_dark(appearance: WindowAppearance) -> bool {
+    matches!(
+        appearance,
+        WindowAppearance::Dark | WindowAppearance::VibrantDark
+    )
 }
 
 /// A callback for terminal sessions, which run on threads of their own: each
