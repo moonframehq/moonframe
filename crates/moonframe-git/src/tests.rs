@@ -370,3 +370,32 @@ fn a_diff_never_reads_outside_the_repository() {
         assert!(!state.to_string().contains("do not publish"));
     }
 }
+
+#[test]
+fn messages_inside_the_interval_read_the_status_alone() {
+    let dir = repository();
+    let (events, _seen) = events();
+    let folder = dir.path().join("providers").join("git");
+    std::fs::create_dir_all(&folder).unwrap();
+    let host = Handle::new("git", &folder, writers(&[]), events);
+    let mut git = Git::default();
+    git.start(&host).unwrap();
+    let message = || Data::Map(BTreeMap::from([("diff".to_owned(), Data::Bool(false))]));
+
+    // The first message may read everything; the next twenty, sent within
+    // the interval, must not, even as files change between them. The last
+    // full read is held at now, however slow the machine running this is.
+    git.receive(&host, "editor", message());
+    git.forced_at = Some(Instant::now() + Duration::from_secs(3600));
+    let reads = git.ref_reads;
+    for n in 0..20 {
+        std::fs::write(dir.path().join("a.txt"), format!("{n}\n")).unwrap();
+        git.receive(&host, "editor", message());
+    }
+    assert_eq!(git.ref_reads, reads);
+    // What moved meanwhile is read at the next look.
+    for _ in 0..LOOK_EVERY {
+        git.tick(&host);
+    }
+    assert_eq!(git.ref_reads, reads + 1);
+}

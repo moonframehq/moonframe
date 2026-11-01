@@ -214,6 +214,20 @@ impl List {
             .map(|(id, _)| id.clone())
     }
 
+    /// Where linked packages sit inside `folder`, relative to it: what an
+    /// app shipped beside it and the profile linked, whether or not its
+    /// new version still requires them, since they stay live layers.
+    fn links_inside(&self, folder: &Path) -> Vec<PathBuf> {
+        let root = folder.canonicalize().unwrap_or_else(|_| folder.to_owned());
+        self.package
+            .values()
+            .filter(|entry| entry.link)
+            .filter_map(|entry| Path::new(&entry.url).strip_prefix(&root).ok())
+            .filter(|inside| !inside.as_os_str().is_empty())
+            .map(Path::to_owned)
+            .collect()
+    }
+
     /// The id `query` names: an id, a source, or the end of one id, such as
     /// `my-mod` for `github.com/someone/my-mod`.
     fn find(&self, query: &str) -> Result<String, String> {
@@ -554,6 +568,31 @@ impl Contents {
             }
         }
         Ok(contents)
+    }
+
+    /// Adds the linked packages at `links` inside `folder` that it does not
+    /// already ship beside it: an update must not change what they run
+    /// unasked just because it stopped requiring them.
+    fn add_links(&mut self, folder: &Path, links: &[PathBuf]) -> Result<(), String> {
+        for inside in links {
+            let source = format!("./{}", inside.display());
+            let path = folder.join(inside);
+            let listed = self
+                .beside
+                .iter()
+                .any(|(shipped, _)| Path::new(shipped.trim_start_matches("./")) == inside);
+            if listed || !path.is_dir() {
+                continue;
+            }
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(&source)
+                .to_owned();
+            let linked = Self::read_one(&path, &name)?;
+            self.beside.push((source, linked));
+        }
+        Ok(())
     }
 
     fn read_one(folder: &Path, name: &str) -> Result<Self, String> {
@@ -1056,7 +1095,8 @@ pub(crate) fn update(
             let updated = if entry.link {
                 Ok(Updated::Linked)
             } else {
-                update_one(&folder, name, entry.reference.as_deref(), approve)
+                let links = list.links_inside(&folder);
+                update_one(&folder, name, entry.reference.as_deref(), &links, approve)
             };
             (id, updated)
         })
@@ -1067,6 +1107,7 @@ fn update_one(
     folder: &Path,
     name: &str,
     reference: Option<&str>,
+    links: &[PathBuf],
     approve: Approve,
 ) -> Result<Updated, String> {
     if !folder.is_dir() {
@@ -1093,7 +1134,12 @@ fn update_one(
     git(folder, &[
         "worktree", "add", "--quiet", "--detach", &shown, &after,
     ])?;
-    let approved = Contents::read(&incoming, name).and_then(|contents| approve(&contents));
+    let approved = Contents::read(&incoming, name)
+        .and_then(|mut contents| {
+            contents.add_links(&incoming, links)?;
+            Ok(contents)
+        })
+        .and_then(|contents| approve(&contents));
     let _ = git(folder, &["worktree", "remove", "--force", &shown]);
     let _ = fs::remove_dir_all(&incoming);
     let _ = git(folder, &["worktree", "prune"]);

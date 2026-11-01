@@ -270,6 +270,32 @@ fn a_wasm_provider_with_a_hook_elsewhere_is_not_built() {
             "[package]\nname = 'sys'\n[patch.crates-io]\nserde = { path = 'local' }\n",
             &[("local/Cargo.toml", package), ("local/build.rs", "")][..],
         ),
+        // Cargo puts a crate without a `[workspace]` of its own in the
+        // nearest one above, whose dependencies and patches it inherits.
+        (
+            "a crate inherited from a parent workspace",
+            "[package]\nname = 'sys'\n[dependencies]\nhelper = { workspace = true }\n",
+            &[
+                (
+                    "../../Cargo.toml",
+                    "[workspace]\nmembers = ['providers/sys']\n[workspace.dependencies]\nhelper = { path = 'helper' }\n",
+                ),
+                ("../../helper/Cargo.toml", package),
+                ("../../helper/build.rs", ""),
+            ][..],
+        ),
+        (
+            "a parent workspace's patch",
+            "[package]\nname = 'sys'\nworkspace = '../..'\n",
+            &[
+                (
+                    "../../Cargo.toml",
+                    "[workspace]\nmembers = ['providers/sys']\n[patch.crates-io]\nserde = { path = 'helper' }\n",
+                ),
+                ("../../helper/Cargo.toml", package),
+                ("../../helper/build.rs", ""),
+            ][..],
+        ),
     ] {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();

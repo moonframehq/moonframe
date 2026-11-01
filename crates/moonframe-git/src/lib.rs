@@ -144,6 +144,12 @@ pub struct Git {
     diff_path: Option<String>,
     ticks: u32,
     looks: u32,
+    /// The status moved while messages came too fast to read worktrees,
+    /// branches, remote and stashes: the next tick reads them.
+    refs_stale: bool,
+    /// How often they were read, for the tests.
+    #[cfg(test)]
+    ref_reads: u32,
     last: Option<Value>,
     /// An action is running: one at a time.
     busy: Arc<AtomicBool>,
@@ -194,7 +200,7 @@ impl Native for Git {
         if read_refs {
             self.forced_at = Some(now);
         }
-        self.look(host, true, read_refs);
+        self.look(host, true, read_refs, true);
     }
 }
 
@@ -202,12 +208,14 @@ impl Git {
     /// Looks at the repository and publishes what changed; `force` reads
     /// everything and publishes even when nothing did.
     fn refresh(&mut self, host: &Handle, force: bool) {
-        self.look(host, force, force);
+        self.look(host, force, force, false);
     }
 
     /// [`Git::refresh`], reading worktrees, branches, remote and stashes on
-    /// `force` only when `read_refs` is set too.
-    fn look(&mut self, host: &Handle, force: bool, read_refs: bool) {
+    /// `force` only when `read_refs` is set too. A look a message asked for
+    /// (`paced`) reads them only when `read_refs` allows it, whatever moved:
+    /// the next tick catches up.
+    fn look(&mut self, host: &Handle, force: bool, read_refs: bool, paced: bool) {
         let Some(root) = self.root.clone() else {
             self.publish(
                 host,
@@ -248,15 +256,27 @@ impl Git {
                 self.head = refs::head(&repo);
             }
         }
-        self.looks += 1;
-        if (read_refs && changed)
-            || looked_new
+        let moved = looked_new || self.status.oid != old_oid || self.status.branch != old_branch;
+        // Only ticks count toward the slow read: a message each frame would
+        // otherwise reach it every few frames.
+        if !paced {
+            self.looks += 1;
+        }
+        let due = (read_refs && changed)
+            || moved
+            || self.refs_stale
             || self.last.is_none()
-            || self.looks >= SLOW_EVERY
-            || self.status.oid != old_oid
-            || self.status.branch != old_branch
-        {
+            || self.looks >= SLOW_EVERY;
+        let allowed = !paced || read_refs || self.last.is_none();
+        if due && !allowed {
+            self.refs_stale |= moved;
+        } else if due {
             self.looks = 0;
+            self.refs_stale = false;
+            #[cfg(test)]
+            {
+                self.ref_reads += 1;
+            }
             changed = true;
             self.worktrees = refs::worktrees(&repo);
             self.branches = refs::branches(&repo);

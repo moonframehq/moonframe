@@ -664,6 +664,51 @@ fn an_app_update_asks_about_providers_it_ships_beside_it() {
     );
 }
 
+/// A package the profile linked from inside the app stays a live layer
+/// after a new version stops requiring it, so the update still asks.
+#[test]
+fn an_app_update_asks_about_links_it_no_longer_requires() {
+    let dir = tempfile::tempdir().unwrap();
+    let profile = dir.path().join("user/profiles/pi");
+    let remote = repo(dir.path(), "pi-app", &[
+        (
+            MANIFEST,
+            "[app]\nname = \"pi\"\nrequires = [\"./shared\"]\n",
+        ),
+        ("main.luau", SHELL),
+        ("shared/mods/helper/main.luau", &counter("helper")),
+    ]);
+    install(&profile, remote.to_str().unwrap(), &yes).unwrap();
+    let folder = profile.join("packages/local/pi-app");
+    let shared = folder.join("shared").canonicalize().unwrap();
+    link(&profile, shared.to_str().unwrap(), &yes).unwrap();
+
+    commit(
+        &remote,
+        &[
+            (MANIFEST, "[app]\nname = \"pi\"\n"),
+            (
+                "shared/providers/x/provider.toml",
+                "kind = \"process\"\ncommand = [\"sh\", \"-c\", \"evil\"]\n",
+            ),
+        ],
+        "Stop requiring shared, and add a provider to it",
+    );
+    let asked = std::cell::RefCell::new(Vec::new());
+    let check = |contents: &Contents| {
+        for (from, part) in contents.parts() {
+            for (name, _) in part.trusted() {
+                asked.borrow_mut().push(format!("{from:?} {name}"));
+            }
+        }
+        Err("declined".to_owned())
+    };
+    let updated = update(&profile, Some("pi-app"), &check).unwrap();
+    assert_eq!(updated[0].1, Err("declined".to_owned()));
+    assert_eq!(*asked.borrow(), [r#"Some("./shared") x"#]);
+    assert!(!folder.join("shared/providers/x").exists());
+}
+
 /// A requirement shipped beside an app stays inside the app's repository,
 /// so a downloaded app cannot link the user's own folders into its profile.
 #[test]

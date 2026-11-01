@@ -230,18 +230,35 @@ fn refuse_hooks(dir: &Path, depth: usize) -> Result<(), String> {
     {
         return hook("`build-dependencies`");
     }
-    // Every table of dependencies the build can use, the ones a
-    // `[patch]` or `[replace]` swaps in among them.
-    let mut tables: Vec<&toml::Table> = sections
+    // Every table of dependencies the build can use.
+    let tables: Vec<&toml::Table> = sections
         .iter()
         .filter_map(|section| section.get("dependencies").and_then(toml::Value::as_table))
         .collect();
-    tables.extend(
-        manifest
-            .get("workspace")
-            .and_then(|workspace| workspace.get("dependencies"))
-            .and_then(toml::Value::as_table),
-    );
+    refuse_local_crates(dir, tables, depth)?;
+    refuse_workspace_crates(dir, &manifest, depth)?;
+    // A crate in a workspace of its own sees nothing above it; one that
+    // belongs to a parent's inherits that workspace's dependencies
+    // (`helper = { workspace = true }`) and its `[patch]`es.
+    if manifest.contains_key("workspace") {
+        return Ok(());
+    }
+    let Some(root) = workspace_root(dir, &manifest) else {
+        return Ok(());
+    };
+    let parent = read_manifest(&root)?;
+    refuse_workspace_crates(&root, &parent, depth)
+}
+
+/// Refuses hooks in the local crates a workspace root at `dir` lists for
+/// its members or swaps in with `[patch]` or `[replace]`.
+fn refuse_workspace_crates(dir: &Path, manifest: &toml::Table, depth: usize) -> Result<(), String> {
+    let mut tables: Vec<&toml::Table> = manifest
+        .get("workspace")
+        .and_then(|workspace| workspace.get("dependencies"))
+        .and_then(toml::Value::as_table)
+        .into_iter()
+        .collect();
     tables.extend(
         manifest
             .get("patch")
@@ -251,6 +268,11 @@ fn refuse_hooks(dir: &Path, depth: usize) -> Result<(), String> {
             .filter_map(toml::Value::as_table),
     );
     tables.extend(manifest.get("replace").and_then(toml::Value::as_table));
+    refuse_local_crates(dir, tables, depth)
+}
+
+/// Follows each `path` dependency in `tables`, relative to `dir`.
+fn refuse_local_crates(dir: &Path, tables: Vec<&toml::Table>, depth: usize) -> Result<(), String> {
     for path in tables
         .into_iter()
         .flat_map(|table| table.values())
@@ -264,6 +286,28 @@ fn refuse_hooks(dir: &Path, depth: usize) -> Result<(), String> {
         refuse_hooks(&dir.join(path), depth + 1)?;
     }
     Ok(())
+}
+
+/// The folder of the workspace Cargo puts the crate at `dir` in, when it
+/// is not its own: the one `package.workspace` names, or else the nearest
+/// folder above whose `Cargo.toml` has a `[workspace]`.
+fn workspace_root(dir: &Path, manifest: &toml::Table) -> Option<PathBuf> {
+    if let Some(named) = manifest
+        .get("package")
+        .and_then(|package| package.get("workspace"))
+        .and_then(toml::Value::as_str)
+    {
+        return Some(dir.join(named));
+    }
+    dir.ancestors()
+        .skip(1)
+        .find(|folder| {
+            fs::read_to_string(folder.join("Cargo.toml"))
+                .ok()
+                .and_then(|text| text.parse::<toml::Table>().ok())
+                .is_some_and(|table| table.contains_key("workspace"))
+        })
+        .map(Path::to_owned)
 }
 
 /// The toolchain rustup would pick for `dir` from a toolchain file, which
