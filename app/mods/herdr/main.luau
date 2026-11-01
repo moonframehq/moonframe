@@ -71,6 +71,17 @@ return mod {
 
 	subscribe = { "provider/herdr" },
 
+	-- The toast is the card; the overlay around it draws no frame of its own.
+	styles = {
+		[".herdr-offer"] = {
+			background = "#00000000",
+			border = "none",
+			shadow = "none",
+			padding = 0,
+			margin = 16,
+		},
+	},
+
 	init = function(previous: State?)
 		local state: State = {
 			dismissed = previous ~= nil and previous.dismissed or false,
@@ -107,6 +118,7 @@ return mod {
 		return ui.overlay {
 			open = card ~= nil,
 			place = "bottom-end",
+			class = "herdr-offer",
 			content = card or ui.text "",
 		}
 	end,
