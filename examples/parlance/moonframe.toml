@@ -1,0 +1,8 @@
+[app]
+# A desktop chat app with a scripted demo agent: chats, pinned chats and
+# folders, projects and recents in a sidebar, rich markdown answers that
+# stream in. `moonframe --profile parlance` opens it.
+keep     = []
+name     = "parlance"
+requires = []
+title    = "Parlance"
