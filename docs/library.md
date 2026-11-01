@@ -248,11 +248,14 @@ cargo run --release -- bundle   # target/bundle/<Title>.app, or a Linux prefix
 each with its Wasm providers prebuilt and no sources, plus an icon and an
 Info.plist, signed ad hoc.
 
-The developer tools (the Components menu, Inspect Element, Reload Modules)
-show in a debug build only: `cargo run` has them, while `cargo run
---release`, an installed binary and a bundle run as a release, as the app's
-users see it. `--dev` brings them back; `--release` hides them in a debug
-build.
+**Developer Mode**, in the app menu beside About, switches the tools for
+changing the app as it runs (the Components menu, Inspect Element ⌥⌘I,
+Reload Modules ⌘R) on and off, at once and without a rebuild, and is kept
+for the app (and each profile) in `$XDG_STATE_HOME/<name>/developer`. Until
+the user picks, it is on in a debug build (`cargo run`) and off in a release
+one (`cargo run --release`, an install, a bundle), as the app's users see
+it. `--dev` and `--release` set it for one run. Its keys are bound in the
+`developer` key context, so with it off ⌘R is the app's own again.
 
 ## Moving an existing GPUI app over
 

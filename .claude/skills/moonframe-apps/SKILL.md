@@ -205,9 +205,11 @@ About is macOS's own panel (icon, name, version, credits); a toast elsewhere.
 
 ## Release mode and bundles
 
-- `--release` runs as users see it: no Components menu, Inspect Element or
-  Reload Modules, and their keys. A bundle is a release; `--dev` brings the
-  tools back.
+- **Developer Mode** (app menu, beside About) switches the Components menu,
+  Inspect Element and Reload Modules, and their keys, on and off live; the
+  choice is kept per app and profile. Until the user picks, it is off in a
+  bundle and in a library app's release build. `--release` and `--dev` set
+  it for one run.
 - `just bundle-app NAME` builds the profile's app standalone:
   `target/bundle/<Title>.app` on macOS (id `dev.moonframe.app.NAME`, its
   icon, its packages staged inside, Wasm providers prebuilt), or on Linux a

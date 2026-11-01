@@ -58,10 +58,10 @@ Options:
                 install`. Its packages and mods are its own; only your
                 style.luau and theme follow you into it
   --check       load every module, report problems, and exit without a window
-  --release     run as the app's users see it: no Components menu, Inspect
-                Element, or Reload Modules (an app bundle always does, and so
-                does an app on the library built with --release)
-  --dev         the tools again, in an app bundle or a release build
+  --release     Developer Mode off for this run: no Components menu, Inspect
+                Element, or Reload Modules (Developer Mode in the app menu
+                switches it, and is kept)
+  --dev         Developer Mode on for this run
   --background  open the window without bringing the app forward (for
                 screenshots and scripts while someone is working)
   --component NAME
@@ -377,8 +377,18 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     // --release`, an install, a bundle). The starter always shows them
     // outside a bundle, as building apps is what it is for.
     let hosted_release = folders.host.is_some() && (paths::in_bundle() || !cfg!(debug_assertions));
+    // The user's own choice (Developer Mode in the app menu) wins over
+    // those defaults; `--release` and `--dev` over both, for this run.
+    let developer_file =
+        paths::state(folders.profile.as_deref()).with_file_name(match &folders.profile {
+            Some(profile) => format!("developer-{profile}"),
+            None => "developer".to_owned(),
+        });
+    let chosen = crate::developer_choice(&developer_file).map(|on| !on);
+    let _ = crate::DEVELOPER_FILE.set(developer_file);
     crate::RELEASE.store(
         args.release
+            .or(chosen)
             .unwrap_or(folders.bundled.is_some() || hosted_release),
         Ordering::Relaxed,
     );

@@ -14,7 +14,8 @@ gpui_kit::actions!(moonframe, [
     ShowThemes,
     AboutApp,
     BuildApp,
-    ToggleSlowAnimations
+    ToggleSlowAnimations,
+    ToggleDeveloperMode
 ]);
 
 /// Runs a shell menu item, found by its id (menu title and label).
@@ -32,14 +33,18 @@ pub(crate) struct ShowComponent {
 }
 
 pub(crate) fn bind_keys(cx: &mut App) {
-    if !crate::release() {
-        // Tools for building the app, which a release leaves out.
-        cx.bind_keys([
-            KeyBinding::new("cmd-r", Reload, Some("MoonframeApp")),
-            KeyBinding::new("cmd-alt-i", Inspect, Some("MoonframeApp")),
-            KeyBinding::new("cmd-shift-k", BrowseComponents, Some("MoonframeApp")),
-        ]);
-    }
+    // Tools for changing the app, only in Developer Mode: the window's key
+    // context says `developer` then, so turning it off frees these keys
+    // for the app's own menus.
+    cx.bind_keys([
+        KeyBinding::new("cmd-r", Reload, Some("MoonframeApp && developer")),
+        KeyBinding::new("cmd-alt-i", Inspect, Some("MoonframeApp && developer")),
+        KeyBinding::new(
+            "cmd-shift-k",
+            BrowseComponents,
+            Some("MoonframeApp && developer"),
+        ),
+    ]);
     cx.bind_keys([
         KeyBinding::new("cmd-q", Quit, None),
         KeyBinding::new("cmd-shift-l", ToggleTheme, Some("MoonframeApp")),
@@ -56,13 +61,17 @@ pub(crate) fn bind_keys(cx: &mut App) {
 
 /// The menu bar: the app menu (About, Quit), the shell's `menus`, then
 /// View, into which a shell menu called View merges, the Components menu
-/// listing `components` by category, and the shell's Window and Help. A release shows only what the
-/// app's users need: no Components menu, Inspect Element, Reload Modules,
-/// or Slow Animations.
+/// listing `components` by category, and the shell's Window and Help.
+/// Outside Developer Mode only what the app's users need shows: no
+/// Components menu, Inspect Element, Reload Modules, or Slow Animations.
 pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
     let title = crate::title();
+    // Developer Mode: the tools for changing the app as it runs, which
+    // its users can turn on too; the choice is kept.
     let mut app_items = vec![
         MenuItem::action(format!("About {title}"), AboutApp),
+        MenuItem::separator(),
+        MenuItem::action("Developer Mode", ToggleDeveloperMode).checked(!crate::release()),
         MenuItem::separator(),
     ];
     // Outside a release, the starter builds itself as one; an app on the

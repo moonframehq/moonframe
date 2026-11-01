@@ -136,6 +136,44 @@ pub(crate) fn release() -> bool {
     RELEASE.load(Ordering::Relaxed)
 }
 
+/// Where this app (or profile) keeps the user's Developer Mode choice:
+/// set once at launch.
+pub(crate) static DEVELOPER_FILE: OnceLock<std::path::PathBuf> = OnceLock::new();
+
+/// The user's Developer Mode choice for this app, if they made one.
+pub(crate) fn developer_choice(file: &std::path::Path) -> Option<bool> {
+    match std::fs::read_to_string(file).ok()?.trim() {
+        "on" => Some(true),
+        "off" => Some(false),
+        _ => None,
+    }
+}
+
+/// Turns Developer Mode on or off for this run, and keeps the choice for
+/// the next ones: the Components menu, Inspect Element and Reload Modules,
+/// and their keys.
+pub(crate) fn set_developer(on: bool) {
+    RELEASE.store(!on, Ordering::Relaxed);
+    if let Some(file) = DEVELOPER_FILE.get() {
+        let written = file
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| {
+                std::fs::write(
+                    file,
+                    if on {
+                        "on\n"
+                    } else {
+                        "off\n"
+                    },
+                )
+            });
+        if let Err(error) = written {
+            tracing::warn!("cannot keep Developer Mode in {}: {error}", file.display());
+        }
+    }
+}
+
 /// This run's name for the menu bar: the app's title in a profile.
 pub(crate) static TITLE: OnceLock<String> = OnceLock::new();
 

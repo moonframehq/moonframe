@@ -1006,6 +1006,27 @@ fn menu_actions(cx: &mut Context<MoonframeApp>) {
     cx.on_action(move |_: &BuildApp, cx| {
         let _ = on.update(cx, |app, cx| app.build_app(cx));
     });
+    let on = app.clone();
+    cx.on_action(move |_: &ToggleDeveloperMode, cx| {
+        let developer = crate::release();
+        crate::set_developer(developer);
+        let _ = on.update(cx, |app, cx| {
+            if !developer && app.inspector.picking {
+                app.toggle_inspect(cx);
+            }
+            cx.set_menus(menus(app.workspace.components(), app.workspace.menus()));
+            app.show_toast(
+                if developer {
+                    "Developer Mode: the Components menu, Inspect Element (⌥⌘I) and Reload Modules (⌘R)"
+                } else {
+                    "Developer Mode is off"
+                },
+                cx,
+            );
+            cx.notify();
+        });
+        cx.refresh_windows();
+    });
     cx.on_action(move |_: &ToggleSlowAnimations, cx| {
         crate::motion::set_slow(!crate::motion::is_slow());
         // The menu shows the switch checked while it is on.
@@ -1325,7 +1346,11 @@ impl Render for MoonframeApp {
         let theme = cx.theme();
         div()
             .id("moonframe-app")
-            .key_context("MoonframeApp")
+            .key_context(if crate::release() {
+                "MoonframeApp"
+            } else {
+                "MoonframeApp developer"
+            })
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &ToggleTheme, window, cx| {
                 this.run(Command::ToggleTheme, window, cx)
