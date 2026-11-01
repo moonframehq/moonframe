@@ -1258,8 +1258,15 @@ impl Workspace {
 /// How deep each stylesheet key merges when one layer goes over another:
 /// a color or speed replaces the one of its name, and a rule's properties
 /// replace those of the same rule, so a user's `panel = { radius = 4 }`
-/// keeps the app's panel background. Any other key replaces the value below.
-const MERGED: &[(&str, usize)] = &[("colors", 1), ("speeds", 1), ("looks", 1), ("rules", 2)];
+/// keeps the app's panel background, and `mono = { size = 14 }` keeps its
+/// family. Any other key replaces the value below.
+const MERGED: &[(&str, usize)] = &[
+    ("colors", 1),
+    ("speeds", 1),
+    ("looks", 1),
+    ("mono", 1),
+    ("rules", 2),
+];
 
 /// Lays the stylesheet `sheet` over `merged`.
 fn layer(merged: &Table, sheet: &Table) -> mlua::Result<()> {

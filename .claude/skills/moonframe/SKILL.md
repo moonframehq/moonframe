@@ -1,6 +1,6 @@
 ---
 name: moonframe
-description: Build anything in Moonframe, a starter app whose window is laid out entirely by Luau. Covers panels, side panels, splits, toolbars, status bars, popovers, overlays (dialogs, command palettes, sheets, toasts) and their keys, mods and extensions, reusable components (`use`), live terminals (`ui.terminal`), data providers (Wasm or process), icons, and styling through style.luau (colors, corners, shadows, spacing, animations). Also covers acting on the user's Inspect Element selection ("add X here"). Use whenever the task is to add, move, restyle or experiment with any UI in moonframe, to build a widget, component, provider or extension, or to customise the installed app in ~/.config/moonframe. The window reloads live as files change, so no Rust build is needed for Luau work.
+description: Build anything in Moonframe, a starter app whose window is laid out entirely by Luau. Covers panels, side panels, splits, toolbars, status bars, popovers, overlays (dialogs, command palettes, sheets, toasts) and their keys, mods and extensions, reusable components (`use`), live terminals (`ui.terminal`), data providers (Wasm or process), icons, and styling through style.luau (colors, fonts, terminal fonts and Nerd Font icons, corners, shadows, spacing, animations). Also covers acting on the user's Inspect Element selection ("add X here"). Use whenever the task is to add, move, restyle or experiment with any UI in moonframe, to build a widget, component, provider or extension, or to customise the installed app in ~/.config/moonframe. The window reloads live as files change, so no Rust build is needed for Luau work.
 ---
 
 # Moonframe
@@ -27,9 +27,10 @@ bundle), then the user's folder, `~/.config/moonframe` (or
   same name, whole. A new name adds one.
 - A user `main.luau` replaces the shell.
 - A user `style.luau` is merged over the built-in one: each color and speed
-  replaces the one of its name, each rule's properties replace those of the
-  same rule (`panel = { radius = 4 }` keeps the app's panel background), and
-  any other key replaces the app's.
+  replaces the one of its name, each `mono` key replaces the app's
+  (`mono = { size = 14 }` keeps its family), each rule's properties replace
+  those of the same rule (`panel = { radius = 4 }` keeps the app's panel
+  background), and any other key replaces the app's.
 - Where to write: when working on this repository, edit `app/`. When the
   user wants to customise the app they use (or it is installed), write to
   `~/.config/moonframe` and never into the bundle, which is signed and
@@ -269,6 +270,10 @@ live shell. The host runs it, so it can't be written in Luau:
 - **Sizing:** it grows to fill its container (give the container `grow`),
   and the shell is resized to match. Style it with a `terminal` rule or
   `style`: `background` and `color` set its default colors.
+- **Font:** the stylesheet's `mono` sets it for every terminal: family,
+  size, weight, line height, fallbacks, ligatures (see "Fonts" under
+  "Stylesheet"). Icons showing as boxes in vim, starship or tmux status
+  lines mean a missing Nerd Font; fix it there, not in the mod.
 - **Input:** click to focus. While it has focus every key goes to the
   shell before the app's shortcuts: Tab (completion), Esc, Ctrl keys,
   arrows. ⌘V pastes (control characters are dropped from pastes, so they
@@ -770,6 +775,15 @@ previous one and shows its error at the top of the window, and in
 return style {
 	font_size = 14,      -- base text size; text sizes scale from it
 	font_family = "Inter",
+	-- The fixed-width font: terminals, and `font = "mono"` text (family and size).
+	-- Fallbacks are searched for characters the family lacks, such as Nerd Font
+	-- icons in prompts and status lines; the default is { "Symbols Nerd Font Mono" }.
+	mono = {
+		family = "JetBrainsMono Nerd Font Mono",
+		size = 13, weight = 400, line_height = 1.3,
+		fallbacks = { "Symbols Nerd Font Mono" },
+		ligatures = false,
+	},
 	radius = 8,          -- the theme's corner radius, which buttons use
 	speeds = { drawer = "220ms" }, -- named durations (fast/normal/slow exist already)
 	animation_speed = 1, -- every animation: 2 twice as fast, 0.5 half, 0 off
@@ -792,6 +806,40 @@ return style {
 	},
 }
 ```
+
+**Fonts.** `font_family` and `font_size` are the interface font; `mono` is
+the fixed-width one. Terminals use every `mono` key. Text with
+`font = "mono"` (and `mono = true` inputs) uses only its `family` and `size`.
+
+| `mono` key | Default | Takes |
+|---|---|---|
+| `family` | `"Menlo"` | a family name, as `fc-list` prints it |
+| `size` | `13` | 6 to 64 |
+| `weight` | regular | 100 (thin) to 900 (black), 400 regular, 700 bold; bold text in the terminal still draws bold |
+| `line_height` | `1.3` | 0.8 to 3, a multiple of `size` |
+| `fallbacks` | `{ "Symbols Nerd Font Mono" }` | fonts searched in order for characters the family lacks; `{}` for none |
+| `ligatures` | the font's own | `false` keeps `->`, `!=` and the like apart |
+
+Picking a font for the user:
+- **Use a name that is installed.** A misspelled or missing family is not
+  an error, and the text just draws in another font. List the installed ones with
+  `fc-list : family | sort -u` (on macOS without fontconfig:
+  `system_profiler SPFontsDataType | grep 'Family:' | sort -u`), and
+  copy the name exactly, spaces included.
+- **Nerd Font icons** (vim and neovim status lines, starship, lsd, tmux
+  themes) need a font that has them. Either keep any family and rely on
+  the `Symbols Nerd Font Mono` fallback (`brew install --cask
+  font-symbols-only-nerd-font`), or set `family` to a patched font.
+- **Pick the "Mono" variant of a patched font** for terminals:
+  `"JetBrainsMono Nerd Font Mono"`, not `"JetBrainsMono Nerd Font"` or
+  `"... Propo"`. Those draw icons wider than one cell, and the columns
+  after them drift.
+- Set `fallbacks` only to add fonts (say, a CJK one) or to drop the
+  default. The list replaces the default, so keep
+  `"Symbols Nerd Font Mono"` in it when icons matter.
+- For the installed app, edit `~/.config/moonframe/style.luau`, not the
+  repo's `app/style.luau`. Changes apply live, and open terminals re-fit their grid
+  to the new cell size.
 
 **Selectors.**
 - An element type: `row` `column` `panel` `panel-header` `pane` `text`

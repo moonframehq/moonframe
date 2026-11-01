@@ -19,6 +19,7 @@ const MAX_SHADOW_LAYERS: usize = 8;
 const SHEET_KEYS: &[&str] = &[
     "font_size",
     "font_family",
+    "mono",
     "radius",
     "colors",
     "speeds",
@@ -44,6 +45,14 @@ const STYLE_KEYS: &[&str] = &[
     "width",
     "height",
     "transition",
+];
+const MONO_KEYS: &[&str] = &[
+    "family",
+    "size",
+    "weight",
+    "line_height",
+    "fallbacks",
+    "ligatures",
 ];
 const EDGE_KEYS: &[&str] = &["x", "y", "top", "right", "bottom", "left"];
 const LAYER_KEYS: &[&str] = &["x", "y", "blur", "spread", "color", "inset"];
@@ -105,12 +114,31 @@ impl Stylesheet {
         Ok(Self {
             font_size: fields.number("font_size", 6.0..=64.0)?,
             font_family: fields.get("font_family")?,
+            mono: fields
+                .raw("mono")
+                .map(|mono| MonoFont::read(mono, &root.key("mono")))
+                .transpose()?
+                .unwrap_or_default(),
             radius: fields.number("radius", 0.0..=64.0)?,
             overrides,
             looks: looks(&fields)?,
             names,
             rules,
             components: Rules::default(),
+        })
+    }
+}
+
+impl Read for MonoFont {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let fields = Fields::read(value, cx, &[MONO_KEYS])?;
+        Ok(Self {
+            family: fields.get("family")?,
+            size: fields.number("size", 6.0..=64.0)?,
+            weight: fields.number("weight", 100.0..=900.0)?,
+            line_height: fields.number("line_height", 0.8..=3.0)?,
+            fallbacks: fields.get("fallbacks")?,
+            ligatures: fields.get("ligatures")?,
         })
     }
 }
