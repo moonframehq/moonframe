@@ -8,8 +8,8 @@ use {
     moonframe_core::{Data, Error},
     std::{
         io::{BufRead, BufReader, Read, Write},
-        process::{Child, Command, Stdio},
-        sync::mpsc::{self, RecvTimeoutError},
+        process::{Child, ChildStdin, Command, Stdio},
+        sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError},
         thread,
         time::Duration,
     },
@@ -17,6 +17,12 @@ use {
 
 /// How often the provider's thread looks for output while it waits.
 const POLL: Duration = Duration::from_millis(100);
+/// Messages waiting for a process that is slow to read them; past this it
+/// is not reading, and new ones are dropped rather than held.
+const INPUT_QUEUE: usize = 256;
+/// Lines read but not yet published; past this the reader waits, and so
+/// does a process printing faster than they are published.
+const OUTPUT_QUEUE: usize = 256;
 
 /// A line the process printed, or the end of its output.
 enum Line {
@@ -56,23 +62,38 @@ fn serve(context: &Context) -> Result<(), String> {
 }
 
 fn drive(context: &Context, child: &mut Child) -> Result<(), String> {
-    let mut stdin = child.stdin.take().ok_or("no stdin")?;
+    let stdin = child.stdin.take().ok_or("no stdin")?;
     let stdout = child.stdout.take().ok_or("no stdout")?;
     let stderr = child.stderr.take().ok_or("no stderr")?;
     let name = context.name.clone();
     thread::spawn(move || {
-        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+        crate::lines::log_lines(stderr, |line| {
             tracing::info!(provider = %name, "{}", moonframe_core::printable(&line));
-        }
+        });
     });
-    let (lines, output) = mpsc::channel();
+    let (lines, output) = mpsc::sync_channel(OUTPUT_QUEUE);
     thread::spawn(move || read_lines(stdout, &lines));
+    // Written on a thread of its own: a process that never reads its
+    // messages fills the pipe, and that must hold up nothing here, or its
+    // output and its end would go unseen. Killing it ends the thread.
+    let (input, queue) = mpsc::sync_channel(INPUT_QUEUE);
+    thread::spawn(move || write_lines(stdin, &queue));
+    let mut dropping = false;
     loop {
         match context.messages.recv_timeout(POLL) {
-            Ok(message) => {
-                let line = line(&message);
-                // A process that stopped reading is noticed when its output ends.
-                let _ = writeln!(stdin, "{line}");
+            Ok(message) => match input.try_send(line(&message)) {
+                Ok(()) => dropping = false,
+                Err(TrySendError::Full(_)) => {
+                    if !dropping {
+                        tracing::warn!(
+                            provider = %context.name,
+                            "not reading its messages; dropping them until it does"
+                        );
+                    }
+                    dropping = true;
+                },
+                // It stopped reading: noticed when its output ends.
+                Err(TrySendError::Disconnected(_)) => {},
             },
             Err(RecvTimeoutError::Timeout) => {},
             Err(RecvTimeoutError::Disconnected) => return Ok(()),
@@ -116,9 +137,18 @@ fn parse(context: &Context, text: &str) -> Result<Data, Error> {
     parsed
 }
 
+/// Writes each queued line to the process, until it stops reading.
+fn write_lines(mut stdin: ChildStdin, queue: &Receiver<String>) {
+    for line in queue {
+        if writeln!(stdin, "{line}").is_err() {
+            return;
+        }
+    }
+}
+
 /// Reads lines no longer than [`json::MAX_JSON`], so a runaway process
 /// cannot fill memory with one line.
-fn read_lines(stdout: impl Read, lines: &mpsc::Sender<Line>) {
+fn read_lines(stdout: impl Read, lines: &SyncSender<Line>) {
     let mut reader = BufReader::new(stdout);
     loop {
         let mut line = Vec::new();

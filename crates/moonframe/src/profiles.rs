@@ -61,7 +61,8 @@ providers/, components/, style.luau) with a moonframe.toml at its root:
   keep = [\"terminal\"]                 # built-in mods it shows
   requires = [\"owner/repo@v1\"]        # packages it installs with it; a path
                                       # such as \"../shared\" is one shipped
-                                      # beside it, used in place";
+                                      # beside it in its repository, used
+                                      # in place";
 
 /// The words that make `app` this command rather than a folder's name.
 pub(crate) const COMMANDS: &[&str] = &[
@@ -265,7 +266,8 @@ fn refuse_taken(user: &Path, name: &str) -> Result<(), String> {
 
 /// Installs each package the app in `folder` requires that the profile
 /// lacks; how many failed. A requirement given as a path from the app's
-/// folder (`./x`, `../x`) is a package shipped beside it, used in place.
+/// folder (`./x`, `../x`) is a package shipped beside it, inside the app's
+/// repository, used in place.
 fn install_requires(
     profile: &Path,
     folder: Option<&Path>,
@@ -278,36 +280,35 @@ fn install_requires(
     let mut failed = 0;
     let writers = packages::git_writers(profile);
     for source in &app.requires {
-        let beside = (source.starts_with("./") || source.starts_with("../"))
-            .then(|| folder.map(|folder| folder.join(source)))
-            .flatten();
-        let local = beside.as_ref().map(|path| {
-            let path = path.canonicalize().unwrap_or_else(|_| path.clone());
-            path.display().to_string()
-        });
-        let source = local.as_deref().unwrap_or(source);
-        let have = packages::source_id(source).and_then(|id| packages::has(profile, &id));
-        let done = match have {
-            Ok(true) => continue,
-            Ok(false) if local.is_some() => {
-                println!("Linking {source}, which it requires…");
-                packages::link(profile, source, &|contents| {
+        let done = packages::beside(folder, source).and_then(|beside| match beside {
+            Some(path) => {
+                if packages::linked(profile, &path)? {
+                    return Ok(None);
+                }
+                let shown = path.display().to_string();
+                println!("Linking {shown}, which it requires…");
+                packages::link(profile, &shown, &|contents| {
                     approve_mod(contents, &writers, yes)
                 })
+                .map(Some)
             },
-            Ok(false) => {
+            None => {
+                if packages::has(profile, &packages::source_id(source)?)? {
+                    return Ok(None);
+                }
                 println!("Cloning {source}, which it requires…");
                 packages::install(profile, source, &|contents| {
                     approve_mod(contents, &writers, yes)
                 })
+                .map(Some)
             },
-            Err(problem) => Err(problem),
-        };
+        });
         match done {
-            Ok((id, contents)) => println!("Installed {id}: {contents}"),
+            Ok(Some((id, contents))) => println!("Installed {id}: {contents}"),
+            Ok(None) => {},
             Err(problem) => {
                 failed += 1;
-                eprintln!("{source}: {problem}");
+                eprintln!("{}: {problem}", packages::printable(source));
             },
         }
     }
@@ -472,14 +473,7 @@ fn create(folder: &Path) -> Result<(), String> {
         "README.md",
         &README.replace("{repository}", env!("CARGO_PKG_REPOSITORY")),
     )?;
-    let output = std::process::Command::new("git")
-        .args(["init", "--quiet"])
-        .current_dir(folder)
-        .output()
-        .map_err(|error| format!("cannot run git: {error}"))?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_owned());
-    }
+    packages::git_init(folder)?;
     let shown = folder.display();
     println!("Started the app {name} in {shown}: moonframe.toml, main.luau, mods/home.");
     println!();

@@ -77,7 +77,11 @@ spotlight_bars {
 				max = math.max(max, bar.value)
 			end
 		end
-		max = math.max(max, 1)
+		-- Only an all-zero chart needs a scale made up: fractions keep
+		-- their own, so 0.2 to 0.4 fills the height.
+		if max <= 0 then
+			max = 1
+		end
 		local event = props.event or "select"
 
 		local columns = {}

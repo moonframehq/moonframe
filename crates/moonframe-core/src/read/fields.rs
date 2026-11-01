@@ -1,5 +1,5 @@
 use {
-    super::{Cx, Read, list, within},
+    super::{Cx, Read, list_to, position, within},
     crate::Error,
     mlua::{Table, Value},
     std::{collections::BTreeMap, ops::RangeInclusive},
@@ -30,7 +30,7 @@ impl<'p> Fields<'p> {
 
     pub(crate) fn table(table: &Table, cx: &Cx<'p>, keys: &[&[&str]]) -> Result<Self, Error> {
         let mut named = BTreeMap::new();
-        let mut line = None;
+        let (mut line, mut last) = (None, 0);
         for pair in table.pairs::<Value, Value>() {
             match pair? {
                 (Value::String(key), value) if key == SOURCE_LINE => {
@@ -46,14 +46,14 @@ impl<'p> Fields<'p> {
                     }
                     named.insert(key, value);
                 },
-                (Value::Integer(_), _) => {},
+                (Value::Integer(index), _) => last = last.max(position(index)),
                 _ => return Err(cx.fail("keys are names or list positions")),
             }
         }
         Ok(Self {
             cx: cx.clone(),
             named,
-            items: list(table)?,
+            items: list_to(table, last)?,
             line,
         })
     }

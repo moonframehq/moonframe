@@ -33,9 +33,15 @@ local function hash(text: string): number
 	return value
 end
 
+-- The name's first letter or digit, whole: `%w` knows only ASCII, so any
+-- other character (É, 李) counts as a letter too.
 local function initial(name: string): string
-	local letter = string.match(name, "%w") or "?"
-	return string.upper(letter)
+	for letter in string.gmatch(name, utf8.charpattern) do
+		if #letter > 1 or string.match(letter, "%w") then
+			return string.upper(letter)
+		end
+	end
+	return "?"
 end
 
 return component {

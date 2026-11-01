@@ -72,10 +72,7 @@ fn bundle(folders: &Folders, out: &Path) -> Result<PathBuf, String> {
         );
     }
     let title = folders.title();
-    let unsafe_title = title.is_empty()
-        || title.starts_with('.')
-        || title.contains(['/', '\\', '<', '>', '&', ':']);
-    if unsafe_title {
+    if !crate::packages::valid_title(&title) {
         return Err(format!("the app's title `{title}` cannot name a bundle"));
     }
     let exe = env::current_exe().map_err(|error| format!("cannot find this binary: {error}"))?;

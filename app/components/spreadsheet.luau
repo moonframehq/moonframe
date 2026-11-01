@@ -27,6 +27,7 @@ type Props = {
 	to: string?,
 	grow: boolean?,
 	height: number?,
+	id: string?,
 }
 
 -- Lists in the preview mix optional fields; typed loosely for the checker.
@@ -35,6 +36,9 @@ local function loose(list: { any }): { any }
 end
 
 local JUSTIFY = { left = "start", start = "start", center = "center", right = "end", ["end"] = "end" }
+-- Past this many rows a grid that scrolls is a `ui.list`, which builds only
+-- the rows that show: a view holds at most 10,000 elements.
+local LIST_AFTER = 200
 
 return component {
 	title = "Spreadsheet",
@@ -55,6 +59,7 @@ return component {
 		["to"] = "mod to send it to, if not the drawing one",
 		["grow"] = "fill the parent and scroll the rows",
 		["height"] = "pixels: the rows scroll within it",
+		["id"] = "names the list a long scrolling grid becomes (default \"spreadsheet\"); two long grids in one mod need two",
 	},
 	styles = {
 		[".spreadsheet-grid"] = { gap = 0 },
@@ -168,43 +173,51 @@ spreadsheet {
 			})
 		end
 
-		local body = {}
-		for index, row in props.rows do
+		-- Row `index`: one of the data, or an empty one after them.
+		local filled = #props.rows
+		local function draw(index: number)
+			local row = props.rows[index]
 			local cells = {}
 			if numbers then
 				table.insert(cells, number(index))
 			end
 			for _, column in props.columns do
-				table.insert(cells, cell(column, row[column.key], index))
+				table.insert(cells, cell(column, row and row[column.key], if row then index else nil))
 			end
-			table.insert(body, ui.row {
+			return ui.row {
 				class = "spreadsheet-row",
 				shrink = false,
 				gap = "none",
-				selected = index == props.current,
+				selected = row ~= nil and index == props.current,
 				table.unpack(cells),
-			})
-		end
-		for extra = 1, props.blank or 0 do
-			local index = #props.rows + extra
-			local cells = {}
-			if numbers then
-				table.insert(cells, number(index))
-			end
-			for _, column in props.columns do
-				table.insert(cells, cell(column, nil, nil))
-			end
-			table.insert(body, ui.row { class = "spreadsheet-row", shrink = false, gap = "none", table.unpack(cells) })
+			}
 		end
 
+		local count = filled + (props.blank or 0)
 		local scrolls = props.height ~= nil or props.grow == true
+		local rows
+		if scrolls and count > LIST_AFTER then
+			-- Each row is its cells' height and its bottom border.
+			rows = ui.list { id = props.id or "spreadsheet", count = count, row_height = height + 1, row = draw, grow = true }
+		else
+			local body = table.create(count)
+			for index = 1, count do
+				body[index] = draw(index)
+			end
+			rows = ui.column {
+				gap = "none",
+				grow = scrolls,
+				scroll = scrolls,
+				ui.column { gap = "none", shrink = false, table.unpack(body) },
+			}
+		end
 		return ui.column {
 			class = "spreadsheet-grid",
 			grow = props.grow,
 			height = props.height,
 			gap = "none",
 			ui.row { class = "spreadsheet-head", shrink = false, gap = "none", table.unpack(heads) },
-			ui.column { gap = "none", grow = scrolls, scroll = scrolls, ui.column { gap = "none", shrink = false, table.unpack(body) } },
+			rows,
 		}
 	end,
 }

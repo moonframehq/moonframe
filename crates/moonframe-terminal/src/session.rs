@@ -11,7 +11,7 @@ use {
     crate::{Ansi, Engine, Opened, Pane, Screen, Size},
     std::{
         sync::{
-            Arc, Mutex,
+            Arc, Mutex, Weak,
             mpsc::{self, Receiver, Sender},
         },
         thread,
@@ -74,7 +74,9 @@ impl Session {
             size,
             received,
             // A backend that answers queries itself must not hear them twice.
-            answers: (!pane.answers_queries()).then(|| pane.clone()),
+            // Held weakly: the session alone keeps the pane, so dropping it
+            // ends the program, its output, and so this thread too.
+            answers: (!pane.answers_queries()).then(|| Arc::downgrade(&pane)),
             screen: screen.clone(),
             wake,
         };
@@ -140,7 +142,7 @@ struct Emulate {
     received: Receiver<Command>,
     /// Where the emulator's answers to queries go, unless the backend
     /// answers them itself.
-    answers: Option<Arc<dyn Pane>>,
+    answers: Option<Weak<dyn Pane>>,
     screen: Arc<Mutex<Screen>>,
     wake: Arc<dyn Fn() + Send + Sync>,
 }
@@ -163,7 +165,7 @@ impl Emulate {
             }
             let replies = emulator.replies();
             if !replies.is_empty()
-                && let Some(pane) = &self.answers
+                && let Some(pane) = self.answers.as_ref().and_then(Weak::upgrade)
             {
                 pane.write(&replies);
             }

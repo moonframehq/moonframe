@@ -118,7 +118,7 @@ local function line(text: string, extra: string?, cursor: boolean?, to: string?)
 					height = 14,
 					align = "center",
 					justify = "center",
-					ui.text { string.upper(string.sub(atom.text, 1, 1)), class = "chat-markdown-cite-letter" },
+					ui.text { string.upper(string.match(atom.text, utf8.charpattern) or ""), class = "chat-markdown-cite-letter" },
 				},
 				ui.text { atom.text, class = "chat-markdown-cite-text", wrap = false },
 			})

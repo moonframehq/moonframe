@@ -323,16 +323,16 @@ fn binary() -> Result<PathBuf, String> {
 }
 
 /// Links `app`'s folder as its profile in `user`, unless it is linked from
-/// there already; a profile of that name from elsewhere (another worktree)
-/// is replaced.
+/// there already. A profile of that name linked from elsewhere (another
+/// worktree) is replaced; one the user installed, or holding files of
+/// their own, is left alone.
 fn link(user: &Path, app: &App) -> Result<(), String> {
     let profile = paths::profile(user, &app.name);
-    let packages = fs::read_to_string(profile.join("packages.toml")).unwrap_or_default();
     let folder = app
         .folder
         .canonicalize()
         .unwrap_or_else(|_| app.folder.clone());
-    if packages.contains(&format!("url = {:?}", folder.display().to_string())) {
+    if packages::linked(&profile, &folder).unwrap_or(false) {
         return Ok(());
     }
     let run = |args: &[&std::ffi::OsStr]| -> Result<(), String> {
@@ -351,7 +351,14 @@ fn link(user: &Path, app: &App) -> Result<(), String> {
         }
     };
     if profile.exists() {
-        run(&["remove".as_ref(), app.name.as_ref(), "--force".as_ref()])?;
+        if !packages::links_only(&profile)? {
+            return Err(format!(
+                "a profile `{}` of yours exists; remove or rename it to open this demo",
+                app.name
+            ));
+        }
+        // Without --force, so the user's own mods in it stay.
+        run(&["remove".as_ref(), app.name.as_ref()])?;
     }
     run(&["link".as_ref(), folder.as_os_str(), "--yes".as_ref()])
 }

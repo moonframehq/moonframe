@@ -19,7 +19,7 @@ use {
         Justify, Look, Paint, Panel, Part, Popover, Region, Resolved, Side, Sides, Space, Split,
         Stack, States, Text, Token, Tone, TransitionKind, Variant,
     },
-    std::path::{Path, PathBuf},
+    std::path::Path,
 };
 
 /// The smallest a pane gets when a module gives a `max` and no `min`.
@@ -557,12 +557,17 @@ impl<'w> Draw<'w> for Button {
         if self.small {
             element = element.small();
         }
-        if let Some(action) = &self.action {
-            element = element.on_click(place.click(action, cx));
-        }
-        if let Some(text) = self.extras.copy.clone() {
-            element = element.on_click(move |_, _, cx| {
-                cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
+        // One handler for both: a button keeps only the last `on_click`.
+        let send = self.action.as_ref().map(|action| place.click(action, cx));
+        let copy = self.extras.copy.clone();
+        if send.is_some() || copy.is_some() {
+            element = element.on_click(move |event, window, cx| {
+                if let Some(text) = &copy {
+                    cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
+                }
+                if let Some(send) = &send {
+                    send(event, window, cx);
+                }
             });
         }
         let element = element.disabled(self.disabled);
@@ -690,16 +695,16 @@ impl<'w> Draw<'w> for Image {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
         let look = painter.look(Part::Image, &self.look, false, place);
         let theme = cx.theme();
-        let home = std::env::home_dir();
         let folder = painter.folder(place.owner).unwrap_or(Path::new("."));
-        let mut allowed: Vec<PathBuf> = painter
-            .workspace
-            .roots()
-            .layers()
-            .map(Path::to_owned)
-            .collect();
-        allowed.push(crate::paths::images());
-        let path = self.resolve(folder, home.as_deref(), &allowed);
+        let workspace = painter.workspace;
+        let path = super::images::resolve(self, folder, || {
+            workspace
+                .roots()
+                .layers()
+                .map(Path::to_owned)
+                .chain([crate::paths::images()])
+                .collect()
+        });
         let fit = match self.fit {
             Fit::Contain => ObjectFit::Contain,
             Fit::Cover => ObjectFit::Cover,

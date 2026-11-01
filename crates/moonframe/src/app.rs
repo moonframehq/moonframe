@@ -14,7 +14,7 @@ use {
         motion::Motion,
         packages,
         paths::{self, Folders},
-        render::{KeyLayer, ListRequest, Painter},
+        render::{Finished, KeyLayer, ListRequest, Painter},
         settings,
         terminal::Terminals,
         theme_picker::ThemePicker,
@@ -107,9 +107,11 @@ pub(crate) struct MoonframeApp {
     defaults: Defaults,
     /// Dropping it stops the events.
     _watcher: Option<RecommendedWatcher>,
-    /// The open popovers and overlays the last frame drew, which take
-    /// their `keys` before anything else.
-    pub(crate) key_layers: Vec<KeyLayer>,
+    /// The main window, the one this view draws.
+    main_window: WindowId,
+    /// The open popovers and overlays each window's last frame drew, which
+    /// take their `keys` before anything else in that window only.
+    pub(crate) key_layers: HashMap<WindowId, Vec<KeyLayer>>,
     /// Sends keys to the topmost overlay or popover, else a focused
     /// terminal, before key bindings see them.
     _terminal_keys: Subscription,
@@ -198,7 +200,8 @@ impl MoonframeApp {
             motion: Motion::default(),
             providers,
             defaults,
-            key_layers: Vec::new(),
+            main_window: window.window_handle().window_id(),
+            key_layers: HashMap::new(),
             _watcher: watcher,
             _terminal_keys: crate::terminal::intercept_keys(cx),
         };
@@ -471,6 +474,7 @@ impl MoonframeApp {
     }
 
     fn reload(&mut self, cx: &mut Context<Self>) {
+        crate::render::images::forget();
         self.workspace.reload();
         self.forward("reload");
         let before = std::mem::replace(&mut self.asked, self.workspace.chrome());
@@ -498,6 +502,7 @@ impl MoonframeApp {
             return false;
         }
         tracing::info!("packages changed: {roots}");
+        crate::render::images::forget();
         self.workspace.set_roots(roots.clone());
         self.forward("packages");
         self._watcher = watch(&self.workspace, &self.folders, cx)
@@ -642,18 +647,27 @@ impl MoonframeApp {
         self.show_toast("Copied", cx);
     }
 
-    /// Runs the shell menu item `id`, as a click from the shell would.
+    /// Whether `window` is the main window, not a mod's, the components
+    /// browser or the theme picker.
+    pub(crate) fn is_main(&self, window: &Window) -> bool {
+        window.window_handle().window_id() == self.main_window
+    }
+
     /// A keystroke no overlay, field or terminal took: a shell menu item
     /// whose shortcut is a single typing key (`j`, `shift-c`) runs, as a
-    /// mail client's keys do, but only while no text field or terminal has
-    /// focus, so typing is never taken. Returns whether one ran.
+    /// mail client's keys do, but only in the main window and while no
+    /// text field or terminal has focus, so typing is never taken. Returns
+    /// whether one ran.
     pub(crate) fn menu_keystroke(
         &mut self,
         keystroke: &Keystroke,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        if self.inputs.any_focused(window, cx) || self.terminals.any_focused(window) {
+        if !self.is_main(window)
+            || self.inputs.any_focused(window, cx)
+            || self.terminals.any_focused(window)
+        {
             return false;
         }
         let modifiers = keystroke.modifiers;
@@ -666,39 +680,57 @@ impl MoonframeApp {
             cmd: modifiers.platform,
         };
         let mac = cfg!(target_os = "macos");
-        let id = self.workspace.menus().iter().find_map(|menu| {
-            menu.items.iter().find_map(|entry| match entry {
-                moonframe_core::MenuEntry::Item(item)
-                    if item.shortcut.as_ref().is_some_and(|chord| {
-                        chord.types_text() && chord.matches(&pressed, mac)
-                    }) =>
-                {
-                    Some(item.id(&menu.title))
-                },
-                _ => None,
+        self.run_menu_item_where(window, cx, |_, item| {
+            item.shortcut
+                .as_ref()
+                .is_some_and(|chord| chord.types_text() && chord.matches(&pressed, mac))
+        })
+    }
+
+    /// The shell menu item whose (non-typing) shortcut is `keystroke`, in
+    /// GPUI's spelling, runs. Returns whether one did.
+    fn run_menu_key(
+        &mut self,
+        keystroke: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        self.run_menu_item_where(window, cx, |_, item| {
+            item.shortcut.as_ref().is_some_and(|chord| {
+                !chord.types_text() && crate::actions::keystroke(chord) == keystroke
             })
-        });
-        match id {
-            Some(id) => {
-                self.run_menu_item(&id, window, cx);
-                true
-            },
-            None => false,
+        })
+    }
+
+    /// Runs the shell menu item `id`, as a click from the shell would.
+    fn run_menu_item(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.run_menu_item_where(window, cx, |title, item| item.id(title) == id) {
+            tracing::warn!("no menu item {:?} any more", id.replace('\u{1f}', " > "));
         }
     }
 
-    fn run_menu_item(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
+    /// Runs the first shell menu item `matches` picks (given its menu's
+    /// title). Returns whether there was one.
+    fn run_menu_item_where(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        matches: impl Fn(&str, &moonframe_core::MenuCommand) -> bool,
+    ) -> bool {
         let action = self.workspace.menus().iter().find_map(|menu| {
             menu.items.iter().find_map(|entry| match entry {
-                moonframe_core::MenuEntry::Item(item) if item.id(&menu.title) == id => {
+                moonframe_core::MenuEntry::Item(item) if matches(&menu.title, item) => {
                     Some(item.action.clone())
                 },
                 _ => None,
             })
         });
         match action {
-            Some(action) => self.dispatch(SHELL, &action, window, cx),
-            None => tracing::warn!("no menu item {:?} any more", id.replace('\u{1f}', " > ")),
+            Some(action) => {
+                self.dispatch(SHELL, &action, window, cx);
+                true
+            },
+            None => false,
         }
     }
 
@@ -873,11 +905,20 @@ impl MoonframeApp {
         )
         .with_views(&mut self.views);
         let content = painter.window(name, cx);
-        let requests = painter.take_list_requests();
-        let animating = painter.animating();
-        self.request_list_rows(requests, cx);
-        self.make_views(window, cx);
+        let frame = painter.finish();
+        let animating = self.after_frame(frame, window, cx);
         (content, animating)
+    }
+
+    /// Does what a frame drawn in `window` left to do: keeps the keys of
+    /// its open popovers and overlays, asks for the rows its lists want,
+    /// and makes its views. Returns whether it still moves.
+    fn after_frame(&mut self, frame: Finished, window: &Window, cx: &mut Context<Self>) -> bool {
+        self.key_layers
+            .insert(window.window_handle().window_id(), frame.key_layers);
+        self.request_list_rows(frame.list_requests, cx);
+        self.make_views(window, cx);
+        frame.animating
     }
 
     /// Makes the views the frame drew that are not made yet, and gives the
@@ -899,7 +940,6 @@ impl MoonframeApp {
         });
     }
 
-    /// The browser window's content.
     /// The browser window's content, and whether it is still moving.
     pub(crate) fn gallery_content(
         &mut self,
@@ -917,10 +957,9 @@ impl MoonframeApp {
         )
         .previewing();
         let content = painter.gallery(&self.chosen, query, search, cx);
-        let requests = painter.take_list_requests();
-        let animating = painter.animating();
-        self.request_list_rows(requests, cx);
-        (content, animating)
+        let frame = painter.finish();
+        self.request_list_rows(frame.list_requests, cx);
+        (content, frame.animating)
     }
 
     /// Asks an agent to add the component `name`, at the selection if any.
@@ -1316,7 +1355,8 @@ impl Render for MoonframeApp {
         .with_views(&mut self.views)
         .with_keyed(&last_keyed);
         let body = painter.shell(cx);
-        let animating = painter.animating();
+        let frame = painter.finish();
+        let animating = frame.animating;
         if animating {
             window.request_animation_frame();
         }
@@ -1327,14 +1367,17 @@ impl Render for MoonframeApp {
         if built >= moonframe_core::perf::SLOW || !animating {
             moonframe_core::perf!(built, "frame: built in {built:.1?}");
         }
-        let key_layers = painter.take_key_layers();
-        let requests = painter.take_list_requests();
-        self.key_layers = key_layers;
-        self.request_list_rows(requests, cx);
-        self.make_views(window, cx);
+        // Closed windows' layers go: their ids are not reused while open.
+        let open: Vec<WindowId> = cx
+            .windows()
+            .iter()
+            .map(AnyWindowHandle::window_id)
+            .collect();
+        self.key_layers.retain(|id, _| open.contains(id));
+        self.after_frame(frame, window, cx);
         // A terminal that just appeared (a new tab, or one selected) takes
         // the keyboard, once it is drawn.
-        if let Some(focus) = self.terminals.take_appeared() {
+        if let Some(focus) = self.terminals.end_frame() {
             window.defer(cx, move |window, cx| focus.focus(window, cx));
         }
         let layers = self.inspector_layers(window.viewport_size(), cx);
@@ -1357,6 +1400,11 @@ impl Render for MoonframeApp {
             .on_action(cx.listener(|this, _: &Inspect, _, cx| this.toggle_inspect(cx)))
             .on_action(cx.listener(|this, action: &MenuSend, window, cx| {
                 this.run_menu_item(&action.id, window, cx);
+            }))
+            .on_action(cx.listener(|this, action: &MenuKey, window, cx| {
+                if !this.run_menu_key(&action.keystroke, window, cx) {
+                    cx.propagate();
+                }
             }))
             .on_action(cx.listener(|this, _: &Dismiss, _, cx| this.dismiss(cx)))
             .size_full()

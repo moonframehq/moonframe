@@ -115,8 +115,11 @@ types dir="app":
     #!/usr/bin/env bash
     set -euo pipefail
     lsp=$(scripts/setup-luau-lsp.sh)
-    files=$(find {{dir}} -name '*.luau' -not -name '*.d.luau' | sort)
-    output=$("$lsp" analyze --platform=standard --definitions=@moonframe=types/moonframe.d.luau $files 2>&1 | grep -v '^\[INFO\]' || true)
+    files=()
+    while IFS= read -r -d '' file; do
+        files+=("$file")
+    done < <(find "{{dir}}" -name '*.luau' -not -name '*.d.luau' -print0 | sort -z)
+    output=$("$lsp" analyze --platform=standard --definitions=@moonframe=types/moonframe.d.luau "${files[@]}" 2>&1 | grep -v '^\[INFO\]' || true)
     if [ -n "$output" ]; then
         echo "$output"
         exit 1

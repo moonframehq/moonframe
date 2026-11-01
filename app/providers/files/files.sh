@@ -9,8 +9,9 @@
 # sorted without regard to case. Only the root and the open folders are
 # listed, so a large folder costs nothing until it is opened.
 #
-# Messages: `{ open = "app\napp/mods" }` sets which folders are open (their
-# paths from the root, one per line); anything else looks again.
+# Messages: `{ open = "app\napp/mods", owner = "tab-2" }` sets which folders
+# that explorer has open (their paths from the root, one per line); the
+# folders listed are those any explorer has open. Anything else looks again.
 #
 # The root is the git repository the app runs from; set MOONFRAME_FILES to
 # show another folder. Without either it publishes `available = false`:
@@ -116,7 +117,35 @@ json_field() {
 
 # --------------------------------------------------------------- files ----
 
+# Each explorer's open folders: OWNERS[i] has OWNED[i], paths one per line.
+# Parallel arrays, as bash 3.2 has no associative ones.
+OWNERS=()
+OWNED=()
 OPEN=()
+
+# Sets owner $1's open folders to $2, then OPEN to every owner's, once each.
+set_open() {
+    local owner=$1 list=$2 i found= dir seen=$'\n'
+    for ((i = 0; i < ${#OWNERS[@]}; i++)); do
+        if [ "${OWNERS[i]}" = "$owner" ]; then
+            OWNED[i]=$list
+            found=1
+        fi
+    done
+    if [ -z "$found" ]; then
+        OWNERS+=("$owner")
+        OWNED+=("$list")
+    fi
+    OPEN=()
+    for list in "${OWNED[@]}"; do
+        while IFS= read -r dir; do
+            [ -n "$dir" ] || continue
+            case $seen in *$'\n'"$dir"$'\n'*) continue ;; esac
+            seen+="$dir"$'\n'
+            OPEN+=("$dir")
+        done <<<"$list"
+    done
+}
 
 # Whether folder $1 (a path from the root) is inside the root once symlinks
 # are resolved: a link in the project to /etc is not listed.
@@ -219,10 +248,9 @@ while true; do
         force=1
         json_field "$message" open
         if [ "$FOUND" = string ]; then
-            OPEN=()
-            while IFS= read -r dir; do
-                [ -n "$dir" ] && OPEN+=("$dir")
-            done <<<"$VALUE"
+            list=$VALUE
+            json_field "$message" owner
+            set_open "$VALUE" "$list"
         fi
     else
         status=$?

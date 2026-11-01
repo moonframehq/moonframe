@@ -23,7 +23,8 @@
 //!   with `{ reply = id, action = "finished", ok, run, status, message | error }`.
 //! - `{ cancel = "<run>" }` stops it; `{ forget = "<run>" }` drops a
 //!   finished one; `{ answer = "<run>", option = "<option id>" | false }`
-//!   answers its permission question (false refuses).
+//!   answers its permission question (false refuses). An option that
+//!   allows always is refused: a mod answers once at most.
 //! - Anything else publishes again.
 
 mod agents;
@@ -31,7 +32,7 @@ mod run;
 
 use {
     moonframe_core::Data,
-    moonframe_providers::{Handle, Native, to_json},
+    moonframe_providers::{Handle, Mods, Native, to_json},
     run::{Allow, Inbound, Run, Start, Status},
     serde_json::{Value, json},
     std::{
@@ -73,7 +74,7 @@ struct State {
 pub struct Acp {
     state: Arc<Mutex<State>>,
     /// The mods that may start runs (`[settings] starters`).
-    starters: Vec<String>,
+    starters: Mods,
     /// The permission questions each mod's runs answer themselves
     /// (`[settings] allow`), by mod; the rest ask.
     allow: Vec<(String, Allow)>,
@@ -99,13 +100,7 @@ pub struct Acp {
 impl Native for Acp {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         let settings = to_json(host.settings());
-        self.starters = settings
-            .get("starters")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(|name| name.as_str().map(str::to_owned))
-            .collect();
+        self.starters = Mods::from_settings(host.settings(), "starters");
         self.allow = settings
             .get("allow")
             .and_then(Value::as_object)
@@ -133,7 +128,10 @@ impl Native for Acp {
             })
             .collect();
         let home = std::env::var_os("HOME").map(PathBuf::from);
-        self.path = agents::search_path(std::env::var_os("PATH").as_deref(), home.as_deref());
+        self.path = moonframe_providers::program::search_path(
+            std::env::var_os("PATH").as_deref(),
+            home.as_deref(),
+        );
         self.cwd = workdir(
             host.dir(),
             settings.get("cwd").and_then(Value::as_str),
@@ -231,7 +229,7 @@ impl Acp {
         words: &str,
         message: &Value,
     ) -> Result<String, String> {
-        if !self.starters.iter().any(|starter| starter == from) {
+        if !self.starters.allows(from) {
             return Err(format!(
                 "`{from}` may not start agents: only the mods in providers/acp's `starters` may"
             ));
@@ -307,7 +305,7 @@ impl Acp {
                 allow: self
                     .allow
                     .iter()
-                    .find(|(name, _)| name == from)
+                    .find(|(name, _)| name == moonframe_providers::owner(from))
                     .map_or(Allow::Ask, |(_, allow)| *allow),
                 cwd: self.cwd.clone(),
                 now,
@@ -372,8 +370,8 @@ impl Acp {
     fn locate(&self, agent: &agents::Agent) -> agents::Found {
         let custom = self.commands.iter().find(|(name, _)| name == agent.name);
         if let Some((program, args)) = custom.and_then(|(_, words)| words.split_first()) {
-            let program =
-                agents::find_program(program, &self.path).unwrap_or_else(|| PathBuf::from(program));
+            let program = moonframe_providers::program::find(program, &self.path)
+                .unwrap_or_else(|| PathBuf::from(program));
             return agents::Found::Installed(program, args.to_vec());
         }
         agent.locate(&self.path)

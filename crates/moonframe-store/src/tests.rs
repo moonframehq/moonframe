@@ -126,3 +126,12 @@ fn a_damaged_value_reads_as_nothing() {
     let store = Store::open(&path).unwrap();
     assert_eq!(store.state("mod:a"), None);
 }
+
+#[test]
+fn a_saved_value_past_what_a_state_holds_reads_as_nothing() {
+    let deep = format!("{}1{}", "[".repeat(40), "]".repeat(40));
+    assert_eq!(crate::json::from_text(&deep), None);
+    let wide = format!("[{}]", vec!["1"; 50_000].join(","));
+    assert_eq!(crate::json::from_text(&wide), None);
+    assert!(crate::json::from_text("[[1, 2], {\"a\": true}]").is_some());
+}

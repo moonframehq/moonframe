@@ -11,6 +11,7 @@ mod browser;
 mod elements;
 mod floating;
 mod gallery;
+pub(crate) mod images;
 mod input;
 mod keyed;
 mod list;
@@ -178,6 +179,16 @@ impl Place<'_> {
     }
 }
 
+/// What a drawn frame leaves for the app to do.
+pub(crate) struct Finished {
+    /// Something still moves: draw again next frame.
+    pub(crate) animating: bool,
+    /// The rows lists asked for.
+    pub(crate) list_requests: Vec<ListRequest>,
+    /// The open popovers and overlays it drew, for their keys.
+    pub(crate) key_layers: Vec<KeyLayer>,
+}
+
 pub(crate) struct Painter<'w, 'm> {
     workspace: &'w Workspace,
     /// The modules being drawn, outermost first, to catch mount cycles.
@@ -295,18 +306,13 @@ impl<'w, 'm> Painter<'w, 'm> {
         self
     }
 
-    pub(crate) fn animating(&self) -> bool {
-        self.animating || self.tweening.get()
-    }
-
-    /// The rows lists asked for this frame.
-    pub(crate) fn take_list_requests(&mut self) -> Vec<ListRequest> {
-        std::mem::take(&mut self.list_requests)
-    }
-
-    /// The open popovers and overlays this frame drew, for their keys.
-    pub(crate) fn take_key_layers(&mut self) -> Vec<KeyLayer> {
-        std::mem::take(&mut self.key_layers)
+    /// The frame is drawn: what it leaves for the app to do.
+    pub(crate) fn finish(self) -> Finished {
+        Finished {
+            animating: self.animating || self.tweening.get(),
+            list_requests: self.list_requests,
+            key_layers: self.key_layers,
+        }
     }
 
     /// The whole window: the shell, under the stylesheet's and providers'

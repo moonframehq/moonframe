@@ -89,7 +89,7 @@ impl Stylesheet {
         let fields = Fields::read(value, &root, &[SHEET_KEYS])?;
         let mut names = Names {
             speeds: speeds(&fields)?,
-            animation_speed: fields.number("animation_speed", 0.0..=10.0)?.unwrap_or(1.0),
+            animation_speed: animation_speed(&fields)?,
             ..Names::NONE
         };
         let mut overrides = Vec::new();
@@ -588,6 +588,21 @@ const TRANSITION_KEYS: &[&str] = &["kind", "duration", "curve", "delay"];
 /// (`"slide fast"`). As in CSS, a second duration is the delay before it
 /// starts (`"fade 150ms ease-out 40ms"`, or `delay = 40` in the table).
 /// Missing parts are a slide, the `normal` speed, `ease`, no delay.
+/// The slowest `animation_speed` short of turning animations off: below it,
+/// a moment's fade would last for hours.
+const MIN_ANIMATION_SPEED: f32 = 0.01;
+
+/// `animation_speed`: 0 turns animations off, otherwise 0.01 to 10.
+fn animation_speed(fields: &Fields) -> Result<f32, Error> {
+    let speed = fields.number("animation_speed", 0.0..=10.0)?.unwrap_or(1.0);
+    if speed != 0.0 && speed < MIN_ANIMATION_SPEED {
+        return Err(fields.cx().key("animation_speed").fail(format!(
+            "expected 0 (no animations) or {MIN_ANIMATION_SPEED} to 10"
+        )));
+    }
+    Ok(speed)
+}
+
 /// The stylesheet's `animation_speed` applies to the result.
 impl Read for Transition {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {

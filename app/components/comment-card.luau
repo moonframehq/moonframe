@@ -30,6 +30,23 @@ local function ago(seconds: number): string
 	return `{math.floor(seconds / 86400)}d ago`
 end
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Comment Card",
 	category = "Data",
@@ -80,7 +97,7 @@ return component {
 				end
 			end
 		end
-		for _, child in ipairs(props) do
+		for _, child in positional(props) do
 			table.insert(paragraphs, child)
 		end
 		local age = props.age

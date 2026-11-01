@@ -41,10 +41,10 @@ const EXTRAS: &[&str] = &["tooltip", "context", "copy"];
 /// `to` a `context` message goes to.
 const ATTACHED: &[&str] = &["tooltip", "context", "copy", "to"];
 
-/// Reads a whole tree; `sheet` resolves the color names in `style` keys.
-/// Reads a view. A broken child becomes a [`Node::Problem`] in its place,
-/// so one mistake marks one spot and the rest of the view still draws; its
-/// error is returned alongside. The root, and the limits on size and depth,
+/// Reads a view; `sheet` resolves the color names in `style` keys. A broken
+/// child becomes a [`Node::Problem`] in its place, so one mistake marks one
+/// spot and the rest of the view still draws; its error is returned
+/// alongside. The root, and the limits on size and depth,
 /// still fail the whole view.
 ///
 /// `windows` says which rows of each `ui.list` to build, by its `id`; a
@@ -150,18 +150,39 @@ impl Tree<'_> {
     }
 
     fn nodes(&mut self, items: &[Value], cx: &Cx) -> Result<Vec<Node>, Error> {
-        let mut nodes = Vec::with_capacity(items.len());
-        for (index, item) in items.iter().enumerate() {
-            match self.node(item, &cx.index(index + 1)) {
-                Ok(node) => nodes.push(node),
-                Err(error) if self.halted => return Err(error),
-                Err(error) => {
-                    nodes.push(Node::Problem(error.to_string()));
-                    self.problems.push(error);
-                },
+        let mut nodes = items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| self.child(item, &cx.index(index + 1)))
+            .collect::<Result<Vec<_>, _>>()?;
+        // A key names one child among its siblings: two with the same one
+        // would share a place, and so its size and animations.
+        let mut keys = BTreeSet::new();
+        for (index, node) in nodes.iter_mut().enumerate() {
+            if let Node::Stack(Stack { key: Some(key), .. }) = node
+                && !keys.insert(key.clone())
+            {
+                let error = cx.index(index + 1).key("key").fail(format!(
+                    "a sibling already has the key `{key}`; keys differ among siblings"
+                ));
+                *node = Node::Problem(error.to_string());
+                self.problems.push(error);
             }
         }
         Ok(nodes)
+    }
+
+    /// A child element; one that fails to read becomes a [`Node::Problem`]
+    /// in its place, unless a limit halted the whole view.
+    fn child(&mut self, value: &Value, cx: &Cx) -> Result<Node, Error> {
+        match self.node(value, cx) {
+            Err(error) if !self.halted => {
+                let problem = Node::Problem(error.to_string());
+                self.problems.push(error);
+                Ok(problem)
+            },
+            read => read,
+        }
     }
 
     fn count(&mut self, cx: &Cx) -> Result<(), Error> {
@@ -889,7 +910,7 @@ impl Build for Popover {
             width: fields.number("width", PIXELS)?,
             keys: fields.get("keys")?.unwrap_or_default(),
             anchor: tree.children(fields)?,
-            content: Box::new(tree.node(content, &fields.cx().key("content"))?),
+            content: Box::new(tree.node(content, &fields.cx().nested("content"))?),
         })
     }
 }
@@ -911,7 +932,7 @@ impl Build for Overlay {
             width: fields.number("width", PIXELS)?,
             height: fields.number("height", PIXELS)?,
             keys: fields.get("keys")?.unwrap_or_default(),
-            content: Box::new(tree.node(content, &fields.cx().key("content"))?),
+            content: Box::new(tree.node(content, &fields.cx().nested("content"))?),
         })
     }
 }
@@ -958,15 +979,7 @@ impl Build for List {
             let value = row
                 .call::<Value>(index + 1)
                 .map_err(|error| Error::from(error).context(format!("row({})", index + 1)))?;
-            let cx = cx.index(index + 1);
-            match tree.node(&value, &cx) {
-                Ok(node) => rows.push(node),
-                Err(error) if tree.halted => return Err(error),
-                Err(error) => {
-                    rows.push(Node::Problem(error.to_string()));
-                    tree.problems.push(error);
-                },
-            }
+            rows.push(tree.child(&value, &cx.index(index + 1))?);
         }
         Ok(Self {
             look: Look::from_fields(fields)?,
@@ -990,7 +1003,6 @@ fn content<'f>(fields: &'f Fields) -> Result<&'f Value, Error> {
         .ok_or_else(|| fields.cx().key("content").fail("missing"))
 }
 
-/// `ui.mount "name"`: the mod to draw.
 /// `ui.mount "name"` draws a mod where it is; with an `id`, it mounts an
 /// instance of the mod with state of its own.
 enum Mount {

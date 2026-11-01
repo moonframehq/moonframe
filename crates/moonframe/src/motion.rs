@@ -18,20 +18,90 @@ mod slow;
 
 pub(crate) use slow::{is_slow, now, set_slow};
 
-#[derive(Default)]
 pub(crate) struct Motion {
-    panes: HashMap<String, Track>,
+    panes: Recent<Track>,
     /// What each container with keyed children drew in the frame being
     /// drawn, or the last one until the next begins.
     keyed: Keyed,
     /// Each animated keyed child's size at rest, measured as it is drawn,
     /// for how far it grows or shrinks.
-    sizes: HashMap<String, Rc<Cell<Option<Size<Pixels>>>>>,
+    sizes: Recent<Rc<Cell<Option<Size<Pixels>>>>>,
     /// Elements with a named state, each between two looks: drawn while
     /// styles resolve, which only borrow the painter.
     pub(crate) tweens: RefCell<Tweens>,
     /// Where each `ui.list` is scrolled, by path.
-    scrolls: HashMap<String, ScrollHandle>,
+    scrolls: Recent<ScrollHandle>,
+}
+
+impl Default for Motion {
+    fn default() -> Self {
+        Self {
+            panes: Recent::default(),
+            keyed: Keyed::default(),
+            sizes: Recent::default(),
+            tweens: RefCell::default(),
+            scrolls: Recent::keeping(FORGET_SCROLL),
+        }
+    }
+}
+
+/// Entries by path, each stamped when last used; those not used for
+/// [`FORGET`] go as the map grows, so a long list's rows, each with a
+/// track of its own, do not pile up for the app's life.
+struct Recent<T> {
+    entries: HashMap<String, (T, Instant)>,
+    /// How long an unused entry is kept.
+    keep: Duration,
+}
+
+impl<T> Default for Recent<T> {
+    fn default() -> Self {
+        Self {
+            entries: HashMap::new(),
+            keep: FORGET,
+        }
+    }
+}
+
+impl<T> Recent<T> {
+    /// Kept for `keep` unused instead.
+    fn keeping(keep: Duration) -> Self {
+        Self {
+            entries: HashMap::new(),
+            keep,
+        }
+    }
+
+    /// The entry at `key`, made with `make` if there is none, used `now`.
+    fn get_or(&mut self, key: &str, now: Instant, make: impl FnOnce() -> T) -> &mut T {
+        if !self.entries.contains_key(key) {
+            self.sweep(now);
+        }
+        let (value, seen) = self
+            .entries
+            .entry(key.to_owned())
+            .or_insert_with(|| (make(), now));
+        *seen = now;
+        value
+    }
+
+    fn insert(&mut self, key: &str, value: T, now: Instant) {
+        self.sweep(now);
+        self.entries.insert(key.to_owned(), (value, now));
+    }
+
+    fn remove(&mut self, key: &str) {
+        self.entries.remove(key);
+    }
+
+    /// Every 64 new entries, the ones unused for too long go.
+    fn sweep(&mut self, now: Instant) {
+        if self.entries.len().is_multiple_of(64) {
+            let keep = self.keep;
+            self.entries
+                .retain(|_, (_, seen)| now.saturating_duration_since(*seen) < keep);
+        }
+    }
 }
 
 /// The animated part of a look, in the theme's colors.
@@ -102,6 +172,9 @@ struct Tween {
 
 /// Elements not drawn for this long are forgotten, and start at rest.
 const FORGET: Duration = Duration::from_secs(10);
+/// Where a list not drawn for this long was scrolled is forgotten: kept
+/// longer, so a tab left for a while opens where it was.
+const FORGET_SCROLL: Duration = Duration::from_secs(600);
 
 impl Tween {
     /// Where it is at `now`, and whether it is still moving.
@@ -186,7 +259,9 @@ pub(crate) struct Kept {
     pub(crate) key: String,
     /// Where it was among its siblings.
     pub(crate) index: usize,
-    pub(crate) node: Node,
+    /// Shared from frame to frame while it does not change, so a child at
+    /// rest is compared, not copied, each frame.
+    pub(crate) node: Rc<Node>,
     pub(crate) transition: Transition,
 }
 
@@ -244,10 +319,14 @@ impl Motion {
     /// The pane at `key` has just appeared: it starts hidden, so being
     /// shown plays its way in.
     pub(crate) fn enter(&mut self, key: &str) {
-        self.panes.insert(key.to_owned(), Track {
-            visible: false,
-            started: None,
-        });
+        self.panes.insert(
+            key,
+            Track {
+                visible: false,
+                started: None,
+            },
+            Instant::now(),
+        );
     }
 
     /// The pane at `key` is gone for good.
@@ -258,12 +337,14 @@ impl Motion {
 
     /// Where the list or scrolling frame at `path` is scrolled.
     pub(crate) fn scroll(&mut self, path: &str) -> ScrollHandle {
-        self.scrolls.entry(path.to_owned()).or_default().clone()
+        self.scrolls
+            .get_or(path, Instant::now(), ScrollHandle::default)
+            .clone()
     }
 
     /// Where the size of the keyed child at `key` is kept.
     pub(crate) fn size(&mut self, key: &str) -> Rc<Cell<Option<Size<Pixels>>>> {
-        self.sizes.entry(key.to_owned()).or_default().clone()
+        self.sizes.get_or(key, Instant::now(), Rc::default).clone()
     }
 
     /// How much of the pane at `key` shows at `now`, given what the view
@@ -275,7 +356,7 @@ impl Motion {
         transition: Option<&Transition>,
         now: Instant,
     ) -> Shown {
-        let track = self.panes.entry(key.to_owned()).or_insert(Track {
+        let track = self.panes.get_or(key, now, || Track {
             visible,
             started: None,
         });
@@ -291,9 +372,14 @@ impl Motion {
         };
         if track.visible != visible {
             // Turning back mid-move starts from where the pane is, not from
-            // the far end.
+            // the far end: from the time at which the eased way back shows
+            // what shows now, which for an asymmetric curve is not simply
+            // the time left.
             let done = track.progress(now, transition.duration).unwrap_or(1.0);
-            let head_start = transition.duration.mul_f32(1.0 - done);
+            let shown_from_far_end = 1.0 - transition.curve.at(done);
+            let head_start = transition
+                .duration
+                .mul_f32(time_at(&transition.curve, shown_from_far_end));
             track.visible = visible;
             track.started = Some(now.checked_sub(head_start).unwrap_or(now));
         }
@@ -312,6 +398,21 @@ impl Motion {
             },
         }
     }
+}
+
+/// The time (0 to 1) at which `curve` reaches `progress`, by bisection:
+/// curves only ever grow with time.
+fn time_at(curve: &Curve, progress: f32) -> f32 {
+    let (mut low, mut high) = (0.0_f32, 1.0_f32);
+    for _ in 0..32 {
+        let middle = (low + high) / 2.0;
+        if curve.at(middle) < progress {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    (low + high) / 2.0
 }
 
 #[cfg(test)]
@@ -404,6 +505,35 @@ mod tests {
         // 30% hidden, then shown again: it is 70% shown and grows from there.
         moving(pane(true, 30), 0.7);
         assert_eq!(pane(true, 60), Shown::Settled(true));
+    }
+
+    #[test]
+    fn turning_back_on_an_asymmetric_curve_does_not_jump() {
+        let slide = Transition {
+            curve: Curve::EASE_OUT,
+            ..SLIDE
+        };
+        let mut motion = Motion::default();
+        let start = Instant::now();
+        let mut pane = |visible, ms| {
+            motion.pane(
+                "p",
+                visible,
+                Some(&slide),
+                start + Duration::from_millis(ms),
+            )
+        };
+        pane(false, 0);
+        pane(true, 0);
+        // Halfway in, in time: ease-out has it well over half shown.
+        let shown = Curve::EASE_OUT.at(0.5);
+        assert!(shown > 0.6);
+        moving(pane(true, 50), shown);
+        // Turned back on that frame: it starts from there, not from 1 - shown.
+        moving(pane(false, 50), shown);
+        // And then keeps hiding.
+        let later = pane(false, 60).moving().unwrap_or(f32::NAN);
+        assert!(later < shown, "{later} should be below {shown}");
     }
 
     fn snapshot(width: f32) -> Snapshot {

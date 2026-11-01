@@ -16,7 +16,7 @@ fn docs(writers: &[&str]) -> (Docs, Handle, Arc<Mutex<Vec<Event>>>, tempfile::Te
     let host = Handle::new("docs", dir.path(), Data::Nil, events);
     let docs = Docs {
         root: Some(dir.path().canonicalize().unwrap()),
-        writers: writers.iter().map(|name| (*name).to_owned()).collect(),
+        writers: writers.iter().copied().collect(),
         open: BTreeMap::new(),
         uses: 0,
     };
@@ -317,10 +317,11 @@ fn the_root_is_the_repository_holding_the_app() {
     if std::env::var_os("MOONFRAME_FILES").is_none() {
         assert_eq!(root(&provider), Some(dir.path().canonicalize().unwrap()));
     }
-    assert_eq!(
-        writers(&map([("writers", Data::List(vec!["editor".into()]))])),
-        ["editor"]
+    let writers = Mods::from_settings(
+        &map([("writers", Data::List(vec!["editor".into()]))]),
+        "writers",
     );
+    assert!(writers.allows("editor") && !writers.allows("other"));
 }
 
 #[test]

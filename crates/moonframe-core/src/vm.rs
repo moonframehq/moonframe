@@ -16,7 +16,13 @@ const PRELUDE: &str = include_str!("prelude.luau");
 
 /// Luau's interrupt checks per call: one per loop iteration and call, roughly.
 const INTERRUPTS: u64 = 10_000_000;
-const MEMORY: usize = 64 * 1024 * 1024;
+/// The memory a mod's state may use.
+pub(crate) const MEMORY: usize = 64 * 1024 * 1024;
+
+/// The memory a component instance, preview, or stylesheet may use. A view
+/// may hold up to 256 instances, each a state of its own; at a mod's limit
+/// they could take 16 GiB between them before any one ran out.
+pub(crate) const SMALL_MEMORY: usize = 8 * 1024 * 1024;
 
 /// Globals a module never gets: code loading, environments, and the
 /// collector. `print` is replaced by `log`.
@@ -47,8 +53,13 @@ impl Meter {
 }
 
 /// A sealed state for the module `name`, ready to load its source, with
-/// `library`'s components to `use`.
-pub(crate) fn open(name: &str, meter: &Meter, library: &Library) -> mlua::Result<Lua> {
+/// `library`'s components to `use`, and `memory` bytes to use.
+pub(crate) fn open(
+    name: &str,
+    meter: &Meter,
+    library: &Library,
+    memory: usize,
+) -> mlua::Result<Lua> {
     let libs =
         StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::UTF8 | StdLib::BIT | StdLib::BUFFER;
     let lua = Lua::new_with(libs, LuaOptions::new())?;
@@ -56,7 +67,7 @@ pub(crate) fn open(name: &str, meter: &Meter, library: &Library) -> mlua::Result
     for removed in REMOVED {
         globals.raw_set(*removed, Value::Nil)?;
     }
-    lua.set_memory_limit(MEMORY)?;
+    lua.set_memory_limit(memory)?;
     let count = meter.0.clone();
     lua.set_interrupt(move |_| {
         let used = count.get().saturating_add(1);
@@ -83,7 +94,11 @@ pub(crate) fn open(name: &str, meter: &Meter, library: &Library) -> mlua::Result
         let line = values
             .iter()
             .map(|value| match value {
-                Value::String(text) => text.to_string_lossy(),
+                // No more is copied out of Luau than a line can show.
+                Value::String(text) => {
+                    let bytes = text.as_bytes();
+                    String::from_utf8_lossy(&bytes[..bytes.len().min(MAX_LOG * 4)]).into_owned()
+                },
                 Value::Integer(value) => value.to_string(),
                 Value::Number(value) => value.to_string(),
                 Value::Boolean(value) => value.to_string(),
@@ -146,6 +161,16 @@ pub fn printable(line: &str) -> String {
 /// A script's source as a chunk named `name` in errors. Always text: Luau
 /// bytecode is not verified when loaded, so a file that looks like bytecode
 /// could escape the sandbox; in text mode it is a syntax error.
+/// A table of globals for one chunk: it reads the shared ones, and what it
+/// assigns stays its own.
+pub(crate) fn own_globals(lua: &Lua) -> mlua::Result<mlua::Table> {
+    let globals = lua.create_table()?;
+    let meta = lua.create_table()?;
+    meta.raw_set("__index", lua.globals())?;
+    globals.set_metatable(Some(meta))?;
+    Ok(globals)
+}
+
 pub(crate) fn text<'a>(lua: &Lua, source: &'a str, name: &str) -> Chunk<'a> {
     lua.load(source)
         .set_mode(ChunkMode::Text)

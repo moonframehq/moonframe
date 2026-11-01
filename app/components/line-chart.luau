@@ -80,13 +80,16 @@ return component {
 		local width = props.width or 600
 		local height = props.height or 180
 		local low = props.min or 0
-		local span = math.max(props.max - low, 0.0001)
+		-- `math.clamp` raises when its bounds cross: a `max` under `min`
+		-- (all-negative data with the default `min = 0`) draws flat instead.
+		local high = math.max(props.max, low)
+		local span = math.max(high - low, 0.0001)
 		local slot = width / count
 		local event = props.event or "point"
 		local selected = props.selected
 
 		local function y(value: number): number
-			return height - height * (math.clamp(value, low, props.max) - low) / span
+			return height - height * (math.clamp(value, low, high) - low) / span
 		end
 
 		-- The slots: a faint column each, lit under the pointer, picked on a click.

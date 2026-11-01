@@ -9,7 +9,8 @@ out="${2:-target/components/$name.png}"
 dir="${3:-app}"
 mkdir -p "$(dirname "$out")"
 binary=target/release/moonframe
-[ -x "$binary" ] || cargo build --quiet --release -p moonframe-app
+# Always build: an old binary would show yesterday's UI. A no-op when current.
+cargo build --quiet --release -p moonframe-app
 "$binary" --no-user --background --component "$name" "$dir" >/dev/null 2>&1 &
 pid=$!
 trap 'kill "$pid" 2>/dev/null || true' EXIT

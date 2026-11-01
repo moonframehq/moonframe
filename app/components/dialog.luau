@@ -41,6 +41,23 @@ type Props = {
 
 local WIDTHS = { small = 360, medium = 480, large = 640 }
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Dialog",
 	category = "Overlays",
@@ -191,12 +208,13 @@ dialog { open = state.renaming, dismiss = "close", title = "Rename workspace",
 		end
 
 		local body: any = false
-		if #props > 0 then
+		local children = positional(props)
+		if #children > 0 then
 			body = ui.column {
 				class = "dialog-body",
 				height = props.height,
 				scroll = props.height ~= nil,
-				table.unpack(props),
+				table.unpack(children),
 			}
 		end
 

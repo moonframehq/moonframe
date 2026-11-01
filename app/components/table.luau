@@ -35,9 +35,15 @@ type Props = {
 	check: string?,
 	check_all: any,
 	bordered: boolean?,
+	id: string?,
 }
 
 local JUSTIFY = { left = "start", start = "start", center = "center", right = "end", ["end"] = "end" }
+-- Past this many rows a body that scrolls is a `ui.list`, which builds only
+-- the rows that show: a view holds at most 10,000 elements. Its rows then
+-- take one height each.
+local LIST_AFTER = 200
+local ROW_HEIGHT, BORDERED_ROW_HEIGHT = 32, 36
 
 return component {
 	title = "Table",
@@ -58,6 +64,7 @@ return component {
 		["to"] = "the mod to send { sort = key } and { select = id } to",
 		["height"] = "pixels: the body scrolls within it",
 		["grow"] = "fill the parent and scroll the body",
+		["id"] = "names the list a long scrolling body becomes (default \"table\"); two long tables in one mod need two",
 		["checkable"] = "a leading column of checkboxes, in the header too",
 		["checks"] = "the checked rows' ids: a list, or a set { [id] = true }",
 		["check"] = "key of the message a row's box sends, default \"check\": { check = id }",
@@ -141,16 +148,16 @@ table_view {
 		local sortable = props.sortable ~= false
 		local bordered = props.bordered == true
 
-		-- `checks` as a set, from a list or a set.
+		-- `checks` as a set, from a list of ids or a set of `[id] = true`.
+		-- Told apart per entry, not by `checks[1]`: rows without an `id` are
+		-- numbered, so a set may well have a key 1.
 		local checked: { [any]: boolean } = {}
 		if type(props.checks) == "table" then
-			if props.checks[1] ~= nil then
-				for _, id in props.checks do
-					checked[id] = true
-				end
-			else
-				for id, on in props.checks do
-					checked[id] = on == true
+			for key, value in props.checks do
+				if value == true then
+					checked[key] = true
+				elseif type(value) ~= "boolean" then
+					checked[value] = true
 				end
 			end
 		end
@@ -223,13 +230,21 @@ table_view {
 			}
 		end
 
-		local all, some = #props.rows > 0, false
-		local body = {}
+		local count = #props.rows
+		local all, some = count > 0, false
 		for index, row in props.rows do
-			local id = row.id or index
-			local on = checked[id] == true
+			local on = checked[row.id or index] == true
 			all = all and on
 			some = some or on
+		end
+		local scrolls = props.height ~= nil or props.grow == true
+		local listed = scrolls and count > LIST_AFTER
+		local row_height = if bordered then BORDERED_ROW_HEIGHT else ROW_HEIGHT
+
+		local function draw(index: number)
+			local row = props.rows[index]
+			local id = row.id or index
+			local on = checked[id] == true
 			local cells = {}
 			if props.checkable then
 				cells[1] = checkbox(on, false, { [props.check or "check"] = id })
@@ -243,33 +258,47 @@ table_view {
 			end
 			if bordered then
 				table.insert(classes, "table-row-bordered")
-				if index == #props.rows then
+				if index == count then
 					table.insert(classes, "table-row-last")
 				end
 			end
-			body[index] = ui.row {
+			return ui.row {
 				class = classes,
 				shrink = false,
 				align = "center",
+				height = if listed then row_height else nil,
 				selected = id == props.selected,
 				msg = row.msg or { [props.event or "select"] = id },
 				to = props.to,
 				table.unpack(cells),
 			}
 		end
-		if #body == 0 then
-			body[1] = ui.row {
-				class = "table-empty",
-				justify = "center",
-				ui.text { props.empty or "Nothing to show", class = "table-empty-text" },
+
+		local body
+		if count == 0 then
+			body = ui.column {
+				gap = "none",
+				grow = scrolls,
+				ui.row {
+					class = "table-empty",
+					justify = "center",
+					ui.text { props.empty or "Nothing to show", class = "table-empty-text" },
+				},
 			}
+		elseif listed then
+			body = ui.list { id = props.id or "table", count = count, row_height = row_height, row = draw, grow = true }
+		else
+			local rows = table.create(count)
+			for index = 1, count do
+				rows[index] = draw(index)
+			end
+			body = ui.column { gap = "none", grow = scrolls, scroll = scrolls, table.unpack(rows) }
 		end
 
 		if props.checkable then
 			table.insert(headings, 1, checkbox(all, some and not all, props.check_all or { check_all = true }))
 		end
 
-		local scrolls = props.height ~= nil or props.grow == true
 		return ui.column {
 			class = if bordered then { "table", "table-bordered" } else "table",
 			grow = props.grow,
@@ -281,7 +310,7 @@ table_view {
 				align = "center",
 				table.unpack(headings),
 			},
-			ui.column { gap = "none", grow = scrolls, scroll = scrolls, table.unpack(body) },
+			body,
 		}
 	end,
 }

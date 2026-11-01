@@ -242,6 +242,205 @@ fn a_wasm_provider_with_a_build_hook_is_not_built() {
 }
 
 #[test]
+fn a_wasm_provider_with_a_hook_elsewhere_is_not_built() {
+    let package = "[package]\nname = 'sys'\n";
+    for (case, manifest, files) in [
+        (
+            "package.build",
+            "[package]\nname = 'sys'\nbuild = 'src/gen.rs'\n",
+            &[][..],
+        ),
+        (
+            "build-dependencies",
+            "[package]\nname = 'sys'\n[build-dependencies]\ncc = '1'\n",
+            &[],
+        ),
+        (
+            "a target's build-dependencies",
+            "[package]\nname = 'sys'\n[target.'cfg(unix)'.build-dependencies]\ncc = '1'\n",
+            &[],
+        ),
+        (
+            "a local crate's build script",
+            "[package]\nname = 'sys'\n[dependencies]\nlocal = { path = 'local' }\n",
+            &[("local/Cargo.toml", package), ("local/build.rs", "")][..],
+        ),
+        (
+            "a patched-in crate's build script",
+            "[package]\nname = 'sys'\n[patch.crates-io]\nserde = { path = 'local' }\n",
+            &[("local/Cargo.toml", package), ("local/build.rs", "")][..],
+        ),
+        // Cargo puts a crate without a `[workspace]` of its own in the
+        // nearest one above, whose dependencies and patches it inherits.
+        (
+            "a crate inherited from a parent workspace",
+            "[package]\nname = 'sys'\n[dependencies]\nhelper = { workspace = true }\n",
+            &[
+                (
+                    "../../Cargo.toml",
+                    "[workspace]\nmembers = ['providers/sys']\n[workspace.dependencies]\nhelper = { path = 'helper' }\n",
+                ),
+                ("../../helper/Cargo.toml", package),
+                ("../../helper/build.rs", ""),
+            ][..],
+        ),
+        // A path with `..` in it is the folder it resolves to: the
+        // workspace above `member`, not the decoy one above the path as
+        // written (`member/decoy`).
+        (
+            "a crate reached through `..` in a parent workspace",
+            "[package]\nname = 'sys'\n[workspace]\n[dependencies]\nmember = { path = '../../member/decoy/..' }\n",
+            &[
+                (
+                    "../../Cargo.toml",
+                    "[workspace]\nmembers = ['member']\n[workspace.dependencies]\nhelper = { path = 'helper' }\n",
+                ),
+                (
+                    "../../member/Cargo.toml",
+                    "[package]\nname = 'member'\n[dependencies]\nhelper = { workspace = true }\n",
+                ),
+                ("../../member/decoy/Cargo.toml", "[workspace]\n"),
+                ("../../helper/Cargo.toml", package),
+                ("../../helper/build.rs", ""),
+            ][..],
+        ),
+        (
+            "a parent workspace's patch",
+            "[package]\nname = 'sys'\nworkspace = '../..'\n",
+            &[
+                (
+                    "../../Cargo.toml",
+                    "[workspace]\nmembers = ['providers/sys']\n[patch.crates-io]\nserde = { path = 'helper' }\n",
+                ),
+                ("../../helper/Cargo.toml", package),
+                ("../../helper/build.rs", ""),
+            ][..],
+        ),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(root, "providers/sys/provider.toml", "kind = 'wasm'\n");
+        write(root, "providers/sys/Cargo.toml", manifest);
+        for (path, text) in files {
+            write(root, &format!("providers/sys/{path}"), text);
+        }
+        let (events, received) = events();
+        let _providers = Providers::start(root.into(), root.join("build"), events);
+        let Event::Failed { problem, .. } = received.recv_timeout(Duration::from_secs(5)).unwrap()
+        else {
+            panic!("{case}: built");
+        };
+        assert!(
+            problem.to_string().contains("cannot have"),
+            "{case}: {problem}"
+        );
+    }
+}
+
+#[test]
+fn a_wasm_provider_cannot_name_its_toolchain_by_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(root, "providers/sys/provider.toml", "kind = 'wasm'\n");
+    write(
+        root,
+        "providers/sys/Cargo.toml",
+        "[package]\nname = 'sys'\n",
+    );
+    write(
+        root,
+        "providers/sys/rust-toolchain.toml",
+        "[toolchain]\npath = './tc'\n",
+    );
+    let (events, received) = events();
+    let _providers = Providers::start(root.into(), root.join("build"), events);
+    let Event::Failed { problem, .. } = received.recv_timeout(Duration::from_secs(5)).unwrap()
+    else {
+        panic!("built");
+    };
+    assert!(problem.to_string().contains("by path"), "{problem}");
+}
+
+/// A process that never reads its messages holds up nothing: what it
+/// prints is still published, however many messages it is sent.
+#[test]
+fn a_process_that_never_reads_its_messages_still_publishes() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/deaf/provider.toml",
+        "kind = 'process'\ncommand = ['sh', 'deaf.sh']\n",
+    );
+    write(
+        root,
+        "providers/deaf/deaf.sh",
+        "echo '{\"n\": 1}'\nsleep 2\necho '{\"n\": 2}'\nsleep 30\n",
+    );
+    let (events, received) = events();
+    let mut providers = Providers::start(root.into(), root.join("build"), events);
+    let next = || received.recv_timeout(Duration::from_secs(10)).unwrap();
+    let Event::Published { .. } = next() else {
+        panic!("not published");
+    };
+    // Far more than a pipe holds: writing it all at once would block.
+    let big = Data::from("x".repeat(4096));
+    for _ in 0..2_000 {
+        providers.send("deaf", "explorer", big.clone()).unwrap();
+    }
+    let Event::Published { data, .. } = next() else {
+        panic!("not published");
+    };
+    assert_eq!(data, Data::Map([("n".to_owned(), Data::Integer(2))].into()));
+}
+
+#[test]
+fn log_lines_are_cut_and_the_rest_dropped() {
+    let mut text = "a".repeat(crate::lines::MAX_LOG_LINE * 100);
+    text.push_str("\nnext\r\nlast");
+    let mut lines = Vec::new();
+    crate::lines::log_lines(text.as_bytes(), |line| lines.push(line));
+    assert_eq!(
+        lines.len(),
+        3,
+        "{:?}",
+        lines.iter().map(String::len).collect::<Vec<_>>()
+    );
+    assert_eq!(lines[0].len(), crate::lines::MAX_LOG_LINE);
+    assert_eq!(lines[1..], ["next", "last"]);
+}
+
+#[test]
+fn a_mod_list_counts_a_mods_components_but_not_its_instances_as_it() {
+    let settings = Data::Map(
+        [(
+            "writers".to_owned(),
+            Data::List(vec![Data::from("editor"), Data::Integer(3)]),
+        )]
+        .into(),
+    );
+    let writers = crate::Mods::from_settings(&settings, "writers");
+    for from in ["editor", "editor/markdown-editor#main"] {
+        assert!(writers.allows(from), "{from}");
+    }
+    // Any mod may mount `editor#2`, so it doesn't speak for `editor`.
+    for from in [
+        "editor#2",
+        "editor#2/tabs#a",
+        "editorx",
+        "edit",
+        "other/editor",
+        "other#editor",
+        "",
+        "3",
+    ] {
+        assert!(!writers.allows(from), "{from}");
+    }
+    assert!(!crate::Mods::from_settings(&settings, "starters").allows("editor"));
+    assert!(!crate::Mods::from_settings(&Data::Nil, "writers").allows("editor"));
+}
+
+#[test]
 fn a_reload_restarts_only_providers_that_changed() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
@@ -531,4 +730,112 @@ fn a_static_file_swapped_for_a_link_is_refused_at_read() {
     assert_eq!(crate::fixed::read(&root.join("own.json")).unwrap(), "{}");
     std::os::unix::fs::symlink(root.join("outside.json"), root.join("linked.json")).unwrap();
     assert!(crate::fixed::read(&root.join("linked.json")).is_err());
+}
+
+#[test]
+fn a_wasm_provider_in_a_hook_free_parent_workspace_passes_the_check() {
+    // Members of one workspace that depend on each other share its root;
+    // each is checked once rather than until the depth limit refuses it.
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "Cargo.toml",
+        "[workspace]\nmembers = ['providers/sys', 'helper']\n[workspace.dependencies]\nhelper = { path = 'helper' }\n",
+    );
+    write(
+        root,
+        "providers/sys/Cargo.toml",
+        "[package]\nname = 'sys'\n[dependencies]\nhelper = { workspace = true }\n",
+    );
+    write(
+        root,
+        "helper/Cargo.toml",
+        "[package]\nname = 'helper'\n[dependencies]\nother = { workspace = true }\n",
+    );
+    crate::wasm::check_hooks(&root.join("providers/sys")).unwrap();
+}
+
+/// Cargo works out `..` on the path's text, not through links: so does the
+/// check, or a link could point it at a workspace Cargo never uses.
+#[cfg(unix)]
+#[test]
+fn a_wasm_provider_reached_through_a_link_is_checked_where_cargo_looks() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    // `providers/sys/via` links to `elsewhere/deep`. To Cargo,
+    // `via/../../member` is `providers/member`, in the workspace whose
+    // helper has a build script; through the link it is a harmless
+    // `member` at the top.
+    write(
+        root,
+        "providers/sys/Cargo.toml",
+        "[package]\nname = 'sys'\n[workspace]\n[dependencies]\nmember = { path = 'via/../../member' }\n",
+    );
+    write(
+        root,
+        "elsewhere/deep/Cargo.toml",
+        "[package]\nname = 'deep'\n",
+    );
+    std::os::unix::fs::symlink(root.join("elsewhere/deep"), root.join("providers/sys/via"))
+        .unwrap();
+    write(
+        root,
+        "providers/Cargo.toml",
+        "[workspace]\nmembers = ['member']\n[workspace.dependencies]\nhelper = { path = 'helper' }\n",
+    );
+    write(
+        root,
+        "providers/member/Cargo.toml",
+        "[package]\nname = 'member'\n[dependencies]\nhelper = { workspace = true }\n",
+    );
+    write(
+        root,
+        "providers/helper/Cargo.toml",
+        "[package]\nname = 'helper'\n",
+    );
+    write(root, "providers/helper/build.rs", "");
+    write(
+        root,
+        "member/Cargo.toml",
+        "[package]\nname = 'member'\n[workspace]\n",
+    );
+    let problem = crate::wasm::check_hooks(&root.join("providers/sys")).unwrap_err();
+    assert!(problem.contains("cannot have"), "{problem}");
+}
+
+/// Links can make one crate look like many: seven levels of three links
+/// each, never deeper than allowed, would be 3^7 paths. The check stops
+/// at a total instead.
+#[cfg(unix)]
+#[test]
+fn a_wasm_provider_with_crates_multiplied_by_links_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let deps = "[dependencies]\na = { path = 'a' }\nb = { path = 'b' }\nc = { path = 'c' }\n";
+    write(
+        root,
+        "providers/sys/Cargo.toml",
+        &format!("[package]\nname = 'sys'\n[workspace]\n{deps}"),
+    );
+    let mut level = root.join("providers/sys");
+    for n in 1..=7 {
+        let next = root.join(format!("level{n}"));
+        let more = if n < 7 {
+            deps
+        } else {
+            ""
+        };
+        write(
+            &next,
+            "Cargo.toml",
+            &format!("[package]\nname = 'level{n}'\n{more}"),
+        );
+        for link in ["a", "b", "c"] {
+            std::os::unix::fs::symlink(&next, level.join(link)).unwrap();
+        }
+        level = next;
+    }
+    let problem = crate::wasm::check_hooks(&root.join("providers/sys")).unwrap_err();
+    assert!(problem.contains("at most"), "{problem}");
 }

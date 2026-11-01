@@ -60,6 +60,7 @@ tab_view { tab = state.tab, kind = kind_of(app.kinds, state.tab.kind) }]],
 			-- The tab frames it, so a mod that draws its own panel elsewhere
 			-- (the explorer in the sidebar) should draw its content bare.
 			merged.framed = true
+			merged.id = tab.id
 			return ui.mount { name :: any, id = tab.id, props = merged }
 		end
 		if kind and kind.report then

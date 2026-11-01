@@ -327,7 +327,8 @@ return mod {
 		local agents = 0
 		local running: { any } = (app.agents and app.agents.agents) or {}
 		for _, agent in running do
-			if agent.cwd and current and string.sub(agent.cwd, 1, #current.path) == current.path then
+			local path = current and current.path
+			if agent.cwd and path and (agent.cwd == path or string.sub(agent.cwd, 1, #path + 1) == path .. "/") then
 				agents += 1
 			end
 		end

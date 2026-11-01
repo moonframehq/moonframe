@@ -27,6 +27,7 @@ type Props = {
 }
 
 local diff_counts = use "diff-counts"
+local relative_time = use "relative-time"
 
 local ICONS = {
 	draft = "git-pull-request-draft",
@@ -39,17 +40,6 @@ local CHECKS = {
 	failed = "Checks failed",
 	pending = "Checks running",
 }
-
-local function compact(seconds: number): string
-	if seconds < 3600 then
-		return `{math.max(1, math.floor(seconds / 60))}m`
-	elseif seconds < 86400 then
-		return `{math.floor(seconds / 3600)}h`
-	elseif seconds < 604800 then
-		return `{math.floor(seconds / 86400)}d`
-	end
-	return `{math.floor(seconds / 604800)}w`
-end
 
 return component {
 	title = "PR Row",
@@ -153,10 +143,10 @@ ui.column { gap = "none",
 			table.insert(tags, ui.row { class = "pr-row-label", ui.text { label, class = "pr-row-label-text" } })
 		end
 
-		local age = props.age
-		if age == nil and props.seconds then
-			age = compact(props.seconds)
-		end
+		local age = if props.age
+			then ui.text { props.age, class = "pr-row-age" }
+			elseif props.seconds then relative_time { seconds = props.seconds, compact = true }
+			else nil
 
 		return ui.row {
 			class = "pr-row",
@@ -212,7 +202,7 @@ ui.column { gap = "none",
 				justify = "end",
 				diff_counts { added = props.added, removed = props.removed },
 			},
-			age and ui.row { width = 32, justify = "end", ui.text { age, class = "pr-row-age" } },
+			age and ui.row { width = 32, justify = "end", age },
 		}
 	end,
 }
