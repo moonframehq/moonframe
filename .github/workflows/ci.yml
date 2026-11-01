@@ -76,6 +76,8 @@ jobs:
         run: just lockfile-check
       - name: Type-check the app's Luau
         run: just types
+      - name: Type-check the example apps' Luau
+        run: just types examples
       - name: Lint and build the Wasm providers
         run: just providers
 
@@ -116,6 +118,10 @@ jobs:
         run: cargo test --locked --workspace --all-features
       - name: Load every built-in module headlessly
         run: cargo run --locked -p moonframe -- --check --no-user app
+      - name: Load every example app headlessly
+        run: scripts/check-examples.sh "target/debug/moonframe$EXE"
+        env:
+          EXE: ${{ runner.os == 'Windows' && '.exe' || '' }}
       - name: Check the component catalogue skill is current
         run: |
           mkdir -p target

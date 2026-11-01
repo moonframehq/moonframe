@@ -26,15 +26,8 @@ check-builtin dir="app":
 # Load the example apps in examples/ headlessly, each as a profile in a
 # throwaway user folder, and type-check their Luau.
 check-examples:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    user=$(mktemp -d)
-    trap 'rm -rf "$user"' EXIT
     cargo build --quiet --release -p moonframe
-    for app in sessions workbench daybook ledger audience pipeline stage; do
-        target/release/moonframe --user "$user" app link "examples/$app" --yes >/dev/null
-        target/release/moonframe --user "$user" --profile "$app" --check | cut -c1-120
-    done
+    scripts/check-examples.sh target/release/moonframe
     just types examples
 
 # Build Moonframe.app (release binary, staged app, icon) in target/bundle.
