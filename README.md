@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="#install"><b>Install</b></a> ·
   <a href="#quick-start"><b>Quick start</b></a> ·
   <a href="#make-it-yours">Make it yours</a> ·
   <a href="#building-blocks">Building blocks</a> ·
@@ -109,6 +110,19 @@ Whole apps run on it too, each as a profile of its own: `examples/` holds
 - **A sandbox.** Luau runs with no files, network or process access, a
   memory cap and an instruction budget; anything that reaches the machine
   goes through a provider or an element the host owns.
+
+## Install
+
+On macOS 13 or later, with [Homebrew](https://brew.sh):
+
+```sh
+brew install penso/tap/moonframe
+```
+
+This installs `Moonframe.app` in `/Applications` and the `moonframe` command.
+Linux and Windows builds are on the
+[releases page](https://github.com/penso/moonframe/releases). To change
+Moonframe itself rather than build on it, start from the source instead.
 
 ## Quick start
 
