@@ -1,17 +1,36 @@
 -- The bar over the page: where you are, then search, notifications and
--- your avatar.
+-- your avatar. The crumbs follow the sidebar's page, and Learn's course or
+-- guide when one is open (a click on "Learn" goes back to its page).
 
 local breadcrumbs = use "breadcrumbs"
 local icon_button = use "icon-button"
 local avatar = use "avatar"
 
-type State = { query: string }
+type State = { query: string, page: string, learn: any }
 
-local CRUMBS: { any } = { { label = "Workspace", icon = "layout-dashboard" }, { label = "Audience" } }
+-- The pages' names, for the last crumb.
+local PAGES = {
+	overview = "Overview",
+	audience = "Audience",
+	campaigns = "Campaigns",
+	content = "Content",
+	engagement = "Engagement",
+	revenue = "Revenue",
+	subscribers = "Subscribers",
+	automations = "Automations",
+	segments = "Segments",
+	integrations = "Integrations",
+	analytics = "Analytics",
+	reports = "Reports",
+	learn = "Learn",
+	help = "Help Center",
+	settings = "System Settings",
+}
 
 return mod {
 	region = "top",
 	title = "Top bar",
+	subscribe = { "inkwell/page", "inkwell/learn" },
 
 	styles = {
 		[".top"] = { padding = { 0, 18, 0, 18 }, gap = 8 },
@@ -21,23 +40,43 @@ return mod {
 	},
 
 	init = function(previous: State?): State
-		return previous or { query = "" }
+		local state: State = previous or { query = "", page = "audience" }
+		state.page = state.page or "audience"
+		return state
 	end,
 
 	update = function(state: State, msg)
-		if type(msg) == "table" and msg.msg == "query" then
-			state.query = msg.value
+		if type(msg) ~= "table" then
+			return
 		end
+		if msg.msg == "query" then
+			state.query = msg.value
+		elseif msg.topic == "inkwell/page" then
+			state.page = msg.value
+		elseif msg.topic == "inkwell/learn" then
+			state.learn = msg.value
+		elseif msg.crumb == "learn" then
+			return state, { { to = "learn", msg = { screen = "home" } } }
+		end
+		return state
 	end,
 
 	view = function(state: State)
+		local crumbs: { any } = { { label = "Workspace", icon = "layout-dashboard", id = "workspace" } }
+		local learn = state.learn
+		if state.page == "learn" and learn and learn.title then
+			table.insert(crumbs, { label = "Learn", id = "learn" })
+			table.insert(crumbs, { label = learn.title })
+		else
+			table.insert(crumbs, { label = PAGES[state.page] or "Audience" })
+		end
 		return ui.row {
 			class = "top",
 			drag = true,
 			grow = true,
 			height = 64,
 			align = "center",
-			breadcrumbs { crumbs = CRUMBS },
+			breadcrumbs { crumbs = crumbs },
 			ui.spacer(),
 			ui.row {
 				class = "top-search",

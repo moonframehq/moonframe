@@ -1,6 +1,6 @@
 -- The sidebar: the brand beside the traffic lights, then the pages in
 -- sections (Main menu, Manage, Resources, Settings), the current one
--- raised. Choosing one tells the page; only Audience is drawn here.
+-- raised. Choosing one tells the pages; Audience and Learn are drawn here.
 
 type State = { page: string }
 
@@ -49,14 +49,17 @@ return mod {
 		[".side-rule"] = { background = "border", margin = { 10, 6, 0, 6 } },
 	},
 
-	init = function(previous: State?): State
-		return previous or { page = "audience" }
+	-- The page is published on `inkwell/page`, which the pages and the top
+	-- bar follow; it goes out once at launch too, so they start in step.
+	init = function(previous: State?)
+		local state: State = previous or { page = "audience" }
+		return state, { { to = "topic:inkwell/page", msg = state.page } }
 	end,
 
 	update = function(state: State, msg)
 		if type(msg) == "table" and msg.page then
 			state.page = msg.page
-			return state, { { to = "audience", msg = { page = msg.page } } }
+			return state, { { to = "topic:inkwell/page", msg = msg.page } }
 		end
 	end,
 
