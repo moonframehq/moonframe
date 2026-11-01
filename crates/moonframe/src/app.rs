@@ -211,10 +211,14 @@ impl MoonframeApp {
         app.apply_theme(cx);
         // What the mods' `init` sent providers as they started.
         app.forward("start");
-        // A release looks for updates by itself, once a day, also while it
-        // stays open; runs without the user's folder (checks, screenshots)
+        // An installed app looks for updates by itself, once a day, also
+        // while it stays open, whatever Developer Mode says; runs from
+        // source and runs without the user's folder (checks, screenshots)
         // never do.
-        if crate::release() && crate::update::source().is_some() && app.folders.user.is_some() {
+        if crate::update::checks_by_itself()
+            && crate::update::source().is_some()
+            && app.folders.user.is_some()
+        {
             let profile = app.folders.profile.clone();
             cx.spawn(async move |this, cx| {
                 loop {
@@ -853,12 +857,18 @@ impl MoonframeApp {
         if asked {
             self.show_toast("Checking for updates…", cx);
         }
+        let profile = self.folders.profile.clone();
         cx.spawn(async move |this, cx| {
             let looked = source.clone();
             let found = cx
                 .background_executor()
                 .spawn(async move { crate::update::check(&looked) })
                 .await;
+            // Only a check that reached GitHub counts as the day's: one that
+            // failed (offline, rate limited) is tried again within the hour.
+            if found.is_ok() {
+                crate::update::checked(profile.as_deref());
+            }
             let title = crate::title();
             let release = match found {
                 Ok(crate::update::Found::Newer(release)) => release,

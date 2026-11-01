@@ -17,10 +17,11 @@ Updates…**, under About:
   One copy of the app installs at a time. Anywhere else (Linux, Windows, a run from source) the
   dialog offers **Download**, which opens the build for this platform in
   the browser, and **Release Notes**, which opens the release's page.
-- A release build (a bundle, an install) also checks by itself once a day,
-  at launch and while it stays open, and says something only when there is
-  a newer release. Runs from source
-  check only when asked.
+- An installed app (a bundle, a Linux install, or an app on the library
+  built for release) also checks by itself once a day, at launch and while
+  it stays open, whatever Developer Mode says, and says something only when
+  there is a newer release. A check that cannot reach GitHub is tried again
+  within the hour. Runs from source check only when asked.
 
 The starter checks `penso/moonframe`.
 

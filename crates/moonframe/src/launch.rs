@@ -106,7 +106,7 @@ impl Moonframe {
     /// app menu gets **Check for Updates…**, which compares the newest
     /// release's tag (`v1.2.3`) with [`version`](Self::version), and on
     /// macOS installs its `.dmg` over the running `.app` and starts again.
-    /// A release build also checks by itself once a day.
+    /// An installed or release build also checks by itself once a day.
     pub fn updates(mut self, repo: &str) -> Self {
         if crate::update::valid_repo(repo) {
             self.identity.updates = Some(repo.to_owned());

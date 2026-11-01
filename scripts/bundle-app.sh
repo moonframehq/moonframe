@@ -88,7 +88,8 @@ dist() {
         sum=$(sha256sum "$DIST/$archive" | cut -d' ' -f1)
     fi
     touch "$DIST/SHA256SUMS"
-    { grep -v "  $archive\$" "$DIST/SHA256SUMS" || true; echo "$sum  $archive"; } |
+    # Every line but this archive's (by its exact name), then its own.
+    { awk -v name="$archive" '$2 != name && $2 != "*" name' "$DIST/SHA256SUMS"; echo "$sum  $archive"; } |
         sort -k2 > "$DIST/SHA256SUMS.new"
     mv "$DIST/SHA256SUMS.new" "$DIST/SHA256SUMS"
     echo "$DIST/$archive" >&2

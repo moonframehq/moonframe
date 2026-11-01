@@ -131,10 +131,13 @@ impl Release {
     }
 }
 
-fn agent() -> ureq::Agent {
+/// A client whose whole answer must arrive within `body`: short for
+/// GitHub's answers, long for a download, never unbounded.
+fn agent(body: Duration) -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(10)))
         .timeout_recv_response(Some(Duration::from_secs(30)))
+        .timeout_recv_body(Some(body))
         .user_agent(format!(
             "{}/{} (+https://moonframe.dev)",
             crate::identity().name,
@@ -144,13 +147,20 @@ fn agent() -> ureq::Agent {
         .new_agent()
 }
 
+/// How long GitHub's answer, or `SHA256SUMS`, may take to arrive.
+const ANSWER: Duration = Duration::from_secs(60);
+
+/// How long a download may take: a disk image over a slow line, but not a
+/// connection that stalled for good.
+const DOWNLOAD: Duration = Duration::from_secs(30 * 60);
+
 /// Asks GitHub for `source`'s newest release. Blocks on the network.
 pub(crate) fn check(source: &Source) -> Result<Found, String> {
     let url = format!(
         "https://api.github.com/repos/{}/releases/latest",
         source.repo
     );
-    let response = agent()
+    let response = agent(ANSWER)
         .get(&url)
         .header("Accept", "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2022-11-28")
@@ -347,17 +357,26 @@ const EVERY: Duration = Duration::from_secs(24 * 60 * 60);
 /// open for days, and sleep through some of them.
 pub(crate) const POLL: Duration = Duration::from_secs(60 * 60);
 
-/// Whether the automatic check is due (once a day), noting that it ran.
+/// Whether this run checks by itself: an installed app (a bundle, or a
+/// Linux prefix), or an app on the library built for release. A run from
+/// source checks only when asked, and Developer Mode changes neither.
+pub(crate) fn checks_by_itself() -> bool {
+    crate::paths::in_bundle() || (crate::identity().hosted && !cfg!(debug_assertions))
+}
+
+/// Whether the automatic check is due: a day after the last check that
+/// reached GitHub.
 pub(crate) fn due(profile: Option<&str>) -> bool {
-    let file = stamp(profile);
-    let fresh = fs::metadata(&file)
+    !fs::metadata(stamp(profile))
         .and_then(|meta| meta.modified())
         .ok()
         .and_then(|modified| SystemTime::now().duration_since(modified).ok())
-        .is_some_and(|age| age < EVERY);
-    if fresh {
-        return false;
-    }
+        .is_some_and(|age| age < EVERY)
+}
+
+/// Notes that a check reached GitHub, so the next is a day away.
+pub(crate) fn checked(profile: Option<&str>) {
+    let file = stamp(profile);
     let written = file
         .parent()
         .map_or(Ok(()), fs::create_dir_all)
@@ -368,7 +387,6 @@ pub(crate) fn due(profile: Option<&str>) -> bool {
             file.display()
         );
     }
-    true
 }
 
 /// The new app, copied beside the running one, ready to take its place.
@@ -604,12 +622,32 @@ fn helper(
 }
 
 /// This run's arguments, for the new app to open with, but for the
-/// process serial number old macOS adds to a Finder launch.
+/// process serial number old macOS adds to a Finder launch. A relative
+/// path becomes absolute: `open` starts the app in `/`.
 fn launch_args() -> Vec<std::ffi::OsString> {
+    let cwd = std::env::current_dir().ok();
     std::env::args_os()
         .skip(1)
         .filter(|arg| !arg.to_string_lossy().starts_with("-psn_"))
+        .map(|arg| absolute(arg, cwd.as_deref()))
         .collect()
+}
+
+/// `arg` from `cwd` when it names a file or folder there by a relative
+/// path; anything else (a flag, a name, an absolute path) as it is.
+fn absolute(arg: std::ffi::OsString, cwd: Option<&Path>) -> std::ffi::OsString {
+    let path = Path::new(&arg);
+    match cwd {
+        Some(cwd) if path.is_relative() && !arg.to_string_lossy().starts_with('-') => {
+            let joined = cwd.join(path);
+            if joined.exists() {
+                joined.into_os_string()
+            } else {
+                arg
+            }
+        },
+        _ => arg,
+    }
 }
 
 fn ensure(dir: PathBuf) -> Result<PathBuf, String> {
@@ -619,7 +657,7 @@ fn ensure(dir: PathBuf) -> Result<PathBuf, String> {
 }
 
 fn download(url: &str, to: &Path) -> Result<(), String> {
-    let response = agent()
+    let response = agent(DOWNLOAD)
         .get(url)
         .call()
         .map_err(|error| format!("cannot download the update: {error}"))?;
@@ -634,7 +672,7 @@ fn download(url: &str, to: &Path) -> Result<(), String> {
 /// Checks `file` against its line in the release's `SHA256SUMS`.
 fn verify(sums: &str, name: &str, file: &Path) -> Result<(), String> {
     let mut text = String::new();
-    agent()
+    agent(ANSWER)
         .get(sums)
         .call()
         .map_err(|error| format!("cannot download SHA256SUMS: {error}"))?
@@ -874,6 +912,20 @@ mod tests {
         assert_eq!(team_in("Signature=adhoc\nTeamIdentifier=not set\n"), None);
         assert_eq!(team_in("TeamIdentifier=AB\"CD\" or 1\n"), None);
         assert_eq!(team_in("code object is not signed at all\n"), None);
+    }
+
+    #[test]
+    fn relative_paths_survive_the_relaunch() {
+        let dir = tempfile::tempdir().expect("a folder");
+        fs::create_dir(dir.path().join("user")).expect("user");
+        let cwd = Some(dir.path());
+        assert_eq!(
+            absolute("user".into(), cwd),
+            dir.path().join("user").into_os_string()
+        );
+        for kept in ["--profile", "notes", "/abs/user", "missing"] {
+            assert_eq!(absolute(kept.into(), cwd), std::ffi::OsString::from(kept));
+        }
     }
 
     #[test]
