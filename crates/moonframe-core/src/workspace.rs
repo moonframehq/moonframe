@@ -11,8 +11,8 @@
 
 use {
     crate::{
-        Action, Chrome, Command, Data, Error, Instance, InstanceOf, ListWindow, Node, Roots, Rules,
-        Stylesheet, WindowState,
+        APP, Action, Chrome, Command, Data, Error, Instance, InstanceOf, ListWindow, Node, Request,
+        Roots, Rules, Stylesheet, WindowState,
         component::{Component, Demo, Library},
         module::{AppData, Meta, Module, Reads},
         persist::{Persist, state_key},
@@ -70,6 +70,9 @@ pub struct Workspace {
     /// Messages for providers (`to = "provider:<name>"`), for the app to
     /// forward: providers run outside the workspace.
     outbox: Vec<(String, String, Data)>,
+    /// What modules asked of the app itself (`to = "app:<what>"`), with
+    /// who asked, for the app to carry out.
+    requests: Vec<(String, Request)>,
     /// Where state outlives the app; nothing is saved without it.
     persist: Option<Box<dyn Persist>>,
     /// The last value published on each topic (`to = "topic:<name>"`).
@@ -424,6 +427,7 @@ impl Workspace {
             host: BTreeMap::new(),
             host_problems: BTreeMap::new(),
             outbox: Vec::new(),
+            requests: Vec::new(),
             topics: persist
                 .as_ref()
                 .map(|persist| persist.topics())
@@ -722,6 +726,12 @@ impl Workspace {
         std::mem::take(&mut self.outbox)
     }
 
+    /// What modules asked of the app since the last call, as `(sending
+    /// module, request)`, in the order they asked.
+    pub fn take_requests(&mut self) -> Vec<(String, Request)> {
+        std::mem::take(&mut self.requests)
+    }
+
     pub fn set_dark(&mut self, dark: bool) {
         self.dark = dark;
         self.render();
@@ -988,6 +998,21 @@ impl Workspace {
             }
             if let Some(provider) = to.strip_prefix(PROVIDER) {
                 self.outbox.push((provider.to_owned(), from.clone(), msg));
+                continue;
+            }
+            if let Some(what) = to.strip_prefix(APP) {
+                // Modules ask; a provider's answer or a topic's news does not.
+                if from.starts_with(PROVIDER) || from.starts_with(TOPIC) {
+                    continue;
+                }
+                match Request::parse(what, &msg) {
+                    Ok(request) => self.requests.push((from, request)),
+                    Err(error) => {
+                        if let Some(slot) = self.slot_mut(&from) {
+                            slot.update_error = Some(error);
+                        }
+                    },
+                }
                 continue;
             }
             if let Some(topic) = to.strip_prefix(TOPIC) {

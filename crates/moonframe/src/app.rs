@@ -26,8 +26,8 @@ use {
         *,
     },
     moonframe_core::{
-        Action, Chrome, Command, Data, Error, Platform, Roots, SHELL, Stylesheet, Titlebar, Token,
-        WindowState, Workspace,
+        Action, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL, Stylesheet,
+        Titlebar, Token, WindowState, Workspace,
     },
     moonframe_mux::Backends,
     moonframe_providers::{Event, Natives, Providers},
@@ -210,7 +210,7 @@ impl MoonframeApp {
         };
         app.apply_theme(cx);
         // What the mods' `init` sent providers as they started.
-        app.forward("start");
+        app.forward("start", cx);
         // An installed app looks for updates by itself, once a day, also
         // while it stays open, whatever Developer Mode says; runs from
         // source and runs without the user's folder (checks, screenshots)
@@ -451,7 +451,7 @@ impl MoonframeApp {
 
     /// Passes on what the mods sent providers, and draws again.
     fn flush(&mut self, from: &str, cx: &mut Context<Self>) {
-        self.forward(from);
+        self.forward(from, cx);
         report(&self.workspace);
         cx.notify();
     }
@@ -493,7 +493,7 @@ impl MoonframeApp {
     /// sent providers: after a click, and after whatever else runs mods (a
     /// start, a reload, a provider's data), so a request from `init` or a
     /// topic is not left waiting for a click.
-    fn forward(&mut self, from: &str) {
+    fn forward(&mut self, from: &str, cx: &mut Context<Self>) {
         // What the views read and the mods hear now may want a provider
         // that hasn't started; one a message is for starts as it is sent.
         self.providers.want(self.workspace.wanted_providers());
@@ -502,12 +502,55 @@ impl MoonframeApp {
                 tracing::warn!("{from}: {problem}");
             }
         }
+        let requests = self.workspace.take_requests();
+        if !requests.is_empty() {
+            self.carry_out(requests, cx);
+        }
+    }
+
+    /// Does what mods asked of the app (`to = "app:<what>"`), once the
+    /// update that asked is done, in the main window: a command there
+    /// runs as a control's `command` would.
+    fn carry_out(&mut self, requests: Vec<(String, Request)>, cx: &mut Context<Self>) {
+        let main = self.main_window;
+        let app = cx.entity();
+        cx.defer(move |cx| {
+            let Some(window) = cx
+                .windows()
+                .into_iter()
+                .find(|window| window.window_id() == main)
+            else {
+                return;
+            };
+            let _ = window.update(cx, |_, window, cx| {
+                app.update(cx, |app, cx| {
+                    for (from, request) in requests {
+                        app.request(&from, request, window, cx);
+                    }
+                    app.flush("app", cx);
+                });
+            });
+        });
+    }
+
+    /// Does one thing the mod `from` asked of the app.
+    fn request(
+        &mut self,
+        from: &str,
+        request: Request,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match request {
+            Request::Command(Command::Inspect) => self.inspect_for(from, cx),
+            Request::Command(command) => self.run(command, window, cx),
+        }
     }
 
     fn reload(&mut self, cx: &mut Context<Self>) {
         crate::render::images::forget();
         self.workspace.reload();
-        self.forward("reload");
+        self.forward("reload", cx);
         let before = std::mem::replace(&mut self.asked, self.workspace.chrome());
         if self.asked != before && self.asked != self.chrome {
             tracing::warn!(
@@ -535,7 +578,7 @@ impl MoonframeApp {
         tracing::info!("packages changed: {roots}");
         crate::render::images::forget();
         self.workspace.set_roots(roots.clone());
-        self.forward("packages");
+        self.forward("packages", cx);
         self._watcher = watch(&self.workspace, &self.folders, cx)
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
@@ -1350,7 +1393,7 @@ fn start_providers(
                         // No view read it: the window looks the same.
                         let drawn = this.workspace.set_host(&provider, data);
                         // Mods that heard it may have asked a provider.
-                        this.forward(&provider);
+                        this.forward(&provider, cx);
                         if drawn > 0 {
                             // A view may fail on the new data: say so.
                             report(&this.workspace);

@@ -625,6 +625,31 @@ return mod {
 - Use a topic when several modules share a value; use `to = "<mod>"` when
   one module tells another.
 
+## Asking the app
+
+A module asks the app itself for something by sending to `app:<what>`,
+from `update` (or `init`) as a second result, or from a control's `msg`
+with `to`. No click is needed, so a command palette's Enter, a keyboard
+shortcut in `keys` or a provider's news can run what a button would.
+
+```lua
+update = function(state, msg)
+	if msg == "run" then
+		local row = state.rows[state.selected]
+		return state, { { to = "app:command", msg = row.command } }   -- "minimize"
+	end
+end,
+```
+
+- `app:command`, `msg` a command's name: runs it as a control's `command`
+  does, with the same commands (`quit` `reload` `toggle-theme`
+  `show-themes` `minimize` `maximize` `close-window` `check-for-updates`
+  `inspect`) and nothing else. It runs once the update that asked is done.
+- A request the app cannot read (an unknown command, a misspelled
+  `app:<what>`) is the sender's error, shown as an `update` error.
+- Previews (the Components window) ask nothing, and a provider's answer
+  cannot be passed off as a request.
+
 ## Tabs
 
 `tabbed { id = "main", start = "component:terminal" }` is a tab bar that
@@ -910,6 +935,8 @@ true` on a row or column matches `:selected` rules, for tabs and segments.
 **Actions:** `msg = <data>` calls `update(state, msg)` on the mod that drew the
 control. Add `to = "name"` to send it to another mod, or to `"shell"`.
 `command = "..."` runs an app command instead. Use one or the other, not both.
+To run a command from `update`, without a click, send it to the app:
+`{ to = "app:command", msg = "minimize" }` (see "Asking the app").
 A browser command also takes `browser = "<id>"` (and `to` for another mod's
 browser).
 

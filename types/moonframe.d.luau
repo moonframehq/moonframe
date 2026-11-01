@@ -1259,7 +1259,9 @@ type App = {
 	[string]: any,
 }
 
--- A message `update` sends on.
+-- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,
+-- `"provider:<name>"`, `"topic:<name>"`, or the app itself:
+-- `"app:command"` (`msg` a `Command`).
 type Send = {
 	to: string,
 	msg: Data,
