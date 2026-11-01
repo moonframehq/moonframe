@@ -27,18 +27,58 @@ type State = {
 	seen: number,
 	-- The main tab's title, from `tabs/main`: what they are looking at.
 	tab: string?,
+	-- The reply being written under the open conversation, and the
+	-- conversation a follow-up being started goes in.
+	reply: string,
+	following: string?,
+	-- From `app.acp`: our runs (newest first), the app folder agents
+	-- change, and this window's process, to screenshot.
+	runs: { any },
+	folder: string?,
+	pid: number?,
 }
 
--- How the agent should work on this app; the user's words follow.
-local INSTRUCTIONS = [[
-The user of the Moonframe app wrote this in the app's "Send feedback" dialog. Change the app so it does what they ask.
+-- How the agent checks its change in the user's window, the process `pid`.
+local function look(pid: number?): string
+	local shot = if pid
+		then `\`just screenshot target/feedback.png {pid}\` (the user's window, process {pid}, which reloaded with your change)`
+		else "`just screenshot target/feedback.png <pid of the user's window>`"
+	return `Then look at it: screenshot it with {shot}, read the picture, and check it shows what they asked for. Checks passing is not enough. If it does not, find out why, fix it, and look again, until it does or you know why it cannot.`
+end
+
+-- How the agent should work on the app in `folder` (from the repository
+-- agents work in: `app`, or an app package such as `examples/ledger`); the
+-- user's words follow.
+local function instructions(folder: string?, pid: number?, follow: boolean): string
+	local where, check
+	if folder == nil or folder == "app" or folder == "." then
+		where =
+			"The UI is Luau under app/ (or ~/.config/moonframe, laid out the same way), and the user's open window reloads as files change, so a change that passes the checks is live at once."
+		check = "Run `just check` and `just types` (or `moonframe --check <folder>` where there is no justfile) until they pass."
+	else
+		where = `The app is the package in {folder}: its moonframe.toml names it, main.luau is its shell, and its mods/, components/, providers/ and style.luau sit beside it; its README.md says what each part does, so read it first. It runs as a profile over the built-in app in app/, whose components and providers it uses: change {folder}, and app/ only for a component every app should share. The user's open window reloads as files change, so a change that passes the checks is live at once.`
+		check = `Check it as \`just check-examples\` does, until it passes: link it into a throwaway user folder (\`target/release/moonframe --user "$DIR" app link {folder} --yes\`, then \`target/release/moonframe --user "$DIR" --profile <its name> --check\`), and run \`just types {folder}\`. Build target/release/moonframe first only if it is missing or you changed Rust.`
+	end
+	return [[
+The user of this Moonframe app wrote this in the app's "Send feedback" dialog. Change the app so it does what they ask.
 
 How to work:
-- Read the moonframe skill (.claude/skills/moonframe/SKILL.md in the Moonframe repository) before changing anything. The UI is Luau under app/ (or ~/.config/moonframe, laid out the same way), and the user's open window reloads as files change, so a change that passes the checks is live at once.
+- Read the moonframe skill (.claude/skills/moonframe/SKILL.md in the Moonframe repository) before changing anything, and the moonframe-components catalogue before writing UI. ]] .. where .. [[
+
 - Keep the change to what they ask for.
-- Run `just check` and `just types` (or `moonframe --check <folder>` where there is no justfile) until they pass.
+- ]] .. check .. [[
+
+- ]] .. look(pid) .. [[
+
 - Do not commit, push, or stop the user's running app.
-- End with two or three plain sentences for the user: what you changed and where, or why you did not.]]
+- End with two or three plain sentences for the user: what you changed and where, and what you saw in the window; or why you did not.]]
+		.. if follow
+			then [[
+
+
+This continues a conversation: `conversation` in the context has the user's earlier requests and the answers given, oldest first, and their new words say what is still wrong. Do not trust the earlier answers: read the files as they are now and look at the window before changing anything.]]
+			else ""
+end
 
 -- Where the agent works, with the home folder as ~.
 local function short(path: string): string
@@ -93,6 +133,11 @@ return mod {
 			latest = seen,
 			seen = seen,
 			tab = nil,
+			reply = "",
+			following = nil,
+			runs = {},
+			folder = nil,
+			pid = nil,
 		}
 	end,
 
@@ -133,7 +178,10 @@ return mod {
 		elseif msg.topic == "tabs/main" then
 			state.tab = msg.value and msg.value.title
 		elseif msg.topic == "provider/acp" then
-			state.latest = newest(ours(msg.value))
+			state.runs = ours(msg.value)
+			state.folder = msg.value and msg.value.app
+			state.pid = msg.value and msg.value.pid
+			state.latest = newest(state.runs)
 			if state.open then
 				state.seen = state.latest
 			end
@@ -144,6 +192,49 @@ return mod {
 			state.picking = false
 		elseif msg.expand then
 			state.expanded = if state.expanded == msg.expand then nil else msg.expand
+			state.reply = ""
+		elseif msg.follow_type then
+			state.reply = msg.value or ""
+		elseif msg.forget_thread then
+			-- Each run of the conversation.
+			local sends = {}
+			for _, run in state.runs do
+				if run.id == msg.forget_thread or run.thread == msg.forget_thread then
+					table.insert(sends, { to = "provider:acp", msg = { forget = run.id } })
+				end
+			end
+			return state, sends
+		elseif msg.follow then
+			-- A follow-up in the conversation `msg.follow`, with what was said.
+			local text = msg.value or state.reply
+			if string.match(text or "", "^%s*$") then
+				return nil
+			end
+			local said = {}
+			for index = #state.runs, 1, -1 do
+				local run = state.runs[index]
+				if run.id == msg.follow or run.thread == msg.follow then
+					table.insert(said, { request = run.text, answer = run.message or run.error or run.status })
+				end
+			end
+			state.reply = ""
+			state.error = nil
+			state.following = msg.follow
+			return state,
+				{
+					{
+						to = "provider:acp",
+						msg = {
+							start = text,
+							id = "feedback",
+							thread = msg.follow,
+							agent = state.agent,
+							instructions = instructions(state.folder, state.pid, true),
+							context = { main_tab = state.tab, conversation = said },
+							permissions = "allow",
+						},
+					},
+				}
 		elseif msg.send then
 			-- The Send button can't read the field, so it carries no `value`;
 			-- ⌘↩ does.
@@ -167,15 +258,17 @@ return mod {
 							start = text,
 							id = "feedback",
 							agent = state.agent,
-							instructions = INSTRUCTIONS,
+							instructions = instructions(state.folder, state.pid, false),
 							context = context,
 							permissions = "allow",
 						},
 					},
 				}
 		elseif msg.reply == "feedback" and msg.action == "start" then
+			local following = state.following
+			state.following = nil
 			if msg.ok then
-				state.expanded = msg.run
+				state.expanded = following or msg.run
 			else
 				-- Back in the dialog, with why.
 				state.open = true
@@ -238,7 +331,7 @@ return mod {
 		elseif #options == 0 then
 			note = "No coding agent is installed here. Install one with an ACP mode (claude-agent-acp, codex-acp, gemini, opencode or copilot), or Node for npx."
 		else
-			note = `A background agent ({title}) in {short(acp.workdir)} implements it with every permission; your window reloads with the change, and it reports back under Feedback & fixes. It gets what you're looking at, your window and the build.`
+			note = `A background agent ({title}) in {short(acp.workdir)}{if acp.app and acp.app ~= "." then "/" .. acp.app else ""} implements it with every permission; your window reloads with the change, and it reports back under Feedback & fixes. It gets what you're looking at, your window and the build.`
 		end
 
 		local icon = if asking then "circle-alert" elseif running > 0 then "loader-circle" else "circle-help"
@@ -247,7 +340,9 @@ return mod {
 			-- The dialog is beside the button, not in it, so clicks in the
 			-- dialog never reach the button.
 			ui.row {
-				class = if asking then "tool feedback-asking" else "tool",
+				-- `feedback-button` lets an app reshape the button (a round one
+				-- in a round corner) without restyling every `tool`.
+				class = if asking then "tool feedback-button feedback-asking" else "tool feedback-button",
 				align = "center",
 				justify = "center",
 				msg = "open",
@@ -269,6 +364,8 @@ return mod {
 				error = state.error,
 				runs = runs,
 				expanded = state.expanded,
+				follow = true,
+				reply = state.reply,
 				actions = {
 					#options > 0 and dropdown {
 						label = "Agent",

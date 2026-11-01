@@ -311,6 +311,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         return crate::bundle::run(&args.folders, words);
     }
     let folders = args.folders;
+    paths::set_user_folder(folders.user.clone());
     if let Some(words) = &args.apps {
         let Some(user) = &folders.user else {
             eprintln!(

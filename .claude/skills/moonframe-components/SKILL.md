@@ -290,19 +290,21 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | `detach` | msg the chip's × sends |
 | `dismiss` | msg sent by Cancel, Escape or a backdrop click |
 | `error` | why the last send failed, shown above the buttons |
-| `expanded` | id of the run shown open, with `agent-run`; one waiting on an answer is always open |
+| `expanded` | id of the conversation shown open (its first run), each run with `agent-run`; one waiting on an answer is always open |
+| `follow` | show a box to reply in under the open conversation: Reply sends `{ follow = id }` (⌘↩ with `value`), each edit `{ follow_type = id, value }`; start the follow-up with `thread = id` |
 | `id` | keeps the text across renders (default "feedback") |
 | `inspect` | show an Inspect button that starts Inspect Element for the mod (`command = "inspect"`); the pick comes back on the topic `app/inspect` |
 | `note` | muted lines under the field: who acts on the feedback, and what goes with it |
 | `open` | show it |
 | `placeholder` | grey text while empty (default: two examples) |
-| `runs` | runs from `app.acp.runs` the mod started, newest first; a row sends `{ expand = id }`, its × `{ forget = id }` to `provider:acp` |
+| `reply` | the reply the mod has from `follow_type`; Reply is greyed out while it is blank |
+| `runs` | runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it) |
 | `send` | sent by Send and ⌘↩, with `value` set to the text from ⌘↩ |
 | `text` | the text the mod has from `change`; Send is greyed out while it is blank |
 | `to` | mod its own messages go to, if not the drawing one |
 | `value` | the text; set it to "" after sending to clear the field |
 
-**Styles:** `.feedback` `.feedback-action` `.feedback-action:hover` `.feedback-body` `.feedback-chip` `.feedback-chip-at` `.feedback-chip-element` `.feedback-detail` `.feedback-done` `.feedback-error` `.feedback-failed` `.feedback-heading` `.feedback-history` `.feedback-item` `.feedback-item-head` `.feedback-item-head:hover` `.feedback-muted` `.feedback-note` `.feedback-request` `.feedback-run` `.feedback-running` `.feedback-title` `.feedback-waiting`
+**Styles:** `.feedback` `.feedback-action` `.feedback-action:hover` `.feedback-body` `.feedback-chip` `.feedback-chip-at` `.feedback-chip-element` `.feedback-detail` `.feedback-done` `.feedback-error` `.feedback-failed` `.feedback-heading` `.feedback-history` `.feedback-item` `.feedback-item-head` `.feedback-item-head:hover` `.feedback-muted` `.feedback-note` `.feedback-reply` `.feedback-request` `.feedback-run` `.feedback-running` `.feedback-said` `.feedback-title` `.feedback-waiting`
 
 ```lua
 local feedback = use "feedback"

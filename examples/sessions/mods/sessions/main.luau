@@ -57,7 +57,7 @@ return mod {
 
 	styles = {
 		[".sessions-top"] = { padding = { 0, 10, 0, 10 }, gap = 2 },
-		[".sessions-list"] = { padding = { 4, 10 }, gap = 2 },
+		[".sessions-list"] = { padding = { 0, 10, 4, 10 }, gap = 2 },
 		[".sessions-group"] = { padding = { 14, 10, 6, 10 }, gap = 6 },
 		[".sessions-group-name"] = { weight = "medium", color = "muted-foreground" },
 		[".sessions-group-count"] = { color = "muted-foreground", size = "small" },
@@ -123,10 +123,12 @@ return mod {
 		end
 
 		local list = {}
-		for _, home in order do
+		for index, home in order do
 			local name, tag = heading(home)
 			table.insert(list, ui.row {
 				class = "sessions-group",
+				-- The first heading sits right under the top bar.
+				style = if index == 1 then { padding = { 0, 10, 6, 10 } } else nil,
 				align = "center",
 				tooltip = home,
 				ui.text { name, class = "sessions-group-name" },

@@ -35,6 +35,23 @@ check-examples:
     scripts/check-examples.sh target/release/moonframe target/release/host-example
     just types examples
 
+# Open the demo gallery (examples/demo): every example app as a picture; a
+# click opens one as a window of its own, any number at once, each with the
+# Send feedback `?` to have an agent fix it. Profiles go in a user folder of
+# their own (USER), so yours stays as it is.
+demo user="~/.local/share/moonframe/demo":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    user="{{user}}"
+    user="${user/#\~/$HOME}"
+    cargo build --quiet --release -p moonframe-app
+    bin=target/release/moonframe
+    if ! grep -qs "url = \"$PWD/examples/demo\"" "$user/profiles/demo/packages.toml"; then
+        "$bin" --user "$user" app remove demo --force >/dev/null 2>&1 || true
+        "$bin" --user "$user" app link examples/demo --yes >/dev/null
+    fi
+    exec "$bin" --user "$user" --profile demo
+
 # Build Moonframe.app (release binary, staged app, icon) in target/bundle.
 bundle out="target/bundle":
     scripts/bundle-app.sh {{out}}

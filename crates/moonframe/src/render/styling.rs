@@ -3,7 +3,13 @@
 
 use {
     crate::color::ThemeColor,
-    gpui_kit::{component::Theme, *},
+    gpui_kit::{
+        component::{
+            Theme,
+            scroll::{Scrollbar, ScrollbarAxis},
+        },
+        *,
+    },
     moonframe_core::{
         Align, Border, Corners, Direction, Font, Frame, Resolved, Scroll, Shadow, ShadowPreset,
         Sides, Space, Style, TextSize, Weight,
@@ -274,6 +280,35 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
             (Direction::Column, Scroll::Along) | (_, Scroll::Y) => element.overflow_y_scroll(),
             (_, Scroll::Both) => element.overflow_scroll(),
         }
+    }
+
+    /// A scrolling frame's scrollbars, shown while it scrolls and faded out
+    /// after, kept at `handle`. Add them after the children, to draw over
+    /// them. They hang from a box of no size where the content starts, so
+    /// they add nothing to what scrolls, and take the frame's bounds from
+    /// `handle`.
+    fn scrollbars(
+        self,
+        frame: &Frame,
+        direction: Direction,
+        handle: &ScrollHandle,
+        id: ElementId,
+    ) -> Self
+    where
+        Self: ParentElement,
+    {
+        let axis = match (direction, frame.scroll) {
+            (_, Scroll::No) => return self,
+            (Direction::Row, Scroll::Along) | (_, Scroll::X) => ScrollbarAxis::Horizontal,
+            (Direction::Column, Scroll::Along) | (_, Scroll::Y) => ScrollbarAxis::Vertical,
+            (_, Scroll::Both) => ScrollbarAxis::Both,
+        };
+        self.track_scroll(handle).child(
+            div()
+                .absolute()
+                .size_0()
+                .child(Scrollbar::new(handle).id(id).axis(axis)),
+        )
     }
 }
 

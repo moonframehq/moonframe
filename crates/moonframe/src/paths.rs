@@ -126,6 +126,19 @@ fn private() -> PathBuf {
         .clone()
 }
 
+static USER_FOLDER: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+
+/// Records the user's folder this run uses (`--user`, or the default; none
+/// with `--no-user`), for what starts other runs of the app.
+pub(crate) fn set_user_folder(folder: Option<PathBuf>) {
+    let _ = USER_FOLDER.set(folder.map(|folder| std::path::absolute(&folder).unwrap_or(folder)));
+}
+
+/// The user's folder this run uses, once [`set_user_folder`] said.
+pub(crate) fn user_folder() -> Option<PathBuf> {
+    USER_FOLDER.get().cloned().flatten()
+}
+
 /// `$XDG_CONFIG_HOME/<name>`, by default `~/.config/<name>`: the user's
 /// mods, providers, and stylesheet.
 pub(crate) fn user() -> Option<PathBuf> {

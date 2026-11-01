@@ -4,6 +4,8 @@
 
 -- The menus after the app menu (About, Quit); "View" merges into the
 -- host's. A typed local, so items with `msg` and `command` mix.
+local icon_button = use "icon-button"
+
 local MENUS: { { title: string, items: { any } } } = {
 	{ title = "File", items = {
 		{ label = "New Shell", msg = "new", to = "agent", shortcut = "secondary-t" },
@@ -50,13 +52,25 @@ return mod {
 	end,
 
 	view = function(state)
-		return ui.hsplit {
+		local body = ui.hsplit {
 			id = "body",
 			-- The cards meet with no line; a handle shows on hover.
 			divider = false,
 			ui.pane { size = 560, min = 320, class = "card-pane", ui.region "left" },
 			ui.pane { min = 320, visible = state.editor, class = "card-pane", ui.region "main" },
 			ui.pane { size = 340, min = 240, max = 560, fixed = true, visible = state.right, class = "side", ui.region "right" },
+			-- With the files hidden, a slim strip at the right edge brings them back.
+			ui.pane {
+				size = 44,
+				min = 44,
+				max = 44,
+				fixed = true,
+				visible = not state.right,
+				class = "side-rail",
+				ui.column { drag = true, grow = true, icon_button { icon = "panel-right", tooltip = "Show files", msg = "toggle-right" } },
+			},
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

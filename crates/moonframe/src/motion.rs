@@ -248,7 +248,7 @@ impl Motion {
         self.sizes.remove(key);
     }
 
-    /// Where the list at `path` is scrolled.
+    /// Where the list or scrolling frame at `path` is scrolled.
     pub(crate) fn scroll(&mut self, path: &str) -> ScrollHandle {
         self.scrolls.entry(path.to_owned()).or_default().clone()
     }

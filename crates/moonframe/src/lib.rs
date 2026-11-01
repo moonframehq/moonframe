@@ -31,6 +31,7 @@ mod build;
 mod bundle;
 mod cli;
 mod color;
+mod demos;
 mod dock;
 mod embed;
 mod gallery;

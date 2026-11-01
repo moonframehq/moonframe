@@ -1110,6 +1110,9 @@ type AcpRun = {
 	agent_title: string,
 	-- The user's words.
 	text: string,
+	-- The run it follows up (`thread` in its start): the first of a
+	-- conversation.
+	thread: string?,
 	-- "starting", "running", "waiting" (a question for the user), "done",
 	-- "failed", "cancelled" or "stopped" (the app quit while it ran).
 	status: string,
@@ -1136,6 +1139,11 @@ type Acp = {
 	agent: string,
 	-- The folder agents work in.
 	workdir: string,
+	-- The app folder they change, from `workdir` (`app`, `examples/ledger`),
+	-- when it is inside it.
+	app: string?,
+	-- This app's process: an agent screenshots the window with it.
+	pid: number,
 	running: number,
 	-- Newest first, at most 30.
 	runs: { AcpRun },

@@ -1,0 +1,16 @@
+# The example apps beside this one, and which are open; opens and closes
+# them for the gallery mod, each as a window of its own. A native provider:
+# Rust built into the app (crates/moonframe/src/demos.rs). It links each app
+# as a profile in the user's folder this run uses and runs it on this same
+# binary, with your access.
+interval = 1
+kind     = "native"
+
+[settings]
+# The mods that may open and close apps.
+openers = ["gallery"]
+# Where the apps are, from this app's folder (default: the folder holding
+# it), and their screenshots, <name>.png (default: docs/screenshots/apps
+# in the repository); an app without one shows its icon.
+# apps = ".."
+# pictures = "../../docs/screenshots/apps"

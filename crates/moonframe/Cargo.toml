@@ -53,7 +53,7 @@ tempfile.workspace = true
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
 block2.workspace           = true
 objc2.workspace            = true
-objc2-app-kit              = { features = ["NSEvent", "NSView", "NSWindow", "block2"], workspace = true }
+objc2-app-kit              = { features = ["NSEvent", "NSRunningApplication", "NSView", "NSWindow", "block2"], workspace = true }
 objc2-foundation.workspace = true
 objc2-web-kit.workspace    = true
 

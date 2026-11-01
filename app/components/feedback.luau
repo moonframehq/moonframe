@@ -1,9 +1,11 @@
 -- A "Send feedback" dialog: a text area for what should change, a note on
 -- who acts on it, the mod's own controls (an agent picker), Cancel and Send,
 -- and under them what came of earlier requests ("Feedback & fixes"): agent
--- runs from `app.acp`, each opening into `agent-run`. Stateless: the host
--- keeps the text, the mod keeps `open`, the text from `change` and which
--- run is open, and sends the request on.
+-- runs from `app.acp`, each request with its follow-ups (runs whose `thread`
+-- is its id) as one conversation that opens into `agent-run`s and a box to
+-- reply in. Stateless: the host keeps the text, the mod keeps `open`, the
+-- text from `change`, the reply and which conversation is open, and sends
+-- the requests on.
 local agent_run = use "agent-run"
 
 type Props = {
@@ -20,8 +22,13 @@ type Props = {
 	send: any,
 	-- Runs from `app.acp.runs`, newest first.
 	runs: { any }?,
-	-- The run shown open.
+	-- The conversation shown open: its first run's id.
 	expanded: string?,
+	-- A box under an open conversation to reply in: sends `{ follow = id }`
+	-- with the first run's id (and `value` from ⌘↩), and `{ follow_type =
+	-- id, value }` on each edit; `reply` is the text the mod has.
+	follow: boolean?,
+	reply: string?,
 	-- Elements on the footer's left (an agent picker).
 	actions: { any }?,
 	-- An Inspect button: the app's Inspect Element, for the mod to attach
@@ -72,35 +79,98 @@ local function detail(run: any): string
 	return `{status.label} · {run.agent_title}`
 end
 
-local function row(run: any, open: boolean, to: string?): any
+-- Runs (newest first) as conversations, newest first: each request with
+-- its follow-ups after it, oldest first. A follow-up whose request was
+-- forgotten stands on its own.
+local function conversations(runs: { any }): { { any } }
+	local by: { [string]: { any } } = {}
+	local order: { { any } } = {}
+	for _, run in runs do
+		if run.thread == nil then
+			by[run.id] = { run }
+			table.insert(order, by[run.id])
+		end
+	end
+	for index = #runs, 1, -1 do
+		local run = runs[index]
+		if run.thread ~= nil and by[run.thread] then
+			table.insert(by[run.thread], run)
+		end
+	end
+	for _, run in runs do
+		if run.thread ~= nil and not by[run.thread] then
+			table.insert(order, { run })
+		end
+	end
+	return order
+end
+
+-- One conversation: the request's row, opening into each run (the user's
+-- words above every follow-up) and a box to reply in.
+local function conversation(turns: { any }, open: boolean, props: Props): any
+	local first, run = turns[1], turns[#turns]
+	local to = props.to
 	local status = STATUS[run.status] or STATUS.stopped
 	local going = run.status == "starting" or run.status == "running" or run.status == "waiting"
+	local body = {}
+	if open then
+		for index, turn in turns do
+			if index > 1 then
+				table.insert(body, ui.text { turn.text, class = "feedback-said", wrap = true })
+			end
+			local latest = turn == run
+			table.insert(body, agent_run { run = turn, lines = if latest then 10 else 4, tools = if latest then 6 else 3 })
+		end
+		local blank = string.match(props.reply or "", "^%s*$") ~= nil
+		if props.follow and not going then
+			table.insert(body, ui.row {
+				class = "feedback-reply",
+				align = "end",
+				ui.input {
+					id = "feedback-reply-" .. first.id,
+					value = props.reply,
+					placeholder = "Not quite? Tell the agent what is still wrong…",
+					multiline = true,
+					rows = 2,
+					grow = true,
+					change = { follow_type = first.id },
+					submit = not blank and { follow = first.id } or nil,
+					to = to,
+				},
+				ui.button { "Reply", variant = "primary", msg = { follow = first.id }, to = to, disabled = blank },
+			})
+		end
+	end
 	return ui.column {
-		key = "run-" .. run.id,
+		key = "run-" .. first.id,
 		class = "feedback-item",
 		gap = "small",
 		ui.row {
 			class = "feedback-item-head",
 			align = "start",
-			msg = { expand = run.id },
+			msg = { expand = first.id },
 			to = to,
 			ui.icon { name = status.icon :: any, class = status.class, spin = status.spin },
 			ui.column {
 				grow = true,
 				gap = "none",
-				ui.text { first_line(run.text), class = "feedback-request", truncate = true, tooltip = run.text },
-				not open and ui.text { detail(run), class = "feedback-detail", truncate = true },
+				ui.text { first_line(first.text), class = "feedback-request", truncate = true, tooltip = first.text },
+				not open and ui.text {
+					if #turns > 1 then `{#turns} turns · {detail(run)}` else detail(run),
+					class = "feedback-detail",
+					truncate = true,
+				},
 			},
 			not going and ui.row {
 				class = "feedback-action",
-				msg = { forget = run.id },
-				to = "provider:acp",
+				msg = { forget_thread = first.id },
+				to = to,
 				tooltip = "Remove",
 				ui.icon "close",
 			},
 			ui.icon { name = if open then "chevron-down" else "chevron-right", class = "feedback-muted" },
 		},
-		open and ui.column { class = "feedback-run", agent_run { run = run, lines = 10, tools = 6 } },
+		open and ui.column { class = "feedback-run", gap = "normal", table.unpack(body) },
 	}
 end
 
@@ -121,8 +191,10 @@ return component {
 		["error"] = "why the last send failed, shown above the buttons",
 		["change"] = "sent on each edit, with `value` set to the text",
 		["send"] = "sent by Send and ⌘↩, with `value` set to the text from ⌘↩",
-		["runs"] = "runs from `app.acp.runs` the mod started, newest first; a row sends `{ expand = id }`, its × `{ forget = id }` to `provider:acp`",
-		["expanded"] = "id of the run shown open, with `agent-run`; one waiting on an answer is always open",
+		["runs"] = "runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it)",
+		["expanded"] = "id of the conversation shown open (its first run), each run with `agent-run`; one waiting on an answer is always open",
+		["follow"] = "show a box to reply in under the open conversation: Reply sends `{ follow = id }` (⌘↩ with `value`), each edit `{ follow_type = id, value }`; start the follow-up with `thread = id`",
+		["reply"] = "the reply the mod has from `follow_type`; Reply is greyed out while it is blank",
 		["actions"] = "elements on the footer's left, such as an agent `dropdown`",
 		["inspect"] = "show an Inspect button that starts Inspect Element for the mod (`command = \"inspect\"`); the pick comes back on the topic `app/inspect`",
 		["attached"] = "the element attached to the request, `{ element, at }`, shown as a chip",
@@ -152,6 +224,8 @@ return component {
 		[".feedback-item-head:hover"] = { background = "list-hover" },
 		[".feedback-run"] = { padding = { 0, 8, 8, 34 } },
 		[".feedback-request"] = { weight = "medium" },
+		[".feedback-said"] = { padding = { 6, 10 }, radius = 8, background = "accent/8", size = "small" },
+		[".feedback-reply"] = { gap = 8 },
 		[".feedback-detail"] = { size = "small", color = "muted-foreground" },
 		[".feedback-running"] = { color = "accent" },
 		[".feedback-waiting"] = { color = "warning" },
@@ -173,13 +247,15 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 		inspect = true,
 		attached = { element = 'text.status-text "⎇ main +29"', at = "/code/moonframe/app/mods/status/main.luau:33" },
 		note = "A background agent (Claude) in ~/code/moonframe implements it with every permission, then reports back under Feedback & fixes. It gets what you're looking at, your window and the build.",
-		expanded = "2",
+		expanded = "1",
+		follow = true,
 		runs = ({
 			{
 				id = "2",
+				thread = "1",
 				agent = "claude",
 				agent_title = "Claude",
-				text = "Make the status bar taller",
+				text = "It is still the same height in my window",
 				status = "running",
 				started = 0,
 				tool_count = 2,
@@ -192,12 +268,12 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 				id = "1",
 				agent = "claude",
 				agent_title = "Claude",
-				text = "Focus the prompt when I open a session",
+				text = "Make the status bar taller",
 				status = "done",
 				started = 0,
 				finished = 140,
 				tool_count = 5,
-				message = "New terminal tabs take focus now: app/mods/editor/main.luau passes focus to the terminal it opens.",
+				message = "The status bar is 28px tall now, in app/main.luau.",
 			},
 		} :: { any }),
 	},
@@ -206,9 +282,9 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 		local blank = string.match(props.text or "", "^%s*$") ~= nil
 		local runs: { any } = props.runs or {}
 		local rows = {}
-		for _, run in runs do
-			local open = run.id == props.expanded or run.status == "waiting"
-			table.insert(rows, row(run, open, props.to))
+		for _, turns in conversations(runs) do
+			local open = turns[1].id == props.expanded or turns[#turns].status == "waiting"
+			table.insert(rows, conversation(turns, open, props))
 		end
 		-- The mod's controls on the left, Cancel and Send on the right.
 		local footer: { [any]: any } = { gap = "normal", align = "center" }

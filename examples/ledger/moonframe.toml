@@ -1,7 +1,7 @@
 [app]
 # A fund-operations overview: cash against the floor for 13 weeks, what is
 # waiting on you, the current raise, and the funds. Sample data.
-keep     = []
+keep     = ["feedback"]
 name     = "ledger"
 requires = []
 title    = "Ledger"

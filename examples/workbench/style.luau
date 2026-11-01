@@ -16,6 +16,8 @@ return style {
 	rules = {
 		pane = { transition = "slide-fade normal ease-out" },
 		[".side"] = { background = "background" },
+		-- Lines its button up with the card headers' icons.
+		[".side-rail"] = { background = "background", padding = { 22, 7, 0, 7 } },
 		[".card-pane"] = { background = "background", padding = { 10, 0, 10, 10 } },
 		[".card"] = {
 			background = "card",

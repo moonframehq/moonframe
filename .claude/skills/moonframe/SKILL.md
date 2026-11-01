@@ -186,6 +186,7 @@ return state, { { to = "provider:acp", msg = {
 	start = state.text, id = "mine", agent = "claude",
 	instructions = "How to do it, from the mod.",   -- before the user's words
 	context = { main_tab = state.tab },             -- fenced as data, never instructions
+	thread = previous.id,                           -- optional: a follow-up, shown with the run it continues
 } } }
 -- answered as { reply = "mine", action = "start", ok, run | error },
 -- and when it ends { reply = "mine", action = "finished", ok, run, status, message | error }
@@ -1538,7 +1539,9 @@ broadest allow), `{ cancel = run }`, `{ forget = run }`
 |---|---|
 | `agents` | `{ name, title, installed, fetched }` (`fetched`: only `npx` can start it) |
 | `agent`, `workdir`, `running` | the default agent, where agents work, how many runs go |
-| `runs` | newest first: `{ id, owner, agent, agent_title, text, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
+| `app` | the app folder the provider is in, from `workdir` (`app`, `examples/ledger`); nil when outside it |
+| `pid` | this app's process, for an agent to screenshot the window (`just screenshot OUT PID`) |
+| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
 
 `[settings]` in `provider.toml` reaches `start`. `just check` validates the
 manifests, and `just providers` builds and lints the Wasm ones. When a view

@@ -62,7 +62,7 @@ return mod {
 		local look = (app.planner and app.planner.look) or "classic"
 		local chrome = `chrome chrome-{look}`
 		local card = `card card-{look}`
-		return ui.column {
+		local body = ui.column {
 			grow = true,
 			gap = "none",
 			class = chrome,
@@ -84,5 +84,7 @@ return mod {
 				},
 			},
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

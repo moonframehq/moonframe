@@ -34,11 +34,13 @@ return mod {
 	end,
 
 	view = function(state)
-		return ui.hsplit {
+		local body = ui.hsplit {
 			id = "body",
 			divider = false,
 			ui.pane { size = 290, min = 230, max = 380, fixed = true, visible = state.left, class = "frame", ui.region "left" },
 			ui.pane { class = { "frame", "sheet-pane" }, ui.column { class = "sheet", grow = true, ui.region "main" } },
 		}
+		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
+		return ui.column { grow = true, body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
 	end,
 }

@@ -77,6 +77,9 @@ pub struct Acp {
     default_agent: String,
     /// Where agents work.
     cwd: PathBuf,
+    /// The app folder this provider is in, from `cwd` (`app`,
+    /// `examples/ledger`), when agents work around it.
+    app: Option<String>,
     /// The folders agents are looked for in.
     path: OsString,
     /// Commands replacing an agent's own (`[settings] commands`), by name.
@@ -125,6 +128,7 @@ impl Native for Acp {
             settings.get("cwd").and_then(Value::as_str),
             home.as_deref(),
         );
+        self.app = app_folder(host.dir(), &self.cwd);
         let state = std::env::var_os("XDG_STATE_HOME")
             .map(PathBuf::from)
             .or_else(|| home.as_ref().map(|home| home.join(".local/state")));
@@ -283,6 +287,10 @@ impl Acp {
                 request: message.get("id").cloned().unwrap_or(Value::Null),
                 agent,
                 text: words.to_owned(),
+                thread: message
+                    .get("thread")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
                 prompt,
                 allow: message.get("permissions").and_then(Value::as_str) == Some("allow"),
                 cwd: self.cwd.clone(),
@@ -391,6 +399,9 @@ impl Acp {
             "agents": self.agents,
             "agent": self.default_agent,
             "workdir": self.cwd,
+            "app": self.app,
+            // The window's process, for an agent to screenshot its work.
+            "pid": std::process::id(),
             "running": running,
             "runs": runs,
         });
@@ -508,6 +519,21 @@ fn workdir(dir: &Path, setting: Option<&str>, home: Option<&Path>) -> PathBuf {
         .or_else(|| home.map(|home| home.join(".config")))
         .unwrap_or_default();
     config.join("moonframe")
+}
+
+/// The app folder holding the provider folder `dir`, from `cwd`; none when
+/// it is not inside `cwd`.
+fn app_folder(dir: &Path, cwd: &Path) -> Option<String> {
+    let app = dir.join("..").join("..");
+    let app = std::path::absolute(&app).unwrap_or(app);
+    let app = app.canonicalize().ok()?;
+    let cwd = cwd.canonicalize().ok()?;
+    let rest = app.strip_prefix(&cwd).ok()?;
+    Some(if rest.as_os_str().is_empty() {
+        ".".to_owned()
+    } else {
+        rest.to_string_lossy().into_owned()
+    })
 }
 
 /// Keeps the newest runs, never dropping one that is going.

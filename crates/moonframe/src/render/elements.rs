@@ -69,7 +69,13 @@ impl<'w> Draw<'w> for Stack {
         } else {
             element
         };
-        let element = element.children(children);
+        let handle = painter.motion.scroll(&place.path);
+        let element = element.children(children).scrollbars(
+            &self.frame,
+            self.direction,
+            &handle,
+            place.part("scrollbar").id(),
+        );
         // Hugging only says something across a column.
         let element = if self.frame.hug
             && self.frame.self_align.is_none()
@@ -231,8 +237,10 @@ impl<'w> Draw<'w> for Panel {
                 .child(title)
                 .children(actions)
         });
+        let body_place = place.part("body");
+        let handle = painter.motion.scroll(&body_place.path);
         let body = div()
-            .id(place.part("body").id())
+            .id(body_place.id())
             .flex()
             .flex_1()
             .min_h_0()
@@ -242,7 +250,13 @@ impl<'w> Draw<'w> for Panel {
                 Direction::Column,
                 (Space::Normal, Space::Normal),
             )
-            .children(children);
+            .children(children)
+            .scrollbars(
+                &self.frame,
+                Direction::Column,
+                &handle,
+                body_place.part("scrollbar").id(),
+            );
         // Padding and gap belong to the body, under the header.
         let mut outer = look.clone();
         outer.base.padding = Sides::default();
@@ -385,7 +399,14 @@ impl<'w> Draw<'w> for Split {
                 {
                     body = body.opacity(amount);
                 }
-                group.child(panel.child(body.children(children)))
+                let handle = painter.motion.scroll(&place.path);
+                let body = body.children(children).scrollbars(
+                    &pane.frame,
+                    Direction::Column,
+                    &handle,
+                    place.part("scrollbar").id(),
+                );
+                group.child(panel.child(body))
             });
         div()
             .flex()
