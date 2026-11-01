@@ -10,6 +10,7 @@ use {
         style::Edges,
     },
     mlua::{Table, Value},
+    std::collections::{BTreeMap, BTreeSet},
 };
 
 const MAX_DEPTH: usize = 48;
@@ -33,17 +34,33 @@ const FRAME: &[&str] = &[
     "max_height",
     "float",
 ];
-const LOOK: &[&str] = &["class", "style"];
+const LOOK: &[&str] = &["class", "style", "state"];
 const ACTION: &[&str] = &["msg", "to", "command", "browser", "window"];
 const EXTRAS: &[&str] = &["tooltip", "context", "copy"];
+/// What elements without a click take of [`EXTRAS`]: the same, and the
+/// `to` a `context` message goes to.
+const ATTACHED: &[&str] = &["tooltip", "context", "copy", "to"];
 
 /// Reads a whole tree; `sheet` resolves the color names in `style` keys.
 /// Reads a view. A broken child becomes a [`Node::Problem`] in its place,
 /// so one mistake marks one spot and the rest of the view still draws; its
 /// error is returned alongside. The root, and the limits on size and depth,
 /// still fail the whole view.
-pub(crate) fn read(value: &Value, sheet: &Stylesheet) -> Result<(Node, Vec<Error>), Error> {
-    let mut tree = Tree::default();
+///
+/// `windows` says which rows of each `ui.list` to build, by its `id`; a
+/// list not in it builds its first rows.
+pub(crate) fn read(
+    value: &Value,
+    sheet: &Stylesheet,
+    windows: &BTreeMap<String, ListWindow>,
+) -> Result<(Node, Vec<Error>), Error> {
+    let mut tree = Tree {
+        nodes: 0,
+        problems: Vec::new(),
+        halted: false,
+        windows,
+        lists: BTreeSet::new(),
+    };
     let node = tree.node(value, &Cx::root(sheet.names()))?;
     Ok((node, tree.problems))
 }
@@ -54,20 +71,23 @@ trait Build: Sized {
     /// Whether its list part holds child elements.
     const CHILDREN: bool = false;
 
-    fn build(kind: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error>;
+    fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error>;
 }
 
 /// The reader's state across a tree: how many elements it has read, and
 /// the children it could not.
-#[derive(Default)]
-struct Tree {
+struct Tree<'w> {
     nodes: usize,
     problems: Vec<Error>,
     /// Past a limit: the whole view fails rather than marking a spot.
     halted: bool,
+    /// The rows of each list to build, by id.
+    windows: &'w BTreeMap<String, ListWindow>,
+    /// The ids of the lists read so far, which must differ.
+    lists: BTreeSet<String>,
 }
 
-impl Tree {
+impl Tree<'_> {
     fn node(&mut self, value: &Value, cx: &Cx) -> Result<Node, Error> {
         self.count(cx)?;
         let table = match value {
@@ -103,6 +123,7 @@ impl Tree {
             Element::Instance => Node::Instance(self.build(kind, table, &cx)?),
             Element::Popover => Node::Popover(self.build(kind, table, &cx)?),
             Element::Overlay => Node::Overlay(self.build(kind, table, &cx)?),
+            Element::List => Node::List(self.build(kind, table, &cx)?),
         })
     }
 
@@ -167,7 +188,7 @@ impl Build for Stack {
         "align", "justify", "wrap", "selected", "drag", "key",
     ]];
 
-    fn build(kind: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
+    fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             look: Look::from_fields(fields)?,
             direction: match kind {
@@ -192,7 +213,7 @@ impl Build for Panel {
     const CHILDREN: bool = true;
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, FRAME, LOOK, &["title", "actions"]];
 
-    fn build(_: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             look: Look::from_fields(fields)?,
             title: fields.get("title")?,
@@ -207,7 +228,7 @@ impl Build for Split {
     const CHILDREN: bool = true;
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["id"]];
 
-    fn build(kind: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
+    fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let panes = fields
             .items()
             .iter()
@@ -243,10 +264,10 @@ fn kind_of(table: &Table) -> Option<Element> {
 impl Build for Pane {
     const CHILDREN: bool = true;
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "size", "min", "max", "fixed", "visible", "gap", "padding", "surface", "scroll",
+        "size", "min", "max", "fixed", "visible", "lazy", "gap", "padding", "surface", "scroll",
     ]];
 
-    fn build(_: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let size = fields.number("size", PIXELS)?;
         let fixed = fields.get("fixed")?.unwrap_or(false);
         if fixed && size.is_none() {
@@ -259,6 +280,7 @@ impl Build for Pane {
             max: fields.number("max", PIXELS)?,
             fixed,
             visible: fields.get("visible")?.unwrap_or(true),
+            lazy: fields.get("lazy")?.unwrap_or(false),
             frame: Frame::from_fields(fields)?,
             children: tree.children(fields)?,
         })
@@ -266,11 +288,11 @@ impl Build for Pane {
 }
 
 impl Build for Text {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ATTACHED, &[
         "text", "tone", "size", "weight", "truncate", "lines", "wrap",
     ]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             look: Look::from_fields(fields)?,
             text: fields.need("text")?,
@@ -282,6 +304,7 @@ impl Build for Text {
                 .number("lines", 1.0..=100.0)?
                 .map(|lines| lines as u8),
             wrap: fields.get("wrap")?.unwrap_or(true),
+            extras: Extras::from_fields(fields)?,
         })
     }
 }
@@ -291,7 +314,7 @@ impl Build for Button {
         "label", "icon", "variant", "small", "disabled",
     ]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         let icon = fields.get("icon")?;
         let label = match icon {
             Some(_) => fields.get("label")?.unwrap_or_default(),
@@ -315,7 +338,7 @@ impl Build for Item {
         "label", "detail", "badge", "selected",
     ]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             look: Look::from_fields(fields)?,
             label: fields.need("label")?,
@@ -329,43 +352,46 @@ impl Build for Item {
 }
 
 impl Build for Badge {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &["text", "tone"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ATTACHED, &["text", "tone"]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             look: Look::from_fields(fields)?,
             text: fields.need("text")?,
             tone: fields.get("tone")?,
+            extras: Extras::from_fields(fields)?,
         })
     }
 }
 
 impl Build for Icon {
     const KEYS: &'static [&'static [&'static str]] =
-        &[TYPE, LOOK, &["name", "tone", "size", "spin"]];
+        &[TYPE, LOOK, ATTACHED, &["name", "tone", "size", "spin"]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             look: Look::from_fields(fields)?,
             name: fields.need("name")?,
             tone: fields.get("tone")?,
             size: fields.get("size")?,
             spin: fields.get("spin")?.unwrap_or(false),
+            extras: Extras::from_fields(fields)?,
         })
     }
 }
 
 impl Build for Image {
     const KEYS: &'static [&'static [&'static str]] =
-        &[TYPE, LOOK, &["src", "width", "height", "fit"]];
+        &[TYPE, LOOK, ATTACHED, &["src", "width", "height", "fit"]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             look: Look::from_fields(fields)?,
             src: fields.need::<ImageSrc>("src")?.0,
             width: fields.number("width", PIXELS)?,
             height: fields.number("height", PIXELS)?,
             fit: fields.get("fit")?.unwrap_or(Fit::Contain),
+            extras: Extras::from_fields(fields)?,
         })
     }
 }
@@ -402,7 +428,7 @@ impl Read for ImageSrc {
 impl Build for Terminal {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &["id", "cwd", "engine"]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             look: Look::from_fields(fields)?,
             id: fields
@@ -492,7 +518,7 @@ impl Build for Browser {
     const KEYS: &'static [&'static [&'static str]] =
         &[TYPE, LOOK, &["id", "url", "zoom", "navigate", "loading"]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             look: Look::from_fields(fields)?,
             id: fields
@@ -573,7 +599,7 @@ impl Build for Input {
         "grow",
     ]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         let multiline = fields.get("multiline")?.unwrap_or(false);
         let rows = fields.get::<f32>("rows")?;
         if rows.is_some() && !multiline {
@@ -687,7 +713,7 @@ impl Build for Region {
     const KEYS: &'static [&'static [&'static str]] =
         &[TYPE, &["name", "direction", "gap", "justify"]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             name: fields.need("name")?,
             direction: fields.get("direction")?.unwrap_or(Direction::Column),
@@ -703,7 +729,7 @@ impl Build for Popover {
         "open", "dismiss", "to", "side", "align", "gap", "width", "keys", "content",
     ]];
 
-    fn build(_: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let content = content(fields)?;
         Ok(Self {
             look: Look::from_fields(fields)?,
@@ -726,7 +752,7 @@ impl Build for Overlay {
         "open", "dismiss", "to", "place", "backdrop", "width", "height", "keys", "content",
     ]];
 
-    fn build(_: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let content = content(fields)?;
         Ok(Self {
             look: Look::from_fields(fields)?,
@@ -742,6 +768,73 @@ impl Build for Overlay {
         })
     }
 }
+
+impl Build for List {
+    const KEYS: &'static [&'static [&'static str]] =
+        &[TYPE, FRAME, LOOK, &["id", "count", "row_height", "row"]];
+
+    fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
+        let id = fields
+            .get::<PlainId>("id")?
+            .map_or_else(|| "list".to_owned(), |id| id.0);
+        if !tree.lists.insert(id.clone()) {
+            return Err(fields
+                .cx()
+                .key("id")
+                .fail(format!("two lists with the id `{id}`; give each its own")));
+        }
+        let count = fields.need::<i64>("count")?;
+        let count = usize::try_from(count)
+            .ok()
+            .filter(|count| *count <= MAX_ROWS)
+            .ok_or_else(|| {
+                fields
+                    .cx()
+                    .key("count")
+                    .fail(format!("expected 0 to {MAX_ROWS} rows"))
+            })?;
+        let row_height = fields
+            .number("row_height", 1.0..=10_000.0)?
+            .ok_or_else(|| {
+                fields
+                    .cx()
+                    .key("row_height")
+                    .fail("missing: each row's height in pixels")
+            })?;
+        let row: mlua::Function = fields.need("row")?;
+        let window = tree.windows.get(&id).copied().unwrap_or(ListWindow::FIRST);
+        let range = window.range(count);
+        let cx = fields.cx().key("row");
+        let mut rows = Vec::with_capacity(range.len());
+        for index in range.clone() {
+            // Rows count from 1 in Lua.
+            let value = row
+                .call::<Value>(index + 1)
+                .map_err(|error| Error::from(error).context(format!("row({})", index + 1)))?;
+            let cx = cx.index(index + 1);
+            match tree.node(&value, &cx) {
+                Ok(node) => rows.push(node),
+                Err(error) if tree.halted => return Err(error),
+                Err(error) => {
+                    rows.push(Node::Problem(error.to_string()));
+                    tree.problems.push(error);
+                },
+            }
+        }
+        Ok(Self {
+            look: Look::from_fields(fields)?,
+            frame: Frame::from_fields(fields)?,
+            id,
+            count,
+            row_height,
+            start: range.start,
+            rows,
+        })
+    }
+}
+
+/// The most rows a list may have; it builds only those that show.
+const MAX_ROWS: usize = 10_000_000;
 
 /// The element a popover or overlay floats.
 fn content<'f>(fields: &'f Fields) -> Result<&'f Value, Error> {
@@ -761,7 +854,7 @@ enum Mount {
 impl Build for Mount {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["mod", "id", "props"]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         let name: String = fields.need("mod")?;
         // A mod's name is its folder's, never a path: an instance loads
         // `mods/<name>/main.luau`.
@@ -791,7 +884,7 @@ impl Build for Mount {
 impl Build for Instance {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["component", "id", "props"]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
             of: InstanceOf::Component(fields.need("component")?),
             id: fields.need::<PlainId>("id")?.0,
@@ -827,7 +920,7 @@ struct Bare;
 impl Build for Bare {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE];
 
-    fn build(_: Element, _: &Fields, _: &mut Tree) -> Result<Self, Error> {
+    fn build(_: Element, _: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self)
     }
 }
@@ -930,11 +1023,46 @@ impl Extras {
     }
 }
 
-/// `float = { top = -4, right = -4 }`: pixels from the parent's edges.
+/// Where `float = "<at>"` pins an element: the edges it is held to.
+const FLOAT_AT: &[(&str, [bool; 4])] = &[
+    // top, right, bottom, left
+    ("top-left", [true, false, false, true]),
+    ("top-right", [true, true, false, false]),
+    ("bottom-left", [false, false, true, true]),
+    ("bottom-right", [false, true, true, false]),
+    ("top", [true, true, false, true]),
+    ("bottom", [false, true, true, true]),
+    ("left", [true, false, true, true]),
+    ("right", [true, true, true, false]),
+    ("fill", [true, true, true, true]),
+];
+
+/// `float = { top = -4, right = -4 }`: pixels from the parent's edges. Or
+/// pinned to an edge or corner, `float = "top-right"`, and set in from it,
+/// `float = { at = "top-right", inset = 4 }`.
 impl Read for Offsets {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
-        let fields = Fields::read(value, cx, &[&["top", "right", "bottom", "left"]])?;
-        let edge = |key| fields.number(key, -100_000.0..=100_000.0);
+        const RANGE: std::ops::RangeInclusive<f32> = -100_000.0..=100_000.0;
+        if let Value::String(_) = value {
+            return pinned(&String::read(value, cx)?, 0.0, cx);
+        }
+        let fields = Fields::read(value, cx, &[&[
+            "top", "right", "bottom", "left", "at", "inset",
+        ]])?;
+        if let Some(at) = fields.get::<String>("at")? {
+            let edges = ["top", "right", "bottom", "left"];
+            if let Some(edge) = edges.iter().find(|edge| fields.raw(edge).is_some()) {
+                return Err(cx
+                    .key(edge)
+                    .fail("give `at` and `inset`, or the edges, not both"));
+            }
+            let inset = fields.number("inset", RANGE)?.unwrap_or(0.0);
+            return pinned(&at, inset, &cx.key("at"));
+        }
+        if fields.raw("inset").is_some() {
+            return Err(cx.key("inset").fail("`inset` goes with `at`"));
+        }
+        let edge = |key| fields.number(key, RANGE);
         Ok(Self {
             top: edge("top")?,
             right: edge("right")?,
@@ -942,6 +1070,26 @@ impl Read for Offsets {
             left: edge("left")?,
         })
     }
+}
+
+/// The offsets that hold an element `inset` pixels in from the edges `at`
+/// names.
+fn pinned(at: &str, inset: f32, cx: &Cx) -> Result<Offsets, Error> {
+    let Some((_, [top, right, bottom, left])) = FLOAT_AT.iter().find(|(name, _)| *name == at)
+    else {
+        let names: Vec<&str> = FLOAT_AT.iter().map(|(name, _)| *name).collect();
+        return Err(cx.fail(format!(
+            "`{at}` is not a place; use {}, or {{ top, right, bottom, left }}",
+            names.join(", ")
+        )));
+    };
+    let edge = |held: &bool| held.then_some(inset);
+    Ok(Offsets {
+        top: edge(top),
+        right: edge(right),
+        bottom: edge(bottom),
+        left: edge(left),
+    })
 }
 
 /// `scroll = true` (along the axis), or `"x"`, `"y"`, `"both"`.

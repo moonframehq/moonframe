@@ -102,6 +102,7 @@ tokens! {
         Overlay = "overlay",
         /// What dims the window behind an overlay with `backdrop = true`.
         OverlayBackdrop = "overlay-backdrop",
+        List = "list",
     }
 }
 
@@ -256,8 +257,13 @@ pub struct Style {
     /// Letter case of a `ui.text`: section headings in capitals.
     pub case: Option<Case>,
     pub opacity: Option<f32>,
-    /// How a pane, popover or overlay animates when it shows or hides, and
-    /// how a keyed row or column arrives and goes.
+    /// Width and height in pixels, under the element's own `width` and
+    /// `height`: what a named state can change, as QML states do.
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+    /// How a pane, popover or overlay animates when it shows or hides, how
+    /// a keyed row or column arrives and goes, and how an element with a
+    /// `state` moves from one state's look to the next.
     pub transition: Option<Transition>,
 }
 
@@ -284,6 +290,8 @@ impl Style {
             font,
             case,
             opacity,
+            width,
+            height,
             transition
         );
         self.padding.layer(&over.padding);
@@ -366,6 +374,10 @@ impl Corners {
 pub struct Look {
     pub class: Vec<String>,
     pub style: Style,
+    /// The state of the view's own naming it is in, which `:<state>` rules
+    /// match: `state = "open"` takes `.drawer:open`. With a `transition`,
+    /// a change of state moves between the two looks.
+    pub state: Option<String>,
     /// The line of the module's source that built the element, for the
     /// inspector to point at.
     pub line: Option<u32>,
@@ -444,7 +456,24 @@ impl Default for Names {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Selector {
     base: Base,
-    state: Option<State>,
+    state: Option<Pseudo>,
+}
+
+/// A selector's state: one the app knows (`hover`), or one a view names
+/// and puts an element in with `state`.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Pseudo {
+    Known(State),
+    Named(String),
+}
+
+impl Pseudo {
+    fn name(&self) -> &str {
+        match self {
+            Self::Known(state) => state.name(),
+            Self::Named(name) => name,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -467,7 +496,7 @@ impl Rules {
                     Base::Part(part) => part.name().to_owned(),
                     Base::Class(class) => format!(".{class}"),
                 };
-                match selector.state {
+                match &selector.state {
                     Some(state) => format!("{base}:{}", state.name()),
                     None => base,
                 }
@@ -485,7 +514,14 @@ impl Rules {
     fn get(&self, base: &Base, state: Option<State>) -> Option<&Style> {
         self.0.get(&Selector {
             base: base.clone(),
-            state,
+            state: state.map(Pseudo::Known),
+        })
+    }
+
+    fn get_named(&self, base: &Base, state: &str) -> Option<&Style> {
+        self.0.get(&Selector {
+            base: base.clone(),
+            state: Some(Pseudo::Named(state.to_owned())),
         })
     }
 }
@@ -529,8 +565,9 @@ impl Stylesheet {
     }
 
     /// The style for a `part` with `look` in `states`. At each selector the
-    /// states layer over its resting rule (`selected`, then `focus`, then
-    /// `disabled`); a disabled element has no hover.
+    /// states layer over its resting rule (`selected`, then the look's own
+    /// named `state`, then `focus`, then `disabled`); a disabled element has
+    /// no hover.
     pub fn resolve_in(&self, part: Part, look: &Look, states: States, local: &Rules) -> Resolved {
         let mut resolved = Resolved::default();
         let bases =
@@ -545,8 +582,15 @@ impl Stylesheet {
                 if let Some(style) = rules.get(&base, None) {
                     resolved.base.layer(style);
                 }
-                for (on, state) in active {
+                for (index, (on, state)) in active.into_iter().enumerate() {
                     if on && let Some(style) = rules.get(&base, Some(state)) {
+                        resolved.base.layer(style);
+                    }
+                    // A named state goes after `selected`.
+                    if index == 0
+                        && let Some(named) = &look.state
+                        && let Some(style) = rules.get_named(&base, named)
+                    {
                         resolved.base.layer(style);
                     }
                 }
