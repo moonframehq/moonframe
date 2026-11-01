@@ -62,6 +62,10 @@ pub(crate) struct Terminals {
     /// The terminals refused for being over a limit, warned of once: they
     /// are asked for again every frame.
     refused: HashSet<String>,
+    /// What to type into a terminal as it starts, by its element `id`: a
+    /// command line `moonframe pane new` asked for. The app sets it, never
+    /// Luau, so a mod still picks where a terminal starts but not what runs.
+    typed: HashMap<String, Vec<u8>>,
 }
 
 impl Terminals {
@@ -76,6 +80,7 @@ impl Terminals {
             appeared: None,
             in_main_frame: false,
             refused: HashSet::new(),
+            typed: HashMap::new(),
         }
     }
 
@@ -106,6 +111,12 @@ impl Terminals {
             session.set_palette(self.palette);
         }
         (session, backend)
+    }
+
+    /// Types `bytes` into the terminal drawn with the element id `id` once
+    /// it starts and its shell is ready for a line.
+    pub(crate) fn type_on_start(&mut self, id: &str, bytes: Vec<u8>) {
+        self.typed.insert(id.to_owned(), bytes);
     }
 
     /// The terminal at `key`, started now if it is new.
@@ -167,6 +178,10 @@ impl Terminals {
         if !refused {
             self.refused.remove(key);
             self.views.insert(key.to_owned(), view.clone());
+            let id = key.rsplit_once('/').map_or(key, |(_, id)| id);
+            if let (Ok(session), Some(bytes)) = (&view.session, self.typed.remove(id)) {
+                session.type_when_ready(bytes);
+            }
         }
         view
     }

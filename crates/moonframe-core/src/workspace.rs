@@ -940,6 +940,16 @@ impl Workspace {
         }
     }
 
+    /// Whether any module hears the topic `name`, such as a tab bar
+    /// `tabs/main/open`.
+    pub fn hears(&self, name: &str) -> bool {
+        self.listeners().any(|(_, slot)| {
+            slot.module
+                .as_ref()
+                .is_some_and(|module| module.subscribes(name))
+        })
+    }
+
     /// Delivers `msg` to the module `to`, then whatever it sends on, and
     /// draws every module again.
     pub fn send(&mut self, from: &str, to: &str, msg: Data) {

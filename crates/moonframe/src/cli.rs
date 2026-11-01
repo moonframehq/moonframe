@@ -35,6 +35,9 @@ Usage: moonframe [OPTIONS] [DIR]
        moonframe init [DIR] [--name NAME] [--path CHECKOUT]
                                          start an app of your own on the Moonframe
                                          library, or add one to a crate; see `init help`
+       moonframe [--profile NAME] pane new [--agent NAME] [--cwd DIR] [PROMPT...]
+                                         open a terminal tab in the running window,
+                                         with an agent in it; see `pane help`
        moonframe bundle [--dist DIR] [OUT]
                                          build this app's bundle (for apps on the
                                          library; the starter's is `just bundle`)
@@ -87,6 +90,8 @@ struct Args {
     init: Option<Vec<String>>,
     /// The words after `bundle`, to bundle an app on the library.
     bundle: Option<Vec<String>>,
+    /// The words after `pane`, for the running window.
+    panes: Option<Vec<String>>,
 }
 
 fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>, String> {
@@ -102,6 +107,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
     let mut apps = None;
     let mut init = None;
     let mut bundle = None;
+    let mut panes = None;
     let mut profile = None;
     let mut args = std::env::args().skip(1).collect::<Vec<_>>().into_iter();
     while let Some(arg) = args.next() {
@@ -132,6 +138,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
             },
             "init" if builtin.is_none() => init = Some(args.by_ref().collect()),
             "bundle" if builtin.is_none() => bundle = Some(args.by_ref().collect()),
+            "pane" | "panes" if builtin.is_none() => panes = Some(args.by_ref().collect()),
             // `app` is also the app folder's usual name (`moonframe app`),
             // so it is the command only before one of its words.
             "app" | "apps" if builtin.is_none() => {
@@ -181,6 +188,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
         apps,
         init,
         bundle,
+        panes,
     }))
 }
 
@@ -350,6 +358,9 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
             app = paths::name(),
         );
         return ExitCode::from(2);
+    }
+    if let Some(words) = &args.panes {
+        return crate::panes::run(folders.profile.as_deref(), &folders.title(), words);
     }
     if let Some(words) = &args.packages {
         let Some(own) = folders.own() else {

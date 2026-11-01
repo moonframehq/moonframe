@@ -11,7 +11,7 @@
 -- draws the content from that topic with `tab-view`; what the content reports
 -- comes back on `tabs/<id>/report`.
 -- Another mod opens a tab by publishing on `tabs/<id>/open`
--- { n, kind, props, title }: a tab of that kind showing the same `path` is
+-- { n, kind, props, title, id? }: a tab of that kind showing the same `path` is
 -- selected instead of opened twice. `n` numbers the requests, so one heard
 -- again (as a topic is, when the bar loads) opens nothing.
 
@@ -90,6 +90,12 @@ local function open_asked(state: State, props: Props, asked: any)
 	local tab = state.tabs[#state.tabs]
 	tab.props = table.clone(wanted)
 	tab.title = asked.title
+	-- The id it asked for, when no tab has it: what the app gives a tab
+	-- `moonframe pane new` opens, to know its terminal.
+	if type(asked.id) == "string" and asked.id ~= "" and not find(state.tabs, "id", asked.id) then
+		tab.id = asked.id
+		state.selected = asked.id
+	end
 	return true
 end
 

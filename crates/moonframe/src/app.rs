@@ -211,6 +211,27 @@ impl MoonframeApp {
         app.apply_theme(cx);
         // What the mods' `init` sent providers as they started.
         app.forward("start");
+        // Tabs `moonframe pane new` asks for, also those left for this
+        // window before it opened. Runs without the user's folder (checks,
+        // screenshots) take none.
+        if app.folders.user.is_some() {
+            let inbox = crate::panes::inbox(app.folders.profile.as_deref());
+            cx.spawn(async move |this, cx| {
+                loop {
+                    let requests = crate::panes::take(&inbox);
+                    let open = this.update(cx, |app, cx| {
+                        for request in requests {
+                            app.open_pane(request, cx);
+                        }
+                    });
+                    if open.is_err() {
+                        break;
+                    }
+                    cx.background_executor().timer(crate::panes::POLL).await;
+                }
+            })
+            .detach();
+        }
         // An installed app looks for updates by itself, once a day, also
         // while it stays open, whatever Developer Mode says; runs from
         // source and runs without the user's folder (checks, screenshots)
@@ -781,6 +802,56 @@ impl MoonframeApp {
             text = format!("{text}: {description}");
         }
         self.show_toast_text(text.into(), cx);
+    }
+
+    /// Opens the tab `request` asks for in the main tab bar: a terminal in
+    /// its folder (the window's own user folder by default), with the
+    /// agent's command typed into it.
+    fn open_pane(&mut self, request: crate::panes::Request, cx: &mut Context<Self>) {
+        const OPEN: &str = "tabs/main/open";
+        if !self.workspace.hears(OPEN) {
+            tracing::warn!(
+                "pane new: this app's shell has no main tab bar (`tabbed {{ id = \"main\" }}`)"
+            );
+            self.show_toast("This app has no main tab bar to open a pane in", cx);
+            return;
+        }
+        // Unique, and above any number the editor gave a request.
+        let n = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| {
+                i64::try_from(since.as_millis()).unwrap_or(i64::MAX)
+            });
+        let id = format!("pane-{n}");
+        if let Some(bytes) = request.typed() {
+            self.terminals.type_on_start(&id, bytes);
+        }
+        let mut props = Vec::new();
+        if let Some(cwd) = request.cwd.clone().or_else(|| self.folders.own()) {
+            props.push(("cwd", Data::from(cwd.to_string_lossy().into_owned())));
+        }
+        // The tab's id names its terminal (`<mod>/<tab id>`), so the
+        // command goes to that one.
+        let mut asked = vec![
+            ("n", Data::from(n)),
+            ("id", Data::from(id.as_str())),
+            ("kind", Data::from("component:terminal")),
+            ("props", Data::map(props)),
+        ];
+        if let Some(title) = request.title() {
+            asked.push(("title", Data::from(title)));
+        }
+        let from = SHELL;
+        self.workspace.send(
+            from,
+            &format!("{}{OPEN}", moonframe_core::TOPIC),
+            Data::map(asked),
+        );
+        self.flush(from, cx);
+        // Brought forward, to watch the agent; not when opened behind others.
+        if !crate::background() {
+            cx.activate(true);
+        }
     }
 
     /// Shows `message` at the bottom for a moment.

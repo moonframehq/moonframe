@@ -206,6 +206,26 @@
   .copy code { flex:1; min-width:0; background:none; color:inherit; padding:0; white-space:pre-wrap; overflow-wrap:anywhere; user-select:all }
   .copy span { font:600 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:#f2b33d; padding:4px 8px; border-radius:3px }
   .copy:hover span { background:#ffffff14 }
+  .gs-brew { margin-top:36px; border:2px solid var(--ink); display:flex; justify-content:space-between; align-items:center; padding:18px 24px; gap:24px; font:16px var(--sans) }
+  .gs-brew b { font:500 22px var(--serif) } .gs-brew p { font-size:14px; color:var(--dim) }
+  .gs-brew .copy { width:auto; flex-shrink:0 }
+  .gs-or { text-align:center; font:italic 18px var(--serif); color:var(--dim); margin:26px 0 0 }
+  .gs-cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; margin-top:22px }
+  .gs-card { text-align:left; border:1px solid #2a1a1033; background:#fffaf0; border-radius:6px; padding:20px 22px; cursor:pointer; font:inherit; color:inherit; position:relative; transition:border-color .15s, box-shadow .15s }
+  .gs-card:hover { border-color:var(--ink) }
+  .gs-card.on { border-color:var(--acc-hi); box-shadow:0 0 0 2px var(--acc-hi), 0 18px 40px -24px #2a1a1066 }
+  .gs-card .q { font:italic 16px var(--serif); color:var(--dim) }
+  .gs-card b { display:block; font:500 24px/1.2 var(--serif); margin:6px 0 8px }
+  .gs-card p { font:14px/1.5 var(--sans); color:var(--ink2) }
+  .gs-card .n { position:absolute; top:16px; right:18px; font:600 12px var(--mono); color:var(--acc) }
+  .gs-path { display:none; margin-top:34px } .gs-path.on { display:block }
+  .gs-path > h3 { font:400 36px/1.1 var(--serif) } .gs-path > h3 i { color:var(--acc-hi) }
+  .steps li.gs-wide { grid-template-columns:44px minmax(0, 1fr); align-items:start }
+  .gs-pair { grid-column:2; display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:14px; margin-top:4px }
+  .gs-code { background:var(--ink); color:var(--paper); border-radius:3px; min-width:0 }
+  .gs-code header { display:flex; justify-content:space-between; align-items:center; padding:8px 10px 8px 16px; border-bottom:1px solid #ffffff14; font:600 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:#d8c8ad }
+  .gs-code button { font:inherit; text-transform:inherit; letter-spacing:inherit; color:#f2b33d; background:none; border:0; padding:4px 8px; border-radius:3px; cursor:pointer } .gs-code button:hover { background:#ffffff14 }
+  .gs-code pre { font:12.5px/1.7 var(--mono); padding:12px 16px 14px; overflow-x:auto }
   .needs { margin-top:18px; font:14px var(--sans); color:var(--dim) }
   .needs a { color:var(--acc); text-decoration:underline; text-underline-offset:2px }
 
@@ -243,6 +263,7 @@
     .cols { columns:1 }
     .installbar { flex-direction:column; align-items:flex-start } .installbar pre { white-space:pre-wrap; word-break:break-all; font-size:13px }
     .pull { font-size:28px; padding:40px 0 }
+    .gs-brew { flex-direction:column; align-items:stretch } .gs-cards, .gs-pair { grid-template-columns:1fr } .gs-pair { grid-column:1 / -1 }
     .steps li { grid-template-columns:32px minmax(0, 1fr); gap:10px 12px } .steps .copy { grid-column:2 }
     footer { grid-template-columns:1fr 1fr }
     .lb { padding:56px 10px 20px } .lb .prev, .lb .next { top:auto; bottom:14px } .lb-cap { flex-direction:column; text-align:center; gap:6px } .lb .lb-cmd { max-width:100%; text-align:left } .lb-cmd code { white-space:normal; word-break:break-all }
@@ -382,14 +403,111 @@ just install   # into /Applications</pre></div>
 
   <div class="getstarted" id="get-started">
     <p class="kicker">Get started</p>
-    <h2>Four commands <i>to a running window.</i></h2>
-    <ol class="steps">
+    <h2>Where are you <i>starting from?</i></h2>
+
+    <div class="gs-brew">
+      <div><b>The app, in one line</b><p>Moonframe.app in /Applications and the <code>moonframe</code> command. macOS 13 or later; Linux and Windows on the <a href="https://github.com/penso/moonframe/releases">releases page</a>.</p></div>
+      <button class="copy" title="Copy the command"><code>brew install penso/tap/moonframe</code><span>Copy</span></button>
+    </div>
+
+    <p class="gs-or">or build with it</p>
+
+    <div class="gs-cards">
+      <button class="gs-card" data-p="app"><span class="n">I</span><span class="q">“I installed it.”</span><b>Make the app yours</b><p>Ask an agent to change anything in <code>~/.config/moonframe</code>; add mods and whole apps.</p></button>
+      <button class="gs-card on" data-p="new"><span class="n">II</span><span class="q">“I'm starting fresh.”</span><b>Build a new app</b><p>Clone the starter and rename it. Everything is yours to change.</p></button>
+      <button class="gs-card" data-p="lib"><span class="n">III</span><span class="q">“I have a Rust project.”</span><b>Give it a Moonframe window</b><p>Depend on the crate; your Rust becomes providers and views.</p></button>
+    </div>
+
+    <div class="gs-path" data-p="app">
+      <h3>Make the app <i>yours.</i></h3>
+      <ol class="steps">
+      <li><span class="num">I</span><div><h3>Open it</h3><p>Turn on <b>Developer Mode</b> in the app menu for Inspect Element, Components and reloads.</p></div><button class="copy" title="Copy the command"><code>open -a Moonframe</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Ask an agent to change it</h3><p>It opens in a tab of the window, in your folder; you watch it work as the window changes. Updates never touch your folder.</p></div><button class="copy" title="Copy the command"><code>moonframe pane new --agent claude "add a clock to the status bar"</code><span>Copy</span></button></li>
+      <li><span class="num">III</span><div><h3>Add a mod from git</h3><p>Source only, so you can read it first.</p></div><button class="copy" title="Copy the command"><code>moonframe mod install owner/repo</code><span>Copy</span></button></li>
+      <li><span class="num">IV</span><div><h3>Or a whole app</h3><p>Runs beside the starter as its own profile.</p></div><button class="copy" title="Copy the command"><code>moonframe app install owner/some-app</code><span>Copy</span></button></li>
+      </ol>
+      <p class="needs">The app offers to copy its skills into your folder, so the agent knows how to build in it. More on <a href="https://github.com/penso/moonframe#working-with-an-agent">working with an agent</a>, <a href="https://github.com/penso/moonframe#mods-from-git">mods from git</a> and <a href="https://github.com/penso/moonframe#whole-apps-as-profiles">apps as profiles</a>.</p>
+    </div>
+
+    <div class="gs-path on" data-p="new">
+      <h3>Four commands <i>to a running window.</i></h3>
+      <ol class="steps">
       <li><span class="num">I</span><div><h3>Clone the starter</h3><p>Name the folder after your app.</p></div><button class="copy" title="Copy the command"><code>git clone https://github.com/penso/moonframe my-app</code><span>Copy</span></button></li>
       <li><span class="num">II</span><div><h3>Step inside</h3><p>Everything else runs from here.</p></div><button class="copy" title="Copy the command"><code>cd my-app</code><span>Copy</span></button></li>
       <li><span class="num">III</span><div><h3>Install the toolchain</h3><p>mise fetches Rust, and Zig for the Ghostty terminal.</p></div><button class="copy" title="Copy the command"><code>mise install</code><span>Copy</span></button></li>
-      <li><span class="num">IV</span><div><h3>Open the window</h3><p>Then edit <code>app/style.luau</code> and save, or ask your agent.</p></div><button class="copy" title="Copy the command"><code>just run</code><span>Copy</span></button></li>
-    </ol>
-    <p class="needs">You need <a href="https://rustup.rs">rustup</a>, <a href="https://github.com/casey/just">just</a> and <a href="https://mise.jdx.dev">mise</a>. Developed on macOS; CI builds Linux and Windows too. More in the <a href="https://github.com/penso/moonframe#quick-start">quick start</a>.</p>
+      <li><span class="num">IV</span><div><h3>Open the window</h3><p>Then ask your agent for anything; the window changes as it saves.</p></div><button class="copy" title="Copy the command"><code>just run</code><span>Copy</span></button></li>
+      </ol>
+      <p class="needs">You need <a href="https://rustup.rs">rustup</a>, <a href="https://github.com/casey/just">just</a> and <a href="https://mise.jdx.dev">mise</a>. Developed on macOS; CI builds Linux and Windows too. More in the <a href="https://github.com/penso/moonframe#quick-start">quick start</a>.</p>
+    </div>
+
+    <div class="gs-path" data-p="lib">
+      <h3>Your crate, <i>Moonframe's window.</i></h3>
+      <ol class="steps">
+      <li><span class="num">I</span><div><h3>Write the app folder</h3><p>From your crate's root: <code>app/</code>, Luau types and the agent skills. It never touches <code>Cargo.toml</code> or <code>src/</code>.</p></div><button class="copy" title="Copy the command"><code>moonframe init . --name my-app</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Depend on it</h3><p>Also add the <code>opt-level = 2</code> lines <code>init</code> printed: GPUI and Luau are slow unoptimised. <code>Cargo.lock</code> pins the commit.</p></div><button class="copy" title="Copy the command"><code>cargo add moonframe --git https://github.com/penso/moonframe</code><span>Copy</span></button></li>
+      <li class="gs-wide"><span class="num">III</span><div><h3>Hand it main, last</h3><p>Your own setup first, then end <code>main</code> with Moonframe. Your Rust publishes data as providers, plain or <code>async</code> on tokio, and Luau draws it.</p></div>
+        <div class="gs-pair">
+          <div class="gs-code"><header>Sync<button>Copy</button></header><pre>use moonframe::{Data, Handle, Moonframe, Native};
+
+#[derive(Default)]
+struct Vault { unread: i64 }
+
+impl Native for Vault {
+    // Every `interval` seconds of its provider.toml.
+    fn tick(&amp;mut self, host: &amp;Handle) {
+        host.publish(Data::map([("unread", self.unread.into())]));
+    }
+
+    // A mod sent { to = "provider:vault", msg = ... }.
+    fn receive(&amp;mut self, host: &amp;Handle, _from: &amp;str, msg: Data) {}
+}
+
+fn main() -&gt; std::process::ExitCode {
+    // 1. Your own setup first: logging, config, flags.
+
+    // 2. Moonframe last: run() holds the main thread
+    //    until the window closes.
+    Moonframe::new("my-app")
+        .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
+        .native("vault", Vault::default)
+        .run()
+}</pre></div>
+          <div class="gs-code"><header>Async, on tokio<button>Copy</button></header><pre>use moonframe::{AsyncNative, Data, Handle, Moonframe};
+
+#[derive(Default)]
+struct Weather { client: reqwest::Client }
+
+impl AsyncNative for Weather {
+    async fn tick(&amp;mut self, host: &amp;Handle) {
+        match self.client.get(URL).send().await {
+            Ok(reply) =&gt; {
+                let json = reply.json().await.unwrap_or_default();
+                host.publish_json(&amp;json);
+            },
+            Err(error) =&gt; host.fail(error.to_string()),
+        }
+    }
+
+    // And async fn receive, as in the sync one.
+}
+
+// run() takes the multi-thread runtime it is called in.
+#[tokio::main]
+async fn main() -&gt; std::process::ExitCode {
+    // 1. Your own setup first: pools, clients, on tokio.
+
+    // 2. Moonframe last. Views await tokio work
+    //    with moonframe::on_runtime.
+    Moonframe::new("my-app")
+        .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
+        .native_async("weather", Weather::default)
+        .run()
+}</pre></div>
+        </div></li>
+      <li><span class="num">IV</span><div><h3>Run it</h3><p>Edit <code>app/</code> while it runs; it reloads live.</p></div><button class="copy" title="Copy the command"><code>cargo run</code><span>Copy</span></button></li>
+      </ol>
+      <p class="needs">See it done in <a href="https://github.com/penso/msgvault-moonframe">msgvault-moonframe</a>, a mail archive reader on the library. More in <a href="https://github.com/penso/moonframe/blob/main/docs/library.md">the library guide</a>.</p>
+    </div>
   </div>
 
   <footer>
@@ -519,7 +637,19 @@ cmd.onclick = async () => {
   catch { getSelection().selectAllChildren(cmd.firstElementChild); }
 };
 // Copy buttons on the get started steps.
-document.querySelectorAll(".steps .copy").forEach(b => b.onclick = async () => {
+// The paths: the card picked shows its steps.
+const gsCards = document.querySelectorAll(".gs-card");
+gsCards.forEach(c => c.onclick = () => {
+  gsCards.forEach(x => x.classList.toggle("on", x === c));
+  document.querySelectorAll(".gs-path").forEach(p => p.classList.toggle("on", p.dataset.p === c.dataset.p));
+});
+// Copy buttons on the code panels.
+document.querySelectorAll(".gs-code button").forEach(b => b.onclick = async () => {
+  const pre = b.closest(".gs-code").querySelector("pre");
+  try { await navigator.clipboard.writeText(pre.textContent); b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1600); }
+  catch { getSelection().selectAllChildren(pre); }
+});
+document.querySelectorAll(".steps .copy, .gs-brew .copy").forEach(b => b.onclick = async () => {
   const label = b.lastElementChild;
   try { await navigator.clipboard.writeText(b.firstElementChild.textContent); label.textContent = "Copied"; setTimeout(() => label.textContent = "Copy", 1600); }
   catch { getSelection().selectAllChildren(b.firstElementChild); }
