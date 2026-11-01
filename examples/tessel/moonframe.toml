@@ -1,0 +1,8 @@
+[app]
+# An agents hub: your agents as pixel-icon cards or a table, the hub's runs
+# with their steps, and a workflow to fix a failed one. Sample data.
+# `moonframe --profile tessel` opens it.
+keep     = []
+name     = "tessel"
+requires = []
+title    = "Tessel"

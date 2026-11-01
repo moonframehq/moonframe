@@ -1,0 +1,177 @@
+{
+  "user": { "name": "Nora Vale", "plan": "Enterprise", "color": "#2f9e8f" },
+  "people": {
+    "me": { "name": "me", "color": "#2f9e8f" },
+    "tobias": { "name": "Tobias", "color": "#8a6f5c" },
+    "ilse": { "name": "Ilse", "color": "#475569" },
+    "tessel": { "name": "Tessel", "color": "#f2542d", "official": true }
+  },
+  "projects": [
+    { "id": "design", "label": "Design", "icon": "folder" },
+    { "id": "travel", "label": "Travel Planning", "icon": "folder" },
+    { "id": "starred", "label": "Starred Chats", "icon": "star" }
+  ],
+  "agent_chats": [
+    { "id": "ac1", "agent": "offer", "label": "Offer for the design lead" },
+    { "id": "ac2", "agent": "onboarding", "label": "Week one for Sami" },
+    { "id": "ac3", "agent": "contract", "label": "Printing vendor terms" }
+  ],
+  "chats": [
+    { "id": "c1", "label": "Lisbon trip ideas" },
+    { "id": "c2", "label": "Expense claims assistant" },
+    { "id": "c3", "label": "Clarify the brief" },
+    { "id": "c4", "label": "Kyoto trip schedule" },
+    { "id": "c5", "label": "Library search" },
+    { "id": "c6", "label": "New chat" },
+    { "id": "c7", "label": "go" },
+    { "id": "c8", "label": "Best onboarding screens on mobile" },
+    { "id": "c9", "label": "Quiet keyboards under 100" }
+  ],
+  "agents": [
+    {
+      "id": "offer", "mine": true, "name": "Offer Letter Generator",
+      "description": "Pulls templates from Google Drive", "used": "12m", "used_min": 12,
+      "owner": "me", "tag": "HR",
+      "icon": { "colors": ["#eceef1", "#17171d", "#25d0e0", "#f0428f"],
+        "pattern": ["0111", "1222", "1213", "1222", "0111", "0013", "0111", "1111"] },
+      "stats": [2, 5, 2, 1, 1]
+    },
+    {
+      "id": "onboarding", "mine": true, "name": "Onboarding Buddy",
+      "description": "Coordinate onboarding tasks for new hires", "used": "45m", "used_min": 45,
+      "owner": "me", "tag": "Eng",
+      "icon": { "colors": ["#6fd3e6", "#f7f7fa", "#c9a7e8"],
+        "pattern": ["0011", "0122", "0011", "0002", "0011", "0002", "0022", "0111"] },
+      "stats": [1, 6, 1, 1, 0]
+    },
+    {
+      "id": "contract", "mine": true, "name": "Contract Review",
+      "description": "Review vendor contracts", "used": "1h", "used_min": 60,
+      "owner": "me", "tag": "HR",
+      "icon": { "colors": ["#ffd21f", "#3a1d6e", "#ff5aa5"],
+        "pattern": ["1001", "0110", "1021", "0111", "1010", "0122", "1001", "0110"] },
+      "stats": [1, 4, 1, 1, 0]
+    },
+    {
+      "id": "employee", "mine": true, "name": "Employee Onboarding Docs",
+      "description": "Generate onboarding documents", "used": "2d", "used_min": 2880,
+      "owner": "me", "tag": "HR",
+      "icon": { "colors": ["#ff9f1c", "#e8378a", "#6b1f7a"],
+        "pattern": ["1000", "0100", "0210", "0021", "0021", "0210", "0100", "1000"] },
+      "stats": [0, 3, 1, 1, 1]
+    },
+    {
+      "id": "sprint", "mine": true, "name": "Sprint Summarizer",
+      "description": "Summarize sprint tasks", "used": "1w", "used_min": 10080,
+      "owner": "tobias", "tag": "Design",
+      "icon": { "colors": ["#b4561c", "#f5e6d0", "#3b1a08"],
+        "pattern": ["0010", "0111", "0121", "0011", "0110", "0122", "0011", "0010"] },
+      "stats": [0, 4, 1, 1, 0]
+    },
+    {
+      "id": "resume", "mine": true, "name": "Resume Review",
+      "description": "Drafting completed - awaiting approval", "used": "1w", "used_min": 10200,
+      "owner": "tobias", "tag": "HR",
+      "icon": { "colors": ["#a8ec5c", "#1e2fd6", "#7a5af5"],
+        "pattern": ["0101", "0011", "0111", "1210", "0111", "0011", "0101", "0010"] },
+      "stats": [0, 3, 2, 0, 1]
+    },
+    {
+      "id": "nda", "mine": false, "name": "NDA Review Agent",
+      "description": "Review NDA agreements", "used": "3w", "used_min": 30000,
+      "owner": "tessel", "tag": "Legal",
+      "icon": { "colors": ["#f5f0c8", "#1a1a1a", "#22c55e"],
+        "pattern": ["0001", "0012", "0112", "1112", "1112", "0112", "0012", "0001"] },
+      "stats": [1, 4, 0, 0, 0]
+    },
+    {
+      "id": "q1", "mine": false, "name": "Q1 Competitor Analysis",
+      "description": "Pulls market notes from Google Drive", "used": "1mo", "used_min": 43000,
+      "owner": "tessel", "tag": "Strategy",
+      "icon": { "colors": ["#c4b5fd", "#f9a8d4", "#ffffff"],
+        "pattern": ["0110", "1001", "1020", "0202", "1020", "1001", "0110", "0000"] },
+      "stats": [0, 2, 0, 1, 1]
+    },
+    {
+      "id": "newsletter", "mine": false, "name": "Newsletter Agent",
+      "description": "Draft the weekly team newsletter", "used": "2mo", "used_min": 86000,
+      "owner": "ilse", "tag": "Comms",
+      "icon": { "colors": ["#5eead4", "#0f172a", "#ffffff"],
+        "pattern": ["0011", "0111", "0000", "1111", "1202", "1111", "0110", "0000"] },
+      "stats": [0, 1, 1, 0, 1]
+    }
+  ],
+  "runs": [
+    {
+      "id": "r1", "agent": "offer", "summary": "Pulls templates from Google Drive", "status": "active", "age": "44m",
+      "steps": [
+        { "title": "Pull letters from Google Drive", "line": "Started creating offer letters", "status": "done", "note": "Peoplebase connected.", "note_icon": "link" },
+        { "title": "Auto-fill with candidate details", "line": "Auto-fills offer letter templates with candidate details", "status": "running", "note": "Filling 3 of 7 letters.", "note_icon": "loader-circle" },
+        { "title": "Send drafts by email", "line": "Sends drafts to email for HR review", "status": "waiting", "chips": ["hr@tessel.dev"], "chips_icon": "mail" }
+      ]
+    },
+    {
+      "id": "r2", "agent": "onboarding", "summary": "Coordinate onboarding tasks for new hires", "status": "active", "age": "1h",
+      "steps": [
+        { "title": "Read the start dates", "line": "Read 4 start dates from Peoplebase", "status": "done", "note": "Peoplebase connected.", "note_icon": "link" },
+        { "title": "Book laptops and badges", "line": "Booking laptops and badges", "status": "running", "note": "2 of 4 booked.", "note_icon": "loader-circle" },
+        { "title": "Post the week-one plan", "line": "Posts the week-one plan to Slack", "status": "waiting", "chips": ["#new-joiners"], "chips_icon": "hash" }
+      ]
+    },
+    {
+      "id": "r3", "agent": "contract", "summary": "Review vendor contracts", "status": "active", "age": "1h",
+      "steps": [
+        { "title": "Collect the contracts", "line": "Collected 6 vendor contracts", "status": "done", "note": "6 files from Drive.", "note_icon": "file" },
+        { "title": "Flag unusual clauses", "line": "Flagging unusual clauses", "status": "running", "note": "Reading clause 14 of 38.", "note_icon": "loader-circle" },
+        { "title": "Send the summary", "line": "Sends a summary to Legal", "status": "waiting", "chips": ["#legal"], "chips_icon": "hash" }
+      ]
+    },
+    {
+      "id": "r4", "agent": "employee", "summary": "Generate onboarding documents", "status": "failed", "age": "5d",
+      "steps": [
+        { "title": "Pull letters from Google Drive", "line": "Pull latest letters from Google Drive", "status": "done", "note": "Peoplebase connected.", "note_icon": "link" },
+        { "title": "Turn letters to templates", "line": "Turn letters to templates", "status": "done", "note": "Templates ready.", "note_icon": "info" },
+        { "title": "Auto-fill with candidate details", "line": "Auto-fill templates with candidate details", "status": "failed", "error": "Candidate details pull action failed…", "note": "Attach a related doc in chat or connect your drive.", "note_icon": "info", "action": "Connect to Drive" },
+        { "title": "Send drafts to Slack for review", "line": "Send template drafts to Slack #HR-leads and #Candidates for review", "status": "waiting", "chips": ["#HR-leads", "#Candidates"], "chips_icon": "hash" }
+      ]
+    },
+    {
+      "id": "r5", "agent": "sprint", "summary": "Summarize sprint tasks", "status": "pending", "age": "5d",
+      "steps": [
+        { "title": "Wait for the sprint to close", "line": "Waiting for sprint 42 to close", "status": "waiting", "note": "Closes Friday at 17:00.", "note_icon": "clock" },
+        { "title": "Summarize the board", "line": "Summarizes the board", "status": "waiting" }
+      ]
+    },
+    {
+      "id": "r6", "agent": "resume", "summary": "Drafting completed - awaiting approval", "status": "review", "age": "1w",
+      "steps": [
+        { "title": "Read the resumes", "line": "Read 18 resumes", "status": "done", "note": "18 files from the careers inbox.", "note_icon": "mail" },
+        { "title": "Draft the shortlist", "line": "Drafted a shortlist of 5", "status": "done", "note": "Shortlist ready.", "note_icon": "info" },
+        { "title": "Approve the shortlist", "line": "Waiting for your approval", "status": "review", "note": "Tobias asked you to review it.", "note_icon": "eye", "action": "Review shortlist" }
+      ]
+    },
+    {
+      "id": "r7", "agent": "nda", "summary": "Review NDA agreements", "status": "completed", "age": "4m",
+      "steps": [
+        { "title": "Read the NDA", "line": "Read the Northwind NDA", "status": "done", "note": "12 pages.", "note_icon": "file" },
+        { "title": "Mark the risky terms", "line": "Marked 2 risky terms", "status": "done", "note": "2 terms flagged.", "note_icon": "flag" },
+        { "title": "Reply to Legal", "line": "Replied to Legal", "status": "done", "chips": ["#legal"], "chips_icon": "hash" }
+      ]
+    },
+    {
+      "id": "r8", "agent": "q1", "summary": "Pulls market notes from Google Drive", "status": "failed", "age": "5d",
+      "steps": [
+        { "title": "Pull notes from Google Drive", "line": "Pull market notes from Google Drive", "status": "done", "note": "Drive connected.", "note_icon": "link" },
+        { "title": "Compare pricing pages", "line": "Compare competitors' pricing pages", "status": "failed", "error": "Two pages could not be reached…", "note": "Paste the pages in chat or allow web access.", "note_icon": "info", "action": "Allow web access" },
+        { "title": "Write the brief", "line": "Write the Q1 brief", "status": "waiting", "chips": ["#strategy"], "chips_icon": "hash" }
+      ]
+    },
+    {
+      "id": "r9", "agent": "newsletter", "summary": "Draft the weekly team newsletter", "status": "review", "age": "1w",
+      "steps": [
+        { "title": "Gather the week's news", "line": "Gathered 9 updates", "status": "done", "note": "From 4 channels.", "note_icon": "hash" },
+        { "title": "Approve the draft", "line": "Waiting for your approval", "status": "review", "note": "Ilse shared the draft.", "note_icon": "eye", "action": "Open draft" }
+      ]
+    }
+  ]
+}

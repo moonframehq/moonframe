@@ -220,3 +220,30 @@ do {
     }
     save(cx, "examples/stage/icon.png")
 }
+
+// Tessel: four agent cards, each with a pixel sprite on its tile.
+do {
+    let cx = body([0xfb923c, 0xf2542d, 0xc2410c])
+    let sprites: [([String], [UInt32])] = [
+        (["0111", "1222", "1213", "0111", "0011"], [0xeceef1, 0x17171d, 0x25d0e0, 0xf0428f]),
+        (["1001", "0110", "1021", "0111", "1001"], [0xffd21f, 0x3a1d6e, 0xff5aa5]),
+        (["0101", "0011", "1210", "0111", "0101"], [0xa8ec5c, 0x1e2fd6, 0x7a5af5]),
+        (["0011", "0111", "1111", "1202", "0110"], [0x5eead4, 0x0f172a, 0xffffff]),
+    ]
+    for (index, (pattern, colours)) in sprites.enumerated() {
+        let x = 214 + CGFloat(index % 2) * 312
+        let y = 524 - CGFloat(index / 2) * 312
+        card(cx, CGRect(x: x, y: y, width: 284, height: 284), 0x7c2d12)
+        let tile = CGRect(x: x + 42, y: y + 42, width: 200, height: 200)
+        fill(cx, tile, 36, color(colours[0]))
+        for (row, line) in pattern.enumerated() {
+            let full = line + String(line.reversed())
+            for (column, digit) in full.enumerated() where digit != "0" {
+                let value = Int(String(digit))!
+                fill(cx, CGRect(x: tile.minX + 22 + CGFloat(column) * 19.5, y: tile.maxY - 52 - CGFloat(row) * 30,
+                                width: 19.5, height: 30), 0, color(colours[value]))
+            }
+        }
+    }
+    save(cx, "examples/tessel/icon.png")
+}
