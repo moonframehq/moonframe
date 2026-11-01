@@ -38,6 +38,69 @@ fn keys_name_tmux_sessions() {
     assert_eq!(session_name("my mod/a.b:c"), "my_mod+a_b_c");
 }
 
+/// Each app's terminals are on a tmux server of its own: one app never
+/// attaches to another's session of the same key.
+#[test]
+fn apps_keep_their_tmux_terminals_apart() {
+    if Tmux::find().is_none() {
+        eprintln!("tmux is not installed; skipped");
+        return;
+    }
+    let (one, two) = (
+        format!("moonframe-test-a-{}", std::process::id()),
+        format!("moonframe-test-b-{}", std::process::id()),
+    );
+    let (first, second) = (
+        crate::Backends::for_app(&one),
+        crate::Backends::for_app(&two),
+    );
+    let open = Open {
+        key: "terminal/main".into(),
+        cwd: None,
+        size: Size::default(),
+    };
+    let sessions = |socket: &str| {
+        Command::new("tmux")
+            .args(["-L", socket, "list-sessions", "-F", "#{session_name}"])
+            .output()
+            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+            .unwrap_or_default()
+    };
+    let opened = first.tmux().unwrap().open(&open).map(drop);
+    let listed_one = sessions(&one);
+    let listed_two = sessions(&two);
+    second.tmux().unwrap().open(&open).map(drop).unwrap();
+    let listed_two_after = sessions(&two);
+    for socket in [&one, &two] {
+        let _ = Command::new("tmux")
+            .args(["-L", socket, "kill-server"])
+            .status();
+    }
+    opened.unwrap();
+    assert_eq!(listed_one.trim(), "terminal+main");
+    assert_eq!(listed_two.trim(), "", "the second app saw the first's");
+    assert_eq!(listed_two_after.trim(), "terminal+main");
+}
+
+#[cfg(feature = "herdr-core")]
+#[test]
+fn herdr_core_terminals_belong_to_the_app_that_labelled_them() {
+    use {crate::herdr_core::owns, std::collections::BTreeMap};
+    let labelled = |app: Option<&str>| {
+        let mut labels = BTreeMap::from([("moonframe".to_owned(), "terminal/main".to_owned())]);
+        if let Some(app) = app {
+            labels.insert("moonframe-app".to_owned(), app.to_owned());
+        }
+        labels
+    };
+    assert!(owns("notes", &labelled(Some("notes"))));
+    assert!(!owns("notes", &labelled(Some("moonframe"))));
+    assert!(!owns("notes", &labelled(None)));
+    // The starter's terminals from before labels.
+    assert!(owns("moonframe", &labelled(None)));
+    assert!(!owns("moonframe", &labelled(Some("notes"))));
+}
+
 /// A tmux terminal runs, and a second attach after the first let go shows
 /// what the first printed: the session outlived its view.
 #[test]

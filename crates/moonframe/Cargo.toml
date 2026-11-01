@@ -1,4 +1,5 @@
 [package]
+description            = "A window laid out by Luau: the library apps build on"
 edition.workspace      = true
 license.workspace      = true
 name                   = "moonframe"
@@ -11,10 +12,11 @@ version.workspace      = true
 workspace = true
 
 [features]
-# The terminal emulators `ui.terminal` can run on; both by default. `ghostty`
-# builds libghostty-vt with Zig (see mise.toml and tools/zig).
+# The terminal emulators `ui.terminal` can run on. `ghostty` builds
+# libghostty-vt with Zig (see mise.toml and tools/zig), so an app on the
+# library opts into it; the starter (crates/moonframe-app) has both.
 alacritty = ["moonframe-terminal/alacritty"]
-default   = ["alacritty", "ghostty", "git", "herdr-core"]
+default   = ["alacritty", "git", "herdr-core"]
 ghostty   = ["moonframe-terminal/ghostty"]
 # The `git` native provider (`app.git`, commit and push), on herdr-vcs.
 git = ["dep:moonframe-git"]

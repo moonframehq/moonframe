@@ -112,6 +112,7 @@ impl Tree<'_> {
             Element::Hatch => Node::Hatch(self.build(kind, table, &cx)?),
             Element::Terminal => Node::Terminal(self.build(kind, table, &cx)?),
             Element::Browser => Node::Browser(self.build(kind, table, &cx)?),
+            Element::View => Node::View(self.build(kind, table, &cx)?),
             Element::Input => Node::Input(self.build(kind, table, &cx)?),
             Element::Divider => self
                 .build::<Bare>(kind, table, &cx)
@@ -586,6 +587,46 @@ impl Build for Browser {
             navigate: fields.get("navigate")?,
             loading: fields.get("loading")?,
         })
+    }
+}
+
+impl Build for View {
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &["name", "id", "props"]];
+
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
+        let name = fields.get::<ViewName>("name")?.ok_or_else(|| {
+            fields
+                .cx()
+                .key("name")
+                .fail("a view needs the `name` the app registered")
+        })?;
+        Ok(Self {
+            look: Look::from_fields(fields)?,
+            name: name.0,
+            id: fields
+                .get::<BrowserId>("id")?
+                .map_or_else(|| "view".to_owned(), |id| id.0),
+            props: fields.get("props")?.unwrap_or(Data::Nil),
+        })
+    }
+}
+
+/// The name an app registered a view by: `herdr.workspace`, `chart`.
+struct ViewName(String);
+
+impl Read for ViewName {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let name = String::read(value, cx)?;
+        let plain = !name.is_empty()
+            && name.len() <= 64
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+        if plain {
+            Ok(Self(name))
+        } else {
+            Err(cx.fail("a view's name is 1 to 64 of a-z, A-Z, 0-9, -, _ and ."))
+        }
     }
 }
 

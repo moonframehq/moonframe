@@ -299,6 +299,12 @@ impl Module {
 
     /// Whether it hears the topic `name`: listed by name, or under a prefix
     /// ending in `*` (`tabs/*`).
+    /// The topic patterns it hears, as written: names, or prefixes ending
+    /// in `*`.
+    pub(crate) fn subscriptions(&self) -> &[String] {
+        &self.definition.subscribe
+    }
+
     pub(crate) fn subscribes(&self, name: &str) -> bool {
         self.definition
             .subscribe

@@ -624,6 +624,21 @@ type BrowserProps = {
 	[number]: string,
 }
 
+-- A view the app writes in Rust and registers by `name` (an app on the
+-- Moonframe library; the starter has none). The host keeps it by mod and
+-- `id`, so it lives across reloads and while hidden, and hands it `props`,
+-- telling it when they change. What the user does in it comes back to this
+-- mod's `update` as messages the view chooses.
+type ViewProps = {
+	class: Class?,
+	style: Style?,
+	state: string?,
+	name: string?,
+	id: string?,
+	props: Data,
+	[number]: string,
+}
+
 -- A text field. The host keeps its text by mod and `id` (else its place in
 -- the tree); `value` replaces the text only when it differs from the last
 -- `value` passed. Messages carry the text: a table `msg` gets a `value`
@@ -779,6 +794,7 @@ declare ui: {
 	hatch: (props: HatchProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,
 	browser: (props: string | BrowserProps) -> Element,
+	view: (props: string | ViewProps) -> Element,
 	input: (props: InputProps) -> Element,
 	divider: () -> Element,
 	spacer: () -> Element,

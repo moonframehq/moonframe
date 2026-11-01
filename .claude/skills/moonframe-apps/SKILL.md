@@ -5,6 +5,12 @@ description: Create, run, install, share and bundle whole apps on Moonframe, eac
 
 # Moonframe apps
 
+An app that needs Rust of its own (native views, its own binary, an
+existing GPUI app moving over) is not a profile: it depends on the
+`moonframe` library crate and runs as its own binary. `moonframe init DIR`
+starts one; `docs/library.md` and `examples/host` show how. Everything
+below is about profiles.
+
 Moonframe stays a starter. A **whole app** (its own shell, mods, style,
 menus, icon) is an *app package* that runs as a **profile**: a folder in
 `~/.config/moonframe/profiles/<name>`, opened with `moonframe --profile

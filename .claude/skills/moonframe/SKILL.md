@@ -303,12 +303,15 @@ live shell. The host runs it, so it can't be written in Luau:
   shell exits (Enter starts another). Two `id`s are two shells.
 - **Backends:** `backend = "auto"` (default) runs it on herdr-core (`hc`)
   when installed (starting its server if needed), else tmux (a session per
-  terminal on the app's own server: `tmux -L moonframe ls`), else a local
+  terminal on the app's own server: `tmux -L moonframe ls`, `tmux -L
+  moonframe-<profile> ls` for a profile, `tmux -L <name> ls` for an app on
+  the library; herdr-core labels each app's apart), else a local
   pty that ends with the app. `"herdr-core"`, `"tmux"` or `"pty"` asks for
   one; one that is missing falls back to the next. A faint label in the
   terminal's bottom-right corner names the backend in use.
 - **Engines:** `engine = "alacritty"` (default, pure Rust) or `"ghostty"`
-  (libghostty-vt). Both are cargo features of `moonframe`, on by default.
+  (libghostty-vt). Both are cargo features of the `moonframe` crate; the
+  starter builds both, an app on the library opts into `ghostty`.
   A build without one shows why in the element's place.
 - **Sizing:** it grows to fill its container (give the container `grow`),
   and the shell is resized to match. Style it with a `terminal` rule or
@@ -758,6 +761,7 @@ Text-like elements take their main value positionally:
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
 | `ui.badge "..."` | `text`, `tone`, extras | pill |
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
+| `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
 | `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
 | `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
@@ -1301,7 +1305,12 @@ is labelled demo data, as in `mods/usage`.
 publishes appears to every view as `app.<name>`, and a mod messages it with
 `msg = ..., to = "provider:<name>"`. Adding, editing or removing a provider
 folder starts, restarts or stops only that provider, while the window keeps
-running; the others keep their state. A failed provider shows a banner, and its error appears in the
+running; the others keep their state. A provider starts only once
+something wants it: a drawn view reads `app.<name>` (a view that loops
+over all of `app` wants every one), a mod subscribes to
+`provider/<name>`, or a mod sends it a message; once started it keeps
+running. `start = "always"` in provider.toml starts it with the app
+instead, for one whose work matters before anything shows it. A failed provider shows a banner, and its error appears in the
 terminal log. There are three kinds:
 
 - **`kind = "wasm"`:** a WebAssembly component implementing
@@ -1549,8 +1558,26 @@ examples of each pattern. Read them before larger changes.
 
 ## Extending the host
 
-When a request needs something no element can express (a tree, a chart),
-add an element in Rust. Say so to the user first: it needs a build and an
+**In an app built on the library** (a crate whose `main` calls
+`moonframe::Moonframe::new(...)`, with its own `app/` folder; see
+`docs/library.md` in the Moonframe repository), Rust goes in the app's own
+crate, never in Moonframe:
+- a view Luau can't draw (an editor, a canvas, an existing GPUI view):
+  a type implementing `moonframe::HostView` and `Render`, registered with
+  `.view("editor", Editor::new)`, placed with `ui.view { name = "editor",
+  id = "main", props = {...} }`. It is made on first draw, kept by mod and
+  `id`, gets `set_props` when `props` change, and sends the mod's `update`
+  messages with its `Messenger` (`ViewInit::messenger`).
+- data or actions: a `moonframe::Native` provider, `.native("index",
+  Index::default)`, with `app/providers/index/provider.toml` holding
+  `kind = "native"`.
+There, `cargo run -- --check` checks the app (not `just check`), its
+user folder is `~/.config/<name>`, and Moonframe's components, providers
+and stylesheet sit under its `app/`, its mods shadowing none of theirs.
+Rebuild and restart after Rust changes; Luau still reloads live.
+
+**In Moonframe itself**, when a request needs something no element can
+express (a tree, a chart), add an element in Rust. Say so to the user first: it needs a build and an
 app restart, unlike everything above. `ui.icon`, `ui.terminal`, `ui.browser`
 and `ui.input` are recent examples to copy; `ui.input` shows an element
 whose host-side state is kept by mod and `id` and drawn with a `RenderOnce`

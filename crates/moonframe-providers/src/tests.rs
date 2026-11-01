@@ -133,7 +133,7 @@ fn a_process_publishes_lines_and_answers_messages() {
         "echo '{\"ready\": true}'\nwhile read -r line; do echo \"{\\\"got\\\": $line}\"; done\n",
     );
     let (events, received) = events();
-    let providers = Providers::start(root.into(), root.join("build"), events);
+    let mut providers = Providers::start(root.into(), root.join("build"), events);
     assert_eq!(providers.names().collect::<Vec<_>>(), ["echo"]);
     let next = || received.recv_timeout(Duration::from_secs(5)).unwrap();
     let Event::Published { provider, data } = next() else {
@@ -328,8 +328,9 @@ fn a_native_provider_publishes_and_answers_the_mod_that_asked() {
     );
     write(root, "providers/gone/provider.toml", "kind = 'native'\n");
     let (events, received) = events();
-    let natives = crate::Natives::from([("echo", echo as crate::native::Factory)]);
-    let providers = Providers::start_with(root.into(), root.join("build"), events, natives);
+    let factory: crate::native::Factory = Arc::new(echo);
+    let natives = crate::Natives::from([("echo".to_owned(), factory)]);
+    let mut providers = Providers::start_with(root.into(), root.join("build"), events, natives);
     let mut seen = Vec::new();
     let mut next = || {
         let event = received.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -399,4 +400,55 @@ fn a_native_manifest_takes_no_command_or_capabilities() {
     let manifest = Manifest::load("c", &root.join("c")).unwrap();
     assert_eq!(manifest.kind, Kind::Native);
     assert_eq!(manifest.settings["limit"], 3);
+}
+
+#[test]
+fn providers_start_once_wanted_unless_they_always_start() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    for name in ["echo", "github", "gitlab", "eager"] {
+        let start = if name == "eager" {
+            "start = 'always'\n"
+        } else {
+            ""
+        };
+        write(
+            root,
+            &format!("providers/{name}/provider.toml"),
+            &format!("kind = 'native'\ninterval = 5\n{start}"),
+        );
+    }
+    let (events, _received) = events();
+    let natives: crate::Natives = ["echo", "github", "gitlab", "eager"]
+        .into_iter()
+        .map(|name| {
+            let factory: crate::native::Factory = Arc::new(echo);
+            (name.to_owned(), factory)
+        })
+        .collect();
+    let mut providers = Providers::start_wanting(
+        root.into(),
+        root.join("build"),
+        events,
+        natives,
+        Some(std::collections::BTreeSet::new()),
+    );
+    let running = |providers: &Providers| {
+        ["echo", "github", "gitlab", "eager"]
+            .into_iter()
+            .filter(|name| providers.running(name))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(running(&providers), ["eager"]);
+
+    providers.want(Some(["git*".to_owned()].into()));
+    assert_eq!(running(&providers), ["github", "gitlab", "eager"]);
+
+    // A message starts the one it is for.
+    providers.send("echo", "editor", Data::from("hi")).unwrap();
+    assert_eq!(running(&providers), ["echo", "github", "gitlab", "eager"]);
+
+    // Wanting less stops nothing.
+    providers.want(Some(std::collections::BTreeSet::new()));
+    assert_eq!(running(&providers).len(), 4);
 }

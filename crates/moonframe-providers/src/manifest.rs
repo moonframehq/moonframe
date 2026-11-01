@@ -27,6 +27,8 @@ const MAX_INTERVAL: f64 = 3600.0;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Manifest {
     pub kind: Kind,
+    /// When it starts.
+    pub start: Start,
     pub interval: Duration,
     pub capabilities: Vec<Capability>,
     /// The `[settings]` table, as JSON for the provider's `start`.
@@ -43,6 +45,19 @@ pub enum Kind {
     Native,
 }
 
+/// When a provider starts.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Start {
+    /// Once something wants it: a view reads `app.<name>`, a mod hears its
+    /// topic, or a mod sends it a message. The default, so an app pays for
+    /// none it doesn't use.
+    #[default]
+    OnDemand,
+    /// With the app, whether or not anything reads it yet.
+    Always,
+}
+
 /// What a wasm provider may ask the host for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -56,6 +71,8 @@ pub enum Capability {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 struct File {
     kind: String,
+    #[serde(default)]
+    start: Start,
     #[serde(default)]
     command: Vec<String>,
     interval: Option<f64>,
@@ -123,6 +140,7 @@ impl Manifest {
             serde_json::to_value(file.settings).map_err(|error| problem(error.to_string()))?;
         Ok(Self {
             kind,
+            start: file.start,
             interval: Duration::from_secs_f64(interval),
             capabilities: file.capabilities,
             settings,
