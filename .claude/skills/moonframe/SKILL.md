@@ -1004,6 +1004,8 @@ Leave an element's own keys off if the stylesheet should decide.
 | `opacity` | 0 to 1 |
 | `width`, `height` | pixels, under the element's own `width`/`height`; on rows, columns, panels and lists. What a named state changes: `[".drawer:closed"] = { width = 48 }` |
 | `transition` | how a `pane`, `popover` or `overlay` animates when it shows or hides, how a keyed row or column arrives and goes, and how an element with a `state` eases between states (see below) |
+| `delay` | milliseconds or `"40ms"`: replaces the transition's delay for a change of `state`. Set it inline from an item's index so a list's items move one after another (see "Staggered states") |
+| `clip` | `true` hides what overflows the box instead of drawing it past its edges: a column whose width eases down (a sidebar folding to a rail) |
 
 **Shadows.** Write them like CSS `box-shadow`. Lengths are pixels, with or
 without `px`, and layers are separated by commas. The color can be any
@@ -1046,12 +1048,35 @@ pane = { transition = "slide 220ms ease-out" },                   -- every pane
 - **`animation_speed`:** at the top of `style.luau`, it divides every
   duration (mod `styles` and inline `style` included): `2` is twice as fast,
   `0` turns animations off.
-- **Defaults:** slide, the `normal` speed, `ease`.
+- **Delay:** a second duration, as in CSS, waits before a change of `state`
+  starts moving: `"fade 150ms ease-out 40ms"`, or `delay = 40` in the
+  table. (Panes, popovers and keyed children ignore it.)
+- **Defaults:** slide, the `normal` speed, `ease`, no delay.
 
 Words can come in any order. Toggling again mid-animation turns back from
 where the pane is. A slide moves across the pane's `size` (or `max`), not a
 width the user dragged it to. Put the transition on the pane (type rule,
 class, or `style`), not on what is inside it.
+
+**Staggered states.** Items that change state together (labels fading as a
+sidebar folds) can move one after another: keep the transition in the
+rules, and give each item its place in line as an inline `delay`, which
+replaces the transition's. Each state's rule may bring its own transition,
+so going one way can be quicker than coming back:
+
+```lua
+for index, entry in entries do
+	ui.text { entry.label, class = "label", state = if folded then "hidden" else "shown",
+		style = { delay = (index - 1) * 16 } }
+end
+-- styles: [".label"] = { transition = "fade 180ms ease-out" },
+--   [".label:shown"] = { opacity = 1 },
+--   [".label:hidden"] = { opacity = 0, transition = "fade 90ms ease-in" },
+```
+
+The `side-nav` component does this for a whole sidebar, with the column's
+width easing between `.side-nav:full` and `.side-nav:rail` (and `clip` on
+it, so the labels do not spill past the narrowing edge).
 
 **Arriving and leaving.** A `ui.row` or `ui.column` with a `key` (1 to 64 of
 a-z, 0-9, `-` and `_`, unique among its siblings) stays itself as its

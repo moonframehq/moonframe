@@ -1,0 +1,8 @@
+[app]
+# A mail client's frame: a sidebar of folders and labels that folds to an
+# icon rail (labels fade out one after another, the icons stay put) and the
+# folder's messages beside it. Sample data.
+keep     = []
+name     = "mailbox"
+requires = []
+title    = "Mailbox"

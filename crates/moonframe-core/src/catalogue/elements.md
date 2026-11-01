@@ -108,6 +108,8 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
 `margin`, `shadow`, `size`, `weight`, `font` (`sans`, `mono`), `case`
 (`upper`, `lower`, on text), `opacity`, `width` and `height` (under the
 element's own; on containers),
-`transition`. Selectors: a part (`row`, `item`, `list`, `popover`, `overlay`, `overlay-backdrop`, `tooltip`, `image`, ...),
+`transition` (a second duration is its delay: `"fade 150ms 40ms"`), `delay`
+(replaces the transition's delay, set inline per item to stagger a list),
+`clip = true` (hide what overflows the box). Selectors: a part (`row`, `item`, `list`, `popover`, `overlay`, `overlay-backdrop`, `tooltip`, `image`, ...),
 a class (`.tab`), and a state: `:hover`, `:selected`, `:focus`,
 `:disabled`, or one the view names with `state = "..."` (`.drawer:open`).

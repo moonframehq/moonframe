@@ -45,6 +45,8 @@ const STYLE_KEYS: &[&str] = &[
     "width",
     "height",
     "transition",
+    "delay",
+    "clip",
 ];
 const MONO_KEYS: &[&str] = &[
     "family",
@@ -244,6 +246,10 @@ impl Read for Style {
             width: fields.number("width", 0.0..=100_000.0)?,
             height: fields.number("height", 0.0..=100_000.0)?,
             transition: fields.get("transition")?,
+            delay: fields
+                .get::<Speed>("delay")?
+                .map(|Speed(delay)| cx.names().scaled(delay)),
+            clip: fields.get("clip")?,
         })
     }
 }
@@ -526,13 +532,15 @@ impl ShadowLayer {
 
 /// The longest transition: anything slower reads as a hang.
 const MAX_DURATION_MS: f32 = 10_000.0;
-const TRANSITION_KEYS: &[&str] = &["kind", "duration", "curve"];
+const TRANSITION_KEYS: &[&str] = &["kind", "duration", "curve", "delay"];
 
 /// A transition as CSS-like words in any order, such as
 /// `"slide 220ms ease-out"` or `"fade 0.3s cubic-bezier(0.2, 0, 0, 1)"`, or
 /// a table `{ kind = "slide", duration = 220, curve = "ease-out" }` with
 /// the duration in milliseconds or a speed. Durations can be speed names
-/// (`"slide fast"`). Missing parts are a slide, the `normal` speed, `ease`.
+/// (`"slide fast"`). As in CSS, a second duration is the delay before it
+/// starts (`"fade 150ms ease-out 40ms"`, or `delay = 40` in the table).
+/// Missing parts are a slide, the `normal` speed, `ease`, no delay.
 /// The stylesheet's `animation_speed` applies to the result.
 impl Read for Transition {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
@@ -541,7 +549,10 @@ impl Read for Transition {
             kind: TransitionKind::Slide,
             duration: names.speed("normal").unwrap_or(Duration::from_millis(220)),
             curve: Curve::EASE,
+            delay: Duration::ZERO,
         };
+        // The first duration is how long it runs, the second its delay.
+        let mut durations = 0;
         match value {
             Value::String(text) => {
                 let text = text.to_string_lossy();
@@ -564,7 +575,16 @@ impl Read for Transition {
                     if let Some(kind) = TransitionKind::parse(word) {
                         transition.kind = kind;
                     } else if let Some(Speed(duration)) = Speed::word(word, cx)? {
-                        transition.duration = duration;
+                        match durations {
+                            0 => transition.duration = duration,
+                            1 => transition.delay = duration,
+                            _ => {
+                                return Err(cx.fail(
+                                    "a transition takes at most two durations: how long it runs, then its delay",
+                                ));
+                            },
+                        }
+                        durations += 1;
                     } else {
                         transition.curve = Curve::parse(word, cx)?;
                     }
@@ -581,6 +601,9 @@ impl Read for Transition {
                 if let Some(curve) = fields.get::<String>("curve")? {
                     transition.curve = Curve::parse(&curve, &fields.cx().key("curve"))?;
                 }
+                if let Some(Speed(delay)) = fields.get("delay")? {
+                    transition.delay = delay;
+                }
             },
             _ => {
                 return Err(
@@ -589,6 +612,7 @@ impl Read for Transition {
             },
         }
         transition.duration = names.scaled(transition.duration);
+        transition.delay = names.scaled(transition.delay);
         Ok(transition)
     }
 }

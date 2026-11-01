@@ -528,8 +528,12 @@ impl<'w, 'm> Painter<'w, 'm> {
             width: style.width,
             height: style.height,
         };
+        let sheet = self.workspace.stylesheet();
         let transition = style.transition.map(|transition| Transition {
-            duration: self.workspace.stylesheet().scaled(transition.duration),
+            duration: sheet.scaled(transition.duration),
+            // An item's own `delay` (its place in a staggered list) wins
+            // over the transition's.
+            delay: sheet.scaled(style.delay.unwrap_or(transition.delay)),
             ..transition
         });
         let (now, moving) = self.motion.tweens.borrow_mut().step(

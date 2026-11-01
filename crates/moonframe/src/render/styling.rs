@@ -159,6 +159,9 @@ pub(super) trait LookExt: StyleExt + InteractiveElement {
         if let Some(opacity) = style.opacity {
             self = self.opacity(opacity);
         }
+        if style.clip == Some(true) {
+            self = self.overflow_hidden();
+        }
         // GPUI takes one hover style per element: everything goes in it.
         let hover = &look.hover;
         let background = hover.background.map(|color| color.hsla(theme));

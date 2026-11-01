@@ -52,6 +52,8 @@ type Transition = string | {
 	kind: TransitionKind?,
 	duration: (number | string)?,
 	curve: string?,
+	-- Wait before moving, as CSS's transition-delay.
+	delay: (number | string)?,
 }
 
 type Style = {
@@ -80,6 +82,11 @@ type Style = {
 	-- and goes, and an element with a `state` moves to its next state's look
 	-- (colors, opacity, width and height ease between the two).
 	transition: Transition?,
+	-- Replaces the transition's delay (ms, or "40ms"): set from an item's
+	-- index so a list's items move one after another (a staggered fade).
+	delay: (number | string)?,
+	-- Hide what overflows the box instead of drawing it outside.
+	clip: boolean?,
 }
 
 -- What a `ui` function returns; the host reads its fields.
@@ -344,6 +351,7 @@ type IconName =
 	| "bug"
 	| "building-2"
 	| "calendar"
+	| "calendar-days"
 	| "case-sensitive"
 	| "chart-column"
 	| "chart-pie"
@@ -484,6 +492,7 @@ type IconName =
 	| "split-square-vertical"
 	| "square"
 	| "square-check"
+	| "square-pen"
 	| "square-split-horizontal"
 	| "square-split-vertical"
 	| "square-terminal"
@@ -503,6 +512,7 @@ type IconName =
 	| "unlock"
 	| "upload"
 	| "user"
+	| "wand-sparkles"
 	| "wifi"
 	| "wifi-off"
 	| "window-close"

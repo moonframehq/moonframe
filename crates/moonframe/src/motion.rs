@@ -89,7 +89,8 @@ struct Tween {
     state: Option<String>,
     from: Snapshot,
     to: Snapshot,
-    /// When the move began, and how it runs; `None` at rest.
+    /// When the move begins (later than the change, by the transition's
+    /// delay), and how it runs; `None` at rest.
     moving: Option<(Instant, Duration, Curve)>,
     /// The last frame that drew it, to forget elements that went.
     seen: Instant,
@@ -148,7 +149,14 @@ impl Tweens {
             tween.moving = transition
                 .filter(|transition| transition.kind != TransitionKind::None)
                 .filter(|transition| !transition.duration.is_zero())
-                .map(|transition| (now, transition.duration, transition.curve));
+                .map(|transition| {
+                    // Until its delay is over it holds where it was.
+                    (
+                        now + transition.delay,
+                        transition.duration,
+                        transition.curve,
+                    )
+                });
         }
         // The theme may change mid-move: aim at the current look.
         tween.to = target;
@@ -319,6 +327,7 @@ mod tests {
         kind: TransitionKind::Slide,
         duration: Duration::from_millis(100),
         curve: Curve::Linear,
+        delay: Duration::ZERO,
     };
 
     #[test]
@@ -432,6 +441,34 @@ mod tests {
         // Without a transition, a change jumps.
         let jump = tweens.step("drawer", Some("open"), snapshot(240.0), None, at(300));
         assert_eq!(jump, (snapshot(240.0), false));
+    }
+
+    #[test]
+    fn a_delayed_state_change_holds_then_moves() {
+        let mut tweens = Tweens::default();
+        let start = Instant::now();
+        let at = |ms| start + Duration::from_millis(ms);
+        let later = Transition {
+            delay: Duration::from_millis(50),
+            ..SLIDE
+        };
+        let mut step = |state, width, ms| {
+            tweens.step("label", Some(state), snapshot(width), Some(&later), at(ms))
+        };
+        step("shown", 100.0, 0);
+        // Hidden at 10ms: it holds, still moving, until 60ms, then eases.
+        assert_eq!(step("hidden", 0.0, 10), (snapshot(100.0), true));
+        assert_eq!(step("hidden", 0.0, 40), (snapshot(100.0), true));
+        assert_eq!(step("hidden", 0.0, 110), (snapshot(50.0), true));
+        assert_eq!(step("hidden", 0.0, 160), (snapshot(0.0), false));
+        // Shown again at 200, then hidden while it still waits: it never
+        // left 0, and waits again from there.
+        assert_eq!(step("shown", 100.0, 200), (snapshot(0.0), true));
+        assert_eq!(step("hidden", 0.0, 220), (snapshot(0.0), true));
+        assert_eq!(step("shown", 100.0, 230), (snapshot(0.0), true));
+        // Shown from 230: waits until 280, halfway at 330, there by 380.
+        assert_eq!(step("shown", 100.0, 330), (snapshot(50.0), true));
+        assert_eq!(step("shown", 100.0, 400), (snapshot(100.0), false));
     }
 
     #[test]
