@@ -624,12 +624,16 @@ impl Workspace {
         drawn
     }
 
-    /// Tells the modules subscribed to the app's own topic `app/<name>`
-    /// (which no mod can publish), and draws again. Not kept: only what
-    /// happens from now on.
-    pub fn app_topic(&mut self, name: &str, value: Data) {
-        let deliveries = self.deliveries(&format!("{APP_TOPIC}{name}"), &value);
-        self.process(deliveries.into());
+    /// Tells the module `to`, if it subscribes to the app's own topic
+    /// `app/<name>` (which no mod can publish or forge), and draws again.
+    /// Only `to` hears it, and it is not kept.
+    pub fn app_topic(&mut self, name: &str, to: &str, value: Data) {
+        let deliveries: VecDeque<_> = self
+            .deliveries(&format!("{APP_TOPIC}{name}"), &value)
+            .into_iter()
+            .filter(|(_, key, _)| key == to)
+            .collect();
+        self.process(deliveries);
         self.settle();
     }
 
@@ -963,6 +967,16 @@ impl Workspace {
                             slot.update_error = Some(error);
                         }
                     },
+                }
+                continue;
+            }
+            // What arrives as `provider/` or `app/` topic news comes from
+            // the host only: a mod cannot pass one off to another.
+            if !from.starts_with(TOPIC) && forged_topic(&msg) {
+                if let Some(slot) = self.slot_mut(&from) {
+                    slot.update_error = Some(Error::new(format!(
+                        "a message to `{to}` looks like `{PROVIDER_TOPIC}` or `{APP_TOPIC}` topic news, which only the app sends"
+                    )));
                 }
                 continue;
             }
@@ -1425,6 +1439,15 @@ fn merge(into: &Table, key: Value, value: Value, depth: usize) -> mlua::Result<(
 }
 
 /// What a module hears on a topic: `{ topic = "<name>", value = ... }`.
+/// A message with a `topic` the host alone publishes.
+fn forged_topic(msg: &Data) -> bool {
+    let Data::Map(fields) = msg else {
+        return false;
+    };
+    matches!(fields.get("topic"), Some(Data::String(topic))
+        if topic.starts_with(PROVIDER_TOPIC) || topic.starts_with(APP_TOPIC))
+}
+
 fn topic_message(name: &str, value: &Data) -> Data {
     Data::Map(
         [

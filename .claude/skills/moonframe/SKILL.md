@@ -235,9 +235,11 @@ picking for the mod that drew it, without the card. That mod hears it on the
 topic `app/inspect` (subscribe to it): `{ asker, picking = true }` as it
 starts (hide a dialog then), and `{ asker, picking = false, picked, element?,
 mod?, at?, report? }` when the user clicks an element (`picked = true`;
-`report` is the text above) or presses Escape. Check `asker` is your mod's
-name. `mods/feedback` attaches the pick to a request this way. `app/` topics
-are the app's: a mod can't publish them.
+`report` is the text above) or presses Escape. Only the mod that asked
+hears it; if another mod starts a pick meanwhile, the first hears
+`picked = false`. `mods/feedback` attaches the pick to a request this way.
+`app/` topics are the app's: a mod can't publish them, nor send another mod
+a message passing for `app/` or `provider/` topic news.
 
 "Copy for agent" copies that text and closes the card, but the file stays,
 so the selection is still there for you. "Clear" (or Esc) deletes it. The

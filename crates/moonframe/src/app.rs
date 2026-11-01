@@ -549,6 +549,15 @@ impl MoonframeApp {
         if from.starts_with(moonframe_core::DEMO) {
             return;
         }
+        // A pick another mod started ends for it first, unanswered.
+        if self
+            .inspector
+            .asker
+            .as_deref()
+            .is_some_and(|asker| asker != from)
+        {
+            self.answer_asker(None);
+        }
         self.inspector.selected = None;
         self.inspector.asker = Some(from.to_owned());
         self.inspector.picking = true;
@@ -558,7 +567,8 @@ impl MoonframeApp {
             ("asker".to_owned(), Data::String(from.to_owned())),
             ("picking".to_owned(), Data::Bool(true)),
         ]);
-        self.workspace.app_topic("inspect", Data::Map(started));
+        self.workspace
+            .app_topic("inspect", from, Data::Map(started));
         cx.notify();
     }
 
@@ -570,7 +580,7 @@ impl MoonframeApp {
             return;
         };
         let mut fields = std::collections::BTreeMap::from([
-            ("asker".to_owned(), Data::String(asker)),
+            ("asker".to_owned(), Data::String(asker.clone())),
             ("picking".to_owned(), Data::Bool(false)),
             ("picked".to_owned(), Data::Bool(picked.is_some())),
         ]);
@@ -581,7 +591,8 @@ impl MoonframeApp {
             fields.insert("at".to_owned(), Data::String(pick.at));
             fields.insert("report".to_owned(), Data::String(pick.report));
         }
-        self.workspace.app_topic("inspect", Data::Map(fields));
+        self.workspace
+            .app_topic("inspect", &asker, Data::Map(fields));
     }
 
     /// Selects `picked` (or nothing) and saves it where agents read it.

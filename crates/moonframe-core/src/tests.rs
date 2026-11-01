@@ -3126,17 +3126,37 @@ fn a_topic_pushes_to_its_subscribers_and_is_saved() {
 }
 
 #[test]
-fn the_apps_own_topics_reach_subscribers_and_no_mod_publishes_them() {
+fn the_apps_own_topics_reach_only_their_mod_and_no_mod_forges_them() {
     let picker = listener(r#""app/inspect""#);
-    let dir = app(&[("publisher", PUBLISHER), ("picker", &picker)]);
+    let dir = app(&[
+        ("publisher", PUBLISHER),
+        ("picker", &picker),
+        ("bystander", &picker),
+    ]);
     let mut workspace = Workspace::open_with(dir.path(), false, None);
-    let pick = Data::Map([("branch".to_owned(), Data::from("picked"))].into());
-    workspace.app_topic("inspect", pick);
-    let heard = match workspace.slot("picker").and_then(crate::Slot::view) {
+    let heard = |workspace: &Workspace, name: &str| match workspace
+        .slot(name)
+        .and_then(crate::Slot::view)
+    {
         Some(Node::Text(text)) => text.text.clone(),
         other => panic!("{other:?}"),
     };
-    assert_eq!(heard, "app/inspect=picked");
+    let pick = |what: &str| Data::Map([("branch".to_owned(), Data::from(what))].into());
+    workspace.app_topic("inspect", "picker", pick("picked"));
+    assert_eq!(heard(&workspace, "picker"), "app/inspect=picked");
+    assert_eq!(heard(&workspace, "bystander"), "nothing");
+
+    // Sent straight to a mod, looking like topic news, it is refused.
+    let forged = Data::Map(
+        [
+            ("topic".to_owned(), Data::from("app/inspect")),
+            ("value".to_owned(), pick("forged")),
+        ]
+        .into(),
+    );
+    workspace.send("publisher", "picker", forged);
+    assert_eq!(heard(&workspace, "picker"), "app/inspect=picked");
+    assert!(workspace.slot("publisher").unwrap().error().is_some());
 
     publish(&mut workspace, "app/inspect", Data::Bool(true));
     let error = workspace
@@ -3145,7 +3165,8 @@ fn the_apps_own_topics_reach_subscribers_and_no_mod_publishes_them() {
         .error()
         .unwrap()
         .to_string();
-    assert!(error.contains("app/ ones the app's"), "{error}");
+    // Refused either way: published, or handed to the publisher as news.
+    assert!(error.contains("app/"), "{error}");
 }
 
 #[test]
