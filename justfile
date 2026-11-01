@@ -12,16 +12,21 @@ nightly_toolchain := "nightly-2026-06-20"
 # Open the window on the built-in app folder, with ~/.config/moonframe
 # over it; it reloads as either changes.
 run dir="app":
-    cargo run --release -p moonframe -- {{dir}}
+    cargo run --release -p moonframe-app -- {{dir}}
+
+# Open the example app built on the library (examples/host): its own
+# binary, with Rust views and a native provider.
+run-host:
+    cargo run --release -p moonframe-host-example
 
 # Load every module headlessly, ~/.config/moonframe included, and report
 # problems; run after each edit.
 check dir="app":
-    cargo run --quiet --release -p moonframe -- --check {{dir}}
+    cargo run --quiet --release -p moonframe-app -- --check {{dir}}
 
 # The same for the built-in app alone, whatever ~/.config holds.
 check-builtin dir="app":
-    cargo run --quiet --release -p moonframe -- --check --no-user {{dir}}
+    cargo run --quiet --release -p moonframe-app -- --check --no-user {{dir}}
 
 # Load the example apps in examples/ headlessly, each as a profile in a
 # throwaway user folder, and type-check their Luau.
@@ -30,11 +35,12 @@ check-examples:
     set -euo pipefail
     user=$(mktemp -d)
     trap 'rm -rf "$user"' EXIT
-    cargo build --quiet --release -p moonframe
+    cargo build --quiet --release -p moonframe-app
     for app in sessions workbench daybook ledger audience pipeline stage; do
         target/release/moonframe --user "$user" app link "examples/$app" --yes >/dev/null
         target/release/moonframe --user "$user" --profile "$app" --check | cut -c1-120
     done
+    cargo run --quiet --release -p moonframe-host-example -- --user "$user" --check | cut -c1-120
     just types examples
 
 # Build Moonframe.app (release binary, staged app, icon) in target/bundle.
@@ -55,12 +61,12 @@ install:
 # app/components and crates/moonframe-core/src/catalogue/elements.md.
 components dir="app":
     mkdir -p .claude/skills/moonframe-components
-    cargo run --quiet --release -p moonframe -- --no-user --catalogue {{dir}} > target/components.md
+    cargo run --quiet --release -p moonframe-app -- --no-user --catalogue {{dir}} > target/components.md
     mv target/components.md .claude/skills/moonframe-components/SKILL.md
 
 # Fail when the moonframe-components skill is out of date with the components.
 components-check dir="app":
-    cargo run --quiet --release -p moonframe -- --no-user --catalogue {{dir}} > target/components.md
+    cargo run --quiet --release -p moonframe-app -- --no-user --catalogue {{dir}} > target/components.md
     diff -u .claude/skills/moonframe-components/SKILL.md target/components.md
 
 # Stage the built-in app as it ships in the bundle (Contents/Resources/app):

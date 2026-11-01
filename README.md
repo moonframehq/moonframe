@@ -11,6 +11,7 @@
   <a href="#working-with-an-agent">Working with an agent</a> ·
   <a href="#mods-from-git">Mods from git</a> ·
   <a href="#whole-apps-as-profiles">Apps</a> ·
+  <a href="#your-own-app-on-the-library">Library</a> ·
   <a href="#commands">Commands</a> ·
   <a href="#license">License</a>
 </p>
@@ -168,7 +169,8 @@ recipes.
 ```text
 app/                    the built-in app: shell, mods, components, providers, style
 crates/moonframe-core/  reads Luau into checked element trees, styles, components
-crates/moonframe/       the window: draws the trees with GPUI, inspector, menus
+crates/moonframe/       the library: the window, drawn with GPUI, inspector, menus
+crates/moonframe-app/   the `moonframe` binary: the starter, on the library
 crates/moonframe-providers/  runs Wasm and process providers
 crates/moonframe-terminal/   shells on alacritty_terminal and libghostty-vt
 types/moonframe.d.luau  types for the Luau API, used by `just types` and editors
@@ -303,13 +305,38 @@ sessions, workbench and stage require the `projects` package beside them.
 them:
 
 ```sh
-cargo build --release -p moonframe
+cargo build --release -p moonframe-app
 for app in sessions workbench daybook ledger audience pipeline stage; do
   target/release/moonframe app link examples/$app --yes
 done
 target/release/moonframe --profile ledger &
 target/release/moonframe --profile pipeline &
 ```
+
+## Your own app, on the library
+
+Profiles share the `moonframe` binary. An app with Rust of its own (or an
+existing GPUI app moving over) depends on the `moonframe` crate instead,
+and is a binary of its own:
+
+```rust
+fn main() -> std::process::ExitCode {
+    moonframe::Moonframe::new("notes")            // ~/.config/notes, its state, its id
+        .title("Notes")
+        .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
+        .native("index", Index::default)          // a native provider: `app.index`
+        .view("editor", Editor::new)              // a GPUI view: `ui.view { name = "editor" }`
+        .run()                                    // the window, --check, mod, app, bundle
+}
+```
+
+Its `app/` folder is laid out like this repository's, and stands on
+Moonframe's components, providers and stylesheet (compiled into the
+library, so a git dependency needs no checkout beside it). `moonframe init
+DIR` starts one, or adds the app folder, types and agent skills to an
+existing crate; `cargo run --release -- bundle` builds its bundle.
+[examples/host](examples/host) is a small one, and
+[docs/library.md](docs/library.md) has the rest.
 
 ## Commands
 
@@ -324,6 +351,7 @@ target/release/moonframe --profile pipeline &
 | `just check-examples` | loads and type-checks the apps in `examples/` |
 | `just install` | builds the app and installs it in `/Applications` |
 | `just ci` | formatting, lints, tests, types, providers and check |
+| `just run-host` | opens the example app on the library, `examples/host` |
 
 `moonframe --help` lists the app's own options, such as `--user DIR`,
 `--no-user`, `--profile NAME`, `--check`, `--release`, and `--background`

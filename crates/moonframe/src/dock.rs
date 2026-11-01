@@ -3,8 +3,16 @@
 //! it at launch: a profile's app's `icon.png`, else Moonframe's, which
 //! `scripts/draw-icon.swift` draws in `assets/icon.png`.
 
+/// Moonframe's own icon, for an app that names none.
 #[cfg(target_os = "macos")]
 const ICON: &[u8] = include_bytes!("../../../assets/icon.png");
+
+/// The icon an app gets when its folder has none: the one it was launched
+/// with, else Moonframe's.
+#[cfg(target_os = "macos")]
+fn fallback() -> &'static [u8] {
+    crate::identity().icon.unwrap_or(ICON)
+}
 
 /// Must run on the main thread once the application exists.
 #[cfg(target_os = "macos")]
@@ -24,7 +32,7 @@ pub(crate) fn set_icon(icon: Option<&std::path::Path>) {
             .inspect_err(|error| tracing::warn!("cannot read {}: {error}", path.display()))
             .ok()
     });
-    let data = NSData::with_bytes(own.as_deref().unwrap_or(ICON));
+    let data = NSData::with_bytes(own.as_deref().unwrap_or_else(|| fallback()));
     let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) else {
         tracing::warn!("cannot read the app icon");
         return;
@@ -123,7 +131,7 @@ pub(crate) fn about_panel(
     let image = icon
         .and_then(|path| std::fs::read(path).ok())
         .map(|bytes| NSData::with_bytes(&bytes))
-        .or_else(|| Some(NSData::with_bytes(ICON)))
+        .or_else(|| Some(NSData::with_bytes(fallback())))
         .and_then(|data| NSImage::initWithData(NSImage::alloc(), &data));
     if let Some(image) = image {
         options.push((

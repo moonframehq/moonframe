@@ -1,6 +1,8 @@
 //! A yellow bar along the bottom of a dev build made from a branch other
 //! than `main`, naming the branch, worktree and commit, so it is plain which
-//! checkout a window runs. Release builds and `main` never show it.
+//! checkout a window runs. Release builds and `main` never show it. In an
+//! app on the library it names Moonframe's checkout, and only a branch of
+//! one: a git dependency's checkout is detached, and says nothing.
 
 use gpui_kit::*;
 
@@ -15,7 +17,8 @@ const INK: u32 = 0x2b2100;
 /// What the bar says, when this build should have one.
 pub(crate) fn label() -> Option<String> {
     let on_main = matches!(BRANCH, "main" | "master");
-    if !cfg!(debug_assertions) || on_main {
+    let hosted = crate::identity().hosted;
+    if !cfg!(debug_assertions) || on_main || (hosted && BRANCH.is_empty()) {
         return None;
     }
     let branch = if BRANCH.is_empty() {
@@ -23,7 +26,11 @@ pub(crate) fn label() -> Option<String> {
     } else {
         BRANCH
     };
-    let mut parts = vec![branch.to_owned()];
+    let mut parts = vec![if hosted {
+        format!("moonframe {branch}")
+    } else {
+        branch.to_owned()
+    }];
     if !WORKTREE.is_empty() {
         parts.push(format!("worktree {WORKTREE}"));
     }

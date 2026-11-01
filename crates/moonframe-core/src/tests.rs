@@ -2204,6 +2204,48 @@ fn an_app_package_brings_its_shell_and_keeps_only_the_builtin_mods_it_names() {
 }
 
 #[test]
+fn a_hosted_app_stands_on_the_toolbox_under_its_packages_and_the_user() {
+    const PANEL: &str = r#"return mod { view = function() return ui.text "x" end }"#;
+    let toolbox = app(&[("explorer", PANEL), ("terminal", PANEL)]);
+    write(toolbox.path(), "components/card.luau", BADGE_COMPONENT);
+    let dir = tempfile::tempdir().unwrap();
+    let (host, package, user) = (
+        dir.path().join("host"),
+        dir.path().join("extras"),
+        dir.path().join("user"),
+    );
+    write(&host, "main.luau", SHELL_SOURCE);
+    write(&host, "mods/sessions/main.luau", PANEL);
+    write(&host, "mods/notes/main.luau", "error('the host notes')");
+    // A package the user installed replaces the host's mod of its name.
+    write(&package, "mods/notes/main.luau", PANEL);
+    write(&user, "style.luau", "return style { radius = 7 }");
+
+    let roots = crate::Roots::hosted(
+        toolbox.path().to_owned(),
+        crate::AppLayer {
+            path: host.clone(),
+            keep: vec!["terminal".to_owned()],
+        },
+        [package],
+        Some(user),
+    );
+    assert_eq!(roots.file("main.luau"), Some(host.join("main.luau")));
+    assert!(roots.entries("components", "luau").contains_key("card"));
+    let workspace = Workspace::open(roots, false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    // The toolbox's explorer stays out; its terminal is kept.
+    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
+        "notes", "sessions", "terminal"
+    ]);
+    assert_eq!(workspace.stylesheet().radius, Some(7.0));
+}
+
+#[test]
 fn packages_lie_between_the_app_and_the_user_and_never_replace_the_shell() {
     let builtin = app(&[]);
     let dir = tempfile::tempdir().unwrap();
@@ -3881,4 +3923,34 @@ return mod {
         panic!("no panel");
     };
     assert_eq!(text_of(&panel.children[0]), "count 1");
+}
+
+#[test]
+fn providers_are_wanted_by_what_views_read_and_mods_hear() {
+    let reader = r#"return mod { region = "left", view = function(state, app)
+        return ui.text(app.git and app.git.branch or "none") end }"#;
+    let dir = app(&[
+        ("reader", reader),
+        (
+            "hears",
+            &listener(r#""provider/files", "provider/gh*", "tabs/main""#),
+        ),
+    ]);
+    let workspace = Workspace::open(dir.path(), false);
+    let wanted = workspace.wanted_providers().unwrap();
+    for name in ["git", "files", "gh*"] {
+        assert!(wanted.contains(name), "{name} is not wanted: {wanted:?}");
+    }
+    assert!(!wanted.contains("tabs/main"));
+    assert!(!wanted.contains("system"));
+
+    // A view that goes through every key wants them all.
+    let all = r#"return mod { region = "left", view = function(state, app)
+        local count = 0
+        for _ in app do count += 1 end
+        return ui.text(tostring(count)) end }"#;
+    let dir = app(&[("all", all)]);
+    assert_eq!(Workspace::open(dir.path(), false).wanted_providers(), None);
+    let dir = app(&[("hears", &listener(r#""provider/*""#))]);
+    assert_eq!(Workspace::open(dir.path(), false).wanted_providers(), None);
 }

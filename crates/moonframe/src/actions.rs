@@ -65,8 +65,9 @@ pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
         MenuItem::action(format!("About {title}"), AboutApp),
         MenuItem::separator(),
     ];
-    // Outside a release, the app builds itself as one.
-    if !crate::release() {
+    // Outside a release, the starter builds itself as one; an app on the
+    // library bundles with its own `bundle` command.
+    if !crate::release() && !crate::identity().hosted {
         app_items.extend([
             MenuItem::action("Build App Bundle", BuildApp),
             MenuItem::separator(),
