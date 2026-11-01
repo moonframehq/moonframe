@@ -3,7 +3,6 @@
 -- anywhere here; the real mod (app/mods/feedback) hands it to the `acp`
 -- provider, which runs a coding agent.
 local feedback = use "feedback"
-local checkbox = use "checkbox"
 
 return mod {
 	init = function(previous)
@@ -21,7 +20,8 @@ return mod {
 			},
 		}
 		local expanded: string? = nil
-		return previous or { open = true, text = "", count = 1, runs = runs, expanded = expanded, selection = true }
+		local attached: any = { element = 'text.status-text "⎇ main +29"', at = "app/mods/status/main.luau:33" }
+		return previous or { open = true, text = "", count = 1, runs = runs, expanded = expanded, attached = attached }
 	end,
 
 	update = function(state, msg)
@@ -29,8 +29,8 @@ return mod {
 			state.open = true
 		elseif msg == "close" then
 			state.open = false
-		elseif msg == "toggle-selection" then
-			state.selection = not state.selection
+		elseif msg == "detach" then
+			state.attached = nil
 		elseif type(msg) == "table" and msg.msg == "type" then
 			state.text = msg.value
 		elseif msg == "send" or (type(msg) == "table" and msg.msg == "send") then
@@ -67,9 +67,11 @@ return mod {
 				note = "A background agent implements it, then reports back under Feedback & fixes.",
 				runs = state.runs,
 				expanded = state.expanded,
-				actions = {
-					checkbox { label = "Attach the selected element", checked = state.selection, msg = "toggle-selection" },
-				},
+				-- In a mod, the Inspect button starts Inspect Element and the pick
+				-- comes back on the topic `app/inspect`; the gallery starts nothing.
+				inspect = true,
+				attached = state.attached,
+				detach = "detach",
 			},
 		}
 	end,

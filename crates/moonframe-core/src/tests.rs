@@ -3084,6 +3084,29 @@ fn a_topic_pushes_to_its_subscribers_and_is_saved() {
 }
 
 #[test]
+fn the_apps_own_topics_reach_subscribers_and_no_mod_publishes_them() {
+    let picker = listener(r#""app/inspect""#);
+    let dir = app(&[("publisher", PUBLISHER), ("picker", &picker)]);
+    let mut workspace = Workspace::open_with(dir.path(), false, None);
+    let pick = Data::Map([("branch".to_owned(), Data::from("picked"))].into());
+    workspace.app_topic("inspect", pick);
+    let heard = match workspace.slot("picker").and_then(crate::Slot::view) {
+        Some(Node::Text(text)) => text.text.clone(),
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(heard, "app/inspect=picked");
+
+    publish(&mut workspace, "app/inspect", Data::Bool(true));
+    let error = workspace
+        .slot("publisher")
+        .unwrap()
+        .error()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("app/ ones the app's"), "{error}");
+}
+
+#[test]
 fn an_instance_mounted_late_catches_up_on_its_topics() {
     let watcher = listener(r#""tabs/main""#);
     let dir = app(&[("publisher", PUBLISHER), ("watcher", &watcher)]);

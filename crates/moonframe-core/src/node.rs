@@ -202,6 +202,9 @@ tokens! {
         Maximize = "maximize",
         CloseWindow = "close-window",
         ShowThemes = "show-themes",
+        /// Starts Inspect Element for the mod that asked: the pick, or
+        /// Escape, comes back to it on the topic `app/inspect`.
+        Inspect = "inspect",
     }
 }
 

@@ -282,11 +282,14 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | Prop | Meaning |
 | --- | --- |
 | `actions` | elements on the footer's left, such as an agent `dropdown` |
+| `attached` | the element attached to the request, `{ element, at }`, shown as a chip |
 | `change` | sent on each edit, with `value` set to the text |
+| `detach` | msg the chip's × sends |
 | `dismiss` | msg sent by Cancel, Escape or a backdrop click |
 | `error` | why the last send failed, shown above the buttons |
 | `expanded` | id of the run shown open, with `agent-run`; one waiting on an answer is always open |
 | `id` | keeps the text across renders (default "feedback") |
+| `inspect` | show an Inspect button that starts Inspect Element for the mod (`command = "inspect"`); the pick comes back on the topic `app/inspect` |
 | `note` | muted lines under the field: who acts on the feedback, and what goes with it |
 | `open` | show it |
 | `placeholder` | grey text while empty (default: two examples) |
@@ -296,7 +299,7 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | `to` | mod its own messages go to, if not the drawing one |
 | `value` | the text; set it to "" after sending to clear the field |
 
-**Styles:** `.feedback` `.feedback-action` `.feedback-action:hover` `.feedback-body` `.feedback-detail` `.feedback-done` `.feedback-error` `.feedback-failed` `.feedback-heading` `.feedback-history` `.feedback-item` `.feedback-item-head` `.feedback-item-head:hover` `.feedback-muted` `.feedback-note` `.feedback-request` `.feedback-run` `.feedback-running` `.feedback-title` `.feedback-waiting`
+**Styles:** `.feedback` `.feedback-action` `.feedback-action:hover` `.feedback-body` `.feedback-chip` `.feedback-chip-at` `.feedback-chip-element` `.feedback-detail` `.feedback-done` `.feedback-error` `.feedback-failed` `.feedback-heading` `.feedback-history` `.feedback-item` `.feedback-item-head` `.feedback-item-head:hover` `.feedback-muted` `.feedback-note` `.feedback-request` `.feedback-run` `.feedback-running` `.feedback-title` `.feedback-waiting`
 
 ```lua
 local feedback = use "feedback"

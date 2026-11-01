@@ -12,11 +12,10 @@
 //! Messages (only from mods in provider.toml's `starters`; a run answers
 //! only the mod that started it):
 //! - `{ start = "<the user's words>", id?, agent?, instructions?, context?,
-//!   selection?, permissions? }` starts a run. `instructions` are the mod's
-//!   own guidance, put before the words; `context` is data the app gathered,
+//!   permissions? }` starts a run. `instructions` are the mod's own
+//!   guidance, put before the words; `context` is data the app gathered,
 //!   sent as JSON fenced with a tag chosen per run and marked as data, never
-//!   instructions; `selection = true` adds the Inspect Element pick the same
-//!   way. `permissions = "allow"` answers every permission question with
+//!   instructions. `permissions = "allow"` answers every permission question with
 //!   the broadest allow (the agent then does anything without asking);
 //!   otherwise each waits on the user. Answered at once with
 //!   `{ reply = id, action = "start", ok, run | error }`, and when it ends
@@ -54,8 +53,6 @@ const MAX_RUNS: usize = 30;
 const START_TIMEOUT: Duration = Duration::from_secs(300);
 /// The longest request, instructions and context a mod may send.
 const MAX_TEXT: usize = 64 << 10;
-/// The most of the Inspect Element pick attached.
-const MAX_SELECTION: usize = 8 << 10;
 
 /// Makes the provider, for the app's registry.
 pub fn native() -> Box<dyn Native> {
@@ -86,8 +83,6 @@ pub struct Acp {
     commands: Vec<(String, Vec<String>)>,
     /// Where finished runs are saved; none in tests that keep nothing.
     store: Option<PathBuf>,
-    /// Where the Inspect Element pick is.
-    selection: Option<PathBuf>,
     /// The agents as last published, and whether any can run.
     agents: Value,
     last: Option<Value>,
@@ -138,10 +133,6 @@ impl Native for Acp {
             Some(store) => Some(PathBuf::from(store)),
             None => state.map(|state| state.join("moonframe/acp").join(format!("{profile}.json"))),
         };
-        let cache = std::env::var_os("XDG_CACHE_HOME")
-            .map(PathBuf::from)
-            .or_else(|| home.as_ref().map(|home| home.join(".cache")));
-        self.selection = cache.map(|cache| cache.join("moonframe/selection.md"));
         self.restore();
         self.look_for_agents();
         self.publish(host);
@@ -262,16 +253,10 @@ impl Acp {
 
         // What the app attaches: data, fenced with a tag the data cannot
         // know, so nothing in it can pass for instructions.
-        let mut context = match message.get("context") {
-            Some(Value::Object(fields)) => fields.clone(),
-            _ => serde_json::Map::new(),
+        let context = match message.get("context") {
+            Some(Value::Object(fields)) => Value::Object(fields.clone()),
+            _ => json!({}),
         };
-        if message.get("selection").and_then(Value::as_bool) == Some(true)
-            && let Some(pick) = self.selection.as_deref().and_then(read_selection)
-        {
-            context.insert("inspect_element_selection".to_owned(), json!(pick));
-        }
-        let context = Value::Object(context);
         if context.to_string().len() > MAX_TEXT {
             return Err("the context is too large".to_owned());
         }
@@ -523,15 +508,6 @@ fn workdir(dir: &Path, setting: Option<&str>, home: Option<&Path>) -> PathBuf {
         .or_else(|| home.map(|home| home.join(".config")))
         .unwrap_or_default();
     config.join("moonframe")
-}
-
-fn read_selection(path: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(path).ok()?;
-    let mut end = text.len().min(MAX_SELECTION);
-    while !text.is_char_boundary(end) {
-        end -= 1;
-    }
-    Some(text[..end].to_owned())
 }
 
 /// Keeps the newest runs, never dropping one that is going.

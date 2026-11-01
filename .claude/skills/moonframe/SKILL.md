@@ -224,6 +224,15 @@ lists every element around it, outermost first, so "add a list here" on a
 row means adding a child to that row; on a text, add a sibling. If the file
 is missing, nothing is selected: ask, or pick a sensible place and say which.
 
+**A mod can ask for a pick.** A button with `command = "inspect"` starts
+picking for the mod that drew it, without the card. That mod hears it on the
+topic `app/inspect` (subscribe to it): `{ asker, picking = true }` as it
+starts (hide a dialog then), and `{ asker, picking = false, picked, element?,
+mod?, at?, report? }` when the user clicks an element (`picked = true`;
+`report` is the text above) or presses Escape. Check `asker` is your mod's
+name. `mods/feedback` attaches the pick to a request this way. `app/` topics
+are the app's: a mod can't publish them.
+
 "Copy for agent" copies that text and closes the card, but the file stays,
 so the selection is still there for you. "Clear" (or Esc) deletes it. The
 Components window's "Copy for agent" copies a request to add that component
@@ -581,7 +590,7 @@ return mod {
 - `provider/<name>` carries a provider's data each time it publishes, for a
   mod that must react (not only redraw); views still read `app.<name>`.
 - Names are 1 to 128 of `a-z A-Z 0-9 - _ . /`; `provider/` is the
-  providers'. Previews (the Components window) hear nothing.
+  providers', and `app/` the app's own (`app/inspect`). Previews (the Components window) hear nothing.
 - Use a topic when several modules share a value; use `to = "<mod>"` when
   one module tells another.
 
@@ -841,7 +850,7 @@ Text-like elements take their main value positionally:
 - border: `true`, `all`, `top`, `bottom`, `left`, `right`, `none`
 - direction: `row` `column`
 - variant (button): `normal` `primary` `ghost` `outline` `danger`
-- command: `quit` `reload` `toggle-theme` `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window`
+- command: `quit` `reload` `toggle-theme` `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `inspect` (Inspect Element for the mod: see "Here")
 - place (overlay): `center` `top` `bottom` `left` `right` `top-start`
   `top-end` `bottom-start` `bottom-end`
 - browser commands (with `browser = "<id>"`): `browser-back`
@@ -1483,9 +1492,8 @@ replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
 runs are kept (30) across launches.
 
 Messages: `{ start = "<words>", id?, agent?, instructions?, context?,
-selection?, permissions? }` (`selection = true` attaches the Inspect
-Element pick to the context; `permissions = "allow"` answers every
-question with the broadest allow), `{ cancel = run }`, `{ forget = run }`
+permissions? }` (`permissions = "allow"` answers every question with the
+broadest allow), `{ cancel = run }`, `{ forget = run }`
 (finished ones), `{ answer = run, option = "<id>" | false }`.
 
 | field | shape |

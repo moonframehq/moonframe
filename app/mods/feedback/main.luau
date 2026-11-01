@@ -4,18 +4,21 @@
 -- app's own files with every permission, so the window reloads with the
 -- change; the dialog follows each run under "Feedback & fixes". The icon
 -- spins while an agent works, and shows a dot when one finished since the
--- dialog was last open. The shell mounts it in its title bar.
+-- dialog was last open. Inspect in the dialog picks an element in the
+-- window to attach. The shell mounts it in its title bar.
 local feedback = use "feedback"
 local dropdown = use "dropdown"
-local checkbox = use "checkbox"
 
 type State = {
 	open: boolean,
 	text: string,
 	agent: string?,
 	picking: boolean,
-	-- Attach the Inspect Element pick to the request.
-	selection: boolean,
+	-- The element picked with Inspect to go with the request:
+	-- { element, mod, at, report } from `app/inspect`.
+	attached: any?,
+	-- Picking for the dialog: it hides until the pick comes back.
+	inspecting: boolean,
 	expanded: string?,
 	error: string?,
 	-- The newest time one of our runs finished, and the newest the user has
@@ -74,7 +77,7 @@ end
 
 return mod {
 	title = "Feedback",
-	subscribe = { "tabs/main", "provider/acp" },
+	subscribe = { "tabs/main", "provider/acp", "app/inspect" },
 
 	init = function(previous: State?): State
 		local seen = previous and previous.seen or 0
@@ -83,7 +86,8 @@ return mod {
 			text = "",
 			agent = previous and previous.agent,
 			picking = false,
-			selection = if previous then previous.selection ~= false else true,
+			attached = previous and previous.attached,
+			inspecting = false,
 			expanded = nil,
 			error = nil,
 			latest = seen,
@@ -106,12 +110,27 @@ return mod {
 				state.picking = not state.picking
 			elseif msg == "close-agents" then
 				state.picking = false
-			elseif msg == "toggle-selection" then
-				state.selection = not state.selection
+			elseif msg == "detach" then
+				state.attached = nil
 			end
 			return nil
 		end
-		if msg.topic == "tabs/main" then
+		if msg.topic == "app/inspect" then
+			-- Inspect Element, started from the dialog's Inspect button.
+			local pick = msg.value
+			if pick.asker ~= "feedback" then
+				return nil
+			elseif pick.picking then
+				state.inspecting = true
+				state.open = false
+			elseif state.inspecting then
+				state.inspecting = false
+				state.open = true
+				if pick.picked then
+					state.attached = { element = pick.element, mod = pick.mod, at = pick.at, report = pick.report }
+				end
+			end
+		elseif msg.topic == "tabs/main" then
 			state.tab = msg.value and msg.value.title
 		elseif msg.topic == "provider/acp" then
 			state.latest = newest(ours(msg.value))
@@ -132,9 +151,14 @@ return mod {
 			if string.match(text or "", "^%s*$") then
 				return nil
 			end
+			local context = msg.context or {}
+			if state.attached then
+				context.inspect_element_selection = state.attached.report
+			end
 			state.text = ""
 			state.open = false
 			state.error = nil
+			state.attached = nil
 			return state,
 				{
 					{
@@ -144,8 +168,7 @@ return mod {
 							id = "feedback",
 							agent = state.agent,
 							instructions = INSTRUCTIONS,
-							context = msg.context,
-							selection = state.selection,
+							context = context,
 							permissions = "allow",
 						},
 					},
@@ -258,12 +281,10 @@ return mod {
 						event = "agent_pick",
 						side = "top",
 					},
-					checkbox {
-						label = "Attach the selected element",
-						checked = state.selection,
-						msg = "toggle-selection",
-					},
 				},
+				inspect = true,
+				attached = state.attached,
+				detach = "detach",
 			},
 		}
 	end,

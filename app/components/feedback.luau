@@ -22,8 +22,15 @@ type Props = {
 	runs: { any }?,
 	-- The run shown open.
 	expanded: string?,
-	-- Elements on the footer's left (an agent picker, a checkbox).
+	-- Elements on the footer's left (an agent picker).
 	actions: { any }?,
+	-- An Inspect button: the app's Inspect Element, for the mod to attach
+	-- what the user picks (it hears it on `app/inspect`).
+	inspect: boolean?,
+	-- The element attached, { element, at }, shown as a chip.
+	attached: { element: string, at: string? }?,
+	-- Sent by the chip's ×.
+	detach: any,
 	to: string?,
 }
 
@@ -38,6 +45,11 @@ local STATUS = {
 	cancelled = { icon = "circle-x", class = "feedback-muted", label = "Stopped" },
 	stopped = { icon = "circle-alert", class = "feedback-muted", label = "Stopped when the app quit" },
 }
+
+-- `mods/status/main.luau:33` from a whole path.
+local function short_at(at: string): string
+	return string.match(at, "([^/]+/[^/]+/[^/]+)$") or at
+end
 
 -- The first line of a request, for its row.
 local function first_line(text: string): string
@@ -112,6 +124,9 @@ return component {
 		["runs"] = "runs from `app.acp.runs` the mod started, newest first; a row sends `{ expand = id }`, its × `{ forget = id }` to `provider:acp`",
 		["expanded"] = "id of the run shown open, with `agent-run`; one waiting on an answer is always open",
 		["actions"] = "elements on the footer's left, such as an agent `dropdown`",
+		["inspect"] = "show an Inspect button that starts Inspect Element for the mod (`command = \"inspect\"`); the pick comes back on the topic `app/inspect`",
+		["attached"] = "the element attached to the request, `{ element, at }`, shown as a chip",
+		["detach"] = "msg the chip's × sends",
 		["to"] = "mod its own messages go to, if not the drawing one",
 	},
 	styles = {
@@ -120,6 +135,16 @@ return component {
 		[".feedback-title"] = { weight = "bold", size = "large" },
 		[".feedback-note"] = { size = "small", color = "muted-foreground" },
 		[".feedback-error"] = { size = "small", color = "danger" },
+		[".feedback-chip"] = {
+			gap = 6,
+			padding = { 4, 6, 4, 10 },
+			radius = 8,
+			background = "accent/8",
+			border = true,
+			border_color = "accent/25",
+		},
+		[".feedback-chip-element"] = { size = "small", font = "mono" },
+		[".feedback-chip-at"] = { size = "small", color = "muted-foreground" },
 		[".feedback-history"] = { border = "top", border_color = "border", padding = { 12, 20, 14, 20 }, gap = 8 },
 		[".feedback-heading"] = { size = "small", weight = "medium", color = "muted-foreground", case = "upper" },
 		[".feedback-item"] = { radius = 8, transition = "slide-fade fast ease-out" },
@@ -145,6 +170,8 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 		open = true,
 		dismiss = "close",
 		text = "",
+		inspect = true,
+		attached = { element = 'text.status-text "⎇ main +29"', at = "/code/moonframe/app/mods/status/main.luau:33" },
 		note = "A background agent (Claude) in ~/code/moonframe implements it with every permission, then reports back under Feedback & fixes. It gets what you're looking at, your window and the build.",
 		expanded = "2",
 		runs = ({
@@ -185,6 +212,15 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 		end
 		-- The mod's controls on the left, Cancel and Send on the right.
 		local footer: { [any]: any } = { gap = "normal", align = "center" }
+		if props.inspect then
+			table.insert(footer, ui.button {
+				"Inspect",
+				icon = "inspector",
+				variant = "outline",
+				command = "inspect",
+				tooltip = "Pick an element in the window to attach",
+			})
+		end
 		local actions: { any } = props.actions or {}
 		for _, action in actions do
 			table.insert(footer, action)
@@ -221,6 +257,26 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 					},
 					props.note ~= nil and ui.text { props.note, class = "feedback-note", wrap = true },
 					props.error ~= nil and ui.text { props.error, class = "feedback-error", wrap = true },
+					props.attached ~= nil and ui.row {
+						class = "feedback-chip",
+						align = "center",
+						self_align = "start",
+						ui.icon { name = "inspector", class = "feedback-running", size = "small" },
+						ui.text { props.attached.element, class = "feedback-chip-element", truncate = true },
+						props.attached.at ~= nil and ui.text {
+							short_at(props.attached.at),
+							class = "feedback-chip-at",
+							truncate = true,
+							tooltip = props.attached.at,
+						},
+						ui.row {
+							class = "feedback-action",
+							msg = props.detach,
+							to = props.to,
+							tooltip = "Don't attach it",
+							ui.icon "close",
+						},
+					},
 					ui.row(footer),
 				},
 				#rows > 0 and ui.column {

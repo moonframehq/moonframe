@@ -160,6 +160,8 @@ pub const TOPIC: &str = "topic:";
 
 /// The topic a provider's data is published on: `provider/git`.
 const PROVIDER_TOPIC: &str = "provider/";
+/// Topics only the app itself publishes: `app/inspect`.
+const APP_TOPIC: &str = "app/";
 
 /// Longest a topic name can be.
 const MAX_TOPIC: usize = 128;
@@ -622,6 +624,15 @@ impl Workspace {
         drawn
     }
 
+    /// Tells the modules subscribed to the app's own topic `app/<name>`
+    /// (which no mod can publish), and draws again. Not kept: only what
+    /// happens from now on.
+    pub fn app_topic(&mut self, name: &str, value: Data) {
+        let deliveries = self.deliveries(&format!("{APP_TOPIC}{name}"), &value);
+        self.process(deliveries.into());
+        self.settle();
+    }
+
     /// Stops sharing `app.<key>`, with the reason when there is one.
     pub fn clear_host(&mut self, key: &str, problem: Option<Error>) {
         self.host.remove(key);
@@ -959,9 +970,9 @@ impl Workspace {
             && name
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'));
-        if !plain || name.starts_with(PROVIDER_TOPIC) {
+        if !plain || name.starts_with(PROVIDER_TOPIC) || name.starts_with(APP_TOPIC) {
             return Err(Error::new(format!(
-                "`topic:{name}`: a topic is 1 to {MAX_TOPIC} of a-z, A-Z, 0-9, - _ . /, and provider/ topics are the providers'"
+                "`topic:{name}`: a topic is 1 to {MAX_TOPIC} of a-z, A-Z, 0-9, - _ . /; provider/ topics are the providers' and app/ ones the app's"
             )));
         }
         let deliveries = self.deliveries(name, &value);
