@@ -54,6 +54,7 @@ mod settings;
 mod terminal;
 mod theme_picker;
 mod themes;
+mod update;
 
 #[cfg(feature = "tokio")]
 pub use moonframe_providers::{AsyncNative, on_runtime, runtime, tokio};
@@ -91,6 +92,9 @@ pub(crate) struct Identity {
     pub(crate) icon: Option<&'static [u8]>,
     /// Its version, for its bundle.
     pub(crate) version: String,
+    /// The GitHub repository (`owner/repo`) whose releases update it:
+    /// Check for Updates in the app menu.
+    pub(crate) updates: Option<String>,
     /// Built on the library by another app rather than the starter: the
     /// built-in app is only a toolbox under the host's own.
     pub(crate) hosted: bool,
@@ -104,6 +108,7 @@ impl Identity {
             title: "Moonframe".to_owned(),
             icon: None,
             version: env!("CARGO_PKG_VERSION").to_owned(),
+            updates: Some("penso/moonframe".to_owned()),
             hosted: false,
         }
     }

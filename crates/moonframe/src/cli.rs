@@ -393,6 +393,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         Ordering::Relaxed,
     );
     let _ = crate::TITLE.set(folders.title());
+    let _ = crate::update::SOURCE.set(folders.updates());
     crate::dock::set_name(&crate::title());
     tracing::info!(
         "starting {} ({}{}) on {}",

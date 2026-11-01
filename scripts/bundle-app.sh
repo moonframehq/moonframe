@@ -11,8 +11,9 @@
 #
 # With PROFILE it is that profile's app, standalone: its app package and the
 # packages it requires are staged in Contents/Resources/bundle, it takes the
-# app's title, id (dev.moonframe.app.NAME) and icon (its manifest's `icon`,
-# else icon.png), and it runs as a release, without the Components menu or
+# app's title, id (dev.moonframe.app.NAME), version (its manifest's
+# `version`, else Moonframe's) and icon (its manifest's `icon`, else
+# icon.png), and it runs as a release, without the Components menu or
 # Inspect Element. What its users add goes in
 # ~/.config/moonframe/profiles/NAME. MOONFRAME_USER names another user
 # folder to find the profile in.
@@ -44,6 +45,7 @@ if [ -n "$profile" ]; then
             title) title=$value ;;
             app) app=$value ;;
             icon) icon=$value ;;
+            version) version=$value ;;
             package) packages+=("$value") ;;
         esac
     done < <("$binary" ${MOONFRAME_USER:+--user "$MOONFRAME_USER"} app paths "$profile")

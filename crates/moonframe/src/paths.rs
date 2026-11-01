@@ -298,6 +298,36 @@ impl Folders {
             .map(|app| app.path)
     }
 
+    /// The profile's app package's `[app]`, if it has one.
+    pub(crate) fn manifest(&self) -> Option<packages::App> {
+        self.app()
+            .and_then(|app| packages::App::read(&app).ok().flatten())
+    }
+
+    /// Where Check for Updates looks, if anywhere: in a profile, its app's
+    /// `updates` and `version`; else the app's own (the starter's is
+    /// Moonframe's repository). Only the bundle running the app being
+    /// updated is replaced: the starter's `.app` with a profile in it is
+    /// not the profile's app.
+    pub(crate) fn updates(&self) -> Option<crate::update::Source> {
+        let (repo, version) = match &self.profile {
+            Some(_) => {
+                let manifest = self.manifest()?;
+                (manifest.updates?, manifest.version?)
+            },
+            None => (
+                crate::identity().updates.clone()?,
+                crate::identity().version.clone(),
+            ),
+        };
+        let replaceable = self.profile.is_none() || self.bundled.is_some();
+        Some(crate::update::Source {
+            repo,
+            version,
+            bundle: crate::update::running_bundle().filter(|_| replaceable),
+        })
+    }
+
     /// The app's name for people: its manifest's title, else its name, else
     /// the profile's, else the one the app was launched with.
     pub(crate) fn title(&self) -> String {

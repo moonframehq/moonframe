@@ -68,6 +68,14 @@ pub(crate) struct App {
     /// Packages it needs, as `moonframe mod install` takes them.
     #[serde(default)]
     pub(crate) requires: Vec<String>,
+    /// Its version (`1.2.0`): the About panel's, a bundle's, and the one
+    /// Check for Updates compares with its releases.
+    #[serde(default)]
+    pub(crate) version: Option<String>,
+    /// The GitHub repository (`owner/repo`) whose releases update it: the
+    /// app menu gets Check for Updates. Needs `version`.
+    #[serde(default)]
+    pub(crate) updates: Option<String>,
 }
 
 impl App {
@@ -111,8 +119,48 @@ impl App {
                 printable(icon)
             ));
         }
+        // The version goes into a bundle's plist, so it is plain.
+        if let Some(version) = &app.version
+            && !valid_version(version)
+        {
+            return Err(format!(
+                "{}: `{}` is not a version: digits and dots, such as 1.2.0, \
+                 with an optional -pre-release",
+                path.display(),
+                printable(version)
+            ));
+        }
+        if let Some(repo) = &app.updates {
+            if !crate::update::valid_repo(repo) {
+                return Err(format!(
+                    "{}: `{}` is not a GitHub repository: owner/repo",
+                    path.display(),
+                    printable(repo)
+                ));
+            }
+            if app.version.is_none() {
+                return Err(format!(
+                    "{}: `updates` needs the app's `version` to compare releases with",
+                    path.display()
+                ));
+            }
+        }
         Ok(Some(app))
     }
+}
+
+/// Whether `version` reads as one: `1.2.0`, `1.2.0-beta.1`.
+fn valid_version(version: &str) -> bool {
+    let (core, pre) = version.split_once('-').unwrap_or((version, ""));
+    !core.is_empty()
+        && core.split('.').count() <= 4
+        && core
+            .split('.')
+            .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+        && pre
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-'))
+        && !(version.contains('-') && pre.is_empty())
 }
 
 /// A name for a profile or app: lowercase letters, digits, `-` and `_`.

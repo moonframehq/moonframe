@@ -19,7 +19,7 @@ type Edge = "none" | "all" | "top" | "bottom" | "left" | "right"
 type Border = boolean | Edge
 type Direction = "row" | "column"
 type Variant = "normal" | "primary" | "ghost" | "outline" | "danger"
-type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | BrowserCommand
+type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | "check-for-updates" | BrowserCommand
 -- Run on the `ui.browser` the control's `browser` key names.
 type BrowserCommand = "browser-back" | "browser-forward" | "browser-reload" | "browser-stop" | "browser-open"
 

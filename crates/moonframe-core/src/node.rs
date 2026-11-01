@@ -212,6 +212,9 @@ tokens! {
         /// Starts Inspect Element for the mod that asked: the pick, or
         /// Escape, comes back to it on the topic `app/inspect`.
         Inspect = "inspect",
+        /// Asks the app's GitHub repository for a newer release, as the
+        /// app menu's Check for Updates does.
+        CheckForUpdates = "check-for-updates",
     }
 }
 

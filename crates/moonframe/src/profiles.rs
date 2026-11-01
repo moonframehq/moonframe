@@ -61,7 +61,10 @@ providers/, components/, style.luau) with a moonframe.toml at its root:
   keep = [\"terminal\"]                 # built-in mods it shows
   requires = [\"owner/repo@v1\"]        # packages it installs with it; a path
                                       # such as \"../shared\" is one shipped
-                                      # beside it, used in place";
+                                      # beside it, used in place
+  version = \"1.0.0\"                   # its version, for bundles and updates
+  updates = \"owner/repo\"              # GitHub releases to update from:
+                                      # Check for Updates in the app menu";
 
 /// The words that make `app` this command rather than a folder's name.
 pub(crate) const COMMANDS: &[&str] = &[
@@ -422,6 +425,9 @@ fn print_paths(user: &Path, name: &str) -> Result<(), String> {
             .unwrap_or_else(|| manifest.name.clone())
     );
     println!("app\t{}", app.path.display());
+    if let Some(version) = &manifest.version {
+        println!("version\t{version}");
+    }
     let icon = app
         .path
         .join(manifest.icon.as_deref().unwrap_or("icon.png"));

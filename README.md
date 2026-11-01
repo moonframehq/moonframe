@@ -294,7 +294,13 @@ title = "My App"                 # its name in the menu bar and bundle
 icon = "icon.png"                # its icon (default icon.png)
 keep = ["terminal"]              # built-in mods it shows; it brings the rest
 requires = ["owner/repo@v1"]     # packages it installs with it, or "../shared"
+version = "1.0.0"                # its version, for its bundle and updates
+updates = "owner/my-app"         # the GitHub repository it is released from
 ```
+
+With `updates`, the app menu gets **Check for Updates…**, which offers the
+repository's newest GitHub release and, on macOS, installs it over the app's
+bundle; see [docs/updates.md](docs/updates.md).
 
 The built-in providers, components and styles are there for it to use; the
 built-in mods are not, unless it keeps them. Profiles live in
