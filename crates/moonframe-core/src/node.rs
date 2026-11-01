@@ -62,6 +62,8 @@ tokens! {
         Normal = "normal",
         Large = "large",
         Title = "title",
+        Headline = "headline",
+        Display = "display",
     }
 }
 

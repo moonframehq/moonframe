@@ -10,7 +10,7 @@ type Data = nil | boolean | number | string | { [any]: any }
 
 type Space = "none" | "small" | "normal" | "large"
 type Tone = "normal" | "muted" | "accent" | "success" | "warning" | "danger"
-type TextSize = "small" | "normal" | "large" | "title"
+type TextSize = "small" | "normal" | "large" | "title" | "headline" | "display"
 type Weight = "light" | "normal" | "medium" | "semibold" | "bold"
 type Align = "stretch" | "start" | "center" | "end"
 type Justify = "start" | "center" | "end" | "between"
