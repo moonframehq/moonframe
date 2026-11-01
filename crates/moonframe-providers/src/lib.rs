@@ -65,7 +65,7 @@ use {
     moonframe_core::{Data, Error, Roots},
     std::{
         collections::{BTreeMap, BTreeSet},
-        path::PathBuf,
+        path::{Path, PathBuf},
         sync::{
             Arc,
             atomic::{AtomicBool, Ordering},
@@ -116,6 +116,24 @@ pub fn set_profile(name: &str) {
 /// state of its own per app.
 pub fn profile() -> Option<&'static str> {
     PROFILE.get().map(String::as_str)
+}
+
+/// The folder the app was started from, which process providers see as
+/// `MOONFRAME_LAUNCH_DIR`; set once at launch with [`set_launch_dir`].
+static LAUNCH_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Records the folder the app was started from. `/` (an app opened from
+/// the Finder or the Dock) names none and is not kept.
+pub fn set_launch_dir(dir: &Path) {
+    if dir.is_dir() && dir.parent().is_some() {
+        let _ = LAUNCH_DIR.set(dir.to_owned());
+    }
+}
+
+/// The folder the app was started from (`moonframe` run in a shell), if
+/// any: where a terminal starts when nothing names another folder.
+pub fn launch_dir() -> Option<&'static Path> {
+    LAUNCH_DIR.get().map(PathBuf::as_path)
 }
 
 pub struct Providers {

@@ -1117,6 +1117,9 @@ type Files = {
 	-- The root folder's name, and its absolute path.
 	root: string,
 	path: string,
+	-- Where a terminal starts: the folder `moonframe` was started from,
+	-- else `path`.
+	cwd: string?,
 	-- Entries of the root (key "") and of each open folder (its path from
 	-- the root), folders first, each group sorted without regard to case.
 	dirs: { [string]: { FileEntry } },

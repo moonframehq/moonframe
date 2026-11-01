@@ -12,7 +12,7 @@ use {
     std::{
         cell::Cell,
         collections::{HashMap, HashSet},
-        path::PathBuf,
+        path::{Path, PathBuf},
         rc::Rc,
         sync::Arc,
     },
@@ -138,7 +138,11 @@ impl Terminals {
             preference,
             open: Open {
                 key: key.to_owned(),
-                cwd: cwd.map(expand),
+                // Unnamed, the folder the app was started from; the
+                // backend falls back to home without one.
+                cwd: cwd
+                    .map(expand)
+                    .or_else(|| moonframe_providers::launch_dir().map(Path::to_owned)),
                 size: moonframe_terminal::Size::default(),
             },
         };

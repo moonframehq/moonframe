@@ -302,6 +302,10 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         return ExitCode::from(2);
     }
     let _ = crate::IDENTITY.set(launch.identity.clone());
+    if let Ok(dir) = std::env::current_dir() {
+        // Terminals start here, and the explorer shows its project.
+        moonframe_providers::set_launch_dir(&dir);
+    }
     let host = launch.app.as_ref().filter(|_| launch.identity.hosted);
     if launch.identity.hosted && host.is_none() {
         eprintln!("{name}: the app names no folder: call `Moonframe::app_dir` or `embedded_app`");

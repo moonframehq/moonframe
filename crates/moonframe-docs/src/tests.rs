@@ -309,7 +309,13 @@ fn tells_readers_when_a_file_changes_or_goes() {
 #[test]
 fn the_root_is_the_repository_holding_the_app() {
     let dir = tempfile::tempdir().unwrap();
-    fs::create_dir(dir.path().join(".git")).unwrap();
+    let made = std::process::Command::new("git")
+        .arg("init")
+        .arg("--quiet")
+        .arg(dir.path())
+        .status()
+        .unwrap();
+    assert!(made.success());
     let provider = dir.path().join("app/providers/docs");
     fs::create_dir_all(&provider).unwrap();
     // LAYOUTS_REPO, which git and the forges watch, doesn't move it: the
