@@ -239,7 +239,15 @@ fn app_name(contents: &Contents) -> String {
         .unwrap_or_default()
 }
 
+/// Refuses a name that is taken or that is not a profile name, before any
+/// path is made from it.
 fn refuse_taken(user: &Path, name: &str) -> Result<(), String> {
+    if !packages::valid_name(name) {
+        return Err(format!(
+            "`{}` is not a profile name: use a-z, 0-9, - and _",
+            name.escape_debug()
+        ));
+    }
     if paths::profile(user, name).exists() {
         return Err(format!(
             "a profile `{name}` exists; pick another with --as NAME, or \
