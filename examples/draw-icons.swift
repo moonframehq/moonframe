@@ -515,3 +515,32 @@ do {
     cx.strokePath()
     save(cx, "examples/parlance/icon.png")
 }
+
+// Ember: Cinder, the pixel mascot, on a charcoal tile.
+do {
+    let cx = body([0x3a3a3c, 0x262627, 0x161617])
+    let rows = [
+        "......f.....",
+        ".....ff.....",
+        "....oooo....",
+        "..oooooooo..",
+        ".ookooookoo.",
+        "oooooooooooo",
+        "oooooooooooo",
+        ".oooooooooo.",
+        "..ooo..ooo..",
+        "..oo....oo..",
+    ]
+    let colours: [Character: UInt32] = ["o": 0xd9774b, "f": 0xf2a65a, "k": 0x141414]
+    let pixel = 52.0
+    let left = 512 - pixel * 6
+    let top = 512 + pixel * 5
+    for (row, line) in rows.enumerated() {
+        for (column, char) in line.enumerated() {
+            guard let hex = colours[char] else { continue }
+            cx.setFillColor(color(hex))
+            cx.fill(CGRect(x: left + CGFloat(column) * pixel, y: top - CGFloat(row + 1) * pixel, width: pixel, height: pixel))
+        }
+    }
+    save(cx, "examples/ember/icon.png")
+}
