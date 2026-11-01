@@ -31,16 +31,8 @@ check-builtin dir="app":
 # Load the example apps in examples/ headlessly, each as a profile in a
 # throwaway user folder, and type-check their Luau.
 check-examples:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    user=$(mktemp -d)
-    trap 'rm -rf "$user"' EXIT
-    cargo build --quiet --release -p moonframe-app
-    for app in sessions workbench daybook ledger audience pipeline stage; do
-        target/release/moonframe --user "$user" app link "examples/$app" --yes >/dev/null
-        target/release/moonframe --user "$user" --profile "$app" --check | cut -c1-120
-    done
-    cargo run --quiet --release -p moonframe-host-example -- --user "$user" --check | cut -c1-120
+    cargo build --quiet --release -p moonframe-app -p moonframe-host-example
+    scripts/check-examples.sh target/release/moonframe target/release/host-example
     just types examples
 
 # Build Moonframe.app (release binary, staged app, icon) in target/bundle.
@@ -131,5 +123,31 @@ lint: lockfile-check
 test:
     cargo test --locked --workspace
     cargo test --locked --workspace --all-features
+
+# Audit the GitHub workflows (zizmor, actionlint) and the dependency graph
+# (cargo-deny: advisories, licenses, sources) as CI does.
+audit:
+    zizmor .github/
+    actionlint
+    cargo deny check advisories bans licenses sources
+
+# Build this Mac's release packages, unsigned, as .github/workflows/package.yml
+# does: the app and its disk image in target/dist.
+package-macos out="target/dist":
+    cargo build --locked --release -p moonframe-app
+    scripts/release/package-macos.sh {{out}} target/release/moonframe
+
+# Publish main's HEAD as v<version in Cargo.toml> (bump it first) through the
+# Release workflow, which waits for CI on that commit; see docs/releasing.md.
+release:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    git fetch --quiet origin main
+    sha=$(git rev-parse origin/main)
+    version=$(scripts/release/version.sh)
+    test "$(git rev-parse HEAD)" = "$sha" || { echo "check out origin/main ($sha) first" >&2; exit 1; }
+    test -z "$(git status --porcelain)" || { echo "the working tree is not clean" >&2; exit 1; }
+    echo "Releasing v$version from $sha"
+    gh workflow run release.yml --ref main -f expected_sha="$sha"
 
 ci: format-check lint test types providers check-builtin components-check check-examples

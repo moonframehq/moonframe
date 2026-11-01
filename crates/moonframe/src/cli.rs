@@ -40,7 +40,8 @@ Usage: moonframe [OPTIONS] [DIR]
                                          library; the starter's is `just bundle`)
 
   DIR           the built-in app folder: main.luau, style.luau, mods/, providers/
-                (default: Contents/Resources/app in the bundle, else ./app)
+                (default: Contents/Resources/app in the bundle, else app
+                beside the executable, else ./app)
 
 The user's folder goes over it: a mod or provider there replaces the
 built-in one of the same name, a main.luau replaces the shell, and a

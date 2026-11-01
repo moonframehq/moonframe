@@ -163,7 +163,14 @@ fn a_session_runs_a_shell() {
             })
             .unwrap();
         let session = Session::start(opened, engine, Size::default(), Arc::new(|| {})).unwrap();
-        session.write(b"echo moonframe-$((40 + 2))\r");
+        // What the shell prints, never what it echoes as typed: POSIX
+        // arithmetic, or on Windows cmd.exe an empty slice of a variable.
+        let command: &[u8] = if cfg!(windows) {
+            b"echo moonframe-%COMSPEC:~0,0%42\r"
+        } else {
+            b"echo moonframe-$((40 + 2))\r"
+        };
+        session.write(command);
         let deadline = Instant::now() + Duration::from_secs(15);
         let found = loop {
             let screen = session.screen();

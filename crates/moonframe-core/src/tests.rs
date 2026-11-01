@@ -3,7 +3,10 @@ use {
         Action, Border, Color, Command, Corners, Data, Direction, Node, Paint, Part, Rules, SHELL,
         Shade, Shadow, ShadowLayer, ShadowPreset, Sides, Token, Workspace,
     },
-    std::{fs, path::Path},
+    std::{
+        fs,
+        path::{Path, PathBuf},
+    },
 };
 
 const SHELL_SOURCE: &str = r#"
@@ -1920,7 +1923,13 @@ fn images_come_only_from_the_app_folders_and_the_cache() {
     // Out of the app's folders, by a path or by `..`: an empty box.
     let secret = outside.path().join("secret.png");
     assert!(!shown(secret.to_str().unwrap()));
-    let relative = format!("../../../{}", secret.strip_prefix("/").unwrap().display());
+    let named = |path: &Path| {
+        path.components()
+            .filter(|part| matches!(part, std::path::Component::Normal(_)))
+            .collect::<PathBuf>()
+    };
+    let up = "../".repeat(named(&folder).components().count());
+    let relative = format!("{up}{}", named(&secret).display());
     assert!(!shown(&relative));
     // A folder is not a picture.
     assert!(!shown("."));

@@ -32,14 +32,20 @@ pub(crate) fn namespace(profile: Option<&str>) -> String {
 
 /// The bundle's folder for the app's files: `Contents/Resources` inside a
 /// macOS bundle, `share/<binary>` beside `bin/` in a Linux one (each bundled
-/// app's binary has its own name). Only when it holds an `app` folder.
+/// app's binary has its own name), or the executable's own folder in the
+/// Linux and Windows release archives. Only when it holds an `app` folder.
 fn resources() -> Option<PathBuf> {
     let exe = env::current_exe().and_then(|exe| exe.canonicalize()).ok()?;
     let name = exe.file_name()?.to_str()?.to_owned();
-    let root = exe.parent()?.parent()?.to_owned();
-    [root.join("Resources"), root.join("share").join(name)]
-        .into_iter()
-        .find(|folder| folder.join("app").is_dir())
+    let dir = exe.parent()?;
+    let root = dir.parent()?;
+    [
+        root.join("Resources"),
+        root.join("share").join(name),
+        dir.to_owned(),
+    ]
+    .into_iter()
+    .find(|folder| folder.join("app").is_dir())
 }
 
 /// The starter's app folder: the bundle's, else `app` in the current

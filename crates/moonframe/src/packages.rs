@@ -303,8 +303,9 @@ impl Source {
     /// `@<ref>`: a branch, tag, or commit.
     fn parse(text: &str) -> Result<Self, String> {
         let text = text.trim();
-        // The ref's `@` comes after the last `/`, unlike `git@host:`'s.
-        let (text, reference) = match text.rsplit_once('/') {
+        // The ref's `@` comes after the last `/` (or Windows' `\`), unlike
+        // `git@host:`'s.
+        let (text, reference) = match text.rsplit_once(['/', '\\']) {
             Some((_, last)) if last.contains('@') => {
                 let (text, reference) = text.rsplit_once('@').unwrap_or((text, ""));
                 if reference.is_empty() {
@@ -314,7 +315,8 @@ impl Source {
             },
             _ => (text, None),
         };
-        if text.starts_with(['/', '.', '~']) {
+        // `C:\` and `\\server\` are folders too, on Windows.
+        if text.starts_with(['/', '.', '~']) || Path::new(text).is_absolute() {
             let folder = expand_home(text);
             let folder = std::path::absolute(&folder).unwrap_or(folder);
             let name = folder

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Packages a Linux or Windows release in OUT_DIR: BINARY with the built-in
+# app beside it (scripts/stage-app.sh: Wasm providers prebuilt), which is
+# where the binary looks for it, plus the license and readme, in
+# Moonframe-VERSION-TARGET.tar.gz (Linux) or .zip (Windows).
+set -euo pipefail
+[[ $# == 3 ]] || { echo "usage: package-archive.sh TARGET BINARY OUT_DIR" >&2; exit 2; }
+target=$1
+binary=$2
+out=$3
+version=$(scripts/release/version.sh)
+name="Moonframe-$version-$target"
+mkdir -p "$out"
+out=$(cd "$out" && pwd)
+
+work=$(mktemp -d)
+trap 'rm -rf -- "$work"' EXIT
+root="$work/$name"
+mkdir -p "$root"
+cp "$binary" "$root/"
+cp LICENSE README.md "$root/"
+scripts/stage-app.sh "$root/app" >/dev/null
+# With no folder given, the binary must find the app beside it and load
+# every module of it, headlessly.
+"$root/$(basename "$binary")" --check --no-user
+
+case $target in
+*-windows-*)
+    # Git Bash on the Windows runners has Python but no zip.
+    python=$(command -v python3 || command -v python)
+    (cd "$work" && "$python" -c 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", ".", sys.argv[2])' "$out/$name" "$name")
+    echo "$out/$name.zip"
+    ;;
+*)
+    tar -C "$work" -czf "$out/$name.tar.gz" "$name"
+    echo "$out/$name.tar.gz"
+    ;;
+esac
