@@ -1,0 +1,5 @@
+# Tandem's help desk, shared as `app.desk`. SAMPLE DATA from sample.json,
+# kept in memory; replace it, or this provider, with your help desk's API. A
+# process provider: it reads that file. Needs perl 5 (as macOS ships).
+command = ["perl", "desk.pl"]
+kind    = "process"

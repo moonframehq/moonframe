@@ -1,0 +1,8 @@
+[app]
+# An IT help desk inbox: tickets by priority, and the open ticket with the
+# assistant's health check and the chat thread it came from.
+# `moonframe --profile helpdesk` opens it.
+keep     = []
+name     = "helpdesk"
+requires = []
+title    = "Tandem"

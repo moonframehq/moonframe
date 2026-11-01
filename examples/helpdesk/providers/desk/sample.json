@@ -1,0 +1,241 @@
+{
+  "assistant": "Tandem",
+  "workspace": { "team": "IT Help", "company": "Corvo" },
+  "me": { "name": "Elena Ruiz", "email": "elena@corvo.co" },
+  "week": {
+    "total": 148,
+    "share": 61,
+    "first_reply": "38 seconds",
+    "split": [
+      { "id": "assistant", "label": "Tandem", "count": 90 },
+      { "id": "team", "label": "IT team", "count": 34 },
+      { "id": "open", "label": "Open", "count": 24 }
+    ]
+  },
+  "tickets": [
+    {
+      "id": "INC-1234", "kind": "Incident", "priority": "High", "age": "8 min", "minutes": 8,
+      "title": "Network connectivity drops in meeting room 4B",
+      "requester": { "name": "Priya Raman", "team": "Sales" },
+      "source": "slack", "status": "open", "status_label": "Open", "mine": false,
+      "created": "8 minutes ago",
+      "device": { "name": "Meeting room 4B", "detail": "Wi-Fi access point AP-4B-2" },
+      "summary": "Priya's calls drop every few minutes in room 4B. Two other people reported the same today; the access point there restarted itself three times this morning.",
+      "sla": [
+        { "left": "0h 52m", "label": "First response", "due": "Jun 20, 13:00", "used": 0.13, "urgent": false },
+        { "left": "3h 52m", "label": "Resolution", "due": "Jun 20, 16:00", "used": 0.03, "urgent": false }
+      ],
+      "watchers": [ "Priya Raman", "Jonas Hale" ],
+      "thread": [
+        { "from": "person", "name": "Priya Raman", "age": "10 minutes ago", "text": "The Wi-Fi in 4B keeps dropping, I've lost my client call twice now." },
+        { "from": "assistant", "age": "8 minutes ago", "text": "Sorry about that, Priya. I can see the access point in 4B restarted three times this morning, so I've opened INC-1234 for the network team. Room 4C next door is free until 3 pm if you need it." }
+      ]
+    },
+    {
+      "id": "REQ-1220", "kind": "Request", "priority": "Medium", "age": "25 min", "minutes": 25,
+      "title": "License request: Figma",
+      "requester": { "name": "Luca Moreau", "team": "Marketing" },
+      "source": "teams", "status": "waiting", "status_label": "Waiting for approval", "mine": false,
+      "created": "25 minutes ago",
+      "device": { "name": "MacBook Air 13\"", "detail": "macOS Tahoe 26.4" },
+      "summary": "Luca needs a Figma editor seat for the spring campaign. Two seats are free in the Marketing plan; his manager has to approve the cost centre.",
+      "sla": [
+        { "left": "Met", "label": "First response", "due": "Jun 20, 12:40", "used": 1.0, "urgent": false },
+        { "left": "1d 4h", "label": "Approval", "due": "Jun 21, 17:00", "used": 0.08, "urgent": false }
+      ],
+      "watchers": [ "Luca Moreau", "Hana Ito" ],
+      "check": {
+        "title": "Approval for Luca's Figma seat", "via": "Okta",
+        "steps": [
+          { "label": "Seat available in the Marketing plan", "state": "done" },
+          { "label": "Manager approval from Hana Ito", "state": "waiting", "note": "Waiting" }
+        ],
+        "suggestion": "Nudge Hana in Teams; the seat is ready to assign",
+        "primary": "Remind Hana", "secondary": "Reply to Luca"
+      },
+      "thread": [
+        { "from": "person", "name": "Luca Moreau", "age": "26 minutes ago", "text": "Could I get a Figma seat? Starting the spring campaign mock-ups this week." },
+        { "from": "assistant", "age": "25 minutes ago", "text": "Sure! There's a free editor seat in the Marketing plan. I've asked Hana to approve it and will add you as soon as she does." }
+      ]
+    },
+    {
+      "id": "INC-1231", "kind": "Incident", "priority": "High", "age": "1 h", "minutes": 60,
+      "title": "VPN connection unstable",
+      "requester": { "name": "Yusuf Demir", "team": "Finance" },
+      "source": "slack", "status": "progress", "status_label": "In progress", "mine": true,
+      "created": "1 hour ago",
+      "device": { "name": "ThinkPad X1 Carbon", "detail": "Windows 11 24H2" },
+      "summary": "Yusuf's VPN drops every 10 to 15 minutes since this morning's client update. Rolling back the client fixed it for one other person in Finance.",
+      "sla": [
+        { "left": "Met", "label": "First response", "due": "Jun 20, 12:10", "used": 1.0, "urgent": false },
+        { "left": "1h 05m", "label": "Resolution", "due": "Jun 20, 14:30", "used": 0.72, "urgent": true }
+      ],
+      "watchers": [ "Yusuf Demir", "Elena Ruiz" ],
+      "check": {
+        "title": "VPN diagnostics on Yusuf's laptop", "via": "Fleetly",
+        "steps": [
+          { "label": "Client updated to 7.2 this morning", "state": "done" },
+          { "label": "Packet loss 14% on the tunnel", "state": "done" },
+          { "label": "Rolling back the VPN client", "state": "running", "done_label": "Rolled back to 7.1" }
+        ],
+        "suggestion": "Pin version 7.1 for Finance until the vendor fixes 7.2",
+        "primary": "Pin 7.1 via Fleetly", "secondary": "Reply to Yusuf"
+      },
+      "thread": [
+        { "from": "person", "name": "Yusuf Demir", "age": "1 hour ago", "text": "VPN keeps kicking me out, I can't stay on the ledger system." },
+        { "from": "assistant", "age": "1 hour ago", "text": "Thanks Yusuf. Your VPN client updated this morning and the tunnel is losing packets. I'm rolling it back to the previous version now; it takes about a minute." }
+      ]
+    },
+    {
+      "id": "QUE-134", "kind": "Question", "priority": "Low", "age": "2 h", "minutes": 120,
+      "title": "How do I connect Confluence to Figma?",
+      "requester": { "name": "Anika Patel", "team": "Product" },
+      "source": "teams", "status": "resolved", "status_label": "Resolved", "mine": false,
+      "created": "2 hours ago",
+      "device": { "name": "MacBook Pro 14\"", "detail": "macOS Tahoe 26.5" },
+      "summary": "Anika wanted live Figma frames in a Confluence page. Tandem sent the steps from the Knowledge base and she confirmed it works.",
+      "sla": [
+        { "left": "Met", "label": "First response", "due": "Jun 20, 11:20", "used": 1.0, "urgent": false },
+        { "left": "Met", "label": "Resolution", "due": "Jun 20, 15:00", "used": 1.0, "urgent": false }
+      ],
+      "watchers": [ "Anika Patel" ],
+      "thread": [
+        { "from": "person", "name": "Anika Patel", "age": "2 hours ago", "text": "How do I embed a Figma frame in a Confluence page so it stays up to date?" },
+        { "from": "assistant", "age": "2 hours ago", "text": "Use the Figma macro: type /figma in the page, paste the frame's link, and pick Live embed. Your Figma account needs to be connected once, under Profile > Apps." },
+        { "from": "person", "name": "Anika Patel", "age": "2 hours ago", "text": "Worked, thanks!" }
+      ]
+    },
+    {
+      "id": "REQ-1218", "kind": "Request", "priority": "Low", "age": "3 h", "minutes": 180,
+      "title": "External monitor request",
+      "requester": { "name": "Theo Grant", "team": "Engineering" },
+      "source": "slack", "status": "waiting", "status_label": "Waiting for approval", "mine": true,
+      "created": "3 hours ago",
+      "device": { "name": "MacBook Pro 16\"", "detail": "macOS Tahoe 26.5" },
+      "summary": "Theo asks for a 27\" 4K monitor for his desk on floor 2. Stock has three; the request needs his team lead's approval under the hardware policy.",
+      "sla": [
+        { "left": "Met", "label": "First response", "due": "Jun 20, 10:30", "used": 1.0, "urgent": false },
+        { "left": "2d 5h", "label": "Approval", "due": "Jun 22, 17:00", "used": 0.05, "urgent": false }
+      ],
+      "watchers": [ "Theo Grant", "Elena Ruiz" ],
+      "thread": [
+        { "from": "person", "name": "Theo Grant", "age": "3 hours ago", "text": "Could I get an external monitor for my desk? Working on two codebases side by side." },
+        { "from": "assistant", "age": "3 hours ago", "text": "We have 27\" 4K monitors in stock. I've sent the request to your team lead for approval and will let you know when it's ready to pick up." }
+      ]
+    },
+    {
+      "id": "INC-1207", "kind": "Incident", "priority": "Medium", "age": "5 h", "minutes": 300,
+      "title": "Outlook calendar sync not working",
+      "requester": { "name": "Kwame Mensah", "team": "Operations" },
+      "source": "teams", "status": "resolved", "status_label": "Resolved", "mine": false,
+      "created": "5 hours ago",
+      "device": { "name": "iPhone 16", "detail": "iOS 26.5" },
+      "summary": "Kwame's phone stopped syncing his calendar after a password change. Tandem had him sign in again in the Outlook app and sync came back.",
+      "sla": [
+        { "left": "Met", "label": "First response", "due": "Jun 20, 08:10", "used": 1.0, "urgent": false },
+        { "left": "Met", "label": "Resolution", "due": "Jun 20, 12:00", "used": 1.0, "urgent": false }
+      ],
+      "watchers": [ "Kwame Mensah" ],
+      "thread": [
+        { "from": "person", "name": "Kwame Mensah", "age": "5 hours ago", "text": "My calendar on my phone is stuck at yesterday." },
+        { "from": "assistant", "age": "5 hours ago", "text": "You changed your password yesterday, so the Outlook app needs you to sign in again: open it, tap the account banner and sign in. Sync should catch up within a minute." },
+        { "from": "person", "name": "Kwame Mensah", "age": "5 hours ago", "text": "That did it, all there now." }
+      ]
+    },
+    {
+      "id": "INC-1206", "kind": "Incident", "priority": "Medium", "age": "12 h", "minutes": 720,
+      "title": "MacBook Pro 16\" running slow",
+      "requester": { "name": "Nora Lindqvist", "team": "Design" },
+      "source": "slack", "status": "open", "status_label": "Open", "mine": true,
+      "created": "12 hours ago",
+      "device": { "name": "MacBook Pro 16\"", "detail": "macOS Tahoe 26.5" },
+      "summary": "Nora's MacBook Pro is running slow. The last restart was May 21. She was advised to restart and run the usual checks, but asked for IT support.",
+      "sla": [
+        { "left": "0h 24m", "label": "First response", "due": "Jun 20, 13:00", "used": 0.97, "urgent": true },
+        { "left": "5h 24m", "label": "Resolution", "due": "Jun 20, 18:00", "used": 0.69, "urgent": false }
+      ],
+      "watchers": [ "Nora Lindqvist", "Elena Ruiz", "Jonas Hale" ],
+      "check": {
+        "title": "Health check on Nora's Mac", "via": "Fleetly",
+        "steps": [
+          { "label": "Disk 92% full", "state": "done" },
+          { "label": "Last restart 30 days ago", "state": "done" },
+          { "label": "Checking memory pressure", "state": "running", "done_label": "Memory pressure high" }
+        ],
+        "suggestion": "Free up disk space and restart after 2 pm",
+        "primary": "Run cleanup via Fleetly", "secondary": "Reply to Nora"
+      },
+      "earlier": [
+        { "from": "person", "name": "Nora Lindqvist", "age": "22 hours ago", "text": "My laptop has been crawling all day, Figma takes forever to open files." }
+      ],
+      "thread": [
+        { "from": "assistant", "age": "22 hours ago", "text": "Hi Nora, I can see you're on your MacBook Pro 16\". One thing stands out: the last restart was May 21, which is over a week ago. A restart can often resolve slowness issues. Would you like to try restarting first, or should I go ahead and open an IT ticket now?" },
+        { "from": "person", "name": "Nora Lindqvist", "age": "12 hours ago", "text": "Can you open a ticket? I have a client review at 2 pm." },
+        { "from": "assistant", "age": "12 hours ago", "text": "Done, I opened INC-1206 for the IT team and I'm checking your Mac in the meantime." }
+      ]
+    },
+    {
+      "id": "INC-1198", "kind": "Incident", "priority": "Low", "age": "Yesterday", "minutes": 1500,
+      "title": "Laptop battery drains in 2 hours",
+      "requester": { "name": "Felix Brandt", "team": "Support" },
+      "source": "slack", "status": "open", "status_label": "Open", "mine": false,
+      "created": "yesterday",
+      "device": { "name": "MacBook Air 15\"", "detail": "macOS Tahoe 26.3" },
+      "summary": "Felix's battery lasts about two hours. The battery reports 412 cycles at 78% capacity; a background sync app is also keeping the CPU busy.",
+      "sla": [
+        { "left": "Met", "label": "First response", "due": "Jun 19, 16:30", "used": 1.0, "urgent": false },
+        { "left": "1d 2h", "label": "Resolution", "due": "Jun 21, 16:00", "used": 0.45, "urgent": false }
+      ],
+      "watchers": [ "Felix Brandt" ],
+      "check": {
+        "title": "Battery check on Felix's Mac", "via": "Fleetly",
+        "steps": [
+          { "label": "Battery at 78% of design capacity", "state": "done" },
+          { "label": "Sync app using 40% CPU in the background", "state": "done" }
+        ],
+        "suggestion": "Book a battery replacement and quit the sync app at login",
+        "primary": "Book replacement", "secondary": "Reply to Felix"
+      },
+      "thread": [
+        { "from": "person", "name": "Felix Brandt", "age": "yesterday", "text": "Battery dies before lunch, is that normal?" },
+        { "from": "assistant", "age": "yesterday", "text": "Not quite. Your battery is at 78% of its original capacity and a sync app is busy in the background. I've opened INC-1198 so the team can book a replacement." }
+      ]
+    },
+    {
+      "id": "INC-1192", "kind": "Incident", "priority": "Medium", "age": "2 days", "minutes": 2880,
+      "title": "Printer on floor 3 shows offline",
+      "requester": { "name": "Mira Solberg", "team": "Legal" },
+      "source": "teams", "status": "resolved", "status_label": "Resolved", "mine": false,
+      "created": "2 days ago",
+      "device": { "name": "Printer F3-East", "detail": "Firmware 4.12" },
+      "summary": "The floor 3 printer had dropped off the network after a power cut. Tandem power-cycled it through the smart plug and it came back.",
+      "sla": [
+        { "left": "Met", "label": "First response", "due": "Jun 18, 10:00", "used": 1.0, "urgent": false },
+        { "left": "Met", "label": "Resolution", "due": "Jun 18, 14:00", "used": 1.0, "urgent": false }
+      ],
+      "watchers": [ "Mira Solberg" ],
+      "thread": [
+        { "from": "person", "name": "Mira Solberg", "age": "2 days ago", "text": "The printer by the east stairs says offline." },
+        { "from": "assistant", "age": "2 days ago", "text": "It lost its network after last night's power cut. I've restarted it; it should show up again in a minute." }
+      ]
+    },
+    {
+      "id": "REQ-1189", "kind": "Request", "priority": "Low", "age": "3 days", "minutes": 4320,
+      "title": "Access to the Finance shared drive",
+      "requester": { "name": "Jonas Hale", "team": "Operations" },
+      "source": "slack", "status": "progress", "status_label": "In progress", "mine": false,
+      "created": "3 days ago",
+      "device": { "name": "MacBook Pro 14\"", "detail": "macOS Tahoe 26.5" },
+      "summary": "Jonas needs read access to the Finance quarterly folder for the budget review. Finance approved; the group change is waiting on the next directory sync.",
+      "sla": [
+        { "left": "Met", "label": "First response", "due": "Jun 17, 11:00", "used": 1.0, "urgent": false },
+        { "left": "4h 10m", "label": "Resolution", "due": "Jun 20, 17:00", "used": 0.84, "urgent": false }
+      ],
+      "watchers": [ "Jonas Hale", "Yusuf Demir" ],
+      "thread": [
+        { "from": "person", "name": "Jonas Hale", "age": "3 days ago", "text": "Can I get read access to Finance / Quarterly? Need it for the budget review." },
+        { "from": "assistant", "age": "3 days ago", "text": "Yusuf approved it. I've added you to the Finance readers group; it shows up after the next directory sync." }
+      ]
+    }
+  ]
+}
