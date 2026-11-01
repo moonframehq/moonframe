@@ -66,6 +66,9 @@ Options:
                 screenshots and scripts while someone is working)
   --component NAME
                 open the components window on NAME as well
+  --preview-only
+                with --component, show only NAME's preview, filling the
+                components window (for screenshots of it)
   --catalogue   print the component catalogue (markdown) and exit; fails if a
                 component is broken or says nothing of when to use it
   -h, --help    show this help";
@@ -75,6 +78,8 @@ struct Args {
     check: bool,
     /// Open without activating the app or focusing its window.
     background: bool,
+    /// The components window shows the chosen preview alone.
+    preview_only: bool,
     /// `--release`, or `--dev` (`Some(false)`); else as the bundle says.
     release: Option<bool>,
     catalogue: bool,
@@ -96,6 +101,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
     let mut check = false;
     let mut catalogue = false;
     let mut background = false;
+    let mut preview_only = false;
     let mut release = None;
     let mut component = None;
     let mut packages = None;
@@ -109,6 +115,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
             "--check" => check = true,
             "--catalogue" => catalogue = true,
             "--background" => background = true,
+            "--preview-only" => preview_only = true,
             "--release" => release = Some(true),
             "--dev" => release = Some(false),
             "--component" => component = Some(args.next().ok_or("--component needs a name")?),
@@ -175,6 +182,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
         check,
         catalogue,
         background,
+        preview_only,
         release,
         component,
         packages,
@@ -413,6 +421,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     let icon = folders.icon();
     let background = args.background;
     crate::BACKGROUND.store(background, Ordering::Relaxed);
+    crate::PREVIEW_ONLY.store(args.preview_only, Ordering::Relaxed);
     let _ = crate::RUNNING_ID.set(folders.app_id());
     if let Some(profile) = &folders.profile {
         moonframe_providers::set_profile(profile);
