@@ -456,7 +456,8 @@ fn replace_aside(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> 
         Err(error) => return Err(error.into()),
     }
     let was = aside.metadata().ok().map(|meta| version(&meta));
-    let placed = if was.as_deref() == Some(expected) {
+    let checked = was.as_deref() == Some(expected);
+    let placed = if checked {
         place(temp, file)
     } else {
         Err(std::io::ErrorKind::AlreadyExists.into())
@@ -467,7 +468,9 @@ fn replace_aside(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> 
             Ok(())
         },
         Err(error) => {
-            put_back(&aside, file)?;
+            // What was aside is the original only when it checked out;
+            // otherwise it is a save from elsewhere, never dropped.
+            put_back(&aside, file, checked)?;
             if error.kind() == std::io::ErrorKind::AlreadyExists {
                 Err(Saved::Conflict(CHANGED))
             } else {
@@ -477,13 +480,23 @@ fn replace_aside(temp: &Path, file: &Path, expected: &str) -> Result<(), Saved> 
     }
 }
 
-/// The original, moved aside by [`replace_aside`], back in its place;
-/// when a save elsewhere already took it, that newer one stays and the old
-/// is dropped. A failure names where the original still is.
-fn put_back(aside: &Path, file: &Path) -> std::io::Result<()> {
+/// What [`replace_aside`] moved aside, back in its place. When a save
+/// elsewhere already took the place, that one stays; what was aside is
+/// dropped only if it is the `original` this save was allowed to replace,
+/// and otherwise kept, the error saying where.
+fn put_back(aside: &Path, file: &Path, original: bool) -> std::io::Result<()> {
     match place(aside, file) {
         Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => fs::remove_file(aside),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists && original => {
+            fs::remove_file(aside)
+        },
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            Err(std::io::Error::other(format!(
+                "two saves were made elsewhere meanwhile; the newer is in place, the other \
+                 kept at {}",
+                aside.display()
+            )))
+        },
         Err(error) => Err(std::io::Error::new(
             error.kind(),
             format!("{error}; the file is kept at {}", aside.display()),
@@ -534,6 +547,9 @@ fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
         .write(true)
         .create_new(true)
         .open(&temp)?;
+    // The temporary file's version once written: a rollback may leave
+    // another save at its name, which is then never removed.
+    let mut ours = None;
     let written = (|| {
         out.write_all(text.as_bytes())?;
         out.sync_all()?;
@@ -541,6 +557,7 @@ fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
         if let Some(meta) = &now {
             fs::set_permissions(&temp, meta.permissions())?;
         }
+        ours = Some(version(&temp.metadata()?));
         match over {
             Over::Version(expected) => {
                 if now.as_ref().map(version).as_deref() != Some(expected.as_str()) {
@@ -560,8 +577,17 @@ fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
         }
         Ok(())
     })();
-    if written.is_err() {
-        fs::remove_file(&temp).ok();
+    if written.is_err()
+        && let Ok(meta) = temp.symlink_metadata()
+    {
+        if ours.is_none() || ours == Some(version(&meta)) {
+            fs::remove_file(&temp).ok();
+        } else {
+            return Err(Saved::Failed(std::io::Error::other(format!(
+                "a save made elsewhere meanwhile is kept at {}",
+                temp.display()
+            ))));
+        }
     }
     written
 }

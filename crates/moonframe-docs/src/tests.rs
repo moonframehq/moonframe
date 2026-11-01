@@ -451,11 +451,18 @@ fn placing_never_replaces_a_file_and_the_original_comes_back() {
     let aside = dir.path().join("aside");
     fs::write(&aside, "original").unwrap();
     let gone = dir.path().join("gone");
-    put_back(&aside, &gone).unwrap();
+    put_back(&aside, &gone, false).unwrap();
     assert_eq!(fs::read_to_string(&gone).unwrap(), "original");
     assert!(!aside.exists());
+    // The original this save was allowed to replace is dropped...
     fs::write(&aside, "older").unwrap();
-    put_back(&aside, &to).unwrap();
+    put_back(&aside, &to, true).unwrap();
     assert_eq!(fs::read_to_string(&to).unwrap(), "theirs");
     assert!(!aside.exists());
+    // ...but a save from elsewhere never is: it is kept, and said where.
+    fs::write(&aside, "another save").unwrap();
+    let error = put_back(&aside, &to, false).unwrap_err();
+    assert!(error.to_string().contains("kept at"), "{error}");
+    assert_eq!(fs::read_to_string(&aside).unwrap(), "another save");
+    assert_eq!(fs::read_to_string(&to).unwrap(), "theirs");
 }
