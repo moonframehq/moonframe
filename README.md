@@ -276,28 +276,27 @@ Packages ship source only, so everything they run can be read first.
 
 ## What runs with what access
 
-| Code | Runs | It can reach |
+| Code | Runs | Can reach |
 |---|---|---|
-| Mods (Luau) | in the host's Luau sandbox, with a memory cap and an instruction budget | no files, network or processes: only the elements and providers the host offers |
-| Wasm providers (`kind = "wasm"`) | on [wasmtime](https://wasmtime.dev), with 64 MiB of memory and a fresh instruction budget for every call | no files, network or environment: only the host calls its `provider.toml` lists under `capabilities` (today `system`, the machine's load) |
-| Process and native providers | as your user | what you can: git, forges, coding agents, your files |
+| Mods (Luau) | in the host's Luau sandbox, with memory and instruction caps | only the elements and providers the host offers |
+| Wasm providers (`kind = "wasm"`) | on [wasmtime](https://wasmtime.dev), with 64 MiB and a fresh instruction budget per call | only the host calls listed under `capabilities` in `provider.toml` (today `system`, the machine's load) |
+| Process and native providers | as your user | anything you can: git, forges, coding agents, your files |
 
-So a provider that only shapes data, or that you take from someone else,
-is best written as a Wasm component: a bug or a bad actor in it cannot
-read your files or reach the network. Process and native providers are
-for what a sandbox cannot reach; read them as you would any script.
+Write a provider as a Wasm component if it only shapes data or if it comes
+from someone else. A bug or bad actor in it can't read your files or reach
+the network. Keep process and native providers for things the sandbox
+can't reach, and read them as you would any script.
 
-The sandbox holds the running component. Building one from its crate runs
-Cargo, with its proc macros and its published dependencies' build scripts,
-as your user. The host refuses the provider's own build hooks (a build
-script in it or a local crate it uses, a toolchain named by path), and runs
-Cargo outside its folders so no Cargo config there applies. A package is
-refused if it ships a `provider.wasm` or any other binary, so what it runs
-is always source you can read. A bundled app ships its Wasm providers
-prebuilt, and builds nothing on your machine.
+The sandbox only covers the running component. Building it runs Cargo as
+your user, including proc macros and dependency build scripts. The host
+refuses the provider's own build hooks (build scripts, local crates,
+toolchains named by path) and runs Cargo outside its folders, so no Cargo
+config there applies. It also refuses any package that ships a binary, so
+what runs is always source you can read. Bundled apps ship their Wasm
+providers prebuilt and build nothing on your machine.
 
-An app on the library with no Wasm providers can leave the runtime out
-(the `wasm` feature, on by default; see [docs/library.md](docs/library.md)).
+Apps with no Wasm providers can turn off the `wasm` feature, which is on by
+default (see [docs/library.md](docs/library.md)).
 
 ## Whole apps as profiles
 
