@@ -212,7 +212,7 @@ impl Inputs {
                 editor.set_value(text, window, cx);
             }
             let events = subscribe(app, &editor, key, window, cx)?;
-            prune(&mut registry.fields, window, cx);
+            prune(&mut registry.fields, frame, window, cx);
             registry.fields.insert(key.to_owned(), Field {
                 editor,
                 wiring: wiring.clone(),
@@ -321,16 +321,24 @@ fn subscribe(
 
 /// Makes room for one more field: drops those drawn longest ago, never one
 /// with focus.
-fn prune(fields: &mut HashMap<String, Field>, window: &Window, cx: &App) {
+fn prune(fields: &mut HashMap<String, Field>, frame: u64, window: &Window, cx: &App) {
     while fields.len() >= MAX_FIELDS {
+        // Never one drawn in this frame: its text would be lost as it is
+        // typed. The frame's fields are bounded by what a view may draw.
         let oldest = fields
             .iter()
+            .filter(|(_, field)| field.seen < frame)
             .filter(|(_, field)| !field.editor.focus_handle(cx).is_focused(window))
             .min_by_key(|(_, field)| field.seen)
             .map(|(key, _)| key.clone());
         match oldest {
             Some(key) => fields.remove(&key),
-            None => return,
+            None => {
+                tracing::warn!(
+                    "more than {MAX_FIELDS} text fields are drawn at once; keeping them all"
+                );
+                return;
+            },
         };
     }
 }

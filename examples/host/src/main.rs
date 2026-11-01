@@ -155,7 +155,9 @@ impl Counter {
 
 impl Counter {
     fn add(&mut self, cx: &mut Context<Self>) {
-        self.count += self.step;
+        // `step` comes from Luau props, so it can be anything: stop at the
+        // ends rather than overflow.
+        self.count = self.count.saturating_add(self.step);
         self.messenger
             .send(Data::map([("counted", self.count.into())]));
         cx.notify();
