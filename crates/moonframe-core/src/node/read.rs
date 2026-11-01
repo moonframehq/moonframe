@@ -2,11 +2,13 @@
 //! keys it takes and reads them itself ([`Build`]); unknown elements and keys
 //! are refused, so a typo is reported where it is.
 
+// keep-sorted start
 mod common;
 mod content;
 mod embed;
 mod input;
 mod layout;
+// keep-sorted end
 
 use {
     super::*,

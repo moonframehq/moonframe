@@ -9,10 +9,12 @@
 //!     explorer/main.luau a mod; the shell places it by name or region
 //! ```
 
+// keep-sorted start
 mod load;
 mod messages;
 mod render;
 mod slot;
+// keep-sorted end
 
 use {
     crate::{

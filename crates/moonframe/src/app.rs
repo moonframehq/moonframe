@@ -41,6 +41,7 @@ use {
     },
 };
 
+// keep-sorted start
 mod listeners;
 mod menu;
 mod picking;
@@ -49,6 +50,7 @@ mod updates;
 mod view;
 mod watch;
 mod windows;
+// keep-sorted end
 
 use {
     listeners::{deliver_from_views, flush_on_quit, report, start_providers, wake_on_output},

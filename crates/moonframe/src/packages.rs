@@ -17,6 +17,7 @@
 //!
 //! [`Roots`]: moonframe_core::Roots
 
+// keep-sorted start
 mod cli;
 mod contents;
 mod create;
@@ -24,6 +25,7 @@ mod git;
 mod install;
 mod manifest;
 mod source;
+// keep-sorted end
 
 pub(crate) use {
     cli::{approve, run, update as print_update},

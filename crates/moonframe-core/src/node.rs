@@ -8,6 +8,7 @@ use {
     std::path::{Path, PathBuf},
 };
 
+// keep-sorted start
 mod embed;
 mod icon;
 mod input;
@@ -15,6 +16,7 @@ mod instance;
 mod layout;
 mod read;
 mod tokens;
+// keep-sorted end
 
 pub use {embed::*, icon::*, input::*, instance::*, layout::*, tokens::*};
 
