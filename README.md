@@ -23,17 +23,20 @@
   <a href="#license">License</a>
 </p>
 
-A starter for native desktop apps whose whole window is written in
-[Luau](https://luau.org). Rust and [GPUI](https://www.gpui.rs) draw it, check
-it, and keep it safe; every panel, split, toolbar and status bar is a Luau
-file that reloads as you save, with its state kept. Clone it, rename it, and
-build anything, by hand or by asking an agent while the app runs, even from
-inside the app: its **Send feedback** button hands what you write to a coding
-agent, which changes the app in front of you.
+A factory for native desktop apps you reshape while they run. Each app's
+whole window is written in [Luau](https://luau.org): Rust and
+[GPUI](https://www.gpui.rs) draw it, check it, and keep it safe, and every
+panel, split, toolbar and status bar is a Luau file that reloads as you save,
+with its state kept. Ask an agent for a change, or make it by hand, and the
+running app reshapes itself, even from inside the app: its **Send feedback**
+button hands what you write to a coding agent, which changes the app in front
+of you.
 
-Whole apps run on it too, each as a profile of its own: `examples/` holds
-25 of them, from a mail client to an infra console, all in one gallery with
-`just demo`. A Rust app can also use it as a library.
+Moonframe starts you off with an app of its own, ready to change, and builds
+whole new ones beside it: each runs as a profile of its own and ships as a
+standalone release. `examples/` holds 25 of them, from a mail client to an
+infra console, all in one gallery with `just demo`. A Rust app can also use
+Moonframe as a library.
 
 ## Gallery
 
