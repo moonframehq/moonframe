@@ -940,6 +940,11 @@ impl Workspace {
         }
     }
 
+    /// The last value published on the topic `name`.
+    pub fn topic(&self, name: &str) -> Option<&Data> {
+        self.topics.get(name)
+    }
+
     /// Whether any module hears the topic `name`, such as a tab bar
     /// `tabs/main/open`.
     pub fn hears(&self, name: &str) -> bool {

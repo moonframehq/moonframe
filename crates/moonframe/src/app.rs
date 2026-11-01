@@ -117,6 +117,9 @@ pub(crate) struct MoonframeApp {
     /// Sends keys to the topmost overlay or popover, else a focused
     /// terminal, before key bindings see them.
     _terminal_keys: Subscription,
+    /// The number of the last tab `moonframe pane new` opened, which names
+    /// it: each one's is higher, even for two in the same millisecond.
+    last_pane: i64,
 }
 
 struct Defaults {
@@ -207,6 +210,7 @@ impl MoonframeApp {
             key_layers: HashMap::new(),
             _watcher: watcher,
             _terminal_keys: crate::terminal::intercept_keys(cx),
+            last_pane: 0,
         };
         app.apply_theme(cx);
         // What the mods' `init` sent providers as they started.
@@ -214,8 +218,8 @@ impl MoonframeApp {
         // Tabs `moonframe pane new` asks for, also those left for this
         // window before it opened. Runs without the user's folder (checks,
         // screenshots) take none.
-        if app.folders.user.is_some() {
-            let inbox = crate::panes::inbox(app.folders.profile.as_deref());
+        if let Some(user) = &app.folders.user {
+            let inbox = crate::panes::inbox(user, app.folders.profile.as_deref());
             cx.spawn(async move |this, cx| {
                 loop {
                     let requests = crate::panes::take(&inbox);
@@ -816,15 +820,19 @@ impl MoonframeApp {
             self.show_toast("This app has no main tab bar to open a pane in", cx);
             return;
         }
-        // Unique, and above any number the editor gave a request.
-        let n = std::time::SystemTime::now()
+        // Unique: above the last one, and above any number the editor
+        // gave a request (its own count) or an earlier run used.
+        let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| {
                 i64::try_from(since.as_millis()).unwrap_or(i64::MAX)
             });
+        let n = now.max(self.last_pane + 1);
+        self.last_pane = n;
         let id = format!("pane-{n}");
         let cwd = request.cwd.clone().or_else(|| self.folders.own());
-        if let Some(bytes) = request.typed() {
+        let shell = crate::panes::Shell::current();
+        if let Some(bytes) = request.typed(shell) {
             self.terminals.type_on_start(&id, cwd.clone(), bytes);
         }
         let mut props = Vec::new();
@@ -843,12 +851,29 @@ impl MoonframeApp {
             asked.push(("title", Data::from(title)));
         }
         let from = SHELL;
+        // The main bar publishes `tabs/main` at every change, so one that
+        // opened the tab changed it; any other bar ignores the request.
+        let before = self.workspace.topic("tabs/main").cloned();
         self.workspace.send(
             from,
             &format!("{}{OPEN}", moonframe_core::TOPIC),
             Data::map(asked),
         );
         self.flush(from, cx);
+        if self.workspace.topic("tabs/main") == before.as_ref() {
+            tracing::warn!("pane new: no tab bar `main` took the request");
+            self.show_toast("This app has no main tab bar to open a pane in", cx);
+            return;
+        }
+        if request.prompt_lost(shell) {
+            tracing::warn!(
+                "pane new: cannot quote a prompt for this shell; started the agent without it"
+            );
+            self.show_toast(
+                "Your shell's quoting is unknown: the agent started without the prompt",
+                cx,
+            );
+        }
         // Brought forward, to watch the agent; not when opened behind others.
         if !crate::background() {
             cx.activate(true);

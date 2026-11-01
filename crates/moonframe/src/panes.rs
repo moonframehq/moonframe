@@ -77,17 +77,30 @@ impl Request {
         self.title.clone().or_else(|| self.agent.clone())
     }
 
-    /// What the app types into the new shell: the agent with the prompt
-    /// quoted for the shell, and Return. `None` for a plain shell.
-    pub(crate) fn typed(&self) -> Option<Vec<u8>> {
+    /// What the app types into a new terminal running `shell`: the agent
+    /// with the prompt quoted for that shell, and Return. `None` for a
+    /// plain shell. A prompt for a shell it cannot quote for is left out
+    /// (see [`Request::prompt_lost`]): the agent starts without it.
+    pub(crate) fn typed(&self, shell: Shell) -> Option<Vec<u8>> {
         let agent = self.agent.as_deref().filter(|agent| valid_agent(agent))?;
         let mut line = agent.to_owned();
-        if let Some(prompt) = self.prompt.as_deref().map(clean).filter(|p| !p.is_empty()) {
+        if let Some(prompt) = self.prompt()
+            && let Some(quoted) = shell.quote(&prompt)
+        {
             line.push(' ');
-            line.push_str(&quote(&prompt));
+            line.push_str(&quoted);
         }
         line.push('\r');
         Some(line.into_bytes())
+    }
+
+    /// Whether `shell` drops the prompt: one Moonframe cannot quote for.
+    pub(crate) fn prompt_lost(&self, shell: Shell) -> bool {
+        self.agent.is_some() && self.prompt().is_some() && shell == Shell::Unknown
+    }
+
+    fn prompt(&self) -> Option<String> {
+        self.prompt.as_deref().map(clean).filter(|p| !p.is_empty())
     }
 
     fn expired(&self, now: u64) -> bool {
@@ -123,22 +136,105 @@ fn clean(prompt: &str) -> String {
         .to_owned()
 }
 
-/// `text` as one argument for the login shell: single quotes for sh, bash,
-/// zsh and fish; PowerShell's on Windows.
-fn quote(text: &str) -> String {
-    if cfg!(windows) {
-        format!("'{}'", text.replace('\'', "''"))
-    } else {
-        format!("'{}'", text.replace('\'', r"'\''"))
+/// The shell a new terminal runs, which decides how the prompt is quoted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Shell {
+    /// sh, bash, zsh, dash, ksh and the like.
+    Posix,
+    Fish,
+    /// PowerShell, Windows' or the cross-platform `pwsh`.
+    Pwsh,
+    /// Windows' `cmd.exe`.
+    Cmd,
+    /// One whose quoting Moonframe does not know (nushell, xonsh, ...).
+    Unknown,
+}
+
+impl Shell {
+    /// The one the terminals start: `$SHELL`, or `COMSPEC` on Windows, as
+    /// the backends pick it.
+    pub(crate) fn current() -> Self {
+        let var = if cfg!(windows) {
+            "COMSPEC"
+        } else {
+            "SHELL"
+        };
+        Self::named(
+            std::env::var_os(var)
+                .as_deref()
+                .and_then(|path| path.to_str()),
+        )
+    }
+
+    /// The shell at `path`, by its file name.
+    fn named(path: Option<&str>) -> Self {
+        let Some(path) = path else {
+            return if cfg!(windows) {
+                Self::Cmd
+            } else {
+                Self::Unknown
+            };
+        };
+        let name = path
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or(path)
+            .to_ascii_lowercase();
+        match name.strip_suffix(".exe").unwrap_or(&name) {
+            "sh" | "bash" | "zsh" | "dash" | "ksh" | "mksh" | "oksh" | "loksh" | "ash" | "yash" => {
+                Self::Posix
+            },
+            "fish" => Self::Fish,
+            "pwsh" | "powershell" => Self::Pwsh,
+            "cmd" => Self::Cmd,
+            _ => Self::Unknown,
+        }
+    }
+
+    /// `text` as one argument, taken literally: nothing in it expands or
+    /// ends the command. `None` for a shell whose rules are unknown.
+    fn quote(self, text: &str) -> Option<String> {
+        Some(match self {
+            Self::Posix => format!("'{}'", text.replace('\'', r"'\''")),
+            Self::Fish => format!("'{}'", text.replace('\\', r"\\").replace('\'', r"\'")),
+            // PowerShell also ends a single-quoted string at the curly
+            // single quotes; each is doubled to stay literal.
+            Self::Pwsh => {
+                let mut quoted = String::from("'");
+                for c in text.chars() {
+                    if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}') {
+                        quoted.push(c);
+                    }
+                    quoted.push(c);
+                }
+                quoted.push('\'');
+                quoted
+            },
+            // Inside double quotes cmd takes & | < > ^ literally, but not a
+            // double quote, which ends them, or %NAME%, which expands: the
+            // first becomes a single quote and the second a full-width %.
+            Self::Cmd => format!("\"{}\"", text.replace('"', "'").replace('%', "\u{FF05}")),
+            Self::Unknown => return None,
+        })
     }
 }
 
-/// The folder requests wait in, beside the app's state: `panes`, or
-/// `panes-<profile>`, so each profile's window takes its own.
-pub(crate) fn inbox(profile: Option<&str>) -> PathBuf {
+/// The folder requests wait in, beside the app's state: one for each user
+/// folder (`--user`) and profile, so a request reaches only a window of
+/// that folder and profile.
+pub(crate) fn inbox(user: &Path, profile: Option<&str>) -> PathBuf {
+    let user = user.canonicalize().unwrap_or_else(|_| user.to_owned());
+    let folder = format!("{:016x}", fnv(user.to_string_lossy().as_bytes()));
     crate::paths::state(profile).with_file_name(match profile {
-        Some(profile) => format!("panes-{profile}"),
-        None => "panes".to_owned(),
+        Some(profile) => format!("panes-{folder}-{profile}"),
+        None => format!("panes-{folder}"),
+    })
+}
+
+/// FNV-1a: the same for the same folder in every build, unlike std's hasher.
+fn fnv(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
     })
 }
 
@@ -164,7 +260,9 @@ fn leave(inbox: &Path, request: &Request) -> std::io::Result<PathBuf> {
 }
 
 /// The requests waiting in `inbox`, oldest first, each removed as it is
-/// read; expired and unreadable ones are dropped.
+/// read; expired and unreadable ones are dropped. Each is claimed first by
+/// renaming it, which only one window can do, so two windows of the same
+/// folder never both open it.
 pub(crate) fn take(inbox: &Path) -> Vec<Request> {
     let Ok(entries) = fs::read_dir(inbox) else {
         return Vec::new();
@@ -179,9 +277,11 @@ pub(crate) fn take(inbox: &Path) -> Vec<Request> {
     paths
         .into_iter()
         .filter_map(|path| {
-            let text = fs::read_to_string(&path).ok();
+            let claimed = path.with_extension(format!("claimed-{}", std::process::id()));
+            fs::rename(&path, &claimed).ok()?;
+            let text = fs::read_to_string(&claimed).ok();
             // Taken, read or not: a broken one must not come back each poll.
-            let _ = fs::remove_file(&path);
+            let _ = fs::remove_file(&claimed);
             let request: Request = match serde_json::from_str(text.as_deref()?) {
                 Ok(request) => request,
                 Err(error) => {
@@ -198,8 +298,9 @@ pub(crate) fn take(inbox: &Path) -> Vec<Request> {
         .collect()
 }
 
-/// `pane WORDS`, for the window `profile` names, called `title`.
-pub(crate) fn run(profile: Option<&str>, title: &str, words: &[String]) -> ExitCode {
+/// `pane WORDS`, for the window of the user folder `user` and `profile`,
+/// called `title`.
+pub(crate) fn run(user: &Path, profile: Option<&str>, title: &str, words: &[String]) -> ExitCode {
     let app = crate::paths::name();
     let request = match parse(words) {
         Ok(Some(request)) => request,
@@ -212,7 +313,13 @@ pub(crate) fn run(profile: Option<&str>, title: &str, words: &[String]) -> ExitC
             return ExitCode::from(2);
         },
     };
-    let inbox = inbox(profile);
+    // The window creates it as it starts; made now, it names the same
+    // inbox before and after.
+    if let Err(error) = fs::create_dir_all(user) {
+        eprintln!("{app} pane: cannot create {}: {error}", user.display());
+        return ExitCode::FAILURE;
+    }
+    let inbox = inbox(user, profile);
     let path = match leave(&inbox, &request) {
         Ok(path) => path,
         Err(error) => {
@@ -380,14 +487,81 @@ mod tests {
             prompt: Some("it's $HOME\n`and` \x1b[2Jthis".into()),
             ..Request::default()
         };
-        let typed = String::from_utf8(request.typed().unwrap()).unwrap();
-        if cfg!(windows) {
-            assert_eq!(typed, "claude 'it''s $HOME `and`  [2Jthis'\r");
-        } else {
-            assert_eq!(typed, "claude 'it'\\''s $HOME `and`  [2Jthis'\r");
-        }
-        let plain = Request::default();
-        assert_eq!(plain.typed(), None);
+        let typed = |shell| String::from_utf8(request.typed(shell).unwrap()).unwrap();
+        assert_eq!(
+            typed(Shell::Posix),
+            "claude 'it'\\''s $HOME `and`  [2Jthis'\r"
+        );
+        assert_eq!(typed(Shell::Fish), "claude 'it\\'s $HOME `and`  [2Jthis'\r");
+        assert_eq!(typed(Shell::Pwsh), "claude 'it''s $HOME `and`  [2Jthis'\r");
+        assert_eq!(typed(Shell::Cmd), "claude \"it's $HOME `and`  [2Jthis\"\r");
+        // A shell it cannot quote for starts the agent without the prompt.
+        assert_eq!(typed(Shell::Unknown), "claude\r");
+        assert!(request.prompt_lost(Shell::Unknown));
+        assert!(!request.prompt_lost(Shell::Posix));
+        assert_eq!(Request::default().typed(Shell::Posix), None);
+    }
+
+    #[test]
+    fn nothing_in_a_prompt_runs_in_cmd_or_powershell() {
+        let request = Request {
+            agent: Some("claude".into()),
+            prompt: Some(r#"a "b" & del %TEMP% | c ‘d’"#.into()),
+            ..Request::default()
+        };
+        let typed = |shell| String::from_utf8(request.typed(shell).unwrap()).unwrap();
+        assert_eq!(
+            typed(Shell::Cmd),
+            "claude \"a 'b' & del \u{FF05}TEMP\u{FF05} | c ‘d’\"\r"
+        );
+        assert_eq!(
+            typed(Shell::Pwsh),
+            "claude 'a \"b\" & del %TEMP% | c ‘‘d’’'\r"
+        );
+        let fish = Request {
+            prompt: Some(r"back\slash".into()),
+            ..request
+        };
+        assert_eq!(
+            String::from_utf8(fish.typed(Shell::Fish).unwrap()).unwrap(),
+            "claude 'back\\\\slash'\r"
+        );
+    }
+
+    #[test]
+    fn knows_shells_by_name() {
+        assert_eq!(Shell::named(Some("/bin/zsh")), Shell::Posix);
+        assert_eq!(Shell::named(Some("/opt/homebrew/bin/fish")), Shell::Fish);
+        assert_eq!(
+            Shell::named(Some(r"C:\Windows\System32\cmd.exe")),
+            Shell::Cmd
+        );
+        assert_eq!(
+            Shell::named(Some(r"C:\Program Files\PowerShell\7\pwsh.exe")),
+            Shell::Pwsh
+        );
+        assert_eq!(Shell::named(Some("/usr/bin/nu")), Shell::Unknown);
+    }
+
+    #[test]
+    fn each_user_folder_and_profile_has_its_own_inbox() {
+        let (a, b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+        assert_eq!(inbox(a.path(), None), inbox(a.path(), None));
+        assert_ne!(inbox(a.path(), None), inbox(b.path(), None));
+        assert_ne!(inbox(a.path(), None), inbox(a.path(), Some("work")));
+    }
+
+    #[test]
+    fn a_claimed_request_is_not_taken_again() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = leave(dir.path(), &Request {
+            created: now(),
+            ..Request::default()
+        })
+        .unwrap();
+        // Another window claimed it first.
+        fs::rename(&path, path.with_extension("claimed-1")).unwrap();
+        assert!(take(dir.path()).is_empty());
     }
 
     #[test]

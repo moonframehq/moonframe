@@ -225,7 +225,8 @@
   .gs-code { background:var(--ink); color:var(--paper); border-radius:3px; min-width:0 }
   .gs-code header { display:flex; justify-content:space-between; align-items:center; padding:8px 10px 8px 16px; border-bottom:1px solid #ffffff14; font:600 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:#d8c8ad }
   .gs-code button { font:inherit; text-transform:inherit; letter-spacing:inherit; color:#f2b33d; background:none; border:0; padding:4px 8px; border-radius:3px; cursor:pointer } .gs-code button:hover { background:#ffffff14 }
-  .gs-code pre { font:12.5px/1.7 var(--mono); padding:12px 16px 14px; overflow-x:auto }
+  .gs-code pre { font:12.5px/1.7 var(--mono); padding:12px 16px 14px; overflow-x:auto; tab-size:4 }
+  .gs-deps { font:12.5px/1.6 var(--mono); background:#2a1a100d; padding:8px 12px; border-radius:3px; margin-top:8px; overflow-x:auto }
   .needs { margin-top:18px; font:14px var(--sans); color:var(--dim) }
   .needs a { color:var(--acc); text-decoration:underline; text-underline-offset:2px }
 
@@ -445,25 +446,38 @@ just install   # into /Applications</pre></div>
       <ol class="steps">
       <li><span class="num">I</span><div><h3>Write the app folder</h3><p>From your crate's root: <code>app/</code>, Luau types and the agent skills. It never touches <code>Cargo.toml</code> or <code>src/</code>.</p></div><button class="copy" title="Copy the command"><code>moonframe init . --name my-app</code><span>Copy</span></button></li>
       <li><span class="num">II</span><div><h3>Depend on it</h3><p>Also add the <code>opt-level = 2</code> lines <code>init</code> printed: GPUI and Luau are slow unoptimised. <code>Cargo.lock</code> pins the commit.</p></div><button class="copy" title="Copy the command"><code>cargo add moonframe --git https://github.com/penso/moonframe</code><span>Copy</span></button></li>
-      <li class="gs-wide"><span class="num">III</span><div><h3>Hand it main, last</h3><p>Your own setup first, then end <code>main</code> with Moonframe. Your Rust publishes data as providers, plain or <code>async</code> on tokio, and Luau draws it.</p></div>
+      <li class="gs-wide"><span class="num">III</span><div><h3>Hand it main, last</h3><p>Your own setup first, then end <code>main</code> with Moonframe. Your Rust publishes data as a provider, plain or <code>async</code> on tokio. The async one also needs <code>reqwest</code> and <code>tokio</code>:</p><pre class="gs-deps">[dependencies]
+reqwest = { version = "0.12", features = ["json"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }</pre></div>
         <div class="gs-pair">
-          <div class="gs-code"><header>Sync<button>Copy</button></header><pre>use moonframe::{Data, Handle, Moonframe, Native};
+          <div class="gs-code"><header>Sync · src/main.rs<button>Copy</button></header><pre>use moonframe::{Data, Handle, Moonframe, Native};
 
 #[derive(Default)]
 struct Vault { unread: i64 }
 
 impl Native for Vault {
+    fn start(&amp;mut self, host: &amp;Handle) -&gt; Result&lt;(), String&gt; {
+        self.tick(host);
+        Ok(())
+    }
+
     // Every `interval` seconds of its provider.toml.
     fn tick(&amp;mut self, host: &amp;Handle) {
         host.publish(Data::map([("unread", self.unread.into())]));
     }
 
-    // A mod sent { to = "provider:vault", msg = ... }.
-    fn receive(&amp;mut self, host: &amp;Handle, _from: &amp;str, msg: Data) {}
+    // A mod sent { read = true } to "provider:vault".
+    fn receive(&amp;mut self, host: &amp;Handle, _from: &amp;str, msg: Data) {
+        if msg.get("read").and_then(Data::as_bool) == Some(true) {
+            self.unread = 0;
+            self.tick(host);
+        }
+    }
 }
 
 fn main() -&gt; std::process::ExitCode {
-    // 1. Your own setup first: logging, config, flags.
+    // 1. Your own setup first: config, flags.
+    //    (Moonframe sets up logging itself.)
 
     // 2. Moonframe last: run() holds the main thread
     //    until the window closes.
@@ -472,12 +486,16 @@ fn main() -&gt; std::process::ExitCode {
         .native("vault", Vault::default)
         .run()
 }</pre></div>
-          <div class="gs-code"><header>Async, on tokio<button>Copy</button></header><pre>use moonframe::{AsyncNative, Data, Handle, Moonframe};
+          <div class="gs-code"><header>Async, on tokio · src/main.rs<button>Copy</button></header><pre>use moonframe::{AsyncNative, Handle, Moonframe};
+
+const URL: &amp;str = "https://api.open-meteo.com/v1/forecast\
+    ?latitude=48.85&amp;longitude=2.35&amp;current=temperature_2m";
 
 #[derive(Default)]
 struct Weather { client: reqwest::Client }
 
 impl AsyncNative for Weather {
+    // start and receive do nothing unless you write them.
     async fn tick(&amp;mut self, host: &amp;Handle) {
         match self.client.get(URL).send().await {
             Ok(reply) =&gt; {
@@ -487,8 +505,6 @@ impl AsyncNative for Weather {
             Err(error) =&gt; host.fail(error.to_string()),
         }
     }
-
-    // And async fn receive, as in the sync one.
 }
 
 // run() takes the multi-thread runtime it is called in.
@@ -504,7 +520,26 @@ async fn main() -&gt; std::process::ExitCode {
         .run()
 }</pre></div>
         </div></li>
-      <li><span class="num">IV</span><div><h3>Run it</h3><p>Edit <code>app/</code> while it runs; it reloads live.</p></div><button class="copy" title="Copy the command"><code>cargo run</code><span>Copy</span></button></li>
+      <li class="gs-wide"><span class="num">IV</span><div><h3>Start it, and draw it</h3><p>A provider runs once its folder says how often, and Luau reads what it publishes as <code>app.&lt;name&gt;</code>. The async <code>weather</code> gets the same folder, with <code>interval = 600.0</code>.</p></div>
+        <div class="gs-pair">
+          <div class="gs-code"><header>provider.toml<button>Copy</button></header><pre># app/providers/vault/provider.toml
+# Shared as app.vault, from .native("vault", ...).
+kind     = "native"
+interval = 5.0   # seconds between ticks</pre></div>
+          <div class="gs-code"><header>Luau<button>Copy</button></header><pre>-- app/main.luau, or any mod's view
+view = function(state, app)
+	local vault = app.vault or { unread = 0 }
+	return ui.row {
+		ui.text { `{vault.unread} unread` },
+		ui.button {
+			"Mark read",
+			msg = { read = true },
+			to = "provider:vault",
+		},
+	}
+end,</pre></div>
+        </div></li>
+      <li><span class="num">V</span><div><h3>Run it</h3><p>Edit <code>app/</code> while it runs; it reloads live.</p></div><button class="copy" title="Copy the command"><code>cargo run</code><span>Copy</span></button></li>
       </ol>
       <p class="needs">See it done in <a href="https://github.com/penso/msgvault-moonframe">msgvault-moonframe</a>, a mail archive reader on the library. More in <a href="https://github.com/penso/moonframe/blob/main/docs/library.md">the library guide</a>.</p>
     </div>

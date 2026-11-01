@@ -360,7 +360,15 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         return ExitCode::from(2);
     }
     if let Some(words) = &args.panes {
-        return crate::panes::run(folders.profile.as_deref(), &folders.title(), words);
+        // A window without the user's folder takes no requests.
+        let Some(user) = &folders.user else {
+            eprintln!(
+                "{} pane: panes open in a window with the user's folder; drop --no-user",
+                paths::name()
+            );
+            return ExitCode::from(2);
+        };
+        return crate::panes::run(user, folders.profile.as_deref(), &folders.title(), words);
     }
     if let Some(words) = &args.packages {
         let Some(own) = folders.own() else {
