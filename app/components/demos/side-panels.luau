@@ -11,6 +11,12 @@ local function loose(list: { any }): { any }
 	return list
 end
 
+-- Every pane's first row: one height, so the toggles line up whichever
+-- panes are open.
+local function header(children: { any })
+	return ui.row { height = 30, align = "center", gap = "small", shrink = false, table.unpack(children) }
+end
+
 local VIEWS = {
 	inbox = { title = "Inbox", icon = "inbox" },
 	all = { title = "All", icon = "copy" },
@@ -40,8 +46,7 @@ return mod {
 		local sidebar = ui.column {
 			padding = "normal",
 			gap = "normal",
-			ui.row {
-				align = "center",
+			header {
 				ui.text { "Neverland.", weight = "bold", size = "large" },
 				ui.spacer(),
 				icon_button { icon = "panel-left-close", tooltip = "Hide sidebar", msg = "left", size = "small" },
@@ -53,7 +58,7 @@ return mod {
 				items = loose {
 					{ id = "inbox", icon = "inbox", label = "Inbox", count = 1, dot = true },
 					{ id = "all", icon = "copy", label = "All", count = 1 },
-					{ id = "recent", icon = "clock", label = "Last 7 Days", count = 1, label_width = 70 },
+					{ id = "recent", icon = "clock", label = "Last 7 Days", count = 1 },
 				},
 			},
 			ui.text { "Groups", tone = "muted", size = "small" },
@@ -62,10 +67,9 @@ return mod {
 		local list = ui.column {
 			padding = "normal",
 			gap = "normal",
-			ui.row {
-				align = "center",
-				justify = "end",
+			header {
 				not state.left and icon_button { icon = "panel-left-open", tooltip = "Show sidebar", msg = "left", size = "small" },
+				ui.spacer(),
 				icon_button { icon = "panel-left-close", tooltip = "Hide list", msg = "middle", size = "small" },
 			},
 			swap_view {
@@ -90,16 +94,19 @@ return mod {
 			},
 		}
 		local main = ui.column {
-			padding = "large",
+			padding = "normal",
 			gap = "normal",
 			grow = true,
-			ui.row {
-				align = "center",
+			header {
 				not state.middle and icon_button { icon = "panel-left-open", tooltip = "Show list", msg = "middle", size = "small" },
 				ui.text { "Hello world!", tone = "muted", size = "small" },
 			},
-			ui.text { "# Hello world!", size = "title", weight = "bold" },
-			ui.text { "Lorem sint deserunt adipisicing laborum tempor nulla ut in aute anim labore. Duis enim consectetur ut laborum." },
+			ui.column {
+				style = { padding = { 0, 8 } },
+				gap = "normal",
+				ui.text { "# Hello world!", size = "title", weight = "bold" },
+				ui.text { "Lorem sint deserunt adipisicing laborum tempor nulla ut in aute anim labore. Duis enim consectetur ut laborum." },
+			},
 		}
 		return side_panels {
 			id = "demo-side-panels",

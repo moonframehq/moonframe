@@ -281,6 +281,19 @@ impl Node {
         }
     }
 
+    /// Whether the tree holds what the stylesheet animates as it shows and
+    /// hides: a popover, an overlay or a split's panes.
+    pub fn moves(&self) -> bool {
+        let any = |nodes: &[Node]| nodes.iter().any(Node::moves);
+        match self {
+            Self::Popover(_) | Self::Overlay(_) | Self::Split(_) => true,
+            Self::Stack(stack) => any(&stack.children),
+            Self::Panel(panel) => any(&panel.actions) || any(&panel.children),
+            Self::List(list) => any(&list.rows),
+            _ => false,
+        }
+    }
+
     /// Calls `found` with each instance inside a hidden `lazy` pane: they
     /// are kept as they are, neither started nor drawn, until it shows.
     pub fn asleep(&self, found: &mut dyn FnMut(&Instance)) {

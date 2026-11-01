@@ -2882,7 +2882,7 @@ A whole mod using it, with state: `app/components/demos/pager.luau`.
 | Prop | Meaning |
 | --- | --- |
 | `event` | key of the message a click sends, default "select": { select = id } |
-| `items` | list of { id, icon, label?, count? (after the label), dot? (an unread dot on the circle), tooltip?, label_width? (pixels, when the estimate is off), msg? } |
+| `items` | list of { id, icon, label?, count? (after the label), dot? (an unread dot on the circle), tooltip?, label_width? (pixels, when the estimate is off; a longer label ends in …), msg? } |
 | `selected` | id of the current view |
 | `size` | the circles' diameter and the pills' height in pixels (default 34) |
 | `to` | mod to send messages to, if not the drawing one |

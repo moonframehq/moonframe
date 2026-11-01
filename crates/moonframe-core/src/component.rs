@@ -198,6 +198,12 @@ pub struct Component {
 }
 
 impl Component {
+    /// Whether it moves: a transition in its own styles, or a popover,
+    /// overlay or split in its preview, which the stylesheet animates.
+    pub fn animated(&self) -> bool {
+        self.rules.animated() || self.preview.as_ref().is_ok_and(Node::moves)
+    }
+
     /// How problems name its demo file.
     pub fn demo_name(&self) -> &str {
         self.demo

@@ -6,7 +6,8 @@
 -- Each item eases by its `on` and `off` states: the width comes from props
 -- (inline style, which the state's tween reads), the colors and the label's
 -- opacity from the rules below. The label sits in a row clipped by
--- `scroll = "x"`, so it is cut, not wrapped, while the pill is narrow.
+-- `scroll = "x"`, so it is cut, not wrapped, while the pill is narrow; a
+-- label longer than the pill has room for ends in "…".
 
 type Item = {
 	id: string,
@@ -53,7 +54,7 @@ return component {
 	description = "A view switcher whose chosen item is a wide pill with icon, label and count while the others are icon circles; switching morphs one into the other. Sends { select = id }.",
 	when = "Switching the few views of one list from a sidebar or header (Inbox, All, Last 7 Days), where the current view deserves its name and the rest only an icon. For settings choices use `segmented`; for documents or sessions use `tabs`; for the app's main views use `activity-bar`.",
 	props = {
-		["items"] = "list of { id, icon, label?, count? (after the label), dot? (an unread dot on the circle), tooltip?, label_width? (pixels, when the estimate is off), msg? }",
+		["items"] = "list of { id, icon, label?, count? (after the label), dot? (an unread dot on the circle), tooltip?, label_width? (pixels, when the estimate is off; a longer label ends in …), msg? }",
 		["selected"] = "id of the current view",
 		["event"] = "key of the message a click sends, default \"select\": { select = id }",
 		["width"] = "the chosen pill's width in pixels (default 112)",
@@ -89,7 +90,8 @@ return component {
 		for _, item in props.items do
 			local on = item.id == props.selected
 			local state = if on then "on" else "off"
-			local clip = math.min(label_width(item), wide - size)
+			-- Room beside the icon, short of the pill's rounded end.
+			local clip = math.min(label_width(item), wide - size - 6)
 			cells[#cells + 1] = ui.row {
 				class = if on then "pill-tabs-item" else "pill-tabs-item pill-tabs-idle",
 				state = state,
@@ -112,7 +114,7 @@ return component {
 					align = "center",
 					-- In the clip, so a closed pill keeps its icon centred.
 					ui.row { width = 2, shrink = false },
-					item.label and ui.text { item.label, wrap = false },
+					item.label and ui.text { item.label, truncate = true },
 					item.count ~= nil and ui.text { tostring(item.count), class = "pill-tabs-count", wrap = false },
 				},
 				item.dot and not on and ui.row {
