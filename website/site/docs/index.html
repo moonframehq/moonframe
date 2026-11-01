@@ -6,7 +6,7 @@
 <!-- social -->
 <meta name="description" content="Get started with Moonframe: mods, the stylesheet, 142 components, terminals, providers, working with an agent, and whole apps as profiles.">
 <link rel="canonical" href="https://docs.moonframe.dev/">
-<meta name="theme-color" content="#f6f3ec">
+<meta name="theme-color" content="#f6eedc">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Moonframe">
 <meta property="og:url" content="https://docs.moonframe.dev/">
@@ -25,7 +25,7 @@
 <!-- /social -->
 <style>
   :root {
-    --paper:#f6f3ec; --side:#efebe1; --ink:#1d1b26; --ink2:#3b3746; --dim:#6b6676; --rule:#1d1b2622; --acc:#4b3fd1;
+    --paper:#f6eedc; --side:#eee2c8; --ink:#2a1a10; --ink2:#4a3426; --dim:#6e5a4a; --rule:#2a1a1022; --acc:#a33a14;
     --serif:"Iowan Old Style", "Palatino Linotype", Georgia, serif;
     --sans:Inter, system-ui, -apple-system, sans-serif;
     --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -33,7 +33,7 @@
   * { box-sizing:border-box; margin:0 }
   body { background:var(--paper); color:var(--ink); font:17px/1.7 var(--serif); -webkit-font-smoothing:antialiased }
   a { color:inherit; text-decoration:none }
-  .top { height:58px; border-bottom:2px solid var(--ink); display:flex; align-items:center; padding:0 24px; gap:12px; position:sticky; top:0; background:#f6f3ecee; backdrop-filter:blur(8px); z-index:2; font-family:var(--sans) }
+  .top { height:58px; border-bottom:2px solid var(--ink); display:flex; align-items:center; padding:0 24px; gap:12px; position:sticky; top:0; background:#f6eedcee; backdrop-filter:blur(8px); z-index:2; font-family:var(--sans) }
   .top .name { font:italic 600 22px var(--serif); display:flex; gap:9px; align-items:center }
   .top .name img { width:24px; border-radius:6px }
   .top .sec { font:600 12px var(--sans); letter-spacing:.12em; text-transform:uppercase; color:var(--acc); border-left:1px solid var(--rule); padding-left:12px }
@@ -53,7 +53,7 @@
   [hidden] { display:none !important }
   aside a { display:block; padding:4px 10px; border-left:2px solid transparent; color:var(--ink2) }
   aside a:hover { color:var(--acc) }
-  aside a.on { border-left-color:var(--acc); color:var(--acc); font-weight:600; background:#4b3fd10a }
+  aside a.on { border-left-color:var(--acc); color:var(--acc); font-weight:600; background:#d9541f0a }
   main { padding:52px 64px 120px; max-width:860px }
   .crumb { font:13px var(--sans); color:var(--dim); margin-bottom:14px }
   h1 { font-size:54px; font-weight:500; letter-spacing:-.025em; line-height:1.05; margin-bottom:16px }
@@ -61,8 +61,8 @@
   h2 { font-size:30px; font-weight:500; letter-spacing:-.015em; margin:52px 0 12px; padding-top:20px; border-top:1px solid var(--rule) }
   p { margin-bottom:14px; color:var(--ink2) }
   pre { background:var(--ink); color:#e8e6f5; border-radius:3px; padding:18px 20px; font:13.5px/1.75 var(--mono); margin:16px 0 22px; overflow:auto }
-  pre .c { color:#7f7c99 } pre .k { color:#c792ea } pre .s { color:#addb67 } pre .p { color:#9d94ff } pre .n { color:#f78c6c }
-  code { font:.84em var(--mono); background:#1d1b260d; padding:1px 5px; border-radius:3px }
+  pre .c { color:#7f7c99 } pre .k { color:#c792ea } pre .s { color:#addb67 } pre .p { color:#f2b33d } pre .n { color:#f78c6c }
+  code { font:.84em var(--mono); background:#2a1a100d; padding:1px 5px; border-radius:3px }
   .cards { display:grid; grid-template-columns:1fr 1fr; gap:0; margin:30px 0 40px; border-top:2px solid var(--ink) }
   .cards a { padding:18px 20px 18px 0; border-bottom:1px solid var(--rule) }
   .cards a:nth-child(odd) { border-right:1px solid var(--rule) } .cards a:nth-child(even) { padding-left:20px }
@@ -70,9 +70,9 @@
   .cards b { display:block; font:600 16px var(--sans); margin-bottom:2px }
   .cards span { color:var(--dim); font:14px var(--sans) }
   figure { margin:28px 0 }
-  figure img { width:100%; display:block; filter:drop-shadow(0 18px 24px #1d1b2638) }
+  figure img { width:100%; display:block; filter:drop-shadow(0 18px 24px #2a1a1038) }
   figcaption { font:13.5px var(--sans); color:var(--dim); margin-top:8px } figcaption b { color:var(--ink) }
-  .note { border-left:3px solid var(--acc); background:#4b3fd10a; padding:14px 18px; font-size:16px; margin:22px 0 }
+  .note { border-left:3px solid var(--acc); background:#d9541f0a; padding:14px 18px; font-size:16px; margin:22px 0 }
   .note b { font-family:var(--sans); font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:var(--acc); display:block; margin-bottom:2px }
   table { width:100%; border-collapse:collapse; font:14.5px/1.5 var(--sans); margin:16px 0 }
   th { text-align:left; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); border-bottom:2px solid var(--ink); padding:8px 0 }
@@ -115,7 +115,7 @@
   <main>
     <p class="crumb">Start · Introduction</p>
     <h1>Introduction</h1>
-    <p class="lead">Moonframe is a starter for native desktop apps whose whole window is written in Luau. Rust and GPUI draw it, check it, and keep it safe; every panel, split, toolbar and status bar is a Luau file that reloads as you save, with its state kept.</p>
+    <p class="lead">Moonframe is a factory for native desktop apps whose whole window is written in Luau. Rust and GPUI draw it, check it, and keep it safe; every panel, split, toolbar and status bar is a Luau file that reloads as you save, with its state kept.</p>
 <pre><span class="p">$</span> git clone https://github.com/penso/moonframe my-app
 <span class="p">$</span> cd my-app
 <span class="p">$</span> mise install   <span class="c"># Rust, and Zig for the Ghostty terminal</span>

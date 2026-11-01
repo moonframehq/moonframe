@@ -76,7 +76,7 @@ def tags(page, image):
     return f"""<!-- social -->
 <meta name="description" content="{p['description']}">
 <link rel="canonical" href="{p['url']}">
-<meta name="theme-color" content="#f6f3ec">
+<meta name="theme-color" content="#f6eedc">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Moonframe">
 <meta property="og:url" content="{p['url']}">
