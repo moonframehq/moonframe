@@ -291,9 +291,9 @@ The sandbox only covers the running component. Building it runs Cargo as
 your user, including proc macros and dependency build scripts. The host
 refuses build scripts in the provider or its local crates, and toolchains
 named by path, and runs Cargo outside its folders, so no Cargo config there
-applies. It also refuses any package that ships a binary, so
-what runs is always source you can read. Bundled apps ship their Wasm
-providers prebuilt and build nothing on your machine.
+applies. It also refuses any package that ships a binary, so what runs is
+always source you can read. Bundled apps ship their Wasm providers prebuilt
+and build nothing on your machine.
 
 Apps with no Wasm providers can turn off the `wasm` feature, which is on by
 default (see [docs/library.md](docs/library.md)).
