@@ -35,6 +35,9 @@ local FILE = { "file", "#9da5b4" }
 local FOLDER = "#dcb67a"
 -- Pixels each level of the tree steps in.
 local INDENT = 12
+-- Each row's height: the tree is a `ui.list`, which builds only the rows
+-- that show, so a large project costs what a screenful does.
+local ROW_HEIGHT = 24
 
 type State = {
 	-- Open folders, by path from the root.
@@ -55,18 +58,69 @@ local function file_icon(name: string)
 end
 
 -- The explorer's box: a panel in the sidebar; in a tab, which frames it
--- already (`props.framed`), a bare scrolling column, so no second border.
+-- already (`props.framed`), a bare column, so no second border. The list
+-- in it scrolls itself.
 local function frame(props: any, children: { any })
 	if props and props.framed then
-		return ui.column { grow = true, scroll = true, gap = "none", padding = "small", table.unpack(children) }
+		return ui.column { grow = true, gap = "none", padding = "small", table.unpack(children) }
 	end
 	return ui.panel {
 		title = "Explorer",
 		grow = true,
-		scroll = true,
 		gap = "none",
 		padding = "small",
 		table.unpack(children),
+	}
+end
+
+-- One line of the tree, as data: a file or folder at a depth, or a folder
+-- the provider has not listed yet.
+type Line = {
+	path: string,
+	depth: number,
+	entry: any?,
+	open: boolean?,
+}
+
+-- Draws one line of the tree.
+local function line(state: State, at: Line)
+	local entry = at.entry
+	if not entry then
+		return ui.row {
+			class = "tree-row",
+			ui.row { width = INDENT * at.depth + 16 },
+			ui.text { "…", tone = "muted", size = "small" },
+		}
+	end
+	local icon, color, lead
+	if entry.dir then
+		icon, color = if at.open then "folder-open" else "folder", FOLDER
+		lead = ui.icon {
+			name = if at.open then "chevron-down" else "chevron-right",
+			class = "tree-chevron",
+			size = "small",
+		}
+	else
+		local known = file_icon(entry.name)
+		icon, color = known[1], known[2]
+		-- Where a folder's chevron goes, so names line up.
+		lead = ui.row { width = 14 }
+	end
+	local classes = { "tree-row" }
+	if at.path == state.selected then
+		table.insert(classes, "tree-selected")
+	end
+	if entry.ignored then
+		table.insert(classes, "tree-ignored")
+	end
+	return ui.row {
+		class = classes,
+		align = "center",
+		msg = if entry.dir then { toggle = at.path } else { open = at.path },
+		ui.row { width = INDENT * at.depth },
+		lead,
+		ui.icon { name = icon :: any, style = { color = color } },
+		ui.text { entry.name, truncate = true },
 	}
 end
 
@@ -133,51 +187,20 @@ return mod {
 			return frame(props, { ui.text { files.reason or "No files to show.", tone = "muted" } })
 		end
 
-		local rows = {}
+		-- The open part of the tree, flat and in order; only the lines that
+		-- show are drawn.
+		local lines: { Line } = {}
 		local function add(dir: string, depth: number)
 			local entries = files.dirs[dir]
 			if not entries then
 				-- Opened, and the provider has not listed it yet.
-				table.insert(rows, ui.row {
-					class = "tree-row",
-					ui.row { width = INDENT * depth + 16 },
-					ui.text { "…", tone = "muted", size = "small" },
-				})
+				table.insert(lines, { path = dir, depth = depth })
 				return
 			end
 			for _, entry in entries do
 				local path = if dir == "" then entry.name else `{dir}/{entry.name}`
-				local open = entry.dir and state.open[path]
-				local icon, color, lead
-				if entry.dir then
-					icon, color = if open then "folder-open" else "folder", FOLDER
-					lead = ui.icon {
-						name = if open then "chevron-down" else "chevron-right",
-						class = "tree-chevron",
-						size = "small",
-					}
-				else
-					local known = file_icon(entry.name)
-					icon, color = known[1], known[2]
-					-- Where a folder's chevron goes, so names line up.
-					lead = ui.row { width = 14 }
-				end
-				local classes = { "tree-row" }
-				if path == state.selected then
-					table.insert(classes, "tree-selected")
-				end
-				if entry.ignored then
-					table.insert(classes, "tree-ignored")
-				end
-				table.insert(rows, ui.row {
-					class = classes,
-					align = "center",
-					msg = if entry.dir then { toggle = path } else { open = path },
-					ui.row { width = INDENT * depth },
-					lead,
-					ui.icon { name = icon :: any, style = { color = color } },
-					ui.text { entry.name, truncate = true },
-				})
+				local open = entry.dir and state.open[path] or false
+				table.insert(lines, { path = path, depth = depth, entry = entry, open = open })
 				if open then
 					add(path, depth + 1)
 				end
@@ -195,11 +218,20 @@ return mod {
 			},
 			ui.text { string.upper(files.root), class = "tree-root-label" },
 		}
-		if not state.collapsed then
-			add("", 0)
+		if state.collapsed then
+			return frame(props, { root })
 		end
-
-		table.insert(rows, 1, root)
-		return frame(props, rows)
+		add("", 0)
+		return frame(props, {
+			root,
+			ui.list {
+				id = "tree",
+				count = #lines,
+				row_height = ROW_HEIGHT,
+				row = function(index)
+					return line(state, lines[index])
+				end,
+			},
+		})
 	end,
 }

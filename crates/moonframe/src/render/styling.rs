@@ -202,7 +202,9 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
             Some(Align::End) => self.self_end(),
         };
         // A fixed size is the basis to grow from, not nothing.
-        if frame.grow && frame.width.is_none() && frame.height.is_none() {
+        let sized =
+            frame.width.or(style.width).is_some() || frame.height.or(style.height).is_some();
+        if frame.grow && !sized {
             self = self.flex_1();
         } else if frame.grow {
             self = self.flex_grow(1.);
@@ -228,10 +230,11 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
                 self = self.left(px(left));
             }
         }
-        if let Some(width) = frame.width {
+        // The element's own size, else a rule's, such as a named state's.
+        if let Some(width) = frame.width.or(style.width) {
             self = self.w(px(width)).flex_shrink_0();
         }
-        if let Some(height) = frame.height {
+        if let Some(height) = frame.height.or(style.height) {
             self = self.h(px(height)).flex_shrink_0();
         }
         if let Some(surface) = frame.surface {

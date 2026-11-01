@@ -13,6 +13,7 @@ mod floating;
 mod gallery;
 mod input;
 mod keyed;
+mod list;
 mod styling;
 mod terminal;
 
@@ -20,20 +21,22 @@ use {
     crate::{
         app::MoonframeApp,
         browser::Browsers,
+        color::ThemeColor,
         input::Inputs,
         inspect::{Crumb, Sink, Tracked},
-        motion::{Keyed, Motion, Shown},
+        motion::{Keyed, Motion, Shown, Snapshot},
         terminal::Terminals,
     },
     gpui_kit::{
-        component::{ActiveTheme, Icon, Sizable as _, tooltip::Tooltip},
+        component::{ActiveTheme, Icon, Sizable as _, Theme, tooltip::Tooltip},
         *,
     },
     moonframe_core::{
-        Action, Data, Direction, Keys, Look, Node, Part, Resolved, Rules, SHELL, Slot, States,
-        Transition, Workspace,
+        Action, Color, Data, Direction, Keys, ListWindow, Look, Node, Paint, Part, Resolved, Rules,
+        SHELL, Shade, Slot, States, Transition, Workspace,
     },
     std::{
+        cell::Cell,
         path::Path,
         rc::Rc,
         sync::LazyLock,
@@ -212,7 +215,19 @@ pub(crate) struct Painter<'w, 'm> {
     /// What keyed containers drew last frame, for children that arrive or
     /// go; none in previews, which draw them as they are.
     last_keyed: Option<&'w Keyed>,
+    /// The theme, for the colors a state's look eases between.
+    theme: Theme,
+    /// Whether an element is moving between named states: styles resolve
+    /// through a shared borrow, so this is apart from `animating`.
+    tweening: Cell<bool>,
+    /// The rows lists need that their views did not build, as `(owner,
+    /// list id, rows)`: asked for once the frame is drawn.
+    list_requests: Vec<(String, String, ListWindow)>,
 }
+
+/// A list's rows a mod should build, which the app asks the workspace for
+/// after the frame.
+pub(crate) type ListRequest = (String, String, ListWindow);
 
 impl<'w, 'm> Painter<'w, 'm> {
     pub(crate) fn new(
@@ -221,8 +236,12 @@ impl<'w, 'm> Painter<'w, 'm> {
         terminals: &'m mut Terminals,
         inputs: &Inputs,
         sink: Option<Sink>,
+        theme: &Theme,
     ) -> Self {
         Self {
+            theme: theme.clone(),
+            tweening: Cell::new(false),
+            list_requests: Vec::new(),
             workspace,
             mounted: Vec::new(),
             motion,
@@ -264,7 +283,12 @@ impl<'w, 'm> Painter<'w, 'm> {
     }
 
     pub(crate) fn animating(&self) -> bool {
-        self.animating
+        self.animating || self.tweening.get()
+    }
+
+    /// The rows lists asked for this frame.
+    pub(crate) fn take_list_requests(&mut self) -> Vec<ListRequest> {
+        std::mem::take(&mut self.list_requests)
     }
 
     /// The open popovers and overlays this frame drew, for their keys.
@@ -479,9 +503,53 @@ impl<'w, 'm> Painter<'w, 'm> {
             .slot(place.owner)
             .map(Slot::rules)
             .unwrap_or(&NO_RULES);
-        self.workspace
+        let mut resolved = self
+            .workspace
             .stylesheet()
-            .resolve_in(part, look, states, local)
+            .resolve_in(part, look, states, local);
+        if let Some(state) = &look.state {
+            self.tween(&mut resolved, state, place);
+        }
+        resolved
+    }
+
+    /// Eases `resolved`, the look of `state`, from the look of the state
+    /// the element at `place` was in before, as its `transition` says.
+    fn tween(&self, resolved: &mut Resolved, state: &str, place: &Place) {
+        let theme = &self.theme;
+        let style = &resolved.base;
+        let color = |color: Option<Color>| color.map(|color| color.hsla(theme));
+        let target = Snapshot {
+            background: color(style.background),
+            color: color(style.color),
+            border_color: color(style.border_color),
+            opacity: style.opacity,
+            width: style.width,
+            height: style.height,
+        };
+        let transition = style.transition.map(|transition| Transition {
+            duration: self.workspace.stylesheet().scaled(transition.duration),
+            ..transition
+        });
+        let (now, moving) = self.motion.tweens.borrow_mut().step(
+            &place.path,
+            Some(state),
+            target,
+            transition.as_ref(),
+            self.now,
+        );
+        if !moving {
+            return;
+        }
+        self.tweening.set(true);
+        let fixed = |hsla: Option<Hsla>| hsla.map(fixed_color);
+        let style = &mut resolved.base;
+        style.background = fixed(now.background).or(style.background);
+        style.color = fixed(now.color).or(style.color);
+        style.border_color = fixed(now.border_color).or(style.border_color);
+        style.opacity = now.opacity;
+        style.width = now.width;
+        style.height = now.height;
     }
 }
 
@@ -555,7 +623,22 @@ fn draw_node<'w>(
         },
         Node::Popover(popover) => popover.draw(painter, place, cx),
         Node::Overlay(overlay) => overlay.draw(painter, place, cx),
+        Node::List(list) => list.draw(painter, place, cx),
         Node::Problem(message) => broken(message, place, cx),
+    }
+}
+
+/// A color mid-move between two states', as the same in light and dark.
+fn fixed_color(hsla: Hsla) -> Color {
+    let rgba = Rgba::from(hsla);
+    let byte = |channel: f32| (channel.clamp(0.0, 1.0) * 255.0).round() as u32;
+    let packed = byte(rgba.r) << 24 | byte(rgba.g) << 16 | byte(rgba.b) << 8 | byte(rgba.a);
+    Color {
+        paint: Paint::Fixed(Shade {
+            light: packed,
+            dark: packed,
+        }),
+        alpha: 1.0,
     }
 }
 

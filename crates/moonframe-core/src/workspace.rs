@@ -11,10 +11,10 @@
 
 use {
     crate::{
-        Action, Chrome, Command, Data, Error, Instance, InstanceOf, Node, Roots, Rules, Stylesheet,
-        WindowState,
+        Action, Chrome, Command, Data, Error, Instance, InstanceOf, ListWindow, Node, Roots, Rules,
+        Stylesheet, WindowState,
         component::{Component, Demo, Library},
-        module::{Meta, Module},
+        module::{AppData, Meta, Module, Reads},
         persist::{Persist, state_key},
         style,
         vm::{self, Meter},
@@ -24,6 +24,7 @@ use {
         collections::{BTreeMap, BTreeSet, VecDeque},
         fs,
         path::{Path, PathBuf},
+        rc::Rc,
     },
 };
 
@@ -64,6 +65,73 @@ pub struct Workspace {
     persist: Option<Box<dyn Persist>>,
     /// The last value published on each topic (`to = "topic:<name>"`).
     topics: BTreeMap<String, Data>,
+    /// What views last got as `app`.
+    app: Rc<AppData>,
+    /// When each key of `app` last changed, for views to tell whether
+    /// what they read is still current.
+    versions: Versions,
+    /// Counts stylesheet loads: every view draws again after one.
+    style_generation: u64,
+}
+
+/// A count for each key of `app`, raised when its value changes, and one
+/// raised when any does.
+#[derive(Default)]
+struct Versions {
+    keys: BTreeMap<String, u64>,
+    any: u64,
+}
+
+impl Versions {
+    /// Raises the count of every key whose value differs from `old` to `new`.
+    fn compare(&mut self, old: &AppData, new: &AppData) {
+        let gone = old.keys().filter(|key| !new.contains_key(*key));
+        let changed = new
+            .iter()
+            .filter(|(key, value)| old.get(*key) != Some(value))
+            .map(|(key, _)| key);
+        let keys: Vec<String> = gone.chain(changed).cloned().collect();
+        for key in keys {
+            self.any += 1;
+            self.keys.insert(key, self.any);
+        }
+    }
+
+    /// Where `reads` stand now.
+    fn stamp(&self, reads: &Reads) -> Stamp {
+        match reads {
+            Reads::All => Stamp::All(self.any),
+            Reads::Keys(keys) => Stamp::Keys(
+                keys.iter()
+                    .map(|key| (key.clone(), self.keys.get(key).copied().unwrap_or(0)))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Whether nothing `stamp` read has changed since.
+    fn current(&self, stamp: &Stamp) -> bool {
+        match stamp {
+            Stamp::All(any) => *any == self.any,
+            Stamp::Keys(keys) => keys
+                .iter()
+                .all(|(key, at)| self.keys.get(key).copied().unwrap_or(0) == *at),
+        }
+    }
+}
+
+/// The counts of the keys of `app` a view read, when it was drawn.
+#[derive(Debug)]
+enum Stamp {
+    All(u64),
+    Keys(Vec<(String, u64)>),
+}
+
+/// What a view was drawn from, besides its state and props.
+#[derive(Debug)]
+struct Drawn {
+    style_generation: u64,
+    stamp: Stamp,
 }
 
 /// An instance the app keeps: its module, and what it is an instance of.
@@ -122,6 +190,14 @@ pub struct Slot {
     props: Data,
     /// Loaded since its topics were last handed to it.
     fresh: bool,
+    /// Its state, props or lists changed since it was last drawn, or it
+    /// was never drawn: its view must run again.
+    dirty: bool,
+    /// What its view read when last drawn; while that is current and it is
+    /// not `dirty`, drawing again would draw the same.
+    drawn: Option<Drawn>,
+    /// Which rows each of its lists builds, by the list's `id`.
+    lists: BTreeMap<String, ListWindow>,
 }
 
 impl Slot {
@@ -212,6 +288,7 @@ impl Slot {
             Ok(module) => {
                 self.module = Some(module);
                 self.fresh = true;
+                self.dirty = true;
                 self.load_error = None;
                 self.update_error = None;
             },
@@ -233,6 +310,7 @@ impl Slot {
             Ok(module) => {
                 self.module = Some(module);
                 self.fresh = true;
+                self.dirty = true;
                 self.load_error = None;
                 self.update_error = None;
             },
@@ -246,6 +324,7 @@ impl Slot {
             return;
         }
         self.props = props.clone();
+        self.dirty = true;
         if let Some(module) = &mut self.module
             && let Err(error) = module.set_props(props)
         {
@@ -253,21 +332,38 @@ impl Slot {
         }
     }
 
-    fn render(&mut self, app: &Data, sheet: &Stylesheet) {
+    /// Runs its view, unless nothing it was drawn from has changed.
+    fn render(&mut self, app: &Rc<AppData>, versions: &Versions, sheet: &Stylesheet, style: u64) {
         let Some(module) = &self.module else {
             return;
         };
+        let current = self
+            .drawn
+            .as_ref()
+            .is_some_and(|drawn| drawn.style_generation == style && versions.current(&drawn.stamp));
+        if current && !self.dirty {
+            return;
+        }
+        self.dirty = false;
         match module
             .rules(sheet)
-            .and_then(|rules| Ok((rules, module.view(app, sheet)?)))
+            .and_then(|rules| Ok((rules, module.view(app, sheet, &self.lists)?)))
         {
-            Ok((rules, (view, broken))) => {
+            Ok((rules, (view, broken, reads))) => {
                 self.rules = rules;
                 self.view = Some(view);
                 self.broken = broken;
                 self.view_error = None;
+                self.drawn = Some(Drawn {
+                    style_generation: style,
+                    stamp: versions.stamp(&reads),
+                });
             },
-            Err(error) => self.view_error = Some(error),
+            Err(error) => {
+                self.view_error = Some(error);
+                // Tried again on the next render, whatever changes.
+                self.drawn = None;
+            },
         }
     }
 }
@@ -306,6 +402,9 @@ impl Workspace {
                 .map(|persist| persist.topics())
                 .unwrap_or_default(),
             persist,
+            app: Rc::new(AppData::new()),
+            versions: Versions::default(),
+            style_generation: 0,
         };
         workspace.shell.restored = workspace.restore(SHELL);
         workspace.reload();
@@ -360,6 +459,7 @@ impl Workspace {
     /// Reads every module again, adds mods that appeared, drops those that
     /// went, and keeps each module's state across the reload.
     pub fn reload(&mut self) {
+        self.style_generation += 1;
         self.load_style();
         self.library = Library::read(self.roots.entries("components", "luau"));
         self.components = self.library.catalogue(&self.stylesheet);
@@ -757,6 +857,7 @@ impl Workspace {
             let Some(Slot {
                 module: Some(module),
                 update_error,
+                dirty,
                 ..
             }) = self.slot_mut(&to)
             else {
@@ -765,6 +866,8 @@ impl Workspace {
                 }
                 continue;
             };
+            // `update` may change the state in place, so the view runs again.
+            *dirty = true;
             match module.update(&msg) {
                 Ok(sends) => {
                     *update_error = None;
@@ -889,7 +992,7 @@ impl Workspace {
 
     /// What every `view` gets as `app`: what the host shares, the mods,
     /// which regions they asked for, and the theme.
-    fn app(&self) -> Data {
+    fn app(&self) -> AppData {
         let mut regions: BTreeMap<String, Vec<Data>> = BTreeMap::new();
         let names: BTreeSet<&str> = self
             .mods
@@ -931,7 +1034,7 @@ impl Workspace {
                 ),
             ),
         ]);
-        Data::Map(app)
+        app
     }
 
     /// What a tab bar's `+` menu offers, `app.kinds`: each component and mod
@@ -975,13 +1078,37 @@ impl Workspace {
         Data::List(kinds.into_iter().map(|(_, kind)| kind).collect())
     }
 
+    /// Runs every view whose state, props, lists or `app` keys it read
+    /// changed since it was last drawn; the others keep their view.
     fn render(&mut self) {
         let app = self.app();
-        self.shell.render(&app, &self.stylesheet);
+        if app != *self.app {
+            self.versions.compare(&self.app, &app);
+            self.app = Rc::new(app);
+        }
+        let app = self.app.clone();
+        let style = self.style_generation;
+        self.shell
+            .render(&app, &self.versions, &self.stylesheet, style);
         for slot in self.mods.values_mut().chain(self.demos.values_mut()) {
-            slot.render(&app, &self.stylesheet);
+            slot.render(&app, &self.versions, &self.stylesheet, style);
         }
         self.render_instances(&app);
+    }
+
+    /// Has the list `id` drawn by `owner` build the rows in `window`, as the
+    /// window scrolls it, and draws again. Whether that changed anything.
+    pub fn set_list_window(&mut self, owner: &str, id: &str, window: ListWindow) -> bool {
+        let Some(slot) = self.slot_mut(owner) else {
+            return false;
+        };
+        if slot.lists.get(id) == Some(&window) {
+            return false;
+        }
+        slot.lists.insert(id.to_owned(), window);
+        slot.dirty = true;
+        self.settle();
+        true
     }
 
     /// What every module sent from `init` and is not yet delivered.
@@ -1041,7 +1168,7 @@ impl Workspace {
     /// state they saved), handing each its props, and following instances
     /// drawn inside instances. Those no longer drawn are dropped; their
     /// state stays saved, so they resume where they were if drawn again.
-    fn render_instances(&mut self, app: &Data) {
+    fn render_instances(&mut self, app: &Rc<AppData>) {
         let mut queue: Vec<(String, Instance)> = Vec::new();
         let collect = |owner: &str, view: Option<&Node>, queue: &mut Vec<(String, Instance)>| {
             if let Some(view) = view {
@@ -1089,18 +1216,57 @@ impl Workspace {
                 continue;
             };
             mounted.slot.set_props(&instance.props);
-            mounted.slot.render(app, &self.stylesheet);
+            mounted
+                .slot
+                .render(app, &self.versions, &self.stylesheet, self.style_generation);
             collect(&key, mounted.slot.view(), &mut queue);
         }
-        self.instances.retain(|key, _| drawn.contains(key));
+        // Instances in hidden `lazy` panes sleep: kept as they are if they
+        // were started, with what they mount, but neither drawn nor started.
+        let mut asleep: Vec<(String, Instance)> = Vec::new();
+        let doze = |owner: &str, view: Option<&Node>, queue: &mut Vec<(String, Instance)>| {
+            if let Some(view) = view {
+                view.asleep(&mut |instance| queue.push((owner.to_owned(), instance.clone())));
+            }
+        };
+        doze(SHELL, self.shell.view(), &mut asleep);
+        for (name, slot) in self.mods.iter().chain(&self.demos) {
+            doze(name, slot.view(), &mut asleep);
+        }
+        for (key, mounted) in &self.instances {
+            if drawn.contains(key) {
+                doze(key, mounted.slot.view(), &mut asleep);
+            }
+        }
+        let mut kept = BTreeSet::new();
+        while let Some((owner, instance)) = asleep.pop() {
+            let key = instance.key(&owner);
+            if drawn.contains(&key) || !kept.insert(key.clone()) {
+                continue;
+            }
+            if let Some(mounted) = self.instances.get(&key) {
+                // What it mounts, awake or asleep in its own view, sleeps too.
+                collect(&key, mounted.slot.view(), &mut asleep);
+                doze(&key, mounted.slot.view(), &mut asleep);
+            }
+        }
+        self.instances
+            .retain(|key, _| drawn.contains(key) || kept.contains(key));
     }
 }
 
 /// How deep each stylesheet key merges when one layer goes over another:
 /// a color or speed replaces the one of its name, and a rule's properties
 /// replace those of the same rule, so a user's `panel = { radius = 4 }`
-/// keeps the app's panel background. Any other key replaces the value below.
-const MERGED: &[(&str, usize)] = &[("colors", 1), ("speeds", 1), ("looks", 1), ("rules", 2)];
+/// keeps the app's panel background, and `mono = { size = 14 }` keeps its
+/// family. Any other key replaces the value below.
+const MERGED: &[(&str, usize)] = &[
+    ("colors", 1),
+    ("speeds", 1),
+    ("looks", 1),
+    ("mono", 1),
+    ("rules", 2),
+];
 
 /// Lays the stylesheet `sheet` over `merged`.
 fn layer(merged: &Table, sheet: &Table) -> mlua::Result<()> {
