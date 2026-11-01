@@ -106,6 +106,7 @@
   /* Inspect */
   .inspect { display:grid; grid-template-columns:1fr 1.25fr; gap:64px; align-items:center }
   .shot { position:relative }
+  .shot .frame { position:relative }
   .shot img { display:block; width:100%; filter:drop-shadow(0 24px 30px #1d1b2640) }
   .pick { position:absolute; left:.7%; top:6%; width:17.7%; height:89%; border:2px solid var(--acc); border-radius:6px; background:#4b3fd114 }
   .pick::before { content:"mods/explorer/main.luau"; position:absolute; top:-25px; left:-2px; background:var(--acc); color:#fff; font:11px var(--mono); padding:3px 7px; border-radius:3px 3px 3px 0; white-space:nowrap }
@@ -186,6 +187,7 @@
     .cols { columns:2 }
   }
   @media (max-width:720px) {
+    #components, .wide { display:none }
     .wrap { padding:0 18px }
     .sub { flex-direction:column; align-items:center; gap:2px }
     .hero { padding:44px 0 24px } .deck { font-size:18px }
@@ -210,7 +212,7 @@
   <header class="mast">
     <span>Open source · MIT</span>
     <a class="name" href="#"><img src="img/icon.png" alt="">Moonframe</a>
-    <nav><a href="#components">Components</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe">GitHub</a></nav>
+    <nav><a class="wide" href="#components">Components</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe">GitHub</a></nav>
   </header>
   <div class="sub"><span>Native desktop apps, <b>written in Rust</b></span><span>macOS · Linux · Windows</span></div>
 
@@ -279,8 +281,7 @@ just install   # into /Applications</pre></div>
         </ol>
       </div>
       <div class="shot">
-        <img src="img/window.webp" alt="The Moonframe window">
-        <div class="pick"></div>
+        <div class="frame"><img src="img/window.webp" alt="The Moonframe window"><div class="pick"></div></div>
         <div class="chat">
           <div class="m u">add a list of branches here</div>
           <div class="m a">Adding a <code>ui.list</code> fed by the <code>git</code> provider to the explorer. ✓ <code>just check</code> passed</div>
@@ -340,7 +341,7 @@ just install   # into /Applications</pre></div>
 
   <footer>
     <div><span class="name"><img src="img/icon.png" alt="">Moonframe</span>Native desktop apps in Rust, shaped live in Luau.<br>MIT licensed.</div>
-    <div><b>Learn</b><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe#quick-start">Quick start</a><a href="#components">Components</a></div>
+    <div><b>Learn</b><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe#quick-start">Quick start</a><a class="wide" href="#components">Components</a></div>
     <div><b>Build</b><a href="https://github.com/penso/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/penso/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/penso/moonframe/blob/main/docs/library.md">The library</a></div>
     <div><b>Project</b><a href="https://github.com/penso/moonframe">GitHub</a><a href="https://github.com/penso/moonframe/issues">Issues</a><a href="https://github.com/penso/moonframe/blob/main/LICENSE">License</a></div>
   </footer>
