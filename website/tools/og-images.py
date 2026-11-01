@@ -30,8 +30,8 @@ PAGES = {
         "file": SITE / "index.html",
         "url": "https://moonframe.dev/",
         "title": "Moonframe: native desktop apps in Rust, shaped live in Luau",
-        "description": "A Rust starter for native desktop apps whose panels, toolbars and status bar are Luau. "
-        "Ask an agent for a change and watch the running window update: no rebuild, no restart.",
+        "description": "Native desktop apps in Rust, with every panel and toolbar in Luau. "
+        "Ask an agent for a change and watch the running window update, no restart.",
         "alt": "Moonframe. Ask for it, watch the window change: the Moonframe window beside an agent "
         "adding a CPU sparkline to its status bar.",
     },
@@ -94,6 +94,11 @@ def tags(page, image):
 <meta name="twitter:image:alt" content="{p['alt']}">
 <!-- /social -->"""
 
+
+# Social previews and search results cut descriptions off at about 155 characters.
+for page, info in PAGES.items():
+    if len(info["description"]) > 155:
+        raise SystemExit(f"{page}: description is {len(info['description'])} characters; keep it to 155")
 
 OG.mkdir(parents=True, exist_ok=True)
 for page, info in PAGES.items():
