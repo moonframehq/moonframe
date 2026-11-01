@@ -34,7 +34,8 @@ use {
         fs,
         io::Write as _,
         path::{Component, Path, PathBuf},
-        time::UNIX_EPOCH,
+        sync::atomic::{AtomicU64, Ordering},
+        time::{SystemTime, UNIX_EPOCH},
     },
 };
 
@@ -270,7 +271,7 @@ fn joined(root: &Path, path: &str) -> Result<PathBuf, String> {
         && path.split('/').all(|part| !part.is_empty())
         && Path::new(path)
             .components()
-            .all(|part| matches!(part, Component::Normal(name) if name != ".git"));
+            .all(|part| matches!(part, Component::Normal(name) if !is_git(name)));
     if !plain {
         return Err(format!(
             "`{path}` is not a path in the project: write it relative to the root, without \
@@ -280,15 +281,34 @@ fn joined(root: &Path, path: &str) -> Result<PathBuf, String> {
     Ok(root.join(path))
 }
 
-/// The file `path` names, which must exist and stay in the root after
-/// following links.
+/// `.git` in any case: macOS and Windows folders ignore it.
+fn is_git(name: &std::ffi::OsStr) -> bool {
+    name.eq_ignore_ascii_case(".git")
+}
+
+/// `resolved`, a path with its links followed, if it is still in the root
+/// and out of `.git`: a link can lead anywhere, so what it names is checked
+/// again.
+fn inside(root: &Path, resolved: &Path, path: &str) -> Result<(), String> {
+    let Ok(within) = resolved.strip_prefix(root) else {
+        return Err(format!("`{path}` leads outside the project"));
+    };
+    if within
+        .components()
+        .any(|part| matches!(part, Component::Normal(name) if is_git(name)))
+    {
+        return Err(format!("`{path}` leads into `.git`"));
+    }
+    Ok(())
+}
+
+/// The file `path` names, which must exist and stay in the root, out of
+/// `.git`, after following links.
 fn existing(root: &Path, path: &str) -> Result<PathBuf, String> {
     let file = joined(root, path)?
         .canonicalize()
         .map_err(|_| format!("`{path}` does not exist"))?;
-    if !file.starts_with(root) {
-        return Err(format!("`{path}` leads outside the project"));
-    }
+    inside(root, &file, path)?;
     if !file.is_file() {
         return Err(format!("`{path}` is not a file"));
     }
@@ -308,10 +328,9 @@ fn writable(root: &Path, path: &str) -> Result<PathBuf, String> {
     let parent = parent
         .canonicalize()
         .map_err(|_| format!("the folder of `{path}` does not exist"))?;
-    if !parent.starts_with(root) {
-        return Err(format!("`{path}` leads outside the project"));
-    }
-    Ok(parent.join(name))
+    let file = parent.join(name);
+    inside(root, &file, path)?;
+    Ok(file)
 }
 
 /// Writes `text` to a file beside `file`, then renames it over, so the file
@@ -321,9 +340,22 @@ fn save(file: &Path, text: &str) -> std::io::Result<()> {
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let temp = file.with_file_name(format!(".{name}.moonframe-{}.tmp", std::process::id()));
+    // A name no one else picks, made here: never a file or link already
+    // there.
+    static SAVES: AtomicU64 = AtomicU64::new(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.subsec_nanos());
+    let temp = file.with_file_name(format!(
+        ".{name}.moonframe-{}-{nanos}-{}.tmp",
+        std::process::id(),
+        SAVES.fetch_add(1, Ordering::Relaxed)
+    ));
+    let mut out = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp)?;
     let written = (|| {
-        let mut out = fs::File::create(&temp)?;
         out.write_all(text.as_bytes())?;
         out.sync_all()?;
         if let Ok(meta) = file.metadata() {

@@ -88,6 +88,7 @@ fn refuses_paths_outside_the_project_and_files_that_are_not_text() {
         ("./binary.md", "not a path in the project"),
         ("a//b.md", "not a path in the project"),
         (".git/config", "not a path in the project"),
+        (".GIT/config", "not a path in the project"),
         ("", "not a path in the project"),
         ("missing.md", "does not exist"),
         ("binary.md", "not a text file"),
@@ -112,6 +113,33 @@ fn refuses_paths_outside_the_project_and_files_that_are_not_text() {
             error.contains("leads outside the project"),
             "{action}: {error}"
         );
+    }
+    // A link into `.git` is refused too: reading its files, saving over
+    // one (a hook), or making a new one there.
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(dir.path().join(".git"), dir.path().join("hooks")).unwrap();
+        for (action, path) in [
+            ("read", "hooks/config"),
+            ("write", "hooks/config"),
+            ("write", "hooks/post-checkout"),
+        ] {
+            docs.receive(
+                &host,
+                "editor",
+                message(&[(action, path.into()), ("text", "x".into())]),
+            );
+            let error = string(&sent(&seen)[0].1, "error");
+            assert!(
+                error.contains("leads into `.git`"),
+                "{action} {path}: {error}"
+            );
+        }
+        assert_eq!(
+            fs::read_to_string(dir.path().join(".git/config")).unwrap(),
+            "[core]"
+        );
+        assert!(!dir.path().join(".git/post-checkout").exists());
     }
     assert_eq!(
         fs::read_to_string(outside.path().join("secret.md")).unwrap(),
