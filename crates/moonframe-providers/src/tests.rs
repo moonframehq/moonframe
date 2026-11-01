@@ -520,3 +520,15 @@ fn a_static_provider_publishes_its_file_on_messages_and_changes() {
         "more than",
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn a_static_file_swapped_for_a_link_is_refused_at_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(root, "own.json", "{}");
+    write(root, "outside.json", r#"{"secret": 1}"#);
+    assert_eq!(crate::fixed::read(&root.join("own.json")).unwrap(), "{}");
+    std::os::unix::fs::symlink(root.join("outside.json"), root.join("linked.json")).unwrap();
+    assert!(crate::fixed::read(&root.join("linked.json")).is_err());
+}
