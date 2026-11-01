@@ -1,12 +1,20 @@
 //! What the app remembers between runs: `settings.toml` in the user's
-//! folder. Only the keys the app writes are touched; others stay.
+//! folder, or the profile's. Only the keys the app writes are touched;
+//! others stay.
 
 use std::{fs, io::ErrorKind, path::Path};
 
-const THEME: &str = "theme";
+/// The theme picked before light and dark kept one each: read once, to
+/// carry it over.
+pub(crate) const THEME: &str = "theme";
+/// The theme light windows show, and the one dark windows show.
+pub(crate) const LIGHT_THEME: &str = "light_theme";
+pub(crate) const DARK_THEME: &str = "dark_theme";
+/// `system`, `light` or `dark`.
+pub(crate) const APPEARANCE: &str = "appearance";
 
-/// The saved theme's name, if any.
-pub(crate) fn theme(path: &Path) -> Option<String> {
+/// The text saved under `key`, if any.
+pub(crate) fn get(path: &Path, key: &str) -> Option<String> {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
         Err(error) if error.kind() == ErrorKind::NotFound => return None,
@@ -16,7 +24,7 @@ pub(crate) fn theme(path: &Path) -> Option<String> {
         },
     };
     match text.parse::<toml::Table>() {
-        Ok(table) => table.get(THEME)?.as_str().map(str::to_owned),
+        Ok(table) => table.get(key)?.as_str().map(str::to_owned),
         Err(error) => {
             tracing::warn!("{}: {error}", path.display());
             None
@@ -24,8 +32,8 @@ pub(crate) fn theme(path: &Path) -> Option<String> {
     }
 }
 
-/// Saves `name` as the theme.
-pub(crate) fn save_theme(path: &Path, name: &str) -> Result<(), String> {
+/// Saves each `(key, value)`, keeping the other keys.
+pub(crate) fn save(path: &Path, entries: &[(&str, &str)]) -> Result<(), String> {
     let mut table = match fs::read_to_string(path) {
         Ok(text) => text
             .parse::<toml::Table>()
@@ -33,7 +41,9 @@ pub(crate) fn save_theme(path: &Path, name: &str) -> Result<(), String> {
         Err(error) if error.kind() == ErrorKind::NotFound => toml::Table::new(),
         Err(error) => return Err(format!("cannot read {}: {error}", path.display())),
     };
-    table.insert(THEME.to_owned(), name.into());
+    for (key, value) in entries {
+        table.insert((*key).to_owned(), (*value).into());
+    }
     if let Some(folder) = path.parent() {
         fs::create_dir_all(folder).map_err(|error| format!("{}: {error}", folder.display()))?;
     }
@@ -46,21 +56,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_theme_is_saved_beside_other_settings() {
+    fn settings_are_saved_beside_other_settings() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("nested/settings.toml");
-        assert_eq!(theme(&path), None);
-        save_theme(&path, "Gruvbox Dark").unwrap();
-        assert_eq!(theme(&path).as_deref(), Some("Gruvbox Dark"));
+        assert_eq!(get(&path, THEME), None);
+        save(&path, &[(THEME, "Gruvbox Dark")]).unwrap();
+        assert_eq!(get(&path, THEME).as_deref(), Some("Gruvbox Dark"));
 
         fs::write(&path, "other = 1\ntheme = \"Nord\"\n").unwrap();
-        save_theme(&path, "Dracula").unwrap();
+        save(&path, &[(APPEARANCE, "dark"), (THEME, "Dracula")]).unwrap();
         let text = fs::read_to_string(&path).unwrap();
         assert!(text.contains("other = 1"), "{text}");
-        assert_eq!(theme(&path).as_deref(), Some("Dracula"));
+        assert_eq!(get(&path, THEME).as_deref(), Some("Dracula"));
+        assert_eq!(get(&path, APPEARANCE).as_deref(), Some("dark"));
 
         fs::write(&path, "theme = [").unwrap();
-        assert_eq!(theme(&path), None);
-        assert!(save_theme(&path, "Nord").is_err());
+        assert_eq!(get(&path, THEME), None);
+        assert!(save(&path, &[(THEME, "Nord")]).is_err());
     }
 }

@@ -24,7 +24,7 @@ impl MoonframeApp {
         };
         self.building = true;
         // Stays up until the build ends: cargo can take minutes.
-        let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
+        let id = self.next_toast();
         self.toast = Some((id, format!("Building {}…", crate::title()).into()));
         cx.notify();
         cx.spawn(async move |this, cx| {
@@ -165,7 +165,7 @@ impl MoonframeApp {
         cx: &mut Context<Self>,
     ) {
         // Stays up until the download ends.
-        let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
+        let id = self.next_toast();
         self.toast = Some((
             id,
             format!("Downloading {} {}…", crate::title(), release.version).into(),

@@ -1,6 +1,6 @@
 use {
     gpui_kit::{App, KeyBinding, Menu, MenuItem},
-    moonframe_core::{AppMenu, Chord, Component, MenuEntry},
+    moonframe_core::{AppMenu, Appearance, Chord, Component, MenuEntry},
     std::collections::BTreeMap,
 };
 
@@ -32,6 +32,24 @@ pub(crate) struct MenuSend {
 #[action(namespace = moonframe, no_json)]
 pub(crate) struct MenuKey {
     pub(crate) keystroke: String,
+}
+
+/// Makes the window light, dark, or follow the system (View > Appearance).
+#[derive(Clone, Debug, PartialEq, gpui_kit::Action)]
+#[action(namespace = moonframe, no_json)]
+pub(crate) struct SetAppearance {
+    pub(crate) appearance: Appearance,
+}
+
+thread_local! {
+    /// The appearance View > Appearance shows checked.
+    static APPEARANCE: std::cell::Cell<Appearance> = const { std::cell::Cell::new(Appearance::System) };
+}
+
+/// Shows `appearance` checked in View > Appearance, from the next time the
+/// menus are set.
+pub(crate) fn show_appearance(appearance: Appearance) {
+    APPEARANCE.set(appearance);
 }
 
 /// Opens the component browser on one component.
@@ -117,7 +135,17 @@ pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
             bar.push(Menu::new(menu.title.clone()).items(items));
         }
     }
+    let shown = APPEARANCE.get();
+    let appearances = [
+        ("System", Appearance::System),
+        ("Light", Appearance::Light),
+        ("Dark", Appearance::Dark),
+    ]
+    .map(|(label, appearance)| {
+        MenuItem::action(label, SetAppearance { appearance }).checked(appearance == shown)
+    });
     view_items.extend([
+        MenuItem::submenu(Menu::new("Appearance").items(appearances)),
         MenuItem::action("Themes…", ShowThemes),
         MenuItem::action("Toggle Dark Mode", ToggleTheme),
     ]);

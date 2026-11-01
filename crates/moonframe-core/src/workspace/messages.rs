@@ -3,7 +3,7 @@
 
 use {
     super::*,
-    crate::{Action, Command},
+    crate::{APP, Action, Command},
 };
 
 impl Workspace {
@@ -89,6 +89,21 @@ impl Workspace {
             }
             if let Some(provider) = to.strip_prefix(PROVIDER) {
                 self.outbox.push((provider.to_owned(), from.clone(), msg));
+                continue;
+            }
+            if let Some(what) = to.strip_prefix(APP) {
+                // Modules ask; a provider's answer or a topic's news does not.
+                if from.starts_with(PROVIDER) || from.starts_with(TOPIC) {
+                    continue;
+                }
+                match Request::parse(what, &msg) {
+                    Ok(request) => self.requests.push((from, request)),
+                    Err(error) => {
+                        if let Some(slot) = self.slot_mut(&from) {
+                            slot.update_error = Some(error);
+                        }
+                    },
+                }
                 continue;
             }
             if let Some(topic) = to.strip_prefix(TOPIC) {

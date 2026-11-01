@@ -59,6 +59,12 @@ impl Workspace {
         self.save();
     }
 
+    /// What views get as `app`, for tests.
+    #[cfg(test)]
+    pub(crate) fn app_data(&self) -> AppData {
+        self.app()
+    }
+
     /// What every `view` gets as `app`: what the host shares, the mods,
     /// which regions they asked for, and the theme.
     fn app(&self) -> AppData {
@@ -88,6 +94,20 @@ impl Workspace {
         );
         app.extend([
             ("dark".to_owned(), Data::Bool(self.dark)),
+            ("appearance".to_owned(), {
+                let (mode, fields) = &self.appearance;
+                // Until the app says (and in checks), the stock look in both.
+                let mut appearance = BTreeMap::from([
+                    ("theme".to_owned(), Data::from("Default")),
+                    ("light_theme".to_owned(), Data::from("Default")),
+                    ("dark_theme".to_owned(), Data::from("Default")),
+                    ("themes".to_owned(), Data::List(Vec::new())),
+                ]);
+                appearance.extend(fields.clone());
+                appearance.insert("mode".to_owned(), Data::from(mode.name()));
+                appearance.insert("dark".to_owned(), Data::Bool(self.dark));
+                Data::Map(appearance)
+            }),
             ("window".to_owned(), self.window.data()),
             (
                 "mods".to_owned(),

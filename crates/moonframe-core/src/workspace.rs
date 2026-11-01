@@ -18,8 +18,8 @@ mod slot;
 
 use {
     crate::{
-        Chrome, Data, Error, Instance, InstanceOf, ListWindow, Node, Roots, Rules, Stylesheet,
-        WindowState,
+        Appearance, Chrome, Data, Error, Instance, InstanceOf, ListWindow, Node, Request, Roots,
+        Rules, Stylesheet, WindowState,
         component::{Component, Library},
         module::{AppData, Meta, Module, Reads},
         persist::{Persist, state_key},
@@ -63,6 +63,9 @@ pub struct Workspace {
     stylesheet: Stylesheet,
     style_error: Option<Error>,
     dark: bool,
+    /// The appearance the user chose, and what the app adds about it
+    /// (the themes), as views see them in `app.appearance`.
+    appearance: (Appearance, BTreeMap<String, Data>),
     /// The window as views see it, `app.window`.
     window: WindowState,
     /// What the host shares with every view under `app`, such as
@@ -73,6 +76,9 @@ pub struct Workspace {
     /// Messages for providers (`to = "provider:<name>"`), for the app to
     /// forward: providers run outside the workspace.
     outbox: Vec<(String, String, Data)>,
+    /// What modules asked of the app itself (`to = "app:<what>"`), with
+    /// who asked, for the app to carry out.
+    requests: Vec<(String, Request)>,
     /// Where state outlives the app; nothing is saved without it.
     persist: Option<Box<dyn Persist>>,
     /// The last value published on each topic (`to = "topic:<name>"`).
@@ -253,6 +259,8 @@ impl Workspace {
             host: BTreeMap::new(),
             host_problems: BTreeMap::new(),
             outbox: Vec::new(),
+            requests: Vec::new(),
+            appearance: (Appearance::System, BTreeMap::new()),
             topics: persist
                 .as_ref()
                 .map(|persist| persist.topics())
@@ -425,6 +433,31 @@ impl Workspace {
     /// `(provider, sending module, message)`.
     pub fn take_outbox(&mut self) -> Vec<(String, String, Data)> {
         std::mem::take(&mut self.outbox)
+    }
+
+    /// Makes `problem` the module `name`'s update error: what it asked of
+    /// the app could not be done.
+    pub fn refuse(&mut self, name: &str, problem: Error) {
+        if let Some(slot) = self.slot_mut(name) {
+            slot.update_error = Some(problem);
+        }
+    }
+
+    /// What modules asked of the app since the last call, as `(sending
+    /// module, request)`, in the order they asked.
+    pub fn take_requests(&mut self) -> Vec<(String, Request)> {
+        std::mem::take(&mut self.requests)
+    }
+
+    /// Shares the appearance the user chose as `app.appearance.mode`,
+    /// beside `dark` (what the window is) and the app's `fields`, drawing
+    /// the views again when it changed.
+    pub fn set_appearance(&mut self, mode: Appearance, fields: BTreeMap<String, Data>) {
+        let appearance = (mode, fields);
+        if self.appearance != appearance {
+            self.appearance = appearance;
+            self.render();
+        }
     }
 
     pub fn set_dark(&mut self, dark: bool) {

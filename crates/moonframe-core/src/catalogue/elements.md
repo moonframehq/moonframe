@@ -79,7 +79,8 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   command instead: `quit`, `reload`, `toggle-theme`, `minimize`, `maximize`,
   `close-window`. A browser command (`browser-back`, `browser-forward`,
   `browser-reload`, `browser-stop`, `browser-open`) also takes
-  `browser = "<id>"`.
+  `browser = "<id>"`. To run a command from `update`, without a click, send
+  `{ to = "app:command", msg = "minimize" }`.
 - **Window:** the shell's `mod { window = { titlebar = "hidden",
   traffic_lights = { x, y } } }` draws the layout under the title bar (at
   startup only); `app.window` tells views the `platform`, `titlebar`,

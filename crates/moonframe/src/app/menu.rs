@@ -128,6 +128,10 @@ pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
         let _ = on.update(cx, |app, cx| app.show_themes(cx));
     });
     let on = app.clone();
+    cx.on_action(move |action: &SetAppearance, cx| {
+        let _ = on.update(cx, |app, cx| app.set_appearance(action.appearance, cx));
+    });
+    let on = app.clone();
     cx.on_action(move |_: &AboutApp, cx| {
         let _ = on.update(cx, |app, cx| app.show_about(cx));
     });
@@ -168,4 +172,64 @@ pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
         });
         cx.refresh_windows();
     });
+}
+
+/// A theme's name; the stock look's for `None`.
+pub(super) fn name_of(scheme: Option<&Scheme>) -> &'static str {
+    scheme.map_or(themes::DEFAULT, |scheme| scheme.name)
+}
+
+/// The stock look as a theme picker shows it, in dark windows or light
+/// ones: gpui-component's colors with the stylesheet's over them.
+pub(super) fn stock_preview(
+    overrides: &[(Token, moonframe_core::Shade)],
+    dark: bool,
+) -> themes::Preview {
+    let mut preview = if dark {
+        themes::STOCK_DARK
+    } else {
+        themes::STOCK_LIGHT
+    };
+    for (token, shade) in overrides {
+        // `0xRRGGBBAA`, without the alpha.
+        let color = if dark {
+            shade.dark
+        } else {
+            shade.light
+        } >> 8;
+        match token {
+            Token::Background => preview.background = color,
+            Token::Foreground => preview.foreground = color,
+            Token::Accent => preview.accent = color,
+            _ => {},
+        }
+    }
+    preview
+}
+
+/// Hears the clicks on the notifications mods posted: each brings the
+/// app and its window forward and tells the mod that posted it, on
+/// `app/notification`: `{ id, clicked = true }`.
+pub(super) fn hear_notification_clicks(cx: &mut Context<MoonframeApp>) {
+    let (sender, mut clicks) = futures::channel::mpsc::unbounded::<(String, Option<String>)>();
+    crate::alerts::listen(move |from, id| {
+        let _ = sender.unbounded_send((from, id));
+    });
+    cx.spawn(async move |this, cx| {
+        while let Some((from, id)) = clicks.next().await {
+            let heard = this.update(cx, |app, cx| app.notification_clicked(&from, id, cx));
+            if heard.is_err() {
+                break;
+            }
+        }
+    })
+    .detach();
+}
+
+/// Whether the system's appearance is a dark one.
+pub(super) fn is_dark(appearance: WindowAppearance) -> bool {
+    matches!(
+        appearance,
+        WindowAppearance::Dark | WindowAppearance::VibrantDark
+    )
 }

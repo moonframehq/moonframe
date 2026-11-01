@@ -1,7 +1,9 @@
-//! View > Themes: every theme in a window of its own, to preview and pick.
-//! Pointing at a theme, or moving to it with the arrow keys, shows it on the
-//! whole app; a click or Enter picks it and saves it. Leaving the list or
-//! closing the window goes back to the picked theme.
+//! View > Themes: the themes for the appearance the window is in (light or
+//! dark) in a window of their own, to preview and pick. Pointing at a theme,
+//! or moving to it with the arrow keys, shows it on the whole app; a click
+//! or Enter picks it for that appearance and saves it. Leaving the list or
+//! closing the window goes back to the picked theme. When the appearance
+//! changes, the list does.
 
 use {
     crate::{
@@ -26,6 +28,8 @@ const ROW_HEIGHT: f32 = 40.;
 pub(crate) struct ThemePicker {
     app: Entity<MoonframeApp>,
     search: Entity<InputState>,
+    /// Whether it lists the themes for dark windows or for light ones.
+    dark: bool,
     /// The names matching the search, in catalog order.
     shown: Vec<&'static str>,
     selected: usize,
@@ -73,13 +77,15 @@ impl ThemePicker {
             }),
         ];
         let current = app.read(cx).theme_name();
-        let shown: Vec<&'static str> = themes::names().collect();
+        let dark = app.read(cx).dark();
+        let shown: Vec<&'static str> = themes::names_for(dark).collect();
         let selected = shown.iter().position(|name| *name == current).unwrap_or(0);
         let scroll = ScrollHandle::new();
         scroll.scroll_to_item(selected);
         Self {
             app,
             search,
+            dark,
             shown,
             selected,
             scroll,
@@ -90,7 +96,7 @@ impl ThemePicker {
 
     fn filter(&mut self, cx: &mut Context<Self>) {
         let query = self.search.read(cx).value().trim().to_lowercase();
-        self.shown = themes::names()
+        self.shown = themes::names_for(self.dark)
             .filter(|name| name.to_lowercase().contains(&query))
             .collect();
         self.selected = 0;
@@ -216,8 +222,19 @@ fn swatch(scheme: Option<&Scheme>) -> Div {
 
 impl Render for ThemePicker {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The window turned light or dark: list the themes for that.
+        let dark = self.app.read(cx).dark();
+        if dark != self.dark {
+            self.dark = dark;
+            self.filter(cx);
+        }
         let current = self.app.read(cx).theme_name();
-        let total = themes::names().count();
+        let total = themes::names_for(dark).count();
+        let kind = if dark {
+            "dark"
+        } else {
+            "light"
+        };
         let rows: Vec<_> = self
             .shown
             .iter()
@@ -260,7 +277,10 @@ impl Render for ThemePicker {
                         div()
                             .text_sm()
                             .text_color(theme.muted_foreground)
-                            .child(format!("{} of {total} themes", self.shown.len())),
+                            .child(format!(
+                                "{} of {total} {kind} themes, for the {kind} appearance",
+                                self.shown.len()
+                            )),
                     ),
             )
             .child(

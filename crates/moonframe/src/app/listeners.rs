@@ -67,7 +67,7 @@ pub(super) fn start_providers(
                         // No view read it: the window looks the same.
                         let drawn = this.workspace.set_host(&provider, data);
                         // Mods that heard it may have asked a provider.
-                        this.forward(&provider);
+                        this.forward(&provider, cx);
                         if drawn > 0 {
                             // A view may fail on the new data: say so.
                             report(&this.workspace);

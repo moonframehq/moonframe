@@ -386,21 +386,35 @@ impl Image {
         home: Option<&Path>,
         allowed: &[PathBuf],
     ) -> Option<PathBuf> {
-        let src = Path::new(&self.src);
-        let path = match (home, src.strip_prefix("~")) {
-            (Some(home), Ok(rest)) => home.join(rest),
-            _ if src.is_absolute() => src.to_owned(),
-            _ => folder.join(src),
-        };
-        let real = path.canonicalize().ok()?;
-        let metadata = real.metadata().ok()?;
-        if !metadata.is_file() || metadata.len() > MAX_IMAGE_BYTES {
-            return None;
-        }
-        allowed
-            .iter()
-            .filter_map(|root| root.canonicalize().ok())
-            .any(|root| real.starts_with(root))
-            .then_some(real)
+        resolve_file(&self.src, folder, home, allowed, MAX_IMAGE_BYTES)
     }
+}
+
+/// The file `src` names for a mod in `folder` (relative to it, `~/...`
+/// with `home`, or absolute), if it is a regular file of at most
+/// `max_bytes` under one of `allowed` after following links and `..`: so
+/// a mod reaches only the app's own files.
+pub fn resolve_file(
+    src: &str,
+    folder: &Path,
+    home: Option<&Path>,
+    allowed: &[PathBuf],
+    max_bytes: u64,
+) -> Option<PathBuf> {
+    let src = Path::new(src);
+    let path = match (home, src.strip_prefix("~")) {
+        (Some(home), Ok(rest)) => home.join(rest),
+        _ if src.is_absolute() => src.to_owned(),
+        _ => folder.join(src),
+    };
+    let real = path.canonicalize().ok()?;
+    let metadata = real.metadata().ok()?;
+    if !metadata.is_file() || metadata.len() > max_bytes {
+        return None;
+    }
+    allowed
+        .iter()
+        .filter_map(|root| root.canonicalize().ok())
+        .any(|root| real.starts_with(root))
+        .then_some(real)
 }

@@ -54,10 +54,13 @@ impl Render for MoonframeApp {
             window.defer(cx, move |window, cx| focus.focus(window, cx));
         }
         let layers = self.inspector_layers(window.viewport_size(), cx);
-        let toast = self
-            .toast
-            .as_ref()
-            .map(|(_, message)| toast(message.clone(), cx));
+        let toast = self.toast.as_ref().map(|(id, message)| {
+            let notice = self
+                .toast_notice
+                .as_ref()
+                .is_some_and(|(shown, ..)| shown == id);
+            toast(message.clone(), notice, cx)
+        });
         let theme = cx.theme();
         div()
             .id("moonframe-app")
