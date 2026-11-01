@@ -182,6 +182,9 @@ fn build(context: &Context, cargo: &Path) -> Result<PathBuf, String> {
 
 /// How deep local path dependencies are followed.
 const MAX_LOCAL_CRATES: usize = 8;
+/// How many local crates are checked in all: links can make one crate
+/// look like many.
+const MAX_CHECKED_CRATES: usize = 256;
 
 fn read_manifest(dir: &Path) -> Result<toml::Table, String> {
     let manifest = dir.join("Cargo.toml");
@@ -205,11 +208,35 @@ struct Checked {
     workspaces: HashSet<PathBuf>,
 }
 
+impl Checked {
+    /// Whether the crate (or workspace root) at `key` is new; past
+    /// [`MAX_CHECKED_CRATES`] in all, the build is refused. Keys are paths
+    /// as Cargo works them out, not through links: one folder reached two
+    /// ways can sit in two workspaces, so each way is checked, and the cap
+    /// keeps links from making that endless.
+    fn first(&mut self, key: &Path, workspace: bool) -> Result<bool, String> {
+        let set = if workspace {
+            &mut self.workspaces
+        } else {
+            &mut self.crates
+        };
+        if !set.insert(key.to_owned()) {
+            return Ok(false);
+        }
+        if self.crates.len() + self.workspaces.len() > MAX_CHECKED_CRATES {
+            return Err(format!(
+                "a wasm provider can use at most {MAX_CHECKED_CRATES} local crates"
+            ));
+        }
+        Ok(true)
+    }
+}
+
 fn refuse_hooks(dir: &Path, depth: usize, checked: &mut Checked) -> Result<(), String> {
     // Cargo resolves `..` in a path dependency before it looks for the
     // workspace above it; walking the path as written could look elsewhere.
     let dir = &normalize(dir)?;
-    if !checked.crates.insert(dir.clone()) {
+    if !checked.first(dir, false)? {
         return Ok(());
     }
     let hook = |what: &str| {
@@ -266,7 +293,7 @@ fn refuse_hooks(dir: &Path, depth: usize, checked: &mut Checked) -> Result<(), S
         return Ok(());
     };
     let root = normalize(&root)?;
-    if !checked.workspaces.insert(root.clone()) {
+    if !checked.first(&root, true)? {
         return Ok(());
     }
     let parent = read_manifest(&root)?;

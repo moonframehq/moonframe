@@ -803,3 +803,39 @@ fn a_wasm_provider_reached_through_a_link_is_checked_where_cargo_looks() {
     let problem = crate::wasm::check_hooks(&root.join("providers/sys")).unwrap_err();
     assert!(problem.contains("cannot have"), "{problem}");
 }
+
+/// Links can make one crate look like many: seven levels of three links
+/// each, never deeper than allowed, would be 3^7 paths. The check stops
+/// at a total instead.
+#[cfg(unix)]
+#[test]
+fn a_wasm_provider_with_crates_multiplied_by_links_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let deps = "[dependencies]\na = { path = 'a' }\nb = { path = 'b' }\nc = { path = 'c' }\n";
+    write(
+        root,
+        "providers/sys/Cargo.toml",
+        &format!("[package]\nname = 'sys'\n[workspace]\n{deps}"),
+    );
+    let mut level = root.join("providers/sys");
+    for n in 1..=7 {
+        let next = root.join(format!("level{n}"));
+        let more = if n < 7 {
+            deps
+        } else {
+            ""
+        };
+        write(
+            &next,
+            "Cargo.toml",
+            &format!("[package]\nname = 'level{n}'\n{more}"),
+        );
+        for link in ["a", "b", "c"] {
+            std::os::unix::fs::symlink(&next, level.join(link)).unwrap();
+        }
+        level = next;
+    }
+    let problem = crate::wasm::check_hooks(&root.join("providers/sys")).unwrap_err();
+    assert!(problem.contains("at most"), "{problem}");
+}
