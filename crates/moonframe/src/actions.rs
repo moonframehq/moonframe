@@ -13,7 +13,8 @@ gpui_kit::actions!(moonframe, [
     BrowseComponents,
     ShowThemes,
     AboutApp,
-    BuildApp
+    BuildApp,
+    ToggleSlowAnimations
 ]);
 
 /// Runs a shell menu item, found by its id (menu title and label).
@@ -56,15 +57,17 @@ pub(crate) fn bind_keys(cx: &mut App) {
 /// The menu bar: the app menu (About, Quit), the shell's `menus`, then
 /// View, into which a shell menu called View merges, the Components menu
 /// listing `components` by category, and the shell's Window and Help. A release shows only what the
-/// app's users need: no Components menu, Inspect Element, or Reload Modules.
+/// app's users need: no Components menu, Inspect Element, Reload Modules,
+/// or Slow Animations.
 pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
     let title = crate::title();
     let mut app_items = vec![
         MenuItem::action(format!("About {title}"), AboutApp),
         MenuItem::separator(),
     ];
-    // Outside a release, the app builds itself as one.
-    if !crate::release() {
+    // Outside a release, the starter builds itself as one; an app on the
+    // library bundles with its own `bundle` command.
+    if !crate::release() && !crate::identity().hosted {
         app_items.extend([
             MenuItem::action("Build App Bundle", BuildApp),
             MenuItem::separator(),
@@ -120,6 +123,7 @@ pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
         MenuItem::separator(),
         MenuItem::action("Reload Modules", Reload),
         MenuItem::action("Inspect Element", Inspect),
+        MenuItem::action("Slow Animations", ToggleSlowAnimations).checked(crate::motion::is_slow()),
     ]);
     bar.extend([
         Menu::new("View").items(view_items),

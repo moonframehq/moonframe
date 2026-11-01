@@ -117,15 +117,17 @@ jobs:
       - name: Test
         run: cargo test --locked --workspace --all-features
       - name: Load every built-in module headlessly
-        run: cargo run --locked -p moonframe -- --check --no-user app
+        run: cargo run --locked -p moonframe-app -- --check --no-user app
       - name: Load every example app headlessly
-        run: scripts/check-examples.sh "target/debug/moonframe$EXE"
+        run: |
+          cargo build --locked -p moonframe-app -p moonframe-host-example
+          scripts/check-examples.sh "target/debug/moonframe$EXE" "target/debug/host-example$EXE"
         env:
           EXE: ${{ runner.os == 'Windows' && '.exe' || '' }}
       - name: Check the component catalogue skill is current
         run: |
           mkdir -p target
-          cargo run --quiet --locked -p moonframe -- --no-user --catalogue app > target/components.md
+          cargo run --quiet --locked -p moonframe-app -- --no-user --catalogue app > target/components.md
           # --strip-trailing-cr: Git for Windows checks the skill out with CRLF.
           diff -u --strip-trailing-cr .claude/skills/moonframe-components/SKILL.md target/components.md
 

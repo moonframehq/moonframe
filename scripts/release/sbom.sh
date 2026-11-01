@@ -10,9 +10,9 @@ mkdir -p "$out"
 name=moonframe-release-sbom
 trap 'rm -f crates/*/"$name".json app/providers/*/"$name".json' EXIT
 
-cargo cyclonedx -q --manifest-path crates/moonframe/Cargo.toml --format json \
+cargo cyclonedx -q --manifest-path crates/moonframe-app/Cargo.toml --format json \
     --all-features --target all --spec-version 1.5 --override-filename "$name"
-mv "crates/moonframe/$name.json" "$out/Moonframe-$version.cdx.json"
+mv "crates/moonframe-app/$name.json" "$out/Moonframe-$version.cdx.json"
 
 for manifest in app/providers/*/Cargo.toml; do
     [ -e "$manifest" ] || continue

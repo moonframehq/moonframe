@@ -31,7 +31,7 @@ version=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
 binary=${MOONFRAME_BINARY:-}
 
 if [ -z "$binary" ]; then
-    cargo build --quiet --release --locked -p moonframe
+    cargo build --quiet --release --locked -p moonframe-app
     binary="target/release/$exe"
 fi
 

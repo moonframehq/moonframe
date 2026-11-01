@@ -68,7 +68,7 @@ jobs:
       - name: Build optimized executables
         run: |
           for target in aarch64-apple-darwin x86_64-apple-darwin; do
-            cargo build --locked --release -p moonframe --target "$target"
+            cargo build --locked --release -p moonframe-app --target "$target"
           done
       - name: Package the app and disk image
         run: |
@@ -114,7 +114,7 @@ jobs:
           version: 0.15.2
           use-cache: false
       - name: Build the optimized executable
-        run: cargo build --locked --release -p moonframe --target "$TARGET"
+        run: cargo build --locked --release -p moonframe-app --target "$TARGET"
       - name: Package the tarball
         run: scripts/release/package-archive.sh "$TARGET" "target/$TARGET/release/moonframe" dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -152,7 +152,7 @@ jobs:
           version: 0.15.2
           use-cache: false
       - name: Build the optimized executable
-        run: cargo build --locked --release -p moonframe --target "$TARGET"
+        run: cargo build --locked --release -p moonframe-app --target "$TARGET"
       - name: Package the zip
         run: scripts/release/package-archive.sh "$TARGET" "target/$TARGET/release/moonframe.exe" dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

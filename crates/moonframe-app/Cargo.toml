@@ -1,0 +1,23 @@
+[package]
+description            = "The Moonframe starter app: the window on app/, with ~/.config/moonframe over it"
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-app"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "moonframe"
+path = "src/main.rs"
+
+[features]
+# Every terminal emulator the library has; `ghostty` needs Zig.
+default = ["moonframe/ghostty"]
+
+[dependencies]
+moonframe.workspace = true

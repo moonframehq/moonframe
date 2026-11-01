@@ -12,22 +12,27 @@ nightly_toolchain := "nightly-2026-06-20"
 # Open the window on the built-in app folder, with ~/.config/moonframe
 # over it; it reloads as either changes.
 run dir="app":
-    cargo run --release -p moonframe -- {{dir}}
+    cargo run --release -p moonframe-app -- {{dir}}
+
+# Open the example app built on the library (examples/host): its own
+# binary, with Rust views and a native provider.
+run-host:
+    cargo run --release -p moonframe-host-example
 
 # Load every module headlessly, ~/.config/moonframe included, and report
 # problems; run after each edit.
 check dir="app":
-    cargo run --quiet --release -p moonframe -- --check {{dir}}
+    cargo run --quiet --release -p moonframe-app -- --check {{dir}}
 
 # The same for the built-in app alone, whatever ~/.config holds.
 check-builtin dir="app":
-    cargo run --quiet --release -p moonframe -- --check --no-user {{dir}}
+    cargo run --quiet --release -p moonframe-app -- --check --no-user {{dir}}
 
 # Load the example apps in examples/ headlessly, each as a profile in a
 # throwaway user folder, and type-check their Luau.
 check-examples:
-    cargo build --quiet --release -p moonframe
-    scripts/check-examples.sh target/release/moonframe
+    cargo build --quiet --release -p moonframe-app -p moonframe-host-example
+    scripts/check-examples.sh target/release/moonframe target/release/host-example
     just types examples
 
 # Build Moonframe.app (release binary, staged app, icon) in target/bundle.
@@ -48,12 +53,12 @@ install:
 # app/components and crates/moonframe-core/src/catalogue/elements.md.
 components dir="app":
     mkdir -p .claude/skills/moonframe-components
-    cargo run --quiet --release -p moonframe -- --no-user --catalogue {{dir}} > target/components.md
+    cargo run --quiet --release -p moonframe-app -- --no-user --catalogue {{dir}} > target/components.md
     mv target/components.md .claude/skills/moonframe-components/SKILL.md
 
 # Fail when the moonframe-components skill is out of date with the components.
 components-check dir="app":
-    cargo run --quiet --release -p moonframe -- --no-user --catalogue {{dir}} > target/components.md
+    cargo run --quiet --release -p moonframe-app -- --no-user --catalogue {{dir}} > target/components.md
     diff -u .claude/skills/moonframe-components/SKILL.md target/components.md
 
 # Stage the built-in app as it ships in the bundle (Contents/Resources/app):
@@ -129,7 +134,7 @@ audit:
 # Build this Mac's release packages, unsigned, as .github/workflows/package.yml
 # does: the app and its disk image in target/dist.
 package-macos out="target/dist":
-    cargo build --locked --release -p moonframe
+    cargo build --locked --release -p moonframe-app
     scripts/release/package-macos.sh {{out}} target/release/moonframe
 
 # Publish main's HEAD as v<version in Cargo.toml> (bump it first) through the
