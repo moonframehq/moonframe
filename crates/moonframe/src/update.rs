@@ -343,6 +343,10 @@ fn stamp(profile: Option<&str>) -> PathBuf {
 /// How often the app checks by itself.
 const EVERY: Duration = Duration::from_secs(24 * 60 * 60);
 
+/// How often an open app asks whether the daily check is due: it may stay
+/// open for days, and sleep through some of them.
+pub(crate) const POLL: Duration = Duration::from_secs(60 * 60);
+
 /// Whether the automatic check is due (once a day), noting that it ran.
 pub(crate) fn due(profile: Option<&str>) -> bool {
     let file = stamp(profile);
@@ -372,6 +376,68 @@ pub(crate) fn due(profile: Option<&str>) -> bool {
 pub(crate) struct Staged {
     new: PathBuf,
     target: PathBuf,
+    /// Held until the swap is done: the helper that makes it removes it.
+    lock: Lock,
+}
+
+/// One update of an app at a time, whichever copy of it asks: a folder
+/// beside the app, made atomically, which also holds the staged app (so
+/// no two updates share a path). Removed when dropped, unless handed to
+/// the helper that swaps the app in.
+#[derive(Debug)]
+struct Lock(Option<PathBuf>);
+
+/// A lock older than this was left by an update that died half-way.
+const STALE: Duration = Duration::from_secs(60 * 60);
+
+impl Lock {
+    fn take(target: &Path) -> Result<Self, String> {
+        let parent = target.parent().ok_or("the app has no folder")?;
+        let path = parent.join(format!(
+            ".{}.updating",
+            target.file_name().unwrap_or_default().to_string_lossy()
+        ));
+        for _ in 0..2 {
+            match fs::create_dir(&path) {
+                Ok(()) => return Ok(Self(Some(path))),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                    let stale = fs::metadata(&path)
+                        .and_then(|meta| meta.modified())
+                        .ok()
+                        .and_then(|modified| SystemTime::now().duration_since(modified).ok())
+                        .is_some_and(|age| age > STALE);
+                    if !stale {
+                        return Err("another copy of the app is installing an update".to_owned());
+                    }
+                    let _ = fs::remove_dir_all(&path);
+                },
+                Err(error) => {
+                    return Err(format!(
+                        "cannot write beside {} ({error}); download it from the release page",
+                        target.display()
+                    ));
+                },
+            }
+        }
+        Err(format!("cannot lock {}", path.display()))
+    }
+
+    fn path(&self) -> &Path {
+        self.0.as_deref().unwrap_or(Path::new(""))
+    }
+
+    /// Hands the lock to whoever removes it later.
+    fn release_to_helper(mut self) -> PathBuf {
+        self.0.take().unwrap_or_default()
+    }
+}
+
+impl Drop for Lock {
+    fn drop(&mut self) {
+        if let Some(path) = self.0.take() {
+            let _ = fs::remove_dir_all(path);
+        }
+    }
 }
 
 /// Downloads `release`'s build, checks it, and copies the `.app` inside
@@ -389,6 +455,7 @@ pub(crate) fn stage(release: &Release, source: &Source) -> Result<Staged, String
     if asset.name.contains(['/', '\\']) || asset.name.starts_with('.') {
         return Err(format!("unexpected download name {:?}", asset.name));
     }
+    let lock = Lock::take(&target)?;
     let work = tempfile::Builder::new()
         .prefix("update-")
         .tempdir_in(ensure(crate::paths::cache().join("updates"))?)
@@ -454,49 +521,95 @@ pub(crate) fn stage(release: &Release, source: &Source) -> Result<Staged, String
     }
     run(signature.arg(&app))
         .map_err(|problem| format!("the download's signature is refused: {problem}"))?;
-    // Beside the old one, on the same volume, so it moves into place.
-    let parent = target.parent().ok_or("the app has no folder")?;
-    let new = parent.join(format!(
-        ".{}.update",
-        target.file_name().unwrap_or_default().to_string_lossy()
-    ));
-    let _ = fs::remove_dir_all(&new);
+    // Beside the old one (in the lock), on the same volume, so it moves
+    // into place.
+    let new = lock.path().join("new.app");
     run(Command::new("ditto").arg(&app).arg(&new)).map_err(|problem| {
         format!(
             "cannot write beside {} ({problem}); download it from the release page",
             target.display()
         )
     })?;
-    Ok(Staged { new, target })
+    Ok(Staged { new, target, lock })
 }
+
+/// The helper that swaps the app in once this process exits. The old app
+/// is kept until the new one opens; if the new one cannot (a newer macOS
+/// than this one, say), the old one goes back and opens instead. Either
+/// opens with this run's arguments (`--user`, `--profile`), and the lock
+/// goes last. Paths and arguments come in as its arguments, never into its
+/// text.
+const HELPER: &str = r#"
+pid=$1 new=$2 target=$3 lock=$4
+shift 4
+launch() {
+    if [ $# -gt 0 ]; then open "$target" --args "$@"; else open "$target"; fi
+}
+while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done
+old="$lock/old.app"
+if mv "$target" "$old"; then
+    if mv "$new" "$target" && launch "$@"; then
+        rm -rf "$old"
+    else
+        rm -rf "$target"
+        mv "$old" "$target"
+        launch "$@"
+    fi
+else
+    launch "$@"
+fi
+rm -rf "$lock"
+"#;
 
 /// Swaps the staged app in once this process exits, then opens it. The
 /// caller quits the app right after.
-pub(crate) fn relaunch(staged: &Staged) -> Result<(), String> {
-    // Paths go in as arguments, never into the script's text.
-    const SCRIPT: &str = r#"
-pid=$1 new=$2 target=$3
-while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done
-old="$target.old.$$"
-mv "$target" "$old" && mv "$new" "$target" && rm -rf "$old" || {
-    [ -e "$target" ] || mv "$old" "$target"
-    rm -rf "$new"
+pub(crate) fn relaunch(staged: Staged) -> Result<(), String> {
+    let Staged { new, target, lock } = staged;
+    let spawned = helper(
+        std::process::id(),
+        &new,
+        &target,
+        lock.path(),
+        &launch_args(),
+    )
+    .spawn()
+    .map_err(|error| format!("cannot start the installer: {error}"))?;
+    drop(spawned);
+    // The helper removes it once the app is in place.
+    lock.release_to_helper();
+    Ok(())
 }
-open "$target"
-"#;
-    Command::new("/bin/sh")
+
+fn helper(
+    pid: u32,
+    new: &Path,
+    target: &Path,
+    lock: &Path,
+    args: &[std::ffi::OsString],
+) -> Command {
+    let mut command = Command::new("/bin/sh");
+    command
         .arg("-c")
-        .arg(SCRIPT)
+        .arg(HELPER)
         .arg("moonframe-update")
-        .arg(std::process::id().to_string())
-        .arg(&staged.new)
-        .arg(&staged.target)
+        .arg(pid.to_string())
+        .arg(new)
+        .arg(target)
+        .arg(lock)
+        .args(args)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .map(drop)
-        .map_err(|error| format!("cannot start the installer: {error}"))
+        .stderr(std::process::Stdio::null());
+    command
+}
+
+/// This run's arguments, for the new app to open with, but for the
+/// process serial number old macOS adds to a Finder launch.
+fn launch_args() -> Vec<std::ffi::OsString> {
+    std::env::args_os()
+        .skip(1)
+        .filter(|arg| !arg.to_string_lossy().starts_with("-psn_"))
+        .collect()
 }
 
 fn ensure(dir: PathBuf) -> Result<PathBuf, String> {
@@ -761,6 +874,101 @@ mod tests {
         assert_eq!(team_in("Signature=adhoc\nTeamIdentifier=not set\n"), None);
         assert_eq!(team_in("TeamIdentifier=AB\"CD\" or 1\n"), None);
         assert_eq!(team_in("code object is not signed at all\n"), None);
+    }
+
+    #[test]
+    fn one_update_at_a_time() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let target = dir.path().join("App.app");
+        let lock = Lock::take(&target).expect("the first takes it");
+        assert!(lock.path().ends_with(".App.app.updating"));
+        let problem = Lock::take(&target).expect_err("the second waits");
+        assert!(problem.contains("another copy"), "{problem}");
+        drop(lock);
+        let lock = Lock::take(&target).expect("free again once dropped");
+        // Handed to the helper, it stays until the helper removes it.
+        let path = lock.release_to_helper();
+        assert!(path.is_dir());
+    }
+
+    /// Runs the helper as the app would, with `open` replaced by a stub
+    /// that notes its arguments and fails while `fail` exists.
+    #[cfg(unix)]
+    fn swap(dir: &Path, fail_open: bool) -> (String, String) {
+        use std::os::unix::fs::PermissionsExt as _;
+        let bin = dir.join("bin");
+        fs::create_dir_all(&bin).expect("bin");
+        let opened = dir.join("opened");
+        let fail = dir.join("fail");
+        let stub = bin.join("open");
+        fs::write(
+            &stub,
+            format!(
+                "#!/bin/sh\nprintf '%s|' \"$@\" >> '{}'\necho >> '{}'\n[ ! -e '{}' ]\n",
+                opened.display(),
+                opened.display(),
+                fail.display()
+            ),
+        )
+        .expect("stub");
+        fs::set_permissions(&stub, fs::Permissions::from_mode(0o755)).expect("chmod");
+        if fail_open {
+            fs::write(&fail, "").expect("fail");
+        }
+        let target = dir.join("App.app");
+        fs::create_dir_all(&target).expect("old");
+        fs::write(target.join("version"), "old").expect("old");
+        let lock = Lock::take(&target).expect("lock");
+        let new = lock.path().join("new.app");
+        fs::create_dir_all(&new).expect("new");
+        fs::write(new.join("version"), "new").expect("new");
+        // A process that has already exited stands for the app.
+        let mut gone = Command::new("/usr/bin/true").spawn().expect("true");
+        let pid = gone.id();
+        gone.wait().expect("exited");
+        let path = format!("{}:/usr/bin:/bin", bin.display());
+        let args = [
+            "--profile".into(),
+            "notes".into(),
+            "--user".into(),
+            "/a b".into(),
+        ];
+        let status = helper(pid, &new, &target, lock.path(), &args)
+            .env("PATH", path)
+            .status()
+            .expect("the helper runs");
+        assert!(status.success());
+        assert!(
+            !lock.release_to_helper().exists(),
+            "the helper removes the lock"
+        );
+        (
+            fs::read_to_string(target.join("version")).expect("an app is in place"),
+            fs::read_to_string(&opened).unwrap_or_default(),
+        )
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_helper_swaps_and_opens_with_the_same_arguments() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let (version, opened) = swap(dir.path(), false);
+        assert_eq!(version, "new");
+        let target = dir.path().join("App.app");
+        assert_eq!(
+            opened,
+            format!("{}|--args|--profile|notes|--user|/a b|\n", target.display())
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_new_app_that_cannot_open_gives_the_old_one_back() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let (version, opened) = swap(dir.path(), true);
+        assert_eq!(version, "old");
+        // Tried the new one, then opened the old one again.
+        assert_eq!(opened.lines().count(), 2, "{opened}");
     }
 
     #[test]

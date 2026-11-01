@@ -208,14 +208,28 @@ impl MoonframeApp {
         app.apply_theme(cx);
         // What the mods' `init` sent providers as they started.
         app.forward("start");
-        // A release looks for updates by itself, once a day; runs without
-        // the user's folder (checks, screenshots) never do.
-        if crate::release()
-            && crate::update::source().is_some()
-            && app.folders.user.is_some()
-            && crate::update::due(app.folders.profile.as_deref())
-        {
-            app.check_for_updates(false, cx);
+        // A release looks for updates by itself, once a day, also while it
+        // stays open; runs without the user's folder (checks, screenshots)
+        // never do.
+        if crate::release() && crate::update::source().is_some() && app.folders.user.is_some() {
+            let profile = app.folders.profile.clone();
+            cx.spawn(async move |this, cx| {
+                loop {
+                    if crate::update::due(profile.as_deref())
+                        && this
+                            .update(cx, |app, cx| app.check_for_updates(false, cx))
+                            .is_err()
+                    {
+                        break;
+                    }
+                    cx.background_executor().timer(crate::update::POLL).await;
+                    // The window is gone: so is the app.
+                    if this.update(cx, |_, _| ()).is_err() {
+                        break;
+                    }
+                }
+            })
+            .detach();
         }
         app
     }
@@ -906,8 +920,7 @@ impl MoonframeApp {
                 .spawn({
                     let release = release.clone();
                     async move {
-                        crate::update::stage(&release, &source)
-                            .and_then(|staged| crate::update::relaunch(&staged))
+                        crate::update::stage(&release, &source).and_then(crate::update::relaunch)
                     }
                 })
                 .await;

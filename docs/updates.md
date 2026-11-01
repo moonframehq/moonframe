@@ -12,11 +12,14 @@ Updates…**, under About:
   zip) downloads, is checked against the release's `SHA256SUMS` when there is
   one, must hold an app with the same bundle id, signed by the same team as
   the running app, and takes the old app's place once it quits; then the
-  new one opens. Anywhere else (Linux, Windows, a run from source) the
+  new one opens, with the arguments the old one had (`--user`, `--profile`).
+  If it cannot open (it needs a newer macOS, say), the old app goes back.
+  One copy of the app installs at a time. Anywhere else (Linux, Windows, a run from source) the
   dialog offers **Download**, which opens the build for this platform in
   the browser, and **Release Notes**, which opens the release's page.
 - A release build (a bundle, an install) also checks by itself once a day,
-  and says something only when there is a newer release. Runs from source
+  at launch and while it stays open, and says something only when there is
+  a newer release. Runs from source
   check only when asked.
 
 The starter checks `penso/moonframe`.
