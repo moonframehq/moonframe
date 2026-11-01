@@ -12,6 +12,7 @@ mod elements;
 mod floating;
 mod gallery;
 mod input;
+mod keyed;
 mod styling;
 mod terminal;
 
@@ -21,7 +22,7 @@ use {
         browser::Browsers,
         input::Inputs,
         inspect::{Crumb, Sink, Tracked},
-        motion::{Motion, Shown},
+        motion::{Keyed, Motion, Shown},
         terminal::Terminals,
     },
     gpui_kit::{
@@ -208,6 +209,9 @@ pub(crate) struct Painter<'w, 'm> {
     in_drag: bool,
     /// The pages browsers show; none in previews.
     browsers: Option<&'m mut Browsers>,
+    /// What keyed containers drew last frame, for children that arrive or
+    /// go; none in previews, which draw them as they are.
+    last_keyed: Option<&'w Keyed>,
 }
 
 impl<'w, 'm> Painter<'w, 'm> {
@@ -236,7 +240,15 @@ impl<'w, 'm> Painter<'w, 'm> {
             preview: false,
             in_drag: false,
             browsers: None,
+            last_keyed: None,
         }
+    }
+
+    /// Plays keyed children in and out against what the last frame drew
+    /// (`Motion::begin_frame`).
+    pub(crate) fn with_keyed(mut self, last: &'w Keyed) -> Self {
+        self.last_keyed = Some(last);
+        self
     }
 
     /// For the main window, whose browsers show their pages.
@@ -263,7 +275,19 @@ impl<'w, 'm> Painter<'w, 'm> {
     /// The whole window: the shell, under the stylesheet's and providers'
     /// problems if any, the backdrops of open popovers, and open overlays.
     pub(crate) fn shell(&mut self, cx: Cx) -> AnyElement {
-        let shell = self.slot(SHELL, cx);
+        self.root(SHELL, cx)
+    }
+
+    /// A window of its own for the mod `name`, with its popovers and
+    /// overlays, as the shell has.
+    pub(crate) fn window(&mut self, name: &'w str, cx: Cx) -> AnyElement {
+        self.root(name, cx)
+    }
+
+    /// The mod `name` filling a window, under the problems if any, with the
+    /// backdrops of open popovers and the open overlays.
+    fn root(&mut self, name: &'w str, cx: Cx) -> AnyElement {
+        let shell = self.slot(name, cx);
         // The stylesheet's problem and each provider's, above the shell.
         let banners: Vec<_> = self
             .workspace
@@ -521,6 +545,14 @@ fn draw_node<'w>(
         Node::Divider => elements::divider(painter, place, cx),
         Node::Spacer => div().flex_1().into_any_element(),
         Node::Mount(name) => painter.slot(name, cx),
+        // Drawn where it is, from the state the app keeps for it.
+        Node::Instance(instance) => match painter.workspace.instance(place.owner, instance) {
+            Some((key, _)) => painter.slot(key, cx),
+            None => problem(
+                format!("`{}` is not running", instance.key(place.owner)),
+                cx,
+            ),
+        },
         Node::Popover(popover) => popover.draw(painter, place, cx),
         Node::Overlay(overlay) => overlay.draw(painter, place, cx),
         Node::Problem(message) => broken(message, place, cx),

@@ -8,7 +8,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 | Element | Use it for | Keys (besides children) |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `msg`/`to` or `command`, extras |
+| `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `key` (names it among its siblings: with a `transition` rule it grows in as it appears and shrinks away as it goes), `msg`/`to`, `command` or `window` (a mod opened in a window of its own), extras |
 | `ui.panel { ... }` | a titled section with header actions over a body | frame keys, `title`, `actions = { elements }` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | areas the user resizes by dragging; children must be `ui.pane` | `id` |
 | `ui.pane { ... }` | one side of a split; slides in and out when `visible` changes | `size`, `min`, `max`, `fixed`, `visible`, `gap`, `padding`, `surface`, `scroll` |
