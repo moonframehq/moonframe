@@ -4,9 +4,10 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-// The disk image window's background, 640x400 points: a pale wash of the
-// icon's indigo and violet, an arrow from where the app sits (left) to the
-// Applications shortcut (right), and what to do, under it. Finder draws
+// The disk image window's background, 640x400 points: a cream wash in the
+// icon's 70s palette, an arrow striped mustard, orange and red from where
+// the app sits (left) to the Applications shortcut (right), and what to do,
+// under it. Finder draws
 // the two icons and their names on top, at the positions in
 // assets/macos/dmg/settings.py (scripts/release/make-dmg.sh). The caption
 // stays above the 56 points a path bar and status bar take, for users who
@@ -30,41 +31,45 @@ func draw(scale: CGFloat) -> CGImage {
     cx.translateBy(x: 0, y: height)
     cx.scaleBy(x: 1, y: -1)
 
-    let wash = CGGradient(colorsSpace: space, colors: [color(0xf8f7ff), color(0xeef0ff), color(0xf5edff)] as CFArray,
+    let wash = CGGradient(colorsSpace: space, colors: [color(0xfbf6ec), color(0xf6eedd), color(0xf3e6cc)] as CFArray,
                           locations: [0, 0.55, 1])!
     cx.drawLinearGradient(wash, start: CGPoint(x: 0, y: 0), end: CGPoint(x: width, y: height), options: [])
     // A soft glow behind each icon's place.
     for x in [160.0, 480.0] {
-        let glow = CGGradient(colorsSpace: space, colors: [color(0x6366f1, 0.10), color(0x6366f1, 0)] as CFArray,
+        let glow = CGGradient(colorsSpace: space, colors: [color(0xe8642c, 0.05), color(0xe8642c, 0)] as CFArray,
                               locations: [0, 1])!
         cx.drawRadialGradient(glow, startCenter: CGPoint(x: x, y: 150), startRadius: 0,
                               endCenter: CGPoint(x: x, y: 150), endRadius: 120, options: [])
     }
 
-    // The arrow: a shaft and a head, in the icon's gradient.
+    // The arrow: a shaft and a head, striped like the icon's moon.
     let y = 150.0
     let arrow = CGMutablePath()
-    arrow.move(to: CGPoint(x: 262, y: y - 5))
-    arrow.addLine(to: CGPoint(x: 360, y: y - 5))
-    arrow.addLine(to: CGPoint(x: 360, y: y - 17))
+    arrow.move(to: CGPoint(x: 262, y: y - 8))
+    arrow.addLine(to: CGPoint(x: 356, y: y - 8))
+    arrow.addLine(to: CGPoint(x: 356, y: y - 20))
     arrow.addLine(to: CGPoint(x: 384, y: y))
-    arrow.addLine(to: CGPoint(x: 360, y: y + 17))
-    arrow.addLine(to: CGPoint(x: 360, y: y + 5))
-    arrow.addLine(to: CGPoint(x: 262, y: y + 5))
+    arrow.addLine(to: CGPoint(x: 356, y: y + 20))
+    arrow.addLine(to: CGPoint(x: 356, y: y + 8))
+    arrow.addLine(to: CGPoint(x: 262, y: y + 8))
     arrow.closeSubpath()
     cx.saveGState()
     cx.addPath(arrow)
     cx.clip()
-    let ink = CGGradient(colorsSpace: space, colors: [color(0x6366f1, 0.55), color(0x9333ea, 0.85)] as CFArray,
-                         locations: [0, 1])!
-    cx.drawLinearGradient(ink, start: CGPoint(x: 262, y: y), end: CGPoint(x: 384, y: y), options: [])
+    for (top, bottom, hex) in [(y - 20, y - 2.7, 0xf2b33d), (y - 2.7, y + 2.7, 0xe8642c), (y + 2.7, y + 20, 0xc63d26)] {
+        cx.setFillColor(color(UInt32(hex)))
+        cx.fill(CGRect(x: 262, y: top, width: 122, height: bottom - top))
+    }
+    // Thin cream gaps between the bands, as on the moon.
+    cx.setFillColor(color(0xf6eedd))
+    for top in [y - 3.3, y + 2.1] { cx.fill(CGRect(x: 262, y: top, width: 122, height: 1.2)) }
     cx.restoreGState()
 
     // The instruction, centred under the icons' names.
     let font = CTFontCreateUIFontForLanguage(.system, 14, nil)!
     let text = NSAttributedString(string: "Drag Moonframe to Applications to install it",
                                   attributes: [kCTFontAttributeName as NSAttributedString.Key: font,
-                                               kCTForegroundColorAttributeName as NSAttributedString.Key: color(0x4c4a73)])
+                                               kCTForegroundColorAttributeName as NSAttributedString.Key: color(0x5a4030)])
     let line = CTLineCreateWithAttributedString(text)
     let bounds = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
     cx.saveGState()
