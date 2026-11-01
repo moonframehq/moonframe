@@ -87,6 +87,8 @@ tokens! {
         Badge = "badge",
         Icon = "icon",
         Image = "image",
+        Line = "line",
+        Hatch = "hatch",
         Terminal = "terminal",
         Browser = "browser",
         Input = "input",

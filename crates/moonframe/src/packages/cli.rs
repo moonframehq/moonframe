@@ -53,7 +53,17 @@ pub(crate) fn run(user: &Path, args: &[String]) -> ExitCode {
         .map(String::as_str)
         .filter(|arg| !matches!(*arg, "--yes" | "-y"))
         .collect();
-    let approve = move |contents: &Contents| approve(contents, yes);
+    let approve_any = move |contents: &Contents| approve(contents, yes);
+    // An app runs in a profile of its own; over the user's app it would
+    // only add mods its shell has no place for.
+    let approve_mod = move |contents: &Contents| match &contents.app {
+        Some(app) => Err(format!(
+            "this is the app {name}, not a mod: `moonframe app install` runs it as a \
+             profile of its own",
+            name = super::printable(&app.name)
+        )),
+        None => approve(contents, yes),
+    };
     let done = match words.as_slice() {
         [] | ["help" | "-h" | "--help"] => {
             println!("{USAGE}");
@@ -61,18 +71,18 @@ pub(crate) fn run(user: &Path, args: &[String]) -> ExitCode {
         },
         ["install", source] => {
             println!("Cloning {source}…");
-            super::install(user, source, &approve).map(|(id, contents)| {
+            super::install(user, source, &approve_mod).map(|(id, contents)| {
                 println!("Installed {id}: {contents}");
                 println!("It is enabled; an open window shows it now.");
             })
         },
-        ["link", folder] => super::link(user, folder, &approve).map(|(id, contents)| {
+        ["link", folder] => super::link(user, folder, &approve_mod).map(|(id, contents)| {
             println!("Linked {id}: {contents}");
             println!("Edits to {folder} show in an open window as you save.");
         }),
         ["list"] => list(user),
-        ["update"] => update(user, None, &approve),
-        ["update", name] => update(user, Some(name), &approve),
+        ["update"] => update(user, None, &approve_any),
+        ["update", name] => update(user, Some(name), &approve_any),
         ["remove" | "uninstall", name] => {
             super::remove(user, name).map(|id| println!("Removed {id}"))
         },
@@ -136,7 +146,11 @@ fn list(user: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn update(user: &Path, name: Option<&str>, approve: super::Approve) -> Result<(), String> {
+pub(crate) fn update(
+    user: &Path,
+    name: Option<&str>,
+    approve: super::Approve,
+) -> Result<(), String> {
     let mut failed = 0;
     for (id, updated) in super::update(user, name, approve)? {
         match updated {
@@ -158,7 +172,7 @@ fn update(user: &Path, name: Option<&str>, approve: super::Approve) -> Result<()
 
 /// Asks before a package's providers may run code with the user's access;
 /// mods, components, and styles are Luau the app runs sandboxed.
-fn approve(contents: &Contents, yes: bool) -> Result<(), String> {
+pub(crate) fn approve(contents: &Contents, yes: bool) -> Result<(), String> {
     let trusted: Vec<_> = contents.trusted().collect();
     if trusted.is_empty() || yes {
         return Ok(());

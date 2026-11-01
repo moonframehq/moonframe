@@ -22,6 +22,7 @@ use {
         collections::{BTreeMap, BTreeSet, VecDeque},
         fs,
         path::{Path, PathBuf},
+        time::{Duration, Instant},
     },
 };
 
@@ -55,6 +56,13 @@ pub struct Workspace {
     /// Messages for providers (`to = "provider:<name>"`), for the app to
     /// forward: providers run outside the workspace.
     outbox: Vec<(String, Data)>,
+    /// What views get as `app`, as of the last full render, and its
+    /// generation, which each module's converted copy is checked against.
+    app: Data,
+    generation: u64,
+    /// Whether the component demos are drawn (the Components window is
+    /// open); otherwise they are not run.
+    demos_shown: bool,
 }
 
 /// How a message names a provider rather than a mod.
@@ -171,13 +179,13 @@ impl Slot {
         }
     }
 
-    fn render(&mut self, app: &Data, sheet: &Stylesheet) {
+    fn render(&mut self, app: &Data, generation: u64, sheet: &Stylesheet) {
         let Some(module) = &self.module else {
             return;
         };
         match module
             .rules(sheet)
-            .and_then(|rules| Ok((rules, module.view(app, sheet)?)))
+            .and_then(|rules| Ok((rules, module.view(app, generation, sheet)?)))
         {
             Ok((rules, (view, broken))) => {
                 self.rules = rules;
@@ -208,6 +216,11 @@ impl Workspace {
             host: BTreeMap::new(),
             host_problems: BTreeMap::new(),
             outbox: Vec::new(),
+            app: Data::Nil,
+            generation: 0,
+            // Headless checks see every demo; a window turns them off
+            // until its Components window opens.
+            demos_shown: true,
         };
         workspace.reload();
         workspace
@@ -311,10 +324,19 @@ impl Workspace {
     }
 
     /// Shares `value` with every view as `app.<key>`, and draws them again.
-    pub fn set_host(&mut self, key: &str, value: Data) {
+    /// Shares `value` as `app.<key>` and draws again the views that read
+    /// it; how many did, so a window can skip a frame when none did.
+    pub fn set_host(&mut self, key: &str, value: Data) -> usize {
+        let started = Instant::now();
         self.host.insert(key.to_owned(), value);
         self.host_problems.remove(key);
-        self.render();
+        let drawn = self.render_reading(key);
+        tracing::info!(
+            target: "moonframe::perf",
+            "provider {key}: published, {drawn} views that read it in {:.1?}",
+            started.elapsed()
+        );
+        drawn
     }
 
     /// Stops sharing `app.<key>`, with the reason when there is one.
@@ -324,7 +346,7 @@ impl Workspace {
             Some(problem) => self.host_problems.insert(key.to_owned(), problem),
             None => self.host_problems.remove(key),
         };
-        self.render();
+        self.render_reading(key);
     }
 
     /// Why each source of shared data has nothing to share.
@@ -355,12 +377,28 @@ impl Workspace {
             .unwrap_or_default()
     }
 
+    /// The menus the shell asks for, after the host's app menu.
+    pub fn menus(&self) -> &[crate::AppMenu] {
+        self.shell.module.as_ref().map_or(&[], Module::menus)
+    }
+
+    /// What the shell's About panel says, if it says.
+    pub fn about(&self) -> crate::About {
+        self.shell
+            .module
+            .as_ref()
+            .and_then(Module::about)
+            .cloned()
+            .unwrap_or_default()
+    }
+
     /// Shares the window's state as `app.window`, drawing the views again
     /// when it changed.
     pub fn set_window(&mut self, window: WindowState) {
         if self.window != window {
             self.window = window;
-            self.render();
+            // Focus and size change often; only views reading it care.
+            self.render_reading("window");
         }
     }
 
@@ -507,9 +545,33 @@ impl Workspace {
         }
     }
 
+    /// Draws the component demos from now on, or stops running them.
+    pub fn show_demos(&mut self, shown: bool) {
+        if shown == self.demos_shown {
+            return;
+        }
+        self.demos_shown = shown;
+        if shown {
+            let started = Instant::now();
+            for slot in self.demos.values_mut() {
+                slot.render(&self.app, self.generation, &self.stylesheet);
+            }
+            tracing::info!(
+                target: "moonframe::perf",
+                "demos: {} views in {:.1?}",
+                self.demos.len(),
+                started.elapsed()
+            );
+        }
+    }
+
     /// Delivers `msg` to the module `to`, then whatever it sends on, and
-    /// draws every module again.
+    /// draws again the modules whose state that changed. `app` is the same
+    /// as before, so the others would draw the same.
     pub fn send(&mut self, from: &str, to: &str, msg: Data) {
+        let started = Instant::now();
+        let first = to.to_owned();
+        let mut touched = BTreeSet::new();
         let mut queue = VecDeque::from([(from.to_owned(), to.to_owned(), msg)]);
         let mut delivered = 0;
         while let Some((from, to, msg)) = queue.pop_front() {
@@ -541,6 +603,7 @@ impl Workspace {
                 }
                 continue;
             };
+            touched.insert(to.clone());
             match module.update(&msg) {
                 Ok(sends) => {
                     *update_error = None;
@@ -553,7 +616,50 @@ impl Workspace {
                 Err(error) => *update_error = Some(error),
             }
         }
-        self.render();
+        let updated = started.elapsed();
+        let (views, slowest) = self.render_some(&touched);
+        tracing::info!(
+            target: "moonframe::perf",
+            "message to {first}: {delivered} updates in {updated:.1?}, {views} views in {:.1?}{slowest}",
+            started.elapsed() - updated,
+        );
+    }
+
+    /// Draws again the modules named in `names`: the shell, mods, and
+    /// demos. The number drawn, and the slowest, for the log.
+    fn render_some(&mut self, names: &BTreeSet<String>) -> (usize, String) {
+        let mut slowest = (Duration::ZERO, String::new());
+        let mut drawn = 0;
+        let (app, generation, sheet) = (&self.app, self.generation, &self.stylesheet);
+        let slots = std::iter::once((SHELL, &mut self.shell))
+            .chain(
+                self.mods
+                    .iter_mut()
+                    .map(|(name, slot)| (name.as_str(), slot)),
+            )
+            .chain(
+                self.demos
+                    .iter_mut()
+                    .map(|(name, slot)| (name.as_str(), slot)),
+            );
+        for (name, slot) in slots {
+            if !names.contains(name) {
+                continue;
+            }
+            let started = Instant::now();
+            slot.render(app, generation, sheet);
+            let took = started.elapsed();
+            drawn += 1;
+            if took > slowest.0 {
+                slowest = (took, name.to_owned());
+            }
+        }
+        let note = if drawn > 1 {
+            format!(" (slowest: {} {:.1?})", slowest.1, slowest.0)
+        } else {
+            String::new()
+        };
+        (drawn, note)
     }
 
     /// What every `view` gets as `app`: what the host shares, the mods,
@@ -592,12 +698,49 @@ impl Workspace {
         Data::Map(app)
     }
 
-    fn render(&mut self) {
-        let app = self.app();
-        self.shell.render(&app, &self.stylesheet);
-        for slot in self.mods.values_mut().chain(self.demos.values_mut()) {
-            slot.render(&app, &self.stylesheet);
+    /// Draws again, with `app` made afresh, the modules whose last view read
+    /// `app.<key>`, or that have not drawn yet: after a provider publishes,
+    /// the others would draw the same. How many it drew.
+    fn render_reading(&mut self, key: &str) -> usize {
+        self.app = self.app();
+        self.generation += 1;
+        let reads = |slot: &Slot| {
+            slot.view.is_none()
+                || slot.view_error.is_some()
+                || slot.module.as_ref().is_none_or(|module| module.reads(key))
+        };
+        let mut names = BTreeSet::new();
+        if reads(&self.shell) {
+            names.insert(SHELL.to_owned());
         }
+        let demos = self.demos.iter().filter(|_| self.demos_shown);
+        for (name, slot) in self.mods.iter().chain(demos) {
+            if reads(slot) {
+                names.insert(name.clone());
+            }
+        }
+        self.render_some(&names).0
+    }
+
+    /// Draws every module again, with `app` made afresh: after what views
+    /// share changed (the theme, the window, a reload).
+    fn render(&mut self) {
+        let started = Instant::now();
+        self.app = self.app();
+        self.generation += 1;
+        let made = started.elapsed();
+        let mut names: BTreeSet<String> = std::iter::once(SHELL.to_owned())
+            .chain(self.mods.keys().cloned())
+            .collect();
+        if self.demos_shown {
+            names.extend(self.demos.keys().cloned());
+        }
+        let (drawn, slowest) = self.render_some(&names);
+        tracing::debug!(
+            target: "moonframe::perf",
+            "render all: app in {made:.1?}, {drawn} views in {:.1?}{slowest}",
+            started.elapsed() - made,
+        );
     }
 }
 

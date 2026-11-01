@@ -1,0 +1,7 @@
+[app]
+# A newsletter's audience at a glance: readers, growth, where they come
+# from, and how they read. `moonframe --profile audience` opens it.
+keep     = []
+name     = "audience"
+requires = []
+title    = "Inkwell"

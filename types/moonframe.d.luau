@@ -171,6 +171,8 @@ type PaneProps = {
 
 type SplitProps = {
 	id: string?,
+	-- false: no hairline between panes; a handle shows only when hovered.
+	divider: boolean?,
 	[number]: Element | false | nil,
 }
 
@@ -186,6 +188,8 @@ type TextProps = {
 	lines: number?,
 	-- false keeps each line whole (code in a container that scrolls sideways).
 	wrap: boolean?,
+	-- A line through it: a task done.
+	strike: boolean?,
 	[number]: string,
 }
 
@@ -478,6 +482,34 @@ type ImageProps = {
 	[number]: string,
 }
 
+-- A line through `points`, evenly spaced across its box. Its style's
+-- `color` strokes it, `background` fills the area to the baseline, and
+-- `border_color` draws the baseline, dashed.
+type LineProps = {
+	class: Class?,
+	style: Style?,
+	points: { number },
+	min: number?,
+	max: number?,
+	baseline: number?,
+	area: boolean?,
+	dots: ("last" | "all")?,
+	stroke: number?,
+	dashed: boolean?,
+	width: number?,
+	height: number?,
+}
+
+-- A box of diagonal stripes in its style's `color` over its `background`.
+type HatchProps = {
+	class: Class?,
+	style: Style?,
+	gap: number?,
+	width: number?,
+	height: number?,
+	grow: boolean?,
+}
+
 type TerminalEngine = "alacritty" | "ghostty"
 
 -- A live shell (your login shell). The host keeps it by mod and `id`.
@@ -623,6 +655,8 @@ declare ui: {
 	badge: (props: string | BadgeProps) -> Element,
 	icon: (props: IconName | IconProps) -> Element,
 	image: (props: string | ImageProps) -> Element,
+	line: (props: LineProps) -> Element,
+	hatch: (props: HatchProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,
 	browser: (props: string | BrowserProps) -> Element,
 	input: (props: InputProps) -> Element,
@@ -918,6 +952,35 @@ type Send = {
 type Window = {
 	titlebar: Titlebar?,
 	traffic_lights: { x: number?, y: number? }?,
+	-- The size the window opens at, before the user resizes it.
+	size: { width: number?, height: number? }?,
+}
+
+-- A menu item in the shell's `menus`: it sends `msg` (to the shell, or to
+-- `to`) or runs `command`; `shortcut` is a key as `keys` take them, such as
+-- "secondary-t". "-" between items draws a line.
+type MenuItem = {
+	label: string,
+	msg: Data?,
+	to: string?,
+	command: Command?,
+	shortcut: string?,
+}
+
+-- `items` holds `MenuItem`s and "-"; typed loosely so items with `msg` and
+-- with `command` mix in one list. The host checks each.
+type AppMenu = {
+	title: string,
+	items: { any },
+}
+
+-- What the About panel says besides the app's name and icon.
+type About = {
+	name: string?,
+	version: string?,
+	description: string?,
+	website: string?,
+	copyright: string?,
 }
 
 type Mod<State> = {
@@ -934,6 +997,10 @@ type Mod<State> = {
 	styles: { [string]: Style }?,
 	-- Only in main.luau: the window's frame, read when the app starts.
 	window: Window?,
+	-- Only in main.luau: menus after the app menu (a "View" one merges into
+	-- the host's), and what About says.
+	menus: { AppMenu }?,
+	about: About?,
 }
 
 declare function mod<State>(definition: Mod<State>): Mod<State>

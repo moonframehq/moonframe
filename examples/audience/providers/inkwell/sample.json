@@ -1,0 +1,44 @@
+{
+  "note": "Sample data for the Inkwell example app; replace this file or the provider with your own source.",
+  "kpis": [
+    { "id": "total", "title": "Total readers", "icon": "user", "tint": "#7c5cff", "value": "24,816", "delta": "+6.4%", "good": true, "caption": "All active subscribers" },
+    { "id": "new", "title": "New subscribers", "icon": "plus", "tint": "#22b45a", "value": "1,382", "delta": "+11.9%", "good": true, "caption": "Joined in the last 30 days" },
+    { "id": "engaged", "title": "Engaged readers", "icon": "zap", "tint": "#f59e0b", "value": "15,207", "delta": "+4.1%", "good": true, "caption": "Opened at least once" },
+    { "id": "churn", "title": "Unsubscribe rate", "icon": "log-out", "tint": "#3b82f6", "value": "0.9%", "delta": "+0.2%", "good": false, "caption": "187 left this month" }
+  ],
+  "growth": {
+    "max": 120,
+    "ticks": ["120", "90", "60", "30", "0"],
+    "labels": ["Oct 2", "Oct 7", "Oct 12", "Oct 17", "Oct 22", "Oct 27", "Oct 31"],
+    "current": [48, 62, 55, 70, 66, 40, 52, 75, 82, 68, 58, 61, 64, 79, 86, 90, 72, 63, 70, 78, 88, 95, 101, 84, 69, 76, 92, 104, 98, 112],
+    "previous": [60, 58, 66, 61, 72, 55, 63, 70, 74, 75, 66, 70, 72, 74, 80, 85, 80, 72, 74, 82, 90, 92, 100, 96, 77, 82, 96, 100, 104, 118]
+  },
+  "sources": [
+    { "label": "Website signup form", "icon": "globe", "count": "604", "share": 44, "color": "#7c5cff" },
+    { "label": "Referral program", "icon": "link", "count": "276", "share": 20, "color": "#60a5fa" },
+    { "label": "Social profiles", "icon": "at-sign", "count": "221", "share": 16, "color": "#f59e0b" },
+    { "label": "Imported lists", "icon": "upload", "count": "152", "share": 11, "color": "#84cc16" },
+    { "label": "Recommendations", "icon": "star", "count": "129", "share": 9, "color": "#facc15" }
+  ],
+  "locations": [
+    { "code": "CA", "name": "Canada", "count": "7,940", "share": "32%" },
+    { "code": "FR", "name": "France", "count": "3,226", "share": "13%" },
+    { "code": "BR", "name": "Brazil", "count": "2,481", "share": "10%" },
+    { "code": "JP", "name": "Japan", "count": "1,738", "share": "7%" },
+    { "code": "AU", "name": "Australia", "count": "1,489", "share": "6%" }
+  ],
+  "devices": {
+    "rows": [
+      { "label": "Mobile", "icon": "monitor", "opens": "7,412 opens", "share": 51, "color": "#a78bfa" },
+      { "label": "Desktop", "icon": "laptop", "opens": "6,103 opens", "share": 42, "color": "#fbbf24" },
+      { "label": "Tablet", "icon": "square", "opens": "1,017 opens", "share": 7, "color": "#93c5fd" }
+    ],
+    "clients": "Mail apps 49% · Webmail 34% · Desktop clients 12%"
+  },
+  "tiers": [
+    { "label": "Highly engaged", "count": "5,610", "share": 23, "color": "#2bb39a" },
+    { "label": "Engaged", "count": "11,166", "share": 45, "color": "#60a5fa" },
+    { "label": "At risk", "count": "4,467", "share": 18, "color": "#fb923c" },
+    { "label": "Dormant", "count": "3,573", "share": 14, "color": "#d4d4d8" }
+  ]
+}

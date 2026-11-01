@@ -30,6 +30,7 @@ mod component;
 mod data;
 mod error;
 mod keys;
+mod menus;
 mod module;
 mod node;
 mod read;
@@ -44,9 +45,10 @@ pub use {
     data::Data,
     error::Error,
     keys::{Chord, Keys, Pressed},
+    menus::{About, AppMenu, MenuCommand, MenuEntry},
     module::Meta,
     node::*,
-    roots::{Roots, mod_name},
+    roots::{AppLayer, Roots, mod_name},
     style::{
         Case, Color, Curve, Font, Look, Paint, Part, Resolved, Rules, Shade, Shadow, ShadowLayer,
         ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition, TransitionKind,

@@ -4,6 +4,7 @@
 
 use {
     crate::{Context, Kind, json},
+    moonframe_core::{Data, Error},
     std::{
         io::{BufRead, BufReader, Read, Write},
         process::{Child, Command, Stdio},
@@ -34,7 +35,12 @@ fn serve(context: &Context) -> Result<(), String> {
         return Err("not a process provider".to_owned());
     };
     let (program, arguments) = command.split_first().ok_or("an empty `command`")?;
-    let mut child = Command::new(program)
+    let mut child = Command::new(program);
+    if let Some(profile) = crate::PROFILE.get() {
+        // Which app it serves, to keep state of its own per app.
+        child.env("MOONFRAME_PROFILE", profile);
+    }
+    let mut child = child
         .args(arguments)
         .current_dir(&context.dir)
         .stdin(Stdio::piped())
@@ -76,7 +82,7 @@ fn drive(context: &Context, child: &mut Child) -> Result<(), String> {
         while let Ok(line) = output.try_recv() {
             match line {
                 Line::Text(text) if text.trim().is_empty() => {},
-                Line::Text(text) => match json::data(&text) {
+                Line::Text(text) => match parse(context, &text) {
                     Ok(data) => context.publish(data),
                     Err(problem) => return Err(problem.to_string()),
                 },
@@ -93,6 +99,20 @@ fn drive(context: &Context, child: &mut Child) -> Result<(), String> {
             }
         }
     }
+}
+
+/// Reads `text` as JSON, timing it for the perf log.
+fn parse(context: &Context, text: &str) -> Result<Data, Error> {
+    let started = std::time::Instant::now();
+    let parsed = json::data(text);
+    tracing::debug!(
+        target: "moonframe::perf",
+        "provider {}: {} bytes read in {:.1?}",
+        context.name,
+        text.len(),
+        started.elapsed()
+    );
+    parsed
 }
 
 /// Reads lines no longer than [`json::MAX_JSON`], so a runaway process

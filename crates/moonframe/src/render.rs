@@ -12,6 +12,7 @@ mod elements;
 mod floating;
 mod gallery;
 mod input;
+mod plot;
 mod styling;
 mod terminal;
 
@@ -514,6 +515,8 @@ fn draw_node<'w>(
         Node::Badge(badge) => badge.draw(painter, place, cx),
         Node::Icon(icon) => icon.draw(painter, place, cx),
         Node::Image(image) => image.draw(painter, place, cx),
+        Node::Line(line) => line.draw(painter, place, cx),
+        Node::Hatch(hatch) => hatch.draw(painter, place, cx),
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
         Node::Browser(browser) => browser.draw(painter, place, cx),
         Node::Input(input) => input.draw(painter, place, cx),

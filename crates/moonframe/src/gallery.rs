@@ -41,7 +41,7 @@ impl Gallery {
                 title: Some("Components".into()),
                 ..Default::default()
             }),
-            app_id: Some(crate::APP_ID.into()),
+            app_id: Some(crate::app_id()),
             ..Default::default()
         };
         cx.open_window(options, |window, cx| {

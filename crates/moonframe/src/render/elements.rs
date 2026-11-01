@@ -262,6 +262,38 @@ impl<'w> Draw<'w> for Panel {
     }
 }
 
+/// A split handle with no hairline: panes meet with nothing between them,
+/// and a pill shows only while the handle is hovered or dragged.
+fn bare_handle() -> base::ResizeHandleRenderer {
+    use base::ResizeHandleState;
+    std::rc::Rc::new(|handle, _window, cx| {
+        let (length, opacity) = match handle.state() {
+            ResizeHandleState::Idle => return Some(div().into_any_element()),
+            ResizeHandleState::Hovered => (px(20.), 0.35),
+            ResizeHandleState::Pressed => (px(28.), 0.6),
+            ResizeHandleState::Dragging => (px(44.), 0.9),
+        };
+        let pill = div()
+            .flex_none()
+            .rounded_full()
+            .bg(cx.theme().muted_foreground)
+            .opacity(opacity);
+        let pill = match handle.axis() {
+            Axis::Horizontal => pill.w(px(3.)).h(length),
+            _ => pill.h(px(3.)).w(length),
+        };
+        Some(
+            div()
+                .size_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(pill)
+                .into_any_element(),
+        )
+    })
+}
+
 impl<'w> Draw<'w> for Split {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
         // Each pane's look and how much of it shows, before the group: which
@@ -295,10 +327,13 @@ impl<'w> Draw<'w> for Split {
                 .clone()
                 .unwrap_or_else(|| format!("{}:{}", place.owner, place.path)),
         );
-        let group = match self.direction {
+        let mut group = match self.direction {
             Direction::Row => h_resizable(key),
             Direction::Column => v_resizable(key),
         };
+        if !self.divider {
+            group = group.with_handle_appearance(bare_handle());
+        }
         let group = panes
             .into_iter()
             .fold(group, |group, (pane, place, look, shown)| {
@@ -381,6 +416,9 @@ impl<'w> Draw<'w> for Text {
         if let Some(weight) = self.weight {
             element = element.weighted(weight);
         }
+        if self.strike {
+            element = element.line_through();
+        }
         if self.truncate {
             element = element.min_w_0().truncate();
         }
@@ -437,7 +475,11 @@ impl<'w> Draw<'w> for Button {
                     .foreground(foreground.unwrap_or(theme.foreground))
                     .hover(hover)
                     .active(background),
-            );
+            )
+            // gpui-component paints a custom button at rest as a 20% tint of
+            // its color; the button's own style goes on last, so the color
+            // the stylesheet asked for is what shows.
+            .bg(background);
         }
         if let Some(radius) = look.base.radius {
             element = element.rounded(px(radius));

@@ -10,7 +10,8 @@ use {
         input::Inputs,
         inspect::{self, Inspector, Placed},
         motion::Motion,
-        packages, paths,
+        packages,
+        paths::{self, Folders},
         render::{KeyLayer, Painter},
         settings,
         terminal::Terminals,
@@ -23,7 +24,7 @@ use {
         *,
     },
     moonframe_core::{
-        Action, Chrome, Command, Data, Error, Platform, Roots, Stylesheet, Titlebar, Token,
+        Action, Chrome, Command, Data, Error, Platform, Roots, SHELL, Stylesheet, Titlebar, Token,
         WindowState, Workspace,
     },
     moonframe_providers::{Event, Providers},
@@ -69,11 +70,11 @@ pub(crate) struct MoonframeApp {
     scheme: Option<&'static Scheme>,
     preview: Option<Option<&'static Scheme>>,
     themes: Option<WindowHandle<component::Root>>,
-    /// The built-in app and the user's folder, from which the app's layers
-    /// are found again when the user installs a package.
-    builtin: PathBuf,
-    user: Option<PathBuf>,
-    /// Where the theme is saved: `settings.toml` in the user's folder, when
+    /// The built-in app, the user's folder, and the profile, from which the
+    /// app's layers are found again when the user installs a package.
+    folders: Folders,
+    /// Where the theme is saved: `settings.toml` in the user's folder, or
+    /// the profile's, when
     /// there is one.
     settings: Option<PathBuf>,
     /// A short note at the bottom, such as "Copied", and which one it is,
@@ -104,12 +105,11 @@ struct Defaults {
 
 impl MoonframeApp {
     /// The window's view of `workspace`, in a window opened with `chrome`;
-    /// `builtin` and `user` are the folders it was opened from.
+    /// `folders` are the ones it was opened from.
     pub(crate) fn new(
         mut workspace: Workspace,
         chrome: Chrome,
-        builtin: PathBuf,
-        user: Option<PathBuf>,
+        folders: Folders,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -126,19 +126,21 @@ impl MoonframeApp {
             .detach();
         cx.observe_window_activation(window, |this, window, cx| this.sync_window(window, cx))
             .detach();
-        let watcher = watch(&workspace, user.as_deref(), cx)
+        let watcher = watch(&workspace, &folders, cx)
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
         let providers = start_providers(&workspace, cx);
         let focus = cx.focus_handle();
         focus.focus(window, cx);
-        cx.set_menus(menus(workspace.components()));
+        bind_menu_keys(workspace.menus(), cx);
+        cx.set_menus(menus(workspace.components(), workspace.menus()));
         menu_actions(cx);
         let terminals = Terminals::new(wake_on_output(cx));
-        let settings = user.as_ref().map(|user| user.join("settings.toml"));
-        let scheme = settings
-            .as_deref()
-            .and_then(settings::theme)
+        let settings = folders.settings().into_iter().next();
+        let scheme = folders
+            .settings()
+            .iter()
+            .find_map(|path| settings::theme(path))
             .and_then(|name| {
                 let scheme = themes::find(&name);
                 if scheme.is_none() && name != themes::DEFAULT {
@@ -160,8 +162,7 @@ impl MoonframeApp {
             scheme,
             preview: None,
             themes: None,
-            builtin,
-            user,
+            folders,
             settings,
             toast: None,
             focus,
@@ -400,7 +401,8 @@ impl MoonframeApp {
             );
             self.show_toast("The window's title bar changes when the app restarts", cx);
         }
-        cx.set_menus(menus(self.workspace.components()));
+        bind_menu_keys(self.workspace.menus(), cx);
+        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
         self.apply_theme(cx);
         report(&self.workspace);
         cx.notify();
@@ -410,16 +412,17 @@ impl MoonframeApp {
     /// and providers that stay keep running, and the new folders are
     /// watched. False if the layers are the same.
     fn reload_packages(&mut self, cx: &mut Context<Self>) -> bool {
-        let roots = paths::roots(self.builtin.clone(), self.user.clone());
+        let roots = self.folders.roots();
         if &roots == self.workspace.roots() {
             return false;
         }
         tracing::info!("packages changed: {roots}");
         self.workspace.set_roots(roots.clone());
-        self._watcher = watch(&self.workspace, self.user.as_deref(), cx)
+        self._watcher = watch(&self.workspace, &self.folders, cx)
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
-        cx.set_menus(menus(self.workspace.components()));
+        bind_menu_keys(self.workspace.menus(), cx);
+        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
         self.apply_theme(cx);
         report(&self.workspace);
         self.reload_providers(Some(roots), cx);
@@ -494,10 +497,48 @@ impl MoonframeApp {
         self.show_toast("Copied", cx);
     }
 
+    /// Runs the shell menu item `id`, as a click from the shell would.
+    fn run_menu_item(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let action = self.workspace.menus().iter().find_map(|menu| {
+            menu.items.iter().find_map(|entry| match entry {
+                moonframe_core::MenuEntry::Item(item) if item.id(&menu.title) == id => {
+                    Some(item.action.clone())
+                },
+                _ => None,
+            })
+        });
+        match action {
+            Some(action) => self.dispatch(SHELL, &action, window, cx),
+            None => tracing::warn!("no menu item {:?} any more", id.replace('\u{1f}', " > ")),
+        }
+    }
+
+    /// The About panel: the app's name, icon and version, and what the
+    /// shell's `about` says. macOS's own panel there; a toast elsewhere.
+    pub(crate) fn show_about(&mut self, cx: &mut Context<Self>) {
+        let about = self.workspace.about();
+        let name = about.name.clone().unwrap_or_else(crate::title);
+        if crate::dock::about_panel(&name, &about, self.folders.icon().as_deref()) {
+            return;
+        }
+        let mut text = name;
+        if let Some(version) = &about.version {
+            text = format!("{text} {version}");
+        }
+        if let Some(description) = &about.description {
+            text = format!("{text}: {description}");
+        }
+        self.show_toast_text(text.into(), cx);
+    }
+
     /// Shows `message` at the bottom for a moment.
     fn show_toast(&mut self, message: &'static str, cx: &mut Context<Self>) {
+        self.show_toast_text(message.into(), cx);
+    }
+
+    fn show_toast_text(&mut self, message: SharedString, cx: &mut Context<Self>) {
         let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
-        self.toast = Some((id, message.into()));
+        self.toast = Some((id, message));
         cx.notify();
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(TOAST).await;
@@ -517,6 +558,8 @@ impl MoonframeApp {
         if !name.is_empty() {
             self.chosen = name.to_owned();
         }
+        // The demos run only while their window is open.
+        self.workspace.show_demos(true);
         cx.notify();
         let open = self.gallery.filter(|gallery| {
             cx.windows()
@@ -632,8 +675,12 @@ fn menu_actions(cx: &mut Context<MoonframeApp>) {
     cx.on_action(move |action: &ShowComponent, cx| {
         let _ = on.update(cx, |app, cx| app.show_component(&action.name, cx));
     });
+    let on = app.clone();
     cx.on_action(move |_: &ShowThemes, cx| {
-        let _ = app.update(cx, |app, cx| app.show_themes(cx));
+        let _ = on.update(cx, |app, cx| app.show_themes(cx));
+    });
+    cx.on_action(move |_: &AboutApp, cx| {
+        let _ = app.update(cx, |app, cx| app.show_about(cx));
     });
 }
 
@@ -698,15 +745,20 @@ fn start_providers(workspace: &Workspace, cx: &mut Context<MoonframeApp>) -> Pro
             let handled = this.update(cx, |this, cx| {
                 match event {
                     Event::Published { provider, data } => {
-                        this.workspace.set_host(&provider, data);
+                        // No view read it: the window looks the same.
+                        if this.workspace.set_host(&provider, data) > 0 {
+                            // A view may fail on the new data: say so.
+                            report(&this.workspace);
+                            cx.notify();
+                        }
                     },
                     Event::Failed { provider, problem } => {
                         tracing::warn!("provider {provider}: {problem}");
                         let problem = Error::new(format!("provider failed: {problem}"));
                         this.workspace.clear_host(&provider, Some(problem));
+                        cx.notify();
                     },
                 }
-                cx.notify();
             });
             if handled.is_err() {
                 break;
@@ -733,10 +785,12 @@ struct Changes {
     packages: bool,
 }
 
-/// Watches every layer, and the user's list of packages.
+/// Watches every layer, and the list of packages in the window's own
+/// folder. Other profiles, inside the user's folder, are none of its
+/// business.
 fn watch(
     workspace: &Workspace,
-    user: Option<&Path>,
+    folders: &Folders,
     cx: &mut Context<MoonframeApp>,
 ) -> notify::Result<RecommendedWatcher> {
     let (sender, mut changes) = futures::channel::mpsc::unbounded();
@@ -747,11 +801,13 @@ fn watch(
         .filter(|layer| layer.is_dir())
         .map(Path::to_owned)
         .collect();
-    let list = user.map(|user| {
-        user.canonicalize()
-            .unwrap_or_else(|_| user.to_owned())
-            .join(packages::FILE)
-    });
+    let resolved = |folder: &Path| folder.canonicalize().unwrap_or_else(|_| folder.to_owned());
+    let own = folders.own().map(|own| resolved(&own));
+    let list = own.as_ref().map(|own| own.join(packages::FILE));
+    let others = folders
+        .user
+        .as_deref()
+        .map(|user| resolved(&paths::profiles_folder(user)));
     let providers: Vec<PathBuf> = layers
         .iter()
         .map(|layer| {
@@ -770,6 +826,13 @@ fn watch(
         }
         let mut found = Changes::default();
         for path in &event.paths {
+            if others
+                .as_ref()
+                .is_some_and(|others| path.starts_with(others))
+                && !own.as_ref().is_some_and(|own| path.starts_with(own))
+            {
+                continue;
+            }
             // Git writes its own files as a package is fetched; the
             // checkout it makes is what counts.
             if path.components().any(|part| part.as_os_str() == ".git") {
@@ -839,6 +902,15 @@ fn watch(
 
 impl Render for MoonframeApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let started = std::time::Instant::now();
+        let gallery_open = self.gallery.is_some_and(|gallery| {
+            cx.windows()
+                .iter()
+                .any(|window| window.window_id() == gallery.window_id())
+        });
+        if !gallery_open {
+            self.workspace.show_demos(false);
+        }
         self.inputs.begin_frame();
         let mut painter = Painter::new(
             &self.workspace,
@@ -849,8 +921,17 @@ impl Render for MoonframeApp {
         )
         .with_browsers(&mut self.browsers);
         let body = painter.shell(cx);
-        if painter.animating() {
+        let animating = painter.animating();
+        if animating {
             window.request_animation_frame();
+        }
+        // Building the element tree from the views; GPUI lays it out and
+        // paints it after. Slow frames are worth seeing in the log.
+        let built = started.elapsed();
+        if built.as_millis() >= 8 {
+            tracing::info!(target: "moonframe::perf", "frame: built in {built:.1?}");
+        } else if !animating {
+            tracing::debug!(target: "moonframe::perf", "frame: built in {built:.1?}");
         }
         let key_layers = painter.take_key_layers();
         self.key_layers = key_layers;
@@ -868,6 +949,9 @@ impl Render for MoonframeApp {
                 this.run(Command::ToggleTheme, window, cx)
             }))
             .on_action(cx.listener(|this, _: &Inspect, _, cx| this.toggle_inspect(cx)))
+            .on_action(cx.listener(|this, action: &MenuSend, window, cx| {
+                this.run_menu_item(&action.id, window, cx);
+            }))
             .on_action(cx.listener(|this, _: &Dismiss, _, cx| this.dismiss(cx)))
             .size_full()
             .flex()

@@ -10,6 +10,7 @@
   <a href="#building-blocks">Building blocks</a> ·
   <a href="#working-with-an-agent">Working with an agent</a> ·
   <a href="#mods-from-git">Mods from git</a> ·
+  <a href="#whole-apps-as-profiles">Apps</a> ·
   <a href="#commands">Commands</a> ·
   <a href="#license">License</a>
 </p>
@@ -196,6 +197,70 @@ moonframe mod list | update | remove NAME | enable NAME | disable NAME
 
 Packages ship source only, so everything they run can be read first.
 
+## Whole apps as profiles
+
+The starter stays as it is; a whole other app installs beside it as a
+profile, with its own shell, mods, packages and theme, and runs as an app of
+its own:
+
+```sh
+moonframe app install github.com/owner/some-app   # clones it and what it requires
+moonframe --profile some-app                      # opens it
+moonframe app new ~/code/my-app                   # start one: moonframe.toml, a shell, a mod
+moonframe app link ~/code/my-app                  # run it in place, editing live
+moonframe app list | update NAME | remove NAME
+```
+
+An app is a repository laid out like `app/`, with a `moonframe.toml`:
+
+```toml
+[app]
+name = "my-app"                  # the profile it installs as
+title = "My App"                 # its name in the menu bar and bundle
+icon = "icon.png"                # its icon (default icon.png)
+keep = ["terminal"]              # built-in mods it shows; it brings the rest
+requires = ["owner/repo@v1"]     # packages it installs with it, or "../shared"
+```
+
+The built-in providers, components and styles are there for it to use; the
+built-in mods are not, unless it keeps them. Profiles live in
+`~/.config/moonframe/profiles/`, and your own `style.luau` follows you
+into each.
+
+`just bundle-app NAME` builds a profile's app as a standalone release:
+`target/bundle/<Title>.app` on macOS, or a prefix with a `.desktop` file
+on Linux, with the app's title, id and icon. A release leaves out the
+Components menu, Inspect Element and Reload; `--release` runs any window
+that way, and `--dev` brings the tools back in a bundle.
+
+An app's `main.luau` can also add `menus` to the menu bar, with
+shortcuts, and say what its About panel shows (`about = { version,
+description, website, copyright }`); the menu bar carries the app's title.
+
+`examples/` holds apps built this way:
+
+- **sessions**: coding sessions across your repositories, each with a shell
+  and its changes.
+- **workbench**: a terminal, an editor and the project's files.
+- **daybook**: a planner: today's tasks and events, an inbox, a month,
+  notes, three looks.
+- **ledger**: a fund overview: cash against a floor, what is waiting, a
+  raise, funds with their curves (sample data).
+- **audience**: a newsletter's audience dashboard (sample data).
+- **pipeline**: a sales kanban with a scripted, labelled agent panel.
+- **stage**: the components on a bento board, for stills.
+
+sessions, workbench and stage require the `projects` package beside them. `moonframe app link
+examples/sessions` runs one in place:
+
+```sh
+cargo build --release -p moonframe
+target/release/moonframe app link examples/sessions --yes
+target/release/moonframe app link examples/workbench --yes
+target/release/moonframe --profile sessions &
+target/release/moonframe --profile workbench &
+```
+
 ## Commands
 
 | Command | Does |
@@ -205,11 +270,20 @@ Packages ship source only, so everything they run can be read first.
 | `just types` | type-checks the Luau in strict mode |
 | `just providers` | builds and lints the Wasm providers |
 | `just bundle` | builds `target/bundle/Moonframe.app` |
+| `just bundle-app NAME` | builds the profile NAME's app as a standalone release |
+| `just check-examples` | loads and type-checks the apps in `examples/` |
 | `just install` | builds the app and installs it in `/Applications` |
 | `just ci` | formatting, lints, tests, types, providers and check |
 
 `moonframe --help` lists the app's own options, such as `--user DIR`,
-`--no-user`, `--check`, and `--background` (open without taking focus).
+`--no-user`, `--profile NAME`, `--check`, `--release`, and `--background`
+(open without taking focus).
+
+To see where time goes, run with `RUST_LOG=moonframe::perf=debug`: each
+message, provider publish and frame is logged with how long it took and
+which views it ran (`trace` adds each view's Luau and tree time). A message
+runs only the views of the mods it reached, and a publish only those that
+read that provider's data.
 
 ## License
 

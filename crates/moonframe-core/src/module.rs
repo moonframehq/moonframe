@@ -3,8 +3,9 @@
 
 use {
     crate::{
-        Chrome, Data, Error, Node, Rules, SHELL, Stylesheet,
+        About, AppMenu, Chrome, Data, Error, Node, Rules, SHELL, Stylesheet,
         component::Library,
+        menus::Menus,
         node,
         read::{Cx, Fields, NO_NAMES, Read},
         vm::{self, Meter},
@@ -32,6 +33,9 @@ struct Definition {
     styles: Option<Value>,
     /// The window the shell asks for; only `main.luau` may set it.
     window: Option<Chrome>,
+    /// The shell's menus and About panel; `main.luau` only, too.
+    menus: Option<Menus>,
+    about: Option<About>,
     meta: Meta,
 }
 
@@ -41,7 +45,8 @@ impl Read for Definition {
             return Err(cx.fail("main.luau must return mod { ... }"));
         }
         let fields = Fields::read(value, cx, &[&[
-            "init", "update", "view", "region", "order", "title", "styles", "window",
+            "init", "update", "view", "region", "order", "title", "styles", "window", "menus",
+            "about",
         ]])?;
         Ok(Self {
             init: fields.get("init")?,
@@ -49,6 +54,8 @@ impl Read for Definition {
             view: fields.need("view")?,
             styles: fields.raw("styles").cloned(),
             window: fields.get("window")?,
+            menus: fields.get("menus")?,
+            about: fields.get("about")?,
             meta: Meta {
                 region: fields.get("region")?,
                 order: fields.get("order")?.unwrap_or(0),
@@ -79,7 +86,36 @@ pub(crate) struct Module {
     meter: Meter,
     definition: Definition,
     state: Value,
+    /// `app` as a table in this module's Luau, and the generation of the
+    /// workspace's `app` it was made from: views after a message see the
+    /// same `app`, so it is converted once per change, not once per view.
+    app: std::cell::RefCell<Option<(u64, Value)>>,
+    /// The keys of `app` the last view read (`app.system`, `app.window`),
+    /// so a provider's publish redraws only the views that read it. `None`
+    /// until a view has run to the end.
+    reads: std::cell::RefCell<Option<std::collections::BTreeSet<String>>>,
 }
+
+/// Wraps `app` so reading `app.<key>` notes the key in `reads`; iterating
+/// and `#` see the real table. Views get it, never the table itself.
+const WATCHED: &str = r#"
+local real, reads = ...
+return setmetatable({}, {
+	__index = function(_, key)
+		reads[key] = true
+		return real[key]
+	end,
+	__iter = function()
+		for key in real do
+			reads[key] = true
+		end
+		return next, real
+	end,
+	__len = function()
+		return #real
+	end,
+})
+"#;
 
 impl Module {
     /// Runs `source` and its `init`. `previous` is the state the module had
@@ -99,6 +135,11 @@ impl Module {
                 "window: only the shell (main.luau) sets the window",
             ));
         }
+        if (definition.menus.is_some() || definition.about.is_some()) && name != SHELL {
+            return Err(Error::new(
+                "menus and about: only the shell (main.luau) sets them",
+            ));
+        }
         let previous = match previous {
             Some(previous) => previous.to_lua(&lua)?,
             None => Value::Nil,
@@ -116,6 +157,8 @@ impl Module {
             meter,
             definition,
             state,
+            app: std::cell::RefCell::new(None),
+            reads: std::cell::RefCell::new(None),
         })
     }
 
@@ -126,6 +169,16 @@ impl Module {
     /// The window the shell asks for, if it says.
     pub(crate) fn window(&self) -> Option<Chrome> {
         self.definition.window
+    }
+
+    /// The menus the shell asks for.
+    pub(crate) fn menus(&self) -> &[AppMenu] {
+        self.definition.menus.as_ref().map_or(&[], |menus| &menus.0)
+    }
+
+    /// What the shell's About panel says.
+    pub(crate) fn about(&self) -> Option<&About> {
+        self.definition.about.as_ref()
     }
 
     /// Runs `update(state, msg)`. It returns the new state, or nothing to
@@ -148,14 +201,56 @@ impl Module {
 
     /// Runs `view(state, app)` and checks the tree it returns: the view, and
     /// the problems of children marked in it.
-    pub(crate) fn view(&self, app: &Data, sheet: &Stylesheet) -> Result<(Node, Vec<Error>), Error> {
+    pub(crate) fn view(
+        &self,
+        app: &Data,
+        generation: u64,
+        sheet: &Stylesheet,
+    ) -> Result<(Node, Vec<Error>), Error> {
         self.meter.reset();
+        let started = std::time::Instant::now();
+        let cached = self
+            .app
+            .borrow()
+            .as_ref()
+            .filter(|(made, _)| *made == generation)
+            .map(|(_, table)| table.clone());
+        let table = match cached {
+            Some(table) => table,
+            None => {
+                let table = app.to_lua(&self.lua)?;
+                *self.app.borrow_mut() = Some((generation, table.clone()));
+                table
+            },
+        };
+        let converted = started.elapsed();
+        let reads = self.lua.create_table()?;
+        let watched = self
+            .lua
+            .load(WATCHED)
+            .set_name("=app")
+            .call::<Value>((table, reads.clone()))?;
+        *self.reads.borrow_mut() = None;
         let tree = self
             .definition
             .view
-            .call::<Value>((self.state.clone(), app.to_lua(&self.lua)?))
+            .call::<Value>((self.state.clone(), watched))
             .map_err(|error| Error::from(error).context("view"))?;
+        *self.reads.borrow_mut() = Some(
+            reads
+                .pairs::<String, Value>()
+                .filter_map(Result::ok)
+                .map(|(key, _)| key)
+                .collect(),
+        );
+        let ran = started.elapsed();
         let (node, problems) = node::read(&tree, sheet).map_err(|error| error.context("view"))?;
+        tracing::trace!(
+            target: "moonframe::perf",
+            "view: app {converted:.1?}, luau {:.1?}, tree {:.1?}",
+            ran - converted,
+            started.elapsed() - ran,
+        );
         Ok((
             node,
             problems
@@ -163,6 +258,14 @@ impl Module {
                 .map(|problem| problem.context("view"))
                 .collect(),
         ))
+    }
+
+    /// Whether the last view read `app.<key>`; true when it is not known.
+    pub(crate) fn reads(&self, key: &str) -> bool {
+        self.reads
+            .borrow()
+            .as_ref()
+            .is_none_or(|reads| reads.contains(key))
     }
 
     /// The mod's own `styles`, read against the stylesheet's names.

@@ -23,9 +23,28 @@ check dir="app":
 check-builtin dir="app":
     cargo run --quiet --release -p moonframe -- --check --no-user {{dir}}
 
+# Load the example apps in examples/ headlessly, each as a profile in a
+# throwaway user folder, and type-check their Luau.
+check-examples:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    user=$(mktemp -d)
+    trap 'rm -rf "$user"' EXIT
+    cargo build --quiet --release -p moonframe
+    for app in sessions workbench daybook ledger audience pipeline stage; do
+        target/release/moonframe --user "$user" app link "examples/$app" --yes >/dev/null
+        target/release/moonframe --user "$user" --profile "$app" --check | cut -c1-120
+    done
+    just types examples
+
 # Build Moonframe.app (release binary, staged app, icon) in target/bundle.
 bundle out="target/bundle":
     scripts/bundle-app.sh {{out}}
+
+# Build a profile's app as a standalone release bundle (its title, id and
+# icon; no Components menu or Inspect Element) in target/bundle.
+bundle-app profile out="target/bundle":
+    scripts/bundle-app.sh {{out}} {{profile}}
 
 # Build the app and install it in /Applications, to try mods that live in
 # ~/.config/moonframe against the app as users get it.
@@ -107,4 +126,4 @@ test:
     cargo test --locked --workspace
     cargo test --locked --workspace --all-features
 
-ci: format-check lint test types providers check-builtin components-check
+ci: format-check lint test types providers check-builtin components-check check-examples

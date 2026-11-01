@@ -1,0 +1,66 @@
+{
+  "org": { "name": "Pemberton Row", "detail": "Capital · Boston", "initials": "PR" },
+  "person": { "name": "Ines Hartley", "role": "Head of Capital" },
+  "synced": "Bank feeds synced 08:36 · Fund admin synced 07:00",
+  "cash": {
+    "today": "$46.8M",
+    "lowest": { "value": "$26.4M", "note": "Week of Jan 4" },
+    "free": { "value": "$11.4M", "note": "above the floor" },
+    "end": { "value": "$27.5M", "note": "−19.3 from today" },
+    "accounts": [{ "name": "Coastal Trust", "initials": "CT", "color": "#1d4ed8" }, { "name": "North Bank", "initials": "NB", "color": "#15803d" }, { "name": "Meridian", "initials": "MB", "color": "#0284c7" }],
+    "floor": 15, "max": 60,
+    "ticks": ["$60M", "$45M", "$30M", "$15M", "$0"],
+    "weeks": [
+      { "label": "Today", "value": 46.8, "delta": "$46.8M", "current": true, "low": false },
+      { "label": "Nov 2", "value": 44.0, "delta": "−2.8", "current": false, "low": false },
+      { "label": "Nov 9", "value": 53.2, "delta": "+9.2", "current": false, "low": false },
+      { "label": "Nov 16", "value": 36.4, "delta": "−16.8", "current": false, "low": false },
+      { "label": "Nov 23", "value": 34.7, "delta": "−1.7", "current": false, "low": false },
+      { "label": "Nov 30", "value": 46.5, "delta": "+11.8", "current": false, "low": false },
+      { "label": "Dec 7", "value": 44.0, "delta": "−2.5", "current": false, "low": false },
+      { "label": "Dec 14", "value": 51.5, "delta": "+7.5", "current": false, "low": false },
+      { "label": "Dec 21", "value": 40.4, "delta": "−11.1", "current": false, "low": false },
+      { "label": "Dec 28", "value": 46.0, "delta": "+5.6", "current": false, "low": false },
+      { "label": "Jan 4", "value": 26.4, "delta": "−19.6", "current": false, "low": true },
+      { "label": "Jan 11", "value": 39.0, "delta": "+12.6", "current": false, "low": false },
+      { "label": "Jan 18", "value": 28.9, "delta": "−10.1", "current": false, "low": false },
+      { "label": "Jan 25", "value": 27.5, "delta": "−1.4", "current": false, "low": false }
+    ]
+  },
+  "waiting": [
+    { "month": "Nov", "day": "2", "when": "Today", "tone": "neutral", "title": "Larkfield Partners wants the Credit IV deck", "who": "RIA · 48 client accounts", "initials": "LP", "amount": "$8–12M", "actions": true },
+    { "month": "Nov", "day": "9", "when": "In 7 days", "tone": "danger", "title": "Okafor subscription is missing one letter", "who": "Dana & Theo Okafor", "initials": "DO", "amount": "$750K", "actions": false },
+    { "month": "Nov", "day": "12", "when": "In 10 days", "tone": "danger", "title": "Call #7: 44 investors haven't funded", "who": "Growth III · 197 of 241 paid", "initials": "G3", "amount": "$2.9M", "actions": false },
+    { "month": "Nov", "day": "18", "when": "In 16 days", "tone": "neutral", "title": "Whitcombe asks to redeem from Credit IV", "who": "Whitcombe Family Office", "initials": "WF", "amount": "$3.2M", "actions": false }
+  ],
+  "handled": 7,
+  "raise": {
+    "title": "Q4 raise · Credit IV", "closes": "Closes Dec 31 · 59 days",
+    "closed": "$41.3M", "target": "$75M", "pace": "$6M short of target",
+    "total": 75, "marker": { "value": 69, "label": "Pace $69M" },
+    "labels": ["$0M", "$25M", "$50M", "Target $75M"],
+    "segments": [
+      { "value": 41.3, "color": "accent", "hatch": false },
+      { "value": 8.5, "color": "accent/45", "hatch": false },
+      { "value": 12.0, "color": "accent/60", "hatch": true },
+      { "value": 13.2, "color": "danger", "hatch": true }
+    ],
+    "stages": [
+      { "label": "Closed", "value": "$41.3M", "count": 38, "color": "accent", "hatch": false, "people": ["Ada Moss", "Ben Ruiz", "Cleo Park"] },
+      { "label": "Documents out", "value": "$8.5M", "count": 6, "color": "accent/45", "hatch": false, "people": ["Dev Shah", "Eli Grant"] },
+      { "label": "Soft-circled", "value": "$12.0M", "count": 9, "color": "accent/60", "hatch": true, "people": ["Fay Lin", "Gus Ward", "Hana Ito"] },
+      { "label": "Still needed", "value": "$13.2M", "count": 0, "color": "danger", "hatch": true, "people": [], "note": "24 prospects" }
+    ]
+  },
+  "funds": {
+    "summary": "$1.76bn NAV · 1,612 investors",
+    "note": "The curve is cash paid back minus cash called, by year. Above the line, investors are ahead.",
+    "rows": [
+      { "name": "Credit Fund IV", "detail": "Evergreen · bridge loans", "icon": "building-2", "nav": "$742M", "called": "100%", "dpi": "0.41×", "irr": "9.4%", "curve": [0, -0.4, -0.3, -0.1, 0.1, 0.3, 0.5] },
+      { "name": "Growth II", "detail": "2021 · harvesting", "icon": "layers", "nav": "$418M", "called": "100%", "dpi": "1.42×", "irr": "15.1%", "curve": [0, -0.6, -1.1, -1.2, -0.6, 0.2, 0.9] },
+      { "name": "Co-investments", "detail": "Deal by deal · 13 live", "icon": "workflow", "nav": "$214M", "called": "88%", "dpi": "0.86×", "irr": "12.6%", "curve": [0, -0.5, -0.8, -0.6, -0.2] },
+      { "name": "Growth III", "detail": "2024 · investing", "icon": "rocket", "nav": "$386M", "called": "78%", "dpi": "0.12×", "irr": "6.2%", "curve": [0, -0.6, -1.2] }
+    ]
+  },
+  "next": { "month": "Jan", "day": "4", "title": "Q4 distribution", "amount": "$21.2M", "detail": "to 1,612 investors", "when": "in 62 days" }
+}

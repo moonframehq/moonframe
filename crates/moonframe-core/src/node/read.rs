@@ -88,6 +88,8 @@ impl Tree {
             Element::Badge => Node::Badge(self.build(kind, table, &cx)?),
             Element::Icon => Node::Icon(self.build(kind, table, &cx)?),
             Element::Image => Node::Image(self.build(kind, table, &cx)?),
+            Element::Line => Node::Line(self.build(kind, table, &cx)?),
+            Element::Hatch => Node::Hatch(self.build(kind, table, &cx)?),
             Element::Terminal => Node::Terminal(self.build(kind, table, &cx)?),
             Element::Browser => Node::Browser(self.build(kind, table, &cx)?),
             Element::Input => Node::Input(self.build(kind, table, &cx)?),
@@ -200,7 +202,7 @@ impl Build for Panel {
 
 impl Build for Split {
     const CHILDREN: bool = true;
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["id"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["id", "divider"]];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
         let panes = fields
@@ -224,6 +226,7 @@ impl Build for Split {
                 _ => Direction::Column,
             },
             id: fields.get("id")?,
+            divider: fields.get("divider")?.unwrap_or(true),
             panes,
         })
     }
@@ -262,7 +265,7 @@ impl Build for Pane {
 
 impl Build for Text {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "text", "tone", "size", "weight", "truncate", "lines", "wrap",
+        "text", "tone", "size", "weight", "truncate", "lines", "wrap", "strike",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
@@ -277,6 +280,7 @@ impl Build for Text {
                 .number("lines", 1.0..=100.0)?
                 .map(|lines| lines as u8),
             wrap: fields.get("wrap")?.unwrap_or(true),
+            strike: fields.get("strike")?.unwrap_or(false),
         })
     }
 }
@@ -346,6 +350,57 @@ impl Build for Icon {
             tone: fields.get("tone")?,
             size: fields.get("size")?,
             spin: fields.get("spin")?.unwrap_or(false),
+        })
+    }
+}
+
+/// The most points a `ui.line` draws.
+const MOST_POINTS: usize = 2000;
+
+impl Build for Line {
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
+        "points", "min", "max", "baseline", "area", "dots", "stroke", "dashed", "width", "height",
+    ]];
+
+    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+        let points: Vec<f32> = fields.need("points")?;
+        if points.len() > MOST_POINTS {
+            return Err(fields
+                .cx()
+                .key("points")
+                .fail(format!("at most {MOST_POINTS} points")));
+        }
+        if points.iter().any(|value| !value.is_finite()) {
+            return Err(fields.cx().key("points").fail("points are numbers"));
+        }
+        let value = -1.0e12..=1.0e12;
+        Ok(Self {
+            look: Look::from_fields(fields)?,
+            points,
+            min: fields.number("min", value.clone())?,
+            max: fields.number("max", value.clone())?,
+            baseline: fields.number("baseline", value)?,
+            area: fields.get("area")?.unwrap_or(false),
+            dots: fields.get("dots")?,
+            stroke: fields.number("stroke", 0.5..=8.0)?.unwrap_or(1.5),
+            dashed: fields.get("dashed")?.unwrap_or(false),
+            width: fields.number("width", PIXELS)?,
+            height: fields.number("height", PIXELS)?,
+        })
+    }
+}
+
+impl Build for Hatch {
+    const KEYS: &'static [&'static [&'static str]] =
+        &[TYPE, LOOK, &["gap", "width", "height", "grow"]];
+
+    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+        Ok(Self {
+            look: Look::from_fields(fields)?,
+            gap: fields.number("gap", 2.0..=64.0)?.unwrap_or(6.0),
+            width: fields.number("width", PIXELS)?,
+            height: fields.number("height", PIXELS)?,
+            grow: fields.get("grow")?.unwrap_or(false),
         })
     }
 }
@@ -796,7 +851,7 @@ impl Frame {
 impl Action {
     /// A control's `msg` (with an optional `to`) or `command`; a browser
     /// command names its browser with `browser` (and its mod with `to`).
-    fn from_fields(fields: &Fields) -> Result<Option<Self>, Error> {
+    pub(crate) fn from_fields(fields: &Fields) -> Result<Option<Self>, Error> {
         let browser = fields.get::<BrowserId>("browser")?.map(|id| id.0);
         let misplaced = || {
             fields.cx().key("browser").fail(format!(
