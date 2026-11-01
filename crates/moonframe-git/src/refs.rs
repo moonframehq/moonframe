@@ -212,9 +212,25 @@ pub(crate) fn remote(repo: &Repo, branch: &str) -> Value {
     remote_json(&name, &url)
 }
 
+/// `url` without the user and password a `scheme://user:token@host/...`
+/// URL may carry, which mods must never see.
+fn without_credentials(url: &str) -> String {
+    let Some((scheme, rest)) = url.split_once("://") else {
+        return url.to_owned();
+    };
+    let end = rest.find('/').unwrap_or(rest.len());
+    match rest[..end].rfind('@') {
+        Some(at) => format!("{scheme}://{}", &rest[at + 1..]),
+        None => url.to_owned(),
+    }
+}
+
 /// `name` and `url` with the host, owner and repository the URL names:
 /// scp-like `user@host:owner/repo`, or `scheme://[user@]host[:port]/owner/repo`.
+/// Credentials in the URL are left out.
 pub(crate) fn remote_json(name: &str, url: &str) -> Value {
+    let url = without_credentials(url);
+    let url = url.as_str();
     let (host, path) = if let Some((_, rest)) = url.split_once("://") {
         let (host, path) = rest.split_once('/').unwrap_or((rest, ""));
         let host = host.rsplit('@').next().unwrap_or(host);

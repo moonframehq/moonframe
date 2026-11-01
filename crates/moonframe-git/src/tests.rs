@@ -65,6 +65,13 @@ fn remotes_name_their_host_owner_and_repository() {
     assert_eq!(https["kind"], "gitlab");
     assert_eq!(https["host"], "gitlab.example.com");
     assert_eq!(https["owner"], "group/sub");
+    assert_eq!(
+        https["url"],
+        "https://gitlab.example.com:8443/group/sub/app/"
+    );
+    let token = refs::remote_json("t", "https://x-access-token:ghp_secret@github.com/a/b.git");
+    assert_eq!(token["url"], "https://github.com/a/b.git");
+    assert!(!token.to_string().contains("ghp_secret"));
     let local = refs::remote_json("disk", "/srv/repo");
     assert_eq!(local["kind"], "other");
     assert!(local.get("web_url").is_none());

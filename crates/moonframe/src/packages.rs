@@ -332,6 +332,16 @@ impl Contents {
         Ok(contents)
     }
 
+    /// Its mods named in `writers`, the mods the git provider lets commit
+    /// and push: a package's mod of that name takes the place of the
+    /// user's, and with it that right.
+    pub(crate) fn writers<'a>(&'a self, writers: &'a [String]) -> impl Iterator<Item = &'a str> {
+        self.mods
+            .iter()
+            .filter(|name| writers.contains(name))
+            .map(String::as_str)
+    }
+
     /// The providers that would run code with the user's access.
     pub(crate) fn trusted(&self) -> impl Iterator<Item = (&str, &Provider)> {
         self.providers
@@ -530,6 +540,31 @@ impl fmt::Display for Provider {
             Self::Broken(problem) => write!(f, "broken: {}", printable(problem)),
         }
     }
+}
+
+/// The built-in git provider's manifest, compiled in so its `writers` are
+/// known wherever the command runs from.
+const BUILTIN_GIT: &str = include_str!("../../../app/providers/git/provider.toml");
+
+/// The mods the git provider lets commit and push: `[settings] writers`
+/// in the user's `providers/git`, else in the built-in one.
+pub(crate) fn git_writers(user: &Path) -> Vec<String> {
+    let text = fs::read_to_string(user.join("providers/git/provider.toml"))
+        .unwrap_or_else(|_| BUILTIN_GIT.to_owned());
+    let Ok(manifest) = text.parse::<toml::Table>() else {
+        return Vec::new();
+    };
+    manifest
+        .get("settings")
+        .and_then(|settings| settings.get("writers"))
+        .and_then(toml::Value::as_array)
+        .map(|names| {
+            names
+                .iter()
+                .filter_map(|name| name.as_str().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Asked before a package's code may run: `Err` refuses it.

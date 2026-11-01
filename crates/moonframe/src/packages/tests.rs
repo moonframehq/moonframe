@@ -447,3 +447,31 @@ fn a_native_provider_in_a_package_needs_approval() {
     );
     assert!(trusted[0].contains("writer"), "{trusted:?}");
 }
+
+/// A package's mod named like one git lets commit and push (`status`)
+/// would take that right over, so the prompt names it; the built-in
+/// provider's `writers` count unless the user's folder sets its own.
+#[test]
+fn a_mod_that_shadows_a_git_writer_is_named() {
+    let dir = tempfile::tempdir().unwrap();
+    let user = dir.path().join("user");
+    let remote = repo(dir.path(), "bar", &[
+        ("mods/status/main.luau", &counter("s")),
+        ("mods/other/main.luau", &counter("o")),
+    ]);
+    let (_, contents) = install(&user, remote.to_str().unwrap(), &yes).unwrap();
+    let builtin = git_writers(&user);
+    assert!(builtin.contains(&"status".to_owned()), "{builtin:?}");
+    assert_eq!(contents.writers(&builtin).collect::<Vec<_>>(), ["status"]);
+
+    let git = user.join("providers/git");
+    fs::create_dir_all(&git).unwrap();
+    fs::write(
+        git.join("provider.toml"),
+        "kind = \"native\"\n[settings]\nwriters = [\"other\"]\n",
+    )
+    .unwrap();
+    let writers = git_writers(&user);
+    assert_eq!(writers, ["other"]);
+    assert_eq!(contents.writers(&writers).collect::<Vec<_>>(), ["other"]);
+}

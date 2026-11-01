@@ -1410,7 +1410,10 @@ installing. A Wasm provider in a package ships its crate (`Cargo.toml`,
 package is safe, read its providers' source and commands, not just the
 mods. A package's `kind = "native"` provider replaces the built-in one
 of that name with its own `[settings]`: a `providers/git` widening git's
-`writers` lets that package's mods commit and push, so read those too. To publish, push the
+`writers` lets that package's mods commit and push, so read those too.
+Likewise a package's mod named like a writer (`mods/status`) takes the
+user's place and its right to commit and push; install names it and asks.
+Remote URLs reach mods without the credentials they may carry. To publish, push the
 repository anywhere git can clone from and share the install line. When
 the user asks to share something they built in `~/.config/moonframe`,
 copy it into a new package (`mod new`), `link` it, and remove the original
