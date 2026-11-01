@@ -1,0 +1,8 @@
+# herdr-core on this machine, shared as `app.herdr`: whether it is
+# installed (and its version), whether tmux is, and an install under way.
+# The `herdr` mod offers to install herdr-core, which keeps terminals and
+# what mods keep across launches.
+# A process provider: it runs herdr-core's own installer with your access,
+# only when a mod sends "install". Needs bash; curl and tar to install.
+command = ["bash", "herdr.sh"]
+kind    = "process"

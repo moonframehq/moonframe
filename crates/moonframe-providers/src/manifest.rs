@@ -2,7 +2,9 @@
 //! ask the host for.
 //!
 //! ```toml
-//! kind = "wasm"            # or "process" with `command = ["bash", "git.sh"]`
+//! kind = "wasm"            # or "process" with `command = ["bash", "github.sh"]`,
+//!                          # or "native": the Rust one the app built in
+//!                          # under this folder's name
 //! interval = 1.0           # seconds between ticks (wasm)
 //! capabilities = ["system"]
 //!
@@ -37,6 +39,8 @@ pub enum Kind {
     Wasm,
     /// A command run in the folder.
     Process { command: Vec<String> },
+    /// Rust the app was built with, registered under the folder's name.
+    Native,
 }
 
 /// What a wasm provider may ask the host for.
@@ -87,9 +91,13 @@ impl Manifest {
             ("process", true) => {
                 return Err(problem("a process provider needs a `command`".to_owned()));
             },
+            ("native", true) => Kind::Native,
+            ("native", false) => {
+                return Err(problem("a native provider takes no `command`".to_owned()));
+            },
             (other, _) => {
                 return Err(problem(format!(
-                    "unknown kind `{other}`; expected wasm or process"
+                    "unknown kind `{other}`; expected wasm, process or native"
                 )));
             },
         };
@@ -99,9 +107,9 @@ impl Manifest {
                 "a wasm provider needs a {PREBUILT}, or a Cargo.toml to build one, beside provider.toml"
             )));
         }
-        if matches!(kind, Kind::Process { .. }) && !file.capabilities.is_empty() {
+        if kind != Kind::Wasm && !file.capabilities.is_empty() {
             return Err(problem(
-                "capabilities are for wasm providers; a process has the user's own access"
+                "capabilities are for wasm providers; the others have the user's own access"
                     .to_owned(),
             ));
         }

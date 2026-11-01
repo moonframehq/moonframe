@@ -60,6 +60,9 @@ wildcards         = "deny"
 allow-wildcard-paths = true
 
 [sources]
-allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# herdr-gpui's crates (terminals in herdr-core, the git provider), each
+# pinned to a commit in Cargo.toml.
+allow-git        = ["https://github.com/penso/herdr-gpui"]
 unknown-git      = "deny"
 unknown-registry = "deny"

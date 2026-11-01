@@ -8,7 +8,8 @@ use {
     std::{env, path::PathBuf},
 };
 
-const NAME: &str = "moonframe";
+/// The app's name: its folders, and its document in herdr-core.
+pub(crate) const NAME: &str = "moonframe";
 
 /// The app folder the binary ships with: `Contents/Resources/app` inside a
 /// macOS bundle, `app` beside the executable in the Linux and Windows

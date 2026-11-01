@@ -53,7 +53,8 @@ pub(crate) fn run(user: &Path, args: &[String]) -> ExitCode {
         .map(String::as_str)
         .filter(|arg| !matches!(*arg, "--yes" | "-y"))
         .collect();
-    let approve = move |contents: &Contents| approve(contents, yes);
+    let writers = super::git_writers(user);
+    let approve = move |contents: &Contents| approve(contents, &writers, yes);
     let done = match words.as_slice() {
         [] | ["help" | "-h" | "--help"] => {
             println!("{USAGE}");
@@ -156,19 +157,29 @@ fn update(user: &Path, name: Option<&str>, approve: super::Approve) -> Result<()
     }
 }
 
-/// Asks before a package's providers may run code with the user's access;
-/// mods, components, and styles are Luau the app runs sandboxed.
-fn approve(contents: &Contents, yes: bool) -> Result<(), String> {
+/// Asks before a package's providers may run code with the user's access,
+/// or its mods may commit and push (named in git's `writers`); other mods,
+/// components, and styles are Luau the app runs sandboxed.
+fn approve(contents: &Contents, writers: &[String], yes: bool) -> Result<(), String> {
     let trusted: Vec<_> = contents.trusted().collect();
-    if trusted.is_empty() || yes {
+    let writing: Vec<_> = contents.writers(writers).collect();
+    if (trusted.is_empty() && writing.is_empty()) || yes {
         return Ok(());
     }
-    println!("This package has providers that run code as you:");
-    for (name, how) in &trusted {
-        println!("  {}: {how}", super::printable(name));
+    if !trusted.is_empty() {
+        println!("This package has providers that run code as you:");
+        for (name, how) in &trusted {
+            println!("  {}: {how}", super::printable(name));
+        }
+    }
+    if !writing.is_empty() {
+        println!("This package replaces mods that may commit and push with git:");
+        for name in &writing {
+            println!("  {}", super::printable(name));
+        }
     }
     if !io::stdin().is_terminal() {
-        return Err("declined: pass --yes to allow its providers".to_owned());
+        return Err("declined: pass --yes to allow them".to_owned());
     }
     print!("Allow them? [y/N] ");
     let _ = io::stdout().flush();

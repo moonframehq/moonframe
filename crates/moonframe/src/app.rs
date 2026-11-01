@@ -27,6 +27,7 @@ use {
         Action, Chrome, Command, Data, Error, Platform, Roots, Stylesheet, Titlebar, Token,
         WindowState, Workspace,
     },
+    moonframe_mux::Backends,
     moonframe_providers::{Event, Providers},
     notify::{RecommendedWatcher, RecursiveMode, Watcher as _},
     std::{
@@ -58,6 +59,7 @@ pub(crate) struct MoonframeApp {
     pub(crate) inspector: Inspector,
     /// The shells `ui.terminal` elements show.
     pub(crate) terminals: Terminals,
+    /// Saves what mods keep across launches; `None` keeps nothing.
     /// The pages `ui.browser` elements show.
     pub(crate) browsers: Browsers,
     /// The text `ui.input` fields edit.
@@ -116,6 +118,7 @@ impl MoonframeApp {
         chrome: Chrome,
         builtin: PathBuf,
         user: Option<PathBuf>,
+        backends: Arc<Backends>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -142,7 +145,8 @@ impl MoonframeApp {
         focus.focus(window, cx);
         cx.set_menus(menus(workspace.components()));
         menu_actions(cx);
-        let terminals = Terminals::new(wake_on_output(cx));
+        let terminals = Terminals::new(backends, wake_on_output(cx));
+        flush_on_quit(cx);
         let settings = user.as_ref().map(|user| user.join("settings.toml"));
         let scheme = settings
             .as_deref()
@@ -391,8 +395,8 @@ impl MoonframeApp {
 
     /// Passes on what the mods sent providers, and draws again.
     fn flush(&mut self, from: &str, cx: &mut Context<Self>) {
-        for (provider, message) in self.workspace.take_outbox() {
-            if let Err(problem) = self.providers.send(&provider, message) {
+        for (provider, sender, message) in self.workspace.take_outbox() {
+            if let Err(problem) = self.providers.send(&provider, &sender, message) {
                 tracing::warn!("{from}: {problem}");
             }
         }
@@ -787,12 +791,13 @@ fn toast(message: SharedString, cx: &Context<MoonframeApp>) -> AnyElement {
 /// Starts the providers, sharing what each publishes as `app.<name>`.
 fn start_providers(workspace: &Workspace, cx: &mut Context<MoonframeApp>) -> Providers {
     let (sender, mut events) = futures::channel::mpsc::unbounded();
-    let providers = Providers::start(
+    let providers = Providers::start_with(
         workspace.roots().clone(),
         paths::builds(),
         Arc::new(move |event| {
             let _ = sender.unbounded_send(event);
         }),
+        crate::natives::natives(),
     );
     cx.spawn(async move |this, cx| {
         while let Some(event) = events.next().await {
@@ -805,6 +810,12 @@ fn start_providers(workspace: &Workspace, cx: &mut Context<MoonframeApp>) -> Pro
                         tracing::warn!("provider {provider}: {problem}");
                         let problem = Error::new(format!("provider failed: {problem}"));
                         this.workspace.clear_host(&provider, Some(problem));
+                    },
+                    // A native provider's answer to the mod that asked.
+                    Event::Sent { provider, to, msg } => {
+                        let from = format!("{}{provider}", moonframe_core::PROVIDER);
+                        this.workspace.send(&from, &to, msg);
+                        this.flush(&from, cx);
                     },
                 }
                 cx.notify();
@@ -996,4 +1007,14 @@ impl Render for MoonframeApp {
             .children(toast)
             .child(crate::browser::presenter(self.browsers.pages()))
     }
+}
+
+/// Saves the state that changed since the last save, waiting for it, as
+/// the app quits: the workspace saves as it goes, but writes are queued.
+fn flush_on_quit(cx: &mut Context<MoonframeApp>) {
+    cx.on_app_quit(|app, _| {
+        app.workspace.flush();
+        async {}
+    })
+    .detach();
 }

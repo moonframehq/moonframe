@@ -15,9 +15,11 @@ mod inspect;
 mod keys;
 mod mod_window;
 mod motion;
+mod natives;
 mod overlay;
 mod packages;
 mod paths;
+mod persist;
 mod render;
 mod settings;
 mod terminal;
@@ -32,7 +34,8 @@ use {
         point, px, size,
     },
     moonframe_core::{Chrome, Roots, Titlebar, Workspace},
-    std::{fs, path::PathBuf, process::ExitCode},
+    moonframe_mux::Backends,
+    std::{fs, path::PathBuf, process::ExitCode, sync::Arc},
 };
 
 const USAGE: &str = "\
@@ -275,14 +278,13 @@ fn main() -> ExitCode {
             })
             .detach();
 
-            // The shell says what window it wants, so it loads first. With a
-            // user folder, each mod's state comes back from the last run.
-            let persist = user.as_ref().and_then(|_| {
-                moonframe_store::Store::open(&paths::state())
-                    .inspect_err(|error| tracing::warn!("{error}; state will not be saved"))
-                    .ok()
-                    .map(|store| Box::new(store) as Box<dyn moonframe_core::Persist>)
-            });
+            // Each mod's state and the topics come back from the last run:
+            // from herdr-core when it runs here, else SQLite. Only with the
+            // user's folder: `--no-user` runs (checks, screenshots) start
+            // fresh and keep nothing.
+            let backends = Arc::new(Backends::new());
+            let persist = user.as_ref().and_then(|_| persist::open(&backends));
+            // The shell says what window it wants, so it loads first.
             let workspace = Workspace::open_with(
                 paths::roots(builtin.clone(), user.clone()),
                 cx.theme().is_dark(),
@@ -299,7 +301,8 @@ fn main() -> ExitCode {
             };
             let opened = cx.open_window(options, |window, cx| {
                 let view = cx.new(|cx| {
-                    let mut app = MoonframeApp::new(workspace, chrome, builtin, user, window, cx);
+                    let mut app =
+                        MoonframeApp::new(workspace, chrome, builtin, user, backends, window, cx);
                     if let Some(name) = &component {
                         app.show_component(name, cx);
                     }
