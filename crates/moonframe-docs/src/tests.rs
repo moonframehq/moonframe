@@ -18,6 +18,7 @@ fn docs(writers: &[&str]) -> (Docs, Handle, Arc<Mutex<Vec<Event>>>, tempfile::Te
         root: Some(dir.path().canonicalize().unwrap()),
         writers: writers.iter().map(|name| (*name).to_owned()).collect(),
         open: BTreeMap::new(),
+        uses: 0,
     };
     (docs, host, seen, dir)
 }
@@ -311,11 +312,157 @@ fn the_root_is_the_repository_holding_the_app() {
     fs::create_dir(dir.path().join(".git")).unwrap();
     let provider = dir.path().join("app/providers/docs");
     fs::create_dir_all(&provider).unwrap();
-    if std::env::var_os("MOONFRAME_FILES").is_none() && std::env::var_os("LAYOUTS_REPO").is_none() {
+    // LAYOUTS_REPO, which git and the forges watch, doesn't move it: the
+    // explorer lists this same root.
+    if std::env::var_os("MOONFRAME_FILES").is_none() {
         assert_eq!(root(&provider), Some(dir.path().canonicalize().unwrap()));
     }
     assert_eq!(
         writers(&map([("writers", Data::List(vec!["editor".into()]))])),
         ["editor"]
     );
+}
+
+#[test]
+fn a_save_made_elsewhere_meanwhile_is_refused_not_lost() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("a.md");
+    fs::write(&file, "theirs").unwrap();
+    // Checked at one version; by the time it is put in place, another.
+    let stale = Over::Version("0:1".to_owned());
+    assert!(matches!(
+        save(&file, "mine", &stale),
+        Err(Saved::Conflict(CHANGED))
+    ));
+    // A new file, when one appeared meanwhile.
+    assert!(matches!(
+        save(&file, "mine", &Over::Nothing),
+        Err(Saved::Conflict(EXISTS))
+    ));
+    assert_eq!(fs::read_to_string(&file).unwrap(), "theirs");
+    // Nothing is left beside it.
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+
+    let current = Over::Version(version(&file.metadata().unwrap()));
+    assert!(save(&file, "mine", &current).is_ok());
+    assert_eq!(fs::read_to_string(&file).unwrap(), "mine");
+    let new = dir.path().join("b.md");
+    assert!(save(&new, "new", &Over::Nothing).is_ok());
+    assert_eq!(fs::read_to_string(&new).unwrap(), "new");
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 2);
+}
+
+#[test]
+fn past_the_limit_the_oldest_watch_makes_room() {
+    let (mut docs, host, seen, dir) = docs(&["editor"]);
+    for index in 0..=MAX_OPEN {
+        fs::write(dir.path().join(format!("{index}.md")), "x").unwrap();
+    }
+    for index in 0..MAX_OPEN {
+        let path = format!("{index}.md");
+        docs.receive(&host, "editor", message(&[("read", path.into())]));
+    }
+    // Read again, the first is the newest; the second is now the oldest.
+    docs.receive(&host, "editor", message(&[("read", "0.md".into())]));
+    let last = format!("{MAX_OPEN}.md");
+    docs.receive(&host, "editor", message(&[("read", last.clone().into())]));
+    sent(&seen);
+    assert_eq!(docs.open.len(), MAX_OPEN);
+    assert!(
+        !docs
+            .open
+            .contains_key(&("editor".to_owned(), "1.md".to_owned()))
+    );
+
+    // The newest read is still followed.
+    fs::write(dir.path().join(&last), "changed").unwrap();
+    fs::write(dir.path().join("0.md"), "changed").unwrap();
+    docs.tick(&host);
+    let mut changed: Vec<String> = sent(&seen)
+        .iter()
+        .map(|(_, fields)| string(fields, "changed"))
+        .collect();
+    changed.sort();
+    assert_eq!(changed, ["0.md".to_owned(), last]);
+}
+
+#[test]
+fn a_save_that_lands_after_the_last_look_is_swapped_back() {
+    // `replace` looks only once the new text is in place: here the file
+    // has already moved on, as when a save elsewhere lands between the last
+    // look and the swap.
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("a.md");
+    let temp = dir.path().join(".a.md.tmp");
+    fs::write(&file, "theirs").unwrap();
+    fs::write(&temp, "mine").unwrap();
+    assert!(matches!(
+        replace(&temp, &file, "0:1"),
+        Err(Saved::Conflict(CHANGED))
+    ));
+    assert_eq!(fs::read_to_string(&file).unwrap(), "theirs");
+
+    let current = version(&file.metadata().unwrap());
+    replace(&temp, &file, &current).unwrap_or_else(|_| panic!("not replaced"));
+    assert_eq!(fs::read_to_string(&file).unwrap(), "mine");
+    assert!(!temp.exists());
+}
+
+#[test]
+fn without_a_swap_the_file_is_moved_aside_and_only_ever_linked_over_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("a.md");
+    let temp = dir.path().join(".a.md.tmp");
+    fs::write(&file, "theirs").unwrap();
+    fs::write(&temp, "mine").unwrap();
+    assert!(matches!(
+        replace_aside(&temp, &file, "0:1"),
+        Err(Saved::Conflict(CHANGED))
+    ));
+    assert_eq!(fs::read_to_string(&file).unwrap(), "theirs");
+    // Gone meanwhile: nothing is written.
+    let gone = dir.path().join("gone.md");
+    assert!(matches!(
+        replace_aside(&temp, &gone, "0:1"),
+        Err(Saved::Conflict(CHANGED))
+    ));
+    assert!(!gone.exists());
+
+    let current = version(&file.metadata().unwrap());
+    replace_aside(&temp, &file, &current).unwrap_or_else(|_| panic!("not replaced"));
+    assert_eq!(fs::read_to_string(&file).unwrap(), "mine");
+    // Only the file is left: nothing aside, no temporary one.
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn placing_never_replaces_a_file_and_the_original_comes_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let from = dir.path().join("from");
+    let to = dir.path().join("to");
+    fs::write(&from, "mine").unwrap();
+    fs::write(&to, "theirs").unwrap();
+    let error = place(&from, &to).unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists);
+    assert_eq!(fs::read_to_string(&to).unwrap(), "theirs");
+    assert_eq!(fs::read_to_string(&from).unwrap(), "mine");
+
+    // Put back where nothing is; when a newer one took the place, it stays.
+    let aside = dir.path().join("aside");
+    fs::write(&aside, "original").unwrap();
+    let gone = dir.path().join("gone");
+    put_back(&aside, &gone, false).unwrap();
+    assert_eq!(fs::read_to_string(&gone).unwrap(), "original");
+    assert!(!aside.exists());
+    // The original this save was allowed to replace is dropped...
+    fs::write(&aside, "older").unwrap();
+    put_back(&aside, &to, true).unwrap();
+    assert_eq!(fs::read_to_string(&to).unwrap(), "theirs");
+    assert!(!aside.exists());
+    // ...but a save from elsewhere never is: it is kept, and said where.
+    fs::write(&aside, "another save").unwrap();
+    let error = put_back(&aside, &to, false).unwrap_err();
+    assert!(error.to_string().contains("kept at"), "{error}");
+    assert_eq!(fs::read_to_string(&aside).unwrap(), "another save");
+    assert_eq!(fs::read_to_string(&to).unwrap(), "theirs");
 }

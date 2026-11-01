@@ -64,17 +64,19 @@ objc2-foundation    = { default-features = false, features = ["NSAttributedStrin
 objc2-web-kit       = { default-features = false, features = ["WKWebView", "objc2-app-kit", "std"], version = "0.3" }
 portable-pty        = "0.9"
 rusqlite            = { features = ["bundled"], version = "0.41" }
-rust-embed          = { features = ["include-exclude"], version = "8.7" }
-serde               = { features = ["derive"], version = "1" }
-serde_json          = "1"
-sysinfo             = { default-features = false, features = ["network", "system"], version = "0.39" }
-tempfile            = "3"
-thiserror           = "2"
-toml                = "1"
-tracing             = "0.1"
-tracing-subscriber  = { default-features = false, features = ["ansi", "env-filter", "fmt", "std"], version = "0.3" }
-wasmtime            = "50"
-wasmtime-wasi       = "50"
+# Swapping a saved file into place atomically (moonframe-docs).
+rust-embed         = { features = ["include-exclude"], version = "8.7" }
+rustix             = { default-features = false, features = ["fs", "std"], version = "1.1" }
+serde              = { features = ["derive"], version = "1" }
+serde_json         = "1"
+sysinfo            = { default-features = false, features = ["network", "system"], version = "0.39" }
+tempfile           = "3"
+thiserror          = "2"
+toml               = "1"
+tracing            = "0.1"
+tracing-subscriber = { default-features = false, features = ["ansi", "env-filter", "fmt", "std"], version = "0.3" }
+wasmtime           = "50"
+wasmtime-wasi      = "50"
 # The native web views behind `ui.browser` (WebKit, WebView2): a fork of
 # wry that renders under GPUI.
 wry = { default-features = false, package = "lb-wry", version = "=0.53.3" }

@@ -202,6 +202,7 @@ markdown_editor { id = "readme", path = "README.md" }
 				state.dirty = false
 				state.outside = false
 				state.conflict = false
+				state.error = nil
 			elseif msg.version ~= state.version then
 				-- Unsaved edits over a file that has moved on: the user decides.
 				state.outside = true
@@ -216,6 +217,8 @@ markdown_editor { id = "readme", path = "README.md" }
 				state.note = "Saved"
 			elseif msg.conflict then
 				state.conflict = true
+				-- Why, when it isn't a change on disk (a drive that can't check).
+				state.error = if string.find(msg.error or "", "changed on disk", 1, true) then nil else msg.error
 			else
 				state.error = msg.error
 			end
@@ -264,7 +267,8 @@ markdown_editor { id = "readme", path = "README.md" }
 				"Save",
 				small = true,
 				variant = if state.dirty then "primary" else "ghost",
-				disabled = not state.dirty or state.saving ~= nil or state.text == nil,
+				-- A deleted file is written again even unedited.
+				disabled = (not state.dirty and not state.missing) or state.saving ~= nil or state.text == nil,
 				msg = "save",
 				tooltip = "Save (⌘S while editing)",
 			},
@@ -272,10 +276,12 @@ markdown_editor { id = "readme", path = "README.md" }
 
 		local warning
 		if state.conflict then
+			-- A change on disk, or another reason the provider gave.
 			warning = notice {
 				tone = "warning",
-				title = `{name(state.path)} changed on disk`,
-				text = "It was changed elsewhere since you opened it. Overwrite it with your version, or reload it and lose your edits.",
+				title = if state.error then `Couldn't save {name(state.path)}` else `{name(state.path)} changed on disk`,
+				text = state.error
+					or "It was changed elsewhere since you opened it. Overwrite it with your version, or reload it and lose your edits.",
 				action = { label = "Overwrite", msg = "overwrite", variant = "outline" },
 				ui.row { ui.button { "Reload from disk", small = true, variant = "ghost", msg = "reload" } },
 			}
