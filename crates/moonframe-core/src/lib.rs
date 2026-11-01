@@ -33,6 +33,7 @@ mod keys;
 mod menus;
 mod module;
 mod node;
+pub mod perf;
 mod persist;
 mod read;
 mod roots;

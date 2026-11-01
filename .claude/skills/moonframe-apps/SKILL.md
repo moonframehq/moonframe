@@ -233,7 +233,9 @@ second; round it), and draw long lists a page at a time.
 
 `RUST_LOG=moonframe::perf=debug` logs each message, publish and frame with
 its time and the views it ran; `trace` adds each view's Luau and tree time.
-Frames over 8 ms are logged at `info` always. Measure in a release build
+Anything over 8 ms
+(a frame, message, publish or provider read) is logged at `info` always,
+and over 16 ms at `warn`; fast ones stay at `debug`. Measure in a release build
 (`target/release/moonframe`): debug is several times slower.
 
 ## Examples
