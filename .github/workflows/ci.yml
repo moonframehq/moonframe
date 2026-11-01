@@ -9,10 +9,12 @@ on:
 # Deny by default; every job below declares the scopes it needs.
 permissions: {}
 
-# A newer push cancels a pull request's run, but every main run finishes:
-# a release requires a complete CI run for its exact commit.
+# A newer push cancels a pull request's run, but every commit on main gets
+# a run of its own that finishes: a release requires a complete CI run for
+# its exact commit, and in one shared group a newer push would replace a
+# run still queued.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
