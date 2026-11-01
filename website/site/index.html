@@ -25,7 +25,7 @@
 <!-- /social -->
 <style>
   :root {
-    --paper:#f6eedc; --paper2:#eee2c8; --ink:#2a1a10; --ink2:#4a3426; --dim:#7a6656; --rule:#2a1a1022; --acc:#d9541f;
+    --paper:#f6eedc; --paper2:#eee2c8; --ink:#2a1a10; --ink2:#4a3426; --dim:#7a6656; --rule:#2a1a1022; --acc:#a33a14; --acc-hi:#d9541f;
     --serif:"Iowan Old Style", "Palatino Linotype", Georgia, serif;
     --sans:Inter, system-ui, -apple-system, sans-serif;
     --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -52,7 +52,7 @@
   .hero { padding:72px 0 40px }
   .hero .head { text-align:center }
   h1 { font-size:clamp(52px, 8vw, 96px); line-height:.98; letter-spacing:-.03em; font-weight:500 }
-  h1 i { color:var(--acc) }
+  h1 i { color:var(--acc-hi) }
   .deck { font-size:22px; line-height:1.5; color:var(--ink2); max-width:740px; margin:26px auto 0 }
   .hero .start { display:inline-flex; gap:14px; margin-top:32px; font:14px var(--sans); align-items:center }
   .btn { padding:13px 20px; border-radius:4px; background:var(--ink); color:var(--paper); font-weight:600 }
@@ -110,7 +110,7 @@
   /* Sections */
   section { padding:88px 0; border-top:1px solid var(--rule) }
   h2 { font-size:52px; line-height:1.05; letter-spacing:-.025em; font-weight:500 }
-  h2 i { color:var(--acc) }
+  h2 i { color:var(--acc-hi) }
   .lead { font-size:20px; color:var(--ink2); max-width:660px; margin-top:18px }
 
   .three { display:grid; grid-template-columns:repeat(3, 1fr); margin-top:48px; border-top:2px solid var(--ink) }
@@ -148,7 +148,7 @@
 
   /* Components */
   .comp-head { display:flex; justify-content:space-between; align-items:flex-end; gap:40px }
-  .big-num { font:italic 140px/0.8 var(--serif); color:var(--acc) }
+  .big-num { font:italic 140px/0.8 var(--serif); color:var(--acc-hi) }
   .comp-main { margin-top:44px; border:1px solid var(--ink); box-shadow:0 30px 60px -30px #2a1a1066 }
 
   .comp-strip { display:grid; grid-template-columns:repeat(4, 1fr); gap:22px; margin-top:28px }
