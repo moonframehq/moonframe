@@ -284,6 +284,26 @@ fn a_wasm_provider_with_a_hook_elsewhere_is_not_built() {
                 ("../../helper/build.rs", ""),
             ][..],
         ),
+        // A path with `..` in it is the folder it resolves to: the
+        // workspace above `member`, not the decoy one above the path as
+        // written (`member/decoy`).
+        (
+            "a crate reached through `..` in a parent workspace",
+            "[package]\nname = 'sys'\n[workspace]\n[dependencies]\nmember = { path = '../../member/decoy/..' }\n",
+            &[
+                (
+                    "../../Cargo.toml",
+                    "[workspace]\nmembers = ['member']\n[workspace.dependencies]\nhelper = { path = 'helper' }\n",
+                ),
+                (
+                    "../../member/Cargo.toml",
+                    "[package]\nname = 'member'\n[dependencies]\nhelper = { workspace = true }\n",
+                ),
+                ("../../member/decoy/Cargo.toml", "[workspace]\n"),
+                ("../../helper/Cargo.toml", package),
+                ("../../helper/build.rs", ""),
+            ][..],
+        ),
         (
             "a parent workspace's patch",
             "[package]\nname = 'sys'\nworkspace = '../..'\n",

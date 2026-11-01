@@ -193,6 +193,11 @@ fn read_manifest(dir: &Path) -> Result<toml::Table, String> {
 /// Refuses build scripts in the crate at `dir` and the local crates it
 /// depends on or patches in: they would run with the user's access.
 fn refuse_hooks(dir: &Path, depth: usize) -> Result<(), String> {
+    // Cargo resolves `..` in a path dependency before it looks for the
+    // workspace above it; walking the path as written could look elsewhere.
+    let dir = &dir
+        .canonicalize()
+        .map_err(|error| format!("cannot read {}: {error}", dir.display()))?;
     let hook = |what: &str| {
         Err(format!(
             "a wasm provider cannot have {what}: it would run code with your access while building"
@@ -246,6 +251,9 @@ fn refuse_hooks(dir: &Path, depth: usize) -> Result<(), String> {
     let Some(root) = workspace_root(dir, &manifest) else {
         return Ok(());
     };
+    let root = root
+        .canonicalize()
+        .map_err(|error| format!("cannot read {}: {error}", root.display()))?;
     let parent = read_manifest(&root)?;
     refuse_workspace_crates(&root, &parent, depth)
 }
