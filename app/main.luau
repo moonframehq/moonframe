@@ -150,7 +150,7 @@ return mod {
 			ui.hsplit {
 				ui.pane { size = 240, min = 160, max = 480, fixed = true, visible = state.left, surface = "sidebar", side "left" },
 				ui.pane { middle },
-				ui.pane { size = 280, min = 180, max = 520, fixed = true, visible = state.right, surface = "sidebar", side "right" },
+				ui.pane { size = 320, min = 200, max = 640, fixed = true, visible = state.right, surface = "sidebar", side "right" },
 			},
 			ui.row {
 				-- A fixed height lets the regions hide the mods that do not fit.

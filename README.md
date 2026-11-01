@@ -10,6 +10,7 @@
   <a href="#building-blocks">Building blocks</a> ·
   <a href="#working-with-an-agent">Working with an agent</a> ·
   <a href="#mods-from-git">Mods from git</a> ·
+  <a href="#whole-apps-as-profiles">Apps</a> ·
   <a href="#commands">Commands</a> ·
   <a href="#license">License</a>
 </p>
@@ -23,9 +24,9 @@ build anything, by hand or by asking an agent while the app runs.
 ## Gallery
 
 <p align="center">
-  <img src="docs/screenshots/window.png" alt="The Moonframe window: an icon toolbar; an Explorer panel listing files on the left; a Terminal panel with a shell prompt in the middle; an Inspector panel with the selected file and the loaded mods on the right; and a status bar with usage meters, the git branch, a CPU sparkline, a memory meter and network rates" width="900">
+  <img src="docs/screenshots/window.png" alt="The Moonframe window: a title bar with panel toggles and a terminal tab; an Explorer panel listing the repository's files on the left; a terminal in the middle; a Changes panel with the changed files as a tree and one file's diff on the right; and a status bar with usage meters, the git branch, a CPU sparkline, a memory meter and network rates" width="900">
   <br>
-  <sub><b>The window that ships.</b> Every part of it is a mod in <code>app/mods/</code>: the explorer, the terminal, the inspector, and the status bar widgets, whose CPU, memory and git data come from providers.</sub>
+  <sub><b>The window that ships.</b> Every part of it is a mod in <code>app/mods/</code>: the explorer, the terminal tabs, the changes and their diffs, and the status bar widgets, whose CPU, memory and git data come from providers. <b>+</b> opens more tabs: terminals, browsers, files.</sub>
 </p>
 
 <table>
@@ -42,6 +43,8 @@ build anything, by hand or by asking an agent while the app runs.
     </td>
   </tr>
 </table>
+
+Whole apps run on it too, beside the starter: see [Example apps](#example-apps).
 
 ## What you get
 
@@ -106,7 +109,7 @@ Moonframe is meant to be copied and renamed:
 
 1. **The app.** Replace what's in `app/`: `main.luau` lays out the window,
    `mods/` fills it, `style.luau` styles it. Keep what helps and delete the
-   rest; the explorer and inspector are examples.
+   rest; the explorer, the tabs and the changes are a place to start.
 2. **The name.** The crate names and `repository` in `Cargo.toml`, the
    app id `APP_ID` in `crates/moonframe/src/main.rs`, the user folder's name
    in `crates/moonframe/src/paths.rs`, the bundle's name in
@@ -198,6 +201,111 @@ moonframe mod list | update | remove NAME | enable NAME | disable NAME
 
 Packages ship source only, so everything they run can be read first.
 
+## Whole apps as profiles
+
+The starter stays as it is; a whole other app installs beside it as a
+profile, with its own shell, mods, packages and theme, and runs as an app of
+its own:
+
+```sh
+moonframe app install github.com/owner/some-app   # clones it and what it requires
+moonframe --profile some-app                      # opens it
+moonframe app new ~/code/my-app                   # start one: moonframe.toml, a shell, a mod
+moonframe app link ~/code/my-app                  # run it in place, editing live
+moonframe app list | update NAME | remove NAME
+```
+
+An app is a repository laid out like `app/`, with a `moonframe.toml`:
+
+```toml
+[app]
+name = "my-app"                  # the profile it installs as
+title = "My App"                 # its name in the menu bar and bundle
+icon = "icon.png"                # its icon (default icon.png)
+keep = ["terminal"]              # built-in mods it shows; it brings the rest
+requires = ["owner/repo@v1"]     # packages it installs with it, or "../shared"
+```
+
+The built-in providers, components and styles are there for it to use; the
+built-in mods are not, unless it keeps them. Profiles live in
+`~/.config/moonframe/profiles/`, and your own `style.luau` follows you
+into each.
+
+`just bundle-app NAME` builds a profile's app as a standalone release:
+`target/bundle/<Title>.app` on macOS, or a prefix with a `.desktop` file
+on Linux, with the app's title, id and icon. A release leaves out the
+Components menu, Inspect Element and Reload; `--release` runs any window
+that way, and `--dev` brings the tools back in a bundle. Outside a release,
+**Build App Bundle** in the app menu builds the window's own app the same
+way and shows it in Finder.
+
+An app's `main.luau` can also add `menus` to the menu bar, with
+shortcuts, and say what its About panel shows (`about = { version,
+description, website, copyright }`); the menu bar carries the app's title.
+
+### Example apps
+
+`examples/` holds apps built this way, each with its own name, icon, menus
+and About panel. The dashboards run on sample data from a provider.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/sessions.png" alt="Sessions: a list of projects with their branch and changes on the left, a shell in the open project in the middle, and its uncommitted files on the right">
+      <br>
+      <sub><b>sessions</b>: coding sessions across your repositories, each with a shell, its branch, and its changes by commit, uncommitted or branch.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/workbench.png" alt="Workbench in a dark theme: a terminal with tabs on the left, an editor in the middle, and the project's files on the right">
+      <br>
+      <sub><b>workbench</b>: a terminal, an editor and the project's files, in tabs and splits.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/daybook.png" alt="Daybook: a sidebar of views, favorites and folders; today's tasks and events under a week strip; and an inbox of tasks by section">
+      <br>
+      <sub><b>daybook</b>: a planner with today's tasks and events, an inbox, a month, notes, and three looks.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/ledger.png" alt="Ledger: a fund overview with a 13-week cash forecast against a floor, items waiting with date tiles, a raise as a stacked bar, and a table of funds with curves">
+      <br>
+      <sub><b>ledger</b>: a fund overview: cash against a floor, what is waiting on you, a raise, and funds with their curves.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/audience.png" alt="Audience: a newsletter dashboard with KPI cells, a dot chart of daily signups, acquisition sources with bars, and locations, devices and engagement tiers">
+      <br>
+      <sub><b>audience</b>: a newsletter's audience: KPIs, signups per day, where readers come from, and how engaged they are.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/pipeline.png" alt="Pipeline: a sales kanban with KPIs above five columns of deal cards, and an agent chat panel on the right">
+      <br>
+      <sub><b>pipeline</b>: a sales kanban with KPIs, deal cards, a list view, and a scripted agent panel labelled demo.</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/apps/stage.png" alt="Stage: a bento board of components: a forecast chart, KPI cells, a month grid, a dot chart, share bars, a day strip with tasks, a progress stack and date tiles" width="900">
+  <br>
+  <sub><b>stage</b>: the components on a bento board, with sample data, for stills. View hides the captions and changes the backdrop.</sub>
+</p>
+
+sessions, workbench and stage require the `projects` package beside them.
+`moonframe app link` runs an app in place, so its files reload as you edit
+them:
+
+```sh
+cargo build --release -p moonframe
+for app in sessions workbench daybook ledger audience pipeline stage; do
+  target/release/moonframe app link examples/$app --yes
+done
+target/release/moonframe --profile ledger &
+target/release/moonframe --profile pipeline &
+```
+
 ## Commands
 
 | Command | Does |
@@ -207,13 +315,22 @@ Packages ship source only, so everything they run can be read first.
 | `just types` | type-checks the Luau in strict mode |
 | `just providers` | builds and lints the Wasm providers |
 | `just bundle` | builds `target/bundle/Moonframe.app` |
+| `just bundle-app NAME` | builds the profile NAME's app as a standalone release |
+| `just check-examples` | loads and type-checks the apps in `examples/` |
 | `just install` | builds the app and installs it in `/Applications` |
 | `just ci` | formatting, lints, tests, types, providers and check |
 | `just audit` | zizmor and actionlint on the workflows, cargo-deny on the dependencies |
 | `just release` | publishes `main` as the version in `Cargo.toml` |
 
 `moonframe --help` lists the app's own options, such as `--user DIR`,
-`--no-user`, `--check`, and `--background` (open without taking focus).
+`--no-user`, `--profile NAME`, `--check`, `--release`, and `--background`
+(open without taking focus).
+
+To see where time goes, run with `RUST_LOG=moonframe::perf=debug`: each
+message, provider publish and frame is logged with how long it took and
+which views it ran (`trace` adds each view's Luau and tree time). A message
+runs only the views of the mods it reached, and a publish only those that
+read that provider's data.
 
 ## License
 

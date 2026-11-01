@@ -25,6 +25,7 @@ use {
         fs,
         path::{Path, PathBuf},
         rc::Rc,
+        time::Instant,
     },
 };
 
@@ -72,6 +73,11 @@ pub struct Workspace {
     versions: Versions,
     /// Counts stylesheet loads: every view draws again after one.
     style_generation: u64,
+    /// Counts the views run, so a caller can tell whether any was.
+    views_run: usize,
+    /// Whether the component demos are drawn (the Components window is
+    /// open); otherwise they are not run.
+    demos_shown: bool,
 }
 
 /// A count for each key of `app`, raised when its value changes, and one
@@ -332,17 +338,24 @@ impl Slot {
         }
     }
 
-    /// Runs its view, unless nothing it was drawn from has changed.
-    fn render(&mut self, app: &Rc<AppData>, versions: &Versions, sheet: &Stylesheet, style: u64) {
+    /// Runs its view, unless nothing it was drawn from has changed;
+    /// whether it ran.
+    fn render(
+        &mut self,
+        app: &Rc<AppData>,
+        versions: &Versions,
+        sheet: &Stylesheet,
+        style: u64,
+    ) -> bool {
         let Some(module) = &self.module else {
-            return;
+            return false;
         };
         let current = self
             .drawn
             .as_ref()
             .is_some_and(|drawn| drawn.style_generation == style && versions.current(&drawn.stamp));
         if current && !self.dirty {
-            return;
+            return false;
         }
         self.dirty = false;
         match module
@@ -365,6 +378,7 @@ impl Slot {
                 self.drawn = None;
             },
         }
+        true
     }
 }
 
@@ -405,6 +419,10 @@ impl Workspace {
             app: Rc::new(AppData::new()),
             versions: Versions::default(),
             style_generation: 0,
+            views_run: 0,
+            // Headless checks see every demo; a window turns them off
+            // until its Components window opens.
+            demos_shown: true,
         };
         workspace.shell.restored = workspace.restore(SHELL);
         workspace.reload();
@@ -583,8 +601,11 @@ impl Workspace {
         &self.stylesheet
     }
 
-    /// Shares `value` with every view as `app.<key>`, and draws them again.
-    pub fn set_host(&mut self, key: &str, value: Data) {
+    /// Shares `value` with every view as `app.<key>`, and draws again the
+    /// views that read it or heard it; how many, so a window can skip a
+    /// frame when none did.
+    pub fn set_host(&mut self, key: &str, value: Data) -> usize {
+        let (started, before) = (Instant::now(), self.views_run);
         // Pushed to whoever subscribes to `provider/<key>`, then drawn.
         let topic = format!("{PROVIDER_TOPIC}{key}");
         let deliveries = self.deliveries(&topic, &value);
@@ -592,6 +613,13 @@ impl Workspace {
         self.host_problems.remove(key);
         self.process(deliveries.into());
         self.settle();
+        let drawn = self.views_run - before;
+        tracing::info!(
+            target: "moonframe::perf",
+            "provider {key}: published, {drawn} views ran in {:.1?}",
+            started.elapsed()
+        );
+        drawn
     }
 
     /// Stops sharing `app.<key>`, with the reason when there is one.
@@ -620,6 +648,21 @@ impl Workspace {
     pub fn set_dark(&mut self, dark: bool) {
         self.dark = dark;
         self.render();
+    }
+
+    /// The menus the shell adds to the menu bar.
+    pub fn menus(&self) -> &[crate::AppMenu] {
+        self.shell.module.as_ref().map_or(&[], Module::menus)
+    }
+
+    /// What the About panel shows, as the shell says.
+    pub fn about(&self) -> crate::About {
+        self.shell
+            .module
+            .as_ref()
+            .and_then(Module::about)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// What the shell asks of the window; the system title bar when it
@@ -823,8 +866,26 @@ impl Workspace {
     /// Delivers `msg` to the module `to`, then whatever it sends on, and
     /// draws every module again.
     pub fn send(&mut self, from: &str, to: &str, msg: Data) {
+        let (started, before) = (Instant::now(), self.views_run);
         self.process(VecDeque::from([(from.to_owned(), to.to_owned(), msg)]));
+        let updated = started.elapsed();
         self.settle();
+        tracing::info!(
+            target: "moonframe::perf",
+            "message to {to}: updated in {updated:.1?}, {} views ran in {:.1?}",
+            self.views_run - before,
+            started.elapsed() - updated,
+        );
+    }
+
+    /// Runs the component demos only while the Components window shows them.
+    pub fn show_demos(&mut self, shown: bool) {
+        if shown != self.demos_shown {
+            self.demos_shown = shown;
+            if shown {
+                self.render();
+            }
+        }
     }
 
     /// Delivers each message in `queue`, and what the modules send on.
@@ -1096,11 +1157,15 @@ impl Workspace {
         }
         let app = self.app.clone();
         let style = self.style_generation;
-        self.shell
-            .render(&app, &self.versions, &self.stylesheet, style);
-        for slot in self.mods.values_mut().chain(self.demos.values_mut()) {
-            slot.render(&app, &self.versions, &self.stylesheet, style);
+        let mut ran = usize::from(
+            self.shell
+                .render(&app, &self.versions, &self.stylesheet, style),
+        );
+        let demos = self.demos.values_mut().filter(|_| self.demos_shown);
+        for slot in self.mods.values_mut().chain(demos) {
+            ran += usize::from(slot.render(&app, &self.versions, &self.stylesheet, style));
         }
+        self.views_run += ran;
         self.render_instances(&app);
     }
 
@@ -1224,9 +1289,12 @@ impl Workspace {
                 continue;
             };
             mounted.slot.set_props(&instance.props);
-            mounted
+            if mounted
                 .slot
-                .render(app, &self.versions, &self.stylesheet, self.style_generation);
+                .render(app, &self.versions, &self.stylesheet, self.style_generation)
+            {
+                self.views_run += 1;
+            }
             collect(&key, mounted.slot.view(), &mut queue);
         }
         // Instances in hidden `lazy` panes sleep: kept as they are if they

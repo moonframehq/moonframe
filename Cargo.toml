@@ -50,7 +50,7 @@ moonframe-terminal  = { default-features = false, path = "crates/moonframe-termi
 notify              = "8"
 objc2               = "0.6"
 objc2-app-kit       = { default-features = false, features = ["NSApplication", "NSImage", "NSResponder", "std"], version = "0.3" }
-objc2-foundation    = { default-features = false, features = ["NSData", "std"], version = "0.3" }
+objc2-foundation    = { default-features = false, features = ["NSAttributedString", "NSBundle", "NSData", "NSDictionary", "NSProcessInfo", "NSString", "std"], version = "0.3" }
 objc2-web-kit       = { default-features = false, features = ["WKWebView", "objc2-app-kit", "std"], version = "0.3" }
 portable-pty        = "0.9"
 rusqlite            = { features = ["bundled"], version = "0.41" }

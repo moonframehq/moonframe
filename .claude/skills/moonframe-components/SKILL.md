@@ -136,6 +136,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`accordion`](#accordion) | Containers | A stack of foldable sections of the same kind: a merge request's checks, files and activity, or groups of settings. The mod decides whether opening one closes the others. For one foldable block use `collapsible`; for sidebar groups use `sidebar-section`; for switching between views use `tabs`. |
 | [`card`](#card) | Containers | A titled box around related content inside a panel or page; for a whole sidebar section use `ui.panel`, for a plain heading use `section`. |
 | [`collapsible`](#collapsible) | Containers | One foldable block of content, such as "No agent yet" or advanced options. For several of them stacked use `accordion`; for a titled sidebar group with a count and actions use `sidebar-section`; for a plain heading use `section`. |
+| [`dashboard-card`](#dashboard-card) | Containers | Each block of a dashboard or overview (a chart, a list of things waiting, a table). For a titled box inside a page use `card`; for a sidebar panel use `ui.panel`; for a tiled pane with controls use `pane-frame`. |
 | [`section`](#section) | Containers | A small muted heading over a group of content inside a panel or settings page. |
 | [`browser`](#browser) | Content | A web page in a pane, with browser chrome. Keep the page's `navigate` messages in state and pass the latest as `page`; the address bar navigates on its own. For a bare page without a bar use `ui.browser`. |
 | [`button-group`](#button-group) | Controls | Related actions or view modes side by side in a header: Unified \| Split, Uncommitted \| Branch, zoom − \| +. For a settings choice in a track use `segmented`; for separate quiet buttons use `toolbar`; for back/forward use `nav-buttons`. |
@@ -146,16 +147,31 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`segmented`](#segmented) | Controls | A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`. |
 | [`toolbar`](#toolbar) | Controls | A row of small quiet buttons above a panel or list. For icon-only buttons use `icon-button`; for one-of-many choices use `segmented`. |
 | [`avatar`](#avatar) | Data | Stand for a person, space, project or agent by its name: comment authors, workspace switchers, people lists. Use `comment-card` for an authored message (it draws one), `status-dot` for a state alone. |
+| [`avatar-stack`](#avatar-stack) | Data | Who is in a group, in a card or a row (38 investors, 3 reviewers), when their names matter less than how many. For one person use `avatar`; for a list of people use `list` or `table`. |
 | [`bar-chart`](#bar-chart) | Data | Counts over time or per category: tokens per day, runs per hour, alerts per device, stacked by kind. For a tiny live trend in a status bar use `sparkline`; for one fraction use `meter`; for one headline number use `stat-tile`. |
+| [`chat-message`](#chat-message) | Data | Each turn of a conversation with an agent or a person, stacked in a scrolling column over a `composer`. For a comment on a pull request use `comment-card`; for a notification use `toast`. |
 | [`code-view`](#code-view) | Data | Show code or a log read-only: a file at a line, a snippet in a comment, a test's output. For changes use `diff-view`; for a live shell use `terminal`. |
 | [`comment-card`](#comment-card) | Data | Comments in a pull request conversation, review threads, notes left by agents or people. Stack them in a column. For a numbered review note with a remove button use `note-card`; for events in order use `timeline`. |
 | [`count-bubble`](#count-bubble) | Data | An unread or pending count on a sidebar icon, a tab or a menu entry; pass `float = { top = -4, right = -4 }` to put it on the corner of its parent. For a status use `status-dot`; for a text label use `ui.badge`; for added/removed lines use `diff-counts`. |
+| [`country-code`](#country-code) | Data | Beside a country's name in lists of locations or settings, in place of a flag (no flag images ship). For any short label use `ui.badge` or `pill`. |
+| [`date-tile`](#date-tile) | Data | Beside dated items in a list (deadlines, calls, distributions, events) where the date leads. For a date inside a line of text use plain text; for picking a day use `day-strip` or `month-grid`. |
+| [`dot-chart`](#dot-chart) | Data | A daily or weekly count compared with the period before (signups, orders), where the squares' rhythm reads better than smooth bars. For stacked counts by kind use `bar-chart`; for a balance against a floor use `forecast-chart`; for a trend line use `ui.line`. |
+| [`file-icon`](#file-icon) | Data | Beside a file name in a tree, a tab or a list of changes. For a generic icon use `ui.icon`. |
+| [`forecast-chart`](#forecast-chart) | Data | A balance or capacity projected over weeks or months against a minimum (cash against a floor, stock against a reorder point). For counts per bucket, stacked by kind, use `bar-chart`; for a small trend use `sparkline` or `ui.line`. |
 | [`kbd`](#kbd) | Data | Show a keyboard shortcut: in a menu row, a palette result, a tooltip line or a help sheet. Inside menus `menu` already draws one from an item's `shortcut`; for a word-like tag use `ui.badge`. |
 | [`key-values`](#key-values) | Data | Read-only properties or details: aligned label/value lines. For editable settings use `settings-row`. |
+| [`kpi-cell`](#kpi-cell) | Data | A row of three to five headline figures across the top of a dashboard (readers, signups, churn), set side by side in a bordered strip. For a figure inside a card's text use `metric`; for a standalone tile with a sparkline use `stat-tile`. |
 | [`meter`](#meter) | Data | A fraction (0 to 1) as a bar with its percentage: memory, quota, progress of a known size. For work with no known size use `progress` with `busy`. |
+| [`metric`](#metric) | Data | Headline figures across the top of a dashboard card: cash today, the lowest week, a total. For a figure in its own tile with a trend use `stat-tile`; for a status bar reading use `stat`; for a fraction use `meter`. |
+| [`mini-bars`](#mini-bars) | Data | A figure over a few periods in a KPI strip or a card header (revenue by month, signups by week). For a live trend in a status bar use `sparkline`; for a full chart with an axis use `bar-chart` or `forecast-chart`. |
 | [`note-card`](#note-card) | Data | Notes a person leaves on lines while reviewing, to send to an agent; list them in a column beside a `diff-view`. For an authored comment use `comment-card`. |
+| [`numbered-list`](#numbered-list) | Data | Ordered steps or suggestions in a message, a note or a help page. For a checklist use `task-row`; for events in time use `timeline`. |
+| [`pill`](#pill) | Data | A tag on a row ("Work", "Health") or a count inside a sentence ("2 events"), where colour carries meaning. For several read-only labels use `tags`; for filters the user toggles use `chips`; for a plain status word use `ui.badge`. |
 | [`progress`](#progress) | Data | Progress of a task: a download, an index, a build step. Use `busy = true` when the size is unknown. For a reading such as memory use `meter`; for a quota with a reset use `usage-bar`; for a spinner alone use `ui.icon { name = "loader-circle", spin = true }`. |
+| [`progress-stack`](#progress-stack) | Data | How far a goal is (a raise, a budget, a quota) split by stage: closed, out, soft, still needed, with where the pace leads. For one fraction use `meter`; for a quota with a reset use `usage-bar`; for task progress use `progress`. |
+| [`record-card`](#record-card) | Data | A record an agent or a person points at inside a message or a note, which a click opens. For a full row in a list use `list` or `pr-row`; for a dated item use `date-tile` beside text. |
 | [`relative-time`](#relative-time) | Data | An age or last-updated time in rows, cards and headers. Pass elapsed `seconds`: the mod computes them from a provider's timestamp and the current time. Use `compact` in tight columns (PR lists, tables). For a dated list of events use `timeline`. |
+| [`share-bar`](#share-bar) | Data | How a whole splits into a few parts, above a list of those parts (devices, engagement tiers, plans). For progress toward a target with stages use `progress-stack`; for one fraction use `meter`. |
 | [`sparkline`](#sparkline) | Data | Recent samples as tiny bars, like CPU over the last minute, in a status bar or header. |
 | [`stat-tile`](#stat-tile) | Data | A headline number on a dashboard or overview: open PRs, tokens today, uptime, failing checks; put several in a wrapping row. For a status bar reading use `stat`; for a fraction use `meter`; for a quota use `usage-bar`; for a series use `bar-chart`. |
 | [`table`](#table) | Data | Tabular data with several aligned fields per row: devices, processes, files, runs. For one field per row use `list`; for pull requests use `pr-row`; for label/value pairs use `key-values`. |
@@ -170,18 +186,22 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`notice`](#notice) | Feedback | A message that belongs in the page and stays until handled: a config error, an announcement, a permission problem. For transient notifications use `toast`/`toasts`; for a failed load with Retry use `error-state`; for an empty list use `empty-state`. |
 | [`reconnecting`](#reconnecting) | Feedback | A whole window or pane depends on a connection that dropped (the daemon, an SSH host, a cloud machine) and must wait for it. For a failed load inside one pane use `error-state`; for a brief note that something reconnected use `toast`; for plain loading use `loading`. |
 | [`release-notes`](#release-notes) | Feedback | A What's new page, an update panel or a changelog list (one per release, older ones `collapsed`). For the update offer itself use `update-pill`; for a first-run tour use `onboarding`; for a dated activity feed use `timeline`. |
+| [`thinking`](#thinking) | Feedback | Inside an agent's `chat-message`, before its answer. For a spinner while it is still thinking use `loading`; for a general fold use `collapsible`. |
 | [`toast`](#toast) | Feedback | A single transient notification, usually inside `toasts`, which stacks them in a window corner. For a message that stays in the page use `notice`; for a blocking question use `confirm`; for an app update use `update-pill`. |
 | [`toasts`](#toasts) | Feedback | The app's notifications: keep a list in the mod's state, push to it, remove on `dismiss` (or after a timer). For one card inline use `toast`; for a persistent callout in a page use `notice`; for an update offer use `update-pill`. |
 | [`update-pill`](#update-pill) | Feedback | Tell the user an update is downloaded and ready to install, without interrupting. For the changelog itself use `release-notes`; for other notifications use `toast`/`toasts`; for a lasting in-page message use `notice`. |
 | [`checkbox`](#checkbox) | Forms | An option that is on or off among others in a form or list, or a "select all" (indeterminate when some are). For a setting that applies at once use `switch`; for one of many use `radio-group`; for filter toggles use `chips`. |
 | [`choice-cards`](#choice-cards) | Forms | Pick one of several options that are best seen: a theme, a layout, a template, an agent. For short text options use `segmented` or `radio-group`; for a colour use `swatches`; for a menu use `dropdown`. |
+| [`composer`](#composer) | Forms | The bottom of a chat with an agent or a person. For a search box use `search-field`; for a longer form field use `ui.input` with `multiline`. |
 | [`radio-group`](#radio-group) | Forms | Pick one of a few options that need a description or room to read (a mode, a policy). For 2 to 4 short values use `segmented`; for many values use `dropdown`; for options with a picture use `choice-cards`; for independent on/off options use `checkbox`. |
 | [`search-field`](#search-field) | Forms | A query box over a list or palette: filter files, branches or commands as the user types, with up and down to move through results. For a longer value use `ui.input` (multiline for a text area); for one-of-many choices use `segmented` or `dropdown`. |
 | [`settings-row`](#settings-row) | Forms | Each line of a settings page or preferences card, holding a `switch`, `segmented`, `dropdown` or button. Group rows under `settings-page` sections; for read-only properties use `key-values`; for a labelled switch on its own use `switch` with `label`. |
 | [`stepper`](#stepper) | Forms | A small number nudged up or down: a font size, a column count, a delay. For a fraction shown as a bar use `meter`; for one of a few named sizes use `segmented`. |
 | [`swatches`](#swatches) | Forms | Pick a colour from a short palette: a workspace or tag colour, an accent. For themes (many colours each) use `choice-cards` with a swatch row as the preview; to show colours without picking, use `ui.row`s with a background. |
 | [`switch`](#switch) | Forms | A setting that takes effect at once, on or off ("High contrast"). For a choice that is confirmed later or part of a list of options use `checkbox`; for one of several values use `segmented` or `radio-group`. |
+| [`task-check`](#task-check) | Forms | The check at the start of a task or to-do row; a click sends `msg` for the mod to flip it. For a form option use `checkbox`; for an agent's state use `status-dot`. |
 | [`ahead-behind`](#ahead-behind) | Git | A branch's sync state beside its name: sidebars, title bars, branch lists. For lines changed use `diff-counts`. |
+| [`change-tree`](#change-tree) | Git | The changed files of a repository or a review, as the right pane's Changes shows `app.git.files`. For every file in a folder use `tree`; for a file's lines use `diff-view`. |
 | [`checks`](#checks) | Git | CI runs or readiness factors for a pull request or branch: a PR detail pane, a merge dialog. For a single summary dot use `pr-badge` or `pr-row` with `checks`; for an agent's state use `status-dot`. |
 | [`diff-counts`](#diff-counts) | Git | The size of a change beside a file, commit, branch or PR: file lists, rows, title bars. For commits ahead and behind use `ahead-behind`; for a whole diff use `diff-view`. |
 | [`diff-view`](#diff-view) | Git | Show a file's changes for review: a review pane, a checkpoint, a commit. Stack one per file in a scrolling column. For only the size of a change use `diff-counts`; for a file without changes use `code-view`. |
@@ -191,11 +211,17 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`pane-frame`](#pane-frame) | Layout | Framing each pane of a tiled workspace (a terminal, an agent, a log) with its own header and controls. The panes' sizes come from `ui.hsplit`/`ui.vsplit` (see `split-view`); this only draws the frame inside one. For a titled box of content use `card`; for a sidebar panel use `ui.panel`. |
 | [`settings-page`](#settings-page) | Layout | A whole preferences window or settings tab. It is made of `settings-nav` (the page list) and `settings-row` (each setting); use those directly for a different arrangement, `section` for a plain heading, `card` to box a group. |
 | [`split-view`](#split-view) | Layout | The body of a shell or a large mod: a sidebar, the main content and optional inspector and bottom panes the user can resize and toggle. It is plain `ui.hsplit`/`ui.vsplit` with `ui.pane` children; write those directly for any other arrangement. For framing each pane use `pane-frame`; for a scrolling page inside the main area use `page`. |
+| [`board-card`](#board-card) | Lists | Items in a `kanban-column`: deals, tickets, tasks, candidates. For a row in a list use `task-row` or `list`; for a pull request use `pr-row`. |
 | [`group-header`](#group-header) | Lists | A heading inside a list that groups its rows by state or owner ("Needs you 3", "Waiting 3", a machine with its online dot). For a sidebar's own sections use `sidebar-section`; for a heading over arbitrary content use `section`; for nested rows use `tree`. |
+| [`kanban-column`](#kanban-column) | Lists | Each stage of a kanban board (deals, tickets, tasks by status); put several in a row that scrolls sideways and fill them with `board-card`. For a list grouped by status without columns use `group-header` over rows. |
 | [`list`](#list) | Lists | A plain selectable list of rows with label, detail and badge. For rich rows (status, icons, two lines) use `agent-row`, `workspace-row` or `tree`. |
+| [`ratio-row`](#ratio-row) | Lists | Lists of parts of a whole: where signups came from, top countries, devices, tiers. Stack them in a column; give `share` for the bar under each. For a bar of all the parts at once use `share-bar`; for a data grid use `table`. |
+| [`task-row`](#task-row) | Lists | Rows of tasks, to-dos, habits or events in a planner, an inbox or a day view; stack them in a column under `section` headings. For a plain selectable row use `list`; for pull requests use `pr-row`. |
 | [`tree`](#tree) | Lists | Nested rows: a file tree in a review, worktrees under a repository, agents and their sub-agents. For flat rows use `list`; for a heading over a group of rows use `group-header`; for one foldable block use `collapsible`. |
 | [`activity-bar`](#activity-bar) | Navigation | Switching between the app's main views from a thin strip at the window's edge (terminals, pull requests, issues, agents, settings). For a collapsed list of workspaces use `rail`; for text tabs use `tabs`; for a full list of rows use `sidebar`. |
 | [`breadcrumbs`](#breadcrumbs) | Navigation | Where a detail view sits in a hierarchy (repository › Pull requests › !2), with a way back up and to step through siblings. For a window's top row use `title-bar`; for switching views use `tabs`; for a pane's own header use `pane-frame`. |
+| [`day-strip`](#day-strip) | Navigation | Picking a day in a planner, an agenda or a log, over the list for that day. For a whole month use a calendar grid; for steps of a flow use `pager`; for a few named views use `segmented`. |
+| [`month-grid`](#month-grid) | Navigation | A calendar view or a date picker's body: choosing a day in a month. For a strip of days over a list use `day-strip`; for events in order use `timeline`. |
 | [`nav-buttons`](#nav-buttons) | Navigation | History navigation in a title bar, a browser tab or a pane that keeps a back stack. For onboarding steps use `pager`; for a single icon action use `icon-button`. |
 | [`pager`](#pager) | Navigation | Steps of an onboarding or welcome flow, or pages of a carousel. For history back/forward use `nav-buttons`; for switching views use `tabs` or `segmented`. |
 | [`rail`](#rail) | Navigation | The sidebar folded to a narrow strip, one tile per workspace or agent with its status. For switching the app's views use `activity-bar`; for the full width version use `sidebar`. |
@@ -306,6 +332,35 @@ collapsible { title = "No agent yet", summary = "dispatch one", open = state.age
 ```
 
 A whole mod using it, with state: `app/components/demos/collapsible.luau`.
+
+#### `dashboard-card`
+
+**Dashboard Card.** A section of a dashboard: a tinted frame with an uppercase heading, meta and a ⋮ menu, around a white card of content.
+
+**When:** Each block of a dashboard or overview (a chart, a list of things waiting, a table). For a titled box inside a page use `card`; for a sidebar panel use `ui.panel`; for a tiled pane with controls use `pane-frame`.
+
+| Prop | Meaning |
+| --- | --- |
+| `[children]` | the content |
+| `footer` | elements under the card, on the frame |
+| `grow` | fill the parent's free space |
+| `icon` | icon before the heading |
+| `menu` | message the ⋮ button sends; no button without it |
+| `meta` | text or elements on the heading's right (a legend, a count, "Closes Dec 31") |
+| `padding` | false: the content touches the card's edges (a table) |
+| `title` | the heading, shown in capitals |
+| `to` | mod to send `menu` to, if not the drawing one |
+
+**Styles:** `.dashboard-card` `.dashboard-card-body` `.dashboard-card-flush` `.dashboard-card-foot` `.dashboard-card-head` `.dashboard-card-meta` `.dashboard-card-title`
+
+```lua
+local dashboard_card = use "dashboard-card"
+
+dashboard_card {
+	title = "Waiting on you", icon = "inbox", meta = ui.badge "4", menu = "waiting-menu",
+	ui.text "…the content…",
+}
+```
 
 #### `section`
 
@@ -586,6 +641,27 @@ avatar { name = "harbor-docs", size = "xlarge", status = "working" }
 
 A whole mod using it, with state: `app/components/demos/avatar.luau`.
 
+#### `avatar-stack`
+
+**Avatar Stack.** Up to a few overlapping round avatars, then the group's size.
+
+**When:** Who is in a group, in a card or a row (38 investors, 3 reviewers), when their names matter less than how many. For one person use `avatar`; for a list of people use `list` or `table`.
+
+| Prop | Meaning |
+| --- | --- |
+| `count` | the group's size, shown after them (default the number of people) |
+| `most` | the most avatars drawn (default 3) |
+| `people` | list of { name, src? }: the avatars drawn |
+| `size` | avatar size: small (default) or normal |
+
+**Styles:** `.avatar-stack` `.avatar-stack-count` `.avatar-stack-face` `.avatar-stack-faces`
+
+```lua
+local avatar_stack = use "avatar-stack"
+
+avatar_stack { count = 38, people = { { name = "Cole Bennett" }, { name = "Imani Bennett" }, { name = "Ray Ortiz" }, { name = "Mia Chen" } } }
+```
+
 #### `bar-chart`
 
 **Bar Chart.** Vertical bars per bucket, stacked by series with toned colours, axis labels, an optional scale, and a legend.
@@ -623,6 +699,33 @@ bar_chart {
 ```
 
 A whole mod using it, with state: `app/components/demos/bar-chart.luau`.
+
+#### `chat-message`
+
+**Chat Message.** A chat message: the user's as a bubble on the right, the assistant's as text under an icon and a name, with anything else inside.
+
+**When:** Each turn of a conversation with an agent or a person, stacked in a scrolling column over a `composer`. For a comment on a pull request use `comment-card`; for a notification use `toast`.
+
+| Prop | Meaning |
+| --- | --- |
+| `[children]` | more after the text: a `thinking` fold, cards, lists |
+| `author` | the assistant's name in its header; no header without it |
+| `from` | "user" (a bubble on the right) or "assistant" (default) |
+| `icon` | the icon in the header's chip (default sparkles) |
+| `text` | the message's text; paragraphs split on blank lines |
+
+**Styles:** `.chat-message` `.chat-message-author` `.chat-message-bubble` `.chat-message-chip` `.chat-message-head`
+
+```lua
+local chat_message = use "chat-message"
+local thinking = use "thinking"
+
+chat_message { from = "user", text = "Which deal should I look at first?" }
+chat_message {
+	author = "Sales agent", text = "Start with Lumen Retail: the biggest deal at risk.",
+	thinking { seconds = 4, open = state.thought, msg = "toggle-thought" },
+}
+```
 
 #### `code-view`
 
@@ -712,6 +815,113 @@ count_bubble { count = 128, tone = "danger" }
 
 A whole mod using it, with state: `app/components/demos/count-bubble.luau`.
 
+#### `country-code`
+
+**Country Code.** A country's ISO code ("CA") in a small bordered mono chip.
+
+**When:** Beside a country's name in lists of locations or settings, in place of a flag (no flag images ship). For any short label use `ui.badge` or `pill`.
+
+| Prop | Meaning |
+| --- | --- |
+| `code` | the two-letter code |
+
+**Styles:** `.country-code` `.country-code-text`
+
+```lua
+local country_code = use "country-code"
+
+country_code { code = "CA" }
+```
+
+#### `date-tile`
+
+**Date Tile.** A small calendar leaf: the month on a coloured band over the day's number.
+
+**When:** Beside dated items in a list (deadlines, calls, distributions, events) where the date leads. For a date inside a line of text use plain text; for picking a day use `day-strip` or `month-grid`.
+
+| Prop | Meaning |
+| --- | --- |
+| `day` | the day's number |
+| `month` | the month, short ("Nov"); shown in capitals |
+| `size` | "normal" (default, 48 px) or "small" (38 px) |
+| `tone` | the band: neutral (default, dark), danger or accent |
+
+**Styles:** `.date-tile` `.date-tile-accent` `.date-tile-band` `.date-tile-danger` `.date-tile-day` `.date-tile-month`
+
+```lua
+local date_tile = use "date-tile"
+
+date_tile { day = "9", month = "Nov", tone = "danger" }
+```
+
+#### `dot-chart`
+
+**Dot Chart.** Columns of rounded squares, one per bucket: filled for this period, pale up to the previous period's value; with an axis and labels.
+
+**When:** A daily or weekly count compared with the period before (signups, orders), where the squares' rhythm reads better than smooth bars. For stacked counts by kind use `bar-chart`; for a balance against a floor use `forecast-chart`; for a trend line use `ui.line`.
+
+| Prop | Meaning |
+| --- | --- |
+| `color` | this period's colour (default accent) |
+| `columns` | list of { current, previous?, tooltip? }, left to right |
+| `labels` | labels under the chart, spread evenly from the first column to the last |
+| `max` | the value at the top |
+| `rows` | squares in a full column (default 8): each is max / rows |
+| `shade` | the previous period's colour (default muted-foreground at 12%) |
+| `size` | a square's side in pixels (default 13) |
+| `ticks` | axis labels from the top (max) down to 0, evenly spaced |
+
+**Styles:** `.dot-chart` `.dot-chart-column` `.dot-chart-dot` `.dot-chart-label` `.dot-chart-tick`
+
+```lua
+local dot_chart = use "dot-chart"
+
+dot_chart { columns = { { current = 48, previous = 60 }, { current = 70, previous = 61 }, { current = 55, previous = 66 }, { current = 90, previous = 85 }, { current = 82, previous = 74 }, { current = 104, previous = 118 } }, labels = { "Oct 2", "Oct 5", "Oct 8" }, max = 120, rows = 8, ticks = { "120", "60", "0" } }
+```
+
+#### `file-icon`
+
+**File Icon.** A file's or folder's icon, coloured by its type, as an editor's file tree shows it.
+
+**When:** Beside a file name in a tree, a tab or a list of changes. For a generic icon use `ui.icon`.
+
+| Prop | Meaning |
+| --- | --- |
+| `dir` | a folder |
+| `name` | the file's name, which picks the icon and colour |
+| `open` | an open folder |
+
+```lua
+local file_icon = use "file-icon"
+
+file_icon { name = "app.go" }
+```
+
+#### `forecast-chart`
+
+**Forecast Chart.** Bars over periods with each change above them, a dashed floor with the held part hatched, the low period flagged, and a value axis.
+
+**When:** A balance or capacity projected over weeks or months against a minimum (cash against a floor, stock against a reorder point). For counts per bucket, stacked by kind, use `bar-chart`; for a small trend use `sparkline` or `ui.line`.
+
+| Prop | Meaning |
+| --- | --- |
+| `bar` | each bar's width in pixels (default 28) |
+| `bars` | list of { label, value, delta? ("+9.2"), note? (text over the bar instead), current? (drawn dark), low? (flagged), tooltip? } |
+| `event` | key of the message a bar sends: { [event] = index }; none without it |
+| `floor` | a value drawn across, dashed; the part of each bar under it is hatched |
+| `height` | the plot's height in pixels (default 260) |
+| `max` | the value at the top of the plot |
+| `ticks` | axis labels from the top (max) down to 0, evenly spaced |
+| `to` | mod to send it to, if not the drawing one |
+
+**Styles:** `.forecast` `.forecast-axis` `.forecast-bar` `.forecast-current` `.forecast-delta` `.forecast-fill` `.forecast-floor` `.forecast-held` `.forecast-label` `.forecast-label-low` `.forecast-label-now` `.forecast-low` `.forecast-low-text` `.forecast-tick` `.forecast-up`
+
+```lua
+local forecast_chart = use "forecast-chart"
+
+forecast_chart { bars = { { current = true, delta = "$46.8M", label = "Today", low = false, value = 46.8 }, { current = false, delta = "−2.8", label = "Nov 2", low = false, value = 44 }, { current = false, delta = "+9.2", label = "Nov 9", low = false, value = 53.2 }, { current = false, delta = "−16.8", label = "Nov 16", low = false, value = 36.4 }, { current = false, delta = "−15.3", label = "Nov 23", low = true, value = 21.1 }, { current = false, delta = "+11.9", label = "Nov 30", low = false, value = 33 } }, floor = 15, height = 160, max = 60, ticks = { "$60M", "$30M", "$0" } }
+```
+
 #### `kbd`
 
 **Kbd.** Key caps for a shortcut, from a list of keys or a string like "cmd-shift-p" drawn with macOS glyphs.
@@ -756,6 +966,32 @@ key_values { rows = { { "Branch", "main" }, { "Ahead", "2 commits" }, { "Changed
 
 A whole mod using it, with state: `app/components/demos/key-values.luau`.
 
+#### `kpi-cell`
+
+**KPI Cell.** A key figure in a dashboard's top row: an icon tile and title with a menu, the value large with its change in a pill, and a caption.
+
+**When:** A row of three to five headline figures across the top of a dashboard (readers, signups, churn), set side by side in a bordered strip. For a figure inside a card's text use `metric`; for a standalone tile with a sparkline use `stat-tile`.
+
+| Prop | Meaning |
+| --- | --- |
+| `caption` | a line under the figure |
+| `delta` | its change, as text ("+8.2%") |
+| `good` | whether the change is good: green when true (default), red when false |
+| `icon` | icon on the tile |
+| `menu` | message the ⋯ button sends; no button without it |
+| `tint` | the tile's colour (default accent) |
+| `title` | what it counts |
+| `to` | mod to send `menu` to, if not the drawing one |
+| `value` | the figure, as text |
+
+**Styles:** `.kpi-cell` `.kpi-cell-caption` `.kpi-cell-head` `.kpi-cell-rule` `.kpi-cell-tile` `.kpi-cell-title` `.kpi-cell-value`
+
+```lua
+local kpi_cell = use "kpi-cell"
+
+kpi_cell { caption = "All active subscribers", delta = "+6.4%", good = true, icon = "user", menu = "more", tint = "#7c5cff", title = "Total readers", value = "24,816" }
+```
+
 #### `meter`
 
 **Meter.** A bar filled to a fraction from 0 to 1, with the percentage beside it; it warns past a threshold.
@@ -776,6 +1012,49 @@ meter { label = "Memory", value = 0.62, width = 48 }
 ```
 
 A whole mod using it, with state: `app/components/demos/meter.luau`.
+
+#### `metric`
+
+**Metric.** A label, a value set large (or very large), and a note under it in a tone.
+
+**When:** Headline figures across the top of a dashboard card: cash today, the lowest week, a total. For a figure in its own tile with a trend use `stat-tile`; for a status bar reading use `stat`; for a fraction use `meter`.
+
+| Prop | Meaning |
+| --- | --- |
+| `label` | what it is |
+| `note` | a line under it |
+| `size` | "normal" (default) or "hero": the card's main figure |
+| `tone` | the note's tone: success, danger, warning or muted (default) |
+| `value` | the figure, as text |
+
+**Styles:** `.metric` `.metric-hero` `.metric-label` `.metric-note` `.metric-value`
+
+```lua
+local metric = use "metric"
+
+metric { label = "Lowest week", note = "Week of Jan 4", value = "$26.4M" }
+```
+
+#### `mini-bars`
+
+**Mini Bars.** A few small labelled bars, one highlighted, future ones hatched: a figure by period at a glance.
+
+**When:** A figure over a few periods in a KPI strip or a card header (revenue by month, signups by week). For a live trend in a status bar use `sparkline`; for a full chart with an axis use `bar-chart` or `forecast-chart`.
+
+| Prop | Meaning |
+| --- | --- |
+| `bar` | each bar's width in pixels (default 18) |
+| `bars` | list of { label, value, future? } |
+| `height` | the tallest bar's height in pixels (default 40) |
+| `highlight` | index of the bar to stand out (default the last that is not future) |
+
+**Styles:** `.mini-bars` `.mini-bars-bar` `.mini-bars-future` `.mini-bars-label` `.mini-bars-on`
+
+```lua
+local mini_bars = use "mini-bars"
+
+mini_bars { bars = { { future = false, label = "Jul", value = 18 }, { future = false, label = "Aug", value = 26 }, { future = false, label = "Sep", value = 21 }, { future = false, label = "Oct", value = 33 }, { future = false, label = "Nov", value = 41 }, { future = true, label = "Dec", value = 38 } } }
+```
 
 #### `note-card`
 
@@ -804,6 +1083,51 @@ note_card { location = "src/ledger.rs:26", number = 1, text = "Reject mixing cur
 
 A whole mod using it, with state: `app/components/demos/note-card.luau`.
 
+#### `numbered-list`
+
+**Numbered List.** Items in order, numbered in a muted column, wrapping text aligned.
+
+**When:** Ordered steps or suggestions in a message, a note or a help page. For a checklist use `task-row`; for events in time use `timeline`.
+
+| Prop | Meaning |
+| --- | --- |
+| `items` | the items' text |
+| `start` | the first number (default 1) |
+
+**Styles:** `.numbered-list` `.numbered-list-item` `.numbered-list-number`
+
+```lua
+local numbered_list = use "numbered-list"
+
+numbered_list { items = { "Send the revised pricing deck", "Book a call with procurement", "Offer a two-year term" } }
+```
+
+#### `pill`
+
+**Pill.** A small tinted label with an optional icon, in a tone or any colour; clickable when given `msg`.
+
+**When:** A tag on a row ("Work", "Health") or a count inside a sentence ("2 events"), where colour carries meaning. For several read-only labels use `tags`; for filters the user toggles use `chips`; for a plain status word use `ui.badge`.
+
+| Prop | Meaning |
+| --- | --- |
+| `color` | any colour instead of a tone, such as "#3b82f6"; the tint is its 14% |
+| `icon` | icon before the text |
+| `label` | the text |
+| `msg` | message a click sends |
+| `size` | "small" (default, for tags) or "normal" (in a sentence) |
+| `to` | mod to send `msg` to, if not the drawing one |
+| `tone` | neutral (default), accent, success, warning or danger |
+| `tooltip` | text under the pointer |
+
+**Styles:** `.pill` `.pill-label` `.pill-normal`
+
+```lua
+local pill = use "pill"
+
+pill { label = "Work", color = "#3b82f6" }
+pill { label = "2 events", icon = "calendar", tone = "danger", size = "normal", msg = "show-events" }
+```
+
 #### `progress`
 
 **Progress.** A thin rounded progress bar filled to a fraction, or a striped busy bar with a spinner, with an optional label and percentage.
@@ -831,6 +1155,52 @@ progress { detail = "1,284 of 2,006 files", label = "Indexing workspace", value 
 
 A whole mod using it, with state: `app/components/demos/progress.luau`.
 
+#### `progress-stack`
+
+**Progress Stack.** A horizontal bar of stacked segments toward a target, solid or hatched, with a labelled marker and a ticked axis.
+
+**When:** How far a goal is (a raise, a budget, a quota) split by stage: closed, out, soft, still needed, with where the pace leads. For one fraction use `meter`; for a quota with a reset use `usage-bar`; for task progress use `progress`.
+
+| Prop | Meaning |
+| --- | --- |
+| `labels` | axis labels, evenly spaced from the left end to the right |
+| `marker` | { value, label }: a line and a pill over the bar ("Pace $69M") |
+| `segments` | list of { value, color? or tone? (default accent), hatch? }, left to right |
+| `ticks` | small ticks along the axis (default 40) |
+| `total` | the value at the right end (the target) |
+| `width` | pixels (default 520) |
+
+**Styles:** `.progress-stack` `.progress-stack-bar` `.progress-stack-label` `.progress-stack-marker` `.progress-stack-pill` `.progress-stack-pill-text` `.progress-stack-segment` `.progress-stack-tick`
+
+```lua
+local progress_stack = use "progress-stack"
+
+progress_stack { labels = { "$0M", "$25M", "$50M", "Target $75M" }, marker = { label = "Pace $69M", value = 69 }, segments = { { color = "accent", hatch = false, value = 41.3 }, { color = "accent/45", hatch = false, value = 8.5 }, { color = "accent/60", hatch = true, value = 12 }, { color = "danger", hatch = true, value = 13.2 } }, total = 75, width = 420 }
+```
+
+#### `record-card`
+
+**Record Card.** A compact card for a linked record: a bold title, then an icon and a muted line saying what it is.
+
+**When:** A record an agent or a person points at inside a message or a note, which a click opens. For a full row in a list use `list` or `pr-row`; for a dated item use `date-tile` beside text.
+
+| Prop | Meaning |
+| --- | --- |
+| `detail` | what it is, muted ("Deal · Negotiation · $98,000") |
+| `icon` | icon before the detail |
+| `msg` | message a click sends |
+| `title` | the record's name |
+| `to` | mod to send it to, if not the drawing one |
+| `tone` | the icon's tone (default warning) |
+
+**Styles:** `.record-card` `.record-card:hover` `.record-card-detail` `.record-card-title`
+
+```lua
+local record_card = use "record-card"
+
+record_card { detail = "Deal · Negotiation · $98,000", icon = "building-2", title = "Lumen Retail · Platform renewal" }
+```
+
 #### `relative-time`
 
 **Relative Time.** Elapsed seconds as "just now", "5 min ago", "yesterday", "3 days ago", or compact "5m", "2h", "3d".
@@ -854,6 +1224,26 @@ relative_time { prefix = "updated", seconds = 266400, tooltip = "2026-10-28 14:0
 ```
 
 A whole mod using it, with state: `app/components/demos/relative-time.luau`.
+
+#### `share-bar`
+
+**Share Bar.** A horizontal bar split into coloured shares with small gaps, each as wide as its share of the whole.
+
+**When:** How a whole splits into a few parts, above a list of those parts (devices, engagement tiers, plans). For progress toward a target with stages use `progress-stack`; for one fraction use `meter`.
+
+| Prop | Meaning |
+| --- | --- |
+| `height` | pixels (default 10) |
+| `shares` | list of { share (any unit; they are summed), color?, label? (tooltip) } |
+| `width` | pixels (default 420) |
+
+**Styles:** `.share-bar` `.share-bar-part`
+
+```lua
+local share_bar = use "share-bar"
+
+share_bar { shares = { { color = "#a78bfa", label = "Mobile", share = 51 }, { color = "#fbbf24", label = "Desktop", share = 42 }, { color = "#93c5fd", label = "Tablet", share = 7 } }, width = 360 }
+```
 
 #### `sparkline`
 
@@ -1252,6 +1642,29 @@ release_notes { badge = "Latest", date = "October 28, 2026", fixes = { "The side
 
 A whole mod using it, with state: `app/components/demos/release-notes.luau`.
 
+#### `thinking`
+
+**Thinking.** A quiet fold saying how long an agent thought, showing its reasoning when open.
+
+**When:** Inside an agent's `chat-message`, before its answer. For a spinner while it is still thinking use `loading`; for a general fold use `collapsible`.
+
+| Prop | Meaning |
+| --- | --- |
+| `label` | the text instead of "Thought for N seconds" |
+| `msg` | message a click sends (the mod flips `open`) |
+| `open` | show the reasoning |
+| `seconds` | how long it thought |
+| `text` | the reasoning shown when open |
+| `to` | mod to send it to, if not the drawing one |
+
+**Styles:** `.thinking` `.thinking-head` `.thinking-head:hover` `.thinking-text`
+
+```lua
+local thinking = use "thinking"
+
+thinking { open = true, seconds = 6, text = "Three late deals have had no contact in ten days." }
+```
+
 #### `toast`
 
 **Toast.** One notification card: level dot or icon, source label, title, one-line body, an action button and ×.
@@ -1400,6 +1813,34 @@ choice_cards {
 ```
 
 A whole mod using it, with state: `app/components/demos/choice-cards.luau`.
+
+#### `composer`
+
+**Composer.** A message box for an agent: a chip naming it, an attach button, the field and a round send button.
+
+**When:** The bottom of a chat with an agent or a person. For a search box use `search-field`; for a longer form field use `ui.input` with `multiline`.
+
+| Prop | Meaning |
+| --- | --- |
+| `agent` | who it goes to, in a chip above the field |
+| `attach` | message the attach button sends; no button without it |
+| `change` | sent on each edit, with `value` set to the text |
+| `focus` | take focus when it appears |
+| `icon` | the chip's icon (default sparkles) |
+| `id` | keeps the text across renders (default "composer") |
+| `placeholder` | grey text while empty |
+| `send` | message the round button sends; a click cannot read the field, so the mod keeps the text from `change` |
+| `submit` | sent on Enter and by the send button, with `value` |
+| `to` | mod to send them to, if not the drawing one |
+| `value` | the text; "" after sending clears it |
+
+**Styles:** `.composer` `.composer-attach` `.composer-chip` `.composer-chip-icon` `.composer-field` `.composer-send`
+
+```lua
+local composer = use "composer"
+
+composer { agent = "Sales agent", attach = "attach", placeholder = "Ask the sales agent anything…", send = "send", submit = "send" }
+```
 
 #### `radio-group`
 
@@ -1569,6 +2010,27 @@ switch { description = "Switch between light and dark with macOS.", label = "Fol
 
 A whole mod using it, with state: `app/components/demos/switch.luau`.
 
+#### `task-check`
+
+**Task Check.** A round check for a task: open, important (warning ring), in progress (danger ring with a dot), or done (filled with a check).
+
+**When:** The check at the start of a task or to-do row; a click sends `msg` for the mod to flip it. For a form option use `checkbox`; for an agent's state use `status-dot`.
+
+| Prop | Meaning |
+| --- | --- |
+| `msg` | message a click sends |
+| `state` | open (default), important, progress or done |
+| `to` | mod to send `msg` to, if not the drawing one |
+| `tooltip` | text under the pointer |
+
+**Styles:** `.task-check` `.task-check:hover` `.task-check-done` `.task-check-dot` `.task-check-important` `.task-check-progress`
+
+```lua
+local task_check = use "task-check"
+
+task_check { state = if task.done then "done" else "open", msg = { toggle = task.id } }
+```
+
 ### Git
 
 #### `ahead-behind`
@@ -1593,6 +2055,30 @@ ahead_behind { ahead = 2, behind = 1 }
 ```
 
 A whole mod using it, with state: `app/components/demos/ahead-behind.luau`.
+
+#### `change-tree`
+
+**Change Tree.** Changed files nested in their folders, single-child folders joined, with A, M or D at the right.
+
+**When:** The changed files of a repository or a review, as the right pane's Changes shows `app.git.files`. For every file in a folder use `tree`; for a file's lines use `diff-view`.
+
+| Prop | Meaning |
+| --- | --- |
+| `files` | lines of "<status>\t<added>\t<deleted>\t<path>" (`app.projects.current.files`, or made from `app.git.files`) |
+| `fold` | key of the message a folder sends, default "fold": { fold = path } |
+| `folded` | folders folded shut: { [path] = true } |
+| `indent` | pixels per level (default 14) |
+| `pick` | key of the message a file sends, default "pick": { pick = path } |
+| `selected` | the chosen file's path |
+| `to` | the mod to send them to, if not the drawing one |
+
+**Styles:** `.change-tree-chevron` `.change-tree-mark` `.change-tree-row` `.change-tree-row:hover` `.change-tree-row:selected`
+
+```lua
+local change_tree = use "change-tree"
+
+change_tree { files = { "A\t40\t0\tappleauth/appleauth.go", "M\t12\t3\tcmd/ryui/android.go", "M\t2\t1\tcmd/ryui/config.go", "M\t5\t0\tplatform/android/app/build.gradle.kts" }, selected = "cmd/ryui/config.go" }
+```
 
 #### `checks`
 
@@ -1919,6 +2405,36 @@ A whole mod using it, with state: `app/components/demos/split-view.luau`.
 
 ### Lists
 
+#### `board-card`
+
+**Board Card.** A kanban card: title with a badge, a muted line, then an amount, a date and the owner's initials; a tone outlines it.
+
+**When:** Items in a `kanban-column`: deals, tickets, tasks, candidates. For a row in a list use `task-row` or `list`; for a pull request use `pr-row`.
+
+| Prop | Meaning |
+| --- | --- |
+| `amount` | the figure at the bottom left |
+| `badge` | a small label on the right ("30%", "Won", "At risk") |
+| `badge_tone` | the badge's tone: success, danger, warning or muted (default) |
+| `context` | message a right-click sends (a menu of moves) |
+| `date` | a date beside it |
+| `msg` | message a click sends |
+| `owner` | the owner's initials, in a round avatar |
+| `owner_color` | the avatar's colour |
+| `selected` | highlight it |
+| `subtitle` | a muted line under it |
+| `title` | what it is (a company, a ticket's title) |
+| `to` | mod to send them to, if not the drawing one |
+| `tone` | outline it: danger (at risk), warning, success |
+
+**Styles:** `.board-card` `.board-card:hover` `.board-card:selected` `.board-card-amount` `.board-card-badge` `.board-card-date` `.board-card-foot` `.board-card-sub` `.board-card-title`
+
+```lua
+local board_card = use "board-card"
+
+board_card { amount = "$98,000", badge = "At risk", badge_tone = "danger", date = "Nov 13", owner = "TO", subtitle = "Platform renewal", title = "Lumen Retail", tone = "danger" }
+```
+
 #### `group-header`
 
 **Group header.** A list group heading: status dot or icon, title, count, fold chevron and a trailing + action.
@@ -1956,6 +2472,36 @@ ui.column { gap = "none",
 
 A whole mod using it, with state: `app/components/demos/group-header.luau`.
 
+#### `kanban-column`
+
+**Kanban Column.** A board column: dot, title, count and total over a coloured rule, its cards, then an Add button.
+
+**When:** Each stage of a kanban board (deals, tickets, tasks by status); put several in a row that scrolls sideways and fill them with `board-card`. For a list grouped by status without columns use `group-header` over rows.
+
+| Prop | Meaning |
+| --- | --- |
+| `[children]` | the cards |
+| `add` | message the Add button sends; no button without it |
+| `add_label` | the button's text (default "Add") |
+| `color` | the dot's and rule's colour (default accent) |
+| `count` | how many cards, in a small badge |
+| `title` | the stage's name |
+| `to` | mod to send `add` to, if not the drawing one |
+| `total` | a figure on the right ("$412K") |
+| `width` | pixels (default 232) |
+
+**Styles:** `.kanban-column` `.kanban-column-add` `.kanban-column-add:hover` `.kanban-column-cards` `.kanban-column-count` `.kanban-column-head` `.kanban-column-title` `.kanban-column-total`
+
+```lua
+local kanban_column = use "kanban-column"
+local board_card = use "board-card"
+
+kanban_column {
+	title = "Proposal", color = "#a78bfa", count = 3, total = "$284K", add = { add = "proposal" },
+	board_card { title = "Kestrel Airways", subtitle = "Crew rostering suite", amount = "$132,000", date = "Nov 29", badge = "50%" },
+}
+```
+
 #### `list`
 
 **List.** Selectable rows with a label, detail and badge; a click sends { select = id } to the mod drawing it.
@@ -1975,6 +2521,64 @@ list { rows = { { badge = "3", detail = "~/code/app", id = "main", label = "main
 ```
 
 A whole mod using it, with state: `app/components/demos/list.luau`.
+
+#### `ratio-row`
+
+**Ratio Row.** A label with its count and share at the right, after an icon, with an optional thin bar under it as long as the share.
+
+**When:** Lists of parts of a whole: where signups came from, top countries, devices, tiers. Stack them in a column; give `share` for the bar under each. For a bar of all the parts at once use `share-bar`; for a data grid use `table`.
+
+| Prop | Meaning |
+| --- | --- |
+| `color` | the bar's colour (default accent) |
+| `count` | its count, muted |
+| `icon` | icon in a small tile before the label |
+| `label` | what the part is |
+| `leading` | an element instead of the icon (a `country-code`, a dot) |
+| `msg` | message a click sends |
+| `percent` | its share, bold ("42%") |
+| `share` | 0 to 100: draw a bar under the row this long |
+| `to` | mod to send `msg` to, if not the drawing one |
+| `width` | the bar's full width in pixels (default 360) |
+
+**Styles:** `.ratio-row` `.ratio-row-count` `.ratio-row-fill` `.ratio-row-icon` `.ratio-row-line` `.ratio-row-percent` `.ratio-row-track`
+
+```lua
+local ratio_row = use "ratio-row"
+
+ratio_row { color = "#7c5cff", count = "604", icon = "globe", label = "Website signup form", percent = "44%", share = 44 }
+```
+
+#### `task-row`
+
+**Task Row.** A task (round check, title struck through when done) or an event (a dot), with date, due time and tag pills under it.
+
+**When:** Rows of tasks, to-dos, habits or events in a planner, an inbox or a day view; stack them in a column under `section` headings. For a plain selectable row use `list`; for pull requests use `pr-row`.
+
+| Prop | Meaning |
+| --- | --- |
+| `context` | message a right-click sends (a menu, or cycling its priority) |
+| `date` | its date, as shown ("Sat, Oct 31") |
+| `due` | the time in the danger colour: due or late |
+| `event` | an event: a dot instead of a check |
+| `icon` | an icon before the date (a habit's flame) |
+| `leading` | an element instead of the check (an emoji for a note) |
+| `msg` | message a click on the row sends (open it) |
+| `selected` | the row is the chosen one |
+| `state` | the check: open (default), important, progress or done |
+| `tags` | pills after the time: { label, color? or tone?, icon? } |
+| `time` | its time ("17:00") |
+| `title` | what to do |
+| `to` | mod to send both to, if not the drawing one |
+| `toggle` | message the check sends |
+
+**Styles:** `.task-row` `.task-row:hover` `.task-row:selected` `.task-row-body` `.task-row-done` `.task-row-due` `.task-row-event` `.task-row-line` `.task-row-meta` `.task-row-title`
+
+```lua
+local task_row = use "task-row"
+
+task_row { date = "Sat, Oct 31", due = true, state = "progress", tags = { { color = "#3b82f6", label = "Work" } }, time = "17:00", title = "Review the launch checklist" }
+```
 
 #### `tree`
 
@@ -2110,6 +2714,49 @@ breadcrumbs {
 ```
 
 A whole mod using it, with state: `app/components/demos/breadcrumbs.luau`.
+
+#### `day-strip`
+
+**Day Strip.** Days in a row, date over weekday; today in red, the chosen day raised, a dot under days with something on.
+
+**When:** Picking a day in a planner, an agenda or a log, over the list for that day. For a whole month use a calendar grid; for steps of a flow use `pager`; for a few named views use `segmented`.
+
+| Prop | Meaning |
+| --- | --- |
+| `days` | list of { id, day ("31"), weekday ("Sat"), today?, dot? } |
+| `event` | key of the message a click sends, default "select": { select = id } |
+| `selected` | id of the chosen day |
+| `to` | mod to send it to, if not the drawing one |
+
+**Styles:** `.day-strip` `.day-strip-day` `.day-strip-day:hover` `.day-strip-day:selected` `.day-strip-dot` `.day-strip-number` `.day-strip-today` `.day-strip-weekday`
+
+```lua
+local day_strip = use "day-strip"
+
+day_strip { days = { { day = "31", dot = false, id = "2026-10-31", today = true, weekday = "Sat" }, { day = "1", dot = true, id = "2026-11-01", today = false, weekday = "Sun" }, { day = "2", dot = false, id = "2026-11-02", today = false, weekday = "Mon" }, { day = "3", dot = false, id = "2026-11-03", today = false, weekday = "Tue" }, { day = "4", dot = true, id = "2026-11-04", today = false, weekday = "Wed" }, { day = "5", dot = false, id = "2026-11-05", today = false, weekday = "Thu" } }, selected = "2026-10-31" }
+```
+
+#### `month-grid`
+
+**Month Grid.** A month of days in weeks, Monday first; today in red, the chosen day raised, other months dimmed, dots for what is on.
+
+**When:** A calendar view or a date picker's body: choosing a day in a month. For a strip of days over a list use `day-strip`; for events in order use `timeline`.
+
+| Prop | Meaning |
+| --- | --- |
+| `event` | key of the message a click sends, default "select": { select = id } |
+| `selected` | id of the chosen day |
+| `to` | mod to send it to, if not the drawing one |
+| `weekdays` | the heading's names, Monday first (default Mon … Sun) |
+| `weeks` | list of weeks, each 7 of { id, day ("31"), today?, outside? (another month), count? (dots) } |
+
+**Styles:** `.month-grid` `.month-grid-day` `.month-grid-day:hover` `.month-grid-day:selected` `.month-grid-dot` `.month-grid-dots` `.month-grid-number` `.month-grid-outside` `.month-grid-today` `.month-grid-week` `.month-grid-weekday`
+
+```lua
+local month_grid = use "month-grid"
+
+month_grid { selected = "2026-10-14", weeks = { { { count = 0, day = "28", id = "2026-09-28", outside = true, today = false }, { count = 0, day = "29", id = "2026-09-29", outside = true, today = false }, { count = 0, day = "30", id = "2026-09-30", outside = true, today = false }, { count = 1, day = "1", id = "2026-10-01", outside = false, today = false }, { count = 0, day = "2", id = "2026-10-02", outside = false, today = false }, { count = 2, day = "3", id = "2026-10-03", outside = false, today = false }, { count = 0, day = "4", id = "2026-10-04", outside = false, today = false } }, { { count = 0, day = "12", id = "2026-10-12", outside = false, today = false }, { count = 3, day = "13", id = "2026-10-13", outside = false, today = true }, { count = 1, day = "14", id = "2026-10-14", outside = false, today = false }, { count = 0, day = "15", id = "2026-10-15", outside = false, today = false }, { count = 0, day = "16", id = "2026-10-16", outside = false, today = false }, { count = 0, day = "17", id = "2026-10-17", outside = false, today = false }, { count = 1, day = "18", id = "2026-10-18", outside = false, today = false } } } }
+```
 
 #### `nav-buttons`
 

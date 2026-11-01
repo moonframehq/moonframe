@@ -74,14 +74,32 @@ pub struct Chrome {
     /// Where macOS puts its traffic lights under a hidden title bar: the
     /// first button's offset from the window's top left, in pixels.
     pub traffic_lights: Option<(f32, f32)>,
+    /// The size the window opens at, `(width, height)`, before the user
+    /// resizes it; the host's default when unset.
+    pub size: Option<(f32, f32)>,
 }
+
+/// The sizes a shell may ask the window to open at.
+const WINDOW_WIDTH: std::ops::RangeInclusive<f32> = 640.0..=4000.0;
+const WINDOW_HEIGHT: std::ops::RangeInclusive<f32> = 400.0..=3000.0;
 
 /// How far traffic lights can move from the corner.
 const TRAFFIC_LIGHTS: std::ops::RangeInclusive<f32> = 0.0..=200.0;
 
 impl Read for Chrome {
     fn read(value: &mlua::Value, cx: &Cx) -> Result<Self, Error> {
-        let fields = Fields::read(value, cx, &[&["titlebar", "traffic_lights"]])?;
+        let fields = Fields::read(value, cx, &[&["titlebar", "traffic_lights", "size"]])?;
+        let size = match fields.raw("size") {
+            None => None,
+            Some(value) => {
+                let cx = cx.key("size");
+                let size = Fields::read(value, &cx, &[&["width", "height"]])?;
+                Some((
+                    size.number("width", WINDOW_WIDTH)?.unwrap_or(1280.0),
+                    size.number("height", WINDOW_HEIGHT)?.unwrap_or(820.0),
+                ))
+            },
+        };
         let traffic_lights = match fields.raw("traffic_lights") {
             None => None,
             Some(value) => {
@@ -96,6 +114,7 @@ impl Read for Chrome {
         Ok(Self {
             titlebar: fields.get("titlebar")?.unwrap_or_default(),
             traffic_lights,
+            size,
         })
     }
 }

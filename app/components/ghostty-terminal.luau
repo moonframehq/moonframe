@@ -18,7 +18,7 @@ return component {
 	category = "Terminals",
 	icon = "square-terminal",
 	-- Offered by tab bars' + menu; a new tab starts in the home folder.
-	tab = { title = "Ghostty terminal", icon = "square-terminal", props = { cwd = "~" } },
+	tab = { title = "Ghostty terminal", icon = "square-terminal", props = {} },
 	description = "A live shell on libghostty-vt, Ghostty's own emulator. It keeps running across reloads and while hidden.",
 	when = "A shell drawn by Ghostty's emulator; same as `terminal` with the other engine.",
 	props = {

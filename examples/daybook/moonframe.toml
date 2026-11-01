@@ -1,0 +1,7 @@
+[app]
+# A planner: today's tasks and events, an inbox, a month, and notes.
+# `moonframe --profile daybook` opens it.
+keep     = []
+name     = "daybook"
+requires = []
+title    = "Daybook"

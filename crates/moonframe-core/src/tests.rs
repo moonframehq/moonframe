@@ -1839,6 +1839,7 @@ fn the_shell_asks_for_its_window_and_views_see_it() {
     assert_eq!(workspace.chrome(), Chrome {
         titlebar: Titlebar::Hidden,
         traffic_lights: Some((12.0, 16.0)),
+        size: None,
     });
     let row = |workspace: &Workspace| {
         let Some(Node::Stack(row)) = workspace.shell().view() else {
@@ -2135,6 +2136,80 @@ fn a_users_broken_copy_falls_back_to_the_apps_until_it_loads() {
         error.contains("showing") && error.contains(&*user.path().to_string_lossy()),
         "{error}"
     );
+}
+
+#[test]
+fn an_app_package_brings_its_shell_and_keeps_only_the_builtin_mods_it_names() {
+    const PANEL: &str = r#"return mod { view = function() return ui.text "x" end }"#;
+    let builtin = app(&[("explorer", PANEL), ("terminal", PANEL)]);
+    write(builtin.path(), "components/card.luau", BADGE_COMPONENT);
+    write(builtin.path(), "style.luau", "return style { radius = 3 }");
+    let dir = tempfile::tempdir().unwrap();
+    let (pi, needed, global, profile) = (
+        dir.path().join("pi"),
+        dir.path().join("needed"),
+        dir.path().join("global"),
+        dir.path().join("global/profiles/pi"),
+    );
+    write(&pi, "main.luau", SHELL_SOURCE);
+    write(&pi, "mods/sessions/main.luau", PANEL);
+    write(&needed, "mods/changes/main.luau", PANEL);
+    // The user's own mods and shell stay out of every profile; their
+    // stylesheet follows them in.
+    write(&global, "main.luau", "error('the global shell')");
+    write(&global, "mods/nytimes/main.luau", PANEL);
+    write(&global, "style.luau", "return style { radius = 9 }");
+    fs::create_dir_all(&profile).unwrap();
+
+    let roots = crate::Roots::profile(
+        builtin.path().to_owned(),
+        [needed.clone()],
+        Some(crate::AppLayer {
+            path: pi.clone(),
+            keep: vec!["terminal".to_owned()],
+        }),
+        Some(global.clone()),
+        profile.clone(),
+    );
+    assert_eq!(roots.file("main.luau"), Some(pi.join("main.luau")));
+    assert_eq!(roots.candidates("main.luau"), [pi.join("main.luau")]);
+    assert!(roots.entries("components", "luau").contains_key("card"));
+    let workspace = Workspace::open(roots, false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
+        "changes", "sessions", "terminal"
+    ]);
+    assert_eq!(workspace.stylesheet().radius, Some(9.0));
+
+    // The profile's own shell wins over the app's.
+    write(&profile, "main.luau", SHELL_SOURCE);
+    let roots = crate::Roots::profile(
+        builtin.path().to_owned(),
+        [],
+        Some(crate::AppLayer {
+            path: pi,
+            keep: vec![],
+        }),
+        Some(global.clone()),
+        profile.clone(),
+    );
+    assert_eq!(roots.file("main.luau"), Some(profile.join("main.luau")));
+
+    // A profile without an app starts as the built-in app.
+    fs::remove_file(profile.join("main.luau")).unwrap();
+    let roots = crate::Roots::profile(builtin.path().to_owned(), [], None, Some(global), profile);
+    assert_eq!(
+        roots.file("main.luau"),
+        Some(builtin.path().join("main.luau"))
+    );
+    let workspace = Workspace::open(roots, false);
+    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
+        "explorer", "terminal"
+    ]);
 }
 
 #[test]
@@ -2516,6 +2591,170 @@ fn focus_and_disabled_states_layer_over_the_resting_rule() {
     let error = workspace.style_error().unwrap().to_string();
     assert!(error.contains("`Pressed` is not a state"), "{error}");
     assert!(error.contains("focus, disabled"), "{error}");
+}
+
+#[test]
+fn a_publish_redraws_only_the_views_that_read_it() {
+    // Each view counts how often it ran, in its own state.
+    let counting = |key: &str| {
+        format!(
+            r#"return mod {{
+              init = function() return {{ runs = 0 }} end,
+              update = function(state) end,
+              view = function(state, app)
+                state.runs += 1
+                local seen = app.{key}
+                return ui.text(`{{state.runs}} {{if seen then seen.n else "-"}}`)
+              end,
+            }}"#
+        )
+    };
+    let dir = app(&[
+        ("cpu", &counting("system")),
+        ("files", &counting("projects")),
+    ]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    let text = |workspace: &Workspace, name: &str| match workspace.slot(name).unwrap().view() {
+        Some(Node::Text(text)) => text.text.clone(),
+        other => panic!("expected text, got {other:?}"),
+    };
+    let number = |n: f64| Data::Map([("n".to_owned(), Data::Number(n))].into());
+    let before = text(&workspace, "files");
+
+    workspace.set_host("system", number(1.0));
+    workspace.set_host("system", number(2.0));
+    assert!(
+        text(&workspace, "cpu").ends_with(" 2"),
+        "{}",
+        text(&workspace, "cpu")
+    );
+    // `files` never read `app.system`, so it did not run again.
+    assert_eq!(text(&workspace, "files"), before);
+
+    workspace.set_host("projects", number(7.0));
+    assert!(text(&workspace, "files").ends_with(" 7"));
+
+    // A message redraws its mod only, with `app` as it was.
+    let cpu = text(&workspace, "cpu");
+    workspace.send("files", "files", Data::Nil);
+    assert_eq!(text(&workspace, "cpu"), cpu);
+    assert!(text(&workspace, "files").ends_with(" 7"));
+}
+
+#[test]
+fn the_shell_names_its_menus_and_about() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod {
+          about = { version = "1.2", description = "Sessions", website = "https://example.com" },
+          menus = {
+            { title = "File", items = {
+              { label = "New", msg = "new", to = "agent", shortcut = "secondary-t" },
+              "-",
+              { label = "Minimize", command = "minimize" },
+            } },
+          },
+          view = function() return ui.text "shell" end,
+        }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let menus = workspace.menus();
+    assert_eq!(menus.len(), 1);
+    assert_eq!(menus[0].title, "File");
+    let crate::MenuEntry::Item(new) = &menus[0].items[0] else {
+        panic!("{:?}", menus[0].items);
+    };
+    assert_eq!(new.label, "New");
+    assert!(
+        new.shortcut
+            .as_ref()
+            .is_some_and(|chord| chord.secondary && chord.key == "t")
+    );
+    assert!(matches!(&new.action, Action::Send { to: Some(to), .. } if to == "agent"));
+    assert_eq!(menus[0].items[1], crate::MenuEntry::Separator);
+    assert!(
+        matches!(&menus[0].items[2], crate::MenuEntry::Item(item) if item.action == Action::Command(Command::Minimize))
+    );
+    assert_eq!(workspace.about().version.as_deref(), Some("1.2"));
+
+    // A mod may not set them, and a bad key is named.
+    write(
+        dir.path(),
+        "mods/rogue/main.luau",
+        r#"return mod { menus = {}, view = function() return ui.text "x" end }"#,
+    );
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod {
+          menus = { { title = "File", items = { { label = "New", msg = "new", shortcut = "t" } } } },
+          view = function() return ui.text "shell" end,
+        }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let problems: Vec<String> = workspace
+        .problems()
+        .iter()
+        .map(|(name, error)| format!("{name}: {error}"))
+        .collect();
+    assert!(
+        problems
+            .iter()
+            .any(|problem| problem.starts_with("rogue") && problem.contains("only the shell")),
+        "{problems:?}"
+    );
+    assert!(
+        problems
+            .iter()
+            .any(|problem| problem.contains("shortcut") && problem.contains("types text")),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn lines_and_hatches_are_read() {
+    let dir = app(&[(
+        "chart",
+        r#"return mod { view = function() return ui.row {
+          ui.line { points = { 1, 3, 2 }, baseline = 2, area = true, dots = "last", height = 40 },
+          ui.hatch { gap = 5, grow = true },
+        } end }"#,
+    )]);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let Some(Node::Stack(row)) = workspace.slot("chart").unwrap().view() else {
+        panic!("no row");
+    };
+    let Node::Line(line) = &row.children[0] else {
+        panic!("{:?}", row.children[0]);
+    };
+    assert_eq!(line.points, [1.0, 3.0, 2.0]);
+    assert_eq!(
+        (line.baseline, line.area, line.dots),
+        (Some(2.0), true, Some(crate::Dots::Last))
+    );
+    assert!(matches!(&row.children[1], Node::Hatch(hatch) if hatch.gap == 5.0 && hatch.grow));
+
+    let dir = app(&[(
+        "bad",
+        r#"return mod { view = function() return ui.line { points = { 1, "x" } } end }"#,
+    )]);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        !workspace.slot("bad").unwrap().broken().is_empty()
+            || workspace.slot("bad").unwrap().error().is_some()
+    );
 }
 
 /// Keeps saved state in memory, and counts the saves.

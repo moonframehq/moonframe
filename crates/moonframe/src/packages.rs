@@ -10,14 +10,19 @@
 //! no `provider.wasm` or other binaries, so the user, or an agent, can
 //! review all it runs.
 //!
+//! A repository with a `moonframe.toml` naming an `[app]` is a whole app:
+//! its own shell, mods, and the packages it requires. It installs into a
+//! profile of its own (`moonframe app install`, see `profiles`), never over
+//! the user's starter app.
+//!
 //! [`Roots`]: moonframe_core::Roots
 
 mod cli;
 
-pub(crate) use cli::run;
+pub(crate) use cli::{approve, run, update as print_update};
 
 use {
-    moonframe_core::mod_name,
+    moonframe_core::{AppLayer, mod_name},
     moonframe_providers::{Kind, Manifest},
     serde::{Deserialize, Serialize},
     std::{
@@ -33,6 +38,109 @@ use {
 pub(crate) const FILE: &str = "packages.toml";
 /// Where packages are cloned, in the user's folder.
 const DIR: &str = "packages";
+/// What makes a package a whole app, at its root.
+pub(crate) const MANIFEST: &str = "moonframe.toml";
+
+/// `moonframe.toml`.
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ManifestFile {
+    app: App,
+}
+
+/// An app package's `[app]`.
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct App {
+    /// The profile it installs as, unless the user names another.
+    pub(crate) name: String,
+    /// Its name for people: the menu bar's, and a bundle's. The name if
+    /// none.
+    #[serde(default)]
+    pub(crate) title: Option<String>,
+    /// Its icon, a PNG in the app's folder (best 1024 pixels square): the
+    /// Dock's and a bundle's. `icon.png` if none is named.
+    #[serde(default)]
+    pub(crate) icon: Option<String>,
+    /// Built-in mods it keeps; it brings every other mod it shows.
+    #[serde(default)]
+    pub(crate) keep: Vec<String>,
+    /// Packages it needs, as `moonframe mod install` takes them.
+    #[serde(default)]
+    pub(crate) requires: Vec<String>,
+}
+
+impl App {
+    /// The `[app]` of the package in `folder`, if it is an app.
+    pub(crate) fn read(folder: &Path) -> Result<Option<Self>, String> {
+        let path = folder.join(MANIFEST);
+        let text = match fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(format!("cannot read {}: {error}", path.display())),
+        };
+        let app = toml::from_str::<ManifestFile>(&text)
+            .map_err(|error| format!("{}: {error}", path.display()))?
+            .app;
+        if !valid_name(&app.name) {
+            return Err(format!(
+                "{}: `{}` is not an app name: use a-z, 0-9, - and _",
+                path.display(),
+                printable(&app.name)
+            ));
+        }
+        // A bundle is a folder named after the title, and its plist and
+        // .desktop file hold it, so it must be a plain file name.
+        if let Some(title) = &app.title
+            && !valid_title(title)
+        {
+            return Err(format!(
+                "{}: `{}` is not an app title: up to 64 characters, without \
+                 control characters, / \\ < > & or a leading dot",
+                path.display(),
+                printable(title)
+            ));
+        }
+        // The icon must stay inside the app's folder.
+        if let Some(icon) = &app.icon
+            && !valid_icon(icon)
+        {
+            return Err(format!(
+                "{}: `{}` is not an icon path: a file inside the app's folder",
+                path.display(),
+                printable(icon)
+            ));
+        }
+        Ok(Some(app))
+    }
+}
+
+/// A name for a profile or app: lowercase letters, digits, `-` and `_`.
+pub(crate) fn valid_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| matches!(c, 'a'..='z' | '0'..='9' | '-' | '_'))
+}
+
+/// Whether `title` can name a bundle folder and sit in a plist unescaped.
+fn valid_title(title: &str) -> bool {
+    !title.trim().is_empty()
+        && title.chars().count() <= 64
+        && !title.starts_with('.')
+        && !title
+            .chars()
+            .any(|c| c.is_control() || matches!(c, '/' | '\\' | '<' | '>' | '&' | ':'))
+}
+
+/// Whether `icon` is a relative path that stays inside the app's folder.
+fn valid_icon(icon: &str) -> bool {
+    !icon.is_empty()
+        && !icon.chars().any(char::is_control)
+        && Path::new(icon)
+            .components()
+            .all(|part| matches!(part, std::path::Component::Normal(_)))
+}
 
 /// `packages.toml`.
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -132,27 +240,53 @@ impl List {
 }
 
 /// The folders of the enabled packages, in the order they are laid: by id.
-/// A broken `packages.toml` is logged and loads none.
-pub(crate) fn enabled_folders(user: &Path) -> Vec<PathBuf> {
+/// A broken `packages.toml` is logged and loads none. An app package is
+/// laid on its own, above the others, when `apps` allows one (in a
+/// profile); otherwise it is left out.
+pub(crate) fn enabled_layers(user: &Path, apps: bool) -> (Vec<PathBuf>, Option<AppLayer>) {
     let list = match List::read(user) {
         Ok(list) => list,
         Err(problem) => {
             tracing::warn!("no packages: {problem}");
-            return Vec::new();
+            return (Vec::new(), None);
         },
     };
-    list.package
-        .iter()
-        .filter(|(_, entry)| entry.enabled)
-        .map(|(id, entry)| entry.folder(user, id))
-        .filter(|folder| {
-            let found = folder.is_dir();
-            if !found {
-                tracing::warn!("package folder {} is missing", folder.display());
-            }
-            found
-        })
-        .collect()
+    let mut folders = Vec::new();
+    let mut app: Option<AppLayer> = None;
+    for (id, entry) in list.package.iter().filter(|(_, entry)| entry.enabled) {
+        let folder = entry.folder(user, id);
+        if !folder.is_dir() {
+            tracing::warn!("package folder {} is missing", folder.display());
+            continue;
+        }
+        match App::read(&folder) {
+            Ok(None) => folders.push(folder),
+            Ok(Some(_)) if !apps => {
+                tracing::warn!("{id} is an app: it runs in a profile of its own");
+            },
+            Ok(Some(_)) if app.is_some() => {
+                tracing::warn!("{id} is a second app in one profile; left out");
+            },
+            Ok(Some(manifest)) => {
+                app = Some(AppLayer {
+                    path: folder,
+                    keep: manifest.keep,
+                });
+            },
+            Err(problem) => tracing::warn!("{problem}"),
+        }
+    }
+    (folders, app)
+}
+
+/// The id `source` installs as, as `moonframe mod list` shows it.
+pub(crate) fn source_id(source: &str) -> Result<String, String> {
+    Source::parse(source).map(|source| source.id)
+}
+
+/// Whether the package `id` is installed in `user`.
+pub(crate) fn has(user: &Path, id: &str) -> Result<bool, String> {
+    Ok(List::read(user)?.package.contains_key(id))
 }
 
 /// What `install` was given: where to clone from, and the id it goes by.
@@ -264,6 +398,8 @@ fn expand_home(path: &str) -> PathBuf {
 /// What a package holds.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Contents {
+    /// An app's `[app]`: it brings a shell, and runs in a profile.
+    pub(crate) app: Option<App>,
     mods: Vec<String>,
     providers: Vec<(String, Provider)>,
     components: Vec<String>,
@@ -289,8 +425,11 @@ impl Contents {
     /// Reads the package in `folder`, which is installed as `name`.
     fn read(folder: &Path, name: &str) -> Result<Self, String> {
         refuse_binaries(folder)?;
-        let mut contents = Self::default();
-        if folder.join("main.luau").is_file() {
+        let mut contents = Self {
+            app: App::read(folder)?,
+            ..Self::default()
+        };
+        if contents.app.is_none() && folder.join("main.luau").is_file() {
             contents.mods.push(mod_name(name));
             return Ok(contents);
         }
@@ -324,6 +463,12 @@ impl Contents {
         .map(|name| name.trim_end_matches(".luau").to_owned())
         .collect();
         contents.style = folder.join("style.luau").is_file();
+        if contents.app.is_some() && !folder.join("main.luau").is_file() {
+            return Err(format!(
+                "{} is an app without a shell: it needs a main.luau",
+                folder.display()
+            ));
+        }
         if contents == Self::default() {
             return Err(format!(
                 "{} is not a Moonframe package: it has no main.luau, mods/, providers/, \
@@ -504,6 +649,12 @@ impl fmt::Display for Contents {
                 .join(", ")
         };
         let mut parts = Vec::new();
+        if let Some(app) = &self.app {
+            parts.push(format!("the app {}, with its shell", printable(&app.name)));
+            if !app.keep.is_empty() {
+                parts.push(format!("built-in mods it keeps: {}", list(&app.keep)));
+            }
+        }
         if !self.mods.is_empty() {
             parts.push(format!("mods: {}", list(&self.mods)));
         }
@@ -520,6 +671,9 @@ impl fmt::Display for Contents {
         }
         if self.style {
             parts.push("a stylesheet".to_owned());
+        }
+        if let Some(app) = self.app.as_ref().filter(|app| !app.requires.is_empty()) {
+            parts.push(format!("requires: {}", list(&app.requires)));
         }
         f.write_str(&parts.join("; "))
     }

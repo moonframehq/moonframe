@@ -120,7 +120,8 @@ jobs:
         run: |
           mkdir -p target
           cargo run --quiet --locked -p moonframe -- --no-user --catalogue app > target/components.md
-          diff -u .claude/skills/moonframe-components/SKILL.md target/components.md
+          # --strip-trailing-cr: Git for Windows checks the skill out with CRLF.
+          diff -u --strip-trailing-cr .claude/skills/moonframe-components/SKILL.md target/components.md
 
   # One stable context for branch protection, requiring every job above.
   ci-passed:

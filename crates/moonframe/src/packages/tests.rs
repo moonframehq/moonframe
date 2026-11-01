@@ -68,7 +68,7 @@ fn counter(text: &str) -> String {
 fn open(builtin: &Path, user: &Path) -> Workspace {
     let roots = Roots::with_packages(
         builtin.to_owned(),
-        enabled_folders(user),
+        enabled_layers(user, false).0,
         Some(user.to_owned()),
     );
     Workspace::open(roots, false)
@@ -314,7 +314,7 @@ fn a_new_package_links_in_place_and_loads() {
 fn a_broken_list_loads_no_packages() {
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), FILE, "package = 3");
-    assert!(enabled_folders(dir.path()).is_empty());
+    assert!(enabled_layers(dir.path(), false).0.is_empty());
     assert!(installed(dir.path()).is_err());
 }
 
@@ -415,6 +415,107 @@ fn package_text_cannot_drive_the_terminal() {
     let shown = format!("{provider}");
     assert!(!shown.contains('\x1b'), "{shown}");
     assert_eq!(printable("a\x1b[2Kb"), "a\\u{1b}[2Kb");
+}
+
+#[test]
+fn an_app_package_brings_its_shell_into_a_profile_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let (builtin, user) = (dir.path().join("app"), dir.path().join("user"));
+    write(&builtin, "main.luau", SHELL);
+    write(&builtin, "mods/explorer/main.luau", &counter("explorer"));
+    write(&builtin, "mods/terminal/main.luau", &counter("terminal"));
+    let pi = repo(dir.path(), "pi-app", &[
+        (MANIFEST, "[app]\nname = \"pi\"\nkeep = [\"terminal\"]\n"),
+        ("main.luau", SHELL),
+        ("mods/sessions/main.luau", &counter("sessions")),
+    ]);
+    let source = pi.display().to_string();
+
+    let profile = user.join("profiles/pi");
+    let (_, contents) = install(&profile, &source, &yes).unwrap();
+    let app = contents.app.unwrap();
+    assert_eq!(
+        (app.name.as_str(), app.keep.as_slice()),
+        ("pi", ["terminal".to_owned()].as_slice())
+    );
+    let (packages, layer) = enabled_layers(&profile, true);
+    assert!(packages.is_empty());
+    let layer = layer.unwrap();
+    let roots = Roots::profile(
+        builtin.clone(),
+        packages,
+        Some(layer),
+        Some(user.clone()),
+        profile,
+    );
+    assert_eq!(
+        roots
+            .file("main.luau")
+            .unwrap()
+            .parent()
+            .unwrap()
+            .file_name()
+            .unwrap(),
+        "pi-app"
+    );
+    let workspace = Workspace::open(roots, false);
+    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
+        "sessions", "terminal"
+    ]);
+    assert_eq!(shown(&workspace, "sessions"), "sessions");
+
+    // Over the starter app, an app would only bring mods its shell has no
+    // place for: it is left out.
+    install(&user, &source, &yes).unwrap();
+    let (packages, layer) = enabled_layers(&user, false);
+    assert!(packages.is_empty() && layer.is_none());
+}
+
+#[test]
+fn an_app_without_a_shell_or_a_name_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let headless = repo(dir.path(), "headless", &[
+        (MANIFEST, "[app]\nname = \"headless\"\n"),
+        ("mods/a/main.luau", &counter("a")),
+    ]);
+    let problem =
+        install(&dir.path().join("p"), &headless.display().to_string(), &yes).unwrap_err();
+    assert!(problem.contains("main.luau"), "{problem}");
+    let badly_named = repo(dir.path(), "badly", &[
+        (MANIFEST, "[app]\nname = \"Not OK\"\n"),
+        ("main.luau", SHELL),
+    ]);
+    let problem = install(
+        &dir.path().join("q"),
+        &badly_named.display().to_string(),
+        &yes,
+    )
+    .unwrap_err();
+    assert!(problem.contains("not an app name"), "{problem}");
+}
+
+#[test]
+fn an_app_title_or_icon_that_leaves_its_folder_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let read = |manifest: &str| {
+        fs::write(dir.path().join("moonframe.toml"), manifest).unwrap();
+        App::read(dir.path())
+    };
+    assert!(read("[app]\nname = \"ok\"\ntitle = \"Fine App\"\nicon = \"art/icon.png\"\n").is_ok());
+    for bad in [
+        "title = \"../../evil\"",
+        "title = \".hidden\"",
+        "title = \"a<b\"",
+        "title = \"two\\nlines\"",
+        "icon = \"../icon.png\"",
+        "icon = \"/etc/passwd\"",
+    ] {
+        let problem = read(&format!("[app]\nname = \"ok\"\n{bad}\n")).unwrap_err();
+        assert!(
+            problem.contains("is not an app title") || problem.contains("is not an icon"),
+            "{bad}: {problem}"
+        );
+    }
 }
 
 /// A package's native provider runs no code of its own, but it replaces the

@@ -2,7 +2,6 @@
 -- push, which the git provider (providers/git, built into the app) does and
 -- answers here.
 type State = {
-	edits: number,
 	open: boolean,
 	message: string,
 	-- The action waiting for the provider's answer, if any.
@@ -17,7 +16,6 @@ return mod {
 	init = function(previous: any): State
 		local state = previous or {}
 		return {
-			edits = state.edits or 0,
 			open = false,
 			message = state.message or "",
 			running = nil,
@@ -26,9 +24,7 @@ return mod {
 	end,
 
 	update = function(state: State, msg)
-		if type(msg) == "table" and msg.edits then
-			state.edits = msg.edits
-		elseif msg == "toggle" then
+		if msg == "toggle" then
 			state.open = not state.open
 			state.result = nil
 		elseif msg == "close" then
@@ -144,13 +140,6 @@ return mod {
 				},
 			}
 		end
-		return ui.row {
-			gap = "large",
-			align = "center",
-			branch,
-			ui.text { "Ready", size = "small", tone = "success" },
-			ui.text { `{state.edits} edits`, size = "small", tone = "muted" },
-			ui.text { app.dark and "Dark" or "Light", size = "small", tone = "muted" },
-		}
+		return ui.row { gap = "large", align = "center", branch }
 	end,
 }

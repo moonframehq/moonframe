@@ -12,9 +12,10 @@ window=$(swift - "$pid" <<'SWIFT'
 import CoreGraphics
 let pid = CommandLine.arguments.count > 1 ? Int(CommandLine.arguments[1]) : nil
 let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
-for window in windows where (window["kCGWindowOwnerName"] as? String)?.lowercased() == "moonframe"
-    && window["kCGWindowLayer"] as? Int == 0
-    && (pid == nil || window["kCGWindowOwnerPID"] as? Int == pid) {
+// By PID when given: a bundled app goes by its own name, not Moonframe's.
+for window in windows where window["kCGWindowLayer"] as? Int == 0
+    && (pid.map { window["kCGWindowOwnerPID"] as? Int == $0 }
+        ?? ((window["kCGWindowOwnerName"] as? String)?.lowercased() == "moonframe")) {
     print(window["kCGWindowNumber"] ?? "")
     break
 }

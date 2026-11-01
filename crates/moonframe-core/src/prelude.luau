@@ -26,7 +26,7 @@ local function element(kind: string, primary: string?)
 end
 
 local ui = {}
-for _, kind in { "row", "column", "panel", "hsplit", "vsplit", "pane", "divider", "spacer", "popover", "overlay", "input", "list" } do
+for _, kind in { "row", "column", "panel", "hsplit", "vsplit", "pane", "divider", "spacer", "popover", "overlay", "input", "line", "hatch", "list" } do
 	ui[kind] = element(kind)
 end
 ui.text = element("text", "text")
