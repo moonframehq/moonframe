@@ -10,6 +10,8 @@ type State = {
 	selected: string?,
 	-- Folders folded shut, by path.
 	folded: { [string]: boolean },
+	-- Asked git to look again, and waiting for what it publishes.
+	looking: boolean,
 }
 
 -- Asks git for `path`'s diff, or to stop sending one.
@@ -20,14 +22,22 @@ end
 return mod {
 	region = "right",
 	title = "Changes",
+	-- Each time git publishes, even unchanged after a forced look: what
+	-- ends a look again.
+	subscribe = { "provider/git" },
 
 	styles = {
 		[".changes-summary"] = { padding = { 0, 8, 6, 8 } },
 		[".changes-list"] = { padding = { 0, 4 } },
+		[".changes-looking"] = { color = "muted-foreground" },
 	},
 
 	init = function(previous: any): (State, { any }?)
-		local state: State = { selected = previous and previous.selected, folded = previous and previous.folded or {} }
+		local state: State = {
+			selected = previous and previous.selected,
+			folded = previous and previous.folded or {},
+			looking = false,
+		}
 		-- A diff chosen before a reload or a relaunch is asked for again.
 		return state, if state.selected then ask(state.selected) else nil
 	end,
@@ -37,10 +47,18 @@ return mod {
 			if msg == "close" then
 				state.selected = nil
 				return state, ask(nil)
+			elseif msg == "refresh" and not state.looking then
+				state.looking = true
+				return state, { { to = "provider:git", msg = { refresh = true } } }
 			end
 			return nil
 		end
-		if msg.pick then
+		if msg.topic == "provider/git" then
+			if not state.looking then
+				return nil
+			end
+			state.looking = false
+		elseif msg.pick then
 			-- Choosing the open file again closes its diff.
 			state.selected = if state.selected == msg.pick then nil else msg.pick
 			return state, ask(state.selected)
@@ -53,8 +71,19 @@ return mod {
 	view = function(state: State, app)
 		local git = app.git
 		local body: any
+		-- Spins, and takes no clicks, until git has looked again.
 		local actions: { any } = {
-			ui.button { icon = "refresh-cw", variant = "ghost", small = true, msg = "refresh", to = "provider:git", tooltip = "Look again" },
+			if state.looking
+				then ui.row {
+					class = "changes-looking",
+					width = 24,
+					height = 24,
+					align = "center",
+					justify = "center",
+					tooltip = "Looking…",
+					ui.icon { name = "refresh-cw", spin = true },
+				}
+				else ui.button { icon = "refresh-cw", variant = "ghost", small = true, msg = "refresh", tooltip = "Look again" },
 		}
 		if git == nil then
 			body = ui.text { "Loading…", tone = "muted", size = "small" }
