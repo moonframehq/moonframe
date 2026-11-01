@@ -99,6 +99,13 @@ return style {
 			transition = "slide-fade fast ease-out",
 		},
 		["overlay-backdrop"] = { background = "#000000/35" },
+		-- Tooltips wait 400ms under a resting pointer, so passing over a
+		-- control doesn't flash one, then rise and fade in.
+		tooltip = {
+			radius = 6,
+			shadow = "0 6px 16px -4px #00000033, 0 1px 3px #0000001a",
+			transition = "slide-fade fast ease-out 400ms",
+		},
 		[".sheet-title"] = { weight = "semibold", size = "large" },
 		[".muted"] = { size = "small", color = "muted-foreground" },
 		[".usage-tabs"] = { margin = { top = 4 } },

@@ -118,11 +118,26 @@ fn with_extras<'w, E: StatefulInteractiveElement + Styled>(
     }
     if let Some(text) = &extras.tooltip {
         let look = painter.look(Part::Tooltip, &Look::default(), false, place);
+        // The rule's delay (`delay`, or its transition's) is how long the
+        // pointer rests before the tooltip shows; else GPUI's own wait.
+        let transition = look.base.transition;
+        let wait = look.base.delay.or(transition
+            .map(|transition| transition.delay)
+            .filter(|delay| !delay.is_zero()));
+        if let Some(wait) = wait {
+            element = element.tooltip_show_delay(wait);
+        }
+        let stylesheet = painter.workspace.stylesheet();
+        let motion = transition
+            .filter(|transition| transition.kind != TransitionKind::None)
+            .map(|transition| (transition, stylesheet.scaled(transition.duration)))
+            .filter(|(_, duration)| !duration.is_zero());
         let text = SharedString::from(text.clone());
         element = element.tooltip(move |_, cx| {
             let tip = Tip {
                 text: text.clone(),
                 look: look.clone(),
+                motion,
             };
             cx.new(|_| tip).into()
         });
@@ -130,16 +145,23 @@ fn with_extras<'w, E: StatefulInteractiveElement + Styled>(
     element
 }
 
-/// A tooltip's content, styled by the `tooltip` rule.
+/// How far a sliding tooltip rises into place, in pixels.
+const TIP_RISE: f32 = 4.;
+
+/// A tooltip's content, styled by the `tooltip` rule, and eased in by its
+/// `transition` as it shows: faded, risen a little, or both.
 struct Tip {
     text: SharedString,
     look: Resolved,
+    /// The transition and how long it runs, after `animation_speed`.
+    motion: Option<(moonframe_core::Transition, std::time::Duration)>,
 }
 
 impl Render for Tip {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
-        div()
+        let tip = div()
+            .id("tooltip")
             .px_2()
             .py_1()
             .rounded(theme.radius)
@@ -152,7 +174,33 @@ impl Render for Tip {
             .look(&self.look, theme)
             .edges(self.look.base.border, &self.look.base, theme)
             .padded(&self.look.base.padding)
-            .child(self.text.clone())
+            .child(self.text.clone());
+        let Some((transition, duration)) = self.motion else {
+            return tip.into_any_element();
+        };
+        let opacity = self.look.base.opacity.unwrap_or(1.0);
+        let curve = transition.curve;
+        let kind = transition.kind;
+        tip.relative()
+            .with_animation(
+                "tooltip-in",
+                Animation::new(duration).with_easing(move |time| curve.at(time)),
+                move |tip, amount| {
+                    let tip = match kind {
+                        TransitionKind::Slide | TransitionKind::SlideFade => {
+                            tip.top(px(TIP_RISE * (1.0 - amount)))
+                        },
+                        _ => tip,
+                    };
+                    match kind {
+                        TransitionKind::Fade | TransitionKind::SlideFade => {
+                            tip.opacity(opacity * amount)
+                        },
+                        _ => tip,
+                    }
+                },
+            )
+            .into_any_element()
     }
 }
 
@@ -490,17 +538,18 @@ impl<'w> Draw<'w> for Button {
                 .hover
                 .background
                 .map_or(background.opacity(0.85), |color| color.hsla(theme));
-            element = element.custom(
-                ButtonCustomVariant::new(cx)
-                    .color(background)
-                    .foreground(foreground.unwrap_or(theme.foreground))
-                    .hover(hover)
-                    .active(background),
-            )
-            // gpui-component paints a custom button at rest as a 20% tint of
-            // its color; the button's own style goes on last, so the color
-            // the stylesheet asked for is what shows.
-            .bg(background);
+            element = element
+                .custom(
+                    ButtonCustomVariant::new(cx)
+                        .color(background)
+                        .foreground(foreground.unwrap_or(theme.foreground))
+                        .hover(hover)
+                        .active(background),
+                )
+                // gpui-component paints a custom button at rest as a 20% tint of
+                // its color; the button's own style goes on last, so the color
+                // the stylesheet asked for is what shows.
+                .bg(background);
         }
         // A button takes one radius: its top left's.
         if let Some(radius) = look.base.radius {
