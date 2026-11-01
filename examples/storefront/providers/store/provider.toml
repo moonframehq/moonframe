@@ -1,0 +1,5 @@
+# Storefront's audit log, shared as `app.store`: SAMPLE activities made up
+# with a fixed seed. A process provider (perl 5, as macOS ships) because it
+# also writes the CSV the audit page exports, to ~/Downloads.
+command = ["perl", "store.pl"]
+kind    = "process"
