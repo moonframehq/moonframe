@@ -195,6 +195,20 @@
   .cols p { font-size:16px; color:var(--ink2) }
   .pull { font-size:42px; line-height:1.2; font-style:italic; text-align:center; max-width:880px; margin:0 auto; padding:56px 0 }
 
+  /* Get started */
+  .getstarted { padding:0 0 72px }
+  .steps { list-style:none; padding:0; margin-top:36px; border-top:2px solid var(--ink) }
+  .steps li { display:grid; grid-template-columns:44px minmax(0, 1fr) minmax(0, 1.15fr); gap:24px; align-items:center; padding:18px 0; border-bottom:1px solid var(--rule) }
+  .steps .num { font:600 13px var(--mono); color:var(--acc) }
+  .steps h3 { font-size:22px; font-weight:500 }
+  .steps p { font-size:15px; color:var(--ink2) }
+  .copy { display:flex; align-items:center; gap:12px; width:100%; background:var(--ink); color:var(--paper); border:0; border-radius:3px; padding:10px 10px 10px 16px; font:14px var(--mono); text-align:left; cursor:pointer }
+  .copy code { flex:1; min-width:0; background:none; color:inherit; padding:0; white-space:pre-wrap; overflow-wrap:anywhere; user-select:all }
+  .copy span { font:600 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:#f2b33d; padding:4px 8px; border-radius:3px }
+  .copy:hover span { background:#ffffff14 }
+  .needs { margin-top:18px; font:14px var(--sans); color:var(--dim) }
+  .needs a { color:var(--acc); text-decoration:underline; text-underline-offset:2px }
+
   footer { border-top:2px solid var(--ink); padding:28px 0 56px; display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:32px; font:14px var(--sans); color:var(--dim) }
   footer b { display:block; color:var(--ink); margin-bottom:8px; font-size:13px; letter-spacing:.08em; text-transform:uppercase }
   footer a { display:block; padding:2px 0 } footer a:hover { color:var(--acc) }
@@ -229,6 +243,7 @@
     .cols { columns:1 }
     .installbar { flex-direction:column; align-items:flex-start } .installbar pre { white-space:pre-wrap; word-break:break-all; font-size:13px }
     .pull { font-size:28px; padding:40px 0 }
+    .steps li { grid-template-columns:32px minmax(0, 1fr); gap:10px 12px } .steps .copy { grid-column:2 }
     footer { grid-template-columns:1fr 1fr }
     .lb { padding:56px 10px 20px } .lb .prev, .lb .next { top:auto; bottom:14px } .lb-cap { flex-direction:column; text-align:center; gap:6px } .lb .lb-cmd { max-width:100%; text-align:left } .lb-cmd code { white-space:normal; word-break:break-all }
   }
@@ -365,6 +380,18 @@ just install   # into /Applications</pre></div>
 
   <p class="pull">“Clone it, rename it, and build anything, by hand or by asking an agent while the app runs.”</p>
 
+  <div class="getstarted" id="get-started">
+    <p class="kicker">Get started</p>
+    <h2>Four commands <i>to a running window.</i></h2>
+    <ol class="steps">
+      <li><span class="num">I</span><div><h3>Clone the starter</h3><p>Name the folder after your app.</p></div><button class="copy" title="Copy the command"><code>git clone https://github.com/penso/moonframe my-app</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Step inside</h3><p>Everything else runs from here.</p></div><button class="copy" title="Copy the command"><code>cd my-app</code><span>Copy</span></button></li>
+      <li><span class="num">III</span><div><h3>Install the toolchain</h3><p>mise fetches Rust, and Zig for the Ghostty terminal.</p></div><button class="copy" title="Copy the command"><code>mise install</code><span>Copy</span></button></li>
+      <li><span class="num">IV</span><div><h3>Open the window</h3><p>Then edit <code>app/style.luau</code> and save, or ask your agent.</p></div><button class="copy" title="Copy the command"><code>just run</code><span>Copy</span></button></li>
+    </ol>
+    <p class="needs">You need <a href="https://rustup.rs">rustup</a>, <a href="https://github.com/casey/just">just</a> and <a href="https://mise.jdx.dev">mise</a>. Developed on macOS; CI builds Linux and Windows too. More in the <a href="https://github.com/penso/moonframe#quick-start">quick start</a>.</p>
+  </div>
+
   <footer>
     <div><span class="name"><img src="img/icon.png" alt="">Moonframe</span>Native desktop apps in Rust, shaped live in Luau.<br>MIT licensed.</div>
     <div><b>Learn</b><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe#quick-start">Quick start</a><a class="wide" href="#components">Components</a></div>
@@ -491,6 +518,12 @@ cmd.onclick = async () => {
   try { await navigator.clipboard.writeText(cmd.firstElementChild.textContent); cmd.lastElementChild.textContent = "Copied"; }
   catch { getSelection().selectAllChildren(cmd.firstElementChild); }
 };
+// Copy buttons on the get started steps.
+document.querySelectorAll(".steps .copy").forEach(b => b.onclick = async () => {
+  const label = b.lastElementChild;
+  try { await navigator.clipboard.writeText(b.firstElementChild.textContent); label.textContent = "Copied"; setTimeout(() => label.textContent = "Copy", 1600); }
+  catch { getSelection().selectAllChildren(b.firstElementChild); }
+});
 lb.querySelector(".prev").onclick = () => openPlate(lbIndex - 1);
 lb.querySelector(".next").onclick = () => openPlate(lbIndex + 1);
 lb.addEventListener("click", e => { if (e.target === lb) closePlate(); });
