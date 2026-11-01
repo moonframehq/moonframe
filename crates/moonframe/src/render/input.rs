@@ -68,7 +68,9 @@ impl<'w> Draw<'w> for Input {
             caret,
             inputs: painter.inputs.clone(),
             app: cx.entity().downgrade(),
-            preview: painter.preview,
+            // A demo runs live and keeps to itself, so its fields edit;
+            // one drawn from an example only shows.
+            preview: painter.preview && !place.owner.starts_with(moonframe_core::DEMO),
         };
         field.into_any_element()
     }
@@ -90,7 +92,7 @@ struct Field {
     caret: Hsla,
     inputs: Inputs,
     app: WeakEntity<MoonframeApp>,
-    /// In the component browser: drawn, never edited.
+    /// In the component browser outside a demo: drawn, never edited.
     preview: bool,
 }
 
@@ -138,11 +140,15 @@ impl RenderOnce for Field {
             (None, true) => frame.flex_1(),
             (None, false) => frame.min_w(px(MIN_WIDTH)),
         };
-        let body = div()
-            .relative()
-            .w_full()
-            .h(line * rows as f32)
-            .overflow_hidden();
+        let body = div().relative().w_full().overflow_hidden();
+        // A growing text area fills the height it gets (an editor's pane),
+        // never shorter than its rows; the editor scrolls inside it.
+        let body = if self.input.multiline && self.input.grow {
+            frame = frame.min_h_0();
+            body.flex_1().min_h(line * rows as f32)
+        } else {
+            body.h(line * rows as f32)
+        };
         let Some(editor) = editor else {
             // A preview shows its value, or its placeholder.
             let (text, color) = match self.input.value.as_deref().filter(|v| !v.is_empty()) {
@@ -152,7 +158,12 @@ impl RenderOnce for Field {
                     Some(self.placeholder),
                 ),
             };
-            let text = div().truncate().child(text);
+            // A text area keeps its lines and wraps them, as it would edit.
+            let text = if self.input.multiline {
+                div().child(text)
+            } else {
+                div().truncate().child(text)
+            };
             let text = match color {
                 Some(color) => text.text_color(color),
                 None => text,

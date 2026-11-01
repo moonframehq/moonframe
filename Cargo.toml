@@ -3,6 +3,7 @@ exclude = ["app/providers"]
 members = [
   "crates/moonframe",
   "crates/moonframe-core",
+  "crates/moonframe-docs",
   "crates/moonframe-git",
   "crates/moonframe-mux",
   "crates/moonframe-providers",
@@ -42,6 +43,7 @@ herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", rev = "9133
 libghostty-vt       = "0.2.2"
 mlua                = { features = ["luau"], version = "0.12.2" }
 moonframe-core      = { path = "crates/moonframe-core" }
+moonframe-docs      = { path = "crates/moonframe-docs" }
 moonframe-git       = { path = "crates/moonframe-git" }
 moonframe-mux       = { default-features = false, path = "crates/moonframe-mux" }
 moonframe-providers = { path = "crates/moonframe-providers" }

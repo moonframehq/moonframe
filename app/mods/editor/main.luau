@@ -2,6 +2,9 @@
 -- strip (`tabbed { id = "main", show = "bar" }` in main.luau). It hears the
 -- strip on the `tabs/main` topic, draws that tab with `tab-view`, and sends
 -- what the tab reports (a browser's page) back on `tabs/main/report`.
+-- A markdown file chosen in the explorer opens in a tab of its own (asked
+-- for on `tabs/main/open`); a link in one opens the file it names, or a
+-- browser tab for a web address.
 local tab_view = use "tab-view"
 
 type State = {
@@ -9,10 +12,49 @@ type State = {
 	tab: any,
 	-- The shell's layout menu choices: { tabs?, layout? }, on `looks`.
 	looks: any,
+	-- Numbers the tabs it asks the strip for.
+	asked: number,
 }
 
 -- The kinds that open a shell.
 local TERMINALS = { ["component:terminal"] = true, ["component:ghostty-terminal"] = true }
+
+-- Files that open in the markdown editor.
+local function is_markdown(path: string): boolean
+	local lower = string.lower(path)
+	return string.match(lower, "%.md$") ~= nil
+		or string.match(lower, "%.markdown$") ~= nil
+		or string.match(lower, "%.mdx$") ~= nil
+end
+
+-- The file a relative link in `from` names, from the project's root, or nil
+-- when it climbs out of it.
+local function resolve(from: string, link: string): string?
+	local parts = {}
+	for part in string.gmatch(string.match(from, "^(.*)/") or "", "[^/]+") do
+		table.insert(parts, part)
+	end
+	if string.sub(link, 1, 1) == "/" then
+		parts = {}
+	end
+	for part in string.gmatch(link, "[^/]+") do
+		if part == ".." then
+			if #parts == 0 then
+				return nil
+			end
+			table.remove(parts)
+		elseif part ~= "." then
+			table.insert(parts, part)
+		end
+	end
+	return if #parts > 0 then table.concat(parts, "/") else nil
+end
+
+-- Asks the main strip for a tab.
+local function ask(state: State, kind: string, props: { [string]: any }, title: string?)
+	state.asked += 1
+	return state, { { to = "topic:tabs/main/open", msg = { n = state.asked, kind = kind, props = props, title = title } } }
+end
 
 local function kind_of(kinds: { any }, kind: string?)
 	for _, entry in kinds do
@@ -28,7 +70,11 @@ return mod {
 	subscribe = { "tabs/main", "looks" },
 
 	init = function(previous: State?): State
-		return { tab = previous and previous.tab, looks = previous and previous.looks }
+		return {
+			tab = previous and previous.tab,
+			looks = previous and previous.looks,
+			asked = previous and previous.asked or 0,
+		}
 	end,
 
 	update = function(state: State, msg)
@@ -41,6 +87,22 @@ return mod {
 			state.looks = msg.value
 		elseif msg.tab_report then
 			return state, { { to = "topic:tabs/main/report", msg = msg } }
+		elseif type(msg.open) == "string" and is_markdown(msg.open) then
+			-- From the explorer.
+			return ask(state, "component:markdown-editor", { path = msg.open }, string.match(msg.open, "([^/]+)$"))
+		elseif type(msg.open_link) == "string" then
+			-- A link in a markdown tab: a web page, or another file.
+			local url: string = msg.open_link
+			if string.match(url, "^https?://") then
+				return ask(state, "component:browser", { url = url })
+			end
+			if string.match(url, "^%a[%w+.-]*:") or string.sub(url, 1, 1) == "#" then
+				return -- mailto:, an anchor in the page: nothing to open here.
+			end
+			local path = resolve(msg.from or "", (string.gsub(url, "[?#].*$", "")))
+			if path and is_markdown(path) then
+				return ask(state, "component:markdown-editor", { path = path }, string.match(path, "([^/]+)$"))
+			end
 		end
 	end,
 

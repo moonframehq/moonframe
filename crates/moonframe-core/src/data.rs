@@ -13,7 +13,11 @@ use {
 
 const MAX_DEPTH: usize = 16;
 const MAX_ENTRIES: usize = 10_000;
-const MAX_STRING: usize = 64 * 1024;
+/// A string as long as a document, so a file's text can travel in a
+/// message and live in state.
+const MAX_STRING: usize = crate::read::MAX_DOCUMENT;
+/// All the strings of one value together: a few documents at most.
+const MAX_BYTES: usize = 4 * crate::read::MAX_DOCUMENT;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum Data {
@@ -76,6 +80,7 @@ impl Read for Data {
 #[derive(Default)]
 struct Budget {
     entries: usize,
+    bytes: usize,
 }
 
 impl Budget {
@@ -94,6 +99,7 @@ impl Budget {
                 if value.len() > MAX_STRING {
                     return Err(cx.fail(format!("a string longer than {MAX_STRING} bytes")));
                 }
+                self.spend(value.len(), cx)?;
                 Ok(Data::String(value))
             },
             Value::Table(_) if depth == MAX_DEPTH => {
@@ -103,6 +109,14 @@ impl Budget {
             Value::Table(table) => self.map(table, cx, depth),
             other => Err(cx.fail(format!("a {} cannot leave its module", other.type_name()))),
         }
+    }
+
+    fn spend(&mut self, bytes: usize, cx: &Cx) -> Result<(), Error> {
+        self.bytes += bytes;
+        if self.bytes > MAX_BYTES {
+            return Err(cx.fail(format!("more than {MAX_BYTES} bytes of text")));
+        }
+        Ok(())
     }
 
     fn list(&mut self, table: &Table, cx: &Cx, depth: usize) -> Result<Data, Error> {
@@ -125,6 +139,7 @@ impl Budget {
                     if key.len() > MAX_STRING {
                         return Err(cx.fail(format!("a key longer than {MAX_STRING} bytes")));
                     }
+                    self.spend(key.len(), cx)?;
                     let value = self.data(&value, &cx.key(&key), depth + 1)?;
                     map.insert(key, value);
                 },

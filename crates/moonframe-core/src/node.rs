@@ -32,6 +32,7 @@ tokens! {
         Terminal = "terminal",
         Browser = "browser",
         Input = "input",
+        Markdown = "markdown",
         Divider = "divider",
         Spacer = "spacer",
         Region = "region",
@@ -233,6 +234,7 @@ pub enum Node {
     Terminal(Terminal),
     Browser(Browser),
     Input(Input),
+    Markdown(Markdown),
     Divider,
     Spacer,
     /// Every mod that names this region, in order.
@@ -633,6 +635,44 @@ pub struct Hatch {
     pub width: Option<f32>,
     pub height: Option<f32>,
     pub grow: bool,
+}
+
+/// Markdown the host renders: headings, emphasis, lists, task lists,
+/// tables, quotes and highlighted code. Links never open by themselves:
+/// a click sends `link` with the address as `url`, for the mod to decide.
+/// Pictures are not loaded, so a document cannot make the app fetch
+/// anything.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Markdown {
+    pub look: Look,
+    pub text: String,
+    /// Sent when a link is clicked, shaped as [`Markdown::message`].
+    pub link: Option<Data>,
+    /// The mod `link` goes to; the drawing mod when unset.
+    pub to: Option<String>,
+    /// Take the free space along the parent's axis.
+    pub grow: bool,
+    /// Scroll its own content (give it `grow` or a `height`).
+    pub scroll: bool,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+    pub max_width: Option<f32>,
+}
+
+impl Markdown {
+    /// What a click on the link to `url` sends for `msg`: a table `msg`
+    /// is copied with `url` set; anything else becomes `{ msg = msg, url = url }`.
+    pub fn message(msg: &Data, url: &str) -> Data {
+        let url = Data::String(url.to_owned());
+        match msg {
+            Data::Map(entries) => {
+                let mut entries = entries.clone();
+                entries.insert("url".to_owned(), url);
+                Data::Map(entries)
+            },
+            other => Data::Map([("msg".to_owned(), other.clone()), ("url".to_owned(), url)].into()),
+        }
+    }
 }
 
 /// Largest picture file `ui.image` opens.

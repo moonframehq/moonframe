@@ -584,6 +584,29 @@ type HatchProps = {
 	grow: boolean?,
 }
 
+-- Markdown the host renders: headings, emphasis, lists, task lists, tables,
+-- quotes and highlighted code, up to 1 MiB. The `markdown` rule styles the
+-- box, `markdown-code` its code and `markdown-quote` its quotes. A link never
+-- opens by itself: a click sends `link`, a table getting a `url` field and
+-- anything else arriving as `{ msg = link, url = url }`. Pictures are not
+-- loaded.
+type MarkdownProps = {
+	class: Class?,
+	style: Style?,
+	state: string?,
+	text: string?,
+	link: Data,
+	-- The mod `link` goes to; this one when unset.
+	to: string?,
+	grow: boolean?,
+	-- Scroll its own content; give it `grow` or a `height`.
+	scroll: boolean?,
+	width: number?,
+	height: number?,
+	max_width: number?,
+	[number]: string,
+}
+
 type TerminalEngine = "alacritty" | "ghostty"
 -- What keeps the shell running: `auto` (default) is herdr-core, else tmux,
 -- else a pty. herdr-core and tmux keep it across launches; a pty ends with
@@ -780,6 +803,7 @@ declare ui: {
 	terminal: (props: string | TerminalProps) -> Element,
 	browser: (props: string | BrowserProps) -> Element,
 	input: (props: InputProps) -> Element,
+	markdown: (props: string | MarkdownProps) -> Element,
 	divider: () -> Element,
 	spacer: () -> Element,
 	region: (props: string | RegionProps) -> Element,
@@ -1052,6 +1076,14 @@ type Files = {
 }
 
 -- What this machine has for keeping terminals (the `herdr` provider).
+-- The `docs` provider: the folder whose text files it reads and saves for
+-- the mod that asks (`{ read = path }`, `{ write = path, text, version }`).
+type Docs = {
+	available: boolean,
+	reason: string?,
+	root: string?,
+}
+
 type Herdr = {
 	installed: boolean,
 	version: string?,
@@ -1098,6 +1130,7 @@ type App = {
 	gitlab: Forge?,
 	agents: Agents?,
 	files: Files?,
+	docs: Docs?,
 	herdr: Herdr?,
 	-- What tab bars can open: each component and mod with a `tab` entry.
 	kinds: { TabKind },

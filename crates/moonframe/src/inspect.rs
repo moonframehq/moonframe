@@ -190,6 +190,14 @@ fn describe(node: &Node) -> String {
             }
             name
         },
+        Node::Markdown(markdown) => {
+            let first = markdown.text.lines().find(|line| !line.trim().is_empty());
+            let mut name = format!("markdown{}", classes(&markdown.look));
+            if let Some(first) = first {
+                name = format!("{name} {}", quote(first));
+            }
+            name
+        },
         Node::Divider => "divider".to_owned(),
         Node::Spacer => "spacer".to_owned(),
         Node::Region(region) => format!("region {}", quote(&region.name)),
@@ -229,6 +237,7 @@ fn line(node: &Node) -> Option<u32> {
         Node::Terminal(terminal) => terminal.look.line,
         Node::Browser(browser) => browser.look.line,
         Node::Input(input) => input.look.line,
+        Node::Markdown(markdown) => markdown.look.line,
         Node::Popover(popover) => popover.look.line,
         Node::Overlay(overlay) => overlay.look.line,
         Node::List(list) => list.look.line,

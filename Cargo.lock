@@ -4568,6 +4568,7 @@ dependencies = [
  "gpui-kit",
  "lb-wry",
  "moonframe-core",
+ "moonframe-docs",
  "moonframe-git",
  "moonframe-mux",
  "moonframe-providers",
@@ -4595,6 +4596,15 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tracing",
+]
+
+[[package]]
+name = "moonframe-docs"
+version = "0.1.0"
+dependencies = [
+ "moonframe-core",
+ "moonframe-providers",
+ "tempfile",
 ]
 
 [[package]]

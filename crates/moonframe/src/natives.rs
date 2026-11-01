@@ -7,6 +7,8 @@ use moonframe_providers::Natives;
 pub(crate) fn natives() -> Natives {
     #[allow(unused_mut, reason = "empty when every native feature is off")]
     let mut natives = Natives::new();
+    #[cfg(feature = "docs")]
+    natives.insert("docs", moonframe_docs::native);
     #[cfg(feature = "git")]
     natives.insert("git", moonframe_git::native);
     natives

@@ -50,6 +50,7 @@ pub use {
     module::Meta,
     node::*,
     persist::Persist,
+    read::MAX_DOCUMENT,
     roots::{AppLayer, Roots, mod_name},
     style::{
         Case, Color, Corners, Curve, Font, Look, MonoFont, Paint, Part, Resolved, Rules, Shade,

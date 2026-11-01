@@ -10,6 +10,10 @@
 -- With `show = "bar"` it draws only its strip (in a title bar, say) and a mod
 -- draws the content from that topic with `tab-view`; what the content reports
 -- comes back on `tabs/<id>/report`.
+-- Another mod opens a tab by publishing on `tabs/<id>/open`
+-- { n, kind, props, title }: a tab of that kind showing the same `path` is
+-- selected instead of opened twice. `n` numbers the requests, so one heard
+-- again (as a topic is, when the bar loads) opens nothing.
 
 local tabs_strip = use "tabs"
 local menu = use "menu"
@@ -31,6 +35,8 @@ type State = {
 	next: number,
 	-- The + menu is open.
 	menu: boolean,
+	-- The last `tabs/<id>/open` request handled, by its `n`.
+	opened: number?,
 }
 
 type Props = {
@@ -62,6 +68,29 @@ local function open(state: State, props: Props, kind: string)
 	state.next += 1
 	table.insert(state.tabs, { id = id, kind = kind, props = {} })
 	state.selected = id
+end
+
+-- A tab another mod asked for: the open one of that kind and path, else a
+-- new one with those props.
+local function open_asked(state: State, props: Props, asked: any)
+	if type(asked) ~= "table" or type(asked.kind) ~= "string" or asked.n == state.opened then
+		return false
+	end
+	state.opened = asked.n
+	local wanted = type(asked.props) == "table" and asked.props or {}
+	if wanted.path ~= nil then
+		for _, tab in state.tabs do
+			if tab.kind == asked.kind and tab.props.path == wanted.path then
+				state.selected = tab.id
+				return true
+			end
+		end
+	end
+	open(state, props, asked.kind)
+	local tab = state.tabs[#state.tabs]
+	tab.props = table.clone(wanted)
+	tab.title = asked.title
+	return true
 end
 
 -- What the strip shows, published for subscribers: with the selected tab's
@@ -155,6 +184,10 @@ return component {
 		elseif msg.tab_report then
 			-- What its own content reported: a browser's page and title.
 			keep_report(state, msg)
+		elseif msg.topic == `tabs/{props.id or "main"}/open` then
+			if not open_asked(state, props, msg.value) then
+				return
+			end
 		elseif msg.topic == `tabs/{props.id or "main"}/report` and type(msg.value) == "table" then
 			-- The same, from content drawn elsewhere.
 			if not keep_report(state, msg.value) then

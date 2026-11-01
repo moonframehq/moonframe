@@ -98,6 +98,12 @@ tokens! {
         InputSelection = "input-selection",
         /// An input's text cursor; its `background` colors it.
         InputCaret = "input-caret",
+        Markdown = "markdown",
+        /// Code in a `ui.markdown`, in blocks and inline: `background`,
+        /// `color`, `border`, `radius`, `padding`.
+        MarkdownCode = "markdown-code",
+        /// A `ui.markdown`'s block quotes: `background`, `color`, `border`.
+        MarkdownQuote = "markdown-quote",
         Divider = "divider",
         Popover = "popover",
         Tooltip = "tooltip",
