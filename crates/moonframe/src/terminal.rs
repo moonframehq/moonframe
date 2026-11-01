@@ -15,6 +15,7 @@ use {
         path::{Path, PathBuf},
         rc::Rc,
         sync::Arc,
+        time::{Duration, Instant},
     },
 };
 
@@ -42,6 +43,21 @@ pub(crate) struct TerminalView {
     pub(crate) scrolled: Cell<f32>,
 }
 
+/// A command line waiting for the terminal of a tab `moonframe pane new`
+/// opened.
+struct Typed {
+    bytes: Vec<u8>,
+    /// The folder that terminal must start in. The tab's id is published
+    /// on a topic any mod can hear, so a mod could draw a terminal of that
+    /// id first; it gets the command only if it starts where it was asked
+    /// to, never in a folder of the mod's choosing.
+    cwd: Option<PathBuf>,
+    asked: Instant,
+}
+
+/// How long a command line waits for its terminal before it is dropped.
+const TYPED_WAIT: Duration = Duration::from_secs(30);
+
 pub(crate) struct Terminals {
     views: HashMap<String, Rc<TerminalView>>,
     backends: Arc<Backends>,
@@ -65,7 +81,7 @@ pub(crate) struct Terminals {
     /// What to type into a terminal as it starts, by its element `id`: a
     /// command line `moonframe pane new` asked for. The app sets it, never
     /// Luau, so a mod still picks where a terminal starts but not what runs.
-    typed: HashMap<String, Vec<u8>>,
+    typed: HashMap<String, Typed>,
 }
 
 impl Terminals {
@@ -115,8 +131,27 @@ impl Terminals {
 
     /// Types `bytes` into the terminal drawn with the element id `id` once
     /// it starts and its shell is ready for a line.
-    pub(crate) fn type_on_start(&mut self, id: &str, bytes: Vec<u8>) {
-        self.typed.insert(id.to_owned(), bytes);
+    pub(crate) fn type_on_start(&mut self, id: &str, cwd: Option<PathBuf>, bytes: Vec<u8>) {
+        self.typed.insert(id.to_owned(), Typed {
+            bytes,
+            cwd,
+            asked: Instant::now(),
+        });
+    }
+
+    /// The command line waiting for a terminal `key` that starts in `cwd`.
+    fn take_typed(&mut self, key: &str, cwd: Option<&Path>) -> Option<Vec<u8>> {
+        self.typed
+            .retain(|_, typed| typed.asked.elapsed() < TYPED_WAIT);
+        let id = key.rsplit_once('/').map_or(key, |(_, id)| id);
+        let typed = self.typed.get(id)?;
+        if typed.cwd.as_deref().map(canonical) != cwd.map(canonical) {
+            tracing::warn!(
+                "terminal {key}: not in the folder its pane was opened for; nothing typed"
+            );
+            return None;
+        }
+        self.typed.remove(id).map(|typed| typed.bytes)
     }
 
     /// The terminal at `key`, started now if it is new.
@@ -178,8 +213,9 @@ impl Terminals {
         if !refused {
             self.refused.remove(key);
             self.views.insert(key.to_owned(), view.clone());
-            let id = key.rsplit_once('/').map_or(key, |(_, id)| id);
-            if let (Ok(session), Some(bytes)) = (&view.session, self.typed.remove(id)) {
+            if let Ok(session) = &view.session
+                && let Some(bytes) = self.take_typed(key, view.spawn.open.cwd.as_deref())
+            {
                 session.type_when_ready(bytes);
             }
         }
@@ -321,6 +357,11 @@ pub(crate) fn intercept_keys(cx: &mut Context<MoonframeApp>) -> Subscription {
 }
 
 /// `~` and `~/…` are the home folder.
+/// `path` with links resolved, to compare two folders.
+fn canonical(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_owned())
+}
+
 fn expand(cwd: &str) -> PathBuf {
     match (cwd.strip_prefix('~'), std::env::var_os("HOME")) {
         (Some(rest), Some(home)) if rest.is_empty() || rest.starts_with('/') => {

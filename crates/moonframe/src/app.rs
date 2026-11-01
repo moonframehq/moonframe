@@ -823,11 +823,12 @@ impl MoonframeApp {
                 i64::try_from(since.as_millis()).unwrap_or(i64::MAX)
             });
         let id = format!("pane-{n}");
+        let cwd = request.cwd.clone().or_else(|| self.folders.own());
         if let Some(bytes) = request.typed() {
-            self.terminals.type_on_start(&id, bytes);
+            self.terminals.type_on_start(&id, cwd.clone(), bytes);
         }
         let mut props = Vec::new();
-        if let Some(cwd) = request.cwd.clone().or_else(|| self.folders.own()) {
+        if let Some(cwd) = &cwd {
             props.push(("cwd", Data::from(cwd.to_string_lossy().into_owned())));
         }
         // The tab's id names its terminal (`<mod>/<tab id>`), so the
