@@ -47,6 +47,15 @@ tab_view { tab = state.tab, kind = kind_of(app.kinds, state.tab.kind) }]],
 			merged[key] = value
 		end
 		local of, name = string.match(tab.kind, "^(%a+):(.+)$")
+		if of == "mod" and kind == nil then
+			-- Its mod is gone (a mockup deleted while its tab was open).
+			return ui.column {
+				grow = true,
+				align = "center",
+				justify = "center",
+				ui.text { `{name} is no longer installed; close this tab.`, tone = "muted" },
+			}
+		end
 		if of == "mod" then
 			-- The tab frames it, so a mod that draws its own panel elsewhere
 			-- (the explorer in the sidebar) should draw its content bare.

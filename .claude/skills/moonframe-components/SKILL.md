@@ -207,6 +207,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`diff-view`](#diff-view) | Git | Show a file's changes for review: a review pane, a checkpoint, a commit. Stack one per file in a scrolling column. For only the size of a change use `diff-counts`; for a file without changes use `code-view`. |
 | [`pr-badge`](#pr-badge) | Git | A pull or merge request referenced inline: beside a branch in a sidebar, in a title bar, in a tab. For a full list row use `pr-row`; for CI details use `checks`; for an agent's state use `status-dot`. |
 | [`pr-row`](#pr-row) | Git | Lists of pull requests, merge requests or issues, as in an orchestrator or review queue; stack rows in a scrolling column, under `section` headings per group. For a PR referenced inline use `pr-badge`; for a generic data grid use `table`; for its CI use `checks`. |
+| [`mockups`](#mockups) | Layout | Showing the user a few ideas for a change before making it, so they can pick one: the moonframe-mockups skill builds a throwaway mod around it. Not for real content; for choosing between options inside the app use `choice-cards`. |
 | [`page`](#page) | Layout | The main area of a settings screen, a detail view or a dashboard: a big title, then sections of content that scroll. Group its content with `section` or `card`; put it beside a `sidebar` in a `split-view`. For a framed pane use `pane-frame`; for a modal use `dialog`; for a panel in a sidebar use `ui.panel`. |
 | [`pane-frame`](#pane-frame) | Layout | Framing each pane of a tiled workspace (a terminal, an agent, a log) with its own header and controls. The panes' sizes come from `ui.hsplit`/`ui.vsplit` (see `split-view`); this only draws the frame inside one. For a titled box of content use `card`; for a sidebar panel use `ui.panel`. |
 | [`settings-page`](#settings-page) | Layout | A whole preferences window or settings tab. It is made of `settings-nav` (the page list) and `settings-row` (each setting); use those directly for a different arrangement, `section` for a plain heading, `card` to box a group. |
@@ -2246,6 +2247,30 @@ ui.column { gap = "none",
 A whole mod using it, with state: `app/components/demos/pr-row.luau`.
 
 ### Layout
+
+#### `mockups`
+
+**Mockups.** Variants of one change side by side, each live in a lettered card with a Pick button that copies which one to apply.
+
+**When:** Showing the user a few ideas for a change before making it, so they can pick one: the moonframe-mockups skill builds a throwaway mod around it. Not for real content; for choosing between options inside the app use `choice-cards`.
+
+| Prop | Meaning |
+| --- | --- |
+| `ask` | what the user asked for, shown on top and quoted in the pick |
+| `file` | the mockup's file, quoted in the pick so the agent finds it |
+| `variants` | list of { name, note?, body (an element or a list of elements) } |
+| `width` | each card's width in pixels; default 360 |
+
+**Styles:** `.mockups-card` `.mockups-letter` `.mockups-stage`
+
+```lua
+local mockups = use "mockups"
+
+mockups { ask = "a busier status bar", file = "~/.config/moonframe/mods/mockup/main.luau", variants = {
+	{ name = "Pills", note = "Each value in a pill.", body = ui.row { gap = "small", ui.badge "main", ui.badge "+3" } },
+	{ name = "Plain", note = "Muted text, no chrome.", body = ui.text { "main · +3", tone = "muted" } },
+} }
+```
 
 #### `page`
 
