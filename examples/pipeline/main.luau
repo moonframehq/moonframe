@@ -78,7 +78,8 @@ return mod {
 				ui.column {
 					grow = true,
 					gap = "none",
-					ui.row { height = 52, shrink = false, gap = "none", ui.region { name = "top", direction = "row" } },
+					-- With the sidebar hidden, the bar starts past the traffic lights.
+					ui.row { height = 52, shrink = false, gap = "none", style = { padding = { 0, 0, 0, if state.left then 0 else 72 } }, ui.region { name = "top", direction = "row" } },
 					ui.column {
 						class = "sheet",
 						grow = true,
@@ -93,6 +94,6 @@ return mod {
 			},
 		}
 		-- Send feedback (the built-in mods/feedback): ask an agent to change this app.
-		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" } }
+		return ui.column { grow = true, gap = "none", body, ui.row { class = "feedback-corner", float = { top = 12, right = 16 }, ui.mount "feedback" } }
 	end,
 }

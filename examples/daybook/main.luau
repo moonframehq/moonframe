@@ -66,8 +66,10 @@ return mod {
 			grow = true,
 			gap = "none",
 			class = chrome,
-			-- The top bar's height, so its region does not stretch.
-			ui.row { height = 60, shrink = false, gap = "none", ui.region { name = "top", direction = "row" } },
+			-- The top bar's height, so its region does not stretch. A column
+			-- region lays the bar across the whole width (a row region sizes it
+			-- to its content), so its two equal sides center the search field.
+			ui.row { height = 60, shrink = false, gap = "none", ui.region "top" },
 			ui.hsplit {
 				id = "body",
 				divider = false,

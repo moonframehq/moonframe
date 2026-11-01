@@ -54,7 +54,7 @@ return mod {
 				ui.column {
 					grow = true,
 					gap = "none",
-					ui.row { height = 64, shrink = false, gap = "none", ui.region { name = "top", direction = "row" } },
+					ui.row { height = 56, shrink = false, gap = "none", ui.region { name = "top", direction = "row" } },
 					ui.column { class = "page-card", grow = true, ui.region "main" },
 				},
 			},

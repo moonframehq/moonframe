@@ -74,7 +74,7 @@ return mod {
 			class = "top",
 			drag = true,
 			grow = true,
-			height = 64,
+			height = 56,
 			align = "center",
 			breadcrumbs { crumbs = crumbs },
 			ui.spacer(),

@@ -94,7 +94,7 @@ return mod {
 						tooltip = "Share this chat",
 						copy = title,
 						ui.icon "upload",
-						ui.text "Share",
+						ui.text { "Share", class = "pl-bar-label" },
 					},
 					bar_button("ellipsis", "More", "more"),
 					ui.row { class = "pl-bar-rule", height = 18 },

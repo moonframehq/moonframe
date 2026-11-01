@@ -28,10 +28,11 @@ return style {
 
 		[".pl-frame"] = { background = "frame" },
 		[".pl-titlebar"] = { padding = { 0, 10, 0, 0 } },
-		[".pl-title"] = { size = "large", weight = "medium", padding = { 0, 0, 0, 13 } },
+		[".pl-title"] = { size = "small", weight = "medium", padding = { 0, 0, 0, 13 } },
 		[".pl-bar-rule"] = { width = 1, height = 26, background = "#ffffff1a" },
 		[".pl-bar-button"] = { radius = 7, padding = { 5, 7 }, gap = 6, color = "#c8c8c8" },
 		[".pl-bar-button:hover"] = { background = "#ffffff12", color = "foreground" },
+		[".pl-bar-label"] = { size = "small" },
 		[".pl-bar-button-off"] = { color = "#7a7a7a" },
 		[".pl-box-plus"] = { border = true, border_color = "#c8c8c8", radius = 4 },
 

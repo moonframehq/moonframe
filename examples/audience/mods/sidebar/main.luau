@@ -69,7 +69,7 @@ return mod {
 			ui.row {
 				class = "side-brand",
 				drag = true,
-				height = 52,
+				height = 56,
 				align = "center",
 				window.platform == "macos" and not window.fullscreen and ui.row { width = 66 },
 				ui.row {

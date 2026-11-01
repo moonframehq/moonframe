@@ -59,8 +59,8 @@ return mod {
 
 	view = function(state: State)
 		return side_nav {
+			-- No `toggle`: the title bar's button folds it, so the head has none.
 			collapsed = state.collapsed,
-			toggle = "fold",
 			selected = state.selected,
 			account = { name = "Jay", badge = "Personal", subtitle = "Alex's Workspace", color = "#7c3aed", menu = "account" },
 			sections = SECTIONS,
