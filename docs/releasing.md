@@ -37,9 +37,15 @@ The workflow then:
 5. verifies all of that as a user would, creates the tag and a draft release
    with generated notes, checks the uploaded files against `SHA256SUMS`, and
    publishes it.
+6. points the Homebrew cask, `Casks/moonframe.rb` in
+   [penso/homebrew-tap](https://github.com/penso/homebrew-tap), at the
+   published disk image (only for a notarized disk image and a version
+   without a pre-release suffix).
 
 Only the `sign-macos`, `sign-windows`, `attest` and `publish` jobs enter
-the `release` environment. Protect it (Settings → Environments) so it only accepts
+the `release` environment. Only the `homebrew` job enters the `homebrew`
+environment, which holds `HOMEBREW_TAP_SSH_KEY`: the private half of a
+deploy key with write access to penso/homebrew-tap and nothing else. Protect it (Settings → Environments) so it only accepts
 `main`, and add yourself as a required reviewer if releases should wait for
 an approval.
 
@@ -119,3 +125,19 @@ again.
 
 When the publisher's identity validation in Azure expires, signing fails
 until it is renewed (Artifact Signing account → Identity validations).
+
+## Homebrew
+
+`brew install penso/tap/moonframe` installs the disk image's app and links
+its `moonframe` command. The cask is `homebrew/Casks/moonframe.rb` here,
+with the version and checksum left as `@VERSION@` and `@SHA256@`:
+`scripts/release/render-cask.sh` fills them in from the published disk
+image, and `scripts/release/update-homebrew.sh` commits the result to the
+tap. It refuses to go back to an older version or to change one already
+there, and it never runs the tap's Ruby. Do not edit the tap's copy by hand:
+the next release overwrites it.
+
+To replace the deploy key, generate a new one, add its public half to
+penso/homebrew-tap (Settings → Deploy keys, with write access), set the
+private half as the `homebrew` environment's `HOMEBREW_TAP_SSH_KEY`, and
+delete the old key.

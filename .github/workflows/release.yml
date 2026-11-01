@@ -441,3 +441,46 @@ jobs:
           (cd uploaded && sha256sum --check --strict SHA256SUMS)
           [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" --jq .object.sha)" == "$RELEASE_SHA" ]]
           gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false
+
+  # Points penso/homebrew-tap's cask at the published disk image, through
+  # that repository's deploy key, which only the homebrew environment holds.
+  # Only for a notarized disk image and a final (not pre-release) version.
+  homebrew:
+    name: Homebrew
+    needs: [validate, publish]
+    if: >-
+      !cancelled() && needs.publish.result == 'success' &&
+      needs.validate.outputs.macos_signed == 'true' &&
+      !contains(needs.validate.outputs.version, '-')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: homebrew
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+      - name: Render the cask for the published disk image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.validate.outputs.sha }}
+        run: |
+          set -euo pipefail
+          gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease |
+            jq -e '.isDraft == false and .isPrerelease == false'
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" --jq .object.sha)" == "$RELEASE_SHA" ]]
+          dmg="Moonframe-$VERSION-universal-apple-darwin.dmg"
+          gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --dir final \
+            --pattern "$dmg" --pattern SHA256SUMS
+          (cd final && sha256sum --check --strict --ignore-missing SHA256SUMS)
+          checksum=$(sha256sum "final/$dmg" | cut -d' ' -f1)
+          scripts/release/render-cask.sh "$VERSION" "$checksum" > moonframe.rb
+          cat moonframe.rb
+      - name: Commit the cask to the tap
+        env:
+          HOMEBREW_TAP_SSH_KEY: ${{ secrets.HOMEBREW_TAP_SSH_KEY }}
+        run: scripts/release/update-homebrew.sh "$VERSION" moonframe.rb
