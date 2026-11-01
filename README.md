@@ -44,6 +44,8 @@ build anything, by hand or by asking an agent while the app runs.
   </tr>
 </table>
 
+Whole apps run on it too, beside the starter: see [Example apps](#example-apps).
+
 ## What you get
 
 - **A window laid out in Luau.** A shell (`app/main.luau`) places regions,
@@ -237,28 +239,67 @@ An app's `main.luau` can also add `menus` to the menu bar, with
 shortcuts, and say what its About panel shows (`about = { version,
 description, website, copyright }`); the menu bar carries the app's title.
 
-`examples/` holds apps built this way:
+### Example apps
 
-- **sessions**: coding sessions across your repositories, each with a shell
-  and its changes.
-- **workbench**: a terminal, an editor and the project's files.
-- **daybook**: a planner: today's tasks and events, an inbox, a month,
-  notes, three looks.
-- **ledger**: a fund overview: cash against a floor, what is waiting, a
-  raise, funds with their curves (sample data).
-- **audience**: a newsletter's audience dashboard (sample data).
-- **pipeline**: a sales kanban with a scripted, labelled agent panel.
-- **stage**: the components on a bento board, for stills.
+`examples/` holds apps built this way, each with its own name, icon, menus
+and About panel. The dashboards run on sample data from a provider.
 
-sessions, workbench and stage require the `projects` package beside them. `moonframe app link
-examples/sessions` runs one in place:
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/sessions.png" alt="Sessions: a list of projects with their branch and changes on the left, a shell in the open project in the middle, and its uncommitted files on the right">
+      <br>
+      <sub><b>sessions</b>: coding sessions across your repositories, each with a shell, its branch, and its changes by commit, uncommitted or branch.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/workbench.png" alt="Workbench in a dark theme: a terminal with tabs on the left, an editor in the middle, and the project's files on the right">
+      <br>
+      <sub><b>workbench</b>: a terminal, an editor and the project's files, in tabs and splits.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/daybook.png" alt="Daybook: a sidebar of views, favorites and folders; today's tasks and events under a week strip; and an inbox of tasks by section">
+      <br>
+      <sub><b>daybook</b>: a planner with today's tasks and events, an inbox, a month, notes, and three looks.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/ledger.png" alt="Ledger: a fund overview with a 13-week cash forecast against a floor, items waiting with date tiles, a raise as a stacked bar, and a table of funds with curves">
+      <br>
+      <sub><b>ledger</b>: a fund overview: cash against a floor, what is waiting on you, a raise, and funds with their curves.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/audience.png" alt="Audience: a newsletter dashboard with KPI cells, a dot chart of daily signups, acquisition sources with bars, and locations, devices and engagement tiers">
+      <br>
+      <sub><b>audience</b>: a newsletter's audience: KPIs, signups per day, where readers come from, and how engaged they are.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/pipeline.png" alt="Pipeline: a sales kanban with KPIs above five columns of deal cards, and an agent chat panel on the right">
+      <br>
+      <sub><b>pipeline</b>: a sales kanban with KPIs, deal cards, a list view, and a scripted agent panel labelled demo.</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/apps/stage.png" alt="Stage: a bento board of components: a forecast chart, KPI cells, a month grid, a dot chart, share bars, a day strip with tasks, a progress stack and date tiles" width="900">
+  <br>
+  <sub><b>stage</b>: the components on a bento board, with sample data, for stills. View hides the captions and changes the backdrop.</sub>
+</p>
+
+sessions, workbench and stage require the `projects` package beside them.
+`moonframe app link` runs an app in place, so its files reload as you edit
+them:
 
 ```sh
 cargo build --release -p moonframe
-target/release/moonframe app link examples/sessions --yes
-target/release/moonframe app link examples/workbench --yes
-target/release/moonframe --profile sessions &
-target/release/moonframe --profile workbench &
+for app in sessions workbench daybook ledger audience pipeline stage; do
+  target/release/moonframe app link examples/$app --yes
+done
+target/release/moonframe --profile ledger &
+target/release/moonframe --profile pipeline &
 ```
 
 ## Commands

@@ -237,7 +237,7 @@ return mod {
 				ui.spacer(),
 				ui.column { gap = "none", align = "end", ui.text { "At this pace", class = "muted" }, ui.text { raise.pace, class = "raise-short" } },
 			},
-			progress_stack { segments = raise.segments, total = raise.total, width = 520, marker = raise.marker, labels = raise.labels },
+			progress_stack { segments = raise.segments, total = raise.total, width = 460, marker = raise.marker, labels = raise.labels },
 			ui.row { gap = "small", table.unpack(stages) },
 		}
 
@@ -250,13 +250,13 @@ return mod {
 					align = "center",
 					gap = "normal",
 					ui.row { class = "fund-icon", width = 32, height = 32, align = "center", justify = "center", ui.icon { name = row.icon :: any, size = "small" } },
-					ui.column { gap = "none", ui.text { row.name, weight = "medium" }, ui.text { row.detail, class = "muted-small" } },
+					ui.column { gap = "none", shrink = true, ui.text { row.name, weight = "medium", wrap = false, truncate = true }, ui.text { row.detail, class = "muted-small", wrap = false, truncate = true } },
 				},
 				nav = row.nav,
 				called = row.called,
 				dpi = row.dpi,
 				irr = row.irr,
-				curve = ui.line { points = row.curve, baseline = 0, area = true, dots = "last", width = 150, height = 34, min = -1.4, max = 1.0, class = "fund-curve" },
+				curve = ui.line { points = row.curve, baseline = 0, area = true, dots = "last", width = 104, height = 34, min = -1.4, max = 1.0, class = "fund-curve" },
 			})
 		end
 		local funds_card = dashboard_card {
@@ -273,7 +273,7 @@ return mod {
 					{ key = "called", title = "CALLED", width = 80, align = "right", mono = true },
 					{ key = "dpi", title = "DPI", width = 70, align = "right", mono = true },
 					{ key = "irr", title = "NET IRR", width = 80, align = "right", mono = true },
-					{ key = "curve", title = "NET CASH", width = 170 },
+					{ key = "curve", title = "NET CASH", width = 120 },
 				},
 				rows = rows,
 				sortable = false,
@@ -294,7 +294,7 @@ return mod {
 					class = "overview-grid",
 					shrink = false,
 					ui.row { class = "overview-row", align = "stretch", cash_card, ui.column { width = 470, shrink = false, waiting_card } },
-					ui.row { class = "overview-row", align = "stretch", ui.column { width = 600, shrink = false, raise_card }, funds_card },
+					ui.row { class = "overview-row", align = "stretch", ui.column { width = 540, shrink = false, raise_card }, funds_card },
 				},
 			},
 		}
