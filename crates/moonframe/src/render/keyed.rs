@@ -8,6 +8,7 @@ use {
     crate::motion::{Drawn, Kept},
     gpui_kit::*,
     moonframe_core::{Direction, Node, Part, Stack, Transition, TransitionKind},
+    std::rc::Rc,
 };
 
 /// The key of a keyed child, and the stack it is.
@@ -64,10 +65,15 @@ impl<'w> Painter<'w, '_> {
                 self.motion.enter(&child.path);
             }
             let shown = self.shown(&child, true, Some(&transition));
+            // The last frame's copy, if the child has not changed since.
+            let same = before
+                .and_then(|before| before.kept.iter().find(|kept| kept.key == key))
+                .filter(|kept| *kept.node == *node)
+                .map(|kept| kept.node.clone());
             drawn.kept.push(Kept {
                 key: key.to_owned(),
                 index,
-                node: node.clone(),
+                node: same.unwrap_or_else(|| Rc::new(node.clone())),
                 transition,
             });
             let element = node.draw(self, &child, cx);
@@ -84,7 +90,7 @@ impl<'w> Painter<'w, '_> {
         for kept in leaving {
             let child = place.keyed(&kept.key, direction);
             let shown = self.shown(&child, false, Some(&kept.transition));
-            let Node::Stack(stack) = &kept.node else {
+            let Node::Stack(stack) = &*kept.node else {
                 continue;
             };
             if shown.hidden() {

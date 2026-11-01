@@ -799,6 +799,35 @@ def system_open(*args):
         pass
 
 
+# Kinds of file that run something when opened: an attachment of one of
+# these is shown in its folder, never opened, so a mail can't run code.
+LAUNCHERS = {
+    ".app", ".command", ".terminal", ".tool", ".sh", ".bash", ".zsh", ".csh", ".fish",
+    ".pkg", ".mpkg", ".dmg", ".fileloc", ".webloc", ".inetloc", ".url", ".desktop",
+    ".scpt", ".scptd", ".applescript", ".workflow", ".action", ".jar", ".py", ".pl",
+    ".rb", ".js", ".jse", ".vbs", ".exe", ".bat", ".cmd", ".com", ".msi", ".ps1",
+    ".appimage", ".run", ".bin", ".so", ".dylib", ".kext", ".prefpane", ".plugin",
+}
+
+
+def launcher(name):
+    ext = os.path.splitext(name)[1].lower()
+    return ext in LAUNCHERS
+
+
+def quarantine(path):
+    """Marks a written attachment as downloaded, as Mail does, so macOS
+    asks before running it. Best effort: without `xattr`, nothing is set."""
+    if sys.platform != "darwin":
+        return
+    flag = "0081;%x;msgvault;" % int(time.time())
+    try:
+        subprocess.call(["xattr", "-w", "com.apple.quarantine", flag, path],
+                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        pass
+
+
 def private_dir(path):
     """`path` as a folder only this user can enter, or None when it is
     someone else's or a link: /tmp is shared on Linux, and a folder left
@@ -861,10 +890,15 @@ def deliver(aid, save):
             out.write(content)
     except OSError as error:
         return tell_user(False, "Can't write %s: %s" % (tilde(path), error.strerror or error))
+    quarantine(path)
     if save:
         if sys.platform == "darwin" and not truthy(os.environ.get("MSGVAULT_NO_OPEN")):
             system_open("-R", path)
         return tell_user(True, "Saved %s to Downloads" % re.sub(r".*/", "", path))
+    if launcher(name):
+        if sys.platform == "darwin" and not truthy(os.environ.get("MSGVAULT_NO_OPEN")):
+            system_open("-R", path)
+        return tell_user(False, "%s could run a program, so it is shown in its folder, not opened" % name)
     if not truthy(os.environ.get("MSGVAULT_NO_OPEN")):
         system_open(path)
     return tell_user(True, "Opened %s" % name)

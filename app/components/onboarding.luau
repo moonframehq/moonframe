@@ -32,6 +32,23 @@ type Props = {
 	[number]: any,
 }
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Onboarding",
 	category = "Overlays",
@@ -104,12 +121,8 @@ return component {
 		local dismiss = if props.dismiss ~= nil then props.dismiss else done
 		local event = props.event or "page"
 
-		local body: { any } = {}
-		if #props > 0 then
-			for _, child in ipairs(props) do
-				body[#body + 1] = child
-			end
-		elseif pages[current] then
+		local body: { any } = positional(props)
+		if #body == 0 and pages[current] then
 			local page = pages[current]
 			if page.icon then
 				body[#body + 1] = ui.row { ui.row { class = "onboarding-page-icon", ui.icon { name = page.icon :: any } } }

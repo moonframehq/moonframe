@@ -2,10 +2,7 @@
 //! table herdr-acp uses (`herdr_chat_protocol::Agent`), with each agent's
 //! ACP command first and an `npx` fallback for the adapters.
 
-use std::{
-    ffi::{OsStr, OsString},
-    path::{Path, PathBuf},
-};
+use std::{ffi::OsStr, path::PathBuf};
 
 /// An agent: its name in messages, its title, how to sign in, and the
 /// commands that start it over ACP, most preferred first.
@@ -60,40 +57,8 @@ pub(crate) const AGENTS: &[Agent] = &[
 /// The runner that fetches an adapter package on first use.
 const FETCHER: &str = "npx";
 
-/// Where agents install themselves besides `PATH`, under the home folder:
-/// an app started from the Dock gets a `PATH` that leaves them out.
-const USER_DIRS: [&str; 8] = [
-    ".local/bin",
-    ".cargo/bin",
-    ".bun/bin",
-    ".npm-global/bin",
-    ".opencode/bin",
-    ".volta/bin",
-    ".claude/local",
-    ".local/share/mise/shims",
-];
-#[cfg(unix)]
-const SYSTEM_DIRS: [&str; 2] = ["/opt/homebrew/bin", "/usr/local/bin"];
-#[cfg(not(unix))]
-const SYSTEM_DIRS: [&str; 0] = [];
-
 pub(crate) fn find(name: &str) -> Option<&'static Agent> {
     AGENTS.iter().find(|agent| agent.name == name)
-}
-
-/// `path`'s folders, then the user and system folders agents install to.
-pub(crate) fn search_path(path: Option<&OsStr>, home: Option<&Path>) -> OsString {
-    let mut dirs: Vec<PathBuf> = path
-        .map(std::env::split_paths)
-        .into_iter()
-        .flatten()
-        .collect();
-    dirs.extend(
-        home.into_iter()
-            .flat_map(|home| USER_DIRS.iter().map(|dir| home.join(dir))),
-    );
-    dirs.extend(SYSTEM_DIRS.iter().map(PathBuf::from));
-    std::env::join_paths(dirs).unwrap_or_default()
 }
 
 /// How an agent can be started here.
@@ -113,7 +78,7 @@ impl Agent {
             let Some((program, args)) = command.split_first() else {
                 continue;
             };
-            let Some(found) = find_program(program, path) else {
+            let Some(found) = moonframe_providers::program::find(program, path) else {
                 continue;
             };
             let args = args.iter().map(|arg| (*arg).to_owned()).collect();
@@ -135,25 +100,4 @@ impl Agent {
             first.copied().unwrap_or(self.name)
         )
     }
-}
-
-/// Looks `program` up in a `PATH`-style list of folders.
-pub(crate) fn find_program(program: &str, path: &OsStr) -> Option<PathBuf> {
-    std::env::split_paths(path).find_map(|dir| executable(&dir, program))
-}
-
-#[cfg(unix)]
-fn executable(dir: &Path, program: &str) -> Option<PathBuf> {
-    use std::os::unix::fs::PermissionsExt;
-    let candidate = dir.join(program);
-    let metadata = candidate.metadata().ok()?;
-    (metadata.is_file() && metadata.permissions().mode() & 0o111 != 0).then_some(candidate)
-}
-
-#[cfg(windows)]
-fn executable(dir: &Path, program: &str) -> Option<PathBuf> {
-    ["exe", "cmd", "bat"]
-        .iter()
-        .map(|extension| dir.join(program).with_extension(extension))
-        .find(|candidate| candidate.is_file())
 }

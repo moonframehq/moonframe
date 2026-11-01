@@ -206,7 +206,7 @@ impl Module {
         library: &Library,
     ) -> Result<Self, Error> {
         let meter = Meter::default();
-        let lua = vm::open(name, &meter, library)?;
+        let lua = vm::open(name, &meter, library, vm::MEMORY)?;
         let value = vm::text(&lua, source, name).eval::<Value>()?;
         let definition = Definition::read(&value, &Cx::root(&NO_NAMES))?;
         if definition.window.is_some() && name != SHELL {
@@ -232,7 +232,7 @@ impl Module {
         library: &Library,
     ) -> Result<Self, Error> {
         let meter = Meter::default();
-        let lua = vm::open(name, &meter, library)?;
+        let lua = vm::open(name, &meter, library, vm::SMALL_MEMORY)?;
         let table = library.definition(&lua, component)?;
         let update = table.get::<Option<Function>>("update")?;
         if update.is_none() {
@@ -297,14 +297,14 @@ impl Module {
         })
     }
 
-    /// Whether it hears the topic `name`: listed by name, or under a prefix
-    /// ending in `*` (`tabs/*`).
     /// The topic patterns it hears, as written: names, or prefixes ending
     /// in `*`.
     pub(crate) fn subscriptions(&self) -> &[String] {
         &self.definition.subscribe
     }
 
+    /// Whether it hears the topic `name`: listed by name, or under a prefix
+    /// ending in `*` (`tabs/*`).
     pub(crate) fn subscribes(&self, name: &str) -> bool {
         self.definition
             .subscribe
@@ -410,9 +410,9 @@ impl Module {
         )
     }
 
-    /// The state as plain data, to carry over a reload; `None` when it holds
-    /// something that cannot cross, such as a function.
-    pub(crate) fn state(&self) -> Option<Data> {
-        Data::read(&self.state).ok()
+    /// The state as plain data, to carry over a reload; an error when it
+    /// holds something that cannot cross, such as a function.
+    pub(crate) fn state(&self) -> Result<Data, Error> {
+        Data::read(&self.state)
     }
 }

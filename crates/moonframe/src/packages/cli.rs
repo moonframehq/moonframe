@@ -176,23 +176,36 @@ pub(crate) fn update(
 
 /// Asks before a package's providers may run code with the user's access,
 /// or its mods may commit and push (named in git's `writers`); other mods,
-/// components, and styles are Luau the app runs sandboxed.
+/// components, and styles are Luau the app runs sandboxed. An app's
+/// approval covers the packages it ships beside it, which its updates
+/// change with it.
 pub(crate) fn approve(contents: &Contents, writers: &[String], yes: bool) -> Result<(), String> {
-    let trusted: Vec<_> = contents.trusted().collect();
-    let writing: Vec<_> = contents.writers(writers).collect();
+    let mut trusted = Vec::new();
+    let mut writing = Vec::new();
+    for (from, part) in contents.parts() {
+        let name = |name: &str| match from {
+            Some(from) => format!("{} (in {})", super::printable(name), super::printable(from)),
+            None => super::printable(name),
+        };
+        trusted.extend(
+            part.trusted()
+                .map(|(provider, how)| format!("{}: {how}", name(provider))),
+        );
+        writing.extend(part.writers(writers).map(name));
+    }
     if (trusted.is_empty() && writing.is_empty()) || yes {
         return Ok(());
     }
     if !trusted.is_empty() {
         println!("This package has providers that run code as you:");
-        for (name, how) in &trusted {
-            println!("  {}: {how}", super::printable(name));
+        for line in &trusted {
+            println!("  {line}");
         }
     }
     if !writing.is_empty() {
         println!("This package replaces mods that may commit and push with git:");
         for name in &writing {
-            println!("  {}", super::printable(name));
+            println!("  {name}");
         }
     }
     if !io::stdin().is_terminal() {

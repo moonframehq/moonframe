@@ -4,34 +4,10 @@
 -- open folder; opening one tells it which to list. Choosing a file tells the
 -- editor and the inspector, by returning sends from `update`.
 
--- Icon and color for a file, by its whole name first, then its extension.
-local BY_NAME = {
-	["Cargo.toml"] = { "settings-2", "#dea584" },
-	["Cargo.lock"] = { "lock", "#dea584" },
-	["LICENSE"] = { "file-text", "#d4c55c" },
-	["README.md"] = { "book-open", "#519aba" },
-	["justfile"] = { "terminal", "#89e051" },
-	[".gitignore"] = { "git-branch", "#f14e32" },
-}
-local BY_EXTENSION = {
-	luau = { "moon", "#5b8cff" },
-	lua = { "moon", "#5b8cff" },
-	rs = { "code", "#dea584" },
-	toml = { "settings", "#9da5b4" },
-	lock = { "lock", "#9da5b4" },
-	md = { "book-open", "#519aba" },
-	json = { "code", "#cbcb41" },
-	sh = { "terminal", "#89e051" },
-	swift = { "code", "#f05138" },
-	wit = { "plug", "#7fd3ed" },
-	png = { "frame", "#a074c4" },
-	jpg = { "frame", "#a074c4" },
-	svg = { "frame", "#a074c4" },
-	icns = { "frame", "#a074c4" },
-	yml = { "settings", "#cb4b16" },
-	yaml = { "settings", "#cb4b16" },
-}
-local FILE = { "file", "#9da5b4" }
+local file_icon = use "file-icon"
+
+-- Folders are gold here, as editors' trees draw them; files take
+-- `file-icon`'s colours by type.
 local FOLDER = "#dcb67a"
 -- Pixels each level of the tree steps in.
 local INDENT = 12
@@ -47,15 +23,6 @@ type State = {
 	-- The chosen file, by path.
 	selected: string?,
 }
-
-local function file_icon(name: string)
-	local known = BY_NAME[name]
-	if known then
-		return known
-	end
-	local extension = string.match(name, "%.([%w]+)$")
-	return extension and BY_EXTENSION[string.lower(extension)] or FILE
-end
 
 -- The explorer's box: a panel in the sidebar; in a tab, which frames it
 -- already (`props.framed`), a bare column, so no second border. The list
@@ -92,17 +59,16 @@ local function line(state: State, at: Line)
 			ui.text { "…", tone = "muted", size = "small" },
 		}
 	end
-	local icon, color, lead
+	local icon, lead
 	if entry.dir then
-		icon, color = if at.open then "folder-open" else "folder", FOLDER
+		icon = ui.icon { name = if at.open then "folder-open" else "folder", style = { color = FOLDER } }
 		lead = ui.icon {
 			name = if at.open then "chevron-down" else "chevron-right",
 			class = "tree-chevron",
 			size = "small",
 		}
 	else
-		local known = file_icon(entry.name)
-		icon, color = known[1], known[2]
+		icon = file_icon { name = entry.name }
 		-- Where a folder's chevron goes, so names line up.
 		lead = ui.row { width = 14 }
 	end
@@ -119,19 +85,22 @@ local function line(state: State, at: Line)
 		msg = if entry.dir then { toggle = at.path } else { open = at.path },
 		ui.row { width = INDENT * at.depth },
 		lead,
-		ui.icon { name = icon :: any, style = { color = color } },
+		icon,
 		ui.text { entry.name, truncate = true },
 	}
 end
 
--- The open folders, one path per line: what the provider lists.
-local function open_list(open: { [string]: boolean? }): string
+-- Tells the provider which folders this explorer has open, one path per
+-- line. Each explorer (the sidebar's, each tab's) sends its own `owner`, so
+-- the provider lists what any of them has open.
+local function list_open(state: State, props: any): { any }
 	local paths = {}
-	for path in open do
+	for path in state.open do
 		table.insert(paths, path)
 	end
 	table.sort(paths)
-	return table.concat(paths, "\n")
+	local owner = props and props.id or ""
+	return { { to = "provider:files", msg = { open = table.concat(paths, "\n"), owner = owner } } }
 end
 
 return mod {
@@ -152,21 +121,24 @@ return mod {
 		[".tree-chevron"] = { color = "muted-foreground" },
 	},
 
-	init = function(previous: State?): State
-		return {
+	init = function(previous: State?, props): (State, { any }?)
+		local state: State = {
 			open = previous and previous.open or {},
 			collapsed = previous and previous.collapsed or false,
 			selected = previous and previous.selected,
 		}
+		-- Folders open before a reload or a relaunch are listed again: a
+		-- new provider lists only the root.
+		return state, if next(state.open) then list_open(state, props) else nil
 	end,
 
-	update = function(state: State, msg)
+	update = function(state: State, msg, props)
 		if type(msg) ~= "table" then
 			return
 		end
 		if msg.toggle then
 			state.open[msg.toggle] = if state.open[msg.toggle] then nil else true
-			return state, { { to = "provider:files", msg = { open = open_list(state.open) } } }
+			return state, list_open(state, props)
 		elseif msg.collapse ~= nil then
 			state.collapsed = not state.collapsed
 		elseif msg.open then

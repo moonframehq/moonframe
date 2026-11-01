@@ -262,9 +262,9 @@ impl Run {
                 thread::Builder::new()
                     .name("acp-stderr".to_owned())
                     .spawn(move || {
-                        for line in BufReader::new(errors).lines().map_while(Result::ok) {
+                        moonframe_providers::lines::log_lines(errors, |line| {
                             deliver(Inbound::Log(line));
-                        }
+                        });
                     })
             });
         if let Err(error) = spawned {
@@ -528,16 +528,20 @@ impl Run {
     }
 
     /// The user's answer to the waiting question: an option's id, or none
-    /// to refuse. False when there is no such question or option.
+    /// to refuse. False when there is no such question or option, or the
+    /// option is one that allows always: answers come from a mod, which
+    /// could pick it without the user, and the agent would keep it past
+    /// the run. Allowing is once at most, as with `[settings] allow`.
     pub(crate) fn answer(&mut self, option: Option<&str>) -> bool {
         let Some(question) = self.question.as_ref() else {
             return false;
         };
         let outcome = match option {
-            Some(option) if question.options.iter().any(|known| known.0 == option) => {
-                selected(option)
+            Some(option) => match question.options.iter().find(|known| known.0 == option) {
+                Some((.., kind)) if kind == "allow_always" => return false,
+                Some(_) => selected(option),
+                None => return false,
             },
-            Some(_) => return false,
             None => cancelled(),
         };
         let rpc = question.rpc.clone();

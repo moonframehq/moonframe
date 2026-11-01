@@ -985,6 +985,7 @@ chat_message {
 | `grow` | fill the parent and scroll |
 | `height` | pixels: scrolls within it |
 | `highlight` | line numbers to highlight |
+| `id` | names the list a long scrolling view becomes (default "code-view"); two long views in one mod need two |
 | `lines` | the lines instead of `text` |
 | `numbers` | false hides line numbers |
 | `path` | a header with the file path |
@@ -1817,6 +1818,7 @@ A whole mod using it, with state: `app/components/demos/spotlight-bars.luau`.
 | `event` | key of the message a cell click sends, default "cell": { cell = { row, key } } |
 | `grow` | fill the parent and scroll the rows |
 | `height` | pixels: the rows scroll within it |
+| `id` | names the list a long scrolling grid becomes (default "spreadsheet"); two long grids in one mod need two |
 | `numbers` | false hides the row number column |
 | `row_height` | pixels per row (default 34) |
 | `rows` | list of maps, a value per column key: text, a number, an element, `false` for a skeleton bar, or nil for empty |
@@ -1894,6 +1896,7 @@ A whole mod using it, with state: `app/components/demos/stat-tile.luau`.
 | `event` | row message key instead of "select": sends { [event] = id } |
 | `grow` | fill the parent and scroll the body |
 | `height` | pixels: the body scrolls within it |
+| `id` | names the list a long scrolling body becomes (default "table"); two long tables in one mod need two |
 | `rows` | list of maps: `id` plus a value per column key; a value may be a string, a number or an element |
 | `selected` | id of the selected row |
 | `sort` | key of the sorted column (shows an arrow) |

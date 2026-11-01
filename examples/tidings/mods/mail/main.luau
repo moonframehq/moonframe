@@ -404,7 +404,7 @@ return mod {
 					align = "center",
 					justify = "center",
 					style = { background = thread.color },
-					ui.text { string.sub(thread.sender, 1, 1), size = "small", weight = "bold" },
+					ui.text { (string.match(thread.sender, "^" .. utf8.charpattern) or ""), size = "small", weight = "bold" },
 				}
 			end
 			return avatar { name = thread.sender, shape = "circle", size = size or "small", color = thread.color }

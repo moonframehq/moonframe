@@ -11,6 +11,23 @@ type Props = {
 	[number]: any,
 }
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Chat Message",
 	category = "Data",
@@ -54,10 +71,7 @@ chat_message {
 				ui.column { class = "chat-message-bubble", max_width = 300, hug = true, table.unpack(paragraphs) },
 			}
 		end
-		local children = {}
-		for _, child in ipairs(props) do
-			table.insert(children, child)
-		end
+		local children = positional(props)
 		return ui.column {
 			class = "chat-message",
 			props.author and ui.row {

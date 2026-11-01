@@ -13,7 +13,14 @@ type Props = {
 	grow: boolean?,
 	event: string?,
 	to: string?,
+	id: string?,
 }
+
+-- Past this many lines a view that scrolls is a `ui.list`, which builds only
+-- the lines that show: a view holds at most 10,000 elements. Its long lines
+-- are then cut at the edge rather than scrolled to.
+local LIST_AFTER = 500
+local LINE_HEIGHT = 20
 
 return component {
 	title = "Code View",
@@ -32,6 +39,7 @@ return component {
 		["grow"] = "fill the parent and scroll",
 		["event"] = "line click message key: sends { [event] = line number } (no click without it)",
 		["to"] = "the mod to send it to",
+		["id"] = "names the list a long scrolling view becomes (default \"code-view\"); two long views in one mod need two",
 	},
 	styles = {
 		[".code-view"] = { gap = 0, border = "all", border_color = "border", radius = 8, background = "background" },
@@ -75,18 +83,21 @@ code_view {
 			highlighted[line] = true
 		end
 		local digits = #tostring(start + #lines - 1)
+		local scrolls = props.height ~= nil or props.grow == true
+		local listed = scrolls and #lines > LIST_AFTER
 
-		local rows = {}
-		for index, text in lines do
+		local function draw(index: number)
+			local text = lines[index]
 			local number = start + index - 1
 			local classes = { "code-view-line" }
 			if highlighted[number] then
 				table.insert(classes, "code-view-highlight")
 			end
-			rows[index] = ui.row {
+			return ui.row {
 				class = classes,
 				shrink = false,
 				align = "center",
+				height = if listed then LINE_HEIGHT else nil,
 				msg = if props.event then { [props.event] = number } else nil,
 				to = props.to,
 				props.numbers ~= false and ui.row {
@@ -99,7 +110,30 @@ code_view {
 			}
 		end
 
-		local scrolls = props.height ~= nil or props.grow == true
+		local body
+		if listed then
+			body = ui.list {
+				id = props.id or "code-view",
+				class = "code-view-body",
+				height = props.height,
+				grow = props.grow,
+				count = #lines,
+				row_height = LINE_HEIGHT,
+				row = draw,
+			}
+		else
+			local rows = table.create(#lines)
+			for index = 1, #lines do
+				rows[index] = draw(index)
+			end
+			body = ui.column {
+				class = "code-view-body",
+				height = props.height,
+				grow = props.grow,
+				scroll = scrolls and "both",
+				table.unpack(rows),
+			}
+		end
 		return ui.column {
 			class = "code-view",
 			grow = props.grow,
@@ -110,13 +144,7 @@ code_view {
 				ui.icon { name = "file", class = "code-view-header-icon" },
 				ui.text { props.path, class = "code-view-path", truncate = true },
 			},
-			ui.column {
-				class = "code-view-body",
-				height = props.height,
-				grow = props.grow,
-				scroll = scrolls and "both",
-				table.unpack(rows),
-			},
+			body,
 		}
 	end,
 }

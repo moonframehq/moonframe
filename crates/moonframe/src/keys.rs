@@ -1,6 +1,6 @@
 //! Keys an open overlay or popover takes (`keys = { escape = ... }`). They
 //! come first, before a focused terminal and the app's key bindings, but only
-//! for the topmost open one.
+//! for the topmost open one in the window the key was typed in.
 
 use {
     crate::app::MoonframeApp,
@@ -38,10 +38,13 @@ impl MoonframeApp {
         {
             return Taken::Free;
         }
-        // The highest priority; of equals, the later in the tree.
+        // The highest priority in this window; of equals, the later in the
+        // tree.
         let Some(top) = self
             .key_layers
-            .iter()
+            .get(&window.window_handle().window_id())
+            .into_iter()
+            .flatten()
             .max_by_key(|layer| layer.priority)
             .cloned()
         else {

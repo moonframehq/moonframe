@@ -9,6 +9,7 @@ use {
     crate::{
         Data, Error, IconName, Node, Rules, Stylesheet, TabKind, node,
         read::{Cx, Fields, NO_NAMES, Read as _},
+        style,
         vm::{self, Meter},
     },
     mlua::{Function, Lua, Table, Value},
@@ -40,9 +41,18 @@ impl Library {
             files
                 .into_iter()
                 .map(|(name, path)| {
-                    let text = std::fs::read_to_string(&path).map_err(|error| {
-                        Error::new(format!("cannot read {}: {error}", path.display()))
-                    });
+                    // The name goes into the demo's and usage's Luau as
+                    // `use "name"`, so it keeps to a mod name's letters.
+                    let text = if style::valid_name(&name) {
+                        std::fs::read_to_string(&path).map_err(|error| {
+                            Error::new(format!("cannot read {}: {error}", path.display()))
+                        })
+                    } else {
+                        Err(Error::new(format!(
+                            "{}: a component's file name is a-z, 0-9, - and _",
+                            path.display()
+                        )))
+                    };
                     (name, Source { path, text })
                 })
                 .collect(),
@@ -274,7 +284,12 @@ fn describe(
     sheet: &Stylesheet,
 ) -> Result<(About, Result<Node, Error>), Error> {
     let meter = Meter::default();
-    let lua = vm::open(&format!("components/{name}"), &meter, library)?;
+    let lua = vm::open(
+        &format!("components/{name}"),
+        &meter,
+        library,
+        vm::SMALL_MEMORY,
+    )?;
     let table = library.load(&lua, name)?;
     let fields = Fields::read(&Value::Table(table.clone()), &Cx::root(&NO_NAMES), &[&[
         "title",

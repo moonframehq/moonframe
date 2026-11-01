@@ -11,9 +11,12 @@
 //!   The sandbox covers the running component only: building runs Cargo,
 //!   and the crate's proc macros, with the user's access, so a wasm
 //!   provider's source is as trusted as a process provider. The host
-//!   refuses the most direct build hooks, a `build.rs` or a folder-local
-//!   `.cargo/`. A provider from elsewhere ships its source, which can be
-//!   reviewed; packages are refused with any `provider.wasm`.
+//!   refuses the provider's own build hooks (a build script, in it or in a
+//!   local crate it uses, and a toolchain named by path) and runs Cargo
+//!   outside its folders, so no Cargo config there applies; proc macros and
+//!   published dependencies' build scripts still run. A provider from
+//!   elsewhere ships its source, which can be reviewed; packages are
+//!   refused with any `provider.wasm`.
 //! - **native**: Rust built into the app (see [`native`]), for git, forges
 //!   and the like: the user's own access, real libraries, and replies to
 //!   the mod that asked.
@@ -36,9 +39,12 @@ mod asynchronous;
 mod fingerprint;
 mod fixed;
 mod json;
+pub mod lines;
 mod manifest;
+mod mods;
 pub mod native;
 mod process;
+pub mod program;
 mod system;
 mod wasm;
 
@@ -50,6 +56,7 @@ pub use {
 pub use {
     json::{from_json, to_json},
     manifest::{Capability, Kind, Manifest, PREBUILT, Start},
+    mods::{Mods, owner},
     native::{Handle, Native, Natives},
 };
 

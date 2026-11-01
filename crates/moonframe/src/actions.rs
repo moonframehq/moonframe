@@ -26,6 +26,14 @@ pub(crate) struct MenuSend {
     pub(crate) id: String,
 }
 
+/// A shell menu shortcut was pressed: the item it runs is looked up when
+/// it is pressed, so a shortcut a reload took away or moved runs nothing.
+#[derive(Clone, Debug, PartialEq, gpui_kit::Action)]
+#[action(namespace = moonframe, no_json)]
+pub(crate) struct MenuKey {
+    pub(crate) keystroke: String,
+}
+
 /// Opens the component browser on one component.
 #[derive(Clone, Debug, PartialEq, gpui_kit::Action)]
 #[action(namespace = moonframe, no_json)]
@@ -155,9 +163,10 @@ pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
     bar
 }
 
-/// Binds each shell menu item's `shortcut` to it, once per key and item:
-/// GPUI keeps bindings for the app's life, and an item is found again by
-/// its id after a reload.
+/// Binds each shell menu item's `shortcut`, once per key: GPUI keeps
+/// bindings for the app's life, so each key sends [`MenuKey`] and the item
+/// it runs is found when it is pressed. A key no item has any more after a
+/// reload then runs nothing and goes on to whatever else takes it.
 pub(crate) fn bind_menu_keys(shell: &[AppMenu], cx: &mut App) {
     thread_local! {
         static BOUND: std::cell::RefCell<std::collections::BTreeSet<String>> =
@@ -178,16 +187,13 @@ pub(crate) fn bind_menu_keys(shell: &[AppMenu], cx: &mut App) {
                 continue;
             }
             let keystroke = keystroke(chord);
-            let id = item.id(&menu.title);
-            let fresh =
-                BOUND.with_borrow_mut(|bound| bound.insert(format!("{keystroke}\u{1f}{id}")));
-            if fresh {
+            if BOUND.with_borrow_mut(|bound| bound.insert(keystroke.clone())) {
                 // GPUI takes a key's name for the app's life; each is bound
                 // once, so these few strings are all that is kept.
-                let keystroke: &'static str = Box::leak(keystroke.into_boxed_str());
+                let name: &'static str = Box::leak(keystroke.clone().into_boxed_str());
                 bindings.push(KeyBinding::new(
-                    keystroke,
-                    MenuSend { id },
+                    name,
+                    MenuKey { keystroke },
                     Some("MoonframeApp"),
                 ));
             }
@@ -197,7 +203,7 @@ pub(crate) fn bind_menu_keys(shell: &[AppMenu], cx: &mut App) {
 }
 
 /// GPUI's name for `chord`: `secondary` is ⌘ on macOS, Ctrl elsewhere.
-fn keystroke(chord: &Chord) -> String {
+pub(crate) fn keystroke(chord: &Chord) -> String {
     let mac = cfg!(target_os = "macos");
     let mut parts = Vec::new();
     if chord.ctrl || (chord.secondary && !mac) {

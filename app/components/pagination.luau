@@ -42,6 +42,13 @@ local function numbers(page: number, pages: number, window: number, ellipsis: bo
 	end
 	-- With gaps: the first, the last and `window - 2` slots between them.
 	local inner = math.max(window - 2, 1)
+	if pages <= inner + 2 then
+		-- Too few pages for a gap (a `window` of 1 or 2): all of them.
+		for n = 1, pages do
+			table.insert(list, n)
+		end
+		return list
+	end
 	local first = math.clamp(page - math.floor((inner - 1) / 2), 2, pages - inner)
 	local last = first + inner - 1
 	table.insert(list, 1)

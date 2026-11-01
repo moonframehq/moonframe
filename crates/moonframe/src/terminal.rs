@@ -55,6 +55,13 @@ pub(crate) struct Terminals {
     drawn: HashSet<String>,
     /// The last terminal that appeared since the window last looked.
     appeared: Option<FocusHandle>,
+    /// The main window's frame is being drawn: only its terminals count
+    /// as drawn, so one in a mod window that missed a frame of the main
+    /// window's is not taken to have appeared again.
+    in_main_frame: bool,
+    /// The terminals refused for being over a limit, warned of once: they
+    /// are asked for again every frame.
+    refused: HashSet<String>,
 }
 
 impl Terminals {
@@ -67,6 +74,8 @@ impl Terminals {
             last_drawn: HashSet::new(),
             drawn: HashSet::new(),
             appeared: None,
+            in_main_frame: false,
+            refused: HashSet::new(),
         }
     }
 
@@ -145,11 +154,14 @@ impl Terminals {
             spawn,
             scrolled: Cell::new(0.),
         });
-        if let Err(problem) = &view.session {
+        if let Err(problem) = &view.session
+            && (!refused || self.refused.insert(key.to_owned()))
+        {
             tracing::warn!("terminal {key}: {problem}");
         }
         // A refused one is asked for again next frame, not kept.
         if !refused {
+            self.refused.remove(key);
             self.views.insert(key.to_owned(), view.clone());
         }
         view
@@ -159,18 +171,23 @@ impl Terminals {
     /// frame compares against.
     pub(crate) fn begin_frame(&mut self) {
         self.last_drawn = std::mem::take(&mut self.drawn);
+        self.in_main_frame = true;
     }
 
-    /// The terminal at `key` is drawn this frame; if it was not in the
-    /// last one, it is the one to focus.
+    /// The terminal at `key` is drawn in the main window's frame; if it was
+    /// not in the last one, it is the one to focus. Other windows' terminals
+    /// are not counted.
     pub(crate) fn drawn(&mut self, key: &str, view: &TerminalView) {
-        if self.drawn.insert(key.to_owned()) && !self.last_drawn.contains(key) {
+        if self.in_main_frame && self.drawn.insert(key.to_owned()) && !self.last_drawn.contains(key)
+        {
             self.appeared = Some(view.focus.clone());
         }
     }
 
-    /// The terminal that appeared since the last call, to focus.
-    pub(crate) fn take_appeared(&mut self) -> Option<FocusHandle> {
+    /// Ends the main window's frame: the terminal that appeared in it, to
+    /// focus.
+    pub(crate) fn end_frame(&mut self) -> Option<FocusHandle> {
+        self.in_main_frame = false;
         self.appeared.take()
     }
 

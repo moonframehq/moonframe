@@ -86,7 +86,7 @@ return mod {
 				justify = "center",
 				tooltip = user.name,
 				style = { background = user.color, radius = 999, color = "#ffffff" },
-				ui.text { string.sub(user.name, 1, 1), weight = "bold" },
+				ui.text { (string.match(user.name, "^" .. utf8.charpattern) or ""), weight = "bold" },
 			})
 		end
 		return ui.column { class = "rail", grow = true, align = "center", table.unpack(items) }

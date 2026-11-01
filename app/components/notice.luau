@@ -25,6 +25,23 @@ local ICONS = {
 	danger = "circle-alert",
 }
 
+-- The children in order. `ipairs` and `#` stop at the first `nil`, which a
+-- child such as `cond and ui.text "x"` leaves, and drop what follows it.
+local function positional(props: any): { any }
+	local keys = {}
+	for key, child in props do
+		if type(key) == "number" and child then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	local list = table.create(#keys)
+	for _, key in keys do
+		table.insert(list, props[key])
+	end
+	return list
+end
+
 return component {
 	title = "Notice",
 	category = "Feedback",
@@ -115,7 +132,7 @@ return component {
 			props.title ~= nil and ui.text { props.title, class = "notice-title" } or false,
 			props.text ~= nil and ui.text { props.text, class = "notice-text", truncate = folded } or false,
 		}
-		for _, child in ipairs(props) do
+		for _, child in positional(props) do
 			content[#content + 1] = child
 		end
 		content[#content + 1] = actions or false

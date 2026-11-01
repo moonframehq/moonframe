@@ -356,7 +356,7 @@ return mod {
 				align = "center",
 				justify = "center",
 				style = { background = person.color, radius = 999, color = "#ffffff" },
-				ui.text { string.upper(string.sub(person.name, 1, 1)), size = "small", weight = "bold" },
+				ui.text { string.upper((string.match(person.name, "^" .. utf8.charpattern) or "")), size = "small", weight = "bold" },
 			}
 		end
 

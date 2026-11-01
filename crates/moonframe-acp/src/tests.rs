@@ -190,6 +190,8 @@ fn a_question_waits_for_the_user() {
     // Only the mod that started it may answer, and only with an option.
     rig.send("other", json!({ "answer": id, "option": "yes" }));
     rig.send("feedback", json!({ "answer": id, "option": "maybe" }));
+    // Never "always": the mod could pick it without the user.
+    rig.send("feedback", json!({ "answer": id, "option": "always" }));
     assert_eq!(rig.run()["status"], "waiting");
     rig.send("feedback", json!({ "answer": id, "option": "yes" }));
     rig.wait_for("done");
@@ -274,6 +276,33 @@ fn only_starters_start_runs() {
             .unwrap()
             .is_empty()
     );
+}
+
+#[test]
+fn a_starters_component_starts_runs_as_it() {
+    // A component the mod drew counts as the mod; a lookalike name doesn't.
+    let mut rig = rig();
+    rig.send("feedback-x", json!({ "start": "Rename it", "id": 1 }));
+    rig.send(
+        "feedback/chat#main",
+        json!({ "start": "Rename it", "id": 2 }),
+    );
+    let replies = rig.replies();
+    assert_eq!(replies[0].1["ok"], false);
+    assert_eq!(replies[1].1["ok"], true, "{}", replies[1].1);
+}
+
+#[test]
+fn a_mod_cannot_answer_always() {
+    let mut rig = rig();
+    rig.send("feedback", json!({ "start": "Rename it" }));
+    let id = rig.wait_for("waiting")["id"].as_str().unwrap().to_owned();
+    rig.send("feedback", json!({ "answer": id, "option": "always" }));
+    assert_eq!(rig.run()["status"], "waiting");
+    // Refusing stays open to it.
+    rig.send("feedback", json!({ "answer": id, "option": "no" }));
+    rig.wait_for("done");
+    assert_eq!(rig.sent()[3]["result"]["outcome"]["optionId"], "no");
 }
 
 #[test]

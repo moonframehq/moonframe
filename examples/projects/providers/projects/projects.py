@@ -810,7 +810,9 @@ def receive(line):
     message = text_of(msg.get("commit"))
     if message is not None:
         dir = state["select"]
-        if dir is None or not re.search(r"\S", message):
+        if dir is None or not os.path.exists(dir + "/.git"):
+            finish("commit", id, {"ok": False, "error": "No work tree open"})
+        elif not re.search(r"\S", message):
             finish("commit", id, {"ok": False, "error": "Write a message to commit with"})
         else:
             write_action(sender, "commit", id, lambda dir=dir, message=message: commit(dir, message))
