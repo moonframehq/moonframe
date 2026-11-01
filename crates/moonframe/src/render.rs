@@ -14,6 +14,7 @@ mod gallery;
 mod input;
 mod keyed;
 mod list;
+mod markdown;
 mod plot;
 mod styling;
 mod terminal;
@@ -628,6 +629,7 @@ fn draw_node<'w>(
         Node::Browser(browser) => browser.draw(painter, place, cx),
         Node::View(view) => view.draw(painter, place, cx),
         Node::Input(input) => input.draw(painter, place, cx),
+        Node::Markdown(markdown) => markdown.draw(painter, place, cx),
         Node::Region(region) => region.draw(painter, place, cx),
         Node::Divider => elements::divider(painter, place, cx),
         Node::Spacer => div().flex_1().into_any_element(),

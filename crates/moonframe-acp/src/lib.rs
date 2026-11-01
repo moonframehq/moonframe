@@ -15,9 +15,10 @@
 //!   permissions? }` starts a run. `instructions` are the mod's own
 //!   guidance, put before the words; `context` is data the app gathered,
 //!   sent as JSON fenced with a tag chosen per run and marked as data, never
-//!   instructions. `permissions = "allow"` answers every permission question with
-//!   the broadest allow (the agent then does anything without asking);
-//!   otherwise each waits on the user. Answered at once with
+//!   instructions. Permission questions wait on the user, unless the user
+//!   set the mod's entry in provider.toml's `[settings] allow`: `"read"`
+//!   answers those of tools that only look, `"all"` every one; always
+//!   "allow once", never "always". A mod can't ask for more. Answered at once with
 //!   `{ reply = id, action = "start", ok, run | error }`, and when it ends
 //!   with `{ reply = id, action = "finished", ok, run, status, message | error }`.
 //! - `{ cancel = "<run>" }` stops it; `{ forget = "<run>" }` drops a
@@ -31,7 +32,7 @@ mod run;
 use {
     moonframe_core::Data,
     moonframe_providers::{Handle, Native, to_json},
-    run::{Inbound, Run, Start, Status},
+    run::{Allow, Inbound, Run, Start, Status},
     serde_json::{Value, json},
     std::{
         collections::hash_map::RandomState,
@@ -73,6 +74,9 @@ pub struct Acp {
     state: Arc<Mutex<State>>,
     /// The mods that may start runs (`[settings] starters`).
     starters: Vec<String>,
+    /// The permission questions each mod's runs answer themselves
+    /// (`[settings] allow`), by mod; the rest ask.
+    allow: Vec<(String, Allow)>,
     /// The agent a start without `agent` gets (`[settings] agent`).
     default_agent: String,
     /// Where agents work.
@@ -101,6 +105,13 @@ impl Native for Acp {
             .into_iter()
             .flatten()
             .filter_map(|name| name.as_str().map(str::to_owned))
+            .collect();
+        self.allow = settings
+            .get("allow")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .filter_map(|(name, level)| Some((name.clone(), Allow::parse(level.as_str()?)?)))
             .collect();
         self.default_agent = settings
             .get("agent")
@@ -292,7 +303,12 @@ impl Acp {
                     .and_then(Value::as_str)
                     .map(str::to_owned),
                 prompt,
-                allow: message.get("permissions").and_then(Value::as_str) == Some("allow"),
+                // The user's setting, never the mod's message.
+                allow: self
+                    .allow
+                    .iter()
+                    .find(|(name, _)| name == from)
+                    .map_or(Allow::Ask, |(_, allow)| *allow),
                 cwd: self.cwd.clone(),
                 now,
             },

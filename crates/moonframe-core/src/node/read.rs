@@ -6,7 +6,7 @@ use {
     super::*,
     crate::{
         Error, Stylesheet,
-        read::{Cx, Fields, Read},
+        read::{Cx, Document, Fields, Read},
         style::Edges,
     },
     mlua::{Table, Value},
@@ -114,6 +114,7 @@ impl Tree<'_> {
             Element::Browser => Node::Browser(self.build(kind, table, &cx)?),
             Element::View => Node::View(self.build(kind, table, &cx)?),
             Element::Input => Node::Input(self.build(kind, table, &cx)?),
+            Element::Markdown => Node::Markdown(self.build(kind, table, &cx)?),
             Element::Divider => self
                 .build::<Bare>(kind, table, &cx)
                 .map(|_| Node::Divider)?,
@@ -741,7 +742,12 @@ impl Build for Input {
         Ok(Self {
             look: Look::from_fields(fields)?,
             id: fields.get::<InputId>("id")?.map(|id| id.0),
-            value: fields.get("value")?,
+            // A text area may hold a whole document.
+            value: if multiline {
+                fields.get::<Document>("value")?.map(|text| text.0)
+            } else {
+                fields.get("value")?
+            },
             placeholder: fields.get("placeholder")?,
             to,
             change,
@@ -755,6 +761,41 @@ impl Build for Input {
             width: fields.number("width", PIXELS)?,
             grow: fields.get("grow")?.unwrap_or(false),
             browser,
+        })
+    }
+}
+
+impl Build for Markdown {
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
+        "text",
+        "link",
+        "to",
+        "grow",
+        "scroll",
+        "width",
+        "height",
+        "max_width",
+    ]];
+
+    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
+        let link = fields.get::<Data>("link")?;
+        let to = fields.get::<String>("to")?;
+        if to.is_some() && link.is_none() {
+            return Err(fields.cx().key("to").fail("`to` goes with `link`"));
+        }
+        Ok(Self {
+            look: Look::from_fields(fields)?,
+            text: fields
+                .get::<Document>("text")?
+                .map(|text| text.0)
+                .unwrap_or_default(),
+            link,
+            to,
+            grow: fields.get("grow")?.unwrap_or(false),
+            scroll: fields.get("scroll")?.unwrap_or(false),
+            width: fields.number("width", PIXELS)?,
+            height: fields.number("height", PIXELS)?,
+            max_width: fields.number("max_width", PIXELS)?,
         })
     }
 }

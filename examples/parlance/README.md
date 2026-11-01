@@ -13,7 +13,7 @@ manner of the big assistants' own desktop clients.
   Click a chat to open it; click a folder or project to open or close it.
 - **Conversation:** the user's messages as bubbles with copy, share and
   edit; the answers as rich markdown (bold, code, tables, lists, code
-  blocks, source chips) drawn by the `markdown` component, with copy,
+  blocks, source chips) drawn by the `chat-markdown` component, with copy,
   share, read aloud, regenerate, feedback and more.
 - **Composer:** +, the field, a mode menu (Instant, Thinking, Research),
   the mic, and send, which becomes stop while an answer is written.

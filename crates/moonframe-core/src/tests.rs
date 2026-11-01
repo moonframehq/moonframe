@@ -1218,11 +1218,26 @@ fn long_strings_are_refused() {
     assert!(error.contains("longer than"), "{error}");
 
     let lua = mlua::Lua::new();
-    let huge = mlua::Value::String(lua.create_string("y".repeat(100_000)).unwrap());
+    // A document fits in a message; past one, it doesn't.
+    let doc = mlua::Value::String(lua.create_string("y".repeat(100_000)).unwrap());
+    assert!(Data::read(&doc).is_ok());
+    let huge = mlua::Value::String(
+        lua.create_string("y".repeat(crate::MAX_DOCUMENT + 1))
+            .unwrap(),
+    );
     assert!(Data::read(&huge).is_err());
     let key = lua.create_table().unwrap();
-    key.raw_set("k".repeat(100_000), 1).unwrap();
+    key.raw_set("k".repeat(crate::MAX_DOCUMENT + 1), 1).unwrap();
     assert!(Data::read(&mlua::Value::Table(key)).is_err());
+    // Nor do many documents in one value.
+    let many = lua.create_table().unwrap();
+    for _ in 0..5 {
+        many.raw_push("z".repeat(crate::MAX_DOCUMENT)).unwrap();
+    }
+    let error = Data::read(&mlua::Value::Table(many))
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("bytes of text"), "{error}");
 }
 
 #[test]
@@ -2603,6 +2618,70 @@ fn inputs_read_their_text_messages_and_keys() {
         panic!("no address bar");
     };
     assert_eq!(bar.browser.as_deref(), Some("docs"));
+}
+
+#[test]
+fn markdown_reads_a_document_and_its_link() {
+    use crate::Markdown;
+    let Ok(Node::Markdown(doc)) = input_view(
+        r##"ui.markdown { "# Notes\n\nSome *text*.", link = { open = true }, to = "editor",
+            grow = true, scroll = true, max_width = 720, class = "doc" }"##,
+    ) else {
+        panic!("no markdown");
+    };
+    assert_eq!(doc.text, "# Notes\n\nSome *text*.");
+    assert_eq!(doc.to.as_deref(), Some("editor"));
+    assert!(doc.grow && doc.scroll);
+    assert_eq!(
+        (doc.max_width, doc.look.class.as_slice()),
+        (Some(720.0), ["doc".to_owned()].as_slice())
+    );
+    assert_eq!(
+        Markdown::message(doc.link.as_ref().unwrap(), "https://luau.org"),
+        Data::Map(
+            [
+                ("open".to_owned(), Data::Bool(true)),
+                ("url".to_owned(), Data::from("https://luau.org")),
+            ]
+            .into()
+        )
+    );
+    assert_eq!(
+        Markdown::message(&Data::from("link"), "#top"),
+        Data::Map(
+            [
+                ("msg".to_owned(), Data::from("link")),
+                ("url".to_owned(), Data::from("#top")),
+            ]
+            .into()
+        )
+    );
+
+    // A document is longer than a label may be, and a text area holds one.
+    let Ok(Node::Markdown(long)) = input_view("ui.markdown(string.rep('x', 100000))") else {
+        panic!("no long markdown");
+    };
+    assert_eq!(long.text.len(), 100_000);
+    let Ok(Node::Input(area)) =
+        input_view("ui.input { multiline = true, value = string.rep('x', 100000) }")
+    else {
+        panic!("no long text area");
+    };
+    assert_eq!(area.value.map(|value| value.len()), Some(100_000));
+
+    for (view, expected) in [
+        ("ui.markdown { to = 'x' }", "`to` goes with `link`"),
+        ("ui.markdown { 'a', lable = 'x' }", "unknown key `lable`"),
+        ("ui.markdown { ui.text 'a' }", "expected a string"),
+        ("ui.input { value = string.rep('x', 20000) }", "longer than"),
+        (
+            "ui.markdown(string.rep('x', 1048577))",
+            "longer than 1048576 bytes",
+        ),
+    ] {
+        let error = input_view(view).unwrap_err();
+        assert!(error.contains(expected), "{view}: {error}");
+    }
 }
 
 #[test]

@@ -9,6 +9,11 @@ pub(crate) fn natives() -> Natives {
     let mut natives = Natives::new();
     #[cfg(feature = "acp")]
     natives.insert("acp".to_owned(), std::sync::Arc::new(moonframe_acp::native));
+    #[cfg(feature = "docs")]
+    natives.insert(
+        "docs".to_owned(),
+        std::sync::Arc::new(moonframe_docs::native),
+    );
     // The demo gallery's (examples/demo): it opens apps on this binary.
     natives.insert(
         "demos".to_owned(),

@@ -62,6 +62,7 @@ Pick the lowest layer that can do the job:
 | data from the machine, files, network or a CLI | a **provider** feeding `app.<name>` | `providers/<name>/` | no (the host builds Wasm providers itself) |
 | state that survives quitting the app (open panels, tabs, a choice) | nothing to add: every mod's state is saved; shape what comes back in `init` | the mod's `init` | no |
 | git status, a file's diff, commit or push | read `app.git`; send `provider:git` a message | in a mod | no (git is built in) |
+| markdown shown, or a project file read and saved | `ui.markdown` or `use "markdown"`; `use "markdown-editor"`, which reads and saves through `provider:docs` | in a mod | no (docs is built in) |
 | a coding agent doing a task (Claude, Codex, Gemini...) | send `provider:acp` `{ start = ... }`; show the run with `use "agent-run"` | in a mod | no (acp is built in) |
 | a provider that needs a Rust library or answers actions | a **native provider** | `crates/` + `providers/<name>/provider.toml` | yes, and the app restarts |
 | a look change | a rule in `style.luau`, or the mod's `styles` | | no |
@@ -107,6 +108,17 @@ arrows (see "Dialogs, palettes, sheets and toasts").
 
 **A reusable piece.** A component with a good `example`, so it previews
 in the Components window, then `use` it from the mod.
+
+**Markdown.** To show it: `local markdown = use "markdown"`, then
+`markdown { text = state.notes, grow = true, scroll = true, link =
+"open-link" }` (or `ui.markdown`); a link click sends `{ msg = "open-link",
+url = ... }` and opens nothing by itself, and pictures are not loaded. To
+edit a project file: `local markdown_editor = use "markdown-editor"`, then
+`markdown_editor { id = "readme", path = "README.md" }` in a growing
+container; it reads and saves through the `docs` provider (see "Built-in
+providers"), which takes saves only from its `writers` (`editor` as
+shipped; add yours there as for git). In the starter, a markdown file
+picked in the explorer opens in a main tab of this kind.
 
 **A web page.** With browser chrome (back, forward, reload, an address
 bar that navigates, the title): `local browser = use "browser"`, then
@@ -196,9 +208,11 @@ for _, run in (app.acp and app.acp.runs) or {} do
 end
 ```
 
-Without `permissions = "allow"`, every tool the agent wants waits on the
-user in `agent-run`; with it the agent does anything as the user, so set it
-only where the user asked for that (`mods/feedback` does). Like git's
+Every tool the agent wants waits on the user in `agent-run`, unless the
+user set the mod in `providers/acp`'s `[settings] allow`: `"read"` lets
+tools that only look go without asking, `"all"` every tool, each allowed
+once, never always. A mod can't ask for more; leave that setting to the
+user (as shipped, `feedback = "read"`). Like git's
 `writers`, a new mod goes in `starters` of a copy of `app/providers/acp`.
 
 **Customising the installed app.** Write to `~/.config/moonframe`
@@ -327,8 +341,11 @@ return component {
   any component with clicks or state, so the user can play with it: a
   segmented control that switches, a dialog a button opens, a tree that
   folds. Keep it short, realistic and commented. Without one, the preview
-  is a mod made from `example`. A demo runs in the gallery only: its
-  messages reach only its own `update`, and app commands do nothing.
+  is a mod made from `example`, unless the component gives `usage`: then
+  the preview is a still picture whose controls do nothing, so a component
+  with `usage` and clicks needs a demo file. A demo runs in the gallery
+  only: its messages reach only its own `update`, app commands do nothing,
+  and its text fields edit (outside a demo they only show their text).
 - Name it after what it is (`branch-list`, not `widget2`); the file name
   is the name `use` takes.
 - Types: the definition file's type names (`IconName`, `Tone`, `Style`)
@@ -500,7 +517,9 @@ ui.input {
   never take focus or edit.
 - **`multiline = true`** makes a text area: Enter adds a line, ⌘/Ctrl-Enter
   sends `submit`, and `rows` (default 3, up to 200) sets the visible
-  height; it scrolls past that.
+  height; it scrolls past that. With `grow = true` in a column it fills
+  the height it gets instead (an editor's pane), never under `rows`. Its
+  `value` may be a whole document, up to 1 MiB.
 - **Size.** `width` in pixels, or `grow = true` to take the free space
   along the parent's axis (in a row, the width). In a column it fills the
   width anyway. `mono = true` uses the monospace font.
@@ -817,6 +836,7 @@ Text-like elements take their main value positionally:
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
+| `ui.markdown "# Notes"` | `text`, `link`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures are not loaded |
 | `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
 | `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
 | `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras, `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
@@ -969,7 +989,7 @@ Picking a font for the user:
 
 **Selectors.**
 - An element type: `row` `column` `panel` `panel-header` `pane` `text`
-  `button` `item` `badge` `icon` `image` `line` `hatch` `terminal` `browser` `input` `divider` `popover` `tooltip`
+  `button` `item` `badge` `icon` `image` `line` `hatch` `terminal` `browser` `input` `markdown` `markdown-code` `markdown-quote` `divider` `popover` `tooltip`
   `overlay` `overlay-backdrop`. `panel-header` is a panel's title bar;
   `tooltip` is every tooltip's box; `overlay-backdrop` is what dims the
   window behind an overlay with `backdrop = true` (its `background` and
@@ -1378,8 +1398,9 @@ the Wasm provider each second), `app.git` (branch, files, diffs, worktrees;
 native, and it commits and pushes on request), and from process providers
 `app.github` and `app.gitlab` (pull requests, checks, issues),
 `app.agents` (coding agents running here), `app.files` (the project's
-file tree) and `app.herdr` (whether herdr-core and tmux are installed),
-and the native `app.acp` (coding agents a mod runs over ACP).
+file tree), `app.docs` (native: reads and saves the project's text files
+for a mod, answering it), `app.herdr` (whether herdr-core and tmux are
+installed), and the native `app.acp` (coding agents a mod runs over ACP).
 Their shapes are under "Built-in providers" below and typed in
 `types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`, `Acp`,
 and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
@@ -1496,6 +1517,25 @@ that something runs until the reply comes.
 | `stashes` | count |
 | `diff` | `{ path, binary, lines, truncated, hunks = { { header, old_start, new_start, lines = { { kind ("add" "del" "ctx"), old?, new?, text } } } } }`, at most 1200 lines of 300 characters |
 
+`app.docs` (docs, native): `{ available, root }`, the root `app.files`
+lists. It reads and saves the project's text files (UTF-8, at most 1 MiB)
+for the mod that asks, answering it (`{ reply, action, ok, path, ... }`):
+`{ read = "<path>", id = ... }` answers with `text` and `version`, and from
+then on sends that mod `{ changed = "<path>", version }` (or `missing =
+true`) when the file changes on disk; `{ write = "<path>", text, version,
+id = ... }` saves it atomically, keeping its permissions, and answers with
+the new `version`, but refuses with `conflict = true` when the file
+changed since `version` (or exists and none is given) unless `force =
+true`; `{ close = "<path>" }` stops watching. Paths are relative to the
+root, without `.`, `..` or `.git`, and must stay in it through links.
+Anyone may read; only `[settings] writers` (`editor` as shipped) and the
+components they draw may write. `use "markdown-editor"` is the whole
+example.
+
+A document can be long: `ui.markdown`'s `text` and a multiline
+`ui.input`'s `value` take up to 1 MiB (other strings in a view, 16 KiB),
+and a string in a message or in state up to 1 MiB (4 MiB of text per value).
+
 `app.herdr` (herdr, from `bash`): `{ installed, version, path, tmux,
 installing, error, fresh }`, every 30 s and on any message. The message
 `"install"` runs herdr-core's own installer (into `~/.local/bin`) and sets
@@ -1562,8 +1602,8 @@ replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
 runs are kept (30) across launches.
 
 Messages: `{ start = "<words>", id?, agent?, instructions?, context?,
-permissions? }` (`permissions = "allow"` answers every question with the
-broadest allow), `{ cancel = run }`, `{ forget = run }`
+}` (permission questions wait on the user, except those the
+user's `[settings] allow` covers for the mod), `{ cancel = run }`, `{ forget = run }`
 (finished ones), `{ answer = run, option = "<id>" | false }`.
 
 | field | shape |

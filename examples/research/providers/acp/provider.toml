@@ -7,3 +7,6 @@ kind     = "native"
 [settings]
 agent    = "claude"
 starters = ["feedback"]
+# Questions for tools that only look are allowed once; the rest ask you
+# (see the app's providers/acp for "all").
+allow = { feedback = "read" }

@@ -1,8 +1,9 @@
 -- Send feedback: a ? in the title bar opens a dialog where the user writes
 -- what should change in the app. The `acp` provider hands it to a coding
 -- agent (Claude by default, over the Agent Client Protocol) working on the
--- app's own files with every permission, so the window reloads with the
--- change; the dialog follows each run under "Feedback & fixes". The icon
+-- app's own files, so the window reloads with the change; the dialog
+-- follows each run under "Feedback & fixes", where the agent asks before
+-- each change unless providers/acp's `allow` lets it. The icon
 -- spins while an agent works, and shows a dot when one finished since the
 -- dialog was last open. Inspect in the dialog picks an element in the
 -- window to attach. The shell mounts it in its title bar.
@@ -231,7 +232,6 @@ return mod {
 							agent = state.agent,
 							instructions = instructions(state.folder, state.pid, true),
 							context = { main_tab = state.tab, conversation = said },
-							permissions = "allow",
 						},
 					},
 				}
@@ -260,7 +260,6 @@ return mod {
 							agent = state.agent,
 							instructions = instructions(state.folder, state.pid, false),
 							context = context,
-							permissions = "allow",
 						},
 					},
 				}
@@ -331,7 +330,7 @@ return mod {
 		elseif #options == 0 then
 			note = "No coding agent is installed here. Install one with an ACP mode (claude-agent-acp, codex-acp, gemini, opencode or copilot), or Node for npx."
 		else
-			note = `A background agent ({title}) in {short(acp.workdir)}{if acp.app and acp.app ~= "." then "/" .. acp.app else ""} implements it with every permission; your window reloads with the change, and it reports back under Feedback & fixes. It gets what you're looking at, your window and the build.`
+			note = `A background agent ({title}) in {short(acp.workdir)}{if acp.app and acp.app ~= "." then "/" .. acp.app else ""} implements it, asking you here before each change unless providers/acp allows it; your window reloads with the change, and it reports back under Feedback & fixes. It gets what you're looking at, your window and the build.`
 		end
 
 		local icon = if asking then "circle-alert" elseif running > 0 then "loader-circle" else "circle-help"
