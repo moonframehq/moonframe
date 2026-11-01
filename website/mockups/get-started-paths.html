@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Get started: three ways in (mockups)</title>
+<style>
+  :root {
+    --paper:#f6eedc; --paper2:#eee2c8; --ink:#2a1a10; --ink2:#4a3426; --dim:#6e5a4a; --rule:#2a1a1022; --acc:#a33a14; --acc-hi:#d9541f;
+    --serif:"Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --sans:Inter, system-ui, -apple-system, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing:border-box; margin:0 }
+  body { background:var(--paper); color:var(--ink); font:18px/1.65 var(--serif); -webkit-font-smoothing:antialiased }
+  a { color:inherit; text-decoration:none }
+  code { font:.84em var(--mono); background:#2a1a100d; padding:1px 5px; border-radius:3px }
+  .wrap { max-width:1180px; margin:0 auto; padding:0 40px }
+  .kicker { font:600 12px var(--sans); letter-spacing:.14em; text-transform:uppercase; color:var(--acc); margin-bottom:16px }
+  h2 { font:400 64px/1.05 var(--serif); letter-spacing:-.02em } h2 i { color:var(--acc-hi) }
+  .lead { font-size:20px; color:var(--ink2); max-width:720px; margin-top:16px }
+
+  /* Mockup chrome: not part of the design */
+  .picker { position:sticky; top:0; z-index:5; background:var(--ink); color:var(--paper); font:13px var(--sans); display:flex; gap:6px; align-items:center; padding:10px 40px }
+  .picker b { margin-right:10px; letter-spacing:.1em; text-transform:uppercase; font-size:11px; color:#f2b33d }
+  .picker button { font:600 13px var(--sans); background:#ffffff14; color:var(--paper); border:0; padding:6px 12px; border-radius:4px; cursor:pointer }
+  .picker button.on { background:#f2b33d; color:var(--ink) }
+  .mock { display:none; padding:72px 0 88px } .mock.on { display:block }
+  .note { font:13px/1.5 var(--sans); color:var(--dim); border-left:3px solid var(--acc-hi); padding:4px 12px; margin-bottom:40px; max-width:760px }
+
+  /* Shared step rows, as on the site */
+  .steps { list-style:none; padding:0; margin-top:28px; border-top:2px solid var(--ink) }
+  .steps li { display:grid; grid-template-columns:44px minmax(0, 1fr) minmax(0, 1.15fr); gap:24px; align-items:center; padding:18px 0; border-bottom:1px solid var(--rule) }
+  .steps .num { font:600 13px var(--mono); color:var(--acc) }
+  .steps h3 { font-size:22px; font-weight:500 }
+  .steps p { font-size:15px; color:var(--ink2) }
+  .copy { display:flex; align-items:center; gap:12px; width:100%; background:var(--ink); color:var(--paper); border:0; border-radius:3px; padding:10px 10px 10px 16px; font:14px var(--mono); text-align:left; cursor:pointer }
+  .copy code { flex:1; min-width:0; background:none; color:inherit; padding:0; white-space:pre-wrap; overflow-wrap:anywhere }
+  .copy > span { font:600 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:#f2b33d; padding:4px 8px; border-radius:3px }
+  .needs { margin-top:18px; font:14px var(--sans); color:var(--dim) }
+  .needs a { color:var(--acc); text-decoration:underline; text-underline-offset:2px }
+
+  /* A: tabs */
+  .tabs { display:flex; gap:0; margin-top:36px; border-bottom:2px solid var(--ink) }
+  .tabs button { flex:1; text-align:left; background:none; border:0; padding:14px 18px 16px; cursor:pointer; font:inherit; color:var(--dim); border-bottom:4px solid transparent; margin-bottom:-2px }
+  .tabs button b { display:block; font:500 22px var(--serif); color:var(--ink2) }
+  .tabs button small { font:13px var(--sans) }
+  .tabs button.on { border-color:var(--acc-hi); background:#2a1a1008 } .tabs button.on b { color:var(--ink) }
+  .tabs button .tag { font:600 10px var(--sans); letter-spacing:.12em; text-transform:uppercase; color:var(--acc) }
+  .pane { display:none } .pane.on { display:block }
+  .pane .steps { border-top:0; margin-top:0 }
+
+  /* B: three columns */
+  .three { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); margin-top:44px; border-top:2px solid var(--ink) }
+  .three > div { padding:26px 28px 6px; border-right:1px solid var(--rule); display:flex; flex-direction:column }
+  .three > div:last-child { border-right:0 } .three > div:first-child { padding-left:0 }
+  .three .who { font:600 11px var(--sans); letter-spacing:.14em; text-transform:uppercase; color:var(--acc) }
+  .three h3 { font:500 28px/1.15 var(--serif); margin:8px 0 6px }
+  .three h3 i { color:var(--acc-hi) }
+  .three > div > p { font-size:16px; color:var(--ink2); min-height:78px }
+  .three pre { font:13px/1.85 var(--mono); background:var(--ink); color:var(--paper); padding:14px 16px; margin-top:16px; border-radius:3px; white-space:pre-wrap; overflow-wrap:anywhere }
+    .three .then { font:14px/1.5 var(--sans); color:var(--dim); margin-top:14px }
+  .three .then a { color:var(--acc); text-decoration:underline; text-underline-offset:2px }
+  .three .eg { margin-top:auto; padding-top:18px; font:13px var(--sans); color:var(--dim) } .three .eg b { color:var(--ink) }
+
+  /* C: chooser */
+  .brew { margin-top:36px; border:2px solid var(--ink); display:flex; justify-content:space-between; align-items:center; padding:18px 24px; gap:24px; font:16px var(--sans) }
+  .brew b { font:500 22px var(--serif) } .brew p { font-size:14px; color:var(--dim) }
+  .brew .copy { width:auto }
+  .or { text-align:center; font:italic 18px var(--serif); color:var(--dim); margin:26px 0 0 }
+  .cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; margin-top:22px }
+  .card { text-align:left; border:1px solid #2a1a1033; background:#fffaf0; border-radius:6px; padding:20px 22px; cursor:pointer; font:inherit; color:inherit; position:relative; transition:all .15s }
+  .card:hover { border-color:var(--ink) }
+  .card.on { border-color:var(--acc-hi); box-shadow:0 0 0 2px var(--acc-hi), 0 18px 40px -24px #2a1a1066 }
+  .card .q { font:italic 16px var(--serif); color:var(--dim) }
+  .card b { display:block; font:500 24px/1.2 var(--serif); margin:6px 0 8px }
+  .card p { font:14px/1.5 var(--sans); color:var(--ink2) }
+  .card .n { position:absolute; top:16px; right:18px; font:600 12px var(--mono); color:var(--acc) }
+  .sel { margin-top:34px } .sel h3.t { font:400 36px/1.1 var(--serif) } .sel h3.t i { color:var(--acc-hi) }
+
+  /* Wide step: text above, two code panels side by side */
+  .steps li.wide { grid-template-columns:44px minmax(0, 1fr); align-items:start }
+  .steps li.wide .num { padding-top:6px }
+  .pair { grid-column:2; display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px }
+  .panel { background:var(--ink); color:var(--paper); border-radius:3px; display:flex; flex-direction:column; min-width:0 }
+  .panel header { display:flex; justify-content:space-between; align-items:center; padding:8px 10px 8px 16px; border-bottom:1px solid #ffffff14; font:600 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:#d8c8ad }
+  .panel header button { font:inherit; color:#f2b33d; background:none; border:0; padding:4px 8px; border-radius:3px; cursor:pointer }
+  .panel header button:hover { background:#ffffff14 }
+  .panel pre { font:12.5px/1.7 var(--mono); padding:12px 16px 14px; white-space:pre; overflow-x:auto; margin:0 }
+  .proposed { display:inline-block; font:600 10px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--acc); border:1px solid var(--acc); border-radius:3px; padding:0 5px; margin-left:6px; vertical-align:2px }
+</style>
+</head>
+<body>
+
+<div class="picker"><b>Mockup</b>
+  <button data-m="a" class="on">A · Tabs</button>
+  <button data-m="b">B · Three columns</button>
+  <button data-m="c">C · Pick your path</button>
+</div>
+
+<div class="wrap">
+
+<!-- ============ A: tabs over the existing rows ============ -->
+<section class="mock on" id="m-a">
+  <p class="note">A keeps today's section as it is and puts three tabs above the rows. The heading stays "Four commands", which is true of each path. Tab 1 is today's content; the other two swap in.</p>
+  <p class="kicker">Get started</p>
+  <h2>Four commands <i>to a running window.</i></h2>
+
+  <div class="tabs">
+    <button class="on" data-p="new"><span class="tag">From source</span><b>Start a new app</b><small>Clone the starter and make it yours.</small></button>
+    <button data-p="lib"><span class="tag">As a library</span><b>Add it to a Rust project</b><small>Your crate, Moonframe's window.</small></button>
+    <button data-p="app"><span class="tag">Homebrew</span><b>Use the app</b><small>Install it, then shape it from your folder.</small></button>
+  </div>
+
+  <div class="pane on" data-p="new">
+    <ol class="steps">
+      <li><span class="num">I</span><div><h3>Clone the starter</h3><p>Name the folder after your app.</p></div><button class="copy"><code>git clone https://github.com/penso/moonframe my-app</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Step inside</h3><p>Everything else runs from here.</p></div><button class="copy"><code>cd my-app</code><span>Copy</span></button></li>
+      <li><span class="num">III</span><div><h3>Install the toolchain</h3><p>mise fetches Rust, and Zig for the Ghostty terminal.</p></div><button class="copy"><code>mise install</code><span>Copy</span></button></li>
+      <li><span class="num">IV</span><div><h3>Open the window</h3><p>Then ask your agent for anything; the window changes as it saves.</p></div><button class="copy"><code>just run</code><span>Copy</span></button></li>
+    </ol>
+    <p class="needs">You need <a href="#">rustup</a>, <a href="#">just</a> and <a href="#">mise</a>. Developed on macOS; CI builds Linux and Windows too. More in the <a href="#">quick start</a>.</p>
+  </div>
+
+  <div class="pane" data-p="lib">
+    <ol class="steps">
+      <li><span class="num">I</span><div><h3>Get the command</h3><p>The <code>moonframe</code> command writes the app folder for you.</p></div><button class="copy"><code>brew install penso/tap/moonframe</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Give your crate a window</h3><p>Adds <code>app/</code>, Luau types and the agent skills. Never touches <code>src/</code>.</p></div><button class="copy"><code>moonframe init . --name my-app</code><span>Copy</span></button></li>
+      <li><span class="num">III</span><div><h3>Depend on it</h3><p>Then set <code>opt-level = 2</code> for dependencies; <code>init</code> prints the lines.</p></div><button class="copy"><code>cargo add moonframe --git https://github.com/penso/moonframe</code><span>Copy</span></button></li>
+      <li class="wide"><span class="num">IV</span><div><h3>Hand it main, last</h3><p>Do your own setup first, then end <code>main</code> with Moonframe: <code>run()</code> holds the main thread until the window closes. Your Rust publishes data as a provider, plain or <code>async</code> on tokio; Luau draws it.</p></div>
+      <div class="pair">
+        <div class="panel"><header>Sync · src/main.rs<button>Copy</button></header><pre>use moonframe::{Data, Handle, Moonframe, Native};
+
+#[derive(Default)]
+struct Vault { /* your state */ }
+
+impl Native for Vault {
+    fn tick(&amp;mut self, host: &amp;Handle) {
+        host.publish_json(&amp;self.summary());
+    }
+    fn receive(&amp;mut self, host: &amp;Handle, _from: &amp;str, msg: Data) {
+        /* a mod sent { open = id } */
+    }
+}
+
+fn main() -&gt; std::process::ExitCode {
+    // 1. Your setup first: config, logging, CLI flags.
+    env_logger::init();
+
+    // 2. Moonframe last: run() takes the main thread
+    //    and returns when the window closes.
+    Moonframe::new("my-app")
+        .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
+        .native("vault", Vault::default)
+        .run()
+}</pre></div>
+        <div class="panel"><header>Async · tokio<button>Copy</button></header><pre>use moonframe::{AsyncNative, Data, Handle, Moonframe};
+
+#[derive(Default)]
+struct Weather { client: reqwest::Client }
+
+impl AsyncNative for Weather {
+    async fn tick(&amp;mut self, host: &amp;Handle) {
+        match self.client.get(URL).send().await {
+            Ok(r) =&gt; host.publish_json(&amp;r.json().await.unwrap_or_default()),
+            Err(e) =&gt; host.fail(e.to_string()),
+        }
+    }
+}
+
+#[tokio::main]  // run() reuses this multi-thread runtime
+async fn main() -&gt; std::process::ExitCode {
+    // 1. Your setup first: pools and clients on tokio.
+    let db = connect().await;
+
+    // 2. Moonframe last. Providers and views share
+    //    your runtime (moonframe::on_runtime in views).
+    Moonframe::new("my-app")
+        .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
+        .native_async("weather", Weather::default)
+        .run()
+}</pre></div>
+      </div></li>
+    </ol>
+    <p class="needs">See it done in <a href="#">msgvault-moonframe</a>: a mail archive reader, one provider and four mods. More in <a href="#">the library guide</a>.</p>
+  </div>
+
+  <div class="pane" data-p="app">
+    <ol class="steps">
+      <li><span class="num">I</span><div><h3>Install it</h3><p>Puts Moonframe.app in /Applications and <code>moonframe</code> on your path.</p></div><button class="copy"><code>brew install penso/tap/moonframe</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Open it</h3><p>Then turn on <b>Developer Mode</b> in the app menu for Inspect Element and reloads.</p></div><button class="copy"><code>open -a Moonframe</code><span>Copy</span></button></li>
+      <li><span class="num">III</span><div><h3>Ask an agent for anything</h3><p>Opens the agent in a pane of the window, in your folder with the Moonframe skills, so you watch it work while the window changes.</p></div><button class="copy"><code>moonframe pane new --agent claude "add a clock to the status bar"</code><span>Copy</span></button></li>
+      <li><span class="num">IV</span><div><h3>Add mods and apps</h3><p>From any git repository. Whole apps run beside the starter as profiles.</p></div><button class="copy"><code>moonframe app install owner/some-app</code><span>Copy</span></button></li>
+    </ol>
+    <p class="needs">macOS 13 or later. Linux and Windows builds are on the <a href="#">releases page</a>. More on <a href="#">mods from git</a> and <a href="#">apps as profiles</a>.</p>
+  </div>
+</section>
+
+<!-- ============ B: three columns ============ -->
+<section class="mock" id="m-b">
+  <p class="note">B shows all three at once, so nobody has to find the tab that fits them. Each column is a short script plus what to do next. Shortest page, least detail per step.</p>
+  <p class="kicker">Get started</p>
+  <h2>Three ways in, <i>one window.</i></h2>
+  <p class="lead">Pick the one that matches what you already have.</p>
+
+  <div class="three">
+    <div>
+      <span class="who">Nothing yet</span>
+      <h3>Start a <i>new app</i></h3>
+      <p>Clone the starter, rename it, and change it live, by hand or with an agent.</p>
+<pre>git clone https://github.com/penso/moonframe my-app
+cd my-app
+mise install   # Rust, Zig
+just run</pre>
+      <p class="then">Then ask your agent for anything; it changes live. Needs <a href="#">rustup</a>, <a href="#">just</a>, <a href="#">mise</a>.</p>
+      <p class="eg"><b>Quick start</b> in the README →</p>
+    </div>
+    <div>
+      <span class="who">A Rust project</span>
+      <h3>Add it to <i>your crate</i></h3>
+      <p>Keep your code and your repository. Moonframe becomes the window; your Rust feeds it.</p>
+<pre>brew install penso/tap/moonframe
+moonframe init . --name my-app
+cargo add moonframe \
+  --git https://github.com/penso/moonframe
+cargo run</pre>
+      <p class="then"><code>init</code> writes <code>app/</code>, types and skills, and prints the <code>main.rs</code> to paste. <a href="#">Library guide</a>.</p>
+      <p class="eg">Example: <b>msgvault-moonframe</b>, a mail archive reader →</p>
+    </div>
+    <div>
+      <span class="who">Just want to use it</span>
+      <h3>Install <i>the app</i></h3>
+      <p>No Rust needed. Ask an agent in your own folder to change anything; add mods and whole apps from git.</p>
+<pre>brew install penso/tap/moonframe
+open -a Moonframe
+# an agent in a pane, in your folder:
+moonframe pane new --agent claude \
+  "add a clock to the status bar"
+moonframe mod install owner/repo</pre>
+      <p class="then">Turn on <b>Developer Mode</b> in the app menu for Inspect Element. macOS 13+; <a href="#">Linux, Windows</a>.</p>
+      <p class="eg"><b>Apps as profiles</b> →</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ C: pick your path ============ -->
+<section class="mock" id="m-c">
+  <p class="note">C leads with Homebrew, the one line most people want, then asks "what do you have?" with three cards. The chosen card's steps appear below in today's row style. Most guided; longest page.</p>
+  <p class="kicker">Get started</p>
+  <h2>Where are you <i>starting from?</i></h2>
+
+  <div class="brew">
+    <div><b>The app, in one line</b><p>Moonframe.app in /Applications and the <code>moonframe</code> command. macOS 13+.</p></div>
+    <button class="copy"><code>brew install penso/tap/moonframe</code><span>Copy</span></button>
+  </div>
+
+  <p class="or">or build with it</p>
+
+  <div class="cards">
+    <button class="card" data-p="app"><span class="n">I</span><span class="q">“I installed it.”</span><b>Make the app yours</b><p>Ask an agent to change anything in <code>~/.config/moonframe</code>; add mods and whole apps.</p></button>
+    <button class="card on" data-p="new"><span class="n">II</span><span class="q">“I'm starting fresh.”</span><b>Build a new app</b><p>Clone the starter and rename it. Everything is yours to change.</p></button>
+    <button class="card" data-p="lib"><span class="n">III</span><span class="q">“I have a Rust project.”</span><b>Give it a Moonframe window</b><p>Depend on the crate; your Rust becomes providers and views.</p></button>
+  </div>
+
+  <div class="sel pane" data-p="app">
+    <h3 class="t">Make the app <i>yours.</i></h3>
+    <ol class="steps">
+      <li><span class="num">I</span><div><h3>Turn on Developer Mode</h3><p>In the app menu: Inspect Element, Components and reloads.</p></div><button class="copy"><code>open -a Moonframe</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Ask an agent to change it</h3><p>The agent opens in a pane beside your window and works in your folder; you see each change land. Updates never touch it.</p></div><button class="copy"><code>moonframe pane new --agent claude "add a clock to the status bar"</code><span>Copy</span></button></li>
+      <li><span class="num">III</span><div><h3>Add a mod from git</h3><p>Source only, so you can read it first.</p></div><button class="copy"><code>moonframe mod install owner/repo</code><span>Copy</span></button></li>
+      <li><span class="num">IV</span><div><h3>Or a whole app</h3><p>Runs beside the starter as its own profile.</p></div><button class="copy"><code>moonframe app install owner/some-app</code><span>Copy</span></button></li>
+    </ol>
+  </div>
+  <div class="sel pane on" data-p="new">
+    <h3 class="t">Four commands <i>to a running window.</i></h3>
+    <ol class="steps">
+      <li><span class="num">I</span><div><h3>Clone the starter</h3><p>Name the folder after your app.</p></div><button class="copy"><code>git clone https://github.com/penso/moonframe my-app</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Step inside</h3><p>Everything else runs from here.</p></div><button class="copy"><code>cd my-app</code><span>Copy</span></button></li>
+      <li><span class="num">III</span><div><h3>Install the toolchain</h3><p>mise fetches Rust, and Zig for the Ghostty terminal.</p></div><button class="copy"><code>mise install</code><span>Copy</span></button></li>
+      <li><span class="num">IV</span><div><h3>Open the window</h3><p>Then ask your agent for anything; the window changes as it saves.</p></div><button class="copy"><code>just run</code><span>Copy</span></button></li>
+    </ol>
+    <p class="needs">You need <a href="#">rustup</a>, <a href="#">just</a> and <a href="#">mise</a>. More in the <a href="#">quick start</a>.</p>
+  </div>
+  <div class="sel pane" data-p="lib">
+    <h3 class="t">Your crate, <i>Moonframe's window.</i></h3>
+    <ol class="steps">
+      <li><span class="num">I</span><div><h3>Write the app folder</h3><p>From your crate's root, with the command from Homebrew above.</p></div><button class="copy"><code>moonframe init . --name my-app</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Depend on it</h3><p>Pin a commit; <code>init</code> prints the <code>opt-level</code> lines too.</p></div><button class="copy"><code>cargo add moonframe --git https://github.com/penso/moonframe</code><span>Copy</span></button></li>
+      <li class="wide"><span class="num">III</span><div><h3>Hand it main, last</h3><p>Your setup first, Moonframe last. Providers can be plain Rust or <code>async</code> on your tokio runtime.</p></div>
+      <div class="pair">
+        <div class="panel"><header>Sync · src/main.rs<button>Copy</button></header><pre>use moonframe::{Data, Handle, Moonframe, Native};
+
+#[derive(Default)]
+struct Vault { /* your state */ }
+
+impl Native for Vault {
+    fn tick(&amp;mut self, host: &amp;Handle) {
+        host.publish_json(&amp;self.summary());
+    }
+    fn receive(&amp;mut self, host: &amp;Handle, _from: &amp;str, msg: Data) {
+        /* a mod sent { open = id } */
+    }
+}
+
+fn main() -&gt; std::process::ExitCode {
+    // 1. Your setup first: config, logging, CLI flags.
+    env_logger::init();
+
+    // 2. Moonframe last: run() takes the main thread
+    //    and returns when the window closes.
+    Moonframe::new("my-app")
+        .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
+        .native("vault", Vault::default)
+        .run()
+}</pre></div>
+        <div class="panel"><header>Async · tokio<button>Copy</button></header><pre>use moonframe::{AsyncNative, Data, Handle, Moonframe};
+
+#[derive(Default)]
+struct Weather { client: reqwest::Client }
+
+impl AsyncNative for Weather {
+    async fn tick(&amp;mut self, host: &amp;Handle) {
+        match self.client.get(URL).send().await {
+            Ok(r) =&gt; host.publish_json(&amp;r.json().await.unwrap_or_default()),
+            Err(e) =&gt; host.fail(e.to_string()),
+        }
+    }
+}
+
+#[tokio::main]  // run() reuses this multi-thread runtime
+async fn main() -&gt; std::process::ExitCode {
+    // 1. Your setup first: pools and clients on tokio.
+    let db = connect().await;
+
+    // 2. Moonframe last. Providers and views share
+    //    your runtime (moonframe::on_runtime in views).
+    Moonframe::new("my-app")
+        .app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app"))
+        .native_async("weather", Weather::default)
+        .run()
+}</pre></div>
+      </div></li>
+      <li><span class="num">IV</span><div><h3>Run it</h3><p>Edit <code>app/</code> while it runs; it reloads live.</p></div><button class="copy"><code>cargo run</code><span>Copy</span></button></li>
+    </ol>
+    <p class="needs">See it done in <a href="#">msgvault-moonframe</a>. More in <a href="#">the library guide</a>.</p>
+  </div>
+</section>
+
+</div>
+
+<script>
+document.querySelectorAll(".picker button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".picker button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".mock").forEach(m => m.classList.toggle("on", m.id === "m-" + b.dataset.m));
+});
+function chooser(sel) {
+  document.querySelectorAll(sel).forEach(sec => {
+    const btns = sec.querySelectorAll(".tabs button, .card");
+    btns.forEach(b => b.onclick = () => {
+      btns.forEach(x => x.classList.toggle("on", x === b));
+      sec.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.dataset.p === b.dataset.p));
+    });
+  });
+}
+chooser("#m-a"); chooser("#m-c");
+</script>
+</body>
+</html>
