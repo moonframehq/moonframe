@@ -1,0 +1,653 @@
+{
+ "note": "Sample data for the Hearth example app; replace this file or the provider with your own source.",
+ "org": {
+  "name": "Hearth",
+  "project": "core",
+  "region": "EU"
+ },
+ "user": {
+  "name": "Noor Halvorsen",
+  "initials": "NH"
+ },
+ "kpis": [
+  {
+   "title": "Pull requests reviewed",
+   "value": "867",
+   "delta": "277%",
+   "up": true,
+   "caption": "vs previous 30d"
+  },
+  {
+   "title": "Total reviews",
+   "value": "3,412",
+   "delta": "542%",
+   "up": true,
+   "caption": "vs previous 30d"
+  },
+  {
+   "title": "Avg time to merge",
+   "value": "6.8h",
+   "delta": "91%",
+   "up": false,
+   "caption": "vs previous 30d"
+  },
+  {
+   "title": "Issues caught",
+   "value": "1,054",
+   "delta": "",
+   "up": true,
+   "caption": "in 3 repos"
+  }
+ ],
+ "days": [
+  {
+   "label": "",
+   "date": "Oct 2",
+   "prs": 9,
+   "info": 2,
+   "warning": 3,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 3",
+   "prs": 11,
+   "info": 2,
+   "warning": 4,
+   "critical": 0
+  },
+  {
+   "label": "Oct 4",
+   "date": "Oct 4",
+   "prs": 17,
+   "info": 4,
+   "warning": 9,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 5",
+   "prs": 14,
+   "info": 3,
+   "warning": 5,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 6",
+   "prs": 15,
+   "info": 5,
+   "warning": 7,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 7",
+   "prs": 16,
+   "info": 5,
+   "warning": 8,
+   "critical": 1
+  },
+  {
+   "label": "",
+   "date": "Oct 8",
+   "prs": 21,
+   "info": 4,
+   "warning": 11,
+   "critical": 1
+  },
+  {
+   "label": "",
+   "date": "Oct 9",
+   "prs": 43,
+   "info": 8,
+   "warning": 13,
+   "critical": 2
+  },
+  {
+   "label": "",
+   "date": "Oct 10",
+   "prs": 29,
+   "info": 4,
+   "warning": 7,
+   "critical": 1
+  },
+  {
+   "label": "Oct 11",
+   "date": "Oct 11",
+   "prs": 37,
+   "info": 6,
+   "warning": 6,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 12",
+   "prs": 1,
+   "info": 0,
+   "warning": 0,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 13",
+   "prs": 14,
+   "info": 4,
+   "warning": 6,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 14",
+   "prs": 44,
+   "info": 24,
+   "warning": 17,
+   "critical": 1
+  },
+  {
+   "label": "",
+   "date": "Oct 15",
+   "prs": 40,
+   "info": 8,
+   "warning": 10,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 16",
+   "prs": 39,
+   "info": 15,
+   "warning": 23,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 17",
+   "prs": 25,
+   "info": 8,
+   "warning": 10,
+   "critical": 1
+  },
+  {
+   "label": "Oct 18",
+   "date": "Oct 18",
+   "prs": 23,
+   "info": 12,
+   "warning": 16,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 19",
+   "prs": 3,
+   "info": 1,
+   "warning": 2,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 20",
+   "prs": 47,
+   "info": 13,
+   "warning": 38,
+   "critical": 1
+  },
+  {
+   "label": "",
+   "date": "Oct 21",
+   "prs": 42,
+   "info": 19,
+   "warning": 40,
+   "critical": 1
+  },
+  {
+   "label": "",
+   "date": "Oct 22",
+   "prs": 38,
+   "info": 17,
+   "warning": 46,
+   "critical": 1
+  },
+  {
+   "label": "",
+   "date": "Oct 23",
+   "prs": 65,
+   "info": 62,
+   "warning": 64,
+   "critical": 1
+  },
+  {
+   "label": "",
+   "date": "Oct 24",
+   "prs": 26,
+   "info": 9,
+   "warning": 24,
+   "critical": 0
+  },
+  {
+   "label": "Oct 25",
+   "date": "Oct 25",
+   "prs": 52,
+   "info": 34,
+   "warning": 82,
+   "critical": 1
+  },
+  {
+   "label": "",
+   "date": "Oct 26",
+   "prs": 49,
+   "info": 16,
+   "warning": 32,
+   "critical": 8
+  },
+  {
+   "label": "",
+   "date": "Oct 27",
+   "prs": 17,
+   "info": 24,
+   "warning": 23,
+   "critical": 3
+  },
+  {
+   "label": "",
+   "date": "Oct 28",
+   "prs": 25,
+   "info": 9,
+   "warning": 13,
+   "critical": 0
+  },
+  {
+   "label": "",
+   "date": "Oct 29",
+   "prs": 33,
+   "info": 30,
+   "warning": 92,
+   "critical": 2
+  },
+  {
+   "label": "",
+   "date": "Oct 30",
+   "prs": 17,
+   "info": 10,
+   "warning": 6,
+   "critical": 1
+  },
+  {
+   "label": "",
+   "date": "Oct 31",
+   "prs": 55,
+   "info": 24,
+   "warning": 28,
+   "critical": 1
+  }
+ ],
+ "repos_by_reviews": [
+  {
+   "name": "emberline/hearth",
+   "count": "3,358"
+  },
+  {
+   "name": "emberline/cinder",
+   "count": "41"
+  },
+  {
+   "name": "emberline/flint-orm",
+   "count": "13"
+  }
+ ],
+ "repos_by_issues": [
+  {
+   "name": "emberline/hearth",
+   "count": "1,214"
+  },
+  {
+   "name": "emberline/cinder",
+   "count": "62"
+  },
+  {
+   "name": "emberline/flint-orm",
+   "count": "7"
+  }
+ ],
+ "categories": [
+  {
+   "label": "Correctness",
+   "count": 781,
+   "color": "#e0855c"
+  },
+  {
+   "label": "Security",
+   "count": 203,
+   "color": "#e5594b"
+  },
+  {
+   "label": "Performance",
+   "count": 142,
+   "color": "#e8b54a"
+  },
+  {
+   "label": "Maintainability",
+   "count": 98,
+   "color": "#5e9cf0"
+  },
+  {
+   "label": "Style",
+   "count": 59,
+   "color": "#8f877e"
+  }
+ ],
+ "outcomes": [
+  {
+   "label": "Issues found",
+   "count": 812,
+   "color": "#e0855c"
+  },
+  {
+   "label": "Approved clean",
+   "count": 214,
+   "color": "#4fbf7f"
+  },
+  {
+   "label": "Changes requested",
+   "count": 96,
+   "color": "#e8b54a"
+  },
+  {
+   "label": "Skipped (draft)",
+   "count": 42,
+   "color": "#8f877e"
+  }
+ ],
+ "authors": [
+  {
+   "name": "Ilse Marchetti",
+   "login": "imarchetti",
+   "count": "188"
+  },
+  {
+   "name": "Tomás Reyes",
+   "login": "treyes",
+   "count": "142"
+  },
+  {
+   "name": "Priya Vale",
+   "login": "pvale",
+   "count": "117"
+  },
+  {
+   "name": "Oskar Lind",
+   "login": "olind",
+   "count": "96"
+  },
+  {
+   "name": "hearth-bot",
+   "login": "hearth-bot",
+   "count": "71"
+  }
+ ],
+ "pulls": [
+  {
+   "number": 4821,
+   "title": "Batch span writes through the ingest queue",
+   "branch": "ingest/batch-writes",
+   "author": "imarchetti",
+   "age": "2h",
+   "checks": "passed",
+   "tone": "ready",
+   "draft": false,
+   "added": 412,
+   "removed": 96,
+   "issues": 3
+  },
+  {
+   "number": 4819,
+   "title": "Drop the legacy query cache warmup",
+   "branch": "query/drop-warmup",
+   "author": "treyes",
+   "age": "5h",
+   "checks": "pending",
+   "tone": "waiting",
+   "draft": false,
+   "added": 38,
+   "removed": 277,
+   "issues": 0
+  },
+  {
+   "number": 4816,
+   "title": "Guard tenant id on trace lookups",
+   "branch": "fix/tenant-guard",
+   "author": "pvale",
+   "age": "9h",
+   "checks": "failed",
+   "tone": "attention",
+   "draft": false,
+   "added": 64,
+   "removed": 12,
+   "issues": 2
+  },
+  {
+   "number": 4812,
+   "title": "Retention tiers per service",
+   "branch": "wip/retention-tiers",
+   "author": "olind",
+   "age": "1d",
+   "checks": "pending",
+   "tone": "draft",
+   "draft": true,
+   "added": 903,
+   "removed": 140,
+   "issues": 5
+  },
+  {
+   "number": 4807,
+   "title": "Bump the ClickHouse client to 1.9",
+   "branch": "deps/clickhouse-1.9",
+   "author": "hearth-bot",
+   "age": "1d",
+   "checks": "passed",
+   "tone": "merged",
+   "draft": false,
+   "added": 22,
+   "removed": 22,
+   "issues": 0
+  },
+  {
+   "number": 4801,
+   "title": "Stream alert evaluations instead of polling",
+   "branch": "alerts/stream-eval",
+   "author": "imarchetti",
+   "age": "2d",
+   "checks": "passed",
+   "tone": "merged",
+   "draft": false,
+   "added": 356,
+   "removed": 201,
+   "issues": 4
+  },
+  {
+   "number": 4796,
+   "title": "Fix histogram bucket overflow on p99",
+   "branch": "fix/p99-overflow",
+   "author": "treyes",
+   "age": "3d",
+   "checks": "passed",
+   "tone": "merged",
+   "draft": false,
+   "added": 18,
+   "removed": 7,
+   "issues": 1
+  },
+  {
+   "number": 4790,
+   "title": "Sampled logs: keep error spans whole",
+   "branch": "logs/keep-errors",
+   "author": "pvale",
+   "age": "4d",
+   "checks": "failed",
+   "tone": "closed",
+   "draft": false,
+   "added": 121,
+   "removed": 44,
+   "issues": 2
+  }
+ ],
+ "runs": [
+  {
+   "name": "ci / test (linux)",
+   "state": "passed",
+   "detail": "4m 08s · #4821"
+  },
+  {
+   "name": "ci / test (macos)",
+   "state": "passed",
+   "detail": "6m 31s · #4821"
+  },
+  {
+   "name": "ci / lint",
+   "state": "failed",
+   "detail": "2 warnings denied · #4816"
+  },
+  {
+   "name": "ci / build images",
+   "state": "pending",
+   "detail": "running 3m · #4819"
+  },
+  {
+   "name": "ci / e2e ingest",
+   "state": "passed",
+   "detail": "11m 47s · #4807"
+  },
+  {
+   "name": "ci / migrations",
+   "state": "skipped",
+   "detail": "no schema change · #4801"
+  }
+ ],
+ "ci_kpis": [
+  {
+   "title": "Runs",
+   "value": "1,904",
+   "delta": "38%",
+   "up": true,
+   "caption": "last 30 days"
+  },
+  {
+   "title": "Pass rate",
+   "value": "93.6%",
+   "delta": "6%",
+   "up": true,
+   "caption": "vs 88.1% before"
+  },
+  {
+   "title": "Median duration",
+   "value": "7m 12s",
+   "delta": "12%",
+   "up": false,
+   "caption": "all workflows"
+  },
+  {
+   "title": "Flaky tests",
+   "value": "14",
+   "delta": "",
+   "up": true,
+   "caption": "6 quarantined"
+  }
+ ],
+ "ci_minutes": [
+  61,
+  58,
+  72,
+  66,
+  70,
+  40,
+  38,
+  77,
+  81,
+  69,
+  22,
+  30,
+  84,
+  88,
+  79,
+  73,
+  70,
+  35,
+  33,
+  92,
+  95,
+  90,
+  99,
+  81,
+  40,
+  36,
+  97,
+  103,
+  94,
+  110
+ ],
+ "issues": [
+  {
+   "severity": "critical",
+   "title": "Trace lookup skips the tenant check",
+   "where": "query/trace.rs:142",
+   "repo": "emberline/hearth",
+   "pr": 4816,
+   "category": "Security",
+   "age": "9h"
+  },
+  {
+   "severity": "warning",
+   "title": "Unbounded retry loop on queue backpressure",
+   "where": "ingest/queue.rs:88",
+   "repo": "emberline/hearth",
+   "pr": 4821,
+   "category": "Correctness",
+   "age": "2h"
+  },
+  {
+   "severity": "warning",
+   "title": "Retention tier read on every span write",
+   "where": "ingest/retention.rs:31",
+   "repo": "emberline/hearth",
+   "pr": 4812,
+   "category": "Performance",
+   "age": "1d"
+  },
+  {
+   "severity": "info",
+   "title": "Error spans dropped when the sampling rate is 0",
+   "where": "logs/sampler.rs:57",
+   "repo": "emberline/hearth",
+   "pr": 4790,
+   "category": "Correctness",
+   "age": "4d"
+  },
+  {
+   "severity": "warning",
+   "title": "Bucket bound compared as f32",
+   "where": "metrics/histogram.rs:203",
+   "repo": "emberline/cinder",
+   "pr": 4796,
+   "category": "Correctness",
+   "age": "3d"
+  },
+  {
+   "severity": "info",
+   "title": "Evaluation channel never closed on shutdown",
+   "where": "alerts/stream.rs:119",
+   "repo": "emberline/hearth",
+   "pr": 4801,
+   "category": "Maintainability",
+   "age": "2d"
+  },
+  {
+   "severity": "critical",
+   "title": "Raw SQL built from a label value",
+   "where": "src/where.ts:44",
+   "repo": "emberline/flint-orm",
+   "pr": 4779,
+   "category": "Security",
+   "age": "6d"
+  }
+ ]
+}

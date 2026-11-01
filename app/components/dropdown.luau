@@ -22,6 +22,8 @@ type Props = {
 	placeholder: string?,
 	disabled: boolean?,
 	to: string?,
+	chevron: string?,
+	trigger_width: number?,
 }
 
 -- The preview's options, typed loosely: they mix kinds of entries.
@@ -58,6 +60,8 @@ return component {
 		["placeholder"] = "button text when nothing is selected",
 		["disabled"] = "greys the button out and ignores clicks",
 		["to"] = "mod to send messages to, if not the drawing one",
+		["chevron"] = "icon at the button's end (default \"chevron-down\"; \"chevrons-up-down\" for a select)",
+		["trigger_width"] = "the button's width in pixels, the chevron pushed to its end (default: as wide as its text)",
 	},
 	styles = {
 		[".dropdown-trigger"] = {
@@ -129,6 +133,7 @@ dropdown {
 		end
 		local trigger = ui.row {
 			class = class,
+			width = props.trigger_width,
 			align = "center",
 			selected = props.open == true,
 			msg = if props.disabled then nil else props.toggle,
@@ -136,7 +141,8 @@ dropdown {
 			props.icon and ui.icon { name = props.icon :: any, class = "dropdown-icon" },
 			props.label and ui.text { props.label, class = "dropdown-label" },
 			ui.text { value or props.placeholder or "Choose…", truncate = true },
-			ui.icon { name = "chevron-down", class = "dropdown-chevron" },
+			props.trigger_width and ui.spacer(),
+			ui.icon { name = (props.chevron or "chevron-down") :: any, class = "dropdown-chevron" },
 		}
 
 		return ui.popover {
