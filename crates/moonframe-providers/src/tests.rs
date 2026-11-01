@@ -365,7 +365,7 @@ fn log_lines_are_cut_and_the_rest_dropped() {
 }
 
 #[test]
-fn a_mod_list_counts_a_mods_instances_and_components_as_it() {
+fn a_mod_list_counts_a_mods_components_but_not_its_instances_as_it() {
     let settings = Data::Map(
         [(
             "writers".to_owned(),
@@ -374,15 +374,20 @@ fn a_mod_list_counts_a_mods_instances_and_components_as_it() {
         .into(),
     );
     let writers = crate::Mods::from_settings(&settings, "writers");
-    for from in [
-        "editor",
-        "editor#2",
-        "editor/markdown-editor#main",
-        "editor#2/tabs#a",
-    ] {
+    for from in ["editor", "editor/markdown-editor#main"] {
         assert!(writers.allows(from), "{from}");
     }
-    for from in ["editorx", "edit", "other/editor", "other#editor", "", "3"] {
+    // Any mod may mount `editor#2`, so it doesn't speak for `editor`.
+    for from in [
+        "editor#2",
+        "editor#2/tabs#a",
+        "editorx",
+        "edit",
+        "other/editor",
+        "other#editor",
+        "",
+        "3",
+    ] {
         assert!(!writers.allows(from), "{from}");
     }
     assert!(!crate::Mods::from_settings(&settings, "starters").allows("editor"));

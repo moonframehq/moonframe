@@ -1,7 +1,8 @@
 //! The mods a provider's settings name (`writers`, `starters`): who may do
-//! what only some mods may. A message comes from a mod (`editor`), one of
-//! its instances (`editor#2`) or a component it drew
-//! (`editor/markdown-editor#main`); each counts as that mod.
+//! what only some mods may. A message comes from a mod (`editor`) or a
+//! component it drew (`editor/markdown-editor#main`); both count as that
+//! mod. A mod instance (`editor#2`) does not: any mod may mount one, with
+//! props of its choosing, under the same key.
 
 use moonframe_core::Data;
 
@@ -43,9 +44,9 @@ impl<S: Into<String>> FromIterator<S> for Mods {
     }
 }
 
-/// The mod a sender is or belongs to: `editor/markdown-editor#main` and
-/// `editor#2` are both `editor`.
+/// The mod a sender is or belongs to: `editor/markdown-editor#main` is
+/// `editor`. A mod instance stays itself (`editor#2`), so it matches no
+/// mod's name.
 pub fn owner(from: &str) -> &str {
-    let module = from.split('/').next().unwrap_or(from);
-    module.split('#').next().unwrap_or(module)
+    from.split('/').next().unwrap_or(from)
 }
