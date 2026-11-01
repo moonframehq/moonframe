@@ -41,6 +41,8 @@ const STYLE_KEYS: &[&str] = &[
     "font",
     "case",
     "opacity",
+    "width",
+    "height",
     "transition",
 ];
 const EDGE_KEYS: &[&str] = &["x", "y", "top", "right", "bottom", "left"];
@@ -164,14 +166,16 @@ impl FromStr for Selector {
             Some((base, state)) => (base, Some(state)),
             None => (selector, None),
         };
+        // Any other name is a state of the view's own, which an element
+        // enters with `state = "<name>"`.
         let state = state
-            .map(|state| {
-                State::parse(state).ok_or_else(|| {
-                    format!(
-                        "unknown state `{state}`; expected one of {}",
-                        State::NAMES.join(", ")
-                    )
-                })
+            .map(|state| match State::parse(state) {
+                Some(known) => Ok(Pseudo::Known(known)),
+                None if valid_name(state) => Ok(Pseudo::Named(state.to_owned())),
+                None => Err(format!(
+                    "`{state}` is not a state: use {}, or a name of a-z, 0-9, - and _",
+                    State::NAMES.join(", ")
+                )),
             })
             .transpose()?;
         let base = match base.strip_prefix('.') {
@@ -209,17 +213,29 @@ impl Read for Style {
             font: fields.get("font")?,
             case: fields.get("case")?,
             opacity: fields.number("opacity", 0.0..=1.0)?,
+            width: fields.number("width", 0.0..=100_000.0)?,
+            height: fields.number("height", 0.0..=100_000.0)?,
             transition: fields.get("transition")?,
         })
     }
 }
 
 impl Look {
-    /// An element's `class` and `style` keys.
+    /// An element's `class`, `style` and `state` keys.
     pub(crate) fn from_fields(fields: &Fields) -> Result<Self, Error> {
+        let state = fields.get::<String>("state")?;
+        if let Some(state) = &state
+            && !valid_name(state)
+        {
+            return Err(fields
+                .cx()
+                .key("state")
+                .fail("use a-z, 0-9, - and _ in a state's name"));
+        }
         Ok(Self {
             class: fields.get::<Classes>("class")?.unwrap_or_default().0,
             style: fields.get("style")?.unwrap_or_default(),
+            state,
             line: fields.line(),
         })
     }

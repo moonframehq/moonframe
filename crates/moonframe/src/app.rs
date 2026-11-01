@@ -12,7 +12,7 @@ use {
         mod_window::ModWindow,
         motion::Motion,
         packages, paths,
-        render::{KeyLayer, Painter},
+        render::{KeyLayer, ListRequest, Painter},
         settings,
         terminal::Terminals,
         theme_picker::ThemePicker,
@@ -359,6 +359,27 @@ impl MoonframeApp {
         self.flush(owner, cx);
     }
 
+    /// Has each mod build the list rows the frame just drawn showed without,
+    /// once the frame is done, and draws again if any changed.
+    fn request_list_rows(&self, requests: Vec<ListRequest>, cx: &mut Context<Self>) {
+        if requests.is_empty() {
+            return;
+        }
+        let this = cx.entity().downgrade();
+        cx.defer(move |cx| {
+            this.update(cx, |this, cx| {
+                let mut changed = false;
+                for (owner, id, window) in &requests {
+                    changed |= this.workspace.set_list_window(owner, id, *window);
+                }
+                if changed {
+                    this.flush("list", cx);
+                }
+            })
+            .ok();
+        });
+    }
+
     /// Passes on what the mods sent providers, and draws again.
     fn flush(&mut self, from: &str, cx: &mut Context<Self>) {
         for (provider, message) in self.workspace.take_outbox() {
@@ -599,9 +620,13 @@ impl MoonframeApp {
             &mut self.terminals,
             &self.inputs,
             None,
+            cx.theme(),
         );
         let content = painter.window(name, cx);
-        (content, painter.animating())
+        let requests = painter.take_list_requests();
+        let animating = painter.animating();
+        self.request_list_rows(requests, cx);
+        (content, animating)
     }
 
     /// The browser window's content.
@@ -618,10 +643,14 @@ impl MoonframeApp {
             &mut self.terminals,
             &self.inputs,
             None,
+            cx.theme(),
         )
         .previewing();
         let content = painter.gallery(&self.chosen, query, search, cx);
-        (content, painter.animating())
+        let requests = painter.take_list_requests();
+        let animating = painter.animating();
+        self.request_list_rows(requests, cx);
+        (content, animating)
     }
 
     /// Asks an agent to add the component `name`, at the selection if any.
@@ -910,6 +939,7 @@ impl Render for MoonframeApp {
             &mut self.terminals,
             &self.inputs,
             self.inspector.sink(),
+            cx.theme(),
         )
         .with_browsers(&mut self.browsers)
         .with_keyed(&last_keyed);
@@ -918,7 +948,9 @@ impl Render for MoonframeApp {
             window.request_animation_frame();
         }
         let key_layers = painter.take_key_layers();
+        let requests = painter.take_list_requests();
         self.key_layers = key_layers;
+        self.request_list_rows(requests, cx);
         let layers = self.inspector_layers(window.viewport_size(), cx);
         let toast = self
             .toast

@@ -675,21 +675,22 @@ Text-like elements take their main value positionally:
 | `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id` | user-resizable; children must be `ui.pane`. Always grows to fill |
-| `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size` |
-| `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap` | a bare string child is plain text |
+| `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
+| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, frame keys, `class`, `style` | rows of one height of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
+| `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
-| `ui.badge "..."` | `text`, `tone` | pill |
+| `ui.badge "..."` | `text`, `tone`, extras | pill |
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
 | `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
-| `ui.icon "cpu"` | `name`, `tone`, `size`, `spin` | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
-| `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
+| `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
+| `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras, `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
 | `ui.divider()` | | a line across the parent's axis |
 | `ui.spacer()` | | takes the free space, e.g. to push items right |
 | `ui.region "name"` or `ui.region { name = "x", direction = "row", gap = "large" }` | `name`, `direction`, `gap`, `justify` | draws every mod with `region = name`, in order; `justify = "end"` pushes them to the far edge |
 | `ui.mount "name"` | `mod` | draws one mod's view by name |
-| `ui.popover { ..., content = el }` | `open`, `dismiss`, `to`, `side` (`top`/`bottom`), `align` (`start`/`end`), `gap`, `width`, `keys`, `content` | floats `content` over everything beside its anchor (its children). While `open`, a click anywhere outside, or Escape, sends `dismiss` to this mod. Styled and animated by the `popover` rule |
+| `ui.popover { ..., content = el }` | `open`, `dismiss`, `to`, `side` (`top`/`bottom`/`left`/`right`), `align` (`start`/`end`: the anchor's left or right edge above and below it, its top or bottom beside it), `gap`, `width`, `keys`, `content` | floats `content` over everything beside its anchor (its children). While `open`, a click anywhere outside, or Escape, sends `dismiss` to this mod. Styled and animated by the `popover` rule |
 | `ui.overlay { ..., content = el }` | `open`, `dismiss`, `place`, `backdrop`, `width`, `height`, `keys`, `content`, `class`, `style` | floats `content` over the whole window, above popovers: a dialog, palette, sheet or toast (see "Dialogs, palettes, sheets and toasts"). No children |
 
 **Frame keys** (`row`, `column`, `panel`):
@@ -713,9 +714,13 @@ Text-like elements take their main value positionally:
   (`self_align = "start"` in a row lifts it to the top).
 - `max_width` and `max_height` cap it; `grow` with a `width` or `height`
   grows from that size.
-- `float = { top = -4, right = -4 }` takes it out of the flow and places it
-  over its parent at those pixel offsets (negative overhangs): count
-  bubbles on an icon's corner, badges on avatars.
+- `float` takes it out of the flow and places it over its parent:
+  `float = "top-right"` pins it to an edge or corner (`top-left`,
+  `top-right`, `bottom-left`, `bottom-right`, `top`, `bottom`, `left`,
+  `right` (an edge stretches along it), `fill`); `float = { at =
+  "bottom-right", inset = 8 }` sets it in from there; `float = { top = -4,
+  right = -4 }` gives pixel offsets (negative overhangs): count bubbles on
+  an icon's corner, badges on avatars.
 - A click goes to the innermost clickable element only: a close button in
   a clickable tab does not also select the tab.
 
@@ -737,7 +742,8 @@ Text-like elements take their main value positionally:
 - browser commands (with `browser = "<id>"`): `browser-back`
   `browser-forward` `browser-reload` `browser-stop` `browser-open`
 
-**Extras** (`row`, `column`, `button`, `item`): `tooltip = "text"` shows
+**Extras** (`row`, `column`, `button`, `item`, `text`, `icon`, `image`,
+`badge`): `tooltip = "text"` shows
 under the pointer (styled by the `tooltip` rule); `context = <data>` is sent
 on a right-click, to open a context menu (with `to` like `msg`);
 `copy = "text"` puts the text on the clipboard when clicked. `selected =
@@ -803,15 +809,39 @@ return style {
     ignores its hover rules.
   - `:disabled`: `disabled = true`; applies to `ui.input` and
     `ui.button`. A disabled element has no hover.
+  - `:<name>`, any other plain name: a state of the view's own, which an
+    element enters with `state = "<name>"` (see "States").
 
   A state's rule layers over the same selector's resting rule, so
   `["input:focus"] = { border_color = "accent" }` keeps the `input` rule's
   background.
 
 **Classes and inline styles.** These elements take `class = "a b"` (or
-`{ "a", "b" }`) and `style = { ...same properties... }`: `row`, `column`,
-`panel`, `pane`, `text`, `button`, `item`, `badge`, `icon`, `image`, `terminal`,
-`browser`, `input`, `popover`, `overlay` (on its content).
+`{ "a", "b" }`), `style = { ...same properties... }` and `state = "name"`:
+`row`, `column`, `panel`, `pane`, `text`, `button`, `item`, `badge`, `icon`,
+`image`, `terminal`, `browser`, `input`, `list`, `popover`, `overlay` (on its
+content).
+
+**States.** As in QML, a view says which state an element is in, and the
+stylesheet says what each state looks like and how to move between them:
+
+```lua
+-- view
+ui.column { class = "drawer", state = state.open and "open" or "closed", ... }
+-- style.luau (or the mod's `styles`)
+[".drawer"] = { transition = "normal ease-out", background = "sidebar" },
+[".drawer:open"] = { width = 280 },
+[".drawer:closed"] = { width = 48, opacity = 0.8 },
+```
+
+A state's rule layers over the resting rule (after `:selected`). With a
+`transition`, a change of state eases `background`, `color`,
+`border_color`, `opacity`, `width` and `height` from the old state's values
+to the new; turning back mid-move starts from where it is. A property only
+one of the two states sets jumps. Prefer a state over picking classes in
+the view when the look changes with the element's mode (open/closed,
+compact/full, idle/busy): the view stays about meaning, the stylesheet
+about looks, and the user can restyle each state.
 
 **Numbers that change.** Text is proportional, so a reading such as a rate
 or a percentage changes width as it ticks and pushes its neighbours. Put it
@@ -851,7 +881,8 @@ Leave an element's own keys off if the stylesheet should decide.
 | `font` | `sans` or `mono` (the terminal font, for code and paths; inherited) |
 | `case` | `upper`, `lower` or `none`: the letter case a `ui.text` shows (headings in capitals, restyleable) |
 | `opacity` | 0 to 1 |
-| `transition` | how a `pane`, `popover` or `overlay` animates when it shows or hides, and how a keyed row or column arrives and goes (see below) |
+| `width`, `height` | pixels, under the element's own `width`/`height`; on rows, columns, panels and lists. What a named state changes: `[".drawer:closed"] = { width = 48 }` |
+| `transition` | how a `pane`, `popover` or `overlay` animates when it shows or hides, how a keyed row or column arrives and goes, and how an element with a `state` eases between states (see below) |
 
 **Shadows.** Write them like CSS `box-shadow`. Lengths are pixels, with or
 without `px`, and layers are separated by commas. The color can be any
@@ -992,6 +1023,55 @@ return mod {
 
 ## Patterns
 
+**Long lists.** Anything that can grow past a screenful (files, logs,
+results, history) goes in a `ui.list`. Build the rows as plain data in the
+view, then draw one in `row`; only the rows showing (and a few around them)
+are ever built, and the host asks for more as the user scrolls:
+
+```lua
+local lines = {}
+for _, entry in app.files.entries do
+	table.insert(lines, entry) -- data, not elements
+end
+return ui.panel { grow = true, title = "Files",
+	ui.list {
+		id = "files",
+		count = #lines,
+		row_height = 24,
+		row = function(i)
+			local entry = lines[i]
+			return ui.item { entry.name, selected = entry.path == state.selected, msg = { open = entry.path } }
+		end,
+	},
+}
+```
+
+Rows must all be `row_height` tall (they are centered in it). The explorer
+(`app/mods/explorer`) flattens its open folders this way.
+
+**Views run only when needed.** The host keeps each view's last tree and
+runs `view` again only when the mod's state or props may have changed (a
+message reached its `update`), when a key of `app` it read changed (each
+key counts on its own: a mod that reads `app.git` does not run when
+`app.system` ticks), or on a reload. So read `app.x` where you use it;
+`for k, v in app` reads every key and runs on any change. Views must not
+depend on anything else (no clocks or random numbers that should change
+between runs).
+
+**`ui.memo`** keeps a costly part of a view while what it depends on stays
+the same: `ui.memo("chart", { state.range, app.usage }, function() return
+build_chart(...) end)`. Dependencies compare with `==`: values, or tables
+that are replaced when they change (provider data is a new table each
+time it changes; a state table changed in place stays the same table).
+
+**Lazy panes.** `ui.pane { lazy = true, visible = state.right, ui.mount {
+"inspector", id = "side" } }` starts nothing until the pane first shows,
+and while it is hidden again the instances in it sleep: their state stays,
+but they neither run nor draw.
+
+**Pinned badges.** `float = "top-right"` (or `{ at = "top-right", inset =
+-4 }`) puts a count bubble on an icon without measuring anything.
+
 **Shell with toggleable side panels.** Keep the visibility in the shell's
 state, flip it from buttons, and pass it to `visible`:
 
@@ -1007,7 +1087,8 @@ ui.hsplit {
 fixed pane (`size = 180`, `visible = state.bottom`) holding `ui.region "bottom"`.
 
 **A mod that fills its pane.** The root should be `ui.panel { grow = true, ... }`.
-Use `scroll = true` for long lists. Several mods in one region stack. Give
+Use `scroll = true` for a short scrolling body, and `ui.list` for lists that
+can grow long (see "Long lists"). Several mods in one region stack. Give
 `grow = true` only to those that should share the leftover height.
 
 **Selectable list.** Use `ui.item { name, selected = name == state.selected, msg = { open = name } }`,

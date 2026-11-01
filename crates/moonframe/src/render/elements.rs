@@ -93,14 +93,14 @@ impl<'w> Draw<'w> for Stack {
         with_extras(element, &self.extras, painter, place, cx).into_any_element()
     }
 }
-/// A control's tooltip, right-click and copy, on the element that draws it.
-fn with_extras<'w>(
-    mut element: Stateful<Div>,
+/// An element's tooltip, right-click and copy, on the element that draws it.
+fn with_extras<'w, E: StatefulInteractiveElement + Styled>(
+    mut element: E,
     extras: &Extras,
     painter: &Painter<'w, '_>,
     place: &Place<'w>,
     cx: Cx,
-) -> Stateful<Div> {
+) -> E {
     if let Some(text) = &extras.copy {
         let text = text.clone();
         element = element.cursor_pointer().on_click(move |_, _, cx| {
@@ -395,7 +395,7 @@ impl<'w> Draw<'w> for Text {
             Some(Case::Lower) => self.text.to_lowercase(),
             Some(Case::None) | None => self.text.clone(),
         };
-        element.child(text).into_any_element()
+        with_extras(element.child(text), &self.extras, painter, place, cx).into_any_element()
     }
 }
 
@@ -537,7 +537,8 @@ impl<'w> Draw<'w> for Item {
 impl<'w> Draw<'w> for Badge {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
         let look = painter.look(Part::Badge, &self.look, false, place);
-        pill(&self.text, self.tone, &look, place.id(), cx.theme()).into_any_element()
+        let pill = pill(&self.text, self.tone, &look, place.id(), cx.theme());
+        with_extras(pill, &self.extras, painter, place, cx).into_any_element()
     }
 }
 
@@ -567,7 +568,7 @@ impl<'w> Draw<'w> for Icon {
         {
             icon = icon.rotate(radians(turned * std::f32::consts::TAU));
         }
-        element.child(icon).into_any_element()
+        with_extras(element.child(icon), &self.extras, painter, place, cx).into_any_element()
     }
 }
 
@@ -608,7 +609,7 @@ impl<'w> Draw<'w> for Image {
             if let Some(height) = self.height {
                 element = element.h(px(height));
             }
-            return element.into_any_element();
+            return with_extras(element, &self.extras, painter, place, cx).into_any_element();
         };
         let mut element = img(path)
             .object_fit(fit)
@@ -622,7 +623,7 @@ impl<'w> Draw<'w> for Image {
         if let Some(height) = self.height {
             element = element.h(px(height));
         }
-        element.into_any_element()
+        with_extras(element, &self.extras, painter, place, cx).into_any_element()
     }
 }
 
@@ -759,10 +760,16 @@ impl<'w> Draw<'w> for Popover {
         sheet = match self.side {
             Side::Top => sheet.bottom_full().mb(px(self.gap - shift)),
             Side::Bottom => sheet.top_full().mt(px(self.gap - shift)),
+            Side::Left => sheet.right_full().mr(px(self.gap - shift)),
+            Side::Right => sheet.left_full().ml(px(self.gap - shift)),
         };
-        sheet = match self.align {
-            Anchor::Start => sheet.left_0(),
-            Anchor::End => sheet.right_0(),
+        // Above or below, it lines up with the anchor's left or right edge;
+        // beside it, with its top or bottom.
+        sheet = match (self.side, self.align) {
+            (Side::Top | Side::Bottom, Anchor::Start) => sheet.left_0(),
+            (Side::Top | Side::Bottom, Anchor::End) => sheet.right_0(),
+            (Side::Left | Side::Right, Anchor::Start) => sheet.top_0(),
+            (Side::Left | Side::Right, Anchor::End) => sheet.bottom_0(),
         };
         if let Some(width) = self.width {
             sheet = sheet.w(px(width));
