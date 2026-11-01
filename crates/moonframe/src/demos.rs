@@ -65,19 +65,30 @@ impl Native for Demos {
         let settings = to_json(host.settings());
         let app = host.dir().join("..").join("..");
         self.app = app.canonicalize().unwrap_or(app);
-        let relative = |key: &str| {
-            settings
-                .get(key)
-                .and_then(Value::as_str)
-                .map(|path| self.app.join(path))
+        // It links and opens apps without asking about their providers, so
+        // only the apps of the checkout the gallery itself is in: the
+        // folders of one repository, which the user linked to develop.
+        let repo = self
+            .app
+            .ancestors()
+            .find(|folder| folder.join(".git").exists())
+            .map(Path::to_path_buf)
+            .ok_or("the demo gallery opens the apps of the repository it is in, and is in none")?;
+        let inside = |key: &str, default: PathBuf| -> Result<PathBuf, String> {
+            let Some(path) = settings.get(key).and_then(Value::as_str) else {
+                return Ok(default);
+            };
+            let path = self.app.join(path);
+            let path = path.canonicalize().unwrap_or(path);
+            if path.starts_with(&repo) {
+                Ok(path)
+            } else {
+                Err(format!("`{key}` must be inside {}", repo.display()))
+            }
         };
-        self.folder = relative("apps").unwrap_or_else(|| self.app.join(".."));
-        self.pictures = relative("pictures").or_else(|| {
-            self.app
-                .ancestors()
-                .find(|folder| folder.join(".git").exists())
-                .map(|repo| repo.join("docs/screenshots/apps"))
-        });
+        self.folder = inside("apps", self.app.join(".."))?;
+        self.folder = self.folder.canonicalize().unwrap_or_else(|_| self.folder.clone());
+        self.pictures = Some(inside("pictures", repo.join("docs/screenshots/apps"))?);
         self.openers = settings
             .get("openers")
             .and_then(Value::as_array)
