@@ -26,6 +26,7 @@ pub(super) fn text_pixels(size: Option<TextSize>, theme: &Theme) -> Pixels {
         Some(TextSize::Title) => 1.5,
         Some(TextSize::Headline) => 1.75,
         Some(TextSize::Display) => 2.25,
+        Some(TextSize::Hero) => 3.0,
     };
     theme.font_size * scale
 }

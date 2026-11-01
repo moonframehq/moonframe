@@ -246,3 +246,31 @@ do {
     fill(cx, CGRect(x: 716, y: 276, width: 60, height: 44), 14, color(0x4338ca))
     save(cx, "examples/tidings/icon.png")
 }
+
+// Vigil: a green trend over a dashed limit on a dark card, a live dot.
+do {
+    let cx = body([0x3f3f46, 0x27272a, 0x18181b])
+    fill(cx, CGRect(x: 196, y: 236, width: 632, height: 552), 64, color(0x2f2f33))
+    // The limit, dashed, with its chip.
+    cx.setStrokeColor(color(0xffffff, 0.35))
+    cx.setLineWidth(8)
+    cx.setLineDash(phase: 0, lengths: [22, 16])
+    cx.move(to: CGPoint(x: 248, y: 400)); cx.addLine(to: CGPoint(x: 640, y: 400))
+    cx.strokePath()
+    cx.setLineDash(phase: 0, lengths: [])
+    fill(cx, CGRect(x: 664, y: 376, width: 116, height: 48), 14, color(0xffffff, 0.22))
+    // The trend, staying above the limit, ending on a dot.
+    let points = [(248.0, 600.0), (330, 578), (410, 500), (500, 490), (560, 540), (640, 585)].map { CGPoint(x: $0.0, y: $0.1) }
+    cx.setStrokeColor(color(0x5fd35a))
+    cx.setLineWidth(18)
+    cx.setLineCap(.round)
+    cx.setLineJoin(.round)
+    cx.addLines(between: points)
+    cx.strokePath()
+    fill(cx, CGRect(x: 612, y: 557, width: 56, height: 56), 28, color(0x5fd35a))
+    // The live dot in its halo, beside a line of text.
+    fill(cx, CGRect(x: 248, y: 668, width: 76, height: 76), 38, color(0xf2605d, 0.3))
+    fill(cx, CGRect(x: 268, y: 688, width: 36, height: 36), 18, color(0xf2605d))
+    fill(cx, CGRect(x: 360, y: 692, width: 220, height: 28), 14, color(0xffffff, 0.75))
+    save(cx, "examples/vigil/icon.png")
+}
