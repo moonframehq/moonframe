@@ -545,11 +545,16 @@ fn app_folder(dir: &Path, cwd: &Path) -> Option<String> {
     let app = app.canonicalize().ok()?;
     let cwd = cwd.canonicalize().ok()?;
     let rest = app.strip_prefix(&cwd).ok()?;
-    Some(if rest.as_os_str().is_empty() {
-        ".".to_owned()
-    } else {
-        rest.to_string_lossy().into_owned()
-    })
+    if rest.as_os_str().is_empty() {
+        return Some(".".to_owned());
+    }
+    // Joined with `/` on every system: the mod shows it, and the agent is
+    // told it, as a path from the repository.
+    let parts: Vec<String> = rest
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    Some(parts.join("/"))
 }
 
 /// Keeps the newest runs, never dropping one that is going.

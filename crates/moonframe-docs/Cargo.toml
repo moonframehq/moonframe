@@ -14,5 +14,9 @@ workspace = true
 moonframe-core.workspace      = true
 moonframe-providers.workspace = true
 
+# Swaps a save into place and back if the file moved on meanwhile.
+[target.'cfg(any(target_os = "macos", target_os = "linux"))'.dependencies]
+rustix.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
