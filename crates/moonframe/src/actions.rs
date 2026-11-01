@@ -34,6 +34,8 @@ pub(crate) fn bind_keys(cx: &mut App) {
         KeyBinding::new("escape", Dismiss, Some("Gallery")),
         KeyBinding::new("cmd-w", Dismiss, Some("Gallery")),
         KeyBinding::new("cmd-w", Dismiss, Some("ThemePicker")),
+        KeyBinding::new("escape", Dismiss, Some("ModWindow")),
+        KeyBinding::new("cmd-w", Dismiss, Some("ModWindow")),
     ]);
 }
 

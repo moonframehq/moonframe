@@ -5,8 +5,8 @@ use {
     crate::color::ThemeColor,
     gpui_kit::{component::Theme, *},
     moonframe_core::{
-        Align, Border, Direction, Font, Frame, Resolved, Scroll, Shadow, ShadowPreset, Sides,
-        Space, Style, TextSize, Weight,
+        Align, Border, Corners, Direction, Font, Frame, Resolved, Scroll, Shadow, ShadowPreset,
+        Sides, Space, Style, TextSize, Weight,
     },
 };
 
@@ -94,6 +94,18 @@ pub(super) trait StyleExt: Styled + Sized {
         apply(self, edges)
     }
 
+    /// Rounds each corner by its radius.
+    fn cornered(self, corners: Corners) -> Self {
+        match corners.uniform() {
+            Some(radius) => self.rounded(px(radius)),
+            None => self
+                .rounded_tl(px(corners.top_left))
+                .rounded_tr(px(corners.top_right))
+                .rounded_br(px(corners.bottom_right))
+                .rounded_bl(px(corners.bottom_left)),
+        }
+    }
+
     fn shadowed(self, shadow: &Shadow, theme: &Theme) -> Self {
         match shadow {
             Shadow::Preset(ShadowPreset::None) => self.shadow_none(),
@@ -139,7 +151,7 @@ pub(super) trait LookExt: StyleExt + InteractiveElement {
         }
         self = self.typography(style, theme).margined(&style.margin);
         if let Some(radius) = style.radius {
-            self = self.rounded(px(radius));
+            self = self.cornered(radius);
         }
         if let Some(shadow) = &style.shadow {
             self = self.shadowed(shadow, theme);

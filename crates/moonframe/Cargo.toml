@@ -22,6 +22,7 @@ futures.workspace             = true
 gpui-kit.workspace            = true
 moonframe-core.workspace      = true
 moonframe-providers.workspace = true
+moonframe-store.workspace     = true
 moonframe-terminal.workspace  = true
 notify.workspace              = true
 rust-embed.workspace          = true
