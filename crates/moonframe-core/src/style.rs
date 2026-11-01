@@ -244,7 +244,8 @@ pub struct Style {
     pub color: Option<Color>,
     pub border: Option<Border>,
     pub border_color: Option<Color>,
-    pub radius: Option<f32>,
+    /// Corner rounding: one radius, or each corner's.
+    pub radius: Option<Corners>,
     pub padding: Sides,
     pub gap: Option<f32>,
     pub margin: Sides,
@@ -257,7 +258,8 @@ pub struct Style {
     /// Letter case of a `ui.text`: section headings in capitals.
     pub case: Option<Case>,
     pub opacity: Option<f32>,
-    /// How a pane animates when it shows or hides.
+    /// How a pane, popover or overlay animates when it shows or hides, and
+    /// how a keyed row or column arrives and goes.
     pub transition: Option<Transition>,
 }
 
@@ -326,6 +328,38 @@ impl Sides {
                 *side = over;
             }
         }
+    }
+}
+
+/// A radius for each corner, clockwise from the top left as in CSS.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Corners {
+    pub top_left: f32,
+    pub top_right: f32,
+    pub bottom_right: f32,
+    pub bottom_left: f32,
+}
+
+impl Corners {
+    pub fn all(radius: f32) -> Self {
+        Self {
+            top_left: radius,
+            top_right: radius,
+            bottom_right: radius,
+            bottom_left: radius,
+        }
+    }
+
+    /// The radius when every corner has the same.
+    pub fn uniform(&self) -> Option<f32> {
+        let Self {
+            top_left,
+            top_right,
+            bottom_right,
+            bottom_left,
+        } = *self;
+        (top_right == top_left && bottom_right == top_left && bottom_left == top_left)
+            .then_some(top_left)
     }
 }
 
@@ -466,6 +500,9 @@ pub struct Stylesheet {
     pub radius: Option<f32>,
     /// Theme colors replaced for the whole app.
     pub overrides: Vec<(Token, Shade)>,
+    /// Which look each kind of component takes, by kind: `looks = { tabs =
+    /// "cards" }`. Views see it as `app.looks`; a component's own prop wins.
+    pub looks: BTreeMap<String, String>,
     names: Names,
     rules: Rules,
     /// Every component's `styles`, under each mod's and the stylesheet's.

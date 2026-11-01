@@ -34,7 +34,7 @@ const FRAME: &[&str] = &[
     "float",
 ];
 const LOOK: &[&str] = &["class", "style"];
-const ACTION: &[&str] = &["msg", "to", "command", "browser"];
+const ACTION: &[&str] = &["msg", "to", "command", "browser", "window"];
 const EXTRAS: &[&str] = &["tooltip", "context", "copy"];
 
 /// Reads a whole tree; `sheet` resolves the color names in `style` keys.
@@ -98,7 +98,11 @@ impl Tree {
                 .map(|_| Node::Divider)?,
             Element::Spacer => self.build::<Bare>(kind, table, &cx).map(|_| Node::Spacer)?,
             Element::Region => Node::Region(self.build(kind, table, &cx)?),
-            Element::Mount => Node::Mount(self.build::<Mount>(kind, table, &cx)?.0),
+            Element::Mount => match self.build::<Mount>(kind, table, &cx)? {
+                Mount::Place(name) => Node::Mount(name),
+                Mount::Instance(instance) => Node::Instance(instance),
+            },
+            Element::Instance => Node::Instance(self.build(kind, table, &cx)?),
             Element::Popover => Node::Popover(self.build(kind, table, &cx)?),
             Element::Overlay => Node::Overlay(self.build(kind, table, &cx)?),
         })
@@ -162,7 +166,7 @@ fn kind(table: &Table, cx: &Cx) -> Result<Element, Error> {
 impl Build for Stack {
     const CHILDREN: bool = true;
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, FRAME, LOOK, ACTION, EXTRAS, &[
-        "align", "justify", "wrap", "selected", "drag",
+        "align", "justify", "wrap", "selected", "drag", "key",
     ]];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree) -> Result<Self, Error> {
@@ -180,6 +184,7 @@ impl Build for Stack {
             action: Action::from_fields(fields)?,
             extras: Extras::from_fields(fields)?,
             drag: fields.get("drag")?.unwrap_or(false),
+            key: fields.get::<PlainId>("key")?.map(|key| key.0),
             children: tree.children(fields)?,
         })
     }
@@ -801,13 +806,73 @@ fn content<'f>(fields: &'f Fields) -> Result<&'f Value, Error> {
 }
 
 /// `ui.mount "name"`: the mod to draw.
-struct Mount(String);
+/// `ui.mount "name"` draws a mod where it is; with an `id`, it mounts an
+/// instance of the mod with state of its own.
+enum Mount {
+    Place(String),
+    Instance(Instance),
+}
 
 impl Build for Mount {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["mod"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["mod", "id", "props"]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
-        fields.need("mod").map(Self)
+        let name: String = fields.need("mod")?;
+        // A mod's name is its folder's, never a path: an instance loads
+        // `mods/<name>/main.luau`.
+        if !crate::style::valid_name(&name) {
+            return Err(fields
+                .cx()
+                .key("mod")
+                .fail(format!("`{name}` is not a mod name: use a-z, 0-9, - and _")));
+        }
+        match fields.get::<PlainId>("id")? {
+            Some(PlainId(id)) => Ok(Self::Instance(Instance {
+                of: InstanceOf::Mod(name),
+                id,
+                props: fields.get("props")?.unwrap_or(Data::Nil),
+            })),
+            None if fields.raw("props").is_some() => Err(fields
+                .cx()
+                .key("props")
+                .fail("props go to an instance: give it an `id`")),
+            None => Ok(Self::Place(name)),
+        }
+    }
+}
+
+/// What `use` returns for a component that keeps state builds: an instance
+/// of it.
+impl Build for Instance {
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["component", "id", "props"]];
+
+    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+        Ok(Self {
+            of: InstanceOf::Component(fields.need("component")?),
+            id: fields.need::<PlainId>("id")?.0,
+            props: fields.get("props")?.unwrap_or(Data::Nil),
+        })
+    }
+}
+
+impl Read for TabKind {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let fields = Fields::read(value, cx, &[&["title", "icon", "props", "report"]])?;
+        Ok(Self {
+            title: fields.get("title")?,
+            icon: fields.get("icon")?,
+            props: fields.get("props")?.unwrap_or(Data::Nil),
+            report: fields.get("report")?,
+        })
+    }
+}
+
+/// An instance's `id`, as plain as a terminal's.
+struct PlainId(String);
+
+impl Read for PlainId {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        plain_id(value, cx).map(Self)
     }
 }
 
@@ -849,9 +914,21 @@ impl Frame {
 }
 
 impl Action {
-    /// A control's `msg` (with an optional `to`) or `command`; a browser
+    /// A control's `msg` (with an optional `to`), `command` or `window`; a browser
     /// command names its browser with `browser` (and its mod with `to`).
     pub(crate) fn from_fields(fields: &Fields) -> Result<Option<Self>, Error> {
+        if let Some(name) = fields.get::<PlainId>("window")? {
+            let alone = ["msg", "command", "to", "browser"]
+                .iter()
+                .all(|key| fields.raw(key).is_none());
+            return if alone {
+                Ok(Some(Self::Window(name.0)))
+            } else {
+                Err(fields.cx().key("window").fail(
+                    "`window` (a mod to open in its own window) takes no `msg`, `to` or `command`",
+                ))
+            };
+        }
         let browser = fields.get::<BrowserId>("browser")?.map(|id| id.0);
         let misplaced = || {
             fields.cx().key("browser").fail(format!(

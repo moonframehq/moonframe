@@ -511,6 +511,9 @@ fn an_app_title_or_icon_that_leaves_its_folder_is_refused() {
         "icon = \"/etc/passwd\"",
     ] {
         let problem = read(&format!("[app]\nname = \"ok\"\n{bad}\n")).unwrap_err();
-        assert!(problem.contains("is not an app title") || problem.contains("is not an icon"), "{bad}: {problem}");
+        assert!(
+            problem.contains("is not an app title") || problem.contains("is not an icon"),
+            "{bad}: {problem}"
+        );
     }
 }

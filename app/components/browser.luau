@@ -20,6 +20,9 @@ return component {
 	title = "Browser",
 	category = "Content",
 	icon = "globe",
+	-- Offered by tab bars' + menu. A tab passes `navigate` and keeps the
+	-- `url` and `title` it reports, so the tab shows the page it is on.
+	tab = { title = "Browser", icon = "globe", props = { url = "https://luau.org" }, report = "navigate" },
 	description = "A web page with an address bar: back, forward, reload, its address, and open in the system browser.",
 	when = "A web page in a pane, with browser chrome. Keep the address the page reports in state (from `navigate`) and pass it as `at`. For a bare page without a bar use `ui.browser`.",
 	props = {

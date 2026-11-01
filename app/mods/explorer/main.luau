@@ -54,6 +54,22 @@ local function file_icon(name: string)
 	return extension and BY_EXTENSION[string.lower(extension)] or FILE
 end
 
+-- The explorer's box: a panel in the sidebar; in a tab, which frames it
+-- already (`props.framed`), a bare scrolling column, so no second border.
+local function frame(props: any, children: { any })
+	if props and props.framed then
+		return ui.column { grow = true, scroll = true, gap = "none", padding = "small", table.unpack(children) }
+	end
+	return ui.panel {
+		title = "Explorer",
+		grow = true,
+		scroll = true,
+		gap = "none",
+		padding = "small",
+		table.unpack(children),
+	}
+end
+
 -- The open folders, one path per line: what the provider lists.
 local function open_list(open: { [string]: boolean? }): string
 	local paths = {}
@@ -67,6 +83,8 @@ end
 return mod {
 	region = "left",
 	title = "Explorer",
+	-- Offered by tab bars' + menu: each tab is an explorer of its own.
+	tab = { title = "Files", icon = "folder" },
 
 	styles = {
 		[".tree-row"] = { padding = { 2, 6 }, radius = 4, gap = 4 },
@@ -106,10 +124,13 @@ return mod {
 		end
 	end,
 
-	view = function(state: State, app)
+	view = function(state: State, app, props)
 		local files = app.files
 		if not files then
-			return ui.panel { title = "Explorer", grow = true, ui.text { "Loading files…", tone = "muted" } }
+			return frame(props, { ui.text { "Loading files…", tone = "muted" } })
+		end
+		if not files.available then
+			return frame(props, { ui.text { files.reason or "No files to show.", tone = "muted" } })
 		end
 
 		local rows = {}
@@ -178,14 +199,7 @@ return mod {
 			add("", 0)
 		end
 
-		return ui.panel {
-			title = "Explorer",
-			grow = true,
-			scroll = true,
-			gap = "none",
-			padding = "small",
-			root,
-			table.unpack(rows),
-		}
+		table.insert(rows, 1, root)
+		return frame(props, rows)
 	end,
 }

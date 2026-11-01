@@ -33,6 +33,7 @@ mod keys;
 mod menus;
 mod module;
 mod node;
+mod persist;
 mod read;
 mod roots;
 mod style;
@@ -48,14 +49,16 @@ pub use {
     menus::{About, AppMenu, MenuCommand, MenuEntry},
     module::Meta,
     node::*,
+    persist::Persist,
     roots::{AppLayer, Roots, mod_name},
     style::{
-        Case, Color, Curve, Font, Look, Paint, Part, Resolved, Rules, Shade, Shadow, ShadowLayer,
-        ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition, TransitionKind,
+        Case, Color, Corners, Curve, Font, Look, Paint, Part, Resolved, Rules, Shade, Shadow,
+        ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token, Transition,
+        TransitionKind,
     },
     vm::printable,
     window::{Chrome, Platform, Titlebar, WindowState},
-    workspace::{PROVIDER, SHELL, Slot, Workspace},
+    workspace::{DEMO, PROVIDER, SHELL, Slot, Workspace},
 };
 
 #[cfg(test)]

@@ -63,6 +63,20 @@ pub(crate) fn selection() -> PathBuf {
         .join("selection.md")
 }
 
+/// Where state outlives the app (each mod's state, and topics):
+/// `$XDG_STATE_HOME/moonframe/state.sqlite`, by default under
+/// `~/.local/state`; outside the user's folder, which the window watches.
+/// Each profile keeps its own, `state-<profile>.sqlite`.
+pub(crate) fn state(profile: Option<&str>) -> PathBuf {
+    let file = match profile {
+        Some(name) => format!("state-{name}.sqlite"),
+        None => "state.sqlite".to_owned(),
+    };
+    xdg("XDG_STATE_HOME", ".local/state")
+        .unwrap_or_else(|| env::temp_dir().join(NAME))
+        .join(file)
+}
+
 /// Where profiles live in the user's folder: `profiles/<name>`.
 const PROFILES: &str = "profiles";
 

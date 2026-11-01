@@ -23,7 +23,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 | Element | Use it for | Keys (besides children) |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `msg`/`to` or `command`, extras |
+| `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `key` (names it among its siblings: with a `transition` rule it grows in as it appears and shrinks away as it goes), `msg`/`to`, `command` or `window` (a mod opened in a window of its own), extras |
 | `ui.panel { ... }` | a titled section with header actions over a body | frame keys, `title`, `actions = { elements }` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | areas the user resizes by dragging; children must be `ui.pane` | `id` |
 | `ui.pane { ... }` | one side of a split; slides in and out when `visible` changes | `size`, `min`, `max`, `fixed`, `visible`, `gap`, `padding`, `surface`, `scroll` |
@@ -205,6 +205,8 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`settings-nav`](#settings-nav) | Navigation | Choosing the page of a settings or preferences window; pair it with `settings-page`, which uses it. For an app's main sidebar use `sidebar`; for a flat list use `list`; for tabs across the top use `tabs`. |
 | [`sidebar`](#sidebar) | Navigation | The whole left column of an app: workspaces, agents, settings categories. One group alone is `sidebar-section`; the narrow collapsed form is `rail`; a VS Code style icon strip beside it is `activity-bar`; nested rows are `tree`. |
 | [`sidebar-section`](#sidebar-section) | Navigation | A titled group of rows inside a sidebar ("Spaces", "Agents", "APPEARANCE"). The whole column is `sidebar`; a list heading with a status dot and `+` is `group-header`; a foldable card in a page is `collapsible`; a plain non-folding heading is `section`. |
+| [`tab-view`](#tab-view) | Navigation | Drawing the selected tab of a `tabbed` bar somewhere other than under it, from the `tabs/<id>` topic. `tabbed` uses it for its own content. |
+| [`tabbed`](#tabbed) | Navigation | Several terminals, browsers or tools in one place, opened and closed by the user, remembered across launches. For a strip whose tabs the mod keeps itself use `tabs`. |
 | [`tabs`](#tabs) | Navigation | Switch between open documents, terminals or agent sessions, or between views of one panel. For 2 to 4 settings choices use `segmented`; for joined action buttons use `button-group`; for onboarding steps use `pager`. |
 | [`title-bar`](#title-bar) | Navigation | The top row of a window whose shell sets `titlebar = "hidden"`: pass `window = app.window` and it leaves room for macOS's traffic lights or draws its own window buttons elsewhere. Put `tabs` in its content. For a bar along the bottom use `status-bar`; for a path inside a pane use `breadcrumbs`; for a plain row of buttons use `toolbar`. |
 | [`about`](#about) | Overlays | Help > About, or the top of a settings General page (`inline`). For the changes in a version use `release-notes`; for other properties use `key-values`; for a first-run welcome use `onboarding`. |
@@ -2849,32 +2851,72 @@ section { title = "Agents", count = 3, collapsed = state.agents_folded, toggle =
 
 A whole mod using it, with state: `app/components/demos/sidebar-section.luau`.
 
+#### `tab-view`
+
+**Tab view.** One tab's content from its record: its component with the tab's props, or an instance of its mod.
+
+**When:** Drawing the selected tab of a `tabbed` bar somewhere other than under it, from the `tabs/<id>` topic. `tabbed` uses it for its own content.
+
+| Prop | Meaning |
+| --- | --- |
+| `kind` | its entry in `app.kinds` |
+| `tab` | the tab: { id, kind, title?, props }, as `tabbed` publishes it |
+
+```lua
+local tab_view = use "tab-view"
+
+-- in a mod that subscribes to "tabs/main":
+tab_view { tab = state.tab, kind = kind_of(app.kinds, state.tab.kind) }
+```
+
+#### `tabbed`
+
+**Tabbed.** A tab bar that keeps its tabs, which are saved: + opens a menu of kinds (terminals, browsers, files, any component or mod with a `tab` entry), and each tab shows its kind.
+
+**When:** Several terminals, browsers or tools in one place, opened and closed by the user, remembered across launches. For a strip whose tabs the mod keeps itself use `tabs`.
+
+| Prop | Meaning |
+| --- | --- |
+| `id` | names this tab bar: its tabs are kept under it, and published on `tabs/<id>` |
+| `offer` | kinds the + menu offers; all of `app.kinds` when unset |
+| `show` | "bar" draws only the strip, its content drawn elsewhere from the `tabs/<id>` topic with `tab-view`; "both" (default) draws the content under it |
+| `start` | kind of the first tab, as `app.kinds` names it ("component:terminal") |
+| `variant` | the strip's look, as `tabs` takes it; by default the stylesheet's `looks.tabs`, else "classic" |
+
+```lua
+local tabbed = use "tabbed"
+
+tabbed { id = "example", start = "component:terminal" }
+```
+
 #### `tabs`
 
-**Tabs.** A tab strip in six looks (pills, underline, outline, cards, compact, classic) with icons, agent status, badges, close and add buttons.
+**Tabs.** A tab strip in several looks (pills, underline, outline, cards, compact, classic, square, curved) with icons, agent status, badges, close and add buttons; tabs grow in as they open and shrink away as they close.
 
 **When:** Switch between open documents, terminals or agent sessions, or between views of one panel. For 2 to 4 settings choices use `segmented`; for joined action buttons use `button-group`; for onboarding steps use `pager`.
 
 | Prop | Meaning |
 | --- | --- |
 | `add` | message for a + button after the tabs; no button when unset |
+| `add_menu` | a menu the + button opens under itself: { open, dismiss (message on a click outside), content, width? } |
 | `closable` | show × on every tab, not only the selected one |
 | `close` | key of the message the × sends, default "close": { close = id } |
 | `context` | key of the message a right-click sends, default "tab_menu": { tab_menu = id } |
 | `event` | key of the message a click sends, default "select": { select = id } |
 | `grow` | stretch the tabs to share the width equally |
+| `in_bar` | drawn in a title bar or toolbar with its own bottom line: the strip draws no line of its own (`.tabs-in-bar`) |
 | `selected` | id of the selected tab |
 | `tabs` | list of { id, label, icon?, status? ("working" spinner, "blocked", "done", "idle" dot), badge? (count or text), closable?, tooltip?, msg? (sent instead of the select message) } |
 | `to` | mod to send messages to, if not the drawing one |
-| `variant` | "pills" (default), "underline", "outline", "cards", "compact" or "classic" |
+| `variant` | "pills" (default), "underline", "outline", "cards", "compact", "classic", "square" or "curved" (the selected tab joins what is under the strip: put the strip right on top of a card of the same color); or any look a stylesheet defines with `.tabs-<look>` and `.tabs-<look>-tab` rules |
 
-**Styles:** `.tabs` `.tabs-add` `.tabs-add:hover` `.tabs-badge` `.tabs-cards` `.tabs-cards-tab` `.tabs-cards-tab:hover` `.tabs-cards-tab:selected` `.tabs-classic` `.tabs-classic-tab` `.tabs-classic-tab:hover` `.tabs-classic-tab:selected` `.tabs-close` `.tabs-close:hover` `.tabs-compact` `.tabs-compact-tab` `.tabs-compact-tab:selected` `.tabs-dot` `.tabs-dot-blocked` `.tabs-dot-done` `.tabs-dot-idle` `.tabs-icon` `.tabs-label` `.tabs-outline-tab` `.tabs-outline-tab:selected` `.tabs-pills-tab` `.tabs-pills-tab:selected` `.tabs-spinner` `.tabs-tab` `.tabs-tab:hover` `.tabs-tab:selected` `.tabs-underline` `.tabs-underline-tab` `.tabs-underline-tab:hover` `.tabs-underline-tab:selected`
+**Styles:** `.tabs` `.tabs-add` `.tabs-add:hover` `.tabs-badge` `.tabs-cards` `.tabs-cards-tab` `.tabs-cards-tab:hover` `.tabs-cards-tab:selected` `.tabs-classic` `.tabs-classic-tab` `.tabs-classic-tab:hover` `.tabs-classic-tab:selected` `.tabs-close` `.tabs-close:hover` `.tabs-compact` `.tabs-compact-tab` `.tabs-compact-tab:selected` `.tabs-curved` `.tabs-curved-tab` `.tabs-curved-tab:hover` `.tabs-curved-tab:selected` `.tabs-dot` `.tabs-dot-blocked` `.tabs-dot-done` `.tabs-dot-idle` `.tabs-icon` `.tabs-in-bar` `.tabs-label` `.tabs-outline-tab` `.tabs-outline-tab:selected` `.tabs-pills-tab` `.tabs-pills-tab:selected` `.tabs-shoulder` `.tabs-shoulder-left` `.tabs-shoulder-right` `.tabs-spinner` `.tabs-square` `.tabs-square-tab` `.tabs-square-tab:hover` `.tabs-square-tab:selected` `.tabs-tab` `.tabs-tab:hover` `.tabs-tab:selected` `.tabs-underline` `.tabs-underline-tab` `.tabs-underline-tab:hover` `.tabs-underline-tab:selected`
 
 ```lua
 local tabs = use "tabs"
 
 tabs {
-	variant = "pills", -- underline, outline, cards, compact, classic
+	variant = "pills", -- underline, outline, cards, compact, classic, square, curved
 	selected = state.tab, add = "new-tab",
 	tabs = {
 		{ id = "api", label = "ledger-api", icon = "square-terminal", status = "working" },
