@@ -91,6 +91,13 @@ providers dir="app":
     for manifest in {{dir}}/providers/*/Cargo.toml; do
         [ -e "$manifest" ] || continue
         echo "provider: $(basename "$(dirname "$manifest")")"
+        # A provider carries its own copy of the interface, to build wherever
+        # its app is copied; it must stay the one the host implements.
+        local="$(dirname "$manifest")/wit/provider.wit"
+        if [ -e "$local" ] && ! cmp -s "$local" wit/provider.wit; then
+            echo "$local differs from wit/provider.wit; copy it again" >&2
+            exit 1
+        fi
         cargo clippy --quiet --release --target wasm32-wasip2 --manifest-path "$manifest" --target-dir target/providers -- -D warnings
         cargo build --quiet --release --target wasm32-wasip2 --manifest-path "$manifest" --target-dir target/providers
     done

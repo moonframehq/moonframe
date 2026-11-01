@@ -19,7 +19,7 @@
 //!   limit = { service, resource, by = 1|-1 }  raise or lower an allocation
 //!   deploy = id                               roll out a new version
 
-wit_bindgen::generate!({ path: "../../../../wit/provider.wit", world: "provider" });
+wit_bindgen::generate!({ path: "wit/provider.wit", world: "provider" });
 
 use {
     serde_json::{Map, Value, json},

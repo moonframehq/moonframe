@@ -502,13 +502,21 @@ fn a_static_provider_publishes_its_file_on_messages_and_changes() {
     let two = Data::map([("n", Data::Integer(22))]);
     assert_eq!(next(), ("sample".to_owned(), two));
 
-    write(root, "providers/sample/sample.json", "{");
-    providers.reload();
-    match received.recv_timeout(Duration::from_secs(5)).unwrap() {
-        Event::Failed { provider, problem } => {
-            assert_eq!(provider, "sample");
-            assert!(problem.to_string().contains("sample.json"), "{problem}");
-        },
-        other => panic!("{other:?}"),
-    }
+    let mut fails = |text: &str, expected: &str| {
+        write(root, "providers/sample/sample.json", text);
+        providers.reload();
+        match received.recv_timeout(Duration::from_secs(5)).unwrap() {
+            Event::Failed { provider, problem } => {
+                assert_eq!(provider, "sample");
+                assert!(problem.to_string().contains(expected), "{problem}");
+            },
+            other => panic!("{other:?}"),
+        }
+    };
+    fails("{", "sample.json");
+    // Refused after reading one byte past the limit, not the whole file.
+    fails(
+        &format!("\"{}\"", "x".repeat(2 * json::MAX_JSON)),
+        "more than",
+    );
 }

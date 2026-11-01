@@ -18,7 +18,7 @@
 //!   reply = { id, text, internal }  add a reply, or an internal note, to the thread
 //!   new = true                 open a blank ticket at the top of the inbox
 
-wit_bindgen::generate!({ path: "../../../../wit/provider.wit", world: "provider" });
+wit_bindgen::generate!({ path: "wit/provider.wit", world: "provider" });
 
 use {
     serde_json::{Value, json},

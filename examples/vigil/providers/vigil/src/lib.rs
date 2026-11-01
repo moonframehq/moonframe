@@ -9,7 +9,7 @@
 //! "30D" }` switches the figures; `{ rerun = <run id> }` starts that run's
 //! workflow again.
 
-wit_bindgen::generate!({ path: "../../../../wit/provider.wit", world: "provider" });
+wit_bindgen::generate!({ path: "wit/provider.wit", world: "provider" });
 
 use {
     serde_json::{Value, json},

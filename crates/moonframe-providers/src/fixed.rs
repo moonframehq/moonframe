@@ -5,7 +5,7 @@
 
 use {
     crate::{Context, Kind, json},
-    std::{fs, path::Path},
+    std::{fs, io::Read, path::Path},
 };
 
 pub(crate) fn run(context: &Context) {
@@ -38,5 +38,10 @@ fn read(path: &Path) -> std::io::Result<String> {
     if fs::symlink_metadata(path)?.file_type().is_symlink() {
         return Err(std::io::Error::other("it is a link"));
     }
-    fs::read_to_string(path)
+    // One byte past the limit is enough to refuse it, without reading more.
+    let mut text = String::new();
+    fs::File::open(path)?
+        .take(json::MAX_JSON as u64 + 1)
+        .read_to_string(&mut text)?;
+    Ok(text)
 }
