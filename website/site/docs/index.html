@@ -29,6 +29,8 @@
   aside { padding:28px 20px 60px 24px; font:14px/1.5 var(--sans); border-right:1px solid var(--rule); min-height:calc(100vh - 58px); position:sticky; top:58px; align-self:start }
   aside h4 { font:600 11.5px var(--sans); text-transform:uppercase; letter-spacing:.12em; color:var(--dim); margin:22px 0 6px }
   aside h4:first-child { margin-top:0 }
+  /* `hidden` wins over the display rules below (search hides links and headings). */
+  [hidden] { display:none !important }
   aside a { display:block; padding:4px 10px; border-left:2px solid transparent; color:var(--ink2) }
   aside a:hover { color:var(--acc) }
   aside a.on { border-left-color:var(--acc); color:var(--acc); font-weight:600; background:#4b3fd10a }
