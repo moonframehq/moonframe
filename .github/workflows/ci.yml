@@ -27,10 +27,81 @@ defaults:
     shell: bash
 
 jobs:
+  # Decides which jobs below run, from the files this push or pull request
+  # changes, so that a website-only change does not wait for (or occupy)
+  # macOS runners. The run itself always happens and passes with skipped
+  # jobs, because a release waits for a passing CI run on its exact commit.
+  #
+  # `build` lists what cannot affect the lints, tests or app checks, rather
+  # than what can: a path nobody thought of runs everything.
+  changes:
+    name: Changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read # list a pull request's files
+    outputs:
+      workflows: ${{ steps.classify.outputs.workflows }}
+      build: ${{ steps.classify.outputs.build }}
+    steps:
+      - id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          all() {
+            echo "$1: running every job"
+            printf 'workflows=true\nbuild=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          # Renames count under both names.
+          names='.[] | .filename, (.previous_filename // empty)'
+          case $EVENT in
+            pull_request)
+              # The API lists at most 3000 files.
+              files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq "$names")
+              (( $(wc -l <<<"$files") < 3000 )) || all "3000 files or more"
+              ;;
+            push)
+              [[ $BEFORE =~ ^[0-9a-f]{40}$ && $BEFORE != 0000000000000000000000000000000000000000 ]] \
+                || all "no previous commit to compare with"
+              compare=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$SHA")
+              # The API lists at most 300 files.
+              (( $(jq '.files | length' <<<"$compare") < 300 )) || all "300 files or more"
+              files=$(jq -r ".files | $names" <<<"$compare")
+              ;;
+            *) all "$EVENT" ;;
+          esac
+          echo "$files"
+          workflows=false
+          build=false
+          while IFS= read -r file; do
+            [[ -n $file ]] || continue
+            [[ $file != .github/* ]] || workflows=true
+            case $file in
+              # Read by nothing that is built, linted or checked here.
+              website/* | homebrew/* | netlify.toml | LICENSE | README.md | AGENTS.md | CLAUDE.md) ;;
+              docs/*.md | docs/hero/*) ;;
+              # Packaging: package.yml checks these.
+              scripts/release/* | assets/macos/*) ;;
+              # Other workflows: zizmor checks these.
+              .github/*) [[ $file != .github/workflows/ci.yml ]] || build=true ;;
+              *) build=true ;;
+            esac
+          done <<<"$files"
+          printf 'workflows=%s\nbuild=%s\n' "$workflows" "$build" | tee -a "$GITHUB_OUTPUT"
+
   # Audits the workflows themselves: template injection, over-broad
   # permissions, unpinned actions, persisted credentials, cache poisoning.
   zizmor:
     name: Workflow security
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -48,7 +119,10 @@ jobs:
   # Wasm providers.
   lint:
     name: Format, Luau types, and providers
-    needs: zizmor
+    needs: [changes, zizmor]
+    if: >-
+      !cancelled() && needs.changes.outputs.build == 'true' &&
+      (needs.zizmor.result == 'success' || needs.zizmor.result == 'skipped')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -89,7 +163,10 @@ jobs:
   # ships for.
   checks:
     name: Lint and test (${{ matrix.runner }})
-    needs: zizmor
+    needs: [changes, zizmor]
+    if: >-
+      !cancelled() && needs.changes.outputs.build == 'true' &&
+      (needs.zizmor.result == 'success' || needs.zizmor.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
@@ -135,19 +212,22 @@ jobs:
           # --strip-trailing-cr: Git for Windows checks the skill out with CRLF.
           diff -u --strip-trailing-cr .claude/skills/moonframe-components/SKILL.md target/components.md
 
-  # One stable context for branch protection, requiring every job above.
+  # One stable context for branch protection: every job above passed, or
+  # was skipped because Changes found nothing for it to check.
   ci-passed:
     name: CI passed
-    needs: [zizmor, lint, checks]
+    needs: [changes, zizmor, lint, checks]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
     steps:
-      - name: Require every job
+      - name: Require every job to pass or be skipped
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
+          CHANGES: ${{ needs.changes.result }}
         run: |
+          test "$CHANGES" = success
           for result in $RESULTS; do
-            test "$result" = success
+            [[ $result == success || $result == skipped ]]
           done

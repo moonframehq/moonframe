@@ -120,20 +120,58 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     permissions:
-      actions: read # read CI's workflow runs for this commit
+      actions: write # cancel other commits' CI runs, re-run this one's
     steps:
+      # macOS runners are few: CI runs of main's other commits, which this
+      # release does not wait for, would hold them while this release's own
+      # CI run and macOS package queue behind. Only CI runs of pushes to main
+      # are cancelled; pull requests keep theirs.
+      - name: Cancel the CI runs of main's other commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.validate.outputs.sha }}
+        run: |
+          set -euo pipefail
+          for status in requested queued pending waiting in_progress; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=$status&per_page=100" \
+              --jq '.workflow_runs[] | select(.head_sha != env.SHA) | "\(.id) \(.head_sha)"'
+          done | sort -u > others
+          while read -r id sha; do
+            echo "Cancelling CI run $id of $sha"
+            gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" --silent || true
+          done < others
+          # A run with some jobs done and others still queued can ignore a
+          # plain cancel; force those.
+          sleep 30
+          while read -r id _; do
+            if [[ $(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq .status) != completed ]]; then
+              echo "Force-cancelling CI run $id"
+              gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/force-cancel" --silent || true
+            fi
+          done < others
+      # A run cancelled before this release started (by an earlier release,
+      # or by hand) is re-run once rather than failing the release.
       - name: Wait for the CI run of this commit to succeed
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ needs.validate.outputs.sha }}
         run: |
           set -euo pipefail
+          rerun=false
           while :; do
-            run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SHA&branch=main&event=push" \
-              --jq '.workflow_runs | sort_by(.run_number) | last | if . == null then "missing" else .status + " " + (.conclusion // "") end')
-            echo "CI: $run"
-            case $run in
+            read -r id status conclusion < <(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SHA&branch=main&event=push" \
+              --jq '.workflow_runs | sort_by(.run_number) | last | if . == null then "- missing -" else "\(.id) \(.status) \(.conclusion // "-")" end')
+            echo "CI: $status $conclusion"
+            case "$status $conclusion" in
               "completed success") exit 0 ;;
+              "completed cancelled")
+                if [[ $rerun == false ]]; then
+                  echo "Re-running cancelled CI run $id"
+                  gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/rerun" --silent
+                  rerun=true
+                else
+                  echo "::error::CI was cancelled again on $SHA"; exit 1
+                fi ;;
               completed*) echo "::error::CI did not pass on $SHA"; exit 1 ;;
             esac
             sleep 60
