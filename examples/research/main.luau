@@ -2,6 +2,8 @@
 -- white card: the project's bar across the top, then the main thread with
 -- the agent's plan on the left and the sheet it fills on the right.
 
+local icon_button = use "icon-button"
+
 local MENUS: { { title: string, items: { any } } } = {
 	{ title = "Research", items = {
 		{ label = "Pause or Resume the Agent", msg = "toggle", to = "thread", shortcut = "secondary-." },
@@ -43,7 +45,20 @@ return mod {
 		end
 	end,
 
-	view = function(state)
+	view = function(state, app)
+		-- With the sidebar hidden, the top bar leads with a button to bring it
+		-- back, set clear of the traffic lights on macOS.
+		local window = app.window
+		local lights = window.platform == "macos" and not window.fullscreen
+		local show_left = if state.left
+			then nil
+			else ui.row {
+				width = if lights then 104 else 48,
+				shrink = false,
+				align = "center",
+				justify = "end",
+				icon_button { icon = "panel-left", tooltip = "Show the sidebar", msg = "toggle-left" },
+			}
 		local body = ui.hsplit {
 			id = "body",
 			divider = false,
@@ -54,7 +69,7 @@ return mod {
 					class = "card",
 					grow = true,
 					gap = "none",
-					ui.row { height = 54, shrink = false, gap = "none", class = "topline", ui.region { name = "top", direction = "row" } },
+					ui.row { height = 54, shrink = false, gap = "none", class = "topline", show_left, ui.region { name = "top", direction = "row" } },
 					ui.hsplit {
 						id = "work",
 						ui.pane { size = 420, min = 320, max = 620, fixed = true, visible = state.thread, ui.region "thread" },

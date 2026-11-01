@@ -1,7 +1,7 @@
 -- The folded sidebar: a column of icons under the traffic lights (the
 -- brand, New Chat, Agents, Intelligence, Projects, the latest agent chats)
--- and the account at the foot. The brand unfolds the sidebar; an agent's
--- icon opens its page.
+-- and the account at the foot. The brand and the panel icon under it unfold
+-- the sidebar; an agent's icon opens its page.
 
 local pixel_icon = use "pixel-icon"
 
@@ -61,6 +61,7 @@ return mod {
 				to = "shell",
 				pixel_icon { pattern = LOGO, colors = { "#f2542d", "#ffffff" }, size = 24 },
 			},
+			ui.row { class = "rail-tile", tooltip = "Unfold the sidebar", msg = "show-left", to = "shell", ui.icon "panel-left" },
 			ui.row { class = "rail-tile rail-new", tooltip = "New Chat", msg = "show-left", to = "shell", ui.icon "plus" },
 			ui.row {
 				class = "rail-tile",
