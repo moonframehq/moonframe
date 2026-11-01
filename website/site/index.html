@@ -138,7 +138,7 @@
   .plates { display:grid; grid-template-columns:repeat(4, 1fr); gap:26px 22px; align-items:start; margin-top:48px }
   .plate { margin:0 }
   .plate img, .comp-strip img { transition:transform .25s cubic-bezier(.2,.8,.2,1), filter .25s; will-change:transform }
-  .plate img { width:100%; display:block; filter:drop-shadow(0 6px 10px #1d1b2626) }
+  .plate img { width:100%; aspect-ratio:1600/1026; object-fit:cover; object-position:top; display:block; filter:drop-shadow(0 6px 10px #1d1b2626) }
   .plate:hover img, .comp-strip img:hover { transform:translateY(-4px) scale(1.025); filter:drop-shadow(0 18px 20px #1d1b2650) }
   .plate p { font:13px/1.45 var(--sans); color:var(--dim); margin-top:8px }
   .plate p b { color:var(--ink) } .plate p span { font:11px var(--mono); color:var(--acc); margin-right:6px }
@@ -156,6 +156,7 @@
   .lb-cap { margin-top:28px; display:flex; gap:16px; align-items:center; font-size:14px; color:#bbb }
   .lb-cap b { color:#fff; font:italic 500 20px var(--serif) } .lb-cap code { background:#ffffff14; color:#ddd }
   .lb-pct { font:12px var(--mono); color:#9d94ff; min-width:120px }
+  .lb-pct .retry { position:static; width:auto; height:auto; border-radius:4px; font:600 12px var(--sans); padding:4px 10px; margin-left:8px; background:#9d94ff; color:#14121b }
   .lb button { position:absolute; background:#ffffff14; color:#fff; border:0; width:44px; height:44px; border-radius:50%; font-size:20px; cursor:pointer }
   .lb button:hover { background:#ffffff2a }
   .lb .x { top:18px; right:18px } .lb .prev { left:14px; top:50% } .lb .next { right:14px; top:50% }
@@ -172,13 +173,44 @@
   footer a { display:block; padding:2px 0 } footer a:hover { color:var(--acc) }
   footer .name { font:italic 600 24px var(--serif); color:var(--ink); display:flex; gap:10px; align-items:center; margin-bottom:8px }
   footer .name img { width:24px; border-radius:6px }
+  /* Narrower screens: stack the columns, and keep the window demo readable. */
+  @media (max-width:1000px) {
+    .mast { grid-template-columns:1fr; justify-items:center; gap:10px }
+    .mast > span:first-child { display:none } .mast nav { justify-content:center; flex-wrap:wrap; gap:16px }
+    .stage { grid-template-columns:1fr; height:auto }
+    .agent { height:300px } .win { height:380px }
+    .body { grid-template-columns:150px 1fr 170px }
+    .inspect, .mockfig { grid-template-columns:1fr; gap:48px }
+    .chat { right:8px }
+    .plates { grid-template-columns:repeat(3, 1fr) }
+    .cols { columns:2 }
+  }
+  @media (max-width:720px) {
+    .wrap { padding:0 18px }
+    .sub { flex-direction:column; align-items:center; gap:2px }
+    .hero { padding:44px 0 24px } .deck { font-size:18px }
+    .hero .start { flex-wrap:wrap; justify-content:center }
+    .body { grid-template-columns:1fr } .body .panel:first-child, .body .panel:last-child { display:none }
+    .sbar { gap:10px } .uptime { display:none }
+    section { padding:60px 0 } h2 { font-size:36px } .lead { font-size:17px }
+    .three { grid-template-columns:1fr } .three > div { padding:22px 0; border-right:0; border-bottom:1px solid var(--rule) }
+    .chat { position:static; width:auto; margin-top:16px; box-shadow:4px 4px 0 var(--ink) }
+    .comp-head, .plates-head { flex-direction:column; align-items:flex-start; gap:12px } .big-num { font-size:84px }
+    .comp-strip { grid-template-columns:repeat(2, 1fr) }
+    .plates { grid-template-columns:repeat(2, 1fr); gap:20px 14px }
+    .cols { columns:1 }
+    .installbar { flex-direction:column; align-items:flex-start } .installbar pre { white-space:pre-wrap; word-break:break-all; font-size:13px }
+    .pull { font-size:28px; padding:40px 0 }
+    footer { grid-template-columns:1fr 1fr }
+    .lb { padding:56px 10px 20px } .lb .prev, .lb .next { top:auto; bottom:14px } .lb-cap { flex-direction:column; text-align:center; gap:6px }
+  }
 </style>
 <body>
 <div class="wrap">
   <header class="mast">
     <span>Open source · MIT</span>
     <a class="name" href="#"><img src="img/icon.png" alt="">Moonframe</a>
-    <nav><a href="#components">Components</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a>GitHub</a></nav>
+    <nav><a href="#components">Components</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe">GitHub</a></nav>
   </header>
   <div class="sub"><span>Native desktop apps, <b>written in Rust</b></span><span>macOS · Linux · Windows</span></div>
 
@@ -187,7 +219,7 @@
       <p class="kicker">A Rust starter for native desktop apps</p>
       <h1>Ask for it.<br><i>Watch the window change.</i></h1>
       <p class="deck">Moonframe is a native app in Rust, drawn on the GPU by GPUI. Its panels, toolbars and status bar are Luau files on top, so an agent can change them while the app runs. No rebuild, no restart, and your terminals keep running.</p>
-      <div class="start"><a class="btn" href="/docs/">Get started</a><a class="btn o">★ Star on GitHub</a></div>
+      <div class="start"><a class="btn" href="/docs/">Get started</a><a class="btn o" href="https://github.com/penso/moonframe">★ Star on GitHub</a></div>
     </div>
 
     <div class="stage">
@@ -222,7 +254,7 @@
     <p class="kicker">How you work</p>
     <h2>Describe it, and see it <i>while it's being built.</i></h2>
     <div class="three">
-      <div><span class="num">I</span><h3>Run it once</h3><p>Clone the starter and open the window. You won't need to close it again.</p><pre>git clone github.com/penso/moonframe
+      <div><span class="num">I</span><h3>Run it once</h3><p>Clone the starter and open the window. You won't need to close it again.</p><pre>git clone https://github.com/penso/moonframe
 cd moonframe &amp;&amp; mise install
 just run</pre></div>
       <div><span class="num">II</span><h3>Prompt, and watch</h3><p>Ask your agent for a panel, a widget, a whole screen. Each file it saves redraws the window in place, with state and terminals kept. A mistake shows as a small warning mark, never a blank window.</p><pre class="prompts"><span class="q">› a CPU sparkline in the status bar</span>
@@ -308,9 +340,9 @@ just install   # into /Applications</pre></div>
 
   <footer>
     <div><span class="name"><img src="img/icon.png" alt="">Moonframe</span>Native desktop apps in Rust, shaped live in Luau.<br>MIT licensed.</div>
-    <div><b>Learn</b><a href="/docs/">Docs</a><a>Quick start</a><a href="#components">Components</a></div>
-    <div><b>Build</b><a>Mods from git</a><a>Apps as profiles</a><a>Releases</a></div>
-    <div><b>Project</b><a>GitHub</a><a>Changelog</a><a>License</a></div>
+    <div><b>Learn</b><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe#quick-start">Quick start</a><a href="#components">Components</a></div>
+    <div><b>Build</b><a href="https://github.com/penso/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/penso/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/penso/moonframe/blob/main/docs/library.md">The library</a></div>
+    <div><b>Project</b><a href="https://github.com/penso/moonframe">GitHub</a><a href="https://github.com/penso/moonframe/issues">Issues</a><a href="https://github.com/penso/moonframe/blob/main/LICENSE">License</a></div>
   </footer>
 </div>
 
@@ -359,20 +391,31 @@ document.getElementById("plates").innerHTML = APPS.map(([id, title, d], i) =>
 // streams in behind it with a progress bar, then fades over it.
 const lb = document.getElementById("lb"), lo = document.getElementById("lb-lo"), hi = document.getElementById("lb-hi"),
       bar = document.getElementById("lb-bar"), pct = document.getElementById("lb-pct"), cap = document.getElementById("lb-cap");
-const fullCache = new Map();
 let lbIndex = -1, lbToken = 0;
 const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.round(n / 1024) + " KB";
-async function loadFull(url, onProgress) {
-  if (fullCache.has(url)) return fullCache.get(url);
-  try {
-    const res = await fetch(url);
-    if (!res.ok || !res.body) throw 0;
-    const total = +res.headers.get("content-length") || 0, reader = res.body.getReader(), chunks = [];
-    let got = 0;
-    for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); got += value.length; onProgress(got, total); }
-    const blobUrl = URL.createObjectURL(new Blob(chunks, { type:"image/png" }));
-    fullCache.set(url, blobUrl); return blobUrl;
-  } catch { onProgress(0, 0); return url; } // file:// or no streams: the <img> loads it, with an indeterminate bar
+// One download per image, shared by everyone who asks for it (the viewer and
+// the prefetch of the next image), with its progress reported to each.
+const downloads = new Map();
+function loadFull(url, onProgress) {
+  let d = downloads.get(url);
+  if (!d) {
+    d = { listeners:new Set(), got:0, total:0 };
+    d.promise = (async () => {
+      const res = await fetch(url);
+      if (!res.ok || !res.body) throw new Error(`${res.status}`);
+      d.total = +res.headers.get("content-length") || 0;
+      const reader = res.body.getReader(), chunks = [];
+      for (;;) {
+        const { done, value } = await reader.read(); if (done) break;
+        chunks.push(value); d.got += value.length;
+        for (const f of d.listeners) f(d.got, d.total);
+      }
+      return URL.createObjectURL(new Blob(chunks, { type:"image/png" }));
+    })().catch(() => { downloads.delete(url); return url; }); // file:// or no streams: the <img> loads it, or fails to
+    downloads.set(url, d);
+  }
+  d.listeners.add(onProgress); onProgress(d.got, d.total);
+  return d.promise.finally(() => d.listeners.delete(onProgress));
 }
 // A set of images the viewer steps through: { lo, full, caption }.
 const PLATES = APPS.map(([id, title, d]) => ({ lo:`img/${id}.webp`, full:`img/full/${id}.png`,
@@ -385,16 +428,25 @@ async function openPlate(i, set = lbSet) {
   lbSet = set; lbIndex = (i + set.length) % set.length; const token = ++lbToken;
   const item = set[lbIndex];
   lb.classList.add("on"); document.body.style.overflow = "hidden";
-  lo.src = item.lo; lo.style.opacity = 1; hi.classList.remove("ready"); hi.removeAttribute("src");
+  lo.src = item.lo; lo.style.opacity = 1; lo.style.filter = ""; hi.classList.remove("ready"); hi.removeAttribute("src");
   cap.innerHTML = `${item.caption} · ${lbIndex + 1} of ${set.length}`;
   bar.style.opacity = 1; bar.classList.remove("indet"); bar.firstElementChild.style.width = "0"; pct.textContent = "Loading full size…";
   const src = await loadFull(item.full, (got, total) => {
     if (token !== lbToken) return;
     if (!total) { bar.classList.add("indet"); pct.textContent = got ? `Loading… ${kb(got)}` : "Loading full size…"; return; }
+    bar.classList.remove("indet");
     bar.firstElementChild.style.width = (got / total * 100) + "%"; pct.textContent = `${Math.round(got / total * 100)}% · ${kb(got)} of ${kb(total)}`;
   });
   if (token !== lbToken) return;
   hi.onload = () => { if (token !== lbToken) return; hi.classList.add("ready"); lo.style.opacity = 0; bar.style.opacity = 0; pct.textContent = "Full size"; };
+  // If the full size can't load, stop the bar, show the thumbnail clearly, and offer a retry.
+  hi.onerror = () => {
+    if (token !== lbToken) return;
+    downloads.delete(item.full);
+    bar.style.opacity = 0; lo.style.filter = "drop-shadow(0 30px 50px #000a)";
+    pct.innerHTML = `Couldn't load the full size. <button class="retry">Retry</button>`;
+    pct.querySelector(".retry").onclick = e => { e.stopPropagation(); openPlate(lbIndex, lbSet); };
+  };
   hi.src = src;
   // Warm the next one so stepping through feels instant.
   loadFull(set[(lbIndex + 1) % set.length].full, () => {});

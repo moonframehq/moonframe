@@ -18,6 +18,10 @@
   .top .name img { width:24px; border-radius:6px }
   .top .sec { font:600 12px var(--sans); letter-spacing:.12em; text-transform:uppercase; color:var(--acc); border-left:1px solid var(--rule); padding-left:12px }
   .search { margin-left:28px; width:320px; border:1px solid var(--rule); background:#fff; border-radius:4px; padding:6px 10px; color:#999; font-size:13.5px; display:flex; justify-content:space-between }
+  .menu { display:none; font:600 13px var(--sans); background:none; border:1px solid var(--rule); border-radius:4px; padding:6px 10px; color:var(--ink); cursor:pointer }
+  .search input { border:0; outline:none; background:none; font:inherit; color:var(--ink); flex:1; min-width:0 }
+  .none { color:var(--dim); font:13px var(--sans); padding:4px 10px }
+  html { scroll-padding-top:70px }
   .search kbd { font:11px var(--mono); border:1px solid var(--rule); border-radius:3px; padding:0 5px }
   .top .r { margin-left:auto; display:flex; gap:22px; font-size:14px; color:var(--dim) }
   .top .r a.on { color:var(--ink); font-weight:600 }
@@ -58,20 +62,33 @@
   .toc b { color:var(--ink); display:block; margin-bottom:10px; font-size:11.5px; text-transform:uppercase; letter-spacing:.12em }
   .toc a { display:block; padding:4px 0 } .toc a.on { color:var(--acc); font-weight:600 }
   .toc .edit { margin-top:24px; padding-top:14px; border-top:1px solid var(--rule) }
+  /* Narrower screens: last, so they override the layout above. */
+  @media (max-width:1100px) { .layout { grid-template-columns:240px minmax(0, 1fr) } .toc { display:none } main { padding:44px 40px 100px } }
+  @media (max-width:760px) {
+    .top { flex-wrap:wrap; height:auto; padding:10px 16px; gap:8px 12px; position:static }
+    .search { margin-left:0; width:100% } .top .r { margin-left:auto; gap:14px; font-size:13px; flex-wrap:wrap }
+    .layout { display:block } aside { position:static; min-height:0; border-right:0; border-bottom:1px solid var(--rule); padding:16px; display:none }
+    aside.open { display:block } .menu { display:block; order:3 } .search { order:4 }
+    main { padding:28px 18px 80px } h1 { font-size:40px } .lead { font-size:18px }
+    .cards { grid-template-columns:1fr } .cards a:nth-child(odd) { border-right:0 } .cards a:nth-child(even) { padding-left:0 }
+    pre { font-size:12px; padding:14px }
+  }
 </style>
 <body>
-<header class="top">
+<header class="top" id="top">
   <a class="name" href="https://moonframe.dev/"><img src="/img/icon.png" alt="">Moonframe</a><span class="sec">Docs</span>
-  <div class="search">Search the docs… <kbd>⌘K</kbd></div>
-  <div class="r"><a class="on">Guide</a><a>Luau API</a><a>Components</a><a href="https://moonframe.dev/#apps">Apps</a><a>GitHub</a></div>
+  <button class="menu" id="menu" aria-expanded="false" aria-controls="side">Contents ▾</button>
+  <label class="search"><input id="q" type="search" placeholder="Search the docs…" aria-label="Search the docs"><kbd>⌘K</kbd></label>
+  <div class="r"><a class="on" href="/">Guide</a><a href="https://github.com/penso/moonframe/blob/main/types/moonframe.d.luau">Luau API</a><a href="https://moonframe.dev/#components">Components</a><a href="https://moonframe.dev/#apps">Apps</a><a href="https://github.com/penso/moonframe">GitHub</a></div>
 </header>
 <div class="layout">
-  <aside>
-    <h4>Start</h4><a class="on">Introduction</a><a>Quick start</a><a>Make it yours</a>
-    <h4>Building blocks</h4><a>Mods</a><a>The shell</a><a>style.luau</a><a>Components</a><a>Terminals</a><a>Providers</a><a>Popovers &amp; overlays</a><a>Icons</a>
-    <h4>Working with agents</h4><a>The skill</a><a>Inspect Element</a><a>Mockups</a>
-    <h4>Distribute</h4><a>Mods from git</a><a>Apps as profiles</a><a>Bundling a release</a><a>Using the library</a>
-    <h4>Reference</h4><a>Commands</a><a>moonframe.toml</a><a>Element catalogue</a>
+  <aside id="side">
+    <h4>Start</h4><a class="on" href="/">Introduction</a><a href="https://github.com/penso/moonframe#quick-start">Quick start</a><a href="https://github.com/penso/moonframe#make-it-yours">Make it yours</a>
+    <h4>Building blocks</h4><a href="#a-mod-is-one-file">Mods</a><a href="#where-things-go">Where things go</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe/SKILL.md">The full guide</a><a href="https://moonframe.dev/#components">Components</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe-components/SKILL.md">Component catalogue</a>
+    <h4>Working with agents</h4><a href="https://github.com/penso/moonframe#working-with-an-agent">Inspect Element and the skill</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe-mockups/SKILL.md">Mockups</a>
+    <h4>Distribute</h4><a href="https://github.com/penso/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/penso/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe-apps/SKILL.md">Building and bundling apps</a><a href="https://github.com/penso/moonframe/blob/main/docs/library.md">Using the library</a><a href="https://github.com/penso/moonframe/blob/main/docs/releasing.md">Releasing</a>
+    <h4>Reference</h4><a href="https://github.com/penso/moonframe#commands">Commands</a><a href="https://github.com/penso/moonframe/blob/main/types/moonframe.d.luau">Luau API types</a><a href="https://github.com/penso/moonframe/blob/main/wit/provider.wit">Provider interface</a>
+    <p class="none" id="none" hidden>No page matches.</p>
   </aside>
   <main>
     <p class="crumb">Start · Introduction</p>
@@ -82,14 +99,14 @@
 <span class="p">$</span> mise install   <span class="c"># Rust, and Zig for the Ghostty terminal</span>
 <span class="p">$</span> just run       <span class="c"># opens the window on app/</span></pre>
     <div class="cards">
-      <a><b>Quick start →</b><span>Clone, run, edit a file, watch it change.</span></a>
-      <a><b>Your first mod →</b><span>State, init, update, view.</span></a>
-      <a><b>Component catalogue →</b><span>Every <code>ui.*</code> element and <code>use</code> piece.</span></a>
-      <a><b>Build an app →</b><span><code>moonframe.toml</code>, profiles, bundles.</span></a>
+      <a href="https://github.com/penso/moonframe#quick-start"><b>Quick start →</b><span>Clone, run, edit a file, watch it change.</span></a>
+      <a href="#a-mod-is-one-file"><b>Your first mod →</b><span>State, init, update, view.</span></a>
+      <a href="https://moonframe.dev/#components"><b>Component catalogue →</b><span>Every <code>ui.*</code> element and <code>use</code> piece.</span></a>
+      <a href="https://github.com/penso/moonframe#whole-apps-as-profiles"><b>Build an app →</b><span><code>moonframe.toml</code>, profiles, bundles.</span></a>
     </div>
     <figure><img src="/img/window.webp" alt=""><figcaption><b>Fig. 1</b> The window that ships: explorer, terminal tabs, changes, status bar. Each is a mod in <code>app/mods/</code>.</figcaption></figure>
 
-    <h2>A mod is one file</h2>
+    <h2 id="a-mod-is-one-file">A mod is one file</h2>
     <p>The shell, <code>app/main.luau</code>, places regions, and mods fill them. Each mod has its own state, <code>init</code>, <code>update</code> and <code>view</code>, like an Elm program; mods talk with messages.</p>
 <pre><span class="c">-- app/mods/counter/main.luau</span>
 <span class="k">return</span> mod {
@@ -108,7 +125,7 @@
 }</pre>
     <p>Save it and it appears in the left region.</p>
 
-    <h2>Where things go</h2>
+    <h2 id="where-things-go">Where things go</h2>
     <table>
       <tr><th>Need</th><th>Write</th></tr>
       <tr><td>A look</td><td>a rule in <code>style.luau</code></td></tr>
@@ -120,12 +137,35 @@
     </table>
     <div class="note"><b>Sandboxed</b>Luau runs with no files, network or process access, a memory cap and an instruction budget. Anything that reaches the machine goes through a provider or an element the host owns.</div>
 
-    <h2>Platforms</h2>
+    <h2 id="platforms">Platforms</h2>
     <p>Moonframe is developed on macOS. CI builds, lints and tests it on macOS, Linux (x86_64 and ARM64) and Windows; each release ships a macOS disk image, Linux tarballs and Windows zips, with checksums, Sigstore signatures and GitHub attestations.</p>
 
-    <div class="pager"><span></span><a style="text-align:right"><small>Next</small><b>Quick start →</b></a></div>
+    <div class="pager"><span></span><a style="text-align:right" href="https://github.com/penso/moonframe#quick-start"><small>Next</small><b>Quick start →</b></a></div>
   </main>
-  <nav class="toc"><b>On this page</b><a class="on">Introduction</a><a>A mod is one file</a><a>Where things go</a><a>Platforms</a><div class="edit"><a>Edit this page ↗</a></div></nav>
+  <nav class="toc"><b>On this page</b><a class="on" href="#top">Introduction</a><a href="#a-mod-is-one-file">A mod is one file</a><a href="#where-things-go">Where things go</a><a href="#platforms">Platforms</a><div class="edit"><a href="https://github.com/penso/moonframe/edit/main/website/site/docs/index.html">Edit this page ↗</a></div></nav>
 </div>
+<script>
+// Search filters the sidebar; ⌘K or / focuses it, Enter opens the first match.
+const q = document.getElementById("q"), links = [...document.querySelectorAll("aside a")], none = document.getElementById("none");
+// On phones the sidebar folds behind Contents; typing a search opens it.
+const side = document.getElementById("side"), menu = document.getElementById("menu");
+menu.onclick = () => { const open = side.classList.toggle("open"); menu.setAttribute("aria-expanded", open); menu.textContent = open ? "Contents ▴" : "Contents ▾"; };
+q.addEventListener("input", () => { if (q.value && !side.classList.contains("open")) menu.click(); });
+q.addEventListener("input", () => {
+  const term = q.value.trim().toLowerCase();
+  let shown = 0;
+  for (const a of links) { const hit = !term || a.textContent.toLowerCase().includes(term); a.hidden = !hit; shown += hit; }
+  for (const h of document.querySelectorAll("aside h4")) {
+    let next = h.nextElementSibling, any = false;
+    while (next && next.tagName === "A") { any ||= !next.hidden; next = next.nextElementSibling; }
+    h.hidden = !any;
+  }
+  none.hidden = shown > 0;
+});
+q.addEventListener("keydown", e => { if (e.key === "Enter") { const first = links.find(a => !a.hidden); if (first) location.href = first.href; } });
+addEventListener("keydown", e => {
+  if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && document.activeElement !== q)) { e.preventDefault(); q.focus(); }
+});
+</script>
 </body>
 </html>

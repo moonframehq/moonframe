@@ -83,6 +83,11 @@
   .cb-code pre { background:#1b1a24; color:#d8d6f0; font:12px/1.65 var(--mono); padding:14px 16px; border-radius:8px; overflow:auto; max-height:260px; margin:0; white-space:pre }
   .cb-code .k { color:#c792ea } .cb-code .s { color:#addb67 } .cb-code .n { color:#f78c6c } .cb-code .c { color:#6d6b8f }
   .cb-copy { position:absolute; top:8px; right:8px; font:600 11.5px Inter, sans-serif; background:#ffffff1a; color:#fff; border:0; border-radius:6px; padding:5px 9px; cursor:pointer }
+  @media (max-width:720px) {
+    .cb { height:auto } .cb-main { grid-template-columns:1fr }
+    .cb-side { border-right:0; border-bottom:1px solid #ececf1; max-height:240px }
+    .cb-detail { padding:18px 16px 24px } .cb-banner { width:auto; flex-wrap:wrap }
+  }
   .cb-props { width:100%; border-collapse:collapse; font-size:12.5px }
   .cb-props td { border-top:1px solid #ececf1; padding:6px 10px 6px 0; vertical-align:top } .cb-props td:first-child { font-family:var(--mono); color:#4b3fd1; white-space:nowrap; width:1% }
   .cb code { font:.92em var(--mono); background:#f1f0f5; padding:0 4px; border-radius:3px }
@@ -144,8 +149,9 @@
     }
     function drawDetail() {
       const c = all.find(x => x.name === current); if (!c) return;
-      const v = c.name.replace(/-(\w)/g, (_, a) => "_" + a);
-      const code = `local ${v} = use "${c.name}"\n\n${v} ${c.example || "{}"}`;
+      // The component's own usage text, or its example with the helpers it needs
+      // (website/tools/components-data.py builds it).
+      const code = c.code;
       const prev = SHOTS[c.name] ? `<img src="${SHOTS[c.name]}" alt="${esc(c.title)} in the Components window">`
         : PREVIEWS[c.name] ? PREVIEWS[c.name]()
         : `<div class="cb-none"><b>${esc(c.title)}</b>Shown live in the app's Components window. Run <code>just run</code>, then Components › ${esc(c.category)} › ${esc(c.title)}.</div>`;
