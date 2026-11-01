@@ -33,7 +33,7 @@ impl<'w> Draw<'w> for Stack {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
         let in_drag = painter.in_drag;
         painter.in_drag |= self.drag;
-        let children = painter.children(&self.children, place, self.direction, cx);
+        let children = painter.keyed_children(&self.children, place, self.direction, cx);
         painter.in_drag = in_drag;
         let part = match self.direction {
             Direction::Row => Part::Row,
@@ -439,8 +439,9 @@ impl<'w> Draw<'w> for Button {
                     .active(background),
             );
         }
+        // A button takes one radius: its top left's.
         if let Some(radius) = look.base.radius {
-            element = element.rounded(px(radius));
+            element = element.rounded(px(radius.top_left));
         }
         if self.small {
             element = element.small();

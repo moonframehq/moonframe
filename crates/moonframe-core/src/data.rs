@@ -15,8 +15,9 @@ const MAX_DEPTH: usize = 16;
 const MAX_ENTRIES: usize = 10_000;
 const MAX_STRING: usize = 64 * 1024;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum Data {
+    #[default]
     Nil,
     Bool(bool),
     Integer(i64),

@@ -53,6 +53,15 @@ pub(crate) fn selection() -> PathBuf {
         .join("selection.md")
 }
 
+/// Where state outlives the app (each mod's state, and topics):
+/// `$XDG_STATE_HOME/moonframe/state.sqlite`, by default under
+/// `~/.local/state`; outside the user's folder, which the window watches.
+pub(crate) fn state() -> PathBuf {
+    xdg("XDG_STATE_HOME", ".local/state")
+        .unwrap_or_else(|| env::temp_dir().join(NAME))
+        .join("state.sqlite")
+}
+
 /// The built-in app, under the packages the user enabled and the user's
 /// folder, unless `user` is `None`.
 pub(crate) fn roots(builtin: PathBuf, user: Option<PathBuf>) -> Roots {
