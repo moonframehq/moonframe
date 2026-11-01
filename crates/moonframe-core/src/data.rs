@@ -59,9 +59,92 @@ impl Data {
     }
 }
 
+impl Data {
+    /// A table of `entries`: `Data::map([("count", 3.into())])`.
+    pub fn map<K: Into<String>>(entries: impl IntoIterator<Item = (K, Data)>) -> Self {
+        Self::Map(
+            entries
+                .into_iter()
+                .map(|(key, value)| (key.into(), value))
+                .collect(),
+        )
+    }
+
+    /// The field `key` of a table; `None` for anything else.
+    pub fn get(&self, key: &str) -> Option<&Data> {
+        match self {
+            Self::Map(map) => map.get(key),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::String(text) => Some(text),
+            _ => None,
+        }
+    }
+
+    /// A number as an integer, when it is a whole one.
+    pub fn as_i64(&self) -> Option<i64> {
+        match self {
+            Self::Integer(number) => Some(*number),
+            Self::Number(number) if number.fract() == 0.0 && number.abs() < 9.0e15 => {
+                Some(*number as i64)
+            },
+            _ => None,
+        }
+    }
+
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Self::Integer(number) => Some(*number as f64),
+            Self::Number(number) => Some(*number),
+            _ => None,
+        }
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Self::Bool(value) => Some(*value),
+            _ => None,
+        }
+    }
+}
+
 impl From<&str> for Data {
     fn from(value: &str) -> Self {
         Self::String(value.to_owned())
+    }
+}
+
+impl From<String> for Data {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<bool> for Data {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
+    }
+}
+
+impl From<i64> for Data {
+    fn from(value: i64) -> Self {
+        Self::Integer(value)
+    }
+}
+
+impl From<f64> for Data {
+    fn from(value: f64) -> Self {
+        Self::Number(value)
+    }
+}
+
+impl<T: Into<Data>> From<Vec<T>> for Data {
+    fn from(values: Vec<T>) -> Self {
+        Self::List(values.into_iter().map(Into::into).collect())
     }
 }
 

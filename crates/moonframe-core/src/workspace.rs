@@ -643,6 +643,47 @@ impl Workspace {
         self.render();
     }
 
+    /// The providers something here wants running: those whose
+    /// `app.<name>` a view read when last drawn, and those whose topic
+    /// (`provider/<name>`) a module hears. `None` when one wants them all:
+    /// a view that went through every key of `app`, or a module that hears
+    /// every provider's topic. A name ending in `*` stands for every
+    /// provider it starts. A provider no one wants need not start.
+    pub fn wanted_providers(&self) -> Option<BTreeSet<String>> {
+        let mut wanted = BTreeSet::new();
+        let slots = std::iter::once(&self.shell)
+            .chain(self.mods.values())
+            .chain(self.instances.values().map(|mounted| &mounted.slot));
+        for slot in slots {
+            match slot.drawn.as_ref().map(|drawn| &drawn.stamp) {
+                Some(Stamp::All(_)) => return None,
+                Some(Stamp::Keys(keys)) => wanted.extend(keys.iter().map(|(key, _)| key.clone())),
+                None => {},
+            }
+            let Some(module) = &slot.module else {
+                continue;
+            };
+            for pattern in module.subscriptions() {
+                match pattern.strip_suffix('*') {
+                    // `provider/*`, `prov*`, `*`: every provider's topic.
+                    Some(prefix) if PROVIDER_TOPIC.starts_with(prefix) => return None,
+                    // `provider/gi*`: every provider whose name starts so.
+                    Some(prefix) => {
+                        if let Some(start) = prefix.strip_prefix(PROVIDER_TOPIC) {
+                            wanted.insert(format!("{start}*"));
+                        }
+                    },
+                    None => {
+                        if let Some(name) = pattern.strip_prefix(PROVIDER_TOPIC) {
+                            wanted.insert(name.to_owned());
+                        }
+                    },
+                }
+            }
+        }
+        Some(wanted)
+    }
+
     /// Why each source of shared data has nothing to share.
     pub fn host_problems(&self) -> impl Iterator<Item = (&str, &Error)> {
         self.host_problems

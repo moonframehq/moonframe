@@ -211,6 +211,12 @@ fn describe(node: &Node) -> String {
                 .as_deref()
                 .map_or_else(|| "about:blank".to_owned(), quote)
         ),
+        Node::View(view) => format!(
+            "view{} {} {}",
+            classes(&view.look),
+            quote(&view.name),
+            quote(&view.id)
+        ),
         Node::Input(input) => {
             let mut name = format!("input{}", classes(&input.look));
             if let Some(id) = &input.id {
@@ -259,6 +265,7 @@ fn line(node: &Node) -> Option<u32> {
         Node::Hatch(hatch) => hatch.look.line,
         Node::Terminal(terminal) => terminal.look.line,
         Node::Browser(browser) => browser.look.line,
+        Node::View(view) => view.look.line,
         Node::Input(input) => input.look.line,
         Node::Popover(popover) => popover.look.line,
         Node::Overlay(overlay) => overlay.look.line,

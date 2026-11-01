@@ -26,7 +26,7 @@ id=dev.moonframe.app
 icon=assets/icon.png
 version=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
 
-cargo build --quiet --release --locked -p moonframe
+cargo build --quiet --release --locked -p moonframe-app
 
 app=
 packages=()

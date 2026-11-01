@@ -7,6 +7,7 @@ use {
         browser::Browsers,
         color::rgba_color,
         gallery::Gallery,
+        hosted::{Registry, Views},
         input::Inputs,
         inspect::{self, Inspector, Placed},
         mod_window::ModWindow,
@@ -29,7 +30,7 @@ use {
         WindowState, Workspace,
     },
     moonframe_mux::Backends,
-    moonframe_providers::{Event, Providers},
+    moonframe_providers::{Event, Natives, Providers},
     notify::{RecommendedWatcher, RecursiveMode, Watcher as _},
     std::{
         collections::HashMap,
@@ -46,6 +47,13 @@ const SETTLE: Duration = Duration::from_millis(120);
 const TOAST: Duration = Duration::from_millis(1600);
 /// gpui-component's stock 16px reads large in a dense tool window.
 const DEFAULT_FONT_SIZE: Pixels = px(14.);
+
+/// What the app adds to Moonframe in Rust: its native providers, and the
+/// views its Luau places with `ui.view`.
+pub(crate) struct Parts {
+    pub(crate) natives: Natives,
+    pub(crate) views: Registry,
+}
 
 pub(crate) struct MoonframeApp {
     pub(crate) workspace: Workspace,
@@ -65,6 +73,8 @@ pub(crate) struct MoonframeApp {
     pub(crate) browsers: Browsers,
     /// The text `ui.input` fields edit.
     pub(crate) inputs: Inputs,
+    /// The app's own views `ui.view` elements show.
+    pub(crate) views: Views,
     /// The component the browser shows, and its window while it is open.
     chosen: String,
     gallery: Option<WindowHandle<component::Root>>,
@@ -121,6 +131,7 @@ impl MoonframeApp {
         chrome: Chrome,
         folders: Folders,
         backends: Arc<Backends>,
+        parts: Parts,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -142,7 +153,8 @@ impl MoonframeApp {
         let watcher = watch(&workspace, &folders, cx)
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
-        let providers = start_providers(&workspace, cx);
+        let providers = start_providers(&workspace, parts.natives, cx);
+        let views = Views::new(parts.views, deliver_from_views(cx));
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         bind_menu_keys(workspace.menus(), cx);
@@ -166,6 +178,7 @@ impl MoonframeApp {
             terminals,
             browsers: Browsers::new(crate::browser::wake_on_report(cx)),
             inputs: Inputs::default(),
+            views,
             workspace,
             chrome,
             asked: chrome,
@@ -442,10 +455,14 @@ impl MoonframeApp {
         cx.notify();
     }
 
-    /// Passes on what the mods sent providers: after a click, and after
-    /// whatever else runs mods (a start, a reload, a provider's data), so a
-    /// request from `init` or a topic is not left waiting for a click.
+    /// Starts the providers the views now want, and passes on what the mods
+    /// sent providers: after a click, and after whatever else runs mods (a
+    /// start, a reload, a provider's data), so a request from `init` or a
+    /// topic is not left waiting for a click.
     fn forward(&mut self, from: &str) {
+        // What the views read and the mods hear now may want a provider
+        // that hasn't started; one a message is for starts as it is sent.
+        self.providers.want(self.workspace.wanted_providers());
         for (provider, sender, message) in self.workspace.take_outbox() {
             if let Err(problem) = self.providers.send(&provider, &sender, message) {
                 tracing::warn!("{from}: {problem}");
@@ -788,6 +805,7 @@ impl MoonframeApp {
     pub(crate) fn mod_window_content(
         &mut self,
         name: &str,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> (AnyElement, bool) {
         let mut painter = Painter::new(
@@ -797,12 +815,33 @@ impl MoonframeApp {
             &self.inputs,
             None,
             cx.theme(),
-        );
+        )
+        .with_views(&mut self.views);
         let content = painter.window(name, cx);
         let requests = painter.take_list_requests();
         let animating = painter.animating();
         self.request_list_rows(requests, cx);
+        self.make_views(window, cx);
         (content, animating)
+    }
+
+    /// Makes the views the frame drew that are not made yet, and gives the
+    /// others their new props, once the frame is done; draws again to show
+    /// what was made.
+    fn make_views(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let requests = self.views.take_requests();
+        if requests.is_empty() {
+            return;
+        }
+        // In the window that drew them, which a view may want at its start.
+        let this = cx.entity().downgrade();
+        window.defer(cx, move |window, cx| {
+            let _ = this.update(cx, |this, cx| {
+                if this.views.apply(requests, window, cx) {
+                    cx.notify();
+                }
+            });
+        });
     }
 
     /// The browser window's content.
@@ -908,8 +947,17 @@ fn menu_actions(cx: &mut Context<MoonframeApp>) {
     cx.on_action(move |_: &AboutApp, cx| {
         let _ = on.update(cx, |app, cx| app.show_about(cx));
     });
+    let on = app.clone();
     cx.on_action(move |_: &BuildApp, cx| {
-        let _ = app.update(cx, |app, cx| app.build_app(cx));
+        let _ = on.update(cx, |app, cx| app.build_app(cx));
+    });
+    cx.on_action(move |_: &ToggleSlowAnimations, cx| {
+        crate::motion::set_slow(!crate::motion::is_slow());
+        // The menu shows the switch checked while it is on.
+        let _ = app.update(cx, |app, cx| {
+            cx.set_menus(menus(app.workspace.components(), app.workspace.menus()));
+        });
+        cx.refresh_windows();
     });
 }
 
@@ -959,16 +1007,43 @@ fn toast(message: SharedString, cx: &Context<MoonframeApp>) -> AnyElement {
     .into_any_element()
 }
 
+/// Where the app's own views send messages: each goes to the `update` of
+/// the mod that drew the view.
+fn deliver_from_views(
+    cx: &mut Context<MoonframeApp>,
+) -> futures::channel::mpsc::UnboundedSender<(String, Data)> {
+    let (sender, mut messages) = futures::channel::mpsc::unbounded::<(String, Data)>();
+    cx.spawn(async move |this, cx| {
+        while let Some((owner, msg)) = messages.next().await {
+            if this
+                .update(cx, |this, cx| this.deliver(&owner, msg, cx))
+                .is_err()
+            {
+                break;
+            }
+        }
+    })
+    .detach();
+    sender
+}
+
 /// Starts the providers, sharing what each publishes as `app.<name>`.
-fn start_providers(workspace: &Workspace, cx: &mut Context<MoonframeApp>) -> Providers {
+fn start_providers(
+    workspace: &Workspace,
+    natives: Natives,
+    cx: &mut Context<MoonframeApp>,
+) -> Providers {
     let (sender, mut events) = futures::channel::mpsc::unbounded();
-    let providers = Providers::start_with(
+    // Only those the first views read or the mods hear, and those that
+    // always start: the rest wait until something wants them.
+    let providers = Providers::start_wanting(
         workspace.roots().clone(),
         paths::builds(),
         Arc::new(move |event| {
             let _ = sender.unbounded_send(event);
         }),
-        crate::natives::natives(),
+        natives,
+        workspace.wanted_providers(),
     );
     cx.spawn(async move |this, cx| {
         while let Some(event) = events.next().await {
@@ -1162,6 +1237,7 @@ impl Render for MoonframeApp {
             cx.theme(),
         )
         .with_browsers(&mut self.browsers)
+        .with_views(&mut self.views)
         .with_keyed(&last_keyed);
         let body = painter.shell(cx);
         let animating = painter.animating();
@@ -1180,6 +1256,7 @@ impl Render for MoonframeApp {
         let requests = painter.take_list_requests();
         self.key_layers = key_layers;
         self.request_list_rows(requests, cx);
+        self.make_views(window, cx);
         // A terminal that just appeared (a new tab, or one selected) takes
         // the keyboard, once it is drawn.
         if let Some(focus) = self.terminals.take_appeared() {

@@ -4771,6 +4771,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "moonframe-app"
+version = "0.1.0"
+dependencies = [
+ "moonframe",
+]
+
+[[package]]
 name = "moonframe-core"
 version = "0.1.0"
 dependencies = [
@@ -4790,6 +4797,13 @@ dependencies = [
  "moonframe-providers",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "moonframe-host-example"
+version = "0.1.0"
+dependencies = [
+ "moonframe",
 ]
 
 [[package]]

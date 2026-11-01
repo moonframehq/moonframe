@@ -37,7 +37,7 @@ return component {
 	category = "Overlays",
 	icon = "keyboard",
 	description = "A keyboard shortcut reference: groups of key caps and labels laid out in columns in a large modal.",
-	when = "Show the app's or a mod's keybindings (a ? or ⌘/ help overlay, a Shortcuts page). For one shortcut use `kbd`; for a line of hints under a list or palette use `key-hints`; for a command palette use `dialog` with `place = \"top\"`.",
+	when = "Show the app's or a mod's keybindings (a ? or ⌘/ help overlay, a Shortcuts page). For one shortcut use `kbd`; for a line of hints under a list or palette use `key-hints`; for a command palette use `command-palette`.",
 	props = {
 		["open"] = "show it",
 		["dismiss"] = "msg for Escape, the × and backdrop clicks",

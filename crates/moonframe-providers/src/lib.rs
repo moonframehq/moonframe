@@ -22,7 +22,9 @@
 //!   sandbox cannot reach.
 //!
 //! What a provider publishes appears to every view as `app.<name>`; a mod
-//! sends it a message with `to = "provider:<name>"`. Each provider runs on a
+//! sends it a message with `to = "provider:<name>"`. In the app a provider
+//! starts once something wants it (see [`Providers::want`]), unless its
+//! manifest says `start = "always"`. Each provider runs on a
 //! thread of its own, so a slow one never holds up the window, and a reload
 //! restarts only the providers whose folders changed.
 
@@ -36,7 +38,7 @@ mod wasm;
 
 pub use {
     json::{from_json, to_json},
-    manifest::{Capability, Kind, Manifest, PREBUILT},
+    manifest::{Capability, Kind, Manifest, PREBUILT, Start},
     native::{Handle, Native, Natives},
 };
 
@@ -44,7 +46,7 @@ use {
     fingerprint::Fingerprint,
     moonframe_core::{Data, Error, Roots},
     std::{
-        collections::BTreeMap,
+        collections::{BTreeMap, BTreeSet},
         path::PathBuf,
         sync::{
             Arc,
@@ -106,6 +108,30 @@ pub struct Providers {
     running: BTreeMap<String, Running>,
     /// The native providers built into the app, by name.
     natives: Natives,
+    /// Every provider in the roots, as last found.
+    found: BTreeMap<String, (PathBuf, Result<Manifest, Error>)>,
+    /// Which of them run, besides those that always do.
+    wanted: Wanted,
+}
+
+/// Which providers something wants running.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Wanted {
+    All,
+    /// By name; one ending in `*` stands for every name it starts.
+    Names(BTreeSet<String>),
+}
+
+impl Wanted {
+    fn covers(&self, name: &str) -> bool {
+        match self {
+            Self::All => true,
+            Self::Names(names) => names.iter().any(|wanted| match wanted.strip_suffix('*') {
+                Some(prefix) => name.starts_with(prefix),
+                None => wanted == name,
+            }),
+        }
+    }
 }
 
 /// A provider's thread, and how to reach and stop it.
@@ -167,6 +193,19 @@ impl Providers {
         events: Events,
         natives: Natives,
     ) -> Self {
+        Self::start_wanting(roots, build_dir, events, natives, None)
+    }
+
+    /// Starts only the providers in `wanted` (all of them when `None`) and
+    /// those whose manifest says `start = "always"`; the others start once
+    /// [`Providers::want`] names them, or a mod sends them a message.
+    pub fn start_wanting(
+        roots: Roots,
+        build_dir: impl Into<PathBuf>,
+        events: Events,
+        natives: Natives,
+        wanted: Option<BTreeSet<String>>,
+    ) -> Self {
         let build_dir = build_dir.into();
         let mut providers = Self {
             roots,
@@ -174,17 +213,57 @@ impl Providers {
             events,
             running: BTreeMap::new(),
             natives,
+            found: BTreeMap::new(),
+            wanted: wanted.map_or(Wanted::All, Wanted::Names),
         };
         providers.reload();
         providers
     }
 
+    /// Starts the providers in `wanted` that are not running yet (every
+    /// one when `None`). Those started keep running: a pane hidden for a
+    /// moment does not stop its data.
+    pub fn want(&mut self, wanted: Option<BTreeSet<String>>) {
+        let before = self.wanted.clone();
+        match (&mut self.wanted, wanted) {
+            (Wanted::All, _) => {},
+            (all, None) => *all = Wanted::All,
+            (Wanted::Names(names), Some(more)) => names.extend(more),
+        }
+        if self.wanted != before {
+            self.sync();
+        }
+    }
+
+    /// Whether the provider `name` is running.
+    pub fn running(&self, name: &str) -> bool {
+        self.running.contains_key(name)
+    }
+
     /// Starts providers that appeared or whose folders changed, and stops
     /// those that went. The others keep running, and keep their state.
     pub fn reload(&mut self) {
-        let found = discover(&self.roots);
+        self.found = discover(&self.roots);
+        self.sync();
+    }
+
+    /// Runs the providers found that are wanted, or always run, each from
+    /// its folder as it is now.
+    fn sync(&mut self) {
+        let found = &self.found;
         self.running.retain(|name, _| found.contains_key(name));
-        for (name, (dir, manifest)) in found {
+        let found: Vec<(String, PathBuf, Result<Manifest, Error>)> = self
+            .found
+            .iter()
+            .filter(|(name, (_, manifest))| {
+                self.wanted.covers(name)
+                    || manifest
+                        .as_ref()
+                        .is_ok_and(|manifest| manifest.start == Start::Always)
+            })
+            .map(|(name, (dir, manifest))| (name.clone(), dir.clone(), manifest.clone()))
+            .collect();
+        for (name, dir, manifest) in found {
             let fingerprint = Fingerprint::of(&dir);
             if self
                 .running
@@ -217,7 +296,7 @@ impl Providers {
                 stop: stop.clone(),
                 events: self.events.clone(),
             };
-            let native = self.natives.get(name.as_str()).copied();
+            let native = self.natives.get(name.as_str()).cloned();
             let spawned = thread::Builder::new()
                 .name(format!("provider-{name}"))
                 .spawn(move || match context.manifest.kind {
@@ -252,8 +331,12 @@ impl Providers {
         self.running.keys().map(String::as_str)
     }
 
-    /// Hands `message`, from the mod `from`, to the provider `name`.
-    pub fn send(&self, name: &str, from: &str, message: Data) -> Result<(), Error> {
+    /// Hands `message`, from the mod `from`, to the provider `name`,
+    /// starting it first if it is not running yet.
+    pub fn send(&mut self, name: &str, from: &str, message: Data) -> Result<(), Error> {
+        if !self.running.contains_key(name) && self.found.contains_key(name) {
+            self.want(Some(BTreeSet::from([name.to_owned()])));
+        }
         let running = self
             .running
             .get(name)

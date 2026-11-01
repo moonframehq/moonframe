@@ -1,7 +1,10 @@
 //! Terminals kept by tmux, on a server of the app's own (`tmux -L
-//! moonframe`), one session per terminal named after its key. They outlive
-//! the app, and `tmux -L moonframe attach -t <name>` shows one from any
-//! other terminal.
+//! <app>`: `moonframe` for the starter, `moonframe-<profile>` for a
+//! profile, the app's name for one on the library), one session per
+//! terminal named after its key. A server is tmux's own way to keep a group
+//! of sessions apart: two apps never see each other's terminals, and `tmux
+//! -L <app> ls` lists one app's. They outlive the app, and `tmux -L <app>
+//! attach -t <name>` shows one from any other terminal.
 //!
 //! The server starts without the user's tmux.conf, so their plugins never
 //! touch it.
@@ -27,7 +30,8 @@ use {
     },
 };
 
-/// The tmux server the app's sessions live on.
+/// The tmux server sessions live on until [`Tmux::on_socket`] names the
+/// app's.
 pub const SOCKET: &str = "moonframe";
 /// Scrollback lines copied into a terminal when it attaches.
 const HISTORY: u32 = 2000;
@@ -53,7 +57,7 @@ impl Tmux {
         })
     }
 
-    /// The same tmux on another server, as tests use.
+    /// The same tmux on another server: the app's, or a test's.
     pub fn on_socket(self, socket: &str) -> Self {
         Self {
             socket: socket.to_owned(),

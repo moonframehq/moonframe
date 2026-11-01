@@ -41,10 +41,7 @@ pub(crate) fn open(backends: &Backends, profile: Option<&str>) -> Option<Box<dyn
     let sqlite = moonframe_store::Store::open(&crate::paths::state(profile))
         .inspect_err(|error| tracing::warn!("{error}"))
         .ok();
-    let name = match profile {
-        Some(profile) => format!("{}-{profile}", crate::paths::NAME),
-        None => crate::paths::NAME.to_owned(),
-    };
+    let name = crate::paths::namespace(profile);
     if let Some(store) = backends.store(&name) {
         match CorePersist::open(store, sqlite) {
             Ok(core) => {

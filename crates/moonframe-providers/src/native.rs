@@ -35,11 +35,12 @@ pub trait Native: Send {
     fn receive(&mut self, host: &Handle, from: &str, message: Data);
 }
 
-/// Makes a native provider; the app registers one per name.
-pub type Factory = fn() -> Box<dyn Native>;
+/// Makes a native provider; the app registers one per name, and it is
+/// called each time the provider starts.
+pub type Factory = Arc<dyn Fn() -> Box<dyn Native> + Send + Sync>;
 
 /// The native providers this build has, by name.
-pub type Natives = BTreeMap<&'static str, Factory>;
+pub type Natives = BTreeMap<String, Factory>;
 
 /// What a native provider can do with the app, from any of its threads.
 #[derive(Clone)]

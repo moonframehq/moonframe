@@ -91,6 +91,7 @@ tokens! {
         Hatch = "hatch",
         Terminal = "terminal",
         Browser = "browser",
+        View = "view",
         Input = "input",
         /// An input's placeholder; its `color` colors it.
         InputPlaceholder = "input-placeholder",

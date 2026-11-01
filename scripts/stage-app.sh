@@ -13,6 +13,15 @@ rm -rf "$out"
 mkdir -p "$out"
 cp -R "$app"/. "$out"/
 
+# The agent skills the `skills` provider offers to copy to the user's
+# folder, beside it, as a bundle has no repository around it.
+if [ -d "$out/providers/skills" ] && [ -d .claude/skills ]; then
+    mkdir -p "$out/providers/skills/skills"
+    for skill in .claude/skills/*; do
+        [ -f "$skill/SKILL.md" ] && cp -R "$skill" "$out/providers/skills/skills/"
+    done
+fi
+
 for manifest in "$app"/providers/*/Cargo.toml; do
     [ -e "$manifest" ] || continue
     dir=$(dirname "$manifest")
