@@ -157,6 +157,7 @@ lockfile-check:
 
 lint: lockfile-check
     cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+    cargo clippy --locked -p moonframe-providers -p moonframe --no-default-features --features moonframe/alacritty --all-targets -- -D warnings
 
 test:
     cargo test --locked --workspace

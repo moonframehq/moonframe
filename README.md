@@ -112,7 +112,10 @@ Moonframe as a library.
   them too.
 - **A sandbox.** Luau runs with no files, network or process access, a
   memory cap and an instruction budget; anything that reaches the machine
-  goes through a provider or an element the host owns.
+  goes through a provider or an element the host owns. WebAssembly
+  providers run sandboxed too, so a provider you install from someone else
+  can have no access to your machine at all. See
+  [What runs with what access](#what-runs-with-what-access).
 
 ## Install
 
@@ -270,6 +273,30 @@ moonframe mod list | update | remove NAME | enable NAME | disable NAME
 ```
 
 Packages ship source only, so everything they run can be read first.
+
+## What runs with what access
+
+| Code | Runs | Can reach |
+|---|---|---|
+| Mods (Luau) | in the host's Luau sandbox, with memory and instruction caps | only the elements and providers the host offers |
+| Wasm providers (`kind = "wasm"`) | on [wasmtime](https://wasmtime.dev), with 64 MiB and a fresh instruction budget per call | only the host calls listed under `capabilities` in `provider.toml` (today `system`, the machine's load) |
+| Process and native providers | as your user | anything you can: git, forges, coding agents, your files |
+
+Write a provider as a Wasm component if it only shapes data or if it comes
+from someone else. A bug or bad actor in it can't read your files or reach
+the network. Keep process and native providers for things the sandbox
+can't reach, and read them as you would any script.
+
+The sandbox only covers the running component. Building it runs Cargo as
+your user, including proc macros and dependency build scripts. The host
+refuses build scripts in the provider or its local crates, and toolchains
+named by path, and runs Cargo outside its folders, so no Cargo config there
+applies. It also refuses any package that ships a binary, so what runs is
+always source you can read. Bundled apps ship their Wasm providers prebuilt
+and build nothing on your machine.
+
+Apps with no Wasm providers can turn off the `wasm` feature, which is on by
+default (see [docs/library.md](docs/library.md)).
 
 ## Whole apps as profiles
 
