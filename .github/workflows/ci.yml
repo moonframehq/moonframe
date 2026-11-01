@@ -163,6 +163,8 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Check formatting (Rust and TOML)
         run: just format-check
+      - name: Check the keep-sorted regions
+        run: just check-sorted
       - name: Check Cargo.lock is in sync
         run: just lockfile-check
       - name: Type-check the app's Luau
