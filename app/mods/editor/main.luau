@@ -11,6 +11,9 @@ type State = {
 	looks: any,
 }
 
+-- The kinds that open a shell.
+local TERMINALS = { ["component:terminal"] = true, ["component:ghostty-terminal"] = true }
+
 local function kind_of(kinds: { any }, kind: string?)
 	for _, entry in kinds do
 		if entry.kind == kind then
@@ -47,6 +50,22 @@ return mod {
 		local chosen = state.looks or {}
 		local tabs = chosen.tabs or (app.looks and app.looks.tabs)
 		local joined = tabs == "curved" or chosen.layout == "joined"
+		local kind = kind_of(app.kinds, state.tab and state.tab.kind)
+		local content: any
+		if kind and TERMINALS[kind.kind] and not (kind.props and kind.props.cwd) then
+			-- A terminal starts in the project the explorer shows; it waits
+			-- the moment until the files provider says which, as a shell
+			-- started elsewhere would stay there.
+			local files = app.files
+			if files ~= nil then
+				kind = table.clone(kind)
+				kind.props = table.clone(kind.props or {})
+				kind.props.cwd = if files.available then files.path else "~"
+				content = tab_view { tab = state.tab, kind = kind }
+			end
+		else
+			content = tab_view { tab = state.tab, kind = kind }
+		end
 		return ui.panel {
 			-- The strip sits on the card: the selected tab runs on into it
 			-- (`.tab-card-joined` in style.luau).
@@ -54,7 +73,7 @@ return mod {
 			grow = true,
 			gap = "none",
 			padding = "none",
-			tab_view { tab = state.tab, kind = kind_of(app.kinds, state.tab and state.tab.kind) },
+			content,
 		}
 	end,
 }

@@ -27,6 +27,8 @@ tokens! {
         Badge = "badge",
         Icon = "icon",
         Image = "image",
+        Line = "line",
+        Hatch = "hatch",
         Terminal = "terminal",
         Browser = "browser",
         Input = "input",
@@ -226,6 +228,8 @@ pub enum Node {
     Badge(Badge),
     Icon(Icon),
     Image(Image),
+    Line(Line),
+    Hatch(Hatch),
     Terminal(Terminal),
     Browser(Browser),
     Input(Input),
@@ -407,6 +411,9 @@ pub struct Split {
     pub direction: Direction,
     /// Keeps the user's sizes across renders; defaults to the split's path.
     pub id: Option<String>,
+    /// Draws a hairline between panes; without it the panes meet with no
+    /// line, and only a hovered or dragged handle shows.
+    pub divider: bool,
     pub panes: Vec<Pane>,
 }
 
@@ -448,6 +455,8 @@ pub struct Text {
     /// Wrap long lines (the default); `false` keeps each line whole, for
     /// code in a container that scrolls sideways.
     pub wrap: bool,
+    /// A line through it: a task done, a price struck.
+    pub strike: bool,
     pub extras: Extras,
 }
 
@@ -463,6 +472,7 @@ impl Text {
             truncate: false,
             lines: None,
             wrap: true,
+            strike: false,
             extras: Extras::default(),
         }
     }
@@ -577,6 +587,52 @@ pub struct Image {
     pub height: Option<f32>,
     pub fit: Fit,
     pub extras: Extras,
+}
+
+/// A line through values, evenly spaced across its box: a trend, a curve
+/// in a table, a forecast. Its look's `color` strokes it, its `background`
+/// fills the area between it and the `baseline`, and its `border_color`
+/// draws the baseline, dashed.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Line {
+    pub look: Look,
+    pub points: Vec<f32>,
+    /// The values at the bottom and top of the box; the points' (and the
+    /// baseline's) least and most when unset.
+    pub min: Option<f32>,
+    pub max: Option<f32>,
+    /// A value drawn across as a dashed line, with the area filled to it.
+    pub baseline: Option<f32>,
+    /// Fill the area between the line and the baseline (or the bottom).
+    pub area: bool,
+    /// Mark the points: `last`, `all`, or none.
+    pub dots: Option<Dots>,
+    /// The stroke's width in pixels.
+    pub stroke: f32,
+    /// Draw the line itself dashed.
+    pub dashed: bool,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+}
+
+tokens! {
+    /// Which points of a `ui.line` get a dot.
+    Dots {
+        Last = "last",
+        All = "all",
+    }
+}
+
+/// A box filled with diagonal stripes in its look's `color` over its
+/// `background`: what is held back, pending, or not there yet.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Hatch {
+    pub look: Look,
+    /// Pixels between stripes.
+    pub gap: f32,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+    pub grow: bool,
 }
 
 /// Largest picture file `ui.image` opens.

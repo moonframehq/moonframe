@@ -3,8 +3,9 @@
 
 use {
     crate::{
-        Chrome, Data, Error, ListWindow, Node, Rules, SHELL, Stylesheet, TabKind,
+        About, AppMenu, Chrome, Data, Error, ListWindow, Node, Rules, SHELL, Stylesheet, TabKind,
         component::Library,
+        menus::Menus,
         node,
         read::{Cx, Fields, NO_NAMES, Read},
         vm::{self, Meter},
@@ -121,6 +122,9 @@ struct Definition {
     styles: Option<Value>,
     /// The window the shell asks for; only `main.luau` may set it.
     window: Option<Chrome>,
+    /// The shell's menus and About panel; `main.luau` only, too.
+    menus: Option<Menus>,
+    about: Option<About>,
     meta: Meta,
 }
 
@@ -140,6 +144,8 @@ impl Read for Definition {
             "window",
             "subscribe",
             "tab",
+            "menus",
+            "about",
         ]])?;
         Ok(Self {
             init: fields.get("init")?,
@@ -149,6 +155,8 @@ impl Read for Definition {
             subscribe: fields.get("subscribe")?.unwrap_or_default(),
             styles: fields.raw("styles").cloned(),
             window: fields.get("window")?,
+            menus: fields.get("menus")?,
+            about: fields.get("about")?,
             meta: Meta {
                 region: fields.get("region")?,
                 order: fields.get("order")?.unwrap_or(0),
@@ -206,6 +214,11 @@ impl Module {
                 "window: only the shell (main.luau) sets the window",
             ));
         }
+        if (definition.menus.is_some() || definition.about.is_some()) && name != SHELL {
+            return Err(Error::new(
+                "menus and about: only the shell (main.luau) sets them",
+            ));
+        }
         Self::start(lua, meter, definition, previous, props)
     }
 
@@ -237,6 +250,8 @@ impl Module {
                 .unwrap_or_default(),
             styles: table.get::<Option<Value>>("styles")?,
             window: None,
+            menus: None,
+            about: None,
             meta: Meta::default(),
         };
         Self::start(lua, meter, definition, previous, props)
@@ -312,6 +327,16 @@ impl Module {
     /// The window the shell asks for, if it says.
     pub(crate) fn window(&self) -> Option<Chrome> {
         self.definition.window
+    }
+
+    /// The menus the shell asks for.
+    pub(crate) fn menus(&self) -> &[AppMenu] {
+        self.definition.menus.as_ref().map_or(&[], |menus| &menus.0)
+    }
+
+    /// What the shell's About panel says.
+    pub(crate) fn about(&self) -> Option<&About> {
+        self.definition.about.as_ref()
     }
 
     /// Runs `update(state, msg)`. It returns the new state, or nothing to

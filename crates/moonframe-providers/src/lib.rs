@@ -83,6 +83,15 @@ pub enum Event {
 pub type Events = Arc<dyn Fn(Event) + Send + Sync>;
 
 /// The providers of an app, each running on its own thread.
+/// The profile this run serves, if any, which process providers see as
+/// `MOONFRAME_PROFILE`; set once at launch with [`set_profile`].
+static PROFILE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Tells process providers which profile (app) they serve.
+pub fn set_profile(name: &str) {
+    let _ = PROFILE.set(name.to_owned());
+}
+
 pub struct Providers {
     roots: Roots,
     /// Where wasm providers are built.

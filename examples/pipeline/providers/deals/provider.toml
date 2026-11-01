@@ -1,0 +1,5 @@
+# Tally's deals and the figures over the board, shared as `app.deals`. A
+# process provider: it keeps them in a JSON file under ~/.local/share/moonframe
+# with your access. Needs perl 5 (as macOS ships).
+command = ["perl", "deals.pl"]
+kind    = "process"

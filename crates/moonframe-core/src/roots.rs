@@ -12,6 +12,11 @@
 //!
 //! A package is either laid out like an app folder, or is a single mod: a
 //! folder with `main.luau` at its root, named after the folder.
+//!
+//! A profile ([`Roots::profile`]) is another app run from the same binary,
+//! often one installed whole: an app package brings its own shell and mods,
+//! and the built-in app under it is only a toolbox of providers,
+//! components, and styles, with none of its mods unless the app keeps them.
 
 use std::{
     collections::BTreeMap,
@@ -27,22 +32,61 @@ pub struct Roots {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Layer {
     path: PathBuf,
-    package: bool,
+    role: Role,
+}
+
+/// What a layer may bring.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Role {
+    /// Everything, the shell included: the built-in app, the user's
+    /// folder, or a profile's app package.
+    App,
+    /// Everything but the shell: a package someone published.
+    Package,
+    /// The built-in app under another app: its providers, components, and
+    /// stylesheet, and of its mods only these.
+    Toolbox(Vec<String>),
+    /// Only its stylesheet: the user's own folder under a profile, so what
+    /// they style everywhere follows them into every app.
+    Style,
+}
+
+/// An app package for [`Roots::profile`]: its folder, and the built-in mods
+/// it keeps.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AppLayer {
+    pub path: PathBuf,
+    pub keep: Vec<String>,
 }
 
 impl Layer {
     /// Made absolute: providers run in folders of their own, where a
     /// relative path would mean something else.
-    fn new(path: PathBuf, package: bool) -> Self {
+    fn new(path: PathBuf, role: Role) -> Self {
         Self {
             path: std::path::absolute(&path).unwrap_or(path),
-            package,
+            role,
         }
     }
 
     /// A package that is one mod rather than an app folder.
     fn single_mod(&self) -> bool {
-        self.package && self.path.join("main.luau").is_file()
+        self.role == Role::Package && self.path.join("main.luau").is_file()
+    }
+
+    /// Whether it brings anything under `dir`: `mods`, `providers`,
+    /// `components`, and so on.
+    fn brings(&self, dir: &str) -> bool {
+        self.role != Role::Style || dir.is_empty()
+    }
+
+    /// Whether it brings the mod `name`.
+    fn brings_mod(&self, name: &str) -> bool {
+        match &self.role {
+            Role::App | Role::Package => true,
+            Role::Toolbox(keep) => keep.iter().any(|kept| kept == name),
+            Role::Style => false,
+        }
     }
 }
 
@@ -52,7 +96,7 @@ impl Roots {
         Self {
             layers: layers
                 .into_iter()
-                .map(|path| Layer::new(path, false))
+                .map(|path| Layer::new(path, Role::App))
                 .collect(),
         }
     }
@@ -63,10 +107,44 @@ impl Roots {
         packages: impl IntoIterator<Item = PathBuf>,
         user: Option<PathBuf>,
     ) -> Self {
-        let layers = [Layer::new(builtin, false)]
+        let layers = [Layer::new(builtin, Role::App)]
             .into_iter()
-            .chain(packages.into_iter().map(|path| Layer::new(path, true)))
-            .chain(user.map(|path| Layer::new(path, false)))
+            .chain(
+                packages
+                    .into_iter()
+                    .map(|path| Layer::new(path, Role::Package)),
+            )
+            .chain(user.map(|path| Layer::new(path, Role::App)))
+            .collect();
+        Self { layers }
+    }
+
+    /// A profile: `builtin`, the profile's `packages`, its `app` package
+    /// over them, the stylesheet of the user's `global` folder, and the
+    /// profile's own folder on top. With an app package, the built-in app
+    /// brings only the mods the app keeps, and never its shell; without
+    /// one, the profile starts as the built-in app does.
+    pub fn profile(
+        builtin: PathBuf,
+        packages: impl IntoIterator<Item = PathBuf>,
+        app: Option<AppLayer>,
+        global: Option<PathBuf>,
+        profile: PathBuf,
+    ) -> Self {
+        let base = match &app {
+            Some(app) => Role::Toolbox(app.keep.clone()),
+            None => Role::App,
+        };
+        let layers = [Layer::new(builtin, base)]
+            .into_iter()
+            .chain(
+                packages
+                    .into_iter()
+                    .map(|path| Layer::new(path, Role::Package)),
+            )
+            .chain(app.map(|app| Layer::new(app.path, Role::App)))
+            .chain(global.map(|path| Layer::new(path, Role::Style)))
+            .chain([Layer::new(profile, Role::App)])
             .collect();
         Self { layers }
     }
@@ -78,19 +156,19 @@ impl Roots {
 
     /// The highest app layer's `relative` file.
     pub fn file(&self, relative: &str) -> Option<PathBuf> {
+        self.candidates(relative).into_iter().next()
+    }
+
+    /// Every app layer's `relative` file, highest first: what to fall back
+    /// on.
+    pub fn candidates(&self, relative: &str) -> Vec<PathBuf> {
         self.layers
             .iter()
             .rev()
-            .filter(|layer| !layer.package)
+            .filter(|layer| layer.role == Role::App)
             .map(|layer| layer.path.join(relative))
-            .find(|path| path.is_file())
-    }
-
-    /// Every layer's `relative` file, highest first: what to fall back on.
-    pub fn candidates(&self, relative: &str) -> Vec<PathBuf> {
-        let mut files = self.files(relative);
-        files.reverse();
-        files
+            .filter(|path| path.is_file())
+            .collect()
     }
 
     /// Every layer's `main.luau` for the mod `name`, highest first: under
@@ -104,6 +182,7 @@ impl Roots {
         self.layers
             .iter()
             .rev()
+            .filter(|layer| layer.brings_mod(name))
             .filter_map(|layer| {
                 let path = if layer.single_mod() {
                     let folder = layer.path.file_name()?.to_str()?;
@@ -118,7 +197,11 @@ impl Roots {
 
     /// Every layer's `relative` file, lowest first.
     pub fn files(&self, relative: &str) -> Vec<PathBuf> {
-        self.folder_layers()
+        let dir = Path::new(relative)
+            .parent()
+            .and_then(Path::to_str)
+            .unwrap_or_default();
+        self.folder_layers(dir)
             .map(|layer| layer.join(relative))
             .filter(|path| path.is_file())
             .collect()
@@ -130,6 +213,9 @@ impl Roots {
     pub fn folders(&self, dir: &str, marker: &str) -> BTreeMap<String, PathBuf> {
         let mut found = BTreeMap::new();
         for layer in &self.layers {
+            if !layer.brings(dir) {
+                continue;
+            }
             if layer.single_mod() {
                 if dir == "mods"
                     && layer.path.join(marker).is_file()
@@ -147,7 +233,9 @@ impl Roots {
                 if !path.join(marker).is_file() {
                     continue;
                 }
-                if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
+                if let Some(name) = path.file_name().and_then(|name| name.to_str())
+                    && (dir != "mods" || layer.brings_mod(name))
+                {
                     found.insert(name.to_owned(), path.clone());
                 }
             }
@@ -159,7 +247,7 @@ impl Roots {
     /// replaces a lower one's.
     pub fn entries(&self, dir: &str, extension: &str) -> BTreeMap<String, PathBuf> {
         let mut found = BTreeMap::new();
-        for layer in self.folder_layers() {
+        for layer in self.folder_layers(dir) {
             let Ok(entries) = fs::read_dir(layer.join(dir)) else {
                 continue;
             };
@@ -175,11 +263,12 @@ impl Roots {
         found
     }
 
-    /// The layers laid out like an app folder: all but single-mod packages.
-    fn folder_layers(&self) -> impl Iterator<Item = &Path> {
+    /// The layers laid out like an app folder, all but single-mod packages,
+    /// that bring what is under `dir` (`""` for the folder's own files).
+    fn folder_layers(&self, dir: &str) -> impl Iterator<Item = &Path> {
         self.layers
             .iter()
-            .filter(|layer| !layer.single_mod())
+            .filter(move |layer| !layer.single_mod() && layer.brings(dir))
             .map(|layer| layer.path.as_path())
     }
 }

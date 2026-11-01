@@ -1,0 +1,6 @@
+# The git repositories under your project folders, and the changes, folders
+# and files of the one an app has open; shared as `app.projects`. A process
+# provider: it runs git and reads files with your access. Needs perl 5 (as
+# macOS ships) and git. See projects.pl for what it publishes.
+command = ["perl", "projects.pl"]
+kind    = "process"

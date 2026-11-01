@@ -699,7 +699,7 @@ return mod {
 	update = function(state, msg)
 		if type(msg) == "table" and msg.open then
 			state.selected = msg.open
-			return state, { { to = "inspector", msg = { select = msg.open } } }
+			return state, { { to = "preview", msg = { show = msg.open } } }
 		end
 	end,
 
@@ -724,8 +724,9 @@ Rules that trip agents up:
   `just check` names them.
 - The keys allowed on the `mod { }` table are only `init`, `update`, `view`,
   `region`, `order`, `title`, `styles`, `subscribe` (see "Topics") and `tab`
-  (see "Tabs"), plus `window` in `main.luau` only (see "Window and title
-  bar"). `update` and `view` also get `props` last.
+  (see "Tabs"), plus `window`, `menus` and `about` in `main.luau` only (see
+  "Window and title bar" and "Menus and About"). `update` and `view` also
+  get `props` last.
 - State and messages must be plain data: nil, booleans, numbers, strings,
   lists, and string-keyed tables. Functions in state stop it surviving a
   reload. A table is a list without gaps or has string keys, never both.
@@ -749,10 +750,10 @@ Text-like elements take their main value positionally:
 | --- | --- | --- |
 | `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
-| `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id` | user-resizable; children must be `ui.pane`. Always grows to fill |
+| `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover |
 | `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
 | `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, frame keys, `class`, `style` | rows of one height of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
-| `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, extras | a bare string child is plain text |
+| `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
 | `ui.badge "..."` | `text`, `tone`, extras | pill |
@@ -761,6 +762,8 @@ Text-like elements take their main value positionally:
 | `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
 | `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
 | `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras, `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
+| `ui.line { points = { 3, 5, 2, 8 } }` | `points`, `min`, `max`, `baseline`, `area`, `dots` (`last` `all`), `stroke`, `dashed`, `width`, `height`, `class`, `style` | a line through values evenly spaced across its box (fills its parent without `width`/`height`): trends, curves in tables, forecasts. Style `color` strokes it, `background` fills the area to `baseline` (with `area = true`), `border_color` draws the baseline dashed. Use it for any line or curve, a dashed rule (two equal points with `dashed = true`) included |
+| `ui.hatch { width = 40, height = 12 }` | `gap`, `width`, `height`, `grow`, `class`, `style` | diagonal stripes in style `color` over `background`: what is held back, pending or still missing (in a stacked bar, under a floor) |
 | `ui.divider()` | | a line across the parent's axis |
 | `ui.spacer()` | | takes the free space, e.g. to push items right |
 | `ui.region "name"` or `ui.region { name = "x", direction = "row", gap = "large" }` | `name`, `direction`, `gap`, `justify` | draws every mod with `region = name`, in order; `justify = "end"` pushes them to the far edge |
@@ -908,7 +911,7 @@ Picking a font for the user:
 
 **Selectors.**
 - An element type: `row` `column` `panel` `panel-header` `pane` `text`
-  `button` `item` `badge` `icon` `image` `terminal` `browser` `input` `divider` `popover` `tooltip`
+  `button` `item` `badge` `icon` `image` `line` `hatch` `terminal` `browser` `input` `divider` `popover` `tooltip`
   `overlay` `overlay-backdrop`. `panel-header` is a panel's title bar;
   `tooltip` is every tooltip's box; `overlay-backdrop` is what dims the
   window behind an overlay with `backdrop = true` (its `background` and
@@ -1117,6 +1120,8 @@ return mod {
 }
 ```
 
+- `size = { width = 1500, height = 960 }`: the size the window opens at
+  (kept within the screen), for apps whose layout needs room.
 - `titlebar = "hidden"`: on macOS the layout runs under a transparent title
   bar and the traffic lights stay, at `traffic_lights` (the first button's
   offset from the top left; the system's place when unset). On Windows the
@@ -1138,6 +1143,43 @@ return mod {
   lights only when `app.window.titlebar == "hidden"` (until the restart that
   applies `window`, the system bar is still there and the room would be a
   gap).
+
+## Menus and About
+
+The shell (`main.luau` only) can add menus to the menu bar and say what the
+About panel shows. The host puts its app menu first (About <App>, Quit, named
+after the app's title), then the shell's menus, then View (a shell menu titled
+"View" merges into it), Components outside a release, and the shell's Window
+and Help last.
+
+```lua
+-- A typed local: items with `msg` and with `command` mix in one list.
+local MENUS: { { title: string, items: { any } } } = {
+	{ title = "File", items = {
+		{ label = "New Shell", msg = "new", to = "agent", shortcut = "secondary-t" },
+		"-",
+		{ label = "Close File", msg = "close-current", to = "editor", shortcut = "secondary-w" },
+	} },
+	{ title = "Window", items = { { label = "Minimize", command = "minimize", shortcut = "secondary-m" } } },
+}
+
+return mod {
+	about = { version = "1.2", description = "What it is for.", website = "https://…", copyright = "…" },
+	menus = MENUS,
+	-- ...
+}
+```
+
+- An item sends `msg` to the shell, or to `to`, as a click from the shell
+  would, or runs an app `command`. `"-"` is a separator.
+- `shortcut` is a key named as `keys` names them (`secondary-t` is ⌘T on
+  macOS, Ctrl-T elsewhere); it shows in the menu and works while the window
+  has focus. A focused terminal keeps plain and Ctrl keys, not ⌘ ones.
+- About opens macOS's own About panel (the app's icon and name, `version`,
+  `description` and `website` as credits, `copyright`), and a toast
+  elsewhere.
+- The app's name in the menu bar is its title (`title` in moonframe.toml);
+  menus and keys change when the shell reloads.
 
 ## Patterns
 
@@ -1183,7 +1225,7 @@ that are replaced when they change (provider data is a new table each
 time it changes; a state table changed in place stays the same table).
 
 **Lazy panes.** `ui.pane { lazy = true, visible = state.right, ui.mount {
-"inspector", id = "side" } }` starts nothing until the pane first shows,
+"changes", id = "side" } }` starts nothing until the pane first shows,
 and while it is hidden again the instances in it sleep: their state stays,
 but they neither run nor draw.
 
@@ -1237,7 +1279,7 @@ wherever the shell puts it, whether or not it has a `region`.
 **Restyling.** Change `style.luau`, not the modules: for example, make
 panels flat with `panel = { radius = 0, margin = 0, border = "none", shadow = "none" }`.
 For dark-only tweaks, give palette colors `{ light, dark }`. Give a mod its
-own look with `styles` in the mod itself (see `app/mods/inspector`). To
+own look with `styles` in the mod itself (see `app/mods/changes`). To
 restyle an extension from the app side, add a rule for the same selector in
 `style.luau`, which wins.
 
@@ -1544,6 +1586,13 @@ file.
 Anything that runs code or touches the machine belongs in a provider or
 behind a host element that the mod can only parameterise (as terminals take
 a `cwd`, never a command, and browsers an address, never a script). The Luau sandbox is the boundary; keep it.
+
+## Whole apps
+
+A whole app (its own shell, menus, icon, bundle) runs as a profile beside the
+starter: see the **moonframe-apps** skill (`.claude/skills/moonframe-apps`)
+for `moonframe.toml`, `moonframe app new | link | install`, `--profile`,
+menus and About, release mode, `just bundle-app`, and the perf log.
 
 ## Sharing mods
 

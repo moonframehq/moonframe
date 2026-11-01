@@ -35,12 +35,17 @@ const FORMAT: &str = "moonframe.document";
 /// The format this build reads and writes.
 const VERSION: u64 = 2;
 
-/// The store the workspace saves to, or `None` to keep nothing.
-pub(crate) fn open(backends: &Backends) -> Option<Box<dyn Persist>> {
-    let sqlite = moonframe_store::Store::open(&crate::paths::state())
+/// The store the workspace saves to, or `None` to keep nothing. Each
+/// profile keeps its own.
+pub(crate) fn open(backends: &Backends, profile: Option<&str>) -> Option<Box<dyn Persist>> {
+    let sqlite = moonframe_store::Store::open(&crate::paths::state(profile))
         .inspect_err(|error| tracing::warn!("{error}"))
         .ok();
-    if let Some(store) = backends.store(crate::paths::NAME) {
+    let name = match profile {
+        Some(profile) => format!("{}-{profile}", crate::paths::NAME),
+        None => crate::paths::NAME.to_owned(),
+    };
+    if let Some(store) = backends.store(&name) {
         match CorePersist::open(store, sqlite) {
             Ok(core) => {
                 tracing::info!("keeping state in herdr-core");
