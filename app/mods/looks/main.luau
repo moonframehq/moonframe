@@ -31,8 +31,8 @@ local function title(name: string): string
 end
 
 -- A strip in `look` as the title bar would draw it, over a strip of card as
--- the main area would be, so a joined look shows its join. Clicking anywhere
--- in it picks the look.
+-- the main area would be: centred over a line, or for the curved look on
+-- the bar's bottom edge, joined to the card. Clicking anywhere picks it.
 local function sample(look: string, pick)
 	local strip = {}
 	for index, label in { "Terminal", "Browser", "Files" } do
@@ -45,13 +45,14 @@ local function sample(look: string, pick)
 	end
 	return ui.column {
 		gap = "none",
+		shrink = false,
 		ui.row {
-			class = "sample-bar",
-			align = "end",
+			class = if look == "curved" then "sample-bar" else "sample-bar sample-bar-lined",
+			align = if look == "curved" then "end" else "center",
 			height = 40,
-			tabs { tabs = strip, selected = "Terminal", variant = look, add = pick },
+			tabs { tabs = strip, selected = "Terminal", variant = look, add = pick, in_bar = true },
 		},
-		ui.row { class = "sample-card", height = 14 },
+		ui.row { class = "sample-card", height = 18 },
 	}
 end
 
@@ -67,6 +68,7 @@ return mod {
 		[".look-name"] = { weight = "medium" },
 		[".look-note"] = { size = "small", color = "muted-foreground" },
 		[".sample-bar"] = { background = "sidebar", padding = { 0, 12 }, radius = { 6, 6, 0, 0 } },
+		[".sample-bar-lined"] = { border = "bottom" },
 		[".sample-card"] = { background = "card" },
 		[".layout-row"] = { padding = { 8, 10 }, gap = 10, radius = 8 },
 		[".layout-row:hover"] = { background = "list-hover" },
@@ -99,6 +101,9 @@ return mod {
 			local pick = { look = id }
 			table.insert(tiles, ui.column {
 				class = "look-tile",
+				-- In a scrolling page each keeps its height rather than
+				-- squeezing into the window.
+				shrink = false,
 				selected = (state.look or "stylesheet") == id,
 				msg = pick,
 				ui.row {
@@ -119,6 +124,7 @@ return mod {
 		for _, layout in LAYOUTS do
 			table.insert(layouts, ui.row {
 				class = "layout-row",
+				shrink = false,
 				align = "center",
 				selected = (state.layout or "auto") == layout.id,
 				msg = { layout = layout.id },
@@ -132,9 +138,9 @@ return mod {
 			scroll = "y",
 			class = "looks-page",
 			ui.text { "Tab style", class = "looks-heading" },
-			ui.column { gap = "small", table.unpack(tiles) },
+			ui.column { gap = "small", shrink = false, table.unpack(tiles) },
 			ui.text { "Title bar", class = "looks-heading" },
-			ui.column { gap = "none", table.unpack(layouts) },
+			ui.column { gap = "none", shrink = false, table.unpack(layouts) },
 		}
 	end,
 }

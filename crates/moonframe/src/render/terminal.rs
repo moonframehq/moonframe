@@ -68,6 +68,7 @@ impl<'w> Draw<'w> for Terminal {
         if let Err(error) = &view.session {
             return problem(format!("terminal `{}`: {error}", self.id), cx);
         }
+        painter.terminals.drawn(&key, &view);
         let focus = view.focus.clone();
         let scroll_view = view.clone();
         frame
