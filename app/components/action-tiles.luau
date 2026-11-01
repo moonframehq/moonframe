@@ -60,7 +60,7 @@ return component {
 	styles = {
 		[".action-tiles"] = { gap = 8 },
 		[".action-tiles-header"] = { padding = { 2, 4, 6, 4 }, gap = 8, border = "bottom", border_color = "border" },
-		[".action-tiles-title"] = { weight = "bold" },
+		[".action-tiles-title"] = { weight = "semibold" },
 		[".action-tiles-subtitle"] = { color = "muted-foreground", size = "small", font = "mono" },
 		[".action-tiles-grid"] = { gap = 6 },
 		[".action-tiles-tile"] = { background = "secondary", radius = 8, gap = 6, padding = { 10, 4 } },

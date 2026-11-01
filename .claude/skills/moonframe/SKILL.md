@@ -807,7 +807,7 @@ Text-like elements take their main value positionally:
 - space: `none` `small` (4px) `normal` (8px) `large` (16px)
 - tone: `normal` `muted` `accent` `success` `warning` `danger`
 - size (text): `small` `normal` `large` `title`
-- weight: `normal` `medium` `bold`
+- weight: `light` (300) `normal` (400) `medium` (500) `semibold` (600) `bold` (700)
 - align: `stretch` `start` `center` `end`
 - justify: `start` `center` `end` `between`
 - surface: `background` `sidebar` `muted` `secondary`

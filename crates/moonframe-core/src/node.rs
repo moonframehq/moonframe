@@ -66,8 +66,10 @@ tokens! {
 
 tokens! {
     Weight {
+        Light = "light",
         Normal = "normal",
         Medium = "medium",
+        Semibold = "semibold",
         Bold = "bold",
     }
 }

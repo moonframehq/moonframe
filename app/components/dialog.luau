@@ -86,7 +86,7 @@ return component {
 		[".dialog-icon-success"] = { color = "success" },
 		[".dialog-icon-warning"] = { color = "warning" },
 		[".dialog-icon-danger"] = { color = "danger" },
-		[".dialog-title"] = { weight = "bold", size = "large" },
+		[".dialog-title"] = { weight = "semibold", size = "large" },
 		[".dialog-subtitle"] = { size = "small", color = "muted-foreground" },
 		[".dialog-hint"] = {
 			size = "small",

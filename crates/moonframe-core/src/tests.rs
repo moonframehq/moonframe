@@ -774,6 +774,62 @@ fn mods_bring_styles_scoped_to_what_they_draw() {
 }
 
 #[test]
+fn text_takes_the_whole_weight_scale_inline_and_in_rules() {
+    use crate::Weight;
+    let source = r#"return mod { view = function()
+  return ui.panel {
+    ui.text { "a", weight = "semibold" },
+    ui.text { "b", weight = "light" },
+    ui.text { "c", style = { weight = "semibold" } },
+    ui.item { "d", selected = true, class = "nav" },
+  }
+end }"#;
+    let dir = app(&[("probe", source)]);
+    write(
+        dir.path(),
+        "style.luau",
+        r#"return style { rules = {
+          [".nav"] = { weight = "medium" },
+          [".nav:selected"] = { weight = "semibold" },
+          [".nav:hover"] = { weight = "light" },
+        } }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let Some(Node::Panel(panel)) = workspace.slot("probe").unwrap().view() else {
+        panic!("no panel");
+    };
+    let (Node::Text(a), Node::Text(b), Node::Text(c), Node::Item(d)) = (
+        &panel.children[0],
+        &panel.children[1],
+        &panel.children[2],
+        &panel.children[3],
+    ) else {
+        panic!("expected three texts and an item");
+    };
+    assert_eq!(
+        (a.weight, b.weight),
+        (Some(Weight::Semibold), Some(Weight::Light))
+    );
+    let sheet = workspace.stylesheet();
+    let inline = sheet.resolve(Part::Text, &c.look, false, &Rules::default());
+    assert_eq!(inline.base.weight, Some(Weight::Semibold));
+    let selected = sheet.resolve(Part::Item, &d.look, true, &Rules::default());
+    assert_eq!(selected.base.weight, Some(Weight::Semibold));
+    assert_eq!(selected.hover.weight, Some(Weight::Light));
+    let resting = sheet.resolve(Part::Item, &d.look, false, &Rules::default());
+    assert_eq!(resting.base.weight, Some(Weight::Medium));
+
+    let heavy = r#"return mod { view = function() return ui.text { "x", weight = "heavy" } end }"#;
+    let error = view_of(heavy).unwrap_err();
+    assert!(error.contains("semibold"), "{error}");
+}
+
+#[test]
 fn shadows_take_css_strings_tables_and_presets() {
     let sheet = r##"return style {
       colors = { glow = "#ff0000" },
