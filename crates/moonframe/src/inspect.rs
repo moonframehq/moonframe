@@ -75,6 +75,9 @@ pub(crate) struct Inspector {
     sink: Sink,
     pub(crate) hovered: Option<Placed>,
     pub(crate) selected: Option<Placed>,
+    /// The mod that started this pick (`command = "inspect"`): it hears
+    /// the pick on `app/inspect`, and no card opens.
+    pub(crate) asker: Option<String>,
 }
 
 impl Inspector {
@@ -102,10 +105,31 @@ impl Inspector {
     }
 }
 
-/// A pick, written for an agent to act on.
-pub(crate) fn report(placed: &Placed, workspace: &Workspace) -> String {
+/// A pick, for a mod that asked for one.
+pub(crate) struct Pick {
+    /// The element, as the card names it: `text.status-text "⎇ main"`.
+    pub(crate) element: String,
+    /// The innermost mod that drew it.
+    pub(crate) owner: String,
+    /// The file and line that built it.
+    pub(crate) at: String,
+    /// The whole report, as `report` writes it.
+    pub(crate) report: String,
+}
+
+pub(crate) fn pick(placed: &Placed, workspace: &Workspace) -> Pick {
+    let (owner, at) = origin(placed, workspace);
+    Pick {
+        element: placed.crumb.label.clone(),
+        owner,
+        at,
+        report: report(placed, workspace),
+    }
+}
+
+/// The innermost mod that drew `placed`, and the innermost line within it.
+fn origin(placed: &Placed, workspace: &Workspace) -> (String, String) {
     let trail = placed.crumb.trail();
-    // The innermost mod, and the innermost line within it.
     let owner = trail
         .iter()
         .rev()
@@ -117,9 +141,16 @@ pub(crate) fn report(placed: &Placed, workspace: &Workspace) -> String {
         .take_while(|crumb| crumb.owner.is_none())
         .find_map(|crumb| crumb.line);
     let source = workspace.slot(owner).and_then(|slot| slot.source());
+    (owner.to_owned(), location(source, line))
+}
+
+/// A pick, written for an agent to act on.
+pub(crate) fn report(placed: &Placed, workspace: &Workspace) -> String {
+    let trail = placed.crumb.trail();
+    let (owner, at) = origin(placed, workspace);
     let mut out = String::from("Selected in Moonframe (View > Inspect Element):\n");
     let _ = writeln!(out, "- element: {}", placed.crumb.label);
-    let _ = writeln!(out, "- mod: {owner}, drawn by {}", location(source, line));
+    let _ = writeln!(out, "- mod: {owner}, drawn by {at}");
     let path: Vec<&str> = trail.iter().map(|crumb| crumb.label.as_str()).collect();
     let _ = writeln!(out, "- inside: {}", path.join(" > "));
     out

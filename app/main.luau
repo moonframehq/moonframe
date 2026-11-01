@@ -118,6 +118,8 @@ return mod {
 				tooltip = "Layout",
 				ui.icon { "layout-dashboard" },
 			}),
+			-- Send feedback (mods/feedback): ask an agent to change the app.
+			cell(ui.mount "feedback"),
 			cell(ui.row {
 				class = "tool",
 				align = "center",

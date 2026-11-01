@@ -12,11 +12,14 @@ version.workspace      = true
 workspace = true
 
 [features]
+# The `acp` native provider (`app.acp`): coding agents run for mods over
+# the Agent Client Protocol.
+acp = ["dep:moonframe-acp"]
 # The terminal emulators `ui.terminal` can run on. `ghostty` builds
 # libghostty-vt with Zig (see mise.toml and tools/zig), so an app on the
 # library opts into it; the starter (crates/moonframe-app) has both.
 alacritty = ["moonframe-terminal/alacritty"]
-default   = ["alacritty", "git", "herdr-core"]
+default   = ["acp", "alacritty", "git", "herdr-core"]
 ghostty   = ["moonframe-terminal/ghostty"]
 # The `git` native provider (`app.git`, commit and push), on herdr-vcs.
 git = ["dep:moonframe-git"]
@@ -27,6 +30,7 @@ herdr-core = ["moonframe-mux/herdr-core"]
 [dependencies]
 futures.workspace             = true
 gpui-kit.workspace            = true
+moonframe-acp                 = { optional = true, workspace = true }
 moonframe-core.workspace      = true
 moonframe-git                 = { optional = true, workspace = true }
 moonframe-mux.workspace       = true

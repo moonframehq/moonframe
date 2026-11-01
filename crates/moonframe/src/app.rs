@@ -379,7 +379,11 @@ impl MoonframeApp {
             return;
         }
         if let Some(command) = self.workspace.dispatch(from, action) {
-            self.run(command, window, cx);
+            if command == Command::Inspect {
+                self.inspect_for(from, cx);
+            } else {
+                self.run(command, window, cx);
+            }
         }
         self.flush(from, cx);
     }
@@ -441,6 +445,7 @@ impl MoonframeApp {
             Command::Maximize => window.zoom_window(),
             Command::CloseWindow => window.remove_window(),
             Command::ShowThemes => self.show_themes(cx),
+            Command::Inspect => self.inspect_for(SHELL, cx),
         }
     }
 
@@ -530,7 +535,64 @@ impl MoonframeApp {
     pub(crate) fn toggle_inspect(&mut self, cx: &mut Context<Self>) {
         self.inspector.picking = !self.inspector.picking;
         self.inspector.hovered = None;
+        if !self.inspector.picking {
+            // Stopped without a pick: the mod that asked hears so.
+            self.answer_asker(None);
+        }
         cx.notify();
+    }
+
+    /// Starts picking for the mod `from`, which hears the pick (or that
+    /// there was none) on `app/inspect` instead of a card opening.
+    fn inspect_for(&mut self, from: &str, cx: &mut Context<Self>) {
+        // A preview starts nothing.
+        if from.starts_with(moonframe_core::DEMO) {
+            return;
+        }
+        // A pick another mod started ends for it first, unanswered.
+        if self
+            .inspector
+            .asker
+            .as_deref()
+            .is_some_and(|asker| asker != from)
+        {
+            self.answer_asker(None);
+        }
+        self.inspector.selected = None;
+        self.inspector.asker = Some(from.to_owned());
+        self.inspector.picking = true;
+        self.inspector.hovered = None;
+        // It hears that picking started, to get out of the way (a dialog).
+        let started = std::collections::BTreeMap::from([
+            ("asker".to_owned(), Data::String(from.to_owned())),
+            ("picking".to_owned(), Data::Bool(true)),
+        ]);
+        self.workspace
+            .app_topic("inspect", from, Data::Map(started));
+        cx.notify();
+    }
+
+    /// Tells the mod that started the pick what was picked, if any:
+    /// `{ asker, picking = false, picked, element?, mod?, at?, report? }`
+    /// on `app/inspect`.
+    fn answer_asker(&mut self, picked: Option<&Placed>) {
+        let Some(asker) = self.inspector.asker.take() else {
+            return;
+        };
+        let mut fields = std::collections::BTreeMap::from([
+            ("asker".to_owned(), Data::String(asker.clone())),
+            ("picking".to_owned(), Data::Bool(false)),
+            ("picked".to_owned(), Data::Bool(picked.is_some())),
+        ]);
+        if let Some(picked) = picked {
+            let pick = inspect::pick(picked, &self.workspace);
+            fields.insert("element".to_owned(), Data::String(pick.element));
+            fields.insert("mod".to_owned(), Data::String(pick.owner));
+            fields.insert("at".to_owned(), Data::String(pick.at));
+            fields.insert("report".to_owned(), Data::String(pick.report));
+        }
+        self.workspace
+            .app_topic("inspect", &asker, Data::Map(fields));
     }
 
     /// Selects `picked` (or nothing) and saves it where agents read it.
@@ -555,7 +617,13 @@ impl MoonframeApp {
                 tracing::warn!("cannot save the selection to {}: {error}", path.display())
             },
         }
-        self.inspector.selected = picked;
+        if self.inspector.asker.is_some() {
+            // Picked for a mod: it shows the pick itself, so no card.
+            self.answer_asker(picked.as_ref());
+            self.inspector.selected = None;
+        } else {
+            self.inspector.selected = picked;
+        }
         cx.notify();
     }
 

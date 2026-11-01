@@ -134,6 +134,8 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 
 | Component | Category | Use it for |
 | --- | --- | --- |
+| [`agent-run`](#agent-run) | Agents | Show what an agent started through `app.acp` is doing or did, with Stop and the answers to its permission questions. For the Send feedback dialog, which lists runs with this, use `feedback`; for a chat transcript use `chat-message`. |
+| [`feedback`](#feedback) | Agents | Let the user ask for a change to the app itself, from inside it, and follow what the agent does (`app.acp`). For one run on its own use `agent-run`; for a plain form use `dialog`; for chatting with an agent use `composer`. |
 | [`accordion`](#accordion) | Containers | A stack of foldable sections of the same kind: a merge request's checks, files and activity, or groups of settings. The mod decides whether opening one closes the others. For one foldable block use `collapsible`; for sidebar groups use `sidebar-section`; for switching between views use `tabs`. |
 | [`card`](#card) | Containers | A titled box around related content inside a panel or page; for a whole sidebar section use `ui.panel`, for a plain heading use `section`. |
 | [`collapsible`](#collapsible) | Containers | One foldable block of content, such as "No agent yet" or advanced options. For several of them stacked use `accordion`; for a titled sidebar group with a count and actions use `sidebar-section`; for a plain heading use `section`. |
@@ -249,6 +251,68 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`status-bar`](#status-bar) | Status bar | The window's bottom bar: machine, branch, agent counts on the left; CPU, theme, shortcuts on the right. Put `stat`, `meter` or `sparkline` in it for live readings. For a coloured strip announcing something use `banner`; for a top row use `title-bar`; for an extensible bar, give it a `ui.region` as an item. |
 | [`ghostty-terminal`](#ghostty-terminal) | Terminals | A shell drawn by Ghostty's emulator; same as `terminal` with the other engine. |
 | [`terminal`](#terminal) | Terminals | A live shell (alacritty engine) filling its space: a pane, a bottom panel. |
+
+### Agents
+
+#### `agent-run`
+
+**Agent Run.** One coding agent's run: status, plan, its latest tool calls, a permission question with the agent's options, and its answer.
+
+**When:** Show what an agent started through `app.acp` is doing or did, with Stop and the answers to its permission questions. For the Send feedback dialog, which lists runs with this, use `feedback`; for a chat transcript use `chat-message`.
+
+| Prop | Meaning |
+| --- | --- |
+| `lines` | lines of the agent's message shown (default 6; 0 hides it) |
+| `request` | show the user's words above |
+| `run` | a run from `app.acp.runs` { id, agent, agent_title, text, status, started, finished, error, message, tools, tool_count, plan, question } |
+| `to` | where its buttons send, default `provider:acp` |
+| `tools` | tool calls listed, newest last (default 4) |
+
+**Styles:** `.agent-run` `.agent-run-accent` `.agent-run-danger` `.agent-run-error` `.agent-run-head` `.agent-run-message` `.agent-run-meta` `.agent-run-muted` `.agent-run-plan` `.agent-run-question` `.agent-run-request` `.agent-run-status` `.agent-run-step` `.agent-run-success` `.agent-run-tool` `.agent-run-tool-title` `.agent-run-warning`
+
+```lua
+local agent_run = use "agent-run"
+
+agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id = "1", message = "The status bar is the row at the bottom of app/main.luau; I'll raise its height.", plan = { { content = "Find the status bar's row", status = "completed" }, { content = "Make it 36px tall", status = "in_progress" }, { content = "Run just check", status = "pending" } }, question = { options = { { id = "allow", kind = "allow_once", name = "Allow" }, { id = "always", kind = "allow_always", name = "Always allow" }, { id = "reject", kind = "reject_once", name = "Reject" } }, title = "Edit app/main.luau" }, started = 0, status = "waiting", text = "Make the status bar taller", tool_count = 3, tools = { { id = "a", kind = "read", status = "completed", title = "Read app/main.luau" }, { id = "b", kind = "edit", status = "pending", title = "Edit app/main.luau" } } } }
+```
+
+#### `feedback`
+
+**Send Feedback.** A dialog to ask an agent for a change to the app: a text area, a note on who acts on it, Cancel and Send, and the agent runs that came of earlier requests.
+
+**When:** Let the user ask for a change to the app itself, from inside it, and follow what the agent does (`app.acp`). For one run on its own use `agent-run`; for a plain form use `dialog`; for chatting with an agent use `composer`.
+
+| Prop | Meaning |
+| --- | --- |
+| `actions` | elements on the footer's left, such as an agent `dropdown` |
+| `attached` | the element attached to the request, `{ element, at }`, shown as a chip |
+| `change` | sent on each edit, with `value` set to the text |
+| `detach` | msg the chip's × sends |
+| `dismiss` | msg sent by Cancel, Escape or a backdrop click |
+| `error` | why the last send failed, shown above the buttons |
+| `expanded` | id of the run shown open, with `agent-run`; one waiting on an answer is always open |
+| `id` | keeps the text across renders (default "feedback") |
+| `inspect` | show an Inspect button that starts Inspect Element for the mod (`command = "inspect"`); the pick comes back on the topic `app/inspect` |
+| `note` | muted lines under the field: who acts on the feedback, and what goes with it |
+| `open` | show it |
+| `placeholder` | grey text while empty (default: two examples) |
+| `runs` | runs from `app.acp.runs` the mod started, newest first; a row sends `{ expand = id }`, its × `{ forget = id }` to `provider:acp` |
+| `send` | sent by Send and ⌘↩, with `value` set to the text from ⌘↩ |
+| `text` | the text the mod has from `change`; Send is greyed out while it is blank |
+| `to` | mod its own messages go to, if not the drawing one |
+| `value` | the text; set it to "" after sending to clear the field |
+
+**Styles:** `.feedback` `.feedback-action` `.feedback-action:hover` `.feedback-body` `.feedback-chip` `.feedback-chip-at` `.feedback-chip-element` `.feedback-detail` `.feedback-done` `.feedback-error` `.feedback-failed` `.feedback-heading` `.feedback-history` `.feedback-item` `.feedback-item-head` `.feedback-item-head:hover` `.feedback-muted` `.feedback-note` `.feedback-request` `.feedback-run` `.feedback-running` `.feedback-title` `.feedback-waiting`
+
+```lua
+local feedback = use "feedback"
+
+feedback { open = state.open, dismiss = "close", value = state.text, text = state.text,
+	change = "type", send = "send", runs = app.acp and app.acp.runs, expanded = state.expanded,
+	note = "A background agent changes the app and reports back below." }
+```
+
+A whole mod using it, with state: `app/components/demos/feedback.luau`.
 
 ### Containers
 

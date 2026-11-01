@@ -1,0 +1,23 @@
+# Coding agents (Claude, Codex, Gemini, OpenCode, Copilot) run for mods
+# over the Agent Client Protocol, shared as `app.acp`: the agents found
+# here, and each run's status, the agent's latest message, its tool calls,
+# plan, and a permission question waiting on the user.
+# Mods start a run with `{ start = "<words>", ... }` and stop, answer or
+# forget their own (see crates/moonframe-acp).
+# A native provider: Rust built into the app (crates/moonframe-acp, the
+# `acp` feature). The agents run with your access, in the app's repository
+# (else ~/.config/moonframe), and a starter may let one answer every
+# permission question itself.
+interval = 0.25
+kind     = "native"
+
+[settings]
+# The agent a start without `agent` gets.
+agent = "claude"
+# The mods that may start agents; any other is refused. `feedback` sends
+# what the user writes in its dialog, with every permission.
+starters = ["feedback"]
+# Commands replacing an agent's own ACP command, e.g.
+# commands = { claude = ["claude-agent-acp"] }
+# Where agents work, instead of the app's repository:
+# cwd = "~/code/my-app"

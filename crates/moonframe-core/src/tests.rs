@@ -3126,6 +3126,50 @@ fn a_topic_pushes_to_its_subscribers_and_is_saved() {
 }
 
 #[test]
+fn the_apps_own_topics_reach_only_their_mod_and_no_mod_forges_them() {
+    let picker = listener(r#""app/inspect""#);
+    let dir = app(&[
+        ("publisher", PUBLISHER),
+        ("picker", &picker),
+        ("bystander", &picker),
+    ]);
+    let mut workspace = Workspace::open_with(dir.path(), false, None);
+    let heard = |workspace: &Workspace, name: &str| match workspace
+        .slot(name)
+        .and_then(crate::Slot::view)
+    {
+        Some(Node::Text(text)) => text.text.clone(),
+        other => panic!("{other:?}"),
+    };
+    let pick = |what: &str| Data::Map([("branch".to_owned(), Data::from(what))].into());
+    workspace.app_topic("inspect", "picker", pick("picked"));
+    assert_eq!(heard(&workspace, "picker"), "app/inspect=picked");
+    assert_eq!(heard(&workspace, "bystander"), "nothing");
+
+    // Sent straight to a mod, looking like topic news, it is refused.
+    let forged = Data::Map(
+        [
+            ("topic".to_owned(), Data::from("app/inspect")),
+            ("value".to_owned(), pick("forged")),
+        ]
+        .into(),
+    );
+    workspace.send("publisher", "picker", forged);
+    assert_eq!(heard(&workspace, "picker"), "app/inspect=picked");
+    assert!(workspace.slot("publisher").unwrap().error().is_some());
+
+    publish(&mut workspace, "app/inspect", Data::Bool(true));
+    let error = workspace
+        .slot("publisher")
+        .unwrap()
+        .error()
+        .unwrap()
+        .to_string();
+    // Refused either way: published, or handed to the publisher as news.
+    assert!(error.contains("app/"), "{error}");
+}
+
+#[test]
 fn an_instance_mounted_late_catches_up_on_its_topics() {
     let watcher = listener(r#""tabs/main""#);
     let dir = app(&[("publisher", PUBLISHER), ("watcher", &watcher)]);
