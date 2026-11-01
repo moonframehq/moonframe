@@ -1,0 +1,6 @@
+# Gantry's services and their telemetry, shared as `app.telemetry`: SAMPLE
+# data, simulated by telemetry.pl (a new sample every 3 seconds stands for
+# 15 minutes). Replace telemetry.pl to read a real platform. A process
+# provider (perl 5, as macOS ships).
+command = ["perl", "telemetry.pl"]
+kind    = "process"
