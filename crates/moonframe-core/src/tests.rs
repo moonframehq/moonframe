@@ -3882,3 +3882,46 @@ return mod {
     };
     assert_eq!(text_of(&panel.children[0]), "count 1");
 }
+
+#[test]
+fn gradients_take_strings_and_tables() {
+    let sheet = r##"return style {
+      rules = {
+        panel = { gradient = "#ffa53a, accent/50" },
+        row = { gradient = "90deg, #000, #fff" },
+        column = { gradient = { from = "accent", to = "#ff0000", angle = -90 } },
+      },
+    }"##;
+    let dir = app(&[]);
+    write(dir.path(), "style.luau", sheet);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let sheet = workspace.stylesheet();
+    let gradient = |part| {
+        sheet
+            .resolve(part, &Default::default(), false, &Rules::default())
+            .base
+            .gradient
+            .unwrap()
+    };
+    let panel = gradient(Part::Panel);
+    assert_eq!(panel.angle, 180.0);
+    assert_eq!(panel.to.alpha, 0.5);
+    assert_eq!(gradient(Part::Row).angle, 90.0);
+    let column = gradient(Part::Column);
+    assert_eq!(column.angle, 270.0);
+    assert_eq!(column.from.paint, Paint::Token(Token::Accent));
+
+    let bad = app(&[]);
+    write(
+        bad.path(),
+        "style.luau",
+        r##"return style { rules = { row = { gradient = "#000" } } }"##,
+    );
+    let workspace = Workspace::open(bad.path(), false);
+    assert!(!workspace.problems().is_empty());
+}

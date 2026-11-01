@@ -1,0 +1,71 @@
+{
+  "workspace": "Halcyon",
+  "leads": 13487,
+  "kpis": [
+    { "id": "pipeline", "title": "Pipeline Value", "value": "$485,000", "delta": "12.5%", "up": false, "note": "vs Last Months" },
+    { "id": "rate", "title": "Lead-to-Deal Rate", "value": "18.5%", "delta": "12.5%", "up": false, "note": "vs Last Months" },
+    { "id": "contacted", "title": "Contacted Leads", "value": "92", "delta": "+25%", "up": true, "note": "vs Last Months" }
+  ],
+  "revenue": {
+    "total": "$1,631,241",
+    "delta": "12.5%",
+    "up": false,
+    "note": "vs Yesterday",
+    "peak": 5,
+    "growth": [
+      { "id": "3m", "label": "3m growth", "delta": "+25%", "up": true },
+      { "id": "6m", "label": "6m growth", "delta": "+25%", "up": true },
+      { "id": "1y", "label": "1y growth", "delta": "12.5%", "up": false }
+    ],
+    "months": [
+      { "label": "JAN", "value": 90.2, "amount": "$90,214" },
+      { "label": "FEB", "value": 145.4, "amount": "$145,388" },
+      { "label": "MAR", "value": 116.8, "amount": "$116,802" },
+      { "label": "APR", "value": 136.2, "amount": "$136,175" },
+      { "label": "MAY", "value": 193.2, "amount": "$193,240" },
+      { "label": "JUN", "value": 158.2, "amount": "$158,196" },
+      { "label": "JUL", "value": 112.2, "amount": "$112,233" },
+      { "label": "AUG", "value": 170.2, "amount": "$170,167" },
+      { "label": "SEP", "value": 184.0, "amount": "$184,012" },
+      { "label": "OCT", "value": 112.2, "amount": "$112,190" },
+      { "label": "NOV", "value": 85.6, "amount": "$85,604" },
+      { "label": "DEC", "value": 127.0, "amount": "$127,020" }
+    ]
+  },
+  "status": {
+    "total": 213,
+    "rows": [
+      { "label": "NEW LEADS", "count": 134, "share": 1.0, "from": "#5fdcff", "to": "#00a8ff" },
+      { "label": "CONTACTED", "count": 121, "share": 0.57, "from": "#ffa53a", "to": "#ff7a00" },
+      { "label": "QUALIFIED", "count": 86, "share": 0.44, "from": "#b69bff", "to": "#7c5cff" },
+      { "label": "PROPOSAL", "count": 54, "share": 0.31, "from": "#ff8fb4", "to": "#ff4d86" },
+      { "label": "WON", "count": 32, "share": 0.19, "from": "#5ef0a0", "to": "#00c96b" }
+    ]
+  },
+  "visits": {
+    "value": "701.34m",
+    "delta": "12.5%",
+    "up": false,
+    "note": "vs Last month",
+    "weeks": [41, 44, 39, 52, 58, 55, 61, 57, 66, 63, 70, 68, 62, 71],
+    "sources": [
+      { "label": "Organic", "value": "312.6m", "share": 45, "color": "#18c2ff" },
+      { "label": "Referral", "value": "214.9m", "share": 31, "color": "#ff8e16" },
+      { "label": "Paid", "value": "173.8m", "share": 24, "color": "#8b6cff" }
+    ]
+  },
+  "deals": [
+    { "company": "Northbeam Labs", "contact": "Ines Duval", "stage": "Proposal", "tone": "#ff4d86", "value": "$84,500", "age": "2d" },
+    { "company": "Parcel & Pine", "contact": "Theo Marsh", "stage": "Qualified", "tone": "#7c5cff", "value": "$62,000", "age": "4d" },
+    { "company": "Quillstone", "contact": "Amara Okafor", "stage": "Contacted", "tone": "#ff8e16", "value": "$48,750", "age": "5d" },
+    { "company": "Driftwood Health", "contact": "Jonas Berg", "stage": "Won", "tone": "#00c96b", "value": "$39,900", "age": "1w" },
+    { "company": "Lumen Freight", "contact": "Sofia Ruiz", "stage": "New lead", "tone": "#18c2ff", "value": "$27,300", "age": "1w" }
+  ],
+  "sources": [
+    { "label": "Website forms", "icon": "globe", "count": "4,862", "share": 36, "color": "#18c2ff" },
+    { "label": "Outbound email", "icon": "mail", "count": "3,371", "share": 25, "color": "#ff8e16" },
+    { "label": "Referrals", "icon": "user", "count": "2,697", "share": 20, "color": "#8b6cff" },
+    { "label": "Events", "icon": "calendar", "count": "1,618", "share": 12, "color": "#ff4d86" },
+    { "label": "Partners", "icon": "workflow", "count": "939", "share": 7, "color": "#00c96b" }
+  ]
+}

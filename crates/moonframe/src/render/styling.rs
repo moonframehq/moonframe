@@ -5,8 +5,8 @@ use {
     crate::color::ThemeColor,
     gpui_kit::{component::Theme, *},
     moonframe_core::{
-        Align, Border, Corners, Direction, Font, Frame, Resolved, Scroll, Shadow, ShadowPreset,
-        Sides, Space, Style, TextSize, Weight,
+        Align, Border, Corners, Direction, Font, Frame, Gradient, Resolved, Scroll, Shadow,
+        ShadowPreset, Sides, Space, Style, TextSize, Weight,
     },
 };
 
@@ -18,8 +18,18 @@ pub(super) fn text_pixels(size: Option<TextSize>, theme: &Theme) -> Pixels {
         None | Some(TextSize::Normal) => 1.0,
         Some(TextSize::Large) => 1.2,
         Some(TextSize::Title) => 1.5,
+        Some(TextSize::Display) => 2.0,
     };
     theme.font_size * scale
+}
+
+/// A gradient as GPUI paints it.
+fn paint(gradient: Gradient, theme: &Theme) -> Background {
+    linear_gradient(
+        gradient.angle,
+        linear_color_stop(gradient.from.hsla(theme), 0.0),
+        linear_color_stop(gradient.to.hsla(theme), 1.0),
+    )
 }
 
 /// Styles that apply to any element.
@@ -149,6 +159,9 @@ pub(super) trait LookExt: StyleExt + InteractiveElement {
         if let Some(color) = style.background {
             self = self.bg(color.hsla(theme));
         }
+        if let Some(gradient) = style.gradient {
+            self = self.bg(paint(gradient, theme));
+        }
         self = self.typography(style, theme).margined(&style.margin);
         if let Some(radius) = style.radius {
             self = self.cornered(radius);
@@ -162,14 +175,18 @@ pub(super) trait LookExt: StyleExt + InteractiveElement {
         // GPUI takes one hover style per element: everything goes in it.
         let hover = &look.hover;
         let background = hover.background.map(|color| color.hsla(theme));
+        let gradient = hover.gradient.map(|gradient| paint(gradient, theme));
         let color = hover.color.map(|color| color.hsla(theme));
         let border = hover.border_color.map(|color| color.hsla(theme));
-        if background.is_none() && color.is_none() && border.is_none() {
+        if background.is_none() && gradient.is_none() && color.is_none() && border.is_none() {
             return self;
         }
         self.hover(move |mut style| {
             if let Some(background) = background {
                 style = style.bg(background);
+            }
+            if let Some(gradient) = gradient {
+                style = style.bg(gradient);
             }
             if let Some(color) = color {
                 style = style.text_color(color);

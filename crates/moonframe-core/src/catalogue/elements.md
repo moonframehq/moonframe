@@ -104,7 +104,7 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
 
 ### Style keys
 
-`background`, `color`, `border`, `border_color`, `radius`, `padding`, `gap`,
+`background`, `gradient` (`"180deg, #ffa53a, #ff6200"`), `color`, `border`, `border_color`, `radius`, `padding`, `gap`,
 `margin`, `shadow`, `size`, `weight`, `font` (`sans`, `mono`), `case`
 (`upper`, `lower`, on text), `opacity`, `width` and `height` (under the
 element's own; on containers),

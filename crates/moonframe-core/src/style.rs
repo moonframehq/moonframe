@@ -237,10 +237,22 @@ pub struct Color {
     pub alpha: f32,
 }
 
+/// A linear gradient from one color to another, painted over the
+/// background: `"180deg, #ffa53a, #ff6200"`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Gradient {
+    /// The direction in degrees, as in CSS: 0 runs up, 90 right, 180 down.
+    pub angle: f32,
+    pub from: Color,
+    pub to: Color,
+}
+
 /// Visual properties; each one unset unless a rule or the element sets it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Style {
     pub background: Option<Color>,
+    /// A linear gradient instead of the flat background.
+    pub gradient: Option<Gradient>,
     /// Text color; children inherit it.
     pub color: Option<Color>,
     pub border: Option<Border>,
@@ -281,6 +293,7 @@ impl Style {
         }
         take!(
             background,
+            gradient,
             color,
             border,
             border_color,

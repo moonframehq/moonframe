@@ -220,3 +220,26 @@ do {
     }
     save(cx, "examples/stage/icon.png")
 }
+
+// Emberline: dark columns on a near-black card, the tallest one glowing orange.
+do {
+    let cx = body([0x3a3a3a, 0x222222, 0x111111])
+    fill(cx, CGRect(x: 196, y: 220, width: 632, height: 584), 60, color(0x1b1b1b))
+    let floor = 300.0
+    for (index, height) in [210.0, 330, 270, 440, 300].enumerated() {
+        let x = 250 + CGFloat(index) * 108
+        let bar = CGRect(x: x, y: floor, width: 84, height: height)
+        if index == 3 {
+            cx.saveGState()
+            cx.addPath(rounded(bar, 34))
+            cx.clip()
+            let glow = CGGradient(colorsSpace: space, colors: [color(0xff9a1f), color(0xff6400)] as CFArray, locations: [0, 1])!
+            cx.drawLinearGradient(glow, start: CGPoint(x: x, y: floor + height), end: CGPoint(x: x, y: floor), options: [])
+            cx.restoreGState()
+        } else {
+            fill(cx, bar, 34, color(0x2e2e2e))
+        }
+    }
+    fill(cx, CGRect(x: 250, y: 252, width: 516, height: 14), 7, color(0xffffff, 0.12))
+    save(cx, "examples/emberline/icon.png")
+}

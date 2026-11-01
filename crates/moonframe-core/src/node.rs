@@ -61,6 +61,8 @@ tokens! {
         Normal = "normal",
         Large = "large",
         Title = "title",
+        /// Twice the base size: a dashboard's headline figures.
+        Display = "display",
     }
 }
 
