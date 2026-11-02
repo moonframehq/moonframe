@@ -9,7 +9,7 @@ This file is for coding agents. If the user says something like "use Moonframe f
 Run `moonframe --help`. If the command is missing:
 
 - macOS 13 or later: `brew install penso/tap/moonframe` (installs `Moonframe.app` and the `moonframe` command).
-- Linux or Windows: download the archive for the platform from https://github.com/penso/moonframe/releases and put `moonframe` on `PATH`.
+- Linux or Windows: download and extract the archive for the platform from https://github.com/penso/moonframe/releases. Keep the extracted folder whole: `moonframe` finds its `app/` folder (with the prebuilt providers) beside itself. Add that folder to `PATH`, or symlink the executable into one already on it. Never copy the executable on its own.
 
 Ask the user before installing anything.
 
@@ -34,12 +34,12 @@ moonframe init DIR --name NAME     # NAME: the binary and ~/.config/NAME; DIR de
 - **An existing crate:** `init` writes only `app/`, the types and the skills, and never touches `Cargo.toml` or `src/`. It prints what to add. Make these changes yourself:
   - Add `moonframe = { git = "https://github.com/penso/moonframe", branch = "main" }` under `[dependencies]`.
   - Add `[profile.dev.package."*"]` with `opt-level = 2` to the workspace root's `Cargo.toml`. Without it, GPUI and Luau are unusably slow.
-  - Start the window from `main` with `moonframe::Moonframe::new("NAME").title("Title").app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app")).run()`. If `main` already does something else (a CLI or a server), don't replace it. Add a second binary (`src/bin/NAME.rs`) or a new workspace member instead, and ask the user if you are unsure.
+  - Start the window from `main` with `moonframe::Moonframe::new("NAME").title("Title").app_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/app")).run()`. If `main` already does something else (a CLI or a server), don't replace it. Add a second binary (`src/bin/NAME.rs`) or a new workspace member instead, and ask the user if you are unsure. With two binaries, a bare `cargo run` cannot pick one (or runs `default-run`), so name the window's: `cargo run --bin NAME`, and `cargo run -p MEMBER` for a workspace member.
   - The app's own Rust logic reaches the Luau UI through native providers. Implement `moonframe::Native` (or `AsyncNative` on tokio), register it with `.native("name", Make::default)`, and give it a folder `app/providers/name/provider.toml` with `kind = "native"`. Luau reads its data as `app.name`.
   - Existing GPUI views are registered with `.view("name", View::new)` and placed from Luau with `ui.view { name = "name" }`. Use the GPUI that `moonframe::gpui_kit` re-exports: an app links only one GPUI.
   - `init` writes an example `clock` provider. Register it or delete `app/providers/clock/`.
 - The toolchain must match https://github.com/penso/moonframe/blob/main/rust-toolchain.toml or be newer.
-- Check after each edit with `cargo run -- --check` (loads everything headlessly and reports problems). Run the app with `cargo run`, and bundle it with `cargo run --release -- bundle`.
+- Check after each edit with `cargo run -- --check` (loads everything headlessly and reports problems). Run the app with `cargo run`, and bundle it with `cargo run --release -- bundle`. With a second binary, add `--bin NAME` (or `-p MEMBER`) to each: `cargo run --bin NAME -- --check`, `cargo run --bin NAME`, `cargo run --release --bin NAME -- bundle`.
 
 ## Path B: a Luau app run as a profile
 
