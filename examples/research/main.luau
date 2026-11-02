@@ -27,7 +27,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "An agent's research workspace: its plan in a thread, and the sheet it fills cell by cell (a scripted demo).",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

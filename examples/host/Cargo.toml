@@ -1,7 +1,7 @@
 # An app of its own on the Moonframe library, as `moonframe init` starts
 # one. It lives in this workspace so CI builds it against the library as it
 # is; outside this repository the dependency is
-#   moonframe = { git = "https://github.com/penso/moonframe", rev = "..." }
+#   moonframe = { git = "https://github.com/moonframehq/moonframe", rev = "..." }
 # and the crate's own Cargo.toml adds the dev profile below (GPUI and Luau
 # are unusably slow unoptimised):
 #   [profile.dev.package."*"]

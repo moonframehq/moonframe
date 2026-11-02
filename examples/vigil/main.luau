@@ -36,7 +36,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "Workflow operations at a glance: SLA, latency, lag, errors and a live feed of runs. Sample data, simulated live.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

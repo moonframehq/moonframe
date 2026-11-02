@@ -29,7 +29,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "Code review analytics in an observability tool: pull requests reviewed, issues caught, CI and repositories. Sample data.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

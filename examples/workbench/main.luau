@@ -33,7 +33,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "An agent's terminal, an editor and the project's files, side by side.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

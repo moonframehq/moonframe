@@ -113,7 +113,7 @@
 
   <div class="pane on" data-p="new">
     <ol class="steps">
-      <li><span class="num">I</span><div><h3>Clone the starter</h3><p>Name the folder after your app.</p></div><button class="copy"><code>git clone https://github.com/penso/moonframe my-app</code><span>Copy</span></button></li>
+      <li><span class="num">I</span><div><h3>Clone the starter</h3><p>Name the folder after your app.</p></div><button class="copy"><code>git clone https://github.com/moonframehq/moonframe my-app</code><span>Copy</span></button></li>
       <li><span class="num">II</span><div><h3>Step inside</h3><p>Everything else runs from here.</p></div><button class="copy"><code>cd my-app</code><span>Copy</span></button></li>
       <li><span class="num">III</span><div><h3>Install the toolchain</h3><p>mise fetches Rust, and Zig for the Ghostty terminal.</p></div><button class="copy"><code>mise install</code><span>Copy</span></button></li>
       <li><span class="num">IV</span><div><h3>Open the window</h3><p>Then ask your agent for anything; the window changes as it saves.</p></div><button class="copy"><code>just run</code><span>Copy</span></button></li>
@@ -125,7 +125,7 @@
     <ol class="steps">
       <li><span class="num">I</span><div><h3>Get the command</h3><p>The <code>moonframe</code> command writes the app folder for you.</p></div><button class="copy"><code>brew install penso/tap/moonframe</code><span>Copy</span></button></li>
       <li><span class="num">II</span><div><h3>Give your crate a window</h3><p>Adds <code>app/</code>, Luau types and the agent skills. Never touches <code>src/</code>.</p></div><button class="copy"><code>moonframe init . --name my-app</code><span>Copy</span></button></li>
-      <li><span class="num">III</span><div><h3>Depend on it</h3><p>Then set <code>opt-level = 2</code> for dependencies; <code>init</code> prints the lines.</p></div><button class="copy"><code>cargo add moonframe --git https://github.com/penso/moonframe</code><span>Copy</span></button></li>
+      <li><span class="num">III</span><div><h3>Depend on it</h3><p>Then set <code>opt-level = 2</code> for dependencies; <code>init</code> prints the lines.</p></div><button class="copy"><code>cargo add moonframe --git https://github.com/moonframehq/moonframe</code><span>Copy</span></button></li>
       <li class="wide"><span class="num">IV</span><div><h3>Hand it main, last</h3><p>Do your own setup first, then end <code>main</code> with Moonframe: <code>run()</code> holds the main thread until the window closes. Your Rust publishes data as a provider, plain or <code>async</code> on tokio; Luau draws it.</p></div>
       <div class="pair">
         <div class="panel"><header>Sync · src/main.rs<button>Copy</button></header><pre>use moonframe::{Data, Handle, Moonframe, Native};
@@ -207,7 +207,7 @@ async fn main() -&gt; std::process::ExitCode {
       <span class="who">Nothing yet</span>
       <h3>Start a <i>new app</i></h3>
       <p>Clone the starter, rename it, and change it live, by hand or with an agent.</p>
-<pre>git clone https://github.com/penso/moonframe my-app
+<pre>git clone https://github.com/moonframehq/moonframe my-app
 cd my-app
 mise install   # Rust, Zig
 just run</pre>
@@ -221,7 +221,7 @@ just run</pre>
 <pre>brew install penso/tap/moonframe
 moonframe init . --name my-app
 cargo add moonframe \
-  --git https://github.com/penso/moonframe
+  --git https://github.com/moonframehq/moonframe
 cargo run</pre>
       <p class="then"><code>init</code> writes <code>app/</code>, types and skills, and prints the <code>main.rs</code> to paste. <a href="#">Library guide</a>.</p>
       <p class="eg">Example: <b>msgvault-moonframe</b>, a mail archive reader →</p>
@@ -273,7 +273,7 @@ moonframe mod install owner/repo</pre>
   <div class="sel pane on" data-p="new">
     <h3 class="t">Four commands <i>to a running window.</i></h3>
     <ol class="steps">
-      <li><span class="num">I</span><div><h3>Clone the starter</h3><p>Name the folder after your app.</p></div><button class="copy"><code>git clone https://github.com/penso/moonframe my-app</code><span>Copy</span></button></li>
+      <li><span class="num">I</span><div><h3>Clone the starter</h3><p>Name the folder after your app.</p></div><button class="copy"><code>git clone https://github.com/moonframehq/moonframe my-app</code><span>Copy</span></button></li>
       <li><span class="num">II</span><div><h3>Step inside</h3><p>Everything else runs from here.</p></div><button class="copy"><code>cd my-app</code><span>Copy</span></button></li>
       <li><span class="num">III</span><div><h3>Install the toolchain</h3><p>mise fetches Rust, and Zig for the Ghostty terminal.</p></div><button class="copy"><code>mise install</code><span>Copy</span></button></li>
       <li><span class="num">IV</span><div><h3>Open the window</h3><p>Then ask your agent for anything; the window changes as it saves.</p></div><button class="copy"><code>just run</code><span>Copy</span></button></li>
@@ -284,7 +284,7 @@ moonframe mod install owner/repo</pre>
     <h3 class="t">Your crate, <i>Moonframe's window.</i></h3>
     <ol class="steps">
       <li><span class="num">I</span><div><h3>Write the app folder</h3><p>From your crate's root, with the command from Homebrew above.</p></div><button class="copy"><code>moonframe init . --name my-app</code><span>Copy</span></button></li>
-      <li><span class="num">II</span><div><h3>Depend on it</h3><p>Pin a commit; <code>init</code> prints the <code>opt-level</code> lines too.</p></div><button class="copy"><code>cargo add moonframe --git https://github.com/penso/moonframe</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Depend on it</h3><p>Pin a commit; <code>init</code> prints the <code>opt-level</code> lines too.</p></div><button class="copy"><code>cargo add moonframe --git https://github.com/moonframehq/moonframe</code><span>Copy</span></button></li>
       <li class="wide"><span class="num">III</span><div><h3>Hand it main, last</h3><p>Your setup first, Moonframe last. Providers can be plain Rust or <code>async</code> on your tokio runtime.</p></div>
       <div class="pair">
         <div class="panel"><header>Sync · src/main.rs<button>Copy</button></header><pre>use moonframe::{Data, Handle, Moonframe, Native};

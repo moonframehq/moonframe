@@ -40,7 +40,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "Today's tasks and events, an inbox, a month at a glance, and notes.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

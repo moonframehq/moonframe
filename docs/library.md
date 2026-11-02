@@ -26,7 +26,7 @@ The new crate is [examples/host](../examples/host), renamed.
 
 ```toml
 [dependencies]
-moonframe = { git = "https://github.com/penso/moonframe", branch = "main" }
+moonframe = { git = "https://github.com/moonframehq/moonframe", branch = "main" }
 
 # In the workspace root: GPUI and Luau are unusably slow unoptimised.
 [profile.dev.package."*"]

@@ -102,30 +102,30 @@
   <a class="name" href="https://moonframe.dev/"><img src="/img/icon.png" alt="">Moonframe</a><span class="sec">Docs</span>
   <button class="menu" id="menu" aria-expanded="false" aria-controls="side">Contents ▾</button>
   <label class="search"><input id="q" type="search" placeholder="Search the docs…" aria-label="Search the docs"><kbd>⌘K</kbd></label>
-  <div class="r"><a class="on" href="/">Guide</a><a href="https://github.com/penso/moonframe/blob/main/types/moonframe.d.luau">Luau API</a><a href="https://moonframe.dev/#components">Components</a><a href="https://moonframe.dev/#apps">Apps</a><a href="https://github.com/penso/moonframe">GitHub</a></div>
+  <div class="r"><a class="on" href="/">Guide</a><a href="https://github.com/moonframehq/moonframe/blob/main/types/moonframe.d.luau">Luau API</a><a href="https://moonframe.dev/#components">Components</a><a href="https://moonframe.dev/#apps">Apps</a><a href="https://github.com/moonframehq/moonframe">GitHub</a></div>
 </header>
 <div class="layout">
   <aside id="side">
-    <h4>Start</h4><a class="on" href="/">Introduction</a><a href="https://github.com/penso/moonframe#quick-start">Quick start</a><a href="https://github.com/penso/moonframe#make-it-yours">Make it yours</a>
-    <h4>Building blocks</h4><a href="#a-mod-is-one-file">Mods</a><a href="#where-things-go">Where things go</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe/SKILL.md">The full guide</a><a href="https://moonframe.dev/#components">Components</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe-components/SKILL.md">Component catalogue</a>
-    <h4>Working with agents</h4><a href="/llms.txt">For agents: llms.txt</a><a href="https://github.com/penso/moonframe#working-with-an-agent">Inspect Element and the skill</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe-mockups/SKILL.md">Mockups</a>
-    <h4>Distribute</h4><a href="https://github.com/penso/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/penso/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe-apps/SKILL.md">Building and bundling apps</a><a href="https://github.com/penso/moonframe/blob/main/docs/library.md">Using the library</a><a href="https://github.com/penso/moonframe/blob/main/docs/releasing.md">Releasing</a>
-    <h4>Reference</h4><a href="https://github.com/penso/moonframe#commands">Commands</a><a href="https://github.com/penso/moonframe/blob/main/types/moonframe.d.luau">Luau API types</a><a href="https://github.com/penso/moonframe/blob/main/wit/provider.wit">Provider interface</a>
+    <h4>Start</h4><a class="on" href="/">Introduction</a><a href="https://github.com/moonframehq/moonframe#quick-start">Quick start</a><a href="https://github.com/moonframehq/moonframe#make-it-yours">Make it yours</a>
+    <h4>Building blocks</h4><a href="#a-mod-is-one-file">Mods</a><a href="#where-things-go">Where things go</a><a href="https://github.com/moonframehq/moonframe/blob/main/.claude/skills/moonframe/SKILL.md">The full guide</a><a href="https://moonframe.dev/#components">Components</a><a href="https://github.com/moonframehq/moonframe/blob/main/.claude/skills/moonframe-components/SKILL.md">Component catalogue</a>
+    <h4>Working with agents</h4><a href="/llms.txt">For agents: llms.txt</a><a href="https://github.com/moonframehq/moonframe#working-with-an-agent">Inspect Element and the skill</a><a href="https://github.com/moonframehq/moonframe/blob/main/.claude/skills/moonframe-mockups/SKILL.md">Mockups</a>
+    <h4>Distribute</h4><a href="https://github.com/moonframehq/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/moonframehq/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/moonframehq/moonframe/blob/main/.claude/skills/moonframe-apps/SKILL.md">Building and bundling apps</a><a href="https://github.com/moonframehq/moonframe/blob/main/docs/library.md">Using the library</a><a href="https://github.com/moonframehq/moonframe/blob/main/docs/releasing.md">Releasing</a>
+    <h4>Reference</h4><a href="https://github.com/moonframehq/moonframe#commands">Commands</a><a href="https://github.com/moonframehq/moonframe/blob/main/types/moonframe.d.luau">Luau API types</a><a href="https://github.com/moonframehq/moonframe/blob/main/wit/provider.wit">Provider interface</a>
     <p class="none" id="none" hidden>No page matches.</p>
   </aside>
   <main>
     <p class="crumb">Start · Introduction</p>
     <h1>Introduction</h1>
     <p class="lead">Moonframe is a factory for native desktop apps whose whole window is written in Luau. Rust and GPUI draw it, check it, and keep it safe; every panel, split, toolbar and status bar is a Luau file that reloads as you save, with its state kept.</p>
-<pre><span class="p">$</span> git clone https://github.com/penso/moonframe my-app
+<pre><span class="p">$</span> git clone https://github.com/moonframehq/moonframe my-app
 <span class="p">$</span> cd my-app
 <span class="p">$</span> mise install   <span class="c"># Rust, and Zig for the Ghostty terminal</span>
 <span class="p">$</span> just run       <span class="c"># opens the window on app/</span></pre>
     <div class="cards">
-      <a href="https://github.com/penso/moonframe#quick-start"><b>Quick start →</b><span>Clone, run, edit a file, watch it change.</span></a>
+      <a href="https://github.com/moonframehq/moonframe#quick-start"><b>Quick start →</b><span>Clone, run, edit a file, watch it change.</span></a>
       <a href="#a-mod-is-one-file"><b>Your first mod →</b><span>State, init, update, view.</span></a>
       <a href="https://moonframe.dev/#components"><b>Component catalogue →</b><span>Every <code>ui.*</code> element and <code>use</code> piece.</span></a>
-      <a href="https://github.com/penso/moonframe#whole-apps-as-profiles"><b>Build an app →</b><span><code>moonframe.toml</code>, profiles, bundles.</span></a>
+      <a href="https://github.com/moonframehq/moonframe#whole-apps-as-profiles"><b>Build an app →</b><span><code>moonframe.toml</code>, profiles, bundles.</span></a>
     </div>
     <figure><img src="/img/window.webp" alt=""><figcaption><b>Fig. 1</b> The window that ships: explorer, terminal tabs, changes, status bar. Each is a mod in <code>app/mods/</code>.</figcaption></figure>
 
@@ -158,7 +158,7 @@
       <tr><td>A sheet or menu</td><td><code>ui.popover { open = state.open, dismiss = "close" }</code></td></tr>
       <tr><td>A new kind of element</td><td>Rust in <code>crates/</code>, the one change that needs a rebuild</td></tr>
     </table>
-    <div class="note"><b>Sandboxed</b>Luau runs with no files, network or process access, a memory cap and an instruction budget. Anything that reaches the machine goes through a provider or an element the host owns. A WebAssembly provider is sandboxed the same way and reaches only the host calls its manifest lists; process and native providers run as you, for what a sandbox cannot reach. <a href="https://github.com/penso/moonframe#what-runs-with-what-access">What runs with what access</a></div>
+    <div class="note"><b>Sandboxed</b>Luau runs with no files, network or process access, a memory cap and an instruction budget. Anything that reaches the machine goes through a provider or an element the host owns. A WebAssembly provider is sandboxed the same way and reaches only the host calls its manifest lists; process and native providers run as you, for what a sandbox cannot reach. <a href="https://github.com/moonframehq/moonframe#what-runs-with-what-access">What runs with what access</a></div>
 
     <h2 id="for-agents">For coding agents</h2>
     <p>Ask your agent to <i>“use Moonframe for this project: read https://moonframe.dev/llms.txt and follow it.”</i> <a href="/llms.txt"><code>llms.txt</code></a> walks it through the choice: an existing Rust crate gets the library with <code>moonframe init</code>; a new app with no Rust of its own, or a UI for a project in another language, becomes a profile with <code>moonframe app new</code>. It then points at the skills to read before writing UI, and at <code>--check</code> to run after each edit.</p>
@@ -166,9 +166,9 @@
     <h2 id="platforms">Platforms</h2>
     <p>Moonframe is developed on macOS. CI builds, lints and tests it on macOS, Linux (x86_64 and ARM64) and Windows; each release ships a macOS disk image, Linux tarballs and Windows zips, with checksums, Sigstore signatures and GitHub attestations.</p>
 
-    <div class="pager"><span></span><a style="text-align:right" href="https://github.com/penso/moonframe#quick-start"><small>Next</small><b>Quick start →</b></a></div>
+    <div class="pager"><span></span><a style="text-align:right" href="https://github.com/moonframehq/moonframe#quick-start"><small>Next</small><b>Quick start →</b></a></div>
   </main>
-  <nav class="toc"><b>On this page</b><a class="on" href="#top">Introduction</a><a href="#a-mod-is-one-file">A mod is one file</a><a href="#where-things-go">Where things go</a><a href="#for-agents">For coding agents</a><a href="#platforms">Platforms</a><div class="edit"><a href="https://github.com/penso/moonframe/edit/main/website/site/docs/index.html">Edit this page ↗</a></div></nav>
+  <nav class="toc"><b>On this page</b><a class="on" href="#top">Introduction</a><a href="#a-mod-is-one-file">A mod is one file</a><a href="#where-things-go">Where things go</a><a href="#for-agents">For coding agents</a><a href="#platforms">Platforms</a><div class="edit"><a href="https://github.com/moonframehq/moonframe/edit/main/website/site/docs/index.html">Edit this page ↗</a></div></nav>
 </div>
 <script>
 // Search filters the sidebar; ⌘K or / focuses it, Enter opens the first match.

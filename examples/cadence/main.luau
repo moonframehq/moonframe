@@ -26,7 +26,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "Workflow runs, success and tokens at a glance, with a notification drawer. Sample data.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

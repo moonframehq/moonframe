@@ -44,7 +44,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "Deals on a board by stage, the quarter's figures, and a demo agent that reads them.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

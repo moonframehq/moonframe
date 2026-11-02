@@ -5,7 +5,7 @@ cask "moonframe" do
   version "@VERSION@"
   sha256 "@SHA256@"
 
-  url "https://github.com/penso/moonframe/releases/download/v#{version}/Moonframe-#{version}-universal-apple-darwin.dmg"
+  url "https://github.com/moonframehq/moonframe/releases/download/v#{version}/Moonframe-#{version}-universal-apple-darwin.dmg"
   name "Moonframe"
   desc "Native desktop app whose whole window is written in Luau"
   homepage "https://moonframe.dev"

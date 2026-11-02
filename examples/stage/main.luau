@@ -21,7 +21,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "Moonframe's components on a bento board, with sample data, for stills.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

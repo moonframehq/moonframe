@@ -28,7 +28,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "A store's admin, opened at its audit log: filter, search, page and export every activity. Sample data.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

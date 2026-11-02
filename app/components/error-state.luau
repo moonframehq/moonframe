@@ -58,7 +58,7 @@ return component {
 	example = {
 		title = "Couldn't load pull requests",
 		message = "GitHub refused the request. Check the token in Settings › Integrations.",
-		details = "HTTP 401 Unauthorized: Bad credentials (GET /repos/penso/moonframe/pulls)",
+		details = "HTTP 401 Unauthorized: Bad credentials (GET /repos/moonframehq/moonframe/pulls)",
 		retry = "retry",
 		secondary = { label = "Open settings", msg = "open-settings" },
 	},

@@ -54,13 +54,13 @@ fn a_detached_head_is_named_head() {
 
 #[test]
 fn remotes_name_their_host_owner_and_repository() {
-    let ssh = refs::remote_json("origin", "git@github.com:penso/moonframe.git");
+    let ssh = refs::remote_json("origin", "git@github.com:moonframehq/moonframe.git");
     assert_eq!(ssh["kind"], "github");
     assert_eq!(
         (ssh["owner"].clone(), ssh["repo"].clone()),
-        (json!("penso"), json!("moonframe"))
+        (json!("moonframehq"), json!("moonframe"))
     );
-    assert_eq!(ssh["web_url"], "https://github.com/penso/moonframe");
+    assert_eq!(ssh["web_url"], "https://github.com/moonframehq/moonframe");
     let https = refs::remote_json("up", "https://user@gitlab.example.com:8443/group/sub/app/");
     assert_eq!(https["kind"], "gitlab");
     assert_eq!(https["host"], "gitlab.example.com");
