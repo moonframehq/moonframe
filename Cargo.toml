@@ -50,7 +50,7 @@ herdr-core-client = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb
 herdr-github      = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
 herdr-vcs         = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
 # `ui.image` zooms by the picture's own size, read from its header.
-imagesize                = "0.14"
+imagesize                = "0.15"
 libghostty-vt            = "0.2.2"
 mlua                     = { features = ["luau"], version = "0.12.2" }
 moonframe                = { path = "crates/moonframe" }
