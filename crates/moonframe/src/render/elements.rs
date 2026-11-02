@@ -701,13 +701,14 @@ impl<'w> Draw<'w> for Image {
         let theme = cx.theme();
         let folder = painter.folder(place.owner).unwrap_or(Path::new("."));
         let workspace = painter.workspace;
-        let path = super::images::resolve(self, folder, || {
+        let owner = place.owner;
+        let path = super::images::resolve(self, owner, folder, || {
             workspace
                 .roots()
                 .layers()
                 .map(Path::to_owned)
                 .chain([crate::paths::images()])
-                .chain(super::images::granted())
+                .chain(super::images::granted(owner))
                 .collect()
         });
         let fit = match self.fit {

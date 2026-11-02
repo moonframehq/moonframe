@@ -1,8 +1,8 @@
 //! `app:pick`: the system's open, folder or save panel. The answer comes
 //! back to the mod that asked, as its `reply` with `paths` (or `path` for
 //! a save) added, or `cancelled = true`. What the user picks they chose to
-//! share, so a picked file (or a folder's pictures) may show in `ui.image`
-//! from then on.
+//! share with that mod, so a picked file (or a folder's pictures) may show
+//! in its `ui.image`, and its components', from then on.
 
 use {
     super::APP,

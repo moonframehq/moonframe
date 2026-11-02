@@ -96,7 +96,7 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   and `max` (a slider), or `value` plus pixels times `speed` (a number
   scrubbed by its label). `wheel = <msg>` gets scrolls and pinches (`dx`,
   `dy`, `zoom`, `x`, `y`); `drop = <msg>` gets files dropped from other
-  apps (`paths`), which `ui.image` may then show; `cursor` sets the pointer's
+  apps (`paths`), which that mod's `ui.image` may then show; `cursor` sets the pointer's
   shape (`crosshair`, `grab`, `grabbing`, `ew-resize`, `ns-resize`,
   `nwse-resize`, `nesw-resize`, `move`, `pointer`, `text`, `not-allowed`).
 - **Children:** `false` and `nil` children are skipped, wherever they are.
@@ -116,7 +116,7 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   multiple = true, reply = "opened" } }` opens the system's panel (`kind`
   `open`, `folder` or `save` with `name` and `folder`); the answer comes
   back to the mod as `reply` with `paths` (`path` for a save) or
-  `cancelled = true`. Picked files may then show in `ui.image`.
+  `cancelled = true`. Picked files may then show in that mod's `ui.image`.
 - **Keys anywhere:** `mod { keys = { ["secondary-1"] = "histogram" } }`
   sends its message when the key is pressed and nothing nearer (an open
   overlay, a focused field or terminal) took it; the shell's first.

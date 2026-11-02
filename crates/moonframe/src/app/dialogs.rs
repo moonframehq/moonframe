@@ -45,7 +45,7 @@ impl MoonframeApp {
             if pick.kind != PickKind::Save
                 && let Some(paths) = &picked
             {
-                crate::render::images::grant(paths);
+                crate::render::images::grant(&from, paths);
             }
             let answer = pick.answer(picked);
             let _ = this.update(cx, |app, cx| app.deliver(&from, answer, cx));

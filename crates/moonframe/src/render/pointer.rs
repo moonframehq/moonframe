@@ -73,7 +73,7 @@ pub(super) fn attach(
         let (bounds, sender) = (bounds.clone(), sender.clone());
         element = element.on_drop(move |paths: &ExternalPaths, window, cx| {
             let at = travel(bounds.get(), window.mouse_position(), point(px(0.), px(0.)));
-            crate::render::images::grant(paths.paths());
+            crate::render::images::grant(&sender.owner, paths.paths());
             if let Some(msg) = pointer.drop_message(paths.paths(), &at) {
                 sender.send(msg, window, cx);
             }

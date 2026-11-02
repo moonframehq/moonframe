@@ -736,8 +736,9 @@ return mod {
   (`types` keeps those extensions), pick folders, or name a file to save
   (`name` and `folder` suggest one). The answer comes back to the mod's
   `update` as `reply` with `paths` (a list; `path` for a save) or
-  `cancelled = true` added. What the user picks, they chose to show, so
-  `ui.image` may show it from then on (folders: what is in them).
+  `cancelled = true` added. What the user picks, they chose to show that
+  mod, so its `ui.image` (and its components') may show it from then on
+  (folders: what is in them); other mods may not.
 
 ```lua
 update = function(state, msg)
@@ -770,8 +771,8 @@ A row or column hears more than clicks:
   `speed`, counted from the value at the press (a scrubbed number).
 - `wheel = <msg>` gets scrolls and trackpad pinches over it (`dx`, `dy`,
   `zoom`, `x`, `y`), and keeps them from scrolling what is around it.
-- `drop = <msg>` gets files dropped from other apps (`paths`); `ui.image`
-  may show them from then on.
+- `drop = <msg>` gets files dropped from other apps (`paths`); the mod's
+  `ui.image` may show them from then on.
 - `cursor = "crosshair"` (`grab`, `grabbing`, `ew-resize`, `move`, ...).
 - `area = { left, top, width, height }` places any row, column or panel at
   fractions of its parent: handles, markers, a crop frame. In a

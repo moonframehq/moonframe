@@ -270,7 +270,7 @@ type StackProps = {
 	-- `WheelMsg`'s fields; what is around it does not scroll.
 	wheel: Data,
 	-- Sent when files are dropped on it from another app, with `paths`
-	-- (and `x`, `y`). Dropped pictures may then show in `ui.image`.
+	-- (and `x`, `y`). Dropped pictures may then show in this mod's `ui.image`.
 	drop: Data,
 	cursor: Cursor?,
 	[number]: Child,
@@ -1437,7 +1437,8 @@ type NotificationClick = {
 -- What `{ to = "app:pick", msg = ... }` opens: the system's panel to open
 -- files, pick folders, or name a file to save. The answer comes back to
 -- the mod as `reply` with `paths` (a list; `path` for a save) or
--- `cancelled = true` added. What the user picks may show in `ui.image`.
+-- `cancelled = true` added. What the user picks may show in that mod's
+-- `ui.image` (and its components').
 type PickMsg = {
 	kind: ("open" | "folder" | "save")?,
 	reply: Data,
