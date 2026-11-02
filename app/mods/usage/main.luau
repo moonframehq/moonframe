@@ -1,11 +1,13 @@
 -- Plan usage in the status bar, and a sheet with the details when it is
 -- clicked: each AI service signed in here (Claude, Codex, Copilot, ...),
--- from the `usage` provider (`app.usage`). Nothing shows until one has
--- numbers.
+-- from the `usage` provider (`app.usage`). Configured services and host
+-- errors stay reachable even before there are numbers.
 
 local usage_bar = use "usage-bar"
 
 local SHEET_WIDTH = 340
+-- Leave room for the status bar and popover padding in a 400px window.
+local SHEET_MAX_HEIGHT = 300
 -- The sheet's padding on each side, from the `popover` rule in style.luau.
 local SHEET_PADDING = 16
 local INNER = SHEET_WIDTH - 2 * SHEET_PADDING
@@ -59,7 +61,13 @@ local function widget(provider: any)
 		end
 		parts[index] = window.label
 	end
-	local label = if #parts > 0 then table.concat(parts, " · ") else "Allow access"
+	local balance = provider.balances[1]
+	local label = if #parts > 0
+		then table.concat(parts, " · ")
+		elseif balance then `{balance.label}: {balance.text}`
+		elseif provider.access then "Allow access"
+		elseif provider.error then "Unavailable"
+		else "No usage yet"
 	return ui.row {
 		class = "usage-widget",
 		align = "center",
@@ -168,7 +176,7 @@ local function body(provider: any)
 			rows[index] = ui.column {
 				gap = "small",
 				pair(balance.label, balance.text),
-				balance.left and bar(balance.left, INNER),
+				balance.fraction and bar(balance.fraction, INNER),
 			}
 		end
 		add(ui.column { gap = "small", table.unpack(rows) })
@@ -199,7 +207,7 @@ local function sheet(usage: any, provider: any)
 	local tabs = {}
 	for index, entry in usage.providers do
 		tabs[index] = ui.column {
-			class = if entry.id == provider.id then "usage-tab usage-tab-active" else "usage-tab",
+			class = if provider and entry.id == provider.id then "usage-tab usage-tab-active" else "usage-tab",
 			grow = true,
 			align = "center",
 			gap = "none",
@@ -208,25 +216,33 @@ local function sheet(usage: any, provider: any)
 			ui.text { entry.name, class = "usage-tab-label" },
 		}
 	end
+	local blocks = if provider then body(provider) else {}
 	return ui.column {
-		gap = "normal",
-		ui.row {
-			align = "center",
-			ui.text { provider.name, class = "sheet-title" },
-			ui.spacer(),
-			provider.email and ui.text { provider.email, class = "muted" },
+		max_height = SHEET_MAX_HEIGHT,
+		scroll = "y",
+		ui.column {
+			-- Preserve the content's height so long reports scroll, not squeeze.
+			shrink = false,
+			gap = "normal",
+			ui.row {
+				align = "center",
+				ui.text { if provider then provider.name else "Usage", class = "sheet-title" },
+				ui.spacer(),
+				provider and provider.email and ui.text { provider.email, class = "muted" },
+			},
+			ui.row {
+				class = "sheet-subtitle",
+				ui.text { `{updated(usage)} · {usage.host or "local"}`, class = "muted" },
+				ui.spacer(),
+				provider and provider.plan and ui.text { provider.plan, class = "muted" },
+			},
+			ui.divider(),
+			usage.error and ui.text { usage.error, tone = "warning" },
+			ui.column { gap = "normal", table.unpack(blocks) },
+			ui.divider(),
+			ui.item { "↻   Refresh", to = "provider:usage", msg = "refresh" },
+			#tabs > 1 and ui.row { class = "usage-tabs", gap = "small", wrap = true, table.unpack(tabs) },
 		},
-		ui.row {
-			class = "sheet-subtitle",
-			ui.text { `{updated(usage)} · {usage.host or "local"}`, class = "muted" },
-			ui.spacer(),
-			provider.plan and ui.text { provider.plan, class = "muted" },
-		},
-		ui.divider(),
-		ui.column { gap = "normal", table.unpack(body(provider)) },
-		ui.divider(),
-		ui.item { "↻   Refresh", to = "provider:usage", msg = "refresh" },
-		#tabs > 1 and ui.row { class = "usage-tabs", gap = "small", table.unpack(tabs) },
 	}
 end
 
@@ -244,6 +260,8 @@ return mod {
 			state.tab = msg.open
 		elseif type(msg) == "table" and msg.tab then
 			state.tab = msg.tab
+		elseif msg == "open" then
+			state.open = not state.open
 		elseif msg == "close" then
 			state.open = false
 		end
@@ -251,7 +269,7 @@ return mod {
 
 	view = function(state: State, app)
 		local usage = app.usage
-		if usage == nil or #usage.headline == 0 then
+		if usage == nil or (#usage.providers == 0 and not usage.error) then
 			return ui.row {}
 		end
 		local widgets = {}
@@ -261,14 +279,22 @@ return mod {
 				table.insert(widgets, widget(provider))
 			end
 		end
-		local shown = find(usage, state.tab) or find(usage, usage.headline[1])
+		local shown = find(usage, state.tab) or find(usage, usage.headline[1]) or usage.providers[1]
+		if #widgets == 0 then
+			table.insert(widgets, if shown then widget(shown) else ui.row {
+				class = "usage-widget",
+				msg = "open",
+				tooltip = usage.error,
+				ui.text { "Usage unavailable", class = "status-text" },
+			})
+		end
 		return ui.popover {
-			open = state.open and shown ~= nil,
+			open = state.open,
 			dismiss = "close",
 			side = "top",
 			align = "start",
 			width = SHEET_WIDTH,
-			content = shown and sheet(usage, shown),
+			content = sheet(usage, shown),
 			ui.row { gap = "large", align = "center", table.unpack(widgets) },
 		}
 	end,

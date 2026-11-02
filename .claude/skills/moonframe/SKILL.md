@@ -1754,7 +1754,7 @@ variables. `mods/usage` is the whole example.
 | top | `{ available, host, busy, updated?, age?, error?, providers, headline }` |
 | provider | `{ id, name, icon? (bundled logo name), dashboard?, status_page?, email?, plan?, error?, stale, access? ("needed" "denied"), used?, severity?, windows, balances, sections, daily?, accounts? }` |
 | window | `{ title, kind ("session" "daily" "weekly" "monthly" "named"), used, left, severity ("normal" "warning" "critical"), label ("3% used 2h 53m"), resets_at?, resets_in?, pace?, pace_note? }` |
-| balance | `{ label, amount, total?, unit, currency, text ("$5.00 of $20.00"), left? }` |
+| balance | `{ label, amount, total?, unit, currency, text ("$5.00 of $20.00"), fraction? }`; `fraction` is `amount / total` clamped to 0–1 when `total > 0`, spent or remaining as the label says |
 | section | `{ kind = "limit", window }`, `{ kind = "facts", title, facts = { { label, value } } }` or `{ kind = "shares", title, shares = { { label, share } } }` |
 | `daily`, `accounts` | OpenAI's spend per day `{ day, amount }`; Claude's other cswap accounts `{ name, email, disabled, stale, note?, windows }` |
 

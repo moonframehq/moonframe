@@ -1322,8 +1322,9 @@ type UsageBalance = {
 	currency: boolean,
 	-- "$12.30", "$5.00 of $20.00", "1,250 credits".
 	text: string,
-	-- Fraction of `total` left, when there is a total.
-	left: number?,
+	-- amount / total, clamped to 0..1, when total > 0. The label says
+	-- whether the amount is spent or remaining; this is not always credit left.
+	fraction: number?,
 }
 
 type UsageSection =

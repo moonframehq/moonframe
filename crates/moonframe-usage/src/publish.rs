@@ -156,7 +156,9 @@ fn balance(balance: &Balance) -> Value {
         Unit::Currency(code) => (code.as_str(), true),
         Unit::Count(name) => (name.as_str(), false),
     };
-    let left = balance
+    // Upstream amounts can be spent OR remaining; preserve their label's
+    // meaning rather than claiming that every ratio is credit left.
+    let fraction = balance
         .total
         .filter(|total| *total > 0.)
         .map(|total| (balance.amount / total).clamp(0., 1.));
@@ -167,7 +169,7 @@ fn balance(balance: &Balance) -> Value {
         "unit": unit,
         "currency": currency,
         "text": balance.text(),
-        "left": left,
+        "fraction": fraction,
     })
 }
 

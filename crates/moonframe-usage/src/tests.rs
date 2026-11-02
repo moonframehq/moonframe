@@ -1,5 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+mod ui;
+
 use {
     super::*,
     herdr_usage::{
@@ -144,9 +146,36 @@ fn a_reading_publishes_its_tightest_window_and_details() {
     // Sorted session first, as herdr shows them.
     assert_eq!(claude["windows"][0]["kind"], "session");
     assert_eq!(claude["balances"][0]["text"], "$5.00 of $20.00");
-    assert_eq!(claude["balances"][0]["left"], 0.25);
+    assert_eq!(claude["balances"][0]["fraction"], 0.25);
     assert_eq!(claude["sections"][0]["kind"], "shares");
     assert_eq!(claude["sections"][0]["shares"][0]["share"], 0.75);
+}
+
+#[test]
+fn balance_fractions_keep_spending_and_credit_labels_without_claiming_left() {
+    let provider = registry::find("deepinfra").unwrap();
+    let usd = Unit::Currency("USD".into());
+    let report = Report::new(provider, Account::default(), vec![]).with_balances([
+        Balance::new("Billing cycle spend", 12., usd.clone()).out_of(50.),
+        Balance::new("Credits left", 38., usd.clone()).out_of(50.),
+        Balance::new("Uncapped", 12., usd.clone()),
+        Balance::new("Zero budget", 12., usd).out_of(0.),
+    ]);
+    let usage = Usage::showing(Host::Local, vec![Reading {
+        provider,
+        report: Some(report),
+        error: None,
+        access: None,
+    }]);
+    let out = publish::usage(&usage, &UsageConfig::default(), Some(&Host::Local));
+    let balances = out["providers"][0]["balances"].as_array().unwrap();
+    assert_eq!(balances[0]["label"], "Billing cycle spend");
+    assert_eq!(balances[0]["fraction"], 0.24);
+    assert_eq!(balances[1]["label"], "Credits left");
+    assert_eq!(balances[1]["fraction"], 0.76);
+    assert!(balances[2]["fraction"].is_null());
+    assert!(balances[3]["fraction"].is_null());
+    assert!(balances.iter().all(|balance| balance.get("left").is_none()));
 }
 
 #[test]
