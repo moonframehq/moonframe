@@ -45,6 +45,10 @@ impl Project {
     /// Starts following; the providers hear each move through the app.
     /// `kept` is the file projects are kept in, if any.
     pub(crate) fn start(kept: Option<PathBuf>, cx: &mut Context<MoonframeApp>) -> Self {
+        // Remembered before any provider is asked to read: a tab restored
+        // from an earlier launch may name one at once. The docs provider
+        // checks one is still a repository's top folder before using it.
+        moonframe_providers::remember_projects(kept.as_deref().map(read_kept).unwrap_or_default());
         let followed = Arc::new(Mutex::new(None));
         let (poke, poked) = mpsc::channel();
         let (moved, mut moves) = futures::channel::mpsc::unbounded::<()>();
@@ -64,15 +68,6 @@ impl Project {
         let spawned = thread::Builder::new()
             .name("project".into())
             .spawn(move || {
-                // Each one kept is checked again, off the window's thread:
-                // only a folder that is still a repository's top (and not
-                // home) is remembered, whatever the file says.
-                let projects = kept.as_deref().map(read_kept).unwrap_or_default();
-                moonframe_providers::remember_projects(
-                    projects
-                        .into_iter()
-                        .filter(|project| repository(project).as_ref() == Some(project)),
-                );
                 let mut last: Option<PathBuf> = None;
                 loop {
                     match poked.recv_timeout(LOOK_EVERY) {

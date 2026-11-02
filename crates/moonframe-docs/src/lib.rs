@@ -183,30 +183,41 @@ impl Docs {
     /// The root of `from`'s file `path`: the one the message names, else
     /// the one it was read from (a file read before the project moved
     /// stays where it was), else the current one.
-    fn root_for(&self, from: &str, path: &str, asked: Option<&str>) -> Result<PathBuf, Refusal> {
+    fn root_for(
+        &mut self,
+        from: &str,
+        path: &str,
+        asked: Option<&str>,
+    ) -> Result<PathBuf, Refusal> {
         match (asked, self.open.get(&(from.to_owned(), path.to_owned()))) {
             (None, Some(watch)) => Ok(watch.root.clone()),
             (asked, _) => self.chosen(asked),
         }
     }
 
-    /// The root a message names (one this provider has had), else the
-    /// current one.
-    fn chosen(&self, asked: Option<&str>) -> Result<PathBuf, Refusal> {
+    /// The root a message names (one this provider has had, or a project
+    /// the app follows or remembers that is still a repository's top
+    /// folder), else the current one.
+    fn chosen(&mut self, asked: Option<&str>) -> Result<PathBuf, Refusal> {
         let Some(asked) = asked else {
             return Ok(self.root.clone().ok_or("no project folder")?);
         };
-        Path::new(asked)
-            .canonicalize()
-            .ok()
-            .filter(|root| {
-                // A folder the user named stays the only one: then no
-                // project is followed, nor a remembered one reached.
-                self.roots.contains(root)
-                    || (std::env::var_os("MOONFRAME_FILES").is_none()
-                        && moonframe_providers::followed(root))
-            })
-            .ok_or_else(|| format!("`{asked}` is not a project this app shows").into())
+        let refused = || format!("`{asked}` is not a project this app shows").into();
+        let root = Path::new(asked).canonicalize().map_err(|_| refused())?;
+        if self.roots.contains(&root) {
+            return Ok(root);
+        }
+        // A folder the user named stays the only one: then no project is
+        // followed, nor a remembered one reached. A remembered one is
+        // checked once, whatever the file it was kept in says.
+        let project = std::env::var_os("MOONFRAME_FILES").is_none()
+            && moonframe_providers::followed(&root)
+            && repository(&root).as_ref() == Some(&root);
+        if !project {
+            return Err(refused());
+        }
+        self.roots.insert(root.clone());
+        Ok(root)
     }
 
     /// Shares the root as `app.docs`, or why there is none.

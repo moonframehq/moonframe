@@ -619,4 +619,23 @@ fn a_tab_restored_from_an_earlier_launch_reads_its_remembered_project() {
     moonframe_providers::remember_projects([earlier.clone()]);
     docs.receive(&host, "editor/a", read);
     assert_eq!(string(&sent(&seen)[0].1, "text"), "kept");
+
+    // One remembered that is no repository (any more) is refused, whatever
+    // the history says.
+    let plain = tempfile::tempdir().unwrap();
+    let plain_root = plain.path().canonicalize().unwrap();
+    fs::write(plain_root.join("notes.md"), "plain").unwrap();
+    moonframe_providers::remember_projects([plain_root.clone()]);
+    docs.receive(
+        &host,
+        "editor/b",
+        message(&[
+            ("read", "notes.md".into()),
+            (
+                "root",
+                Data::String(plain_root.to_string_lossy().into_owned()),
+            ),
+        ]),
+    );
+    assert_eq!(sent(&seen)[0].1.get("ok"), Some(&Data::Bool(false)));
 }
