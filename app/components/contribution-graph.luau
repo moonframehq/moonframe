@@ -226,9 +226,10 @@ contribution_graph {
 			local cells = {}
 			for row = 1, 7 do
 				local index = (week - 1) * 7 + row - lead
-				if index < 1 then
+				-- Keep every week seven rows tall, including a short range.
+				if index < 1 or index > count then
 					table.insert(cells, ui.row { width = size, height = size, shrink = false })
-				elseif index <= count then
+				else
 					local z = first + index - 1
 					local n = props.days[index]
 					local date = iso(z)
@@ -294,6 +295,7 @@ contribution_graph {
 		local grid = ui.column {
 			gap = "none",
 			hug = true,
+			shrink = false,
 			props.months ~= false and ui.row { gap = "none", style = { margin = { bottom = 4 } }, table.unpack(labels) },
 			ui.row { style = { gap = gap }, table.unpack(columns) },
 		}
