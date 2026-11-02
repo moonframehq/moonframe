@@ -223,7 +223,11 @@ impl MoonframeApp {
         cx.set_menus(menus(workspace.components(), workspace.menus()));
         menu_actions(cx);
         let terminals = Terminals::new(backends, wake_on_output(cx));
-        let project = crate::project::Project::start(folders.profile.as_deref(), cx);
+        // Projects are kept only with the user's folder: `--no-user` runs
+        // start fresh and keep nothing, as their state.
+        let kept =
+            (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
+        let project = crate::project::Project::start(kept, cx);
         flush_on_quit(cx);
         let settings = folders.settings().into_iter().next();
         let saved = |key| {
