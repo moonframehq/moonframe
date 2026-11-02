@@ -83,6 +83,7 @@ impl<'w> Draw<'w> for Terminal {
             return problem(format!("terminal `{}`: {error}", self.id), cx);
         }
         painter.terminals.drawn(&key, &view);
+        view.on_exit(self.exit.as_ref());
         let focus = view.focus.clone();
         let scroll_view = view.clone();
         let hint = hint(view.backend, theme.muted_foreground);
@@ -159,12 +160,12 @@ fn grid(
             }
             painting.cursor(&screen, focused, window);
             if screen.exited {
-                painting.note(
-                    "[the shell exited; press Enter to start another]",
-                    &screen,
-                    window,
-                    cx,
-                );
+                let note = if view.exit_handled() {
+                    "[the shell exited]"
+                } else {
+                    "[the shell exited; press Enter to start another]"
+                };
+                painting.note(note, &screen, window, cx);
             }
         },
     )

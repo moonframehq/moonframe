@@ -7,10 +7,11 @@
 use {
     crate::{app::MoonframeApp, keys::Taken},
     gpui_kit::*,
+    moonframe_core::Data,
     moonframe_mux::{Backends, Preference},
     moonframe_terminal::{Ansi, Engine, Key, Open, Session, encode, paste},
     std::{
-        cell::Cell,
+        cell::{Cell, RefCell},
         collections::{HashMap, HashSet},
         path::{Path, PathBuf},
         rc::Rc,
@@ -41,6 +42,26 @@ pub(crate) struct TerminalView {
     spawn: Spawn,
     /// Scrolling not yet worth a whole line.
     pub(crate) scrolled: Cell<f32>,
+    /// What its element sends its mod as the shell exits, as last drawn.
+    exit: RefCell<Option<Data>>,
+    /// That message went out: the mod handles the exit, so the terminal
+    /// goes once it is no longer drawn.
+    told: Cell<bool>,
+}
+
+impl TerminalView {
+    /// Keeps what the element asks to be sent as the shell exits.
+    pub(crate) fn on_exit(&self, msg: Option<&Data>) {
+        if self.exit.borrow().as_ref() != msg {
+            *self.exit.borrow_mut() = msg.cloned();
+        }
+    }
+
+    /// The mod sends itself a message as the shell exits, so Enter does
+    /// not start another here.
+    pub(crate) fn exit_handled(&self) -> bool {
+        self.exit.borrow().is_some()
+    }
 }
 
 /// A command line waiting for the terminal of a tab `moonframe pane new`
@@ -215,6 +236,8 @@ impl Terminals {
             focus: cx.focus_handle(),
             spawn,
             scrolled: Cell::new(0.),
+            exit: RefCell::new(None),
+            told: Cell::new(false),
         });
         if let Err(problem) = &view.session
             && (!refused || self.refused.insert(key.to_owned()))
@@ -258,6 +281,33 @@ impl Terminals {
         self.appeared.take()
     }
 
+    /// The exit messages of shells that just exited, as `(mod, message)`
+    /// with `exited = true` added, each sent once. A told one that the main window no longer draws (its
+    /// tab closed) goes, so it holds no slot; drawn again, it starts anew.
+    pub(crate) fn take_exits(&mut self) -> Vec<(String, Data)> {
+        let mut exits = Vec::new();
+        for (key, view) in &self.views {
+            let Ok(session) = &view.session else {
+                continue;
+            };
+            if view.told.get() || !session.exited() {
+                continue;
+            }
+            if let Some(msg) = view.exit.borrow().clone() {
+                view.told.set(true);
+                let owner = key
+                    .rsplit_once('/')
+                    .map_or(key.as_str(), |(owner, _)| owner);
+                let msg = crate::browser::with(&msg, [("exited", Data::Bool(true))]);
+                exits.push((owner.to_owned(), msg));
+            }
+        }
+        let drawn = &self.drawn;
+        self.views
+            .retain(|key, view| !view.told.get() || drawn.contains(key));
+        exits
+    }
+
     /// Starts the shell at `key` again, after it exited.
     fn restart(&mut self, key: &str) {
         if let Some(old) = self.views.get(key) {
@@ -268,6 +318,8 @@ impl Terminals {
                 focus: old.focus.clone(),
                 spawn: old.spawn.clone(),
                 scrolled: Cell::new(0.),
+                exit: RefCell::new(old.exit.borrow().clone()),
+                told: Cell::new(false),
             });
             self.views.insert(key.to_owned(), view);
         }
@@ -318,7 +370,7 @@ impl MoonframeApp {
             return false;
         }
         if screen.exited {
-            if keystroke.key == "enter" {
+            if keystroke.key == "enter" && !view.exit_handled() {
                 self.terminals.restart(&key);
                 cx.notify();
             }

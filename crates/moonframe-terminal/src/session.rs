@@ -107,6 +107,11 @@ impl Session {
             .unwrap_or_default()
     }
 
+    /// Whether the shell has exited, without copying the screen.
+    pub fn exited(&self) -> bool {
+        self.screen.lock().is_ok_and(|screen| screen.exited)
+    }
+
     /// Sends what the user typed or pasted to the program.
     pub fn write(&self, bytes: &[u8]) {
         self.pane.write(bytes);

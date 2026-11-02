@@ -10,6 +10,8 @@ type Props = {
 	-- What keeps it running: "auto" (herdr-core, else tmux, else a pty),
 	-- "herdr-core", "tmux" or "pty".
 	backend: string?,
+	-- Sent once as the shell exits (Ctrl-D), with `exited = true` added.
+	exit: any,
 	style: any,
 }
 
@@ -18,13 +20,15 @@ return component {
 	category = "Terminals",
 	icon = "square-terminal",
 	-- Offered by tab bars' + menu; a new tab starts in the home folder.
-	tab = { title = "Ghostty terminal", icon = "square-terminal", props = {} },
+	-- The tab passes `exit`, so Ctrl-D in the shell closes it.
+	tab = { title = "Ghostty terminal", icon = "square-terminal", props = {}, report = "exit" },
 	description = "A live shell on libghostty-vt, Ghostty's own emulator. It keeps running across reloads and while hidden.",
 	when = "A shell drawn by Ghostty's emulator; same as `terminal` with the other engine.",
 	props = {
 		["id"] = "keeps the shell across reloads; one per id",
 		["cwd"] = "starting folder",
 		["backend"] = "`auto` (default), `herdr-core`, `tmux` or `pty`",
+		["exit"] = "message sent once as the shell exits, with `exited = true` added; without it Enter starts another shell",
 		["style"] = "style table for the box",
 	},
 	example = { id = "shell", cwd = "~" },
@@ -34,6 +38,7 @@ return component {
 			id = props.id or "shell",
 			cwd = props.cwd,
 			backend = props.backend :: any,
+			exit = props.exit,
 			engine = "ghostty",
 			style = props.style,
 		}

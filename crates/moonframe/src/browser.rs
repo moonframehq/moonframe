@@ -328,7 +328,7 @@ impl Page {
 
 /// `msg` with `fields` added: into it when it is a table with string keys,
 /// else as `{ msg = msg, ... }`.
-fn with<const N: usize>(msg: &Data, fields: [(&str, Data); N]) -> Data {
+pub(crate) fn with<const N: usize>(msg: &Data, fields: [(&str, Data); N]) -> Data {
     let mut map = match msg {
         Data::Map(map) => map.clone(),
         other => BTreeMap::from([("msg".to_owned(), other.clone())]),
