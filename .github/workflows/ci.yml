@@ -41,7 +41,10 @@ jobs:
   # code that run checks out.
   #
   # `build` lists what cannot affect the lints, tests or app checks, rather
-  # than what can: a path nobody thought of runs everything.
+  # than what can: a path nobody thought of runs everything. The website
+  # (and netlify.toml, which only Netlify reads) sets `site` instead, so its
+  # scripts and TOML get the repository-wide checks on one small runner
+  # rather than every platform's build.
   changes:
     name: Changes
     runs-on: ubuntu-24.04
@@ -52,6 +55,7 @@ jobs:
     outputs:
       workflows: ${{ steps.classify.outputs.workflows }}
       build: ${{ steps.classify.outputs.build }}
+      site: ${{ steps.classify.outputs.site }}
     steps:
       - id: classify
         env:
@@ -64,7 +68,7 @@ jobs:
           set -euo pipefail
           all() {
             echo "$1: running every job"
-            printf 'workflows=true\nbuild=true\n' >> "$GITHUB_OUTPUT"
+            printf 'workflows=true\nbuild=true\nsite=true\n' >> "$GITHUB_OUTPUT"
             exit 0
           }
           case $EVENT in
@@ -90,17 +94,21 @@ jobs:
           echo "$files"
           workflows=false
           build=false
+          site=false
           while IFS= read -r file; do
             [[ -n $file ]] || continue
             [[ $file != .github/* ]] || workflows=true
             case $file in
-              # TOML anywhere is formatted by the lint job (taplo).
+              # Built by nothing here, wherever its scripts or TOML are: the
+              # site job checks their size, sort markers and formatting.
+              website/* | netlify.toml) site=true ;;
+              # TOML anywhere else is formatted by the lint job (taplo).
               *.toml) build=true ;;
               # The checks job holds the file size limit, which covers these
               # wherever they are, the paths skipped below included.
               *.rs | *.py | *.sh | *.swift | *.luau) build=true ;;
               # Read by nothing that is built, linted or checked here.
-              website/* | homebrew/* | LICENSE | README.md | AGENTS.md | CLAUDE.md) ;;
+              homebrew/* | LICENSE | README.md | AGENTS.md | CLAUDE.md) ;;
               docs/*.md | docs/hero/*) ;;
               # Packaging: package.yml checks these.
               scripts/release/* | assets/macos/*) ;;
@@ -109,7 +117,7 @@ jobs:
               *) build=true ;;
             esac
           done <<<"$files"
-          printf 'workflows=%s\nbuild=%s\n' "$workflows" "$build" | tee -a "$GITHUB_OUTPUT"
+          printf 'workflows=%s\nbuild=%s\nsite=%s\n' "$workflows" "$build" "$site" | tee -a "$GITHUB_OUTPUT"
 
   # Audits the workflows themselves: template injection, over-broad
   # permissions, unpinned actions, persisted credentials, cache poisoning.
@@ -238,11 +246,41 @@ jobs:
           # --strip-trailing-cr: Git for Windows checks the skill out with CRLF.
           diff -u --strip-trailing-cr .claude/skills/moonframe-components/SKILL.md target/components.md
 
+  # The repository-wide checks a website change can break, without building
+  # anything. When `build` is set, lint and checks run these already.
+  site:
+    name: Site checks
+    needs: [changes, zizmor]
+    if: >-
+      !cancelled() && needs.changes.outputs.site == 'true' &&
+      needs.changes.outputs.build != 'true' &&
+      (needs.zizmor.result == 'success' || needs.zizmor.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2.88.1
+        with:
+          tool: taplo@0.10.0
+          fallback: none
+      - name: Check the file size limit
+        run: scripts/check-file-size.sh
+      - name: Check the keep-sorted regions
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_check_sorted.py
+          python3 scripts/check-sorted.py
+      - name: Check TOML formatting
+        run: taplo fmt --check
+
   # One stable context for branch protection: every job above passed, or
   # was skipped because Changes found nothing for it to check.
   ci-passed:
     name: CI passed
-    needs: [changes, zizmor, lint, checks]
+    needs: [changes, zizmor, lint, checks, site]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
