@@ -14,9 +14,11 @@
 //! file the download is checked against. With **Beta Releases** on, the
 //! newest pre-release counts too.
 
+// keep-sorted start
 mod beta;
 mod install;
 mod release;
+// keep-sorted end
 
 pub use {
     beta::{beta, load as load_beta, set_beta},
