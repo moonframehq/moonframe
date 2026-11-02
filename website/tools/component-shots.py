@@ -6,7 +6,8 @@ Components window on its preview alone (scripts/component-shot.sh with
 --preview-only; macOS, needs Screen Recording permission, and Accessibility
 to make the window tall), trims the capture to what the preview draws, and
 writes website/site/img/components/<name>.webp at 2x. Run from the repo root,
-after `python3 website/tools/components-data.py`:
+after `python3 website/tools/components-data.py` (it runs that again at the
+end, so data/components.js records each picture's size):
 
     uv run --with pillow website/tools/component-shots.py [NAME ...]
 
@@ -73,6 +74,8 @@ def main():
         except Exception as error:  # noqa: BLE001 - report and go on with the rest
             failed.append(name)
             print(name, "failed:", error, file=sys.stderr)
+    # Record the new pictures' sizes, so the page keeps their room while they load.
+    subprocess.run([sys.executable, "website/tools/components-data.py"], cwd=ROOT, check=True)
     if failed:
         sys.exit("failed: " + " ".join(failed))
 
