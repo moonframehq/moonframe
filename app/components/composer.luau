@@ -12,6 +12,7 @@ type Props = {
 	submit: any,
 	attach: any,
 	send: any,
+	actions: { any }?,
 	to: string?,
 	focus: boolean?,
 }
@@ -31,6 +32,7 @@ return component {
 		["change"] = "sent on each edit, with `value` set to the text",
 		["submit"] = "sent on Enter and by the send button, with `value`",
 		["attach"] = "message the attach button sends; no button without it",
+		["actions"] = "elements between the field and the send button (an AI draft button)",
 		["send"] = "message the round button sends; a click cannot read the field, so the mod keeps the text from `change`",
 		["to"] = "mod to send them to, if not the drawing one",
 		["focus"] = "take focus when it appears",
@@ -47,6 +49,38 @@ return component {
 
 	build = function(props: Props)
 		local submit = props.submit
+		-- The line: attach, the field, the mod's actions, then send.
+		local line: { any } = {}
+		if props.attach ~= nil then
+			table.insert(line, ui.button { icon = "link", variant = "ghost", small = true, msg = props.attach, to = props.to })
+		end
+		table.insert(line, ui.input {
+			id = props.id or "composer",
+			value = props.value,
+			placeholder = props.placeholder or "Write a message…",
+			change = props.change,
+			submit = submit,
+			to = props.to,
+			focus = props.focus,
+			grow = true,
+			class = "composer-field",
+		})
+		local actions: { any } = props.actions or {}
+		for _, action in actions do
+			table.insert(line, action)
+		end
+		table.insert(line, ui.row {
+			class = "composer-send",
+			width = 28,
+			height = 28,
+			align = "center",
+			justify = "center",
+			shrink = false,
+			tooltip = "Send (Enter)",
+			msg = props.send,
+			to = props.to,
+			ui.icon { name = "arrow-up", size = "small" },
+		})
 		return ui.column {
 			class = "composer",
 			props.agent and ui.row {
@@ -59,30 +93,7 @@ return component {
 			ui.row {
 				align = "center",
 				gap = "small",
-				props.attach ~= nil and ui.button { icon = "link", variant = "ghost", small = true, msg = props.attach, to = props.to },
-				ui.input {
-					id = props.id or "composer",
-					value = props.value,
-					placeholder = props.placeholder or "Write a message…",
-					change = props.change,
-					submit = submit,
-					to = props.to,
-					focus = props.focus,
-					grow = true,
-					class = "composer-field",
-				},
-				ui.row {
-					class = "composer-send",
-					width = 28,
-					height = 28,
-					align = "center",
-					justify = "center",
-					shrink = false,
-					tooltip = "Send (Enter)",
-					msg = props.send,
-					to = props.to,
-					ui.icon { name = "arrow-up", size = "small" },
-				},
+				table.unpack(line),
 			},
 		}
 	end,

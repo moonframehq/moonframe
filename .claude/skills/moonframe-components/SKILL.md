@@ -181,6 +181,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`kpi-cell`](#kpi-cell) | Data | A row of three to five headline figures across the top of a dashboard (readers, signups, churn), set side by side in a bordered strip. For a figure inside a card's text use `metric`; for a standalone tile with a sparkline use `stat-tile`. |
 | [`kpi-meter`](#kpi-meter) | Data | A strip of headline figures where each one is a part of a whole (on time / late, fixed / open, one segment per notice). For a figure with a change pill use `kpi-cell`; for one fraction use `meter`; for a whole split into labelled parts in a card use `share-bar`. |
 | [`line-chart`](#line-chart) | Data | A measure over days or weeks compared with a forecast or a target (actual against predicted, this year against last), where the user picks a day to read its figures. For several readings on one scale with a legend and a crosshair use `series-chart`; for bars against a floor use `forecast-chart`; for stacked counts use `bar-chart`; for a bare trend use `ui.line` or `sparkline`. |
+| [`message-header`](#message-header) | Data | Above the body of an email or a thread's message in a reading pane. For a row in the message list use `mail-row`; for a comment in a review use `comment-card`; for a chat turn use `chat-message`. |
 | [`meter`](#meter) | Data | A fraction (0 to 1) as a bar with its percentage: memory, quota, progress of a known size. For work with no known size use `progress` with `busy`. |
 | [`metric`](#metric) | Data | Headline figures across the top of a dashboard card: cash today, the lowest week, a total. For a figure in its own tile with a trend use `stat-tile`; for a status bar reading use `stat`; for a fraction use `meter`. |
 | [`mini-bars`](#mini-bars) | Data | A figure over a few periods in a KPI strip or a card header (revenue by month, signups by week). For a live trend in a status bar use `sparkline`; for a full chart with an axis use `bar-chart` or `forecast-chart`. |
@@ -223,12 +224,14 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`choice-cards`](#choice-cards) | Forms | Pick one of several options that are best seen: a theme, a layout, a template, an agent. For short text options use `segmented` or `radio-group`; for a colour use `swatches`; for a menu use `dropdown`. |
 | [`composer`](#composer) | Forms | The bottom of a chat with an agent or a person. For a search box use `search-field`; for a longer form field use `ui.input` with `multiline`. |
 | [`radio-group`](#radio-group) | Forms | Pick one of a few options that need a description or room to read (a mode, a policy). For 2 to 4 short values use `segmented`; for many values use `dropdown`; for options with a picture use `choice-cards`; for independent on/off options use `checkbox`. |
+| [`recipient-field`](#recipient-field) | Forms | The To, Cc and Bcc lines of a message being written, or inviting people by address. For tags the user only reads use `tags`; for filters use `chips`; for a single free-text value use `ui.input`; for a search box use `search-field`. |
 | [`search-field`](#search-field) | Forms | A query box over a list or palette: filter files, branches or commands as the user types, with up and down to move through results. For a longer value use `ui.input` (multiline for a text area); for one-of-many choices use `segmented` or `dropdown`. |
 | [`settings-row`](#settings-row) | Forms | Each line of a settings page or preferences card, holding a `switch`, `segmented`, `dropdown` or button. Group rows under `settings-page` sections; for read-only properties use `key-values`; for a labelled switch on its own use `switch` with `label`. |
 | [`stepper`](#stepper) | Forms | A small number nudged up or down: a font size, a column count, a delay. For a fraction shown as a bar use `meter`; for one of a few named sizes use `segmented`. |
 | [`swatches`](#swatches) | Forms | Pick a colour from a short palette: a workspace or tag colour, an accent. For themes (many colours each) use `choice-cards` with a swatch row as the preview; to show colours without picking, use `ui.row`s with a background. |
 | [`switch`](#switch) | Forms | A setting that takes effect at once, on or off ("High contrast"). For a choice that is confirmed later or part of a list of options use `checkbox`; for one of several values use `segmented` or `radio-group`. |
 | [`task-check`](#task-check) | Forms | The check at the start of a task or to-do row; a click sends `msg` for the mod to flip it. For a form option use `checkbox`; for an agent's state use `status-dot`. |
+| [`time-picker`](#time-picker) | Forms | Choosing when: Send Later, Snooze or a reminder's "Choose a Time…", beside a `month-grid` for the day. For a list of preset moments alone use `menu` or `dropdown`; for a number that is not a time use `stepper`; for a day use `month-grid` or `day-strip`. |
 | [`ahead-behind`](#ahead-behind) | Git | A branch's sync state beside its name: sidebars, title bars, branch lists. For lines changed use `diff-counts`. |
 | [`change-tree`](#change-tree) | Git | The changed files of a repository or a review, as the right pane's Changes shows `app.git.files`. For every file in a folder use `tree`; for a file's lines use `diff-view`. |
 | [`checks`](#checks) | Git | CI runs or readiness factors for a pull request or branch: a PR detail pane, a merge dialog. For a single summary dot use `pr-badge` or `pr-row` with `checks`; for an agent's state use `status-dot`. |
@@ -247,6 +250,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`kanban-column`](#kanban-column) | Lists | Each stage of a kanban board (deals, tickets, tasks by status); put several in a row that scrolls sideways and fill them with `board-card`. For a list grouped by status without columns use `group-header` over rows. |
 | [`level-row`](#level-row) | Lists | Rows of a breakdown where each part is read on its own scale: leads by status, a funnel's stages, tickets by priority. For parts of one whole with shares use `ratio-row` or `share-bar`; for one fraction with a percentage use `meter`; for a quota use `usage-bar`. |
 | [`list`](#list) | Lists | A plain selectable list of rows with label, detail and badge. For rich rows (status, icons, two lines) use `agent-row`, `workspace-row` or `tree`. |
+| [`mail-row`](#mail-row) | Lists | Each row of an inbox or a mailbox's message list; stack them in a `ui.list` (rows of one height) or a scrolling column, under `segmented` category tabs. For tasks use `task-row`; for pull requests use `pr-row`; for a plain selectable row use `list`; for the open message's header use `message-header`. |
 | [`ratio-row`](#ratio-row) | Lists | Lists of parts of a whole: where signups came from, top countries, devices, tiers. Stack them in a column; give `share` for the bar under each. For a bar of all the parts at once use `share-bar`; for a data grid use `table`. |
 | [`task-row`](#task-row) | Lists | Rows of tasks, to-dos, habits or events in a planner, an inbox or a day view; stack them in a column under `section` headings. For a plain selectable row use `list`; for pull requests use `pr-row`. |
 | [`tree`](#tree) | Lists | Nested rows: a file tree in a review, worktrees under a repository, agents and their sub-agents. For flat rows use `list`; for a heading over a group of rows use `group-header`; for one foldable block use `collapsible`. |
@@ -703,6 +707,8 @@ A whole mod using it, with state: `app/components/demos/copy-field.luau`.
 | `disabled` | greys the button out and ignores clicks |
 | `dismiss` | message sent on a click outside or Escape |
 | `event` | key of the message a pick sends, default "pick": { pick = id } |
+| `expand` | key of the message an item with a submenu sends, default "expand": { expand = id } |
+| `expanded` | id of the item whose submenu shows (an item with `items`), passed to `menu` |
 | `highlighted` | keyboard-highlighted option (id or index), passed to `menu` |
 | `icon` | icon before the text |
 | `keys` | more keys while open, e.g. { up = "prev", down = "next", enter = "choose" }; escape sends `dismiss` |
@@ -712,6 +718,7 @@ A whole mod using it, with state: `app/components/demos/copy-field.luau`.
 | `placeholder` | button text when nothing is selected |
 | `selected` | id of the current option; it gets a check |
 | `side` | "bottom" (default) or "top" |
+| `submenu_highlighted` | keyboard-highlighted row of the open submenu (id or index) |
 | `to` | mod to send messages to, if not the drawing one |
 | `toggle` | message the button sends (open or close) |
 | `trigger_width` | the button's width in pixels, the chevron pushed to its end (default: as wide as its text) |
@@ -823,12 +830,12 @@ A whole mod using it, with state: `app/components/demos/icon-button.luau`.
 | --- | --- |
 | `event` | key of the message a click sends, default "select": { select = id } |
 | `grow` | fill the width, segments sharing it equally |
-| `options` | list of { id, label?, icon?, tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment |
+| `options` | list of { id, label?, icon?, count? (a number or text after the label, in the accent colour), tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment |
 | `selected` | id of the chosen option |
 | `small` | smaller, tighter segments |
 | `to` | mod to send messages to, if not the drawing one |
 
-**Styles:** `.segmented` `.segmented-option` `.segmented-option:hover` `.segmented-option:selected` `.segmented-small`
+**Styles:** `.segmented` `.segmented-count` `.segmented-option` `.segmented-option:hover` `.segmented-option:selected` `.segmented-small`
 
 ```lua
 local segmented = use "segmented"
@@ -868,6 +875,7 @@ A whole mod using it, with state: `app/components/demos/toolbar.luau`.
 | --- | --- |
 | `color` | a colour instead of the one picked from the name |
 | `initial` | letters to show instead of the name's first letter |
+| `letters` | how many initials to take from the name's words: 1 (default) or 2 ("Alex Kim" shows AK) |
 | `name` | the name the initial and colour come from |
 | `shape` | square (rounded, default) \| circle |
 | `size` | small \| normal \| large \| xlarge (18, 24, 32, 44 px) |
@@ -1410,6 +1418,41 @@ line_chart { bars = { 6, 5, 6, 7, 6, 6, 6, 5 }, height = 160, labels = { "21 Oct
 ```
 
 A whole mod using it, with state: `app/components/demos/line-chart.luau`.
+
+#### `message-header`
+
+**Message Header.** An open message's header: the subject large, the sender's avatar, name and a copyable address chip, To and Cc lines, and the date with actions.
+
+**When:** Above the body of an email or a thread's message in a reading pane. For a row in the message list use `mail-row`; for a comment in a review use `comment-card`; for a chat turn use `chat-message`.
+
+| Prop | Meaning |
+| --- | --- |
+| `[children]` | anything under the header, before its line: a follow-up `banner`, a Translate button |
+| `actions` | elements after the date (icon buttons: show images, more) |
+| `avatar` | an image file for the avatar instead of the initials |
+| `cc` | copied to: a name or a list of names |
+| `color` | the avatar's colour instead of the one picked from the name |
+| `date` | when it was sent, as shown ("Oct 16, 2026 at 4:12 PM") |
+| `email` | the sender's address, in a chip that copies it on a click |
+| `from` | the sender's name; the avatar's initials and colour come from it |
+| `recipients` | who it went to: a name, or a list of names ("To: Sam Lee") |
+| `sender` | message a click on the sender's name sends (open the contact) |
+| `subject` | the subject, as the pane's title; none for a later message in a thread |
+| `to` | mod to send `sender` to, if not the drawing one |
+
+**Styles:** `.message-header` `.message-header-date` `.message-header-email` `.message-header-email:hover` `.message-header-from` `.message-header-name` `.message-header-name:hover` `.message-header-subject` `.message-header-to`
+
+```lua
+local message_header = use "message-header"
+local icon_button = use "icon-button"
+
+message_header {
+	subject = m.subject, from = m.from, email = m.email,
+	recipients = m.to, cc = m.cc, date = m.date,
+	actions = { icon_button { icon = "image", tooltip = "Show images", msg = "images", size = "small" } },
+	ui.row { justify = "end", ui.button { "Translate", icon = "sparkles", small = true, variant = "outline", msg = "translate" } },
+}
+```
 
 #### `meter`
 
@@ -2546,6 +2589,7 @@ A whole mod using it, with state: `app/components/demos/choice-cards.luau`.
 
 | Prop | Meaning |
 | --- | --- |
+| `actions` | elements between the field and the send button (an AI draft button) |
 | `agent` | who it goes to, in a chip above the field |
 | `attach` | message the attach button sends; no button without it |
 | `change` | sent on each edit, with `value` set to the text |
@@ -2590,6 +2634,51 @@ radio_group { options = { { description = "Each agent gets its own checkout and 
 
 A whole mod using it, with state: `app/components/demos/radio-group.luau`.
 
+#### `recipient-field`
+
+**Recipient Field.** An address line: a label, recipients as removable chips (red when invalid), a field to type more, and matching contacts in a menu under it.
+
+**When:** The To, Cc and Bcc lines of a message being written, or inviting people by address. For tags the user only reads use `tags`; for filters use `chips`; for a single free-text value use `ui.input`; for a search box use `search-field`.
+
+| Prop | Meaning |
+| --- | --- |
+| `change` | sent on each edit, with `value` set to the text |
+| `dismiss` | message a click outside the suggestions sends (to clear them) |
+| `focus` | take focus when it appears |
+| `highlighted` | index of the keyboard-highlighted suggestion |
+| `id` | keeps the typed text across renders (default "recipients") |
+| `keys` | more keys while typing, such as { up = "up", down = "down", tab = "add", escape = "close" } |
+| `label` | text before the chips ("To", "Cc") |
+| `pick` | key of the message a suggestion sends, default "pick": { pick = email } |
+| `placeholder` | grey text while empty and there are no chips |
+| `recipients` | the chips: addresses, or { name?, email, invalid? } (shown by name, the address under the pointer; `invalid` in the danger colour) |
+| `remove` | key of the message a chip's × sends, default "remove": { remove = index } |
+| `submit` | sent on Enter, with `value`: add the highlighted suggestion or the typed address |
+| `suggestions` | contacts matching the text: { name?, email }; a menu under the field while there are some |
+| `to` | mod to send its messages to, if not the drawing one |
+| `trailing` | elements at the line's right end (Cc and Bcc buttons) |
+| `value` | the typed text; set it to "" after adding a recipient |
+| `width` | the suggestions menu's width in pixels (default 300) |
+
+**Styles:** `.recipient-field` `.recipient-field-chip` `.recipient-field-input` `.recipient-field-invalid` `.recipient-field-label` `.recipient-field-popover` `.recipient-field-remove` `.recipient-field-remove:hover`
+
+```lua
+local recipient_field = use "recipient-field"
+
+recipient_field {
+	label = "To", recipients = state.to, value = state.typed,
+	change = "type", submit = "add", dismiss = "close",
+	keys = { up = "up", down = "down", tab = "add", escape = "close" },
+	suggestions = matches(state.typed), highlighted = state.highlighted,
+	trailing = { ui.button { "Cc", small = true, variant = "ghost", msg = "show-cc" } },
+}
+-- update: msg.msg == "type" keeps msg.value; "add" appends the highlighted
+-- suggestion (or the typed address) and sets state.typed = ""; msg.pick
+-- appends that address; msg.remove drops the recipient at that index.
+```
+
+A whole mod using it, with state: `app/components/demos/recipient-field.luau`.
+
 #### `search-field`
 
 **Search field.** A one-line search box; edits send change with the text as `value`, Esc sends cancel, up and down move through results.
@@ -2601,14 +2690,18 @@ A whole mod using it, with state: `app/components/demos/radio-group.luau`.
 | `cancel` | sent on Esc |
 | `change` | sent on each edit, with `value` set to the text |
 | `focus` | take focus when it appears |
+| `icon` | an icon before the text (`true` for a magnifier); draws the field in a rounded box of its own |
 | `id` | keeps the text across renders |
 | `next` | sent on down |
 | `placeholder` | grey text while empty |
 | `previous` | sent on up |
+| `shortcut` | keys shown as a cap at the end, such as "cmd-k" (it only shows them: the mod binds the key); draws the boxed field |
 | `submit` | sent on Enter |
 | `to` | the mod the messages go to |
 | `value` | the text; applied when it changes, so `""` clears it |
 | `width` | pixels |
+
+**Styles:** `.search-field` `.search-field-icon` `.search-field-input`
 
 ```lua
 local search = use "search-field"
@@ -2754,6 +2847,38 @@ local task_check = use "task-check"
 
 task_check { state = if task.done then "done" else "open", msg = { toggle = task.id } }
 ```
+
+#### `time-picker`
+
+**Time Picker.** A time of day: hour and minutes with up and down arrows, AM and PM, and preset times as chips; sends { time = { hour, minute } }.
+
+**When:** Choosing when: Send Later, Snooze or a reminder's "Choose a Time…", beside a `month-grid` for the day. For a list of preset moments alone use `menu` or `dropdown`; for a number that is not a time use `stepper`; for a day use `month-grid` or `day-strip`.
+
+| Prop | Meaning |
+| --- | --- |
+| `clock` | 12 (default: AM and PM) or 24 |
+| `event` | key of the message every control sends, default "time": { time = { hour, minute } } |
+| `hour` | the hour, 0 to 23 (default 9) |
+| `minute` | the minutes, 0 to 59 (default 0) |
+| `presets` | chips under it: { hour, minute, label? } (the label defaults to the time) |
+| `step` | minutes the minute arrows move by (default 15) |
+| `to` | mod to send it to, if not the drawing one |
+
+**Styles:** `.time-picker` `.time-picker-arrow` `.time-picker-arrow:hover` `.time-picker-colon` `.time-picker-face` `.time-picker-half` `.time-picker-half:hover` `.time-picker-half:selected` `.time-picker-period` `.time-picker-preset` `.time-picker-preset:hover` `.time-picker-preset:selected` `.time-picker-presets` `.time-picker-unit` `.time-picker-value`
+
+```lua
+local time_picker = use "time-picker"
+local month_grid = use "month-grid"
+
+ui.row { gap = "large", align = "start",
+	month_grid { weeks = weeks, selected = state.day },
+	time_picker { hour = state.hour, minute = state.minute, step = 15 },
+}
+-- update: msg.time is the new time: state.hour = msg.time.hour,
+-- state.minute = msg.time.minute.
+```
+
+A whole mod using it, with state: `app/components/demos/time-picker.luau`.
 
 ### Git
 
@@ -3337,6 +3462,53 @@ list { rows = { { badge = "3", detail = "~/code/app", id = "main", label = "main
 ```
 
 A whole mod using it, with state: `app/components/demos/list.luau`.
+
+#### `mail-row`
+
+**Mail Row.** A message in a mailbox: avatar with an unread dot, sender, thread count, star and time, a status pill before the subject, a preview line and the account; the chosen one has an accent bar.
+
+**When:** Each row of an inbox or a mailbox's message list; stack them in a `ui.list` (rows of one height) or a scrolling column, under `segmented` category tabs. For tasks use `task-row`; for pull requests use `pr-row`; for a plain selectable row use `list`; for the open message's header use `message-header`.
+
+| Prop | Meaning |
+| --- | --- |
+| `account` | the account or mailbox it came to, small and muted under the preview |
+| `attachment` | a paperclip before the time |
+| `avatar` | an image file for the avatar instead of the initials |
+| `color` | the avatar's colour instead of the one picked from the name |
+| `context` | message a right-click sends (a `context-menu` of actions) |
+| `count` | messages in the thread, after the sender (hidden under 2) |
+| `from` | the sender's name; the avatar's initials and colour come from it |
+| `msg` | message a click sends (open it) |
+| `preview` | the start of the message, muted, cut to one line |
+| `selected` | the open message: tinted, with an accent bar |
+| `star` | message a click on the star sends; with it, an unstarred row shows a muted star to click |
+| `starred` | a star before the time, in the warning colour |
+| `subject` | the subject, cut to one line |
+| `tag` | a status pill before the subject: { label, icon?, tone? (accent, warning, danger, success), color? }, such as "Needs Reply" or "No reply · 3 days" |
+| `time` | when it came, as shown ("9:41", "Friday") |
+| `to` | mod to send its messages to, if not the drawing one |
+| `unread` | a dot on the avatar and the sender and subject in bold |
+
+**Styles:** `.mail-row` `.mail-row:hover` `.mail-row:selected` `.mail-row-account` `.mail-row-bar` `.mail-row-bar-on` `.mail-row-body` `.mail-row-clip` `.mail-row-count` `.mail-row-dot` `.mail-row-from` `.mail-row-from-unread` `.mail-row-line` `.mail-row-preview` `.mail-row-star` `.mail-row-starred` `.mail-row-subject-unread` `.mail-row-time`
+
+```lua
+local mail_row = use "mail-row"
+
+ui.list { count = #state.messages, row_height = 104, row = function(i)
+	local m = state.messages[i]
+	return mail_row {
+		from = m.from, subject = m.subject, preview = m.preview, time = m.time,
+		account = m.account, unread = m.unread, count = m.count, starred = m.starred,
+		tag = m.waiting and { label = "No reply · 3 days", icon = "clock", tone = "warning" },
+		selected = state.open == m.id, msg = { open = m.id }, context = { menu = m.id },
+		star = { star = m.id },
+	}
+end }
+-- update: msg.open opens a message; msg.star flips its star; msg.menu opens
+-- a context menu for it.
+```
+
+A whole mod using it, with state: `app/components/demos/mail-row.luau`.
 
 #### `ratio-row`
 
@@ -4170,11 +4342,14 @@ A whole mod using it, with state: `app/components/demos/confirm.luau`.
 | `context` | message a right-click on the content sends, to open the menu |
 | `dismiss` | message sent on a click outside or Escape |
 | `event` | key of the message a pick sends, default "pick": { pick = id } |
+| `expand` | key of the message an item with a submenu sends, default "expand": { expand = id } |
+| `expanded` | id of the item whose submenu shows (an item with `items`), passed to `menu` |
 | `highlighted` | keyboard-highlighted item (id or index) |
 | `items` | `menu` items: { id, label, icon?, shortcut?, checked?, danger?, disabled?, detail? }, "separator", { heading = ... } |
 | `keys` | keys while open, e.g. { up = "menu-up", down = "menu-down", enter = "menu-choose" }; escape sends `dismiss` |
 | `open` | true while the menu shows |
 | `side` | "bottom" (default) or "top" |
+| `submenu_highlighted` | keyboard-highlighted row of the open submenu (id or index) |
 | `to` | mod to send right-click and pick messages to, if not the drawing one |
 | `width` | menu width in pixels (default 220) |
 
@@ -4255,16 +4430,20 @@ A whole mod using it, with state: `app/components/demos/dialog.luau`.
 | Prop | Meaning |
 | --- | --- |
 | `event` | key of the message a click sends, default "pick": { pick = id } |
+| `expand` | key of the message an item with a submenu sends, default "expand": { expand = id } |
+| `expanded` | id of the item whose submenu shows beside it; a click on an item with `items` sends { expand = id } (the mod sets this, or clears it on a second click) |
 | `highlighted` | the keyboard-highlighted row: an item id, or its index in `items` |
-| `items` | list of { id, label, icon?, shortcut? (kbd keys, "cmd-s"), checked? (true/false shows the check column), danger?, disabled?, detail? (muted text on the right), msg? (sent instead of the default) }, the string "separator", or { heading = "Text" } |
+| `items` | list of { id, label, icon?, shortcut? (kbd keys, "cmd-s"), checked? (true/false shows the check column), danger?, disabled?, detail? (muted text on the right), items? (a submenu: the same kinds of entries, one level deep), msg? (sent instead of the default) }, the string "separator", or { heading = "Text" } |
+| `submenu_highlighted` | the keyboard-highlighted row of the open submenu: an id or an index |
+| `submenu_width` | the submenu's width in pixels (default 200) |
 | `to` | mod to send messages to, if not the drawing one |
 
-**Styles:** `.menu` `.menu-check` `.menu-detail` `.menu-heading` `.menu-icon` `.menu-item` `.menu-item:hover` `.menu-item:selected` `.menu-item-danger` `.menu-item-danger:hover` `.menu-item-danger-icon` `.menu-item-disabled` `.menu-separator`
+**Styles:** `.menu` `.menu-check` `.menu-chevron` `.menu-detail` `.menu-heading` `.menu-icon` `.menu-item` `.menu-item:hover` `.menu-item:selected` `.menu-item-danger` `.menu-item-danger:hover` `.menu-item-danger-icon` `.menu-item-disabled` `.menu-separator` `.menu-submenu`
 
 ```lua
 local menu = use "menu"
 
-menu { highlighted = "rename", items = { { heading = "Tab" }, { icon = "pencil", id = "rename", label = "Rename…", shortcut = "cmd-r" }, { icon = "copy", id = "duplicate", label = "Duplicate", shortcut = "cmd-d" }, { checked = true, icon = "pin", id = "pin", label = "Pin tab" }, { detail = "2 panes", icon = "columns-2", id = "split", label = "Split right" }, { disabled = true, icon = "folder-open", id = "reveal", label = "Reveal in Finder" }, "separator", { danger = true, icon = "close", id = "close", label = "Close tab", shortcut = "cmd-w" } } }
+menu { expanded = "move", highlighted = "rename", items = { { heading = "Tab" }, { icon = "pencil", id = "rename", label = "Rename…", shortcut = "cmd-r" }, { icon = "copy", id = "duplicate", label = "Duplicate", shortcut = "cmd-d" }, { checked = true, icon = "pin", id = "pin", label = "Pin tab" }, { detail = "2 panes", icon = "columns-2", id = "split", label = "Split right" }, { icon = "folder-open", id = "move", items = { { id = "move-left", label = "Left pane" }, { id = "move-right", label = "Right pane" }, { id = "move-window", label = "New window" } }, label = "Move to" }, { disabled = true, icon = "folder-open", id = "reveal", label = "Reveal in Finder" }, "separator", { danger = true, icon = "close", id = "close", label = "Close tab", shortcut = "cmd-w" } }, submenu_highlighted = "move-right" }
 ```
 
 A whole mod using it, with state: `app/components/demos/menu.luau`.

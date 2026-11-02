@@ -62,6 +62,8 @@ return mod {
 				id = "files",
 				value = state.value,
 				placeholder = "Search files…",
+				icon = true,
+				shortcut = "cmd-k",
 				change = "query",
 				submit = "open",
 				cancel = "clear",
