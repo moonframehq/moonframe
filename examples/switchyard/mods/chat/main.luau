@@ -279,6 +279,16 @@ local function completion_request(state: State): { any }?
 	return { { to = "provider:projects", msg = { complete = folder, cwd = state.workspace.path } } }
 end
 
+-- `sends` and, when the field's text changed under the user (a restored
+-- draft), what its completions need.
+local function completing(state: State, sends: { any }): { any }
+	local requests: { any } = completion_request(state) or {}
+	for _, request in requests do
+		table.insert(sends, request)
+	end
+	return sends
+end
+
 -- Replaces the shell word, including its quotes, or a slash command.
 local function complete(state: State, insert: string)
 	local before = if string.sub(state.draft, 1, 1) == "!" then shell_word(state.draft) else ""
@@ -297,7 +307,7 @@ local function on_reply(state: State, msg: any): (State, { any }?)
 		if pending and pending.message then
 			restore(state, pending.message)
 		end
-		return state, nil
+		return state, completing(state, {})
 	end
 	if pending and pending.kind == "run" then
 		local list = state.timeline[pending.key] or {}
@@ -357,7 +367,7 @@ local function on_chats(state: State, value: any): (State, { any }?)
 		end
 	end
 	state.known = known
-	return state, sends
+	return state, completing(state, sends)
 end
 
 return mod {
@@ -442,7 +452,7 @@ return mod {
 				switch_thread(state, function()
 					state.selected[workspace.path] = id
 				end)
-				return state, focus(state)
+				return state, completing(state, focus(state))
 			end
 		elseif type(msg) ~= "table" then
 			return
@@ -472,7 +482,7 @@ return mod {
 			switch_thread(state, function()
 				state.selected[workspace.path] = msg.select_chat
 			end)
-			return state, focus(state)
+			return state, completing(state, focus(state))
 		elseif msg.close_chat then
 			return state, { { to = "provider:chat", msg = { close = msg.close_chat } } }
 		elseif msg.resume then

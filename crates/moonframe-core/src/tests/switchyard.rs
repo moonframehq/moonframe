@@ -266,6 +266,54 @@ fn a_rejection_after_switching_away_goes_back_to_its_own_chat() {
 }
 
 #[test]
+fn switching_back_to_a_chat_asks_for_its_drafts_completions() {
+    let mut app = App::new();
+    app.start();
+    // A second chat in the same worktree.
+    app.send("chat", "return {pick_new='test'}");
+    let request = app.outbox("chat", "start").remove(0);
+    app.workspace.send(
+        "provider:chat",
+        "chat",
+        Data::Map(
+            [
+                ("reply".into(), field(&request, "id").clone()),
+                ("action".into(), Data::from("start")),
+                ("ok".into(), Data::Bool(true)),
+                ("chat".into(), Data::from("two")),
+            ]
+            .into(),
+        ),
+    );
+    app.workspace.set_host("chat", data(
+        "return {chats={{id='one',agent='test',cwd='/work',status='live',transcript={status={state='idle'},entries={}}},\
+         {id='two',agent='test',cwd='/work',status='live',transcript={status={state='idle'},entries={}}}}}",
+    ));
+    app.check();
+    app.workspace.take_outbox();
+    let folder = |app: &mut App| -> Vec<Data> {
+        app.outbox("projects", "complete")
+            .iter()
+            .map(|msg| field(msg, "complete").clone())
+            .collect()
+    };
+    app.send("chat", "return {msg='draft',value='!cat docs/'}");
+    assert_eq!(folder(&mut app), [Data::from("docs")]);
+    app.send("chat", "return {select_chat='one'}");
+    // Its empty draft drops the listing the other chat asked for.
+    assert_eq!(folder(&mut app), [Data::from("")]);
+    app.send("chat", "return {msg='draft',value='!cat src/'}");
+    assert_eq!(folder(&mut app), [Data::from("src")]);
+    // Back to the first chat: its `docs/` draft gets its listing again.
+    app.send("chat", "return {select_chat='two'}");
+    assert_eq!(
+        field(&app.state("chat"), "draft"),
+        &Data::from("!cat docs/")
+    );
+    assert_eq!(folder(&mut app), [Data::from("docs")]);
+}
+
+#[test]
 fn a_branch_update_keeps_a_script_edit_open() {
     let mut app = App::new();
     app.send("console", "return {edit='run'}");
