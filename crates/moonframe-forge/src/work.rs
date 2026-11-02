@@ -36,13 +36,7 @@ pub struct Asker {
 }
 
 pub enum Done {
-    /// What the provider found at start (or for a new host).
-    Loaded {
-        host: String,
-        credential: Option<Credential>,
-        cli: bool,
-        error: Option<String>,
-    },
+    // keep-sorted start
     /// A device code to show.
     Code {
         attempt: u64,
@@ -51,15 +45,6 @@ pub enum Done {
         complete_url: Option<String>,
         expires: u64,
     },
-    /// A sign-in checked and saved.
-    SignedIn {
-        host: String,
-        credential: Credential,
-        login: String,
-        asker: Asker,
-    },
-    /// A sign-in that did not happen.
-    Refused { error: String, asker: Asker },
     Fetched {
         target: Target,
         epoch: u64,
@@ -69,6 +54,23 @@ pub enum Done {
         /// The credential, renewed or read from the CLI again.
         credential: Option<Credential>,
     },
+    /// What the provider found at start (or for a new host).
+    Loaded {
+        host: String,
+        credential: Option<Credential>,
+        cli: bool,
+        error: Option<String>,
+    },
+    /// A sign-in that did not happen.
+    Refused { error: String, asker: Asker },
+    /// A sign-in checked and saved.
+    SignedIn {
+        host: String,
+        credential: Credential,
+        login: String,
+        asker: Asker,
+    },
+    // keep-sorted end
 }
 
 /// What every job needs.

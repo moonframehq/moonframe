@@ -19,17 +19,19 @@ const MESSAGE: usize = 200;
 /// Why a request gave nothing usable.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Failure {
-    /// 401: the token is missing, expired or revoked.
-    Unauthorized,
+    // keep-sorted start
+    /// An answer that was too large or not the JSON expected.
+    Body(String),
+    /// No answer: offline, DNS, TLS, a timeout.
+    Network(String),
     /// 403 or 429 with the rate limit spent.
     RateLimited,
     /// Any other status, with the forge's own short message when it gave
     /// one.
     Status(u16, String),
-    /// No answer: offline, DNS, TLS, a timeout.
-    Network(String),
-    /// An answer that was too large or not the JSON expected.
-    Body(String),
+    /// 401: the token is missing, expired or revoked.
+    Unauthorized,
+    // keep-sorted end
 }
 
 impl fmt::Display for Failure {

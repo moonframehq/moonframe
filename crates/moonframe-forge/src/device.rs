@@ -83,11 +83,13 @@ fn on_host(url: &str, kind: Kind, host: &str) -> bool {
 
 /// What one poll found.
 pub enum Poll {
-    /// The user has not entered the code yet; poll again after this long.
-    Wait(Duration),
+    // keep-sorted start
     Done(Credential),
     /// Denied, expired, or refused; the words say which.
     Failed(String),
+    /// The user has not entered the code yet; poll again after this long.
+    Wait(Duration),
+    // keep-sorted end
 }
 
 /// Asks once whether the user entered `code`.

@@ -263,3 +263,29 @@ fn a_finished_check_saves_the_sign_in() {
         Ok(Some(Remembered::Token(_)))
     ));
 }
+
+#[test]
+fn a_renewed_token_outlives_a_branch_change() {
+    use secrecy::ExposeSecret;
+    let (host, _) = handle();
+    let mut forge = signed_in();
+    let old = forge.target().unwrap();
+    forge.fetching = true;
+    forge.checkout.branch = "after".into();
+    forge.checkout.branches = vec!["after".into()];
+    forge.take_in(&host, Done::Fetched {
+        target: old,
+        epoch: forge.epoch,
+        result: Ok(json!({ "viewer": { "login": "penso" } })),
+        // No context to save into here: the token is still applied.
+        renewed: false,
+        credential: Some(Credential::new(
+            SecretString::from("renewed-token"),
+            Source::Saved,
+        )),
+    });
+    let kept = forge.credential.as_ref().unwrap();
+    assert_eq!(kept.token.expose_secret(), "renewed-token");
+    // The old branch's data is not shown.
+    assert!(forge.data.is_null());
+}

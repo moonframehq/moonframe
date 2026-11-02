@@ -23,12 +23,14 @@ use {
 /// Where a token came from, as `auth.source` says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Source {
-    /// A device sign-in or a pasted token this app saved.
-    Saved,
-    /// `GH_TOKEN`, `GITHUB_TOKEN` or `GITLAB_TOKEN`.
-    Env,
+    // keep-sorted start
     /// The forge's CLI, which the user chose.
     Cli,
+    /// `GH_TOKEN`, `GITHUB_TOKEN` or `GITLAB_TOKEN`.
+    Env,
+    /// A device sign-in or a pasted token this app saved.
+    Saved,
+    // keep-sorted end
 }
 
 impl Source {
@@ -234,8 +236,10 @@ impl Saved {
 
 /// What [`Saved`] holds for a host.
 pub enum Remembered {
-    Token(Credential),
+    // keep-sorted start
     Cli,
+    Token(Credential),
+    // keep-sorted end
 }
 
 fn create_private(directory: &Path) -> Result<(), StoreError> {
@@ -286,17 +290,19 @@ pub fn cli(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Credential>
 }
 
 /// Resolve the chosen CLI account immediately before use. glab refreshes
-/// OAuth credentials through its API transport, not `config get token`.
+/// OAuth credentials through its API transport, not `config get token`, so
+/// it is asked once first. That call failing (offline, GitLab down) is not
+/// a sign-out: the CLI's token is still used, and only the forge refusing
+/// it signs the user out. `None` means the CLI has no sign-in at all.
 pub fn cli_ready(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Credential> {
     if kind == Kind::GitLab {
         let program = moonframe_providers::program::find("glab", path)?;
-        let status = cli_command(&program, kind, host, path)
+        let renewed = cli_command(&program, kind, host, path)
             .args(["api", "user", "--hostname", host])
             .stdout(Stdio::null())
-            .status()
-            .ok()?;
-        if !status.success() {
-            return None;
+            .status();
+        if !renewed.is_ok_and(|status| status.success()) {
+            tracing::debug!("gitlab: glab could not reach {host}; using its saved token");
         }
     }
     cli(kind, host, path)

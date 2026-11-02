@@ -37,14 +37,16 @@ const UNREACHABLE: Duration = Duration::from_secs(60);
 /// Where the sign-in stands, as `auth.status` says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Status {
+    // keep-sorted start
     /// Looking for a saved sign-in.
     Checking,
-    SignedOut,
     /// A device code is up; waiting on the user.
     Pending,
+    SignedIn,
+    SignedOut,
     /// Checking a token or the CLI's sign-in.
     Verifying,
-    SignedIn,
+    // keep-sorted end
 }
 
 impl Status {
@@ -331,9 +333,14 @@ impl Forge {
             } => {
                 self.fetching = false;
                 self.fetched_at = Some(Instant::now());
-                if epoch != self.epoch || self.target().as_ref() != Some(&target) {
+                // A sign-out (or another account) since bumped `epoch`:
+                // nothing from this fetch counts, its token included.
+                if epoch != self.epoch || target.host != self.host {
                     return;
                 }
+                // The token is still this account's, even when the branch
+                // changed meanwhile: GitLab spends the old refresh token as
+                // it hands out a new one, so the new one must be kept.
                 if let Some(credential) = credential
                     && self.credential.is_some()
                 {
@@ -350,6 +357,11 @@ impl Forge {
                         );
                     }
                     self.credential = Some(credential);
+                }
+                // Data for a branch or worktree list since changed is
+                // dropped; the refresh `look` asked for still runs.
+                if self.target().as_ref() != Some(&target) {
+                    return;
                 }
                 match result {
                     Ok(data) => {

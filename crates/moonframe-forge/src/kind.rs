@@ -5,8 +5,10 @@
 /// A forge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
+    // keep-sorted start
     GitHub,
     GitLab,
+    // keep-sorted end
 }
 
 impl Kind {
