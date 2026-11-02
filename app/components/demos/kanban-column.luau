@@ -54,7 +54,7 @@ return mod {
 					review = { "web140" },
 				},
 				-- Where a dragged card would land: { column, index }.
-				target = nil :: { column: string, index: number }?,
+				target = nil :: { column: string, index: number, card: string? }?,
 			}
 	end,
 
@@ -70,21 +70,22 @@ return mod {
 					move(state, msg.carry.card, column, at)
 					state.target = nil
 				elseif msg.phase == "over" then
-					state.target = { column = column, index = if msg.y > 0.5 then index + 1 else index }
+					state.target = { column = column, index = if msg.y > 0.5 then index + 1 else index, card = msg.over_card }
+				elseif msg.phase == "leave" and state.target and state.target.card == msg.over_card then
+					state.target = nil
 				end
 			end
 		elseif msg.over_column then
 			local column = msg.over_column
 			if msg.phase == "drop" then
-				local target = state.target
-				local at = if target and target.column == column then target.index else #state.board[column] + 1
-				move(state, msg.carry.card, column, at)
+				-- A drop on the column itself is its end; cards handle their
+				-- own drops, so a previously hovered card is irrelevant here.
+				move(state, msg.carry.card, column, #state.board[column] + 1)
 				state.target = nil
 			elseif msg.phase == "over" then
-				-- A card over one of this column's cards already marked the spot.
-				if not state.target or state.target.column ~= column then
-					state.target = { column = column, index = #state.board[column] + 1 }
-				end
+				-- Capture visits the column before its cards. A card's `over`
+				-- replaces this with its own insertion position afterwards.
+				state.target = { column = column, index = #state.board[column] + 1 }
 			elseif msg.phase == "leave" and state.target and state.target.column == column then
 				state.target = nil
 			end

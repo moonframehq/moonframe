@@ -710,21 +710,29 @@ impl MoonframeApp {
         let main = self.main_window;
         let app = cx.entity();
         cx.defer(move |cx| {
-            let Some(window) = cx
-                .windows()
-                .into_iter()
-                .find(|window| window.window_id() == main)
-            else {
-                return;
-            };
-            let _ = window.update(cx, |_, window, cx| {
-                app.update(cx, |app, cx| {
-                    for (from, request) in requests {
+            for (from, request) in requests {
+                let target = match &request {
+                    Request::Edit(edit) => app
+                        .read(cx)
+                        .inputs
+                        .window(&from, &edit.field)
+                        .unwrap_or(main),
+                    _ => main,
+                };
+                let Some(window) = cx
+                    .windows()
+                    .into_iter()
+                    .find(|window| window.window_id() == target)
+                else {
+                    continue;
+                };
+                let _ = window.update(cx, |_, window, cx| {
+                    app.update(cx, |app, cx| {
                         app.request(&from, request, window, cx);
-                    }
-                    app.flush("app", cx);
+                        app.flush("app", cx);
+                    });
                 });
-            });
+            }
         });
     }
 

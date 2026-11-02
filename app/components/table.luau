@@ -252,15 +252,46 @@ table_view {
 
 		local plain: { { [string]: any } } = props.rows or {}
 		local count = #plain
-		local all, some = count > 0, false
-		for index, row in plain do
-			local on = checked[row.id or index] == true
-			all = all and on
-			some = some or on
+		local total, checked_count = 0, 0
+		local function tally(rows: { any })
+			for index, row in rows do
+				total += 1
+				if checked[row.id or index] then
+					checked_count += 1
+				end
+			end
 		end
+		-- Flatten data, not elements: a grouped list must be just as cheap to
+		-- draw as an ordinary list. Folded rows still count for select-all.
+		local entries: { any } = {}
+		if props.groups then
+			for _, group in props.groups do
+				local rows = group.rows or {}
+				tally(rows)
+				table.insert(entries, { kind = "heading", group = group })
+				if not group.collapsed then
+					for index, row in rows do
+						table.insert(entries, { kind = "row", group = group, row = row, index = index })
+					end
+					if group.add ~= nil then
+						table.insert(entries, { kind = "add", group = group })
+					end
+				end
+			end
+		else
+			tally(plain)
+		end
+		local all, some = total > 0 and checked_count == total, checked_count > 0
 		local scrolls = props.height ~= nil or props.grow == true
-		local listed = scrolls and count > LIST_AFTER
+		local shown_count = if props.groups then #entries else count
+		local listed = scrolls and shown_count > LIST_AFTER
 		local row_height = if bordered then BORDERED_ROW_HEIGHT else ROW_HEIGHT
+		local marker = props.marker or {}
+		-- Markers float inside their row, keeping virtual rows equal-height
+		-- and the paths of drag targets stable as the marker moves.
+		local function line(after: boolean)
+			return ui.row { class = "table-marker", float = if after then "bottom" else "top", height = 2 }
+		end
 
 		local function draw(index: number, given: any?, group: any?)
 			local row: any = given or plain[index]
@@ -279,12 +310,17 @@ table_view {
 			end
 			if bordered then
 				table.insert(classes, "table-row-bordered")
-				if index == count then
+				if index == (if group then #(group.rows or {}) else count) then
 					table.insert(classes, "table-row-last")
 				end
 			end
 			local reorder = props.reorder
 			local group_id = if group then group.id else nil
+			if marker.id == id then
+				table.insert(cells, line(marker.after == true))
+			elseif group and marker.group == group_id and marker.id == nil and index == #(group.rows or {}) then
+				table.insert(cells, line(true))
+			end
 			return ui.row {
 				class = classes,
 				shrink = false,
@@ -299,20 +335,16 @@ table_view {
 			}
 		end
 
-		-- A drop line where `marker` says, across the table.
-		local function line()
-			return ui.row { class = "table-marker", height = 2, shrink = false }
-		end
-
-		-- Groups: a heading, the rows unless folded, an Add row.
-		local grouped = nil
-		if props.groups then
-			grouped = {}
-			local marker = props.marker or {}
-			for _, group in props.groups do
+		local function draw_grouped(index: number)
+			local entry = entries[index]
+			local group = entry.group
+			if entry.kind == "row" then
+				return draw(entry.index, entry.row, group)
+			elseif entry.kind == "heading" then
 				local rows = group.rows or {}
-				table.insert(grouped, ui.row {
+				return ui.row {
 					class = "table-group",
+					height = if listed then row_height else nil,
 					align = "center",
 					shrink = false,
 					msg = { [props.fold or "fold"] = group.id },
@@ -323,38 +355,32 @@ table_view {
 					not group.icon and group.color and ui.row { width = 8, height = 8, style = { background = group.color, radius = 4 } },
 					ui.text { group.title or tostring(group.id), class = "table-group-title" },
 					ui.text { tostring(group.count or #rows), class = "table-group-count" },
-				})
-				if not group.collapsed then
-					for index, row in rows do
-						local id = row.id or index
-						if marker.id == id and not marker.after then
-							table.insert(grouped, line())
-						end
-						table.insert(grouped, draw(index, row, group))
-						if marker.id == id and marker.after then
-							table.insert(grouped, line())
-						end
-					end
-					if marker.group == group.id and marker.id == nil then
-						table.insert(grouped, line())
-					end
-					if group.add ~= nil then
-						table.insert(grouped, ui.row {
-							class = "table-add",
-							align = "center",
-							shrink = false,
-							msg = group.add,
-							to = props.to,
-							ui.icon { name = "plus", size = "small" },
-							ui.text { props.add_label or "Add", size = "small" },
-						})
-					end
-				end
+					marker.group == group.id and marker.id == nil and (group.collapsed or #rows == 0) and line(true),
+				}
 			end
+			return ui.row {
+				class = "table-add",
+				height = if listed then row_height else nil,
+				align = "center",
+				shrink = false,
+				msg = group.add,
+				to = props.to,
+				ui.icon { name = "plus", size = "small" },
+				ui.text { props.add_label or "Add", size = "small" },
+			}
 		end
 
 		local body
-		if grouped then
+		if listed then
+			body = ui.list {
+				id = props.id or "table", count = shown_count, row_height = row_height,
+				row = if props.groups then draw_grouped else draw, grow = true,
+			}
+		elseif props.groups then
+			local grouped = {}
+			for index = 1, #entries do
+				table.insert(grouped, draw_grouped(index))
+			end
 			body = ui.column { gap = "none", grow = scrolls, scroll = scrolls, table.unpack(grouped) }
 		elseif count == 0 then
 			body = ui.column {
@@ -366,8 +392,6 @@ table_view {
 					ui.text { props.empty or "Nothing to show", class = "table-empty-text" },
 				},
 			}
-		elseif listed then
-			body = ui.list { id = props.id or "table", count = count, row_height = row_height, row = draw, grow = true }
 		else
 			local rows = table.create(count)
 			for index = 1, count do

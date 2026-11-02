@@ -24,6 +24,9 @@ pub struct Edit {
     /// The field's `id` among the sending mod's fields.
     pub field: String,
     pub change: EditChange,
+    /// A completion is conditional on an empty selection at this byte
+    /// offset and on the exact text immediately before it.
+    pub expected: Option<(usize, String)>,
 }
 
 /// The edit itself.
@@ -50,6 +53,18 @@ pub struct Splice {
 }
 
 impl Edit {
+    /// Whether a completion still refers to what the user was typing.
+    /// A stale menu must never replace text at a newly moved caret.
+    pub fn applies(&self, text: &str, selection: Range<usize>) -> bool {
+        self.expected.as_ref().is_none_or(|(at, expected)| {
+            selection.is_empty()
+                && selection.start == *at
+                && text
+                    .get(..*at)
+                    .is_some_and(|before| before.ends_with(expected))
+        })
+    }
+
     /// What the edit does to `text` whose selection is `selection`, in
     /// bytes. A selection off a character's edge moves back to it.
     pub fn splice(&self, text: &str, selection: Range<usize>) -> Splice {
@@ -106,9 +121,14 @@ fn wrap(text: &str, selection: Range<usize>, before: &str, after: &str) -> Splic
 fn lines(text: &str, selection: Range<usize>, prefix: &str) -> Splice {
     // From the start of the first line touched to the end of the last.
     let from = text[..selection.start].rfind('\n').map_or(0, |at| at + 1);
-    let to = text[selection.end..]
-        .find('\n')
-        .map_or(text.len(), |at| selection.end + at);
+    // A nonempty selection is half-open: ending just after a newline
+    // selects that newline, not the next line's contents.
+    let end = if !selection.is_empty() && text[..selection.end].ends_with('\n') {
+        selection.end - 1
+    } else {
+        selection.end
+    };
+    let to = text[end..].find('\n').map_or(text.len(), |at| end + at);
     let block = &text[from..to];
     let all = block.split('\n').all(|line| line.starts_with(prefix));
     let changed: Vec<String> = block
@@ -140,10 +160,12 @@ pub(super) fn edit(msg: &Data) -> Result<Edit, Error> {
     let Data::Map(fields) = msg else {
         return Err(fail(usage));
     };
-    if let Some(key) = fields
-        .keys()
-        .find(|key| !matches!(key.as_str(), "field" | "wrap" | "lines" | "insert" | "back"))
-    {
+    if let Some(key) = fields.keys().find(|key| {
+        !matches!(
+            key.as_str(),
+            "field" | "wrap" | "lines" | "insert" | "back" | "at" | "expect"
+        )
+    }) {
         return Err(fail(&format!("unknown key `{key}`; it {usage}")));
     }
     let text = |value: &Data, key: &str| match value {
@@ -193,7 +215,31 @@ pub(super) fn edit(msg: &Data) -> Result<Edit, Error> {
     if back.is_some() && !matches!(change, EditChange::Insert { .. }) {
         return Err(fail("`back` goes with `insert`"));
     }
-    Ok(Edit { field, change })
+    let expected = match (fields.get("at"), fields.get("expect")) {
+        (None, None) => None,
+        (Some(Data::Integer(at)), Some(value)) if *at >= 0 => {
+            let at = usize::try_from(*at).map_err(|_| fail("`at` is a byte offset"))?;
+            let expected = text(value, "expect")?;
+            match &change {
+                EditChange::Insert { back, .. } if *back == expected.len() => Some((at, expected)),
+                _ => {
+                    return Err(fail(
+                        "`at` and `expect` go with `insert`, with `back` equal to the expected text's byte length",
+                    ));
+                },
+            }
+        },
+        _ => {
+            return Err(fail(
+                "give both `at` (a byte offset, 0 or more) and `expect` (the text to replace)",
+            ));
+        },
+    };
+    Ok(Edit {
+        field,
+        change,
+        expected,
+    })
 }
 
 #[cfg(test)]
@@ -205,6 +251,7 @@ mod tests {
         let splice = Edit {
             field: "notes".to_owned(),
             change,
+            expected: None,
         }
         .splice(text, selection);
         let mut new = text.to_owned();
@@ -239,6 +286,7 @@ mod tests {
         let splice = Edit {
             field: "notes".to_owned(),
             change: bold(),
+            expected: None,
         }
         .splice("ab", 1..1);
         assert_eq!(splice.text, "****");
@@ -257,9 +305,23 @@ mod tests {
     }
 
     #[test]
+    fn lines_exclude_the_line_at_a_nonempty_selections_end() {
+        let list = EditChange::Lines {
+            prefix: "- ".to_owned(),
+        };
+        let (on, _) = apply(list.clone(), "one\ntwo", 0..4);
+        assert_eq!(on, "- one\ntwo");
+        let (off, _) = apply(list.clone(), "- one\ntwo", 0..6);
+        assert_eq!(off, "one\ntwo");
+        let (caret, _) = apply(list, "one\ntwo", 4..4);
+        assert_eq!(caret, "one\n- two");
+    }
+
+    #[test]
     fn insert_replaces_what_was_typed_before_the_caret() {
         let splice = Edit {
             field: "comment".to_owned(),
+            expected: None,
             change: EditChange::Insert {
                 text: "@Sarah Chen ".to_owned(),
                 back: 3,
@@ -274,6 +336,7 @@ mod tests {
     fn a_selection_inside_a_character_moves_to_its_edge() {
         let splice = Edit {
             field: "notes".to_owned(),
+            expected: None,
             change: EditChange::Insert {
                 text: "x".to_owned(),
                 back: 1,
@@ -281,6 +344,23 @@ mod tests {
         }
         .splice("é", 2..2);
         assert_eq!(splice.range, 0..2);
+    }
+
+    #[test]
+    fn a_completion_rejects_a_moved_caret_selection_or_changed_word() {
+        let edit = Edit {
+            field: "comment".to_owned(),
+            change: EditChange::Insert {
+                text: "@Sarah Chen ".to_owned(),
+                back: 3,
+            },
+            expected: Some((6, "@sa".to_owned())),
+        };
+        assert!(edit.applies("hi @sa", 6..6));
+        assert!(!edit.applies("hi @sa", 5..5));
+        assert!(!edit.applies("hi @sa", 3..6));
+        assert!(!edit.applies("hi @jo", 6..6));
+        assert!(!edit.applies("hi", 6..6));
     }
 
     #[test]

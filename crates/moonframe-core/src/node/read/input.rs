@@ -9,6 +9,7 @@ impl Build for Input {
         "placeholder",
         "to",
         "change",
+        "select",
         "submit",
         "blur",
         "keys",
@@ -65,6 +66,7 @@ impl Build for Input {
             },
         };
         let change = fields.get::<Data>("change")?;
+        let select = fields.get::<Data>("select")?;
         let submit = fields.get::<Data>("submit")?;
         let blur = fields.get::<Data>("blur")?;
         let keys = fields
@@ -75,6 +77,7 @@ impl Build for Input {
         let browser = fields.get::<BrowserId>("browser")?.map(|id| id.0);
         if to.is_some()
             && change.is_none()
+            && select.is_none()
             && submit.is_none()
             && blur.is_none()
             && keys.is_empty()
@@ -83,7 +86,7 @@ impl Build for Input {
             return Err(fields
                 .cx()
                 .key("to")
-                .fail("`to` goes with `change`, `submit`, `blur`, `keys` or `browser`"));
+                .fail("`to` goes with `change`, `select`, `submit`, `blur`, `keys` or `browser`"));
         }
         Ok(Self {
             look: Look::from_fields(fields)?,
@@ -97,6 +100,7 @@ impl Build for Input {
             placeholder: fields.get("placeholder")?,
             to,
             change,
+            select,
             submit,
             blur,
             keys,

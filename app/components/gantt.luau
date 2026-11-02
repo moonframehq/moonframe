@@ -301,20 +301,20 @@ gantt {
 						ui.row { class = "gantt-grip", width = 2, height = 12, style = { background = `{color}/70` } },
 					},
 				}
-				if not inside then
-					mark = ui.row {
-						float = { top = 0, left = 0 },
-						width = width,
+				-- Keep the bar and resize handle at the same paths throughout
+				-- a drag, including when its label moves outside the bar.
+				mark = ui.row {
+					float = { top = 0, left = 0 },
+					width = width,
+					height = rh,
+					mark,
+					not inside and ui.row {
+						float = { top = 0, left = left + bar_width + 10 },
 						height = rh,
-						mark,
-						ui.row {
-							float = { top = 0, left = left + bar_width + 10 },
-							height = rh,
-							align = "center",
-							ui.text { row.label, class = "gantt-bar-after", truncate = true },
-						},
-					}
-				end
+						align = "center",
+						ui.text { row.label, class = "gantt-bar-after", truncate = true },
+					},
+				}
 			end
 			table.insert(lanes, ui.row { class = "gantt-row", width = width, height = rh, shrink = false, mark })
 		end

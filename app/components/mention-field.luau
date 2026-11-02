@@ -77,9 +77,9 @@ return component {
 	props = {
 		["id"] = "the field's id: the suggestions edit it through `app:edit`",
 		["value"] = "the text, kept from `change` (`msg.value`)",
-		["caret"] = "where the caret is, kept from `change` (`msg.caret`)",
+		["caret"] = "where the caret is, kept from `change` (`msg.caret`), which also reports caret movement",
 		["people"] = "who can be mentioned: { name, detail?, src? (an avatar image) }",
-		["change"] = "sent on each edit, with `value` and `caret`",
+		["change"] = "sent on each edit and selection movement, with `value` and `caret`",
 		["submit"] = "sent on Enter (⌘↩ when multiline) while no suggestion shows",
 		["blur"] = "sent with `value` when the field loses focus",
 		["placeholder"] = "grey text while empty",
@@ -127,7 +127,8 @@ mention_field {
 
 		-- What picking someone does: replace the `@query` with `@Name `.
 		local function edit(person: Person)
-			return { field = props.id, insert = `@{person.name} `, back = #(query or "") + 1 }
+			local expected = "@" .. (query or "")
+			return { field = props.id, insert = `@{person.name} `, back = #expected, at = props.caret or #value, expect = expected }
 		end
 
 		local rows = {}
@@ -177,6 +178,7 @@ mention_field {
 				value = props.value,
 				placeholder = props.placeholder,
 				change = props.change,
+				select = props.change,
 				-- Enter picks while suggestions show.
 				submit = if open then nil else props.submit,
 				blur = props.blur,

@@ -20,6 +20,8 @@ pub struct Input {
     pub to: Option<String>,
     /// Sent on each edit, shaped by [`Input::message`].
     pub change: Option<Data>,
+    /// Sent when the selection/caret moves, with the text and caret.
+    pub select: Option<Data>,
     /// Sent on Enter (single-line), or ⌘/Ctrl-Enter (multiline).
     pub submit: Option<Data>,
     /// Sent with the text when the field loses keyboard focus: a title

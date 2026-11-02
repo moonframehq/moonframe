@@ -89,10 +89,7 @@ impl<'w> Draw<'w> for Stack {
             element
         };
         let element = match &self.pointer {
-            Some(pointer) => {
-                let element = super::pointer::attach(element, pointer, place, cx);
-                super::carry::attach(element, pointer, painter, place, cx)
-            },
+            Some(pointer) => super::pointer::attach(element, pointer, place, cx),
             None => element,
         };
         let element = match &self.action {
@@ -101,7 +98,11 @@ impl<'w> Draw<'w> for Stack {
                 .on_click(place.click(action, cx)),
             None => element,
         };
-        with_extras(element, &self.extras, painter, place, cx).into_any_element()
+        let element = with_extras(element, &self.extras, painter, place, cx);
+        match &self.pointer {
+            Some(pointer) => super::carry::attach(element, pointer, painter, place, cx),
+            None => element.into_any_element(),
+        }
     }
 }
 /// An element's tooltip, right-click and copy, on the element that draws it.

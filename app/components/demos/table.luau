@@ -46,6 +46,9 @@ end
 
 -- Moves the task `id` to `group`, before the task `before` (or to its end).
 local function move(board: { [string]: { any } }, id: string, group: string, before: string?)
+	if id == before then
+		return
+	end
 	local task
 	for _, list in board do
 		for index, item in list do

@@ -891,6 +891,8 @@ type InputProps = {
 	-- Sent on each edit, with `value` and `caret` (bytes before the caret:
 	-- `string.sub(value, 1, caret)` is what comes before it) added.
 	change: Data,
+	-- Selection movement, with `value` and the caret's byte offset added.
+	select: Data,
 	-- Sent on Enter, or ⌘/Ctrl-Enter when `multiline`.
 	submit: Data,
 	-- Sent with `value` when it loses keyboard focus: a title edited in
@@ -1537,6 +1539,10 @@ type EditMsg = {
 	lines: string?,
 	insert: string?,
 	back: number?,
+	-- For completions: apply only at this empty selection with this exact
+	-- preceding text. Give both; `back` is the byte length of `expect`.
+	at: number?,
+	expect: string?,
 }
 
 -- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,

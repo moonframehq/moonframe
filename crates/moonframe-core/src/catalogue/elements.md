@@ -38,7 +38,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
-| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow` |
+| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value` and `caret`), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow` |
 
 ### Overlays
 
@@ -94,7 +94,8 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   with `carry` (the data), `from` (the mod that drew it), and `x`, `y`
   (fractions of the target's box: before or after a row's middle) added.
   The innermost target takes the drop; nothing follows a drop, so clear
-  what `over` showed then. Not with `pointer` or `drag`.
+  what `over` showed then. Other entered targets hear `leave` when the
+  drag ends, including cancellation. Not with `pointer` or `drag`.
 - **Children:** `false` and `nil` children are skipped, wherever they are.
 - **Look keys** (every element but splits): `class = "a b"`,
   `style = { ... }`, and `state = "open"`: a state of the view's own naming,
@@ -118,8 +119,11 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   selection, keeping undo and focus: `wrap` puts the two around it (or
   takes them off), `lines = "- "` starts each selected line with it (or
   takes it off), `insert = "@Sam ", back = 3` replaces the selection and
-  the 3 bytes before it. The field then sends its `change`. A toolbar
-  button sends it directly (`to = "app:edit"`) without taking the focus.
+  the 3 bytes before it. A completion can add `at = <caret offset>` and
+  `expect = "@sa"`: it applies only with an empty selection there and that
+  exact preceding text (`back` must equal its byte length). The field then
+  sends its `change`. A toolbar button sends directly (`to = "app:edit"`);
+  editing restores focus in the field's own window.
 - **Keys anywhere:** `mod { keys = { ["secondary-1"] = "histogram" } }`
   sends its message when the key is pressed and nothing nearer (an open
   overlay, a terminal) took it, to every mod and every mounted copy of
