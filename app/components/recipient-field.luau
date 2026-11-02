@@ -158,6 +158,9 @@ recipient_field {
 			class = "recipient-field-popover",
 			open = #items > 0,
 			dismiss = props.dismiss,
+			-- The field, the chips' × and the trailing buttons keep working
+			-- while the suggestions show.
+			anchor_clicks = true,
 			to = props.to,
 			side = "bottom",
 			align = "start",

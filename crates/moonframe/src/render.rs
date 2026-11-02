@@ -17,6 +17,7 @@ mod keyed;
 mod list;
 mod markdown;
 mod plot;
+mod popover;
 mod styling;
 mod terminal;
 mod view;

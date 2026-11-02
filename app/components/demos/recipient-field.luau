@@ -99,6 +99,7 @@ return mod {
 			end
 			return recipient_field {
 				id = `demo-{line}`,
+				focus = line == "to",
 				label = label,
 				recipients = state.lines[line],
 				value = state.typed[line],

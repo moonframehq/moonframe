@@ -108,7 +108,8 @@ local function draw(props: Props)
 			item.shortcut and kbd { keys = item.shortcut, small = true, plain = true },
 			submenu and ui.icon { name = "chevron-right", size = "small", class = "menu-chevron" },
 		}
-		-- The open submenu floats beside its row, its picks sent as the
+		-- The open submenu floats beside its row (on the right, or on the
+		-- left when the window has no room there), its picks sent as the
 		-- menu's own.
 		rows[#rows + 1] = if open and submenu
 			then ui.popover {
@@ -139,7 +140,7 @@ return component {
 	when = "The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `command-palette`.",
 	props = {
 		["items"] = "list of { id, label, icon?, shortcut? (kbd keys, \"cmd-s\"), checked? (true/false shows the check column), danger?, disabled?, detail? (muted text on the right), items? (a submenu: the same kinds of entries, one level deep), msg? (sent instead of the default) }, the string \"separator\", or { heading = \"Text\" }",
-		["expanded"] = "id of the item whose submenu shows beside it; a click on an item with `items` sends { expand = id } (the mod sets this, or clears it on a second click)",
+		["expanded"] = "id of the item whose submenu shows beside it (on the right, or the left near the window's edge); a click on an item with `items` sends { expand = id } (the mod sets this, or clears it on a second click)",
 		["expand"] = "key of the message an item with a submenu sends, default \"expand\": { expand = id }",
 		["submenu_highlighted"] = "the keyboard-highlighted row of the open submenu: an id or an index",
 		["submenu_width"] = "the submenu's width in pixels (default 200)",

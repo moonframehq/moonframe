@@ -42,7 +42,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 | Element | Use it for | Keys |
 | --- | --- | --- |
-| `ui.popover { ..., content = el }` | content floating beside its anchor (the children): dropdowns, context menus, sheets from a status bar; `side` is `top`, `bottom`, `left` or `right`, and `align` (`start`, `end`) the anchor's edge it lines up with | `open`, `dismiss`, `to`, `side`, `align`, `gap`, `width`, `content`, `keys` |
+| `ui.popover { ..., content = el }` | content floating beside its anchor (the children): dropdowns, context menus, sheets from a status bar; `side` is `top`, `bottom`, `left` or `right` (it opens on the other side when that one has no room in the window), and `align` (`start`, `end`) the anchor's edge it lines up with; `anchor_clicks = true` keeps the anchor clickable while open (a field with suggestions under it) instead of a click on it sending `dismiss` | `open`, `dismiss`, `to`, `side`, `align`, `gap`, `width`, `content`, `keys`, `anchor_clicks` |
 | `ui.overlay { ..., content = el }` | content over the whole window: dialogs and palettes (`center`, `top`), sheets (`left`, `right`, `bottom`), toasts (`top-end`, `bottom-end`, ...) | `open`, `dismiss`, `to`, `place`, `backdrop`, `width`, `height`, `keys`, `content` |
 
 **Keys** (`overlay`, `popover`): `keys = { escape = msg, enter = msg, up = msg,

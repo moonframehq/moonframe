@@ -5,7 +5,7 @@ local menu = use "menu"
 
 return mod {
 	init = function(previous)
-		return previous or { pinned = true, panes = 2, last = "rename", place = "left", expanded = "move" }
+		return previous or { pinned = true, panes = 2, last = "rename", place = "left", expanded = "move" :: string? }
 	end,
 
 	update = function(state, msg)

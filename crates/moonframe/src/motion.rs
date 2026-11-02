@@ -4,7 +4,7 @@
 //! an element's named `state`: its look eases from one state's to the next.
 
 use {
-    gpui_kit::{Hsla, Pixels, Rgba, ScrollHandle, Size},
+    gpui_kit::{Bounds, Hsla, Pixels, Rgba, ScrollHandle, Size},
     moonframe_core::{Curve, Node, Transition, TransitionKind},
     std::{
         cell::{Cell, RefCell},
@@ -31,6 +31,20 @@ pub(crate) struct Motion {
     pub(crate) tweens: RefCell<Tweens>,
     /// Where each `ui.list` is scrolled, by path.
     scrolls: Recent<ScrollHandle>,
+    /// Each popover's anchor and the side its content fits on, by path.
+    rooms: Recent<Rc<Room>>,
+}
+
+/// What a popover measured as it was drawn: where its anchor is, and
+/// whether its content opens on the side opposite the one asked for,
+/// because only that one has room in the window.
+#[derive(Default)]
+pub(crate) struct Room {
+    pub(crate) anchor: Cell<Option<Bounds<Pixels>>>,
+    pub(crate) flipped: Cell<bool>,
+    /// The side is known: until then the content is drawn unseen, so it
+    /// never shows for a frame past the window's edge.
+    pub(crate) decided: Cell<bool>,
 }
 
 impl Default for Motion {
@@ -41,6 +55,7 @@ impl Default for Motion {
             sizes: Recent::default(),
             tweens: RefCell::default(),
             scrolls: Recent::keeping(FORGET_SCROLL),
+            rooms: Recent::default(),
         }
     }
 }
@@ -340,6 +355,11 @@ impl Motion {
         self.scrolls
             .get_or(path, Instant::now(), ScrollHandle::default)
             .clone()
+    }
+
+    /// What the popover at `path` measured.
+    pub(crate) fn room(&mut self, path: &str) -> Rc<Room> {
+        self.rooms.get_or(path, Instant::now(), Rc::default).clone()
     }
 
     /// Where the size of the keyed child at `key` is kept.
