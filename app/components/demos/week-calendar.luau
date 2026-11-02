@@ -1,5 +1,6 @@
 -- A week of meetings (sample data): click an event to pick it, switch Day,
--- Week and Month, click a day's heading to open that day. A real calendar
+-- Week and Month, click a day's heading to open that day, drag an event to
+-- another day or hour (in Month, another day). A real calendar
 -- takes its dates from a provider, which knows what today is.
 local week_calendar = use "week-calendar"
 
@@ -20,12 +21,24 @@ local function clock(hour: number): string
 	return string.format("%d:%02d %s", twelve, math.floor((hour - h) * 60), if h < 12 then "AM" else "PM")
 end
 
+type State = {
+	view: string,
+	selected: string,
+	day: string,
+	-- Where events were dragged to: { [id] = { day, start, finish } }.
+	moved: { [string]: any },
+	-- The day a dragged event is over.
+	over: string?,
+}
+
 return mod {
-	init = function(previous)
-		return previous or { view = "week", selected = "e2", day = "2026-11-03" }
+	init = function(previous: State?): State
+		local state: State = previous or { view = "week", selected = "e2", day = "2026-11-03", moved = {} }
+		state.moved = state.moved or {}
+		return state
 	end,
 
-	update = function(state, msg)
+	update = function(state: State, msg)
 		if type(msg) ~= "table" then
 			return
 		end
@@ -36,21 +49,45 @@ return mod {
 		elseif msg.day then
 			state.day = msg.day
 			state.view = "day"
+		elseif msg.move then
+			if msg.phase == "over" then
+				state.over = msg.move
+			elseif msg.phase == "leave" then
+				state.over = nil
+			elseif msg.phase == "drop" then
+				state.over = nil
+				local id = msg.carry.event
+				local event = state.moved[id]
+				for _, original in EVENTS do
+					if original.id == id and not event then
+						event = { day = original.day, start = original.start, finish = original.finish }
+					end
+				end
+				local length = event.finish - event.start
+				local start = event.start
+				-- In Day and Week the drop's height picks the hour, by quarters.
+				if state.view ~= "month" then
+					start = math.clamp(math.floor((8 + msg.y * 6) * 4 + 0.5) / 4, 8, 14 - length)
+				end
+				state.moved[id] = { day = msg.move, start = start, finish = start + length }
+				state.selected = id
+			end
 		end
 	end,
 
-	view = function(state)
+	view = function(state: State)
 		local events = {}
 		for _, event in EVENTS do
+			local at = state.moved[event.id] or event
 			table.insert(events, {
 				id = event.id,
-				day = event.day,
-				start = event.start,
-				finish = event.finish,
+				day = at.day,
+				start = at.start,
+				finish = at.finish,
 				title = event.title,
 				mark = event.mark,
 				caption = "Meeting Time",
-				time = `{clock(event.start)} - {clock(event.finish)}`,
+				time = `{clock(at.start)} - {clock(at.finish)}`,
 			})
 		end
 		local names = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" }
@@ -82,6 +119,8 @@ return mod {
 			weeks = weeks,
 			events = events,
 			selected = state.selected,
+			move = "move",
+			over = state.over,
 			hours = { from = 8, to = 14 },
 			hour_height = 76,
 			column_width = 200,
