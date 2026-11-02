@@ -342,9 +342,29 @@ def replay(journal):
     folder = os.path.dirname(path)
     name = os.path.basename(path)[: -len(".md")]
     suffix = " (recovered)"
-    copy = name[: NAME_MAX - len(suffix)].rstrip() + suffix
-    copy = free(copy, os.path.realpath(folder) == os.path.realpath(TRASH))
-    atomic_write(folder + "/" + copy + ".md", saved["text"])
+    write_new(folder, name[: NAME_MAX - len(suffix)].rstrip() + suffix, saved["text"])
+
+
+def write_new(folder, name, text):
+    # Writes `text` to a new document named `name` in `folder`, or "name
+    # (2)", "name (3)"…: the complete file is linked into place, which fails
+    # rather than replaces when another run took the name first.
+    fd, temporary = tempfile.mkstemp(prefix=".folio-", dir=folder)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        candidate, n = name, 2
+        while True:
+            try:
+                os.link(temporary, folder + "/" + candidate + ".md")
+                return candidate
+            except FileExistsError:
+                suffix = " (%d)" % n
+                candidate, n = name[: NAME_MAX - len(suffix)].rstrip() + suffix, n + 1
+    finally:
+        gone(temporary)
 
 
 def digest_text(text):

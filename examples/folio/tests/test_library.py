@@ -212,6 +212,18 @@ class LibraryTests(unittest.TestCase):
         self.assertTrue(locks[0].exists())
         self.assertIsNone(one.poll())
 
+    def test_recovered_copies_never_replace_one_another(self):
+        (self.folder / "Draft (recovered).md").write_text("Recovered earlier", encoding="utf-8")
+        self.start()
+        opened = self.send({"open": "Draft"})["current"]["opened"]
+        self.send({"save": {"id": "Draft", "opened": opened, "text": "Recovered now"}})
+        self.stop(self.process)
+        (self.folder / "Draft.md").write_text("Changed elsewhere", encoding="utf-8")
+        self.start()
+        self.assertEqual((self.folder / "Draft (recovered).md").read_text(), "Recovered earlier")
+        self.assertEqual((self.folder / "Draft (recovered) (2).md").read_text(), "Recovered now")
+        self.assertEqual([p.name for p in self.folder.glob(".folio-*")], [])
+
 
 if __name__ == "__main__":
     unittest.main()
