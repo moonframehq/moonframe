@@ -750,6 +750,42 @@ update = function(state, msg)
 end,
 ```
 
+- `app:window`, `msg` a mod's name, `{ open = "<mod>", send = <msg>? }`
+  or `{ close = "<mod>" }`: opens that mod in a window of its own (or
+  raises it), as a control's `window = "<mod>"` does, or closes it. `send`
+  reaches the mod's `update` (from the asking mod) before its window
+  draws, so it opens on a page; a `send` to a mod that does not exist is
+  the sender's error. The mod's `title` titles the window, and its
+  `window = { size = { width, height }, min_size = { width, height } }`
+  sizes it (both kept within the screen, as the main window's `size` is;
+  420x560 and 280x240 when unset; a size takes effect the next time the
+  window opens). Any mod may open or close any mod's window, as any
+  control may: the window shows that mod's own view and `send` is an
+  ordinary message, so nothing new crosses. The shell is the main window
+  and is never opened this way. Close a mod's own window from its
+  `update` with `{ close = "<mod>" }`: `app:command` `close-window` runs in
+  the main window and would close that.
+
+```lua
+-- mods/settings/main.luau: Settings as a window, on the page asked for
+return mod {
+	title = "Settings",
+	window = { size = { width = 860, height = 600 }, min_size = { width = 640, height = 480 } },
+	init = function() return { page = "general" } end,
+	update = function(state, msg)
+		if type(msg) == "table" and msg.page then
+			state.page = msg.page
+		elseif msg == "done" then
+			return state, { { to = "app:window", msg = { close = "settings" } } }
+		end
+	end,
+	view = function(state) return ui.text(state.page) end,
+}
+
+-- elsewhere, a palette entry or another mod's update:
+return state, { { to = "app:window", msg = { open = "settings", send = { page = "machines" } } } }
+```
+
 - A request the app cannot read (an unknown command, a misspelled
   `app:<what>`) is the sender's error, shown as an `update` error.
 - Previews (the Components window) ask nothing, and a provider's answer
@@ -980,10 +1016,13 @@ Rules that trip agents up:
 - Unknown element types, keys and token values are errors, not ignored.
   `just check` names them.
 - The keys allowed on the `mod { }` table are only `init`, `update`, `view`,
-  `region`, `order`, `title`, `styles`, `subscribe` (see "Topics") and `tab`
-  (see "Tabs"), plus `window`, `menus` and `about` in `main.luau` only (see
-  "Window and title bar" and "Menus and About"). `update` and `view` also
-  get `props` last.
+  `region`, `order`, `title`, `styles`, `subscribe` (see "Topics"), `tab`
+  (see "Tabs") and `window`, plus `menus` and `about` in `main.luau` only
+  (see "Menus and About"). In `main.luau`, `window` is the main window's
+  frame (see "Window and title bar"); in another mod it is the size of the
+  mod's own window, `window = { size = { width, height }, min_size = {
+  width, height } }` (see "Asking the app", `app:window`). `update` and
+  `view` also get `props` last.
 - State and messages must be plain data: nil, booleans, numbers, strings,
   lists, and string-keyed tables. Functions in state stop it surviving a
   reload. A table is a list without gaps or has string keys, never both.
@@ -1005,7 +1044,7 @@ Text-like elements take their main value positionally:
 
 | Element | Keys (besides children) | Notes |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
+| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window, and a `window = { size, min_size }` to size it; `window` takes no `msg`, so to open it on a page send `app:window` instead) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover |
 | `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |

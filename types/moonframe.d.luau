@@ -255,7 +255,8 @@ type StackProps = {
 	-- it appears and shrinks away when it goes, as tabs open and close.
 	key: string?,
 	-- Opens the mod named this in a window of its own (or raises it) when
-	-- clicked: a tool that stays open beside the main window. Takes no `msg`.
+	-- clicked: a tool that stays open beside the main window. Takes no `msg`;
+	-- to open it on a page, send `app:window` `{ open = "<mod>", send = ... }`.
 	window: string?,
 	-- Sent as a button goes down on it, as the pointer moves while held
 	-- (wherever it goes), and as it comes up, with a `PointerMsg`'s fields
@@ -1455,12 +1456,20 @@ type PickMsg = {
 	folder: string?,
 }
 
+-- What `{ to = "app:window", msg = ... }` asks: a mod's name opens that
+-- mod in a window of its own (or raises it), as a control's `window` does;
+-- `{ open = "<mod>", send = <msg> }` first delivers `send` to its `update`,
+-- so it opens on a page; `{ close = "<mod>" }` closes it. Any mod may ask
+-- for any mod's window; never the shell's.
+type WindowMsg = string | { open: string, send: Data? } | { close: string }
+
 -- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,
 -- `"provider:<name>"`, `"topic:<name>"`, or the app itself:
 -- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
 -- `AppearanceMode`), `"app:theme"` (`msg` `{ light: string?, dark: string? }`),
 -- `"app:sound"` (`msg` `"default"` or a sound file's path),
--- `"app:notify"` (`msg` a `NotifyMsg`) and `"app:pick"` (`msg` a `PickMsg`).
+-- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`)
+-- and `"app:window"` (`msg` a `WindowMsg`).
 type Send = {
 	to: string,
 	msg: Data,
@@ -1474,6 +1483,15 @@ type Window = {
 	traffic_lights: { x: number?, y: number? }?,
 	-- The size the window opens at, before the user resizes it.
 	size: { width: number?, height: number? }?,
+}
+
+-- A mod's own window (`window` on a mod other than main.luau), when a
+-- control's `window` or `app:window` opens it: the size it opens at and
+-- the smallest the user can make it, each kept within the screen; 420x560
+-- and 280x240 when unset.
+type ModWindow = {
+	size: { width: number, height: number }?,
+	min_size: { width: number, height: number }?,
 }
 
 -- A menu item in the shell's `menus`: it sends `msg` (to the shell, or to
@@ -1549,8 +1567,9 @@ type Mod<State> = {
 	title: string?,
 	-- Rules for what this mod draws, by selector.
 	styles: { [string]: Style }?,
-	-- Only in main.luau: the window's frame, read when the app starts.
-	window: Window?,
+	-- In main.luau, the main window's frame, read when the app starts (a
+	-- `Window`); in another mod, the size of its own window (a `ModWindow`).
+	window: (Window | ModWindow)?,
 	-- Only in main.luau: menus after the app menu (a "View" one merges into
 	-- the host's), and what About says.
 	menus: { AppMenu }?,

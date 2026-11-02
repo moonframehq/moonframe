@@ -76,7 +76,7 @@ fn the_shell_asks_for_its_window_and_views_see_it() {
         assert!(error.contains(expected), "{window}: {error}");
     }
 
-    // A mod is not the shell: the window isn't its to set.
+    // A mod is not the shell: the main window's title bar isn't its to set.
     write(dir.path(), "main.luau", SHELL_SOURCE);
     let source = r#"return mod { window = { titlebar = "hidden" }, view = function() return ui.text "x" end }"#;
     write(dir.path(), "mods/sneaky/main.luau", source);
