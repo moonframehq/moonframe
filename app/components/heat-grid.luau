@@ -32,7 +32,7 @@ return component {
 	category = "Data",
 	icon = "layout-dashboard",
 	description = "A contribution grid of rounded squares: columns filled from the bottom by a count, or shaded cell by cell by level, with labels under the ends.",
-	when = "Activity over days or weeks at a glance: lessons per week, posts per day, a streak, a course's progress as squares, a GitHub-style contribution graph. For a count compared with the period before use `dot-chart`; for stacked counts with an axis use `bar-chart`; for one fraction use `meter` or `progress`.",
+	when = "Activity over days or weeks at a glance: lessons per week, posts per day, a streak, a course's progress as squares. For a GitHub-style calendar of days with months and weekdays use `contribution-graph`; for a count compared with the period before use `dot-chart`; for stacked counts with an axis use `bar-chart`; for one fraction use `meter` or `progress`.",
 	props = {
 		["columns"] = "list, left to right; each a count (squares filled from the bottom) or a list of levels from the top (0 empty, 1 to `levels` lighter to full)",
 		["rows"] = "squares per column (default: the tallest column)",

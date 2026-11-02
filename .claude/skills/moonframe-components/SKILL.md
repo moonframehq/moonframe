@@ -194,6 +194,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`chat-message`](#chat-message) | Data | Each turn of a conversation with an agent or a person, stacked in a scrolling column over a `composer`. For a comment on a pull request use `comment-card`; for a notification use `toast`. |
 | [`code-view`](#code-view) | Data | Show code or a log read-only: a file at a line, a snippet in a comment, a test's output. For changes use `diff-view`; for a live shell use `terminal`. |
 | [`comment-card`](#comment-card) | Data | Comments in a pull request conversation, review threads, notes left by agents or people. Stack them in a column. For a numbered review note with a remove button use `note-card`; for events in order use `timeline`. |
+| [`contribution-graph`](#contribution-graph) | Data | Daily activity over months or a year, GitHub style: commits, agent runs, posts, workouts, a streak. Pass one count per day and the first day's date. For weekly or arbitrary buckets without dates use `heat-grid`; for counts with an axis use `bar-chart`; for picking a day use `month-grid`. |
 | [`count-bubble`](#count-bubble) | Data | An unread or pending count on a sidebar icon, a tab or a menu entry; pass `float = { top = -4, right = -4 }` to put it on the corner of its parent. For a status use `status-dot`; for a text label use `ui.badge`; for added/removed lines use `diff-counts`. |
 | [`country-code`](#country-code) | Data | Beside a country's name in lists of locations or settings, in place of a flag (no flag images ship). For any short label use `ui.badge` or `pill`. |
 | [`course-card`](#course-card) | Data | The one course, plan or program a page puts first, with where the reader is and a button to carry on. For a grid of guides use `guide-card`; for a figure with a trend use `stat-tile`; for a titled box of anything use `card`. |
@@ -202,7 +203,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`file-icon`](#file-icon) | Data | Beside a file name in a tree, a tab or a list of changes. For a generic icon use `ui.icon`. |
 | [`forecast-chart`](#forecast-chart) | Data | A balance or capacity projected over weeks or months against a minimum (cash against a floor, stock against a reorder point). For counts per bucket, stacked by kind, use `bar-chart`; for a small trend use `sparkline` or `ui.line`. |
 | [`guide-card`](#guide-card) | Data | Cards of reading material or courses the reader works through (guides, docs, tutorials), three or so to a row, each with how far the reader got. For one featured course with actions use `course-card`; for a plain titled box use `card`; for a linked record inside a message use `record-card`. |
-| [`heat-grid`](#heat-grid) | Data | Activity over days or weeks at a glance: lessons per week, posts per day, a streak, a course's progress as squares, a GitHub-style contribution graph. For a count compared with the period before use `dot-chart`; for stacked counts with an axis use `bar-chart`; for one fraction use `meter` or `progress`. |
+| [`heat-grid`](#heat-grid) | Data | Activity over days or weeks at a glance: lessons per week, posts per day, a streak, a course's progress as squares. For a GitHub-style calendar of days with months and weekdays use `contribution-graph`; for a count compared with the period before use `dot-chart`; for stacked counts with an axis use `bar-chart`; for one fraction use `meter` or `progress`. |
 | [`histogram`](#histogram) | Data | The spread of a picture's tones (red, green, blue, luminance), of latencies or of scores, where the shape matters more than any count; with draggable markers it is a levels control. For counts per labelled bucket use `bar-chart`; for a trend over time use `ui.line` or `series-chart`. |
 | [`kbd`](#kbd) | Data | Show a keyboard shortcut: in a menu row, a palette result, a tooltip line or a help sheet. Inside menus `menu` already draws one from an item's `shortcut`; for a word-like tag use `ui.badge`. |
 | [`key-values`](#key-values) | Data | Read-only properties or details: aligned label/value lines. For editable settings use `settings-row`. |
@@ -1109,6 +1110,50 @@ comment_card { action = "requested changes", age = "3d ago", author = "alice", b
 
 A whole mod using it, with state: `app/components/demos/comment-card.luau`.
 
+#### `contribution-graph`
+
+**Contribution Graph.** A year of days as squares in week columns, shaded by count, with months on top, weekdays on the side, a tooltip per day and a Less … More legend.
+
+**When:** Daily activity over months or a year, GitHub style: commits, agent runs, posts, workouts, a streak. Pass one count per day and the first day's date. For weekly or arbitrary buckets without dates use `heat-grid`; for counts with an axis use `bar-chart`; for picking a day use `month-grid`.
+
+| Prop | Meaning |
+| --- | --- |
+| `color` | the busiest colour, lighter levels tinted from it (default success) |
+| `days` | one count per day, oldest first |
+| `empty` | a day with nothing (default muted-foreground at 12%) |
+| `event` | key of the message a day sends: { [event] = "YYYY-MM-DD" }; days are not clickable without it |
+| `gap` | pixels between squares (default 3) |
+| `legend` | false hides the Less … More legend |
+| `months` | false hides the month labels |
+| `note` | muted text on the legend's left, e.g. "Learn how we count contributions" |
+| `note_msg` | message a click on the note sends |
+| `noun` | what is counted (default "contribution") |
+| `nouns` | its plural (default the noun with an s) |
+| `palette` | colours from empty to busiest, e.g. GitHub's { "#161b22", "#0e4429", "#006d32", "#26a641", "#39d353" }; one more than the thresholds |
+| `selected` | the chosen day, "YYYY-MM-DD", outlined |
+| `size` | a square's side in pixels (default 11) |
+| `start` | the first day's date, "YYYY-MM-DD" |
+| `thresholds` | the smallest count of each level, e.g. { 1, 3, 6, 10 }; default quarters of the busiest day |
+| `to` | mod to send it to, if not the drawing one |
+| `week_start` | "sunday" (default) or "monday": the top row |
+| `weekdays` | false hides the Mon / Wed / Fri labels |
+
+**Styles:** `.contribution-graph` `.contribution-graph-cell` `.contribution-graph-cell:hover` `.contribution-graph-cell:selected` `.contribution-graph-legend` `.contribution-graph-month` `.contribution-graph-note` `.contribution-graph-note:hover` `.contribution-graph-weekday`
+
+```lua
+local contribution_graph = use "contribution-graph"
+
+contribution_graph {
+	start = "2025-11-02",       -- the first count's date
+	days = state.counts,        -- one count per day, oldest first
+	note = "Learn how we count contributions", note_msg = "help",
+	event = "day", selected = state.day,   -- a click sends { day = "2026-05-14" }
+	-- palette = { "#161b22", "#0e4429", "#006d32", "#26a641", "#39d353" },
+}
+```
+
+A whole mod using it, with state: `app/components/demos/contribution-graph.luau`.
+
 #### `count-bubble`
 
 **Count Bubble.** A small round count badge for icons and tabs, capped at 99+.
@@ -1322,7 +1367,7 @@ A whole mod using it, with state: `app/components/demos/guide-card.luau`.
 
 **Heat Grid.** A contribution grid of rounded squares: columns filled from the bottom by a count, or shaded cell by cell by level, with labels under the ends.
 
-**When:** Activity over days or weeks at a glance: lessons per week, posts per day, a streak, a course's progress as squares, a GitHub-style contribution graph. For a count compared with the period before use `dot-chart`; for stacked counts with an axis use `bar-chart`; for one fraction use `meter` or `progress`.
+**When:** Activity over days or weeks at a glance: lessons per week, posts per day, a streak, a course's progress as squares. For a GitHub-style calendar of days with months and weekdays use `contribution-graph`; for a count compared with the period before use `dot-chart`; for stacked counts with an axis use `bar-chart`; for one fraction use `meter` or `progress`.
 
 | Prop | Meaning |
 | --- | --- |

@@ -199,16 +199,18 @@ impl Session {
     }
 
     /// Fits the program and the emulator to `size`, if it changed.
-    pub fn resize(&self, size: Size) {
+    /// Returns whether it did.
+    pub fn resize(&self, size: Size) -> bool {
         let Ok(mut current) = self.size.lock() else {
-            return;
+            return false;
         };
         if *current == size || size.cols == 0 || size.rows == 0 {
-            return;
+            return false;
         }
         *current = size;
         self.pane.resize(size);
         let _ = self.commands.send(Command::Resize(size));
+        true
     }
 
     /// Moves through the scrollback: negative goes up.

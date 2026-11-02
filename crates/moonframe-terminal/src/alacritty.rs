@@ -98,6 +98,7 @@ impl Emulator for Alacritty {
         let content = self.term.renderable_content();
         let offset = i32::try_from(content.display_offset).unwrap_or(0);
         let mut cells = vec![Cell::default(); usize::from(cols) * usize::from(rows)];
+        let mut wrapped = vec![false; usize::from(rows)];
         for indexed in content.display_iter {
             let (Ok(row), column) = (
                 usize::try_from(indexed.point.line.0 + offset),
@@ -109,6 +110,9 @@ impl Emulator for Alacritty {
                 continue;
             };
             let flags = indexed.cell.flags;
+            if flags.contains(Flags::WRAPLINE) {
+                wrapped[row] = true;
+            }
             let (mut fg, mut bg) = (
                 resolve(indexed.cell.fg, content.colors, self.theme.as_ref()),
                 resolve(indexed.cell.bg, content.colors, self.theme.as_ref()),
@@ -133,6 +137,7 @@ impl Emulator for Alacritty {
                 underline: flags.intersects(Flags::ALL_UNDERLINES),
                 strike: flags.contains(Flags::STRIKEOUT),
                 spacer: flags.contains(Flags::WIDE_CHAR_SPACER),
+                wrap_spacer: flags.contains(Flags::LEADING_WIDE_CHAR_SPACER),
             };
         }
         let cursor = (content.mode.contains(TermMode::SHOW_CURSOR)
@@ -149,6 +154,7 @@ impl Emulator for Alacritty {
             cols,
             rows,
             cells,
+            wrapped,
             cursor,
             app_cursor: content.mode.contains(TermMode::APP_CURSOR),
             bracketed_paste: content.mode.contains(TermMode::BRACKETED_PASTE),

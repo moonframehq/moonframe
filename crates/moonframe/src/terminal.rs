@@ -4,6 +4,10 @@
 //! app. Output wakes the window from the session's thread, through a
 //! channel.
 
+mod selection;
+
+pub(crate) use selection::{Selection, Spot};
+
 use {
     crate::{app::MoonframeApp, keys::Taken},
     gpui_kit::*,
@@ -47,9 +51,36 @@ pub(crate) struct TerminalView {
     /// That message went out: the mod handles the exit, so the terminal
     /// goes once it is no longer drawn.
     told: Cell<bool>,
+    /// The text chosen with the pointer, in the visible screen's cells.
+    pub(crate) selection: RefCell<Option<Selection>>,
+    /// The left button went down on the grid and is still held.
+    pub(crate) selecting: Cell<bool>,
+    /// Where the grid was last painted: its first cell's corner and a
+    /// cell's size, to find the cell under the pointer.
+    pub(crate) grid: Cell<Option<(Point<Pixels>, Size<Pixels>)>>,
 }
 
 impl TerminalView {
+    fn new(
+        session: Result<Session, String>,
+        backend: &'static str,
+        focus: FocusHandle,
+        spawn: Spawn,
+    ) -> Self {
+        Self {
+            session,
+            backend,
+            focus,
+            spawn,
+            scrolled: Cell::new(0.),
+            exit: RefCell::new(None),
+            told: Cell::new(false),
+            selection: RefCell::new(None),
+            selecting: Cell::new(false),
+            grid: Cell::new(None),
+        }
+    }
+
     /// Keeps what the element asks to be sent as the shell exits.
     pub(crate) fn on_exit(&self, msg: Option<&Data>) {
         if self.exit.borrow().as_ref() != msg {
@@ -61,6 +92,20 @@ impl TerminalView {
     /// not start another here.
     pub(crate) fn exit_handled(&self) -> bool {
         self.exit.borrow().is_some()
+    }
+
+    /// The selected text, when there is any.
+    pub(crate) fn selected_text(&self) -> Option<String> {
+        let session = self.session.as_ref().ok()?;
+        let selection = (*self.selection.borrow()).filter(|selection| !selection.is_empty())?;
+        Some(selection.text(&session.screen())).filter(|text| !text.is_empty())
+    }
+
+    /// Forgets the selection, as typing, pasting, scrolling or resizing
+    /// moves the text under it. Returns whether there was one to redraw.
+    pub(crate) fn clear_selection(&self) -> bool {
+        self.selecting.set(false);
+        self.selection.borrow_mut().take().is_some()
     }
 }
 
@@ -230,15 +275,12 @@ impl Terminals {
             Some(limit) => (Err(limit), ""),
             None => self.spawn(&spawn),
         };
-        let view = Rc::new(TerminalView {
+        let view = Rc::new(TerminalView::new(
             session,
             backend,
-            focus: cx.focus_handle(),
+            cx.focus_handle(),
             spawn,
-            scrolled: Cell::new(0.),
-            exit: RefCell::new(None),
-            told: Cell::new(false),
-        });
+        ));
         if let Err(problem) = &view.session
             && (!refused || self.refused.insert(key.to_owned()))
         {
@@ -312,15 +354,13 @@ impl Terminals {
     fn restart(&mut self, key: &str) {
         if let Some(old) = self.views.get(key) {
             let (session, backend) = self.spawn(&old.spawn);
-            let view = Rc::new(TerminalView {
+            let view = Rc::new(TerminalView::new(
                 session,
                 backend,
-                focus: old.focus.clone(),
-                spawn: old.spawn.clone(),
-                scrolled: Cell::new(0.),
-                exit: RefCell::new(old.exit.borrow().clone()),
-                told: Cell::new(false),
-            });
+                old.focus.clone(),
+                old.spawn.clone(),
+            ));
+            view.on_exit(old.exit.borrow().as_ref());
             self.views.insert(key.to_owned(), view);
         }
     }
@@ -351,7 +391,8 @@ impl MoonframeApp {
     /// Every keystroke, before any key binding: one for a focused terminal
     /// goes to its shell, Tab, Esc and Ctrl keys included, so completion
     /// and the like work. ⌘ combinations stay the app's, except ⌘V, which
-    /// pastes. Returns whether the terminal took it.
+    /// pastes, and ⌘C while text is selected, which copies it. Returns
+    /// whether the terminal took it.
     pub(crate) fn terminal_keystroke(
         &mut self,
         keystroke: &Keystroke,
@@ -367,9 +408,18 @@ impl MoonframeApp {
         let modifiers = keystroke.modifiers;
         let screen = session.screen();
         if modifiers.platform {
+            if keystroke.key == "c"
+                && let Some(text) = view.selected_text()
+            {
+                cx.write_to_clipboard(ClipboardItem::new_string(text));
+                return true;
+            }
             if keystroke.key == "v"
                 && let Some(text) = cx.read_from_clipboard().and_then(|item| item.text())
             {
+                if view.clear_selection() {
+                    cx.notify();
+                }
                 session.write(&paste(&text, screen.bracketed_paste));
                 return true;
             }
@@ -392,6 +442,9 @@ impl MoonframeApp {
         // A key it has no bytes for (F13) does nothing, and still does not
         // reach the app while the terminal has focus.
         if let Some(bytes) = encode(pressed, screen.app_cursor) {
+            if view.clear_selection() {
+                cx.notify();
+            }
             session.write(&bytes);
         }
         true

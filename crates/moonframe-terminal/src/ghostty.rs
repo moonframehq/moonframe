@@ -7,6 +7,7 @@ use {
     libghostty_vt::{
         Terminal,
         render::{CellIterator, RenderState, RowIterator},
+        screen::CellWide,
         style::{RgbColor, Underline},
         terminal::{Mode, Options, ScrollViewport},
     },
@@ -65,15 +66,20 @@ impl Ghostty {
             None
         };
         let mut cells = Vec::with_capacity(usize::from(cols) * usize::from(rows));
+        let mut wrapped = Vec::with_capacity(usize::from(rows));
         let mut text = String::new();
         let mut row_it = self.rows.update(&snapshot)?;
         while let Some(row) = row_it.next() {
+            wrapped.push(row.raw_row()?.is_wrapped()?);
             let mut cell_it = self.cells.update(row)?;
             let start = cells.len();
             while let Some(cell) = cell_it.next() {
+                let wide = cell.raw_cell()?.wide()?;
                 let mut out = Cell {
                     fg: color(cell.fg_color()?),
                     bg: color(cell.bg_color()?),
+                    spacer: wide == CellWide::SpacerTail,
+                    wrap_spacer: wide == CellWide::SpacerHead,
                     ..Cell::default()
                 };
                 if cell.graphemes_len()? > 0 {
@@ -102,10 +108,12 @@ impl Ghostty {
             cells.resize(start + usize::from(cols), Cell::default());
         }
         cells.resize(usize::from(cols) * usize::from(rows), Cell::default());
+        wrapped.resize(usize::from(rows), false);
         Ok(Screen {
             cols,
             rows,
             cells,
+            wrapped,
             cursor,
             app_cursor,
             bracketed_paste,
