@@ -287,7 +287,7 @@ impl Inputs {
     }
 
     /// The field with keyboard focus in `window`, if any.
-    fn focused(&self, window: &Window, cx: &App) -> Option<(Wiring, String)> {
+    pub(crate) fn focused(&self, window: &Window, cx: &App) -> Option<(Wiring, String)> {
         let registry = self.0.borrow();
         registry
             .fields

@@ -120,6 +120,89 @@ type Float = FloatAt | { at: FloatAt, inset: number? } | {
 	left: number?,
 }
 
+-- Out of the flow, over the parent at fractions of its size: `{ left =
+-- 0.1, top = 0.2, width = 0.5, height = 0.3 }`. A crop frame over a
+-- picture (in a `ui.image`'s `overlay`, fractions of the picture), a
+-- marker on a track.
+type Area = {
+	left: number?,
+	top: number?,
+	width: number?,
+	height: number?,
+}
+
+-- The pointer's shape over a row or column.
+type Cursor =
+	"default"
+	| "pointer"
+	| "text"
+	| "crosshair"
+	| "grab"
+	| "grabbing"
+	| "move"
+	| "ew-resize"
+	| "ns-resize"
+	| "nwse-resize"
+	| "nesw-resize"
+	| "col-resize"
+	| "row-resize"
+	| "not-allowed"
+
+-- Turns a drag into a `value` in `pointer` messages. Without `speed` the
+-- value is where the pointer is along `axis` (a slider: `min` at the left
+-- or bottom, `max` at the right or top); with it, `value` plus pixels
+-- dragged times `speed` (a number scrubbed by dragging its label). It
+-- snaps to `step` and stays between `min` and `max`.
+type Range = {
+	min: number,
+	max: number,
+	step: number?,
+	value: number?,
+	speed: number?,
+	axis: ("x" | "y")?,
+}
+
+-- What a `pointer` message carries, added to its `msg` (a table gets the
+-- fields; anything else arrives as `{ msg = msg, ... }`). `x` and `y` are
+-- fractions of the box as it was when the button went down (0 to 1 inside,
+-- beyond while dragging outside); `dx` and `dy` pixels since then.
+type PointerMsg = {
+	phase: "down" | "move" | "up" | "hover" | "leave",
+	x: number,
+	y: number,
+	dx: number,
+	dy: number,
+	width: number,
+	height: number,
+	button: ("left" | "middle" | "right")?,
+	clicks: number?,
+	-- With `range`: the value the drag sets.
+	value: number?,
+	shift: boolean?,
+	alt: boolean?,
+	ctrl: boolean?,
+	cmd: boolean?,
+	secondary: boolean?,
+}
+
+-- What a `wheel` message carries: `dx`, `dy` the pixels scrolled, `zoom`
+-- a trackpad pinch's change (0.1 is 10 % larger, 0 for a scroll), and
+-- where over the box (`x`, `y`), with the keys held.
+type WheelMsg = {
+	x: number,
+	y: number,
+	dx: number,
+	dy: number,
+	zoom: number,
+	width: number,
+	height: number,
+	shift: boolean?,
+	alt: boolean?,
+	ctrl: boolean?,
+	cmd: boolean?,
+	secondary: boolean?,
+}
+
 -- Each props type is spelled out rather than combined with `&`, so string
 -- literals such as `variant = "ghost"` check against their unions.
 
@@ -153,6 +236,8 @@ type StackProps = {
 	max_height: number?,
 	-- Out of the flow, over the parent: see `Float`.
 	float: Float?,
+	-- Out of the flow, at fractions of the parent: see `Area`.
+	area: Area?,
 	align: Align?,
 	justify: Justify?,
 	wrap: boolean?,
@@ -172,6 +257,22 @@ type StackProps = {
 	-- Opens the mod named this in a window of its own (or raises it) when
 	-- clicked: a tool that stays open beside the main window. Takes no `msg`.
 	window: string?,
+	-- Sent as a button goes down on it, as the pointer moves while held
+	-- (wherever it goes), and as it comes up, with a `PointerMsg`'s fields
+	-- added: drags, sliders, handles, canvases. The innermost stack with
+	-- `pointer` takes the press. To `to` if given.
+	pointer: Data,
+	-- Also send `phase = "hover"` moves with no button held, and `"leave"`.
+	hover: boolean?,
+	-- Adds the `value` a drag sets to `pointer` messages: see `Range`.
+	range: Range?,
+	-- Sent as the wheel or trackpad scrolls or pinches over it, with a
+	-- `WheelMsg`'s fields; what is around it does not scroll.
+	wheel: Data,
+	-- Sent when files are dropped on it from another app, with `paths`
+	-- (and `x`, `y`). Dropped pictures may then show in this mod's `ui.image`.
+	drop: Data,
+	cursor: Cursor?,
 	[number]: Child,
 }
 
@@ -198,6 +299,8 @@ type PanelProps = {
 	max_height: number?,
 	-- Out of the flow, over the parent: see `Float`.
 	float: Float?,
+	-- Out of the flow, at fractions of the parent: see `Area`.
+	area: Area?,
 	title: string?,
 	actions: { Child }?,
 	[number]: Child,
@@ -391,6 +494,7 @@ type IconName =
 	| "command"
 	| "copy"
 	| "cpu"
+	| "crop"
 	| "dash"
 	| "database"
 	| "delete"
@@ -482,6 +586,7 @@ type IconName =
 	| "pencil"
 	| "pin"
 	| "pin-off"
+	| "pipette"
 	| "play"
 	| "plug"
 	| "plus"
@@ -494,18 +599,22 @@ type IconName =
 	| "reply"
 	| "resize-corner"
 	| "rocket"
+	| "rotate-ccw"
 	| "rotate-ccw-clock"
 	| "rotate-cw"
 	| "rows-2"
+	| "scan"
 	| "search"
 	| "send"
 	| "server"
 	| "settings"
 	| "settings-2"
 	| "shield"
+	| "sliders-horizontal"
 	| "sort-ascending"
 	| "sort-descending"
 	| "sparkles"
+	| "spline"
 	| "split-square-horizontal"
 	| "split-square-vertical"
 	| "square"
@@ -542,6 +651,8 @@ type IconName =
 	| "window-restore"
 	| "workflow"
 	| "zap"
+	| "zoom-in"
+	| "zoom-out"
 
 -- Drawn at the size and color of text, so `color` and `size` style it.
 type IconProps = {
@@ -578,6 +689,19 @@ type ImageProps = {
 	width: number?,
 	height: number?,
 	fit: Fit?,
+	-- Screen pixels per picture pixel (1 is 100 %), panned so `center` is
+	-- in the middle: a viewer. Unset, it fits as `fit` says. Without a
+	-- `width` or `height` it fills its parent that way.
+	zoom: number?,
+	-- The point of the picture in the middle while zoomed: `{ x, y }`
+	-- fractions of the picture; `{ 0.5, 0.5 }` when unset.
+	center: { number }?,
+	-- Sent with `width`, `height` (the picture's own pixels), `box_width`,
+	-- `box_height` and `fit` (the zoom that fits it) when they change.
+	measure: Data,
+	-- Drawn over the picture wherever it lands, so `area` there is in
+	-- fractions of the picture: a crop frame, spots, a grid.
+	overlay: { Child }?,
 	-- Shown under the pointer; sent on a right-click (to the mod `to`, else
 	-- this one); copied on a click.
 	tooltip: string?,
@@ -1313,12 +1437,30 @@ type NotificationClick = {
 	clicked: boolean,
 }
 
+-- What `{ to = "app:pick", msg = ... }` opens: the system's panel to open
+-- files, pick folders, or name a file to save. The answer comes back to
+-- the mod as `reply` with `paths` (a list; `path` for a save) or
+-- `cancelled = true` added. What the user picks may show in that mod's
+-- `ui.image` (and its components').
+type PickMsg = {
+	kind: ("open" | "folder" | "save")?,
+	reply: Data,
+	multiple: boolean?,
+	-- The panel's button or title, such as "Open scan".
+	prompt: string?,
+	-- Extensions files to open must have, such as { "tif", "png" }.
+	types: { string }?,
+	-- A save panel's suggested name and starting folder.
+	name: string?,
+	folder: string?,
+}
+
 -- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,
 -- `"provider:<name>"`, `"topic:<name>"`, or the app itself:
 -- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
 -- `AppearanceMode`), `"app:theme"` (`msg` `{ light: string?, dark: string? }`),
--- `"app:sound"` (`msg` `"default"` or a sound file's path) and
--- `"app:notify"` (`msg` a `NotifyMsg`).
+-- `"app:sound"` (`msg` `"default"` or a sound file's path),
+-- `"app:notify"` (`msg` a `NotifyMsg`) and `"app:pick"` (`msg` a `PickMsg`).
 type Send = {
 	to: string,
 	msg: Data,
@@ -1395,6 +1537,11 @@ type Mod<State> = {
 	-- Topics it hears in `update`: names, or prefixes ending in `*`.
 	-- `provider/<name>` carries a provider's data as it changes.
 	subscribe: { string }?,
+	-- Keys it takes anywhere in the window once nothing nearer does (an
+	-- open overlay, a terminal; none while a text field has focus):
+	-- `{ ["secondary-1"] = "histogram" }`; every mounted copy hears them
+	-- too. Keys that type text need ctrl, alt, cmd or secondary.
+	keys: Keys?,
 	-- Offered as a kind of tab: each tab mounts an instance of it.
 	tab: TabEntry?,
 	region: string?,

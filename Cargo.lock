@@ -4735,6 +4735,7 @@ dependencies = [
  "block2 0.6.2",
  "futures",
  "gpui-kit",
+ "imagesize 0.14.0",
  "lb-wry",
  "moonframe-acp",
  "moonframe-core",

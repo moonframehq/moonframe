@@ -8,6 +8,7 @@ mod content;
 mod embed;
 mod input;
 mod layout;
+mod pointer;
 // keep-sorted end
 
 use {
@@ -43,6 +44,7 @@ const FRAME: &[&str] = &[
     "max_width",
     "max_height",
     "float",
+    "area",
 ];
 const LOOK: &[&str] = &["class", "style", "state"];
 const ACTION: &[&str] = &["msg", "to", "command", "browser", "window"];

@@ -91,7 +91,8 @@ impl MoonframeApp {
             None,
             cx.theme(),
         )
-        .with_views(&mut self.views);
+        .with_views(&mut self.views)
+        .in_window(window.window_handle().window_id());
         let content = painter.window(name, cx);
         let frame = painter.finish();
         let animating = self.after_frame(frame, window, cx);

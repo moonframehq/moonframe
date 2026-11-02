@@ -357,6 +357,7 @@ pub(crate) fn intercept_keys(cx: &mut Context<MoonframeApp>) -> Subscription {
                     Taken::Free => {
                         app.input_keystroke(&event.keystroke, window, cx)
                             || app.terminal_keystroke(&event.keystroke, window, cx)
+                            || app.mod_keystroke(&event.keystroke, window, cx)
                             || app.menu_keystroke(&event.keystroke, window, cx)
                     },
                 }

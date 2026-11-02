@@ -3,7 +3,8 @@
 
 use {
     crate::{
-        About, AppMenu, Chrome, Data, Error, ListWindow, Node, Rules, SHELL, Stylesheet, TabKind,
+        About, AppMenu, Chrome, Data, Error, Keys, ListWindow, Node, Rules, SHELL, Stylesheet,
+        TabKind,
         component::Library,
         menus::Menus,
         node,
@@ -125,6 +126,9 @@ struct Definition {
     /// The shell's menus and About panel; `main.luau` only, too.
     menus: Option<Menus>,
     about: Option<About>,
+    /// Keys it takes anywhere in the window, while nothing nearer the
+    /// keystroke (an overlay, a text field, a terminal) does.
+    keys: Keys,
     meta: Meta,
 }
 
@@ -146,6 +150,7 @@ impl Read for Definition {
             "tab",
             "menus",
             "about",
+            "keys",
         ]])?;
         Ok(Self {
             init: fields.get("init")?,
@@ -157,6 +162,7 @@ impl Read for Definition {
             window: fields.get("window")?,
             menus: fields.get("menus")?,
             about: fields.get("about")?,
+            keys: fields.get("keys")?.unwrap_or_default(),
             meta: Meta {
                 region: fields.get("region")?,
                 order: fields.get("order")?.unwrap_or(0),
@@ -252,6 +258,7 @@ impl Module {
             window: None,
             menus: None,
             about: None,
+            keys: Keys::default(),
             meta: Meta::default(),
         };
         Self::start(lua, meter, definition, previous, props)
@@ -338,6 +345,11 @@ impl Module {
     /// The menus the shell asks for.
     pub(crate) fn menus(&self) -> &[AppMenu] {
         self.definition.menus.as_ref().map_or(&[], |menus| &menus.0)
+    }
+
+    /// The keys it takes anywhere in the window.
+    pub(crate) fn keys(&self) -> &Keys {
+        &self.definition.keys
     }
 
     /// What the shell's About panel says.

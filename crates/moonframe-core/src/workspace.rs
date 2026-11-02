@@ -606,6 +606,21 @@ impl Workspace {
         self.style_error.as_ref()
     }
 
+    /// The shell, each mod and each mounted copy of a mod (a tab's
+    /// `editor#1`) with `keys` of its own: who a keystroke nothing nearer
+    /// takes goes to. Every copy hears it, so the one on screen does.
+    pub fn mod_keys(&self) -> impl Iterator<Item = (&str, &crate::Keys)> {
+        std::iter::once((SHELL, &self.shell))
+            .chain(self.mods.iter().map(|(name, slot)| (name.as_str(), slot)))
+            .chain(
+                self.instances
+                    .iter()
+                    .map(|(key, mounted)| (key.as_str(), &mounted.slot)),
+            )
+            .filter_map(|(name, slot)| Some((name, slot.keys()?)))
+            .filter(|(_, keys)| !keys.is_empty())
+    }
+
     pub fn mod_names(&self) -> impl Iterator<Item = &str> {
         self.mods.keys().map(String::as_str)
     }

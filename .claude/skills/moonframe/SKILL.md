@@ -731,10 +731,70 @@ return mod {
 }
 ```
 
+- `app:pick`, `msg` `{ kind = "open" | "folder" | "save", reply, multiple?,
+  prompt?, types?, name?, folder? }`: the system's panel to open files
+  (`types` keeps those extensions), pick folders, or name a file to save
+  (`name` and `folder` suggest one). The answer comes back to the mod's
+  `update` as `reply` with `paths` (a list; `path` for a save) or
+  `cancelled = true` added. What the user picks, they chose to show that
+  mod, so its `ui.image` (and its components') may show it from then on
+  (folders: what is in them); other mods may not.
+
+```lua
+update = function(state, msg)
+	if msg == "open" then
+		return state, { { to = "app:pick", msg = { kind = "open", types = { "tif", "jpg" }, reply = { opened = true } } } }
+	elseif type(msg) == "table" and msg.opened and msg.paths then
+		state.file = msg.paths[1]
+	end
+end,
+```
+
 - A request the app cannot read (an unknown command, a misspelled
   `app:<what>`) is the sender's error, shown as an `update` error.
 - Previews (the Components window) ask nothing, and a provider's answer
   cannot be passed off as a request.
+
+## Pointer, dropped files and keys anywhere
+
+A row or column hears more than clicks:
+
+- `pointer = <msg>` is sent as a button goes down on it (`phase = "down"`),
+  as the pointer moves while held, even outside it (`"move"`), and as it
+  comes up (`"up"`), with `x`, `y` (fractions of its box as it was at the
+  press), `dx`, `dy` (pixels since), `width`, `height`, `button`, `clicks`
+  and the keys held added. The innermost one with `pointer` takes the
+  press. `hover = true` also sends `"hover"` and `"leave"`.
+- `range = { min, max, step?, value?, speed?, axis? }` adds the `value` a
+  drag sets, so the view does no arithmetic: where the pointer is between
+  `min` and `max` (a slider), or, with `speed`, `value` plus pixels times
+  `speed`, counted from the value at the press (a scrubbed number).
+- `wheel = <msg>` gets scrolls and trackpad pinches over it (`dx`, `dy`,
+  `zoom`, `x`, `y`), and keeps them from scrolling what is around it.
+- `drop = <msg>` gets files dropped from other apps (`paths`); the mod's
+  `ui.image` may show them from then on.
+- `cursor = "crosshair"` (`grab`, `grabbing`, `ew-resize`, `move`, ...).
+- `area = { left, top, width, height }` places any row, column or panel at
+  fractions of its parent: handles, markers, a crop frame. In a
+  `ui.image`'s `overlay` those are fractions of the picture, wherever zoom
+  and pan put it (`ui.image { zoom, center, overlay, measure }`).
+
+Record undo on `phase == "up"`, not on every move. Before writing one,
+look for a component: `slider`, `number-field`, `histogram` (draggable
+markers), `curve-editor`, `image-viewer`.
+
+A mod can take keys anywhere in the window, once nothing nearer (an open
+overlay, a terminal) took them. Every mod, and every mounted copy of one
+(a tab's), that takes a key hears it. While a text field has focus it
+keeps all its keys (copy, select all, undo), so mods hear none:
+
+```lua
+return mod {
+	keys = { ["secondary-1"] = "histogram", ["secondary-l"] = "log" },
+	update = function(state, msg) ... end,
+	view = function(state) ... end,
+}
+```
 
 ## Tabs
 

@@ -88,6 +88,10 @@ impl<'w> Draw<'w> for Stack {
         } else {
             element
         };
+        let element = match &self.pointer {
+            Some(pointer) => super::pointer::attach(element, pointer, place, cx),
+            None => element,
+        };
         let element = match &self.action {
             Some(action) => covering(element, in_drag)
                 .cursor_pointer()
@@ -98,7 +102,7 @@ impl<'w> Draw<'w> for Stack {
     }
 }
 /// An element's tooltip, right-click and copy, on the element that draws it.
-fn with_extras<'w, E: StatefulInteractiveElement + Styled>(
+pub(super) fn with_extras<'w, E: StatefulInteractiveElement + Styled>(
     mut element: E,
     extras: &Extras,
     painter: &Painter<'w, '_>,
@@ -695,7 +699,8 @@ impl<'w> Draw<'w> for Image {
         let theme = cx.theme();
         let folder = painter.folder(place.owner).unwrap_or(Path::new("."));
         let workspace = painter.workspace;
-        let path = super::images::resolve(self, folder, || {
+        let owner = place.owner;
+        let path = super::images::resolve(self, owner, folder, || {
             workspace
                 .roots()
                 .layers()
@@ -725,6 +730,9 @@ impl<'w> Draw<'w> for Image {
             }
             return with_extras(element, &self.extras, painter, place, cx).into_any_element();
         };
+        if super::viewer::wanted(self) {
+            return super::viewer::draw(self, &path, painter, place, cx);
+        }
         let mut element = img(path)
             .object_fit(fit)
             .id(place.id())
