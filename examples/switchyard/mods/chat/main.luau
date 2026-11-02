@@ -37,6 +37,8 @@ type State = {
 	workspace: { path: string, name: string, branch: string }?,
 	selected: { [string]: string? },
 	draft: string,
+	-- What was typed in the other threads, by thread, while away from them.
+	drafts: { [string]: string? },
 	timeline: { [string]: { Anchor } },
 	context: { [string]: { { id: string, label: string, text: string } } },
 	waiting: { [string]: { Outgoing } },
@@ -122,10 +124,33 @@ local function focus(state: State): { any }
 	return if id then { { to = "provider:chat", msg = { focus = id } } } else {}
 end
 
--- Puts a message that did not go back: its words in the field (before
--- anything typed since) and its added outputs back as chips.
+-- Moves to another thread: the text typed here waits for this thread, and
+-- the other's comes back.
+local function switch_thread(state: State, change: () -> ())
+	local before = timeline_key(state)
+	change()
+	local after = timeline_key(state)
+	if before == after then
+		return
+	end
+	state.drafts[before] = if state.draft == "" then nil else state.draft
+	state.draft = state.drafts[after] or ""
+	state.drafts[after] = nil
+	state.highlight = 1
+end
+
+-- Puts a message that did not go back into its own thread, even if the
+-- user has moved on: its words in that thread's field (before anything
+-- typed since) and its added outputs back as chips.
 local function restore(state: State, message: Outgoing)
-	state.draft = message.text .. (if state.draft == "" then "" else "\n\n" .. state.draft)
+	local function joined(typed: string): string
+		return message.text .. (if typed == "" then "" else "\n\n" .. typed)
+	end
+	if message.key == timeline_key(state) then
+		state.draft = joined(state.draft)
+	else
+		state.drafts[message.key] = joined(state.drafts[message.key] or "")
+	end
 	if #message.context > 0 then
 		local list: { any } = state.context[message.key] or {}
 		for _, item in message.context do
@@ -281,6 +306,12 @@ local function on_reply(state: State, msg: any): (State, { any }?)
 	elseif pending and pending.kind == "start" and msg.chat then
 		state.selected[pending.path] = msg.chat
 		state.known[msg.chat] = { status = "starting", working = false, cwd = pending.path }
+		-- Text typed for the workspace while away moves into its chat.
+		local typed = state.drafts[`ws:{pending.path}`]
+		if typed then
+			state.drafts[msg.chat] = typed
+			state.drafts[`ws:{pending.path}`] = nil
+		end
 		-- Shell cards run before the chat existed move into it.
 		local loose = `ws:{pending.path}`
 		if state.timeline[loose] then
@@ -354,12 +385,13 @@ return mod {
 
 	init = function(previous: State?): State
 		local state: State = previous or {
-			workspace = nil, selected = {}, draft = "", timeline = {}, context = {}, waiting = {},
+			workspace = nil, selected = {}, draft = "", drafts = {}, timeline = {}, context = {}, waiting = {},
 			pending = {}, known = {}, open = {}, menu = nil, highlight = 1, error = nil, serial = 0,
 		}
 		state.menu = nil
 		state.error = nil
 		state.pending = {}
+		state.drafts = state.drafts or {}
 		state.waiting = {}
 		state.highlight = 1
 		state.completion = nil
@@ -368,7 +400,9 @@ return mod {
 
 	update = function(state: State, msg)
 		if type(msg) == "table" and msg.topic == "switchyard/workspace" then
-			state.workspace = msg.value
+			switch_thread(state, function()
+				state.workspace = msg.value
+			end)
 			state.menu = nil
 			local sends = focus(state)
 			local requests: { any } = completion_request(state) or {}
@@ -403,8 +437,11 @@ return mod {
 			local at = table.find(ids, chat or "") or 0
 			local step = if msg == "next-chat" then 1 else -1
 			local id = ids[((at - 1 + step) % math.max(#ids, 1)) + 1]
-			if id and state.workspace then
-				state.selected[state.workspace.path] = id
+			local workspace = state.workspace
+			if id and workspace then
+				switch_thread(state, function()
+					state.selected[workspace.path] = id
+				end)
 				return state, focus(state)
 			end
 		elseif type(msg) ~= "table" then
@@ -431,7 +468,10 @@ return mod {
 		elseif msg.menu then
 			state.menu = if state.menu == msg.menu then nil else msg.menu
 		elseif msg.select_chat and state.workspace then
-			state.selected[state.workspace.path] = msg.select_chat
+			local workspace = state.workspace
+			switch_thread(state, function()
+				state.selected[workspace.path] = msg.select_chat
+			end)
 			return state, focus(state)
 		elseif msg.close_chat then
 			return state, { { to = "provider:chat", msg = { close = msg.close_chat } } }

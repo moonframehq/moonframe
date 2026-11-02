@@ -244,6 +244,28 @@ fn rejected_commands_and_prompts_keep_their_words_and_outputs() {
 }
 
 #[test]
+fn a_rejection_after_switching_away_goes_back_to_its_own_chat() {
+    let mut app = App::new();
+    app.start();
+    app.live("{}");
+    app.send("chat", "return {msg='send',value='for the chat'}");
+    let prompt = app.outbox("chat", "prompt").remove(0);
+    // Elsewhere, something else is being typed when the rejection comes.
+    app.select("/other");
+    app.send("chat", "return {msg='draft',value='elsewhere'}");
+    reject(&mut app, &prompt, "chat");
+    assert_eq!(field(&app.state("chat"), "draft"), &Data::from("elsewhere"));
+    // Back in the chat, its words are there; the other text waits for /other.
+    app.select("/work");
+    assert_eq!(
+        field(&app.state("chat"), "draft"),
+        &Data::from("for the chat")
+    );
+    app.select("/other");
+    assert_eq!(field(&app.state("chat"), "draft"), &Data::from("elsewhere"));
+}
+
+#[test]
 fn a_branch_update_keeps_a_script_edit_open() {
     let mut app = App::new();
     app.send("console", "return {edit='run'}");
