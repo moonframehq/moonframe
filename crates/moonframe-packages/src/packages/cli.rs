@@ -53,7 +53,7 @@ pub fn run(user: &Path, args: &[String]) -> ExitCode {
         .map(String::as_str)
         .filter(|arg| !matches!(*arg, "--yes" | "-y"))
         .collect();
-    let writers = super::git_writers(user);
+    let writers = super::writers(user);
     let approve_any = {
         let writers = writers.clone();
         move |contents: &Contents| approve(contents, &writers, yes)
@@ -171,7 +171,9 @@ pub fn update(user: &Path, name: Option<&str>, approve: super::Approve) -> Resul
 }
 
 /// Asks before a package's providers may run code with the user's access,
-/// or its mods may commit and push (named in git's `writers`); other mods,
+/// or its mods may send a built-in provider privileged messages (named in
+/// a provider's settings: start agents, commit and push, save files,
+/// Keychain, SSH); other mods,
 /// components, and styles are Luau the app runs sandboxed. An app's
 /// approval covers the packages it ships beside it, which its updates
 /// change with it.
@@ -199,7 +201,9 @@ pub fn approve(contents: &Contents, writers: &[String], yes: bool) -> Result<(),
         }
     }
     if !writing.is_empty() {
-        println!("This package replaces mods that may commit and push with git:");
+        println!(
+            "This package replaces mods that built-in providers trust (to start coding agents, commit and push, save files, read Keychain sign-ins, or connect over SSH):"
+        );
         for name in &writing {
             println!("  {name}");
         }

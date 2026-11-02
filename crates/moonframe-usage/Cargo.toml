@@ -1,0 +1,25 @@
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-usage"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[dependencies]
+herdr-usage.workspace         = true
+moonframe-core.workspace      = true
+moonframe-providers.workspace = true
+serde.workspace               = true
+serde_json.workspace          = true
+tracing.workspace             = true
+
+[dev-dependencies]
+# `Usage::showing`, to publish readings without asking any service.
+herdr-usage        = { features = ["test-support"], workspace = true }
+tempfile.workspace = true
+toml.workspace     = true
