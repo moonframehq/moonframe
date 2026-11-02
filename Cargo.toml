@@ -6,6 +6,7 @@ members = [
   "crates/moonframe-app",
   "crates/moonframe-core",
   "crates/moonframe-docs",
+  "crates/moonframe-forge",
   "crates/moonframe-git",
   "crates/moonframe-history",
   "crates/moonframe-mux",
@@ -47,6 +48,7 @@ tokio              = { default-features = false, version = "1.54" }
 #   herdr-core-client = { path = "../herdr-gpui/crates/herdr-core-client" }
 herdr-client      = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
 herdr-core-client = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-credentials = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
 herdr-github      = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
 herdr-vcs         = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
 # `ui.image` zooms by the picture's own size, read from its header.
@@ -57,6 +59,7 @@ moonframe                = { path = "crates/moonframe" }
 moonframe-acp            = { path = "crates/moonframe-acp" }
 moonframe-core           = { path = "crates/moonframe-core" }
 moonframe-docs           = { path = "crates/moonframe-docs" }
+moonframe-forge          = { path = "crates/moonframe-forge" }
 moonframe-git            = { path = "crates/moonframe-git" }
 moonframe-history        = { path = "crates/moonframe-history" }
 moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }
@@ -73,8 +76,10 @@ objc2-web-kit            = { default-features = false, features = ["WKWebView", 
 portable-pty             = "0.9"
 rusqlite                 = { features = ["bundled"], version = "0.41" }
 # Swapping a saved file into place atomically (moonframe-docs).
-rust-embed         = { features = ["include-exclude"], version = "8.7" }
+rust-embed = { features = ["include-exclude"], version = "8.7" }
+# Tokens kept redacted in memory (moonframe-forge), as herdr-credentials reads them.
 rustix             = { default-features = false, features = ["fs", "std"], version = "1.1" }
+secrecy            = "0.10"
 serde              = { features = ["derive"], version = "1" }
 serde_json         = "1"
 sysinfo            = { default-features = false, features = ["network", "system"], version = "0.39" }

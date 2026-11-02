@@ -1,0 +1,175 @@
+//! OAuth's device authorization grant (RFC 8628), which both forges speak:
+//! the app asks for a code, the user enters it on the forge's site, and the
+//! app polls until the forge hands it a token. It needs the public client
+//! id of an OAuth app (GitHub) or application (GitLab) with the device
+//! flow enabled, which each app built on Moonframe registers as its own.
+
+use {
+    crate::{
+        credentials::{Credential, Source, now},
+        http::{self, Failure},
+        kind::Kind,
+    },
+    secrecy::{ExposeSecret, SecretString},
+    serde_json::Value,
+    std::time::Duration,
+};
+
+const GRANT: &str = "urn:ietf:params:oauth:grant-type:device_code";
+
+/// The code the user enters, and where.
+pub struct Code {
+    pub device: SecretString,
+    pub user: String,
+    pub url: String,
+    /// The same page with the code filled in, when the forge offers one.
+    pub complete_url: Option<String>,
+    /// Unix seconds.
+    pub expires: u64,
+    pub interval: Duration,
+}
+
+/// Asks `host` for a device code.
+pub fn start(agent: &ureq::Agent, kind: Kind, host: &str, client: &str) -> Result<Code, Failure> {
+    let answer = http::form(agent, &kind.device_url(host), &[
+        ("client_id", client),
+        ("scope", kind.scopes()),
+    ])?;
+    if answer.get("error").is_some() {
+        return Err(Failure::Status(400, oauth_error(&answer)));
+    }
+    let text = |key: &str| answer.get(key).and_then(Value::as_str).map(str::to_owned);
+    let device = text("device_code").filter(|code| crate::credentials::plausible(code));
+    let user = text("user_code").filter(|code| {
+        (1..=32).contains(&code.len())
+            && code
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    });
+    // The page the user is sent to must be on the forge's own host.
+    let url = text("verification_uri").filter(|url| on_host(url, kind, host));
+    let (Some(device), Some(user), Some(url)) = (device, user, url) else {
+        return Err(Failure::Body("the device code answer is incomplete".into()));
+    };
+    let expires_in = answer
+        .get("expires_in")
+        .and_then(Value::as_u64)
+        .unwrap_or(900)
+        .clamp(60, 1800);
+    let interval = answer
+        .get("interval")
+        .and_then(Value::as_u64)
+        .unwrap_or(5)
+        .clamp(1, 60);
+    Ok(Code {
+        device: SecretString::from(device),
+        user,
+        complete_url: text("verification_uri_complete").filter(|url| on_host(url, kind, host)),
+        url,
+        expires: now() + expires_in,
+        interval: Duration::from_secs(interval),
+    })
+}
+
+fn on_host(url: &str, kind: Kind, host: &str) -> bool {
+    let expected = match kind {
+        Kind::GitHub => "github.com",
+        Kind::GitLab => host,
+    };
+    url.strip_prefix("https://")
+        .and_then(|rest| rest.split('/').next())
+        .is_some_and(|found| found.eq_ignore_ascii_case(expected))
+}
+
+/// What one poll found.
+pub enum Poll {
+    /// The user has not entered the code yet; poll again after this long.
+    Wait(Duration),
+    Done(Credential),
+    /// Denied, expired, or refused; the words say which.
+    Failed(String),
+}
+
+/// Asks once whether the user entered `code`.
+pub fn poll(agent: &ureq::Agent, kind: Kind, host: &str, client: &str, code: &Code) -> Poll {
+    let answer = match http::form(agent, &kind.token_url(host), &[
+        ("client_id", client),
+        ("device_code", code.device.expose_secret()),
+        ("grant_type", GRANT),
+    ]) {
+        Ok(answer) => answer,
+        // A blip: keep waiting, the code is still good.
+        Err(Failure::Network(_)) => return Poll::Wait(code.interval),
+        Err(failure) => return Poll::Failed(failure.to_string()),
+    };
+    match answer.get("error").and_then(Value::as_str) {
+        Some("authorization_pending") => Poll::Wait(code.interval),
+        Some("slow_down") => Poll::Wait(code.interval + Duration::from_secs(5)),
+        Some("expired_token") => Poll::Failed("the code expired; start again".into()),
+        Some("access_denied") => Poll::Failed("the sign-in was declined".into()),
+        Some(_) => Poll::Failed(oauth_error(&answer)),
+        None => match token(&answer, Source::Saved) {
+            Some(credential) => Poll::Done(credential),
+            None => Poll::Failed("the forge sent no token".into()),
+        },
+    }
+}
+
+/// Renews an expiring OAuth token with its refresh token.
+pub fn refresh(
+    agent: &ureq::Agent,
+    kind: Kind,
+    host: &str,
+    client: &str,
+    credential: &Credential,
+) -> Result<Credential, Failure> {
+    let Some(refresh) = &credential.refresh else {
+        return Err(Failure::Unauthorized);
+    };
+    let answer = http::form(agent, &kind.token_url(host), &[
+        ("client_id", client),
+        ("grant_type", "refresh_token"),
+        ("refresh_token", refresh.expose_secret()),
+    ])?;
+    if answer.get("error").is_some() {
+        return Err(Failure::Unauthorized);
+    }
+    token(&answer, credential.source).ok_or(Failure::Unauthorized)
+}
+
+/// The token in an OAuth answer.
+fn token(answer: &Value, source: Source) -> Option<Credential> {
+    let text = |key: &str| {
+        answer
+            .get(key)
+            .and_then(Value::as_str)
+            .filter(|token| crate::credentials::plausible(token))
+            .map(|token| SecretString::from(token.to_owned()))
+    };
+    Some(Credential {
+        token: text("access_token")?,
+        refresh: text("refresh_token"),
+        expires: answer
+            .get("expires_in")
+            .and_then(Value::as_u64)
+            .map(|seconds| now() + seconds),
+        source,
+    })
+}
+
+fn oauth_error(answer: &Value) -> String {
+    let words = http::message(answer);
+    if words.is_empty() {
+        let code: String = answer
+            .get("error")
+            .and_then(Value::as_str)
+            .unwrap_or("refused")
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .take(64)
+            .collect();
+        format!("the forge refused the sign-in ({code})")
+    } else {
+        words
+    }
+}

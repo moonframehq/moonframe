@@ -408,3 +408,19 @@ fn a_save_panel_answers_one_path_and_bad_picks_are_the_senders_error() {
     }
     assert!(workspace.take_requests().is_empty());
 }
+
+#[test]
+fn open_takes_only_web_addresses() {
+    let url = "https://github.com/moonframehq/moonframe/pull/1";
+    assert_eq!(
+        Request::parse("open", &Data::from(url)),
+        Ok(Request::Open(url.to_owned()))
+    );
+    for refused in ["file:///etc/passwd", "javascript:alert(1)", "x-app://do"] {
+        assert!(
+            Request::parse("open", &Data::from(refused)).is_err(),
+            "{refused}"
+        );
+    }
+    assert!(Request::parse("open", &Data::from(true)).is_err());
+}

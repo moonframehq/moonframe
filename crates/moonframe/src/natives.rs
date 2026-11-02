@@ -15,16 +15,20 @@ use {
 };
 
 pub(crate) fn natives() -> Natives {
-    let built_in: [(&str, fn() -> Box<dyn Native>); 4] = [
+    let built_in: &[(&str, fn() -> Box<dyn Native>)] = &[
+        // keep-sorted start
         ("acp", acp),
-        ("docs", docs),
-        ("git", git),
         // The demo gallery's (examples/demo): it opens apps on this binary.
         ("demos", crate::demos::native),
+        ("docs", docs),
+        ("git", git),
+        ("github", github),
+        ("gitlab", gitlab),
+        // keep-sorted end
     ];
     built_in
-        .into_iter()
-        .map(|(name, make)| {
+        .iter()
+        .map(|&(name, make)| {
             let factory: Arc<dyn Fn() -> Box<dyn Native> + Send + Sync> = Arc::new(make);
             (name.to_owned(), factory)
         })
@@ -46,6 +50,16 @@ fn git() -> Box<dyn Native> {
     moonframe_git::native()
 }
 
+#[cfg(feature = "forge")]
+fn github() -> Box<dyn Native> {
+    moonframe_forge::github()
+}
+
+#[cfg(feature = "forge")]
+fn gitlab() -> Box<dyn Native> {
+    moonframe_forge::gitlab()
+}
+
 #[cfg(not(feature = "acp"))]
 fn acp() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -61,10 +75,20 @@ fn git() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(not(feature = "forge"))]
+fn github() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "forge"))]
+fn gitlab() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 /// A built-in provider this build leaves out: it publishes nothing.
 // With every feature on, only the tests make one.
 #[cfg_attr(
-    all(feature = "acp", feature = "docs", feature = "git"),
+    all(feature = "acp", feature = "docs", feature = "forge", feature = "git"),
     allow(dead_code)
 )]
 struct LeftOut;
@@ -113,7 +137,7 @@ mod tests {
     #[test]
     fn every_built_in_native_is_registered() {
         let natives = natives();
-        for name in ["acp", "docs", "git", "demos"] {
+        for name in ["acp", "docs", "git", "github", "gitlab", "demos"] {
             assert!(natives.contains_key(name), "{name}");
         }
     }

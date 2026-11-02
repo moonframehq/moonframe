@@ -750,6 +750,11 @@ update = function(state, msg)
 end,
 ```
 
+- `app:open`, `msg` a web address (`https://` or `http://`): opens it in
+  the system's browser, as a pull request link or a sign-in page wants.
+  Other schemes (`file`, an app's own) are the sender's error. At most 3
+  pages open in 10 s. A control does it on a click: `ui.row { to =
+  "app:open", msg = pr.url, ... }`.
 - A request the app cannot read (an unknown command, a misspelled
   `app:<what>`) is the sender's error, shown as an `update` error.
 - Previews (the Components window) ask nothing, and a provider's answer
@@ -1580,9 +1585,9 @@ restyle an extension from the app side, add a rule for the same selector in
 **Live data.** Mods can't read the machine (no `os`, `io` or network).
 Providers share data under `app`: `app.system` (CPU, memory, network, from
 the Wasm provider each second), `app.git` (branch, files, diffs, worktrees;
-native, and it commits and pushes on request), and from process providers
-`app.github` and `app.gitlab` (pull requests, checks, issues),
-`app.agents` (coding agents running here), `app.files` (the project's
+native, and it commits and pushes on request), the native `app.github`
+and `app.gitlab` (pull requests, checks, issues, each worktree branch's
+pull request, and the sign-in), and from process providers `app.agents` (coding agents running here), `app.files` (the project's
 file tree), `app.docs` (native: reads and saves the project's text files
 for a mod, answering it), `app.herdr` (whether herdr-core and tmux are
 installed), and the native `app.acp` (coding agents a mod runs over ACP).
@@ -1652,17 +1657,17 @@ terminal log. There are four kinds:
     `{"available":false,"reason":"..."}` and keep polling. Exit only when
     stdin closes. Under macOS's bash 3.2, `read -t` returns 1 for both a
     timeout and the end of input; tell them apart by elapsed time (see
-    `github.sh`).
+    `herdr.sh`).
   - Keep caches out of the provider folder (a change there restarts it);
     use `~/.cache/moonframe/`.
   - The host refuses a line over 1 MiB or with over 10,000 values.
-  - `app/providers/github` is the example; `app/providers/herdr` shows how
-    to check who sent a message.
+  - `app/providers/herdr` is the example, and shows how to check who sent
+    a message.
 - **`kind = "native"`:** Rust compiled into the app, registered under the
   folder's name (`crates/moonframe/src/natives.rs`, each behind a cargo
   feature); a build without it shows why in the provider's banner. For
   what needs real libraries and the user's own access: git (on herdr-vcs),
-  and later the forges and herdr-core.
+  the forges (`crates/moonframe-forge`), and later herdr-core.
   - It implements `moonframe_providers::Native` (`start`, `tick` every
     `interval`, `receive(from, message)`) and gets a `Handle` it may clone
     into its own threads, so a slow action (a push waiting on a hardware
@@ -1744,16 +1749,46 @@ mod's `"install"` copies them, each skill folder replaced whole; it sends
 that when the user agrees on its offer, which comes back when an update
 ships newer skills.
 
-`app.github` (github, via `gh`) and `app.gitlab` (gitlab, via `glab` and
-`jq`, only for a GitLab remote): every 60 s, and on any message. Same shape;
-GitLab merge requests fill `prs` and `current_pr`.
+`app.github` (github) and `app.gitlab` (gitlab, for a remote on
+gitlab.com, `$GITLAB_HOST`, or a host listed in `[settings] hosts`): native
+(`crates/moonframe-forge`), over each forge's own API with the user's
+sign-in, every `poll` seconds (60), when the worktrees' branches change,
+and on any other message. Same shape; GitLab merge requests fill `prs`,
+`current_pr` and `branches`. `auth` and `host` are always there, also when
+`available` is false.
+
+**Signing in is the provider's, drawing it is the app's.** `auth` says where
+it stands, and a mod in the provider's `[settings] accounts` (`forge` as
+shipped) sends it `{ sign_in = true }` (a device code: `auth.code` and
+`auth.url` to show, answered once the user approved it), `{ token =
+"<pasted token>" }` (or `{ token = true, value }`, as an input's `submit`
+sends it), `{ use_cli = true }` (gh's or glab's own sign-in, read from it
+each time), `{ cancel = true }` or `{ sign_out = true }`, each answered
+`{ reply, action, ok, login | message | error }`. A device sign-in goes
+through Moonframe's own OAuth apps on github.com and gitlab.com, whose
+public ids the built-in provider.toml files carry and every app may use;
+an app that wants its own name on the approval page sets its own
+`[settings] client_id` (GitLab instances: `client_ids = { [host] = id }`;
+`MOONFRAME_GITHUB_CLIENT_ID` / `MOONFRAME_GITLAB_CLIENT_ID` override).
+Without one, `auth.device` is false and the other ways remain.
+`GH_TOKEN` and `GITHUB_TOKEN` sign in to github.com, `GITLAB_TOKEN` to
+gitlab.com or `$GITLAB_HOST` only. Tokens stay in
+the provider (the system keyring, or a private file under
+`~/.local/state/moonframe` where the build has none) and never reach a mod.
+Components: `forge-pr` (a branch's request: number by tone, checks dot,
++/− lines, opens on click; `branch = worktree.branch` beside worktrees),
+`forge-account` (the title bar's account button), `forge-sign-in` (a
+ready-made body for the app's own dialog); `mods/forge` puts them in the
+starter's title bar. `{ to = "app:open", msg = url }` opens a web page.
 
 | field | shape |
 |---|---|
 | `repo` | `{ name_with_owner, url, default_branch }` |
 | `viewer` | person: `{ login, name, bot, avatar_url, avatar_path }`; `avatar_path` is a cached file in `~/.cache/moonframe/images/avatars` (where `ui.image` may read it) once downloaded, else nil |
-| `prs` | 30 open, newest first: `{ number, title, state ("open" "closed" "merged"), draft, url, branch, base, author (person), updated, review_decision, mergeable, merge_state, checks, tone, additions?, deletions? }` |
-| `current_pr` | the same for the current branch plus `check_list = { { name, outcome, url } }`, or nil |
+| `prs` | 30 open, newest first: `{ number, title, state ("open" "closed" "merged"), draft, url, branch, base, author (person), updated, review_decision, mergeable, merge_state, checks, tone, additions?, deletions?, files? }` (GitLab's line counts only on `current_pr`) |
+| `current_pr` | the same for the current branch (its newest, open or not) plus `check_list = { { name, outcome, url } }`, or nil |
+| `branches` | `{ [branch] = pr }`: the newest pull request of the current branch and each worktree's (20 at most), for `forge-pr { branch = ... }` |
+| `auth` | `{ status ("checking" "signed_out" "pending" "verifying" "signed_in"), host, login?, source? ("saved" "env" "cli"), device, cli, code?, url?, complete_url?, expires?, error? }` |
 | `checks` | `{ total, passed, failed, pending, skipped }` (GitLab lists show the head pipeline only on `current_pr`) |
 | `tone` | `"merged"`, `"closed"`, `"draft"`, `"attention"` (conflicts, failed checks, changes requested), `"waiting"` (checks running, review required), `"ready"`, `"held"` (blocked or behind) |
 | `issues` | 30 open: `{ number, title, url, author, updated, labels = { { name, color } }, assignees = { login } }` |

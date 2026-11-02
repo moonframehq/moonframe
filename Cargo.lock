@@ -4746,6 +4746,7 @@ dependencies = [
  "moonframe-acp",
  "moonframe-core",
  "moonframe-docs",
+ "moonframe-forge",
  "moonframe-git",
  "moonframe-history",
  "moonframe-mux",
@@ -4807,6 +4808,23 @@ dependencies = [
  "moonframe-providers",
  "rustix",
  "tempfile",
+]
+
+[[package]]
+name = "moonframe-forge"
+version = "0.1.0"
+dependencies = [
+ "herdr-credentials",
+ "herdr-vcs",
+ "moonframe-core",
+ "moonframe-git",
+ "moonframe-packages",
+ "moonframe-providers",
+ "secrecy",
+ "serde_json",
+ "tempfile",
+ "tracing",
+ "ureq",
 ]
 
 [[package]]
