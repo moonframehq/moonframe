@@ -126,7 +126,16 @@ impl Build for Region {
 impl Build for Popover {
     const CHILDREN: bool = true;
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "open", "dismiss", "to", "side", "align", "gap", "width", "keys", "content",
+        "open",
+        "dismiss",
+        "to",
+        "side",
+        "align",
+        "gap",
+        "width",
+        "keys",
+        "anchor_clicks",
+        "content",
     ]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
@@ -141,6 +150,7 @@ impl Build for Popover {
             gap: fields.number("gap", 0.0..=1000.0)?.unwrap_or(6.0),
             width: fields.number("width", PIXELS)?,
             keys: fields.get("keys")?.unwrap_or_default(),
+            anchor_clicks: fields.get("anchor_clicks")?.unwrap_or(false),
             anchor: tree.children(fields)?,
             content: Box::new(tree.node(content, &fields.cx().nested("content"))?),
         })

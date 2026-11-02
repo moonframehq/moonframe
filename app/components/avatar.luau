@@ -5,6 +5,7 @@
 type Props = {
 	name: string?,
 	initial: string?,
+	letters: number?,
 	size: string?,
 	shape: string?,
 	color: string?,
@@ -33,15 +34,23 @@ local function hash(text: string): number
 	return value
 end
 
--- The name's first letter or digit, whole: `%w` knows only ASCII, so any
--- other character (É, 李) counts as a letter too.
-local function initial(name: string): string
-	for letter in string.gmatch(name, utf8.charpattern) do
-		if #letter > 1 or string.match(letter, "%w") then
-			return string.upper(letter)
+-- The first letter or digit of each of the name's first `count` words
+-- ("Alex Kim" gives "AK" for 2), whole: `%w` knows only ASCII, so any other
+-- character (É, 李) counts as a letter too.
+local function initial(name: string, count: number): string
+	local letters = {}
+	for word in string.gmatch(name, "[^%s]+") do
+		for letter in string.gmatch(word, utf8.charpattern) do
+			if #letter > 1 or string.match(letter, "%w") then
+				table.insert(letters, string.upper(letter))
+				break
+			end
+		end
+		if #letters >= count then
+			break
 		end
 	end
-	return "?"
+	return if #letters > 0 then table.concat(letters) else "?"
 end
 
 return component {
@@ -53,6 +62,7 @@ return component {
 	props = {
 		["name"] = "the name the initial and colour come from",
 		["initial"] = "letters to show instead of the name's first letter",
+		["letters"] = "how many initials to take from the name's words: 1 (default) or 2 (\"Alex Kim\" shows AK)",
 		["size"] = "small | normal | large | xlarge (18, 24, 32, 44 px)",
 		["shape"] = "square (rounded, default) | circle",
 		["color"] = "a colour instead of the one picked from the name",
@@ -93,7 +103,7 @@ return component {
 				fit = "cover",
 				class = if props.shape == "circle" then "avatar-image avatar-image-circle" else "avatar-image",
 			}
-			else ui.text { props.initial or initial(name), size = spec.text :: any }
+			else ui.text { props.initial or initial(name, props.letters or 1), size = spec.text :: any }
 		-- The status dot floats over the bottom-right corner, ringed in the
 		-- background colour so it reads on any tile.
 		local dot = math.max(7, math.floor(side / 3.2))

@@ -7,6 +7,7 @@ fn popovers_hold_an_anchor_and_floating_content() {
       view = function(_, app)
         return ui.popover {
           open = true, dismiss = "close", side = "bottom", align = "end", width = 300,
+          anchor_clicks = true,
           content = ui.text(`cpu {app.system.cpu}`),
           ui.row { msg = "toggle", ui.text "anchor" },
         }
@@ -32,6 +33,7 @@ fn popovers_hold_an_anchor_and_floating_content() {
     assert_eq!(popover.dismiss, Some(Data::from("close")));
     assert_eq!((popover.side, popover.align), (Side::Bottom, Anchor::End));
     assert_eq!(popover.width, Some(300.0));
+    assert!(popover.anchor_clicks);
     let Node::Text(text) = popover.content.as_ref() else {
         panic!("no content");
     };

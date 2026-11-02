@@ -767,6 +767,9 @@ type PopoverProps = {
 	gap: number?,
 	width: number?,
 	keys: Keys?,
+	-- While open, a click on the anchor reaches it instead of sending
+	-- `dismiss`: a field whose suggestions show under it.
+	anchor_clicks: boolean?,
 	content: Element,
 	[number]: Child,
 }
