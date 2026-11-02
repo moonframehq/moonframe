@@ -69,6 +69,8 @@ pub fn native() -> Box<dyn Native> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Phase {
     Starting,
+    // Only an attached chat is live, and chats attach on Unix alone.
+    #[cfg_attr(not(unix), allow(dead_code))]
     Live,
     Reconnecting,
     Ended(String),
@@ -92,7 +94,9 @@ pub(crate) struct Chat {
     pub(crate) closing: bool,
 }
 
-/// A command sent and not yet acknowledged: whom to answer.
+/// A command sent and not yet acknowledged: whom to answer. Commands go
+/// out on Unix alone.
+#[cfg_attr(not(unix), allow(dead_code))]
 pub(crate) struct Pending {
     pub(crate) owner: String,
     pub(crate) reply: Value,
@@ -102,6 +106,7 @@ pub(crate) struct Pending {
 #[derive(Default)]
 pub(crate) struct State {
     pub(crate) chats: Vec<Chat>,
+    #[cfg_attr(not(unix), allow(dead_code))]
     pub(crate) pending: HashMap<CommandId, Pending>,
     pub(crate) agents: Vec<String>,
     pub(crate) focus: Option<String>,
@@ -112,6 +117,7 @@ pub(crate) struct State {
 }
 
 impl State {
+    #[cfg_attr(not(unix), allow(dead_code))]
     pub(crate) fn chat(&self, id: &str) -> Option<&Chat> {
         self.chats.iter().find(|chat| chat.id == id)
     }

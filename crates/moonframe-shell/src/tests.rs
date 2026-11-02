@@ -1,3 +1,7 @@
+// The helpers driving the provider serve the tests that run commands,
+// which need a Unix shell.
+#![cfg_attr(not(unix), allow(dead_code, unused_imports))]
+
 use {
     super::{ansi::Output, *},
     moonframe_providers::Event,
