@@ -277,14 +277,13 @@ pub fn environment(kind: Kind) -> Option<Credential> {
 pub fn cli(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Credential> {
     let (program, args) = kind.cli(host);
     let program = moonframe_providers::program::find(program, path)?;
-    let output = cli_command(&program, kind, host, path)
-        .args(args)
-        .output()
-        .ok()?;
-    if !output.status.success() || output.stdout.len() > 4096 {
+    let mut command = cli_command(&program, kind, host, path);
+    command.args(args);
+    let (succeeded, stdout) = run_within(command, true)?;
+    if !succeeded || stdout.len() > 4096 {
         return None;
     }
-    let token = String::from_utf8(output.stdout).ok()?;
+    let token = String::from_utf8(stdout).ok()?;
     let token = token.trim();
     plausible(token).then(|| Credential::new(SecretString::from(token.to_owned()), Source::Cli))
 }
@@ -297,15 +296,66 @@ pub fn cli(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Credential>
 pub fn cli_ready(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Credential> {
     if kind == Kind::GitLab {
         let program = moonframe_providers::program::find("glab", path)?;
-        let renewed = cli_command(&program, kind, host, path)
-            .args(["api", "user", "--hostname", host])
-            .stdout(Stdio::null())
-            .status();
-        if !renewed.is_ok_and(|status| status.success()) {
+        let mut command = cli_command(&program, kind, host, path);
+        command.args(["api", "user", "--hostname", host]);
+        if !run_within(command, false).is_some_and(|(succeeded, _)| succeeded) {
             tracing::debug!("gitlab: glab could not reach {host}; using its saved token");
         }
     }
     cli(kind, host, path)
+}
+
+/// How long a CLI may take: one stalled on the network or on its
+/// credential store must not leave a sign-in checking, or a refresh
+/// running, for good.
+const CLI_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// Runs `command` for at most [`CLI_TIMEOUT`] (`run_for`: `timeout`): whether it succeeded, and
+/// what it printed (at most 8 KiB) when `capture`. `None` when it could not
+/// start or ran out of time, and was killed.
+fn run_within(command: Command, capture: bool) -> Option<(bool, Vec<u8>)> {
+    run_for(command, capture, CLI_TIMEOUT)
+}
+
+fn run_for(
+    mut command: Command,
+    capture: bool,
+    timeout: std::time::Duration,
+) -> Option<(bool, Vec<u8>)> {
+    use std::io::Read;
+    command.stdout(if capture {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    });
+    let mut child = command.spawn().ok()?;
+    // Read on a thread, so a full pipe never stalls the program.
+    let reader = child.stdout.take().map(|stdout| {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let _ = stdout.take(8192).read_to_end(&mut bytes);
+            bytes
+        })
+    });
+    let deadline = std::time::Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            },
+            _ => {
+                tracing::warn!("a forge CLI ran past {}s; stopped", timeout.as_secs());
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            },
+        }
+    };
+    let stdout = reader
+        .and_then(|reader| reader.join().ok())
+        .unwrap_or_default();
+    Some((status.success(), stdout))
 }
 
 /// A CLI choice is resolved afresh rather than reusing a captured token.

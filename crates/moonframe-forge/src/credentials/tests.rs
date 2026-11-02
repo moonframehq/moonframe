@@ -63,3 +63,17 @@ esac
         "refreshed-token"
     );
 }
+
+#[test]
+fn a_stalled_cli_is_stopped_at_its_deadline() {
+    let started = std::time::Instant::now();
+    let mut sleeper = Command::new("sh");
+    sleeper.args(["-c", "sleep 30"]);
+    assert!(run_for(sleeper, true, std::time::Duration::from_millis(300)).is_none());
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    let mut echo = Command::new("sh");
+    echo.args(["-c", "printf token-value"]);
+    let (succeeded, stdout) = run_for(echo, true, std::time::Duration::from_secs(5)).unwrap();
+    assert!(succeeded);
+    assert_eq!(stdout, b"token-value");
+}
