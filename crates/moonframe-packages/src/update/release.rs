@@ -90,14 +90,7 @@ pub(super) const DOWNLOAD: Duration = Duration::from_secs(30 * 60);
 /// or with `beta`, the newest pre-release too. Blocks on the network.
 pub fn check(source: &Source, beta: bool) -> Result<Found, String> {
     let release = if beta {
-        // Every release, newest first: `latest` skips pre-releases.
-        let text = ask(&format!("{}?per_page=30", releases(source)))?;
-        let Some(text) = text else {
-            return Ok(Found::NoRelease);
-        };
-        let all: Vec<GithubRelease> = serde_json::from_str(&text)
-            .map_err(|error| format!("unexpected answer from GitHub: {error}"))?;
-        match newest(all) {
+        match newest(every_release(source)?) {
             Some(release) => release,
             None => return Ok(Found::NoRelease),
         }
@@ -109,6 +102,35 @@ pub fn check(source: &Source, beta: bool) -> Result<Found, String> {
             .map_err(|error| format!("unexpected answer from GitHub: {error}"))?
     };
     Ok(found(release, &source.version))
+}
+
+/// How many releases a page of GitHub's list holds, at most.
+const PER_PAGE: usize = 100;
+
+/// How many pages of releases a beta check reads at most: a thousand
+/// releases, so a repository with years of nightlies still answers in a
+/// few requests.
+const PAGES: usize = 10;
+
+/// `source`'s releases, every page of them (up to [`PAGES`]): GitHub lists
+/// them newest first by date, not by version, so a backport or nightly
+/// published after a higher version can push it onto a later page.
+fn every_release(source: &Source) -> Result<Vec<GithubRelease>, String> {
+    let mut all = Vec::new();
+    for page in 1..=PAGES {
+        let url = format!("{}?per_page={PER_PAGE}&page={page}", releases(source));
+        let Some(text) = ask(&url)? else {
+            break;
+        };
+        let releases: Vec<GithubRelease> = serde_json::from_str(&text)
+            .map_err(|error| format!("unexpected answer from GitHub: {error}"))?;
+        let last = releases.len() < PER_PAGE;
+        all.extend(releases);
+        if last {
+            break;
+        }
+    }
+    Ok(all)
 }
 
 /// The API address of `source`'s releases.

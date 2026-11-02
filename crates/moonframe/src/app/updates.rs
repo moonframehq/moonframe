@@ -95,6 +95,16 @@ impl MoonframeApp {
                 .background_executor()
                 .spawn(async move { crate::update::check(&looked, beta) })
                 .await;
+            // Beta Releases changed while this check ran: its answer is for
+            // the old choice, so it neither counts as the day's nor is
+            // offered; a check for the new choice runs instead.
+            if crate::update::beta() != beta {
+                let _ = this.update(cx, |this, cx| {
+                    this.updating = false;
+                    this.check_for_updates(asked, cx);
+                });
+                return;
+            }
             // Only a check that reached GitHub counts as the day's: one that
             // failed (offline, rate limited) is tried again within the hour.
             if found.is_ok() {
