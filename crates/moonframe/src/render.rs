@@ -246,6 +246,9 @@ pub(crate) struct Painter<'w, 'm> {
     /// The window it draws, for what is kept per window (a viewer's box);
     /// `None` for the components window.
     window: Option<WindowId>,
+    /// How many frames that window has drawn, this one included: what was
+    /// not drawn in the frame before this one was gone in between.
+    frame: u64,
 }
 
 /// A list's rows a mod should build, which the app asks the workspace for
@@ -285,12 +288,14 @@ impl<'w, 'm> Painter<'w, 'm> {
             views: None,
             last_keyed: None,
             window: None,
+            frame: 0,
         }
     }
 
     /// For the window `window`: what is kept per window stays apart.
     pub(crate) fn in_window(mut self, window: WindowId) -> Self {
         self.window = Some(window);
+        self.frame = viewer::begin_frame(window);
         self
     }
 

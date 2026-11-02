@@ -21,6 +21,20 @@ thread_local! {
     static BOXES: RefCell<HashMap<String, Size<Pixels>>> = RefCell::new(HashMap::new());
     /// What each viewer last told its mod, so it is told only of changes.
     static TOLD: RefCell<HashMap<String, [u32; 5]>> = RefCell::new(HashMap::new());
+    /// Frames each window has drawn, and the frame each viewer was last
+    /// drawn in: one missing from the frame before is a new viewer, whose
+    /// mod has been told nothing yet.
+    static FRAMES: RefCell<HashMap<WindowId, u64>> = RefCell::new(HashMap::new());
+    static SEEN: RefCell<HashMap<String, u64>> = RefCell::new(HashMap::new());
+}
+
+/// Counts a frame of `window`, returning its number.
+pub(super) fn begin_frame(window: WindowId) -> u64 {
+    FRAMES.with_borrow_mut(|frames| {
+        let frame = frames.entry(window).or_insert(0);
+        *frame += 1;
+        *frame
+    })
 }
 
 /// Whether `image` needs the viewer rather than a plain picture.
@@ -39,6 +53,13 @@ pub(super) fn draw<'w>(
     let theme = cx.theme();
     let natural = super::images::natural(path);
     let key = format!("{:?}/{}", painter.window, place.path);
+    // Drawn again after a gap (removed, then mounted anew): its mod's
+    // state starts over, so it must be told the picture's size again.
+    let frame = painter.frame;
+    let last = SEEN.with_borrow_mut(|seen| seen.insert(key.clone(), frame));
+    if frame > 0 && !matches!(last, Some(seen) if seen + 1 >= frame) {
+        TOLD.with_borrow_mut(|told| told.remove(&key));
+    }
     let laid = BOXES.with_borrow(|boxes| boxes.get(&key).copied());
     let mut element = div()
         .id(place.id())

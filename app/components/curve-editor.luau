@@ -201,12 +201,16 @@ return component {
 				nearest = at
 			end
 			state.dragging = nearest
-		elseif msg.phase == "up" then
-			state.dragging = nil
-			return state, { { to = "parent", msg = message(props.change, points, "up") } }
 		end
 		local index = state.dragging
+		if msg.phase == "up" then
+			-- The release has the final position: put the point there first.
+			state.dragging = nil
+		end
 		if not index or not points[index] then
+			if msg.phase == "up" then
+				return state, { { to = "parent", msg = message(props.change, points, "up") } }
+			end
 			return state
 		end
 		local low = if index > 1 then points[index - 1][1] + GAP else 0

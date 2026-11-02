@@ -77,7 +77,7 @@ impl MoonframeApp {
     /// once nothing nearer took it: every mod, and every mounted copy of
     /// one, whose keys take it hears it. A focused text field keeps all
     /// its keys (copy, select all, undo), so mods hear none while one has
-    /// focus.
+    /// focus; and a shell menu item's shortcut stays the menu's.
     pub(crate) fn mod_keystroke(
         &mut self,
         keystroke: &Keystroke,
@@ -96,6 +96,20 @@ impl MoonframeApp {
             shift: modifiers.shift,
             cmd: modifiers.platform,
         };
+        // The shell's menus come first: their shortcuts are GPUI bindings,
+        // which see the key only after this.
+        let menu_takes = self.workspace.menus().iter().any(|menu| {
+            menu.items.iter().any(|entry| match entry {
+                moonframe_core::MenuEntry::Item(item) => item
+                    .shortcut
+                    .as_ref()
+                    .is_some_and(|chord| chord.matches(&pressed, MAC)),
+                moonframe_core::MenuEntry::Separator => false,
+            })
+        });
+        if menu_takes {
+            return false;
+        }
         let hearers: Vec<(String, moonframe_core::Data)> = self
             .workspace
             .mod_keys()
