@@ -52,6 +52,7 @@ impl MoonframeApp {
             .meta()
             .and_then(|meta| meta.title.clone())
             .unwrap_or_else(|| name.to_owned());
+        let sizing = slot.meta().and_then(|meta| meta.window).unwrap_or_default();
         let open = self.mod_windows.get(name).copied().filter(|handle| {
             cx.windows()
                 .iter()
@@ -68,9 +69,44 @@ impl MoonframeApp {
                 let app = cx.entity();
                 let name = name.to_owned();
                 cx.defer(move |cx| {
-                    if let Some(handle) = ModWindow::open(app.clone(), name.clone(), title, cx) {
+                    if let Some(handle) =
+                        ModWindow::open(app.clone(), name.clone(), title, sizing, cx)
+                    {
                         app.update(cx, |app, _| app.mod_windows.insert(name, handle));
                     }
+                });
+            },
+        }
+    }
+
+    /// Does what the mod `from` asked with `app:window`: opens a mod's
+    /// window (what it was sent is already delivered) or closes it. A
+    /// preview asks nothing.
+    pub(super) fn window_request(
+        &mut self,
+        from: &str,
+        request: WindowRequest,
+        cx: &mut Context<Self>,
+    ) {
+        if from.starts_with(moonframe_core::DEMO) {
+            return;
+        }
+        match request {
+            WindowRequest::Open { name, .. } if self.workspace.slot(&name).is_none() => {
+                self.workspace.refuse(
+                    from,
+                    Error::new(format!("`app:window`: no mod named `{name}`")),
+                );
+            },
+            WindowRequest::Open { name, .. } => self.show_mod_window(&name, cx),
+            WindowRequest::Close(name) => {
+                let Some(handle) = self.mod_windows.remove(&name) else {
+                    return;
+                };
+                // After this update: the mod may have asked from its own
+                // window, which is busy until it returns.
+                cx.defer(move |cx| {
+                    let _ = handle.update(cx, |_, window, _| window.remove_window());
                 });
             },
         }

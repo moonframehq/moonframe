@@ -3,8 +3,8 @@
 
 use {
     crate::{
-        About, AppMenu, Chrome, Data, Error, Keys, ListWindow, Node, Rules, SHELL, Stylesheet,
-        TabKind,
+        About, AppMenu, Chrome, Data, Error, Keys, ListWindow, ModWindowSize, Node, Rules, SHELL,
+        Stylesheet, TabKind,
         component::Library,
         menus::Menus,
         node,
@@ -105,6 +105,9 @@ pub struct Meta {
     pub title: Option<String>,
     /// Offered as a kind of tab: tab bars mount an instance of it per tab.
     pub tab: Option<TabKind>,
+    /// The size of its own window (`window = { size, min_size }`), when it
+    /// opens in one.
+    pub window: Option<ModWindowSize>,
 }
 
 /// What `main.luau` returns: `mod { init, update, view, ... }`; or, for a
@@ -121,7 +124,8 @@ struct Definition {
     /// Rules for what this mod draws, read when it renders so color names
     /// follow the current stylesheet.
     styles: Option<Value>,
-    /// The window the shell asks for; only `main.luau` may set it.
+    /// The window the shell asks for; a mod's `window` is the size of its
+    /// own, in [`Meta`].
     window: Option<Chrome>,
     /// The shell's menus and About panel; `main.luau` only, too.
     menus: Option<Menus>,
@@ -132,8 +136,10 @@ struct Definition {
     meta: Meta,
 }
 
-impl Read for Definition {
-    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+impl Definition {
+    /// `shell` says how `window` reads: the main window's chrome, or the
+    /// size of a mod's own window.
+    fn read(value: &Value, cx: &Cx, shell: bool) -> Result<Self, Error> {
         if !matches!(value, Value::Table(_)) {
             return Err(cx.fail("main.luau must return mod { ... }"));
         }
@@ -159,7 +165,11 @@ impl Read for Definition {
             component: false,
             subscribe: fields.get("subscribe")?.unwrap_or_default(),
             styles: fields.raw("styles").cloned(),
-            window: fields.get("window")?,
+            window: if shell {
+                fields.get("window")?
+            } else {
+                None
+            },
             menus: fields.get("menus")?,
             about: fields.get("about")?,
             keys: fields.get("keys")?.unwrap_or_default(),
@@ -168,6 +178,11 @@ impl Read for Definition {
                 order: fields.get("order")?.unwrap_or(0),
                 title: fields.get("title")?,
                 tab: fields.get("tab")?,
+                window: if shell {
+                    None
+                } else {
+                    fields.get("window")?
+                },
             },
         })
     }
@@ -214,12 +229,7 @@ impl Module {
         let meter = Meter::default();
         let lua = vm::open(name, &meter, library, vm::MEMORY)?;
         let value = vm::text(&lua, source, name).eval::<Value>()?;
-        let definition = Definition::read(&value, &Cx::root(&NO_NAMES))?;
-        if definition.window.is_some() && name != SHELL {
-            return Err(Error::new(
-                "window: only the shell (main.luau) sets the window",
-            ));
-        }
+        let definition = Definition::read(&value, &Cx::root(&NO_NAMES), name == SHELL)?;
         if (definition.menus.is_some() || definition.about.is_some()) && name != SHELL {
             return Err(Error::new(
                 "menus and about: only the shell (main.luau) sets them",

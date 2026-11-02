@@ -53,7 +53,9 @@ pub use {
     node::*,
     persist::Persist,
     read::MAX_DOCUMENT,
-    request::{APP, Appearance, Notification, Pick, PickKind, Request, SOUND_TYPES, Sound},
+    request::{
+        APP, Appearance, Notification, Pick, PickKind, Request, SOUND_TYPES, Sound, WindowRequest,
+    },
     roots::{AppLayer, Roots, mod_name},
     style::{
         Case, Color, Corners, Curve, Font, Gradient, Look, MonoFont, Paint, Part, Resolved, Rules,
@@ -61,7 +63,7 @@ pub use {
         Transition, TransitionKind,
     },
     vm::printable,
-    window::{Chrome, Platform, Titlebar, WindowState},
+    window::{Chrome, ModWindowSize, Platform, Titlebar, WindowState},
     workspace::{DEMO, PROVIDER, SHELL, Slot, TOPIC, Workspace},
 };
 
