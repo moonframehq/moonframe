@@ -649,9 +649,10 @@ fn a_mod_that_shadows_a_git_writer_is_named() {
     assert!(writers(&user).contains(&"later".to_owned()));
 }
 
-/// The same holds for every built-in provider with `writers`: a package's
-/// mod named `usage` (allowed to raise Keychain prompts and reach SSH
-/// hosts) or `editor` (allowed to save files) is named too.
+/// The same holds for every built-in provider that trusts mods by name: a
+/// package's mod named `usage` (allowed to raise Keychain prompts and
+/// reach SSH hosts), `editor` (allowed to save files) or `feedback`
+/// (allowed to start agents that run as the user) is named too.
 #[test]
 fn a_mod_that_shadows_any_providers_writer_is_named() {
     let dir = tempfile::tempdir().unwrap();
@@ -659,11 +660,12 @@ fn a_mod_that_shadows_any_providers_writer_is_named() {
     let remote = repo(dir.path(), "baz", &[
         ("mods/usage/main.luau", &counter("u")),
         ("mods/editor/main.luau", &counter("e")),
+        ("mods/feedback/main.luau", &counter("f")),
     ]);
     let (_, contents) = install(&user, remote.to_str().unwrap(), &yes).unwrap();
     let all = writers(&user);
     assert_eq!(contents.writers(&all).collect::<Vec<_>>(), [
-        "editor", "usage"
+        "editor", "feedback", "usage"
     ]);
 
     let usage = user.join("providers/usage");
@@ -674,6 +676,16 @@ fn a_mod_that_shadows_any_providers_writer_is_named() {
     )
     .unwrap();
     assert!(writers(&user).contains(&"mine".to_owned()));
+
+    // acp's `allow` names mods by its keys.
+    let acp = user.join("providers/acp");
+    fs::create_dir_all(&acp).unwrap();
+    fs::write(
+        acp.join("provider.toml"),
+        "kind = \"native\"\n[settings]\nallow = { helper = \"all\" }\n",
+    )
+    .unwrap();
+    assert!(writers(&user).contains(&"helper".to_owned()));
 }
 
 /// An update of an app is approved with what it ships beside it: a

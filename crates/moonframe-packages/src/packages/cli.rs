@@ -172,7 +172,8 @@ pub fn update(user: &Path, name: Option<&str>, approve: super::Approve) -> Resul
 
 /// Asks before a package's providers may run code with the user's access,
 /// or its mods may send a built-in provider privileged messages (named in
-/// a `writers` list: commit and push, save files, Keychain, SSH); other mods,
+/// a provider's settings: start agents, commit and push, save files,
+/// Keychain, SSH); other mods,
 /// components, and styles are Luau the app runs sandboxed. An app's
 /// approval covers the packages it ships beside it, which its updates
 /// change with it.
@@ -201,7 +202,7 @@ pub fn approve(contents: &Contents, writers: &[String], yes: bool) -> Result<(),
     }
     if !writing.is_empty() {
         println!(
-            "This package replaces mods that built-in providers trust (to commit and push, save files, read Keychain sign-ins, or connect over SSH):"
+            "This package replaces mods that built-in providers trust (to start coding agents, commit and push, save files, read Keychain sign-ins, or connect over SSH):"
         );
         for name in &writing {
             println!("  {name}");
