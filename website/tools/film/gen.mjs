@@ -93,11 +93,27 @@ function caption(t, a, b, n, eyebrow, head, sub, { x = 110, y = 128, width = 170
 }
 
 // ---------- timeline ----------
+// Each scene's own clock: a scene draws itself for times within its range,
+// and its cues (clicks, typing) are written in these times.
 const S = {
   intro: [0, 4.2], live: [4.0, 13.4], ask: [13.2, 21.6], inspect: [21.4, 27.0], comps: [26.8, 32.4],
   term: [32.2, 38.6], agents: [38.4, 43.8], sandbox: [43.6, 48.4], apps: [48.2, 55.4], outro: [55.2, 60],
 };
-const on = (t, k) => t >= S[k][0] && t < S[k][1];
+// The order the film plays them in. Each starts 0.2s before the previous one
+// ends, so they cross-fade; PLACE maps film time back onto a scene's clock.
+// The chapter times in website/site/index.html and film/chapters.vtt follow it.
+const ORDER = ["intro", "ask", "inspect", "agents", "live", "comps", "term", "sandbox", "apps", "outro"];
+const PLACE = {};
+{
+  let at = 0;
+  for (const k of ORDER) {
+    const [a, b] = S[k];
+    PLACE[k] = { start: at, end: at + (b - a), shift: at - a };
+    at += b - a - 0.2;
+  }
+}
+// Scene numbers in the captions, in playing order (the intro and outro have none).
+const NUM = Object.fromEntries(ORDER.filter((k) => k !== "intro" && k !== "outro").map((k, i) => [k, i + 1]));
 
 // ---------- 1. intro ----------
 function intro(t) {
@@ -165,9 +181,18 @@ function codeLine(x, y, s, size = 21) {
 function live(t) {
   const [a, b] = S.live;
   const o = fadeIO(t, a, b, 0.5);
-  let s = caption(t, a, b, 1, "The whole window is Luau", "Save a file. The window reshapes.", "Every panel is a Luau mod that reloads as you save, with its state kept.");
-  // ---- code card
-  const cx = 110, cy = 270, cw = 800, ch = 680;
+  let s = caption(t, a, b, NUM.live, "Under the hood", "It's all Luau, reloaded live.", "The agent's edits land in Luau files that reload in place: no rebuild, no restart, state kept.");
+  // ---- the request: after the clicks, the agent is asked for the change
+  const PROMPT = "rename it Moon counter, make it orange and rounder";
+  const qo = eOut(prog(t, 6.2, 6.45));
+  if (qo > 0) {
+    let q = rect(110, 262, 800, 52, { rx: 14, fill: C.ink });
+    q += text(132, 296, "you", { size: 17, family: MONO, fill: "#8a7a6a" });
+    q += text(180, 296, "› " + typed(PROMPT, t, 6.35, 6.85), { size: 20, family: MONO, fill: C.cream });
+    s += g(q, { op: qo * o, ty: (1 - qo) * -10 });
+  }
+  // ---- code card, edited by the agent
+  const cx = 110, cy = 330, cw = 800, ch = 620;
   const styleTab = t >= 8.6;
   let c = rect(cx, cy, cw, ch, { rx: 18, fill: "#000", op: 0.3, filter: "shadow" }) + rect(cx, cy, cw, ch, { rx: 18, fill: "#24160e" });
   c += rect(cx, cy, cw, 54, { rx: 18, fill: "#1a0f09" }) + rect(cx, cy + 36, cw, 18, { fill: "#1a0f09" });
@@ -178,8 +203,9 @@ function live(t) {
     c += rect(tx, cy + 10, w, 36, { rx: 9, fill: act ? "#3a2618" : "none" }) + text(tx + 18, cy + 34, n, { size: 18, family: MONO, fill: act ? C.cream : "#8a7a6a" });
     tx += w + 8;
   }
+  if (t >= 6.9 && t < 10.3) c += text(cx + cw - 24, cy + 34, "agent editing…", { size: 17, family: MONO, fill: C.sunY, anchor: "end" });
   const lines = styleTab ? STYLE_CODE : MOD_CODE;
-  let ly = cy + 100;
+  let ly = cy + 90;
   const caretOn = Math.floor(t * 2.5) % 2 === 0;
   for (const [ln0, tag] of lines) {
     let ln = ln0, editing = false;
@@ -198,13 +224,13 @@ function live(t) {
       const at = ln.lastIndexOf('"') > 0 && tag !== "radius" ? ln.lastIndexOf('"') : ln.indexOf(",") ;
       c += rect(cx + 34 + at * 21 * 0.6, ly - 22, 3, 28, { fill: C.sunY });
     }
-    ly += styleTab ? 46 : 33;
+    ly += styleTab ? 46 : 31;
   }
   // save chip
   const saves = [8.0, 10.3];
   for (const sv of saves) {
     const so = fadeIO(t, sv, sv + 1.1, 0.2);
-    if (so > 0) c += pill(cx + cw - 190, cy + ch - 70, "⌘S  saved", { fill: C.teal, size: 20, h: 44, op: so, family: MONO });
+    if (so > 0) c += pill(cx + cw - 210, cy + ch - 70, "agent saved", { fill: C.teal, size: 20, h: 44, op: so, family: MONO });
   }
   s += g(c, { op: o, tx: (1 - eOut(prog(t, a, a + 0.7))) * -60 });
 
@@ -260,7 +286,7 @@ const VALS = [0.44, 0.66, 0.53, 0.58, 0.96, 0.49];
 function ask(t) {
   const [a, b] = S.ask;
   const o = fadeIO(t, a, b, 0.5);
-  let s = caption(t, a, b, 2, "Send feedback", "Ask the running app to change.", "A coding agent edits it, checks it, screenshots it — and the window reloads in front of you.");
+  let s = caption(t, a, b, NUM.ask, "Send feedback", "Ask the running app to change.", "A coding agent edits it, checks it, screenshots it — and the window reloads in front of you.");
   const x = 110, y = 270, w = 1080, h = 680;
   let r = rect(x, y, w, h, { rx: 16, fill: "#000", op: 0.35, filter: "shadow" }) + rect(x, y, w, h, { rx: 16, fill: "#161616" });
   r += rect(x, y, w, 52, { rx: 16, fill: "#1e1e1e" }) + rect(x, y + 36, w, 16, { fill: "#1e1e1e" });
@@ -347,7 +373,7 @@ const REGIONS = [
 function inspect(t) {
   const [a, b] = S.inspect;
   const o = fadeIO(t, a, b, 0.5);
-  let s = caption(t, a, b, 3, "Inspect Element  ⌥⌘I", "Point at anything.", "The inspector tells your agent which file and line drew it. Then say “add a branch list here”.");
+  let s = caption(t, a, b, NUM.inspect, "Inspect Element  ⌥⌘I", "Point at anything.", "The inspector tells your agent which file and line drew it. Then say “add a branch list here”.");
   const sc = 1160 / WIN_W, ix = 110, iy = 260, iw = WIN_W * sc, ih = WIN_H * sc;
   let r = img("window.png", ix, iy, iw, ih, { rx: 14 });
   let cur = null, prev = null;
@@ -392,7 +418,7 @@ const COMPONENTS = fs.readdirSync(path.join(REPO, "app/components")).filter((f) 
 function comps(t) {
   const [a, b] = S.comps;
   const o = fadeIO(t, a, b, 0.5);
-  let s = caption(t, a, b, 4, "Components", "", "Tabs, tables, charts, a command palette, a markdown editor, dialogs, sheets, toasts…");
+  let s = caption(t, a, b, NUM.comps, "Components", "", "Tabs, tables, charts, a command palette, a markdown editor, dialogs, sheets, toasts…");
   const n = Math.round(COMPONENTS.length * eOut(prog(t, a + 0.3, a + 2.4)));
   s += g(text(110, 136, `${n} components, ready to use.`, { size: 62, family: SERIF, fill: C.ink }), { op: fadeIO(t, a + 0.25, b, 0.5) });
   // tile wall
@@ -425,7 +451,7 @@ function comps(t) {
 function term(t) {
   const [a, b] = S.term;
   const o = fadeIO(t, a, b, 0.5);
-  let s = caption(t, a, b, 5, "Batteries included", "Terminals, git, live data, themes.", "The window that ships: every part of it is a mod you can change.");
+  let s = caption(t, a, b, NUM.term, "Batteries included", "Terminals, git, live data, themes.", "The window that ships: every part of it is a mod you can change.");
   const sc = 1120 / WIN_W, ix = 110, iy = 260, iw = WIN_W * sc, ih = WIN_H * sc;
   const dk = eIO(prog(t, 36.6, 37.2));
   let r = img("window.png", ix, iy, iw, ih, { rx: 14 });
@@ -461,7 +487,7 @@ const AGENTS = [["claude", "Claude"], ["codex", "Codex"], ["gemini", "Gemini"], 
 function agents(t) {
   const [a, b] = S.agents;
   const o = fadeIO(t, a, b, 0.5);
-  let s = caption(t, a, b, 6, "Agent Client Protocol", "Coding agents, inside any mod.", "Run Claude, Codex, Gemini, OpenCode or Copilot, and show their plan, tool calls and questions.");
+  let s = caption(t, a, b, NUM.agents, "Agent Client Protocol", "Coding agents, inside any mod.", "Run Claude, Codex, Gemini, OpenCode or Copilot, and show their plan, tool calls and questions.");
   let l = "";
   AGENTS.forEach(([id, name], i) => {
     const k = eBack(prog(t, a + 0.4 + i * 0.12, a + 0.8 + i * 0.12));
@@ -513,7 +539,7 @@ function agents(t) {
 function sandbox(t) {
   const [a, b] = S.sandbox;
   const o = fadeIO(t, a, b, 0.5);
-  let s = caption(t, a, b, 7, "What runs with what access", "Each kind of code has its limits.", "Mods and running Wasm providers reach only what they're given. Building from source runs Cargo as you.");
+  let s = caption(t, a, b, NUM.sandbox, "What runs with what access", "Each kind of code has its limits.", "Mods and running Wasm providers reach only what they're given. Building from source runs Cargo as you.");
   const layers = [
     ["Mods", "Luau", "In the host's sandbox: no files, network or processes.", "Memory cap and instruction budget.", C.teal],
     ["Wasm providers", "wasmtime", "Run with 64 MiB, an instruction budget, and only the capabilities", "in provider.toml. Built from source with Cargo as you; bundled apps ship them prebuilt.", C.sunO],
@@ -550,7 +576,7 @@ const APPS = [
 function apps(t) {
   const [a, b] = S.apps;
   const o = fadeIO(t, a, b, 0.5);
-  let s = caption(t, a, b, 8, "Whole apps", "25 example apps. Build your own.", "Each runs as a profile of its own beside the starter, and ships as a standalone release.");
+  let s = caption(t, a, b, NUM.apps, "Whole apps", "25 example apps. Build your own.", "Each runs as a profile of its own beside the starter, and ships as a standalone release.");
   const tw1 = 340, th1 = 222, gap = 24;
   let wall = "";
   for (let row = 0; row < 3; row++) {
@@ -600,16 +626,11 @@ function frame(n) {
   const t = n / FPS;
   uid = 0;
   let body = "";
-  if (on(t, "intro")) body += intro(t);
-  if (on(t, "live")) body += live(t);
-  if (on(t, "ask")) body += ask(t);
-  if (on(t, "inspect")) body += inspect(t);
-  if (on(t, "comps")) body += comps(t);
-  if (on(t, "term")) body += term(t);
-  if (on(t, "agents")) body += agents(t);
-  if (on(t, "sandbox")) body += sandbox(t);
-  if (on(t, "apps")) body += apps(t);
-  if (on(t, "outro")) body += outro(t);
+  const draw = { intro, live, ask, inspect, comps, term, agents, sandbox, apps, outro };
+  for (const k of ORDER) {
+    const p = PLACE[k];
+    if (t >= p.start && t < p.end) body += draw[k](t - p.shift);
+  }
   // progress hairline
   const bar = rect(0, H - 6, W * (t / DUR), 6, { fill: C.sunO, op: t < 4 || t > 55.2 ? 0 : 0.8 });
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
