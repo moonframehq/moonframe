@@ -1719,7 +1719,8 @@ that something runs until the reply comes.
 lists, followed as it moves; a file read before it moved is still watched
 and saved where it was read. `read` and `write` take `root` (the absolute
 folder a file is in, as `app.files.path` named it) so a tab keeps its file
-after the project moves; only a root the provider has had is accepted. It reads and saves the project's text files (UTF-8, at most 1 MiB)
+after the project moves; only a root the provider has had, or a project
+the app has followed (kept across launches), is accepted. It reads and saves the project's text files (UTF-8, at most 1 MiB)
 for the mod that asks, answering it (`{ reply, action, ok, path, ... }`):
 `{ read = "<path>", id = ... }` answers with `text` and `version`, and from
 then on sends that mod `{ changed = "<path>", version }` (or `missing =

@@ -10,7 +10,9 @@
 //! the root moved stays in its own: it is watched and saved there. A mod
 //! may name the root a file is in (`root`, an absolute folder), so a tab
 //! keeps reading its own file after the project moves; only a root this
-//! provider has had counts, never a folder a mod makes up.
+//! provider has had, or a project the app has followed (in this launch or
+//! one it remembers, for a tab restored from then), counts, never a folder
+//! a mod makes up.
 //!
 //! Messages, each answered to the mod that sent it with
 //! `{ reply = id, action, ok, path, ... }` (`reply` is the action's name when
@@ -197,7 +199,7 @@ impl Docs {
         Path::new(asked)
             .canonicalize()
             .ok()
-            .filter(|root| self.roots.contains(root))
+            .filter(|root| self.roots.contains(root) || moonframe_providers::followed(root))
             .ok_or_else(|| format!("`{asked}` is not a project this app shows").into())
     }
 

@@ -5,6 +5,10 @@
 //! there (see [`moonframe_providers::set_project`]). Outside any
 //! repository, or in home (a dotfiles repository), they stay where they
 //! were.
+//!
+//! The projects followed are kept in a file beside the app's state, so a
+//! markdown tab restored at the next launch may still read and save its
+//! file in the project it came from.
 
 use {
     crate::app::MoonframeApp,
@@ -25,6 +29,8 @@ use {
 
 /// How often the followed terminal is asked for its folder.
 const LOOK_EVERY: Duration = Duration::from_secs(1);
+/// Projects kept across launches, the most recent last.
+const KEEP: usize = 64;
 
 /// The terminal followed, shared with the thread that asks it.
 pub(crate) struct Project {
@@ -35,7 +41,10 @@ pub(crate) struct Project {
 
 impl Project {
     /// Starts following; the providers hear each move through the app.
-    pub(crate) fn start(cx: &mut Context<MoonframeApp>) -> Self {
+    pub(crate) fn start(profile: Option<&str>, cx: &mut Context<MoonframeApp>) -> Self {
+        let kept = kept_file(profile);
+        let mut projects = read_kept(&kept);
+        moonframe_providers::remember_projects(projects.iter().cloned());
         let followed = Arc::new(Mutex::new(None));
         let (poke, poked) = mpsc::channel();
         let (moved, mut moves) = futures::channel::mpsc::unbounded::<()>();
@@ -82,6 +91,7 @@ impl Project {
                     last = Some(cwd);
                     if moonframe_providers::set_project(&top) {
                         tracing::info!(project = %top.display(), "following the terminal's project");
+                        keep(&kept, &mut projects, top);
                         if moved.unbounded_send(()).is_err() {
                             return;
                         }
@@ -107,6 +117,47 @@ impl Project {
     }
 }
 
+/// The file the projects followed are kept in: beside the app's state,
+/// one per profile.
+fn kept_file(profile: Option<&str>) -> PathBuf {
+    let name = match profile {
+        Some(profile) => format!("projects-{profile}.txt"),
+        None => "projects.txt".to_owned(),
+    };
+    crate::paths::state(profile).with_file_name(name)
+}
+
+/// The projects kept by an earlier launch: absolute folders, one a line.
+fn read_kept(file: &Path) -> Vec<PathBuf> {
+    std::fs::read_to_string(file)
+        .unwrap_or_default()
+        .lines()
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .collect()
+}
+
+/// Adds `project` to those kept, the most recent last, and writes them.
+fn keep(file: &Path, projects: &mut Vec<PathBuf>, project: PathBuf) {
+    projects.retain(|kept| kept != &project);
+    projects.push(project);
+    let excess = projects.len().saturating_sub(KEEP);
+    projects.drain(..excess);
+    let text: String = projects
+        .iter()
+        .filter_map(|path| path.to_str())
+        .filter(|path| !path.contains('\n'))
+        .map(|path| format!("{path}\n"))
+        .collect();
+    let written = file
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|()| std::fs::write(file, text));
+    if let Err(error) = written {
+        tracing::warn!("cannot keep the projects in {}: {error}", file.display());
+    }
+}
+
 /// The git repository holding `dir`, with links resolved, unless it is
 /// home.
 fn repository(dir: &Path) -> Option<PathBuf> {
@@ -126,4 +177,36 @@ fn repository(dir: &Path) -> Option<PathBuf> {
         .ok()?;
     let home = std::env::home_dir().and_then(|home| home.canonicalize().ok());
     (Some(&top) != home.as_ref()).then_some(top)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    // Not `super::*`: gpui_kit's `test` would replace the standard one.
+    use {
+        super::{KEEP, keep, read_kept},
+        std::path::PathBuf,
+    };
+
+    #[test]
+    fn kept_projects_come_back_newest_last_without_repeats_or_excess() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("state").join("projects.txt");
+        let mut projects = read_kept(&file);
+        assert!(projects.is_empty());
+        for index in 0..KEEP + 2 {
+            keep(
+                &file,
+                &mut projects,
+                PathBuf::from(format!("/repo/{index}")),
+            );
+        }
+        keep(&file, &mut projects, PathBuf::from("/repo/5"));
+        let read = read_kept(&file);
+        assert_eq!(read, projects);
+        assert_eq!(read.len(), KEEP);
+        assert_eq!(read.last(), Some(&PathBuf::from("/repo/5")));
+        assert_eq!(read.iter().filter(|path| path.ends_with("5")).count(), 1);
+        assert!(!read.contains(&PathBuf::from("/repo/0")));
+    }
 }

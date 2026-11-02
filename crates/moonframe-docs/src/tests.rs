@@ -600,3 +600,23 @@ fn a_tab_naming_its_root_keeps_its_file_and_a_made_up_root_is_refused() {
         "secret"
     );
 }
+
+#[test]
+fn a_tab_restored_from_an_earlier_launch_reads_its_remembered_project() {
+    if std::env::var_os("MOONFRAME_FILES").is_some() {
+        return;
+    }
+    // A fresh provider, as at a launch, that never had this root itself.
+    let (mut docs, host, seen, _dir) = docs(&[]);
+    let (_earlier, earlier) = repository();
+    fs::write(earlier.join("notes.md"), "kept").unwrap();
+    let root = Data::String(earlier.to_string_lossy().into_owned());
+    let read = message(&[("read", "notes.md".into()), ("root", root)]);
+    docs.receive(&host, "editor/a", read.clone());
+    assert_eq!(sent(&seen)[0].1.get("ok"), Some(&Data::Bool(false)));
+
+    // The app remembers following it in an earlier launch.
+    moonframe_providers::remember_projects([earlier.clone()]);
+    docs.receive(&host, "editor/a", read);
+    assert_eq!(string(&sent(&seen)[0].1, "text"), "kept");
+}

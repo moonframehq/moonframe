@@ -223,7 +223,7 @@ impl MoonframeApp {
         cx.set_menus(menus(workspace.components(), workspace.menus()));
         menu_actions(cx);
         let terminals = Terminals::new(backends, wake_on_output(cx));
-        let project = crate::project::Project::start(cx);
+        let project = crate::project::Project::start(folders.profile.as_deref(), cx);
         flush_on_quit(cx);
         let settings = folders.settings().into_iter().next();
         let saved = |key| {
