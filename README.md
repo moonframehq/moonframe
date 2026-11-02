@@ -320,7 +320,7 @@ its own:
 ```sh
 moonframe app install github.com/owner/some-app   # clones it and what it requires
 moonframe --profile some-app                      # opens it
-moonframe app new ~/code/my-app                   # start one: moonframe.toml, a shell, a mod
+moonframe app new ~/code/my-app                   # start one: moonframe.toml, a shell, a mod, agent skills
 moonframe app link ~/code/my-app                  # run it in place, editing live
 moonframe app list | update NAME | remove NAME
 ```

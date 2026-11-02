@@ -23,6 +23,7 @@
 //! Use the GPUI this crate re-exports ([`gpui_kit`]): an app links one GPUI.
 
 mod actions;
+mod agent_files;
 mod alerts;
 mod app;
 mod assets;

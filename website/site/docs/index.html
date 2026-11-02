@@ -6,6 +6,7 @@
 <!-- social -->
 <meta name="description" content="Get started with Moonframe: mods, the stylesheet, 142 components, terminals, providers, working with an agent, and whole apps as profiles.">
 <link rel="canonical" href="https://docs.moonframe.dev/">
+<link rel="alternate" type="text/markdown" title="Moonframe for coding agents" href="/llms.txt">
 <meta name="theme-color" content="#f6eedc">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Moonframe">
@@ -107,7 +108,7 @@
   <aside id="side">
     <h4>Start</h4><a class="on" href="/">Introduction</a><a href="https://github.com/penso/moonframe#quick-start">Quick start</a><a href="https://github.com/penso/moonframe#make-it-yours">Make it yours</a>
     <h4>Building blocks</h4><a href="#a-mod-is-one-file">Mods</a><a href="#where-things-go">Where things go</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe/SKILL.md">The full guide</a><a href="https://moonframe.dev/#components">Components</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe-components/SKILL.md">Component catalogue</a>
-    <h4>Working with agents</h4><a href="https://github.com/penso/moonframe#working-with-an-agent">Inspect Element and the skill</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe-mockups/SKILL.md">Mockups</a>
+    <h4>Working with agents</h4><a href="/llms.txt">For agents: llms.txt</a><a href="https://github.com/penso/moonframe#working-with-an-agent">Inspect Element and the skill</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe-mockups/SKILL.md">Mockups</a>
     <h4>Distribute</h4><a href="https://github.com/penso/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/penso/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/penso/moonframe/blob/main/.claude/skills/moonframe-apps/SKILL.md">Building and bundling apps</a><a href="https://github.com/penso/moonframe/blob/main/docs/library.md">Using the library</a><a href="https://github.com/penso/moonframe/blob/main/docs/releasing.md">Releasing</a>
     <h4>Reference</h4><a href="https://github.com/penso/moonframe#commands">Commands</a><a href="https://github.com/penso/moonframe/blob/main/types/moonframe.d.luau">Luau API types</a><a href="https://github.com/penso/moonframe/blob/main/wit/provider.wit">Provider interface</a>
     <p class="none" id="none" hidden>No page matches.</p>
@@ -159,12 +160,15 @@
     </table>
     <div class="note"><b>Sandboxed</b>Luau runs with no files, network or process access, a memory cap and an instruction budget. Anything that reaches the machine goes through a provider or an element the host owns. A WebAssembly provider is sandboxed the same way and reaches only the host calls its manifest lists; process and native providers run as you, for what a sandbox cannot reach. <a href="https://github.com/penso/moonframe#what-runs-with-what-access">What runs with what access</a></div>
 
+    <h2 id="for-agents">For coding agents</h2>
+    <p>Ask your agent to <i>“use Moonframe for this project: read https://moonframe.dev/llms.txt and follow it.”</i> <a href="/llms.txt"><code>llms.txt</code></a> walks it through the choice: an existing Rust crate gets the library with <code>moonframe init</code>; a new app with no Rust of its own, or a UI for a project in another language, becomes a profile with <code>moonframe app new</code>. It then points at the skills to read before writing UI, and at <code>--check</code> to run after each edit.</p>
+
     <h2 id="platforms">Platforms</h2>
     <p>Moonframe is developed on macOS. CI builds, lints and tests it on macOS, Linux (x86_64 and ARM64) and Windows; each release ships a macOS disk image, Linux tarballs and Windows zips, with checksums, Sigstore signatures and GitHub attestations.</p>
 
     <div class="pager"><span></span><a style="text-align:right" href="https://github.com/penso/moonframe#quick-start"><small>Next</small><b>Quick start →</b></a></div>
   </main>
-  <nav class="toc"><b>On this page</b><a class="on" href="#top">Introduction</a><a href="#a-mod-is-one-file">A mod is one file</a><a href="#where-things-go">Where things go</a><a href="#platforms">Platforms</a><div class="edit"><a href="https://github.com/penso/moonframe/edit/main/website/site/docs/index.html">Edit this page ↗</a></div></nav>
+  <nav class="toc"><b>On this page</b><a class="on" href="#top">Introduction</a><a href="#a-mod-is-one-file">A mod is one file</a><a href="#where-things-go">Where things go</a><a href="#for-agents">For coding agents</a><a href="#platforms">Platforms</a><div class="edit"><a href="https://github.com/penso/moonframe/edit/main/website/site/docs/index.html">Edit this page ↗</a></div></nav>
 </div>
 <script>
 // Search filters the sidebar; ⌘K or / focuses it, Enter opens the first match.

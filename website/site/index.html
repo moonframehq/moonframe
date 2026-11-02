@@ -6,6 +6,7 @@
 <!-- social -->
 <meta name="description" content="Native desktop apps in Rust, with every panel in Luau. Ask for a change and watch the running app reshape itself: no rebuild, no restart.">
 <link rel="canonical" href="https://moonframe.dev/">
+<link rel="alternate" type="text/markdown" title="Moonframe for coding agents" href="/llms.txt">
 <meta name="theme-color" content="#f6eedc">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Moonframe">
@@ -231,6 +232,7 @@
   .gs-brew { margin-top:36px; border:2px solid var(--ink); display:flex; justify-content:space-between; align-items:center; padding:18px 24px; gap:24px; font:16px var(--sans) }
   .gs-brew b { font:500 22px var(--serif) } .gs-brew p { font-size:14px; color:var(--dim) }
   .gs-brew .copy { width:auto; flex-shrink:0 }
+  .gs-agent { margin-top:14px; border-style:dashed } .gs-agent .copy { flex-shrink:1; max-width:58% }
   .gs-or { text-align:center; font:italic 18px var(--serif); color:var(--dim); margin:26px 0 0 }
   .gs-cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; margin-top:22px }
   .gs-card { text-align:left; border:1px solid #2a1a1033; background:#fffaf0; border-radius:6px; padding:20px 22px; cursor:pointer; font:inherit; color:inherit; position:relative; transition:border-color .15s, box-shadow .15s }
@@ -289,7 +291,7 @@
     .cols { columns:1 }
     .installbar { flex-direction:column; align-items:flex-start } .installbar pre { white-space:pre-wrap; word-break:break-all; font-size:13px }
     .pull { font-size:28px; padding:40px 0 }
-    .gs-brew { flex-direction:column; align-items:stretch } .gs-cards, .gs-pair { grid-template-columns:1fr } .gs-pair { grid-column:1 / -1 }
+    .gs-brew { flex-direction:column; align-items:stretch } .gs-agent .copy { max-width:none } .gs-cards, .gs-pair { grid-template-columns:1fr } .gs-pair { grid-column:1 / -1 }
     .steps li { grid-template-columns:32px minmax(0, 1fr); gap:10px 12px } .steps .copy { grid-column:2 }
     footer { grid-template-columns:1fr 1fr }
     .lb { padding:56px 10px 20px } .lb .prev, .lb .next { top:auto; bottom:14px } .lb-cap { flex-direction:column; text-align:center; gap:6px } .lb .lb-cmd { max-width:100%; text-align:left } .lb-cmd code { white-space:normal; word-break:break-all }
@@ -466,6 +468,11 @@ just install   # into /Applications</pre></div>
       <button class="copy" title="Copy the command"><code>brew install penso/tap/moonframe</code><span>Copy</span></button>
     </div>
 
+    <div class="gs-brew gs-agent" id="agents">
+      <div><b>Or hand it to your agent</b><p>Paste this into Claude Code, Codex or any coding agent, in your project. <a href="/llms.txt">llms.txt</a> tells it how to tell a Rust crate from a new app, what to run, and how to check its work.</p></div>
+      <button class="copy" title="Copy the prompt"><code>Use Moonframe for this project: read https://moonframe.dev/llms.txt and follow it.</code><span>Copy</span></button>
+    </div>
+
     <p class="gs-or">or build with it</p>
 
     <div class="gs-cards">
@@ -603,7 +610,7 @@ end,</pre></div>
   <footer>
     <div><span class="name"><img src="img/icon.png" alt="">Moonframe</span>Native desktop apps in Rust, shaped live in Luau.<br>MIT licensed.</div>
     <div><b>Learn</b><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe#quick-start">Quick start</a><a class="wide" href="#components">Components</a></div>
-    <div><b>Build</b><a href="https://github.com/penso/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/penso/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/penso/moonframe/blob/main/docs/library.md">The library</a></div>
+    <div><b>Build</b><a href="https://github.com/penso/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/penso/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/penso/moonframe/blob/main/docs/library.md">The library</a><a href="/llms.txt">For agents</a></div>
     <div><b>Project</b><a href="https://github.com/penso/moonframe">GitHub</a><a href="https://github.com/penso/moonframe/issues">Issues</a><a href="https://github.com/penso/moonframe/blob/main/LICENSE">License</a></div>
   </footer>
 </div>
