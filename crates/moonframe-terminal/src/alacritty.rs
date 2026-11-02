@@ -159,6 +159,7 @@ impl Emulator for Alacritty {
             app_cursor: content.mode.contains(TermMode::APP_CURSOR),
             bracketed_paste: content.mode.contains(TermMode::BRACKETED_PASTE),
             exited: false,
+            disconnected: false,
         }
     }
 

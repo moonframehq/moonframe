@@ -779,6 +779,9 @@ type TerminalProps = {
 	cwd: string?,
 	engine: TerminalEngine?,
 	backend: TerminalBackend?,
+	-- Sent once, with `exited = true` added, as the shell exits (Ctrl-D,
+	-- `exit`). Without it the terminal says so and Enter starts another.
+	exit: Data?,
 	[number]: string,
 }
 

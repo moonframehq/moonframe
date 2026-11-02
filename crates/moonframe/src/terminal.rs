@@ -11,6 +11,7 @@ pub(crate) use selection::{Selection, Spot};
 use {
     crate::{app::MoonframeApp, keys::Taken},
     gpui_kit::*,
+    moonframe_core::Data,
     moonframe_mux::{Backends, Preference},
     moonframe_terminal::{Ansi, Engine, Key, Open, Session, encode, paste},
     std::{
@@ -45,6 +46,14 @@ pub(crate) struct TerminalView {
     spawn: Spawn,
     /// Scrolling not yet worth a whole line.
     pub(crate) scrolled: Cell<f32>,
+    /// What its element sends its mod as the shell exits, as last drawn.
+    exit: RefCell<Option<Data>>,
+    /// That message went out: the mod handles the exit, so the terminal
+    /// goes once it is no longer drawn.
+    told: Cell<bool>,
+    /// A window other than the main one drew it. Only the main window's
+    /// frames are counted, so such a terminal is never taken for gone.
+    elsewhere: Cell<bool>,
     /// The text chosen with the pointer, in the visible screen's cells.
     pub(crate) selection: RefCell<Option<Selection>>,
     /// The left button went down on the grid and is still held.
@@ -67,10 +76,26 @@ impl TerminalView {
             focus,
             spawn,
             scrolled: Cell::new(0.),
+            exit: RefCell::new(None),
+            told: Cell::new(false),
+            elsewhere: Cell::new(false),
             selection: RefCell::new(None),
             selecting: Cell::new(false),
             grid: Cell::new(None),
         }
+    }
+
+    /// Keeps what the element asks to be sent as the shell exits.
+    pub(crate) fn on_exit(&self, msg: Option<&Data>) {
+        if self.exit.borrow().as_ref() != msg {
+            *self.exit.borrow_mut() = msg.cloned();
+        }
+    }
+
+    /// The mod sends itself a message as the shell exits, so Enter does
+    /// not start another here.
+    pub(crate) fn exit_handled(&self) -> bool {
+        self.exit.borrow().is_some()
     }
 
     /// The selected text, when there is any.
@@ -287,8 +312,11 @@ impl Terminals {
 
     /// The terminal at `key` is drawn in the main window's frame; if it was
     /// not in the last one, it is the one to focus. Other windows' terminals
-    /// are not counted.
+    /// are not counted, only marked as drawn elsewhere.
     pub(crate) fn drawn(&mut self, key: &str, view: &TerminalView) {
+        if !self.in_main_frame {
+            view.elsewhere.set(true);
+        }
         if self.in_main_frame && self.drawn.insert(key.to_owned()) && !self.last_drawn.contains(key)
         {
             self.appeared = Some(view.focus.clone());
@@ -302,6 +330,35 @@ impl Terminals {
         self.appeared.take()
     }
 
+    /// The exit messages of shells that just exited, as `(mod, message)`
+    /// with `exited = true` added, each sent once. A told one that the main
+    /// window no longer draws (its tab closed) goes, so it holds no slot;
+    /// drawn again, it starts anew. One another window drew stays: that
+    /// window may still show it, and drawing it would start another shell.
+    pub(crate) fn take_exits(&mut self) -> Vec<(String, Data)> {
+        let mut exits = Vec::new();
+        for (key, view) in &self.views {
+            let Ok(session) = &view.session else {
+                continue;
+            };
+            if view.told.get() || !session.exited() {
+                continue;
+            }
+            if let Some(msg) = view.exit.borrow().clone() {
+                view.told.set(true);
+                let owner = key
+                    .rsplit_once('/')
+                    .map_or(key.as_str(), |(owner, _)| owner);
+                let msg = crate::browser::with(&msg, [("exited", Data::Bool(true))]);
+                exits.push((owner.to_owned(), msg));
+            }
+        }
+        let drawn = &self.drawn;
+        self.views
+            .retain(|key, view| !view.told.get() || view.elsewhere.get() || drawn.contains(key));
+        exits
+    }
+
     /// Starts the shell at `key` again, after it exited.
     fn restart(&mut self, key: &str) {
         if let Some(old) = self.views.get(key) {
@@ -312,6 +369,8 @@ impl Terminals {
                 old.focus.clone(),
                 old.spawn.clone(),
             ));
+            view.on_exit(old.exit.borrow().as_ref());
+            view.elsewhere.set(old.elsewhere.get());
             self.views.insert(key.to_owned(), view);
         }
     }
@@ -376,8 +435,8 @@ impl MoonframeApp {
             }
             return false;
         }
-        if screen.exited {
-            if keystroke.key == "enter" {
+        if screen.exited || screen.disconnected {
+            if keystroke.key == "enter" && (screen.disconnected || !view.exit_handled()) {
                 self.terminals.restart(&key);
                 cx.notify();
             }

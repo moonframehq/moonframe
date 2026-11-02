@@ -154,6 +154,8 @@ pub struct Screen {
     pub bracketed_paste: bool,
     /// The shell has exited.
     pub exited: bool,
+    /// Output ended without a confirmed shell exit; Enter attaches again.
+    pub disconnected: bool,
 }
 
 impl Screen {

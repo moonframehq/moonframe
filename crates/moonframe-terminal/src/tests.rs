@@ -183,7 +183,76 @@ fn a_session_runs_a_shell() {
             std::thread::sleep(Duration::from_millis(50));
         };
         assert!(found, "{engine:?}: {:?}", session.screen());
-        session.write(b"exit\r");
+        // Final output must be drained even when closing the PTY is what
+        // unblocks its reader (ConPTY on Windows).
+        session.write(if cfg!(windows) {
+            b"echo final-%COMSPEC:~0,0%42 & exit\r"
+        } else {
+            b"echo final-$((40 + 2)); exit\r"
+        });
+        let deadline = Instant::now() + Duration::from_secs(15);
+        while !session.exited() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(
+            session.exited(),
+            "{engine:?}: the shell exit was not confirmed"
+        );
+        let screen = session.screen();
+        assert!(!screen.disconnected);
+        assert!(
+            (0..screen.rows).any(|row| text(&screen, row).contains("final-42")),
+            "{engine:?}: final output was lost: {screen:?}"
+        );
+    }
+}
+
+#[test]
+fn output_ending_only_reports_an_exit_when_the_backend_confirms_it() {
+    struct EndedPane(bool);
+    impl crate::Pane for EndedPane {
+        fn write(&self, _: &[u8]) {}
+
+        fn resize(&self, _: Size) {}
+
+        fn exited(&self) -> bool {
+            self.0
+        }
+    }
+
+    for engine in [Engine::Alacritty, Engine::Ghostty]
+        .into_iter()
+        .filter(|engine| engine.available())
+    {
+        for confirmed in [false, true] {
+            let (wake, woken) = std::sync::mpsc::channel();
+            let opened = crate::Opened {
+                pane: Box::new(EndedPane(confirmed)),
+                output: Box::new(std::iter::once(b"final output".to_vec())),
+            };
+            let session = Session::start(
+                opened,
+                engine,
+                Size::default(),
+                Arc::new(move || {
+                    let _ = wake.send(());
+                }),
+            )
+            .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let screen = loop {
+                let screen = session.screen();
+                if screen.exited || screen.disconnected {
+                    break screen;
+                }
+                woken
+                    .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+                    .unwrap();
+            };
+            assert_eq!(session.exited(), confirmed, "{engine:?}");
+            assert_eq!(screen.disconnected, !confirmed, "{engine:?}");
+            assert_eq!(text(&screen, 0), "final output", "{engine:?}");
+        }
     }
 }
 

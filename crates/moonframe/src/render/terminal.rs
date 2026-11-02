@@ -90,6 +90,7 @@ impl<'w> Draw<'w> for Terminal {
             return problem(format!("terminal `{}`: {error}", self.id), cx);
         }
         painter.terminals.drawn(&key, &view);
+        view.on_exit(self.exit.as_ref());
         let press_view = view.clone();
         let scroll_view = view.clone();
         let selection = theme.primary.opacity(SELECTION_ALPHA);
@@ -179,13 +180,15 @@ fn grid(
                 painting.selection(&selected, &screen, selection, window);
             }
             painting.cursor(&screen, focused, window);
-            if screen.exited {
-                painting.note(
-                    "[the shell exited; press Enter to start another]",
-                    &screen,
-                    window,
-                    cx,
-                );
+            if screen.exited || screen.disconnected {
+                let note = if screen.disconnected {
+                    "[connection lost; press Enter to reconnect]"
+                } else if view.exit_handled() {
+                    "[the shell exited]"
+                } else {
+                    "[the shell exited; press Enter to start another]"
+                };
+                painting.note(note, &screen, window, cx);
             }
         },
     )
