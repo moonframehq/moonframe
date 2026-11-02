@@ -23,7 +23,7 @@
   .cb-detail .cb-when { color:#6b6676; font-size:12.5px; max-width:640px }
   .cb-h { font-size:11.5px; color:#8a8798; font-weight:600; margin:18px 0 6px; text-transform:uppercase; letter-spacing:.08em }
   .cb-prev { border:1px dashed #dddbe5; border-radius:10px; min-height:150px; display:grid; grid-template-columns:minmax(0, 1fr); place-items:center; padding:24px; background:repeating-conic-gradient(#fafafc 0 25%, #fff 0 50%) 0 0/16px 16px }
-  .cb-prev img { width:auto; height:auto; max-width:100%; display:block; background:#fff; border-radius:8px; box-shadow:0 0 0 1px #ececf1, 0 6px 14px #0000000d }
+  .cb-prev img { max-width:100%; height:auto; display:block; background:#fff; border-radius:8px; box-shadow:0 0 0 1px #ececf1, 0 6px 14px #0000000d }
   .cb-none { text-align:center; color:#8a8798; max-width:360px }
   .cb-none b { color:#2a2833; display:block; margin-bottom:4px }
   .cb-code { position:relative }
@@ -70,17 +70,20 @@
       // The component's own usage text, or its example with the helpers it needs
       // (website/tools/components-data.py builds it).
       const code = c.code;
-      // Captured at 2x; a component without one points at the app.
+      // Captured at 2x; a component without one points at the app. Its size
+      // (data/components.js) keeps the preview's room before the image loads.
       const shot = `img/components/${encodeURIComponent(c.name)}.webp`;
       const none = `<div class="cb-none"><b>${esc(c.title)}</b>Shown live in the app's Components window. Run <code>just run</code>, then Components › ${esc(c.category)} › ${esc(c.title)}.</div>`;
-      const prev = `<img src="${shot}" srcset="${shot} 2x" alt="${esc(c.title)} in the Components window">`;
+      const prev = c.shot
+        ? `<img src="${shot}" srcset="${shot} 2x" width="${c.shot[0]}" height="${c.shot[1]}" alt="${esc(c.title)} in the Components window">`
+        : none;
       detail.innerHTML = `<h3>${esc(c.title)}</h3><div class="cb-desc">${md(c.description)}</div>${c.when ? `<div class="cb-when"><b>When:</b> ${md(c.when)}</div>` : ""}
         <div class="cb-h">Preview</div><div class="cb-prev">${prev}</div>
         <div class="cb-h">Use it</div><div class="cb-code"><pre>${luau(code)}</pre><button class="cb-copy">Copy code</button></div>
         ${c.props.length ? `<div class="cb-h">Props</div><table class="cb-props">${c.props.map(([k, d]) => `<tr><td>${esc(k)}</td><td>${md(d)}</td></tr>`).join("")}</table>` : ""}`;
       detail.scrollTop = 0;
       const img = detail.querySelector(".cb-prev img");
-      img.onerror = () => { img.outerHTML = none; };
+      if (img) img.onerror = () => { img.outerHTML = none; };
       detail.querySelector(".cb-copy").onclick = e => { navigator.clipboard?.writeText(code); e.target.textContent = "Copied"; setTimeout(() => e.target.textContent = "Copy code", 1200); };
     }
     list.addEventListener("click", e => { const it = e.target.closest(".cb-item"); if (!it) return; current = it.dataset.n; drawList(); drawDetail(); });
