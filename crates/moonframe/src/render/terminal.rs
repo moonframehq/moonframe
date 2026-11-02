@@ -12,7 +12,6 @@ use {
     std::rc::Rc,
 };
 
-const FONT: &str = "Menlo";
 const FONT_SIZE: f32 = 13.;
 /// Line height as a multiple of the font size.
 const LINE: f32 = 1.3;
@@ -41,7 +40,10 @@ impl<'w> Draw<'w> for Terminal {
             TerminalEngine::Alacritty => Engine::Alacritty,
             TerminalEngine::Ghostty => Engine::Ghostty,
         };
-        let typeface = Typeface::new(&painter.workspace.stylesheet().mono);
+        let typeface = Typeface::new(
+            &painter.workspace.stylesheet().mono,
+            &theme.mono_font_family,
+        );
         let frame = div()
             .id(place.id())
             .flex()
@@ -177,8 +179,11 @@ struct Typeface {
 }
 
 impl Typeface {
-    fn new(mono: &MonoFont) -> Self {
-        let mut font = font(mono.family.clone().unwrap_or_else(|| FONT.to_owned()));
+    fn new(mono: &MonoFont, family: &SharedString) -> Self {
+        // The theme has already applied `mono.family`, or selected an
+        // installed Nerd Font / platform monospace default. A hard-coded
+        // macOS family falls back to proportional text on Linux.
+        let mut font = font(family.clone());
         if let Some(weight) = mono.weight {
             font.weight = FontWeight(weight);
         }
