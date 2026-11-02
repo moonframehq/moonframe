@@ -1343,6 +1343,90 @@ type Docs = {
 	root: string?,
 }
 
+-- One limit window of a service's plan (the `usage` provider). Shares are
+-- 0 to 1; `pace` is where an even spend would have left the bar of what is
+-- left (`usage-bar`'s `pace`), nil early in a window or without a reset.
+type UsageWindow = {
+	title: string,
+	kind: "session" | "daily" | "weekly" | "monthly" | "named",
+	used: number,
+	left: number,
+	severity: "normal" | "warning" | "critical",
+	-- "3% used 2h 53m", for a status bar.
+	label: string,
+	resets_at: number?,
+	-- "4d 6h", "2h 53m", "47m".
+	resets_in: string?,
+	pace: number?,
+	-- "11% in reserve · Lasts until reset".
+	pace_note: string?,
+}
+
+type UsageBalance = {
+	label: string,
+	amount: number,
+	total: number?,
+	-- An ISO 4217 code when `currency`, else the service's own unit name.
+	unit: string,
+	currency: boolean,
+	-- "$12.30", "$5.00 of $20.00", "1,250 credits".
+	text: string,
+	-- amount / total, clamped to 0..1, when total > 0. The label says
+	-- whether the amount is spent or remaining; this is not always credit left.
+	fraction: number?,
+}
+
+type UsageSection =
+	{ kind: "limit", window: UsageWindow }
+	| { kind: "facts", title: string, facts: { { label: string, value: string } } }
+	| { kind: "shares", title: string, shares: { { label: string, share: number } } }
+
+-- One service signed in on the host, or one `show_providers` asks for.
+type UsageProvider = {
+	id: string,
+	name: string,
+	-- A bundled logo (`agent-claude`), nil when the app has none for it.
+	icon: IconName?,
+	dashboard: string?,
+	status_page: string?,
+	email: string?,
+	plan: string?,
+	-- Why the latest read failed; with `stale`, the numbers are older ones.
+	error: string?,
+	stale: boolean,
+	-- The sign-in sits behind a macOS Keychain prompt: send `provider:usage`
+	-- `{ allow = id }` when the user agrees, and macOS asks.
+	access: ("needed" | "denied")?,
+	-- The tightest window's share used, and how alarming it is.
+	used: number?,
+	severity: ("normal" | "warning" | "critical")?,
+	windows: { UsageWindow },
+	balances: { UsageBalance },
+	sections: { UsageSection },
+	-- OpenAI's spend per day.
+	daily: { { day: string, amount: number } }?,
+	-- Claude's other accounts, from cswap.
+	accounts: { { name: string, email: string, disabled: boolean, stale: boolean, note: string?, windows: { UsageWindow } } }?,
+}
+
+-- Plan usage of the AI services signed in on `host` (the `usage` provider),
+-- read every 10 minutes at most. Any message to `provider:usage` refreshes.
+type Usage = {
+	available: boolean,
+	-- "local", "ssh:<target>" or "wsl:<distro>".
+	host: string?,
+	busy: boolean,
+	updated: number?,
+	-- Whole minutes since `updated`.
+	age: number?,
+	-- Why the host itself could not be read.
+	error: string?,
+	-- The sheet's tabs, in a stable order.
+	providers: { UsageProvider },
+	-- Ids of those with numbers, closest to a limit first: a status bar's.
+	headline: { string },
+}
+
 type Herdr = {
 	installed: boolean,
 	version: string?,
@@ -1461,6 +1545,7 @@ type App = {
 	docs: Docs?,
 	herdr: Herdr?,
 	acp: Acp?,
+	usage: Usage?,
 	-- What tab bars can open: each component and mod with a `tab` entry.
 	kinds: { TabKind },
 	-- The stylesheet's `looks`: which look each kind of component takes.

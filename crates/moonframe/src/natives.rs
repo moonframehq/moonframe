@@ -24,6 +24,7 @@ pub(crate) fn natives() -> Natives {
         ("git", git),
         ("github", github),
         ("gitlab", gitlab),
+        ("usage", usage),
         // keep-sorted end
     ];
     built_in
@@ -60,6 +61,11 @@ fn gitlab() -> Box<dyn Native> {
     moonframe_forge::gitlab()
 }
 
+#[cfg(feature = "usage")]
+fn usage() -> Box<dyn Native> {
+    moonframe_usage::native()
+}
+
 #[cfg(not(feature = "acp"))]
 fn acp() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -85,10 +91,21 @@ fn gitlab() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(not(feature = "usage"))]
+fn usage() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 /// A built-in provider this build leaves out: it publishes nothing.
 // With every feature on, only the tests make one.
 #[cfg_attr(
-    all(feature = "acp", feature = "docs", feature = "forge", feature = "git"),
+    all(
+        feature = "acp",
+        feature = "docs",
+        feature = "forge",
+        feature = "git",
+        feature = "usage"
+    ),
     allow(dead_code)
 )]
 struct LeftOut;
@@ -137,7 +154,7 @@ mod tests {
     #[test]
     fn every_built_in_native_is_registered() {
         let natives = natives();
-        for name in ["acp", "docs", "git", "github", "gitlab", "demos"] {
+        for name in ["acp", "docs", "git", "github", "gitlab", "usage", "demos"] {
             assert!(natives.contains_key(name), "{name}");
         }
     }

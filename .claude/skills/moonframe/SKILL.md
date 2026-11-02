@@ -64,6 +64,7 @@ Pick the lowest layer that can do the job:
 | git status, a file's diff, commit or push | read `app.git`; send `provider:git` a message | in a mod | no (git is built in) |
 | markdown shown, or a project file read and saved | `ui.markdown` or `use "markdown"`; `use "markdown-editor"`, which reads and saves through `provider:docs` | in a mod | no (docs is built in) |
 | a coding agent doing a task (Claude, Codex, Gemini...) | send `provider:acp` `{ start = ... }`; show the run with `use "agent-run"` | in a mod | no (acp is built in) |
+| AI plan usage (Claude, Codex, Copilot limits, resets, pace) | read `app.usage`; draw each window with `use "usage-bar"` | in a mod | no (usage is built in) |
 | a provider that needs a Rust library or answers actions | a **native provider** | `crates/` + `providers/<name>/provider.toml` | yes, and the app restarts |
 | a look change | a rule in `style.luau`, or the mod's `styles` | | no |
 | a new kind of element (tree, chart, image) | a host element | `crates/` | yes, and the app restarts |
@@ -1629,12 +1630,14 @@ and `app.gitlab` (pull requests, checks, issues, each worktree branch's
 pull request, and the sign-in), and from process providers `app.agents` (coding agents running here), `app.files` (the project's
 file tree), `app.docs` (native: reads and saves the project's text files
 for a mod, answering it), `app.herdr` (whether herdr-core and tmux are
-installed), and the native `app.acp` (coding agents a mod runs over ACP).
+installed), the native `app.acp` (coding agents a mod runs over ACP), and
+the native `app.usage` (plan usage of Claude, Codex, Copilot and the other
+AI services signed in here).
 Their shapes are under "Built-in providers" below and typed in
 `types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`, `Acp`,
-and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
+`Usage`, and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
-is labelled demo data, as in `mods/usage`.
+is labelled demo data.
 
 **Providers: data Luau can't produce.** A provider is a folder
 `providers/<name>/` with a `provider.toml`, in either folder. What it
@@ -1781,6 +1784,35 @@ example.
 A document can be long: `ui.markdown`'s `text` and a multiline
 `ui.input`'s `value` take up to 1 MiB (other strings in a view, 16 KiB),
 and a string in a message or in state up to 1 MiB (4 MiB of text per value).
+
+`app.usage` (usage, native, the `usage` feature): plan usage of the AI
+services signed in on this machine, read by herdr-usage from each agent's
+own sign-in (about ninety services: Claude, Codex, Copilot, Cursor, Gemini,
+OpenRouter...), each asked every 10 minutes at most. Shares are fractions
+from 0 to 1 and countdowns come written out (`resets_in = "4d 6h"`, and
+`age`, minutes since `updated`), as views have no clock. `headline` lists
+the ids with numbers, closest to a limit first, for a status bar;
+`providers` is every one in a stable order, for a sheet's tabs. Each
+window feeds `use "usage-bar"` directly (`left`, `pace`, `pace_note`). Any
+message refreshes (at most every 10 s); `{ allow = "<id>" }` lets a
+sign-in kept in another app's Keychain item be read when the provider says
+`access = "needed"` (macOS asks; the answer is kept across launches);
+`{ host = "ssh:<target>" | "wsl:<distro>" | "local" }` reads another
+machine with its own sign-ins, one listed in `[settings] hosts`. Only the mods in `[settings] writers`
+(`usage` as shipped) may send `allow` or `host`; any mod may refresh.
+The rest of `[settings]` is herdr's `[usage]` table
+(`show_providers`, `hide_providers`, `browser_cookies`,
+`providers.<id>.<name>`); keys are better left in their environment
+variables. `mods/usage` is the whole example.
+
+| field | shape |
+|---|---|
+| top | `{ available, host, busy, updated?, age?, error?, providers, headline }` |
+| provider | `{ id, name, icon? (bundled logo name), dashboard?, status_page?, email?, plan?, error?, stale, access? ("needed" "denied"), used?, severity?, windows, balances, sections, daily?, accounts? }` |
+| window | `{ title, kind ("session" "daily" "weekly" "monthly" "named"), used, left, severity ("normal" "warning" "critical"), label ("3% used 2h 53m"), resets_at?, resets_in?, pace?, pace_note? }` |
+| balance | `{ label, amount, total?, unit, currency, text ("$5.00 of $20.00"), fraction? }`; `fraction` is `amount / total` clamped to 0–1 when `total > 0`, spent or remaining as the label says |
+| section | `{ kind = "limit", window }`, `{ kind = "facts", title, facts = { { label, value } } }` or `{ kind = "shares", title, shares = { { label, share } } }` |
+| `daily`, `accounts` | OpenAI's spend per day `{ day, amount }`; Claude's other cswap accounts `{ name, email, disabled, stale, note?, windows }` |
 
 `app.herdr` (herdr, from `bash`): `{ installed, version, path, tmux,
 installing, error, fresh }`, every 30 s and on any message. The message
