@@ -53,30 +53,37 @@ impl MoonframeApp {
             .and_then(|meta| meta.title.clone())
             .unwrap_or_else(|| name.to_owned());
         let sizing = slot.meta().and_then(|meta| meta.window).unwrap_or_default();
-        let open = self.mod_windows.get(name).copied().filter(|handle| {
-            cx.windows()
-                .iter()
-                .any(|window| window.window_id() == handle.window_id())
-        });
         // After this update, as for the components window: the click may
         // have come from that window, which is busy until it returns.
-        match open {
-            Some(_) if crate::background() => {},
-            Some(handle) => cx.defer(move |cx| {
-                let _ = handle.update(cx, |_, window, _| window.activate_window());
-            }),
-            None => {
-                let app = cx.entity();
-                let name = name.to_owned();
-                cx.defer(move |cx| {
+        // Look up the handle then too: an earlier request in this batch
+        // may be opening or closing the same mod's window.
+        let app = cx.entity();
+        let name = name.to_owned();
+        cx.defer(move |cx| {
+            let open = app
+                .read(cx)
+                .mod_windows
+                .get(&name)
+                .copied()
+                .filter(|handle| {
+                    cx.windows()
+                        .iter()
+                        .any(|window| window.window_id() == handle.window_id())
+                });
+            match open {
+                Some(_) if crate::background() => {},
+                Some(handle) => {
+                    let _ = handle.update(cx, |_, window, _| window.activate_window());
+                },
+                None => {
                     if let Some(handle) =
                         ModWindow::open(app.clone(), name.clone(), title, sizing, cx)
                     {
                         app.update(cx, |app, _| app.mod_windows.insert(name, handle));
                     }
-                });
-            },
-        }
+                },
+            }
+        });
     }
 
     /// Does what the mod `from` asked with `app:window`: opens a mod's
@@ -100,13 +107,15 @@ impl MoonframeApp {
             },
             WindowRequest::Open { name, .. } => self.show_mod_window(&name, cx),
             WindowRequest::Close(name) => {
-                let Some(handle) = self.mod_windows.remove(&name) else {
-                    return;
-                };
                 // After this update: the mod may have asked from its own
-                // window, which is busy until it returns.
+                // window, which is busy until it returns. Resolve its
+                // handle after any earlier deferred open has run.
+                let app = cx.entity();
                 cx.defer(move |cx| {
-                    let _ = handle.update(cx, |_, window, _| window.remove_window());
+                    let handle = app.update(cx, |app, _| app.mod_windows.remove(&name));
+                    if let Some(handle) = handle {
+                        let _ = handle.update(cx, |_, window, _| window.remove_window());
+                    }
                 });
             },
         }

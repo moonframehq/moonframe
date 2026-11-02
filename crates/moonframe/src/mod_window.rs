@@ -101,6 +101,12 @@ impl Render for ModWindow {
 fn fitted(sizing: ModWindowSize, screen: Option<(f32, f32)>) -> ((f32, f32), (f32, f32)) {
     let (mut width, mut height) = sizing.size.unwrap_or(SIZE);
     let (mut min_width, mut min_height) = sizing.min_size.unwrap_or(MIN_SIZE);
+    // An explicit minimum can outgrow the default opening size. Only the
+    // screen may shrink it; an explicit size was checked against it.
+    if sizing.size.is_none() {
+        width = width.max(min_width);
+        height = height.max(min_height);
+    }
     if let Some((screen_width, screen_height)) = screen {
         width = width.min(screen_width - 40.);
         height = height.min(screen_height - 60.);
@@ -114,6 +120,29 @@ fn fitted(sizing: ModWindowSize, screen: Option<(f32, f32)>) -> ((f32, f32), (f3
 #[cfg(test)]
 mod tests {
     use super::{MIN_SIZE, ModWindowSize, SIZE, fitted};
+
+    #[test]
+    fn an_explicit_minimum_grows_the_default_opening_size() {
+        let asked = ModWindowSize {
+            size: None,
+            min_size: Some((640., 480.)),
+        };
+        assert_eq!(fitted(asked, None), ((640., 560.), (640., 480.)));
+        assert_eq!(
+            fitted(asked, Some((1920., 1080.))),
+            ((640., 560.), (640., 480.))
+        );
+        let tall = ModWindowSize {
+            size: None,
+            min_size: Some((300., 700.)),
+        };
+        assert_eq!(fitted(tall, None), ((420., 700.), (300., 700.)));
+        // A screen smaller than the minimum still limits both sizes.
+        assert_eq!(
+            fitted(asked, Some((600., 500.))),
+            ((560., 440.), (560., 440.))
+        );
+    }
 
     #[test]
     fn a_window_opens_at_the_mods_size_within_the_screen() {
