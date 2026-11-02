@@ -30,6 +30,8 @@ done
 scale "$repo/assets/icon.png" "$work/frames/img/icon.png" 512
 
 node "$here/gen.mjs"
+# The inner sh expands $1, one frame per call, so the single quotes are meant.
+# shellcheck disable=SC2016
 (cd "$work/frames" && find . -maxdepth 1 -name 'f*.svg' -print0 |
 	xargs -0 -P "$jobs" -I{} sh -c 'rsvg-convert "$1" -o "../out/$(basename "$1" .svg).png"' _ {})
 
