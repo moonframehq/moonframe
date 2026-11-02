@@ -199,7 +199,13 @@ impl Docs {
         Path::new(asked)
             .canonicalize()
             .ok()
-            .filter(|root| self.roots.contains(root) || moonframe_providers::followed(root))
+            .filter(|root| {
+                // A folder the user named stays the only one: then no
+                // project is followed, nor a remembered one reached.
+                self.roots.contains(root)
+                    || (std::env::var_os("MOONFRAME_FILES").is_none()
+                        && moonframe_providers::followed(root))
+            })
             .ok_or_else(|| format!("`{asked}` is not a project this app shows").into())
     }
 

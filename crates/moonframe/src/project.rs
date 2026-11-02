@@ -43,8 +43,6 @@ impl Project {
     /// Starts following; the providers hear each move through the app.
     pub(crate) fn start(profile: Option<&str>, cx: &mut Context<MoonframeApp>) -> Self {
         let kept = kept_file(profile);
-        let mut projects = read_kept(&kept);
-        moonframe_providers::remember_projects(projects.iter().cloned());
         let followed = Arc::new(Mutex::new(None));
         let (poke, poked) = mpsc::channel();
         let (moved, mut moves) = futures::channel::mpsc::unbounded::<()>();
@@ -64,6 +62,14 @@ impl Project {
         let spawned = thread::Builder::new()
             .name("project".into())
             .spawn(move || {
+                // Each one kept is checked again, off the window's thread:
+                // only a folder that is still a repository's top (and not
+                // home) is remembered, whatever the file says.
+                let mut projects: Vec<PathBuf> = read_kept(&kept)
+                    .into_iter()
+                    .filter(|project| repository(project).as_ref() == Some(project))
+                    .collect();
+                moonframe_providers::remember_projects(projects.iter().cloned());
                 let mut last: Option<PathBuf> = None;
                 loop {
                     match poked.recv_timeout(LOOK_EVERY) {
