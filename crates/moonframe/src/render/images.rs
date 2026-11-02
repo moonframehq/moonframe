@@ -3,10 +3,10 @@
 //! several filesystem calls per image per frame while anything animates.
 
 use {
-    moonframe_core::Image,
+    moonframe_core::{Image, MAX_IMAGE_BYTES},
     std::{
         cell::RefCell,
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         path::{Path, PathBuf},
         time::{Duration, Instant, SystemTime},
     },
@@ -30,12 +30,18 @@ thread_local! {
         RefCell::new(HashMap::new());
     /// Files and folders the user picked (`app:pick`) or dropped on the
     /// window this run, by the mod they were given to: what they chose to
-    /// show that mod, which its `ui.image` (and its components') may.
-    static GRANTED: RefCell<Vec<(String, PathBuf)>> = const { RefCell::new(Vec::new()) };
+    /// show that mod, which its `ui.image` (and its components') may. Kept
+    /// for the whole run, however many: a picture opened stays shown.
+    static GRANTED: RefCell<HashMap<String, Grants>> = RefCell::new(HashMap::new());
 }
 
-/// Most picked or dropped paths kept; the oldest go first.
-const MAX_GRANTED: usize = 256;
+/// What one mod was given: files, looked up at once, and folders, whose
+/// files it may show too.
+#[derive(Default)]
+struct Grants {
+    files: HashSet<PathBuf>,
+    folders: Vec<PathBuf>,
+}
 
 /// The mod a drawing mod's grants belong to: a component instance
 /// (`<mod>/<component>#<id>`) shares its mod's.
@@ -46,34 +52,53 @@ fn grantee(owner: &str) -> &str {
 /// Lets the mod `owner` show `paths` in `ui.image` (and what is in those
 /// that are folders): the user picked them for it or dropped them on it.
 pub(crate) fn grant(owner: &str, paths: &[PathBuf]) {
-    let owner = grantee(owner);
+    let owner = grantee(owner).to_owned();
     GRANTED.with_borrow_mut(|granted| {
+        let grants = granted.entry(owner).or_default();
         for path in paths {
-            let path = path.canonicalize().unwrap_or_else(|_| path.clone());
-            if !granted
-                .iter()
-                .any(|(to, held)| to == owner && *held == path)
-            {
-                granted.push((owner.to_owned(), path));
+            let Ok(path) = path.canonicalize() else {
+                continue;
+            };
+            if path.is_dir() {
+                if !grants.folders.contains(&path) {
+                    grants.folders.push(path);
+                }
+            } else {
+                grants.files.insert(path);
             }
         }
-        let over = granted.len().saturating_sub(MAX_GRANTED);
-        granted.drain(..over);
     });
-    // A picture looked for before it was granted is cached as missing.
-    forget();
+    // Pictures looked for before they were granted are cached as missing;
+    // what was found stays found.
+    CACHE.with_borrow_mut(|cache| {
+        cache.retain(|_, resolved| matches!(resolved, Resolved::Found(_)));
+    });
 }
 
-/// The paths [`grant`] gave the mod `owner`.
-pub(super) fn granted(owner: &str) -> Vec<PathBuf> {
-    let owner = grantee(owner);
+/// Whether the mod `owner` was given `real`, a canonical file path.
+fn granted(owner: &str, real: &Path) -> bool {
     GRANTED.with_borrow(|granted| {
-        granted
-            .iter()
-            .filter(|(to, _)| to == owner)
-            .map(|(_, path)| path.clone())
-            .collect()
+        granted.get(grantee(owner)).is_some_and(|grants| {
+            grants.files.contains(real)
+                || grants.folders.iter().any(|folder| real.starts_with(folder))
+        })
     })
+}
+
+/// The picture `src` names for a mod in `folder`, if the mod `owner` was
+/// given it: a regular file of at most [`MAX_IMAGE_BYTES`], named as
+/// `ui.image` names pictures.
+fn granted_file(owner: &str, src: &str, folder: &Path, home: Option<&Path>) -> Option<PathBuf> {
+    let src = Path::new(src);
+    let path = match (home, src.strip_prefix("~")) {
+        (Some(home), Ok(rest)) => home.join(rest),
+        _ if src.is_absolute() => src.to_owned(),
+        _ => folder.join(src),
+    };
+    let real = path.canonicalize().ok()?;
+    let metadata = real.metadata().ok()?;
+    (metadata.is_file() && metadata.len() <= MAX_IMAGE_BYTES && granted(owner, &real))
+        .then_some(real)
 }
 
 /// The file `image` names for the mod `owner` in `folder`, if it may be
@@ -96,7 +121,9 @@ pub(super) fn resolve(
         return cached;
     }
     let home = std::env::home_dir();
-    let path = image.resolve(folder, home.as_deref(), &allowed());
+    let path = image
+        .resolve(folder, home.as_deref(), &allowed())
+        .or_else(|| granted_file(owner, &image.src, folder, home.as_deref()));
     let resolved = match &path {
         Some(path) => Resolved::Found(path.clone()),
         None => Resolved::Missing(now),
@@ -149,16 +176,40 @@ mod tests {
         let scan = dir.path().join("scan.png");
         std::fs::write(&scan, "png").unwrap();
         grant("editor", std::slice::from_ref(&scan));
-        let scan = scan.canonicalize().unwrap();
-        assert_eq!(granted("editor"), std::slice::from_ref(&scan));
+        let src = scan.to_str().unwrap();
+        let shown = |owner: &str| granted_file(owner, src, dir.path(), None).is_some();
+        assert!(shown("editor"));
         // The editor's image viewer shares it; another mod does not.
-        assert_eq!(granted("editor/image-viewer#main"), [scan]);
-        assert!(granted("notes").is_empty());
+        assert!(shown("editor/image-viewer#main"));
+        assert!(!shown("notes"));
         // A grant made inside a component goes to its mod.
         let other = dir.path().join("other.png");
         std::fs::write(&other, "png").unwrap();
-        grant("notes/image-viewer#main", &[other]);
-        assert_eq!(granted("notes").len(), 1);
-        assert_eq!(granted("editor").len(), 1);
+        grant("notes/image-viewer#main", std::slice::from_ref(&other));
+        let other_src = other.to_str().unwrap();
+        assert!(granted_file("notes", other_src, dir.path(), None).is_some());
+        assert!(granted_file("editor", other_src, dir.path(), None).is_none());
+    }
+
+    #[test]
+    fn grants_last_however_many_files_are_opened() {
+        let dir = tempfile::tempdir().unwrap();
+        let files: Vec<PathBuf> = (0..300)
+            .map(|index| {
+                let path = dir.path().join(format!("{index}.png"));
+                std::fs::write(&path, "png").unwrap();
+                path
+            })
+            .collect();
+        grant("batch", &files);
+        // The first opened is still shown after 300.
+        let first = files[0].to_str().unwrap();
+        assert!(granted_file("batch", first, dir.path(), None).is_some());
+        // A folder grants what is in it.
+        let folder = tempfile::tempdir().unwrap();
+        let inside = folder.path().join("in.png");
+        std::fs::write(&inside, "png").unwrap();
+        grant("folders", &[folder.path().to_owned()]);
+        assert!(granted_file("folders", inside.to_str().unwrap(), folder.path(), None).is_some());
     }
 }

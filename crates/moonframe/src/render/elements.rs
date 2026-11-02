@@ -706,7 +706,6 @@ impl<'w> Draw<'w> for Image {
                 .layers()
                 .map(Path::to_owned)
                 .chain([crate::paths::images()])
-                .chain(super::images::granted(owner))
                 .collect()
         });
         let fit = match self.fit {
