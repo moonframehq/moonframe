@@ -33,6 +33,8 @@
 # edit is journaled in `.pending` before publishing, then recovered on
 # startup if the host stopped the process before its debounced write.
 
+import fcntl
+import glob
 import json
 import os
 import re
@@ -52,8 +54,15 @@ DATA = (_xdg if _xdg.startswith("/") else HOME + "/.local/share") + "/moonframe/
 FOLDER = DATA + "/documents"
 TRASH = FOLDER + "/.trash"
 FAVORITES = FOLDER + "/.favorites"
-JOURNAL = FOLDER + "/.pending"
+LEGACY_JOURNAL = FOLDER + "/.pending"  # one shared file, before runs had their own
+JOURNALS = FOLDER + "/.journals"
 SESSION = uuid.uuid4().hex
+# Each run journals its edit in a file of its own, and holds a lock beside
+# it for as long as it runs: a journal whose lock can be taken belongs to a
+# run that has stopped, and is the only kind another run recovers.
+JOURNAL = JOURNALS + "/" + SESSION + ".json"
+LOCK = JOURNALS + "/" + SESSION + ".lock"
+NAME_MAX = 81  # characters in a document's name, as ID allows
 QUIET = 0.6  # seconds without a keystroke before an edit is written
 LOOK = 30  # seconds between looks at the folder, for files changed elsewhere
 EXCERPT = 140  # characters of a document shown under its title
@@ -220,7 +229,7 @@ def listing():
             except OSError:
                 continue
             doc = name[:-3]
-            body = pending[1] if pending and pending[0] == doc else read(path)
+            body = pending[1] if pending and pending[0] == path else read(path)
             found.append((stamp, {
                 "id": doc,
                 "title": title_of(body, doc),
@@ -236,18 +245,25 @@ def listing():
 
 def free(doc, trashed):
     # `doc` itself if no file by that name is in the folder it moves to,
-    # else "doc (2)", "doc (3)"…, so a move never replaces another file.
+    # else "doc (2)", "doc (3)"…, so a move never replaces another file;
+    # the name is shortened to keep the suffix within NAME_MAX.
     name, n = doc, 2
     while os.path.exists(path_of(name, trashed)):
-        name, n = "%s (%d)" % (doc, n), n + 1
+        suffix = " (%d)" % n
+        name, n = doc[: NAME_MAX - len(suffix)].rstrip() + suffix, n + 1
     return name
 
 
 def move(doc, found, trashed):
     # Moves a document into or out of the trash, renamed if it must be, and
-    # moves its star with it. Returns the name it has now.
+    # moves its star with it; the open document follows its file. Returns
+    # the name it has now.
+    global current_path
     name = free(doc, trashed)
     os.replace(found[0], path_of(name, trashed))
+    if current and current_path == found[0]:
+        current["id"] = name
+        current_path = path_of(name, trashed)
     stars = favorites()
     if name != doc and doc in stars:
         save_favorites((stars - {doc}) | {name})
@@ -269,8 +285,9 @@ def fresh_name():
 
 
 current = None  # { id, text, opened }
+current_path = None  # the open document's file: saves go here, never by name
 opened = 0
-pending = None  # (id, text) not written yet
+pending = None  # (path, text) not written yet
 typed = 0.0  # when the last edit came
 
 
@@ -289,38 +306,88 @@ def atomic_write(path, body):
             os.remove(temporary)
 
 
-def recover():
-    global pending
+def inside(path):
+    # Whether a journal's path is a document of this library.
+    if not isinstance(path, str) or not path.endswith(".md"):
+        return False
+    real = os.path.realpath(path)
+    return os.path.dirname(real) in (os.path.realpath(FOLDER), os.path.realpath(TRASH))
+
+
+def replay(journal):
+    # Writes a journaled edit to its document if that still exists: a
+    # deleted document is deliberately not recreated.
     try:
-        with open(JOURNAL, encoding="utf-8") as f:
+        with open(journal, encoding="utf-8") as f:
             saved = json.load(f)
-    except FileNotFoundError:
+    except (OSError, ValueError):
         return
-    pending = (saved["id"], saved["text"])
-    flush()
+    if not isinstance(saved, dict) or not isinstance(saved.get("text"), str):
+        return
+    path = saved.get("path")
+    if path is None and saved.get("id") is not None:
+        found = where(saved["id"])  # a journal from before paths were kept
+        path = found[0] if found else None
+    if inside(path) and os.path.isfile(path):
+        atomic_write(path, saved["text"])
+
+
+def gone(path):
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+
+
+lock = None  # this run's lock, held open while it runs
+
+
+def recover():
+    # Takes this run's lock, then replays the journals of runs that stopped
+    # before writing their last edit, leaving those of live runs alone.
+    global lock
+    os.makedirs(JOURNALS, exist_ok=True)
+    lock = open(LOCK, "w")
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    if os.path.isfile(LEGACY_JOURNAL):
+        replay(LEGACY_JOURNAL)
+        gone(LEGACY_JOURNAL)
+    for other in glob.glob(JOURNALS + "/*.lock"):
+        if other == LOCK:
+            continue
+        with open(other, "a") as held:
+            try:
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                continue  # its run is still going
+            journal = other[: -len(".lock")] + ".json"
+            if os.path.isfile(journal):
+                replay(journal)
+            gone(journal)
+            gone(other)
 
 
 def flush():
     global pending
     if pending is None:
         return
-    doc, body = pending
-    found = where(doc)
-    if found:
-        atomic_write(found[0], body)
+    path, body = pending
+    if os.path.isfile(path):
+        atomic_write(path, body)
     # Keep recovery available until the document has been replaced. A
     # deleted document is deliberately not recreated by journal replay.
-    os.remove(JOURNAL)
+    gone(JOURNAL)
     pending = None
 
 
 def open_doc(doc):
-    global current, opened
+    global current, current_path, opened
     flush()
     found = where(doc)
     if not found:
         return
     opened += 1
+    current_path = found[0]
     current = {"id": doc, "opened": "%s-%d" % (SESSION, opened)}
     try:
         size = os.path.getsize(found[0])
@@ -344,12 +411,18 @@ def receive(line):
     if "open" in msg:
         open_doc(msg["open"])
     elif isinstance(msg.get("save"), dict):
-        doc, body = msg["save"].get("id"), msg["save"].get("text")
-        if isinstance(body, str) and where(doc):
-            if pending and pending[0] != doc:
+        # An edit of the open document goes to its file, whatever it is
+        # called now; one from an earlier opening is dropped.
+        save = msg["save"]
+        body, token = save.get("text"), save.get("opened")
+        mine = current is not None and (
+            token == current["opened"] if token is not None else save.get("id") == current["id"]
+        )
+        if isinstance(body, str) and mine and os.path.isfile(current_path):
+            if pending and pending[0] != current_path:
                 flush()
-            atomic_write(JOURNAL, encode({"id": doc, "text": body}))
-            pending = (doc, body)
+            atomic_write(JOURNAL, encode({"path": current_path, "text": body}))
+            pending = (current_path, body)
             typed = time.time()
     elif msg.get("new"):
         flush()
@@ -363,9 +436,8 @@ def receive(line):
         save_favorites(stars)
     elif msg.get("trash_current") and current:
         flush()
-        found = where(current["id"])
-        if found and not found[1]:
-            move(current["id"], found, True)
+        if os.path.dirname(current_path) == FOLDER and os.path.isfile(current_path):
+            move(current["id"], (current_path, False), True)
             current = None
     elif "trash" in msg or "restore" in msg:
         doc = msg.get("trash", msg.get("restore"))
@@ -377,8 +449,9 @@ def receive(line):
             found = (path_of(doc, trashed), trashed)
         if found and found[1] == trashed:
             flush()
+            was_open = current is not None and current_path == found[0]
             move(doc, found, "trash" in msg)
-            if "trash" in msg and current and current["id"] == doc:
+            if "trash" in msg and was_open:
                 current = None
     elif "purge" in msg:
         # Only ever from the trash, even when a live document shares the name.
@@ -386,7 +459,7 @@ def receive(line):
         if where(doc) and os.path.isfile(path_of(doc, True)):
             flush()
             os.remove(path_of(doc, True))
-            if current and not where(current["id"]):
+            if current and not os.path.isfile(current_path):
                 current = None
 
 

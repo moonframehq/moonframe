@@ -55,6 +55,9 @@ class LibraryTests(unittest.TestCase):
         line, self.buffer = self.buffer.split(b"\n", 1)
         return json.loads(line)
 
+    def journals(self):
+        return sorted((self.folder / ".journals").glob("*.json"))
+
     def send(self, message):
         self.process.stdin.write((json.dumps({"message": message}) + "\n").encode())
         self.process.stdin.flush()
@@ -70,7 +73,7 @@ class LibraryTests(unittest.TestCase):
         restored = self.start()
         self.assertEqual(restored["current"]["text"], "Latest edit — café")
         self.assertEqual((self.folder / "Draft.md").read_text(), "Latest edit — café")
-        self.assertFalse((self.folder / ".pending").exists())
+        self.assertEqual(self.journals(), [])
 
     def test_opening_tokens_change_on_reopen_and_restart(self):
         first = self.start()["current"]["opened"]
@@ -102,7 +105,7 @@ class LibraryTests(unittest.TestCase):
         self.stop(self.process)
         restored = self.start()
         self.assertEqual(restored["documents"], [])
-        self.assertFalse((self.folder / ".pending").exists())
+        self.assertEqual(self.journals(), [])
 
     def test_trashing_never_replaces_a_trashed_document_of_the_same_name(self):
         trash = self.folder / ".trash"
@@ -140,6 +143,51 @@ class LibraryTests(unittest.TestCase):
         published = self.start()
         self.assertEqual(len(published["documents"]), 500)
         self.assertEqual(published["hidden"], 11)
+
+    def test_a_document_put_back_under_a_new_name_keeps_its_edits_to_itself(self):
+        self.start()
+        self.send({"trash": "Draft"})
+        opened = self.send({"open": "Draft"})["current"]["opened"]
+        (self.folder / "Draft.md").write_text("Another document", encoding="utf-8")
+        current = self.send({"restore": "Draft"})["current"]
+        self.assertEqual(current["id"], "Draft (2)")
+        self.assertEqual(current["opened"], opened)
+        # The editor still names the opening it was given, and its old name.
+        self.send({"save": {"id": "Draft", "opened": opened, "text": "Edited after restoring"}})
+        self.stop(self.process)
+        self.start()
+        self.assertEqual((self.folder / "Draft.md").read_text(), "Another document")
+        self.assertEqual((self.folder / "Draft (2).md").read_text(), "Edited after restoring")
+
+    def test_runs_of_one_profile_keep_their_own_recovery(self):
+        first = self.start()["current"]["opened"]
+        self.send({"save": {"id": "Draft", "opened": first, "text": "First run's edit"}})
+        one = self.process
+        self.start()  # a second run while the first still goes
+        self.assertEqual((self.folder / "Draft.md").read_text(), "Original draft")
+        self.assertEqual(len(self.journals()), 1)
+        self.stop(self.process)
+        # The first run is still alive and writes its edit itself.
+        self.process = one
+        deadline = time.monotonic() + 5
+        while (self.folder / "Draft.md").read_text() != "First run's edit" and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertEqual((self.folder / "Draft.md").read_text(), "First run's edit")
+        self.assertIsNone(one.poll())
+        self.assertEqual(self.journals(), [])
+
+    def test_a_long_name_stays_valid_when_it_must_change(self):
+        name = "L" * 81
+        (self.folder / (name + ".md")).write_text("Long", encoding="utf-8")
+        trash = self.folder / ".trash"
+        trash.mkdir()
+        (trash / (name + ".md")).write_text("Older long", encoding="utf-8")
+        self.start()
+        documents = self.send({"trash": name})["documents"]
+        ids = sorted(d["id"] for d in documents)
+        self.assertEqual(len(ids), 3)
+        self.assertTrue(all(len(i) <= 81 for i in ids))
+        self.assertIn("L" * 77 + " (2)", ids)
 
 
 if __name__ == "__main__":

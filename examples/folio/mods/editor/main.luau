@@ -73,7 +73,7 @@ return mod {
 		if type(msg) == "table" and msg.typed then
 			state.text = msg.value
 			state.opened = msg.opened
-			return state, { { to = "provider:library", msg = { save = { id = msg.typed, text = msg.value } } } }
+			return state, { { to = "provider:library", msg = { save = { id = msg.typed, opened = msg.opened, text = msg.value } } } }
 		elseif type(msg) == "table" and msg.new then
 			return state, { { to = "provider:library", msg = { new = true } } }
 		elseif what == "cycle-dim" then
