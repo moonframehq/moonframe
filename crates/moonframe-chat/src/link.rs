@@ -48,6 +48,10 @@ fn run(shared: &Shared, host: &Handle, id: &str, endpoint: &EndpointId) {
         };
         let gone = ended || !address.exists() || failures > RETRIES;
         let mut state = lock(shared);
+        if state.detached {
+            return;
+        }
+        state.settle(host, id, "the chat disconnected before answering");
         let Some(chat) = state.chat_mut(id) else {
             return;
         };
@@ -69,7 +73,8 @@ fn run(shared: &Shared, host: &Handle, id: &str, endpoint: &EndpointId) {
 }
 
 fn closing(shared: &Shared, id: &str) -> bool {
-    lock(shared).chat(id).is_none_or(|chat| chat.closing)
+    let state = lock(shared);
+    state.detached || state.chat(id).is_none_or(|chat| chat.closing)
 }
 
 /// One connection, until it drops; true when the program said it exits.

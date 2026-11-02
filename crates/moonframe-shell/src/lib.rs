@@ -19,8 +19,10 @@
 //! lines with style marks (see `ansi`), `text` the same without them, at
 //! most 15 KiB from the end; `hidden` the lines left out before them.
 
+// keep-sorted start
 mod ansi;
 mod run;
+// keep-sorted end
 
 use {
     moonframe_core::Data,

@@ -30,8 +30,10 @@
 //! with `status` `"starting" "live" "reconnecting" "ended" "failed"` and
 //! `transcript` herdr's (see `project`).
 
+// keep-sorted start
 mod program;
 mod project;
+// keep-sorted end
 
 #[cfg(unix)]
 mod link;
@@ -98,6 +100,8 @@ pub(crate) struct Chat {
 /// out on Unix alone.
 #[cfg_attr(not(unix), allow(dead_code))]
 pub(crate) struct Pending {
+    /// The chat it went to: answered with an error if it goes first.
+    pub(crate) chat: String,
     pub(crate) owner: String,
     pub(crate) reply: Value,
     pub(crate) action: &'static str,
@@ -114,12 +118,33 @@ pub(crate) struct State {
     pub(crate) dirty: bool,
     /// The chats' records changed since they were last saved.
     pub(crate) unsaved: bool,
+    /// The provider was dropped (a reload, the app quitting): connections
+    /// end, the chats' programs keep running for the next attach.
+    pub(crate) detached: bool,
 }
 
 impl State {
     #[cfg_attr(not(unix), allow(dead_code))]
     pub(crate) fn chat(&self, id: &str) -> Option<&Chat> {
         self.chats.iter().find(|chat| chat.id == id)
+    }
+
+    /// Answers, with `why`, every command `chat` never acknowledged.
+    pub(crate) fn settle(&mut self, host: &Handle, chat: &str, why: &str) {
+        let unanswered: Vec<CommandId> = self
+            .pending
+            .iter()
+            .filter(|(_, pending)| pending.chat == chat)
+            .map(|(id, _)| *id)
+            .collect();
+        for id in unanswered {
+            if let Some(pending) = self.pending.remove(&id) {
+                let answer = json!({
+                    "reply": pending.reply, "action": pending.action, "ok": false, "error": why,
+                });
+                send(host, &pending.owner, &answer);
+            }
+        }
     }
 
     pub(crate) fn chat_mut(&mut self, id: &str) -> Option<&mut Chat> {
@@ -219,6 +244,21 @@ impl Native for Chats {
     }
 }
 
+impl Drop for Chats {
+    /// A reload or the app quitting: the connections end, so their threads
+    /// do; the chats' programs keep running and the next start attaches.
+    fn drop(&mut self) {
+        let mut state = lock(&self.state);
+        state.detached = true;
+        #[cfg(unix)]
+        for chat in &mut state.chats {
+            if let Some(writer) = chat.writer.take() {
+                let _ = writer.shutdown(std::net::Shutdown::Both);
+            }
+        }
+    }
+}
+
 type Handled = Option<(&'static str, Result<Option<Value>, String>)>;
 
 impl Chats {
@@ -258,7 +298,7 @@ impl Chats {
                 .start_chat(host, owner, message)
                 .map(|chat| Some(json!({ "chat": chat }))),
             "resume" => self.resume(host, owner, text("resume").unwrap_or_default()),
-            "close" => self.close(owner, text("close").unwrap_or_default()),
+            "close" => self.close(host, owner, text("close").unwrap_or_default()),
             _ => {
                 let chat = match action {
                     "cancel" | "answer" => text(action),
@@ -368,7 +408,10 @@ impl Chats {
                     log: log.as_deref(),
                 });
                 let mut state = lock(&shared);
-                let Some(chat) = state.chat_mut(&id) else {
+                // Closed meanwhile, or the provider is gone: nothing would
+                // know of the program, so it ends.
+                let detached = state.detached;
+                let Some(chat) = state.chat_mut(&id).filter(|_| !detached) else {
                     if let Ok((pid, _)) = started {
                         program::end(pid);
                     }
@@ -417,7 +460,7 @@ impl Chats {
         Ok(Some(json!({ "chat": id })))
     }
 
-    fn close(&mut self, owner: &str, id: &str) -> Result<Option<Value>, String> {
+    fn close(&mut self, host: &Handle, owner: &str, id: &str) -> Result<Option<Value>, String> {
         let mut state = lock(&self.state);
         let at = state
             .chats
@@ -427,6 +470,7 @@ impl Chats {
         let mut chat = state.chats.remove(at);
         chat.closing = true;
         end_chat(&mut chat);
+        state.settle(host, id, "the chat was closed");
         state.unsaved = true;
         Ok(Some(json!({ "chat": id })))
     }
@@ -455,6 +499,7 @@ impl Chats {
         }
         let owner = owner.to_owned();
         state.pending.insert(command_id, Pending {
+            chat: id.to_owned(),
             owner,
             reply,
             action,
