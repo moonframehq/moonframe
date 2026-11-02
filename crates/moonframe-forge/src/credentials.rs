@@ -133,6 +133,24 @@ pub struct Saved {
     kind: Kind,
     store: Store,
     directory: PathBuf,
+    /// A renewal this app holds but could not save: the store still has
+    /// the pair it replaced, which must not be taken for another app's.
+    unsaved: std::sync::Mutex<Option<Unsaved>>,
+}
+
+/// See [`Saved::unsaved`].
+struct Unsaved {
+    host: String,
+    /// The refresh token the store still holds, spent by the renewal.
+    spent: SecretString,
+    fresh: Credential,
+}
+
+fn same_refresh(a: &Credential, b: &Credential) -> bool {
+    match (&a.refresh, &b.refresh) {
+        (Some(a), Some(b)) => a.expose_secret() == b.expose_secret(),
+        _ => false,
+    }
 }
 
 impl Saved {
@@ -144,6 +162,7 @@ impl Saved {
             kind,
             store: Store::for_policy(plaintext),
             directory,
+            unsaved: std::sync::Mutex::new(None),
         }
     }
 
@@ -204,8 +223,16 @@ impl Saved {
     }
 
     /// Saves `credential` for `host`, or the choice of the CLI when it
-    /// came from there.
+    /// came from there, in turn with renewals and sign-outs.
     pub fn save(&self, host: &str, credential: &Credential) -> Result<(), StoreError> {
+        self.locked(|| {
+            self.forget_unsaved(host);
+            self.write_record(host, credential)
+        })
+    }
+
+    /// [`Saved::save`] for a caller already holding the lock.
+    fn write_record(&self, host: &str, credential: &Credential) -> Result<(), StoreError> {
         let mut records = self.records()?;
         let record = match credential.source {
             Source::Cli => json!({ "source": "cli" }),
@@ -228,6 +255,7 @@ impl Saved {
     /// [`Saved::renew`]).
     pub fn forget(&self, host: &str) -> Result<(), StoreError> {
         self.locked(|| {
+            self.forget_unsaved(host);
             let mut records = self.records()?;
             if records.remove(host).is_some() {
                 self.write(&records)?;
@@ -268,43 +296,87 @@ impl Saved {
         renew: impl FnOnce(&Credential) -> Option<Credential>,
     ) -> Renewal {
         self.locked(|| {
-            let same = |saved: &Credential| match (&saved.refresh, &current.refresh) {
-                (Some(saved), Some(ours)) => saved.expose_secret() == ours.expose_secret(),
-                _ => false,
-            };
-            match self.load(host) {
-                Ok(Some(Remembered::Token(saved))) if !same(&saved) => Renewal::Newer(saved),
-                Ok(Some(Remembered::Token(_))) => match renew(current) {
-                    Some(renewed) => {
-                        if let Err(problem) = self.save(host, &renewed) {
-                            tracing::warn!(
-                                "{}: cannot save the renewed sign-in: {}",
-                                self.kind.name(),
-                                problem.0
-                            );
-                        }
-                        Renewal::Renewed(renewed)
-                    },
-                    None => Renewal::Failed,
-                },
-                Ok(Some(Remembered::Cli) | None) => Renewal::Gone,
+            let saved = match self.load(host) {
+                Ok(Some(Remembered::Token(saved))) => saved,
+                Ok(Some(Remembered::Cli) | None) => return Renewal::Gone,
                 // The store cannot be read: renew for this run alone.
-                Err(_) => renew(current).map_or(Renewal::Failed, Renewal::Renewed),
+                Err(_) => return renew(current).map_or(Renewal::Failed, Renewal::Renewed),
+            };
+            // Ours: the pair the store holds, or a renewal of it this app
+            // could not save, which it saves now.
+            let ours = same_refresh(&saved, current) || self.retry_unsaved(host, &saved, current);
+            if !ours {
+                self.forget_unsaved(host);
+                return Renewal::Newer(saved);
             }
+            let Some(renewed) = renew(current) else {
+                return Renewal::Failed;
+            };
+            if let Err(problem) = self.write_record(host, &renewed) {
+                tracing::warn!(
+                    "{}: cannot save the renewed sign-in, trying again later: {}",
+                    self.kind.name(),
+                    problem.0
+                );
+                if let (Ok(mut unsaved), Some(spent)) = (self.unsaved.lock(), saved.refresh.clone())
+                {
+                    *unsaved = Some(Unsaved {
+                        host: host.to_owned(),
+                        spent,
+                        fresh: renewed.clone(),
+                    });
+                }
+            } else {
+                self.forget_unsaved(host);
+            }
+            Renewal::Renewed(renewed)
         })
+    }
+
+    /// Whether `current` is this app's unsaved renewal of `saved`; if so,
+    /// saves it now.
+    fn retry_unsaved(&self, host: &str, saved: &Credential, current: &Credential) -> bool {
+        let Ok(mut unsaved) = self.unsaved.lock() else {
+            return false;
+        };
+        let pending = unsaved.as_ref().is_some_and(|pending| {
+            pending.host == host
+                && saved
+                    .refresh
+                    .as_ref()
+                    .is_some_and(|refresh| refresh.expose_secret() == pending.spent.expose_secret())
+                && same_refresh(&pending.fresh, current)
+        });
+        if pending
+            && let Some(fresh) = unsaved.as_ref().map(|pending| pending.fresh.clone())
+            && self.write_record(host, &fresh).is_ok()
+        {
+            *unsaved = None;
+        }
+        pending
+    }
+
+    fn forget_unsaved(&self, host: &str) {
+        if let Ok(mut unsaved) = self.unsaved.lock()
+            && unsaved.as_ref().is_some_and(|pending| pending.host == host)
+        {
+            *unsaved = None;
+        }
     }
 }
 
 /// What [`Saved::renew`] did.
 pub enum Renewal {
-    /// Renewed and saved.
-    Renewed(Credential),
-    /// Another app renewed it first: its token, as saved.
-    Newer(Credential),
-    /// Signed out meanwhile: nothing to renew.
-    Gone,
+    // keep-sorted start
     /// The forge would not renew it.
     Failed,
+    /// Signed out meanwhile: nothing to renew.
+    Gone,
+    /// Another app renewed it first: its token, as saved.
+    Newer(Credential),
+    /// Renewed, and saved (or kept to save at the next renewal).
+    Renewed(Credential),
+    // keep-sorted end
 }
 
 /// What [`Saved`] holds for a host.

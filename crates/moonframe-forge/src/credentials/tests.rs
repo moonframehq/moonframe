@@ -112,3 +112,41 @@ fn apps_sharing_a_sign_in_renew_it_once() {
     assert!(matches!(after, Renewal::Gone));
     assert!(matches!(first.load("gitlab.com"), Ok(None)));
 }
+
+#[test]
+fn an_unsaved_renewal_is_still_ours_next_time() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = dir.path().join("state");
+    let saved = Saved::new(Kind::GitLab, store.clone(), true);
+    let held = oauth("access-one", "refresh-one");
+    saved.save("gitlab.com", &held).unwrap();
+    // The store goes read-only: the renewal cannot be saved.
+    std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o500)).unwrap();
+    let Renewal::Renewed(fresh) = saved.renew("gitlab.com", &held, |_| {
+        Some(oauth("access-two", "refresh-two"))
+    }) else {
+        panic!("not renewed");
+    };
+    // Next time the store still holds the spent pair; that is not another
+    // app's newer sign-in, and the fresh pair is renewed.
+    let next = saved.renew("gitlab.com", &fresh, |_| {
+        Some(oauth("access-three", "refresh-three"))
+    });
+    std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(
+        matches!(next, Renewal::Renewed(_)),
+        "took the spent pair back"
+    );
+    // Once it can, it saves.
+    let Renewal::Renewed(third) = next else {
+        unreachable!()
+    };
+    let last = saved.renew("gitlab.com", &third, |_| {
+        Some(oauth("access-four", "refresh-four"))
+    });
+    assert!(matches!(last, Renewal::Renewed(_)));
+    let Ok(Some(Remembered::Token(kept))) = saved.load("gitlab.com") else {
+        panic!("nothing saved");
+    };
+    assert_eq!(kept.token.expose_secret(), "access-four");
+}
