@@ -1,12 +1,8 @@
 use {
     super::*,
-    crate::{
-        credentials::{Credential, Remembered, Saved, Source},
-        shape::{Avatars, parse_time},
-    },
+    crate::shape::{Avatars, parse_time},
     moonframe_core::Data,
     moonframe_providers::{Event, Handle},
-    secrecy::{ExposeSecret, SecretString},
     serde_json::{Value, json},
     std::sync::{Arc, Mutex},
 };
@@ -165,6 +161,10 @@ fn avatars_only_name_safe_files() {
 #[cfg(unix)]
 #[test]
 fn saved_sign_ins_round_trip_per_host() {
+    use {
+        crate::credentials::{Credential, Remembered, Saved, Source},
+        secrecy::{ExposeSecret, SecretString},
+    };
     let folder = tempfile::tempdir().unwrap();
     // The private file, whatever this build's keyring.
     let saved = Saved::new(kind::Kind::GitLab, folder.path().join("state"), true);
