@@ -18,6 +18,7 @@ mod list;
 mod markdown;
 mod plot;
 mod pointer;
+mod popover;
 mod styling;
 mod terminal;
 mod view;

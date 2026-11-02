@@ -159,6 +159,10 @@ pub struct Popover {
     pub width: Option<f32>,
     /// Keystrokes it takes while open and on top.
     pub keys: Keys,
+    /// While open, the anchor stays above the click-outside layer, so a
+    /// click on it reaches the anchor instead of sending `dismiss`: a
+    /// field whose suggestions show under it while the user types.
+    pub anchor_clicks: bool,
     /// What it opens from, drawn in place.
     pub anchor: Vec<Node>,
     pub content: Box<Node>,

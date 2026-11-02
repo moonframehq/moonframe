@@ -2,7 +2,7 @@
 
 use {
     super::{
-        Backdrop, Cx, Draw, KeyLayer, POPOVER_BACKDROP, POPOVER_CONTENT, Painter, Place, Shown,
+        Cx, Draw, Painter, Place, Shown,
         styling::{FrameExt as _, LookExt as _, StyleExt as _},
     },
     crate::color::ThemeColor,
@@ -15,9 +15,9 @@ use {
         *,
     },
     moonframe_core::{
-        Align, Anchor, Badge, Button, Case, Color, Direction, Extras, Fit, Icon, Image, Item,
-        Justify, Look, Paint, Panel, Part, Popover, Region, Resolved, Side, Sides, Space, Split,
-        Stack, States, Text, Token, Tone, TransitionKind, Variant,
+        Align, Badge, Button, Case, Color, Direction, Extras, Fit, Icon, Image, Item, Justify,
+        Look, Paint, Panel, Part, Region, Resolved, Sides, Space, Split, Stack, States, Text,
+        Token, Tone, TransitionKind, Variant,
     },
     std::path::Path,
 };
@@ -26,8 +26,6 @@ use {
 const PANE_MIN: f32 = 80.;
 /// What a sliding pane with neither `size` nor `max` slides across.
 const PANE_SLIDE: f32 = 240.;
-/// How far a popover's content travels as it slides in or out.
-const POPOVER_SLIDE: f32 = 8.;
 
 impl<'w> Draw<'w> for Stack {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
@@ -845,97 +843,4 @@ pub(super) fn divider(painter: &Painter<'_, '_>, place: &Place, cx: Cx) -> AnyEl
     .bg(color)
     .flex_shrink_0()
     .into_any_element()
-}
-
-impl<'w> Draw<'w> for Popover {
-    fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
-        let anchor = painter.children(&self.anchor, place, Direction::Row, cx);
-        let container = div()
-            .id(place.id())
-            .relative()
-            .flex()
-            .flex_row()
-            .items_center()
-            .children(anchor);
-        let content_place = place.part("content");
-        let look = painter.look(Part::Popover, &self.look, false, &content_place);
-        let transition = look.base.transition;
-        let shown = painter.shown(&content_place, self.open, transition.as_ref());
-        if self.open {
-            if let Some(msg) = &self.dismiss {
-                painter.backdrops.push(Backdrop {
-                    priority: painter.layer + POPOVER_BACKDROP,
-                    owner: place.owner,
-                    to: self.to.clone(),
-                    msg: msg.clone(),
-                });
-            }
-            if !self.keys.is_empty() || self.dismiss.is_some() {
-                painter.key_layers.push(KeyLayer {
-                    priority: painter.layer + POPOVER_CONTENT,
-                    owner: place.owner.to_owned(),
-                    to: self.to.clone(),
-                    keys: self.keys.clone(),
-                    dismiss: self.dismiss.clone(),
-                    modal: false,
-                });
-            }
-        }
-        if shown.hidden() {
-            return container.into_any_element();
-        }
-        let content = self
-            .content
-            .draw(painter, &content_place.child(0, Direction::Column), cx);
-        let theme = cx.theme();
-        let kind = transition.map(|transition| transition.kind);
-        let moving = shown.moving();
-        // Sliding starts it a little toward its anchor; it rises into place.
-        let shift = match (moving, kind) {
-            (Some(amount), Some(TransitionKind::Slide | TransitionKind::SlideFade)) => {
-                POPOVER_SLIDE * (1.0 - amount)
-            },
-            _ => 0.0,
-        };
-        let mut sheet = div()
-            .id(content_place.id())
-            .absolute()
-            .flex()
-            .flex_col()
-            .occlude()
-            .look(&look, theme)
-            .edges(look.base.border, &look.base, theme)
-            .padded(&look.base.padding);
-        sheet = match self.side {
-            Side::Top => sheet.bottom_full().mb(px(self.gap - shift)),
-            Side::Bottom => sheet.top_full().mt(px(self.gap - shift)),
-            Side::Left => sheet.right_full().mr(px(self.gap - shift)),
-            Side::Right => sheet.left_full().ml(px(self.gap - shift)),
-        };
-        // Above or below, it lines up with the anchor's left or right edge;
-        // beside it, with its top or bottom.
-        sheet = match (self.side, self.align) {
-            (Side::Top | Side::Bottom, Anchor::Start) => sheet.left_0(),
-            (Side::Top | Side::Bottom, Anchor::End) => sheet.right_0(),
-            (Side::Left | Side::Right, Anchor::Start) => sheet.top_0(),
-            (Side::Left | Side::Right, Anchor::End) => sheet.bottom_0(),
-        };
-        if let Some(width) = self.width {
-            sheet = sheet.w(px(width));
-        }
-        if let Some(gap) = look.base.gap {
-            sheet = sheet.gap(px(gap));
-        }
-        if let (Some(amount), Some(TransitionKind::Fade | TransitionKind::SlideFade)) =
-            (moving, kind)
-        {
-            sheet = sheet.opacity(amount);
-        }
-        container
-            .child(
-                deferred(sheet.child(content).child(crate::browser::cover()))
-                    .with_priority(painter.layer + POPOVER_CONTENT),
-            )
-            .into_any_element()
-    }
 }
