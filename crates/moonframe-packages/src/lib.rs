@@ -47,7 +47,7 @@ impl Identity {
             title: "Moonframe".to_owned(),
             icon: None,
             version: env!("CARGO_PKG_VERSION").to_owned(),
-            updates: Some("penso/moonframe".to_owned()),
+            updates: Some("moonframehq/moonframe".to_owned()),
             hosted: false,
         }
     }

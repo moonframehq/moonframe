@@ -59,7 +59,7 @@ local MORE: { any } = {
 	{ id = "refresh", label = "Look for new sessions", icon = "refresh-cw", shortcut = "cmd-r" },
 }
 
-local HOME = "https://github.com/penso/moonframe"
+local HOME = "https://github.com/moonframehq/moonframe"
 
 -- What the sidebar and the canvas hear, and what the provider reads.
 local function share(state: State): { any }
@@ -137,7 +137,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "Your coding-agent sessions by repository, their transcripts, and a scripted demo agent.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

@@ -30,7 +30,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "Coding sessions across your repositories: a shell in each, and its changes.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

@@ -27,7 +27,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "A newsletter's audience at a glance: readers, growth, sources and reading habits, and Learn: a course, guides and live sessions. Sample data.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

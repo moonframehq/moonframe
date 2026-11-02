@@ -6,7 +6,7 @@
 //!
 //! The repository is the one a library app names with
 //! `moonframe::Moonframe::updates` (the starter's is
-//! `penso/moonframe`), or in a profile its manifest's `updates`, with its
+//! `moonframehq/moonframe`), or in a profile its manifest's `updates`, with its
 //! `version`. Releases follow GitHub's usual path: a tag `v1.2.3` (the `v`
 //! is optional), published (not a draft or pre-release), with the builds as
 //! assets named for their platform, such as
@@ -134,11 +134,11 @@ mod tests {
 
     #[test]
     fn repositories() {
-        assert!(valid_repo("penso/moonframe"));
+        assert!(valid_repo("moonframehq/moonframe"));
         assert!(valid_repo("my-org/my.app_2"));
         assert!(!valid_repo("penso"));
-        assert!(!valid_repo("penso/moonframe/extra"));
+        assert!(!valid_repo("moonframehq/moonframe/extra"));
         assert!(!valid_repo("../x"));
-        assert!(!valid_repo("https://github.com/penso/moonframe"));
+        assert!(!valid_repo("https://github.com/moonframehq/moonframe"));
     }
 }

@@ -302,7 +302,7 @@
   <header class="mast">
     <span>Open source · MIT</span>
     <a class="name" href="#"><img src="img/icon.png" alt="">Moonframe</a>
-    <nav><a href="#tour">Tour</a><a class="wide" href="#components">Components</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe">GitHub</a></nav>
+    <nav><a href="#tour">Tour</a><a class="wide" href="#components">Components</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a href="https://github.com/moonframehq/moonframe">GitHub</a></nav>
   </header>
   <div class="sub"><span>Native desktop apps, <b>written in Rust</b></span><span>macOS · Linux · Windows</span></div>
 
@@ -311,7 +311,7 @@
       <p class="kicker">The native desktop app factory</p>
       <h1>Malleable<br><i>software.</i></h1>
       <p class="deck">Ask for a change and watch the running app reshape itself. Moonframe makes native desktop apps in Rust, drawn on the GPU by GPUI, with every panel, toolbar and status bar a Luau file you or an agent can change while the app runs. Start from its own app, or build whole new ones and ship each as a standalone release. No rebuild, no restart, and your terminals keep running.</p>
-      <div class="start"><a class="btn" href="/docs/">Get started</a><a class="btn o" href="https://github.com/penso/moonframe">★ Star on GitHub</a></div>
+      <div class="start"><a class="btn" href="/docs/">Get started</a><a class="btn o" href="https://github.com/moonframehq/moonframe">★ Star on GitHub</a></div>
     </div>
 
     <div class="stage">
@@ -376,7 +376,7 @@
     <p class="kicker">How you work</p>
     <h2>Describe it, and see it <i>while it's being built.</i></h2>
     <div class="three">
-      <div><span class="num">I</span><h3>Run it once</h3><p>Clone the starter and open the window. You won't need to close it again.</p><pre>git clone https://github.com/penso/moonframe
+      <div><span class="num">I</span><h3>Run it once</h3><p>Clone the starter and open the window. You won't need to close it again.</p><pre>git clone https://github.com/moonframehq/moonframe
 cd moonframe &amp;&amp; mise install
 just run</pre></div>
       <div><span class="num">II</span><h3>Prompt, and watch</h3><p>Ask your agent for a panel, a widget, a whole screen. Each file it saves redraws the window in place, with state and terminals kept. A mistake shows as a small warning mark, never a blank window.</p><pre class="prompts"><span class="q">› a CPU sparkline in the status bar</span>
@@ -451,7 +451,7 @@ just install   # into /Applications</pre></div>
       <div><h3>Themes</h3><p>Bundled color schemes reach the window, its controls and the terminals.</p></div>
       <div><h3>Terminals</h3><p>Your login shell on alacritty_terminal or Ghostty's libghostty-vt.</p></div>
       <div><h3>Providers</h3><p>Sandboxed WebAssembly, plain processes or Rust built into the app publish JSON that views read as <code>app.&lt;name&gt;</code>.</p></div>
-      <div><h3>Sandboxed by default</h3><p>Luau mods and WebAssembly providers get no files, network or processes, with a memory cap and an instruction budget. Building a provider from source still runs Cargo as you, so <a href="https://github.com/penso/moonframe#what-runs-with-what-access">read what it builds</a> first.</p></div>
+      <div><h3>Sandboxed by default</h3><p>Luau mods and WebAssembly providers get no files, network or processes, with a memory cap and an instruction budget. Building a provider from source still runs Cargo as you, so <a href="https://github.com/moonframehq/moonframe#what-runs-with-what-access">read what it builds</a> first.</p></div>
       <div><h3>Your folder over the app</h3><p><code>~/.config/moonframe</code> holds your own mods and stylesheet; updates never touch it.</p></div>
       <div><h3>A library</h3><p>Or skip the starter and host Moonframe in your own Rust app.</p></div>
     </div>
@@ -464,7 +464,7 @@ just install   # into /Applications</pre></div>
     <h2>Where are you <i>starting from?</i></h2>
 
     <div class="gs-brew">
-      <div><b>The app, in one line</b><p>Moonframe.app in /Applications and the <code>moonframe</code> command. macOS 13 or later; Linux and Windows on the <a href="https://github.com/penso/moonframe/releases">releases page</a>.</p></div>
+      <div><b>The app, in one line</b><p>Moonframe.app in /Applications and the <code>moonframe</code> command. macOS 13 or later; Linux and Windows on the <a href="https://github.com/moonframehq/moonframe/releases">releases page</a>.</p></div>
       <button class="copy" title="Copy the command"><code>brew install penso/tap/moonframe</code><span>Copy</span></button>
     </div>
 
@@ -489,25 +489,25 @@ just install   # into /Applications</pre></div>
       <li><span class="num">III</span><div><h3>Add a mod from git</h3><p>Source only, so you can read it first.</p></div><button class="copy" title="Copy the command"><code>moonframe mod install owner/repo</code><span>Copy</span></button></li>
       <li><span class="num">IV</span><div><h3>Or a whole app</h3><p>Runs beside the starter as its own profile.</p></div><button class="copy" title="Copy the command"><code>moonframe app install owner/some-app</code><span>Copy</span></button></li>
       </ol>
-      <p class="needs">The app offers to copy its skills into your folder, so the agent knows how to build in it. More on <a href="https://github.com/penso/moonframe#working-with-an-agent">working with an agent</a>, <a href="https://github.com/penso/moonframe#mods-from-git">mods from git</a> and <a href="https://github.com/penso/moonframe#whole-apps-as-profiles">apps as profiles</a>.</p>
+      <p class="needs">The app offers to copy its skills into your folder, so the agent knows how to build in it. More on <a href="https://github.com/moonframehq/moonframe#working-with-an-agent">working with an agent</a>, <a href="https://github.com/moonframehq/moonframe#mods-from-git">mods from git</a> and <a href="https://github.com/moonframehq/moonframe#whole-apps-as-profiles">apps as profiles</a>.</p>
     </div>
 
     <div class="gs-path on" data-p="new">
       <h3>Four commands <i>to a running window.</i></h3>
       <ol class="steps">
-      <li><span class="num">I</span><div><h3>Clone the starter</h3><p>Name the folder after your app.</p></div><button class="copy" title="Copy the command"><code>git clone https://github.com/penso/moonframe my-app</code><span>Copy</span></button></li>
+      <li><span class="num">I</span><div><h3>Clone the starter</h3><p>Name the folder after your app.</p></div><button class="copy" title="Copy the command"><code>git clone https://github.com/moonframehq/moonframe my-app</code><span>Copy</span></button></li>
       <li><span class="num">II</span><div><h3>Step inside</h3><p>Everything else runs from here.</p></div><button class="copy" title="Copy the command"><code>cd my-app</code><span>Copy</span></button></li>
       <li><span class="num">III</span><div><h3>Install the toolchain</h3><p>mise fetches Rust, and Zig for the Ghostty terminal.</p></div><button class="copy" title="Copy the command"><code>mise install</code><span>Copy</span></button></li>
       <li><span class="num">IV</span><div><h3>Open the window</h3><p>Then ask your agent for anything; the window changes as it saves.</p></div><button class="copy" title="Copy the command"><code>just run</code><span>Copy</span></button></li>
       </ol>
-      <p class="needs">You need <a href="https://rustup.rs">rustup</a>, <a href="https://github.com/casey/just">just</a> and <a href="https://mise.jdx.dev">mise</a>. Developed on macOS; CI builds Linux and Windows too. More in the <a href="https://github.com/penso/moonframe#quick-start">quick start</a>.</p>
+      <p class="needs">You need <a href="https://rustup.rs">rustup</a>, <a href="https://github.com/casey/just">just</a> and <a href="https://mise.jdx.dev">mise</a>. Developed on macOS; CI builds Linux and Windows too. More in the <a href="https://github.com/moonframehq/moonframe#quick-start">quick start</a>.</p>
     </div>
 
     <div class="gs-path" data-p="lib">
       <h3>Your crate, <i>Moonframe's window.</i></h3>
       <ol class="steps">
       <li><span class="num">I</span><div><h3>Write the app folder</h3><p>From your crate's root: <code>app/</code>, Luau types and the agent skills. It never touches <code>Cargo.toml</code> or <code>src/</code>.</p></div><button class="copy" title="Copy the command"><code>moonframe init . --name my-app</code><span>Copy</span></button></li>
-      <li><span class="num">II</span><div><h3>Depend on it</h3><p>Also add the <code>opt-level = 2</code> lines <code>init</code> printed: GPUI and Luau are slow unoptimised. <code>Cargo.lock</code> pins the commit.</p></div><button class="copy" title="Copy the command"><code>cargo add moonframe --git https://github.com/penso/moonframe</code><span>Copy</span></button></li>
+      <li><span class="num">II</span><div><h3>Depend on it</h3><p>Also add the <code>opt-level = 2</code> lines <code>init</code> printed: GPUI and Luau are slow unoptimised. <code>Cargo.lock</code> pins the commit.</p></div><button class="copy" title="Copy the command"><code>cargo add moonframe --git https://github.com/moonframehq/moonframe</code><span>Copy</span></button></li>
       <li class="gs-wide"><span class="num">III</span><div><h3>Hand it main, last</h3><p>Your own setup first, then end <code>main</code> with Moonframe. Your Rust publishes data as a provider, plain or <code>async</code> on tokio. The async one also needs <code>reqwest</code> and <code>tokio</code>:</p><pre class="gs-deps">[dependencies]
 reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }</pre></div>
@@ -603,15 +603,15 @@ end,</pre></div>
         </div></li>
       <li><span class="num">V</span><div><h3>Run it</h3><p>Edit <code>app/</code> while it runs; it reloads live.</p></div><button class="copy" title="Copy the command"><code>cargo run</code><span>Copy</span></button></li>
       </ol>
-      <p class="needs">See it done in <a href="https://github.com/moonframehq/msgvault">msgvault</a>, a mail archive reader on the library. More in <a href="https://github.com/penso/moonframe/blob/main/docs/library.md">the library guide</a>.</p>
+      <p class="needs">See it done in <a href="https://github.com/moonframehq/msgvault">msgvault</a>, a mail archive reader on the library. More in <a href="https://github.com/moonframehq/moonframe/blob/main/docs/library.md">the library guide</a>.</p>
     </div>
   </div>
 
   <footer>
     <div><span class="name"><img src="img/icon.png" alt="">Moonframe</span>Native desktop apps in Rust, shaped live in Luau.<br>MIT licensed.</div>
-    <div><b>Learn</b><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe#quick-start">Quick start</a><a class="wide" href="#components">Components</a></div>
-    <div><b>Build</b><a href="https://github.com/penso/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/penso/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/penso/moonframe/blob/main/docs/library.md">The library</a><a href="/llms.txt">For agents</a></div>
-    <div><b>Project</b><a href="https://github.com/penso/moonframe">GitHub</a><a href="https://github.com/penso/moonframe/issues">Issues</a><a href="https://github.com/penso/moonframe/blob/main/LICENSE">License</a></div>
+    <div><b>Learn</b><a href="/docs/">Docs</a><a href="https://github.com/moonframehq/moonframe#quick-start">Quick start</a><a class="wide" href="#components">Components</a></div>
+    <div><b>Build</b><a href="https://github.com/moonframehq/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/moonframehq/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/moonframehq/moonframe/blob/main/docs/library.md">The library</a><a href="/llms.txt">For agents</a></div>
+    <div><b>Project</b><a href="https://github.com/moonframehq/moonframe">GitHub</a><a href="https://github.com/moonframehq/moonframe/issues">Issues</a><a href="https://github.com/moonframehq/moonframe/blob/main/LICENSE">License</a></div>
   </footer>
 </div>
 

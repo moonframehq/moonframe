@@ -358,7 +358,7 @@ mod tests {
         let release: GithubRelease = serde_json::from_str(
             r#"{
                 "tag_name": "v0.3.0",
-                "html_url": "https://github.com/penso/moonframe/releases/tag/v0.3.0",
+                "html_url": "https://github.com/moonframehq/moonframe/releases/tag/v0.3.0",
                 "draft": false,
                 "assets": [
                     {"name": "Moonframe-0.3.0-universal-apple-darwin.dmg",

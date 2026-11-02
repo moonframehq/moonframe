@@ -42,7 +42,7 @@ return component {
 loading { text = "Fetching pull requests…" }
 loading { block = true, text = "Connecting to devbox", detail = "ssh penso@devbox.local" }
 loading { skeleton = true, count = 4 }]],
-	example = { block = true, text = "Fetching pull requests…", detail = "github.com/penso/moonframe" },
+	example = { block = true, text = "Fetching pull requests…", detail = "github.com/moonframehq/moonframe" },
 
 	build = function(props: Props)
 		if props.skeleton then

@@ -69,10 +69,10 @@ beside it in `app/`, where the executable looks for it.
 
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
-gh attestation verify Moonframe-<v>-universal-apple-darwin.dmg --repo penso/moonframe
+gh attestation verify Moonframe-<v>-universal-apple-darwin.dmg --repo moonframehq/moonframe
 cosign verify-blob Moonframe-<v>-universal-apple-darwin.dmg \
   --bundle Moonframe-<v>-universal-apple-darwin.dmg.sigstore.json \
-  --certificate-identity https://github.com/penso/moonframe/.github/workflows/release.yml@refs/heads/main \
+  --certificate-identity https://github.com/moonframehq/moonframe/.github/workflows/release.yml@refs/heads/main \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -116,8 +116,10 @@ first launch. It is signed with Azure Artifact Signing, under the publisher
 author's apps shares. There is no key, certificate or secret to store: the
 `sign-windows` job exchanges the `release` environment's GitHub OIDC token
 for an Azure token as the `moonframe-signing` app registration, whose
-federated credential trusts only `repo:penso/moonframe:environment:release`
-and which holds the *Artifact Signing Certificate Profile Signer* role on
+federated credential trusts only
+`repo:moonframehq@351295873/moonframe@1441198486:environment:release` (GitHub
+names the owner and repository with their ids too, so a rename or transfer
+needs a new credential) and which holds the *Artifact Signing Certificate Profile Signer* role on
 that profile. Add to the `release` environment, all as variables:
 
 | Name | Value |

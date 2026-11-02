@@ -127,7 +127,7 @@ brew install penso/tap/moonframe
 
 This installs `Moonframe.app` in `/Applications` and the `moonframe` command.
 Linux and Windows builds are on the
-[releases page](https://github.com/penso/moonframe/releases). To change
+[releases page](https://github.com/moonframehq/moonframe/releases). To change
 Moonframe itself rather than build on it, start from the source instead.
 
 ## Quick start
@@ -137,7 +137,7 @@ and [just](https://github.com/casey/just). [mise](https://mise.jdx.dev)
 installs the rest from `mise.toml`.
 
 ```sh
-git clone https://github.com/penso/moonframe my-app
+git clone https://github.com/moonframehq/moonframe my-app
 cd my-app
 mise install        # Rust, and Zig for the Ghostty terminal
 just run            # opens the window on app/

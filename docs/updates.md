@@ -23,7 +23,7 @@ Updates…**, under About:
   there is a newer release. A check that cannot reach GitHub is tried again
   within the hour. Runs from source check only when asked.
 
-The starter checks `penso/moonframe`.
+The starter checks `moonframehq/moonframe`.
 
 <img src="screenshots/check-for-updates.png" alt="The update dialog: Moonframe 20261028.1 is available, You have 0.1.0, with Download, Release Notes and Later buttons" width="380">
 

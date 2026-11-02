@@ -47,7 +47,7 @@ const STYLE_LUAU: &str = include_str!("../../../examples/host/app/style.luau");
 const CLOCK_TOML: &str = include_str!("../../../examples/host/app/providers/clock/provider.toml");
 const TOOLCHAIN: &str = include_str!("../../../rust-toolchain.toml");
 
-const REPOSITORY: &str = "https://github.com/penso/moonframe";
+const REPOSITORY: &str = "https://github.com/moonframehq/moonframe";
 
 struct Options {
     dir: PathBuf,
@@ -290,7 +290,7 @@ mod tests {
         let cargo = fs::read_to_string(target.join("Cargo.toml")).unwrap();
         assert!(cargo.contains("name = \"my-notes\""), "{cargo}");
         assert!(
-            cargo.contains("git = \"https://github.com/penso/moonframe\""),
+            cargo.contains("git = \"https://github.com/moonframehq/moonframe\""),
             "{cargo}"
         );
         let value: toml::Table = toml::from_str(&cargo).unwrap();

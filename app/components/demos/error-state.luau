@@ -33,7 +33,7 @@ return mod {
 					block = state.block,
 					title = "Couldn't load pull requests",
 					message = "GitHub refused the request. Check the token in Settings › Integrations.",
-					details = `HTTP 401 Unauthorized: Bad credentials (GET /repos/penso/moonframe/pulls) · attempt {state.attempts + 1}`,
+					details = `HTTP 401 Unauthorized: Bad credentials (GET /repos/moonframehq/moonframe/pulls) · attempt {state.attempts + 1}`,
 					retry = "retry",
 					retrying = state.retrying,
 					secondary = { label = "Open settings", msg = "open-settings" },

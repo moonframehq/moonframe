@@ -35,7 +35,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "A Halloween terminal workspace: tabs of framed panes, pages of projects, and a pumpkin.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 

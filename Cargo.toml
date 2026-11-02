@@ -21,7 +21,7 @@ resolver = "2"
 edition      = "2024"
 license      = "MIT"
 publish      = false
-repository   = "https://github.com/penso/moonframe"
+repository   = "https://github.com/moonframehq/moonframe"
 rust-version = "1.99"
 version      = "0.1.0"
 

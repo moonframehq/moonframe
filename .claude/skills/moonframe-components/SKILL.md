@@ -2328,7 +2328,7 @@ A whole mod using it, with state: `app/components/demos/empty-state.luau`.
 ```lua
 local error_state = use "error-state"
 
-error_state { details = "HTTP 401 Unauthorized: Bad credentials (GET /repos/penso/moonframe/pulls)", message = "GitHub refused the request. Check the token in Settings › Integrations.", retry = "retry", secondary = { label = "Open settings", msg = "open-settings" }, title = "Couldn't load pull requests" }
+error_state { details = "HTTP 401 Unauthorized: Bad credentials (GET /repos/moonframehq/moonframe/pulls)", message = "GitHub refused the request. Check the token in Settings › Integrations.", retry = "retry", secondary = { label = "Open settings", msg = "open-settings" }, title = "Couldn't load pull requests" }
 ```
 
 A whole mod using it, with state: `app/components/demos/error-state.luau`.

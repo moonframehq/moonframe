@@ -29,7 +29,7 @@ return mod {
 	about = {
 		version = "0.1",
 		description = "Compliance notices for a public buyer: what is due, exceptions, contracts, payments and reports. Shows sample data.",
-		website = "https://github.com/penso/moonframe",
+		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
 
