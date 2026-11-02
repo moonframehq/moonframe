@@ -1,6 +1,8 @@
 //! Drive the real example through the host's input, topic and view paths.
 use super::*;
 
+mod drafts;
+
 fn data(source: &str) -> Data {
     let lua = mlua::Lua::new();
     Data::read(&lua.load(source).eval().unwrap()).unwrap()

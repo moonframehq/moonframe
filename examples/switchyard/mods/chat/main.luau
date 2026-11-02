@@ -166,6 +166,29 @@ local function restore(state: State, message: Outgoing)
 	end
 end
 
+-- A reload cannot know whether an unacknowledged command reached the
+-- provider. Put its words back for the user rather than replaying it.
+-- Prompts still waiting for attachment come after those already sent.
+local function recover_outgoing(state: State)
+	for _, waiting in state.waiting do
+		for at = #waiting, 1, -1 do
+			restore(state, waiting[at])
+		end
+	end
+	local ids = {}
+	for id, pending in state.pending do
+		if pending.message then table.insert(ids, id) end
+	end
+	table.sort(ids, function(a, b)
+		return (tonumber(string.sub(a, 2)) or 0) > (tonumber(string.sub(b, 2)) or 0)
+	end)
+	for _, id in ids do
+		restore(state, state.pending[id].message)
+	end
+	state.pending = {}
+	state.waiting = {}
+end
+
 local function prompt_message(state: State, chat: string, message: Outgoing): any
 	local token = next_id(state)
 	state.pending[token] = { kind = "prompt", message = message }
@@ -314,16 +337,23 @@ local function on_reply(state: State, msg: any): (State, { any }?)
 		table.insert(list, { run = msg.run, after = pending.after })
 		state.timeline[pending.key] = list
 	elseif pending and pending.kind == "start" and msg.chat then
-		state.selected[pending.path] = msg.chat
-		state.known[msg.chat] = { status = "starting", working = false, cwd = pending.path }
-		-- Text typed for the workspace while away moves into its chat.
-		local typed = state.drafts[`ws:{pending.path}`]
+		switch_thread(state, function()
+			state.selected[pending.path] = msg.chat
+			state.known[msg.chat] = { status = "starting", working = false, cwd = pending.path }
+		end)
+		-- Only the loose workspace draft belongs to its first chat. A
+		-- draft from an existing chat stays there when another is opened.
+		local loose = `ws:{pending.path}`
+		local typed = state.drafts[loose]
 		if typed then
-			state.drafts[msg.chat] = typed
-			state.drafts[`ws:{pending.path}`] = nil
+			if timeline_key(state) == msg.chat then
+				state.draft = typed
+			else
+				state.drafts[msg.chat] = typed
+			end
+			state.drafts[loose] = nil
 		end
 		-- Shell cards run before the chat existed move into it.
-		local loose = `ws:{pending.path}`
 		if state.timeline[loose] then
 			for _, item in state.timeline[loose] do item.after = 0 end
 			state.timeline[msg.chat] = state.timeline[loose]
@@ -338,7 +368,7 @@ local function on_reply(state: State, msg: any): (State, { any }?)
 			pending.message.key = msg.chat
 			state.waiting[msg.chat] = { pending.message }
 		end
-		return state, { { to = "provider:chat", msg = { focus = msg.chat } } }
+		return state, completing(state, focus(state))
 	end
 	return state, nil
 end
@@ -400,9 +430,8 @@ return mod {
 		}
 		state.menu = nil
 		state.error = nil
-		state.pending = {}
 		state.drafts = state.drafts or {}
-		state.waiting = {}
+		recover_outgoing(state)
 		state.highlight = 1
 		state.completion = nil
 		return state
