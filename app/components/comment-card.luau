@@ -90,8 +90,7 @@ local function reactions(props: Props): any
 			msg = props.add_reaction,
 			to = props.to,
 			tooltip = "Add reaction",
-			ui.text { "\u{263A}\u{FE0E}", class = "comment-card-add-reaction-face" },
-			ui.icon { name = "plus", class = "comment-card-add-reaction-plus" },
+			ui.icon { name = "smile-plus", size = "small" },
 		}
 		if props.picker then
 			button = ui.popover {
@@ -160,8 +159,6 @@ return component {
 		[".comment-card-add-reaction"] = { radius = 999, padding = { 0, 7 }, gap = 1, border = "all", border_color = "border", color = "muted-foreground" },
 		[".comment-card-add-reaction:hover"] = { color = "foreground", border_color = "muted-foreground/40" },
 		[".comment-card-add-reaction:selected"] = { color = "accent", border_color = "accent/45", background = "accent/10" },
-		[".comment-card-add-reaction-face"] = { size = "normal" },
-		[".comment-card-add-reaction-plus"] = { size = "small" },
 	},
 	example = {
 		author = "alice",
