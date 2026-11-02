@@ -8,8 +8,12 @@
 use crate::{Command, Data, Error};
 
 mod pick;
+mod window;
 
-pub use pick::{Pick, PickKind};
+pub use {
+    pick::{Pick, PickKind},
+    window::WindowRequest,
+};
 
 /// How a message names the app rather than a mod: `to = "app:command"`.
 pub const APP: &str = "app:";
@@ -40,6 +44,9 @@ pub enum Request {
     /// `app:pick`: the system's panel to open files, pick folders or
     /// name a file to save; the answer comes back to the mod that asked.
     Pick(Pick),
+    /// `app:window`: opens a mod in a window of its own, or raises it,
+    /// first delivering what it is sent; or closes it.
+    Window(WindowRequest),
     /// `app:open`: opens a web address (`https://` or `http://`) in the
     /// system's browser: a pull request, a sign-in page.
     Open(String),
@@ -112,6 +119,7 @@ impl Request {
             "sound" => sound(msg).map(Self::Sound),
             "notify" => notification(msg).map(Self::Notify),
             "pick" => pick::pick(msg).map(Self::Pick),
+            "window" => window::window(msg).map(Self::Window),
             "open" => open(msg).map(Self::Open),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
@@ -133,6 +141,7 @@ pub const NAMES: &[&str] = &[
     "sound",
     "notify",
     "pick",
+    "window",
     "open",
 ];
 

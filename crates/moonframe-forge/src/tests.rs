@@ -318,10 +318,18 @@ fn https_remotes_keep_their_port() {
     );
     assert_eq!(repo::https_port("git@gitlab.example.com:g/r.git"), None);
     let gitlab = kind::Kind::GitLab;
-    let hosts = ["gitlab.example.com".to_owned()];
-    assert!(gitlab.serves("gitlab.example.com:8443", &hosts));
-    assert!(!gitlab.serves("gitlab.example.com:8443", &[
-        "gitlab.example.com:9000".to_owned()
-    ]));
+    // The port is part of the host: only an entry naming it matches.
+    let listed = |host: &str| [host.to_owned()];
+    assert!(gitlab.serves(
+        "gitlab.example.com:8443",
+        &listed("gitlab.example.com:8443")
+    ));
+    assert!(!gitlab.serves("gitlab.example.com:8443", &listed("gitlab.example.com")));
+    assert!(!gitlab.serves(
+        "gitlab.example.com:8443",
+        &listed("gitlab.example.com:9000")
+    ));
+    assert!(!gitlab.serves("gitlab.com:8443", &[]));
+    assert!(!gitlab.env_serves("gitlab.com:8443"));
     assert!(!kind::Kind::GitHub.serves("github.com:8443", &[]));
 }

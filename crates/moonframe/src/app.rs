@@ -29,7 +29,7 @@ use {
     },
     moonframe_core::{
         Action, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL, Sound,
-        Stylesheet, Titlebar, Token, WindowState, Workspace,
+        Stylesheet, Titlebar, Token, WindowRequest, WindowState, Workspace,
     },
     moonframe_mux::Backends,
     moonframe_providers::{Event, Natives, Providers},
@@ -144,7 +144,9 @@ pub(crate) struct MoonframeApp {
     /// Where each animated pane is in its transition.
     motion: Motion,
     /// The app's providers, which publish data as `app.<name>`.
-    providers: Providers,
+    pub(crate) providers: Providers,
+    /// The repository of the terminal last used, which providers follow.
+    pub(crate) project: crate::project::Project,
     /// The theme's own settings, restored when a stylesheet stops setting them.
     defaults: Defaults,
     /// Snapshots of the window's own folder, for Undo Last Change; `None`
@@ -221,6 +223,11 @@ impl MoonframeApp {
         cx.set_menus(menus(workspace.components(), workspace.menus()));
         menu_actions(cx);
         let terminals = Terminals::new(backends, wake_on_output(cx));
+        // Projects are kept only with the user's folder: `--no-user` runs
+        // start fresh and keep nothing, as their state.
+        let kept =
+            (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
+        let project = crate::project::Project::start(kept, cx);
         flush_on_quit(cx);
         let settings = folders.settings().into_iter().next();
         let saved = |key| {
@@ -293,6 +300,7 @@ impl MoonframeApp {
             focus,
             motion: Motion::default(),
             providers,
+            project,
             defaults,
             main_window: window.window_handle().window_id(),
             key_layers: HashMap::new(),
@@ -827,6 +835,7 @@ impl MoonframeApp {
             Request::Appearance(appearance) => self.set_appearance(appearance, cx),
             Request::Sound(sound) => self.play(from, &sound),
             Request::Pick(pick) => self.pick(from, pick, cx),
+            Request::Window(request) => self.window_request(from, request, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);

@@ -22,4 +22,5 @@ ghostty = ["dep:libghostty-vt"]
 alacritty_terminal     = { optional = true, workspace = true }
 libghostty-vt          = { optional = true, workspace = true }
 portable-pty.workspace = true
+sysinfo                = { features = ["system"], workspace = true }
 tracing.workspace      = true

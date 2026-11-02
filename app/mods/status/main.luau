@@ -1,6 +1,7 @@
 -- The status bar along the bottom. The branch opens a sheet to commit and
 -- push, which the git provider (providers/git, built into the app) does and
--- answers here.
+-- answers here. Each asks for the repository the sheet shows (`root`): the
+-- provider follows the terminal's project, and refuses one that moved.
 type State = {
 	open: boolean,
 	message: string,
@@ -31,20 +32,21 @@ return mod {
 			state.open = false
 		elseif type(msg) == "table" and msg.msg == "message" then
 			state.message = msg.value
-		elseif msg == "commit" or (type(msg) == "table" and msg.msg == "commit") then
+		elseif type(msg) == "table" and msg.commit == true then
 			if state.running or state.message:match("^%s*$") then
 				return nil
 			end
 			state.running = "commit"
 			state.result = nil
-			return state, { { to = "provider:git", msg = { commit = state.message, id = "status" } } }
-		elseif msg == "push" then
+			return state,
+				{ { to = "provider:git", msg = { commit = state.message, root = msg.root, id = "status" } } }
+		elseif type(msg) == "table" and msg.push == true then
 			if state.running then
 				return nil
 			end
 			state.running = "push"
 			state.result = nil
-			return state, { { to = "provider:git", msg = { push = true, id = "status" } } }
+			return state, { { to = "provider:git", msg = { push = true, root = msg.root, id = "status" } } }
 		elseif type(msg) == "table" and msg.reply == "status" then
 			-- The git provider's answer to a commit or push from here.
 			state.running = nil
@@ -107,7 +109,7 @@ return mod {
 						multiline = true,
 						rows = 3,
 						change = "message",
-						submit = "commit",
+						submit = { commit = true, root = git.root },
 						focus = state.open,
 					},
 					ui.row {
@@ -117,7 +119,7 @@ return mod {
 							icon = "git-commit-horizontal",
 							small = true,
 							disabled = nothing or state.running ~= nil or state.message:match("^%s*$") ~= nil,
-							msg = "commit",
+							msg = { commit = true, root = git.root },
 						},
 						ui.button {
 							"Push",
@@ -125,7 +127,7 @@ return mod {
 							small = true,
 							variant = "outline",
 							disabled = state.running ~= nil,
-							msg = "push",
+							msg = { push = true, root = git.root },
 						},
 						ui.spacer(),
 						ui.button { icon = "refresh-cw", small = true, variant = "ghost", msg = "refresh", to = "provider:git" },

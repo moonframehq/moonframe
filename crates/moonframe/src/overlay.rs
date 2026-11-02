@@ -12,8 +12,9 @@ use {
     },
 };
 
-/// Above popovers (priority 1) and the gallery (2).
-const PRIORITY: usize = 3;
+/// Above every overlay, popover and the toast, so picking reaches inside an
+/// open dialog; the picker, card, banner and label sit one or two above.
+const PRIORITY: usize = crate::render::INSPECTOR_LAYER;
 /// Height kept free under an element for its label.
 const LABEL_ROOM: f32 = 28.;
 /// Widest the selection card gets.

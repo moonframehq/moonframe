@@ -6,7 +6,7 @@
 
 use {
     super::{
-        Cx, Draw, KeyLayer, OVERLAY_BASE, OVERLAY_STEP, Painter, Place,
+        Cx, Draw, KeyLayer, Painter, Place, overlay_layer,
         styling::{LookExt as _, StyleExt as _},
     },
     crate::color::ThemeColor,
@@ -54,7 +54,7 @@ impl<'w> Draw<'w> for Overlay {
         }
         let index = painter.overlays.len();
         painter.overlays.push(None);
-        let priority = OVERLAY_BASE + OVERLAY_STEP * index;
+        let priority = overlay_layer(index);
         if self.open {
             painter.key_layers.push(KeyLayer {
                 priority,

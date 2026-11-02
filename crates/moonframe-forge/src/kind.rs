@@ -139,14 +139,12 @@ fn env_host() -> Option<String> {
     (!host.is_empty()).then_some(host)
 }
 
-/// Whether `found` (a remote's `host[:port]`) is `known`: the same host and
-/// port, or the same host when `known` names no port.
+/// Whether `found` (a remote's `host[:port]`) is `known`. The port is part
+/// of the host: the same name on another port can be another server, so a
+/// self-hosted instance on a port is listed with it (`git.example.com:8443`)
+/// and nothing else receives its sign-in.
 pub fn same_host(found: &str, known: &str) -> bool {
-    if found.eq_ignore_ascii_case(known) {
-        return true;
-    }
-    let name = |host: &str| host.split(':').next().unwrap_or(host).to_ascii_lowercase();
-    !known.contains(':') && name(found) == name(known)
+    found.eq_ignore_ascii_case(known)
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 # The project's text files, read and saved for the mods that edit them (the
 # markdown editor), shared as `app.docs = { available, root }`. The root is
-# the one the files provider lists: MOONFRAME_FILES, else the repository the
-# app runs from.
+# the one the files provider lists: MOONFRAME_FILES, else the repository of
+# the terminal last used, else the repository the app runs from.
 # Mods ask it `{ read = "<path>", id }` and `{ write = "<path>", text,
 # version, force, id }`; it answers the mod that asked with `{ reply = id,
 # action, ok, path, text | version | error, conflict }`, and tells a mod

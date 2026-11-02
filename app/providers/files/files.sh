@@ -4,7 +4,7 @@
 # (`to = "provider:files"`). Exits when the app closes its stdin.
 #
 # Output: { root = "<folder name>", path = "<absolute path>",
-#           cwd = "<where a terminal starts: the launch folder, else path>",
+#           cwd = "<where a terminal starts: the project, else the launch folder, else path>",
 #           dirs = { [""] = entries, ["app/mods"] = entries, ... } }
 # where entries are { name, dir, ignored } with folders first, each group
 # sorted without regard to case. Only the root and the open folders are
@@ -14,10 +14,12 @@
 # that explorer has open (their paths from the root, one per line); the
 # folders listed are those any explorer has open. Anything else looks again.
 #
-# The root is the git repository `moonframe` was started in
+# The root is the repository of the terminal the user last used
+# (MOONFRAME_PROJECT at start, then `{ project = "<path>" }` from the app as
+# it moves), else the git repository `moonframe` was started in
 # (MOONFRAME_LAUNCH_DIR), else the one the app runs from; set MOONFRAME_FILES
-# to show another folder. Without either it publishes `available = false`:
-# it never falls back to a folder as broad as home. Plain bash (3.2 or later), no
+# to show another folder. Without any it publishes `available = false`: it
+# never falls back to a folder as broad as home. Plain bash (3.2 or later), no
 # jq or python: every string goes through `jstr`.
 
 POLL=3             # seconds between looks
@@ -223,38 +225,54 @@ emit() {
     fi
 }
 
-if [ -n "$MOONFRAME_FILES" ]; then
-    ROOT=$MOONFRAME_FILES
-else
-    # The repository `moonframe` was started in, else the one holding the
-    # app; never home (a dotfiles repository). The docs provider finds the
-    # same root, so the editor opens the file the explorer names.
-    repository() {
-        local top
-        top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) || return 1
-        [ -n "$top" ] && ! [ "$top" -ef "$HOME" ] && printf '%s' "$top"
-    }
-    ROOT=
-    [ -n "$MOONFRAME_LAUNCH_DIR" ] && ROOT=$(repository "$MOONFRAME_LAUNCH_DIR")
-    [ -n "$ROOT" ] || ROOT=$(repository ../..)
-fi
-ROOT=${ROOT%/}
-ROOT_REAL=$(cd "$ROOT" 2>/dev/null && pwd -P)
-# Where a terminal starts: the folder `moonframe` was started in, else the
-# root.
-CWD=${MOONFRAME_LAUNCH_DIR:-$ROOT}
-if [ -z "$ROOT" ] || [ -z "$ROOT_REAL" ]; then
-    printf '%s\n' '{"available":false,"reason":"not in a git repository; set MOONFRAME_FILES to the folder to show"}'
-    # Stay until the app closes stdin, as a provider should.
-    while IFS= read -r _; do :; done
-    exit 0
-fi
-GIT=
-git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 && GIT=1
+# The repository holding folder $1, unless it is home (a dotfiles
+# repository).
+repository() {
+    local top
+    top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) || return 1
+    [ -n "$top" ] && ! [ "$top" -ef "$HOME" ] && printf '%s' "$top"
+}
 
+# Sets ROOT, ROOT_REAL, CWD and GIT: MOONFRAME_FILES, else the repository of
+# the project the user works in (PROJECT: the terminal they last used),
+# else the one `moonframe` was started in, else the one holding the app.
+# The docs provider finds the same root, so the editor opens the file the
+# explorer names.
+choose_root() {
+    if [ -n "$MOONFRAME_FILES" ]; then
+        ROOT=$MOONFRAME_FILES
+    else
+        ROOT=
+        [ -n "$PROJECT" ] && ROOT=$(repository "$PROJECT")
+        [ -n "$ROOT" ] || { [ -n "$MOONFRAME_LAUNCH_DIR" ] && ROOT=$(repository "$MOONFRAME_LAUNCH_DIR"); }
+        [ -n "$ROOT" ] || ROOT=$(repository ../..)
+    fi
+    ROOT=${ROOT%/}
+    ROOT_REAL=$(cd "$ROOT" 2>/dev/null && pwd -P)
+    # Where a terminal starts: the project, else the folder `moonframe` was
+    # started in, else the root.
+    if [ -n "$PROJECT" ] && [ -z "$MOONFRAME_FILES" ]; then
+        CWD=$ROOT
+    else
+        CWD=${MOONFRAME_LAUNCH_DIR:-$ROOT}
+    fi
+    GIT=
+    [ -n "$ROOT_REAL" ] && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 && GIT=1
+}
+
+# What it prints with no root to list.
+UNAVAILABLE='{"available":false,"reason":"not in a git repository; set MOONFRAME_FILES to the folder to show"}'
+
+PROJECT=$MOONFRAME_PROJECT
+choose_root
 force=1
 while true; do
-    emit "$force"
+    if [ -n "$ROOT" ] && [ -n "$ROOT_REAL" ]; then
+        emit "$force"
+    elif [ "$LAST" != "$UNAVAILABLE" ]; then
+        printf '%s\n' "$UNAVAILABLE"
+        LAST=$UNAVAILABLE
+    fi
     force=
     # A message, or POLL quiet seconds, looks again. The app closing stdin
     # ends the script. bash 3.2 returns 1 for both a timeout and the end of
@@ -262,6 +280,18 @@ while true; do
     started=$SECONDS
     if IFS= read -r -t "$POLL" message; then
         force=1
+        case $message in
+            # From the app itself (no mod has an empty name, and `from`
+            # comes first): the project the user works in moved.
+            '{"from":"","message":'*)
+                json_field "$message" project
+                if [ "$FOUND" = string ] && [ "$VALUE" != "$PROJECT" ]; then
+                    PROJECT=$VALUE
+                    choose_root
+                fi
+                continue
+                ;;
+        esac
         json_field "$message" open
         if [ "$FOUND" = string ]; then
             list=$VALUE

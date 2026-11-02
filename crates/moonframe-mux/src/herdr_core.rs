@@ -9,7 +9,7 @@
 
 use {
     crate::{document::Store, program},
-    herdr_core_client::{Attachment, Core, Endpoint, PROGRAM, wire},
+    herdr_core_client::{Attachment, Core, End, Endpoint, PROGRAM, wire},
     moonframe_terminal::{Backend, Open, Opened, Pane, Size},
     std::{
         collections::BTreeMap,
@@ -255,15 +255,19 @@ impl Backend for HerdrCore {
             .map_err(|error| error.to_string())?;
         let attachment = Arc::new(attachment);
         let detached = Arc::new(AtomicBool::new(false));
+        let exited = Arc::new(AtomicBool::new(false));
         Ok(Opened {
             pane: Box::new(CorePane {
                 attachment: attachment.clone(),
                 detached: detached.clone(),
-                _core: core,
+                exited: exited.clone(),
+                address,
+                core,
             }),
             output: Box::new(Reading {
                 attachment,
                 detached,
+                exited,
                 done: false,
             }),
         })
@@ -274,8 +278,11 @@ struct CorePane {
     attachment: Arc<Attachment>,
     /// Set when the pane goes, so the reader lets go of the stream too.
     detached: Arc<AtomicBool>,
+    exited: Arc<AtomicBool>,
+    /// The terminal, to find it in the core's list.
+    address: String,
     /// Kept so the connection outlives every stream from it.
-    _core: Arc<Core>,
+    core: Arc<Core>,
 }
 
 impl Drop for CorePane {
@@ -286,6 +293,10 @@ impl Drop for CorePane {
 }
 
 impl Pane for CorePane {
+    fn exited(&self) -> bool {
+        self.exited.load(Ordering::Acquire)
+    }
+
     fn write(&self, bytes: &[u8]) {
         let _ = self.attachment.write(bytes);
     }
@@ -297,6 +308,23 @@ impl Pane for CorePane {
     fn answers_queries(&self) -> bool {
         true
     }
+
+    /// The folder of what runs in the foreground (a program the shell
+    /// started, else the shell), as the core reports it.
+    fn cwd(&self) -> Option<PathBuf> {
+        let terminal = self
+            .core
+            .list(false)
+            .ok()?
+            .terminals
+            .into_iter()
+            .find(|terminal| terminal.address == self.address)?;
+        let foreground = terminal.foreground.map(|foreground| foreground.cwd);
+        [foreground.unwrap_or_default(), terminal.cwd]
+            .into_iter()
+            .find(|cwd| !cwd.is_empty())
+            .map(PathBuf::from)
+    }
 }
 
 /// The attachment's bytes until its stream ends: the program ended, or the
@@ -305,6 +333,7 @@ impl Pane for CorePane {
 struct Reading {
     attachment: Arc<Attachment>,
     detached: Arc<AtomicBool>,
+    exited: Arc<AtomicBool>,
     done: bool,
 }
 
@@ -316,6 +345,9 @@ impl Iterator for Reading {
             match self.attachment.read(POLL) {
                 Ok(chunk) => {
                     self.done = chunk.end.is_some();
+                    if let Some(end) = &chunk.end {
+                        self.exited.store(shell_exited(end), Ordering::Release);
+                    }
                     if !chunk.bytes.is_empty() {
                         return Some(chunk.bytes);
                     }
@@ -327,9 +359,37 @@ impl Iterator for Reading {
     }
 }
 
+/// A detached stream has an empty CLOSE; a lost connection has no exit
+/// information. Only the core's explicit process outcome closes a tab.
+fn shell_exited(end: &End) -> bool {
+    matches!(end, End::Closed(closed) if closed.exit_code.is_some()
+        || matches!(closed.reason.as_deref(), Some("exited" | "killed")))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::terminal_name;
+    use super::{shell_exited, terminal_name};
+
+    #[test]
+    fn lost_and_detached_streams_are_not_shell_exits() {
+        use herdr_core_client::{Closed, End};
+        assert!(!shell_exited(&End::Lost));
+        assert!(!shell_exited(&End::Closed(Closed::default())));
+        assert!(!shell_exited(&End::Closed(Closed {
+            reason: Some("unknown".into()),
+            exit_code: None,
+        })));
+        for reason in ["exited", "killed"] {
+            assert!(shell_exited(&End::Closed(Closed {
+                reason: Some(reason.into()),
+                exit_code: None,
+            })));
+        }
+        assert!(shell_exited(&End::Closed(Closed {
+            reason: None,
+            exit_code: Some(0),
+        })));
+    }
 
     #[test]
     fn keys_become_names_the_core_takes() {

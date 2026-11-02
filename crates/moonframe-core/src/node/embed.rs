@@ -37,6 +37,10 @@ pub struct Terminal {
     pub cwd: Option<String>,
     pub engine: TerminalEngine,
     pub backend: TerminalBackend,
+    /// Sent to the mod once, with `exited = true` added, as the shell
+    /// exits (Ctrl-D, `exit`). Without it the terminal says the shell
+    /// exited and Enter starts another.
+    pub exit: Option<Data>,
 }
 
 /// A web page the host shows in a native web view (WebKit on macOS,

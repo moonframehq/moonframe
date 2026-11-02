@@ -76,7 +76,7 @@ fn the_shell_asks_for_its_window_and_views_see_it() {
         assert!(error.contains(expected), "{window}: {error}");
     }
 
-    // A mod is not the shell: the window isn't its to set.
+    // A mod is not the shell: the main window's title bar isn't its to set.
     write(dir.path(), "main.luau", SHELL_SOURCE);
     let source = r#"return mod { window = { titlebar = "hidden" }, view = function() return ui.text "x" end }"#;
     write(dir.path(), "mods/sneaky/main.luau", source);
@@ -462,11 +462,29 @@ fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
     let strip = memory.0.borrow().0.get(&format!("mod:{key}")).cloned();
     assert!(format!("{strip:?}").contains("Example"), "{strip:?}");
 
+    // A shell that exits (Ctrl-D) reports `exited`, and its tab closes.
+    let pick = Data::Map([("pick".to_owned(), Data::from("component:terminal"))].into());
+    workspace.send(key, key, pick);
+    assert_eq!(tabs(&workspace).len(), 3);
+    let exited = Data::Map(
+        [
+            ("tab_report".to_owned(), Data::from("main-3")),
+            ("exited".to_owned(), Data::Bool(true)),
+        ]
+        .into(),
+    );
+    workspace.send("editor", "editor", exited);
+    assert!(
+        tabs(&workspace).iter().all(|(id, _)| id != "main-3"),
+        "{:?}",
+        tabs(&workspace)
+    );
+
     // A mod kind: the explorer opens as an instance of its own.
     let pick = Data::Map([("pick".to_owned(), Data::from("mod:explorer"))].into());
     workspace.send(key, key, pick);
     assert!(
-        workspace.slot("explorer#main-3").is_some(),
+        workspace.slot("explorer#main-4").is_some(),
         "{:?}",
         workspace.problems()
     );
@@ -482,7 +500,7 @@ fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
     let workspace = Workspace::open_with(root.as_path(), false, Some(Box::new(memory.clone())));
     assert_eq!(tabs(&workspace).len(), 2);
     assert!(
-        workspace.slot("explorer#main-3").is_some(),
+        workspace.slot("explorer#main-4").is_some(),
         "the selected explorer tab is drawn again"
     );
 }
