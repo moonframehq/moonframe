@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Commits RENDERED_CASK (render-cask.sh) as Casks/moonframe.rb in
-# penso/homebrew-tap, through that repository's Moonframe deploy key in
+# moonframehq/homebrew-tap, through that repository's Moonframe deploy key in
 # HOMEBREW_TAP_SSH_KEY. Refuses to go back to an older version, and to
 # change a version already in the tap.
 set +x
@@ -27,7 +27,7 @@ curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
 export GIT_SSH_COMMAND="ssh -F /dev/null -i '$tmp/key' -o IdentitiesOnly=yes -o IdentityAgent=none -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile='$tmp/known_hosts' -o GlobalKnownHostsFile=/dev/null"
 export GIT_TERMINAL_PROMPT=0
 git -c core.hooksPath=/dev/null clone --quiet --depth=1 --single-branch \
-    git@github.com:penso/homebrew-tap.git "$tmp/tap"
+    git@github.com:moonframehq/homebrew-tap.git "$tmp/tap"
 branch=$(git -C "$tmp/tap" symbolic-ref --short HEAD)
 git check-ref-format "refs/heads/$branch"
 target=$tmp/tap/Casks/moonframe.rb

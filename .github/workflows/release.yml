@@ -480,7 +480,7 @@ jobs:
           [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" --jq .object.sha)" == "$RELEASE_SHA" ]]
           gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false
 
-  # Points penso/homebrew-tap's cask at the published disk image, through
+  # Points moonframehq/homebrew-tap's cask at the published disk image, through
   # that repository's deploy key, which only the homebrew environment holds.
   # Only for a notarized disk image and a final (not pre-release) version.
   homebrew:

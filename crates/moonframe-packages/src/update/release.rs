@@ -35,6 +35,8 @@ struct GithubRelease {
     html_url: String,
     #[serde(default)]
     assets: Vec<Asset>,
+    #[serde(default)]
+    draft: bool,
 }
 
 /// What a check found.
@@ -84,34 +86,94 @@ pub(super) const ANSWER: Duration = Duration::from_secs(60);
 /// connection that stalled for good.
 pub(super) const DOWNLOAD: Duration = Duration::from_secs(30 * 60);
 
-/// Asks GitHub for `source`'s newest release. Blocks on the network.
-pub fn check(source: &Source) -> Result<Found, String> {
-    let url = format!(
-        "https://api.github.com/repos/{}/releases/latest",
-        source.repo
-    );
+/// Asks GitHub for `source`'s newest release: the newest published one,
+/// or with `beta`, the newest pre-release too. Blocks on the network.
+pub fn check(source: &Source, beta: bool) -> Result<Found, String> {
+    let release = if beta {
+        match newest(every_release(source)?) {
+            Some(release) => release,
+            None => return Ok(Found::NoRelease),
+        }
+    } else {
+        let Some(text) = ask(&format!("{}/latest", releases(source)))? else {
+            return Ok(Found::NoRelease);
+        };
+        serde_json::from_str(&text)
+            .map_err(|error| format!("unexpected answer from GitHub: {error}"))?
+    };
+    Ok(found(release, &source.version))
+}
+
+/// How many releases a page of GitHub's list holds, at most.
+const PER_PAGE: usize = 100;
+
+/// How many pages of releases a beta check reads at most: a thousand
+/// releases, so a repository with years of nightlies still answers in a
+/// few requests.
+const PAGES: usize = 10;
+
+/// `source`'s releases, every page of them (up to [`PAGES`]): GitHub lists
+/// them newest first by date, not by version, so a backport or nightly
+/// published after a higher version can push it onto a later page.
+fn every_release(source: &Source) -> Result<Vec<GithubRelease>, String> {
+    let mut all = Vec::new();
+    for page in 1..=PAGES {
+        let url = format!("{}?per_page={PER_PAGE}&page={page}", releases(source));
+        let Some(text) = ask(&url)? else {
+            break;
+        };
+        let releases: Vec<GithubRelease> = serde_json::from_str(&text)
+            .map_err(|error| format!("unexpected answer from GitHub: {error}"))?;
+        let last = releases.len() < PER_PAGE;
+        all.extend(releases);
+        if last {
+            break;
+        }
+    }
+    Ok(all)
+}
+
+/// The API address of `source`'s releases.
+fn releases(source: &Source) -> String {
+    format!("https://api.github.com/repos/{}/releases", source.repo)
+}
+
+/// GitHub's answer at `url`, or `None` when it has none (404: no published
+/// release yet).
+fn ask(url: &str) -> Result<Option<String>, String> {
     let response = agent(ANSWER)
-        .get(&url)
+        .get(url)
         .header("Accept", "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2022-11-28")
         .call();
-    let text = match response {
+    match response {
         Ok(mut response) => response
             .body_mut()
             .with_config()
             .limit(4 * 1024 * 1024)
             .read_to_string()
-            .map_err(|error| format!("cannot read GitHub's answer: {error}"))?,
-        // A repository with no published release answers 404.
-        Err(ureq::Error::StatusCode(404)) => return Ok(Found::NoRelease),
+            .map(Some)
+            .map_err(|error| format!("cannot read GitHub's answer: {error}")),
+        Err(ureq::Error::StatusCode(404)) => Ok(None),
         Err(ureq::Error::StatusCode(403 | 429)) => {
-            return Err("GitHub is limiting requests; try again later".to_owned());
+            Err("GitHub is limiting requests; try again later".to_owned())
         },
-        Err(error) => return Err(format!("cannot reach GitHub: {error}")),
-    };
-    let release: GithubRelease = serde_json::from_str(&text)
-        .map_err(|error| format!("unexpected answer from GitHub: {error}"))?;
-    Ok(found(release, &source.version))
+        Err(error) => Err(format!("cannot reach GitHub: {error}")),
+    }
+}
+
+/// The release with the highest version among `all`, pre-releases
+/// included, drafts and tags that read as no version left out.
+fn newest(all: Vec<GithubRelease>) -> Option<GithubRelease> {
+    all.into_iter()
+        .filter(|release| !release.draft && parse(&release.tag_name).is_some())
+        .reduce(|best, release| {
+            if newer(&release.tag_name, &best.tag_name) {
+                release
+            } else {
+                best
+            }
+        })
 }
 
 /// What `release` means for a run of `current`.
@@ -382,5 +444,35 @@ mod tests {
         assert_eq!(found(release, "0.1.0"), Found::UpToDate {
             latest: "0.1.0".to_owned()
         });
+    }
+
+    #[test]
+    fn beta_takes_the_newest_release_with_pre_releases() {
+        let all: Vec<GithubRelease> = serde_json::from_str(
+            r#"[
+                {"tag_name": "v1.2.0-beta.1", "html_url": "b1", "prerelease": true},
+                {"tag_name": "v1.3.0-beta.1", "html_url": "draft", "draft": true},
+                {"tag_name": "v1.1.0", "html_url": "stable"},
+                {"tag_name": "nightly", "html_url": "nightly", "prerelease": true},
+                {"tag_name": "v1.2.0-beta.2", "html_url": "b2", "prerelease": true}
+            ]"#,
+        )
+        .expect("releases");
+        let release = newest(all).expect("a release");
+        assert_eq!(release.html_url, "b2");
+        let Found::Newer(newer) = found(release, "1.1.0") else {
+            panic!("1.2.0-beta.2 is newer than 1.1.0");
+        };
+        assert_eq!(newer.version, "1.2.0-beta.2");
+        // Once the stable release is out, it beats its betas.
+        let all: Vec<GithubRelease> = serde_json::from_str(
+            r#"[
+                {"tag_name": "v1.2.0", "html_url": "stable"},
+                {"tag_name": "v1.2.0-rc.1", "html_url": "rc", "prerelease": true}
+            ]"#,
+        )
+        .expect("releases");
+        assert_eq!(newest(all).map(|r| r.html_url).as_deref(), Some("stable"));
+        assert!(newest(Vec::new()).is_none());
     }
 }

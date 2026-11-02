@@ -123,7 +123,7 @@
 
   <div class="pane" data-p="lib">
     <ol class="steps">
-      <li><span class="num">I</span><div><h3>Get the command</h3><p>The <code>moonframe</code> command writes the app folder for you.</p></div><button class="copy"><code>brew install penso/tap/moonframe</code><span>Copy</span></button></li>
+      <li><span class="num">I</span><div><h3>Get the command</h3><p>The <code>moonframe</code> command writes the app folder for you.</p></div><button class="copy"><code>brew install moonframehq/tap/moonframe</code><span>Copy</span></button></li>
       <li><span class="num">II</span><div><h3>Give your crate a window</h3><p>Adds <code>app/</code>, Luau types and the agent skills. Never touches <code>src/</code>.</p></div><button class="copy"><code>moonframe init . --name my-app</code><span>Copy</span></button></li>
       <li><span class="num">III</span><div><h3>Depend on it</h3><p>Then set <code>opt-level = 2</code> for dependencies; <code>init</code> prints the lines.</p></div><button class="copy"><code>cargo add moonframe --git https://github.com/moonframehq/moonframe</code><span>Copy</span></button></li>
       <li class="wide"><span class="num">IV</span><div><h3>Hand it main, last</h3><p>Do your own setup first, then end <code>main</code> with Moonframe: <code>run()</code> holds the main thread until the window closes. Your Rust publishes data as a provider, plain or <code>async</code> on tokio; Luau draws it.</p></div>
@@ -186,7 +186,7 @@ async fn main() -&gt; std::process::ExitCode {
 
   <div class="pane" data-p="app">
     <ol class="steps">
-      <li><span class="num">I</span><div><h3>Install it</h3><p>Puts Moonframe.app in /Applications and <code>moonframe</code> on your path.</p></div><button class="copy"><code>brew install penso/tap/moonframe</code><span>Copy</span></button></li>
+      <li><span class="num">I</span><div><h3>Install it</h3><p>Puts Moonframe.app in /Applications and <code>moonframe</code> on your path.</p></div><button class="copy"><code>brew install moonframehq/tap/moonframe</code><span>Copy</span></button></li>
       <li><span class="num">II</span><div><h3>Open it</h3><p>Then turn on <b>Developer Mode</b> in the app menu for Inspect Element and reloads.</p></div><button class="copy"><code>open -a Moonframe</code><span>Copy</span></button></li>
       <li><span class="num">III</span><div><h3>Ask an agent for anything</h3><p>Opens the agent in a pane of the window, in your folder with the Moonframe skills, so you watch it work while the window changes.</p></div><button class="copy"><code>moonframe pane new --agent claude "add a clock to the status bar"</code><span>Copy</span></button></li>
       <li><span class="num">IV</span><div><h3>Add mods and apps</h3><p>From any git repository. Whole apps run beside the starter as profiles.</p></div><button class="copy"><code>moonframe app install owner/some-app</code><span>Copy</span></button></li>
@@ -218,7 +218,7 @@ just run</pre>
       <span class="who">A Rust project</span>
       <h3>Add it to <i>your crate</i></h3>
       <p>Keep your code and your repository. Moonframe becomes the window; your Rust feeds it.</p>
-<pre>brew install penso/tap/moonframe
+<pre>brew install moonframehq/tap/moonframe
 moonframe init . --name my-app
 cargo add moonframe \
   --git https://github.com/moonframehq/moonframe
@@ -230,7 +230,7 @@ cargo run</pre>
       <span class="who">Just want to use it</span>
       <h3>Install <i>the app</i></h3>
       <p>No Rust needed. Ask an agent in your own folder to change anything; add mods and whole apps from git.</p>
-<pre>brew install penso/tap/moonframe
+<pre>brew install moonframehq/tap/moonframe
 open -a Moonframe
 # an agent in a pane, in your folder:
 moonframe pane new --agent claude \
@@ -250,7 +250,7 @@ moonframe mod install owner/repo</pre>
 
   <div class="brew">
     <div><b>The app, in one line</b><p>Moonframe.app in /Applications and the <code>moonframe</code> command. macOS 13+.</p></div>
-    <button class="copy"><code>brew install penso/tap/moonframe</code><span>Copy</span></button>
+    <button class="copy"><code>brew install moonframehq/tap/moonframe</code><span>Copy</span></button>
   </div>
 
   <p class="or">or build with it</p>

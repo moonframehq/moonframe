@@ -122,7 +122,7 @@ Moonframe as a library.
 On macOS 13 or later, with [Homebrew](https://brew.sh):
 
 ```sh
-brew install penso/tap/moonframe
+brew install moonframehq/tap/moonframe
 ```
 
 This installs `Moonframe.app` in `/Applications` and the `moonframe` command.

@@ -144,6 +144,10 @@ pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
         let _ = on.update(cx, |app, cx| app.check_for_updates(true, cx));
     });
     let on = app.clone();
+    cx.on_action(move |_: &ToggleBetaReleases, cx| {
+        let _ = on.update(cx, |app, cx| app.toggle_beta_releases(cx));
+    });
+    let on = app.clone();
     cx.on_action(move |_: &UndoChange, cx| {
         let _ = on.update(cx, |app, cx| app.step_history(true, cx));
     });

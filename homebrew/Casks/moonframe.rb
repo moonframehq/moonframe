@@ -1,4 +1,4 @@
-# Template for penso/homebrew-tap's Casks/moonframe.rb. The release's
+# Template for moonframehq/homebrew-tap's Casks/moonframe.rb. The release's
 # homebrew job fills in @VERSION@ and @SHA256@ (the published disk image's)
 # with scripts/release/render-cask.sh and commits it to the tap.
 cask "moonframe" do
