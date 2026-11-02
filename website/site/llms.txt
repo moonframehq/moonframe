@@ -8,7 +8,7 @@ This file is for coding agents. If the user says something like "use Moonframe f
 
 Run `moonframe --help`. If the command is missing:
 
-- macOS 13 or later: `brew install penso/tap/moonframe` (installs `Moonframe.app` and the `moonframe` command).
+- macOS 13 or later: `brew install moonframehq/tap/moonframe` (installs `Moonframe.app` and the `moonframe` command).
 - Linux or Windows: download and extract the archive for the platform from https://github.com/moonframehq/moonframe/releases. Keep the extracted folder whole: `moonframe` finds its `app/` folder (with the prebuilt providers) beside itself. Add that folder to `PATH`, or symlink the executable into one already on it. Never copy the executable on its own.
 
 Ask the user before installing anything.

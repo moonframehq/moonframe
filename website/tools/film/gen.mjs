@@ -611,7 +611,7 @@ function outro(t) {
   s += text(960, 400, "Moonframe", { size: 104, family: SERIF, style: "italic", anchor: "middle", op: eOut(prog(t, a + 0.6, a + 1.2)) });
   s += text(960, 480, "Malleable software.", { size: 50, family: SERIF, anchor: "middle", fill: C.ink2, op: eOut(prog(t, a + 0.9, a + 1.5)) });
   const p = eOut(prog(t, a + 1.4, a + 2.0));
-  const cmd = "brew install penso/tap/moonframe";
+  const cmd = "brew install moonframehq/tap/moonframe";
   const cw = tw(cmd, 26, 0.6) + 60;
   s += g(rect(960 - cw / 2, 560, cw, 64, { rx: 14, fill: C.ink }) + text(960, 601, cmd, { size: 26, family: MONO, fill: C.sunY, anchor: "middle" }), { op: p, ty: (1 - p) * 20 });
   const q = eOut(prog(t, a + 1.8, a + 2.4));
