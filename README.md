@@ -525,6 +525,11 @@ feedback, shows at once.
       <br>
       <sub><b>Storefront</b> (<code>storefront</code>): a store's admin with its audit log: browser-style tabs in the title bar, grouped settings in the sidebar, and a filterable, paged table of every activity. Sample data.</sub>
     </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/folio.png" alt="Folio">
+      <br>
+      <sub><b>Folio</b> (<code>folio</code>): a quiet place to write: a library of markdown files beside a page that styles markdown as you type, with focus mode (the sentence or paragraph being written in full ink) and typewriter scrolling.</sub>
+    </td>
   </tr>
 </table>
 

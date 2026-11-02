@@ -51,6 +51,10 @@ fn serve(context: &Context) -> Result<(), String> {
         // Where the app was started, for one that shows that project.
         child.env("MOONFRAME_LAUNCH_DIR", dir);
     }
+    if let Some(dir) = crate::project() {
+        // The repository of the terminal the user last used.
+        child.env("MOONFRAME_PROJECT", dir);
+    }
     let mut child = child
         .args(arguments)
         .current_dir(&context.dir)

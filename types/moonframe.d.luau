@@ -257,7 +257,8 @@ type StackProps = {
 	-- it appears and shrinks away when it goes, as tabs open and close.
 	key: string?,
 	-- Opens the mod named this in a window of its own (or raises it) when
-	-- clicked: a tool that stays open beside the main window. Takes no `msg`.
+	-- clicked: a tool that stays open beside the main window. Takes no `msg`;
+	-- to open it on a page, send `app:window` `{ open = "<mod>", send = ... }`.
 	window: string?,
 	-- Sent as a button goes down on it, as the pointer moves while held
 	-- (wherever it goes), and as it comes up, with a `PointerMsg`'s fields
@@ -784,6 +785,9 @@ type TerminalProps = {
 	cwd: string?,
 	engine: TerminalEngine?,
 	backend: TerminalBackend?,
+	-- Sent once, with `exited = true` added, as the shell exits (Ctrl-D,
+	-- `exit`). Without it the terminal says so and Enter starts another.
+	exit: Data?,
 	[number]: string,
 }
 
@@ -858,6 +862,14 @@ type InputProps = {
 	-- `to`'s): Enter loads the text (a host over https, words as a web
 	-- search), focus selects it, and Escape puts back the page's address.
 	browser: string?,
+	-- A writing field (needs `multiline`): markdown is styled as it is
+	-- typed (headings bold, emphasis slanted, markup faded).
+	prose: boolean?,
+	-- Focus mode (needs `multiline`): the sentence or paragraph the caret is
+	-- in stays in full ink and the rest of the text fades.
+	dim: ("sentence" | "paragraph")?,
+	-- Keep the caret's line in the middle of the field (needs `multiline`).
+	typewriter: boolean?,
 }
 
 type RegionProps = {
@@ -1283,8 +1295,8 @@ type Files = {
 	-- The root folder's name, and its absolute path.
 	root: string,
 	path: string,
-	-- Where a terminal starts: the folder `moonframe` was started from,
-	-- else `path`.
+	-- Where a terminal starts: the project of the terminal last used,
+	-- else the folder `moonframe` was started from, else `path`.
 	cwd: string?,
 	-- Entries of the root (key "") and of each open folder (its path from
 	-- the root), folders first, each group sorted without regard to case.
@@ -1298,6 +1310,90 @@ type Docs = {
 	available: boolean,
 	reason: string?,
 	root: string?,
+}
+
+-- One limit window of a service's plan (the `usage` provider). Shares are
+-- 0 to 1; `pace` is where an even spend would have left the bar of what is
+-- left (`usage-bar`'s `pace`), nil early in a window or without a reset.
+type UsageWindow = {
+	title: string,
+	kind: "session" | "daily" | "weekly" | "monthly" | "named",
+	used: number,
+	left: number,
+	severity: "normal" | "warning" | "critical",
+	-- "3% used 2h 53m", for a status bar.
+	label: string,
+	resets_at: number?,
+	-- "4d 6h", "2h 53m", "47m".
+	resets_in: string?,
+	pace: number?,
+	-- "11% in reserve · Lasts until reset".
+	pace_note: string?,
+}
+
+type UsageBalance = {
+	label: string,
+	amount: number,
+	total: number?,
+	-- An ISO 4217 code when `currency`, else the service's own unit name.
+	unit: string,
+	currency: boolean,
+	-- "$12.30", "$5.00 of $20.00", "1,250 credits".
+	text: string,
+	-- amount / total, clamped to 0..1, when total > 0. The label says
+	-- whether the amount is spent or remaining; this is not always credit left.
+	fraction: number?,
+}
+
+type UsageSection =
+	{ kind: "limit", window: UsageWindow }
+	| { kind: "facts", title: string, facts: { { label: string, value: string } } }
+	| { kind: "shares", title: string, shares: { { label: string, share: number } } }
+
+-- One service signed in on the host, or one `show_providers` asks for.
+type UsageProvider = {
+	id: string,
+	name: string,
+	-- A bundled logo (`agent-claude`), nil when the app has none for it.
+	icon: IconName?,
+	dashboard: string?,
+	status_page: string?,
+	email: string?,
+	plan: string?,
+	-- Why the latest read failed; with `stale`, the numbers are older ones.
+	error: string?,
+	stale: boolean,
+	-- The sign-in sits behind a macOS Keychain prompt: send `provider:usage`
+	-- `{ allow = id }` when the user agrees, and macOS asks.
+	access: ("needed" | "denied")?,
+	-- The tightest window's share used, and how alarming it is.
+	used: number?,
+	severity: ("normal" | "warning" | "critical")?,
+	windows: { UsageWindow },
+	balances: { UsageBalance },
+	sections: { UsageSection },
+	-- OpenAI's spend per day.
+	daily: { { day: string, amount: number } }?,
+	-- Claude's other accounts, from cswap.
+	accounts: { { name: string, email: string, disabled: boolean, stale: boolean, note: string?, windows: { UsageWindow } } }?,
+}
+
+-- Plan usage of the AI services signed in on `host` (the `usage` provider),
+-- read every 10 minutes at most. Any message to `provider:usage` refreshes.
+type Usage = {
+	available: boolean,
+	-- "local", "ssh:<target>" or "wsl:<distro>".
+	host: string?,
+	busy: boolean,
+	updated: number?,
+	-- Whole minutes since `updated`.
+	age: number?,
+	-- Why the host itself could not be read.
+	error: string?,
+	-- The sheet's tabs, in a stable order.
+	providers: { UsageProvider },
+	-- Ids of those with numbers, closest to a limit first: a status bar's.
+	headline: { string },
 }
 
 type Herdr = {
@@ -1418,6 +1514,7 @@ type App = {
 	docs: Docs?,
 	herdr: Herdr?,
 	acp: Acp?,
+	usage: Usage?,
 	-- What tab bars can open: each component and mod with a `tab` entry.
 	kinds: { TabKind },
 	-- The stylesheet's `looks`: which look each kind of component takes.
@@ -1461,12 +1558,20 @@ type PickMsg = {
 	folder: string?,
 }
 
+-- What `{ to = "app:window", msg = ... }` asks: a mod's name opens that
+-- mod in a window of its own (or raises it), as a control's `window` does;
+-- `{ open = "<mod>", send = <msg> }` first delivers `send` to its `update`,
+-- so it opens on a page; `{ close = "<mod>" }` closes it. Any mod may ask
+-- for any mod's window; never the shell's.
+type WindowMsg = string | { open: string, send: Data? } | { close: string }
+
 -- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,
 -- `"provider:<name>"`, `"topic:<name>"`, or the app itself:
 -- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
 -- `AppearanceMode`), `"app:theme"` (`msg` `{ light: string?, dark: string? }`),
 -- `"app:sound"` (`msg` `"default"` or a sound file's path),
--- `"app:notify"` (`msg` a `NotifyMsg`) and `"app:pick"` (`msg` a `PickMsg`).
+-- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`)
+-- and `"app:window"` (`msg` a `WindowMsg`).
 type Send = {
 	to: string,
 	msg: Data,
@@ -1480,6 +1585,15 @@ type Window = {
 	traffic_lights: { x: number?, y: number? }?,
 	-- The size the window opens at, before the user resizes it.
 	size: { width: number?, height: number? }?,
+}
+
+-- A mod's own window (`window` on a mod other than main.luau), when a
+-- control's `window` or `app:window` opens it: the size it opens at and
+-- the smallest the user can make it, each kept within the screen; 420x560
+-- and 280x240 when unset.
+type ModWindow = {
+	size: { width: number, height: number }?,
+	min_size: { width: number, height: number }?,
 }
 
 -- A menu item in the shell's `menus`: it sends `msg` (to the shell, or to
@@ -1555,8 +1669,9 @@ type Mod<State> = {
 	title: string?,
 	-- Rules for what this mod draws, by selector.
 	styles: { [string]: Style }?,
-	-- Only in main.luau: the window's frame, read when the app starts.
-	window: Window?,
+	-- In main.luau, the main window's frame, read when the app starts (a
+	-- `Window`); in another mod, the size of its own window (a `ModWindow`).
+	window: (Window | ModWindow)?,
 	-- Only in main.luau: menus after the app menu (a "View" one merges into
 	-- the host's), and what About says.
 	menus: { AppMenu }?,

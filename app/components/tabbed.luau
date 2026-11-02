@@ -9,7 +9,8 @@
 -- as { count, selected, title, tab } where `tab` is the selected tab's record.
 -- With `show = "bar"` it draws only its strip (in a title bar, say) and a mod
 -- draws the content from that topic with `tab-view`; what the content reports
--- comes back on `tabs/<id>/report`.
+-- comes back on `tabs/<id>/report`. A report with `exited = true` (its
+-- shell ended, Ctrl-D in a terminal) closes the tab.
 -- Another mod opens a tab by publishing on `tabs/<id>/open`
 -- { n, kind, props, title, id? }: a tab of that kind showing the same `path` is
 -- selected instead of opened twice. `n` numbers the requests, so one heard
@@ -70,8 +71,8 @@ local function open(state: State, props: Props, kind: string)
 	state.selected = id
 end
 
--- A tab another mod asked for: the open one of that kind and path, else a
--- new one with those props.
+-- A tab another mod asked for: the open one of that kind, path and root
+-- (the project a file is in), else a new one with those props.
 local function open_asked(state: State, props: Props, asked: any)
 	if type(asked) ~= "table" or type(asked.kind) ~= "string" or asked.n == state.opened then
 		return false
@@ -80,7 +81,7 @@ local function open_asked(state: State, props: Props, asked: any)
 	local wanted = type(asked.props) == "table" and asked.props or {}
 	if wanted.path ~= nil then
 		for _, tab in state.tabs do
-			if tab.kind == asked.kind and tab.props.path == wanted.path then
+			if tab.kind == asked.kind and tab.props.path == wanted.path and tab.props.root == wanted.root then
 				state.selected = tab.id
 				return true
 			end
@@ -114,11 +115,28 @@ local function report(state: State, props: Props)
 	}
 end
 
--- Keeps what a tab's content reported: a browser's page and title.
+-- Closes the tab `id`, selecting its neighbour if it was selected.
+local function close(state: State, id: string)
+	local _, index = find(state.tabs, "id", id)
+	if index then
+		table.remove(state.tabs, index)
+		if state.selected == id then
+			local neighbour = state.tabs[math.min(index, #state.tabs)]
+			state.selected = neighbour and neighbour.id
+		end
+	end
+end
+
+-- Keeps what a tab's content reported: a browser's page and title. A
+-- shell that exited closes its tab.
 local function keep_report(state: State, msg)
 	local tab = find(state.tabs, "id", msg.tab_report)
 	if not tab then
 		return false
+	end
+	if msg.exited then
+		close(state, tab.id)
+		return true
 	end
 	-- The whole report, as the browser takes it back: address, title,
 	-- loading and history.
@@ -205,14 +223,7 @@ return component {
 				state.selected = neighbour and neighbour.id
 			end
 		elseif msg.close then
-			local _, index = find(state.tabs, "id", msg.close)
-			if index then
-				table.remove(state.tabs, index)
-				if state.selected == msg.close then
-					local neighbour = state.tabs[math.min(index, #state.tabs)]
-					state.selected = neighbour and neighbour.id
-				end
-			end
+			close(state, msg.close)
 		elseif msg.tab_report then
 			-- What its own content reported: a browser's page and title.
 			keep_report(state, msg)

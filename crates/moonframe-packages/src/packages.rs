@@ -270,16 +270,48 @@ fn invisible(c: char) -> bool {
     )
 }
 
-/// The built-in git provider's manifest, compiled in so its `writers` are
-/// known wherever the command runs from.
-const BUILTIN_GIT: &str = include_str!("../../../app/providers/git/provider.toml");
+/// The built-in providers that trust the mods named in their `[settings]`
+/// with privileged messages, and the keys that name them: start coding
+/// agents that run as the user (acp's `starters`, and `allow`, whose keys
+/// are mods whose agents' tools go unasked), save files (docs), commit and
+/// push (git), ask for a Keychain item or reach an SSH host (usage). Their
+/// manifests are compiled in so the names are known wherever the command
+/// runs from. A native provider that gates on mod names belongs here.
+const GATED: &[(&str, &str, &[&str])] = &[
+    // keep-sorted start
+    (
+        "acp",
+        include_str!("../../../app/providers/acp/provider.toml"),
+        &["allow", "starters"],
+    ),
+    (
+        "docs",
+        include_str!("../../../app/providers/docs/provider.toml"),
+        &["writers"],
+    ),
+    (
+        "git",
+        include_str!("../../../app/providers/git/provider.toml"),
+        &["writers"],
+    ),
+    (
+        "usage",
+        include_str!("../../../app/providers/usage/provider.toml"),
+        &["writers"],
+    ),
+    // keep-sorted end
+];
 
-/// Every mod a git provider here may let commit and push: `[settings]
-/// writers` in the built-in `providers/git`, the user's, and every installed
-/// package's, enabled or not (one can be enabled without asking). Which
-/// layer wins depends on what is installed, so all of them count.
-pub fn git_writers(user: &Path) -> Vec<String> {
-    let mut texts = vec![BUILTIN_GIT.to_owned()];
+/// Every mod a built-in provider here may trust with a privileged message:
+/// the names under each [`GATED`] provider's keys, from its built-in
+/// manifest, the user's, and every installed package's, enabled or not
+/// (one can be enabled without asking). Which layer wins depends on what
+/// is installed, so all of them count.
+pub fn writers(user: &Path) -> Vec<String> {
+    let mut manifests: Vec<(String, &[&str])> = GATED
+        .iter()
+        .map(|(_, text, keys)| ((*text).to_owned(), *keys))
+        .collect();
     let mut folders = vec![user.to_owned()];
     if let Ok(list) = List::read(user) {
         folders.extend(
@@ -288,23 +320,32 @@ pub fn git_writers(user: &Path) -> Vec<String> {
                 .map(|(id, entry)| entry.folder(user, id)),
         );
     }
-    texts.extend(
-        folders.iter().filter_map(|folder| {
-            fs::read_to_string(folder.join("providers/git/provider.toml")).ok()
-        }),
-    );
-    let mut writers: Vec<String> = texts
+    for folder in &folders {
+        manifests.extend(GATED.iter().filter_map(|(name, _, keys)| {
+            let path = folder.join("providers").join(name).join("provider.toml");
+            fs::read_to_string(path).ok().map(|text| (text, *keys))
+        }));
+    }
+    let mut writers: Vec<String> = manifests
         .iter()
-        .filter_map(|text| text.parse::<toml::Table>().ok())
-        .filter_map(|manifest| {
-            manifest
-                .get("settings")?
-                .get("writers")?
-                .as_array()
-                .cloned()
+        .filter_map(|(text, keys)| {
+            let manifest = text.parse::<toml::Table>().ok()?;
+            let settings = manifest.get("settings")?.as_table()?.clone();
+            Some(
+                keys.iter()
+                    .filter_map(move |key| settings.get(*key).cloned()),
+            )
         })
         .flatten()
-        .filter_map(|name| name.as_str().map(str::to_owned))
+        .flat_map(|value| match value {
+            // A list of mod names, or a table keyed by them (acp's `allow`).
+            toml::Value::Array(names) => names
+                .iter()
+                .filter_map(|name| name.as_str().map(str::to_owned))
+                .collect(),
+            toml::Value::Table(table) => table.keys().cloned().collect(),
+            _ => Vec::new(),
+        })
         .collect();
     writers.sort();
     writers.dedup();

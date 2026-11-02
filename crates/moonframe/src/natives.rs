@@ -22,6 +22,7 @@ pub(crate) fn natives() -> Natives {
         ("docs", docs),
         ("git", git),
         ("shell", shell),
+        ("usage", usage),
         // keep-sorted end
         // The demo gallery's (examples/demo): it opens apps on this binary.
         ("demos", crate::demos::native),
@@ -60,6 +61,11 @@ fn shell() -> Box<dyn Native> {
     moonframe_shell::native()
 }
 
+#[cfg(feature = "usage")]
+fn usage() -> Box<dyn Native> {
+    moonframe_usage::native()
+}
+
 #[cfg(not(feature = "acp"))]
 fn acp() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -85,6 +91,11 @@ fn git() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(not(feature = "usage"))]
+fn usage() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 /// A built-in provider this build leaves out: it publishes nothing.
 // With every feature on, only the tests make one.
 #[cfg_attr(
@@ -93,7 +104,8 @@ fn git() -> Box<dyn Native> {
         feature = "chat",
         feature = "docs",
         feature = "git",
-        feature = "shell"
+        feature = "shell",
+        feature = "usage"
     ),
     allow(dead_code)
 )]
@@ -143,7 +155,7 @@ mod tests {
     #[test]
     fn every_built_in_native_is_registered() {
         let natives = natives();
-        for name in ["acp", "chat", "docs", "git", "shell", "demos"] {
+        for name in ["acp", "chat", "docs", "git", "shell", "usage", "demos"] {
             assert!(natives.contains_key(name), "{name}");
         }
     }

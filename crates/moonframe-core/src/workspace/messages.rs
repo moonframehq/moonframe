@@ -3,7 +3,7 @@
 
 use {
     super::*,
-    crate::{APP, Action, Command},
+    crate::{APP, Action, Command, WindowRequest},
 };
 
 impl Workspace {
@@ -97,7 +97,18 @@ impl Workspace {
                     continue;
                 }
                 match Request::parse(what, &msg) {
-                    Ok(request) => self.requests.push((from, request)),
+                    Ok(request) => {
+                        // What a window opens with reaches its mod now, in
+                        // this cascade, so its first frame shows it.
+                        if let Request::Window(WindowRequest::Open {
+                            name,
+                            send: Some(send),
+                        }) = &request
+                        {
+                            queue.push_back((from.clone(), name.clone(), send.clone()));
+                        }
+                        self.requests.push((from, request));
+                    },
                     Err(error) => {
                         if let Some(slot) = self.slot_mut(&from) {
                             slot.update_error = Some(error);

@@ -3,8 +3,9 @@
 -- strip on the `tabs/main` topic, draws that tab with `tab-view`, and sends
 -- what the tab reports (a browser's page) back on `tabs/main/report`.
 -- A markdown file chosen in the explorer opens in a tab of its own (asked
--- for on `tabs/main/open`); a link in one opens the file it names, or a
--- browser tab for a web address.
+-- for on `tabs/main/open`), with the project it is in (`root`), so the tab
+-- keeps that file when the project moves; a link in one opens the file it
+-- names in the same project, or a browser tab for a web address.
 local tab_view = use "tab-view"
 
 type State = {
@@ -89,7 +90,13 @@ return mod {
 			return state, { { to = "topic:tabs/main/report", msg = msg } }
 		elseif type(msg.open) == "string" and is_markdown(msg.open) then
 			-- From the explorer.
-			return ask(state, "component:markdown-editor", { path = msg.open }, string.match(msg.open, "([^/]+)$"))
+			local root = if type(msg.root) == "string" then msg.root else nil
+			return ask(
+				state,
+				"component:markdown-editor",
+				{ path = msg.open, root = root },
+				string.match(msg.open, "([^/]+)$")
+			)
 		elseif type(msg.open_link) == "string" then
 			-- A link in a markdown tab: a web page, or another file.
 			local url: string = msg.open_link
@@ -101,7 +108,13 @@ return mod {
 			end
 			local path = resolve(msg.from or "", (string.gsub(url, "[?#].*$", "")))
 			if path and is_markdown(path) then
-				return ask(state, "component:markdown-editor", { path = path }, string.match(path, "([^/]+)$"))
+				local root = if type(msg.root) == "string" then msg.root else nil
+				return ask(
+					state,
+					"component:markdown-editor",
+					{ path = path, root = root },
+					string.match(path, "([^/]+)$")
+				)
 			end
 		end
 	end,
@@ -115,8 +128,9 @@ return mod {
 		local kind = kind_of(app.kinds, state.tab and state.tab.kind)
 		local content: any
 		if kind and TERMINALS[kind.kind] and not (kind.props and kind.props.cwd) then
-			-- A terminal starts in the folder `moonframe` was started from,
-			-- else in the project the explorer shows (else home); it waits
+			-- A terminal starts in the project the explorer shows (that of
+			-- the terminal last used, else the folder `moonframe` was
+			-- started from; else home); it waits
 			-- the moment until the files provider says which, as a shell
 			-- started elsewhere would stay there.
 			local files = app.files

@@ -165,6 +165,7 @@ impl Backend for Tmux {
             }),
             pane: pane_id.clone(),
             client: Mutex::new(client),
+            tmux: self.clone(),
         };
         // Its size first, so what is copied next is laid out for it.
         pane.send(&resize_command(open.size), Expect::Nothing);
@@ -237,6 +238,8 @@ struct TmuxPane {
     commands: Mutex<Commands>,
     pane: String,
     client: Mutex<Child>,
+    /// The server it is on, to ask it things outside the control client.
+    tmux: Tmux,
 }
 
 impl TmuxPane {
@@ -266,6 +269,31 @@ impl Drop for TmuxPane {
 }
 
 impl Pane for TmuxPane {
+    fn exited(&self) -> bool {
+        // A control client's %exit also means detached. Ask the server
+        // after the stream ends, off the window thread, whether our pane
+        // still lives. Errors other than a stopped server are unknown.
+        let Ok(output) = self
+            .tmux
+            .command()
+            .args(["list-panes", "-a", "-F", "#{pane_id} #{pane_dead}"])
+            .stdin(Stdio::null())
+            .output()
+        else {
+            return false;
+        };
+        if output.status.success() {
+            let live = format!("{} 0", self.pane);
+            !String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .any(|line| line == live)
+        } else {
+            // tmux stops its server when the last session exits. The
+            // socket remains, but there is no server (nor a live pane).
+            String::from_utf8_lossy(&output.stderr).starts_with("no server running on ")
+        }
+    }
+
     fn write(&self, bytes: &[u8]) {
         for chunk in bytes.chunks(KEYS_PER_COMMAND) {
             let mut command = format!("send-keys -H -t {}", self.pane);
@@ -282,5 +310,27 @@ impl Pane for TmuxPane {
 
     fn answers_queries(&self) -> bool {
         true
+    }
+
+    /// The pane's folder as tmux knows it, asked apart from the control
+    /// client so the answer never mixes with its output.
+    fn cwd(&self) -> Option<PathBuf> {
+        let output = self
+            .tmux
+            .command()
+            .args([
+                "display-message",
+                "-p",
+                "-t",
+                &self.pane,
+                "#{pane_current_path}",
+            ])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output()
+            .ok()
+            .filter(|output| output.status.success())?;
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        (!path.is_empty()).then(|| PathBuf::from(path))
     }
 }

@@ -1,8 +1,11 @@
-# The git state of the folder the app runs from, shared as `app.git`:
+# The git state of the repository of the terminal last used (else the one
+# the app runs from), shared as `app.git`:
 # branch, ahead/behind, changed files with +/- counts, HEAD, worktrees,
 # recent branches, remote and stashes, and one file's diff on request.
-# Mods also ask it to commit (`{ commit = "message", id = ... }`) or push
-# (`{ push = true, id = ... }`); it answers the mod that asked with
+# Mods also ask it to commit (`{ commit = "message", root, id = ... }`) or
+# push (`{ push = true, root, id = ... }`), `root` naming the repository as
+# `app.git.root` gave it (refused once it moved); it answers the mod that
+# asked with
 # `{ reply = id, action, ok, message | error }`.
 # A native provider: Rust built into the app (crates/moonframe-git, the
 # `git` feature), running git through herdr-vcs with your own access.

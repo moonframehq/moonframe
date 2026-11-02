@@ -21,8 +21,19 @@ acp = ["dep:moonframe-acp"]
 alacritty = ["moonframe-terminal/alacritty"]
 # The `chat` native provider (`app.chat`): agent chats run by herdr-acp,
 # attached over herdr's chat protocol.
-chat    = ["dep:moonframe-chat"]
-default = ["acp", "alacritty", "chat", "docs", "git", "herdr-core", "shell", "tokio", "wasm"]
+chat = ["dep:moonframe-chat"]
+default = [
+  "acp",
+  "alacritty",
+  "chat",
+  "docs",
+  "git",
+  "herdr-core",
+  "shell",
+  "tokio",
+  "usage",
+  "wasm",
+]
 # The `docs` native provider: reads and saves the project's text files
 # for the markdown editor.
 docs    = ["dep:moonframe-docs"]
@@ -38,6 +49,9 @@ herdr-core = ["moonframe-mux/herdr-core"]
 # Native providers written with `async fn` (`.native_async`), and a tokio
 # runtime they and the app's views share (`.tokio`, `on_runtime`).
 tokio = ["moonframe-providers/tokio"]
+# The `usage` native provider (`app.usage`): plan usage of the AI services
+# signed in here (Claude, Codex, Copilot, ...), read by herdr-usage.
+usage = ["dep:moonframe-usage"]
 # Wasm providers (`kind = "wasm"`), sandboxed on wasmtime: the starter's
 # `system` and providers users install. An app with none leaves it out to
 # build faster and smaller.
@@ -59,6 +73,7 @@ moonframe-providers.workspace = true
 moonframe-shell               = { optional = true, workspace = true }
 moonframe-store.workspace     = true
 moonframe-terminal.workspace  = true
+moonframe-usage               = { optional = true, workspace = true }
 notify.workspace              = true
 rust-embed.workspace          = true
 serde.workspace               = true

@@ -142,7 +142,8 @@ fn fail(problem: String) -> ExitCode {
 }
 
 /// Asks as `moonframe mod` does, and refuses anything but an app.
-/// `writers` are the mods git lets commit and push in the profile.
+/// `writers` are the mods built-in providers trust with privileged
+/// messages in the profile (git's commit and push, and the like).
 fn approve_app(contents: &Contents, writers: &[String], yes: bool) -> Result<(), String> {
     if contents.app.is_none() {
         return Err(
@@ -173,8 +174,8 @@ fn install(user: &Path, source: &str, name: Option<&str>, yes: bool) -> Result<(
     let incoming = profiles.join(format!(".incoming-{}", std::process::id()));
     let _ = fs::remove_dir_all(&incoming);
     println!("Cloning {source}…");
-    // A new profile: git's writers are the built-in ones.
-    let writers = packages::git_writers(&incoming);
+    // A new profile: the writers are the built-in ones.
+    let writers = packages::writers(&incoming);
     let installed = packages::install(&incoming, source, &|contents| {
         approve_app(contents, &writers, yes)?;
         match name {
@@ -218,7 +219,7 @@ fn link(user: &Path, folder: &str, name: Option<&str>, yes: bool) -> Result<(), 
     let name = name.map_or(manifest.name, str::to_owned);
     refuse_taken(user, &name)?;
     let profile = paths::profile(user, &name);
-    let writers = packages::git_writers(&profile);
+    let writers = packages::writers(&profile);
     let linked = packages::link(&profile, folder, &|contents| {
         approve_app(contents, &writers, yes)
     });
@@ -283,7 +284,7 @@ fn install_requires(
         return 0;
     };
     let mut failed = 0;
-    let writers = packages::git_writers(profile);
+    let writers = packages::writers(profile);
     for source in &app.requires {
         let done = packages::beside(folder, source).and_then(|beside| match beside {
             Some(path) => {
@@ -358,7 +359,7 @@ fn list(user: &Path) -> Result<(), String> {
 
 fn update(user: &Path, name: &str, yes: bool) -> Result<(), String> {
     let profile = existing(user, name)?;
-    let writers = packages::git_writers(&profile);
+    let writers = packages::writers(&profile);
     let updated = packages::print_update(&profile, None, &|contents| {
         // The app may change its requirements; its kind may not change.
         match contents.app {

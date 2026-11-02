@@ -1,3 +1,5 @@
+mod endings;
+
 use {
     crate::{Tmux, tmux::session_name},
     moonframe_terminal::{Backend as _, Engine, Open, Screen, Session, Size},
