@@ -2,6 +2,8 @@
 //! and prints what it publishes as JSON when the read is done: for seeing
 //! what `app.usage` holds without starting the app. Keychain items no one
 //! allowed are not read, so macOS asks nothing.
+//!
+//! Run with `cargo run -p moonframe-usage --example usage-once`.
 
 use {
     moonframe_core::Data,
