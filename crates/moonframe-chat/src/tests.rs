@@ -45,7 +45,9 @@ fn published(seen: &Seen) -> Value {
 
 fn chats(dir: &Path, settings: &str) -> (Chats, Handle, Seen) {
     let store = dir.join("chats.json");
-    let settings = settings.replace("STORE", &store.display().to_string());
+    // As a JSON string, so a Windows path's backslashes are escaped.
+    let store = serde_json::to_string(&store.display().to_string()).unwrap();
+    let settings = settings.replace("\"STORE\"", &store);
     let (host, seen) = host(&settings, dir);
     let mut chats = Chats::default();
     chats.start(&host).unwrap();
