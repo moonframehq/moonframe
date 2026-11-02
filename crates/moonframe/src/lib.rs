@@ -47,6 +47,7 @@ mod motion;
 mod natives;
 mod overlay;
 mod packages;
+mod panes;
 mod paths;
 mod persist;
 mod profiles;

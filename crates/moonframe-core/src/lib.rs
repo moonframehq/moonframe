@@ -62,7 +62,7 @@ pub use {
     },
     vm::printable,
     window::{Chrome, Platform, Titlebar, WindowState},
-    workspace::{DEMO, PROVIDER, SHELL, Slot, Workspace},
+    workspace::{DEMO, PROVIDER, SHELL, Slot, TOPIC, Workspace},
 };
 
 #[cfg(test)]
