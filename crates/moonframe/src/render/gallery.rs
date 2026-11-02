@@ -144,6 +144,22 @@ impl<'w> Painter<'w, '_> {
                 });
                 std::iter::once(header).chain(items)
             }));
+        // For a screenshot: the preview alone, with the window's room for
+        // its overlays and popovers.
+        if crate::preview_only()
+            && let Some(component) = current
+        {
+            let (preview, _) = self.component_preview(component, cx);
+            return div()
+                .id("gallery-preview-only")
+                .relative()
+                .size_full()
+                .p_4()
+                .flex()
+                .flex_col()
+                .child(preview)
+                .into_any_element();
+        }
         let detail = match current {
             Some(component) => self.component_detail(component, cx),
             None => div()
@@ -171,7 +187,9 @@ impl<'w> Painter<'w, '_> {
             .into_any_element()
     }
 
-    fn component_detail(&mut self, component: &'w Component, cx: Cx) -> AnyElement {
+    /// The component drawn from its demo, or its example; and whether it
+    /// runs live.
+    fn component_preview(&mut self, component: &'w Component, cx: Cx) -> (AnyElement, bool) {
         // A demo runs live: its controls send to its own `update`. Without
         // one the example is drawn, and its controls send nowhere.
         let demo = self.workspace.demo(&component.name);
@@ -186,6 +204,11 @@ impl<'w> Painter<'w, '_> {
             },
             (Ok(node), _) => node.draw(self, &Place::root(&component.name), cx),
         };
+        (preview, live)
+    }
+
+    fn component_detail(&mut self, component: &'w Component, cx: Cx) -> AnyElement {
+        let (preview, live) = self.component_preview(component, cx);
         let theme = cx.theme();
         let name = component.name.clone();
         let usage = component

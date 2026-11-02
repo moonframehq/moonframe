@@ -210,6 +210,21 @@ impl Workspace {
             .collect()
     }
 
+    /// The last value published on the topic `name`.
+    pub fn topic(&self, name: &str) -> Option<&Data> {
+        self.topics.get(name)
+    }
+
+    /// Whether any module hears the topic `name`, such as a tab bar
+    /// `tabs/main/open`.
+    pub fn hears(&self, name: &str) -> bool {
+        self.listeners().any(|(_, slot)| {
+            slot.module
+                .as_ref()
+                .is_some_and(|module| module.subscribes(name))
+        })
+    }
+
     /// Every module that may subscribe: the shell, the mods, and the
     /// instances not drawn by a preview.
     pub(super) fn listeners(&self) -> impl Iterator<Item = (&str, &Slot)> {

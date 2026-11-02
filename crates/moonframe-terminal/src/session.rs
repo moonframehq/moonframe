@@ -15,6 +15,7 @@ use {
             mpsc::{self, Receiver, Sender},
         },
         thread,
+        time::{Duration, Instant},
     },
 };
 
@@ -109,6 +110,56 @@ impl Session {
     /// Sends what the user typed or pasted to the program.
     pub fn write(&self, bytes: &[u8]) {
         self.pane.write(bytes);
+    }
+
+    /// Types `bytes` once the shell is ready to read a line: input sent
+    /// while it starts can be dropped, by tmux before it attaches or by the
+    /// shell's own start-up. Ready is when its line editor turns on
+    /// bracketed paste (zsh, fish, bash with readline 8.1 or later), else
+    /// when it has drawn something and gone quiet for a moment. Gives up
+    /// typing after a while, or once the shell exits.
+    pub fn type_when_ready(&self, bytes: Vec<u8>) {
+        const STEP: Duration = Duration::from_millis(50);
+        const QUIET: Duration = Duration::from_millis(600);
+        const SETTLE: Duration = Duration::from_millis(80);
+        const GIVE_UP: Duration = Duration::from_secs(15);
+        let (pane, screen) = (Arc::downgrade(&self.pane), self.screen.clone());
+        let spawned = thread::Builder::new()
+            .name("terminal-type".into())
+            .spawn(move || {
+                let started = Instant::now();
+                let mut last: Option<(Option<(u16, u16)>, usize)> = None;
+                let mut since = Instant::now();
+                while started.elapsed() < GIVE_UP {
+                    thread::sleep(STEP);
+                    let Some(now) = screen.lock().ok().map(|screen| {
+                        let drawn = screen.cells.iter().filter(|cell| cell.ch != ' ').count();
+                        (screen.exited, screen.bracketed_paste, screen.cursor, drawn)
+                    }) else {
+                        return;
+                    };
+                    let (exited, editing, cursor, drawn) = now;
+                    if exited {
+                        return;
+                    }
+                    let seen = (cursor, drawn);
+                    if last != Some(seen) {
+                        last = Some(seen);
+                        since = Instant::now();
+                    }
+                    if editing || (drawn > 0 && since.elapsed() >= QUIET) {
+                        thread::sleep(SETTLE);
+                        if let Some(pane) = pane.upgrade() {
+                            pane.write(&bytes);
+                        }
+                        return;
+                    }
+                }
+                tracing::warn!("the shell never became ready; nothing typed");
+            });
+        if let Err(error) = spawned {
+            tracing::warn!("cannot start a thread to type in a terminal: {error}");
+        }
     }
 
     /// Fits the program and the emulator to `size`, if it changed.
