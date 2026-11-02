@@ -1195,6 +1195,7 @@ fn the_type_definitions_cover_what_the_host_accepts() {
                 crate::Fit::NAMES,
                 crate::Titlebar::NAMES,
                 crate::Platform::NAMES,
+                crate::Appearance::NAMES,
             ]
             .concat()
             .into_iter()

@@ -14,18 +14,21 @@ workspace = true
 # Native providers written with `async fn` (`AsyncNative`), on a tokio
 # runtime the app's views can use too.
 tokio = ["dep:tokio"]
+# Wasm providers (`kind = "wasm"`), run sandboxed on wasmtime. Without it
+# one publishes nothing and fails only when a mod messages it.
+wasm = ["dep:sysinfo", "dep:wasmtime", "dep:wasmtime-wasi"]
 
 [dependencies]
 moonframe-core.workspace = true
 serde.workspace          = true
 serde_json.workspace     = true
-sysinfo.workspace        = true
+sysinfo                  = { optional = true, workspace = true }
 thiserror.workspace      = true
 tokio                    = { features = ["rt-multi-thread", "time"], optional = true, workspace = true }
 toml.workspace           = true
 tracing.workspace        = true
-wasmtime.workspace       = true
-wasmtime-wasi.workspace  = true
+wasmtime                 = { optional = true, workspace = true }
+wasmtime-wasi            = { optional = true, workspace = true }
 
 [dev-dependencies]
 futures.workspace  = true

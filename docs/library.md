@@ -37,8 +37,8 @@ opt-level = 2
 library needs the toolchain in [rust-toolchain.toml](../rust-toolchain.toml)
 or newer.
 
-Features: `acp`, `alacritty`, `docs`, `git`, `herdr-core` and `tokio` by
-default. `ghostty` (a second terminal emulator, built from Ghostty's source
+Features: `acp`, `alacritty`, `docs`, `git`, `herdr-core`, `tokio` and
+`wasm` by default. `ghostty` (a second terminal emulator, built from Ghostty's source
 with Zig; see `tools/zig`) is opt-in: `features = ["ghostty"]`.
 
 An app that needs none of git, the markdown editor or kept terminals can
@@ -51,6 +51,13 @@ moonframe = { default-features = false, features = ["acp", "alacritty", "tokio"]
 A built-in provider a feature leaves out (`git`, `docs`, `acp`) publishes
 nothing: the starter's mods reading `app.git` see nil and carry on, and only
 a message to it reports that the feature is off.
+
+`wasm` is the runtime for sandboxed WebAssembly providers (wasmtime, the
+largest dependency). An app whose providers are all native or processes
+leaves it out to build faster and ship a smaller binary; the line above
+does, with no `wasm`. Its Wasm providers then behave the same way, the
+toolbox's `system` among them: nothing published, and a message to one
+says the feature is off. `bundle` then builds none of them.
 
 Use the GPUI the library re-exports, `moonframe::gpui_kit` (GPUI with
 gpui-component): one app links one GPUI. If your crates name `gpui`
