@@ -27,13 +27,18 @@ mod manifest;
 mod source;
 // keep-sorted end
 
-pub(crate) use {
+pub use {
     cli::{approve, run, update as print_update},
     contents::Contents,
-    create::{create, git_init},
-    install::{Approve, Updated, install, installed, link, remove, set_enabled, update},
-    manifest::{App, valid_name, valid_title},
+    create::git_init,
+    install::{install, installed, link},
+    manifest::{App, valid_name},
     source::beside,
+};
+pub(crate) use {
+    create::create,
+    install::{Approve, Updated, remove, set_enabled, update},
+    manifest::valid_title,
 };
 
 use {
@@ -49,11 +54,11 @@ use {
 };
 
 /// The list of installed packages, in the user's folder.
-pub(crate) const FILE: &str = "packages.toml";
+pub const FILE: &str = "packages.toml";
 /// Where packages are cloned, in the user's folder.
 const DIR: &str = "packages";
 /// What makes a package a whole app, at its root.
-pub(crate) const MANIFEST: &str = "moonframe.toml";
+pub const MANIFEST: &str = "moonframe.toml";
 
 /// `packages.toml`.
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -178,7 +183,7 @@ impl List {
 /// A broken `packages.toml` is logged and loads none. An app package is
 /// laid on its own, above the others, when `apps` allows one (in a
 /// profile); otherwise it is left out.
-pub(crate) fn enabled_layers(user: &Path, apps: bool) -> (Vec<PathBuf>, Option<AppLayer>) {
+pub fn enabled_layers(user: &Path, apps: bool) -> (Vec<PathBuf>, Option<AppLayer>) {
     let list = match List::read(user) {
         Ok(list) => list,
         Err(problem) => {
@@ -215,22 +220,22 @@ pub(crate) fn enabled_layers(user: &Path, apps: bool) -> (Vec<PathBuf>, Option<A
 }
 
 /// The id `source` installs as, as `moonframe mod list` shows it.
-pub(crate) fn source_id(source: &str) -> Result<String, String> {
+pub fn source_id(source: &str) -> Result<String, String> {
     Source::parse(source).map(|source| source.id)
 }
 
 /// Whether the package `id` is installed in `user`.
-pub(crate) fn has(user: &Path, id: &str) -> Result<bool, String> {
+pub fn has(user: &Path, id: &str) -> Result<bool, String> {
     Ok(List::read(user)?.package.contains_key(id))
 }
 
 /// Whether `folder` is linked as a package in `user`.
-pub(crate) fn linked(user: &Path, folder: &Path) -> Result<bool, String> {
+pub fn linked(user: &Path, folder: &Path) -> Result<bool, String> {
     Ok(List::read(user)?.linked(folder).is_some())
 }
 
 /// Whether every package in `user` is a linked folder: none was cloned.
-pub(crate) fn links_only(user: &Path) -> Result<bool, String> {
+pub fn links_only(user: &Path) -> Result<bool, String> {
     Ok(List::read(user)?.package.values().all(|entry| entry.link))
 }
 
@@ -238,7 +243,7 @@ pub(crate) fn links_only(user: &Path) -> Result<bool, String> {
 /// terminal escape that could redraw the approval prompt, and invisible
 /// ones, such as a right-to-left override that could disguise a name, are
 /// shown escaped instead of sent to the terminal.
-pub(crate) fn printable(text: &str) -> String {
+pub fn printable(text: &str) -> String {
     let mut shown = String::with_capacity(text.len());
     for c in text.chars() {
         if c.is_control() || invisible(c) {
@@ -273,7 +278,7 @@ const BUILTIN_GIT: &str = include_str!("../../../app/providers/git/provider.toml
 /// writers` in the built-in `providers/git`, the user's, and every installed
 /// package's, enabled or not (one can be enabled without asking). Which
 /// layer wins depends on what is installed, so all of them count.
-pub(crate) fn git_writers(user: &Path) -> Vec<String> {
+pub fn git_writers(user: &Path) -> Vec<String> {
     let mut texts = vec![BUILTIN_GIT.to_owned()];
     let mut folders = vec![user.to_owned()];
     if let Ok(list) = List::read(user) {

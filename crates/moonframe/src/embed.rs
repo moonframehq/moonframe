@@ -7,6 +7,7 @@
 //! so a new build brings its own files and an unchanged one reuses them.
 
 use {
+    crate::{launch::AppSource, paths},
     rust_embed::RustEmbed,
     std::{
         fmt::Write as _,
@@ -14,6 +15,52 @@ use {
         path::{Path, PathBuf},
     },
 };
+
+/// The starter's app folder: the bundle's, else `app` in the current
+/// folder (running from the repository), else the toolbox.
+pub(crate) fn builtin() -> PathBuf {
+    if let Some(app) = paths::resources().map(|folder| folder.join("app")) {
+        return app;
+    }
+    let here = PathBuf::from("app");
+    if here.join("main.luau").is_file() {
+        return here;
+    }
+    toolbox_folder()
+}
+
+/// What an app on the library stands on: the toolbox its bundle ships,
+/// else this checkout's `app/` (edits show live), else the copy compiled
+/// into the binary, written to the cache.
+pub(crate) fn toolbox_folder() -> PathBuf {
+    if let Some(toolbox) = paths::resources()
+        .map(|folder| folder.join("toolbox"))
+        .filter(|toolbox| toolbox.is_dir())
+    {
+        return toolbox;
+    }
+    if let Some(source) = toolbox_source() {
+        return source;
+    }
+    toolbox(&paths::cache())
+        .inspect_err(|error| tracing::warn!("cannot write the toolbox: {error}"))
+        .unwrap_or_else(|_| PathBuf::from("app"))
+}
+
+/// An app on the library's own folder: its bundle's, else where `source`
+/// says.
+pub(crate) fn host_app(source: &AppSource) -> PathBuf {
+    if let Some(app) = paths::resources().map(|folder| folder.join("app")) {
+        return app;
+    }
+    match source {
+        AppSource::Dir(dir) => dir.clone(),
+        AppSource::Embedded(write) => write(&paths::cache()).unwrap_or_else(|error| {
+            tracing::warn!("cannot write the app's files: {error}");
+            PathBuf::from("app")
+        }),
+    }
+}
 
 /// The starter's app folder: what a host stands on when it runs from
 /// neither a bundle nor a checkout of this repository.

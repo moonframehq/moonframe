@@ -17,27 +17,27 @@ struct ManifestFile {
 /// An app package's `[app]`.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct App {
+pub struct App {
     /// The profile it installs as, unless the user names another.
-    pub(crate) name: String,
+    pub name: String,
     /// Its name for people: the menu bar's, and a bundle's. The name if
     /// none.
     #[serde(default)]
-    pub(crate) title: Option<String>,
+    pub title: Option<String>,
     /// Its icon, a PNG in the app's folder (best 1024 pixels square): the
     /// Dock's and a bundle's. `icon.png` if none is named.
     #[serde(default)]
-    pub(crate) icon: Option<String>,
+    pub icon: Option<String>,
     /// Built-in mods it keeps; it brings every other mod it shows.
     #[serde(default)]
     pub(crate) keep: Vec<String>,
     /// Packages it needs, as `moonframe mod install` takes them.
     #[serde(default)]
-    pub(crate) requires: Vec<String>,
+    pub requires: Vec<String>,
     /// Its version (`1.2.0`): the About panel's, a bundle's, and the one
     /// Check for Updates compares with its releases.
     #[serde(default)]
-    pub(crate) version: Option<String>,
+    pub version: Option<String>,
     /// The GitHub repository (`owner/repo`) whose releases update it: the
     /// app menu gets Check for Updates. Needs `version`.
     #[serde(default)]
@@ -46,7 +46,7 @@ pub(crate) struct App {
 
 impl App {
     /// The `[app]` of the package in `folder`, if it is an app.
-    pub(crate) fn read(folder: &Path) -> Result<Option<Self>, String> {
+    pub fn read(folder: &Path) -> Result<Option<Self>, String> {
         let path = folder.join(MANIFEST);
         let text = match fs::read_to_string(&path) {
             Ok(text) => text,
@@ -130,7 +130,7 @@ fn valid_version(version: &str) -> bool {
 }
 
 /// A name for a profile or app: lowercase letters, digits, `-` and `_`.
-pub(crate) fn valid_name(name: &str) -> bool {
+pub fn valid_name(name: &str) -> bool {
     !name.is_empty()
         && name
             .chars()

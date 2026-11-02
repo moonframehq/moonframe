@@ -41,7 +41,7 @@ pub(crate) fn create(folder: &Path) -> Result<String, String> {
 }
 
 /// Makes `folder` a new git repository.
-pub(crate) fn git_init(folder: &Path) -> Result<(), String> {
+pub fn git_init(folder: &Path) -> Result<(), String> {
     git(folder, &["init", "--quiet"]).map(drop)
 }
 

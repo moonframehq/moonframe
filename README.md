@@ -165,8 +165,8 @@ Moonframe is meant to be copied and renamed:
    `mods/` fills it, `style.luau` styles it. Keep what helps and delete the
    rest; the explorer, the tabs and the changes are a place to start.
 2. **The name.** The crate names and `repository` in `Cargo.toml`, the
-   app id `APP_ID` in `crates/moonframe/src/main.rs`, the user folder's name
-   in `crates/moonframe/src/paths.rs`, the bundle's name in
+   app id `APP_ID` and the user folder's name (`Identity::starter`) in
+   `crates/moonframe-packages/src/lib.rs`, the bundle's name in
    `scripts/bundle-app.sh`, and the title in `app/main.luau`.
 3. **The icon.** `assets/icon.png`, drawn by `scripts/draw-icon.swift`.
 4. **Ship it.** `just bundle` builds a `.app` with your app inside, and
@@ -224,6 +224,7 @@ crates/moonframe-core/  reads Luau into checked element trees, styles, component
 crates/moonframe/       the library: the window, drawn with GPUI, inspector, menus
 crates/moonframe-app/   the `moonframe` binary: the starter, on the library
 crates/moonframe-providers/  runs Wasm, process and native providers
+crates/moonframe-packages/   installs packages, finds profiles, updates and bundles
 crates/moonframe-terminal/   shells on alacritty_terminal and libghostty-vt
 crates/moonframe-mux/   keeps terminals in herdr-core or tmux, else a local pty
 crates/moonframe-store/ the state kept across launches, in SQLite

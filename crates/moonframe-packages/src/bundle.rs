@@ -41,7 +41,7 @@ with (an icon.png in its app folder wins).
 /// Moonframe's icon, for an app that has none.
 const ICON: &[u8] = include_bytes!("../../../assets/icon.png");
 
-pub(crate) fn run(folders: &Folders, words: &[String]) -> ExitCode {
+pub fn run(folders: &Folders, words: &[String]) -> ExitCode {
     if matches!(words, [word] if matches!(word.as_str(), "help" | "-h" | "--help")) {
         println!("{USAGE}");
         return ExitCode::SUCCESS;
@@ -115,7 +115,8 @@ fn bundle(folders: &Folders, out: &Path) -> Result<PathBuf, String> {
         None => identity.icon.unwrap_or(ICON).to_vec(),
     };
     let builds = paths::cache().join("bundle-providers");
-    let id = crate::app_id();
+    // The app's own id: a bundle is made before any profile names one.
+    let id = identity.id.clone();
 
     if cfg!(target_os = "macos") {
         let bundle = out.join(format!("{title}.app"));

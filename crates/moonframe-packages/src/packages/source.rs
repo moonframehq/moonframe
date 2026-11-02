@@ -133,7 +133,7 @@ fn split_reference(text: &str) -> (&str, Option<&str>) {
 /// outside one), so a downloaded app cannot reach the user's other folders.
 /// `None` for a repository to clone. Other folders, `~` and `file://` are
 /// refused: what an app requires must come with it, or from a repository.
-pub(crate) fn beside(folder: Option<&Path>, source: &str) -> Result<Option<PathBuf>, String> {
+pub fn beside(folder: Option<&Path>, source: &str) -> Result<Option<PathBuf>, String> {
     let source = source.trim();
     let shown = printable(source);
     if !(source.starts_with("./") || source.starts_with("../")) {

@@ -35,7 +35,7 @@ tokio = ["moonframe-providers/tokio"]
 # Wasm providers (`kind = "wasm"`), sandboxed on wasmtime: the starter's
 # `system` and providers users install. An app with none leaves it out to
 # build faster and smaller.
-wasm = ["moonframe-providers/wasm"]
+wasm = ["moonframe-packages/wasm", "moonframe-providers/wasm"]
 
 [dependencies]
 futures.workspace             = true
@@ -45,6 +45,7 @@ moonframe-core.workspace      = true
 moonframe-docs                = { optional = true, workspace = true }
 moonframe-git                 = { optional = true, workspace = true }
 moonframe-mux.workspace       = true
+moonframe-packages.workspace  = true
 moonframe-providers.workspace = true
 moonframe-store.workspace     = true
 moonframe-terminal.workspace  = true

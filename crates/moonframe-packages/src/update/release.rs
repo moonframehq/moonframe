@@ -9,23 +9,23 @@ use {
 
 /// A release newer than the running version.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Release {
+pub struct Release {
     /// Its version, without the tag's `v`.
-    pub(crate) version: String,
+    pub version: String,
     /// Its page on GitHub, with the notes and every download.
-    pub(crate) page: String,
+    pub page: String,
     /// The download for this platform, if it has one.
-    pub(crate) asset: Option<Asset>,
+    pub asset: Option<Asset>,
     /// Its `SHA256SUMS`, if it has one.
     pub(super) sums: Option<String>,
 }
 
 /// A file attached to a release.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-pub(crate) struct Asset {
+pub struct Asset {
     pub(crate) name: String,
     #[serde(rename = "browser_download_url")]
-    pub(crate) url: String,
+    pub url: String,
 }
 
 /// What GitHub says of a release.
@@ -39,7 +39,7 @@ struct GithubRelease {
 
 /// What a check found.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Found {
+pub enum Found {
     /// The running version is the newest (or newer: a build from source).
     UpToDate {
         latest: String,
@@ -52,7 +52,7 @@ pub(crate) enum Found {
 impl Release {
     /// Whether it can replace the running app: on macOS, from its `.app`,
     /// with a disk image or zip to install from.
-    pub(crate) fn installable(&self, source: &Source) -> bool {
+    pub fn installable(&self, source: &Source) -> bool {
         source.bundle.is_some()
             && self
                 .asset
@@ -85,7 +85,7 @@ pub(super) const ANSWER: Duration = Duration::from_secs(60);
 pub(super) const DOWNLOAD: Duration = Duration::from_secs(30 * 60);
 
 /// Asks GitHub for `source`'s newest release. Blocks on the network.
-pub(crate) fn check(source: &Source) -> Result<Found, String> {
+pub fn check(source: &Source) -> Result<Found, String> {
     let url = format!(
         "https://api.github.com/repos/{}/releases/latest",
         source.repo
