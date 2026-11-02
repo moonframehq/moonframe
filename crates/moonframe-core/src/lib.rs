@@ -55,7 +55,7 @@ pub use {
     read::MAX_DOCUMENT,
     request::{
         APP, Appearance, Edit, EditChange, Notification, Pick, PickKind, Request, SOUND_TYPES,
-        Sound, Splice,
+        Sound, Splice, WindowRequest,
     },
     roots::{AppLayer, Roots, mod_name},
     style::{
@@ -64,7 +64,7 @@ pub use {
         Transition, TransitionKind,
     },
     vm::printable,
-    window::{Chrome, Platform, Titlebar, WindowState},
+    window::{Chrome, ModWindowSize, Platform, Titlebar, WindowState},
     workspace::{DEMO, PROVIDER, SHELL, Slot, TOPIC, Workspace},
 };
 

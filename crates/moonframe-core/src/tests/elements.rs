@@ -508,6 +508,19 @@ fn bad_inputs_are_refused() {
             "ui.input { value = true }",
             "input.value: expected a string",
         ),
+        ("ui.input { prose = true }", "`prose` goes with `multiline"),
+        (
+            "ui.input { dim = 'sentence' }",
+            "`dim` goes with `multiline",
+        ),
+        (
+            "ui.input { typewriter = true }",
+            "`typewriter` goes with `multiline",
+        ),
+        (
+            "ui.input { multiline = true, dim = 'line' }",
+            "`line` is no dim",
+        ),
     ] {
         let error = input_view(view).err();
         assert!(
@@ -517,4 +530,26 @@ fn bad_inputs_are_refused() {
             "{view}: {error:?}"
         );
     }
+}
+
+#[test]
+fn writing_fields_read_their_modes() {
+    use crate::Dim;
+    let Ok(Node::Input(input)) = input_view(
+        "ui.input { multiline = true, prose = true, dim = 'paragraph', typewriter = true }",
+    ) else {
+        panic!("no writing field");
+    };
+    assert!(input.prose && input.typewriter && input.writing());
+    assert_eq!(input.dim, Some(Dim::Paragraph));
+    let Ok(Node::Input(focus)) = input_view("ui.input { multiline = true, dim = 'sentence' }")
+    else {
+        panic!("no focus field");
+    };
+    assert_eq!(focus.dim, Some(Dim::Sentence));
+    assert!(!focus.prose && focus.writing());
+    let Ok(Node::Input(plain)) = input_view("ui.input { multiline = true }") else {
+        panic!("no text area");
+    };
+    assert!(!plain.writing());
 }

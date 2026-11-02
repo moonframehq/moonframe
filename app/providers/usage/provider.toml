@@ -1,0 +1,31 @@
+# Plan usage of the AI services signed in on this machine (Claude, Codex,
+# Copilot, Cursor, Gemini, OpenRouter, and about ninety more), shared as
+# `app.usage`: each one's limit windows with their resets and pace,
+# balances, and whatever else its service reports.
+# A native provider: Rust built into the app (crates/moonframe-usage, the
+# `usage` feature), reading each agent's own sign-in with your access
+# through herdr-usage. Services are asked every 10 minutes at most.
+# Messages: `{ allow = "<id>" }` lets a sign-in kept in another app's
+# Keychain item be read (macOS then asks); `{ host = "ssh:<target>" }`
+# reads another machine listed in `hosts`; anything else refreshes.
+interval = 1.0
+kind     = "native"
+
+[settings]
+# The mods that may send `allow` (makes macOS ask for a Keychain item) or
+# `host` (connects over SSH with your keys); any other is refused. Any mod
+# may refresh. Add your own mod here to let it.
+writers = ["usage"]
+# Other machines a `host` message may switch to, besides "local", e.g.
+# ["ssh:me@box", "wsl:Ubuntu"]; `host = "..."` reads one from the start.
+hosts = []
+# Providers shown even without a sign-in here, so their sheet says what to
+# set up; and providers never shown.
+hide_providers = []
+show_providers = []
+# Whether a provider signed in through the browser may read its session
+# from Chrome or Safari (Chrome asks for Keychain access once).
+browser_cookies = true
+# A service's key or cookie, as `[settings.providers.<id>] <name> = "..."`.
+# Each is also read from its environment variable (OPENROUTER_API_KEY, ...),
+# which keeps secrets out of this file.

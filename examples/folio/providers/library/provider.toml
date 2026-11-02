@@ -1,0 +1,5 @@
+# Folio's documents, shared as `app.library`: markdown files in a folder
+# under ~/.local/share/moonframe, read and written with your access. A
+# process provider; needs python3.
+command = ["python3", "library.py"]
+kind    = "process"

@@ -22,10 +22,28 @@ impl Build for Input {
         "width",
         "grow",
         "browser",
+        "prose",
+        "dim",
+        "typewriter",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         let multiline = fields.get("multiline")?.unwrap_or(false);
+        let prose = fields.get("prose")?.unwrap_or(false);
+        let dim = fields.get::<Dim>("dim")?;
+        let typewriter = fields.get("typewriter")?.unwrap_or(false);
+        for (key, set) in [
+            ("prose", prose),
+            ("dim", dim.is_some()),
+            ("typewriter", typewriter),
+        ] {
+            if set && !multiline {
+                return Err(fields
+                    .cx()
+                    .key(key)
+                    .fail(format!("`{key}` goes with `multiline = true`")));
+            }
+        }
         let rows = fields.get::<f32>("rows")?;
         if rows.is_some() && !multiline {
             return Err(fields
@@ -113,6 +131,9 @@ impl Build for Input {
             width: fields.number("width", PIXELS)?,
             grow: fields.get("grow")?.unwrap_or(false),
             browser,
+            prose,
+            dim,
+            typewriter,
         })
     }
 }
@@ -189,6 +210,18 @@ impl Read for InputKeys {
                 .map(|(_, chord, msg)| (chord, msg))
                 .collect(),
         ))
+    }
+}
+
+impl Read for Dim {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        match String::read(value, cx)?.as_str() {
+            "sentence" => Ok(Self::Sentence),
+            "paragraph" => Ok(Self::Paragraph),
+            other => Err(cx.fail(format!(
+                "`{other}` is no dim; use \"sentence\" or \"paragraph\""
+            ))),
+        }
     }
 }
 

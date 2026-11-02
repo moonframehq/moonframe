@@ -54,6 +54,15 @@ impl Render for MoonframeApp {
         if let Some(focus) = self.terminals.end_frame() {
             window.defer(cx, move |window, cx| focus.focus(window, cx));
         }
+        // Shells that exited tell their mods (a tab closes), once drawn.
+        let exits = self.terminals.take_exits();
+        if !exits.is_empty() {
+            cx.defer_in(window, move |app, _, cx| {
+                for (owner, msg) in exits {
+                    app.deliver(&owner, msg, cx);
+                }
+            });
+        }
         // The panels follow the project of the terminal last typed in.
         if let Some(folder) = self.terminals.focused_folder(window) {
             self.project.follow(folder);

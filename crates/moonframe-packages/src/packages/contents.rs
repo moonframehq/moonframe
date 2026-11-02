@@ -154,9 +154,10 @@ impl Contents {
         Ok(contents)
     }
 
-    /// Its mods named in `writers`, the mods the git provider lets commit
-    /// and push: a package's mod of that name takes the place of the
-    /// user's, and with it that right.
+    /// Its mods named in `writers`, the mods built-in providers trust with
+    /// privileged messages (acp's agent starts, git's commit and push, docs'
+    /// saves, usage's Keychain and SSH): a package's mod of that name takes the place of
+    /// the user's, and with it that right.
     pub(crate) fn writers<'a>(&'a self, writers: &'a [String]) -> impl Iterator<Item = &'a str> {
         self.mods
             .iter()

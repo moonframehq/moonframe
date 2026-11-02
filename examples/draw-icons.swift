@@ -221,6 +221,20 @@ do {
     save(cx, "examples/stage/icon.png")
 }
 
+// Folio: a page of lines, all faded but the one being written, a blue caret.
+do {
+    let cx = body([0x9ca3af, 0x6b7280, 0x374151])
+    card(cx, CGRect(x: 236, y: 176, width: 552, height: 672), 0x1f2937)
+    fill(cx, CGRect(x: 300, y: 724, width: 260, height: 30), 15, color(0x1f2937, 0.3))
+    for line in 0..<7 {
+        let y = 640 - CGFloat(line) * 62
+        let width: CGFloat = [400, 360, 420, 300, 380, 410, 250][line]
+        fill(cx, CGRect(x: 300, y: y, width: width, height: 20), 10, color(0x1f2937, line == 3 ? 0.9 : 0.16))
+    }
+    fill(cx, CGRect(x: 614, y: 434, width: 14, height: 52), 7, color(0x1a9ad6))
+    save(cx, "examples/folio/icon.png")
+}
+
 // Tidings: a list of emails, unread ones dotted, beside the open one.
 do {
     let cx = body([0x818cf8, 0x6366f1, 0x4338ca])

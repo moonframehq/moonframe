@@ -9,10 +9,12 @@ use crate::{Command, Data, Error};
 
 mod edit;
 mod pick;
+mod window;
 
 pub use {
     edit::{Edit, EditChange, Splice},
     pick::{Pick, PickKind},
+    window::WindowRequest,
 };
 
 /// How a message names the app rather than a mod: `to = "app:command"`.
@@ -47,6 +49,9 @@ pub enum Request {
     /// `app:edit`: changes the text of one of the sending mod's fields
     /// around its selection, as a formatting toolbar or a completion does.
     Edit(Edit),
+    /// `app:window`: opens a mod in a window of its own, or raises it,
+    /// first delivering what it is sent; or closes it.
+    Window(WindowRequest),
 }
 
 /// What `app:sound` plays.
@@ -117,6 +122,7 @@ impl Request {
             "notify" => notification(msg).map(Self::Notify),
             "pick" => pick::pick(msg).map(Self::Pick),
             "edit" => edit::edit(msg).map(Self::Edit),
+            "window" => window::window(msg).map(Self::Window),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -138,6 +144,7 @@ pub const NAMES: &[&str] = &[
     "notify",
     "pick",
     "edit",
+    "window",
 ];
 
 /// `"default"`, or a sound file's path: never an address.

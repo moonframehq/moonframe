@@ -64,6 +64,7 @@ Pick the lowest layer that can do the job:
 | git status, a file's diff, commit or push | read `app.git`; send `provider:git` a message | in a mod | no (git is built in) |
 | markdown shown, or a project file read and saved | `ui.markdown` or `use "markdown"`; `use "markdown-editor"`, which reads and saves through `provider:docs` | in a mod | no (docs is built in) |
 | a coding agent doing a task (Claude, Codex, Gemini...) | send `provider:acp` `{ start = ... }`; show the run with `use "agent-run"` | in a mod | no (acp is built in) |
+| AI plan usage (Claude, Codex, Copilot limits, resets, pace) | read `app.usage`; draw each window with `use "usage-bar"` | in a mod | no (usage is built in) |
 | a provider that needs a Rust library or answers actions | a **native provider** | `crates/` + `providers/<name>/provider.toml` | yes, and the app restarts |
 | a look change | a rule in `style.luau`, or the mod's `styles` | | no |
 | a new kind of element (tree, chart, image) | a host element | `crates/` | yes, and the app restarts |
@@ -750,6 +751,42 @@ update = function(state, msg)
 end,
 ```
 
+- `app:window`, `msg` a mod's name, `{ open = "<mod>", send = <msg>? }`
+  or `{ close = "<mod>" }`: opens that mod in a window of its own (or
+  raises it), as a control's `window = "<mod>"` does, or closes it. `send`
+  reaches the mod's `update` (from the asking mod) before its window
+  draws, so it opens on a page; a `send` to a mod that does not exist is
+  the sender's error. The mod's `title` titles the window, and its
+  `window = { size = { width, height }, min_size = { width, height } }`
+  sizes it (both kept within the screen, as the main window's `size` is;
+  420x560 and 280x240 when unset; a size takes effect the next time the
+  window opens). Any mod may open or close any mod's window, as any
+  control may: the window shows that mod's own view and `send` is an
+  ordinary message, so nothing new crosses. The shell is the main window
+  and is never opened this way. Close a mod's own window from its
+  `update` with `{ close = "<mod>" }`: `app:command` `close-window` runs in
+  the main window and would close that.
+
+```lua
+-- mods/settings/main.luau: Settings as a window, on the page asked for
+return mod {
+	title = "Settings",
+	window = { size = { width = 860, height = 600 }, min_size = { width = 640, height = 480 } },
+	init = function() return { page = "general" } end,
+	update = function(state, msg)
+		if type(msg) == "table" and msg.page then
+			state.page = msg.page
+		elseif msg == "done" then
+			return state, { { to = "app:window", msg = { close = "settings" } } }
+		end
+	end,
+	view = function(state) return ui.text(state.page) end,
+}
+
+-- elsewhere, a palette entry or another mod's update:
+return state, { { to = "app:window", msg = { open = "settings", send = { page = "machines" } } } }
+```
+
 - A request the app cannot read (an unknown command, a misspelled
   `app:<what>`) is the sender's error, shown as an `update` error.
 - Previews (the Components window) ask nothing, and a provider's answer
@@ -980,10 +1017,13 @@ Rules that trip agents up:
 - Unknown element types, keys and token values are errors, not ignored.
   `just check` names them.
 - The keys allowed on the `mod { }` table are only `init`, `update`, `view`,
-  `region`, `order`, `title`, `styles`, `subscribe` (see "Topics") and `tab`
-  (see "Tabs"), plus `window`, `menus` and `about` in `main.luau` only (see
-  "Window and title bar" and "Menus and About"). `update` and `view` also
-  get `props` last.
+  `region`, `order`, `title`, `styles`, `subscribe` (see "Topics"), `tab`
+  (see "Tabs") and `window`, plus `menus` and `about` in `main.luau` only
+  (see "Menus and About"). In `main.luau`, `window` is the main window's
+  frame (see "Window and title bar"); in another mod it is the size of the
+  mod's own window, `window = { size = { width, height }, min_size = {
+  width, height } }` (see "Asking the app", `app:window`). `update` and
+  `view` also get `props` last.
 - State and messages must be plain data: nil, booleans, numbers, strings,
   lists, and string-keyed tables. Functions in state stop it surviving a
   reload. A table is a list without gaps or has string keys, never both.
@@ -1005,7 +1045,7 @@ Text-like elements take their main value positionally:
 
 | Element | Keys (besides children) | Notes |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
+| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window, and a `window = { size, min_size }` to size it; `window` takes no `msg`, so to open it on a page send `app:window` instead) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover |
 | `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
@@ -1585,12 +1625,14 @@ native, and it commits and pushes on request), and from process providers
 `app.agents` (coding agents running here), `app.files` (the project's
 file tree), `app.docs` (native: reads and saves the project's text files
 for a mod, answering it), `app.herdr` (whether herdr-core and tmux are
-installed), and the native `app.acp` (coding agents a mod runs over ACP).
+installed), the native `app.acp` (coding agents a mod runs over ACP), and
+the native `app.usage` (plan usage of Claude, Codex, Copilot and the other
+AI services signed in here).
 Their shapes are under "Built-in providers" below and typed in
 `types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`, `Acp`,
-and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
+`Usage`, and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
-is labelled demo data, as in `mods/usage`.
+is labelled demo data.
 
 **Providers: data Luau can't produce.** A provider is a folder
 `providers/<name>/` with a `provider.toml`, in either folder. What it
@@ -1737,6 +1779,35 @@ example.
 A document can be long: `ui.markdown`'s `text` and a multiline
 `ui.input`'s `value` take up to 1 MiB (other strings in a view, 16 KiB),
 and a string in a message or in state up to 1 MiB (4 MiB of text per value).
+
+`app.usage` (usage, native, the `usage` feature): plan usage of the AI
+services signed in on this machine, read by herdr-usage from each agent's
+own sign-in (about ninety services: Claude, Codex, Copilot, Cursor, Gemini,
+OpenRouter...), each asked every 10 minutes at most. Shares are fractions
+from 0 to 1 and countdowns come written out (`resets_in = "4d 6h"`, and
+`age`, minutes since `updated`), as views have no clock. `headline` lists
+the ids with numbers, closest to a limit first, for a status bar;
+`providers` is every one in a stable order, for a sheet's tabs. Each
+window feeds `use "usage-bar"` directly (`left`, `pace`, `pace_note`). Any
+message refreshes (at most every 10 s); `{ allow = "<id>" }` lets a
+sign-in kept in another app's Keychain item be read when the provider says
+`access = "needed"` (macOS asks; the answer is kept across launches);
+`{ host = "ssh:<target>" | "wsl:<distro>" | "local" }` reads another
+machine with its own sign-ins, one listed in `[settings] hosts`. Only the mods in `[settings] writers`
+(`usage` as shipped) may send `allow` or `host`; any mod may refresh.
+The rest of `[settings]` is herdr's `[usage]` table
+(`show_providers`, `hide_providers`, `browser_cookies`,
+`providers.<id>.<name>`); keys are better left in their environment
+variables. `mods/usage` is the whole example.
+
+| field | shape |
+|---|---|
+| top | `{ available, host, busy, updated?, age?, error?, providers, headline }` |
+| provider | `{ id, name, icon? (bundled logo name), dashboard?, status_page?, email?, plan?, error?, stale, access? ("needed" "denied"), used?, severity?, windows, balances, sections, daily?, accounts? }` |
+| window | `{ title, kind ("session" "daily" "weekly" "monthly" "named"), used, left, severity ("normal" "warning" "critical"), label ("3% used 2h 53m"), resets_at?, resets_in?, pace?, pace_note? }` |
+| balance | `{ label, amount, total?, unit, currency, text ("$5.00 of $20.00"), fraction? }`; `fraction` is `amount / total` clamped to 0–1 when `total > 0`, spent or remaining as the label says |
+| section | `{ kind = "limit", window }`, `{ kind = "facts", title, facts = { { label, value } } }` or `{ kind = "shares", title, shares = { { label, share } } }` |
+| `daily`, `accounts` | OpenAI's spend per day `{ day, amount }`; Claude's other cswap accounts `{ name, email, disabled, stale, note?, windows }` |
 
 `app.herdr` (herdr, from `bash`): `{ installed, version, path, tmux,
 installing, error, fresh }`, every 30 s and on any message. The message

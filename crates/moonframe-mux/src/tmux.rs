@@ -269,6 +269,31 @@ impl Drop for TmuxPane {
 }
 
 impl Pane for TmuxPane {
+    fn exited(&self) -> bool {
+        // A control client's %exit also means detached. Ask the server
+        // after the stream ends, off the window thread, whether our pane
+        // still lives. Errors other than a stopped server are unknown.
+        let Ok(output) = self
+            .tmux
+            .command()
+            .args(["list-panes", "-a", "-F", "#{pane_id} #{pane_dead}"])
+            .stdin(Stdio::null())
+            .output()
+        else {
+            return false;
+        };
+        if output.status.success() {
+            let live = format!("{} 0", self.pane);
+            !String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .any(|line| line == live)
+        } else {
+            // tmux stops its server when the last session exits. The
+            // socket remains, but there is no server (nor a live pane).
+            String::from_utf8_lossy(&output.stderr).starts_with("no server running on ")
+        }
+    }
+
     fn write(&self, bytes: &[u8]) {
         for chunk in bytes.chunks(KEYS_PER_COMMAND) {
             let mut command = format!("send-keys -H -t {}", self.pane);

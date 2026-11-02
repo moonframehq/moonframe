@@ -652,8 +652,9 @@ const APPS = [
   ["gantry","Gantry","an infra console, in dark monospace"],
   ["hearth","Hearth","a code review bot's analytics"],
   ["storefront","Storefront","a store's admin with its audit log"],
+  ["folio","Folio","a quiet place to write, with focus mode"],
 ];
-const ROMAN = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX","XXI","XXII","XXIII"];
+const ROMAN = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX","XXI","XXII","XXIII","XXIV"];
 document.getElementById("plates").innerHTML = APPS.map(([id, title, d], i) =>
   `<figure class="plate" data-i="${i}"><img src="img/${id}.webp" alt="${title}" loading="lazy"><p><span>PL. ${ROMAN[i]}</span><b>${title}.</b> ${d[0].toUpperCase() + d.slice(1)}.</p></figure>`).join("");
 

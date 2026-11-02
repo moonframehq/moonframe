@@ -1,0 +1,8 @@
+[app]
+# A writing app: a library of markdown documents and a quiet page to write
+# them on, with focus mode and typewriter scrolling.
+# `moonframe --profile folio` opens it.
+keep     = ["feedback"]
+name     = "folio"
+requires = []
+title    = "Folio"

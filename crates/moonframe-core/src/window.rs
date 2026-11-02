@@ -119,6 +119,59 @@ impl Read for Chrome {
     }
 }
 
+/// The window a mod opens in, of its own (`window = { size = { width,
+/// height }, min_size = { width, height } }` on a mod other than the
+/// shell): the size it opens at and the smallest the user can make it.
+/// The host keeps it within the screen and falls back to its own size for
+/// what is unset.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ModWindowSize {
+    pub size: Option<(f32, f32)>,
+    pub min_size: Option<(f32, f32)>,
+}
+
+/// The sizes a mod's window may ask for, opening and at its smallest.
+const MOD_WINDOW_WIDTH: std::ops::RangeInclusive<f32> = 200.0..=4000.0;
+const MOD_WINDOW_HEIGHT: std::ops::RangeInclusive<f32> = 160.0..=3000.0;
+
+impl Read for ModWindowSize {
+    fn read(value: &mlua::Value, cx: &Cx) -> Result<Self, Error> {
+        if let mlua::Value::Table(table) = value
+            && ["titlebar", "traffic_lights"]
+                .iter()
+                .any(|key| table.contains_key(*key).unwrap_or(false))
+        {
+            return Err(cx.fail(
+                "titlebar and traffic_lights: only the shell (main.luau) sets them; a mod's `window` takes size and min_size",
+            ));
+        }
+        let fields = Fields::read(value, cx, &[&["size", "min_size"]])?;
+        let pair = |key: &str| -> Result<Option<(f32, f32)>, Error> {
+            let Some(value) = fields.raw(key) else {
+                return Ok(None);
+            };
+            let cx = cx.key(key);
+            let size = Fields::read(value, &cx, &[&["width", "height"]])?;
+            match (
+                size.number("width", MOD_WINDOW_WIDTH)?,
+                size.number("height", MOD_WINDOW_HEIGHT)?,
+            ) {
+                (Some(width), Some(height)) => Ok(Some((width, height))),
+                _ => Err(cx.fail("takes both `width` and `height`")),
+            }
+        };
+        let (size, min_size) = (pair("size")?, pair("min_size")?);
+        if let (Some(size), Some(min)) = (size, min_size)
+            && (min.0 > size.0 || min.1 > size.1)
+        {
+            return Err(cx
+                .key("min_size")
+                .fail("is larger than `size`, the size the window opens at"));
+        }
+        Ok(Self { size, min_size })
+    }
+}
+
 /// The window as views see it: `app.window`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WindowState {

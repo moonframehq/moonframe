@@ -115,6 +115,9 @@ pub struct Cell {
     pub strike: bool,
     /// The right half of a wide character drawn by the cell before it.
     pub spacer: bool,
+    /// Padding at the end of a row when a wide character wraps to the next.
+    /// It is not part of the text.
+    pub wrap_spacer: bool,
 }
 
 impl Default for Cell {
@@ -128,6 +131,7 @@ impl Default for Cell {
             underline: false,
             strike: false,
             spacer: false,
+            wrap_spacer: false,
         }
     }
 }
@@ -140,6 +144,8 @@ pub struct Screen {
     pub rows: u16,
     /// Row after row.
     pub cells: Vec<Cell>,
+    /// Whether each visible row continues onto the next without a newline.
+    pub wrapped: Vec<bool>,
     /// Column and row, when it shows.
     pub cursor: Option<(u16, u16)>,
     /// Arrow keys send application sequences (DECCKM).
@@ -148,9 +154,15 @@ pub struct Screen {
     pub bracketed_paste: bool,
     /// The shell has exited.
     pub exited: bool,
+    /// Output ended without a confirmed shell exit; Enter attaches again.
+    pub disconnected: bool,
 }
 
 impl Screen {
+    pub fn is_wrapped(&self, row: u16) -> bool {
+        self.wrapped.get(usize::from(row)).copied().unwrap_or(false)
+    }
+
     pub fn row(&self, row: u16) -> &[Cell] {
         let start = usize::from(row) * usize::from(self.cols);
         self.cells
@@ -174,6 +186,10 @@ trait Emulator {
     /// device queries.
     fn replies(&mut self) -> Vec<u8>;
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod snapshot_tests;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

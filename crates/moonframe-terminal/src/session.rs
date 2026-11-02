@@ -51,7 +51,7 @@ enum Command {
     Resize(Size),
     Scroll(i32),
     Palette(Option<Ansi>),
-    Exited,
+    Ended { exited: bool },
 }
 
 impl Session {
@@ -76,6 +76,7 @@ impl Session {
         let screen = Arc::new(Mutex::new(Screen::default()));
 
         let sender = commands.clone();
+        let program = Arc::downgrade(&pane);
         thread::Builder::new()
             .name("terminal-read".into())
             .spawn(move || {
@@ -84,7 +85,8 @@ impl Session {
                         return;
                     }
                 }
-                let _ = sender.send(Command::Exited);
+                let exited = program.upgrade().is_some_and(|pane| pane.exited());
+                let _ = sender.send(Command::Ended { exited });
             })
             .map_err(|error| format!("cannot start a thread: {error}"))?;
 
@@ -125,6 +127,11 @@ impl Session {
             .unwrap_or_default()
     }
 
+    /// Whether the shell has exited, without copying the screen.
+    pub fn exited(&self) -> bool {
+        self.screen.lock().is_ok_and(|screen| screen.exited)
+    }
+
     /// Where to ask which folder its program is in, from any thread. It
     /// holds the program weakly: once the session goes, it answers `None`.
     pub fn folder(&self) -> Folder {
@@ -158,7 +165,12 @@ impl Session {
                     thread::sleep(STEP);
                     let Some(now) = screen.lock().ok().map(|screen| {
                         let drawn = screen.cells.iter().filter(|cell| cell.ch != ' ').count();
-                        (screen.exited, screen.bracketed_paste, screen.cursor, drawn)
+                        (
+                            screen.exited || screen.disconnected,
+                            screen.bracketed_paste,
+                            screen.cursor,
+                            drawn,
+                        )
                     }) else {
                         return;
                     };
@@ -187,16 +199,18 @@ impl Session {
     }
 
     /// Fits the program and the emulator to `size`, if it changed.
-    pub fn resize(&self, size: Size) {
+    /// Returns whether it did.
+    pub fn resize(&self, size: Size) -> bool {
         let Ok(mut current) = self.size.lock() else {
-            return;
+            return false;
         };
         if *current == size || size.cols == 0 || size.rows == 0 {
-            return;
+            return false;
         }
         *current = size;
         self.pane.resize(size);
         let _ = self.commands.send(Command::Resize(size));
+        true
     }
 
     /// Moves through the scrollback: negative goes up.
@@ -228,6 +242,7 @@ impl Emulate {
             return;
         };
         let mut exited = false;
+        let mut disconnected = false;
         while let Ok(first) = self.received.recv() {
             for command in std::iter::once(first).chain(self.received.try_iter()) {
                 match command {
@@ -235,7 +250,10 @@ impl Emulate {
                     Command::Resize(size) => emulator.resize(size),
                     Command::Scroll(lines) => emulator.scroll(lines),
                     Command::Palette(palette) => emulator.set_palette(palette),
-                    Command::Exited => exited = true,
+                    Command::Ended { exited: confirmed } => {
+                        exited = confirmed;
+                        disconnected = !confirmed;
+                    },
                 }
             }
             let replies = emulator.replies();
@@ -246,6 +264,7 @@ impl Emulate {
             }
             let mut screen = emulator.screen();
             screen.exited = exited;
+            screen.disconnected = disconnected;
             if let Ok(mut shared) = self.screen.lock() {
                 *shared = screen;
             }

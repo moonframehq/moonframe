@@ -29,7 +29,7 @@ use {
     },
     moonframe_core::{
         Action, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL, Sound,
-        Stylesheet, Titlebar, Token, WindowState, Workspace,
+        Stylesheet, Titlebar, Token, WindowRequest, WindowState, Workspace,
     },
     moonframe_mux::Backends,
     moonframe_providers::{Event, Natives, Providers},
@@ -849,6 +849,7 @@ impl MoonframeApp {
                         .refuse(from, Error::new(format!("`app:edit`: {problem}")));
                 }
             },
+            Request::Window(request) => self.window_request(from, request, cx),
             Request::Notify(notification) => match self.alerts.notify(from, &notification) {
                 Ok(Posted::System) => {},
                 Ok(Posted::Toast) => {

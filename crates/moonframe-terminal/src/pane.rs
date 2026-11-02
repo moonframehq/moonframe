@@ -22,7 +22,7 @@ pub trait Backend: Send + Sync {
 /// An attached terminal: the program, and what it prints.
 pub struct Opened {
     pub pane: Box<dyn Pane>,
-    /// Read by the session's reader thread until the program ends.
+    /// Read until the program ends or the connection drops.
     pub output: Output,
 }
 
@@ -41,6 +41,14 @@ pub struct Open {
 /// Dropping it lets go of the program: a pseudo-terminal's shell ends with
 /// it, while tmux and herdr-core keep theirs running to attach again.
 pub trait Pane: Send + Sync {
+    /// Whether the program is confirmed to have ended. Asked on the reader
+    /// thread after output ends; a lost connection alone must return false.
+    /// May block while asking the backend. Unknown means disconnected, so
+    /// the user can try attaching again instead of losing the tab.
+    fn exited(&self) -> bool {
+        false
+    }
+
     /// Sends what the user typed or pasted.
     fn write(&self, bytes: &[u8]);
 
@@ -62,5 +70,6 @@ pub trait Pane: Send + Sync {
     }
 }
 
-/// A pane's output: blocks for the next chunk, and ends with the program.
+/// A pane's output: blocks for the next chunk, ending with the program or
+/// its connection. [`Pane::exited`] distinguishes the two.
 pub type Output = Box<dyn Iterator<Item = Vec<u8>> + Send>;
