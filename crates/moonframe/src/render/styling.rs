@@ -336,6 +336,9 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
     where
         Self: ParentElement,
     {
+        if frame.follow && frame.scroll != Scroll::No {
+            follow(handle);
+        }
         let axis = match (direction, frame.scroll) {
             (_, Scroll::No) => return self,
             (Direction::Row, Scroll::Along) | (_, Scroll::X) => ScrollbarAxis::Horizontal,
@@ -352,3 +355,17 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
 }
 
 impl<E: StyleExt + StatefulInteractiveElement> FrameExt for E {}
+
+/// Keeps a frame with `follow` at its end while it is there: as the content
+/// grows, it scrolls along. Where the handle last laid out says whether the
+/// user is at the end; a frame laid out for the first time starts there.
+fn follow(handle: &ScrollHandle) {
+    /// How near the end still counts as there, for the last line's rounding.
+    const SLACK: f32 = 24.;
+    let offset = handle.offset();
+    let max = handle.max_offset();
+    let at_end = -offset.y >= max.y - px(SLACK) && -offset.x >= max.x - px(SLACK);
+    if at_end {
+        handle.scroll_to_bottom();
+    }
+}

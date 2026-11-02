@@ -38,6 +38,7 @@ const FRAME: &[&str] = &[
     "surface",
     "border",
     "scroll",
+    "follow",
     "shrink",
     "self_align",
     "hug",
