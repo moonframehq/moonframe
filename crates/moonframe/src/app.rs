@@ -4,6 +4,7 @@
 use {
     crate::{
         actions::*,
+        alerts::{Alerts, Posted},
         browser::Browsers,
         color::rgba_color,
         gallery::Gallery,
@@ -23,11 +24,12 @@ use {
     futures::StreamExt as _,
     gpui_kit::{
         component::{ActiveTheme, Theme, ThemeMode, ThemeRegistry, ThemeTokens},
+        prelude::FluentBuilder as _,
         *,
     },
     moonframe_core::{
-        Action, Chrome, Command, Data, Error, Platform, Roots, SHELL, Stylesheet, Titlebar, Token,
-        WindowState, Workspace,
+        Action, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL, Sound,
+        Stylesheet, Titlebar, Token, WindowState, Workspace,
     },
     moonframe_mux::Backends,
     moonframe_providers::{Event, Natives, Providers},
@@ -41,10 +43,29 @@ use {
     },
 };
 
+// keep-sorted start
+mod listeners;
+mod menu;
+mod picking;
+mod toasts;
+mod updates;
+mod view;
+mod watch;
+mod windows;
+// keep-sorted end
+
+use {
+    listeners::{deliver_from_views, flush_on_quit, report, start_providers, wake_on_output},
+    menu::{hear_notification_clicks, is_dark, menu_actions, name_of, stock_preview},
+    watch::watch,
+};
+
 /// Editors save in several steps; wait this long and take the burst as one.
 const SETTLE: Duration = Duration::from_millis(120);
 /// How long a toast shows.
 const TOAST: Duration = Duration::from_millis(1600);
+/// How long a notification shown as a toast does: it has more to read.
+const NOTICE: Duration = Duration::from_secs(5);
 /// gpui-component's stock 16px reads large in a dense tool window.
 const DEFAULT_FONT_SIZE: Pixels = px(14.);
 
@@ -78,11 +99,16 @@ pub(crate) struct MoonframeApp {
     /// The component the browser shows, and its window while it is open.
     chosen: String,
     gallery: Option<WindowHandle<component::Root>>,
-    /// The theme picked in View > Themes (`None`: the stock look), the one
-    /// the picker shows while the pointer is over another, and the picker's
-    /// window while it is open.
-    scheme: Option<&'static Scheme>,
+    /// The theme light windows show and the one dark windows show
+    /// (`None`: the stock look), picked in View > Themes or by a mod; the
+    /// one the picker shows while the pointer is over another; and the
+    /// picker's window while it is open.
+    light_scheme: Option<&'static Scheme>,
+    dark_scheme: Option<&'static Scheme>,
     preview: Option<Option<&'static Scheme>>,
+    /// Light, dark, or as the system is; and whether the system is dark.
+    appearance: Appearance,
+    system_dark: bool,
     themes: Option<WindowHandle<component::Root>>,
     /// Mods open in windows of their own (`window = "<mod>"`), by name.
     mod_windows: HashMap<String, WindowHandle<component::Root>>,
@@ -96,10 +122,20 @@ pub(crate) struct MoonframeApp {
     /// A short note at the bottom, such as "Copied", and which one it is,
     /// so an older note's timer does not hide a newer one.
     toast: Option<(u64, SharedString)>,
+    /// The notification a toast shows in place of the system's (by the
+    /// toast's id): who posted it and its `id`, told when it is clicked.
+    toast_notice: Option<(u64, String, Option<String>)>,
+    /// How many toasts have shown: each takes the next number as its id,
+    /// never one an earlier toast (or its timer, or its notice) had.
+    toasts: u64,
     /// A bundle is being built (Build App Bundle).
     building: bool,
     /// Checking for, or installing, an update.
     updating: bool,
+    /// When a mod last asked for a reload (`app:command`).
+    requested_reload: Option<std::time::Instant>,
+    /// The sounds and notifications mods ask for.
+    alerts: Alerts,
     focus: FocusHandle,
     /// Where each animated pane is in its transition.
     motion: Motion,
@@ -154,6 +190,15 @@ impl MoonframeApp {
             .detach();
         cx.observe_window_activation(window, |this, window, cx| this.sync_window(window, cx))
             .detach();
+        // The system's appearance, which `system` follows as it changes.
+        cx.observe_window_appearance(window, |this, window, cx| {
+            this.system_dark = is_dark(window.appearance());
+            if this.appearance == Appearance::System {
+                this.apply_theme(cx);
+                cx.notify();
+            }
+        })
+        .detach();
         let watcher = watch(&workspace, &folders, cx)
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
@@ -167,17 +212,45 @@ impl MoonframeApp {
         let terminals = Terminals::new(backends, wake_on_output(cx));
         flush_on_quit(cx);
         let settings = folders.settings().into_iter().next();
-        let scheme = folders
-            .settings()
-            .iter()
-            .find_map(|path| settings::theme(path))
-            .and_then(|name| {
-                let scheme = themes::find(&name);
-                if scheme.is_none() && name != themes::DEFAULT {
-                    tracing::warn!("no theme called {name:?}; using {}", themes::DEFAULT);
-                }
-                scheme
-            });
+        let saved = |key| {
+            folders
+                .settings()
+                .iter()
+                .find_map(|path| settings::get(path, key))
+        };
+        // The one theme kept before light and dark had one each.
+        let scheme = saved(settings::THEME).and_then(|name| {
+            let scheme = themes::find(&name);
+            if scheme.is_none() && name != themes::DEFAULT {
+                tracing::warn!("no theme called {name:?}; using {}", themes::DEFAULT);
+            }
+            scheme
+        });
+        let slot = |key, dark: bool| match saved(key) {
+            Some(name) => themes::fits(&name, dark)
+                .inspect_err(|problem| {
+                    tracing::warn!("{key}: {problem}; using {}", themes::DEFAULT);
+                })
+                .unwrap_or(None),
+            None => scheme.filter(|scheme| scheme.dark() == dark),
+        };
+        let (light_scheme, dark_scheme) = (
+            slot(settings::LIGHT_THEME, false),
+            slot(settings::DARK_THEME, true),
+        );
+        // Before the appearance was kept, a theme picked set it.
+        let appearance = match saved(settings::APPEARANCE) {
+            Some(name) => Appearance::named(&name).unwrap_or_else(|| {
+                tracing::warn!("no appearance called {name:?}; following the system");
+                Appearance::System
+            }),
+            None => match scheme {
+                Some(scheme) if scheme.dark() => Appearance::Dark,
+                Some(_) => Appearance::Light,
+                None => Appearance::System,
+            },
+        };
+        show_appearance(appearance);
         let mut app = Self {
             terminals,
             browsers: Browsers::new(crate::browser::wake_on_report(cx)),
@@ -190,15 +263,22 @@ impl MoonframeApp {
             inspector: Inspector::default(),
             chosen: String::new(),
             gallery: None,
-            scheme,
+            light_scheme,
+            dark_scheme,
             preview: None,
+            appearance,
+            system_dark: is_dark(window.appearance()),
             themes: None,
             mod_windows: HashMap::new(),
             folders,
             settings,
             toast: None,
+            toast_notice: None,
+            toasts: 0,
             building: false,
             updating: false,
+            requested_reload: None,
+            alerts: Alerts::default(),
             focus,
             motion: Motion::default(),
             providers,
@@ -209,8 +289,9 @@ impl MoonframeApp {
             _terminal_keys: crate::terminal::intercept_keys(cx),
         };
         app.apply_theme(cx);
+        hear_notification_clicks(cx);
         // What the mods' `init` sent providers as they started.
-        app.forward("start");
+        app.forward("start", cx);
         // An installed app looks for updates by itself, once a day, also
         // while it stays open, whatever Developer Mode says; runs from
         // source and runs without the user's folder (checks, screenshots)
@@ -247,12 +328,17 @@ impl MoonframeApp {
     /// each time, so a removed override goes away. A picked theme brings its
     /// own colors, so the stylesheet's apply to the stock look alone.
     fn apply_theme(&mut self, cx: &mut App) {
-        let scheme = self.preview.unwrap_or(self.scheme);
+        let dark = self.appearance.is_dark(self.system_dark);
+        // A theme shows in the appearance it is made for; in the other the
+        // stock look does, and the theme stays picked.
+        let scheme = themes::shown(self.preview, self.scheme(dark), dark);
         let config = scheme.map(|scheme| Rc::new(scheme.config()));
         let was_dark = cx.theme().is_dark();
-        let mode = config
-            .as_ref()
-            .map_or(cx.theme().mode, |config| config.mode);
+        let mode = if dark {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        };
         let registry = ThemeRegistry::global(cx);
         let (light, dark) = (
             registry.default_light_theme().clone(),
@@ -332,11 +418,58 @@ impl MoonframeApp {
         if dark != was_dark {
             self.workspace.set_dark(dark);
         }
+        let stock = |dark| stock_preview(&self.workspace.stylesheet().overrides, dark);
+        let fields = std::collections::BTreeMap::from([
+            ("theme".to_owned(), Data::from(self.theme_name())),
+            (
+                "light_theme".to_owned(),
+                Data::from(name_of(self.light_scheme)),
+            ),
+            (
+                "dark_theme".to_owned(),
+                Data::from(name_of(self.dark_scheme)),
+            ),
+            (
+                "themes".to_owned(),
+                themes::listing(stock(false), stock(true)),
+            ),
+        ]);
+        self.workspace.set_appearance(self.appearance, fields);
     }
 
-    /// The picked theme's name.
+    /// Makes the window light, dark, or follow the system, keeping the
+    /// themes picked, and saves the choice for the next run.
+    pub(crate) fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
+        self.appearance = appearance;
+        self.preview = None;
+        self.apply_theme(cx);
+        show_appearance(appearance);
+        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        if let Some(path) = &self.settings
+            && let Err(problem) = settings::save(path, &[(settings::APPEARANCE, appearance.name())])
+        {
+            tracing::warn!("cannot save the appearance: {problem}");
+        }
+        cx.notify();
+    }
+
+    /// Whether the window is dark.
+    pub(crate) fn dark(&self) -> bool {
+        self.appearance.is_dark(self.system_dark)
+    }
+
+    /// The theme picked for dark windows, or for light ones.
+    fn scheme(&self, dark: bool) -> Option<&'static Scheme> {
+        if dark {
+            self.dark_scheme
+        } else {
+            self.light_scheme
+        }
+    }
+
+    /// The name of the theme picked for the appearance the window is in.
     pub(crate) fn theme_name(&self) -> &'static str {
-        self.scheme.map_or(themes::DEFAULT, |scheme| scheme.name)
+        name_of(self.scheme(self.dark()))
     }
 
     /// Shows the theme `name` without picking it, or the picked one again
@@ -351,17 +484,48 @@ impl MoonframeApp {
         cx.notify();
     }
 
-    /// Picks the theme `name` and saves it for the next run.
+    /// Picks the theme `name` for the appearance the window is in (View >
+    /// Themes lists only those that fit it), and saves it for the next run.
     pub(crate) fn pick_theme(&mut self, name: &str, cx: &mut Context<Self>) {
         self.preview = None;
-        self.scheme = themes::find(name);
+        let (light, dark) = if self.dark() {
+            (None, Some(name))
+        } else {
+            (Some(name), None)
+        };
+        if let Err(problem) = self.set_themes(light, dark, cx) {
+            tracing::warn!("{problem}");
+        }
+    }
+
+    /// Picks the theme light windows show, the one dark windows show, or
+    /// both, and saves them for the next run. Neither changes when a name
+    /// is not a theme of its kind.
+    pub(crate) fn set_themes(
+        &mut self,
+        light: Option<&str>,
+        dark: Option<&str>,
+        cx: &mut Context<Self>,
+    ) -> Result<(), String> {
+        let light = light.map(|name| themes::fits(name, false)).transpose()?;
+        let dark = dark.map(|name| themes::fits(name, true)).transpose()?;
+        if let Some(scheme) = light {
+            self.light_scheme = scheme;
+        }
+        if let Some(scheme) = dark {
+            self.dark_scheme = scheme;
+        }
         self.apply_theme(cx);
         if let Some(path) = &self.settings
-            && let Err(problem) = settings::save_theme(path, self.theme_name())
+            && let Err(problem) = settings::save(path, &[
+                (settings::LIGHT_THEME, name_of(self.light_scheme)),
+                (settings::DARK_THEME, name_of(self.dark_scheme)),
+            ])
         {
-            tracing::warn!("cannot save the theme: {problem}");
+            tracing::warn!("cannot save the themes: {problem}");
         }
         cx.notify();
+        Ok(())
     }
 
     /// Opens the theme picker's window, or raises it.
@@ -451,7 +615,7 @@ impl MoonframeApp {
 
     /// Passes on what the mods sent providers, and draws again.
     fn flush(&mut self, from: &str, cx: &mut Context<Self>) {
-        self.forward(from);
+        self.forward(from, cx);
         report(&self.workspace);
         cx.notify();
     }
@@ -460,20 +624,15 @@ impl MoonframeApp {
         match command {
             Command::Quit => cx.quit(),
             Command::Reload => self.reload(cx),
-            Command::ToggleTheme => {
-                // Back to the stock look, in the other mode.
-                let mode = if cx.theme().is_dark() {
-                    ThemeMode::Light
+            // The other of light and dark, whatever the system is.
+            Command::ToggleTheme => self.set_appearance(
+                if self.appearance.is_dark(self.system_dark) {
+                    Appearance::Light
                 } else {
-                    ThemeMode::Dark
-                };
-                if self.scheme.is_some() {
-                    self.pick_theme(themes::DEFAULT, cx);
-                }
-                Theme::change(mode, Some(window), cx);
-                self.apply_theme(cx);
-                cx.notify();
-            },
+                    Appearance::Dark
+                },
+                cx,
+            ),
             Command::Minimize => window.minimize_window(),
             Command::Maximize => window.zoom_window(),
             Command::CloseWindow => window.remove_window(),
@@ -493,7 +652,7 @@ impl MoonframeApp {
     /// sent providers: after a click, and after whatever else runs mods (a
     /// start, a reload, a provider's data), so a request from `init` or a
     /// topic is not left waiting for a click.
-    fn forward(&mut self, from: &str) {
+    fn forward(&mut self, from: &str, cx: &mut Context<Self>) {
         // What the views read and the mods hear now may want a provider
         // that hasn't started; one a message is for starts as it is sent.
         self.providers.want(self.workspace.wanted_providers());
@@ -502,12 +661,184 @@ impl MoonframeApp {
                 tracing::warn!("{from}: {problem}");
             }
         }
+        let mut requests = self.workspace.take_requests();
+        // A reload runs every `init` again: one that asks for a reload
+        // would loop, so what `init` asks as the app starts or reloads
+        // reloads nothing.
+        if matches!(from, "start" | "reload" | "packages") {
+            requests.retain(|(asker, request)| {
+                let reload = *request == Request::Command(Command::Reload);
+                if reload {
+                    tracing::warn!("{asker}: a reload asked for as the app loads is ignored");
+                }
+                !reload
+            });
+        }
+        if !requests.is_empty() {
+            self.carry_out(requests, cx);
+        }
+    }
+
+    /// Does what mods asked of the app (`to = "app:<what>"`), once the
+    /// update that asked is done, in the main window: a command there
+    /// runs as a control's `command` would.
+    fn carry_out(&mut self, requests: Vec<(String, Request)>, cx: &mut Context<Self>) {
+        let main = self.main_window;
+        let app = cx.entity();
+        cx.defer(move |cx| {
+            let Some(window) = cx
+                .windows()
+                .into_iter()
+                .find(|window| window.window_id() == main)
+            else {
+                return;
+            };
+            let _ = window.update(cx, |_, window, cx| {
+                app.update(cx, |app, cx| {
+                    for (from, request) in requests {
+                        app.request(&from, request, window, cx);
+                    }
+                    app.flush("app", cx);
+                });
+            });
+        });
+    }
+
+    /// A notification the mod `from` posted was clicked: brings the app
+    /// and its window forward and tells the mod, on `app/notification`:
+    /// `{ id, clicked = true }`.
+    fn notification_clicked(&mut self, from: &str, id: Option<String>, cx: &mut Context<Self>) {
+        cx.activate(true);
+        let main = self.main_window;
+        if let Some(window) = cx
+            .windows()
+            .into_iter()
+            .find(|window| window.window_id() == main)
+        {
+            let _ = window.update(cx, |_, window, _| window.activate_window());
+        }
+        let clicked = std::collections::BTreeMap::from([
+            ("id".to_owned(), id.map_or(Data::Nil, Data::String)),
+            ("clicked".to_owned(), Data::Bool(true)),
+        ]);
+        self.workspace
+            .app_topic("notification", from, Data::Map(clicked));
+        self.flush("notification", cx);
+    }
+
+    /// The toast was clicked: when it shows a notification, as a click on
+    /// the system's one would be.
+    fn click_toast(&mut self, cx: &mut Context<Self>) {
+        let shown = self.toast.as_ref().map(|(id, _)| *id);
+        let Some((id, from, notice)) = self.toast_notice.take() else {
+            return;
+        };
+        if Some(id) != shown {
+            return;
+        }
+        self.toast = None;
+        self.notification_clicked(&from, notice, cx);
+    }
+
+    /// Plays what the mod `from` asked for: a file in the app's folders
+    /// (as `ui.image` finds one), or the chime.
+    fn play(&mut self, from: &str, sound: &Sound) {
+        let file = match sound {
+            Sound::Chime => None,
+            Sound::File(src) => {
+                let folder = self
+                    .workspace
+                    .slot(from)
+                    .and_then(|slot| slot.source())
+                    .and_then(Path::parent)
+                    .unwrap_or(Path::new("."));
+                let allowed: Vec<PathBuf> = self
+                    .workspace
+                    .roots()
+                    .layers()
+                    .map(Path::to_owned)
+                    .collect();
+                let home = std::env::home_dir();
+                let Some(file) = moonframe_core::resolve_file(
+                    src,
+                    folder,
+                    home.as_deref(),
+                    &allowed,
+                    crate::alerts::MAX_SOUND_BYTES,
+                ) else {
+                    self.workspace.refuse(
+                        from,
+                        Error::new(format!(
+                            "`app:sound`: no sound file `{src}` of at most 2 MiB in the app's folders"
+                        )),
+                    );
+                    return;
+                };
+                Some(file)
+            },
+        };
+        if let Err(problem) = self.alerts.play(file.as_deref()) {
+            tracing::warn!("{from}: {problem}");
+        }
+    }
+
+    /// Does one thing the mod `from` asked of the app.
+    fn request(
+        &mut self,
+        from: &str,
+        request: Request,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match request {
+            Request::Command(Command::Inspect) => self.inspect_for(from, cx),
+            Request::Command(Command::Reload) => {
+                // At most one a second, however mods ask.
+                let now = std::time::Instant::now();
+                if self
+                    .requested_reload
+                    .is_some_and(|at| now.duration_since(at) < Duration::from_secs(1))
+                {
+                    tracing::warn!(
+                        "{from}: reloads asked for less than a second apart are ignored"
+                    );
+                    return;
+                }
+                self.requested_reload = Some(now);
+                self.reload(cx);
+            },
+            Request::Command(command) => self.run(command, window, cx),
+            Request::Appearance(appearance) => self.set_appearance(appearance, cx),
+            Request::Sound(sound) => self.play(from, &sound),
+            Request::Notify(notification) => match self.alerts.notify(from, &notification) {
+                Ok(Posted::System) => {},
+                Ok(Posted::Toast) => {
+                    let text = if notification.body.is_empty() {
+                        notification.title.clone()
+                    } else {
+                        format!("{}: {}", notification.title, notification.body)
+                    };
+                    self.show_toast_for(text.into(), NOTICE, cx);
+                    // A click on it does what one on the system's would.
+                    if let Some((shown, _)) = &self.toast {
+                        self.toast_notice = Some((*shown, from.to_owned(), notification.id));
+                    }
+                },
+                Err(problem) => tracing::warn!("{from}: {problem}"),
+            },
+            Request::Theme { light, dark } => {
+                if let Err(problem) = self.set_themes(light.as_deref(), dark.as_deref(), cx) {
+                    self.workspace
+                        .refuse(from, Error::new(format!("`app:theme`: {problem}")));
+                }
+            },
+        }
     }
 
     fn reload(&mut self, cx: &mut Context<Self>) {
         crate::render::images::forget();
         self.workspace.reload();
-        self.forward("reload");
+        self.forward("reload", cx);
         let before = std::mem::replace(&mut self.asked, self.workspace.chrome());
         if self.asked != before && self.asked != self.chrome {
             tracing::warn!(
@@ -535,7 +866,7 @@ impl MoonframeApp {
         tracing::info!("packages changed: {roots}");
         crate::render::images::forget();
         self.workspace.set_roots(roots.clone());
-        self.forward("packages");
+        self.forward("packages", cx);
         self._watcher = watch(&self.workspace, &self.folders, cx)
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
@@ -566,615 +897,6 @@ impl MoonframeApp {
     }
 }
 
-impl MoonframeApp {
-    /// Starts picking an element, or stops.
-    pub(crate) fn toggle_inspect(&mut self, cx: &mut Context<Self>) {
-        self.inspector.picking = !self.inspector.picking;
-        self.inspector.hovered = None;
-        if !self.inspector.picking {
-            // Stopped without a pick: the mod that asked hears so.
-            self.answer_asker(None);
-        }
-        cx.notify();
-    }
-
-    /// Starts picking for the mod `from`, which hears the pick (or that
-    /// there was none) on `app/inspect` instead of a card opening.
-    fn inspect_for(&mut self, from: &str, cx: &mut Context<Self>) {
-        // A preview starts nothing.
-        if from.starts_with(moonframe_core::DEMO) {
-            return;
-        }
-        // A pick another mod started ends for it first, unanswered.
-        if self
-            .inspector
-            .asker
-            .as_deref()
-            .is_some_and(|asker| asker != from)
-        {
-            self.answer_asker(None);
-        }
-        self.inspector.selected = None;
-        self.inspector.asker = Some(from.to_owned());
-        self.inspector.picking = true;
-        self.inspector.hovered = None;
-        // It hears that picking started, to get out of the way (a dialog).
-        let started = std::collections::BTreeMap::from([
-            ("asker".to_owned(), Data::String(from.to_owned())),
-            ("picking".to_owned(), Data::Bool(true)),
-        ]);
-        self.workspace
-            .app_topic("inspect", from, Data::Map(started));
-        cx.notify();
-    }
-
-    /// Tells the mod that started the pick what was picked, if any:
-    /// `{ asker, picking = false, picked, element?, mod?, at?, report? }`
-    /// on `app/inspect`.
-    fn answer_asker(&mut self, picked: Option<&Placed>) {
-        let Some(asker) = self.inspector.asker.take() else {
-            return;
-        };
-        let mut fields = std::collections::BTreeMap::from([
-            ("asker".to_owned(), Data::String(asker.clone())),
-            ("picking".to_owned(), Data::Bool(false)),
-            ("picked".to_owned(), Data::Bool(picked.is_some())),
-        ]);
-        if let Some(picked) = picked {
-            let pick = inspect::pick(picked, &self.workspace);
-            fields.insert("element".to_owned(), Data::String(pick.element));
-            fields.insert("mod".to_owned(), Data::String(pick.owner));
-            fields.insert("at".to_owned(), Data::String(pick.at));
-            fields.insert("report".to_owned(), Data::String(pick.report));
-        }
-        self.workspace
-            .app_topic("inspect", &asker, Data::Map(fields));
-    }
-
-    /// Selects `picked` (or nothing) and saves it where agents read it.
-    pub(crate) fn select(&mut self, picked: Option<Placed>, cx: &mut Context<Self>) {
-        self.inspector.picking = false;
-        self.inspector.hovered = None;
-        let path = paths::selection();
-        let saved = match &picked {
-            Some(picked) => path
-                .parent()
-                .map_or(Ok(()), std::fs::create_dir_all)
-                .and_then(|()| std::fs::write(&path, inspect::report(picked, &self.workspace))),
-            None => match std::fs::remove_file(&path) {
-                Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
-                _ => Ok(()),
-            },
-        };
-        match saved {
-            Ok(()) if picked.is_some() => tracing::info!("selection saved to {}", path.display()),
-            Ok(()) => {},
-            Err(error) => {
-                tracing::warn!("cannot save the selection to {}: {error}", path.display())
-            },
-        }
-        if self.inspector.asker.is_some() {
-            // Picked for a mod: it shows the pick itself, so no card.
-            self.answer_asker(picked.as_ref());
-            self.inspector.selected = None;
-        } else {
-            self.inspector.selected = picked;
-        }
-        cx.notify();
-    }
-
-    /// Copies the selection for an agent and closes its card. The saved
-    /// file stays, so an agent told "here" still finds it.
-    pub(crate) fn copy_selection(&mut self, cx: &mut Context<Self>) {
-        if let Some(selected) = self.inspector.selected.take() {
-            let report = inspect::report(&selected, &self.workspace);
-            self.copy(report, cx);
-        }
-        cx.notify();
-    }
-
-    pub(crate) fn copy(&mut self, text: String, cx: &mut Context<Self>) {
-        cx.write_to_clipboard(ClipboardItem::new_string(text));
-        self.show_toast("Copied", cx);
-    }
-
-    /// Whether `window` is the main window, not a mod's, the components
-    /// browser or the theme picker.
-    pub(crate) fn is_main(&self, window: &Window) -> bool {
-        window.window_handle().window_id() == self.main_window
-    }
-
-    /// A keystroke no overlay, field or terminal took: a shell menu item
-    /// whose shortcut is a single typing key (`j`, `shift-c`) runs, as a
-    /// mail client's keys do, but only in the main window and while no
-    /// text field or terminal has focus, so typing is never taken. Returns
-    /// whether one ran.
-    pub(crate) fn menu_keystroke(
-        &mut self,
-        keystroke: &Keystroke,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> bool {
-        if !self.is_main(window)
-            || self.inputs.any_focused(window, cx)
-            || self.terminals.any_focused(window)
-        {
-            return false;
-        }
-        let modifiers = keystroke.modifiers;
-        let pressed = moonframe_core::Pressed {
-            key: &keystroke.key,
-            text: keystroke.key_char.as_deref(),
-            ctrl: modifiers.control,
-            alt: modifiers.alt,
-            shift: modifiers.shift,
-            cmd: modifiers.platform,
-        };
-        let mac = cfg!(target_os = "macos");
-        self.run_menu_item_where(window, cx, |_, item| {
-            item.shortcut
-                .as_ref()
-                .is_some_and(|chord| chord.types_text() && chord.matches(&pressed, mac))
-        })
-    }
-
-    /// The shell menu item whose (non-typing) shortcut is `keystroke`, in
-    /// GPUI's spelling, runs. Returns whether one did.
-    fn run_menu_key(
-        &mut self,
-        keystroke: &str,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> bool {
-        self.run_menu_item_where(window, cx, |_, item| {
-            item.shortcut.as_ref().is_some_and(|chord| {
-                !chord.types_text() && crate::actions::keystroke(chord) == keystroke
-            })
-        })
-    }
-
-    /// Runs the shell menu item `id`, as a click from the shell would.
-    fn run_menu_item(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.run_menu_item_where(window, cx, |title, item| item.id(title) == id) {
-            tracing::warn!("no menu item {:?} any more", id.replace('\u{1f}', " > "));
-        }
-    }
-
-    /// Runs the first shell menu item `matches` picks (given its menu's
-    /// title). Returns whether there was one.
-    fn run_menu_item_where(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-        matches: impl Fn(&str, &moonframe_core::MenuCommand) -> bool,
-    ) -> bool {
-        let action = self.workspace.menus().iter().find_map(|menu| {
-            menu.items.iter().find_map(|entry| match entry {
-                moonframe_core::MenuEntry::Item(item) if matches(&menu.title, item) => {
-                    Some(item.action.clone())
-                },
-                _ => None,
-            })
-        });
-        match action {
-            Some(action) => {
-                self.dispatch(SHELL, &action, window, cx);
-                true
-            },
-            None => false,
-        }
-    }
-
-    /// The About panel: the app's name, icon and version, and what the
-    /// shell's `about` says. macOS's own panel there; a toast elsewhere.
-    pub(crate) fn show_about(&mut self, cx: &mut Context<Self>) {
-        let about = self.workspace.about();
-        let name = about.name.clone().unwrap_or_else(crate::title);
-        if crate::dock::about_panel(&name, &about, self.folders.icon().as_deref()) {
-            return;
-        }
-        let mut text = name;
-        if let Some(version) = &about.version {
-            text = format!("{text} {version}");
-        }
-        if let Some(description) = &about.description {
-            text = format!("{text}: {description}");
-        }
-        self.show_toast_text(text.into(), cx);
-    }
-
-    /// Shows `message` at the bottom for a moment.
-    fn show_toast(&mut self, message: &'static str, cx: &mut Context<Self>) {
-        self.show_toast_text(message.into(), cx);
-    }
-
-    /// Builds the app this window runs as a release bundle, in the
-    /// background, and shows it in Finder when it is done.
-    pub(crate) fn build_app(&mut self, cx: &mut Context<Self>) {
-        if self.building {
-            self.show_toast("The app is already being built", cx);
-            return;
-        }
-        let Some(checkout) = crate::build::checkout(&self.folders.builtin) else {
-            self.show_toast(
-                "Building needs the app's sources: run it from its checkout",
-                cx,
-            );
-            return;
-        };
-        let build = crate::build::Build {
-            checkout,
-            profile: self.folders.profile.clone(),
-            user: self.folders.user.clone(),
-        };
-        self.building = true;
-        // Stays up until the build ends: cargo can take minutes.
-        let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
-        self.toast = Some((id, format!("Building {}…", crate::title()).into()));
-        cx.notify();
-        cx.spawn(async move |this, cx| {
-            let built = cx
-                .background_executor()
-                .spawn(async move { build.run() })
-                .await;
-            let _ = this.update(cx, |this, cx| {
-                this.building = false;
-                match built {
-                    Ok(bundle) => {
-                        let name = bundle
-                            .file_name()
-                            .map(|name| name.to_string_lossy().into_owned())
-                            .unwrap_or_default();
-                        crate::build::reveal(&bundle);
-                        this.show_toast_text(format!("Built {name}").into(), cx);
-                    },
-                    Err(problem) => {
-                        this.show_toast_text(format!("The build failed: {problem}").into(), cx);
-                    },
-                }
-            });
-        })
-        .detach();
-    }
-
-    /// Asks the app's repository for a newer release and offers it. `asked`:
-    /// the user chose Check for Updates, so every outcome is told; the
-    /// daily check speaks only of a newer release.
-    pub(crate) fn check_for_updates(&mut self, asked: bool, cx: &mut Context<Self>) {
-        let Some(source) = crate::update::source().cloned() else {
-            if asked {
-                self.show_toast("This app names no repository to update from", cx);
-            }
-            return;
-        };
-        if self.updating {
-            if asked {
-                self.show_toast("Already checking for updates", cx);
-            }
-            return;
-        }
-        self.updating = true;
-        if asked {
-            self.show_toast("Checking for updates…", cx);
-        }
-        let profile = self.folders.profile.clone();
-        cx.spawn(async move |this, cx| {
-            let looked = source.clone();
-            let found = cx
-                .background_executor()
-                .spawn(async move { crate::update::check(&looked) })
-                .await;
-            // Only a check that reached GitHub counts as the day's: one that
-            // failed (offline, rate limited) is tried again within the hour.
-            if found.is_ok() {
-                crate::update::checked(profile.as_deref());
-            }
-            let title = crate::title();
-            let release = match found {
-                Ok(crate::update::Found::Newer(release)) => release,
-                other => {
-                    let _ = this.update(cx, |this, cx| {
-                        this.updating = false;
-                        let message = match other {
-                            Ok(crate::update::Found::UpToDate { latest }) => {
-                                format!("{title} is up to date ({latest})")
-                            },
-                            Ok(_) => format!("{title} has no release yet"),
-                            Err(problem) => {
-                                tracing::warn!("checking for updates: {problem}");
-                                format!("Cannot check for updates: {problem}")
-                            },
-                        };
-                        if asked {
-                            this.show_toast_text(message.into(), cx);
-                        }
-                    });
-                    return;
-                },
-            };
-            let installable = release.installable(&source);
-            let answers: &[&str] = match (installable, &release.asset) {
-                (true, _) => &["Install and Relaunch", "Release Notes", "Later"],
-                (false, Some(_)) => &["Download", "Release Notes", "Later"],
-                (false, None) => &["Release Notes", "Later"],
-            };
-            let message = format!("{title} {} is available", release.version);
-            let detail = if installable {
-                format!(
-                    "You have {}. It downloads and replaces this copy, then {title} starts again.",
-                    source.version
-                )
-            } else {
-                format!("You have {}.", source.version)
-            };
-            let window =
-                cx.update(|cx| cx.active_window().or_else(|| cx.windows().first().copied()));
-            let prompt = window.and_then(|window| {
-                cx.update_window(window, |_, window, cx| {
-                    window.prompt(PromptLevel::Info, &message, Some(&detail), answers, cx)
-                })
-                .ok()
-            });
-            let choice = match prompt {
-                Some(answer) => answer
-                    .await
-                    .ok()
-                    .and_then(|index| answers.get(index).copied()),
-                None => None,
-            };
-            match choice {
-                Some("Install and Relaunch") => {
-                    let _ = this.update(cx, |this, cx| this.install_update(release, source, cx));
-                    return;
-                },
-                Some("Download") => {
-                    if let Some(asset) = &release.asset {
-                        cx.update(|cx| cx.open_url(&asset.url));
-                    }
-                },
-                Some("Release Notes") => cx.update(|cx| cx.open_url(&release.page)),
-                _ => {},
-            }
-            let _ = this.update(cx, |this, _| this.updating = false);
-        })
-        .detach();
-    }
-
-    /// Downloads `release` and puts it in place of the running app, which
-    /// quits and starts again; on a failure, says why and opens the
-    /// release's page to download it from.
-    fn install_update(
-        &mut self,
-        release: crate::update::Release,
-        source: crate::update::Source,
-        cx: &mut Context<Self>,
-    ) {
-        // Stays up until the download ends.
-        let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
-        self.toast = Some((
-            id,
-            format!("Downloading {} {}…", crate::title(), release.version).into(),
-        ));
-        cx.notify();
-        cx.spawn(async move |this, cx| {
-            let staged = cx
-                .background_executor()
-                .spawn({
-                    let release = release.clone();
-                    async move {
-                        crate::update::stage(&release, &source).and_then(crate::update::relaunch)
-                    }
-                })
-                .await;
-            match staged {
-                Ok(()) => {
-                    tracing::info!("installing {} and starting again", release.version);
-                    cx.update(|cx| cx.quit());
-                },
-                Err(problem) => {
-                    tracing::warn!("installing the update: {problem}");
-                    cx.update(|cx| cx.open_url(&release.page));
-                    let _ = this.update(cx, |this, cx| {
-                        this.updating = false;
-                        this.show_toast_text(format!("The update failed: {problem}").into(), cx);
-                    });
-                },
-            }
-        })
-        .detach();
-    }
-
-    fn show_toast_text(&mut self, message: SharedString, cx: &mut Context<Self>) {
-        let id = self.toast.as_ref().map_or(0, |(id, _)| id + 1);
-        self.toast = Some((id, message));
-        cx.notify();
-        cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(TOAST).await;
-            let _ = this.update(cx, |this, cx| {
-                if this.toast.as_ref().is_some_and(|(shown, _)| *shown == id) {
-                    this.toast = None;
-                    cx.notify();
-                }
-            });
-        })
-        .detach();
-    }
-
-    /// Shows the component `name` (or the last one, when empty) in the
-    /// browser's window, opening it if it is closed.
-    pub(crate) fn show_component(&mut self, name: &str, cx: &mut Context<Self>) {
-        if !name.is_empty() {
-            self.chosen = name.to_owned();
-        }
-        // The demos run only while their window is open.
-        self.workspace.show_demos(true);
-        cx.notify();
-        let open = self.gallery.filter(|gallery| {
-            cx.windows()
-                .iter()
-                .any(|window| window.window_id() == gallery.window_id())
-        });
-        // Both after this update: the action may have come from the
-        // browser's own window, which cannot be updated while it is busy,
-        // and a new window draws by asking the app.
-        match open {
-            Some(_) if crate::background() => {},
-            Some(gallery) => cx.defer(move |cx| {
-                let _ = gallery.update(cx, |_, window, _| window.activate_window());
-            }),
-            None => {
-                let app = cx.entity();
-                cx.defer(move |cx| {
-                    let gallery = Gallery::open(app.clone(), cx);
-                    app.update(cx, |app, _| app.gallery = gallery);
-                });
-            },
-        }
-    }
-
-    /// Opens the mod `name` in a window of its own, or raises it.
-    fn show_mod_window(&mut self, name: &str, cx: &mut Context<Self>) {
-        let Some(slot) = self.workspace.slot(name) else {
-            tracing::warn!("no mod `{name}` to open in a window");
-            return;
-        };
-        let title = slot
-            .meta()
-            .and_then(|meta| meta.title.clone())
-            .unwrap_or_else(|| name.to_owned());
-        let open = self.mod_windows.get(name).copied().filter(|handle| {
-            cx.windows()
-                .iter()
-                .any(|window| window.window_id() == handle.window_id())
-        });
-        // After this update, as for the components window: the click may
-        // have come from that window, which is busy until it returns.
-        match open {
-            Some(_) if crate::background() => {},
-            Some(handle) => cx.defer(move |cx| {
-                let _ = handle.update(cx, |_, window, _| window.activate_window());
-            }),
-            None => {
-                let app = cx.entity();
-                let name = name.to_owned();
-                cx.defer(move |cx| {
-                    if let Some(handle) = ModWindow::open(app.clone(), name.clone(), title, cx) {
-                        app.update(cx, |app, _| app.mod_windows.insert(name, handle));
-                    }
-                });
-            },
-        }
-    }
-
-    /// A mod window's content, and whether it is still moving.
-    pub(crate) fn mod_window_content(
-        &mut self,
-        name: &str,
-        window: &Window,
-        cx: &mut Context<Self>,
-    ) -> (AnyElement, bool) {
-        let mut painter = Painter::new(
-            &self.workspace,
-            &mut self.motion,
-            &mut self.terminals,
-            &self.inputs,
-            None,
-            cx.theme(),
-        )
-        .with_views(&mut self.views);
-        let content = painter.window(name, cx);
-        let frame = painter.finish();
-        let animating = self.after_frame(frame, window, cx);
-        (content, animating)
-    }
-
-    /// Does what a frame drawn in `window` left to do: keeps the keys of
-    /// its open popovers and overlays, asks for the rows its lists want,
-    /// and makes its views. Returns whether it still moves.
-    fn after_frame(&mut self, frame: Finished, window: &Window, cx: &mut Context<Self>) -> bool {
-        self.key_layers
-            .insert(window.window_handle().window_id(), frame.key_layers);
-        self.request_list_rows(frame.list_requests, cx);
-        self.make_views(window, cx);
-        frame.animating
-    }
-
-    /// Makes the views the frame drew that are not made yet, and gives the
-    /// others their new props, once the frame is done; draws again to show
-    /// what was made.
-    fn make_views(&mut self, window: &Window, cx: &mut Context<Self>) {
-        let requests = self.views.take_requests();
-        if requests.is_empty() {
-            return;
-        }
-        // In the window that drew them, which a view may want at its start.
-        let this = cx.entity().downgrade();
-        window.defer(cx, move |window, cx| {
-            let _ = this.update(cx, |this, cx| {
-                if this.views.apply(requests, window, cx) {
-                    cx.notify();
-                }
-            });
-        });
-    }
-
-    /// The browser window's content, and whether it is still moving.
-    pub(crate) fn gallery_content(
-        &mut self,
-        query: &str,
-        search: AnyElement,
-        cx: &mut Context<Self>,
-    ) -> (AnyElement, bool) {
-        let mut painter = Painter::new(
-            &self.workspace,
-            &mut self.motion,
-            &mut self.terminals,
-            &self.inputs,
-            None,
-            cx.theme(),
-        )
-        .previewing();
-        let content = painter.gallery(&self.chosen, query, search, cx);
-        let frame = painter.finish();
-        self.request_list_rows(frame.list_requests, cx);
-        (content, frame.animating)
-    }
-
-    /// Asks an agent to add the component `name`, at the selection if any.
-    pub(crate) fn copy_component_request(&mut self, name: &str, cx: &mut Context<Self>) {
-        let Some(component) = self
-            .workspace
-            .components()
-            .iter()
-            .find(|component| component.name == name)
-        else {
-            return;
-        };
-        let place = match &self.inspector.selected {
-            Some(selected) => format!(
-                "at the selected element:\n\n{}",
-                inspect::report(selected, &self.workspace)
-            ),
-            None => "where it fits (no element is selected; use View > Inspect Element to pick a place).".to_owned(),
-        };
-        let request = format!(
-            "Add the `{name}` component ({}) {place}\nIt is used like this:\n\n{}\n",
-            component.path.display(),
-            component.usage
-        );
-        self.copy(request, cx);
-    }
-
-    /// Esc: stops picking, else clears the selection.
-    fn dismiss(&mut self, cx: &mut Context<Self>) {
-        if self.inspector.picking {
-            self.toggle_inspect(cx);
-        } else if self.inspector.selected.is_some() {
-            self.select(None, cx);
-        }
-    }
-}
-
 /// The window as views see it. The title bar is hidden only where the
 /// system went along: a Linux compositor may keep its own decorations.
 fn window_state(chrome: Chrome, window: &Window) -> WindowState {
@@ -1190,428 +912,4 @@ fn window_state(chrome: Chrome, window: &Window) -> WindowState {
         fullscreen: window.is_fullscreen(),
         active: window.is_window_active(),
     }
-}
-
-/// The menu actions that need no particular window, handled app-wide, so
-/// they work from the menu bar or their shortcut whichever window has focus,
-/// or none (the app in the background, or every window minimized).
-fn menu_actions(cx: &mut Context<MoonframeApp>) {
-    let app = cx.entity().downgrade();
-    // The app's own registry, not the view's of the same name.
-    let cx: &mut App = cx;
-    let on = app.clone();
-    cx.on_action(move |_: &Reload, cx| {
-        let _ = on.update(cx, |app, cx| app.reload(cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &BrowseComponents, cx| {
-        let _ = on.update(cx, |app, cx| app.show_component("", cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |action: &ShowComponent, cx| {
-        let _ = on.update(cx, |app, cx| app.show_component(&action.name, cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &ShowThemes, cx| {
-        let _ = on.update(cx, |app, cx| app.show_themes(cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &AboutApp, cx| {
-        let _ = on.update(cx, |app, cx| app.show_about(cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &BuildApp, cx| {
-        let _ = on.update(cx, |app, cx| app.build_app(cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &CheckForUpdates, cx| {
-        let _ = on.update(cx, |app, cx| app.check_for_updates(true, cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &ToggleDeveloperMode, cx| {
-        let developer = crate::release();
-        crate::set_developer(developer);
-        let _ = on.update(cx, |app, cx| {
-            if !developer && app.inspector.picking {
-                app.toggle_inspect(cx);
-            }
-            cx.set_menus(menus(app.workspace.components(), app.workspace.menus()));
-            app.show_toast(
-                if developer {
-                    "Developer Mode: the Components menu, Inspect Element (⌥⌘I) and Reload Modules (⌘R)"
-                } else {
-                    "Developer Mode is off"
-                },
-                cx,
-            );
-            cx.notify();
-        });
-        cx.refresh_windows();
-    });
-    cx.on_action(move |_: &ToggleSlowAnimations, cx| {
-        crate::motion::set_slow(!crate::motion::is_slow());
-        // The menu shows the switch checked while it is on.
-        let _ = app.update(cx, |app, cx| {
-            cx.set_menus(menus(app.workspace.components(), app.workspace.menus()));
-        });
-        cx.refresh_windows();
-    });
-}
-
-/// A callback for terminal sessions, which run on threads of their own: each
-/// call asks for one more frame, and a burst of calls makes one.
-fn wake_on_output(cx: &mut Context<MoonframeApp>) -> Arc<dyn Fn() + Send + Sync> {
-    let (sender, mut woken) = futures::channel::mpsc::unbounded::<()>();
-    cx.spawn(async move |this, cx| {
-        while woken.next().await.is_some() {
-            while woken.try_recv().is_ok() {}
-            if this.update(cx, |_, cx| cx.notify()).is_err() {
-                break;
-            }
-        }
-    })
-    .detach();
-    Arc::new(move || {
-        let _ = sender.unbounded_send(());
-    })
-}
-
-/// A pill at the bottom center, over everything.
-fn toast(message: SharedString, cx: &Context<MoonframeApp>) -> AnyElement {
-    let theme = cx.theme();
-    deferred(
-        div()
-            .absolute()
-            .bottom(px(48.))
-            .left_0()
-            .right_0()
-            .flex()
-            .justify_center()
-            .child(
-                div()
-                    .px_3()
-                    .py_1()
-                    .rounded_full()
-                    .bg(theme.foreground)
-                    .text_color(theme.background)
-                    .text_sm()
-                    .shadow_md()
-                    .child(message)
-                    .child(crate::browser::cover()),
-            ),
-    )
-    .with_priority(10)
-    .into_any_element()
-}
-
-/// Where the app's own views send messages: each goes to the `update` of
-/// the mod that drew the view.
-fn deliver_from_views(
-    cx: &mut Context<MoonframeApp>,
-) -> futures::channel::mpsc::UnboundedSender<(String, Data)> {
-    let (sender, mut messages) = futures::channel::mpsc::unbounded::<(String, Data)>();
-    cx.spawn(async move |this, cx| {
-        while let Some((owner, msg)) = messages.next().await {
-            if this
-                .update(cx, |this, cx| this.deliver(&owner, msg, cx))
-                .is_err()
-            {
-                break;
-            }
-        }
-    })
-    .detach();
-    sender
-}
-
-/// Starts the providers, sharing what each publishes as `app.<name>`.
-fn start_providers(
-    workspace: &Workspace,
-    natives: Natives,
-    cx: &mut Context<MoonframeApp>,
-) -> Providers {
-    let (sender, mut events) = futures::channel::mpsc::unbounded();
-    // Only those the first views read or the mods hear, and those that
-    // always start: the rest wait until something wants them.
-    let providers = Providers::start_wanting(
-        workspace.roots().clone(),
-        paths::builds(),
-        Arc::new(move |event| {
-            let _ = sender.unbounded_send(event);
-        }),
-        natives,
-        workspace.wanted_providers(),
-    );
-    cx.spawn(async move |this, cx| {
-        while let Some(event) = events.next().await {
-            let handled = this.update(cx, |this, cx| {
-                match event {
-                    Event::Published { provider, data } => {
-                        // No view read it: the window looks the same.
-                        let drawn = this.workspace.set_host(&provider, data);
-                        // Mods that heard it may have asked a provider.
-                        this.forward(&provider);
-                        if drawn > 0 {
-                            // A view may fail on the new data: say so.
-                            report(&this.workspace);
-                            cx.notify();
-                        }
-                    },
-                    Event::Failed { provider, problem } => {
-                        tracing::warn!("provider {provider}: {problem}");
-                        let problem = Error::new(format!("provider failed: {problem}"));
-                        this.workspace.clear_host(&provider, Some(problem));
-                        cx.notify();
-                    },
-                    // A native provider's answer to the mod that asked.
-                    Event::Sent { provider, to, msg } => {
-                        let from = format!("{}{provider}", moonframe_core::PROVIDER);
-                        this.workspace.send(&from, &to, msg);
-                        this.flush(&from, cx);
-                    },
-                }
-            });
-            if handled.is_err() {
-                break;
-            }
-        }
-    })
-    .detach();
-    providers
-}
-
-/// Logs each module's problem, so a terminal shows what the window does.
-fn report(workspace: &Workspace) {
-    for (name, error) in workspace.problems() {
-        tracing::warn!("{name}: {error}");
-    }
-}
-
-/// What a burst of file events touched.
-#[derive(Clone, Copy, Default)]
-struct Changes {
-    modules: bool,
-    providers: bool,
-    /// `packages.toml`: a package was installed, removed, or turned on or off.
-    packages: bool,
-}
-
-/// Watches every layer, and the list of packages in the window's own
-/// folder. Other profiles, inside the user's folder, are none of its
-/// business.
-fn watch(
-    workspace: &Workspace,
-    folders: &Folders,
-    cx: &mut Context<MoonframeApp>,
-) -> notify::Result<RecommendedWatcher> {
-    let (sender, mut changes) = futures::channel::mpsc::unbounded();
-    // Events name absolute, resolved paths; compare against the same.
-    let layers: Vec<PathBuf> = workspace
-        .roots()
-        .layers()
-        .filter(|layer| layer.is_dir())
-        .map(Path::to_owned)
-        .collect();
-    let resolved = |folder: &Path| folder.canonicalize().unwrap_or_else(|_| folder.to_owned());
-    let own = folders.own().map(|own| resolved(&own));
-    let list = own.as_ref().map(|own| own.join(packages::FILE));
-    let others = folders
-        .user
-        .as_deref()
-        .map(|user| resolved(&paths::profiles_folder(user)));
-    let providers: Vec<PathBuf> = layers
-        .iter()
-        .map(|layer| {
-            layer
-                .canonicalize()
-                .unwrap_or_else(|_| layer.clone())
-                .join("providers")
-        })
-        .collect();
-    let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-        let Ok(event) = event else {
-            return;
-        };
-        if event.kind.is_access() {
-            return;
-        }
-        let mut found = Changes::default();
-        for path in &event.paths {
-            if others
-                .as_ref()
-                .is_some_and(|others| path.starts_with(others))
-                && !own.as_ref().is_some_and(|own| path.starts_with(own))
-            {
-                continue;
-            }
-            // Git writes its own files as a package is fetched; the
-            // checkout it makes is what counts.
-            if path.components().any(|part| part.as_os_str() == ".git") {
-                continue;
-            }
-            if list.as_deref() == Some(path.as_path()) {
-                found.packages = true;
-            } else if providers
-                .iter()
-                .any(|providers| path.starts_with(providers))
-            {
-                // Builds write their lock and output; those must not loop
-                // back into a rebuild.
-                let built = path.components().any(|part| part.as_os_str() == "target")
-                    || path.file_name().is_some_and(|name| name == "Cargo.lock");
-                found.providers |= !built && !path.is_dir();
-            } else {
-                found.modules |= path
-                    .extension()
-                    .is_some_and(|extension| extension == "luau")
-                    || path.is_dir();
-            }
-        }
-        if found.modules || found.providers || found.packages {
-            let _ = sender.unbounded_send(found);
-        }
-    })?;
-    // Packages are cloned inside the user's folder, already watched.
-    for (index, layer) in layers.iter().enumerate() {
-        let nested = layers
-            .iter()
-            .enumerate()
-            .any(|(other, outer)| other != index && layer.starts_with(outer) && layer != outer);
-        if !nested {
-            watcher.watch(layer, RecursiveMode::Recursive)?;
-        }
-    }
-    cx.spawn(async move |this, cx| {
-        while let Some(first) = changes.next().await {
-            cx.background_executor().timer(SETTLE).await;
-            let mut burst = first;
-            while let Ok(more) = changes.try_recv() {
-                burst.modules |= more.modules;
-                burst.providers |= more.providers;
-                burst.packages |= more.packages;
-            }
-            let reloaded = this.update(cx, |this, cx| {
-                // Lays the app over again, reloading everything in it.
-                if burst.packages && this.reload_packages(cx) {
-                    return;
-                }
-                if burst.modules {
-                    this.reload(cx);
-                }
-                if burst.providers {
-                    this.reload_providers(None, cx);
-                }
-            });
-            if reloaded.is_err() {
-                break;
-            }
-        }
-    })
-    .detach();
-    Ok(watcher)
-}
-
-impl Render for MoonframeApp {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let started = std::time::Instant::now();
-        let gallery_open = self.gallery.is_some_and(|gallery| {
-            cx.windows()
-                .iter()
-                .any(|window| window.window_id() == gallery.window_id())
-        });
-        if !gallery_open {
-            self.workspace.show_demos(false);
-        }
-        self.inputs.begin_frame();
-        let last_keyed = self.motion.begin_frame();
-        self.terminals.begin_frame();
-        let mut painter = Painter::new(
-            &self.workspace,
-            &mut self.motion,
-            &mut self.terminals,
-            &self.inputs,
-            self.inspector.sink(),
-            cx.theme(),
-        )
-        .with_browsers(&mut self.browsers)
-        .with_views(&mut self.views)
-        .with_keyed(&last_keyed);
-        let body = painter.shell(cx);
-        let frame = painter.finish();
-        let animating = frame.animating;
-        if animating {
-            window.request_animation_frame();
-        }
-        // Building the element tree from the views; GPUI lays it out and
-        // paints it after. Slow frames are worth seeing in the log; fast
-        // ones while animating would flood even `debug`.
-        let built = started.elapsed();
-        if built >= moonframe_core::perf::SLOW || !animating {
-            moonframe_core::perf!(built, "frame: built in {built:.1?}");
-        }
-        // Closed windows' layers go: their ids are not reused while open.
-        let open: Vec<WindowId> = cx
-            .windows()
-            .iter()
-            .map(AnyWindowHandle::window_id)
-            .collect();
-        self.key_layers.retain(|id, _| open.contains(id));
-        self.after_frame(frame, window, cx);
-        // A terminal that just appeared (a new tab, or one selected) takes
-        // the keyboard, once it is drawn.
-        if let Some(focus) = self.terminals.end_frame() {
-            window.defer(cx, move |window, cx| focus.focus(window, cx));
-        }
-        let layers = self.inspector_layers(window.viewport_size(), cx);
-        let toast = self
-            .toast
-            .as_ref()
-            .map(|(_, message)| toast(message.clone(), cx));
-        let theme = cx.theme();
-        div()
-            .id("moonframe-app")
-            .key_context(if crate::release() {
-                "MoonframeApp"
-            } else {
-                "MoonframeApp developer"
-            })
-            .track_focus(&self.focus)
-            .on_action(cx.listener(|this, _: &ToggleTheme, window, cx| {
-                this.run(Command::ToggleTheme, window, cx)
-            }))
-            .on_action(cx.listener(|this, _: &Inspect, _, cx| this.toggle_inspect(cx)))
-            .on_action(cx.listener(|this, action: &MenuSend, window, cx| {
-                this.run_menu_item(&action.id, window, cx);
-            }))
-            .on_action(cx.listener(|this, action: &MenuKey, window, cx| {
-                if !this.run_menu_key(&action.keystroke, window, cx) {
-                    cx.propagate();
-                }
-            }))
-            .on_action(cx.listener(|this, _: &Dismiss, _, cx| this.dismiss(cx)))
-            .size_full()
-            .flex()
-            .flex_col()
-            .bg(theme.background)
-            .text_color(theme.foreground)
-            .font_family(theme.font_family.clone())
-            .text_size(theme.font_size)
-            .relative()
-            // The shell takes what the branch bar leaves.
-            .child(div().flex_1().min_h_0().child(body))
-            .children(crate::branch_bar::label().map(crate::branch_bar::render))
-            .children(layers)
-            .children(toast)
-            .child(crate::browser::presenter(self.browsers.pages()))
-    }
-}
-
-/// Saves the state that changed since the last save, waiting for it, as
-/// the app quits: the workspace saves as it goes, but writes are queued.
-fn flush_on_quit(cx: &mut Context<MoonframeApp>) {
-    cx.on_app_quit(|app, _| {
-        app.workspace.flush();
-        async {}
-    })
-    .detach();
 }

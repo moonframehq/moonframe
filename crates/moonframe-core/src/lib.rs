@@ -36,6 +36,7 @@ mod node;
 pub mod perf;
 mod persist;
 mod read;
+mod request;
 mod roots;
 mod style;
 mod vm;
@@ -52,6 +53,7 @@ pub use {
     node::*,
     persist::Persist,
     read::MAX_DOCUMENT,
+    request::{APP, Appearance, Notification, Request, SOUND_TYPES, Sound},
     roots::{AppLayer, Roots, mod_name},
     style::{
         Case, Color, Corners, Curve, Font, Gradient, Look, MonoFont, Paint, Part, Resolved, Rules,

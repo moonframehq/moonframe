@@ -1,5 +1,5 @@
 use {
-    super::*,
+    super::{contents::Provider, *},
     moonframe_core::{Roots, Workspace},
     std::process::Command,
 };
