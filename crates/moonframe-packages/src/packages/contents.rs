@@ -13,9 +13,9 @@ use {
 
 /// What a package holds.
 #[derive(Debug, Default, PartialEq)]
-pub(crate) struct Contents {
+pub struct Contents {
     /// An app's `[app]`: it brings a shell, and runs in a profile.
-    pub(crate) app: Option<App>,
+    pub app: Option<App>,
     pub(super) mods: Vec<String>,
     providers: Vec<(String, Provider)>,
     components: Vec<String>,

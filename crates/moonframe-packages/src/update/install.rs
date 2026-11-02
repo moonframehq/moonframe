@@ -17,7 +17,7 @@ use {
 
 /// The new app, copied beside the running one, ready to take its place.
 #[derive(Debug)]
-pub(crate) struct Staged {
+pub struct Staged {
     new: PathBuf,
     target: PathBuf,
     /// Held until the swap is done: the helper that makes it removes it.
@@ -86,7 +86,7 @@ impl Drop for Lock {
 
 /// Downloads `release`'s build, checks it, and copies the `.app` inside
 /// beside `source`'s bundle. Blocks for as long as the download takes.
-pub(crate) fn stage(release: &Release, source: &Source) -> Result<Staged, String> {
+pub fn stage(release: &Release, source: &Source) -> Result<Staged, String> {
     let target = source
         .bundle
         .clone()
@@ -207,7 +207,7 @@ rm -rf "$lock"
 
 /// Swaps the staged app in once this process exits, then opens it. The
 /// caller quits the app right after.
-pub(crate) fn relaunch(staged: Staged) -> Result<(), String> {
+pub fn relaunch(staged: Staged) -> Result<(), String> {
     let Staged { new, target, lock } = staged;
     let spawned = helper(
         std::process::id(),

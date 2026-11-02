@@ -8,6 +8,7 @@ members = [
   "crates/moonframe-docs",
   "crates/moonframe-git",
   "crates/moonframe-mux",
+  "crates/moonframe-packages",
   "crates/moonframe-providers",
   "crates/moonframe-store",
   "crates/moonframe-terminal",
@@ -54,6 +55,7 @@ moonframe-core           = { path = "crates/moonframe-core" }
 moonframe-docs           = { path = "crates/moonframe-docs" }
 moonframe-git            = { path = "crates/moonframe-git" }
 moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }
+moonframe-packages       = { path = "crates/moonframe-packages" }
 moonframe-providers      = { path = "crates/moonframe-providers" }
 moonframe-store          = { path = "crates/moonframe-store" }
 moonframe-terminal       = { default-features = false, path = "crates/moonframe-terminal" }

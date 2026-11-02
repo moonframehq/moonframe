@@ -17,11 +17,7 @@ use {
 pub(crate) type Approve<'a> = &'a dyn Fn(&Contents) -> Result<(), String>;
 
 /// Clones `source` into the user's folder and enables it.
-pub(crate) fn install(
-    user: &Path,
-    source: &str,
-    approve: Approve,
-) -> Result<(String, Contents), String> {
+pub fn install(user: &Path, source: &str, approve: Approve) -> Result<(String, Contents), String> {
     let source = Source::parse(source)?;
     let mut list = List::read(user)?;
     if list.package.contains_key(&source.id) {
@@ -84,11 +80,7 @@ pub(crate) fn install(
 }
 
 /// Uses `folder` in place as a package, so edits show as they are made.
-pub(crate) fn link(
-    user: &Path,
-    folder: &str,
-    approve: Approve,
-) -> Result<(String, Contents), String> {
+pub fn link(user: &Path, folder: &str, approve: Approve) -> Result<(String, Contents), String> {
     let folder = expand_home(folder);
     let folder = folder
         .canonicalize()
@@ -253,17 +245,17 @@ pub(crate) fn set_enabled(user: &Path, query: &str, enabled: bool) -> Result<Str
 }
 
 /// One installed package, for `mod list`.
-pub(crate) struct Installed {
-    pub(crate) id: String,
+pub struct Installed {
+    pub id: String,
     pub(crate) enabled: bool,
-    pub(crate) link: bool,
-    pub(crate) reference: Option<String>,
+    pub link: bool,
+    pub reference: Option<String>,
     /// The checked-out commit, abbreviated.
-    pub(crate) commit: Option<String>,
-    pub(crate) contents: Result<Contents, String>,
+    pub commit: Option<String>,
+    pub contents: Result<Contents, String>,
 }
 
-pub(crate) fn installed(user: &Path) -> Result<Vec<Installed>, String> {
+pub fn installed(user: &Path) -> Result<Vec<Installed>, String> {
     Ok(List::read(user)?
         .package
         .into_iter()
