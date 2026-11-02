@@ -4740,6 +4740,7 @@ dependencies = [
  "moonframe-core",
  "moonframe-docs",
  "moonframe-git",
+ "moonframe-history",
  "moonframe-mux",
  "moonframe-providers",
  "moonframe-store",
@@ -4810,6 +4811,16 @@ dependencies = [
  "moonframe-providers",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "moonframe-history"
+version = "0.1.0"
+dependencies = [
+ "herdr-client",
+ "herdr-vcs",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]

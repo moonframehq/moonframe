@@ -106,6 +106,8 @@ pub(super) fn watch(
                 burst.packages |= more.packages;
             }
             let reloaded = this.update(cx, |this, cx| {
+                // Kept before it shows, so it can be undone.
+                this.snapshot("changed", cx);
                 // Lays the app over again, reloading everything in it.
                 if burst.packages && this.reload_packages(cx) {
                     return;
