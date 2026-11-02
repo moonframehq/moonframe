@@ -784,7 +784,9 @@ look for a component: `slider`, `number-field`, `histogram` (draggable
 markers), `curve-editor`, `image-viewer`.
 
 A mod can take keys anywhere in the window, once nothing nearer (an open
-overlay, a focused field or terminal) took them; the shell's come first:
+overlay, a terminal) took them. Every mod, and every mounted copy of one
+(a tab's), that takes a key hears it. While a text field has focus it
+keeps all its keys (copy, select all, undo), so mods hear none:
 
 ```lua
 return mod {

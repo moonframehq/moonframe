@@ -189,7 +189,15 @@ return component {
 						break
 					end
 				end
-				table.insert(points, at, { x, y })
+				-- Only where it fits strictly between its neighbours, GAP
+				-- from each: the points stay sorted with no two at one x.
+				local low = if at > 1 then points[at - 1][1] + GAP else 0
+				local high = if at <= #points then points[at][1] - GAP else 1
+				if high < low then
+					state.dragging = nil
+					return state
+				end
+				table.insert(points, at, { math.clamp(x, low, high), y })
 				nearest = at
 			end
 			state.dragging = nearest
@@ -203,7 +211,9 @@ return component {
 		end
 		local low = if index > 1 then points[index - 1][1] + GAP else 0
 		local high = if index < #points then points[index + 1][1] - GAP else 1
-		points[index] = { math.clamp(x, low, math.max(low, high)), y }
+		-- Squeezed between close neighbours, it moves only up and down.
+		local along = if high < low then points[index][1] else math.clamp(x, low, high)
+		points[index] = { along, y }
 		return state, { { to = "parent", msg = message(props.change, points, msg.phase) } }
 	end,
 

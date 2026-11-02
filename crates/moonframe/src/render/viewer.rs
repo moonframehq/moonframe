@@ -6,6 +6,7 @@
 use {
     super::{
         Cx, Painter, Place,
+        elements::with_extras,
         pointer::Sender,
         styling::{LookExt as _, StyleExt as _},
     },
@@ -15,7 +16,8 @@ use {
 };
 
 thread_local! {
-    /// Each viewer's box as last laid out, by its place.
+    /// Each viewer's box as last laid out, by its window and place: a mod
+    /// shown in two windows has a viewer in each, of different sizes.
     static BOXES: RefCell<HashMap<String, Size<Pixels>>> = RefCell::new(HashMap::new());
     /// What each viewer last told its mod, so it is told only of changes.
     static TOLD: RefCell<HashMap<String, [u32; 5]>> = RefCell::new(HashMap::new());
@@ -36,7 +38,8 @@ pub(super) fn draw<'w>(
     let look = painter.look(Part::Image, &image.look, false, place);
     let theme = cx.theme();
     let natural = super::images::natural(path);
-    let laid = BOXES.with_borrow(|boxes| boxes.get(&place.path).copied());
+    let key = format!("{:?}/{}", painter.window, place.path);
+    let laid = BOXES.with_borrow(|boxes| boxes.get(&key).copied());
     let mut element = div()
         .id(place.id())
         .relative()
@@ -52,20 +55,19 @@ pub(super) fn draw<'w>(
         Some(height) => element.h(px(height)),
         None => element.h_full(),
     };
-    element = element.child(measure(image, natural, place, cx));
+    element = element.child(measure(image, natural, key, place, cx));
     let shown = match (natural, laid) {
         (Some(natural), Some(laid)) => Some(rect(image, natural, laid)),
         _ => None,
     };
     let Some(shown) = shown else {
         // Not laid out yet, or not a picture: fitted, as a plain image.
-        return element
-            .child(
-                img(path.to_owned())
-                    .object_fit(ObjectFit::Contain)
-                    .size_full(),
-            )
-            .into_any_element();
+        let element = element.child(
+            img(path.to_owned())
+                .object_fit(ObjectFit::Contain)
+                .size_full(),
+        );
+        return with_extras(element, &image.extras, painter, place, cx).into_any_element();
     };
     let picture = img(path.to_owned())
         .object_fit(ObjectFit::Fill)
@@ -91,7 +93,8 @@ pub(super) fn draw<'w>(
             .flex_col()
             .children(children)
     });
-    element.child(picture).children(overlay).into_any_element()
+    let element = element.child(picture).children(overlay);
+    with_extras(element, &image.extras, painter, place, cx).into_any_element()
 }
 
 /// The zoom at which the picture fits a box, as `fit` fits it.
@@ -108,6 +111,10 @@ fn fitting(fit: Fit, natural: (f32, f32), laid: Size<Pixels>) -> f32 {
 
 /// Where the picture goes in its box, in pixels from the box's corner.
 fn rect(image: &Image, natural: (f32, f32), laid: Size<Pixels>) -> Bounds<Pixels> {
+    // Unzoomed, `fill` stretches it over the whole box, each way apart.
+    if image.zoom.is_none() && image.fit == Fit::Fill {
+        return Bounds::new(point(px(0.), px(0.)), laid);
+    }
     let scale = image
         .zoom
         .unwrap_or_else(|| fitting(image.fit, natural, laid));
@@ -126,10 +133,10 @@ fn rect(image: &Image, natural: (f32, f32), laid: Size<Pixels>) -> Bounds<Pixels
 fn measure(
     image: &Image,
     natural: Option<(f32, f32)>,
+    key: String,
     place: &Place<'_>,
     cx: Cx,
 ) -> impl IntoElement {
-    let key = place.path.clone();
     let fit = image.fit;
     let told = image.measure.clone().map(|msg| {
         let sender = Sender {

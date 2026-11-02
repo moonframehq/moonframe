@@ -1535,8 +1535,9 @@ type Mod<State> = {
 	-- `provider/<name>` carries a provider's data as it changes.
 	subscribe: { string }?,
 	-- Keys it takes anywhere in the window once nothing nearer does (an
-	-- open overlay, a focused field or terminal): `{ ["secondary-1"] =
-	-- "histogram" }`. Keys that type text need ctrl, alt, cmd or secondary.
+	-- open overlay, a terminal; none while a text field has focus):
+	-- `{ ["secondary-1"] = "histogram" }`; every mounted copy hears them
+	-- too. Keys that type text need ctrl, alt, cmd or secondary.
 	keys: Keys?,
 	-- Offered as a kind of tab: each tab mounts an instance of it.
 	tab: TabEntry?,

@@ -129,6 +129,12 @@ fn measure(
                 if phase != DispatchPhase::Capture || !pressed(&moving, window) {
                     return;
                 }
+                // No button held: the release went unseen (the element was
+                // gone for a frame), so the press is over.
+                if event.pressed_button.is_none() {
+                    DRAG.set(None);
+                    return;
+                }
                 let Some((travel, button, clicks, range)) = DRAG.with_borrow_mut(|drag| {
                     let drag = drag.as_mut()?;
                     let step = event.position - drag.last;

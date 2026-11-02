@@ -104,7 +104,7 @@ impl<'w> Draw<'w> for Stack {
     }
 }
 /// An element's tooltip, right-click and copy, on the element that draws it.
-fn with_extras<'w, E: StatefulInteractiveElement + Styled>(
+pub(super) fn with_extras<'w, E: StatefulInteractiveElement + Styled>(
     mut element: E,
     extras: &Extras,
     painter: &Painter<'w, '_>,

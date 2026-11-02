@@ -177,6 +177,17 @@ fn a_range_turns_a_drag_into_a_value() {
     };
     assert_eq!(scrub.value(&travel(0.0, 25.0)), 350.0);
     assert_eq!(scrub.value(&travel(0.0, -1000.0)), 10.0);
+    // An open-ended scrub keeps small values: no f32 rounding from -1e12.
+    let open = Range {
+        min: -1e12,
+        max: 1e12,
+        step: Some(1.0),
+        value: 300.0,
+        speed: Some(1.0),
+        axis: Axis::X,
+    };
+    assert_eq!(open.value(&travel(0.0, 0.0)), 300.0);
+    assert_eq!(open.value(&travel(0.0, 7.0)), 307.0);
     // Up is more on a vertical range.
     let fader = Range {
         axis: Axis::Y,
@@ -294,4 +305,23 @@ fn a_mod_takes_keys_anywhere() {
         .unwrap()
         .to_string();
     assert!(error.contains("types text"), "{error}");
+}
+
+#[test]
+fn a_mounted_copy_of_a_mod_hears_its_keys_too() {
+    let tools = r#"return mod {
+        keys = { ["secondary-1"] = "histogram" },
+        view = function() return ui.text "x" end,
+    }"#;
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod { view = function() return ui.column { ui.mount { "tools", id = "1" } } end }"#,
+    );
+    write(dir.path(), "mods/tools/main.luau", tools);
+    let workspace = Workspace::open(dir.path(), false);
+    let keyed: Vec<&str> = workspace.mod_keys().map(|(name, _)| name).collect();
+    assert!(keyed.contains(&"tools"), "{keyed:?}");
+    assert!(keyed.contains(&"tools#1"), "{keyed:?}");
 }

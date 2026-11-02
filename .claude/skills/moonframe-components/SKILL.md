@@ -119,7 +119,9 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `cancelled = true`. Picked files may then show in that mod's `ui.image`.
 - **Keys anywhere:** `mod { keys = { ["secondary-1"] = "histogram" } }`
   sends its message when the key is pressed and nothing nearer (an open
-  overlay, a focused field or terminal) took it; the shell's first.
+  overlay, a terminal) took it, to every mod and every mounted copy of
+  one (a tab's) that takes it. While a text field has focus it keeps all
+  its keys, so mods hear none.
 - **Window:** the shell's `mod { window = { titlebar = "hidden",
   traffic_lights = { x, y } } }` draws the layout under the title bar (at
   startup only); `app.window` tells views the `platform`, `titlebar`,

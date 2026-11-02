@@ -242,6 +242,9 @@ pub(crate) struct Painter<'w, 'm> {
     /// The rows lists need that their views did not build, as `(owner,
     /// list id, rows)`: asked for once the frame is drawn.
     list_requests: Vec<(String, String, ListWindow)>,
+    /// The window it draws, for what is kept per window (a viewer's box);
+    /// `None` for the components window.
+    window: Option<WindowId>,
 }
 
 /// A list's rows a mod should build, which the app asks the workspace for
@@ -280,7 +283,14 @@ impl<'w, 'm> Painter<'w, 'm> {
             browsers: None,
             views: None,
             last_keyed: None,
+            window: None,
         }
+    }
+
+    /// For the window `window`: what is kept per window stays apart.
+    pub(crate) fn in_window(mut self, window: WindowId) -> Self {
+        self.window = Some(window);
+        self
     }
 
     /// Plays keyed children in and out against what the last frame drew

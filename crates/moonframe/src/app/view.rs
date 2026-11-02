@@ -26,7 +26,8 @@ impl Render for MoonframeApp {
         )
         .with_browsers(&mut self.browsers)
         .with_views(&mut self.views)
-        .with_keyed(&last_keyed);
+        .with_keyed(&last_keyed)
+        .in_window(window.window_handle().window_id());
         let body = painter.shell(cx);
         let frame = painter.finish();
         let animating = frame.animating;

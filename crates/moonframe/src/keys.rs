@@ -74,13 +74,19 @@ impl MoonframeApp {
     }
 
     /// Offers `keystroke` to the `keys` mods declare (`mod { keys = ... }`),
-    /// once nothing nearer took it: the shell first, then mods by name.
+    /// once nothing nearer took it: every mod, and every mounted copy of
+    /// one, whose keys take it hears it. A focused text field keeps all
+    /// its keys (copy, select all, undo), so mods hear none while one has
+    /// focus.
     pub(crate) fn mod_keystroke(
         &mut self,
         keystroke: &Keystroke,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
+        if self.inputs.focused(window, cx).is_some() {
+            return false;
+        }
         let modifiers = keystroke.modifiers;
         let pressed = Pressed {
             key: &keystroke.key,
@@ -90,13 +96,21 @@ impl MoonframeApp {
             shift: modifiers.shift,
             cmd: modifiers.platform,
         };
-        let Some((owner, msg)) = self.workspace.mod_keys().find_map(|(owner, keys)| {
-            let msg = keys.message(None, &pressed, MAC)?;
-            Some((owner.to_owned(), msg.clone()))
-        }) else {
-            return false;
-        };
-        self.dispatch(&owner, &Action::Send { to: None, msg }, window, cx);
-        true
+        let hearers: Vec<(String, moonframe_core::Data)> = self
+            .workspace
+            .mod_keys()
+            .filter_map(|(owner, keys)| {
+                let msg = keys.message(None, &pressed, MAC)?;
+                Some((owner.to_owned(), msg.clone()))
+            })
+            .collect();
+        for (owner, msg) in &hearers {
+            let action = Action::Send {
+                to: None,
+                msg: msg.clone(),
+            };
+            self.dispatch(owner, &action, window, cx);
+        }
+        !hearers.is_empty()
     }
 }

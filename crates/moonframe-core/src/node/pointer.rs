@@ -92,27 +92,43 @@ pub struct Travel {
 }
 
 impl Range {
-    /// The value a drag that went `travel` gives.
+    /// The value a drag that went `travel` gives. Worked out in f64: an
+    /// open-ended range (`min = -1e12`) would lose a small value to f32's
+    /// rounding when snapping from `min`.
     pub fn value(&self, travel: &Travel) -> f32 {
-        let (low, high) = if self.min <= self.max {
-            (self.min, self.max)
+        let (min, max, value) = (
+            f64::from(self.min),
+            f64::from(self.max),
+            f64::from(self.value),
+        );
+        let (low, high) = if min <= max {
+            (min, max)
         } else {
-            (self.max, self.min)
+            (max, min)
         };
-        let raw = match (self.speed, self.axis) {
-            (Some(speed), Axis::X) => self.value + travel.dx * speed,
+        let raw = match (self.speed.map(f64::from), self.axis) {
+            (Some(speed), Axis::X) => value + f64::from(travel.dx) * speed,
             // Up is more.
-            (Some(speed), Axis::Y) => self.value - travel.dy * speed,
-            (None, Axis::X) => self.min + travel.x.clamp(0.0, 1.0) * (self.max - self.min),
-            (None, Axis::Y) => self.min + (1.0 - travel.y.clamp(0.0, 1.0)) * (self.max - self.min),
+            (Some(speed), Axis::Y) => value - f64::from(travel.dy) * speed,
+            (None, Axis::X) => min + f64::from(travel.x.clamp(0.0, 1.0)) * (max - min),
+            (None, Axis::Y) => min + f64::from(1.0 - travel.y.clamp(0.0, 1.0)) * (max - min),
         };
-        let stepped = match self.step {
-            Some(step) if step > 0.0 => self.min + ((raw - self.min) / step).round() * step,
+        let stepped = match self.step.map(f64::from) {
+            // Snapped from the start of the range, or from zero when it has
+            // no real start, so steps of 1 land on whole numbers.
+            Some(step) if step > 0.0 => {
+                let origin = if min.abs() >= 1e9 {
+                    0.0
+                } else {
+                    min
+                };
+                origin + ((raw - origin) / step).round() * step
+            },
             _ => raw,
         };
         // Steps leave float dust: 0.1 * 3 is 0.30000000000000004.
         let stepped = (stepped * 1e6).round() / 1e6;
-        stepped.clamp(low, high)
+        stepped.clamp(low, high) as f32
     }
 }
 
