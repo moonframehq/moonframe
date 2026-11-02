@@ -11,12 +11,15 @@
 //! is optional), published (not a draft or pre-release), with the builds as
 //! assets named for their platform, such as
 //! `App-1.2.3-universal-apple-darwin.dmg`, and optionally a `SHA256SUMS`
-//! file the download is checked against.
+//! file the download is checked against. With **Beta Releases** on, the
+//! newest pre-release counts too.
 
+mod beta;
 mod install;
 mod release;
 
 pub use {
+    beta::{beta, load as load_beta, set_beta},
     install::{relaunch, stage},
     release::{Found, Release, check},
 };

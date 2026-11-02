@@ -15,6 +15,7 @@ gpui_kit::actions!(moonframe, [
     AboutApp,
     BuildApp,
     CheckForUpdates,
+    ToggleBetaReleases,
     ToggleSlowAnimations,
     ToggleDeveloperMode,
     UndoChange,
@@ -94,8 +95,8 @@ pub(crate) fn bind_keys(cx: &mut App) {
     ]);
 }
 
-/// The menu bar: the app menu (About, Check for Updates when the app
-/// names its repository, Quit), the shell's `menus`, then
+/// The menu bar: the app menu (About, Check for Updates and Beta Releases
+/// when the app names its repository, Quit), the shell's `menus`, then
 /// View, into which a shell menu called View merges, the Components menu
 /// listing `components` by category, and the shell's Window and Help.
 /// Outside Developer Mode only what the app's users need shows: no
@@ -107,6 +108,9 @@ pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
     // An app that names the GitHub repository it is released from.
     if crate::update::source().is_some() {
         app_items.push(MenuItem::action("Check for Updates…", CheckForUpdates));
+        app_items.push(
+            MenuItem::action("Beta Releases", ToggleBetaReleases).checked(crate::update::beta()),
+        );
     }
     // Developer Mode: the tools for changing the app as it runs, which
     // its users can turn on too; the choice is kept.

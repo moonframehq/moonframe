@@ -6,7 +6,8 @@ Updates…**, under About:
 
 - It asks GitHub for the repository's newest release
   (`/repos/OWNER/REPO/releases/latest`: published, not a draft or
-  pre-release) and compares the release's tag with the running version.
+  pre-release, unless Beta Releases is on) and compares the release's tag
+  with the running version.
 - If the release is newer, a dialog offers it. On macOS, an app running from
   its own `.app` gets **Install and Relaunch**: the release's disk image (or
   zip) downloads, is checked against the release's `SHA256SUMS` when there is
@@ -22,6 +23,13 @@ Updates…**, under About:
   it stays open, whatever Developer Mode says, and says something only when
   there is a newer release. A check that cannot reach GitHub is tried again
   within the hour. Runs from source check only when asked.
+- **Beta Releases**, under Check for Updates, lets the user take
+  pre-releases too: with it checked, the check reads the repository's
+  releases (`/repos/OWNER/REPO/releases`) and offers the one with the
+  highest version, pre-release or not (never a draft). Turning it on looks
+  for one at once. The choice is kept per app and profile; it starts off.
+  Turning it off again offers nothing until a published release is newer
+  than the beta running.
 
 The starter checks `moonframehq/moonframe`.
 
@@ -154,7 +162,10 @@ Any release that follows GitHub's usual path works:
 
 1. Bump the version (`Cargo.toml`, or the manifest's `version`).
 2. Tag the commit `v1.2.3` (the `v` is optional) and publish a release for
-   the tag. Drafts and pre-releases are never offered.
+   the tag. Drafts are never offered, and pre-releases only to users who
+   checked Beta Releases. Tag a beta `v1.3.0-beta.1`: semver puts it after
+   `1.2.x` and before `1.3.0`, so testers move on to the final release
+   once it is out.
 3. Attach the builds, named for their platform:
 
    | Platform | Name it like | Picked by |

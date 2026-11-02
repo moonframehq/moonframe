@@ -52,6 +52,21 @@ impl MoonframeApp {
         .detach();
     }
 
+    /// Turns Beta Releases on or off, and on, looks for a pre-release at
+    /// once rather than at the next daily check.
+    pub(crate) fn toggle_beta_releases(&mut self, cx: &mut Context<Self>) {
+        let on = !crate::update::beta();
+        crate::update::set_beta(on);
+        // The menu shows the switch checked while it is on.
+        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        if on {
+            self.show_toast("Beta Releases: updates include pre-releases", cx);
+            self.check_for_updates(false, cx);
+        } else {
+            self.show_toast("Beta Releases are off: only published releases", cx);
+        }
+    }
+
     /// Asks the app's repository for a newer release and offers it. `asked`:
     /// the user chose Check for Updates, so every outcome is told; the
     /// daily check speaks only of a newer release.
@@ -73,11 +88,12 @@ impl MoonframeApp {
             self.show_toast("Checking for updates…", cx);
         }
         let profile = self.folders.profile.clone();
+        let beta = crate::update::beta();
         cx.spawn(async move |this, cx| {
             let looked = source.clone();
             let found = cx
                 .background_executor()
-                .spawn(async move { crate::update::check(&looked) })
+                .spawn(async move { crate::update::check(&looked, beta) })
                 .await;
             // Only a check that reached GitHub counts as the day's: one that
             // failed (offline, rate limited) is tried again within the hour.
