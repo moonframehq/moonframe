@@ -235,12 +235,13 @@ fn follow_pointer(view: &Rc<TerminalView>, window: &mut Window) {
         let Ok(session) = &moved.session else {
             return;
         };
-        let Some(to) = spot_at(&moved, &session.screen(), event.position) else {
+        let screen = session.screen();
+        let Some(to) = spot_at(&moved, &screen, event.position) else {
             return;
         };
         let mut selection = moved.selection.borrow_mut();
         if let Some(selection) = selection.as_mut() {
-            selection.extend(to);
+            selection.extend(&screen, to);
             window.refresh();
         }
     });
@@ -421,7 +422,7 @@ impl Painting<'_> {
 
     /// The selected cells, tinted over their text.
     fn selection(&self, selection: &Selection, screen: &Screen, tint: Hsla, window: &mut Window) {
-        for (row, columns) in selection.rows(screen.cols) {
+        for (row, columns) in selection.rows(screen) {
             if row >= screen.rows || columns.is_empty() {
                 continue;
             }
