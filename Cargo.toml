@@ -43,27 +43,28 @@ tokio              = { default-features = false, version = "1.54" }
 # them beside this app, patch them to a local checkout:
 #   [patch."https://github.com/penso/herdr-gpui"]
 #   herdr-core-client = { path = "../herdr-gpui/crates/herdr-core-client" }
-herdr-core-client   = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-github        = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-libghostty-vt       = "0.2.2"
-mlua                = { features = ["luau"], version = "0.12.2" }
-moonframe           = { path = "crates/moonframe" }
-moonframe-acp       = { path = "crates/moonframe-acp" }
-moonframe-core      = { path = "crates/moonframe-core" }
-moonframe-docs      = { path = "crates/moonframe-docs" }
-moonframe-git       = { path = "crates/moonframe-git" }
-moonframe-mux       = { default-features = false, path = "crates/moonframe-mux" }
-moonframe-providers = { path = "crates/moonframe-providers" }
-moonframe-store     = { path = "crates/moonframe-store" }
-moonframe-terminal  = { default-features = false, path = "crates/moonframe-terminal" }
-notify              = "8"
-objc2               = "0.6"
-objc2-app-kit       = { default-features = false, features = ["NSApplication", "NSImage", "NSResponder", "std"], version = "0.3" }
-objc2-foundation    = { default-features = false, features = ["NSAttributedString", "NSBundle", "NSData", "NSDictionary", "NSProcessInfo", "NSString", "std"], version = "0.3" }
-objc2-web-kit       = { default-features = false, features = ["WKWebView", "objc2-app-kit", "std"], version = "0.3" }
-portable-pty        = "0.9"
-rusqlite            = { features = ["bundled"], version = "0.41" }
+herdr-core-client        = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-github             = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-vcs                = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+libghostty-vt            = "0.2.2"
+mlua                     = { features = ["luau"], version = "0.12.2" }
+moonframe                = { path = "crates/moonframe" }
+moonframe-acp            = { path = "crates/moonframe-acp" }
+moonframe-core           = { path = "crates/moonframe-core" }
+moonframe-docs           = { path = "crates/moonframe-docs" }
+moonframe-git            = { path = "crates/moonframe-git" }
+moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }
+moonframe-providers      = { path = "crates/moonframe-providers" }
+moonframe-store          = { path = "crates/moonframe-store" }
+moonframe-terminal       = { default-features = false, path = "crates/moonframe-terminal" }
+notify                   = "8"
+objc2                    = "0.6"
+objc2-app-kit            = { default-features = false, features = ["NSApplication", "NSImage", "NSResponder", "std"], version = "0.3" }
+objc2-foundation         = { default-features = false, features = ["NSAttributedString", "NSBundle", "NSData", "NSDictionary", "NSProcessInfo", "NSString", "std"], version = "0.3" }
+objc2-user-notifications = { default-features = false, features = ["UNNotification", "UNNotificationContent", "UNNotificationRequest", "UNNotificationResponse", "UNUserNotificationCenter", "block2", "std"], version = "0.3" }
+objc2-web-kit            = { default-features = false, features = ["WKWebView", "objc2-app-kit", "std"], version = "0.3" }
+portable-pty             = "0.9"
+rusqlite                 = { features = ["bundled"], version = "0.41" }
 # Swapping a saved file into place atomically (moonframe-docs).
 rust-embed         = { features = ["include-exclude"], version = "8.7" }
 rustix             = { default-features = false, features = ["fs", "std"], version = "1.1" }

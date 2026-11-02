@@ -151,12 +151,27 @@ format-check:
     cargo +{{nightly_toolchain}} fmt --all -- --check
     taplo fmt --check
 
+# Fail when a source file (Rust, Python, shell, Swift, Luau) is over 1,000
+# lines; split it by responsibility instead (AGENTS.md).
+check-file-size:
+    scripts/check-file-size.sh
+
+# Fail when a `keep-sorted start`/`end` region is out of order (AGENTS.md).
+check-sorted:
+    PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_check_sorted.py
+    python3 scripts/check-sorted.py
+
+# Sort every `keep-sorted start`/`end` region in place.
+sort:
+    python3 scripts/check-sorted.py --fix
+
 # Verify Cargo.lock is in sync with workspace manifests.
 lockfile-check:
     cargo fetch --locked
 
 lint: lockfile-check
     cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+    cargo clippy --locked -p moonframe-providers -p moonframe --no-default-features --features moonframe/alacritty --all-targets -- -D warnings
 
 test:
     cargo test --locked --workspace
@@ -188,4 +203,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check lint test types providers providers-examples check-builtin components-check check-examples
+ci: format-check check-file-size check-sorted lint test types providers providers-examples check-builtin components-check check-examples

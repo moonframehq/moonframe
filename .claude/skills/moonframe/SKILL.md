@@ -621,9 +621,120 @@ return mod {
 - `provider/<name>` carries a provider's data each time it publishes, for a
   mod that must react (not only redraw); views still read `app.<name>`.
 - Names are 1 to 128 of `a-z A-Z 0-9 - _ . /`; `provider/` is the
-  providers', and `app/` the app's own (`app/inspect`). Previews (the Components window) hear nothing.
+  providers', and `app/` the app's own (`app/inspect`, `app/notification`). Previews (the Components window) hear nothing.
 - Use a topic when several modules share a value; use `to = "<mod>"` when
   one module tells another.
+
+## Asking the app
+
+A module asks the app itself for something by sending to `app:<what>`,
+from `update` (or `init`) as a second result, or from a control's `msg`
+with `to`. No click is needed, so a command palette's Enter, a keyboard
+shortcut in `keys` or a provider's news can run what a button would.
+
+```lua
+update = function(state, msg)
+	if msg == "run" then
+		local row = state.rows[state.selected]
+		return state, { { to = "app:command", msg = row.command } }   -- "minimize"
+	end
+end,
+```
+
+- `app:command`, `msg` a command's name: runs it as a control's `command`
+  does, with the same commands (`quit` `reload` `toggle-theme`
+  `show-themes` `minimize` `maximize` `close-window` `check-for-updates`
+  `inspect`) and nothing else. It runs once the update that asked is done.
+- `app:appearance`, `msg` `"system"`, `"light"` or `"dark"`: whether the
+  window follows the system's light or dark (and switches live as it
+  does) or stays one. It is kept across launches for the app and profile
+  (`settings.toml`, as the theme), and changing it keeps the themes picked.
+  Views read it as `app.appearance = { mode, dark }` (`dark` is what the
+  window is now, as `app.dark`). `toggle-theme` sets the other of light and
+  dark; the View menu's Appearance submenu offers all three.
+
+```lua
+-- in view(state, app): System / Light / Dark
+local buttons = {}
+for _, mode in { "system", "light", "dark" } do
+	table.insert(buttons, ui.button { mode, to = "app:appearance", msg = mode,
+		variant = if app.appearance.mode == mode then "primary" else "ghost" })
+end
+return ui.row { table.unpack(buttons) }
+```
+
+- `app:theme`, `msg` `{ light = "<theme>", dark = "<theme>" }` (either or
+  both): the theme light windows show and the one dark windows show, each
+  kept across launches for the app and profile and applied as the
+  appearance says. A dark theme can only be the dark one and a light theme
+  the light one; `"Default"` (the stock look with the stylesheet's colors)
+  is either. A name that does not fit is the sender's error. View > Themes
+  lists the themes for the appearance the window is in and picks for it.
+  Views read `app.appearance.theme` (showing now), `light_theme`,
+  `dark_theme`, and `themes`: every theme as `{ name, dark, background,
+  foreground, accent, colors }` (hex strings; `colors` is red, green,
+  yellow, blue, magenta, cyan), `"Default"` listed once for each, so a mod
+  can draw its own picker:
+
+```lua
+-- cards for the dark themes, with color dots; a click picks one
+local cards = {}
+for _, theme in app.appearance.themes do
+	if theme.dark then
+		local dots = {}
+		for _, color in theme.colors do
+			table.insert(dots, ui.row { class = "dot", style = { background = color } })
+		end
+		table.insert(cards, ui.column { class = "theme-card",
+			selected = theme.name == app.appearance.dark_theme,
+			style = { background = theme.background },
+			to = "app:theme", msg = { dark = theme.name },
+			ui.text { theme.name, style = { color = theme.foreground } },
+			ui.row { gap = "small", table.unpack(dots) },
+		})
+	end
+end
+```
+
+- `app:sound`, `msg` `"default"` (a short chime the app makes) or a sound
+  file (`.wav` `.aiff` `.aif` `.caf` `.mp3` `.m4a`, at most 2 MiB), named
+  as `ui.image` names pictures: relative to the mod's folder, `~/...` or
+  absolute, and inside the app's folders. Never a URL. Sounds closer than
+  150 ms apart are dropped. macOS plays them (`NSSound`); Linux with
+  `paplay` or `aplay` when installed; Windows plays none yet (logged).
+- `app:notify`, `msg` `{ title, body?, id? }`: a system notification. macOS
+  posts it through the Notification Center when the app runs as a bundle
+  (an installed app, `just bundle`, `just bundle-app`), asking the user to
+  allow notifications the first time; it shows even when the window is in
+  front, so check `app.window.active` to alert only when the user is not
+  looking. A run from source (`just run`, a bare binary), Linux and Windows
+  show it as a toast in the window instead, for 5 s. Clicking either brings
+  the app and its window forward and tells the mod that posted it, if it subscribes to
+  `app/notification`: `{ topic = "app/notification", value = { id, clicked
+  = true } }`. At most 5 notifications in 10 s are posted.
+
+```lua
+return mod {
+	subscribe = { "app/notification" },
+	update = function(state, msg, props)
+		if type(msg) == "table" and msg.topic == "app/notification" then
+			state.focused = msg.value.id      -- jump to the agent that finished
+		elseif type(msg) == "table" and msg.finished then
+			-- told by whatever watches the agents (a provider, another mod)
+			return state, {
+				{ to = "app:sound", msg = "default" },
+				{ to = "app:notify", msg = { title = "Agent done", body = msg.finished.title, id = msg.finished.pane } },
+			}
+		end
+	end,
+	view = function(state) return ui.text "agents" end,
+}
+```
+
+- A request the app cannot read (an unknown command, a misspelled
+  `app:<what>`) is the sender's error, shown as an `update` error.
+- Previews (the Components window) ask nothing, and a provider's answer
+  cannot be passed off as a request.
 
 ## Tabs
 
@@ -780,7 +891,9 @@ return mod {
 	end,
 
 	-- Required. Returns one element. `app` is
-	-- { dark = bool, mods = { names }, regions = { name = { mod names } },
+	-- { dark = bool, appearance = { mode = "system"|"light"|"dark", dark, theme,
+	--   light_theme, dark_theme, themes = { { name, dark, background, ... } } },
+	--   mods = { names }, regions = { name = { mod names } },
 	--   kinds = what tab bars can open (see "Tabs"), looks = the stylesheet's looks,
 	--   window = { platform = "macos"|"linux"|"windows", titlebar = "system"|"hidden",
 	--              maximized, fullscreen, active },
@@ -892,7 +1005,7 @@ Text-like elements take their main value positionally:
 - border: `true`, `all`, `top`, `bottom`, `left`, `right`, `none`
 - direction: `row` `column`
 - variant (button): `normal` `primary` `ghost` `outline` `danger`
-- command: `quit` `reload` `toggle-theme` `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `inspect` (Inspect Element for the mod: see "Here")
+- command: `quit` `reload` `toggle-theme` (light to dark or back, keeping the themes) `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `inspect` (Inspect Element for the mod: see "Here")
 - place (overlay): `center` `top` `bottom` `left` `right` `top-start`
   `top-end` `bottom-start` `bottom-end`
 - browser commands (with `browser = "<id>"`): `browser-back`
@@ -910,6 +1023,8 @@ true` on a row or column matches `:selected` rules, for tabs and segments.
 **Actions:** `msg = <data>` calls `update(state, msg)` on the mod that drew the
 control. Add `to = "name"` to send it to another mod, or to `"shell"`.
 `command = "..."` runs an app command instead. Use one or the other, not both.
+To run a command from `update`, without a click, send it to the app:
+`{ to = "app:command", msg = "minimize" }` (see "Asking the app").
 A browser command also takes `browser = "<id>"` (and `to` for another mod's
 browser).
 

@@ -893,6 +893,39 @@ type WindowState = {
 	active: boolean,
 }
 
+-- Light, dark, or as the system is (switching as it does).
+type AppearanceMode = "system" | "light" | "dark"
+
+-- `app.appearance`: set it with `{ to = "app:appearance", msg = "dark" }`.
+type Appearance = {
+	-- What the user chose, kept across launches for the app and profile.
+	mode: AppearanceMode,
+	-- Whether the window is dark now (as `app.dark`).
+	dark: boolean,
+	-- The theme showing: `light_theme` or `dark_theme`, as the window is.
+	theme: string,
+	-- The theme light windows show and the one dark windows show, kept
+	-- across launches; set with `{ to = "app:theme", msg = { dark = "Nord" } }`.
+	-- "Default" is the stock look with the stylesheet's colors.
+	light_theme: string,
+	dark_theme: string,
+	-- Every theme, for a picker of the app's own: "Default" first, once for
+	-- light and once for dark, then the rest by name.
+	themes: { ThemeInfo },
+}
+
+-- A theme as `app.appearance.themes` lists it. Colors are `#rrggbb`.
+type ThemeInfo = {
+	name: string,
+	-- Made for dark windows: only such a theme can be the `dark_theme`.
+	dark: boolean,
+	background: string,
+	foreground: string,
+	accent: string,
+	-- Six of its colors: red, green, yellow, blue, magenta, cyan.
+	colors: { string },
+}
+
 
 -- `app.git`, from providers/git. When `available` is false only `reason`
 -- is set (and `repository = false`); every other field is there otherwise.
@@ -1237,6 +1270,7 @@ type MountProps = {
 -- What every `view` gets as `app`.
 type App = {
 	dark: boolean,
+	appearance: Appearance,
 	window: WindowState,
 	mods: { string },
 	regions: { [string]: { string } },
@@ -1259,7 +1293,29 @@ type App = {
 	[string]: any,
 }
 
--- A message `update` sends on.
+-- What `{ to = "app:notify", msg = ... }` posts. A click on it brings the
+-- window forward and sends the posting mod, if it subscribes to
+-- `app/notification`, `{ topic = "app/notification", value = NotificationClick }`.
+type NotifyMsg = {
+	-- At most 256 bytes.
+	title: string,
+	-- At most 2048 bytes.
+	body: string?,
+	-- 1 to 128 of a-z A-Z 0-9 - _ . : /, handed back on a click.
+	id: string?,
+}
+
+type NotificationClick = {
+	id: string?,
+	clicked: boolean,
+}
+
+-- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,
+-- `"provider:<name>"`, `"topic:<name>"`, or the app itself:
+-- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
+-- `AppearanceMode`), `"app:theme"` (`msg` `{ light: string?, dark: string? }`),
+-- `"app:sound"` (`msg` `"default"` or a sound file's path) and
+-- `"app:notify"` (`msg` a `NotifyMsg`).
 type Send = {
 	to: string,
 	msg: Data,

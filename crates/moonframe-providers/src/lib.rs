@@ -16,7 +16,9 @@
 //!   outside its folders, so no Cargo config there applies; proc macros and
 //!   published dependencies' build scripts still run. A provider from
 //!   elsewhere ships its source, which can be reviewed; packages are
-//!   refused with any `provider.wasm`.
+//!   refused with any `provider.wasm`. The runtime is the `wasm` feature:
+//!   without it a wasm provider publishes nothing and fails only when a mod
+//!   messages it.
 //! - **native**: Rust built into the app (see [`native`]), for git, forges
 //!   and the like: the user's own access, real libraries, and replies to
 //!   the mod that asked.
@@ -45,7 +47,12 @@ mod mods;
 pub mod native;
 mod process;
 pub mod program;
+#[cfg(feature = "wasm")]
 mod system;
+#[cfg(feature = "wasm")]
+mod wasm;
+#[cfg(not(feature = "wasm"))]
+#[path = "wasm_left_out.rs"]
 mod wasm;
 
 #[cfg(feature = "tokio")]
@@ -189,6 +196,7 @@ pub(crate) struct Context {
     pub(crate) name: String,
     pub(crate) dir: PathBuf,
     pub(crate) manifest: Manifest,
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
     pub(crate) build_dir: PathBuf,
     pub(crate) messages: mpsc::Receiver<Message>,
     pub(crate) stop: Arc<AtomicBool>,

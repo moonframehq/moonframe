@@ -11,8 +11,9 @@ use {
         SharedString,
         component::{ThemeConfig, ThemeConfigColors, ThemeMode},
     },
+    moonframe_core::Data,
     moonframe_terminal::Ansi,
-    std::sync::LazyLock,
+    std::{collections::BTreeMap, sync::LazyLock},
 };
 
 /// The stock look: gpui-component's light and dark themes, with the
@@ -128,6 +129,107 @@ pub(crate) fn names() -> impl Iterator<Item = &'static str> {
     std::iter::once(DEFAULT).chain(SCHEMES.iter().map(|scheme| scheme.name))
 }
 
+/// The themes made for dark windows, or for light ones: the stock look
+/// (which has both) first, then the schemes of that kind.
+pub(crate) fn names_for(dark: bool) -> impl Iterator<Item = &'static str> {
+    names().filter(move |name| find(name).is_none_or(|scheme| scheme.dark() == dark))
+}
+
+/// The theme a window shows when it is `dark`: the one `previewed` in the
+/// Themes window (`Some(None)` for the stock look), unless that is a theme for
+/// the other appearance; else the one `picked` for this. `None` is the
+/// stock look.
+pub(crate) fn shown(
+    previewed: Option<Option<&'static Scheme>>,
+    picked: Option<&'static Scheme>,
+    dark: bool,
+) -> Option<&'static Scheme> {
+    let fits = |scheme: Option<&Scheme>| scheme.is_none_or(|scheme| scheme.dark() == dark);
+    previewed
+        .filter(|scheme| fits(*scheme))
+        .unwrap_or(picked)
+        .filter(|scheme| scheme.dark() == dark)
+}
+
+/// Whether `name` is a theme for dark windows (or for light ones, when
+/// `dark` is false): the stock look is for both.
+pub(crate) fn fits(name: &str, dark: bool) -> Result<Option<&'static Scheme>, String> {
+    if name == DEFAULT {
+        return Ok(None);
+    }
+    let scheme = find(name).ok_or_else(|| format!("no theme called `{name}`"))?;
+    if scheme.dark() != dark {
+        let (kind, other) = if dark {
+            ("dark", "light")
+        } else {
+            ("light", "dark")
+        };
+        return Err(format!(
+            "`{name}` is a {other} theme; the {kind} theme must be a {kind} one"
+        ));
+    }
+    Ok(Some(scheme))
+}
+
+/// What a theme picker shows of a theme: its text on its background, its
+/// accent, and six of its colors (red, green, yellow, blue, magenta, cyan).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Preview {
+    pub(crate) background: u32,
+    pub(crate) foreground: u32,
+    pub(crate) accent: u32,
+    pub(crate) colors: [u32; 6],
+}
+
+/// The stock look's colors in light windows and in dark ones, before the
+/// stylesheet's: gpui-component's neutral themes.
+pub(crate) const STOCK_LIGHT: Preview = Preview {
+    background: 0xffffff,
+    foreground: 0x0a0a0a,
+    accent: 0x171717,
+    colors: [0xef4444, 0x22c55e, 0xeab308, 0x3b82f6, 0xa855f7, 0x06b6d4],
+};
+pub(crate) const STOCK_DARK: Preview = Preview {
+    background: 0x0a0a0a,
+    foreground: 0xfafafa,
+    accent: 0xfafafa,
+    colors: [0xf87171, 0x4ade80, 0xfacc15, 0x60a5fa, 0xc084fc, 0x22d3ee],
+};
+
+impl Preview {
+    fn data(&self, name: &str, dark: bool) -> Data {
+        let hex = |color: u32| Data::from(format!("#{color:06x}").as_str());
+        Data::Map(BTreeMap::from([
+            ("name".to_owned(), Data::from(name)),
+            ("dark".to_owned(), Data::Bool(dark)),
+            ("background".to_owned(), hex(self.background)),
+            ("foreground".to_owned(), hex(self.foreground)),
+            ("accent".to_owned(), hex(self.accent)),
+            (
+                "colors".to_owned(),
+                Data::List(self.colors.iter().map(|&color| hex(color)).collect()),
+            ),
+        ]))
+    }
+}
+
+/// Every theme as views read it in `app.appearance.themes`: `{ name,
+/// dark, background, foreground, accent, colors }`, the stock look twice
+/// (in `light` and in `dark`, its colors as the stylesheet makes them),
+/// then each scheme, by name.
+pub(crate) fn listing(light: Preview, dark: Preview) -> Data {
+    Data::List(
+        [light.data(DEFAULT, false), dark.data(DEFAULT, true)]
+            .into_iter()
+            .chain(
+                SCHEMES
+                    .iter()
+                    .map(|scheme| scheme.preview().data(scheme.name, scheme.dark())),
+            )
+            .collect(),
+    )
+}
+
 /// The scheme called `name`; `None` for the stock look or a name no theme
 /// has.
 pub(crate) fn find(name: &str) -> Option<&'static Scheme> {
@@ -183,6 +285,17 @@ impl Scheme {
 
     pub(crate) fn dark(&self) -> bool {
         luminance(self.background) < 0.5
+    }
+
+    fn preview(&self) -> Preview {
+        let mut colors = [0; 6];
+        colors.copy_from_slice(&self.ansi[1..7]);
+        Preview {
+            background: self.background,
+            foreground: self.foreground,
+            accent: self.ansi[4],
+            colors,
+        }
     }
 
     /// The 16 terminal colors.
@@ -329,6 +442,65 @@ mod tests {
         let rest: Vec<String> = names[1..].iter().map(|name| name.to_lowercase()).collect();
         assert!(rest.is_sorted());
         assert!(find(DEFAULT).is_none());
+    }
+
+    #[test]
+    fn light_and_dark_each_list_their_own_themes() {
+        let dark: Vec<&str> = names_for(true).collect();
+        let light: Vec<&str> = names_for(false).collect();
+        assert_eq!(dark[0], DEFAULT);
+        assert_eq!(light[0], DEFAULT);
+        assert!(dark.contains(&"Gruvbox Dark") && !dark.contains(&"Gruvbox Light"));
+        assert!(light.contains(&"Gruvbox Light") && !light.contains(&"Gruvbox Dark"));
+        assert_eq!(dark.len() + light.len(), names().count() + 1);
+
+        assert_eq!(fits(DEFAULT, true), Ok(None));
+        assert_eq!(fits("Nord", true).unwrap().unwrap().name, "Nord");
+        assert!(fits("Nord", false).unwrap_err().contains("is a dark theme"));
+        assert!(fits("Nope", false).unwrap_err().contains("no theme called"));
+    }
+
+    #[test]
+    fn a_preview_for_the_other_appearance_gives_way_to_the_picked_theme() {
+        let nord = find("Nord");
+        let dawn = find("Rose Pine Dawn");
+        // Previewing in the appearance it is for.
+        assert_eq!(shown(Some(dawn), None, false), dawn);
+        // The stock look previewed fits either.
+        assert_eq!(shown(Some(None), nord, true), None);
+        // The window turned dark while a light theme was previewed.
+        assert_eq!(shown(Some(dawn), nord, true), nord);
+        // No preview: the picked one, only where it fits.
+        assert_eq!(shown(None, nord, true), nord);
+        assert_eq!(shown(None, nord, false), None);
+    }
+
+    #[test]
+    fn the_listing_has_the_stock_look_for_each_and_every_scheme() {
+        let Data::List(themes) = listing(STOCK_LIGHT, STOCK_DARK) else {
+            panic!("not a list");
+        };
+        assert_eq!(themes.len(), SCHEMES.len() + 2);
+        let field = |theme: &Data, key: &str| match theme {
+            Data::Map(fields) => fields.get(key).cloned().unwrap_or_default(),
+            _ => Data::Nil,
+        };
+        assert_eq!(field(&themes[0], "name"), Data::from(DEFAULT));
+        assert_eq!(field(&themes[0], "dark"), Data::Bool(false));
+        assert_eq!(field(&themes[1], "dark"), Data::Bool(true));
+        assert_eq!(field(&themes[1], "background"), Data::from("#0a0a0a"));
+        let gruvbox = themes
+            .iter()
+            .find(|theme| field(theme, "name") == Data::from("Gruvbox Dark"))
+            .unwrap();
+        assert_eq!(field(gruvbox, "dark"), Data::Bool(true));
+        assert_eq!(field(gruvbox, "background"), Data::from("#282828"));
+        assert_eq!(field(gruvbox, "accent"), Data::from("#458588"));
+        let Data::List(colors) = field(gruvbox, "colors") else {
+            panic!("no colors");
+        };
+        assert_eq!(colors.len(), 6);
+        assert_eq!(colors[0], Data::from("#cc241d"));
     }
 
     #[test]

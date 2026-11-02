@@ -19,7 +19,7 @@ acp = ["dep:moonframe-acp"]
 # libghostty-vt with Zig (see mise.toml and tools/zig), so an app on the
 # library opts into it; the starter (crates/moonframe-app) has both.
 alacritty = ["moonframe-terminal/alacritty"]
-default   = ["acp", "alacritty", "docs", "git", "herdr-core", "tokio"]
+default   = ["acp", "alacritty", "docs", "git", "herdr-core", "tokio", "wasm"]
 # The `docs` native provider: reads and saves the project's text files
 # for the markdown editor.
 docs    = ["dep:moonframe-docs"]
@@ -32,6 +32,10 @@ herdr-core = ["moonframe-mux/herdr-core"]
 # Native providers written with `async fn` (`.native_async`), and a tokio
 # runtime they and the app's views share (`.tokio`, `on_runtime`).
 tokio = ["moonframe-providers/tokio"]
+# Wasm providers (`kind = "wasm"`), sandboxed on wasmtime: the starter's
+# `system` and providers users install. An app with none leaves it out to
+# build faster and smaller.
+wasm = ["moonframe-providers/wasm"]
 
 [dependencies]
 futures.workspace             = true
@@ -61,9 +65,11 @@ tempfile.workspace = true
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
 block2.workspace           = true
 objc2.workspace            = true
-objc2-app-kit              = { features = ["NSEvent", "NSRunningApplication", "NSView", "NSWindow", "block2"], workspace = true }
+objc2-app-kit              = { features = ["NSEvent", "NSRunningApplication", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
 objc2-foundation.workspace = true
-objc2-web-kit.workspace    = true
+# `app:notify`: system notifications, and hearing their clicks.
+objc2-user-notifications.workspace = true
+objc2-web-kit.workspace            = true
 
 # wry has no working GPUI child-view backend on Linux yet; a `ui.browser`
 # there shows its address and opens it in the system browser.
