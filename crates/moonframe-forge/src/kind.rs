@@ -52,12 +52,17 @@ impl Kind {
     }
 
     /// Whether the environment's token (`GH_TOKEN`, `GITLAB_TOKEN`) is
-    /// meant for `host`: the forge's own, or `$GITLAB_HOST`, as glab reads
-    /// them.
+    /// meant for `host`: `$GITLAB_HOST` overrides GitLab's default host.
     pub fn env_serves(self, host: &str) -> bool {
-        let host = host.to_ascii_lowercase();
-        host == self.default_host()
-            || (self == Self::GitLab && env_host().is_some_and(|known| known == host))
+        self.env_serves_host(host, env_host().as_deref())
+    }
+
+    fn env_serves_host(self, host: &str, configured: Option<&str>) -> bool {
+        let expected = match self {
+            Self::GitHub => self.default_host(),
+            Self::GitLab => configured.unwrap_or(self.default_host()),
+        };
+        host.eq_ignore_ascii_case(expected)
     }
 
     /// Where a device sign-in starts.
@@ -130,4 +135,19 @@ fn env_host() -> Option<String> {
     let value = value.split_once("://").map_or(value, |(_, rest)| rest);
     let host = value.split('/').next()?.to_ascii_lowercase();
     (!host.is_empty()).then_some(host)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Kind;
+
+    #[test]
+    fn environment_tokens_have_exactly_one_host() {
+        let gitlab = Kind::GitLab;
+        assert!(gitlab.env_serves_host("gitlab.com", None));
+        assert!(!gitlab.env_serves_host("gitlab.com", Some("git.corp.example")));
+        assert!(gitlab.env_serves_host("GIT.corp.example", Some("git.corp.example")));
+        assert!(!gitlab.env_serves_host("other.example", Some("git.corp.example")));
+        assert!(Kind::GitHub.env_serves_host("github.com", Some("git.corp.example")));
+    }
 }

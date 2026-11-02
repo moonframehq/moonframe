@@ -90,6 +90,9 @@ pub(crate) struct Forge {
     cancel: Option<Arc<AtomicBool>>,
     /// The action waiting on a worker, to answer.
     waiting: Option<Asker>,
+    /// Identifies the current sign-in attempt and credential generation.
+    attempt: u64,
+    epoch: u64,
     fetching: bool,
     fetched_at: Option<Instant>,
     asked_at: Option<Instant>,
@@ -120,6 +123,8 @@ impl Forge {
             code: None,
             cancel: None,
             waiting: None,
+            attempt: 0,
+            epoch: 0,
             fetching: false,
             fetched_at: None,
             asked_at: None,
@@ -181,23 +186,20 @@ impl Forge {
         })
     }
 
-    fn look(&mut self) {
-        let Some(root) = &self.root else {
-            return;
-        };
-        let checkout = repo::read(root);
+    fn look(&mut self, handle: &Handle) {
+        let checkout = self.root.as_deref().map(repo::read).unwrap_or_default();
         if checkout != self.checkout {
-            let branches_changed = checkout.branches != self.checkout.branches;
             self.checkout = checkout;
-            if branches_changed {
-                self.next = Some(Instant::now());
-            }
+            self.data = Value::Null;
+            self.next = Some(Instant::now());
         }
         let host = self.remote().map_or_else(
             || self.kind.default_host().to_owned(),
             |(host, _)| host.clone(),
         );
         if self.loaded.as_ref() != Some(&host) {
+            self.stop_sign_in(handle, "the sign-in host changed");
+            self.epoch += 1;
             self.host = host.clone();
             self.loaded = Some(host.clone());
             self.status = Status::Checking;
@@ -230,15 +232,20 @@ impl Forge {
                         Status::SignedOut
                     };
                     self.credential = credential;
+                    self.epoch += 1;
                     self.next = Some(Instant::now());
                 }
             },
             Done::Code {
+                attempt,
                 user,
                 url,
                 complete_url,
                 expires,
             } => {
+                if attempt != self.attempt || self.waiting.is_none() {
+                    return;
+                }
                 self.status = Status::Pending;
                 self.code = Some(Shown {
                     user: user.clone(),
@@ -261,11 +268,15 @@ impl Forge {
                 login,
                 asker,
             } => {
+                if asker.attempt != self.attempt || self.waiting.is_none() {
+                    return;
+                }
                 self.end_device();
                 self.waiting = None;
                 if signed_in == self.host {
                     self.status = Status::SignedIn;
                     self.credential = Some(credential);
+                    self.epoch += 1;
                     self.login = Some(login.clone());
                     self.error = None;
                     self.next = Some(Instant::now());
@@ -278,6 +289,9 @@ impl Forge {
                 );
             },
             Done::Refused { error, asker } => {
+                if asker.attempt != self.attempt || self.waiting.is_none() {
+                    return;
+                }
                 self.end_device();
                 self.waiting = None;
                 self.status = if self.credential.is_some() {
@@ -290,12 +304,13 @@ impl Forge {
             },
             Done::Fetched {
                 target,
+                epoch,
                 result,
                 credential,
             } => {
                 self.fetching = false;
                 self.fetched_at = Some(Instant::now());
-                if target.host != self.host {
+                if epoch != self.epoch || self.target().as_ref() != Some(&target) {
                     return;
                 }
                 if let Some(credential) = credential
@@ -308,7 +323,8 @@ impl Forge {
                         self.login = data["viewer"]["login"].as_str().map(str::to_owned);
                         self.data = data;
                         self.error = None;
-                        self.next = Some(Instant::now() + self.every);
+                        // A refresh requested during this fetch still needs to run.
+                        self.next.get_or_insert(Instant::now() + self.every);
                     },
                     Err(Failure::Unauthorized) => {
                         self.credential = None;
@@ -343,6 +359,27 @@ impl Forge {
         self.code = None;
     }
 
+    fn stop_sign_in(&mut self, host: &Handle, error: &str) {
+        self.end_device();
+        self.attempt += 1;
+        if let Some(asker) = self.waiting.take() {
+            reply(host, &asker, false, json!({ "error": error }));
+        }
+        self.status = if self.credential.is_some() {
+            Status::SignedIn
+        } else {
+            Status::SignedOut
+        };
+    }
+
+    fn expire_device(&mut self, host: &Handle, now: u64) {
+        if self.code.as_ref().is_some_and(|code| now >= code.expires) {
+            let error = "the code expired; start again";
+            self.stop_sign_in(host, error);
+            self.error = Some(error.into());
+        }
+    }
+
     fn fetch_if_due(&mut self) {
         let due = self.next.is_some_and(|next| Instant::now() >= next);
         if !due || self.fetching || self.status != Status::SignedIn {
@@ -355,7 +392,12 @@ impl Forge {
         };
         self.fetching = true;
         self.next = None;
-        context.fetch(target.clone(), credential, self.client(&target.host));
+        context.fetch(
+            target.clone(),
+            credential,
+            self.client(&target.host),
+            self.epoch,
+        );
     }
 
     fn snapshot(&self) -> Value {
@@ -402,6 +444,7 @@ impl Forge {
             },
         };
         out["host"] = json!(self.host);
+        out["matches_remote"] = json!(self.remote().is_some());
         out["auth"] = auth;
         out
     }
@@ -419,11 +462,12 @@ impl Forge {
             from: from.to_owned(),
             id: message.get("id").cloned().unwrap_or(Data::Nil),
             action,
+            attempt: self.attempt,
         }
     }
 
     fn act(&mut self, host: &Handle, from: &str, message: &Data, action: &'static str) {
-        let asker = self.asker(from, message, action);
+        let mut asker = self.asker(from, message, action);
         if !self.accounts.allows(from) {
             let words = format!(
                 "`{from}` may not {}: only the mods in providers/{}'s `accounts` may",
@@ -438,18 +482,12 @@ impl Forge {
         };
         match action {
             "cancel" => {
-                self.end_device();
-                self.waiting = None;
-                self.status = if self.credential.is_some() {
-                    Status::SignedIn
-                } else {
-                    Status::SignedOut
-                };
+                self.stop_sign_in(host, "the sign-in was cancelled");
                 reply(host, &asker, true, json!({ "message": "Cancelled" }));
                 return;
             },
             "sign_out" => {
-                self.end_device();
+                self.stop_sign_in(host, "the sign-in was cancelled by signing out");
                 let forgotten = match &self.credential {
                     Some(credential) if !credential.source.forgettable() => Err(format!(
                         "the token comes from the environment ({}); unset it to sign out",
@@ -463,6 +501,7 @@ impl Forge {
                 match forgotten {
                     Ok(()) => {
                         self.credential = None;
+                        self.epoch += 1;
                         self.login = None;
                         self.data = Value::Null;
                         self.error = None;
@@ -497,6 +536,8 @@ impl Forge {
             }
             return;
         }
+        self.attempt += 1;
+        asker.attempt = self.attempt;
         match action {
             "sign_in" => {
                 let Some(client) = self.client(&self.host) else {
@@ -594,7 +635,7 @@ impl Native for Forge {
         });
         self.done = Some(receiver);
         self.root = repo::root(host.dir());
-        self.look();
+        self.look(host);
         self.publish(host);
         Ok(())
     }
@@ -603,7 +644,7 @@ impl Native for Forge {
         self.ticks += 1;
         if self.ticks >= LOOK_EVERY {
             self.ticks = 0;
-            self.look();
+            self.look(host);
         }
         let done: Vec<Done> = self
             .done
@@ -613,13 +654,7 @@ impl Native for Forge {
         for done in done {
             self.take_in(host, done);
         }
-        if self
-            .code
-            .as_ref()
-            .is_some_and(|code| crate::credentials::now() > code.expires)
-        {
-            self.end_device();
-        }
+        self.expire_device(host, crate::credentials::now());
         self.fetch_if_due();
         self.publish(host);
     }
@@ -653,7 +688,7 @@ impl Native for Forge {
                     .is_none_or(|at| now.duration_since(at) >= MIN_ASKED)
                 {
                     self.asked_at = Some(now);
-                    self.look();
+                    self.look(host);
                     self.next = Some(now);
                 }
             },
@@ -662,3 +697,7 @@ impl Native for Forge {
         self.publish(host);
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests;

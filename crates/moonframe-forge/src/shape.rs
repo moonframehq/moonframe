@@ -118,11 +118,15 @@ pub struct Checks {
 
 impl Checks {
     pub fn add(&mut self, outcome: &str) {
+        self.add_count(outcome, 1);
+    }
+
+    pub fn add_count(&mut self, outcome: &str, count: u64) {
         match outcome {
-            "passed" => self.passed += 1,
-            "failed" => self.failed += 1,
-            "skipped" => self.skipped += 1,
-            _ => self.pending += 1,
+            "passed" => self.passed += count,
+            "failed" => self.failed += count,
+            "skipped" => self.skipped += count,
+            _ => self.pending += count,
         }
     }
 

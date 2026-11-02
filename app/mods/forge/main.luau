@@ -36,9 +36,11 @@ return mod {
 
 	view = function(state: State, app)
 		local git = app.git
-		local remote = git and git.remote
-		local provider = if remote and remote.kind == "gitlab" then "gitlab" else "github"
-		local forge = if provider == "gitlab" then app.gitlab else app.github
+		-- The provider knows configured self-hosted instances; a remote's
+		-- hostname need not contain the word "gitlab".
+		local gitlab = app.gitlab
+		local provider = if gitlab and gitlab.matches_remote then "gitlab" else "github"
+		local forge = if provider == "gitlab" then gitlab else app.github
 		return ui.row {
 			gap = "small",
 			align = "center",

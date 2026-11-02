@@ -1,4 +1,4 @@
-//! GitHub, in one GraphQL request: who is signed in, the repository, its
+//! GitHub, normally in one GraphQL request: who is signed in, the repository, its
 //! open pull requests and issues, and the newest pull request of each
 //! branch the checkout's worktrees have out (open, merged or closed), with
 //! its checks and line counts.
@@ -19,9 +19,11 @@ const LISTED: usize = 30;
 const CHECKS: usize = 50;
 
 const PR_FIELDS: &str = "number title state isDraft url headRefName baseRefName updatedAt \
+headRepository { nameWithOwner } \
 additions deletions changedFiles reviewDecision mergeable mergeStateStatus \
 author { __typename login avatarUrl(size: 64) ... on User { name } } \
-commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes { \
+commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { \
+checkRunCountsByState { state count } statusContextCountsByState { state count } nodes { \
 __typename ... on CheckRun { name status conclusion detailsUrl } \
 ... on StatusContext { context state targetUrl } } } } } } }";
 
@@ -34,7 +36,7 @@ fn query(branches: usize) -> String {
         aliases.push_str(&format!(
             " b{index}: pullRequests(headRefName: $b{index}, first: 1, \
              orderBy: {{ field: UPDATED_AT, direction: DESC }}, \
-             states: [OPEN, MERGED, CLOSED]) {{ nodes {{ ...pr }} }}"
+              states: [OPEN, MERGED, CLOSED]) {{ pageInfo {{ hasNextPage endCursor }} nodes {{ ...pr }} }}"
         ));
     }
     format!(
@@ -65,19 +67,12 @@ pub fn fetch(
     for (index, branch) in target.branches.iter().enumerate() {
         variables[format!("b{index}")] = json!(branch);
     }
-    let answer = http::post(
+    let mut data = request(
         agent,
-        "https://api.github.com/graphql",
         token,
-        &json!({ "query": query(target.branches.len()), "variables": variables }),
+        &query(target.branches.len()),
+        variables.clone(),
     )?;
-    if answer.get("data").is_none_or(Value::is_null)
-        && let Some(errors) = answer.get("errors")
-    {
-        let words = errors.get(0).map(http::message).unwrap_or_default();
-        return Err(Failure::Status(200, words));
-    }
-    let data = &answer["data"];
     let repository = &data["repository"];
     if repository.is_null() {
         return Err(Failure::Status(
@@ -85,9 +80,92 @@ pub fn fetch(
             format!("{} is not visible to this account", target.path),
         ));
     }
+    // headRefName alone also finds forks' branches. Keep paging until the
+    // newest request whose head repository is this checkout's is found.
+    let canonical = repository["nameWithOwner"]
+        .as_str()
+        .unwrap_or(&target.path)
+        .to_owned();
+    for (index, branch) in target.branches.iter().enumerate() {
+        let alias = format!("b{index}");
+        let first = data["repository"][&alias].take();
+        let selected = branch_request(first, &canonical, |cursor| {
+            let query = format!(
+                "query($owner: String!, $name: String!, $branch: String!, $after: String!) {{ \
+                 repository(owner: $owner, name: $name) {{ \
+                 pullRequests(headRefName: $branch, first: 25, after: $after, \
+                 orderBy: {{ field: UPDATED_AT, direction: DESC }}, states: [OPEN, MERGED, CLOSED]) \
+                 {{ pageInfo {{ hasNextPage endCursor }} nodes {{ ...pr }} }} }} }} \
+                 fragment pr on PullRequest {{ {PR_FIELDS} }}"
+            );
+            let answer = request(
+                agent,
+                token,
+                &query,
+                json!({
+                    "owner": owner, "name": name, "branch": branch, "after": cursor,
+                }),
+            )?;
+            Ok(answer["repository"]["pullRequests"].clone())
+        })?;
+        data["repository"][alias] = json!({ "nodes": selected.into_iter().collect::<Vec<_>>() });
+    }
     // Pictures first, so this very publish shows them.
-    avatars.fetch(agent, &people(data));
-    Ok(shape(data, target, avatars))
+    avatars.fetch(agent, &people(&data));
+    Ok(shape(&data, target, avatars))
+}
+
+fn request(
+    agent: &ureq::Agent,
+    token: &SecretString,
+    query: &str,
+    variables: Value,
+) -> Result<Value, Failure> {
+    let mut answer = http::post(
+        agent,
+        "https://api.github.com/graphql",
+        token,
+        &json!({ "query": query, "variables": variables }),
+    )?;
+    if let Some(error) = answer["errors"]
+        .as_array()
+        .and_then(|errors| errors.first())
+    {
+        return Err(Failure::Status(200, http::message(error)));
+    }
+    Ok(answer["data"].take())
+}
+
+fn matches_head(pr: &Value, repository: &str) -> bool {
+    pr["headRepository"]["nameWithOwner"]
+        .as_str()
+        .is_some_and(|head| head.eq_ignore_ascii_case(repository))
+}
+
+fn branch_request(
+    mut page: Value,
+    repository: &str,
+    mut next: impl FnMut(&str) -> Result<Value, Failure>,
+) -> Result<Option<Value>, Failure> {
+    let mut previous = String::new();
+    for _ in 0..100 {
+        if let Some(pr) = nodes(&page).find(|pr| matches_head(pr, repository)) {
+            return Ok(Some(pr.clone()));
+        }
+        if page["pageInfo"]["hasNextPage"] != true {
+            return Ok(None);
+        }
+        let cursor = page["pageInfo"]["endCursor"]
+            .as_str()
+            .filter(|cursor| !cursor.is_empty() && *cursor != previous)
+            .ok_or_else(|| Failure::Body("no next pull-request page cursor".into()))?
+            .to_owned();
+        page = next(&cursor)?;
+        previous = cursor;
+    }
+    Err(Failure::Body(
+        "too many pull-request pages for this branch".into(),
+    ))
 }
 
 /// Every (login, avatar address) the answer names.
@@ -144,7 +222,10 @@ pub(crate) fn shape(data: &Value, target: &Target, avatars: &Avatars) -> Value {
     let mut branches = Map::new();
     let mut current = Value::Null;
     for (index, branch) in target.branches.iter().enumerate() {
-        let Some(pr) = nodes(&repository[format!("b{index}")]).next() else {
+        let canonical = repository["nameWithOwner"].as_str().unwrap_or(&target.path);
+        let Some(pr) =
+            nodes(&repository[format!("b{index}")]).find(|pr| matches_head(pr, canonical))
+        else {
             continue;
         };
         let is_current = *branch == target.branch;
@@ -192,7 +273,11 @@ fn outcome(check: &Value) -> &'static str {
         _ if running && check.get("conclusion").is_none_or(Value::is_null) => "pending",
         Some("SUCCESS") => "passed",
         Some("NEUTRAL" | "SKIPPED") => "skipped",
-        None | Some("PENDING" | "EXPECTED" | "QUEUED" | "IN_PROGRESS") => "pending",
+        None
+        | Some(
+            "PENDING" | "EXPECTED" | "QUEUED" | "IN_PROGRESS" | "WAITING" | "REQUESTED"
+            | "COMPLETED",
+        ) => "pending",
         Some(_) => "failed",
     }
 }
@@ -207,13 +292,13 @@ fn pull_request(pr: &Value, avatars: &Avatars, details: bool) -> Value {
     let review = lower("reviewDecision");
     let mergeable = lower("mergeable");
     let merge_state = lower("mergeStateStatus");
-    let contexts: Vec<&Value> =
-        nodes(&pr["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"])
-            .take(CHECKS)
-            .collect();
+    let connection = &pr["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"];
+    let contexts: Vec<&Value> = nodes(connection).take(CHECKS).collect();
     let mut checks = Checks::default();
-    for check in &contexts {
-        checks.add(outcome(check));
+    for key in ["checkRunCountsByState", "statusContextCountsByState"] {
+        for count in connection[key].as_array().into_iter().flatten() {
+            checks.add_count(outcome(count), count["count"].as_u64().unwrap_or(0));
+        }
     }
     let standing = Standing {
         state: &state,
@@ -269,3 +354,7 @@ pub fn login(agent: &ureq::Agent, token: &SecretString) -> Result<String, Failur
         .map(str::to_owned)
         .ok_or_else(|| Failure::Body("no login".into()))
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests;

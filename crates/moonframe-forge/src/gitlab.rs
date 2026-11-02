@@ -16,6 +16,8 @@ use {
 
 const LISTED: usize = 30;
 
+mod diffs;
+
 /// `text` as one URL path segment or query value.
 pub(crate) fn encode(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
@@ -107,22 +109,10 @@ fn current(agent: &ureq::Agent, token: &SecretString, project: &str, iid: u64) -
         .and_then(|pipeline| get(&format!("{project}/pipelines/{pipeline}/jobs?per_page=50")))
         .and_then(|jobs| jobs.as_array().cloned())
         .unwrap_or_default();
-    let lines = get(&format!(
-        "{project}/merge_requests/{iid}/diffs?per_page=100"
-    ))
-    .map(|diffs| {
-        let mut counts = (0, 0);
-        for diff in diffs.as_array().into_iter().flatten() {
-            let text = diff["diff"].as_str().unwrap_or_default();
-            for line in text.lines() {
-                if line.starts_with('+') && !line.starts_with("+++") {
-                    counts.0 += 1;
-                } else if line.starts_with('-') && !line.starts_with("---") {
-                    counts.1 += 1;
-                }
-            }
-        }
-        counts
+    let lines = diffs::read(mr.as_ref().and_then(|mr| mr.get("changes_count")), |page| {
+        get(&format!(
+            "{project}/merge_requests/{iid}/diffs?per_page=100&page={page}"
+        ))
     });
     Details { mr, jobs, lines }
 }
@@ -228,7 +218,7 @@ fn merge_request(mr: &Value, details: &Details, avatars: &Avatars) -> Value {
         state,
         draft: full["draft"] == true || full["work_in_progress"] == true,
         conflicts: full["has_conflicts"] == true || status == "conflict",
-        changes_requested: false,
+        changes_requested: status == "requested_changes",
         review_required: status == "not_approved",
         ready: status == "mergeable",
         held: matches!(
@@ -247,7 +237,7 @@ fn merge_request(mr: &Value, details: &Details, avatars: &Avatars) -> Value {
         "base": shape::text(full.get("target_branch")),
         "author": person(&full["author"], avatars),
         "updated": shape::seconds(full.get("updated_at")),
-        "review_decision": if status == "not_approved" { "review_required" } else { "" },
+        "review_decision": if standing.changes_requested { "changes_requested" } else if standing.review_required { "review_required" } else { "" },
         "mergeable": if standing.conflicts { "conflicting" } else if status == "mergeable" { "mergeable" } else { "" },
         "merge_state": status,
         "checks": checks.json(),

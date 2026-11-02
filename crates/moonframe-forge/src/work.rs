@@ -32,6 +32,7 @@ pub struct Asker {
     pub from: String,
     pub id: moonframe_core::Data,
     pub action: &'static str,
+    pub attempt: u64,
 }
 
 pub enum Done {
@@ -44,6 +45,7 @@ pub enum Done {
     },
     /// A device code to show.
     Code {
+        attempt: u64,
         user: String,
         url: String,
         complete_url: Option<String>,
@@ -60,6 +62,7 @@ pub enum Done {
     Refused { error: String, asker: Asker },
     Fetched {
         target: Target,
+        epoch: u64,
         result: Result<Value, Failure>,
         /// The credential, renewed if it had to be.
         credential: Option<Credential>,
@@ -109,7 +112,9 @@ impl Context {
             let cli = credentials::cli(context.kind, &host, &context.path);
             let credential = match context.saved.load(&host) {
                 Ok(Some(Remembered::Token(credential))) => Some(credential),
-                Ok(Some(Remembered::Cli)) => cli.clone(),
+                Ok(Some(Remembered::Cli)) => {
+                    credentials::cli_ready(context.kind, &host, &context.path)
+                },
                 Ok(None) => None,
                 Err(problem) => {
                     error = Some(format!("cannot read the saved sign-in: {}", problem.0));
@@ -169,8 +174,8 @@ impl Context {
 
     /// The CLI's sign-in, once the user chose it.
     pub fn use_cli(&self, host: String, asker: Asker) {
-        self.spawn(
-            move |context| match credentials::cli(context.kind, &host, &context.path) {
+        self.spawn(move |context| {
+            match credentials::cli_ready(context.kind, &host, &context.path) {
                 Some(credential) => context.keep(&host, credential, asker),
                 None => {
                     let (program, _) = context.kind.cli(&host);
@@ -179,14 +184,14 @@ impl Context {
                         asker,
                     });
                 },
-            },
-        );
+            }
+        });
     }
 
     /// A device sign-in, until it ends or `cancel` is set.
     pub fn device(&self, host: String, client: String, cancel: Arc<AtomicBool>, asker: Asker) {
         self.spawn(move |context| {
-            let code = match device::start(&context.agent, context.kind, &host, &client) {
+            let mut code = match device::start(&context.agent, context.kind, &host, &client) {
                 Ok(code) => code,
                 Err(failure) => {
                     context.send(Done::Refused {
@@ -197,6 +202,7 @@ impl Context {
                 },
             };
             context.send(Done::Code {
+                attempt: asker.attempt,
                 user: code.user.clone(),
                 url: code.url.clone(),
                 complete_url: code.complete_url.clone(),
@@ -220,7 +226,7 @@ impl Context {
                     });
                     return;
                 }
-                match device::poll(&context.agent, context.kind, &host, &client, &code) {
+                match device::poll(&context.agent, context.kind, &host, &client, &mut code) {
                     Poll::Wait(next) => wait = next,
                     Poll::Done(credential) => {
                         if !cancel.load(Ordering::Acquire) {
@@ -239,8 +245,27 @@ impl Context {
 
     /// Reads the forge for `target`, renewing the token first when it is
     /// about to run out (and once more if the forge refuses it).
-    pub fn fetch(&self, target: Target, mut credential: Credential, client: Option<String>) {
+    pub fn fetch(
+        &self,
+        target: Target,
+        mut credential: Credential,
+        client: Option<String>,
+        epoch: u64,
+    ) {
         self.spawn(move |context| {
+            let cli = credential.source == Source::Cli;
+            let Some(fresh) =
+                credentials::for_fetch(context.kind, &target.host, &context.path, credential)
+            else {
+                context.send(Done::Fetched {
+                    target,
+                    epoch,
+                    result: Err(Failure::Unauthorized),
+                    credential: None,
+                });
+                return;
+            };
+            credential = fresh;
             let avatars = Avatars {
                 folder: &context.images,
                 prefix: match context.kind {
@@ -290,8 +315,9 @@ impl Context {
             }
             context.send(Done::Fetched {
                 target,
+                epoch,
                 result,
-                credential: renewed.then_some(credential),
+                credential: (renewed || cli).then_some(credential),
             });
         });
     }

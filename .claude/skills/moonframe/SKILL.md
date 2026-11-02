@@ -1772,7 +1772,7 @@ an app that wants its own name on the approval page sets its own
 `MOONFRAME_GITHUB_CLIENT_ID` / `MOONFRAME_GITLAB_CLIENT_ID` override).
 Without one, `auth.device` is false and the other ways remain.
 `GH_TOKEN` and `GITHUB_TOKEN` sign in to github.com, `GITLAB_TOKEN` to
-gitlab.com or `$GITLAB_HOST` only. Tokens stay in
+`$GITLAB_HOST` when set, otherwise gitlab.com. Tokens stay in
 the provider (the system keyring, or a private file under
 `~/.local/state/moonframe` where the build has none) and never reach a mod.
 Components: `forge-pr` (a branch's request: number by tone, checks dot,
@@ -1783,6 +1783,7 @@ starter's title bar. `{ to = "app:open", msg = url }` opens a web page.
 
 | field | shape |
 |---|---|
+| `matches_remote` | whether this configured provider serves the checkout's remote, even before signing in; use this to select GitLab on self-hosted domains |
 | `repo` | `{ name_with_owner, url, default_branch }` |
 | `viewer` | person: `{ login, name, bot, avatar_url, avatar_path }`; `avatar_path` is a cached file in `~/.cache/moonframe/images/avatars` (where `ui.image` may read it) once downloaded, else nil |
 | `prs` | 30 open, newest first: `{ number, title, state ("open" "closed" "merged"), draft, url, branch, base, author (person), updated, review_decision, mergeable, merge_state, checks, tone, additions?, deletions?, files? }` (GitLab's line counts only on `current_pr`) |

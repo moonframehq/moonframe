@@ -41,11 +41,16 @@ fn github_answers_become_the_forge_shape() {
         json!({
             "number": number, "title": "Add\nforges", "state": state, "isDraft": false,
             "url": format!("https://github.com/o/r/pull/{number}"), "headRefName": "forge",
+            "headRepository": { "nameWithOwner": "o/r" },
             "baseRefName": "main", "updatedAt": "2026-11-01T09:30:00Z", "additions": 120,
             "deletions": 8, "changedFiles": 4, "reviewDecision": "REVIEW_REQUIRED",
             "mergeable": "MERGEABLE", "mergeStateStatus": merge,
             "author": { "__typename": "User", "login": "penso", "avatarUrl": "https://a/x" },
-            "commits": { "nodes": [{ "commit": { "statusCheckRollup": { "contexts": { "nodes": [check] } } } }] },
+            "commits": { "nodes": [{ "commit": { "statusCheckRollup": { "contexts": {
+                "nodes": [check], "checkRunCountsByState": [{
+                    "state": check["conclusion"].as_str().unwrap_or("IN_PROGRESS"), "count": 1
+                }], "statusContextCountsByState": []
+            } } } }] },
         })
     };
     let passing = json!({ "__typename": "CheckRun", "name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS", "detailsUrl": "https://ci" });
@@ -135,6 +140,29 @@ fn gitlab_answers_become_the_forge_shape() {
     assert_eq!(current["additions"], 10);
     assert_eq!(current["check_list"][0]["name"], "test");
     assert_eq!(gitlab::encode("g/s r"), "g%2Fs%20r");
+}
+
+#[test]
+fn gitlab_requested_changes_are_attention_even_with_passing_checks() {
+    let folder = tempfile::tempdir().unwrap();
+    let avatars = Avatars {
+        folder: folder.path(),
+        prefix: String::new(),
+    };
+    let mr = json!({ "iid": 1, "state": "opened", "draft": false,
+        "detailed_merge_status": "requested_changes", "head_pipeline": { "status": "success" } });
+    let out = gitlab::shape(
+        &Value::Null,
+        &Value::Null,
+        &json!([mr]),
+        &json!([]),
+        &[],
+        &target(&["feature"]),
+        &avatars,
+    );
+    assert_eq!(out["prs"][0]["tone"], "attention");
+    assert_eq!(out["prs"][0]["review_decision"], "changes_requested");
+    assert_eq!(out["prs"][0]["checks"]["passed"], 1);
 }
 
 #[test]
@@ -265,6 +293,5 @@ fn gitlab_hosts_are_named_never_guessed() {
     assert!(!gitlab.serves("gitlab.attacker.example", &[]));
     assert!(!gitlab.env_serves("gitlab.attacker.example"));
     assert!(gitlab.serves("git.example.com", &["git.example.com".to_owned()]));
-    assert!(gitlab.env_serves("gitlab.com"));
     assert!(kind::Kind::GitHub.env_serves("github.com"));
 }

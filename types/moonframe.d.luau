@@ -1255,6 +1255,9 @@ type Forge = {
 	available: boolean,
 	reason: string?,
 	host: string,
+	-- Whether the checkout's remote belongs to this configured provider,
+	-- including self-hosted GitLab, even before sign-in succeeds.
+	matches_remote: boolean,
 	auth: ForgeAuth,
 	repo: { name_with_owner: string, url: string, default_branch: string? },
 	viewer: ForgePerson?,

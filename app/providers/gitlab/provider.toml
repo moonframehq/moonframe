@@ -21,7 +21,7 @@ accounts = ["forge"]
 # client_ids = { "gitlab.example.com" = "..." }
 client_id = "8cac6a8a1722b18c0787b58eeb40eed9e255f671407fc98679d82ba78cb966d1"
 # Self-hosted GitLab hosts to sign in to. GITLAB_TOKEN goes only to
-# gitlab.com or $GITLAB_HOST.
+# $GITLAB_HOST when set, otherwise gitlab.com.
 hosts = []
 # Seconds between reads of GitLab, 15 to 3600.
 poll = 60

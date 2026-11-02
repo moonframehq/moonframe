@@ -91,7 +91,7 @@ pub enum Poll {
 }
 
 /// Asks once whether the user entered `code`.
-pub fn poll(agent: &ureq::Agent, kind: Kind, host: &str, client: &str, code: &Code) -> Poll {
+pub fn poll(agent: &ureq::Agent, kind: Kind, host: &str, client: &str, code: &mut Code) -> Poll {
     let answer = match http::form(agent, &kind.token_url(host), &[
         ("client_id", client),
         ("device_code", code.device.expose_secret()),
@@ -102,13 +102,20 @@ pub fn poll(agent: &ureq::Agent, kind: Kind, host: &str, client: &str, code: &Co
         Err(Failure::Network(_)) => return Poll::Wait(code.interval),
         Err(failure) => return Poll::Failed(failure.to_string()),
     };
+    polled(&answer, &mut code.interval)
+}
+
+fn polled(answer: &Value, interval: &mut Duration) -> Poll {
     match answer.get("error").and_then(Value::as_str) {
-        Some("authorization_pending") => Poll::Wait(code.interval),
-        Some("slow_down") => Poll::Wait(code.interval + Duration::from_secs(5)),
+        Some("authorization_pending") => Poll::Wait(*interval),
+        Some("slow_down") => {
+            *interval += Duration::from_secs(5);
+            Poll::Wait(*interval)
+        },
         Some("expired_token") => Poll::Failed("the code expired; start again".into()),
         Some("access_denied") => Poll::Failed("the sign-in was declined".into()),
-        Some(_) => Poll::Failed(oauth_error(&answer)),
-        None => match token(&answer, Source::Saved) {
+        Some(_) => Poll::Failed(oauth_error(answer)),
+        None => match token(answer, Source::Saved) {
             Some(credential) => Poll::Done(credential),
             None => Poll::Failed("the forge sent no token".into()),
         },
@@ -171,5 +178,24 @@ fn oauth_error(answer: &Value) -> String {
         format!("the forge refused the sign-in ({code})")
     } else {
         words
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, serde_json::json};
+
+    #[test]
+    fn slowdowns_accumulate_and_pending_keeps_the_increased_interval() {
+        let mut interval = Duration::from_secs(5);
+        for (error, seconds) in [
+            ("slow_down", 10),
+            ("authorization_pending", 10),
+            ("slow_down", 15),
+            ("slow_down", 20),
+        ] {
+            assert!(matches!(polled(&json!({ "error": error }), &mut interval),
+                Poll::Wait(wait) if wait == Duration::from_secs(seconds)));
+        }
     }
 }

@@ -273,13 +273,8 @@ pub fn environment(kind: Kind) -> Option<Credential> {
 pub fn cli(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Credential> {
     let (program, args) = kind.cli(host);
     let program = moonframe_providers::program::find(program, path)?;
-    let output = Command::new(program)
+    let output = cli_command(&program, kind, host, path)
         .args(args)
-        .env("PATH", path)
-        .env("GH_PROMPT_DISABLED", "1")
-        .env("NO_COLOR", "1")
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
         .output()
         .ok()?;
     if !output.status.success() || output.stdout.len() > 4096 {
@@ -290,8 +285,61 @@ pub fn cli(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Credential>
     plausible(token).then(|| Credential::new(SecretString::from(token.to_owned()), Source::Cli))
 }
 
+/// Resolve the chosen CLI account immediately before use. glab refreshes
+/// OAuth credentials through its API transport, not `config get token`.
+pub fn cli_ready(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Credential> {
+    if kind == Kind::GitLab {
+        let program = moonframe_providers::program::find("glab", path)?;
+        let status = cli_command(&program, kind, host, path)
+            .args(["api", "user", "--hostname", host])
+            .stdout(Stdio::null())
+            .status()
+            .ok()?;
+        if !status.success() {
+            return None;
+        }
+    }
+    cli(kind, host, path)
+}
+
+/// A CLI choice is resolved afresh rather than reusing a captured token.
+pub fn for_fetch(
+    kind: Kind,
+    host: &str,
+    path: &std::ffi::OsStr,
+    credential: Credential,
+) -> Option<Credential> {
+    if credential.source == Source::Cli {
+        cli_ready(kind, host, path)
+    } else {
+        Some(credential)
+    }
+}
+
+fn cli_command(program: &Path, kind: Kind, host: &str, path: &std::ffi::OsStr) -> Command {
+    let mut command = Command::new(program);
+    command
+        .env("PATH", path)
+        .env("GH_PROMPT_DISABLED", "1")
+        .env("GITLAB_PROMPT_DISABLED", "1")
+        .env("NO_COLOR", "1")
+        .stdin(Stdio::null())
+        .stderr(Stdio::null());
+    // glab's environment overrides can otherwise bypass our host scoping.
+    if kind == Kind::GitLab && !kind.env_serves(host) {
+        for name in ["GITLAB_TOKEN", "GITLAB_ACCESS_TOKEN", "OAUTH_TOKEN"] {
+            command.env_remove(name);
+        }
+    }
+    command
+}
+
 /// Whether `token` could be a token: printable, no spaces, not absurdly
 /// long. The forge has the last word.
 pub fn plausible(token: &str) -> bool {
     (8..=1024).contains(&token.len()) && token.bytes().all(|byte| byte.is_ascii_graphic())
 }
+
+#[cfg(all(test, unix))]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests;
