@@ -189,6 +189,29 @@ class LibraryTests(unittest.TestCase):
         self.assertTrue(all(len(i) <= 81 for i in ids))
         self.assertIn("L" * 77 + " (2)", ids)
 
+    def test_a_stale_recovery_never_overwrites_newer_writing(self):
+        opened = self.start()["current"]["opened"]
+        self.send({"save": {"id": "Draft", "opened": opened, "text": "Run A, never written"}})
+        self.stop(self.process)  # A stops before writing; its journal stays
+        self.assertEqual(len(self.journals()), 1)
+        # Meanwhile the file changes elsewhere.
+        (self.folder / "Draft.md").write_text("Newer, saved by run B", encoding="utf-8")
+        self.start()
+        self.assertEqual((self.folder / "Draft.md").read_text(), "Newer, saved by run B")
+        self.assertEqual((self.folder / "Draft (recovered).md").read_text(), "Run A, never written")
+        self.assertEqual(self.journals(), [])
+
+    def test_only_locked_files_are_published_as_locks(self):
+        self.start()
+        locks = list((self.folder / ".journals").glob("*.lock"))
+        self.assertEqual(len(locks), 1)
+        self.assertEqual(list((self.folder / ".journals").glob("*.locking")), [])
+        # A second run's scan leaves a live run's lock in place.
+        one = self.process
+        self.start()
+        self.assertTrue(locks[0].exists())
+        self.assertIsNone(one.poll())
+
 
 if __name__ == "__main__":
     unittest.main()

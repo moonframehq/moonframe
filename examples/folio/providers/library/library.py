@@ -35,6 +35,7 @@
 
 import fcntl
 import glob
+import hashlib
 import json
 import os
 import re
@@ -286,6 +287,7 @@ def fresh_name():
 
 current = None  # { id, text, opened }
 current_path = None  # the open document's file: saves go here, never by name
+base = None  # the hash of that file as this run last read or wrote it
 opened = 0
 pending = None  # (path, text) not written yet
 typed = 0.0  # when the last edit came
@@ -328,8 +330,34 @@ def replay(journal):
     if path is None and saved.get("id") is not None:
         found = where(saved["id"])  # a journal from before paths were kept
         path = found[0] if found else None
-    if inside(path) and os.path.isfile(path):
+    if not inside(path) or not os.path.isfile(path):
+        return
+    # The edit was made on the file as `base` hashes it. If the file has
+    # changed since (another run saved it, or another editor), the newer
+    # text stays and the recovered one goes beside it.
+    now = digest(path)
+    if saved.get("base") == now or now == digest_text(saved["text"]):
         atomic_write(path, saved["text"])
+        return
+    folder = os.path.dirname(path)
+    name = os.path.basename(path)[: -len(".md")]
+    suffix = " (recovered)"
+    copy = name[: NAME_MAX - len(suffix)].rstrip() + suffix
+    copy = free(copy, os.path.realpath(folder) == os.path.realpath(TRASH))
+    atomic_write(folder + "/" + copy + ".md", saved["text"])
+
+
+def digest_text(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def digest(path):
+    # The hash of a file's bytes, or None when it can't be read.
+    try:
+        with open(path, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return None
 
 
 def gone(path):
@@ -347,15 +375,23 @@ def recover():
     # before writing their last edit, leaving those of live runs alone.
     global lock
     os.makedirs(JOURNALS, exist_ok=True)
-    lock = open(LOCK, "w")
+    # Locked under a name the scan below never looks at, then renamed into
+    # place: every `*.lock` another run sees is already held.
+    hidden = JOURNALS + "/" + SESSION + ".locking"
+    lock = open(hidden, "w")
     fcntl.flock(lock, fcntl.LOCK_EX)
+    os.replace(hidden, LOCK)
     if os.path.isfile(LEGACY_JOURNAL):
         replay(LEGACY_JOURNAL)
         gone(LEGACY_JOURNAL)
     for other in glob.glob(JOURNALS + "/*.lock"):
         if other == LOCK:
             continue
-        with open(other, "a") as held:
+        try:
+            fd = os.open(other, os.O_RDWR)  # never create one that has gone
+        except OSError:
+            continue
+        with os.fdopen(fd, "r+") as held:
             try:
                 fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
@@ -368,12 +404,14 @@ def recover():
 
 
 def flush():
-    global pending
+    global pending, base
     if pending is None:
         return
     path, body = pending
     if os.path.isfile(path):
         atomic_write(path, body)
+        if path == current_path:
+            base = digest_text(body)
     # Keep recovery available until the document has been replaced. A
     # deleted document is deliberately not recreated by journal replay.
     gone(JOURNAL)
@@ -381,13 +419,14 @@ def flush():
 
 
 def open_doc(doc):
-    global current, current_path, opened
+    global current, current_path, opened, base
     flush()
     found = where(doc)
     if not found:
         return
     opened += 1
     current_path = found[0]
+    base = digest(current_path)
     current = {"id": doc, "opened": "%s-%d" % (SESSION, opened)}
     try:
         size = os.path.getsize(found[0])
@@ -421,7 +460,7 @@ def receive(line):
         if isinstance(body, str) and mine and os.path.isfile(current_path):
             if pending and pending[0] != current_path:
                 flush()
-            atomic_write(JOURNAL, encode({"path": current_path, "text": body}))
+            atomic_write(JOURNAL, encode({"path": current_path, "text": body, "base": base}))
             pending = (current_path, body)
             typed = time.time()
     elif msg.get("new"):
