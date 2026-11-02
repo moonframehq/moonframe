@@ -37,6 +37,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
+| `ui.input { id = "name", change = "typed" }` | a text field the host edits, one line or a text area (`multiline`); a writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it | `id`, `value`, `placeholder`, `change`, `submit` and `keys` (sent with `value` added), `to`, `multiline`, `rows`, `grow`, `width`, `mono`, `focus`, `disabled`, `browser`, `prose`, `dim`, `typewriter` |
 
 ### Overlays
 

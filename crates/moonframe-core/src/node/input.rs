@@ -38,6 +38,23 @@ pub struct Input {
     pub browser: Option<String>,
     pub width: Option<f32>,
     pub grow: bool,
+    /// A writing field: markdown is styled as it is typed (headings bold,
+    /// emphasis slanted, markup faded) and lines wrap at the field's width.
+    pub prose: bool,
+    /// Focus on the sentence or paragraph being written: the rest fades.
+    pub dim: Option<Dim>,
+    /// Keep the line being written in the middle of the field, as a
+    /// typewriter keeps its line, scrolling the text instead of the caret.
+    pub typewriter: bool,
+}
+
+/// What a writing field keeps in full while the rest of its text fades.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Dim {
+    /// The sentence the caret is in.
+    Sentence,
+    /// The paragraph the caret is in: lines up to a blank one.
+    Paragraph,
 }
 
 impl Input {
@@ -45,6 +62,12 @@ impl Input {
     pub const DEFAULT_ROWS: u32 = 3;
     /// Most `rows` a field can ask for.
     pub const MAX_ROWS: u32 = 200;
+
+    /// Whether the host edits it as prose rather than plain text: any of
+    /// `prose`, `dim` or `typewriter`.
+    pub fn writing(&self) -> bool {
+        self.prose || self.dim.is_some() || self.typewriter
+    }
 
     /// What the field sends for `msg` when its text is `value`: a table
     /// `msg` is copied with `value` set; anything else becomes
