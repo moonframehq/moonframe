@@ -15,7 +15,8 @@
 //!   and the grant is kept across launches (denying it there takes it back);
 //! - `{ host = "local" | "ssh:<target>" | "wsl:<distro>" }` reads another
 //!   machine's sign-ins, over SSH or through `wsl.exe`, with its own
-//!   credentials;
+//!   credentials; only `local`, `[settings] host`, and the machines listed
+//!   in `[settings] hosts`, so a mod cannot point SSH anywhere else;
 //! - anything else refreshes, at most once every 10 seconds.
 //!
 //! Only the mods named in provider.toml's `writers` setting may send
@@ -43,7 +44,7 @@ use {
 };
 
 /// The keys of `[settings]` that are herdr's `[usage]` table; the rest are
-/// this provider's own (`host`, `grants`).
+/// this provider's own (`host`, `hosts`, `grants`, `writers`).
 const USAGE_KEYS: &[&str] = &[
     "browser_cookies",
     "hide_providers",
@@ -64,6 +65,9 @@ pub struct UsageProvider {
     grants: Grants,
     /// The mods that may send `allow` and `host` (`[settings] writers`).
     writers: Mods,
+    /// The machines a `host` message may name besides `local`: `[settings]
+    /// host` and `hosts`.
+    hosts: Vec<Host>,
     /// What was published last, so a tick that changed nothing sends
     /// nothing.
     last: Option<Value>,
@@ -79,6 +83,15 @@ impl Native for UsageProvider {
         });
         self.grants = Grants::load(grants::path(&settings));
         self.writers = Mods::from_settings(host.settings(), "writers");
+        self.hosts = settings
+            .get("hosts")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(parse_host)
+            .collect::<Result<_, _>>()?;
+        self.hosts.extend(self.host.clone());
         self.tick(host);
         Ok(())
     }
@@ -127,7 +140,15 @@ impl Native for UsageProvider {
             self.usage.allow(provider, now);
         } else if let Some(name) = message.get("host").and_then(Value::as_str) {
             match parse_host(name) {
-                Ok(next) => self.host = Some(next),
+                Ok(next) if next == Host::Local || self.hosts.contains(&next) => {
+                    self.host = Some(next);
+                },
+                Ok(_) => {
+                    host.fail(format!(
+                        "{from}: host `{name}` is not in providers/usage's `hosts`"
+                    ));
+                    return;
+                },
                 Err(problem) => {
                     host.fail(format!("{from}: {problem}"));
                     return;

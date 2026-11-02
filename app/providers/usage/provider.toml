@@ -7,7 +7,7 @@
 # through herdr-usage. Services are asked every 10 minutes at most.
 # Messages: `{ allow = "<id>" }` lets a sign-in kept in another app's
 # Keychain item be read (macOS then asks); `{ host = "ssh:<target>" }`
-# reads another machine; anything else refreshes.
+# reads another machine listed in `hosts`; anything else refreshes.
 interval = 1.0
 kind     = "native"
 
@@ -16,6 +16,9 @@ kind     = "native"
 # `host` (connects over SSH with your keys); any other is refused. Any mod
 # may refresh. Add your own mod here to let it.
 writers = ["usage"]
+# Other machines a `host` message may switch to, besides "local", e.g.
+# ["ssh:me@box", "wsl:Ubuntu"]; `host = "..."` reads one from the start.
+hosts = []
 # Providers shown even without a sign-in here, so their sheet says what to
 # set up; and providers never shown.
 hide_providers = []

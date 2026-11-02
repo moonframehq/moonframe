@@ -1742,7 +1742,7 @@ message refreshes (at most every 10 s); `{ allow = "<id>" }` lets a
 sign-in kept in another app's Keychain item be read when the provider says
 `access = "needed"` (macOS asks; the answer is kept across launches);
 `{ host = "ssh:<target>" | "wsl:<distro>" | "local" }` reads another
-machine with its own sign-ins. Only the mods in `[settings] writers`
+machine with its own sign-ins, one listed in `[settings] hosts`. Only the mods in `[settings] writers`
 (`usage` as shipped) may send `allow` or `host`; any mod may refresh.
 The rest of `[settings]` is herdr's `[usage]` table
 (`show_providers`, `hide_providers`, `browser_cookies`,

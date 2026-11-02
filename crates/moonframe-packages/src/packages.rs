@@ -270,16 +270,34 @@ fn invisible(c: char) -> bool {
     )
 }
 
-/// The built-in git provider's manifest, compiled in so its `writers` are
-/// known wherever the command runs from.
-const BUILTIN_GIT: &str = include_str!("../../../app/providers/git/provider.toml");
+/// The built-in providers that let only the mods in their `[settings]
+/// writers` send them privileged messages (save files, commit and push,
+/// ask for a Keychain item, connect over SSH), with their manifests
+/// compiled in so those `writers` are known wherever the command runs from.
+const GATED: &[(&str, &str)] = &[
+    // keep-sorted start
+    (
+        "docs",
+        include_str!("../../../app/providers/docs/provider.toml"),
+    ),
+    (
+        "git",
+        include_str!("../../../app/providers/git/provider.toml"),
+    ),
+    (
+        "usage",
+        include_str!("../../../app/providers/usage/provider.toml"),
+    ),
+    // keep-sorted end
+];
 
-/// Every mod a git provider here may let commit and push: `[settings]
-/// writers` in the built-in `providers/git`, the user's, and every installed
-/// package's, enabled or not (one can be enabled without asking). Which
-/// layer wins depends on what is installed, so all of them count.
-pub fn git_writers(user: &Path) -> Vec<String> {
-    let mut texts = vec![BUILTIN_GIT.to_owned()];
+/// Every mod a built-in provider here may trust with a privileged message:
+/// `[settings] writers` of each provider in [`GATED`], built in, the
+/// user's, and every installed package's, enabled or not (one can be
+/// enabled without asking). Which layer wins depends on what is installed,
+/// so all of them count.
+pub fn writers(user: &Path) -> Vec<String> {
+    let mut texts: Vec<String> = GATED.iter().map(|(_, text)| (*text).to_owned()).collect();
     let mut folders = vec![user.to_owned()];
     if let Ok(list) = List::read(user) {
         folders.extend(
@@ -288,11 +306,11 @@ pub fn git_writers(user: &Path) -> Vec<String> {
                 .map(|(id, entry)| entry.folder(user, id)),
         );
     }
-    texts.extend(
-        folders.iter().filter_map(|folder| {
-            fs::read_to_string(folder.join("providers/git/provider.toml")).ok()
-        }),
-    );
+    for folder in &folders {
+        texts.extend(GATED.iter().filter_map(|(name, _)| {
+            fs::read_to_string(folder.join("providers").join(name).join("provider.toml")).ok()
+        }));
+    }
     let mut writers: Vec<String> = texts
         .iter()
         .filter_map(|text| text.parse::<toml::Table>().ok())

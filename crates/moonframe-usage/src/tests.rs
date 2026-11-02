@@ -191,6 +191,13 @@ fn only_writers_may_allow_or_switch_hosts() {
     assert_eq!(provider.host, Some(Host::Local));
     assert!(provider.grants.granted().is_empty());
     assert_eq!(failures.lock().unwrap().len(), 2);
+    // A writer may switch only to a machine the settings list.
+    provider.receive(&handle, "usage", message(json!({ "host": "wsl:Ubuntu" })));
+    assert_eq!(provider.host, Some(Host::Local));
+    assert_eq!(failures.lock().unwrap().len(), 3);
+    provider.hosts.push(Host::Wsl("Ubuntu".into()));
     provider.receive(&handle, "usage", message(json!({ "host": "wsl:Ubuntu" })));
     assert_eq!(provider.host, Some(Host::Wsl("Ubuntu".into())));
+    provider.receive(&handle, "usage", message(json!({ "host": "local" })));
+    assert_eq!(provider.host, Some(Host::Local));
 }

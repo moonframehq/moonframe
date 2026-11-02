@@ -621,7 +621,7 @@ fn a_mod_that_shadows_a_git_writer_is_named() {
         ("mods/other/main.luau", &counter("o")),
     ]);
     let (_, contents) = install(&user, remote.to_str().unwrap(), &yes).unwrap();
-    let builtin = git_writers(&user);
+    let builtin = writers(&user);
     assert!(builtin.contains(&"status".to_owned()), "{builtin:?}");
     assert_eq!(contents.writers(&builtin).collect::<Vec<_>>(), ["status"]);
 
@@ -632,9 +632,11 @@ fn a_mod_that_shadows_a_git_writer_is_named() {
         "kind = \"native\"\n[settings]\nwriters = [\"other\"]\n",
     )
     .unwrap();
-    let writers = git_writers(&user);
-    assert_eq!(writers, ["other", "status"]);
-    assert_eq!(contents.writers(&writers).collect::<Vec<_>>(), [
+    let widened = writers(&user);
+    for name in ["other", "status"] {
+        assert!(widened.contains(&name.to_owned()), "{widened:?}");
+    }
+    assert_eq!(contents.writers(&widened).collect::<Vec<_>>(), [
         "other", "status"
     ]);
 
@@ -644,7 +646,34 @@ fn a_mod_that_shadows_a_git_writer_is_named() {
         "kind = \"native\"\n[settings]\nwriters = [\"later\"]\n",
     )]);
     install(&user, widening.to_str().unwrap(), &yes).unwrap();
-    assert!(git_writers(&user).contains(&"later".to_owned()));
+    assert!(writers(&user).contains(&"later".to_owned()));
+}
+
+/// The same holds for every built-in provider with `writers`: a package's
+/// mod named `usage` (allowed to raise Keychain prompts and reach SSH
+/// hosts) or `editor` (allowed to save files) is named too.
+#[test]
+fn a_mod_that_shadows_any_providers_writer_is_named() {
+    let dir = tempfile::tempdir().unwrap();
+    let user = dir.path().join("user");
+    let remote = repo(dir.path(), "baz", &[
+        ("mods/usage/main.luau", &counter("u")),
+        ("mods/editor/main.luau", &counter("e")),
+    ]);
+    let (_, contents) = install(&user, remote.to_str().unwrap(), &yes).unwrap();
+    let all = writers(&user);
+    assert_eq!(contents.writers(&all).collect::<Vec<_>>(), [
+        "editor", "usage"
+    ]);
+
+    let usage = user.join("providers/usage");
+    fs::create_dir_all(&usage).unwrap();
+    fs::write(
+        usage.join("provider.toml"),
+        "kind = \"native\"\n[settings]\nwriters = [\"mine\"]\n",
+    )
+    .unwrap();
+    assert!(writers(&user).contains(&"mine".to_owned()));
 }
 
 /// An update of an app is approved with what it ships beside it: a
