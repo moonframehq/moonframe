@@ -181,10 +181,7 @@ impl Read for Polyline {
             return Err(points.fail("points are numbers of pixels"));
         }
         Ok(Self {
-            points: flat
-                .as_chunks::<2>()
-                .0
-                .to_vec(),
+            points: flat.as_chunks::<2>().0.to_vec(),
             color: fields.get("color")?,
             stroke: fields.number("stroke", 0.5..=8.0)?.unwrap_or(1.5),
             dashed: fields.get("dashed")?.unwrap_or(false),
