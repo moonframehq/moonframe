@@ -12,6 +12,8 @@ builds=target/providers
 rm -rf "$out"
 mkdir -p "$out"
 cp -R "$app"/. "$out"/
+# The skills `app new` writes are for agents building the app, not for its users.
+rm -rf "$out/.claude"
 
 # The agent skills the `skills` provider offers to copy to the user's
 # folder, beside it, as a bundle has no repository around it.

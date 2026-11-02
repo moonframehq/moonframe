@@ -359,7 +359,7 @@ fn copy_tree(from: &Path, to: &Path) -> io::Result<()> {
         let name = entry.file_name();
         if matches!(
             name.to_str(),
-            Some(".git" | "target" | ".DS_Store" | ".moonframe-embedded")
+            Some(".claude" | ".git" | "target" | ".DS_Store" | ".moonframe-embedded")
         ) {
             continue;
         }
