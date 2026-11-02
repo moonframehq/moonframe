@@ -375,8 +375,8 @@ impl MoonframeApp {
             }
             return false;
         }
-        if screen.exited {
-            if keystroke.key == "enter" && !view.exit_handled() {
+        if screen.exited || screen.disconnected {
+            if keystroke.key == "enter" && (screen.disconnected || !view.exit_handled()) {
                 self.terminals.restart(&key);
                 cx.notify();
             }

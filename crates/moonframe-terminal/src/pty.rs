@@ -7,7 +7,10 @@ use {
     std::{
         io::{Read, Write},
         path::PathBuf,
-        sync::Mutex,
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, Ordering},
+        },
     },
     sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind},
 };
@@ -41,6 +44,7 @@ impl Backend for Pty {
             .spawn_command(command)
             .map_err(|error| format!("cannot start the shell: {error}"))?;
         let killer = Mutex::new(child.clone_killer());
+        let exited = Arc::new(AtomicBool::new(false));
         let pid = child.process_id();
         drop(pair.slave);
         let reader = pair
@@ -57,10 +61,12 @@ impl Backend for Pty {
                 master: Mutex::new(pair.master),
                 killer,
                 pid,
+                exited: exited.clone(),
             }),
             output: Box::new(Reading {
                 reader,
                 child,
+                exited,
                 buffer: vec![0; CHUNK],
                 done: false,
             }),
@@ -76,6 +82,7 @@ struct PtyPane {
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
     /// The shell's process, to read its folder.
     pid: Option<u32>,
+    exited: Arc<AtomicBool>,
 }
 
 impl Drop for PtyPane {
@@ -87,6 +94,10 @@ impl Drop for PtyPane {
 }
 
 impl Pane for PtyPane {
+    fn exited(&self) -> bool {
+        self.exited.load(Ordering::Acquire)
+    }
+
     fn write(&self, bytes: &[u8]) {
         if let Ok(mut writer) = self.writer.lock() {
             let _ = writer.write_all(bytes).and_then(|()| writer.flush());
@@ -118,6 +129,7 @@ impl Pane for PtyPane {
 struct Reading {
     reader: Box<dyn Read + Send>,
     child: Box<dyn Child + Send + Sync>,
+    exited: Arc<AtomicBool>,
     buffer: Vec<u8>,
     done: bool,
 }
@@ -132,7 +144,8 @@ impl Iterator for Reading {
         match self.reader.read(&mut self.buffer) {
             Ok(0) | Err(_) => {
                 self.done = true;
-                let _ = self.child.wait();
+                self.exited
+                    .store(self.child.wait().is_ok(), Ordering::Release);
                 None
             },
             Ok(read) => Some(self.buffer[..read].to_vec()),

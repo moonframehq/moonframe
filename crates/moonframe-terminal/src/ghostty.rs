@@ -110,6 +110,7 @@ impl Ghostty {
             app_cursor,
             bracketed_paste,
             exited: false,
+            disconnected: false,
         })
     }
 }

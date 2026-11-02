@@ -159,8 +159,10 @@ fn grid(
                 painting.row(&screen, row, window, cx);
             }
             painting.cursor(&screen, focused, window);
-            if screen.exited {
-                let note = if view.exit_handled() {
+            if screen.exited || screen.disconnected {
+                let note = if screen.disconnected {
+                    "[connection lost; press Enter to reconnect]"
+                } else if view.exit_handled() {
                     "[the shell exited]"
                 } else {
                     "[the shell exited; press Enter to start another]"
