@@ -40,13 +40,15 @@ impl Kind {
     /// host that merely has `gitlab` in its name: anyone can register
     /// one, and a sign-in would be sent there.
     pub fn serves(self, host: &str, extra: &[String]) -> bool {
-        let host = host.to_ascii_lowercase();
         match self {
-            Self::GitHub => host == "github.com" || host == "www.github.com",
+            Self::GitHub => {
+                host.eq_ignore_ascii_case("github.com")
+                    || host.eq_ignore_ascii_case("www.github.com")
+            },
             Self::GitLab => {
-                host == "gitlab.com"
-                    || env_host().is_some_and(|known| known == host)
-                    || extra.iter().any(|known| known.eq_ignore_ascii_case(&host))
+                same_host(host, "gitlab.com")
+                    || env_host().is_some_and(|known| same_host(host, &known))
+                    || extra.iter().any(|known| same_host(host, known))
             },
         }
     }
@@ -62,7 +64,7 @@ impl Kind {
             Self::GitHub => self.default_host(),
             Self::GitLab => configured.unwrap_or(self.default_host()),
         };
-        host.eq_ignore_ascii_case(expected)
+        same_host(host, expected)
     }
 
     /// Where a device sign-in starts.
@@ -135,6 +137,16 @@ fn env_host() -> Option<String> {
     let value = value.split_once("://").map_or(value, |(_, rest)| rest);
     let host = value.split('/').next()?.to_ascii_lowercase();
     (!host.is_empty()).then_some(host)
+}
+
+/// Whether `found` (a remote's `host[:port]`) is `known`: the same host and
+/// port, or the same host when `known` names no port.
+pub fn same_host(found: &str, known: &str) -> bool {
+    if found.eq_ignore_ascii_case(known) {
+        return true;
+    }
+    let name = |host: &str| host.split(':').next().unwrap_or(host).to_ascii_lowercase();
+    !known.contains(':') && name(found) == name(known)
 }
 
 #[cfg(test)]

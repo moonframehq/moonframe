@@ -99,9 +99,34 @@ fn remote(root: &Path, branch: &str) -> Option<(String, String)> {
         })?;
     let url = text(root, &["remote", "get-url", &name])?;
     let remote = moonframe_git::remote_json(&name, &url);
-    let host = remote["host"].as_str()?.to_ascii_lowercase();
+    let mut host = remote["host"].as_str()?.to_ascii_lowercase();
+    // An HTTPS remote's port is where its API answers too; an SSH port is
+    // the SSH server's, never the web's.
+    if let Some(port) = https_port(&url) {
+        host = format!("{host}:{port}");
+    }
     let owner = remote["owner"].as_str()?;
     let repo = remote["repo"].as_str()?;
     (!host.is_empty() && !owner.is_empty() && !repo.is_empty())
         .then(|| (host, format!("{owner}/{repo}")))
+}
+
+/// The port an `https://` (or `http://`) remote names, unless it is the
+/// default one.
+pub fn https_port(url: &str) -> Option<u16> {
+    let (scheme, rest) = url.split_once("://")?;
+    if !scheme.eq_ignore_ascii_case("https") && !scheme.eq_ignore_ascii_case("http") {
+        return None;
+    }
+    let authority = rest.split('/').next()?;
+    let authority = authority.rsplit('@').next()?;
+    // An IPv6 literal (`[::1]:8443`) keeps its colons inside the brackets.
+    let after_host = authority.rsplit(']').next()?;
+    let port: u16 = after_host.rsplit_once(':')?.1.parse().ok()?;
+    let default = if scheme.eq_ignore_ascii_case("https") {
+        443
+    } else {
+        80
+    };
+    (port != default).then_some(port)
 }

@@ -295,3 +295,33 @@ fn gitlab_hosts_are_named_never_guessed() {
     assert!(gitlab.serves("git.example.com", &["git.example.com".to_owned()]));
     assert!(kind::Kind::GitHub.env_serves("github.com"));
 }
+
+#[test]
+fn https_remotes_keep_their_port() {
+    assert_eq!(
+        repo::https_port("https://gitlab.example.com:8443/g/r.git"),
+        Some(8443)
+    );
+    assert_eq!(
+        repo::https_port("https://user:tok@gitlab.example.com:8443/g/r"),
+        Some(8443)
+    );
+    assert_eq!(repo::https_port("https://gitlab.example.com/g/r.git"), None);
+    assert_eq!(
+        repo::https_port("https://gitlab.example.com:443/g/r.git"),
+        None
+    );
+    // An SSH port is the SSH server's.
+    assert_eq!(
+        repo::https_port("ssh://git@gitlab.example.com:2222/g/r.git"),
+        None
+    );
+    assert_eq!(repo::https_port("git@gitlab.example.com:g/r.git"), None);
+    let gitlab = kind::Kind::GitLab;
+    let hosts = ["gitlab.example.com".to_owned()];
+    assert!(gitlab.serves("gitlab.example.com:8443", &hosts));
+    assert!(!gitlab.serves("gitlab.example.com:8443", &[
+        "gitlab.example.com:9000".to_owned()
+    ]));
+    assert!(!kind::Kind::GitHub.serves("github.com:8443", &[]));
+}

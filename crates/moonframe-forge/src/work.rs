@@ -64,7 +64,9 @@ pub enum Done {
         target: Target,
         epoch: u64,
         result: Result<Value, Failure>,
-        /// The credential, renewed if it had to be.
+        /// Whether `credential` is a renewed one, which the provider saves.
+        renewed: bool,
+        /// The credential, renewed or read from the CLI again.
         credential: Option<Credential>,
     },
 }
@@ -138,17 +140,11 @@ impl Context {
         });
     }
 
-    /// Checks `credential` with the forge, saves it, and says so.
+    /// Checks `credential` with the forge and says so. Saving it is the
+    /// provider's, once it knows no sign-out came in the meantime.
     fn keep(&self, host: &str, credential: Credential, asker: Asker) {
         match self.login(host, &credential) {
             Ok(login) => {
-                if let Err(problem) = self.saved.save(host, &credential) {
-                    self.send(Done::Refused {
-                        error: format!("signed in as {login}, but cannot save it: {}", problem.0),
-                        asker,
-                    });
-                    return;
-                }
                 self.send(Done::SignedIn {
                     host: host.to_owned(),
                     credential,
@@ -261,6 +257,7 @@ impl Context {
                     target,
                     epoch,
                     result: Err(Failure::Unauthorized),
+                    renewed: false,
                     credential: None,
                 });
                 return;
@@ -283,13 +280,6 @@ impl Context {
                     credential,
                 )
                 .ok()?;
-                if let Err(problem) = context.saved.save(&target.host, &renewed) {
-                    tracing::warn!(
-                        "{}: cannot save the renewed sign-in: {}",
-                        context.kind.name(),
-                        problem.0
-                    );
-                }
                 Some(renewed)
             };
             let mut renewed = false;
@@ -317,6 +307,7 @@ impl Context {
                 target,
                 epoch,
                 result,
+                renewed,
                 credential: (renewed || cli).then_some(credential),
             });
         });

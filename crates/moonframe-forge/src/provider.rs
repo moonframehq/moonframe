@@ -97,6 +97,9 @@ pub(crate) struct Forge {
     fetched_at: Option<Instant>,
     asked_at: Option<Instant>,
     next: Option<Instant>,
+    /// No read before this, whatever asks: the forge limited requests or
+    /// could not be reached.
+    blocked_until: Option<Instant>,
     data: Value,
     published: Value,
 }
@@ -129,6 +132,7 @@ impl Forge {
             fetched_at: None,
             asked_at: None,
             next: None,
+            blocked_until: None,
             data: Value::Null,
             published: Value::Null,
         }
@@ -273,6 +277,22 @@ impl Forge {
                 }
                 self.end_device();
                 self.waiting = None;
+                // Saved here, not by the worker: a sign-out that came while
+                // it checked the token bumped `attempt`, and this is skipped.
+                let saved = self.context.as_ref().map_or(Ok(()), |context| {
+                    context.saved.save(&signed_in, &credential)
+                });
+                if let Err(problem) = saved {
+                    let error = format!("signed in as {login}, but cannot save it: {}", problem.0);
+                    self.status = if self.credential.is_some() {
+                        Status::SignedIn
+                    } else {
+                        Status::SignedOut
+                    };
+                    self.error = Some(error.clone());
+                    reply(host, &asker, false, json!({ "error": error }));
+                    return;
+                }
                 if signed_in == self.host {
                     self.status = Status::SignedIn;
                     self.credential = Some(credential);
@@ -306,6 +326,7 @@ impl Forge {
                 target,
                 epoch,
                 result,
+                renewed,
                 credential,
             } => {
                 self.fetching = false;
@@ -316,6 +337,18 @@ impl Forge {
                 if let Some(credential) = credential
                     && self.credential.is_some()
                 {
+                    // Only a sign-in still current is saved: a sign-out
+                    // during the fetch bumped `epoch`.
+                    if renewed
+                        && let Some(context) = &self.context
+                        && let Err(problem) = context.saved.save(&target.host, &credential)
+                    {
+                        tracing::warn!(
+                            "{}: cannot save the renewed sign-in: {}",
+                            self.kind.name(),
+                            problem.0
+                        );
+                    }
                     self.credential = Some(credential);
                 }
                 match result {
@@ -323,6 +356,7 @@ impl Forge {
                         self.login = data["viewer"]["login"].as_str().map(str::to_owned);
                         self.data = data;
                         self.error = None;
+                        self.blocked_until = None;
                         // A refresh requested during this fetch still needs to run.
                         self.next.get_or_insert(Instant::now() + self.every);
                     },
@@ -345,6 +379,9 @@ impl Forge {
                         } else {
                             self.every
                         };
+                        if matches!(failure, Failure::RateLimited | Failure::Network(_)) {
+                            self.blocked_until = Some(Instant::now() + wait);
+                        }
                         self.next = Some(Instant::now() + wait);
                     },
                 }
@@ -380,9 +417,15 @@ impl Forge {
         }
     }
 
+    /// Whether a read is asked for and allowed at `now`: a request moves
+    /// `next`, never `blocked_until`.
+    fn due(&self, now: Instant) -> bool {
+        self.next.is_some_and(|next| now >= next)
+            && self.blocked_until.is_none_or(|until| now >= until)
+    }
+
     fn fetch_if_due(&mut self) {
-        let due = self.next.is_some_and(|next| Instant::now() >= next);
-        if !due || self.fetching || self.status != Status::SignedIn {
+        if !self.due(Instant::now()) || self.fetching || self.status != Status::SignedIn {
             return;
         }
         let (Some(target), Some(credential), Some(context)) =

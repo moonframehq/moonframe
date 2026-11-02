@@ -22,6 +22,7 @@
 //! Any other message, from any mod, reads the forge again. Tokens never
 //! leave the provider: mods only ever see the login.
 
+// keep-sorted start
 mod credentials;
 mod device;
 mod github;
@@ -32,6 +33,7 @@ mod provider;
 mod repo;
 mod shape;
 mod work;
+// keep-sorted end
 
 use moonframe_providers::Native;
 

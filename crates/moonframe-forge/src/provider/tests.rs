@@ -111,6 +111,7 @@ fn a_branch_change_discards_the_old_fetch_and_preserves_the_refresh() {
     let due = Instant::now();
     forge.next = Some(due);
     forge.take_in(&host, Done::Fetched {
+        renewed: false,
         target: old,
         epoch: forge.epoch,
         result: Ok(json!({ "current_pr": { "number": 1 } })),
@@ -128,6 +129,7 @@ fn a_refresh_during_a_fetch_still_runs_after_it() {
     let due = Instant::now();
     forge.next = Some(due);
     forge.take_in(&host, Done::Fetched {
+        renewed: false,
         target: forge.target().unwrap(),
         epoch: forge.epoch,
         result: Ok(json!({ "viewer": { "login": "user" } })),
@@ -143,6 +145,7 @@ fn an_old_accounts_failure_cannot_sign_out_the_new_account() {
     let mut forge = signed_in();
     forge.epoch = 1;
     forge.take_in(&host, Done::Fetched {
+        renewed: false,
         target: forge.target().unwrap(),
         epoch: 0,
         result: Err(Failure::Unauthorized),
@@ -162,4 +165,101 @@ fn a_self_hosted_remote_is_identified_before_signing_in() {
     assert_eq!(data["available"], false);
     forge.checkout.remote = Some(("gitlab.attacker.example".into(), "group/repo".into()));
     assert_eq!(forge.snapshot()["matches_remote"], false);
+}
+
+#[test]
+fn a_refresh_request_waits_out_a_rate_limit() {
+    let (host, _) = handle();
+    let mut forge = signed_in();
+    let target = forge.target().unwrap();
+    forge.fetching = true;
+    forge.take_in(&host, Done::Fetched {
+        renewed: false,
+        target,
+        epoch: forge.epoch,
+        result: Err(Failure::RateLimited),
+        credential: None,
+    });
+    // What a mod's refresh does.
+    forge.next = Some(Instant::now());
+    assert!(!forge.due(Instant::now()));
+    assert!(forge.due(Instant::now() + RATE_LIMITED + Duration::from_secs(1)));
+}
+
+/// A provider whose sign-ins are kept in a private file under `dir`.
+#[cfg(unix)]
+fn with_store(dir: &std::path::Path) -> (Forge, Arc<Saved>) {
+    let mut forge = Forge::new(Kind::GitHub);
+    let saved = Arc::new(Saved::new(Kind::GitHub, dir.to_owned(), true));
+    let (sender, receiver) = channel();
+    forge.context = Some(Context {
+        kind: Kind::GitHub,
+        sender,
+        agent: crate::http::agent(),
+        saved: Arc::clone(&saved),
+        path: std::ffi::OsString::new(),
+        images: dir.join("avatars"),
+    });
+    forge.done = Some(receiver);
+    forge.accounts = Mods::from_iter(["forge"]);
+    forge.loaded = Some("github.com".into());
+    forge.status = Status::Verifying;
+    (forge, saved)
+}
+
+#[cfg(unix)]
+#[test]
+fn a_sign_out_during_the_check_is_not_undone() {
+    let (host, _) = handle();
+    let dir = tempfile::tempdir().unwrap();
+    let (mut forge, saved) = with_store(dir.path());
+    let waiting = Asker {
+        action: "token",
+        ..asker(forge.attempt)
+    };
+    forge.waiting = Some(waiting.clone());
+    forge.act(
+        &host,
+        "forge",
+        &Data::map([("sign_out", Data::from(true))]),
+        "sign_out",
+    );
+    // The check finishes after the sign-out.
+    forge.take_in(&host, Done::SignedIn {
+        host: "github.com".into(),
+        credential: Credential::new(SecretString::from("late-token"), Source::Saved),
+        login: "late".into(),
+        asker: waiting,
+    });
+    assert_eq!(forge.status, Status::SignedOut);
+    assert!(forge.credential.is_none());
+    assert!(
+        matches!(saved.load("github.com"), Ok(None)),
+        "the token was saved"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_finished_check_saves_the_sign_in() {
+    use crate::credentials::Remembered;
+    let (host, _) = handle();
+    let dir = tempfile::tempdir().unwrap();
+    let (mut forge, saved) = with_store(dir.path());
+    let waiting = Asker {
+        action: "token",
+        ..asker(forge.attempt)
+    };
+    forge.waiting = Some(waiting.clone());
+    forge.take_in(&host, Done::SignedIn {
+        host: "github.com".into(),
+        credential: Credential::new(SecretString::from("good-token"), Source::Saved),
+        login: "penso".into(),
+        asker: waiting,
+    });
+    assert_eq!(forge.status, Status::SignedIn);
+    assert!(matches!(
+        saved.load("github.com"),
+        Ok(Some(Remembered::Token(_)))
+    ));
 }
