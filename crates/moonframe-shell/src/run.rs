@@ -202,21 +202,20 @@ impl Run {
         };
         {
             let mut shared = lock(&self.shared);
-            if shared.status != Status::Running {
+            if shared.status != Status::Running || shared.stopping {
                 return;
             }
             shared.stopping = true;
             shared.changed = true;
         }
         signal(pid, false);
-        let shared = Arc::clone(&self.shared);
         let _ = thread::Builder::new()
             .name("shell-stop".to_owned())
             .spawn(move || {
                 thread::sleep(Duration::from_secs(2));
-                if lock(&shared).status == Status::Running {
-                    signal(pid, true);
-                }
+                // The leader may already have exited while children still
+                // hold the group (and its output pipe) alive.
+                signal(pid, true);
             });
     }
 

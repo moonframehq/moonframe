@@ -19,6 +19,7 @@ type State = {
 	file: string?,
 	limit: number,
 	branch: string?,
+	workspace: string?,
 }
 
 local function open_list(open: { [string]: boolean? }): string
@@ -110,8 +111,9 @@ return mod {
 		[".checks-row:hover"] = { background = "list-hover" },
 	},
 
-	init = function(previous: State?): State
-		return previous or { tab = "files", scope = "uncommitted", folded = {}, open = {}, file = nil, limit = 400 }
+	init = function(previous: State?): (State, { any })
+		local state = previous or { tab = "files", scope = "uncommitted", folded = {}, open = {}, file = nil, limit = 400 }
+		return state, { { to = "provider:projects", msg = { forge = state.tab == "checks" } } }
 	end,
 
 	update = function(state: State, msg)
@@ -125,10 +127,14 @@ return mod {
 			return
 		end
 		if msg.topic == "switchyard/workspace" then
-			-- Another worktree: its folders start shut.
-			state.folded = {}
-			state.open = {}
-			state.file = nil
+			local path = msg.value and msg.value.path
+			-- Metadata updates in the same worktree keep the inspector open.
+			if path ~= state.workspace then
+				state.folded = {}
+				state.open = {}
+				state.file = nil
+			end
+			state.workspace = path
 			state.branch = msg.value and msg.value.branch
 		elseif msg.tab then
 			state.tab = msg.tab

@@ -336,15 +336,15 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
     where
         Self: ParentElement,
     {
-        if frame.follow && frame.scroll != Scroll::No {
-            follow(handle);
-        }
         let axis = match (direction, frame.scroll) {
             (_, Scroll::No) => return self,
             (Direction::Row, Scroll::Along) | (_, Scroll::X) => ScrollbarAxis::Horizontal,
             (Direction::Column, Scroll::Along) | (_, Scroll::Y) => ScrollbarAxis::Vertical,
             (_, Scroll::Both) => ScrollbarAxis::Both,
         };
+        if frame.follow {
+            follow(handle, axis);
+        }
         self.track_scroll(handle).child(
             div()
                 .absolute()
@@ -359,13 +359,21 @@ impl<E: StyleExt + StatefulInteractiveElement> FrameExt for E {}
 /// Keeps a frame with `follow` at its end while it is there: as the content
 /// grows, it scrolls along. Where the handle last laid out says whether the
 /// user is at the end; a frame laid out for the first time starts there.
-fn follow(handle: &ScrollHandle) {
+fn follow(handle: &ScrollHandle, axis: ScrollbarAxis) {
     /// How near the end still counts as there, for the last line's rounding.
     const SLACK: f32 = 24.;
     let offset = handle.offset();
     let max = handle.max_offset();
-    let at_end = -offset.y >= max.y - px(SLACK) && -offset.x >= max.x - px(SLACK);
-    if at_end {
+    if matches!(axis, ScrollbarAxis::Horizontal | ScrollbarAxis::Both)
+        && -offset.x >= max.x - px(SLACK)
+    {
+        // GPUI clamps this to the newly laid-out content's right edge in
+        // prepaint. scroll_to_bottom only changes y.
+        handle.set_offset(point(-Pixels::MAX, offset.y));
+    }
+    if matches!(axis, ScrollbarAxis::Vertical | ScrollbarAxis::Both)
+        && -offset.y >= max.y - px(SLACK)
+    {
         handle.scroll_to_bottom();
     }
 }

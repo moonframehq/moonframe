@@ -15,6 +15,7 @@ type State = {
 	query: string,
 	searching: boolean,
 	folded: { [string]: boolean? },
+	workspace: { path: string, name: string, branch: string }?,
 }
 
 local function workspace_of(project: any): any
@@ -63,6 +64,7 @@ return mod {
 		local state: State = previous or { selected = nil, query = "", searching = false, folded = {} }
 		state.searching = false
 		state.query = ""
+		state.workspace = nil
 		return state
 	end,
 
@@ -78,16 +80,21 @@ return mod {
 			-- The first projects: tell everyone where we are.
 			local projects = msg.value
 			local current = projects and projects.current
-			if not state.selected and current then
-				state.selected = current.path
-				return state, { { to = "topic:switchyard/workspace", msg = workspace_of(current) } }
-			elseif state.selected and current and current.path ~= state.selected then
+			if state.selected and current and current.path ~= state.selected then
 				return state, { { to = "provider:projects", msg = { select = state.selected } } }
+			elseif current then
+				local previous = state.workspace
+				state.selected = current.path
+				state.workspace = workspace_of(current)
+				if not previous or previous.path ~= current.path or previous.branch ~= current.branch or previous.name ~= current.name then
+					return state, { { to = "topic:switchyard/workspace", msg = state.workspace } }
+				end
 			end
 			return
 		end
 		if msg.select then
 			state.selected = msg.select.path
+			state.workspace = msg.select
 			return state, {
 				{ to = "provider:projects", msg = { select = msg.select.path } },
 				{ to = "topic:switchyard/workspace", msg = msg.select },

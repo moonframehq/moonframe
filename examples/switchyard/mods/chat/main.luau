@@ -27,7 +27,7 @@ local AGENT_TITLES = {
 local SETTING_ORDER = { model = 1, model_config = 2, thought_level = 3, mode = 4, other = 5 }
 
 type Anchor = { run: string, after: number }
-type Known = { status: string, working: boolean, cwd: string }
+type Known = { status: string, working: boolean, cwd: string, after: number? }
 
 type State = {
 	workspace: { path: string, name: string, branch: string }?,
@@ -35,7 +35,7 @@ type State = {
 	draft: string,
 	timeline: { [string]: { Anchor } },
 	context: { [string]: { { id: string, label: string, text: string } } },
-	waiting: { [string]: string? },
+	waiting: { [string]: { string } },
 	pending: { [string]: any },
 	known: { [string]: Known },
 	open: { [string]: boolean? },
@@ -43,8 +43,7 @@ type State = {
 	highlight: number,
 	error: string?,
 	serial: number,
-	-- The shown chat's last entry: where the next shell card goes.
-	after: number,
+	completion: { path: string, folder: string }?,
 }
 
 local function agent_icon(agent: string?): any
@@ -68,6 +67,11 @@ end
 -- Where a shell command's card goes: the chat shown, else the workspace.
 local function timeline_key(state: State): string
 	return current_chat(state) or `ws:{(state.workspace and state.workspace.path) or ""}`
+end
+
+local function anchor(state: State): number
+	local id = current_chat(state)
+	return if id then state.known[id].after or 0 else 0
 end
 
 -- The chats of the workspace, oldest first, from what the mod knows.
@@ -114,12 +118,29 @@ local function focus(state: State): { any }
 	return if id then { { to = "provider:chat", msg = { focus = id } } } else {}
 end
 
+-- Keep unsent text even when another draft was typed before a rejection.
+local function restore_prompt(state: State, prompt: string)
+	state.draft = prompt .. (if state.draft == "" then "" else "\n\n" .. state.draft)
+end
+
+local function prompt_message(state: State, chat: string, prompt: string): any
+	local token = next_id(state)
+	state.pending[token] = { kind = "prompt", prompt = prompt }
+	return { to = "provider:chat", msg = { prompt = prompt, chat = chat, id = token } }
+end
+
 -- Sends the draft: a shell command, a prompt to the chat shown, or a new
 -- chat that gets the prompt once it is up.
 local function send(state: State): (State, { any }?)
 	local text = state.draft
 	local workspace = state.workspace
 	if not workspace or string.match(text, "^%s*$") then
+		return state, nil
+	end
+	local chat = current_chat(state)
+	if string.sub(text, 1, 1) ~= "!" and chat
+		and (state.known[chat].status == "ended" or state.known[chat].status == "failed") then
+		state.error = "Resume this chat before sending a message"
 		return state, nil
 	end
 	state.draft = ""
@@ -131,15 +152,20 @@ local function send(state: State): (State, { any }?)
 			return state, nil
 		end
 		local token = next_id(state)
-		state.pending[token] = { kind = "run", key = timeline_key(state), after = state.after }
+		state.pending[token] = { kind = "run", key = timeline_key(state), after = anchor(state) }
 		return state, { { to = "provider:shell", msg = { run = command, cwd = workspace.path, id = token } } }
 	end
 	local key = timeline_key(state)
 	local prompt = with_context(text, state.context[key] or {})
 	state.context[key] = nil
-	local chat = current_chat(state)
 	if chat then
-		return state, { { to = "provider:chat", msg = { prompt = prompt, chat = chat, id = next_id(state) } } }
+		if state.known[chat].status ~= "live" then
+			local waiting = state.waiting[chat] or {}
+			table.insert(waiting, prompt)
+			state.waiting[chat] = waiting
+			return state, nil
+		end
+		return state, { prompt_message(state, chat, prompt) }
 	end
 	local token = next_id(state)
 	state.pending[token] = { kind = "start", prompt = prompt, path = workspace.path }
@@ -156,9 +182,59 @@ local function start_chat(state: State, agent: string): (State, { any }?)
 	return state, { { to = "provider:chat", msg = { start = agent, cwd = workspace.path, id = token } } }
 end
 
--- Replaces the word being typed with a completion.
+-- The last shell word, decoding quoting so a completed directory with
+-- spaces can itself be completed. The prefix is kept byte for byte.
+local function shell_word(draft: string): (string, string)
+	local start, escaped = 2, false
+	local word: { string } = {}
+	local quote: string = ""
+	for at = 2, #draft do
+		local char = string.sub(draft, at, at)
+		if escaped then
+			table.insert(word, char)
+			escaped = false
+		elseif quote == "'" then
+			if char == "'" then quote = "" else table.insert(word, char) end
+		elseif char == "\\" then
+			escaped = true
+		elseif quote == '"' then
+			if char == '"' then quote = "" else table.insert(word, char) end
+		elseif char == "'" or char == '"' then
+			quote = char
+		elseif string.match(char, "[%s;|&<>()]") then
+			start, word = at + 1, {}
+		else
+			table.insert(word, char)
+		end
+	end
+	return string.sub(draft, 1, start - 1), table.concat(word)
+end
+
+local function shell_quote(path: string): string
+	if string.match(path, "^[%w_./%-]+$") then return path end
+	return "'" .. string.gsub(path, "'", "'\\''") .. "'"
+end
+
+local function completion_request(state: State): { any }?
+	if not state.workspace then return nil end
+	local folder = ""
+	if string.sub(state.draft, 1, 1) == "!" then
+		local _, word = shell_word(state.draft)
+		folder = string.match(word, "^(.+)/[^/]*$") or ""
+		local previous = state.completion
+		if previous and previous.path == state.workspace.path and previous.folder == folder then return nil end
+		state.completion = { path = state.workspace.path, folder = folder }
+	elseif state.completion then
+		state.completion = nil
+	else
+		return nil
+	end
+	return { { to = "provider:projects", msg = { complete = folder, cwd = state.workspace.path } } }
+end
+
+-- Replaces the shell word, including its quotes, or a slash command.
 local function complete(state: State, insert: string)
-	local before = string.match(state.draft, "^(.-)%S*$") or ""
+	local before = if string.sub(state.draft, 1, 1) == "!" then shell_word(state.draft) else ""
 	state.draft = before .. insert
 	state.highlight = 1
 end
@@ -171,6 +247,7 @@ local function on_reply(state: State, msg: any): (State, { any }?)
 	state.pending[msg.reply] = nil
 	if not msg.ok then
 		state.error = msg.error or "That did not work"
+		if pending and pending.prompt then restore_prompt(state, pending.prompt) end
 		return state, nil
 	end
 	if pending and pending.kind == "run" then
@@ -183,6 +260,7 @@ local function on_reply(state: State, msg: any): (State, { any }?)
 		-- Shell cards run before the chat existed move into it.
 		local loose = `ws:{pending.path}`
 		if state.timeline[loose] then
+			for _, item in state.timeline[loose] do item.after = 0 end
 			state.timeline[msg.chat] = state.timeline[loose]
 			state.timeline[loose] = nil
 		end
@@ -191,7 +269,7 @@ local function on_reply(state: State, msg: any): (State, { any }?)
 			state.context[loose] = nil
 		end
 		if pending.prompt then
-			state.waiting[msg.chat] = pending.prompt
+			state.waiting[msg.chat] = { pending.prompt }
 		end
 		return state, { { to = "provider:chat", msg = { focus = msg.chat } } }
 	end
@@ -206,18 +284,15 @@ local function on_chats(state: State, value: any): (State, { any }?)
 	for _, chat in (value and value.chats) or {} do
 		local transcript = chat.transcript
 		local working = transcript ~= nil and transcript.status ~= nil and transcript.status.state == "working"
-		known[chat.id] = { status = chat.status, working = working, cwd = chat.cwd }
+		known[chat.id] = { status = chat.status, working = working, cwd = chat.cwd, after = last_entry(chat) }
 		local waiting = state.waiting[chat.id]
 		if waiting and chat.status == "live" then
 			state.waiting[chat.id] = nil
-			table.insert(sends, { to = "provider:chat", msg = { prompt = waiting, chat = chat.id, id = next_id(state) } })
+			for _, prompt in waiting do table.insert(sends, prompt_message(state, chat.id, prompt)) end
 		elseif waiting and (chat.status == "failed" or chat.status == "ended") then
 			state.waiting[chat.id] = nil
 			state.error = chat.error or "The chat did not start"
-		end
-		-- Where the next shell card goes in this chat's thread.
-		if chat.id == current_chat(state) then
-			state.after = last_entry(chat)
+			restore_prompt(state, table.concat(waiting, "\n\n"))
 		end
 	end
 	state.known = known
@@ -250,14 +325,14 @@ return mod {
 	init = function(previous: State?): State
 		local state: State = previous or {
 			workspace = nil, selected = {}, draft = "", timeline = {}, context = {}, waiting = {},
-			pending = {}, known = {}, open = {}, menu = nil, highlight = 1, error = nil, serial = 0, after = 0,
+			pending = {}, known = {}, open = {}, menu = nil, highlight = 1, error = nil, serial = 0,
 		}
-		state.after = state.after or 0
 		state.menu = nil
 		state.error = nil
 		state.pending = {}
 		state.waiting = {}
 		state.highlight = 1
+		state.completion = nil
 		return state
 	end,
 
@@ -265,7 +340,10 @@ return mod {
 		if type(msg) == "table" and msg.topic == "switchyard/workspace" then
 			state.workspace = msg.value
 			state.menu = nil
-			return state, focus(state)
+			local sends = focus(state)
+			local requests: { any } = completion_request(state) or {}
+			for _, request in requests do table.insert(sends, request) end
+			return state, sends
 		elseif type(msg) == "table" and msg.topic == "provider/chat" then
 			return on_chats(state, msg.value)
 		elseif type(msg) == "table" and msg.reply ~= nil then
@@ -274,6 +352,10 @@ return mod {
 
 		local chat = current_chat(state)
 		local working = chat ~= nil and state.known[chat].working
+		if type(msg) == "table" and (msg.msg == "send" or msg.msg == "newline") then
+			state.draft = msg.value
+			msg = msg.msg
+		end
 		if msg == "send" then
 			return send(state)
 		elseif msg == "newline" then
@@ -310,10 +392,12 @@ return mod {
 		elseif msg.msg == "draft" then
 			state.draft = msg.value
 			state.highlight = 1
+			return state, completion_request(state)
 		elseif msg.highlight then
 			state.highlight = msg.highlight
 		elseif msg.complete then
 			complete(state, msg.complete)
+			return state, completion_request(state)
 		elseif msg.menu then
 			state.menu = if state.menu == msg.menu then nil else msg.menu
 		elseif msg.select_chat and state.workspace then
@@ -352,7 +436,7 @@ return mod {
 			return state, { { to = "provider:shell", msg = { stop = msg.shell_stop } } }
 		elseif msg.rerun and state.workspace then
 			local token = next_id(state)
-			state.pending[token] = { kind = "run", key = timeline_key(state), after = state.after }
+			state.pending[token] = { kind = "run", key = timeline_key(state), after = anchor(state) }
 			return state, { { to = "provider:shell", msg = { run = msg.rerun, cwd = state.workspace.path, id = token } } }
 		elseif msg.add then
 			local key = timeline_key(state)
@@ -542,23 +626,19 @@ return mod {
 		local draft = state.draft
 		local shell = string.sub(draft, 1, 1) == "!"
 		local completions = {}
-		local word = string.match(draft, "(%S*)$") or ""
-		if shell and word ~= "" and draft ~= "!" then
-			if string.sub(word, 1, 1) == "!" then
-				word = string.sub(word, 2)
-			end
+		if shell and draft ~= "!" then
+			local _, word = shell_word(draft)
 			local found_folder, found_base = string.match(word, "^(.*/)([^/]*)$")
 			local folder: string = found_folder or ""
 			local base: string = found_base or word
-			local listing = app.projects and app.projects.dirs and app.projects.dirs[string.gsub(folder, "/$", "")]
+			local projects = app.projects
+			local listing = projects and projects.current and workspace and projects.current.path == workspace.path
+				and projects.dirs and projects.dirs[string.gsub(folder, "/$", "")]
 			for _, item in listing or {} do
 				local kind, name = string.sub(item, 1, 1), string.sub(item, 2)
 				if string.sub(name, 1, #base) == base and name ~= base and #completions < 8 then
 					local dir = kind == "d" or kind == "D"
-					local insert = folder .. name .. (if dir then "/" else "")
-					if string.sub(draft, 1, #draft - #word) == "" or string.match(draft, "^!%S*$") then
-						insert = "!" .. insert
-					end
+					local insert = shell_quote(folder .. name .. (if dir then "/" else ""))
 					table.insert(completions, { label = name .. (if dir then "/" else ""), icon = if dir then "folder" else "file", insert = insert })
 				end
 			end

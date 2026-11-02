@@ -181,3 +181,64 @@ fn stop_ends_a_command_and_others_may_neither_run_nor_stop() {
         std::thread::sleep(Duration::from_millis(20));
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn stop_escalates_after_the_leader_exits() {
+    use rustix::process::{Pid, Signal, kill_process, test_kill_process};
+    struct ChildGuard(Pid);
+    impl Drop for ChildGuard {
+        fn drop(&mut self) {
+            let _ = kill_process(self.0, Signal::KILL);
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let run = Run::start(
+        "stop-tree".into(),
+        "chat".into(),
+        "sh -c 'trap \"\" TERM HUP; echo $$ > child; exec sleep 30' & wait".into(),
+        dir.path(),
+        Path::new("/bin/sh"),
+    );
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let pid = loop {
+        if let Some(pid) = std::fs::read_to_string(dir.path().join("child"))
+            .ok()
+            .and_then(|text| text.trim().parse::<i32>().ok())
+            .and_then(Pid::from_raw)
+        {
+            break pid;
+        }
+        assert!(Instant::now() < deadline, "child did not become ready");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let _child = ChildGuard(pid);
+    run.stop();
+    while run.running() {
+        assert!(Instant::now() < deadline, "leader did not exit");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(run::lock(&run.shared).status, run::Status::Stopped);
+    assert!(
+        test_kill_process(pid).is_ok(),
+        "fixture child should survive TERM"
+    );
+    loop {
+        if test_kill_process(pid).is_err() {
+            break;
+        }
+        // An orphan killed in a container may await pid 1's reap.
+        let status = std::process::Command::new("ps")
+            .args(["-o", "stat=", "-p", &pid.as_raw_nonzero().get().to_string()])
+            .output()
+            .unwrap();
+        if String::from_utf8_lossy(&status.stdout)
+            .trim_start()
+            .starts_with('Z')
+        {
+            break;
+        }
+        assert!(Instant::now() < deadline, "Stop left its child alive");
+        std::thread::sleep(Duration::from_millis(30));
+    }
+}

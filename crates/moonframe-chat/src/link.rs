@@ -103,7 +103,12 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
             return true;
         };
         match message {
-            ServerMessage::Welcome { .. } => {},
+            ServerMessage::Welcome { .. } => {
+                // A valid cursor is resumed with changes, not a snapshot.
+                if chat.cursor.is_some() && chat.transcript.is_some() {
+                    chat.phase = Phase::Live;
+                }
+            },
             ServerMessage::Snapshot { cursor, transcript } => {
                 chat.cursor = Some(cursor);
                 chat.transcript = Some(*transcript);
@@ -164,3 +169,7 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
 pub(crate) fn command(writer: &mut UnixStream, id: CommandId, command: Command) -> bool {
     write_frame(writer, &ClientMessage::Command { command, id }).is_ok()
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests;

@@ -3,7 +3,6 @@
 -- its reasoning in a fold, a tool call as one quiet line that opens, how a
 -- turn ended, a notice, or a picture's placeholder.
 
-local chat_markdown = use "chat-markdown"
 local thinking = use "thinking"
 
 local TOOL_ICONS = {
@@ -84,6 +83,7 @@ return component {
 	styles = {
 		[".entry-user"] = { background = "secondary", radius = 14, padding = { 10, 14 } },
 		[".entry-agent"] = { padding = { 2, 2 } },
+		[".entry-thought"] = { color = "muted-foreground", padding = { 0, 0, 0, 18 } },
 		[".entry-tool"] = { padding = { 3, 6 }, radius = 8, gap = 8 },
 		[".entry-tool:hover"] = { background = "list-hover" },
 		[".entry-tool-title"] = { color = "muted-foreground" },
@@ -106,9 +106,17 @@ return component {
 				ui.column { class = "entry-user", hug = true, max_width = 620, ui.text { kind.text or "", wrap = true } },
 			}
 		elseif kind_type == "agent" then
-			return ui.column { class = "entry-agent", chat_markdown { text = kind.text or "", cursor = props.streaming } }
+			-- One host document, rather than one Luau element per word: a
+			-- whole conversation must fit the host's element budget.
+			return ui.column { class = "entry-agent",
+				ui.markdown { text = kind.text or "" },
+				props.streaming and ui.text { "●", class = "entry-muted" },
+			}
 		elseif kind_type == "thought" then
-			return thinking { label = if props.streaming then "Thinking…" else "Thought", open = props.open, msg = props.toggle, text = kind.text or "" }
+			return ui.column { gap = "small",
+				thinking { label = if props.streaming then "Thinking…" else "Thought", open = props.open, msg = props.toggle },
+				props.open and ui.markdown { text = kind.text or "", class = "entry-thought" },
+			}
 		elseif kind_type == "tool" then
 			local title = kind.title
 			if not title or title == "" then

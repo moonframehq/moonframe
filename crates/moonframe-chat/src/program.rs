@@ -5,11 +5,12 @@
 //! here runs in none, so its endpoint is the socket its process listens on,
 //! named after the endpoint's id in herdr's private endpoint folder.
 
+mod endpoint;
+
 use {
     herdr_chat_protocol::EndpointId,
     std::{
-        collections::HashSet,
-        ffi::{OsStr, OsString},
+        ffi::OsStr,
         fs::File,
         path::{Path, PathBuf},
         process::{Command, Stdio},
@@ -79,7 +80,6 @@ pub(crate) struct Spawn<'a> {
 pub(crate) fn spawn(spawn: &Spawn<'_>) -> Result<(u32, EndpointId), String> {
     let folder = herdr_chat_protocol::endpoint_dir()
         .ok_or_else(|| "herdr's endpoint folder is unknown here".to_owned())?;
-    let before = sockets(&folder);
     let mut command = Command::new(spawn.program);
     command.arg("--headless").arg("--cwd").arg(spawn.cwd);
     if let Some(session) = spawn.load {
@@ -109,7 +109,7 @@ pub(crate) fn spawn(spawn: &Spawn<'_>) -> Result<(u32, EndpointId), String> {
     let pid = child.id();
     let started = Instant::now();
     loop {
-        if let Some(endpoint) = listening(pid, &folder, &before) {
+        if let Some(endpoint) = endpoint::listening(pid, &folder) {
             // Reap it whenever it ends; it is not waited on otherwise.
             let _ = thread::Builder::new()
                 .name("chat-reap".to_owned())
@@ -122,48 +122,13 @@ pub(crate) fn spawn(spawn: &Spawn<'_>) -> Result<(u32, EndpointId), String> {
         if started.elapsed() > LISTEN_TIMEOUT {
             end(pid);
             let _ = child.wait();
-            return Err("herdr-acp did not start listening in time".to_owned());
+            return Err(
+                "could not find herdr-acp's listening socket (needs /proc on Linux or lsof)"
+                    .to_owned(),
+            );
         }
         thread::sleep(Duration::from_millis(100));
     }
-}
-
-/// The endpoint `pid` listens on: the socket `lsof` names for it, else the
-/// one socket that appeared in `folder` since `before`.
-fn listening(pid: u32, folder: &Path, before: &HashSet<OsString>) -> Option<EndpointId> {
-    let named = Command::new("lsof")
-        .args(["-a", "-U", "-Fn", "-p", &pid.to_string()])
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output();
-    if let Ok(output) = named
-        && output.status.success()
-    {
-        return String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .filter_map(|line| line.strip_prefix('n'))
-            .map(Path::new)
-            .find(|path| path.parent() == Some(folder))
-            .and_then(endpoint_of);
-    }
-    let new: Vec<OsString> = sockets(folder).difference(before).cloned().collect();
-    match &new[..] {
-        [one] => endpoint_of(&folder.join(one)),
-        _ => None,
-    }
-}
-
-fn endpoint_of(path: &Path) -> Option<EndpointId> {
-    path.file_stem()?.to_str()?.parse().ok()
-}
-
-fn sockets(folder: &Path) -> HashSet<OsString> {
-    std::fs::read_dir(folder)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|entry| entry.file_name())
-        .collect()
 }
 
 /// Whether the chat at `endpoint` may still be running: its socket is there.

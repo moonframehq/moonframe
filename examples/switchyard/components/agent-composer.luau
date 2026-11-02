@@ -5,8 +5,8 @@
 -- auto-accept) beside a send button that stops a running turn.
 --
 -- It keeps nothing: the mod holds the text and what is open, and gets
--- `{ msg = "draft", value }` as the text changes, "send" on Enter,
--- "newline" on Shift-Enter, "escape", `{ highlight = n }`,
+-- `{ msg = "draft", value }` as the text changes, `{ msg = "send", value }`
+-- on Enter, `{ msg = "newline", value }` on Shift-Enter, "escape", `{ highlight = n }`,
 -- `{ complete = text }`, `{ menu = key }`, "close-menu",
 -- `{ auto_accept = on }`, "stop", and each
 -- setting's pick as `{ ["pick_" .. key] = id }`.
