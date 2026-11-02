@@ -1,10 +1,15 @@
 //! A `ui.terminal`: the latest screen of its shell, painted cell by cell in
 //! runs of one style, with the cursor; keys, pastes and scrolling go back
-//! to the shell. Its size follows the space the layout gives it.
+//! to the shell. Its size follows the space the layout gives it. Dragging
+//! selects text (a double click a word, a triple click a line), copied as
+//! the button is released and again with ⌘C.
 
 use {
     super::{Cx, Draw, Painter, Place, problem, styling::StyleExt as _},
-    crate::{color::ThemeColor as _, terminal::TerminalView},
+    crate::{
+        color::ThemeColor as _,
+        terminal::{Selection, Spot, TerminalView},
+    },
     gpui_kit::{component::ActiveTheme as _, *},
     moonframe_core::{MonoFont, Part, Terminal, TerminalBackend, TerminalEngine},
     moonframe_mux::Preference,
@@ -23,6 +28,8 @@ const FALLBACKS: &[&str] = &["Symbols Nerd Font Mono"];
 const PADDING: f32 = 8.;
 /// The least room a terminal asks for.
 const MIN_HEIGHT: f32 = 80.;
+/// The selection over the text: the accent, light enough to read through.
+const SELECTION_ALPHA: f32 = 0.3;
 
 impl<'w> Draw<'w> for Terminal {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
@@ -83,8 +90,9 @@ impl<'w> Draw<'w> for Terminal {
             return problem(format!("terminal `{}`: {error}", self.id), cx);
         }
         painter.terminals.drawn(&key, &view);
-        let focus = view.focus.clone();
+        let press_view = view.clone();
         let scroll_view = view.clone();
+        let selection = theme.primary.opacity(SELECTION_ALPHA);
         let hint = hint(view.backend, theme.muted_foreground);
         let line = typeface.line;
         frame
@@ -92,8 +100,9 @@ impl<'w> Draw<'w> for Terminal {
             .key_context("Terminal")
             .track_focus(&view.focus)
             .cursor(CursorStyle::IBeam)
-            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                focus.focus(window, cx)
+            .on_mouse_down(MouseButton::Left, move |event, window, cx| {
+                press_view.focus.focus(window, cx);
+                press(&press_view, event, window);
             })
             .on_scroll(move |event: &ScrollEvent, _, _| {
                 let moved = scroll_view.scrolled.get() + event.delta.pixel_delta(line).y / line;
@@ -102,11 +111,13 @@ impl<'w> Draw<'w> for Terminal {
                 if lines != 0.
                     && let Ok(session) = &scroll_view.session
                 {
+                    // The text moves from under the selection.
+                    scroll_view.clear_selection();
                     // Wheel down shows older lines: up the scrollback.
                     session.scroll(-(lines as i32));
                 }
             })
-            .child(grid(view, typeface, background, foreground))
+            .child(grid(view, typeface, background, foreground, selection))
             .child(hint)
             .into_any_element()
     }
@@ -131,6 +142,7 @@ fn grid(
     typeface: Typeface,
     background: Hsla,
     foreground: Hsla,
+    selection: Hsla,
 ) -> impl IntoElement {
     let resize = view.clone();
     canvas(
@@ -147,6 +159,8 @@ fn grid(
             };
             let screen = session.screen();
             let origin = bounds.origin + point(px(PADDING), px(PADDING));
+            view.grid.set(Some((origin, metrics.cell)));
+            follow_pointer(&view, window);
             let focused = view.focus.is_focused(window);
             let painting = Painting {
                 metrics: &metrics,
@@ -156,6 +170,9 @@ fn grid(
             };
             for row in 0..screen.rows {
                 painting.row(&screen, row, window, cx);
+            }
+            if let Some(selected) = *view.selection.borrow() {
+                painting.selection(&selected, &screen, selection, window);
             }
             painting.cursor(&screen, focused, window);
             if screen.exited {
@@ -169,6 +186,76 @@ fn grid(
         },
     )
     .size_full()
+}
+
+/// The cell under `position`, held inside the screen so a drag past an
+/// edge selects up to it.
+fn spot_at(view: &TerminalView, screen: &Screen, position: Point<Pixels>) -> Option<Spot> {
+    let (origin, cell) = view.grid.get()?;
+    if screen.cols == 0 || screen.rows == 0 {
+        return None;
+    }
+    let x = f32::from(position.x - origin.x) / f32::from(cell.width).max(1.);
+    let y = f32::from(position.y - origin.y) / f32::from(cell.height).max(1.);
+    // Clamped to the screen first, so the casts cannot truncate.
+    Some(Spot {
+        column: x.clamp(0., f32::from(screen.cols - 1)) as u16,
+        row: y.clamp(0., f32::from(screen.rows - 1)) as u16,
+    })
+}
+
+/// A left press on the grid starts a selection: one click at a cell, two
+/// its word, three its line.
+fn press(view: &TerminalView, event: &MouseDownEvent, window: &mut Window) {
+    let Ok(session) = &view.session else {
+        return;
+    };
+    let screen = session.screen();
+    let Some(at) = spot_at(view, &screen, event.position) else {
+        return;
+    };
+    *view.selection.borrow_mut() = Some(Selection::press(&screen, at, event.click_count));
+    view.selecting.set(true);
+    window.refresh();
+}
+
+/// While the button that started a selection is held, the selection
+/// follows the pointer, even outside the terminal; releasing it copies
+/// what it chose.
+fn follow_pointer(view: &Rc<TerminalView>, window: &mut Window) {
+    let moved = view.clone();
+    window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, _| {
+        if phase != DispatchPhase::Bubble || !moved.selecting.get() {
+            return;
+        }
+        if event.pressed_button != Some(MouseButton::Left) {
+            moved.selecting.set(false);
+            return;
+        }
+        let Ok(session) = &moved.session else {
+            return;
+        };
+        let Some(to) = spot_at(&moved, &session.screen(), event.position) else {
+            return;
+        };
+        let mut selection = moved.selection.borrow_mut();
+        if let Some(selection) = selection.as_mut() {
+            selection.extend(to);
+            window.refresh();
+        }
+    });
+    let released = view.clone();
+    window.on_mouse_event(move |event: &MouseUpEvent, phase, _, cx| {
+        if phase != DispatchPhase::Bubble
+            || event.button != MouseButton::Left
+            || !released.selecting.replace(false)
+        {
+            return;
+        }
+        if let Some(text) = released.selected_text() {
+            cx.write_to_clipboard(ClipboardItem::new_string(text));
+        }
+    });
 }
 
 /// The font a terminal draws in, from the stylesheet's `mono`.
@@ -329,6 +416,23 @@ impl Painting<'_> {
                 );
             }
             start = end;
+        }
+    }
+
+    /// The selected cells, tinted over their text.
+    fn selection(&self, selection: &Selection, screen: &Screen, tint: Hsla, window: &mut Window) {
+        for (row, columns) in selection.rows(screen.cols) {
+            if row >= screen.rows || columns.is_empty() {
+                continue;
+            }
+            let width = self.metrics.cell.width * f32::from(columns.end - columns.start);
+            window.paint_quad(fill(
+                Bounds::new(
+                    self.at(columns.start, row),
+                    size(width, self.metrics.cell.height),
+                ),
+                tint,
+            ));
         }
     }
 
