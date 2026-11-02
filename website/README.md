@@ -8,8 +8,10 @@ site/                 what Netlify publishes (netlify.toml at the repo root)
   docs/index.html     docs.moonframe.dev (served by a host rewrite in site/_redirects)
   components-browser.js, data/components.js   the Components browser on the home page
   img/                thumbnails (WebP, transparent corners) and img/full/ PNGs for the viewer
+  img/components/     each component's preview, cut from the app's Components window
 mockups/              the ten design directions the site was picked from, for reference
 tools/components-data.py   regenerates data/components.js from app/components/*.luau
+tools/component-shots.py   screenshots each component's preview into img/components/
 tools/og-images.py   renders the social cards from og/card.html and writes the Open Graph and X tags
 ```
 
@@ -25,6 +27,16 @@ repo root:
 ```sh
 python3 website/tools/components-data.py
 ```
+
+then re-capture the previews of the ones you changed (macOS, needs Screen
+Recording permission; with no names it captures every component, which
+takes a while):
+
+```sh
+uv run --with pillow website/tools/component-shots.py NAME ...
+```
+
+A component without a picture shows a pointer to the app instead.
 
 The social title, description and image alt text live in `PAGES` in
 `tools/og-images.py`; the tool writes them into each page's

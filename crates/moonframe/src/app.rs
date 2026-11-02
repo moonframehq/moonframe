@@ -46,6 +46,7 @@ use {
 // keep-sorted start
 mod listeners;
 mod menu;
+mod panes;
 mod picking;
 mod toasts;
 mod updates;
@@ -153,6 +154,9 @@ pub(crate) struct MoonframeApp {
     /// Sends keys to the topmost overlay or popover, else a focused
     /// terminal, before key bindings see them.
     _terminal_keys: Subscription,
+    /// The number of the last tab `moonframe pane new` opened, which names
+    /// it: each one's is higher, even for two in the same millisecond.
+    last_pane: i64,
 }
 
 struct Defaults {
@@ -287,11 +291,13 @@ impl MoonframeApp {
             key_layers: HashMap::new(),
             _watcher: watcher,
             _terminal_keys: crate::terminal::intercept_keys(cx),
+            last_pane: 0,
         };
         app.apply_theme(cx);
         hear_notification_clicks(cx);
         // What the mods' `init` sent providers as they started.
         app.forward("start", cx);
+        app.take_panes(cx);
         // An installed app looks for updates by itself, once a day, also
         // while it stays open, whatever Developer Mode says; runs from
         // source and runs without the user's folder (checks, screenshots)

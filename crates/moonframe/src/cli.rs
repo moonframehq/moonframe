@@ -35,6 +35,9 @@ Usage: moonframe [OPTIONS] [DIR]
        moonframe init [DIR] [--name NAME] [--path CHECKOUT]
                                          start an app of your own on the Moonframe
                                          library, or add one to a crate; see `init help`
+       moonframe [--profile NAME] pane new [--agent NAME] [--cwd DIR] [PROMPT...]
+                                         open a terminal tab in the running window,
+                                         with an agent in it; see `pane help`
        moonframe bundle [--dist DIR] [OUT]
                                          build this app's bundle (for apps on the
                                          library; the starter's is `just bundle`)
@@ -66,6 +69,9 @@ Options:
                 screenshots and scripts while someone is working)
   --component NAME
                 open the components window on NAME as well
+  --preview-only
+                with --component, show only NAME's preview, filling the
+                components window (for screenshots of it)
   --catalogue   print the component catalogue (markdown) and exit; fails if a
                 component is broken or says nothing of when to use it
   -h, --help    show this help";
@@ -75,6 +81,8 @@ struct Args {
     check: bool,
     /// Open without activating the app or focusing its window.
     background: bool,
+    /// The components window shows the chosen preview alone.
+    preview_only: bool,
     /// `--release`, or `--dev` (`Some(false)`); else as the bundle says.
     release: Option<bool>,
     catalogue: bool,
@@ -87,6 +95,8 @@ struct Args {
     init: Option<Vec<String>>,
     /// The words after `bundle`, to bundle an app on the library.
     bundle: Option<Vec<String>>,
+    /// The words after `pane`, for the running window.
+    panes: Option<Vec<String>>,
 }
 
 fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>, String> {
@@ -96,12 +106,14 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
     let mut check = false;
     let mut catalogue = false;
     let mut background = false;
+    let mut preview_only = false;
     let mut release = None;
     let mut component = None;
     let mut packages = None;
     let mut apps = None;
     let mut init = None;
     let mut bundle = None;
+    let mut panes = None;
     let mut profile = None;
     let mut args = std::env::args().skip(1).collect::<Vec<_>>().into_iter();
     while let Some(arg) = args.next() {
@@ -109,6 +121,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
             "--check" => check = true,
             "--catalogue" => catalogue = true,
             "--background" => background = true,
+            "--preview-only" => preview_only = true,
             "--release" => release = Some(true),
             "--dev" => release = Some(false),
             "--component" => component = Some(args.next().ok_or("--component needs a name")?),
@@ -132,6 +145,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
             },
             "init" if builtin.is_none() => init = Some(args.by_ref().collect()),
             "bundle" if builtin.is_none() => bundle = Some(args.by_ref().collect()),
+            "pane" | "panes" if builtin.is_none() => panes = Some(args.by_ref().collect()),
             // `app` is also the app folder's usual name (`moonframe app`),
             // so it is the command only before one of its words.
             "app" | "apps" if builtin.is_none() => {
@@ -175,12 +189,14 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
         check,
         catalogue,
         background,
+        preview_only,
         release,
         component,
         packages,
         apps,
         init,
         bundle,
+        panes,
     }))
 }
 
@@ -351,6 +367,17 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         );
         return ExitCode::from(2);
     }
+    if let Some(words) = &args.panes {
+        // A window without the user's folder takes no requests.
+        let Some(user) = &folders.user else {
+            eprintln!(
+                "{} pane: panes open in a window with the user's folder; drop --no-user",
+                paths::name()
+            );
+            return ExitCode::from(2);
+        };
+        return crate::panes::run(user, folders.profile.as_deref(), &folders.title(), words);
+    }
     if let Some(words) = &args.packages {
         let Some(own) = folders.own() else {
             eprintln!(
@@ -413,6 +440,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     let icon = folders.icon();
     let background = args.background;
     crate::BACKGROUND.store(background, Ordering::Relaxed);
+    crate::PREVIEW_ONLY.store(args.preview_only, Ordering::Relaxed);
     let _ = crate::RUNNING_ID.set(folders.app_id());
     if let Some(profile) = &folders.profile {
         moonframe_providers::set_profile(profile);

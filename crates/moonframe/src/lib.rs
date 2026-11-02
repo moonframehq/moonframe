@@ -45,6 +45,7 @@ mod mod_window;
 mod motion;
 mod natives;
 mod overlay;
+mod panes;
 mod persist;
 mod profiles;
 mod render;
@@ -151,4 +152,13 @@ pub(crate) static BACKGROUND: AtomicBool = AtomicBool::new(false);
 /// Whether windows open without taking focus; see [`BACKGROUND`].
 pub(crate) fn background() -> bool {
     BACKGROUND.load(Ordering::Relaxed)
+}
+
+/// Whether the components window shows only the chosen component's preview,
+/// filling the window (`--preview-only`, for screenshots): set once at launch.
+pub(crate) static PREVIEW_ONLY: AtomicBool = AtomicBool::new(false);
+
+/// Whether the components window draws the preview alone; see [`PREVIEW_ONLY`].
+pub(crate) fn preview_only() -> bool {
+    PREVIEW_ONLY.load(Ordering::Relaxed)
 }

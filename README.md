@@ -240,6 +240,19 @@ wit/provider.wit        the interface a Wasm provider implements
 
 The window reloads while an agent edits it, so you can watch it work.
 
+- **An agent in a tab.** From any terminal,
+
+  ```sh
+  moonframe pane new --agent claude "add a clock to the status bar"
+  ```
+
+  opens a terminal tab in the running window (opening the app if it
+  isn't), in your folder, `~/.config/moonframe` (the profile's with
+  `--profile`), and starts the agent there with your prompt. You watch it
+  work in the tab while the window changes beside it. `--cwd DIR` starts it
+  somewhere else, and without `--agent` the tab is a plain shell. The app
+  types the command into your login shell, so the agent runs as you, with
+  your settings.
 - **Send feedback.** The `?` in the title bar (or in a corner of an example
   app) opens a box: write what should change, attach an element picked with
   Inspect if it helps, and send. A coding agent in the background changes
