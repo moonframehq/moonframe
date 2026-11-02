@@ -1,0 +1,182 @@
+//! The windows besides the main one: the components browser and mods'
+//! own, and what each frame leaves to do.
+
+use super::*;
+
+impl MoonframeApp {
+    /// Whether `window` is the main window, not a mod's, the components
+    /// browser or the theme picker.
+    pub(crate) fn is_main(&self, window: &Window) -> bool {
+        window.window_handle().window_id() == self.main_window
+    }
+
+    /// Shows the component `name` (or the last one, when empty) in the
+    /// browser's window, opening it if it is closed.
+    pub(crate) fn show_component(&mut self, name: &str, cx: &mut Context<Self>) {
+        if !name.is_empty() {
+            self.chosen = name.to_owned();
+        }
+        // The demos run only while their window is open.
+        self.workspace.show_demos(true);
+        cx.notify();
+        let open = self.gallery.filter(|gallery| {
+            cx.windows()
+                .iter()
+                .any(|window| window.window_id() == gallery.window_id())
+        });
+        // Both after this update: the action may have come from the
+        // browser's own window, which cannot be updated while it is busy,
+        // and a new window draws by asking the app.
+        match open {
+            Some(_) if crate::background() => {},
+            Some(gallery) => cx.defer(move |cx| {
+                let _ = gallery.update(cx, |_, window, _| window.activate_window());
+            }),
+            None => {
+                let app = cx.entity();
+                cx.defer(move |cx| {
+                    let gallery = Gallery::open(app.clone(), cx);
+                    app.update(cx, |app, _| app.gallery = gallery);
+                });
+            },
+        }
+    }
+
+    /// Opens the mod `name` in a window of its own, or raises it.
+    pub(super) fn show_mod_window(&mut self, name: &str, cx: &mut Context<Self>) {
+        let Some(slot) = self.workspace.slot(name) else {
+            tracing::warn!("no mod `{name}` to open in a window");
+            return;
+        };
+        let title = slot
+            .meta()
+            .and_then(|meta| meta.title.clone())
+            .unwrap_or_else(|| name.to_owned());
+        let open = self.mod_windows.get(name).copied().filter(|handle| {
+            cx.windows()
+                .iter()
+                .any(|window| window.window_id() == handle.window_id())
+        });
+        // After this update, as for the components window: the click may
+        // have come from that window, which is busy until it returns.
+        match open {
+            Some(_) if crate::background() => {},
+            Some(handle) => cx.defer(move |cx| {
+                let _ = handle.update(cx, |_, window, _| window.activate_window());
+            }),
+            None => {
+                let app = cx.entity();
+                let name = name.to_owned();
+                cx.defer(move |cx| {
+                    if let Some(handle) = ModWindow::open(app.clone(), name.clone(), title, cx) {
+                        app.update(cx, |app, _| app.mod_windows.insert(name, handle));
+                    }
+                });
+            },
+        }
+    }
+
+    /// A mod window's content, and whether it is still moving.
+    pub(crate) fn mod_window_content(
+        &mut self,
+        name: &str,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> (AnyElement, bool) {
+        let mut painter = Painter::new(
+            &self.workspace,
+            &mut self.motion,
+            &mut self.terminals,
+            &self.inputs,
+            None,
+            cx.theme(),
+        )
+        .with_views(&mut self.views);
+        let content = painter.window(name, cx);
+        let frame = painter.finish();
+        let animating = self.after_frame(frame, window, cx);
+        (content, animating)
+    }
+
+    /// Does what a frame drawn in `window` left to do: keeps the keys of
+    /// its open popovers and overlays, asks for the rows its lists want,
+    /// and makes its views. Returns whether it still moves.
+    pub(super) fn after_frame(
+        &mut self,
+        frame: Finished,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        self.key_layers
+            .insert(window.window_handle().window_id(), frame.key_layers);
+        self.request_list_rows(frame.list_requests, cx);
+        self.make_views(window, cx);
+        frame.animating
+    }
+
+    /// Makes the views the frame drew that are not made yet, and gives the
+    /// others their new props, once the frame is done; draws again to show
+    /// what was made.
+    fn make_views(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let requests = self.views.take_requests();
+        if requests.is_empty() {
+            return;
+        }
+        // In the window that drew them, which a view may want at its start.
+        let this = cx.entity().downgrade();
+        window.defer(cx, move |window, cx| {
+            let _ = this.update(cx, |this, cx| {
+                if this.views.apply(requests, window, cx) {
+                    cx.notify();
+                }
+            });
+        });
+    }
+
+    /// The browser window's content, and whether it is still moving.
+    pub(crate) fn gallery_content(
+        &mut self,
+        query: &str,
+        search: AnyElement,
+        cx: &mut Context<Self>,
+    ) -> (AnyElement, bool) {
+        let mut painter = Painter::new(
+            &self.workspace,
+            &mut self.motion,
+            &mut self.terminals,
+            &self.inputs,
+            None,
+            cx.theme(),
+        )
+        .previewing();
+        let content = painter.gallery(&self.chosen, query, search, cx);
+        let frame = painter.finish();
+        self.request_list_rows(frame.list_requests, cx);
+        (content, frame.animating)
+    }
+
+    /// Asks an agent to add the component `name`, at the selection if any.
+    pub(crate) fn copy_component_request(&mut self, name: &str, cx: &mut Context<Self>) {
+        let Some(component) = self
+            .workspace
+            .components()
+            .iter()
+            .find(|component| component.name == name)
+        else {
+            return;
+        };
+        let place = match &self.inspector.selected {
+            Some(selected) => format!(
+                "at the selected element:\n\n{}",
+                inspect::report(selected, &self.workspace)
+            ),
+            None => "where it fits (no element is selected; use View > Inspect Element to pick a place).".to_owned(),
+        };
+        let request = format!(
+            "Add the `{name}` component ({}) {place}\nIt is used like this:\n\n{}\n",
+            component.path.display(),
+            component.usage
+        );
+        self.copy(request, cx);
+    }
+}
