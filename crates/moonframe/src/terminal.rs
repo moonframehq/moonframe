@@ -51,6 +51,9 @@ pub(crate) struct TerminalView {
     /// That message went out: the mod handles the exit, so the terminal
     /// goes once it is no longer drawn.
     told: Cell<bool>,
+    /// A window other than the main one drew it. Only the main window's
+    /// frames are counted, so such a terminal is never taken for gone.
+    elsewhere: Cell<bool>,
     /// The text chosen with the pointer, in the visible screen's cells.
     pub(crate) selection: RefCell<Option<Selection>>,
     /// The left button went down on the grid and is still held.
@@ -75,6 +78,7 @@ impl TerminalView {
             scrolled: Cell::new(0.),
             exit: RefCell::new(None),
             told: Cell::new(false),
+            elsewhere: Cell::new(false),
             selection: RefCell::new(None),
             selecting: Cell::new(false),
             grid: Cell::new(None),
@@ -308,8 +312,11 @@ impl Terminals {
 
     /// The terminal at `key` is drawn in the main window's frame; if it was
     /// not in the last one, it is the one to focus. Other windows' terminals
-    /// are not counted.
+    /// are not counted, only marked as drawn elsewhere.
     pub(crate) fn drawn(&mut self, key: &str, view: &TerminalView) {
+        if !self.in_main_frame {
+            view.elsewhere.set(true);
+        }
         if self.in_main_frame && self.drawn.insert(key.to_owned()) && !self.last_drawn.contains(key)
         {
             self.appeared = Some(view.focus.clone());
@@ -324,8 +331,10 @@ impl Terminals {
     }
 
     /// The exit messages of shells that just exited, as `(mod, message)`
-    /// with `exited = true` added, each sent once. A told one that the main window no longer draws (its
-    /// tab closed) goes, so it holds no slot; drawn again, it starts anew.
+    /// with `exited = true` added, each sent once. A told one that the main
+    /// window no longer draws (its tab closed) goes, so it holds no slot;
+    /// drawn again, it starts anew. One another window drew stays: that
+    /// window may still show it, and drawing it would start another shell.
     pub(crate) fn take_exits(&mut self) -> Vec<(String, Data)> {
         let mut exits = Vec::new();
         for (key, view) in &self.views {
@@ -346,7 +355,7 @@ impl Terminals {
         }
         let drawn = &self.drawn;
         self.views
-            .retain(|key, view| !view.told.get() || drawn.contains(key));
+            .retain(|key, view| !view.told.get() || view.elsewhere.get() || drawn.contains(key));
         exits
     }
 
@@ -361,6 +370,7 @@ impl Terminals {
                 old.spawn.clone(),
             ));
             view.on_exit(old.exit.borrow().as_ref());
+            view.elsewhere.set(old.elsewhere.get());
             self.views.insert(key.to_owned(), view);
         }
     }
