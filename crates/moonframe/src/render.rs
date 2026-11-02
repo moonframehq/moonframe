@@ -75,6 +75,28 @@ const POPOVER_BACKDROP: usize = 1;
 const POPOVER_CONTENT: usize = 2;
 const OVERLAY_BASE: usize = 10;
 const OVERLAY_STEP: usize = 10;
+/// Above every layer the painter hands out: each overlay is a node, so a
+/// frame opens fewer than `MAX_DRAWN`, and its popovers sit within its step.
+const APP_LAYERS: usize = overlay_layer(MAX_DRAWN);
+/// The toast, over every overlay and popover.
+pub(crate) const TOAST_LAYER: usize = APP_LAYERS;
+/// The inspector's lowest layer (its others are just above), over the toast
+/// too, so it can pick inside an open dialog.
+pub(crate) const INSPECTOR_LAYER: usize = APP_LAYERS + 1;
+
+/// The paint priority of the `index`th overlay open in a frame.
+const fn overlay_layer(index: usize) -> usize {
+    OVERLAY_BASE + OVERLAY_STEP * index
+}
+
+// Checked when the crate builds: a popover sits within its layer's step, and
+// one in the last overlay a frame can open is still under the toast, which
+// is under the inspector, so picking reaches inside any open dialog.
+const _: () = {
+    assert!(POPOVER_BACKDROP < POPOVER_CONTENT && POPOVER_CONTENT < OVERLAY_STEP);
+    assert!(overlay_layer(MAX_DRAWN - 1) + POPOVER_CONTENT < TOAST_LAYER);
+    assert!(TOAST_LAYER < INSPECTOR_LAYER);
+};
 
 /// An open popover or overlay that may take keystrokes: the topmost one (by
 /// `priority`, then the later in the tree) gets the first say over each key.

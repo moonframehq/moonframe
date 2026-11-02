@@ -73,6 +73,6 @@ pub(super) fn toast(message: SharedString, notice: bool, cx: &Context<MoonframeA
                     }),
             ),
     )
-    .with_priority(10)
+    .with_priority(crate::render::TOAST_LAYER)
     .into_any_element()
 }
