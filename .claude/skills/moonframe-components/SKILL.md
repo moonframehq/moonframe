@@ -3367,7 +3367,7 @@ forge_pr { brand = true, forge = { auth = { cli = false, device = true, host = "
 
 #### `forge-sign-in`
 
-**Forge Sign-in.** Sign in to GitHub or GitLab from the provider's state: a device code with Open and Copy, the gh/glab sign-in, a pasted token; who is signed in and Sign out.
+**Forge Sign-in.** Sign in to GitHub or GitLab from the provider's state: a device code with Open and Copy, the gh/glab sign-in; who is signed in and Sign out.
 
 **When:** The body of the app's own sign-in, opened from `forge-account` or a settings page. Draw your own instead from `app.github.auth` when it should look different; send the provider the same messages.
 

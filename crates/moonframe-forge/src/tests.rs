@@ -333,3 +333,21 @@ fn https_remotes_keep_their_port() {
     assert!(!gitlab.env_serves("gitlab.com:8443"));
     assert!(!kind::Kind::GitHub.serves("github.com:8443", &[]));
 }
+
+#[test]
+fn gitlab_extra_requests_stop_on_a_rate_limit() {
+    use crate::http::Failure;
+    assert_eq!(gitlab::optional(Ok(json!(1))), Ok(Some(json!(1))));
+    assert_eq!(
+        gitlab::optional(Err(Failure::Status(404, String::new()))),
+        Ok(None)
+    );
+    assert_eq!(
+        gitlab::optional(Err(Failure::RateLimited)),
+        Err(Failure::RateLimited)
+    );
+    assert_eq!(
+        gitlab::optional(Err(Failure::Unauthorized)),
+        Err(Failure::Unauthorized)
+    );
+}

@@ -1813,7 +1813,8 @@ it stands, and a mod in the provider's `[settings] accounts` (`forge` as
 shipped) sends it `{ sign_in = true }` (a device code: `auth.code` and
 `auth.url` to show, answered once the user approved it), `{ token =
 "<pasted token>" }` (or `{ token = true, value }`, as an input's `submit`
-sends it), `{ use_cli = true }` (gh's or glab's own sign-in, read from it
+sends it; `ui.input` shows what is typed, so `forge-sign-in` offers no
+such field and a token pasted into one stays on screen), `{ use_cli = true }` (gh's or glab's own sign-in, read from it
 each time), `{ cancel = true }` or `{ sign_out = true }`, each answered
 `{ reply, action, ok, login | message | error }`. A device sign-in goes
 through Moonframe's own OAuth apps on github.com and gitlab.com, whose

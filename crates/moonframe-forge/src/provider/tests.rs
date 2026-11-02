@@ -111,7 +111,6 @@ fn a_branch_change_discards_the_old_fetch_and_preserves_the_refresh() {
     let due = Instant::now();
     forge.next = Some(due);
     forge.take_in(&host, Done::Fetched {
-        renewed: false,
         target: old,
         epoch: forge.epoch,
         result: Ok(json!({ "current_pr": { "number": 1 } })),
@@ -129,7 +128,6 @@ fn a_refresh_during_a_fetch_still_runs_after_it() {
     let due = Instant::now();
     forge.next = Some(due);
     forge.take_in(&host, Done::Fetched {
-        renewed: false,
         target: forge.target().unwrap(),
         epoch: forge.epoch,
         result: Ok(json!({ "viewer": { "login": "user" } })),
@@ -145,7 +143,6 @@ fn an_old_accounts_failure_cannot_sign_out_the_new_account() {
     let mut forge = signed_in();
     forge.epoch = 1;
     forge.take_in(&host, Done::Fetched {
-        renewed: false,
         target: forge.target().unwrap(),
         epoch: 0,
         result: Err(Failure::Unauthorized),
@@ -174,7 +171,6 @@ fn a_refresh_request_waits_out_a_rate_limit() {
     let target = forge.target().unwrap();
     forge.fetching = true;
     forge.take_in(&host, Done::Fetched {
-        renewed: false,
         target,
         epoch: forge.epoch,
         result: Err(Failure::RateLimited),
@@ -278,7 +274,6 @@ fn a_renewed_token_outlives_a_branch_change() {
         epoch: forge.epoch,
         result: Ok(json!({ "viewer": { "login": "penso" } })),
         // No context to save into here: the token is still applied.
-        renewed: false,
         credential: Some(Credential::new(
             SecretString::from("renewed-token"),
             Source::Saved,

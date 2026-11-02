@@ -5,7 +5,7 @@
 use {
     crate::{
         Target,
-        credentials::{self, Credential, Remembered, Saved, Source},
+        credentials::{self, Credential, Remembered, Renewal, Saved, Source},
         device::{self, Poll},
         github, gitlab,
         http::Failure,
@@ -49,9 +49,7 @@ pub enum Done {
         target: Target,
         epoch: u64,
         result: Result<Value, Failure>,
-        /// Whether `credential` is a renewed one, which the provider saves.
-        renewed: bool,
-        /// The credential, renewed or read from the CLI again.
+        /// The credential, renewed (and saved) or read from the CLI again.
         credential: Option<Credential>,
     },
     /// What the provider found at start (or for a new host).
@@ -259,7 +257,6 @@ impl Context {
                     target,
                     epoch,
                     result: Err(Failure::Unauthorized),
-                    renewed: false,
                     credential: None,
                 });
                 return;
@@ -272,24 +269,45 @@ impl Context {
                     Kind::GitLab => format!("{}-", target.host),
                 },
             };
-            let renew = |credential: &Credential| -> Option<Credential> {
+            // Renewing goes through the store, in turn with other apps
+            // sharing this sign-in: `None` when it was signed out
+            // meanwhile, else the token to use, whoever renewed it.
+            let renew = |credential: &Credential| -> Option<Option<Credential>> {
                 let client = client.as_deref()?;
-                let renewed = device::refresh(
-                    &context.agent,
-                    context.kind,
-                    &target.host,
-                    client,
-                    credential,
-                )
-                .ok()?;
-                Some(renewed)
+                let renewal = context.saved.renew(&target.host, credential, |credential| {
+                    device::refresh(
+                        &context.agent,
+                        context.kind,
+                        &target.host,
+                        client,
+                        credential,
+                    )
+                    .ok()
+                });
+                match renewal {
+                    Renewal::Renewed(fresh) | Renewal::Newer(fresh) => Some(Some(fresh)),
+                    Renewal::Gone => Some(None),
+                    Renewal::Failed => None,
+                }
             };
             let mut renewed = false;
-            if credential.expiring()
-                && let Some(fresh) = renew(&credential)
-            {
-                credential = fresh;
-                renewed = true;
+            if credential.expiring() {
+                match renew(&credential) {
+                    Some(Some(fresh)) => {
+                        credential = fresh;
+                        renewed = true;
+                    },
+                    Some(None) => {
+                        context.send(Done::Fetched {
+                            target,
+                            epoch,
+                            result: Err(Failure::Unauthorized),
+                            credential: None,
+                        });
+                        return;
+                    },
+                    None => {},
+                }
             }
             let read = |credential: &Credential| match context.kind {
                 Kind::GitHub => github::fetch(&context.agent, &credential.token, &target, &avatars),
@@ -299,7 +317,7 @@ impl Context {
             if result == Err(Failure::Unauthorized)
                 && !renewed
                 && credential.refresh.is_some()
-                && let Some(fresh) = renew(&credential)
+                && let Some(Some(fresh)) = renew(&credential)
             {
                 credential = fresh;
                 renewed = true;
@@ -309,7 +327,6 @@ impl Context {
                 target,
                 epoch,
                 result,
-                renewed,
                 credential: (renewed || cli).then_some(credential),
             });
         });

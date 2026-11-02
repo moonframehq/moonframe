@@ -328,7 +328,6 @@ impl Forge {
                 target,
                 epoch,
                 result,
-                renewed,
                 credential,
             } => {
                 self.fetching = false;
@@ -344,18 +343,6 @@ impl Forge {
                 if let Some(credential) = credential
                     && self.credential.is_some()
                 {
-                    // Only a sign-in still current is saved: a sign-out
-                    // during the fetch bumped `epoch`.
-                    if renewed
-                        && let Some(context) = &self.context
-                        && let Err(problem) = context.saved.save(&target.host, &credential)
-                    {
-                        tracing::warn!(
-                            "{}: cannot save the renewed sign-in: {}",
-                            self.kind.name(),
-                            problem.0
-                        );
-                    }
                     self.credential = Some(credential);
                 }
                 // Data for a branch or worktree list since changed is

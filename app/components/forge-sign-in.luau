@@ -1,6 +1,7 @@
 -- A ready-made sign-in for GitHub or GitLab, drawn from the provider's
 -- `auth`: a device code to enter on the forge's site, the CLI's own
--- sign-in, or a pasted token; and who is signed in, with Sign out. Its
+-- sign-in, or a hint at gh, glab and the environment; and who is signed
+-- in, with Sign out. Its
 -- buttons talk to the provider directly, so the mod drawing it must be in
 -- that provider's `[settings] accounts`. Put it in any container: a
 -- `dialog`, a popover, a settings page.
@@ -22,7 +23,7 @@ return component {
 	title = "Forge Sign-in",
 	category = "Git",
 	icon = "key-round",
-	description = "Sign in to GitHub or GitLab from the provider's state: a device code with Open and Copy, the gh/glab sign-in, a pasted token; who is signed in and Sign out.",
+	description = "Sign in to GitHub or GitLab from the provider's state: a device code with Open and Copy, the gh/glab sign-in; who is signed in and Sign out.",
 	when = "The body of the app's own sign-in, opened from `forge-account` or a settings page. Draw your own instead from `app.github.auth` when it should look different; send the provider the same messages.",
 	props = {
 		["forge"] = "`app.github` or `app.gitlab`",
@@ -56,6 +57,7 @@ return component {
 		local to = `provider:{provider}`
 		local title = if provider == "gitlab" then "GitLab" else "GitHub"
 		local cli = if provider == "gitlab" then "glab" else "gh"
+		local env = if provider == "gitlab" then "GITLAB_TOKEN" else "GH_TOKEN"
 		local forge = props.forge
 		local auth = forge and forge.auth
 		if not auth or auth.status == "checking" or auth.status == "verifying" then
@@ -143,17 +145,13 @@ return component {
 				to = to,
 				msg = { use_cli = true },
 			},
-			ui.column {
-				gap = "small",
-				ui.text { "Or paste a personal access token, then press Enter:", class = "forge-sign-in-muted" },
-				ui.input {
-					id = `forge-token-{provider}`,
-					value = "",
-					placeholder = if provider == "gitlab" then "glpat-…" else "ghp_… or github_pat_…",
-					mono = true,
-					to = to,
-					submit = { token = true },
-				},
+			-- No pasted-token field: text fields show what is typed, and a
+			-- token must not sit on screen. An app with a masked field of its
+			-- own sends the provider `{ token = "..." }`.
+			ui.text {
+				`Or sign in with {cli} in a terminal ({cli} auth login), or set {env}, and it is used.`,
+				class = "forge-sign-in-muted",
+				wrap = true,
 			},
 			error_text,
 		}

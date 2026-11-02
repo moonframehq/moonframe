@@ -45,19 +45,18 @@ pub fn fetch(
     let listed = get(&format!(
         "{project}/merge_requests?state=opened&order_by=updated_at&per_page={LISTED}"
     ))?;
-    let issues = get(&format!(
+    let issues = optional(get(&format!(
         "{project}/issues?state=opened&order_by=updated_at&per_page={LISTED}&with_labels_details=true"
-    ))
+    )))?
     .unwrap_or(Value::Array(Vec::new()));
     let mut by_branch = Vec::new();
     for branch in &target.branches {
-        let found = get(&format!(
+        let found = optional(get(&format!(
             "{project}/merge_requests?source_branch={}&order_by=updated_at&per_page=1",
             encode(branch)
-        ));
-        let Some(mr) = found
-            .ok()
-            .and_then(|found| found.as_array().and_then(|list| list.first().cloned()))
+        )))?;
+        let Some(mr) =
+            found.and_then(|found| found.as_array().and_then(|list| list.first().cloned()))
         else {
             continue;
         };
@@ -65,7 +64,7 @@ pub fn fetch(
         if *branch == target.branch
             && let Some(iid) = mr.get("iid").and_then(Value::as_u64)
         {
-            details = current(agent, token, &project, iid);
+            details = current(agent, token, &project, iid)?;
         }
         by_branch.push((branch.clone(), mr, details));
     }
@@ -100,21 +99,53 @@ pub(crate) struct Details {
     pub(crate) lines: Option<(u64, u64)>,
 }
 
-fn current(agent: &ureq::Agent, token: &SecretString, project: &str, iid: u64) -> Details {
-    let get = |url: &str| http::get(agent, url, token).ok();
-    let mr = get(&format!("{project}/merge_requests/{iid}"));
-    let jobs = mr
+/// What an extra request (issues, a branch's merge request, details) gave:
+/// nothing when it failed on its own, but a rate limit or a refused token
+/// ends the whole read, so the provider waits or signs out as it should.
+pub(crate) fn optional(result: Result<Value, Failure>) -> Result<Option<Value>, Failure> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(failure @ (Failure::RateLimited | Failure::Unauthorized)) => Err(failure),
+        Err(_) => Ok(None),
+    }
+}
+
+fn current(
+    agent: &ureq::Agent,
+    token: &SecretString,
+    project: &str,
+    iid: u64,
+) -> Result<Details, Failure> {
+    let get = |url: &str| optional(http::get(agent, url, token));
+    let mr = get(&format!("{project}/merge_requests/{iid}"))?;
+    let jobs = match mr
         .as_ref()
         .and_then(|mr| mr["head_pipeline"]["id"].as_u64())
-        .and_then(|pipeline| get(&format!("{project}/pipelines/{pipeline}/jobs?per_page=50")))
-        .and_then(|jobs| jobs.as_array().cloned())
-        .unwrap_or_default();
-    let lines = diffs::read(mr.as_ref().and_then(|mr| mr.get("changes_count")), |page| {
-        get(&format!(
+    {
+        Some(pipeline) => get(&format!("{project}/pipelines/{pipeline}/jobs?per_page=50"))?
+            .and_then(|jobs| jobs.as_array().cloned())
+            .unwrap_or_default(),
+        None => Vec::new(),
+    };
+    // The pages are read through a closure that can only say "nothing";
+    // a failure that must end the read is kept aside and returned after.
+    let stop = std::cell::Cell::new(None);
+    let lines = diffs::read(
+        mr.as_ref().and_then(|mr| mr.get("changes_count")),
+        |page| match get(&format!(
             "{project}/merge_requests/{iid}/diffs?per_page=100&page={page}"
-        ))
-    });
-    Details { mr, jobs, lines }
+        )) {
+            Ok(value) => value,
+            Err(failure) => {
+                stop.set(Some(failure));
+                None
+            },
+        },
+    );
+    if let Some(failure) = stop.take() {
+        return Err(failure);
+    }
+    Ok(Details { mr, jobs, lines })
 }
 
 pub(crate) fn shape(

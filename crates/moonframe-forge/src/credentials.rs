@@ -224,14 +224,87 @@ impl Saved {
         self.write(&records)
     }
 
-    /// Forgets `host`'s sign-in.
+    /// Forgets `host`'s sign-in, in turn with any renewal (see
+    /// [`Saved::renew`]).
     pub fn forget(&self, host: &str) -> Result<(), StoreError> {
-        let mut records = self.records()?;
-        if records.remove(host).is_some() {
-            self.write(&records)?;
-        }
-        Ok(())
+        self.locked(|| {
+            let mut records = self.records()?;
+            if records.remove(host).is_some() {
+                self.write(&records)?;
+            }
+            Ok(())
+        })
     }
+
+    /// Runs `work` holding this forge's sign-in lock, a file beside the
+    /// private one, so apps sharing a sign-in renew and forget it in turn.
+    /// Without a lock to take (no folder), it runs anyway.
+    fn locked<T>(&self, work: impl FnOnce() -> T) -> T {
+        let file = create_private(&self.directory).ok().and_then(|()| {
+            let name = format!("{}-sign-in.lock", self.kind.name());
+            std::fs::OpenOptions::new()
+                .create(true)
+                .truncate(false)
+                .write(true)
+                .open(self.directory.join(name))
+                .ok()
+        });
+        let held = file.as_ref().is_some_and(|file| file.lock().is_ok());
+        let result = work();
+        if held && let Some(file) = &file {
+            let _ = file.unlock();
+        }
+        result
+    }
+
+    /// Renews `current`, the sign-in this app holds for `host`, unless
+    /// another app sharing it renewed it first (GitLab spends a refresh
+    /// token as it hands out the next, so only one may use it) or it was
+    /// signed out meanwhile. A renewal is saved before the lock is let go.
+    pub fn renew(
+        &self,
+        host: &str,
+        current: &Credential,
+        renew: impl FnOnce(&Credential) -> Option<Credential>,
+    ) -> Renewal {
+        self.locked(|| {
+            let same = |saved: &Credential| match (&saved.refresh, &current.refresh) {
+                (Some(saved), Some(ours)) => saved.expose_secret() == ours.expose_secret(),
+                _ => false,
+            };
+            match self.load(host) {
+                Ok(Some(Remembered::Token(saved))) if !same(&saved) => Renewal::Newer(saved),
+                Ok(Some(Remembered::Token(_))) => match renew(current) {
+                    Some(renewed) => {
+                        if let Err(problem) = self.save(host, &renewed) {
+                            tracing::warn!(
+                                "{}: cannot save the renewed sign-in: {}",
+                                self.kind.name(),
+                                problem.0
+                            );
+                        }
+                        Renewal::Renewed(renewed)
+                    },
+                    None => Renewal::Failed,
+                },
+                Ok(Some(Remembered::Cli) | None) => Renewal::Gone,
+                // The store cannot be read: renew for this run alone.
+                Err(_) => renew(current).map_or(Renewal::Failed, Renewal::Renewed),
+            }
+        })
+    }
+}
+
+/// What [`Saved::renew`] did.
+pub enum Renewal {
+    /// Renewed and saved.
+    Renewed(Credential),
+    /// Another app renewed it first: its token, as saved.
+    Newer(Credential),
+    /// Signed out meanwhile: nothing to renew.
+    Gone,
+    /// The forge would not renew it.
+    Failed,
 }
 
 /// What [`Saved`] holds for a host.

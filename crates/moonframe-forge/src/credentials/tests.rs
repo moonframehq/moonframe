@@ -77,3 +77,38 @@ fn a_stalled_cli_is_stopped_at_its_deadline() {
     assert!(succeeded);
     assert_eq!(stdout, b"token-value");
 }
+
+fn oauth(token: &str, refresh: &str) -> Credential {
+    Credential {
+        token: SecretString::from(token.to_owned()),
+        refresh: Some(SecretString::from(refresh.to_owned())),
+        expires: Some(1),
+        source: Source::Saved,
+    }
+}
+
+#[test]
+fn apps_sharing_a_sign_in_renew_it_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = Saved::new(Kind::GitLab, dir.path().to_owned(), true);
+    let second = Saved::new(Kind::GitLab, dir.path().to_owned(), true);
+    let held = oauth("access-one", "refresh-one");
+    first.save("gitlab.com", &held).unwrap();
+    // The first app renews it, and saves the new pair.
+    let renewed = first.renew("gitlab.com", &held, |_| {
+        Some(oauth("access-two", "refresh-two"))
+    });
+    assert!(matches!(renewed, Renewal::Renewed(_)));
+    // The second still holds the spent pair: it takes the saved one
+    // instead of spending `refresh-one` again.
+    let renewal = second.renew("gitlab.com", &held, |_| panic!("renewed a spent token"));
+    let Renewal::Newer(newer) = renewal else {
+        panic!("did not take the newer sign-in");
+    };
+    assert_eq!(newer.token.expose_secret(), "access-two");
+    // Signed out meanwhile: nothing is renewed, nothing comes back.
+    first.forget("gitlab.com").unwrap();
+    let after = second.renew("gitlab.com", &newer, |_| panic!("renewed after a sign-out"));
+    assert!(matches!(after, Renewal::Gone));
+    assert!(matches!(first.load("gitlab.com"), Ok(None)));
+}
