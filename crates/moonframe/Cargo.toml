@@ -16,7 +16,7 @@ workspace = true
 # the Agent Client Protocol.
 acp = ["dep:moonframe-acp"]
 # The terminal emulators `ui.terminal` can run on. `ghostty` builds
-# libghostty-vt with Zig (see mise.toml and tools/zig), so an app on the
+# libghostty-vt with Zig (see mise.toml), so an app on the
 # library opts into it; the starter (crates/moonframe-app) has both.
 alacritty = ["moonframe-terminal/alacritty"]
 default   = ["acp", "alacritty", "docs", "git", "herdr-core", "tokio", "usage", "wasm"]

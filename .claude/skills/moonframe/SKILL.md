@@ -534,11 +534,8 @@ ui.input {
   components and theme picker searches do). A host window with a search
   field focuses it when it opens (`search.update(cx, |s, cx| s.focus(window, cx))`).
 
-Building the `ghostty` engine needs Zig 0.15 (in `mise.toml`). On macOS 27
-and later, Zig 0.15 can't link natively, so `tools/zig/zig` (first on
-`PATH` through mise and the justfile) works around it. That needs a macOS
-SDK of version 15 or older installed. Build without it with
-`--no-default-features --features alacritty`.
+Building the `ghostty` engine needs Zig 0.17 (in `mise.toml`). Build
+without it with `--no-default-features --features alacritty`.
 
 ## State that outlives the app
 
