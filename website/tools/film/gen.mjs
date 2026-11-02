@@ -6,8 +6,9 @@
 //        node gen.mjs 120 300    -> only those frames (for checking a scene)
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../..");
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const WORK = process.env.FILM_WORK || path.join(REPO, "target/film");
 const OUT = path.join(WORK, "frames");
 fs.mkdirSync(OUT, { recursive: true });
@@ -512,19 +513,22 @@ function agents(t) {
 function sandbox(t) {
   const [a, b] = S.sandbox;
   const o = fadeIO(t, a, b, 0.5);
-  let s = caption(t, a, b, 7, "What runs with what access", "Safe by construction.", "Install someone else's mod or Wasm provider: it can't touch your machine.");
+  let s = caption(t, a, b, 7, "What runs with what access", "Each kind of code has its limits.", "Mods and running Wasm providers reach only what they're given. Building from source runs Cargo as you.");
   const layers = [
     ["Mods", "Luau", "In the host's sandbox: no files, network or processes.", "Memory cap and instruction budget.", C.teal],
-    ["Wasm providers", "wasmtime", "64 MiB and a fresh instruction budget per call.", "Only the capabilities listed in provider.toml.", C.sunO],
+    ["Wasm providers", "wasmtime", "Run with 64 MiB, an instruction budget, and only the capabilities", "in provider.toml. Built from source with Cargo as you; bundled apps ship them prebuilt.", C.sunO],
     ["Process & native providers", "your user", "For what the sandbox can't reach: git, forges, agents.", "Source only, so you can read what runs.", C.sunR],
   ];
+  // Each title's width in Iowan Old Style at 40px, measured from a frame:
+  // a character count misjudges this face by a third either way.
+  const titleW = [100, 290, 468];
   layers.forEach(([h, tag, l1, l2, col], i) => {
     const k = eOut(prog(t, a + 0.5 + i * 0.35, a + 1.0 + i * 0.35));
     if (k <= 0) return;
     const x = 110 + i * 40, y = 290 + i * 200, w = 1700 - i * 80;
     s += g(rect(x, y, w, 172, { rx: 22, fill: "#fffaf0", stroke: "#e2d4b8" }) + rect(x, y, 14, 172, { rx: 7, fill: col }) +
       text(x + 52, y + 66, h, { size: 40, family: SERIF, fill: C.ink }) +
-      pill(x + 76 + tw(h, 40, 0.5), y + 30, tag, { fill: col, size: 19, h: 40, family: MONO, padX: 16 }) +
+      pill(x + 52 + titleW[i] + 18, y + 30, tag, { fill: col, size: 19, h: 40, family: MONO, padX: 16 }) +
       text(x + 52, y + 112, l1, { size: 24, fill: C.ink2 }) + text(x + 52, y + 146, l2, { size: 24, fill: C.dim }) +
       lock(x + w - 90, y + 50, col, i < 2),
       { op: k * o, tx: (1 - k) * -50 });

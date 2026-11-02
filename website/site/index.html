@@ -114,7 +114,10 @@
   .film video { position:absolute; inset:0; width:100%; height:100%; display:block; background:var(--paper2) }
   .film video[hidden] { display:none }
   .film .play { position:absolute; left:50%; bottom:28px; transform:translateX(-50%); display:flex; gap:12px; align-items:center; padding:14px 22px 14px 16px; border:0; border-radius:999px; background:var(--ink); color:var(--paper); font:600 15px var(--sans); cursor:pointer; box-shadow:0 14px 30px #2a1a1055; transition:transform .2s, background .2s }
-  .film .play[hidden] { display:none }
+  .film .play[hidden], .film .hold[hidden] { display:none }
+  .film .hold { position:absolute; top:12px; right:12px; padding:6px 12px; border:0; border-radius:999px; background:#2a1a10b3; color:var(--paper); font:500 12px var(--sans); cursor:pointer }
+  .film .hold:hover { background:var(--ink) }
+  .film .hold:focus-visible, .film .play:focus-visible { outline:2px solid var(--acc-hi); outline-offset:3px }
   .film .play:hover { background:var(--acc); transform:translateX(-50%) translateY(-2px) }
   .film .play i { width:30px; height:30px; border-radius:50%; background:var(--acc-hi); display:grid; place-items:center }
   .film .play i::before { content:""; border-left:10px solid #fff; border-top:6px solid transparent; border-bottom:6px solid transparent; margin-left:3px }
@@ -255,6 +258,7 @@
     .sbar { gap:10px } .uptime { display:none }
     section { padding:60px 0 } h2 { font-size:36px } .lead { font-size:17px }
     .film .play { bottom:10px; gap:8px; padding:6px 14px 6px 6px; font-size:13px } .film .play i { width:24px; height:24px } .film .play span { display:none }
+    .film .hold { top:8px; right:8px; padding:4px 10px; font-size:11px }
     .chapters { grid-template-columns:repeat(2, minmax(0, 1fr)) } .chapters button { font-size:15px; gap:8px }
     .three { grid-template-columns:1fr } .three > div { padding:22px 0; border-right:0; border-bottom:1px solid var(--rule) }
     .chat { position:static; width:auto; margin-top:16px }
@@ -328,6 +332,7 @@
           <source src="film/loop.mp4" type="video/mp4">
         </video>
         <button class="play" type="button" hidden><i></i>Watch the tour<span>1:00</span></button>
+        <button class="hold" type="button" aria-pressed="false" hidden>Pause preview</button>
       </div>
       <ol class="chapters">
         <li><button type="button" data-t="4.3"><time>0:04</time>The window is Luau</button></li>
@@ -644,24 +649,33 @@ async function run() {
 run();
 </script>
 <script>
-// The tour: a muted loop plays while the section is on screen; the button or a
+// The tour: a muted loop plays while the section is on screen, unless the
+// visitor pauses it or asks for reduced motion (now or later). The button or a
 // chapter swaps in the whole film. Without script the film shows with controls.
 (() => {
   const box = document.querySelector(".film .screen");
-  const full = box.querySelector(".full"), preview = box.querySelector(".preview"), play = box.querySelector(".play");
+  const full = box.querySelector(".full"), preview = box.querySelector(".preview");
+  const play = box.querySelector(".play"), hold = box.querySelector(".hold");
   const items = [...document.querySelectorAll(".chapters li")];
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let started = false;
-  full.hidden = true; preview.hidden = false; play.hidden = false;
-  const seen = new IntersectionObserver(([e]) => {
-    if (started || still) return;
-    if (e.isIntersecting) preview.play().catch(() => {}); else preview.pause();
-  }, { threshold: 0.4 });
+  const motion = matchMedia("(prefers-reduced-motion: reduce)");
+  let started = false, visible = false, paused = motion.matches;
+  full.hidden = true; preview.hidden = false; play.hidden = false; hold.hidden = false;
+  function sync() {
+    if (started) return;
+    if (visible && !paused) preview.play().catch(() => {}); else preview.pause();
+    hold.textContent = paused ? "Play preview" : "Pause preview";
+    hold.setAttribute("aria-pressed", String(paused));
+  }
+  const seen = new IntersectionObserver(([e]) => { visible = e.isIntersecting; sync(); }, { threshold: 0.4 });
   seen.observe(box);
+  motion.addEventListener("change", () => { if (motion.matches) paused = true; sync(); });
+  hold.addEventListener("click", () => { paused = !paused; sync(); });
+  sync();
   function start(at) {
     if (!started) {
       started = true;
-      seen.disconnect(); preview.pause(); preview.hidden = true; play.hidden = true; full.hidden = false;
+      seen.disconnect(); preview.pause();
+      preview.hidden = true; play.hidden = true; hold.hidden = true; full.hidden = false;
       full.preload = "auto";
     }
     if (at != null) full.currentTime = at;

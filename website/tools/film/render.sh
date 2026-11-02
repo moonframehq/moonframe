@@ -48,6 +48,6 @@ cwebp -quiet -q 82 -resize 1600 0 "$work/out/f0605.png" -o "$site/film-poster.we
 fades="crop=1920:1072:0:0,scale=1280:-2,fade=in:st=0:d=0.3:color=0xf2e8d4,fade=out:st=16.85:d=0.35:color=0xf2e8d4"
 ffmpeg -loglevel error -y -framerate 30 -start_number 126 -i "$frames" -frames:v 516 \
 	-vf "$fades" -c:v libx264 -preset slow -crf 26 -pix_fmt yuv420p -movflags +faststart -an "$site/loop.mp4"
-cwebp -quiet -q 80 -resize 1280 0 "$work/out/f0300.png" -o "$site/loop-poster.webp"
+cwebp -quiet -q 80 -crop 0 0 1920 1072 -resize 1280 0 "$work/out/f0300.png" -o "$site/loop-poster.webp"
 
 ls -la "$site"
