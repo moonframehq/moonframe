@@ -70,12 +70,12 @@
       // The component's own usage text, or its example with the helpers it needs
       // (website/tools/components-data.py builds it).
       const code = c.code;
-      // Captured at 2x; a component without one points at the app. Its size
-      // (data/components.js) keeps the preview's room before the image loads.
+      // Captured at 2x; a component without one points at the app. Its pixel
+      // size (data/components.js) keeps the preview's exact room before it loads.
       const shot = `img/components/${encodeURIComponent(c.name)}.webp`;
       const none = `<div class="cb-none"><b>${esc(c.title)}</b>Shown live in the app's Components window. Run <code>just run</code>, then Components › ${esc(c.category)} › ${esc(c.title)}.</div>`;
       const prev = c.shot
-        ? `<img src="${shot}" srcset="${shot} 2x" width="${c.shot[0]}" height="${c.shot[1]}" alt="${esc(c.title)} in the Components window">`
+        ? `<img src="${shot}" srcset="${shot} 2x" style="width:${c.shot[0] / 2}px;aspect-ratio:${c.shot[0]} / ${c.shot[1]}" alt="${esc(c.title)} in the Components window">`
         : none;
       detail.innerHTML = `<h3>${esc(c.title)}</h3><div class="cb-desc">${md(c.description)}</div>${c.when ? `<div class="cb-when"><b>When:</b> ${md(c.when)}</div>` : ""}
         <div class="cb-h">Preview</div><div class="cb-prev">${prev}</div>

@@ -12,7 +12,6 @@ import re
 import struct
 
 SHOTS = "website/site/img/components"
-SCALE = 2  # the previews are captured at 2x (tools/component-shots.py)
 
 
 def webp_size(path):
@@ -34,12 +33,9 @@ def webp_size(path):
 
 
 def shot(name):
-    """The preview's size in CSS pixels, so the page can keep its room before it loads."""
+    """The preview's size in pixels (2x), so the page can keep its room before it loads."""
     path = os.path.join(SHOTS, name + ".webp")
-    if not os.path.exists(path):
-        return None
-    width, height = webp_size(path)
-    return [round(width / SCALE), round(height / SCALE)]
+    return list(webp_size(path)) if os.path.exists(path) else None
 
 
 def field(source, key):
