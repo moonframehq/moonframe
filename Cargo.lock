@@ -4900,6 +4900,7 @@ dependencies = [
  "alacritty_terminal 0.26.0",
  "libghostty-vt",
  "portable-pty",
+ "sysinfo 0.39.6",
  "tracing",
 ]
 

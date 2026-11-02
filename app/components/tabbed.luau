@@ -71,8 +71,8 @@ local function open(state: State, props: Props, kind: string)
 	state.selected = id
 end
 
--- A tab another mod asked for: the open one of that kind and path, else a
--- new one with those props.
+-- A tab another mod asked for: the open one of that kind, path and root
+-- (the project a file is in), else a new one with those props.
 local function open_asked(state: State, props: Props, asked: any)
 	if type(asked) ~= "table" or type(asked.kind) ~= "string" or asked.n == state.opened then
 		return false
@@ -81,7 +81,7 @@ local function open_asked(state: State, props: Props, asked: any)
 	local wanted = type(asked.props) == "table" and asked.props or {}
 	if wanted.path ~= nil then
 		for _, tab in state.tabs do
-			if tab.kind == asked.kind and tab.props.path == wanted.path then
+			if tab.kind == asked.kind and tab.props.path == wanted.path and tab.props.root == wanted.root then
 				state.selected = tab.id
 				return true
 			end

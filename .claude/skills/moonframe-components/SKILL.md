@@ -665,6 +665,7 @@ A whole mod using it, with state: `app/components/demos/markdown.luau`.
 | `id` | keeps the edits apart from another editor's; a tab passes its own |
 | `mode` | how it opens: "split" (default), "edit" or "view" |
 | `path` | the file, relative to the project's root (as the explorer names it) |
+| `root` | the project the file is in, an absolute folder (the explorer's `app.files.path`); the current project when left out |
 | `text` | without `path`: a scratch note to start from, edited in place and never saved |
 
 **Styles:** `.md-editor-bar` `.md-editor-dirty` `.md-editor-notice` `.md-editor-path` `.md-editor-source` `.md-editor-status`
@@ -675,7 +676,7 @@ local markdown_editor = use "markdown-editor"
 -- In a pane that fills its space; Save needs the drawing mod in
 -- providers/docs's `writers` (as shipped, `editor`).
 markdown_editor { id = "readme", path = "README.md" }
--- update: msg.open_link is a clicked link's address, msg.from the file it is in
+-- update: msg.open_link is a clicked link's address, msg.from the file it is in, msg.root its project
 ```
 
 A whole mod using it, with state: `app/components/demos/markdown-editor.luau`.

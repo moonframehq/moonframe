@@ -186,3 +186,32 @@ fn a_session_runs_a_shell() {
         session.write(b"exit\r");
     }
 }
+
+#[test]
+fn a_shell_says_which_folder_it_is_in_until_its_session_goes() {
+    let Some(engine) = [Engine::Alacritty, Engine::Ghostty]
+        .into_iter()
+        .find(|engine| engine.available())
+    else {
+        return;
+    };
+    let dir = std::env::temp_dir().canonicalize().unwrap();
+    let opened = Pty
+        .open(&Open {
+            key: "test/folder".into(),
+            cwd: Some(dir.clone()),
+            size: Size::default(),
+        })
+        .unwrap();
+    let session = Session::start(opened, engine, Size::default(), Arc::new(|| {})).unwrap();
+    let folder = session.folder();
+    assert!(folder.same(&session.folder()));
+    // Windows names the folder in a form of its own (`\\?\`); elsewhere
+    // it is the one the shell started in.
+    if !cfg!(windows) {
+        let cwd = folder.get().map(|cwd| cwd.canonicalize().unwrap_or(cwd));
+        assert_eq!(cwd, Some(dir));
+    }
+    drop(session);
+    assert_eq!(folder.get(), None);
+}

@@ -165,6 +165,7 @@ impl Backend for Tmux {
             }),
             pane: pane_id.clone(),
             client: Mutex::new(client),
+            tmux: self.clone(),
         };
         // Its size first, so what is copied next is laid out for it.
         pane.send(&resize_command(open.size), Expect::Nothing);
@@ -237,6 +238,8 @@ struct TmuxPane {
     commands: Mutex<Commands>,
     pane: String,
     client: Mutex<Child>,
+    /// The server it is on, to ask it things outside the control client.
+    tmux: Tmux,
 }
 
 impl TmuxPane {
@@ -282,5 +285,27 @@ impl Pane for TmuxPane {
 
     fn answers_queries(&self) -> bool {
         true
+    }
+
+    /// The pane's folder as tmux knows it, asked apart from the control
+    /// client so the answer never mixes with its output.
+    fn cwd(&self) -> Option<PathBuf> {
+        let output = self
+            .tmux
+            .command()
+            .args([
+                "display-message",
+                "-p",
+                "-t",
+                &self.pane,
+                "#{pane_current_path}",
+            ])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output()
+            .ok()
+            .filter(|output| output.status.success())?;
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        (!path.is_empty()).then(|| PathBuf::from(path))
     }
 }

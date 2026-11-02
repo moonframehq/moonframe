@@ -10,6 +10,7 @@
 use {
     crate::{Ansi, Engine, Opened, Pane, Screen, Size},
     std::{
+        path::PathBuf,
         sync::{
             Arc, Mutex, Weak,
             mpsc::{self, Receiver, Sender},
@@ -25,6 +26,23 @@ pub struct Session {
     pane: Arc<dyn Pane>,
     screen: Arc<Mutex<Screen>>,
     size: Mutex<Size>,
+}
+
+/// Asks a session's program which folder it is in; see [`Session::folder`].
+#[derive(Clone)]
+pub struct Folder(Weak<dyn Pane>);
+
+impl Folder {
+    /// The folder now, when the session still runs and its backend can
+    /// tell. It may block briefly (a backend asks its server).
+    pub fn get(&self) -> Option<PathBuf> {
+        self.0.upgrade()?.cwd()
+    }
+
+    /// Whether both ask the same program.
+    pub fn same(&self, other: &Self) -> bool {
+        Weak::ptr_eq(&self.0, &other.0)
+    }
 }
 
 /// What the emulator thread is asked to do.
@@ -110,6 +128,12 @@ impl Session {
     /// Whether the shell has exited, without copying the screen.
     pub fn exited(&self) -> bool {
         self.screen.lock().is_ok_and(|screen| screen.exited)
+    }
+
+    /// Where to ask which folder its program is in, from any thread. It
+    /// holds the program weakly: once the session goes, it answers `None`.
+    pub fn folder(&self) -> Folder {
+        Folder(Arc::downgrade(&self.pane))
     }
 
     /// Sends what the user typed or pasted to the program.

@@ -63,6 +63,10 @@ impl Render for MoonframeApp {
                 }
             });
         }
+        // The panels follow the project of the terminal last typed in.
+        if let Some(folder) = self.terminals.focused_folder(window) {
+            self.project.follow(folder);
+        }
         let layers = self.inspector_layers(window.viewport_size(), cx);
         let toast = self.toast.as_ref().map(|(id, message)| {
             let notice = self
