@@ -13,6 +13,8 @@ fn field<'a>(value: &'a Data, key: &str) -> &'a Data {
     fields.get(key).unwrap_or(&Data::Nil)
 }
 
+// Only the Unix-only test below reads the composer.
+#[cfg(unix)]
 fn composer(node: &Node) -> Option<&crate::Input> {
     match node {
         Node::Input(input) if input.id.as_deref() == Some("composer") => Some(input),
