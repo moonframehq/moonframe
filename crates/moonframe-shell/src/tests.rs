@@ -50,6 +50,14 @@ fn only_the_last_lines_are_kept() {
 }
 
 #[test]
+fn a_tab_at_the_end_of_a_full_line_ends() {
+    let mut line = vec![b'x'; 5000];
+    line.extend_from_slice(b"\t\tdone\n");
+    let got = lines(&line);
+    assert_eq!(got[0].chars().count(), 4000);
+}
+
+#[test]
 fn plain_text_drops_the_marks() {
     assert_eq!(
         ansi::plain("\u{1}red;b\u{2}hi\u{1};\u{2} there"),

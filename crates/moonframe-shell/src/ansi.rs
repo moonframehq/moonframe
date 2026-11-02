@@ -196,7 +196,8 @@ impl Output {
                 '\n' => self.newline(),
                 '\r' => self.at = 0,
                 '\t' => {
-                    let next = (self.at / 8 + 1) * 8;
+                    // Never past the cap, where `put` stops moving.
+                    let next = ((self.at / 8 + 1) * 8).min(MAX_LINE);
                     while self.at < next {
                         self.put(' ');
                     }
