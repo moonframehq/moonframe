@@ -206,25 +206,24 @@ fn repository(dir: &Path) -> Option<PathBuf> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     // Not `super::*`: gpui_kit's `test` would replace the standard one.
-    use {
-        super::{KEEP, keep, read_kept},
-        std::path::PathBuf,
-    };
+    use super::{KEEP, keep, read_kept};
 
     #[test]
     fn kept_projects_come_back_newest_last_without_repeats_or_excess() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("state").join("projects.txt");
+        // Absolute on every system (`/repo` has no drive on Windows).
+        let repo = |index: usize| dir.path().join(format!("repo{index}"));
         assert!(read_kept(&file).is_empty());
         for index in 0..KEEP + 2 {
-            keep(&file, PathBuf::from(format!("/repo/{index}")));
+            keep(&file, repo(index));
         }
-        keep(&file, PathBuf::from("/repo/5"));
+        keep(&file, repo(5));
         let read = read_kept(&file);
         assert_eq!(read.len(), KEEP);
-        assert_eq!(read.last(), Some(&PathBuf::from("/repo/5")));
-        assert_eq!(read.iter().filter(|path| path.ends_with("5")).count(), 1);
-        assert!(!read.contains(&PathBuf::from("/repo/0")));
+        assert_eq!(read.last(), Some(&repo(5)));
+        assert_eq!(read.iter().filter(|path| **path == repo(5)).count(), 1);
+        assert!(!read.contains(&repo(0)));
     }
 
     #[test]
@@ -233,10 +232,10 @@ mod tests {
         let file = dir.path().join("projects.txt");
         let runs: Vec<_> = (0..8)
             .map(|run| {
-                let file = file.clone();
+                let (file, root) = (file.clone(), dir.path().to_owned());
                 std::thread::spawn(move || {
                     for index in 0..4 {
-                        keep(&file, PathBuf::from(format!("/run{run}/repo{index}")));
+                        keep(&file, root.join(format!("run{run}-repo{index}")));
                     }
                 })
             })
