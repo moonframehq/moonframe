@@ -48,6 +48,9 @@ fn settings_are_herdrs_usage_table_and_typos_are_refused() {
     assert_eq!(read.show_providers, ["openrouter"]);
     assert!(!read.browser_cookies);
     assert!(config(&json!({ "browser_cookies": "yes" })).is_err());
+    // A misspelled key is refused, not dropped with its default kept.
+    let typo = config(&json!({ "browser_cookie": false })).unwrap_err();
+    assert!(typo.contains("browser_cookie"), "{typo}");
 }
 
 #[test]
@@ -229,4 +232,13 @@ fn only_writers_may_allow_or_switch_hosts() {
     assert_eq!(provider.host, Some(Host::Wsl("Ubuntu".into())));
     provider.receive(&handle, "usage", message(json!({ "host": "local" })));
     assert_eq!(provider.host, Some(Host::Local));
+}
+
+#[test]
+fn the_shipped_settings_load() {
+    let manifest: toml::Table = include_str!("../../../app/providers/usage/provider.toml")
+        .parse()
+        .unwrap();
+    let settings = serde_json::to_value(&manifest["settings"]).unwrap();
+    config(&settings).unwrap();
 }

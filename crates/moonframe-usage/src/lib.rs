@@ -52,6 +52,13 @@ const USAGE_KEYS: &[&str] = &[
     "show_providers",
 ];
 
+/// The keys of `[settings]` this provider reads itself.
+const OWN_KEYS: &[&str] = &[
+    // keep-sorted start
+    "grants", "host", "hosts", "writers",
+    // keep-sorted end
+];
+
 /// Makes the provider, for the app's registry.
 pub fn native() -> Box<dyn Native> {
     Box::new(UsageProvider::default())
@@ -164,10 +171,17 @@ impl Native for UsageProvider {
 /// herdr-usage's config from `[settings]`, refusing what it does not
 /// know so a typo says so instead of showing nothing.
 fn config(settings: &Value) -> Result<UsageConfig, String> {
-    let table: Map<String, Value> = settings
-        .as_object()
-        .into_iter()
-        .flatten()
+    let entries = settings.as_object().into_iter().flatten();
+    if let Some((key, _)) = entries
+        .clone()
+        .find(|(key, _)| !USAGE_KEYS.contains(&key.as_str()) && !OWN_KEYS.contains(&key.as_str()))
+    {
+        return Err(format!(
+            "settings: unknown key `{key}`; expected one of {}",
+            [USAGE_KEYS, OWN_KEYS].concat().join(", ")
+        ));
+    }
+    let table: Map<String, Value> = entries
         .filter(|(key, _)| USAGE_KEYS.contains(&key.as_str()))
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect();
