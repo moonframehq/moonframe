@@ -58,8 +58,12 @@ return mod {
 			return
 		end
 		if msg.topic == "switchyard/workspace" then
+			-- Its branch changing keeps the folder: an edit stays open.
+			local moved = not workspace or not msg.value or workspace.path ~= msg.value.path
 			state.workspace = msg.value
-			state.editing = nil
+			if moved then
+				state.editing = nil
+			end
 		elseif msg.select then
 			state.tab = msg.select
 			state.editing = nil

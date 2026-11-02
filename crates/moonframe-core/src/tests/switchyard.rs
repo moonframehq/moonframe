@@ -182,6 +182,84 @@ fn shell_enter_and_cards_use_the_selected_workspaces_anchor() {
     );
 }
 
+fn reject(app: &mut App, request: &Data, action: &str) {
+    let rejection = Data::Map(
+        [
+            ("reply".into(), field(request, "id").clone()),
+            ("action".into(), Data::from(action)),
+            ("ok".into(), Data::Bool(false)),
+            ("error".into(), Data::from("no")),
+        ]
+        .into(),
+    );
+    app.workspace
+        .send(&format!("provider:{action}"), "chat", rejection);
+    app.check();
+}
+
+#[test]
+fn rejected_commands_and_prompts_keep_their_words_and_outputs() {
+    let mut app = App::new();
+    app.start();
+    app.live("{}");
+    // A command the shell refuses comes back as typed.
+    app.send("chat", "return {msg='send',value='!make test'}");
+    let run = app.outbox("shell", "run").remove(0);
+    app.workspace.send(
+        "provider:shell",
+        "chat",
+        Data::Map(
+            [
+                ("reply".into(), field(&run, "id").clone()),
+                ("action".into(), Data::from("run")),
+                ("ok".into(), Data::Bool(false)),
+                ("error".into(), Data::from("no")),
+            ]
+            .into(),
+        ),
+    );
+    assert_eq!(
+        field(&app.state("chat"), "draft"),
+        &Data::from("!make test")
+    );
+    // A prompt with an output added gets both back, the output as a chip.
+    app.send("chat", "return {add={id='r1',command='ls',text='a b'}}");
+    app.send("chat", "return {msg='send',value='why?'}");
+    let prompt = app.outbox("chat", "prompt").remove(0);
+    let Data::String(sent) = field(&prompt, "prompt") else {
+        panic!()
+    };
+    assert!(sent.starts_with("why?") && sent.contains("a b"), "{sent}");
+    assert_eq!(
+        field(field(&app.state("chat"), "context"), "one"),
+        &Data::Nil
+    );
+    reject(&mut app, &prompt, "chat");
+    let state = app.state("chat");
+    assert_eq!(field(&state, "draft"), &Data::from("why?"));
+    let Data::List(chips) = field(field(&state, "context"), "one") else {
+        panic!("the output was not put back: {state:?}")
+    };
+    assert_eq!(field(&chips[0], "id"), &Data::from("r1"));
+}
+
+#[test]
+fn a_branch_update_keeps_a_script_edit_open() {
+    let mut app = App::new();
+    app.send("console", "return {edit='run'}");
+    app.send("console", "return {msg='text',value='just run'}");
+    // The same folder, now on another branch.
+    app.send(
+        "workspaces",
+        "return {select={path='/work',name='repo',branch='feature'}}",
+    );
+    let state = app.state("console");
+    assert_eq!(field(&state, "editing"), &Data::from("run"));
+    assert_eq!(field(&state, "text"), &Data::from("just run"));
+    app.select("/other");
+    assert_eq!(field(&app.state("console"), "editing"), &Data::Nil);
+}
+
 #[test]
 fn long_conversations_and_expanded_reasoning_stay_within_host_limits() {
     let mut app = App::new();

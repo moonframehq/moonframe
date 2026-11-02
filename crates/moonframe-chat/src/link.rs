@@ -92,6 +92,11 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
     match stream.try_clone() {
         Ok(writer) => {
             let mut state = lock(shared);
+            // Dropped before the writer was stored: nothing else would shut
+            // this connection.
+            if state.detached {
+                return false;
+            }
             if let Some(chat) = state.chat_mut(id) {
                 chat.writer = Some(writer);
             }

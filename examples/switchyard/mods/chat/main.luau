@@ -26,6 +26,10 @@ local AGENT_TITLES = {
 -- Settings in the order the composer shows them.
 local SETTING_ORDER = { model = 1, model_config = 2, thought_level = 3, mode = 4, other = 5 }
 
+-- A message on its way: the words typed, the outputs added to it, and the
+-- thread it was typed in, so a rejection puts each back where it was.
+type Outgoing = { text: string, context: { any }, key: string }
+
 type Anchor = { run: string, after: number }
 type Known = { status: string, working: boolean, cwd: string, after: number? }
 
@@ -35,7 +39,7 @@ type State = {
 	draft: string,
 	timeline: { [string]: { Anchor } },
 	context: { [string]: { { id: string, label: string, text: string } } },
-	waiting: { [string]: { string } },
+	waiting: { [string]: { Outgoing } },
 	pending: { [string]: any },
 	known: { [string]: Known },
 	open: { [string]: boolean? },
@@ -118,14 +122,29 @@ local function focus(state: State): { any }
 	return if id then { { to = "provider:chat", msg = { focus = id } } } else {}
 end
 
--- Keep unsent text even when another draft was typed before a rejection.
-local function restore_prompt(state: State, prompt: string)
-	state.draft = prompt .. (if state.draft == "" then "" else "\n\n" .. state.draft)
+-- Puts a message that did not go back: its words in the field (before
+-- anything typed since) and its added outputs back as chips.
+local function restore(state: State, message: Outgoing)
+	state.draft = message.text .. (if state.draft == "" then "" else "\n\n" .. state.draft)
+	if #message.context > 0 then
+		local list: { any } = state.context[message.key] or {}
+		for _, item in message.context do
+			local present = false
+			for _, kept in list do
+				present = present or kept.id == item.id
+			end
+			if not present then
+				table.insert(list, item)
+			end
+		end
+		state.context[message.key] = list
+	end
 end
 
-local function prompt_message(state: State, chat: string, prompt: string): any
+local function prompt_message(state: State, chat: string, message: Outgoing): any
 	local token = next_id(state)
-	state.pending[token] = { kind = "prompt", prompt = prompt }
+	state.pending[token] = { kind = "prompt", message = message }
+	local prompt = with_context(message.text, message.context)
 	return { to = "provider:chat", msg = { prompt = prompt, chat = chat, id = token } }
 end
 
@@ -152,23 +171,26 @@ local function send(state: State): (State, { any }?)
 			return state, nil
 		end
 		local token = next_id(state)
-		state.pending[token] = { kind = "run", key = timeline_key(state), after = anchor(state) }
+		local key = timeline_key(state)
+		state.pending[token] = {
+			kind = "run", key = key, after = anchor(state), message = { text = text, context = {}, key = key },
+		}
 		return state, { { to = "provider:shell", msg = { run = command, cwd = workspace.path, id = token } } }
 	end
 	local key = timeline_key(state)
-	local prompt = with_context(text, state.context[key] or {})
+	local message: Outgoing = { text = text, context = state.context[key] or {}, key = key }
 	state.context[key] = nil
 	if chat then
 		if state.known[chat].status ~= "live" then
 			local waiting = state.waiting[chat] or {}
-			table.insert(waiting, prompt)
+			table.insert(waiting, message)
 			state.waiting[chat] = waiting
 			return state, nil
 		end
-		return state, { prompt_message(state, chat, prompt) }
+		return state, { prompt_message(state, chat, message) }
 	end
 	local token = next_id(state)
-	state.pending[token] = { kind = "start", prompt = prompt, path = workspace.path }
+	state.pending[token] = { kind = "start", message = message, path = workspace.path }
 	return state, { { to = "provider:chat", msg = { start = "", cwd = workspace.path, id = token } } }
 end
 
@@ -247,7 +269,9 @@ local function on_reply(state: State, msg: any): (State, { any }?)
 	state.pending[msg.reply] = nil
 	if not msg.ok then
 		state.error = msg.error or "That did not work"
-		if pending and pending.prompt then restore_prompt(state, pending.prompt) end
+		if pending and pending.message then
+			restore(state, pending.message)
+		end
 		return state, nil
 	end
 	if pending and pending.kind == "run" then
@@ -268,8 +292,10 @@ local function on_reply(state: State, msg: any): (State, { any }?)
 			state.context[msg.chat] = state.context[loose]
 			state.context[loose] = nil
 		end
-		if pending.prompt then
-			state.waiting[msg.chat] = { pending.prompt }
+		if pending.message then
+			-- Its outputs moved into the chat with the loose cards.
+			pending.message.key = msg.chat
+			state.waiting[msg.chat] = { pending.message }
 		end
 		return state, { { to = "provider:chat", msg = { focus = msg.chat } } }
 	end
@@ -288,11 +314,15 @@ local function on_chats(state: State, value: any): (State, { any }?)
 		local waiting = state.waiting[chat.id]
 		if waiting and chat.status == "live" then
 			state.waiting[chat.id] = nil
-			for _, prompt in waiting do table.insert(sends, prompt_message(state, chat.id, prompt)) end
+			for _, message in waiting do
+				table.insert(sends, prompt_message(state, chat.id, message))
+			end
 		elseif waiting and (chat.status == "failed" or chat.status == "ended") then
 			state.waiting[chat.id] = nil
 			state.error = chat.error or "The chat did not start"
-			restore_prompt(state, table.concat(waiting, "\n\n"))
+			for at = #waiting, 1, -1 do
+				restore(state, waiting[at])
+			end
 		end
 	end
 	state.known = known
