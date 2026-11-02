@@ -606,6 +606,15 @@ impl Workspace {
         self.style_error.as_ref()
     }
 
+    /// The shell and each mod with `keys` of its own, shell first, then
+    /// by name: who a keystroke nothing nearer takes goes to.
+    pub fn mod_keys(&self) -> impl Iterator<Item = (&str, &crate::Keys)> {
+        std::iter::once((SHELL, &self.shell))
+            .chain(self.mods.iter().map(|(name, slot)| (name.as_str(), slot)))
+            .filter_map(|(name, slot)| Some((name, slot.keys()?)))
+            .filter(|(_, keys)| !keys.is_empty())
+    }
+
     pub fn mod_names(&self) -> impl Iterator<Item = &str> {
         self.mods.keys().map(String::as_str)
     }

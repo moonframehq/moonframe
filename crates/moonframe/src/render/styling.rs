@@ -260,6 +260,21 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
                 self = self.left(px(left));
             }
         }
+        if let Some(area) = frame.area {
+            self = self.absolute();
+            if let Some(left) = area.left {
+                self = self.left(relative(left));
+            }
+            if let Some(top) = area.top {
+                self = self.top(relative(top));
+            }
+            if let Some(width) = area.width {
+                self = self.w(relative(width));
+            }
+            if let Some(height) = area.height {
+                self = self.h(relative(height));
+            }
+        }
         // The element's own size, else a rule's, such as a named state's.
         if let Some(width) = frame.width.or(style.width) {
             self = self.w(px(width)).flex_shrink_0();

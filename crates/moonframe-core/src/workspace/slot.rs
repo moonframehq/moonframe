@@ -27,6 +27,11 @@ impl Slot {
         self.module.as_ref().map(Module::meta)
     }
 
+    /// The keys its mod takes anywhere in the window (`keys` in `mod {}`).
+    pub fn keys(&self) -> Option<&crate::Keys> {
+        self.module.as_ref().map(Module::keys)
+    }
+
     /// The file the module comes from.
     pub fn source(&self) -> Option<&Path> {
         self.source.as_deref()

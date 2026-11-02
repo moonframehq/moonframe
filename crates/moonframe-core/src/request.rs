@@ -7,6 +7,10 @@
 
 use crate::{Command, Data, Error};
 
+mod pick;
+
+pub use pick::{Pick, PickKind};
+
 /// How a message names the app rather than a mod: `to = "app:command"`.
 pub const APP: &str = "app:";
 
@@ -33,6 +37,9 @@ pub enum Request {
     /// none); a click on it brings the window forward and tells the mod
     /// that posted it, on `app/notification`, with its `id`.
     Notify(Notification),
+    /// `app:pick`: the system's panel to open files, pick folders or
+    /// name a file to save; the answer comes back to the mod that asked.
+    Pick(Pick),
 }
 
 /// What `app:sound` plays.
@@ -101,6 +108,7 @@ impl Request {
             "theme" => theme(msg),
             "sound" => sound(msg).map(Self::Sound),
             "notify" => notification(msg).map(Self::Notify),
+            "pick" => pick::pick(msg).map(Self::Pick),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -114,7 +122,7 @@ impl Request {
 }
 
 /// What a module can send to, after `app:`.
-pub const NAMES: &[&str] = &["command", "appearance", "theme", "sound", "notify"];
+pub const NAMES: &[&str] = &["command", "appearance", "theme", "sound", "notify", "pick"];
 
 /// `"default"`, or a sound file's path: never an address.
 fn sound(msg: &Data) -> Result<Sound, Error> {

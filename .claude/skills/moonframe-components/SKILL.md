@@ -23,7 +23,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 | Element | Use it for | Keys (besides children) |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `key` (names it among its siblings: with a `transition` rule it grows in as it appears and shrinks away as it goes), `msg`/`to`, `command` or `window` (a mod opened in a window of its own), extras |
+| `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `key` (names it among its siblings: with a `transition` rule it grows in as it appears and shrinks away as it goes), `msg`/`to`, `command` or `window` (a mod opened in a window of its own), pointer keys, extras |
 | `ui.panel { ... }` | a titled section with header actions over a body | frame keys, `title`, `actions = { elements }` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | areas the user resizes by dragging; children must be `ui.pane` | `id` |
 | `ui.pane { ... }` | one side of a split; slides in and out when `visible` changes; `lazy = true` starts what it mounts only once it first shows, and keeps it asleep (not run, not drawn) while hidden | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` |
@@ -39,7 +39,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | --- | --- | --- |
 | `ui.text "..."` | any text; a bare string child is plain text | `text`, `tone`, `size`, `weight` (`light` `normal` `medium` `semibold` `bold`), `truncate` (one line), `lines` (at most N lines), `wrap = false` (keep lines whole, for code that scrolls sideways), extras |
 | `ui.icon "name"` | a bundled icon at the text's size and color; `spin = true` turns it (loaders). Lucide glyphs (git: `git-branch` `git-commit-horizontal` `git-merge` `git-pull-request` `git-pull-request-draft` `git-pull-request-closed` `git-compare` `circle-dot`), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, brands `brand-github` `brand-gitlab` `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama`; the full list is `IconName` in types/moonframe.d.luau | `name`, `tone`, `size`, `spin`, extras |
-| `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras |
+| `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), `zoom` (screen pixels per picture pixel, 1 is 100 %: a viewer that fills its parent unless sized) panned to `center = { x, y }` (fractions of the picture), `overlay = { elements }` drawn over the picture wherever it lands (their `area` is in fractions of the picture: a crop frame, spots), `measure` (sent with the picture's `width`, `height`, `box_width`, `box_height` and the `fit` zoom when they change), extras |
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone`, extras |
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
@@ -82,7 +82,23 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `bottom`, `left`, `right`, `fill`), set in from it,
   `float = { at = "top-right", inset = 4 }`, or at pixel offsets,
   `float = { top = -4, right = -4 }`, negative overhanging: a count bubble
-  on an icon's corner). `grow` with a `width` or `height` grows from that size.
+  on an icon's corner), `area` (out of the flow at fractions of the parent,
+  `area = { left = 0.1, top = 0.2, width = 0.5, height = 0.3 }`: a crop
+  frame, a marker on a track). `grow` with a `width` or `height` grows from that size.
+- **Pointer keys** (`row`, `column`): `pointer = <msg>` is sent as a button
+  goes down on it, as the pointer moves while held (anywhere in the
+  window), and as it comes up, with `phase` (`down` `move` `up`), `x`, `y`
+  (fractions of the box as it was at the press), `dx`, `dy` (pixels since
+  the press), `width`, `height`, `button`, `clicks` and the keys held
+  (`shift` `alt` `ctrl` `cmd` `secondary`) added. `hover = true` also
+  sends `hover` moves and `leave`. `range = { min, max, step, value, speed,
+  axis }` adds the `value` a drag sets: where the pointer is between `min`
+  and `max` (a slider), or `value` plus pixels times `speed` (a number
+  scrubbed by its label). `wheel = <msg>` gets scrolls and pinches (`dx`,
+  `dy`, `zoom`, `x`, `y`); `drop = <msg>` gets files dropped from other
+  apps (`paths`), which `ui.image` may then show; `cursor` sets the pointer's
+  shape (`crosshair`, `grab`, `grabbing`, `ew-resize`, `ns-resize`,
+  `nwse-resize`, `nesw-resize`, `move`, `pointer`, `text`, `not-allowed`).
 - **Children:** `false` and `nil` children are skipped, wherever they are.
 - **Look keys** (every element but splits): `class = "a b"`,
   `style = { ... }`, and `state = "open"`: a state of the view's own naming,
@@ -96,6 +112,14 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `browser-reload`, `browser-stop`, `browser-open`) also takes
   `browser = "<id>"`. To run a command from `update`, without a click, send
   `{ to = "app:command", msg = "minimize" }`.
+- **Files:** `{ to = "app:pick", msg = { kind = "open", types = { "tif" },
+  multiple = true, reply = "opened" } }` opens the system's panel (`kind`
+  `open`, `folder` or `save` with `name` and `folder`); the answer comes
+  back to the mod as `reply` with `paths` (`path` for a save) or
+  `cancelled = true`. Picked files may then show in `ui.image`.
+- **Keys anywhere:** `mod { keys = { ["secondary-1"] = "histogram" } }`
+  sends its message when the key is pressed and nothing nearer (an open
+  overlay, a focused field or terminal) took it; the shell's first.
 - **Window:** the shell's `mod { window = { titlebar = "hidden",
   traffic_lights = { x, y } } }` draws the layout under the title bar (at
   startup only); `app.window` tells views the `platform`, `titlebar`,
@@ -151,6 +175,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`swap-view`](#swap-view) | Containers | The body under a view switcher (`pill-tabs`, `segmented`, `tabs`) whose content is replaced, such as a list's header and rows per filter. Give `width` so the pages can be measured while they move. For panels that open and close use `side-panels`; for items joining a list give the rows a `key` and a transition instead. |
 | [`browser`](#browser) | Content | A web page in a pane, with browser chrome. Keep the page's `navigate` messages in state and pass the latest as `page`; the address bar navigates on its own. For a bare page without a bar use `ui.browser`. |
 | [`chat-markdown`](#chat-markdown) | Content | A chat answer in markdown, including one still streaming in (pass `cursor` while it grows) or citing its sources with `[label](cite:source)` chips. For a whole document, a note or a README use `markdown` (drawn by the host, with links the mod handles); for a file to edit use `markdown-editor`; for plain text use `ui.text`; for a file's source use `code-view`; for ordered steps alone use `numbered-list`. |
+| [`image-viewer`](#image-viewer) | Content | Looking at a picture closely: a scan, a photo, a screenshot, a render, with tools drawn over it (a crop frame, picked spots). The mod keeps `zoom` and `center`. For a picture at a fixed size use `ui.image`; for an avatar use `avatar`. |
 | [`markdown`](#markdown) | Content | Show markdown read-only: a README, notes, an agent's answer, release notes written in markdown. For editing a file use `markdown-editor`; for a chat answer streaming in, or one with source chips, use `chat-markdown`; for code alone use `code-view`; for one line of text use `ui.text`. |
 | [`markdown-editor`](#markdown-editor) | Content | Editing a markdown file of the project in a tab or a pane. For showing markdown without editing use `markdown`; for code read-only use `code-view`; for a short text field use `ui.input`. |
 | [`button-group`](#button-group) | Controls | Related actions or view modes side by side in a header: Unified \| Split, Uncommitted \| Branch, zoom − \| +. For a settings choice in a track use `segmented`; for separate quiet buttons use `toolbar`; for back/forward use `nav-buttons`. |
@@ -176,6 +201,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`forecast-chart`](#forecast-chart) | Data | A balance or capacity projected over weeks or months against a minimum (cash against a floor, stock against a reorder point). For counts per bucket, stacked by kind, use `bar-chart`; for a small trend use `sparkline` or `ui.line`. |
 | [`guide-card`](#guide-card) | Data | Cards of reading material or courses the reader works through (guides, docs, tutorials), three or so to a row, each with how far the reader got. For one featured course with actions use `course-card`; for a plain titled box use `card`; for a linked record inside a message use `record-card`. |
 | [`heat-grid`](#heat-grid) | Data | Activity over days or weeks at a glance: lessons per week, posts per day, a streak, a course's progress as squares, a GitHub-style contribution graph. For a count compared with the period before use `dot-chart`; for stacked counts with an axis use `bar-chart`; for one fraction use `meter` or `progress`. |
+| [`histogram`](#histogram) | Data | The spread of a picture's tones (red, green, blue, luminance), of latencies or of scores, where the shape matters more than any count; with draggable markers it is a levels control. For counts per labelled bucket use `bar-chart`; for a trend over time use `ui.line` or `series-chart`. |
 | [`kbd`](#kbd) | Data | Show a keyboard shortcut: in a menu row, a palette result, a tooltip line or a help sheet. Inside menus `menu` already draws one from an item's `shortcut`; for a word-like tag use `ui.badge`. |
 | [`key-values`](#key-values) | Data | Read-only properties or details: aligned label/value lines. For editable settings use `settings-row`. |
 | [`kpi-cell`](#kpi-cell) | Data | A row of three to five headline figures across the top of a dashboard (readers, signups, churn), set side by side in a bordered strip. For a figure inside a card's text use `metric`; for a standalone tile with a sparkline use `stat-tile`. |
@@ -222,9 +248,13 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`checkbox`](#checkbox) | Forms | An option that is on or off among others in a form or list, or a "select all" (indeterminate when some are). For a setting that applies at once use `switch`; for one of many use `radio-group`; for filter toggles use `chips`. |
 | [`choice-cards`](#choice-cards) | Forms | Pick one of several options that are best seen: a theme, a layout, a template, an agent. For short text options use `segmented` or `radio-group`; for a colour use `swatches`; for a menu use `dropdown`. |
 | [`composer`](#composer) | Forms | The bottom of a chat with an agent or a person. For a search box use `search-field`; for a longer form field use `ui.input` with `multiline`. |
+| [`curve-editor`](#curve-editor) | Forms | A tone or response curve the user shapes by hand: a photo's gradation curve per channel, an easing, a gain curve. For one value along a range use `slider`; for a fixed set of levels over a histogram use `histogram` with markers. |
+| [`form-grid`](#form-grid) | Forms | A dense form in a tool's sidebar or inspector: an output's size, a scanner's holder, a file name. For a settings page with descriptions use `settings-row`; for read-only label/value pairs use `key-values`. |
+| [`number-field`](#number-field) | Forms | A number the user sets exactly or nudges: a resolution, a frame number, a zoom, a count, in a dense settings form or inspector. Read `tonumber(msg.value)` for both typing and dragging. For a value along a range where the feel matters use `slider`; for a small count with buttons only use `stepper`. |
 | [`radio-group`](#radio-group) | Forms | Pick one of a few options that need a description or room to read (a mode, a policy). For 2 to 4 short values use `segmented`; for many values use `dropdown`; for options with a picture use `choice-cards`; for independent on/off options use `checkbox`. |
 | [`search-field`](#search-field) | Forms | A query box over a list or palette: filter files, branches or commands as the user types, with up and down to move through results. For a longer value use `ui.input` (multiline for a text area); for one-of-many choices use `segmented` or `dropdown`. |
 | [`settings-row`](#settings-row) | Forms | Each line of a settings page or preferences card, holding a `switch`, `segmented`, `dropdown` or button. Group rows under `settings-page` sections; for read-only properties use `key-values`; for a labelled switch on its own use `switch` with `label`. |
+| [`slider`](#slider) | Forms | A setting along a continuous range where the feel matters more than the exact number: contrast, saturation, an amount, a radius, a volume. For a number the user types or nudges use `number-field` or `stepper`; for a fraction shown read-only use `meter`; for a few named values use `segmented`. |
 | [`stepper`](#stepper) | Forms | A small number nudged up or down: a font size, a column count, a delay. For a fraction shown as a bar use `meter`; for one of a few named sizes use `segmented`. |
 | [`swatches`](#swatches) | Forms | Pick a colour from a short palette: a workspace or tag colour, an accent. For themes (many colours each) use `choice-cards` with a swatch row as the preview; to show colours without picking, use `ui.row`s with a background. |
 | [`switch`](#switch) | Forms | A setting that takes effect at once, on or off ("High contrast"). For a choice that is confirmed later or part of a list of options use `checkbox`; for one of several values use `segmented` or `radio-group`. |
@@ -561,6 +591,36 @@ chat_markdown { text = "A reply with **bold**, _italic_ and `code` in the line, 
 ```
 
 A whole mod using it, with state: `app/components/demos/chat-markdown.luau`.
+
+#### `image-viewer`
+
+**Image Viewer.** A picture that fits its space and zooms about the pointer (pinch or ⌘-wheel), pans by wheel or drag, goes between fitted and 100 % on a double-click, with an optional zoom pill and things drawn over the picture.
+
+**When:** Looking at a picture closely: a scan, a photo, a screenshot, a render, with tools drawn over it (a crop frame, picked spots). The mod keeps `zoom` and `center`. For a picture at a fixed size use `ui.image`; for an avatar use `avatar`.
+
+| Prop | Meaning |
+| --- | --- |
+| `center` | the point of the picture in the middle, { x, y } fractions of it; the middle when unset |
+| `change` | message sent as the view changes, with `zoom` (nil when fitted) and `center` added |
+| `controls` | a pill in the corner: zoom out, the zoom, zoom in, fit, 100 % |
+| `height` | pixels; fills its parent when unset |
+| `id` | keeps its state apart from another viewer's in the same mod (default "main") |
+| `max` | the most zoom (default 32, 3200 %) |
+| `min` | the least zoom (default a quarter of fitted) |
+| `overlay` | elements drawn over the picture; their `area` is in fractions of the picture, a `pointer` there takes presses before panning does, and their messages reach the mod as they are |
+| `src` | the picture: an absolute or `~/` path (a file the user picked or dropped, the image cache, the app's folders), or one relative to the components folder, which draws it |
+| `width` | pixels; fills its parent when unset |
+| `zoom` | screen pixels per picture pixel (1 is 100 %); nil fits it |
+
+**Styles:** `.image-viewer` `.image-viewer-button` `.image-viewer-button:hover` `.image-viewer-controls` `.image-viewer-zoom`
+
+```lua
+local image_viewer = use "image-viewer"
+
+image_viewer { controls = true, height = 280, src = "demos/scan.jpg", width = 420 }
+```
+
+A whole mod using it, with state: `app/components/demos/image-viewer.luau`.
 
 #### `markdown`
 
@@ -1279,6 +1339,34 @@ heat_grid { levels = 2, columns = { { 2 }, { 2 }, { 2 }, { 1 }, { 0 }, { 0 }, { 
 ```
 
 A whole mod using it, with state: `app/components/demos/heat-grid.luau`.
+
+#### `histogram`
+
+**Histogram.** Filled curves of counts across a range, one per channel and overlaid in their colours, with optional log scale and markers that can be dragged along it.
+
+**When:** The spread of a picture's tones (red, green, blue, luminance), of latencies or of scores, where the shape matters more than any count; with draggable markers it is a levels control. For counts per labelled bucket use `bar-chart`; for a trend over time use `ui.line` or `series-chart`.
+
+| Prop | Meaning |
+| --- | --- |
+| `channels` | list of { values (counts, evenly spread from the range's start to its end), color?, name? }, drawn first to last |
+| `drag` | message a marker's drag sends, with `marker` (its id), `value` (0 to 1) and `phase` added; markers are fixed without it |
+| `height` | pixels (default 96) |
+| `log` | scale counts by their logarithm, so small ones still show |
+| `markers` | list of { id, value (0 to 1 along the range), color?, tooltip? }: lines across it |
+| `max` | the count at the top (default the largest) |
+| `shade` | dim what lies outside the first and last marker |
+| `to` | mod to send `drag` to, if not the drawing one |
+| `width` | pixels (default 256) |
+
+**Styles:** `.histogram` `.histogram-grip` `.histogram-knob` `.histogram-marker` `.histogram-shade`
+
+```lua
+local histogram = use "histogram"
+
+histogram { channels = { { color = "#ef4444", values = { 2, 6, 14, 30, 52, 70, 64, 48, 40, 52, 66, 50, 30, 16, 8, 3 } }, { color = "#22c55e", values = { 1, 4, 10, 22, 40, 60, 74, 66, 50, 44, 46, 38, 24, 12, 5, 2 } }, { color = "#3b82f6", values = { 4, 10, 22, 40, 58, 62, 50, 40, 36, 34, 30, 22, 14, 8, 4, 1 } } }, height = 90, markers = { { id = "shadow", value = 0.08 }, { id = "highlight", value = 0.9 } }, shade = true, width = 256 }
+```
+
+A whole mod using it, with state: `app/components/demos/histogram.luau`.
 
 #### `kbd`
 
@@ -2566,6 +2654,88 @@ local composer = use "composer"
 composer { agent = "Sales agent", attach = "attach", placeholder = "Ask the sales agent anything…", send = "send", submit = "send" }
 ```
 
+#### `curve-editor`
+
+**Curve Editor.** A square graph with a smooth curve through draggable points: press to add one, drag to move it between its neighbours, double-click to remove it; an optional histogram shows behind it.
+
+**When:** A tone or response curve the user shapes by hand: a photo's gradation curve per channel, an easing, a gain curve. For one value along a range use `slider`; for a fixed set of levels over a histogram use `histogram` with markers.
+
+| Prop | Meaning |
+| --- | --- |
+| `change` | message sent as the points change, with `points` and `phase` (down, move, up) added; record undo on `phase == "up"` |
+| `color` | the curve's colour (default accent) |
+| `disabled` | shows the curve without taking presses |
+| `grid` | lines across each way (default 3, quarters) |
+| `id` | keeps its drag apart from another curve editor's in the same mod (default "main") |
+| `points` | the curve's points, { x, y } pairs from 0 to 1, sorted by x; at least two |
+| `size` | the square's side in pixels (default 200) |
+| `values` | counts drawn faintly behind it, such as the channel's histogram |
+
+**Styles:** `.curve-editor` `.curve-editor-grid` `.curve-editor-handle` `.curve-editor-handle:selected`
+
+```lua
+local curve_editor = use "curve-editor"
+
+curve_editor { points = { { 0, 0 }, { 0.3, 0.22 }, { 0.7, 0.82 }, { 1, 1 } }, size = 180 }
+```
+
+A whole mod using it, with state: `app/components/demos/curve-editor.luau`.
+
+#### `form-grid`
+
+**Form Grid.** Rows of a label and its control in two aligned columns, with an optional hint under a control: a compact form.
+
+**When:** A dense form in a tool's sidebar or inspector: an output's size, a scanner's holder, a file name. For a settings page with descriptions use `settings-row`; for read-only label/value pairs use `key-values`.
+
+| Prop | Meaning |
+| --- | --- |
+| `gap` | pixels between rows (default 8) |
+| `label_width` | the label column's width in pixels (default 96) |
+| `rows` | list of { label?, control (an element, or a list of them in a row), hint? }; a row without a label puts its control under the others |
+
+**Styles:** `.form-grid-hint` `.form-grid-label`
+
+```lua
+local form_grid = use "form-grid"
+
+form_grid { rows = { { control = { __line = 34, id = "form-grid-name", type = "input", value = "scan", width = 140 }, label = "Name" }, { control = { __line = 35, text = "TIFF 16-bit", type = "badge" }, hint = "Written beside the scan", label = "Format" } } }
+```
+
+A whole mod using it, with state: `app/components/demos/form-grid.luau`.
+
+#### `number-field`
+
+**Number Field.** A number field with a label that scrubs it when dragged sideways, a unit, optional − and + buttons, and min, max and step; typing sends the text, dragging and the buttons send numbers.
+
+**When:** A number the user sets exactly or nudges: a resolution, a frame number, a zoom, a count, in a dense settings form or inspector. Read `tonumber(msg.value)` for both typing and dragging. For a value along a range where the feel matters use `slider`; for a small count with buttons only use `stepper`.
+
+| Prop | Meaning |
+| --- | --- |
+| `buttons` | show − and + on either side |
+| `change` | message sent as it changes, with `value` added: a number from a drag or a button, the text typed on Enter (`tonumber(msg.value)` reads both), and `phase` (down, move, up) while dragging |
+| `decimals` | digits after the point shown (default 0) |
+| `disabled` | greyed out, read-only |
+| `id` | keeps what is typed apart from another field's (default the label) |
+| `label` | text before the field, which scrubs the value when dragged |
+| `max` | highest value |
+| `min` | lowest value; dragging and the buttons stop there |
+| `speed` | value per pixel dragged (default `step`, or a two-hundredth of min to max when that is larger) |
+| `step` | what a button adds, and what values snap to (default 1) |
+| `to` | mod to send `change` to, if not the drawing one |
+| `unit` | text after the number ("ppi", "%") |
+| `value` | the current number |
+| `width` | the field's width in pixels (default 64) |
+
+**Styles:** `.number-field` `.number-field-box` `.number-field-button` `.number-field-button:hover` `.number-field-disabled` `.number-field-input` `.number-field-label` `.number-field-scrub` `.number-field-scrub:hover` `.number-field-unit`
+
+```lua
+local number_field = use "number-field"
+
+number_field { buttons = true, label = "Output", max = 10000, min = 10, step = 1, unit = "ppi", value = 300 }
+```
+
+A whole mod using it, with state: `app/components/demos/number-field.luau`.
+
 #### `radio-group`
 
 **Radio Group.** Radio buttons, vertical or horizontal, each with a label and optional description; sends { select = id }.
@@ -2654,6 +2824,40 @@ settings_row { title = "Show agents", description = "List running agents under t
 ```
 
 A whole mod using it, with state: `app/components/demos/settings-row.luau`.
+
+#### `slider`
+
+**Slider.** A thumb on a track between `min` and `max`, with a label and its value; dragging or clicking the track sends the new value, snapped to `step`, and a click on the value puts back `default`.
+
+**When:** A setting along a continuous range where the feel matters more than the exact number: contrast, saturation, an amount, a radius, a volume. For a number the user types or nudges use `number-field` or `stepper`; for a fraction shown read-only use `meter`; for a few named values use `segmented`.
+
+| Prop | Meaning |
+| --- | --- |
+| `change` | message a drag sends, with `value` and `phase` (down, move, up) added; record undo on `phase == "up"` |
+| `colors` | the track as a gradient through these colours instead of a fill, such as a hue's { "#ff0000", "#ffff00", ... } |
+| `decimals` | digits after the point in the value shown (default 0) |
+| `default` | the value a click on the shown value puts back; no reset without it |
+| `disabled` | greyed out, not draggable |
+| `inline` | label, track and value on one line |
+| `label` | text over the track's left (or before it, `inline`) |
+| `label_width` | with `inline`, the label's width in pixels (default 88) |
+| `max` | the right end (default 100) |
+| `min` | the left end (default 0) |
+| `step` | the value snaps to multiples of it (default none, or 1 when min and max are whole) |
+| `to` | mod to send `change` to, if not the drawing one |
+| `unit` | text after the value ("%", "px") |
+| `value` | the current value |
+| `width` | the track's width in pixels (default 180) |
+
+**Styles:** `.slider` `.slider-disabled` `.slider-fill` `.slider-inline` `.slider-label` `.slider-reset` `.slider-reset:hover` `.slider-thumb` `.slider-track` `.slider-value`
+
+```lua
+local slider = use "slider"
+
+slider { default = 0, label = "Contrast", max = 50, min = -50, value = 12, width = 220 }
+```
+
+A whole mod using it, with state: `app/components/demos/slider.luau`.
 
 #### `stepper`
 

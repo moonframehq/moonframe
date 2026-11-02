@@ -40,6 +40,7 @@ wasm = ["moonframe-packages/wasm", "moonframe-providers/wasm"]
 [dependencies]
 futures.workspace             = true
 gpui-kit.workspace            = true
+imagesize.workspace           = true
 moonframe-acp                 = { optional = true, workspace = true }
 moonframe-core.workspace      = true
 moonframe-docs                = { optional = true, workspace = true }

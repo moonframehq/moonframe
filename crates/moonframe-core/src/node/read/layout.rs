@@ -5,9 +5,15 @@ use super::*;
 
 impl Build for Stack {
     const CHILDREN: bool = true;
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, FRAME, LOOK, ACTION, EXTRAS, &[
-        "align", "justify", "wrap", "selected", "drag", "key",
-    ]];
+    const KEYS: &'static [&'static [&'static str]] = &[
+        TYPE,
+        FRAME,
+        LOOK,
+        ACTION,
+        EXTRAS,
+        &["align", "justify", "wrap", "selected", "drag", "key"],
+        pointer::POINTER,
+    ];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
@@ -25,6 +31,9 @@ impl Build for Stack {
             extras: Extras::from_fields(fields)?,
             drag: fields.get("drag")?.unwrap_or(false),
             key: fields.get::<PlainId>("key")?.map(|key| key.0),
+            pointer: Some(Pointer::from_fields(fields)?)
+                .filter(|pointer| !pointer.is_empty())
+                .map(Box::new),
             children: tree.children(fields)?,
         })
     }

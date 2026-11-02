@@ -72,4 +72,31 @@ impl MoonframeApp {
             None => Taken::Free,
         }
     }
+
+    /// Offers `keystroke` to the `keys` mods declare (`mod { keys = ... }`),
+    /// once nothing nearer took it: the shell first, then mods by name.
+    pub(crate) fn mod_keystroke(
+        &mut self,
+        keystroke: &Keystroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let modifiers = keystroke.modifiers;
+        let pressed = Pressed {
+            key: &keystroke.key,
+            text: keystroke.key_char.as_deref(),
+            ctrl: modifiers.control,
+            alt: modifiers.alt,
+            shift: modifiers.shift,
+            cmd: modifiers.platform,
+        };
+        let Some((owner, msg)) = self.workspace.mod_keys().find_map(|(owner, keys)| {
+            let msg = keys.message(None, &pressed, MAC)?;
+            Some((owner.to_owned(), msg.clone()))
+        }) else {
+            return false;
+        };
+        self.dispatch(&owner, &Action::Send { to: None, msg }, window, cx);
+        true
+    }
 }

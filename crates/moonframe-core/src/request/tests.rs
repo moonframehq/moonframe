@@ -300,3 +300,111 @@ fn update_posts_a_notification() {
     }
     assert!(workspace.take_requests().is_empty());
 }
+
+#[test]
+fn update_opens_a_pick_panel_and_its_answer_is_the_reply() {
+    let (_dir, mut workspace) = workspace();
+    let msg = |fields: &[(&str, Data)]| {
+        Data::Map(
+            fields
+                .iter()
+                .map(|(key, value)| ((*key).to_owned(), value.clone()))
+                .collect(),
+        )
+    };
+    let types = Data::List(vec![Data::from("TIF"), Data::from(".jpg")]);
+    ask(
+        &mut workspace,
+        "app:pick",
+        msg(&[
+            ("kind", Data::from("open")),
+            ("multiple", Data::Bool(true)),
+            ("types", types),
+            ("reply", msg(&[("opened", Data::Bool(true))])),
+        ]),
+    );
+    assert_eq!(error(&workspace), "");
+    let requests = workspace.take_requests();
+    let [(from, Request::Pick(pick))] = &requests[..] else {
+        panic!("expected a pick, got {requests:?}");
+    };
+    assert_eq!(from, "asker");
+    assert_eq!((pick.kind, pick.multiple), (PickKind::Open, true));
+    assert_eq!(pick.types, ["tif", "jpg"]);
+    // Files of other types are left out; none left is a cancel.
+    let picked = vec!["/a/scan.TIF".into(), "/a/notes.txt".into()];
+    assert_eq!(
+        pick.answer(Some(picked)),
+        msg(&[
+            ("opened", Data::Bool(true)),
+            ("paths", Data::List(vec![Data::from("/a/scan.TIF")])),
+        ])
+    );
+    assert_eq!(
+        pick.answer(None),
+        msg(&[
+            ("opened", Data::Bool(true)),
+            ("cancelled", Data::Bool(true))
+        ])
+    );
+}
+
+#[test]
+fn a_save_panel_answers_one_path_and_bad_picks_are_the_senders_error() {
+    let (_dir, mut workspace) = workspace();
+    let msg = |fields: &[(&str, Data)]| {
+        Data::Map(
+            fields
+                .iter()
+                .map(|(key, value)| ((*key).to_owned(), value.clone()))
+                .collect(),
+        )
+    };
+    ask(
+        &mut workspace,
+        "app:pick",
+        msg(&[
+            ("kind", Data::from("save")),
+            ("name", Data::from("scan.tif")),
+            ("reply", Data::from("saved")),
+        ]),
+    );
+    let requests = workspace.take_requests();
+    let [(_, Request::Pick(pick))] = &requests[..] else {
+        panic!("expected a pick, got {requests:?}");
+    };
+    assert_eq!(
+        pick.answer(Some(vec!["/out/scan.tif".into()])),
+        msg(&[
+            ("msg", Data::from("saved")),
+            ("path", Data::from("/out/scan.tif")),
+        ])
+    );
+    for (bad, problem) in [
+        (msg(&[("kind", Data::from("open"))]), "needs a `reply`"),
+        (
+            msg(&[("kind", Data::from("disk")), ("reply", Data::Nil)]),
+            "unknown kind `disk`",
+        ),
+        (
+            msg(&[
+                ("kind", Data::from("save")),
+                ("multiple", Data::Bool(true)),
+                ("reply", Data::from("x")),
+            ]),
+            "picks one file",
+        ),
+        (
+            msg(&[("name", Data::from("a")), ("reply", Data::from("x"))]),
+            "go with kind = \"save\"",
+        ),
+        (
+            msg(&[("path", Data::from("/etc")), ("reply", Data::from("x"))]),
+            "unknown key `path`",
+        ),
+    ] {
+        ask(&mut workspace, "app:pick", bad);
+        assert!(error(&workspace).contains(problem), "{}", error(&workspace));
+    }
+    assert!(workspace.take_requests().is_empty());
+}

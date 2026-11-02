@@ -90,6 +90,10 @@ impl<'w> Draw<'w> for Stack {
         } else {
             element
         };
+        let element = match &self.pointer {
+            Some(pointer) => super::pointer::attach(element, pointer, place, cx),
+            None => element,
+        };
         let element = match &self.action {
             Some(action) => covering(element, in_drag)
                 .cursor_pointer()
@@ -703,6 +707,7 @@ impl<'w> Draw<'w> for Image {
                 .layers()
                 .map(Path::to_owned)
                 .chain([crate::paths::images()])
+                .chain(super::images::granted())
                 .collect()
         });
         let fit = match self.fit {
@@ -727,6 +732,9 @@ impl<'w> Draw<'w> for Image {
             }
             return with_extras(element, &self.extras, painter, place, cx).into_any_element();
         };
+        if super::viewer::wanted(self) {
+            return super::viewer::draw(self, &path, painter, place, cx);
+        }
         let mut element = img(path)
             .object_fit(fit)
             .id(place.id())

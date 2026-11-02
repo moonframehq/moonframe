@@ -17,9 +17,11 @@ mod keyed;
 mod list;
 mod markdown;
 mod plot;
+mod pointer;
 mod styling;
 mod terminal;
 mod view;
+mod viewer;
 
 use {
     crate::{

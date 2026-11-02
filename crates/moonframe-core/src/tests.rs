@@ -18,6 +18,7 @@ mod motion;
 mod overlays;
 mod packages;
 mod paint;
+mod pointer;
 mod shell;
 mod state;
 mod styles;

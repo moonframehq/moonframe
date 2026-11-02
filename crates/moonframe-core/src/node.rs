@@ -14,11 +14,12 @@ mod icon;
 mod input;
 mod instance;
 mod layout;
+mod pointer;
 mod read;
 mod tokens;
 // keep-sorted end
 
-pub use {embed::*, icon::*, input::*, instance::*, layout::*, tokens::*};
+pub use {embed::*, icon::*, input::*, instance::*, layout::*, pointer::*, tokens::*};
 
 pub(crate) use read::read;
 
@@ -85,6 +86,7 @@ impl Node {
             },
             Self::Overlay(overlay) => overlay.content.instances(found),
             Self::List(list) => all(&list.rows, found),
+            Self::Image(image) => all(&image.overlay, found),
             _ => {},
         }
     }
@@ -134,6 +136,7 @@ impl Node {
             },
             Self::Overlay(overlay) => overlay.content.asleep(found),
             Self::List(list) => all(&list.rows, found),
+            Self::Image(image) => all(&image.overlay, found),
             _ => {},
         }
     }
@@ -284,6 +287,20 @@ pub struct Image {
     pub width: Option<f32>,
     pub height: Option<f32>,
     pub fit: Fit,
+    /// Screen pixels per picture pixel (1 is 100 %), panned to `center`:
+    /// a viewer's zoom. Unset, the picture fits its box as `fit` says.
+    pub zoom: Option<f32>,
+    /// The point of the picture at the middle of the box while zoomed, as
+    /// fractions across and down it; the middle when unset.
+    pub center: Option<[f32; 2]>,
+    /// Sent with the picture's own size and the zoom that fits it (`{
+    /// width, height, fit }`) when the picture or its box changes.
+    pub measure: Option<Data>,
+    /// The mod `measure` and `context` go to; the drawing mod when unset.
+    pub to: Option<String>,
+    /// Drawn over the picture itself, wherever it is shown in its box, so
+    /// an `area` there is in fractions of the picture: a crop frame, marks.
+    pub overlay: Vec<Node>,
     pub extras: Extras,
 }
 

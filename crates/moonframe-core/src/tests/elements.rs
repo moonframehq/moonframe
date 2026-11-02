@@ -182,6 +182,11 @@ fn images_come_only_from_the_app_folders_and_the_cache() {
         width: None,
         height: None,
         fit: crate::Fit::Contain,
+        zoom: None,
+        center: None,
+        measure: None,
+        to: None,
+        overlay: Vec::new(),
         extras: crate::Extras::default(),
     };
     let folder = app.path().join("mods/pic");

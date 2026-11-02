@@ -25,6 +25,7 @@ impl Frame {
             max_width: fields.number("max_width", PIXELS)?,
             max_height: fields.number("max_height", PIXELS)?,
             float: fields.get("float")?,
+            area: fields.get("area")?,
         })
     }
 }
@@ -70,10 +71,13 @@ impl Action {
                 Ok(Some(Self::Browser { to, id, command }))
             },
             (None, ..) if browser.is_some() => Err(misplaced()),
-            (None, Some(_), _) if fields.raw("context").is_none() => Err(fields
-                .cx()
-                .key("to")
-                .fail("`to` goes with a `msg`, `context` or browser `command`")),
+            (None, Some(_), _)
+                if fields.raw("context").is_none() && !Pointer::sends(fields) =>
+            {
+                Err(fields.cx().key("to").fail(
+                    "`to` goes with a `msg`, `context`, `pointer`, `wheel`, `drop` or browser `command`",
+                ))
+            },
             (None, _, Some(AnyCommand::App(command))) => Ok(Some(Self::Command(command))),
             (None, _, None) => Ok(None),
         }

@@ -8,7 +8,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 | Element | Use it for | Keys (besides children) |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `key` (names it among its siblings: with a `transition` rule it grows in as it appears and shrinks away as it goes), `msg`/`to`, `command` or `window` (a mod opened in a window of its own), extras |
+| `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `key` (names it among its siblings: with a `transition` rule it grows in as it appears and shrinks away as it goes), `msg`/`to`, `command` or `window` (a mod opened in a window of its own), pointer keys, extras |
 | `ui.panel { ... }` | a titled section with header actions over a body | frame keys, `title`, `actions = { elements }` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | areas the user resizes by dragging; children must be `ui.pane` | `id` |
 | `ui.pane { ... }` | one side of a split; slides in and out when `visible` changes; `lazy = true` starts what it mounts only once it first shows, and keeps it asleep (not run, not drawn) while hidden | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` |
@@ -24,7 +24,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | --- | --- | --- |
 | `ui.text "..."` | any text; a bare string child is plain text | `text`, `tone`, `size`, `weight` (`light` `normal` `medium` `semibold` `bold`), `truncate` (one line), `lines` (at most N lines), `wrap = false` (keep lines whole, for code that scrolls sideways), extras |
 | `ui.icon "name"` | a bundled icon at the text's size and color; `spin = true` turns it (loaders). Lucide glyphs (git: `git-branch` `git-commit-horizontal` `git-merge` `git-pull-request` `git-pull-request-draft` `git-pull-request-closed` `git-compare` `circle-dot`), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, brands `brand-github` `brand-gitlab` `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama`; the full list is `IconName` in types/moonframe.d.luau | `name`, `tone`, `size`, `spin`, extras |
-| `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras |
+| `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), `zoom` (screen pixels per picture pixel, 1 is 100 %: a viewer that fills its parent unless sized) panned to `center = { x, y }` (fractions of the picture), `overlay = { elements }` drawn over the picture wherever it lands (their `area` is in fractions of the picture: a crop frame, spots), `measure` (sent with the picture's `width`, `height`, `box_width`, `box_height` and the `fit` zoom when they change), extras |
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone`, extras |
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
@@ -67,7 +67,23 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `bottom`, `left`, `right`, `fill`), set in from it,
   `float = { at = "top-right", inset = 4 }`, or at pixel offsets,
   `float = { top = -4, right = -4 }`, negative overhanging: a count bubble
-  on an icon's corner). `grow` with a `width` or `height` grows from that size.
+  on an icon's corner), `area` (out of the flow at fractions of the parent,
+  `area = { left = 0.1, top = 0.2, width = 0.5, height = 0.3 }`: a crop
+  frame, a marker on a track). `grow` with a `width` or `height` grows from that size.
+- **Pointer keys** (`row`, `column`): `pointer = <msg>` is sent as a button
+  goes down on it, as the pointer moves while held (anywhere in the
+  window), and as it comes up, with `phase` (`down` `move` `up`), `x`, `y`
+  (fractions of the box as it was at the press), `dx`, `dy` (pixels since
+  the press), `width`, `height`, `button`, `clicks` and the keys held
+  (`shift` `alt` `ctrl` `cmd` `secondary`) added. `hover = true` also
+  sends `hover` moves and `leave`. `range = { min, max, step, value, speed,
+  axis }` adds the `value` a drag sets: where the pointer is between `min`
+  and `max` (a slider), or `value` plus pixels times `speed` (a number
+  scrubbed by its label). `wheel = <msg>` gets scrolls and pinches (`dx`,
+  `dy`, `zoom`, `x`, `y`); `drop = <msg>` gets files dropped from other
+  apps (`paths`), which `ui.image` may then show; `cursor` sets the pointer's
+  shape (`crosshair`, `grab`, `grabbing`, `ew-resize`, `ns-resize`,
+  `nwse-resize`, `nesw-resize`, `move`, `pointer`, `text`, `not-allowed`).
 - **Children:** `false` and `nil` children are skipped, wherever they are.
 - **Look keys** (every element but splits): `class = "a b"`,
   `style = { ... }`, and `state = "open"`: a state of the view's own naming,
@@ -81,6 +97,14 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `browser-reload`, `browser-stop`, `browser-open`) also takes
   `browser = "<id>"`. To run a command from `update`, without a click, send
   `{ to = "app:command", msg = "minimize" }`.
+- **Files:** `{ to = "app:pick", msg = { kind = "open", types = { "tif" },
+  multiple = true, reply = "opened" } }` opens the system's panel (`kind`
+  `open`, `folder` or `save` with `name` and `folder`); the answer comes
+  back to the mod as `reply` with `paths` (`path` for a save) or
+  `cancelled = true`. Picked files may then show in `ui.image`.
+- **Keys anywhere:** `mod { keys = { ["secondary-1"] = "histogram" } }`
+  sends its message when the key is pressed and nothing nearer (an open
+  overlay, a focused field or terminal) took it; the shell's first.
 - **Window:** the shell's `mod { window = { titlebar = "hidden",
   traffic_lights = { x, y } } }` draws the layout under the title bar (at
   startup only); `app.window` tells views the `platform`, `titlebar`,

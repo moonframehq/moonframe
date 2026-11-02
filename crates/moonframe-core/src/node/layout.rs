@@ -32,6 +32,9 @@ pub struct Frame {
     /// edge optional, negative overhangs): a count bubble on an icon's corner.
     /// `float = "top-right"` pins it to an edge or corner.
     pub float: Option<Offsets>,
+    /// Out of the flow, over the parent at fractions of its size: a crop
+    /// frame on a picture, a marker on a track.
+    pub area: Option<Area>,
 }
 
 tokens! {
@@ -77,6 +80,9 @@ pub struct Stack {
     /// go: with a `transition` rule it grows in when it appears and shrinks
     /// away when it goes, as tabs open and close.
     pub key: Option<String>,
+    /// Presses, drags, the wheel, dropped files and the cursor; boxed, as
+    /// most stacks have none.
+    pub pointer: Option<Box<Pointer>>,
     pub children: Vec<Node>,
 }
 

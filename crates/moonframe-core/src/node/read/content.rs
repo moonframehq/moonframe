@@ -149,16 +149,31 @@ impl Build for Hatch {
 }
 
 impl Build for Image {
-    const KEYS: &'static [&'static [&'static str]] =
-        &[TYPE, LOOK, ATTACHED, &["src", "width", "height", "fit"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ATTACHED, &[
+        "src", "width", "height", "fit", "zoom", "center", "measure", "overlay",
+    ]];
 
-    fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
+    fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
+        let center = fields
+            .get::<Vec<f32>>("center")?
+            .map(|center| match center[..] {
+                [x, y] => Ok([x, y]),
+                _ => Err(fields.cx().key("center").fail(
+                    "`center` is { x, y }, two fractions of the picture, such as { 0.5, 0.5 }",
+                )),
+            })
+            .transpose()?;
         Ok(Self {
             look: Look::from_fields(fields)?,
             src: fields.need::<ImageSrc>("src")?.0,
             width: fields.number("width", PIXELS)?,
             height: fields.number("height", PIXELS)?,
             fit: fields.get("fit")?.unwrap_or(Fit::Contain),
+            zoom: fields.number("zoom", 0.001..=1000.0)?,
+            center,
+            measure: fields.get("measure")?,
+            to: fields.get("to")?,
+            overlay: tree.list(fields, "overlay")?,
             extras: Extras::from_fields(fields)?,
         })
     }
