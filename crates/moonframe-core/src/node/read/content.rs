@@ -166,7 +166,7 @@ impl Read for Polyline {
         ]])?;
         let flat: Vec<f32> = fields.need("points")?;
         let points = cx.key("points");
-        if flat.len() % 2 != 0 || flat.len() < 4 {
+        if !flat.len().is_multiple_of(2) || flat.len() < 4 {
             return Err(
                 points.fail("points are x, y pairs, at least two of them: { x1, y1, x2, y2 }")
             );
@@ -182,9 +182,9 @@ impl Read for Polyline {
         }
         Ok(Self {
             points: flat
-                .chunks_exact(2)
-                .map(|pair| [pair[0], pair[1]])
-                .collect(),
+                .as_chunks::<2>()
+                .0
+                .to_vec(),
             color: fields.get("color")?,
             stroke: fields.number("stroke", 0.5..=8.0)?.unwrap_or(1.5),
             dashed: fields.get("dashed")?.unwrap_or(false),
