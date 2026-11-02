@@ -3,14 +3,16 @@
 
 use {
     crate::{Backend, Open, Opened, Pane, Size},
-    portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system},
+    portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system},
     std::{
         io::{Read, Write},
         path::PathBuf,
         sync::{
             Arc, Mutex,
             atomic::{AtomicBool, Ordering},
+            mpsc::{self, Receiver},
         },
+        thread,
     },
     sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind},
 };
@@ -39,7 +41,7 @@ impl Backend for Pty {
         } else if let Some(home) = std::env::var_os("HOME") {
             command.cwd(home);
         }
-        let child = pair
+        let mut child = pair
             .slave
             .spawn_command(command)
             .map_err(|error| format!("cannot start the shell: {error}"))?;
@@ -55,17 +57,36 @@ impl Backend for Pty {
             .master
             .take_writer()
             .map_err(|error| format!("cannot write to the terminal: {error}"))?;
+        let master = Arc::new(Mutex::new(Some(pair.master)));
+        let closing = master.clone();
+        let (finished, status) = mpsc::channel();
+        thread::Builder::new()
+            .name("terminal-wait".into())
+            .spawn(move || {
+                let _ = finished.send(child.wait().is_ok());
+                // ConPTY keeps output open after the child exits. Closing it
+                // can itself wait for output to drain, so the reader must run
+                // independently, and resize must not hold up that reader.
+                let master = closing.lock().ok().and_then(|mut master| master.take());
+                drop(master);
+            })
+            .map_err(|error| {
+                if let Ok(mut killer) = killer.lock() {
+                    let _ = killer.kill();
+                }
+                format!("cannot wait for the shell: {error}")
+            })?;
         Ok(Opened {
             pane: Box::new(PtyPane {
                 writer: Mutex::new(writer),
-                master: Mutex::new(pair.master),
+                master,
                 killer,
                 pid,
                 exited: exited.clone(),
             }),
             output: Box::new(Reading {
                 reader,
-                child,
+                status,
                 exited,
                 buffer: vec![0; CHUNK],
                 done: false,
@@ -76,7 +97,7 @@ impl Backend for Pty {
 
 struct PtyPane {
     writer: Mutex<Box<dyn Write + Send>>,
-    master: Mutex<Box<dyn MasterPty + Send>>,
+    master: Arc<Mutex<Option<Box<dyn MasterPty + Send>>>>,
     /// Ends the shell when the pane goes: the reader keeps the terminal
     /// open, so closing it alone would not.
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
@@ -105,7 +126,9 @@ impl Pane for PtyPane {
     }
 
     fn resize(&self, size: Size) {
-        if let Ok(master) = self.master.lock() {
+        if let Ok(master) = self.master.lock()
+            && let Some(master) = master.as_ref()
+        {
             let _ = master.resize(pty_size(size));
         }
     }
@@ -124,11 +147,10 @@ impl Pane for PtyPane {
     }
 }
 
-/// The shell's output, read until it closes; then the shell is reaped so it
-/// does not linger as a zombie.
+/// Drains the shell's output before publishing its independently reaped exit.
 struct Reading {
     reader: Box<dyn Read + Send>,
-    child: Box<dyn Child + Send + Sync>,
+    status: Receiver<bool>,
     exited: Arc<AtomicBool>,
     buffer: Vec<u8>,
     done: bool,
@@ -145,7 +167,7 @@ impl Iterator for Reading {
             Ok(0) | Err(_) => {
                 self.done = true;
                 self.exited
-                    .store(self.child.wait().is_ok(), Ordering::Release);
+                    .store(self.status.recv().unwrap_or(false), Ordering::Release);
                 None
             },
             Ok(read) => Some(self.buffer[..read].to_vec()),

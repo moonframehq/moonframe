@@ -183,7 +183,13 @@ fn a_session_runs_a_shell() {
             std::thread::sleep(Duration::from_millis(50));
         };
         assert!(found, "{engine:?}: {:?}", session.screen());
-        session.write(b"exit\r");
+        // Final output must be drained even when closing the PTY is what
+        // unblocks its reader (ConPTY on Windows).
+        session.write(if cfg!(windows) {
+            b"echo final-%COMSPEC:~0,0%42 & exit\r"
+        } else {
+            b"echo final-$((40 + 2)); exit\r"
+        });
         let deadline = Instant::now() + Duration::from_secs(15);
         while !session.exited() && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(20));
@@ -192,7 +198,12 @@ fn a_session_runs_a_shell() {
             session.exited(),
             "{engine:?}: the shell exit was not confirmed"
         );
-        assert!(!session.screen().disconnected);
+        let screen = session.screen();
+        assert!(!screen.disconnected);
+        assert!(
+            (0..screen.rows).any(|row| text(&screen, row).contains("final-42")),
+            "{engine:?}: final output was lost: {screen:?}"
+        );
     }
 }
 
