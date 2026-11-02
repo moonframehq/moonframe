@@ -23,36 +23,27 @@ impl Span {
         Self { start: at, end: at }
     }
 
-    /// The run of non-blank cells around `at`.
+    /// The run of non-blank cells around `at`, carried on across rows the
+    /// terminal soft-wrapped, so a long URL or path is picked whole.
     fn word(screen: &Screen, at: Spot) -> Self {
-        let cells = screen.row(at.row);
-        let blank = |column: u16| {
-            cells
-                .get(usize::from(column))
-                .is_none_or(|cell| !cell.spacer && cell.ch.is_whitespace())
+        let blank = |spot: Spot| {
+            screen
+                .row(spot.row)
+                .get(usize::from(spot.column))
+                .is_none_or(|cell| !cell.spacer && !cell.wrap_spacer && cell.ch.is_whitespace())
         };
-        if blank(at.column) {
+        if blank(at) {
             return Self::at(at);
         }
-        let start = (0..at.column)
-            .rev()
-            .take_while(|column| !blank(*column))
-            .last()
-            .unwrap_or(at.column);
-        let end = (at.column..screen.cols)
-            .take_while(|column| !blank(*column))
-            .last()
-            .unwrap_or(at.column);
-        Self {
-            start: Spot {
-                row: at.row,
-                column: start,
-            },
-            end: Spot {
-                row: at.row,
-                column: end,
-            },
+        let mut start = at;
+        while let Some(before) = before(screen, start).filter(|spot| !blank(*spot)) {
+            start = before;
         }
+        let mut end = at;
+        while let Some(after) = after(screen, end).filter(|spot| !blank(*spot)) {
+            end = after;
+        }
+        Self { start, end }
     }
 
     fn line(screen: &Screen, at: Spot) -> Self {
@@ -67,6 +58,37 @@ impl Span {
             },
         }
     }
+}
+
+/// The cell before `spot` in reading order, through a soft wrap but not
+/// a hard line break.
+fn before(screen: &Screen, spot: Spot) -> Option<Spot> {
+    if spot.column > 0 {
+        return Some(Spot {
+            column: spot.column - 1,
+            ..spot
+        });
+    }
+    let row = spot.row.checked_sub(1)?;
+    screen.is_wrapped(row).then(|| Spot {
+        row,
+        column: screen.cols.saturating_sub(1),
+    })
+}
+
+/// The cell after `spot` in reading order, through a soft wrap but not a
+/// hard line break.
+fn after(screen: &Screen, spot: Spot) -> Option<Spot> {
+    if spot.column + 1 < screen.cols {
+        return Some(Spot {
+            column: spot.column + 1,
+            ..spot
+        });
+    }
+    (screen.is_wrapped(spot.row) && spot.row + 1 < screen.rows).then(|| Spot {
+        row: spot.row + 1,
+        column: 0,
+    })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -251,6 +273,20 @@ mod tests {
         let screen = screen(&["cargo build --release"]);
         let selection = Selection::press(&screen, spot(0, 8), 2);
         assert_eq!(selection.text(&screen), "build");
+    }
+
+    #[test]
+    fn a_double_click_selects_a_word_across_soft_wraps_from_either_part() {
+        let mut screen = screen(&["see https://", "host/abc def", "next"]);
+        screen.wrapped = vec![true, false, false];
+        for at in [spot(0, 6), spot(1, 2)] {
+            let selection = Selection::press(&screen, at, 2);
+            assert_eq!(selection.text(&screen), "https://host/abc", "{at:?}");
+        }
+        // A hard line break ends the word.
+        screen.wrapped = vec![false, false, false];
+        let selection = Selection::press(&screen, spot(1, 2), 2);
+        assert_eq!(selection.text(&screen), "host/abc");
     }
 
     #[test]

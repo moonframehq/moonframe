@@ -148,8 +148,12 @@ fn grid(
     canvas(
         move |bounds, window, _| {
             let metrics = Metrics::measure(typeface, window);
-            if let Ok(session) = &resize.session {
-                session.resize(metrics.fit(bounds));
+            // A new grid moves text between rows and columns, so the
+            // selection's cells no longer hold what was chosen.
+            if let Ok(session) = &resize.session
+                && session.resize(metrics.fit(bounds))
+            {
+                resize.clear_selection();
             }
             metrics
         },

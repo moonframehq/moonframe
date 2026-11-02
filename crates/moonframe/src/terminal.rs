@@ -80,10 +80,11 @@ impl TerminalView {
         Some(selection.text(&session.screen())).filter(|text| !text.is_empty())
     }
 
-    /// Forgets the selection, as typing or scrolling moves the text under it.
-    pub(crate) fn clear_selection(&self) {
-        self.selection.borrow_mut().take();
+    /// Forgets the selection, as typing, pasting, scrolling or resizing
+    /// moves the text under it. Returns whether there was one to redraw.
+    pub(crate) fn clear_selection(&self) -> bool {
         self.selecting.set(false);
+        self.selection.borrow_mut().take().is_some()
     }
 }
 
@@ -361,6 +362,9 @@ impl MoonframeApp {
             if keystroke.key == "v"
                 && let Some(text) = cx.read_from_clipboard().and_then(|item| item.text())
             {
+                if view.clear_selection() {
+                    cx.notify();
+                }
                 session.write(&paste(&text, screen.bracketed_paste));
                 return true;
             }
@@ -383,8 +387,7 @@ impl MoonframeApp {
         // A key it has no bytes for (F13) does nothing, and still does not
         // reach the app while the terminal has focus.
         if let Some(bytes) = encode(pressed, screen.app_cursor) {
-            if view.selection.borrow().is_some() {
-                view.clear_selection();
+            if view.clear_selection() {
                 cx.notify();
             }
             session.write(&bytes);
