@@ -9,6 +9,33 @@ import glob
 import json
 import os
 import re
+import struct
+
+SHOTS = "website/site/img/components"
+
+
+def webp_size(path):
+    """A WebP's pixel width and height, read from its header."""
+    with open(path, "rb") as image:
+        head = image.read(30)
+    if head[:4] != b"RIFF" or head[8:12] != b"WEBP":
+        raise ValueError(f"{path} is not a WebP")
+    chunk = head[12:16]
+    if chunk == b"VP8 ":
+        width, height = struct.unpack("<HH", head[26:30])
+        return width & 0x3FFF, height & 0x3FFF
+    if chunk == b"VP8L":
+        bits = int.from_bytes(head[21:25], "little")
+        return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
+    if chunk == b"VP8X":
+        return int.from_bytes(head[24:27], "little") + 1, int.from_bytes(head[27:30], "little") + 1
+    raise ValueError(f"{path}: unknown WebP chunk {chunk!r}")
+
+
+def shot(name):
+    """The preview's size in pixels (2x), so the page can keep its room before it loads."""
+    path = os.path.join(SHOTS, name + ".webp")
+    return list(webp_size(path)) if os.path.exists(path) else None
 
 
 def field(source, key):
@@ -109,6 +136,7 @@ for path in sorted(glob.glob("app/components/*.luau")):
             "props": props,
             "example": example,
             "code": code,
+            "shot": shot(name),
         }
     )
 

@@ -6,6 +6,7 @@ The project's website: static HTML, no build step.
 site/                 what Netlify publishes (netlify.toml at the repo root)
   index.html          moonframe.dev
   docs/index.html     docs.moonframe.dev (served by a host rewrite in site/_redirects)
+  llms.txt            for coding agents: how to start a Moonframe app in the user's project
   components-browser.js, data/components.js   the Components browser on the home page
   img/                thumbnails (WebP, transparent corners) and img/full/ PNGs for the viewer
   img/components/     each component's preview, cut from the app's Components window

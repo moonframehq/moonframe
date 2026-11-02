@@ -1,5 +1,6 @@
 # docs.moonframe.dev serves site/docs/, sharing the site's images and scripts.
 https://docs.moonframe.dev/img/*  /img/:splat  200!
+https://docs.moonframe.dev/llms.txt  /llms.txt  200!
 https://docs.moonframe.dev/*      /docs/:splat  200!
 
 # On the main domain, /docs moves to its own subdomain.

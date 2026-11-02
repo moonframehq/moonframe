@@ -9,6 +9,7 @@
 
 use {
     crate::{
+        agent_files,
         packages::{self, Contents},
         paths,
     },
@@ -35,7 +36,8 @@ Commands:
   link <DIR>              run a folder in place as a profile's app, to
                           develop it
   new <DIR>               start an app to publish: a git repository with a
-                          moonframe.toml, a shell, and one mod
+                          moonframe.toml, a shell, one mod, and the skills
+                          and Luau types agents read to build in it
   paths <NAME>            what a bundle of the profile holds, one per line:
                           name, title, its app folder, its icon, each package
                           (`just bundle-app NAME` reads it)
@@ -475,13 +477,19 @@ fn create(folder: &Path) -> Result<(), String> {
     write("main.luau", SHELL)?;
     write("mods/home/main.luau", HOME)?;
     write("style.luau", STYLE)?;
+    write(".luaurc", LUAURC)?;
     write(
         "README.md",
         &README.replace("{repository}", env!("CARGO_PKG_REPOSITORY")),
     )?;
+    agent_files::refresh(folder, agent_files::PROFILE)?;
     packages::git_init(folder)?;
     let shown = folder.display();
     println!("Started the app {name} in {shown}: moonframe.toml, main.luau, mods/home.");
+    println!(
+        "For agents and luau-lsp: the Moonframe skills in .claude/skills, and the Luau API in \
+         types/moonframe.d.luau."
+    );
     println!();
     println!("  moonframe app link {shown}   make it a profile, edited live");
     println!("  moonframe --profile {name}        open it");
@@ -546,6 +554,15 @@ return mod {
 }
 "#;
 
+/// Strict type checks, as the built-in app has, against `types/`.
+const LUAURC: &str = r#"{
+  "languageMode": "strict",
+  "lint": {
+    "ImplicitReturn": false
+  }
+}
+"#;
+
 const STYLE: &str = "-- {name}'s styles, merged over the built-in stylesheet.
 return style {}
 ";
@@ -567,4 +584,39 @@ moonframe --profile {name}
 moonframe app link .          # a profile running this folder in place
 moonframe --profile {name}    # the window shows your edits as you save
 ```
+
+`.claude/skills` holds the Moonframe skills a coding agent reads to build
+here, and `types/moonframe.d.luau` the Luau API, for luau-lsp.
 ";
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_new_app_has_what_agents_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("my-app");
+        create(&folder).unwrap();
+        for file in [
+            packages::MANIFEST,
+            "main.luau",
+            "mods/home/main.luau",
+            ".luaurc",
+        ] {
+            assert!(folder.join(file).is_file(), "{file}");
+        }
+        for (file, text) in agent_files::PROFILE {
+            assert_eq!(
+                &fs::read_to_string(folder.join(file)).unwrap(),
+                text,
+                "{file}"
+            );
+        }
+        assert!(
+            create(&folder).is_err(),
+            "it wrote into a folder with an app"
+        );
+    }
+}

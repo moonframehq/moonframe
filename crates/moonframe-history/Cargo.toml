@@ -1,0 +1,26 @@
+[package]
+description            = "Undo and redo for an app's own folder: snapshots kept in a git repository of their own"
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-history"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[features]
+# When the folder sits in a git checkout and Herdr is about, a restore
+# first takes a Herdr checkpoint of that checkout, so Herdr UI's
+# checkpoints can bring it back too.
+herdr = ["dep:herdr-client", "dep:herdr-vcs"]
+
+[dependencies]
+herdr-client      = { optional = true, workspace = true }
+herdr-vcs         = { optional = true, workspace = true }
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -55,7 +55,8 @@ are there to use.
 ## Commands
 
 ```sh
-moonframe app new ~/code/my-app           # starts one: moonframe.toml, a shell, a mod, a README, git init
+moonframe app new ~/code/my-app           # starts one: moonframe.toml, a shell, a mod, a README, the
+                                          # skills in .claude/skills, types/, a strict .luaurc, git init
 moonframe app link ~/code/my-app          # a profile running the folder in place (edits reload live)
 moonframe app install owner/repo[@ref]    # clone an app and what it requires into a new profile
 moonframe app list | update NAME | remove NAME [--force]

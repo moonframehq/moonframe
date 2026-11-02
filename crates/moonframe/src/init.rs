@@ -4,7 +4,10 @@
 //! Cargo.toml and `main` (printed, never written into its sources).
 
 use {
-    crate::packages,
+    crate::{
+        agent_files::{self, write},
+        packages,
+    },
     std::{
         fs,
         path::{Path, PathBuf},
@@ -43,10 +46,6 @@ const MAIN_LUAU: &str = include_str!("../../../examples/host/app/main.luau");
 const STYLE_LUAU: &str = include_str!("../../../examples/host/app/style.luau");
 const CLOCK_TOML: &str = include_str!("../../../examples/host/app/providers/clock/provider.toml");
 const TOOLCHAIN: &str = include_str!("../../../rust-toolchain.toml");
-const TYPES: &str = include_str!("../../../types/moonframe.d.luau");
-const SKILL: &str = include_str!("../../../.claude/skills/moonframe/SKILL.md");
-const COMPONENTS_SKILL: &str =
-    include_str!("../../../.claude/skills/moonframe-components/SKILL.md");
 
 const REPOSITORY: &str = "https://github.com/penso/moonframe";
 
@@ -157,26 +156,8 @@ fn init(options: &Options) -> Result<(), String> {
     keep("app/main.luau", &template.text(MAIN_LUAU))?;
     keep("app/style.luau", STYLE_LUAU)?;
     keep("app/providers/clock/provider.toml", CLOCK_TOML)?;
-    for (relative, text) in [
-        ("types/moonframe.d.luau", TYPES),
-        (".claude/skills/moonframe/SKILL.md", SKILL),
-        (
-            ".claude/skills/moonframe-components/SKILL.md",
-            COMPONENTS_SKILL,
-        ),
-    ] {
-        let path = dir.join(relative);
-        if fs::read_to_string(&path).is_ok_and(|old| old == text) {
-            println!("current   {relative}");
-            continue;
-        }
-        let verb = if path.exists() {
-            "updated"
-        } else {
-            "wrote"
-        };
-        write(&path, text)?;
-        println!("{verb:<9} {relative}");
+    for (relative, outcome) in agent_files::refresh(&dir, agent_files::LIBRARY)? {
+        println!("{:<9} {relative}", outcome.verb());
     }
 
     println!();
@@ -247,14 +228,6 @@ fn dependency(checkout: Option<&Path>) -> Result<String, String> {
         "moonframe = {{ path = \"{}\" }}",
         crate_dir.display().to_string().replace('\\', "/")
     ))
-}
-
-fn write(path: &Path, text: &str) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("cannot create {}: {error}", parent.display()))?;
-    }
-    fs::write(path, text).map_err(|error| format!("cannot write {}: {error}", path.display()))
 }
 
 /// The example host app's files, as the new app's.

@@ -44,6 +44,8 @@ use {
 };
 
 // keep-sorted start
+mod fonts;
+mod history;
 mod listeners;
 mod menu;
 mod panes;
@@ -144,6 +146,9 @@ pub(crate) struct MoonframeApp {
     providers: Providers,
     /// The theme's own settings, restored when a stylesheet stops setting them.
     defaults: Defaults,
+    /// Snapshots of the window's own folder, for Undo Last Change; `None`
+    /// without a user's folder or git.
+    history: Option<Arc<moonframe_history::History>>,
     /// Dropping it stops the events.
     _watcher: Option<RecommendedWatcher>,
     /// The main window, the one this view draws.
@@ -184,7 +189,7 @@ impl MoonframeApp {
             font_size: DEFAULT_FONT_SIZE,
             font_family: theme.font_family.clone(),
             mono_font_size: theme.mono_font_size,
-            mono_font_family: theme.mono_font_family.clone(),
+            mono_font_family: fonts::default_mono(cx, &theme.mono_font_family),
             radius: theme.radius,
         };
         workspace.set_dark(theme.is_dark());
@@ -206,6 +211,7 @@ impl MoonframeApp {
         let watcher = watch(&workspace, &folders, cx)
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
+        let history = crate::history::open(&folders);
         let providers = start_providers(&workspace, parts.natives, cx);
         let views = Views::new(parts.views, deliver_from_views(cx));
         let focus = cx.focus_handle();
@@ -289,11 +295,14 @@ impl MoonframeApp {
             defaults,
             main_window: window.window_handle().window_id(),
             key_layers: HashMap::new(),
+            history,
             _watcher: watcher,
             _terminal_keys: crate::terminal::intercept_keys(cx),
             last_pane: 0,
         };
         app.apply_theme(cx);
+        // What changed while the app was closed is a snapshot of its own.
+        app.snapshot("launch", cx);
         hear_notification_clicks(cx);
         // What the mods' `init` sent providers as they started.
         app.forward("start", cx);
