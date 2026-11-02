@@ -15,16 +15,20 @@ use {
 };
 
 pub(crate) fn natives() -> Natives {
-    let built_in: [(&str, fn() -> Box<dyn Native>); 4] = [
+    let built_in: &[(&str, fn() -> Box<dyn Native>)] = &[
+        // keep-sorted start
         ("acp", acp),
+        ("chat", chat),
         ("docs", docs),
         ("git", git),
+        ("shell", shell),
+        // keep-sorted end
         // The demo gallery's (examples/demo): it opens apps on this binary.
         ("demos", crate::demos::native),
     ];
     built_in
-        .into_iter()
-        .map(|(name, make)| {
+        .iter()
+        .map(|&(name, make)| {
             let factory: Arc<dyn Fn() -> Box<dyn Native> + Send + Sync> = Arc::new(make);
             (name.to_owned(), factory)
         })
@@ -34,6 +38,11 @@ pub(crate) fn natives() -> Natives {
 #[cfg(feature = "acp")]
 fn acp() -> Box<dyn Native> {
     moonframe_acp::native()
+}
+
+#[cfg(feature = "chat")]
+fn chat() -> Box<dyn Native> {
+    moonframe_chat::native()
 }
 
 #[cfg(feature = "docs")]
@@ -46,8 +55,23 @@ fn git() -> Box<dyn Native> {
     moonframe_git::native()
 }
 
+#[cfg(feature = "shell")]
+fn shell() -> Box<dyn Native> {
+    moonframe_shell::native()
+}
+
 #[cfg(not(feature = "acp"))]
 fn acp() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "chat"))]
+fn chat() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "shell"))]
+fn shell() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
@@ -64,7 +88,13 @@ fn git() -> Box<dyn Native> {
 /// A built-in provider this build leaves out: it publishes nothing.
 // With every feature on, only the tests make one.
 #[cfg_attr(
-    all(feature = "acp", feature = "docs", feature = "git"),
+    all(
+        feature = "acp",
+        feature = "chat",
+        feature = "docs",
+        feature = "git",
+        feature = "shell"
+    ),
     allow(dead_code)
 )]
 struct LeftOut;
@@ -113,7 +143,7 @@ mod tests {
     #[test]
     fn every_built_in_native_is_registered() {
         let natives = natives();
-        for name in ["acp", "docs", "git", "demos"] {
+        for name in ["acp", "chat", "docs", "git", "shell", "demos"] {
             assert!(natives.contains_key(name), "{name}");
         }
     }
