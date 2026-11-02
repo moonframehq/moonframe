@@ -52,6 +52,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
+| `ui.input { id = "name", change = "typed" }` | a text field the host edits, one line or a text area (`multiline`); a writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it | `id`, `value`, `placeholder`, `change`, `submit` and `keys` (sent with `value` added), `to`, `multiline`, `rows`, `grow`, `width`, `mono`, `focus`, `disabled`, `browser`, `prose`, `dim`, `typewriter` |
 
 ### Overlays
 
@@ -180,6 +181,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`image-viewer`](#image-viewer) | Content | Looking at a picture closely: a scan, a photo, a screenshot, a render, with tools drawn over it (a crop frame, picked spots). The mod keeps `zoom` and `center`. For a picture at a fixed size use `ui.image`; for an avatar use `avatar`. |
 | [`markdown`](#markdown) | Content | Show markdown read-only: a README, notes, an agent's answer, release notes written in markdown. For editing a file use `markdown-editor`; for a chat answer streaming in, or one with source chips, use `chat-markdown`; for code alone use `code-view`; for one line of text use `ui.text`. |
 | [`markdown-editor`](#markdown-editor) | Content | Editing a markdown file of the project in a tab or a pane. For showing markdown without editing use `markdown`; for code read-only use `code-view`; for a short text field use `ui.input`. |
+| [`prose-editor`](#prose-editor) | Content | Writing long text: a draft, an article, notes, a journal, where the words are the whole screen. For a markdown file with a preview beside it use `markdown-editor`; for a short field in a form use `ui.input` (with `multiline` for a text area); for a chat box use `composer`. |
 | [`button-group`](#button-group) | Controls | Related actions or view modes side by side in a header: Unified \| Split, Uncommitted \| Branch, zoom − \| +. For a settings choice in a track use `segmented`; for separate quiet buttons use `toolbar`; for back/forward use `nav-buttons`. |
 | [`chips`](#chips) | Controls | Filters over a list where any number can be on (Open, Mine, Has agent). For exactly one of a few use `segmented`; for read-only labels use `tags`; for a single on/off setting use `switch`. |
 | [`copy-field`](#copy-field) | Controls | Text the user will paste elsewhere: an install command, a token, a URL, a path. For read-only label/value pairs use `key-values`; for an editable field wait for `ui.input`. |
@@ -278,6 +280,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`side-panels`](#side-panels) | Layout | A three-column app (notes, mail, writing) whose sidebar and list the user hides to focus on the main area. The mod keeps `left` and `middle` and flips them from buttons in the panes' headers. For resizable panes, an inspector or a bottom panel use `split-view`; for a switcher over the list use `pill-tabs`. |
 | [`split-view`](#split-view) | Layout | The body of a shell or a large mod: a sidebar, the main content and optional inspector and bottom panes the user can resize and toggle. It is plain `ui.hsplit`/`ui.vsplit` with `ui.pane` children; write those directly for any other arrangement. For framing each pane use `pane-frame`; for a scrolling page inside the main area use `page`. |
 | [`board-card`](#board-card) | Lists | Items in a `kanban-column`: deals, tickets, tasks, candidates. For a row in a list use `task-row` or `list`; for a pull request use `pr-row`. |
+| [`document-row`](#document-row) | Lists | The list of documents in a writing or notes app (drafts, articles, notes), stacked in a scrolling column beside the editor. For mail use `mail-row`; for tasks use `task-row`; for files in folders use `tree` or `file-tree`; for a plain row use `list`. |
 | [`group-header`](#group-header) | Lists | A heading inside a list that groups its rows by state or owner ("Needs you 3", "Waiting 3", a machine with its online dot). For a sidebar's own sections use `sidebar-section`; for a heading over arbitrary content use `section`; for nested rows use `tree`. |
 | [`kanban-column`](#kanban-column) | Lists | Each stage of a kanban board (deals, tickets, tasks by status); put several in a row that scrolls sideways and fill them with `board-card`. For a list grouped by status without columns use `group-header` over rows. |
 | [`level-row`](#level-row) | Lists | Rows of a breakdown where each part is read on its own scale: leads by status, a funnel's stages, tickets by priority. For parts of one whole with shares use `ratio-row` or `share-bar`; for one fraction with a percentage use `meter`; for a quota use `usage-bar`. |
@@ -317,6 +320,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`status-dot`](#status-dot) | Status | Show the state of an agent, job or session beside its name: in sidebar rows, tabs and lists. Use `chip = true` where the state must catch the eye (a blocked agent). For a count use `count-bubble`; for a PR's state use `pr-badge`; for CI results use `checks`. |
 | [`stat`](#stat) | Status bar | One labelled value with an icon in a status bar or toolbar, kept to a fixed width so it does not jitter. |
 | [`status-bar`](#status-bar) | Status bar | The window's bottom bar: machine, branch, agent counts on the left; CPU, theme, shortcuts on the right. Put `stat`, `meter` or `sparkline` in it for live readings. For a coloured strip announcing something use `banner`; for a top row use `title-bar`; for an extensible bar, give it a `ui.region` as an item. |
+| [`writing-stats`](#writing-stats) | Status bar | Under or beside a writing surface (`prose-editor`), in its status bar, where the writer glances at how far they got. For any other reading in a status bar use `stat`; for progress toward a target use `progress` or `meter`. |
 | [`ghostty-terminal`](#ghostty-terminal) | Terminals | A shell drawn by Ghostty's emulator; same as `terminal` with the other engine. |
 | [`terminal`](#terminal) | Terminals | A live shell (alacritty engine) filling its space: a pane, a bottom panel. |
 
@@ -680,6 +684,39 @@ markdown_editor { id = "readme", path = "README.md" }
 ```
 
 A whole mod using it, with state: `app/components/demos/markdown-editor.luau`.
+
+#### `prose-editor`
+
+**Prose Editor.** A distraction-free writing surface: a centred column of text with markdown styled as typed, focus mode that fades all but the current sentence or paragraph, and typewriter scrolling.
+
+**When:** Writing long text: a draft, an article, notes, a journal, where the words are the whole screen. For a markdown file with a preview beside it use `markdown-editor`; for a short field in a form use `ui.input` (with `multiline` for a text area); for a chat box use `composer`.
+
+| Prop | Meaning |
+| --- | --- |
+| `change` | sent on each edit, with `value` set to the text |
+| `dim` | focus mode: "sentence" or "paragraph" stays in full ink, the rest fades; nil shows all |
+| `focus` | take keyboard focus when it appears, or when this turns true |
+| `id` | keeps the text across renders; give each document its own (default "prose") |
+| `keys` | keys the field sends instead of editing while focused: { ['secondary-d'] = "focus" } |
+| `markdown` | false writes plain text: no styling of markdown (default true) |
+| `measure` | the column's widest width in pixels, a readable line (default 680) |
+| `mono` | set the text in the monospace font |
+| `placeholder` | grey text while empty (default "Start writing…") |
+| `size` | the text's size: normal, large (default) or title |
+| `submit` | sent on ⌘↩, with `value` |
+| `to` | mod to send its messages to, if not the drawing one |
+| `typewriter` | keep the caret's line in the middle of the field |
+| `value` | the text; applied when it changes, so opening another document replaces it |
+
+**Styles:** `.prose-editor` `.prose-editor-field` `.prose-editor-field:hover` `.prose-editor-field:focus` `.prose-editor-large` `.prose-editor-normal` `.prose-editor-title`
+
+```lua
+local prose_editor = use "prose-editor"
+
+prose_editor { dim = "sentence", measure = 520, value = "# A quiet page\n\nThe sentence being written stays in full ink. The rest of the page steps back, so the next word is all there is.\n\nMarkdown takes its shape as it is typed: *emphasis*, **strong**, `code`." }
+```
+
+A whole mod using it, with state: `app/components/demos/prose-editor.luau`.
 
 ### Controls
 
@@ -3555,6 +3592,33 @@ local board_card = use "board-card"
 board_card { amount = "$98,000", badge = "At risk", badge_tone = "danger", date = "Nov 13", owner = "TO", subtitle = "Platform renewal", title = "Lumen Retail", tone = "danger" }
 ```
 
+#### `document-row`
+
+**Document Row.** A document in a library list: bold title, a two-line excerpt, the date it changed and its word count, a star for favourites; selectable.
+
+**When:** The list of documents in a writing or notes app (drafts, articles, notes), stacked in a scrolling column beside the editor. For mail use `mail-row`; for tasks use `task-row`; for files in folders use `tree` or `file-tree`; for a plain row use `list`.
+
+| Prop | Meaning |
+| --- | --- |
+| `context` | message a right-click sends (a menu of actions) |
+| `date` | when it last changed, as shown ("Today, 14:02") |
+| `excerpt` | what it says after the title, cut to `lines` lines |
+| `favorite` | a star after the title |
+| `lines` | lines of excerpt shown (default 2) |
+| `msg` | message a click sends (open it) |
+| `selected` | the open document: tinted |
+| `title` | the document's title (its first line) |
+| `to` | mod to send them to, if not the drawing one |
+| `words` | its length in words, shown after the date |
+
+**Styles:** `.document-row` `.document-row:hover` `.document-row:selected` `.document-row-excerpt` `.document-row-meta` `.document-row-star` `.document-row-title`
+
+```lua
+local document_row = use "document-row"
+
+document_row { date = "Today, 09:41", excerpt = "A short sentence is a door. It opens, you walk through, and you are somewhere new. Long sentences have their place, of course.", favorite = true, selected = true, title = "On short sentences", words = 1284 }
+```
+
 #### `group-header`
 
 **Group header.** A list group heading: status dot or icon, title, count, fold chevron and a trailing + action.
@@ -4887,6 +4951,29 @@ status_bar {
 ```
 
 A whole mod using it, with state: `app/components/demos/status-bar.luau`.
+
+#### `writing-stats`
+
+**Writing Stats.** A text's length as one figure, words, characters, sentences or reading time, that steps to the next on a click.
+
+**When:** Under or beside a writing surface (`prose-editor`), in its status bar, where the writer glances at how far they got. For any other reading in a status bar use `stat`; for progress toward a target use `progress` or `meter`.
+
+| Prop | Meaning |
+| --- | --- |
+| `msg` | message a click sends, with `show` set to the next figure; not clickable without it |
+| `show` | the figure shown: words (default), characters, sentences or reading |
+| `text` | the text counted |
+| `to` | mod to send `msg` to, if not the drawing one |
+| `tooltip` | text under the pointer (default: all four figures) |
+| `wpm` | reading speed in words per minute, for the reading time (default 230) |
+
+**Styles:** `.writing-stats` `.writing-stats:hover` `.writing-stats-text`
+
+```lua
+local writing_stats = use "writing-stats"
+
+writing_stats { show = "words", text = "A short sentence is a door. It opens, you walk through, and you are somewhere new." }
+```
 
 ### Terminals
 
