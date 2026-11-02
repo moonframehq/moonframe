@@ -41,13 +41,14 @@ frames="$work/out/f%04d.png"
 ffmpeg -loglevel error -y -framerate 30 -i "$frames" -c:v libx264 -preset slow -crf 24 \
 	-pix_fmt yuv420p -movflags +faststart "$site/film.mp4"
 # Its poster: the moment the report's best month turns orange.
-cwebp -quiet -q 82 -resize 1600 0 "$work/out/f0605.png" -o "$site/film-poster.webp"
+cwebp -quiet -q 82 -resize 1600 0 "$work/out/f0329.png" -o "$site/film-poster.webp"
 
-# The muted loop beside "How you work": the first two scenes (4.2s to 21.4s),
+# The muted loop that previews the film: its first two scenes, asking the app
+# for a change and the inspector (4.2s to 17.5s),
 # fading in and out so the cut is not seen. The crop drops the progress line.
-fades="crop=1920:1072:0:0,scale=1280:-2,fade=in:st=0:d=0.3:color=0xf2e8d4,fade=out:st=16.85:d=0.35:color=0xf2e8d4"
-ffmpeg -loglevel error -y -framerate 30 -start_number 126 -i "$frames" -frames:v 516 \
+fades="crop=1920:1072:0:0,scale=1280:-2,fade=in:st=0:d=0.3:color=0xf2e8d4,fade=out:st=13.0:d=0.35:color=0xf2e8d4"
+ffmpeg -loglevel error -y -framerate 30 -start_number 126 -i "$frames" -frames:v 401 \
 	-vf "$fades" -c:v libx264 -preset slow -crf 26 -pix_fmt yuv420p -movflags +faststart -an "$site/loop.mp4"
-cwebp -quiet -q 80 -crop 0 0 1920 1072 -resize 1280 0 "$work/out/f0300.png" -o "$site/loop-poster.webp"
+cwebp -quiet -q 80 -crop 0 0 1920 1072 -resize 1280 0 "$work/out/f0329.png" -o "$site/loop-poster.webp"
 
 ls -la "$site"
