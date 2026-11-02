@@ -104,6 +104,43 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(restored["documents"], [])
         self.assertFalse((self.folder / ".pending").exists())
 
+    def test_trashing_never_replaces_a_trashed_document_of_the_same_name(self):
+        trash = self.folder / ".trash"
+        trash.mkdir()
+        (trash / "Draft.md").write_text("Trashed earlier", encoding="utf-8")
+        self.start()
+        documents = self.send({"trash": "Draft"})["documents"]
+        self.assertEqual((trash / "Draft.md").read_text(), "Trashed earlier")
+        self.assertEqual((trash / "Draft (2).md").read_text(), "Original draft")
+        self.assertEqual(sorted(d["id"] for d in documents), ["Draft", "Draft (2)"])
+        # Putting it back is just as careful.
+        (self.folder / "Draft.md").write_text("Written meanwhile", encoding="utf-8")
+        self.send({"restore": "Draft"})
+        self.assertEqual((self.folder / "Draft.md").read_text(), "Written meanwhile")
+        self.assertEqual((self.folder / "Draft (2).md").read_text(), "Trashed earlier")
+        # Deleting for good takes the trashed one, never the live one.
+        (trash / "Draft.md").write_text("Trashed again", encoding="utf-8")
+        self.process.stdin.write(b'{"message": {"purge": "Draft"}}\n')
+        self.process.stdin.flush()
+        deadline = time.monotonic() + 5
+        while (trash / "Draft.md").exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.assertFalse((trash / "Draft.md").exists())
+        self.assertEqual((self.folder / "Draft.md").read_text(), "Written meanwhile")
+
+    def test_a_document_too_large_to_send_opens_without_its_text(self):
+        (self.folder / "Draft.md").write_text("é\n" * 200_000, encoding="utf-8")
+        current = self.start()["current"]
+        self.assertTrue(current["too_large"])
+        self.assertNotIn("text", current)
+
+    def test_a_large_library_lists_the_newest_and_counts_the_rest(self):
+        for n in range(510):
+            (self.folder / ("Note %d.md" % n)).write_text("A note", encoding="utf-8")
+        published = self.start()
+        self.assertEqual(len(published["documents"]), 500)
+        self.assertEqual(published["hidden"], 11)
+
 
 if __name__ == "__main__":
     unittest.main()

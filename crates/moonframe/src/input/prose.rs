@@ -49,8 +49,11 @@ impl Writing {
         window: &mut Window,
         cx: &mut App,
     ) {
-        let changed = self.markdown.replace(input.prose) != input.prose
-            || self.dim.replace(input.dim) != input.dim;
+        // Both cells take the new settings before either is compared, so
+        // a change to one never skips the other.
+        let markdown = self.markdown.replace(input.prose) != input.prose;
+        let dim = self.dim.replace(input.dim) != input.dim;
+        let changed = markdown || dim;
         if self.typewriter.replace(Some(input.typewriter)) != Some(input.typewriter) {
             let (around, below) = if input.typewriter {
                 (Some(TYPEWRITER_LINES), None)

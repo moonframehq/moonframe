@@ -32,9 +32,11 @@ local function count(text: string, wpm: number)
 	for _ in string.gmatch(text, "[%w'’)\"*_]+[.!?]+") do
 		sentences += 1
 	end
-	-- A last sentence still being written counts too.
-	if sentences == 0 and words > 0 then
-		sentences = 1
+	-- A last sentence still being written counts too: words after the
+	-- last ending mark.
+	local tail = string.match(text, "[.!?][^.!?]*$") or text
+	if string.find(tail, "[%w'’]") then
+		sentences += 1
 	end
 	local minutes = math.ceil(words / wpm)
 	return {

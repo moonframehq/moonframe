@@ -58,6 +58,7 @@ return mod {
 		[".documents-title"] = { weight = "semibold" },
 		[".documents-count"] = { size = "small", color = "muted-foreground" },
 		[".documents-search"] = { padding = { 0, 12, 8, 12 } },
+		[".documents-hidden"] = { padding = { 12, 16 }, size = "small", color = "muted-foreground" },
 		[".documents-list"] = { padding = { 0, 8, 12, 8 }, gap = 2 },
 	},
 
@@ -118,6 +119,13 @@ return mod {
 					msg = { open = doc.id },
 					to = "provider:library",
 				},
+			})
+		end
+		local hidden = library and library.hidden or 0
+		if hidden > 0 and #rows > 0 then
+			table.insert(rows, ui.text {
+				`{hidden} older {if hidden == 1 then "document is" else "documents are"} not listed`,
+				class = "documents-hidden",
 			})
 		end
 		local body = if #rows > 0

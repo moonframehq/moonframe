@@ -114,6 +114,21 @@ return mod {
 				},
 			}
 		end
+		if current.too_large then
+			return ui.column {
+				grow = true,
+				ui.row { class = "page-head", drag = true, shrink = false },
+				ui.column {
+					grow = true,
+					justify = "center",
+					empty_state {
+						icon = "file-text",
+						title = `{current.id} is too large to edit here`,
+						message = "Folio opens documents up to 256 KB. Open the file in another editor, or split it.",
+					},
+				},
+			}
+		end
 		local text = if state.opened == current.opened and state.text then state.text else current.text
 		local title = string.match(text, "^%s*#*%s*([^\n]+)") or current.id
 		local page = if state.preview

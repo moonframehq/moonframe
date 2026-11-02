@@ -12,6 +12,11 @@
 #               the editor never gets its own keystrokes back late; `opened`
 #               identifies an opening across provider restarts too.
 #   folder      where the files are
+#   hidden      documents left out of `documents` past MAX_DOCUMENTS (the
+#               oldest), so the line stays under the host's limit
+#
+# A document over MAX_TEXT bytes opens with `too_large = true` and no text:
+# its text would not fit the line the host reads.
 #
 # Messages (one key each):
 #   open = id                        open that document
@@ -52,6 +57,9 @@ SESSION = uuid.uuid4().hex
 QUIET = 0.6  # seconds without a keystroke before an edit is written
 LOOK = 30  # seconds between looks at the folder, for files changed elsewhere
 EXCERPT = 140  # characters of a document shown under its title
+MAX_DOCUMENTS = 500  # newest documents listed; the rest are counted in `hidden`
+MAX_TEXT = 256 * 1024  # bytes of the open document sent; larger ones aren't
+MAX_LINE = 900 * 1024  # bytes of one output line; the host refuses 1 MiB
 ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9 _.,'()-]{0,80}\Z")
 
 
@@ -226,6 +234,26 @@ def listing():
     return [doc for _, doc in found]
 
 
+def free(doc, trashed):
+    # `doc` itself if no file by that name is in the folder it moves to,
+    # else "doc (2)", "doc (3)"…, so a move never replaces another file.
+    name, n = doc, 2
+    while os.path.exists(path_of(name, trashed)):
+        name, n = "%s (%d)" % (doc, n), n + 1
+    return name
+
+
+def move(doc, found, trashed):
+    # Moves a document into or out of the trash, renamed if it must be, and
+    # moves its star with it. Returns the name it has now.
+    name = free(doc, trashed)
+    os.replace(found[0], path_of(name, trashed))
+    stars = favorites()
+    if name != doc and doc in stars:
+        save_favorites((stars - {doc}) | {name})
+    return name
+
+
 def fresh_name():
     taken = set()
     for folder in (FOLDER, TRASH):
@@ -293,7 +321,15 @@ def open_doc(doc):
     if not found:
         return
     opened += 1
-    current = {"id": doc, "text": read(found[0]), "opened": "%s-%d" % (SESSION, opened)}
+    current = {"id": doc, "opened": "%s-%d" % (SESSION, opened)}
+    try:
+        size = os.path.getsize(found[0])
+    except OSError:
+        size = 0
+    if size > MAX_TEXT:
+        current["too_large"] = True
+    else:
+        current["text"] = read(found[0])
 
 
 def receive(line):
@@ -329,22 +365,28 @@ def receive(line):
         flush()
         found = where(current["id"])
         if found and not found[1]:
-            os.replace(found[0], path_of(current["id"], True))
+            move(current["id"], found, True)
             current = None
     elif "trash" in msg or "restore" in msg:
         doc = msg.get("trash", msg.get("restore"))
+        # Each looks only in the folder it moves out of: the same name may
+        # be in both.
+        trashed = "restore" in msg
         found = where(doc)
-        if found and found[1] != ("trash" in msg):
+        if found and found[1] != trashed and isinstance(doc, str) and os.path.isfile(path_of(doc, trashed)):
+            found = (path_of(doc, trashed), trashed)
+        if found and found[1] == trashed:
             flush()
-            os.replace(found[0], path_of(doc, "trash" in msg))
+            move(doc, found, "trash" in msg)
             if "trash" in msg and current and current["id"] == doc:
                 current = None
     elif "purge" in msg:
-        found = where(msg["purge"])
-        if found and found[1]:
+        # Only ever from the trash, even when a live document shares the name.
+        doc = msg["purge"]
+        if where(doc) and os.path.isfile(path_of(doc, True)):
             flush()
-            os.remove(found[0])
-            if current and current["id"] == msg["purge"]:
+            os.remove(path_of(doc, True))
+            if current and not where(current["id"]):
                 current = None
 
 
@@ -352,7 +394,24 @@ def out():
     documents = listing()
     if current is None and documents:
         open_doc(next((d["id"] for d in documents if not d["trashed"]), documents[0]["id"]))
-    return {"documents": documents, "current": current, "folder": FOLDER}
+    shown = documents[:MAX_DOCUMENTS]
+    return {
+        "documents": shown,
+        "hidden": len(documents) - len(shown),
+        "current": current,
+        "folder": FOLDER,
+    }
+
+
+def line_of(value):
+    # The output line, kept under MAX_LINE: a text that escapes to more
+    # than fits (quotes and newlines double) is left out like a large one.
+    line = encode(value)
+    if len(line.encode("utf-8")) > MAX_LINE and value["current"] and "text" in value["current"]:
+        current.pop("text", None)
+        current["too_large"] = True
+        line = encode(value)
+    return line
 
 
 def main():
@@ -364,7 +423,7 @@ def main():
     while True:
         if pending and time.time() - typed >= QUIET:
             flush()
-        line = encode(out())
+        line = line_of(out())
         if line != last:
             sys.stdout.buffer.write(line.encode("utf-8") + b"\n")
             sys.stdout.buffer.flush()
