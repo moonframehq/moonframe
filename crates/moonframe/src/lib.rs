@@ -50,6 +50,7 @@ mod overlay;
 mod panes;
 mod persist;
 mod profiles;
+mod project;
 mod render;
 mod settings;
 mod terminal;

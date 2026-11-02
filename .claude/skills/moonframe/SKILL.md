@@ -1647,6 +1647,10 @@ terminal log. There are four kinds:
   - It runs in its own folder (`providers/<name>/`); the built-in ones `cd`
     to the repository holding the app (`git -C ../.. rev-parse
     --show-toplevel`), or to `$LAYOUTS_REPO` when set.
+  - `$MOONFRAME_PROJECT` is the project the user works in when it starts:
+    the git repository of the terminal they last used. When that changes,
+    the app sends `{"from":"","message":{"project":"<path>"}}`; an empty
+    `from` is the app itself (no mod has one), so trust only that line.
   - If it exits, the provider fails (a banner) and stays stopped until its
     folder changes, so never exit on an error: publish
     `{"available":false,"reason":"..."}` and keep polling. Exit only when
@@ -1682,7 +1686,9 @@ Linux; on Windows they need a bash such as Git Bash, and `agents` does
 not work there. Each publishes `available` and, when false,
 only `reason` (with `repository = false` for git). Times are Unix seconds.
 
-`app.git` (git): every 5 s when `git status` or the numstat changed;
+`app.git` (git): the repository is `LAYOUTS_REPO`, else the one of the
+terminal the user last typed in (as `app.files`), else the one holding the
+app. Every 5 s when `git status` or the numstat changed;
 worktrees, branches, remote and stashes every 30 s or when HEAD moves.
 Any message refreshes. `{ diff = "<path>" }` adds `diff` for that file and
 keeps it fresh (only a file in `files`; any other path gets an empty diff);
@@ -1708,7 +1714,8 @@ that something runs until the reply comes.
 | `diff` | `{ path, binary, lines, truncated, hunks = { { header, old_start, new_start, lines = { { kind ("add" "del" "ctx"), old?, new?, text } } } } }`, at most 1200 lines of 300 characters |
 
 `app.docs` (docs, native): `{ available, root }`, the root `app.files`
-lists. It reads and saves the project's text files (UTF-8, at most 1 MiB)
+lists, followed as it moves; a file read before it moved is still watched
+and saved where it was read. It reads and saves the project's text files (UTF-8, at most 1 MiB)
 for the mod that asks, answering it (`{ reply, action, ok, path, ... }`):
 `{ read = "<path>", id = ... }` answers with `text` and `version`, and from
 then on sends that mod `{ changed = "<path>", version }` (or `missing =
@@ -1759,9 +1766,12 @@ GitLab merge requests fill `prs` and `current_pr`.
 | `issues` | 30 open: `{ number, title, url, author, updated, labels = { { name, color } }, assignees = { login } }` |
 
 `app.files` (files): the project's files, every 3 s when they changed. The
-root is `MOONFRAME_FILES`, else the git repository `moonframe` was started
-in, else the one the app runs from; with none it is unavailable (never home).
-`cwd` is where a terminal starts: the launch folder, else the root. Only the root and the open folders are
+root is `MOONFRAME_FILES`, else the git repository of the terminal the user
+last typed in (followed as they `cd` or switch tabs; a terminal outside any
+repository leaves it where it was), else the git repository `moonframe` was
+started in, else the one the app runs from; with none it is unavailable
+(never home). `cwd` is where a terminal starts: that project, else the
+launch folder, else the root. Only the root and the open folders are
 listed, so a large folder costs nothing until it is opened: send
 `{ open = "app\napp/mods" }`, the open folders' paths one per line, the
 whole set each time (`mods/explorer` does). `.git` and `.DS_Store` are

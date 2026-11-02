@@ -2,6 +2,10 @@
 //! `app.git`, and the writes a mod asks for (commit, push), each answered
 //! to the mod that asked.
 //!
+//! The repository is `LAYOUTS_REPO` when set; else the project the user
+//! works in (the repository of the terminal they last used), followed as
+//! it changes; else the one holding the app.
+//!
 //! It reads what `providers/git/git.sh` read, in the same shape (see the
 //! moonframe skill's "Built-in providers"), and runs every git command
 //! through herdr-vcs: no shell, no terminal prompts, bounded output, a
@@ -126,6 +130,8 @@ impl Repo {
 #[derive(Default)]
 pub struct Git {
     root: Option<PathBuf>,
+    /// The project it last moved to ([`moonframe_providers::project`]).
+    followed: Option<PathBuf>,
     /// The mods that may commit and push (`[settings] writers`).
     writers: Mods,
     /// When a message last made it read everything; one coming sooner
@@ -160,12 +166,17 @@ pub struct Git {
 impl Native for Git {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         self.root = repository(host.dir());
+        self.followed = moonframe_providers::project();
         self.writers = Mods::from_settings(host.settings(), "writers");
         self.refresh(host, true);
         Ok(())
     }
 
     fn tick(&mut self, host: &Handle) {
+        if self.follow(moonframe_providers::project()) {
+            self.refresh(host, true);
+            return;
+        }
         self.ticks += 1;
         let stale = self.stale.swap(false, Ordering::AcqRel);
         if stale || self.ticks >= LOOK_EVERY {
@@ -175,6 +186,10 @@ impl Native for Git {
     }
 
     fn receive(&mut self, host: &Handle, from: &str, message: Data) {
+        if self.follow(moonframe_providers::project()) {
+            self.refresh(host, true);
+            return;
+        }
         let fields = match &message {
             Data::Map(fields) => Some(fields),
             _ => None,
@@ -205,6 +220,35 @@ impl Native for Git {
 }
 
 impl Git {
+    /// Moves to `project`, the project the user works in now, unless
+    /// `LAYOUTS_REPO` names the repository; returns whether it moved.
+    /// Everything read of the old one goes; an action running there
+    /// finishes there.
+    fn follow(&mut self, project: Option<PathBuf>) -> bool {
+        if std::env::var_os("LAYOUTS_REPO").is_some() {
+            return false;
+        }
+        if project.is_none() || project == self.followed {
+            return false;
+        }
+        self.followed = project.clone();
+        let Some(root) = project.as_deref().and_then(toplevel) else {
+            return false;
+        };
+        if self.root.as_ref() == Some(&root) {
+            return false;
+        }
+        *self = Self {
+            root: Some(root),
+            followed: project,
+            writers: std::mem::take(&mut self.writers),
+            busy: self.busy.clone(),
+            stale: self.stale.clone(),
+            ..Self::default()
+        };
+        true
+    }
+
     /// Looks at the repository and publishes what changed; `force` reads
     /// everything and publishes even when nothing did.
     fn refresh(&mut self, host: &Handle, force: bool) {
@@ -427,14 +471,23 @@ fn base(repo: &Repo) -> String {
     }
 }
 
-/// The repository to watch: `LAYOUTS_REPO`, else the one holding the app
-/// folder this provider is in (two folders up), as git.sh did.
+/// The repository to watch: `LAYOUTS_REPO`, else the project the user
+/// works in, else the one holding the app folder this provider is in (two
+/// folders up), as git.sh did.
 fn repository(dir: &Path) -> Option<PathBuf> {
-    let start = std::env::var_os("LAYOUTS_REPO")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| dir.join("..").join(".."));
+    if let Some(named) = std::env::var_os("LAYOUTS_REPO") {
+        return toplevel(Path::new(&named));
+    }
+    moonframe_providers::project()
+        .as_deref()
+        .and_then(toplevel)
+        .or_else(|| toplevel(&dir.join("..").join("..")))
+}
+
+/// The repository holding `start`, as git names it.
+fn toplevel(start: &Path) -> Option<PathBuf> {
     // The app's folder may be relative (`moonframe app`); git runs elsewhere.
-    let start = std::path::absolute(&start).unwrap_or(start);
+    let start = std::path::absolute(start).unwrap_or_else(|_| start.to_owned());
     let top = Repo::at(&start).text(&["rev-parse", "--show-toplevel"], "find the repository")?;
     Some(PathBuf::from(top))
 }

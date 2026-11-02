@@ -115,8 +115,9 @@ return mod {
 		local kind = kind_of(app.kinds, state.tab and state.tab.kind)
 		local content: any
 		if kind and TERMINALS[kind.kind] and not (kind.props and kind.props.cwd) then
-			-- A terminal starts in the folder `moonframe` was started from,
-			-- else in the project the explorer shows (else home); it waits
+			-- A terminal starts in the project the explorer shows (that of
+			-- the terminal last used, else the folder `moonframe` was
+			-- started from; else home); it waits
 			-- the moment until the files provider says which, as a shell
 			-- started elsewhere would stay there.
 			local files = app.files

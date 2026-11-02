@@ -399,3 +399,29 @@ fn messages_inside_the_interval_read_the_status_alone() {
     }
     assert_eq!(git.ref_reads, reads + 1);
 }
+
+#[test]
+fn it_moves_to_the_project_the_user_works_in() {
+    if std::env::var_os("LAYOUTS_REPO").is_some() {
+        return;
+    }
+    let (first, second) = (repository(), repository());
+    std::fs::write(second.path().join("c.txt"), "new\n").unwrap();
+    let (events, seen) = events();
+    let folder = first.path().join("providers").join("git");
+    std::fs::create_dir_all(&folder).unwrap();
+    let host = Handle::new("git", &folder, writers(&["status"]), events);
+    let mut git = Git::default();
+    git.start(&host).unwrap();
+    assert_eq!(published(&seen)["changed"], 0);
+
+    assert!(git.follow(Some(second.path().to_owned())));
+    git.refresh(&host, true);
+    let state = published(&seen);
+    assert_eq!(state["changed"], 1);
+    assert_eq!(state["files"][0]["path"], "c.txt");
+    // Asked again, it stays; a folder outside any repository moves nothing.
+    assert!(!git.follow(Some(second.path().to_owned())));
+    let plain = tempfile::tempdir().unwrap();
+    assert!(!git.follow(Some(plain.path().to_owned())));
+}

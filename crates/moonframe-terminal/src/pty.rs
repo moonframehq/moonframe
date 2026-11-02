@@ -6,8 +6,10 @@ use {
     portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system},
     std::{
         io::{Read, Write},
+        path::PathBuf,
         sync::Mutex,
     },
+    sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind},
 };
 
 /// How much output is read at once.
@@ -39,6 +41,7 @@ impl Backend for Pty {
             .spawn_command(command)
             .map_err(|error| format!("cannot start the shell: {error}"))?;
         let killer = Mutex::new(child.clone_killer());
+        let pid = child.process_id();
         drop(pair.slave);
         let reader = pair
             .master
@@ -53,6 +56,7 @@ impl Backend for Pty {
                 writer: Mutex::new(writer),
                 master: Mutex::new(pair.master),
                 killer,
+                pid,
             }),
             output: Box::new(Reading {
                 reader,
@@ -70,6 +74,8 @@ struct PtyPane {
     /// Ends the shell when the pane goes: the reader keeps the terminal
     /// open, so closing it alone would not.
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
+    /// The shell's process, to read its folder.
+    pid: Option<u32>,
 }
 
 impl Drop for PtyPane {
@@ -91,6 +97,19 @@ impl Pane for PtyPane {
         if let Ok(master) = self.master.lock() {
             let _ = master.resize(pty_size(size));
         }
+    }
+
+    /// The shell's folder, as the system tells it: a program it runs
+    /// mostly starts where the shell is.
+    fn cwd(&self) -> Option<PathBuf> {
+        let pid = Pid::from_u32(self.pid?);
+        let mut system = System::new();
+        system.refresh_processes_specifics(
+            ProcessesToUpdate::Some(&[pid]),
+            false,
+            ProcessRefreshKind::nothing().with_cwd(UpdateKind::Always),
+        );
+        system.process(pid)?.cwd().map(PathBuf::from)
     }
 }
 

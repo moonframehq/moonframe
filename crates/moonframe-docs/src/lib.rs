@@ -4,8 +4,10 @@
 //!
 //! It publishes `app.docs = { available, root }`, or `{ available = false,
 //! reason }` when there is no project. The root is the one the `files`
-//! provider lists: `MOONFRAME_FILES`, else the git repository the app runs
-//! from.
+//! provider lists: `MOONFRAME_FILES`, else the project the user works in
+//! (the repository of the terminal they last used), followed as it
+//! changes, else the git repository the app runs from. A file read before
+//! the root moved stays in its own: it is watched and saved there.
 //!
 //! Messages, each answered to the mod that sent it with
 //! `{ reply = id, action, ok, path, ... }` (`reply` is the action's name when
@@ -57,6 +59,8 @@ pub fn native() -> Box<dyn Native> {
 pub struct Docs {
     /// The project's folder, with links resolved.
     root: Option<PathBuf>,
+    /// The project it last moved to ([`moonframe_providers::project`]).
+    followed: Option<PathBuf>,
     /// The mods that may save (`[settings] writers`).
     writers: Mods,
     /// The files mods read, by mod and path.
@@ -65,42 +69,31 @@ pub struct Docs {
     uses: u64,
 }
 
-/// A file a mod reads: the version it last saw, and when it last read or
-/// saved it (in [`Docs::uses`]).
+/// A file a mod reads: the root it read it from, the version it last saw,
+/// and when it last read or saved it (in [`Docs::uses`]).
 struct Watch {
+    root: PathBuf,
     version: String,
     used: u64,
 }
 
 impl Native for Docs {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
-        self.root = root(host.dir());
+        self.followed = moonframe_providers::project();
+        self.root = root(host.dir(), self.followed.as_deref());
         self.writers = Mods::from_settings(host.settings(), "writers");
-        host.publish(match &self.root {
-            Some(root) => map([
-                ("available", Data::Bool(true)),
-                ("root", Data::String(root.to_string_lossy().into_owned())),
-            ]),
-            None => map([
-                ("available", Data::Bool(false)),
-                (
-                    "reason",
-                    Data::from(
-                        "not in a git repository; set MOONFRAME_FILES to the folder to edit",
-                    ),
-                ),
-            ]),
-        });
+        self.publish(host);
         Ok(())
     }
 
     /// Tells each mod about the files it reads that changed on disk.
     fn tick(&mut self, host: &Handle) {
-        let Some(root) = &self.root else {
-            return;
-        };
+        if self.follow(moonframe_providers::project()) {
+            self.publish(host);
+        }
         for ((owner, path), watch) in &mut self.open {
-            let now = root
+            let now = watch
+                .root
                 .join(path)
                 .metadata()
                 .ok()
@@ -121,6 +114,13 @@ impl Native for Docs {
     }
 
     fn receive(&mut self, host: &Handle, from: &str, message: Data) {
+        // The app telling it the project moved.
+        if from.is_empty() {
+            if self.follow(moonframe_providers::project()) {
+                self.publish(host);
+            }
+            return;
+        }
         let Data::Map(fields) = &message else {
             return;
         };
@@ -139,6 +139,48 @@ impl Native for Docs {
         } else if let Some(path) = text("close") {
             self.open.remove(&(from.to_owned(), path.to_owned()));
         }
+    }
+}
+
+impl Docs {
+    /// Moves to `project`, the project the user works in now, unless
+    /// `MOONFRAME_FILES` names the folder; returns whether the root moved.
+    /// Files already read stay watched, and saved, in their own root.
+    fn follow(&mut self, project: Option<PathBuf>) -> bool {
+        if std::env::var_os("MOONFRAME_FILES").is_some()
+            || project.is_none()
+            || project == self.followed
+        {
+            return false;
+        }
+        self.followed = project;
+        let Some(root) = self.followed.as_deref().and_then(repository) else {
+            return false;
+        };
+        if self.root.as_ref() == Some(&root) {
+            return false;
+        }
+        self.root = Some(root);
+        true
+    }
+
+    /// Shares the root as `app.docs`, or why there is none.
+    fn publish(&self, host: &Handle) {
+        host.publish(match &self.root {
+            Some(root) => map([
+                ("available", Data::Bool(true)),
+                ("root", Data::String(root.to_string_lossy().into_owned())),
+            ]),
+            None => map([
+                ("available", Data::Bool(false)),
+                (
+                    "reason",
+                    Data::from(
+                        "not in a git repository; set MOONFRAME_FILES to the folder to edit",
+                    ),
+                ),
+            ]),
+        });
     }
 }
 
@@ -186,7 +228,7 @@ impl From<String> for Refusal {
 impl Docs {
     /// Watches `path` for `from`, at `version`; when full, the watch used
     /// longest ago makes room.
-    fn watch(&mut self, from: &str, path: &str, version: &str) {
+    fn watch(&mut self, from: &str, path: &str, root: &Path, version: &str) {
         self.uses += 1;
         let key = (from.to_owned(), path.to_owned());
         if !self.open.contains_key(&key)
@@ -200,14 +242,15 @@ impl Docs {
             self.open.remove(&oldest);
         }
         self.open.insert(key, Watch {
+            root: root.to_owned(),
             version: version.to_owned(),
             used: self.uses,
         });
     }
 
     fn read(&mut self, from: &str, path: &str) -> Answer {
-        let root = self.root.as_deref().ok_or("no project folder")?;
-        let file = existing(root, path)?;
+        let root = self.root.clone().ok_or("no project folder")?;
+        let file = existing(&root, path)?;
         let meta = file.metadata().map_err(|error| error.to_string())?;
         if meta.len() > MAX_DOCUMENT as u64 {
             return Err(format!("larger than {} KiB", MAX_DOCUMENT / 1024).into());
@@ -215,7 +258,7 @@ impl Docs {
         let bytes = fs::read(&file).map_err(|error| error.to_string())?;
         let text = String::from_utf8(bytes).map_err(|_| "not a text file".to_owned())?;
         let version = version(&meta);
-        self.watch(from, path, &version);
+        self.watch(from, path, &root, &version);
         Ok(vec![
             ("text", Data::String(text)),
             ("version", Data::String(version)),
@@ -240,12 +283,18 @@ impl Docs {
             )
             .into());
         }
-        let root = self.root.as_deref().ok_or("no project folder")?;
+        // A file read before the project moved is saved where it was read.
+        let root = self
+            .open
+            .get(&(from.to_owned(), path.to_owned()))
+            .map(|watch| watch.root.clone())
+            .or_else(|| self.root.clone())
+            .ok_or("no project folder")?;
         let text = text.ok_or("nothing to save: `text` is missing")?;
         if text.len() > MAX_DOCUMENT {
             return Err(format!("larger than {} KiB", MAX_DOCUMENT / 1024).into());
         }
-        let file = writable(root, path)?;
+        let file = writable(&root, path)?;
         let over = match file.metadata() {
             _ if force => Over::Anything,
             Ok(meta) => {
@@ -268,7 +317,7 @@ impl Docs {
         let meta = file.metadata().map_err(|error| error.to_string())?;
         let version = version(&meta);
         // Its own save is not news to the mod that made it.
-        self.watch(from, path, &version);
+        self.watch(from, path, &root, &version);
         Ok(vec![
             ("version", Data::String(version)),
             ("message", Data::String(format!("Saved {path}"))),
@@ -592,20 +641,27 @@ fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
     written
 }
 
-/// The project: `MOONFRAME_FILES`, else the git repository the app was
-/// started in, else the one holding the app's folder (two above the
-/// provider's); never home. Found as the `files` provider finds it (git's
-/// own answer, so a repository git refuses is skipped by both), so a path
-/// the explorer gives names the same file here.
-fn root(dir: &Path) -> Option<PathBuf> {
+/// The project: `MOONFRAME_FILES`, else the repository of `project` (the
+/// one the user works in), else the git repository the app was started
+/// in, else the one holding the app's folder (two above the provider's);
+/// never home. Found as the `files` provider finds it (git's own answer,
+/// so a repository git refuses is skipped by both), so a path the explorer
+/// gives names the same file here.
+fn root(dir: &Path, project: Option<&Path>) -> Option<PathBuf> {
     if let Some(folder) = std::env::var_os("MOONFRAME_FILES") {
         return PathBuf::from(folder).canonicalize().ok();
     }
-    let home = std::env::home_dir().and_then(|home| home.canonicalize().ok());
-    let repository = |start: &Path| toplevel(start).filter(|found| Some(found) != home.as_ref());
-    moonframe_providers::launch_dir()
+    project
         .and_then(repository)
+        .or_else(|| moonframe_providers::launch_dir().and_then(repository))
         .or_else(|| repository(&dir.join("..").join("..")))
+}
+
+/// The repository holding `start`, unless it is home (a dotfiles
+/// repository).
+fn repository(start: &Path) -> Option<PathBuf> {
+    let home = std::env::home_dir().and_then(|home| home.canonicalize().ok());
+    toplevel(start).filter(|found| Some(found) != home.as_ref())
 }
 
 /// The git repository holding `dir`, as `git rev-parse --show-toplevel`

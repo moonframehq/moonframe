@@ -16,6 +16,7 @@ fn docs(writers: &[&str]) -> (Docs, Handle, Arc<Mutex<Vec<Event>>>, tempfile::Te
     let host = Handle::new("docs", dir.path(), Data::Nil, events);
     let docs = Docs {
         root: Some(dir.path().canonicalize().unwrap()),
+        followed: None,
         writers: writers.iter().copied().collect(),
         open: BTreeMap::new(),
         uses: 0,
@@ -321,7 +322,10 @@ fn the_root_is_the_repository_holding_the_app() {
     // LAYOUTS_REPO, which git and the forges watch, doesn't move it: the
     // explorer lists this same root.
     if std::env::var_os("MOONFRAME_FILES").is_none() {
-        assert_eq!(root(&provider), Some(dir.path().canonicalize().unwrap()));
+        assert_eq!(
+            root(&provider, None),
+            Some(dir.path().canonicalize().unwrap())
+        );
     }
     let writers = Mods::from_settings(
         &map([("writers", Data::List(vec!["editor".into()]))]),
@@ -472,4 +476,69 @@ fn placing_never_replaces_a_file_and_the_original_comes_back() {
     assert!(error.to_string().contains("kept at"), "{error}");
     assert_eq!(fs::read_to_string(&aside).unwrap(), "another save");
     assert_eq!(fs::read_to_string(&to).unwrap(), "theirs");
+}
+
+/// A fresh git repository, with links resolved.
+fn repository() -> (tempfile::TempDir, PathBuf) {
+    let dir = tempfile::tempdir().unwrap();
+    let made = std::process::Command::new("git")
+        .arg("init")
+        .arg("--quiet")
+        .arg(dir.path())
+        .status()
+        .unwrap();
+    assert!(made.success());
+    let path = dir.path().canonicalize().unwrap();
+    (dir, path)
+}
+
+#[test]
+fn follows_the_project_and_saves_a_file_read_before_where_it_was_read() {
+    if std::env::var_os("MOONFRAME_FILES").is_some() {
+        return;
+    }
+    let (mut docs, host, seen, first) = docs(&["editor"]);
+    fs::write(first.path().join("notes.md"), "first").unwrap();
+    docs.receive(&host, "editor", message(&[("read", "notes.md".into())]));
+    let version = string(&sent(&seen)[0].1, "version");
+
+    let (_second, second) = repository();
+    assert!(docs.follow(Some(second.clone())));
+    assert_eq!(docs.root.as_deref(), Some(second.as_path()));
+    // The same project again moves nothing.
+    assert!(!docs.follow(Some(second.clone())));
+
+    // The tab read before the move saves into its own folder, never the new
+    // project's.
+    docs.receive(
+        &host,
+        "editor",
+        message(&[
+            ("write", "notes.md".into()),
+            ("text", "edited".into()),
+            ("version", Data::String(version)),
+        ]),
+    );
+    assert_eq!(sent(&seen)[0].1.get("ok"), Some(&Data::Bool(true)));
+    assert_eq!(
+        fs::read_to_string(first.path().join("notes.md")).unwrap(),
+        "edited"
+    );
+    assert!(!second.join("notes.md").exists());
+
+    // A file read now comes from the new project.
+    fs::write(second.join("plan.md"), "second").unwrap();
+    docs.receive(&host, "editor", message(&[("read", "plan.md".into())]));
+    assert_eq!(string(&sent(&seen)[0].1, "text"), "second");
+}
+
+#[test]
+fn a_folder_outside_any_repository_moves_nothing() {
+    if std::env::var_os("MOONFRAME_FILES").is_some() {
+        return;
+    }
+    let (mut docs, _host, _seen, dir) = docs(&[]);
+    let plain = tempfile::tempdir().unwrap();
+    assert!(!docs.follow(Some(plain.path().to_owned())));
+    assert_eq!(docs.root, Some(dir.path().canonicalize().unwrap()));
 }

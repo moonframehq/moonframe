@@ -54,6 +54,10 @@ impl Render for MoonframeApp {
         if let Some(focus) = self.terminals.end_frame() {
             window.defer(cx, move |window, cx| focus.focus(window, cx));
         }
+        // The panels follow the project of the terminal last typed in.
+        if let Some(folder) = self.terminals.focused_folder(window) {
+            self.project.follow(folder);
+        }
         let layers = self.inspector_layers(window.viewport_size(), cx);
         let toast = self.toast.as_ref().map(|(id, message)| {
             let notice = self

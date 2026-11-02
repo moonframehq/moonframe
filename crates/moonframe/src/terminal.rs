@@ -275,7 +275,13 @@ impl Terminals {
 }
 
 impl Terminals {
-    /// The terminal with keyboard focus in `window`, by key.
+    /// Where to ask the folder of the terminal with keyboard focus in
+    /// `window`, if one has it.
+    pub(crate) fn focused_folder(&self, window: &Window) -> Option<moonframe_terminal::Folder> {
+        let (_, view) = self.focused(window)?;
+        view.session.as_ref().ok().map(Session::folder)
+    }
+
     /// Whether a terminal has keyboard focus in `window`.
     pub(crate) fn any_focused(&self, window: &Window) -> bool {
         self.focused(window).is_some()

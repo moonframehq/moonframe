@@ -1,4 +1,5 @@
-# The git state of the folder the app runs from, shared as `app.git`:
+# The git state of the repository of the terminal last used (else the one
+# the app runs from), shared as `app.git`:
 # branch, ahead/behind, changed files with +/- counts, HEAD, worktrees,
 # recent branches, remote and stashes, and one file's diff on request.
 # Mods also ask it to commit (`{ commit = "message", id = ... }`) or push
