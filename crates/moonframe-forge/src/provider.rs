@@ -87,6 +87,7 @@ pub(crate) struct Forge {
     credential: Option<Credential>,
     login: Option<String>,
     cli: bool,
+    cli_probe: Option<u64>,
     error: Option<String>,
     code: Option<Shown>,
     cancel: Option<Arc<AtomicBool>>,
@@ -124,6 +125,7 @@ impl Forge {
             credential: None,
             login: None,
             cli: false,
+            cli_probe: None,
             error: None,
             code: None,
             cancel: None,
@@ -211,36 +213,48 @@ impl Forge {
             self.status = Status::Checking;
             self.credential = None;
             self.login = None;
+            self.cli = false;
             self.data = Value::Null;
             if let Some(context) = &self.context {
-                context.load(host);
+                context.load(host, self.epoch);
             }
         }
     }
 
     fn take_in(&mut self, host: &Handle, done: Done) {
         match done {
+            Done::Cli {
+                host: loaded,
+                epoch,
+                available,
+            } => {
+                if self.cli_probe == Some(epoch) {
+                    self.cli_probe = None;
+                }
+                if loaded == self.host && epoch == self.epoch {
+                    self.cli = available;
+                }
+            },
             Done::Loaded {
                 host: loaded,
+                epoch,
                 credential,
                 cli,
                 error,
             } => {
-                if loaded != self.host {
+                if loaded != self.host || epoch != self.epoch || self.status != Status::Checking {
                     return;
                 }
                 self.cli = cli;
                 self.error = error;
-                if self.status == Status::Checking {
-                    self.status = if credential.is_some() {
-                        Status::SignedIn
-                    } else {
-                        Status::SignedOut
-                    };
-                    self.credential = credential;
-                    self.epoch += 1;
-                    self.next = Some(Instant::now());
-                }
+                self.status = if credential.is_some() {
+                    Status::SignedIn
+                } else {
+                    Status::SignedOut
+                };
+                self.credential = credential;
+                self.epoch += 1;
+                self.next = Some(Instant::now());
             },
             Done::Code {
                 attempt,
@@ -345,9 +359,14 @@ impl Forge {
                 {
                     self.credential = Some(credential);
                 }
-                // Data for a branch or worktree list since changed is
-                // dropped; the refresh `look` asked for still runs.
-                if self.target().as_ref() != Some(&target) {
+                // Branch data can be stale, but account-wide failures still
+                // apply: switching branches cannot escape a rate limit.
+                if self.target().as_ref() != Some(&target)
+                    && !matches!(
+                        &result,
+                        Err(Failure::RateLimited | Failure::Network(_) | Failure::Unauthorized)
+                    )
+                {
                     return;
                 }
                 match result {
@@ -421,6 +440,16 @@ impl Forge {
     fn due(&self, now: Instant) -> bool {
         self.next.is_some_and(|next| now >= next)
             && self.blocked_until.is_none_or(|until| now >= until)
+    }
+
+    fn probe_cli(&mut self) {
+        if self.status == Status::Checking || self.cli_probe == Some(self.epoch) {
+            return;
+        }
+        if let Some(context) = &self.context {
+            self.cli_probe = Some(self.epoch);
+            context.probe_cli(self.host.clone(), self.epoch);
+        }
     }
 
     fn fetch_if_due(&mut self) {
@@ -731,6 +760,7 @@ impl Native for Forge {
                 {
                     self.asked_at = Some(now);
                     self.look(host);
+                    self.probe_cli();
                     self.next = Some(now);
                 }
             },

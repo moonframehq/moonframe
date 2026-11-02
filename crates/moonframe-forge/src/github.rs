@@ -121,17 +121,31 @@ fn request(
     query: &str,
     variables: Value,
 ) -> Result<Value, Failure> {
-    let mut answer = http::post(
+    let answer = http::post(
         agent,
         "https://api.github.com/graphql",
         token,
         &json!({ "query": query, "variables": variables }),
     )?;
-    if let Some(error) = answer["errors"]
-        .as_array()
-        .and_then(|errors| errors.first())
-    {
-        return Err(Failure::Status(200, http::message(error)));
+    response(answer)
+}
+
+fn response(mut answer: Value) -> Result<Value, Failure> {
+    if let Some(errors) = answer["errors"].as_array() {
+        // GraphQL reports primary (and some secondary) limits with HTTP
+        // 200, including when it also returns partial data.
+        if errors.iter().any(|error| {
+            error["type"] == "RATE_LIMITED"
+                || error["extensions"]["code"] == "RATE_LIMITED"
+                || http::message(error)
+                    .to_ascii_lowercase()
+                    .contains("rate limit")
+        }) {
+            return Err(Failure::RateLimited);
+        }
+        if let Some(error) = errors.first() {
+            return Err(Failure::Status(200, http::message(error)));
+        }
     }
     Ok(answer["data"].take())
 }

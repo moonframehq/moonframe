@@ -23,8 +23,12 @@ return mod {
 	end,
 
 	update = function(state: State, msg: any)
-		if msg == "account" then
+		if type(msg) == "table" and msg.account then
 			state.open = not state.open
+			if state.open then
+				-- Recheck the CLI after a terminal login, without selecting it.
+				return state, { { to = `provider:{msg.account}`, msg = { refresh = true } } }
+			end
 		elseif msg == "close" then
 			state.open = false
 		elseif type(msg) == "table" and msg.reply and msg.ok and msg.login then
@@ -48,7 +52,7 @@ return mod {
 				forge = forge,
 				changes = git and { added = git.added, deleted = git.deleted },
 			},
-			forge_account { forge = forge, brand = provider, msg = "account" },
+			forge_account { forge = forge, brand = provider, msg = { account = provider } },
 			dialog {
 				open = state.open,
 				dismiss = "close",

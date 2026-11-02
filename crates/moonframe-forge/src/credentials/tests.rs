@@ -82,7 +82,7 @@ fn oauth(token: &str, refresh: &str) -> Credential {
     Credential {
         token: SecretString::from(token.to_owned()),
         refresh: Some(SecretString::from(refresh.to_owned())),
-        expires: Some(1),
+        expires: Some(now() + 7200),
         source: Source::Saved,
     }
 }
@@ -149,4 +149,125 @@ fn an_unsaved_renewal_is_still_ours_next_time() {
         panic!("nothing saved");
     };
     assert_eq!(kept.token.expose_secret(), "access-four");
+}
+
+#[test]
+fn an_expired_newer_pair_is_renewed_under_the_same_lock() {
+    let dir = tempfile::tempdir().unwrap();
+    let saved = Saved::new(Kind::GitLab, dir.path().to_owned(), true);
+    let stale = oauth("access-one", "refresh-one");
+    let mut newer = oauth("access-two", "refresh-two");
+    newer.expires = Some(1);
+    saved.save("gitlab.com", &newer).unwrap();
+    let result = saved.renew("gitlab.com", &stale, |current| {
+        assert_eq!(
+            current.refresh.as_ref().unwrap().expose_secret(),
+            "refresh-two"
+        );
+        Some(oauth("access-three", "refresh-three"))
+    });
+    let Renewal::Renewed(fresh) = result else {
+        panic!("adopted an expired pair")
+    };
+    assert!(!fresh.expiring());
+    let Ok(Some(Remembered::Token(kept))) = saved.load("gitlab.com") else {
+        panic!("not saved")
+    };
+    assert_eq!(kept.token.expose_secret(), "access-three");
+}
+
+#[test]
+fn unreadable_storage_preserves_multiple_unsaved_rotations() {
+    let dir = tempfile::tempdir().unwrap();
+    let saved = Saved::new(Kind::GitLab, dir.path().to_owned(), true);
+    let held = oauth("access-one", "refresh-one");
+    saved.save("gitlab.com", &held).unwrap();
+    let record = dir.path().join("gitlab-sign-in.json");
+    std::fs::set_permissions(&record, std::fs::Permissions::from_mode(0o000)).unwrap();
+    assert!(saved.load("gitlab.com").is_err());
+    let Renewal::Renewed(second) = saved.renew("gitlab.com", &held, |_| {
+        Some(oauth("access-two", "refresh-two"))
+    }) else {
+        panic!("not renewed")
+    };
+    let Renewal::Renewed(third) = saved.renew("gitlab.com", &second, |current| {
+        assert_eq!(current.token.expose_secret(), "access-two");
+        Some(oauth("access-three", "refresh-three"))
+    }) else {
+        panic!("not renewed")
+    };
+    std::fs::set_permissions(&record, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let next = saved.renew("gitlab.com", &third, |current| {
+        assert_eq!(current.token.expose_secret(), "access-three");
+        Some(oauth("access-four", "refresh-four"))
+    });
+    assert!(
+        matches!(next, Renewal::Renewed(_)),
+        "re-adopted a spent pair after storage recovered"
+    );
+    let Ok(Some(Remembered::Token(kept))) = saved.load("gitlab.com") else {
+        panic!("not saved")
+    };
+    assert_eq!(kept.token.expose_secret(), "access-four");
+}
+
+#[test]
+fn a_rotation_is_saved_if_storage_recovers_during_the_request() {
+    let dir = tempfile::tempdir().unwrap();
+    let saved = Saved::new(Kind::GitLab, dir.path().to_owned(), true);
+    let held = oauth("access-one", "refresh-one");
+    saved.save("gitlab.com", &held).unwrap();
+    let record = dir.path().join("gitlab-sign-in.json");
+    std::fs::set_permissions(&record, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let result = saved.renew("gitlab.com", &held, |_| {
+        std::fs::set_permissions(&record, std::fs::Permissions::from_mode(0o600)).unwrap();
+        Some(oauth("access-two", "refresh-two"))
+    });
+    assert!(matches!(result, Renewal::Renewed(_)));
+    let Ok(Some(Remembered::Token(kept))) = saved.load("gitlab.com") else {
+        panic!("not saved")
+    };
+    assert_eq!(kept.token.expose_secret(), "access-two");
+}
+
+#[test]
+fn retrying_a_save_updates_the_persisted_predecessor() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = dir.path().join("state");
+    let saved = Saved::new(Kind::GitLab, store.clone(), true);
+    let held = oauth("access-one", "refresh-one");
+    saved.save("gitlab.com", &held).unwrap();
+    std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o500)).unwrap();
+    let Renewal::Renewed(second) = saved.renew("gitlab.com", &held, |_| {
+        Some(oauth("access-two", "refresh-two"))
+    }) else {
+        panic!("not renewed")
+    };
+    // Failed account changes must also retain the unsaved pair.
+    assert!(
+        saved
+            .save("gitlab.com", &oauth("other-access", "other-refresh"))
+            .is_err()
+    );
+    std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let Renewal::Renewed(third) = saved.renew("gitlab.com", &second, |_| {
+        // The retry persisted B; writing its rotation C now fails.
+        let Ok(Some(Remembered::Token(kept))) = saved.load("gitlab.com") else {
+            panic!("not saved")
+        };
+        assert_eq!(kept.token.expose_secret(), "access-two");
+        std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o500)).unwrap();
+        Some(oauth("access-three", "refresh-three"))
+    }) else {
+        panic!("not renewed")
+    };
+    std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let next = saved.renew("gitlab.com", &third, |current| {
+        assert_eq!(current.token.expose_secret(), "access-three");
+        Some(oauth("access-four", "refresh-four"))
+    });
+    assert!(
+        matches!(next, Renewal::Renewed(_)),
+        "re-adopted B after spending its refresh token"
+    );
 }

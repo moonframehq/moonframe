@@ -1,6 +1,28 @@
 use super::*;
 
 #[test]
+fn graphql_rate_limits_are_not_generic_errors_even_with_partial_data() {
+    for limit in [
+        json!({ "type": "RATE_LIMITED", "message": "API rate limit exceeded" }),
+        json!({ "extensions": { "code": "RATE_LIMITED" } }),
+        json!({ "message": "You have exceeded a secondary rate limit. Please wait." }),
+    ] {
+        let answer = json!({ "data": { "viewer": { "login": "user" } }, "errors": [
+            { "type": "FORBIDDEN", "message": "Another error" }, limit,
+        ] });
+        assert_eq!(response(answer), Err(Failure::RateLimited));
+    }
+    assert_eq!(
+        response(json!({ "errors": [{ "message": "Not found" }] })),
+        Err(Failure::Status(200, "Not found".into()))
+    );
+    assert_eq!(
+        response(json!({ "data": { "viewer": { "login": "user" } } })).unwrap(),
+        json!({ "viewer": { "login": "user" } })
+    );
+}
+
+#[test]
 fn branch_lookup_skips_other_forks_and_continues_past_the_first_page() {
     let first = json!({
         "nodes": [{ "number": 9, "headRepository": { "nameWithOwner": "other/repo" } }],

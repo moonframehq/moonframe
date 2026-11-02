@@ -37,6 +37,12 @@ pub struct Asker {
 
 pub enum Done {
     // keep-sorted start
+    /// Whether a CLI sign-in is available now, without selecting it.
+    Cli {
+        host: String,
+        epoch: u64,
+        available: bool,
+    },
     /// A device code to show.
     Code {
         attempt: u64,
@@ -55,6 +61,7 @@ pub enum Done {
     /// What the provider found at start (or for a new host).
     Loaded {
         host: String,
+        epoch: u64,
         credential: Option<Credential>,
         cli: bool,
         error: Option<String>,
@@ -108,7 +115,7 @@ impl Context {
 
     /// Finds the sign-in for `host`: saved, else the environment. Also
     /// whether the CLI has one to offer.
-    pub fn load(&self, host: String) {
+    pub fn load(&self, host: String, epoch: u64) {
         self.spawn(move |context| {
             let mut error = None;
             let cli = credentials::cli(context.kind, &host, &context.path);
@@ -133,9 +140,21 @@ impl Context {
             });
             context.send(Done::Loaded {
                 host,
+                epoch,
                 credential,
                 cli: cli.is_some(),
                 error,
+            });
+        });
+    }
+
+    pub fn probe_cli(&self, host: String, epoch: u64) {
+        self.spawn(move |context| {
+            let available = credentials::cli(context.kind, &host, &context.path).is_some();
+            context.send(Done::Cli {
+                host,
+                epoch,
+                available,
             });
         });
     }
@@ -270,11 +289,13 @@ impl Context {
                 },
             };
             // Renewing goes through the store, in turn with other apps
-            // sharing this sign-in: `None` when it was signed out
-            // meanwhile, else the token to use, whoever renewed it.
-            let renew = |credential: &Credential| -> Option<Option<Credential>> {
-                let client = client.as_deref()?;
-                let renewal = context.saved.renew(&target.host, credential, |credential| {
+            // sharing this sign-in. Adopting another app's pair is not a
+            // renewal: if refused, it can still be renewed once.
+            let renew = |credential: &Credential| {
+                let Some(client) = client.as_deref() else {
+                    return Renewal::Failed;
+                };
+                context.saved.renew(&target.host, credential, |credential| {
                     device::refresh(
                         &context.agent,
                         context.kind,
@@ -283,21 +304,22 @@ impl Context {
                         credential,
                     )
                     .ok()
-                });
-                match renewal {
-                    Renewal::Renewed(fresh) | Renewal::Newer(fresh) => Some(Some(fresh)),
-                    Renewal::Gone => Some(None),
-                    Renewal::Failed => None,
-                }
+                })
             };
             let mut renewed = false;
+            let mut updated = cli;
             if credential.expiring() {
                 match renew(&credential) {
-                    Some(Some(fresh)) => {
+                    Renewal::Renewed(fresh) => {
                         credential = fresh;
                         renewed = true;
+                        updated = true;
                     },
-                    Some(None) => {
+                    Renewal::Newer(fresh) => {
+                        credential = fresh;
+                        updated = true;
+                    },
+                    Renewal::Gone => {
                         context.send(Done::Fetched {
                             target,
                             epoch,
@@ -306,7 +328,7 @@ impl Context {
                         });
                         return;
                     },
-                    None => {},
+                    Renewal::Failed => {},
                 }
             }
             let read = |credential: &Credential| match context.kind {
@@ -317,17 +339,17 @@ impl Context {
             if result == Err(Failure::Unauthorized)
                 && !renewed
                 && credential.refresh.is_some()
-                && let Some(Some(fresh)) = renew(&credential)
+                && let Renewal::Renewed(fresh) | Renewal::Newer(fresh) = renew(&credential)
             {
                 credential = fresh;
-                renewed = true;
+                updated = true;
                 result = read(&credential);
             }
             context.send(Done::Fetched {
                 target,
                 epoch,
                 result,
-                credential: (renewed || cli).then_some(credential),
+                credential: updated.then_some(credential),
             });
         });
     }

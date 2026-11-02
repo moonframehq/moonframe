@@ -44,6 +44,7 @@ fn authentication_is_initialized_without_a_checkout() {
     assert_eq!(forge.loaded.as_deref(), Some("github.com"));
     forge.take_in(&host, Done::Loaded {
         host: "github.com".into(),
+        epoch: forge.epoch,
         credential: None,
         cli: true,
         error: None,
@@ -283,4 +284,147 @@ fn a_renewed_token_outlives_a_branch_change() {
     assert_eq!(kept.token.expose_secret(), "renewed-token");
     // The old branch's data is not shown.
     assert!(forge.data.is_null());
+}
+
+#[test]
+fn branch_changes_preserve_account_backoff() {
+    for (failure, wait) in [
+        (Failure::RateLimited, RATE_LIMITED),
+        (Failure::Network("offline".into()), UNREACHABLE),
+    ] {
+        let (host, _) = handle();
+        let mut forge = signed_in();
+        let target = forge.target().unwrap();
+        forge.fetching = true;
+        forge.checkout.branch = "after".into();
+        forge.checkout.branches = vec!["after".into()];
+        forge.next = Some(Instant::now());
+        forge.take_in(&host, Done::Fetched {
+            target,
+            epoch: forge.epoch,
+            result: Err(failure),
+            credential: None,
+        });
+        // Explicit refreshes and further branch changes must still wait.
+        forge.next = Some(Instant::now());
+        assert!(!forge.due(Instant::now()));
+        assert!(forge.due(Instant::now() + wait + Duration::from_secs(1)));
+        assert!(!forge.fetching);
+        assert_eq!(forge.status, Status::SignedIn);
+    }
+}
+
+#[test]
+fn an_old_accounts_rate_limit_does_not_block_the_new_account() {
+    let (host, _) = handle();
+    let mut forge = signed_in();
+    let old_epoch = forge.epoch;
+    forge.epoch += 1;
+    forge.next = Some(Instant::now());
+    forge.take_in(&host, Done::Fetched {
+        target: forge.target().unwrap(),
+        epoch: old_epoch,
+        result: Err(Failure::RateLimited),
+        credential: None,
+    });
+    assert!(forge.due(Instant::now()));
+    assert!(forge.blocked_until.is_none());
+}
+
+#[cfg(unix)]
+#[test]
+fn an_old_load_cannot_restore_a_signed_out_account_after_a_host_round_trip() {
+    let (host, _) = handle();
+    let dir = tempfile::tempdir().unwrap();
+    let (mut forge, _) = with_store(dir.path());
+    forge.status = Status::Checking;
+    let old = Done::Loaded {
+        host: forge.host.clone(),
+        epoch: forge.epoch,
+        credential: Some(Credential::new(
+            SecretString::from("old-token"),
+            Source::Cli,
+        )),
+        cli: true,
+        error: Some("old error".into()),
+    };
+    forge.act(
+        &host,
+        "forge",
+        &Data::map([("sign_out", Data::Bool(true))]),
+        "sign_out",
+    );
+    // Two host changes start newer loads; the original one is still running.
+    forge.epoch += 2;
+    forge.status = Status::Checking;
+    forge.take_in(&host, old);
+    assert!(forge.credential.is_none());
+    assert!(!forge.cli);
+    assert!(forge.error.is_none());
+    assert_eq!(forge.status, Status::Checking);
+    forge.take_in(&host, Done::Loaded {
+        host: forge.host.clone(),
+        epoch: forge.epoch,
+        credential: None,
+        cli: false,
+        error: None,
+    });
+    assert_eq!(forge.status, Status::SignedOut);
+}
+
+#[cfg(unix)]
+#[test]
+fn refresh_discovers_a_new_cli_login_without_selecting_it() {
+    use std::os::unix::fs::PermissionsExt;
+    let (host, _) = handle();
+    let dir = tempfile::tempdir().unwrap();
+    let (mut forge, _) = with_store(dir.path());
+    forge.status = Status::SignedOut;
+    forge.context.as_mut().unwrap().path = dir.path().as_os_str().to_owned();
+    let cli = dir.path().join("gh");
+    std::fs::write(&cli, "#!/bin/sh\nexit 1\n").unwrap();
+    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o700)).unwrap();
+    for (script, available) in [
+        ("#!/bin/sh\nexit 1\n", false),
+        ("#!/bin/sh\nprintf new-cli-token\n", true),
+        ("#!/bin/sh\nexit 1\n", false),
+    ] {
+        std::fs::write(&cli, script).unwrap();
+        forge.asked_at = None;
+        forge.receive(&host, "forge", Data::map([("refresh", Data::Bool(true))]));
+        let done = forge
+            .done
+            .as_ref()
+            .unwrap()
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap();
+        forge.take_in(&host, done);
+        assert_eq!(forge.snapshot()["auth"]["cli"], available);
+        assert_eq!(forge.status, Status::SignedOut);
+        assert!(forge.credential.is_none());
+        assert!(forge.cli_probe.is_none());
+    }
+}
+
+#[test]
+fn an_obsolete_cli_probe_cannot_replace_the_current_one() {
+    let (host, _) = handle();
+    let mut forge = signed_in();
+    let old_epoch = forge.epoch;
+    forge.epoch += 1;
+    forge.cli_probe = Some(forge.epoch);
+    forge.take_in(&host, Done::Cli {
+        host: forge.host.clone(),
+        epoch: old_epoch,
+        available: true,
+    });
+    assert!(!forge.cli);
+    assert_eq!(forge.cli_probe, Some(forge.epoch));
+    forge.take_in(&host, Done::Cli {
+        host: forge.host.clone(),
+        epoch: forge.epoch,
+        available: true,
+    });
+    assert!(forge.cli);
+    assert!(forge.cli_probe.is_none());
 }

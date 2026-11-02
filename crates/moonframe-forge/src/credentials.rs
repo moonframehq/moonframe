@@ -226,8 +226,9 @@ impl Saved {
     /// came from there, in turn with renewals and sign-outs.
     pub fn save(&self, host: &str, credential: &Credential) -> Result<(), StoreError> {
         self.locked(|| {
+            self.write_record(host, credential)?;
             self.forget_unsaved(host);
-            self.write_record(host, credential)
+            Ok(())
         })
     }
 
@@ -255,11 +256,11 @@ impl Saved {
     /// [`Saved::renew`]).
     pub fn forget(&self, host: &str) -> Result<(), StoreError> {
         self.locked(|| {
-            self.forget_unsaved(host);
             let mut records = self.records()?;
             if records.remove(host).is_some() {
                 self.write(&records)?;
             }
+            self.forget_unsaved(host);
             Ok(())
         })
     }
@@ -296,46 +297,81 @@ impl Saved {
         renew: impl FnOnce(&Credential) -> Option<Credential>,
     ) -> Renewal {
         self.locked(|| {
-            let saved = match self.load(host) {
+            let mut saved = match self.load(host) {
                 Ok(Some(Remembered::Token(saved))) => saved,
                 Ok(Some(Remembered::Cli) | None) => return Renewal::Gone,
-                // The store cannot be read: renew for this run alone.
-                Err(_) => return renew(current).map_or(Renewal::Failed, Renewal::Renewed),
+                Err(_) => {
+                    // Keep the whole unsaved chain if storage is temporarily
+                    // unreadable, not just the last pair it spent.
+                    let spent = self
+                        .unsaved
+                        .lock()
+                        .ok()
+                        .and_then(|pending| {
+                            pending
+                                .as_ref()
+                                .filter(|pending| {
+                                    pending.host == host && same_refresh(&pending.fresh, current)
+                                })
+                                .map(|pending| pending.spent.clone())
+                        })
+                        .or_else(|| current.refresh.clone());
+                    return self.rotate(host, current, spent, renew);
+                },
             };
             // Ours: the pair the store holds, or a renewal of it this app
             // could not save, which it saves now.
-            let ours = same_refresh(&saved, current) || self.retry_unsaved(host, &saved, current);
-            if !ours {
-                self.forget_unsaved(host);
-                return Renewal::Newer(saved);
-            }
-            let Some(renewed) = renew(current) else {
-                return Renewal::Failed;
-            };
-            if let Err(problem) = self.write_record(host, &renewed) {
-                tracing::warn!(
-                    "{}: cannot save the renewed sign-in, trying again later: {}",
-                    self.kind.name(),
-                    problem.0
-                );
-                if let (Ok(mut unsaved), Some(spent)) = (self.unsaved.lock(), saved.refresh.clone())
-                {
-                    *unsaved = Some(Unsaved {
-                        host: host.to_owned(),
-                        spent,
-                        fresh: renewed.clone(),
-                    });
-                }
+            let ours =
+                same_refresh(&saved, current) || self.retry_unsaved(host, &mut saved, current);
+            let current = if ours {
+                current
             } else {
                 self.forget_unsaved(host);
-            }
-            Renewal::Renewed(renewed)
+                if !saved.expiring() {
+                    return Renewal::Newer(saved);
+                }
+                // Newer does not mean usable: both apps may have slept
+                // through this pair's lifetime. Renew it under the same lock.
+                &saved
+            };
+            self.rotate(host, current, saved.refresh.clone(), renew)
         })
+    }
+
+    /// Rotate while holding the store lock, remembering the persisted
+    /// predecessor if either reading or writing storage fails.
+    fn rotate(
+        &self,
+        host: &str,
+        current: &Credential,
+        spent: Option<SecretString>,
+        renew: impl FnOnce(&Credential) -> Option<Credential>,
+    ) -> Renewal {
+        let Some(renewed) = renew(current) else {
+            return Renewal::Failed;
+        };
+        if let Err(problem) = self.write_record(host, &renewed) {
+            tracing::warn!(
+                "{}: cannot save the renewed sign-in, trying again later: {}",
+                self.kind.name(),
+                problem.0
+            );
+            if let (Ok(mut unsaved), Some(spent)) = (self.unsaved.lock(), spent) {
+                *unsaved = Some(Unsaved {
+                    host: host.to_owned(),
+                    spent,
+                    fresh: renewed.clone(),
+                });
+            }
+        } else {
+            self.forget_unsaved(host);
+        }
+        Renewal::Renewed(renewed)
     }
 
     /// Whether `current` is this app's unsaved renewal of `saved`; if so,
     /// saves it now.
-    fn retry_unsaved(&self, host: &str, saved: &Credential, current: &Credential) -> bool {
+    fn retry_unsaved(&self, host: &str, saved: &mut Credential, current: &Credential) -> bool {
         let Ok(mut unsaved) = self.unsaved.lock() else {
             return false;
         };
@@ -351,6 +387,7 @@ impl Saved {
             && let Some(fresh) = unsaved.as_ref().map(|pending| pending.fresh.clone())
             && self.write_record(host, &fresh).is_ok()
         {
+            *saved = fresh;
             *unsaved = None;
         }
         pending
