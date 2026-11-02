@@ -7,15 +7,18 @@
 //! provider lists: `MOONFRAME_FILES`, else the project the user works in
 //! (the repository of the terminal they last used), followed as it
 //! changes, else the git repository the app runs from. A file read before
-//! the root moved stays in its own: it is watched and saved there.
+//! the root moved stays in its own: it is watched and saved there. A mod
+//! may name the root a file is in (`root`, an absolute folder), so a tab
+//! keeps reading its own file after the project moves; only a root this
+//! provider has had counts, never a folder a mod makes up.
 //!
 //! Messages, each answered to the mod that sent it with
 //! `{ reply = id, action, ok, path, ... }` (`reply` is the action's name when
 //! the mod gave no `id`):
-//! - `{ read = "<path>", id }` answers with `text` and `version`, and keeps
+//! - `{ read = "<path>", root, id }` answers with `text` and `version`, and keeps
 //!   watching the file for that mod: when it changes on disk, the mod gets
 //!   `{ changed = "<path>", version }` (`missing = true` once it is gone);
-//! - `{ write = "<path>", text, version, force, id }` saves `text`, answering
+//! - `{ write = "<path>", root, text, version, force, id }` saves `text`, answering
 //!   with the new `version`. When the file changed since `version` (or exists
 //!   and no `version` is given), it refuses with `conflict = true` unless
 //!   `force` is set, so an edit never silently overwrites someone else's;
@@ -36,7 +39,7 @@ use {
     moonframe_core::{Data, MAX_DOCUMENT},
     moonframe_providers::{Handle, Mods, Native},
     std::{
-        collections::BTreeMap,
+        collections::{BTreeMap, BTreeSet},
         fs,
         io::Write as _,
         path::{Component, Path, PathBuf},
@@ -61,6 +64,8 @@ pub struct Docs {
     root: Option<PathBuf>,
     /// The project it last moved to ([`moonframe_providers::project`]).
     followed: Option<PathBuf>,
+    /// Every root it has had: a mod may name any of them as a file's.
+    roots: BTreeSet<PathBuf>,
     /// The mods that may save (`[settings] writers`).
     writers: Mods,
     /// The files mods read, by mod and path.
@@ -81,6 +86,7 @@ impl Native for Docs {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         self.followed = moonframe_providers::project();
         self.root = root(host.dir(), self.followed.as_deref());
+        self.roots.extend(self.root.clone());
         self.writers = Mods::from_settings(host.settings(), "writers");
         self.publish(host);
         Ok(())
@@ -130,11 +136,18 @@ impl Native for Docs {
         };
         let id = fields.get("id");
         if let Some(path) = text("read") {
-            let answer = self.read(from, path);
+            let answer = self.read(from, path, text("root"));
             reply(host, from, id, "read", path, answer);
         } else if let Some(path) = text("write") {
             let force = matches!(fields.get("force"), Some(Data::Bool(true)));
-            let answer = self.write(from, path, text("text"), text("version"), force);
+            let answer = self.write(
+                from,
+                path,
+                text("root"),
+                text("text"),
+                text("version"),
+                force,
+            );
             reply(host, from, id, "write", path, answer);
         } else if let Some(path) = text("close") {
             self.open.remove(&(from.to_owned(), path.to_owned()));
@@ -160,8 +173,32 @@ impl Docs {
         if self.root.as_ref() == Some(&root) {
             return false;
         }
+        self.roots.insert(root.clone());
         self.root = Some(root);
         true
+    }
+
+    /// The root of `from`'s file `path`: the one the message names, else
+    /// the one it was read from (a file read before the project moved
+    /// stays where it was), else the current one.
+    fn root_for(&self, from: &str, path: &str, asked: Option<&str>) -> Result<PathBuf, Refusal> {
+        match (asked, self.open.get(&(from.to_owned(), path.to_owned()))) {
+            (None, Some(watch)) => Ok(watch.root.clone()),
+            (asked, _) => self.chosen(asked),
+        }
+    }
+
+    /// The root a message names (one this provider has had), else the
+    /// current one.
+    fn chosen(&self, asked: Option<&str>) -> Result<PathBuf, Refusal> {
+        let Some(asked) = asked else {
+            return Ok(self.root.clone().ok_or("no project folder")?);
+        };
+        Path::new(asked)
+            .canonicalize()
+            .ok()
+            .filter(|root| self.roots.contains(root))
+            .ok_or_else(|| format!("`{asked}` is not a project this app shows").into())
     }
 
     /// Shares the root as `app.docs`, or why there is none.
@@ -248,8 +285,8 @@ impl Docs {
         });
     }
 
-    fn read(&mut self, from: &str, path: &str) -> Answer {
-        let root = self.root.clone().ok_or("no project folder")?;
+    fn read(&mut self, from: &str, path: &str, root: Option<&str>) -> Answer {
+        let root = self.root_for(from, path, root)?;
         let file = existing(&root, path)?;
         let meta = file.metadata().map_err(|error| error.to_string())?;
         if meta.len() > MAX_DOCUMENT as u64 {
@@ -269,6 +306,7 @@ impl Docs {
         &mut self,
         from: &str,
         path: &str,
+        root: Option<&str>,
         text: Option<&str>,
         expected: Option<&str>,
         force: bool,
@@ -283,13 +321,7 @@ impl Docs {
             )
             .into());
         }
-        // A file read before the project moved is saved where it was read.
-        let root = self
-            .open
-            .get(&(from.to_owned(), path.to_owned()))
-            .map(|watch| watch.root.clone())
-            .or_else(|| self.root.clone())
-            .ok_or("no project folder")?;
+        let root = self.root_for(from, path, root)?;
         let text = text.ok_or("nothing to save: `text` is missing")?;
         if text.len() > MAX_DOCUMENT {
             return Err(format!("larger than {} KiB", MAX_DOCUMENT / 1024).into());

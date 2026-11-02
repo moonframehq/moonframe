@@ -70,11 +70,13 @@ impl Project {
                     let Some(cwd) = folder.as_ref().and_then(Folder::get) else {
                         continue;
                     };
+                    // A folder found in a repository is not asked again; one
+                    // that is not is, as `git init` may make it one.
                     if last.as_ref() == Some(&cwd) {
                         continue;
                     }
                     let Some(top) = repository(&cwd) else {
-                        last = Some(cwd);
+                        last = None;
                         continue;
                     };
                     last = Some(cwd);

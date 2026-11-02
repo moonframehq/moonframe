@@ -188,6 +188,7 @@ fn a_repository_is_published_and_a_commit_answers_its_mod() {
     );
     assert_eq!(state["head"]["subject"], "first");
     assert_eq!(state["worktrees"][0]["current"], true);
+    let root = Data::from(state["root"].as_str().unwrap());
 
     git.receive(
         &host,
@@ -214,6 +215,7 @@ fn a_repository_is_published_and_a_commit_answers_its_mod() {
         "editor",
         Data::Map(BTreeMap::from([
             ("commit".to_owned(), Data::from("second")),
+            ("root".to_owned(), root.clone()),
             ("id".to_owned(), Data::from("c1")),
         ])),
     );
@@ -244,7 +246,10 @@ fn a_repository_is_published_and_a_commit_answers_its_mod() {
     git.receive(
         &host,
         "editor",
-        Data::Map(BTreeMap::from([("commit".to_owned(), Data::from("again"))])),
+        Data::Map(BTreeMap::from([
+            ("commit".to_owned(), Data::from("again")),
+            ("root".to_owned(), root),
+        ])),
     );
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {
@@ -279,11 +284,13 @@ fn a_failed_push_answers_with_the_reason() {
     let host = Handle::new("git", &folder, writers(&["editor", "status"]), events);
     let mut git = Git::default();
     git.start(&host).unwrap();
+    let root = Data::from(published(&seen)["root"].as_str().unwrap());
     git.receive(
         &host,
         "status",
         Data::Map(BTreeMap::from([
             ("push".to_owned(), Data::Bool(true)),
+            ("root".to_owned(), root),
             ("id".to_owned(), Data::from("p1")),
         ])),
     );
@@ -424,4 +431,29 @@ fn it_moves_to_the_project_the_user_works_in() {
     assert!(!git.follow(Some(second.path().to_owned())));
     let plain = tempfile::tempdir().unwrap();
     assert!(!git.follow(Some(plain.path().to_owned())));
+
+    // A commit asked for the first repository, or for none, is refused
+    // with an answer, and nothing is committed in the second.
+    let first_root = Repo::at(first.path())
+        .text(&["rev-parse", "--show-toplevel"], "find the repository")
+        .unwrap();
+    for (id, root) in [("old", Some(first_root)), ("none", None)] {
+        seen.lock().unwrap().clear();
+        let mut fields = BTreeMap::from([
+            ("commit".to_owned(), Data::from("wrong place")),
+            ("id".to_owned(), Data::from(id)),
+        ]);
+        if let Some(root) = root {
+            fields.insert("root".to_owned(), Data::String(root));
+        }
+        git.receive(&host, "status", Data::Map(fields));
+        let reply = seen.lock().unwrap().iter().find_map(|event| match event {
+            Event::Sent { msg, .. } => Some(moonframe_providers::to_json(msg)),
+            _ => None,
+        });
+        let reply = reply.expect("a refusal, at once");
+        assert_eq!(reply["reply"], id);
+        assert_eq!(reply["ok"], false, "{reply}");
+        assert_eq!(published(&seen)["changed"], 1, "nothing was committed");
+    }
 }

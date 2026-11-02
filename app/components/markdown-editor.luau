@@ -4,7 +4,10 @@
 -- (`editor`, as shipped). Saving never overwrites a file that changed on
 -- disk since it was opened: the user picks Overwrite or Reload. A change on
 -- disk with nothing edited simply reloads. Unsaved edits are kept across
--- launches. Links go to the drawing mod as { open_link = url, from = path }.
+-- launches. Links go to the drawing mod as { open_link = url, from = path,
+-- root }. Given a `root` (the project the file is in, as `app.docs.root` or
+-- `app.files.path` names it), it reads and saves there even after the
+-- project moves to another repository.
 
 local segmented = use "segmented"
 local markdown = use "markdown"
@@ -17,6 +20,8 @@ type Mode = "view" | "edit" | "split"
 
 type State = {
 	path: string?,
+	-- The project the file is in; the current one when nil.
+	root: string?,
 	-- The text being edited, and the version of the file it started from.
 	text: string?,
 	version: string?,
@@ -41,6 +46,8 @@ type State = {
 type Props = {
 	-- The file, relative to the project's root.
 	path: string?,
+	-- That root (an absolute folder); the project's current one when nil.
+	root: string?,
 	-- Without a path: a scratch note to start from, never saved.
 	text: string?,
 	-- The mode it opens in: "split" (default), "edit" or "view".
@@ -55,8 +62,8 @@ local MODES = {
 	{ id = "split", icon = "columns-2", tooltip = "Source and preview side by side" },
 }
 
-local function read(path: string, id: string)
-	return { to = "provider:docs", msg = { read = path, id = id } }
+local function read(state: State, id: string)
+	return { to = "provider:docs", msg = { read = state.path, root = state.root, id = id } }
 end
 
 local function save(state: State, force: boolean?)
@@ -67,7 +74,14 @@ local function save(state: State, force: boolean?)
 		{
 			{
 				to = "provider:docs",
-				msg = { write = state.path, text = state.text, version = state.version, force = force, id = "save" },
+				msg = {
+					write = state.path,
+					root = state.root,
+					text = state.text,
+					version = state.version,
+					force = force,
+					id = "save",
+				},
 			},
 		}
 end
@@ -86,6 +100,7 @@ return component {
 	when = "Editing a markdown file of the project in a tab or a pane. For showing markdown without editing use `markdown`; for code read-only use `code-view`; for a short text field use `ui.input`.",
 	props = {
 		["path"] = "the file, relative to the project's root (as the explorer names it)",
+		["root"] = "the project the file is in, an absolute folder (the explorer's `app.files.path`); the current project when left out",
 		["text"] = "without `path`: a scratch note to start from, edited in place and never saved",
 		["mode"] = "how it opens: \"split\" (default), \"edit\" or \"view\"",
 		["id"] = "keeps the edits apart from another editor's; a tab passes its own",
@@ -119,17 +134,19 @@ return component {
 -- In a pane that fills its space; Save needs the drawing mod in
 -- providers/docs's `writers` (as shipped, `editor`).
 markdown_editor { id = "readme", path = "README.md" }
--- update: msg.open_link is a clicked link's address, msg.from the file it is in]],
+-- update: msg.open_link is a clicked link's address, msg.from the file it is in, msg.root its project]],
 
 	init = function(previous: State?, props: Props?)
 		local path = props and props.path
+		local root = props and props.root
 		local state: State
-		if previous and previous.path == path then
+		if previous and previous.path == path and previous.root == root then
 			state = previous
 		else
 			local mode = (props and props.mode) or (previous and previous.mode) or "split"
 			state = {
 				path = path,
+				root = root,
 				dirty = false,
 				mode = mode :: Mode,
 				loading = false,
@@ -144,7 +161,7 @@ markdown_editor { id = "readme", path = "README.md" }
 		state.error = nil
 		state.loading = path ~= nil and state.text == nil
 		if path then
-			return state, { read(path, "load") }
+			return state, { read(state, "load") }
 		end
 		-- A scratch note: what it was given, until it is edited.
 		if state.text == nil then
@@ -161,14 +178,14 @@ markdown_editor { id = "readme", path = "README.md" }
 				return save(state, true)
 			elseif msg == "reload" and state.path then
 				state.loading = state.text == nil
-				return state, { read(state.path, "reload") }
+				return state, { read(state, "reload") }
 			elseif msg == "keep" then
 				-- Keep editing; a save will then ask before overwriting.
 				state.outside = false
 			elseif msg == "retry" and state.path then
 				state.error = nil
 				state.loading = true
-				return state, { read(state.path, "load") }
+				return state, { read(state, "load") }
 			end
 			return
 		end
@@ -180,14 +197,14 @@ markdown_editor { id = "readme", path = "README.md" }
 		elseif msg.mode then
 			state.mode = msg.mode
 		elseif msg.link then
-			return state, { { to = "parent", msg = { open_link = msg.url, from = state.path } } }
+			return state, { { to = "parent", msg = { open_link = msg.url, from = state.path, root = state.root } } }
 		elseif msg.changed and msg.changed == state.path then
 			if msg.missing then
 				state.missing = true
 			elseif state.dirty then
 				state.outside = true
 			else
-				return state, { read(state.path :: string, "load") }
+				return state, { read(state, "load") }
 			end
 		elseif msg.reply == "load" or msg.reply == "reload" then
 			state.loading = false

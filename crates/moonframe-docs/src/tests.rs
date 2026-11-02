@@ -17,6 +17,7 @@ fn docs(writers: &[&str]) -> (Docs, Handle, Arc<Mutex<Vec<Event>>>, tempfile::Te
     let docs = Docs {
         root: Some(dir.path().canonicalize().unwrap()),
         followed: None,
+        roots: BTreeSet::from([dir.path().canonicalize().unwrap()]),
         writers: writers.iter().copied().collect(),
         open: BTreeMap::new(),
         uses: 0,
@@ -541,4 +542,61 @@ fn a_folder_outside_any_repository_moves_nothing() {
     let plain = tempfile::tempdir().unwrap();
     assert!(!docs.follow(Some(plain.path().to_owned())));
     assert_eq!(docs.root, Some(dir.path().canonicalize().unwrap()));
+}
+
+#[test]
+fn a_tab_naming_its_root_keeps_its_file_and_a_made_up_root_is_refused() {
+    if std::env::var_os("MOONFRAME_FILES").is_some() {
+        return;
+    }
+    let (mut docs, host, seen, first) = docs(&["editor"]);
+    let first_root = first.path().canonicalize().unwrap();
+    fs::write(first.path().join("README.md"), "first").unwrap();
+    let (_second, second) = repository();
+    fs::write(second.join("README.md"), "second").unwrap();
+    assert!(docs.follow(Some(second.clone())));
+
+    // The same path, read by a tab of each project.
+    let root = |path: &Path| Data::String(path.to_string_lossy().into_owned());
+    docs.receive(
+        &host,
+        "editor/a",
+        message(&[("read", "README.md".into()), ("root", root(&first_root))]),
+    );
+    docs.receive(&host, "editor/b", message(&[("read", "README.md".into())]));
+    let answers = sent(&seen);
+    assert_eq!(string(&answers[0].1, "text"), "first");
+    assert_eq!(string(&answers[1].1, "text"), "second");
+
+    // A folder this provider never showed is no root, to read or to save.
+    let elsewhere = tempfile::tempdir().unwrap();
+    fs::write(elsewhere.path().join("README.md"), "secret").unwrap();
+    docs.receive(
+        &host,
+        "editor/c",
+        message(&[
+            ("read", "README.md".into()),
+            ("root", root(elsewhere.path())),
+        ]),
+    );
+    docs.receive(
+        &host,
+        "editor/c",
+        message(&[
+            ("write", "README.md".into()),
+            ("root", root(elsewhere.path())),
+            ("text", "mine".into()),
+            ("force", Data::Bool(true)),
+        ]),
+    );
+    let answers = sent(&seen);
+    assert!(
+        answers
+            .iter()
+            .all(|(_, fields)| fields.get("ok") == Some(&Data::Bool(false)))
+    );
+    assert_eq!(
+        fs::read_to_string(elsewhere.path().join("README.md")).unwrap(),
+        "secret"
+    );
 }

@@ -16,8 +16,14 @@
 //! - anything refreshes;
 //! - `{ diff = "<path>" }` adds that file's diff as `diff`, kept fresh
 //!   until `{ diff = false }`;
-//! - `{ commit = "<message>", id = ... }` stages everything and commits;
-//! - `{ push = true, id = ... }` pushes the branch to `origin`.
+//! - `{ commit = "<message>", root, id = ... }` stages everything and
+//!   commits;
+//! - `{ push = true, root, id = ... }` pushes the branch to `origin`.
+//!
+//! A write names the repository it is for (`root`, as `app.git.root` gave
+//! it) and is refused when the provider no longer watches that one: the
+//! repository follows the terminal's project, so a sheet drawn for one must
+//! never commit to another.
 //!
 //! Only the mods named in provider.toml's `writers` setting may commit or
 //! push; any other gets a refusal as its answer. Reading is open to all.
@@ -186,9 +192,10 @@ impl Native for Git {
     }
 
     fn receive(&mut self, host: &Handle, from: &str, message: Data) {
+        // A move first: a write asked for the old repository is refused
+        // below, with an answer, never run in the new one.
         if self.follow(moonframe_providers::project()) {
             self.refresh(host, true);
-            return;
         }
         let fields = match &message {
             Data::Map(fields) => Some(fields),
@@ -200,10 +207,14 @@ impl Native for Git {
             Some(Data::Bool(false) | Data::Nil) => self.diff_path = None,
             _ => {},
         }
+        let root = match field("root") {
+            Some(Data::String(root)) => Some(root.as_str()),
+            _ => None,
+        };
         if let Some(Data::String(text)) = field("commit") {
-            self.act(host, from, field("id"), Action::Commit(text.clone()));
+            self.act(host, from, field("id"), root, Action::Commit(text.clone()));
         } else if let Some(Data::Bool(true)) = field("push") {
-            self.act(host, from, field("id"), Action::Push);
+            self.act(host, from, field("id"), root, Action::Push);
         }
         // Worktrees, branches, remote and stashes are some 60 git commands
         // with many worktrees: a mod sending a message each frame gets them
@@ -373,8 +384,16 @@ impl Git {
         }
     }
 
-    /// Runs `action` on a thread of its own and answers `from` when it ends.
-    fn act(&self, host: &Handle, from: &str, id: Option<&Data>, action: Action) {
+    /// Runs `action` on a thread of its own and answers `from` when it ends,
+    /// if `asked` names the repository it watches.
+    fn act(
+        &self,
+        host: &Handle,
+        from: &str,
+        id: Option<&Data>,
+        asked: Option<&str>,
+        action: Action,
+    ) {
         let name = match action {
             Action::Commit(_) => "commit",
             Action::Push => "push",
@@ -411,6 +430,10 @@ impl Git {
             answer(Err("not a git repository".to_owned()));
             return;
         };
+        if let Err(problem) = same_repository(asked, &root) {
+            answer(Err(problem));
+            return;
+        }
         if self.busy.swap(true, Ordering::AcqRel) {
             answer(Err(herdr_vcs::git::Error::Busy.to_string()));
             return;
@@ -453,6 +476,21 @@ fn run(input: Input, action: Action) -> Result<String, String> {
         (None, Some(error)) => Err(error.to_owned()),
         (None, None) => Err("git stopped without saying why".to_owned()),
     }
+}
+
+/// Whether `asked`, the repository a write is for, is `root`, the one
+/// watched now.
+fn same_repository(asked: Option<&str>, root: &Path) -> Result<(), String> {
+    let Some(asked) = asked else {
+        return Err("say which repository: `root`, as `app.git.root` gives it".to_owned());
+    };
+    if Path::new(asked) == root {
+        return Ok(());
+    }
+    Err(format!(
+        "the repository changed to {}; look at it before writing",
+        root.display()
+    ))
 }
 
 /// HEAD, or the empty tree before the first commit.

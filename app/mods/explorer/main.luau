@@ -50,7 +50,7 @@ type Line = {
 }
 
 -- Draws one line of the tree.
-local function line(state: State, at: Line)
+local function line(state: State, at: Line, root: string)
 	local entry = at.entry
 	if not entry then
 		return ui.row {
@@ -82,7 +82,7 @@ local function line(state: State, at: Line)
 	return ui.row {
 		class = classes,
 		align = "center",
-		msg = if entry.dir then { toggle = at.path } else { open = at.path },
+		msg = if entry.dir then { toggle = at.path } else { open = at.path, root = root },
 		ui.row { width = INDENT * at.depth },
 		lead,
 		icon,
@@ -143,8 +143,10 @@ return mod {
 			state.collapsed = not state.collapsed
 		elseif msg.open then
 			state.selected = msg.open
+			-- With the project it is in: the project follows the terminal,
+			-- and a tab keeps the file it opened.
 			return state, {
-				{ to = "editor", msg = { open = msg.open } },
+				{ to = "editor", msg = { open = msg.open, root = msg.root } },
 				{ to = "inspector", msg = { select = msg.open } },
 			}
 		end
@@ -201,7 +203,7 @@ return mod {
 				count = #lines,
 				row_height = ROW_HEIGHT,
 				row = function(index)
-					return line(state, lines[index])
+					return line(state, lines[index], files.path)
 				end,
 			},
 		})

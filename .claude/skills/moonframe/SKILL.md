@@ -1695,9 +1695,11 @@ keeps it fresh (only a file in `files`; any other path gets an empty diff);
 `{ diff = false }` drops it. Writes, one at a time, only from the mods named
 in `providers/git`'s `[settings] writers` (`status` as shipped; add yours
 there), each answered to the mod that asked (`{ reply, action, ok, message | error }`):
-`{ commit = "<message>", id = ... }` stages everything and commits;
-`{ push = true, id = ... }` pushes the branch to `origin`, setting its
-upstream. Signing and pushing may wait on the user's hardware key: show
+`{ commit = "<message>", root, id = ... }` stages everything and commits;
+`{ push = true, root, id = ... }` pushes the branch to `origin`, setting its
+upstream. `root` is the repository the write is for, as `app.git.root` gave
+it: the repository follows the terminal, so one that moved (or no `root`)
+is refused, never written to another. Signing and pushing may wait on the user's hardware key: show
 that something runs until the reply comes.
 
 | field | shape |
@@ -1715,7 +1717,9 @@ that something runs until the reply comes.
 
 `app.docs` (docs, native): `{ available, root }`, the root `app.files`
 lists, followed as it moves; a file read before it moved is still watched
-and saved where it was read. It reads and saves the project's text files (UTF-8, at most 1 MiB)
+and saved where it was read. `read` and `write` take `root` (the absolute
+folder a file is in, as `app.files.path` named it) so a tab keeps its file
+after the project moves; only a root the provider has had is accepted. It reads and saves the project's text files (UTF-8, at most 1 MiB)
 for the mod that asks, answering it (`{ reply, action, ok, path, ... }`):
 `{ read = "<path>", id = ... }` answers with `text` and `version`, and from
 then on sends that mod `{ changed = "<path>", version }` (or `missing =
