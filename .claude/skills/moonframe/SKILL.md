@@ -1040,6 +1040,9 @@ Text-like elements take their main value positionally:
 - `scroll = true` scrolls along the container's axis; `"x"`, `"y"` or
   `"both"` pick the axes (long code lines that scroll sideways). Give the container
   `grow = true` or a fixed size so it has something to overflow.
+- `follow = true`, with `scroll`, keeps it at its end while it is there:
+  as the content grows (a chat streaming in, a log), it scrolls along;
+  scrolled back, it stays where the user put it.
 - `shrink = false` keeps the content's size when the parent is short of
   space (strips, toolbars), instead of being squeezed.
 - `self_align = "start"` (or `center`, `end`, `stretch`) places it across
@@ -1804,6 +1807,38 @@ user's `[settings] allow` covers for the mod), `{ cancel = run }`, `{ forget = r
 | `app` | the app folder the provider is in, from `workdir` (`app`, `examples/ledger`); nil when outside it |
 | `pid` | this app's process, for an agent to screenshot the window (`just screenshot OUT PID`) |
 | `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
+
+`app.chat` (chat, native, crates/moonframe-chat): conversations with
+coding agents, each run by herdr-gpui's `herdr-acp` program with no view
+of its own (found on PATH or in Herdr.app; `[settings] program`) and
+attached over herdr's chat protocol. A chat takes prompt after prompt and
+outlives the app: the next launch attaches again. Only `[settings]
+starters` drive chats, each obeying the mod that started it: `{ start =
+"<agent>", cwd?, load? }`, `{ prompt, chat, files? }`, `{ cancel = chat }`,
+`{ answer = chat, permission, option }`, `{ mode, chat }`, `{ setting,
+value, chat }`, `{ unqueue, chat }`, `{ auto_accept, chat }`, `{ resume =
+chat }`, `{ close = chat }`, each answered `{ reply, action, ok, error? }`;
+anyone may send `{ focus = chat }`, the chat whose whole recent transcript
+is shared (the others share their last few entries). It publishes `{
+available, reason?, program, agents, default, cwd, chats }`, a chat being
+`{ id, owner, agent, cwd, created, status ("starting" "live" "reconnecting"
+"ended" "failed"), error?, session?, transcript? }` and `transcript`
+herdr's own (`Transcript` in herdr-chat-protocol: `entries`, `status`,
+`permissions`, `plan`, `options`, `modes`, `usage`, `queued`, `commands`),
+trimmed (see crates/moonframe-chat/src/project.rs). `examples/switchyard`
+is the whole example.
+
+`app.shell` (shell, native, crates/moonframe-shell): shell commands a mod
+runs for the user, in their login shell, with output in colour as it
+comes. Only `[settings] runners` may `{ run = "<command>", id?, cwd? }`
+(answered with `run`, and `{ action = "finished", status, code? }` when it
+ends), `{ stop = run }` and `{ forget = run }`. It publishes `{ available,
+cwd, runs }`, newest first: `{ id, owner, command, cwd, status
+("running" "finished" "failed" "stopped"), code?, error?, started,
+finished?, elapsed_ms, output, text, lines, hidden }`. `output` marks
+colours in each line as `\1FG;FLAGS\2` (crates/moonframe-shell/src/ansi.rs);
+`text` is the same without them, for copying; `examples/switchyard`'s
+`shell-card` component draws one.
 
 `[settings]` in `provider.toml` reaches `start`. `just check` validates the
 manifests, and `just providers` builds and lints the Wasm ones. When a view
