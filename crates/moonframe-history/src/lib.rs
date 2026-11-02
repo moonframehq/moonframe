@@ -26,16 +26,15 @@
 mod git;
 #[cfg(feature = "herdr")]
 mod herdr;
+mod store;
 #[cfg(test)]
 mod tests;
 
+pub use store::store_in;
 use {
     git::Git,
-    std::{
-        fmt, fs,
-        path::{Path, PathBuf},
-        sync::Mutex,
-    },
+    std::{fmt, fs, path::Path},
+    store::Lock,
 };
 
 /// The newest snapshot.
@@ -101,32 +100,36 @@ impl Snapshot {
     }
 }
 
-/// The history of one folder.
+/// The history of one folder. Each change to it takes the repository's
+/// lock, so the window and `moonframe history` never interleave.
 #[derive(Debug)]
 pub struct History {
     git: Git,
-    /// One operation at a time: they share the repository's index.
-    busy: Mutex<()>,
 }
 
 impl History {
     /// The history of `folder`, kept in the repository `store`, made if it
-    /// is not there yet.
+    /// is not there yet. Refuses a repository that keeps another folder.
     pub fn open(folder: &Path, store: &Path) -> Result<Self> {
         let work = folder.canonicalize()?;
-        if !store.join("HEAD").is_file() {
-            create(store, &work)?;
+        // Its parent too: the store's name says which folder it keeps.
+        if let Some(parent) = store.parent() {
+            store::private_dir(parent)?;
         }
+        store::private_dir(store)?;
+        let git = Git {
+            dir: store.to_owned(),
+            work,
+        };
+        let _lock = Lock::take(store)?;
+        if !store.join("HEAD").is_file() {
+            create(&git)?;
+        }
+        store::bind(&git)?;
         let info = store.join("info");
         fs::create_dir_all(&info)?;
         fs::write(info.join("exclude"), EXCLUDE)?;
-        Ok(Self {
-            git: Git {
-                dir: store.to_owned(),
-                work,
-            },
-            busy: Mutex::new(()),
-        })
+        Ok(Self { git })
     }
 
     /// The folder this history keeps.
@@ -137,7 +140,7 @@ impl History {
     /// Takes a snapshot if anything changed since the folder's current
     /// one, saying `reason`; `None` when nothing did.
     pub fn capture(&self, reason: &str) -> Result<Option<Snapshot>> {
-        let _busy = self.lock();
+        let _lock = self.lock()?;
         self.capture_now(reason)
     }
 
@@ -168,7 +171,7 @@ impl History {
     /// Takes the folder back one snapshot; the one it undid, or `None`
     /// when there is none before.
     pub fn undo(&self) -> Result<Option<Snapshot>> {
-        let _busy = self.lock();
+        let _lock = self.lock()?;
         self.capture_now("before undo")?;
         let Some(cursor) = self.cursor() else {
             return Ok(None);
@@ -187,7 +190,7 @@ impl History {
     /// Takes the folder forward again one snapshot after an undo; the one
     /// it redid, or `None` when there is none after.
     pub fn redo(&self) -> Result<Option<Snapshot>> {
-        let _busy = self.lock();
+        let _lock = self.lock()?;
         self.capture_now("before redo")?;
         let Some(cursor) = self.cursor() else {
             return Ok(None);
@@ -210,7 +213,7 @@ impl History {
 
     /// Takes the folder to the snapshot `id` (a full or short id).
     pub fn restore(&self, id: &str) -> Result<Snapshot> {
-        let _busy = self.lock();
+        let _lock = self.lock()?;
         let target = self.resolve(id)?;
         self.capture_now("before restore")?;
         let snapshot = self.snapshot(&target)?;
@@ -230,14 +233,12 @@ impl History {
 
     /// Lets git pack and prune the repository when it has grown enough.
     pub fn tidy(&self) -> Result<()> {
-        let _busy = self.lock();
+        let _lock = self.lock()?;
         self.git.run(&["gc", "--auto", "--quiet"]).map(drop)
     }
 
-    fn lock(&self) -> std::sync::MutexGuard<'_, ()> {
-        self.busy
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    fn lock(&self) -> Result<Lock> {
+        Lock::take(&self.git.dir)
     }
 
     fn cursor(&self) -> Option<String> {
@@ -310,14 +311,11 @@ impl History {
     }
 }
 
-/// A new history repository for the folder `work`.
-fn create(store: &Path, work: &Path) -> Result<()> {
-    if let Some(parent) = store.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let made = git::plain(work)
+/// A new history repository, in the private folder `git.dir`.
+fn create(git: &Git) -> Result<()> {
+    let made = git::plain(&git.work)
         .args(["init", "--quiet", "--bare", "--initial-branch=history"])
-        .arg(store)
+        .arg(&git.dir)
         .output()
         .map_err(|error| Error(format!("cannot run git: {error}")))?;
     if !made.status.success() {
@@ -326,10 +324,6 @@ fn create(store: &Path, work: &Path) -> Result<()> {
             String::from_utf8_lossy(&made.stderr).trim()
         )));
     }
-    let git = Git {
-        dir: store.to_owned(),
-        work: work.to_owned(),
-    };
     // A work tree comes from GIT_WORK_TREE each time; the reflog keeps a
     // line of snapshots an edit after an undo left behind.
     git.run(&["config", "core.bare", "false"])?;
@@ -365,13 +359,4 @@ fn label<'a>(paths: impl Iterator<Item = &'a str>) -> String {
         count if count <= NAMED => named,
         count => format!("{named} and {} more", count - NAMED),
     }
-}
-
-/// Where a folder's history is kept beside the app's other state, as
-/// `history.git` or, for a profile, `history-<profile>.git`.
-pub fn store_in(state: &Path, profile: Option<&str>) -> PathBuf {
-    state.join(match profile {
-        Some(name) => format!("history-{name}.git"),
-        None => "history.git".to_owned(),
-    })
 }

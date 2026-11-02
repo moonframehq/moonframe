@@ -1,6 +1,10 @@
 #![allow(clippy::unwrap_used)]
 
-use {super::*, std::fs, tempfile::TempDir};
+use {
+    super::*,
+    std::{fs, path::PathBuf},
+    tempfile::TempDir,
+};
 
 struct Fixture {
     _dirs: TempDir,
@@ -171,11 +175,64 @@ fn labels_name_a_few_files_and_count_the_rest() {
 }
 
 #[test]
-fn each_profile_keeps_its_own_store() {
-    let state = Path::new("/state");
-    assert_eq!(store_in(state, None), state.join("history.git"));
-    assert_eq!(
-        store_in(state, Some("ledger")),
-        state.join("history-ledger.git")
+fn each_folder_keeps_a_store_of_its_own() {
+    let dirs = tempfile::tempdir().unwrap();
+    let (one, two) = (dirs.path().join("one"), dirs.path().join("two"));
+    fs::create_dir_all(&one).unwrap();
+    fs::create_dir_all(&two).unwrap();
+    let state = dirs.path().join("state");
+    assert_ne!(store_in(&state, &one), store_in(&state, &two));
+    assert_eq!(store_in(&state, &one), store_in(&state, &one));
+    assert!(store_in(&state, &one).starts_with(state.join("history")));
+}
+
+#[test]
+fn a_store_is_never_used_for_another_folder() {
+    let fixture = fixture();
+    let other = fixture._dirs.path().join("other");
+    fs::create_dir_all(&other).unwrap();
+    let error = History::open(&other, &fixture.history.git.dir).unwrap_err();
+    assert!(
+        error.to_string().contains("keeps the history of"),
+        "{error}"
     );
+    // Its own folder opens it again.
+    History::open(&fixture.folder, &fixture.history.git.dir).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn only_its_owner_can_read_the_store() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let fixture = fixture();
+    let store = &fixture.history.git.dir;
+    let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode(store), 0o700);
+    // Reopening puts it right again.
+    fs::set_permissions(store, fs::Permissions::from_mode(0o755)).unwrap();
+    History::open(&fixture.folder, store).unwrap();
+    assert_eq!(mode(store), 0o700);
+}
+
+#[test]
+fn another_process_waits_for_an_operation_to_finish() {
+    let fixture = fixture();
+    fixture.history.capture("launch").unwrap();
+    // A second opening, as `moonframe history` beside the window has.
+    let other = History::open(&fixture.folder, &fixture.history.git.dir).unwrap();
+    let held = fixture.history.lock().unwrap();
+    fixture.write("main.luau", "-- edited\n");
+    let (sender, done) = std::sync::mpsc::channel();
+    std::thread::scope(|scope| {
+        scope.spawn(|| sender.send(other.capture("changed")).unwrap());
+        assert!(
+            done.recv_timeout(std::time::Duration::from_millis(300))
+                .is_err()
+        );
+        drop(held);
+        let taken = done
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+        assert_eq!(taken.unwrap().unwrap().reason, "changed");
+    });
 }
