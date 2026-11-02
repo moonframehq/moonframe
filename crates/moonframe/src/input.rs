@@ -6,13 +6,17 @@
 //! Edits, Enter and the field's `keys` become messages for the drawing
 //! mod's `update`, shaped by [`moonframe_core::Input::message`]. A field
 //! with `browser` is that page's address bar: Enter loads what it says,
-//! focus selects it, and Escape puts back the page's address.
+//! focus selects it, and Escape puts back the page's address. A field
+//! with `prose`, `dim` or `typewriter` is a writing field ([`prose`]).
+
+mod prose;
 
 use {
     crate::app::MoonframeApp,
     gpui_kit::{
         base::input::{
-            Input as LineElement, InputEditorStyle, InputEvent, InputState, Textarea, TextareaState,
+            Editor as ProseElement, EditorState, Input as LineElement, InputEditorStyle,
+            InputEvent, InputState, Textarea, TextareaState,
         },
         *,
     },
@@ -24,11 +28,12 @@ use {
 /// so a mod drawing inputs from data can't grow the set without end.
 const MAX_FIELDS: usize = 256;
 
-/// The engine behind one field: one line, or several.
+/// The engine behind one field: one line, several, or a writing field.
 #[derive(Clone)]
 pub(crate) enum Editor {
     Line(Entity<InputState>),
     Lines(Entity<TextareaState>),
+    Prose(Entity<EditorState>, Rc<prose::Writing>),
 }
 
 /// Runs `$body` on whichever state the editor holds.
@@ -37,21 +42,31 @@ macro_rules! on_state {
         match $editor {
             Editor::Line($state) => $body,
             Editor::Lines($state) => $body,
+            Editor::Prose($state, _) => $body,
         }
     };
 }
 
 impl Editor {
-    fn new(multiline: bool, window: &mut Window, cx: &mut App) -> Self {
-        if multiline {
+    fn new(input: &Input, window: &mut Window, cx: &mut App) -> Self {
+        if input.writing() {
+            let writing = Rc::new(prose::Writing::default());
+            Self::Prose(prose::editor(&writing, window, cx), writing)
+        } else if input.multiline {
             Self::Lines(cx.new(|cx| TextareaState::new(window, cx)))
         } else {
             Self::Line(cx.new(|cx| InputState::new(window, cx)))
         }
     }
 
-    fn multiline(&self) -> bool {
-        matches!(self, Self::Lines(_))
+    /// Whether `input` asks for an engine of another kind than this one.
+    fn other_kind(&self, input: &Input) -> bool {
+        let (multiline, writing) = match self {
+            Self::Line(_) => (false, false),
+            Self::Lines(_) => (true, false),
+            Self::Prose(..) => (true, true),
+        };
+        multiline != input.multiline || writing != input.writing()
     }
 
     pub(crate) fn focus_handle(&self, cx: &App) -> FocusHandle {
@@ -101,6 +116,7 @@ impl Editor {
         match self {
             Self::Line(state) => LineElement::new(state).into_any_element(),
             Self::Lines(state) => Textarea::new(state).into_any_element(),
+            Self::Prose(state, _) => ProseElement::new(state).into_any_element(),
         }
     }
 }
@@ -161,6 +177,8 @@ struct Field {
     /// The frame it was last drawn in.
     seen: u64,
     _events: Subscription,
+    /// A writing field follows its caret, for what it keeps in focus.
+    _caret: Option<Subscription>,
 }
 
 #[derive(Default)]
@@ -199,7 +217,7 @@ impl Inputs {
         let wiring = Wiring::of(owner, input);
         // A field whose kind changed starts again with the text it had.
         let carried = match registry.fields.get(key) {
-            Some(field) if field.editor.multiline() != input.multiline => {
+            Some(field) if field.editor.other_kind(input) => {
                 let text = field.editor.value(cx).to_string();
                 registry.fields.remove(key);
                 Some(text)
@@ -207,11 +225,15 @@ impl Inputs {
             _ => None,
         };
         if !registry.fields.contains_key(key) {
-            let editor = Editor::new(input.multiline, window, cx);
+            let editor = Editor::new(input, window, cx);
             if let Some(text) = &carried {
                 editor.set_value(text, window, cx);
             }
             let events = subscribe(app, &editor, key, window, cx)?;
+            let caret = match &editor {
+                Editor::Prose(state, writing) => Some(prose::follow(writing, state, cx)),
+                _ => None,
+            };
             prune(&mut registry.fields, frame, window, cx);
             registry.fields.insert(key.to_owned(), Field {
                 editor,
@@ -222,6 +244,7 @@ impl Inputs {
                 focus: false,
                 seen: frame,
                 _events: events,
+                _caret: caret,
             });
         }
         let field = registry.fields.get_mut(key)?;
@@ -250,6 +273,9 @@ impl Inputs {
             let rows = input.rows as usize;
             state.update(cx, |state, cx| state.set_rows(rows, cx));
             field.rows = Some(input.rows);
+        }
+        if let Editor::Prose(state, writing) = &editor {
+            writing.apply(input, state, window, cx);
         }
         editor.set_disabled(input.disabled, cx);
         let take_focus = input.focus && !field.focus && !input.disabled;

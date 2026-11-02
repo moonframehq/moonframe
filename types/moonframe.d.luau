@@ -852,6 +852,14 @@ type InputProps = {
 	-- `to`'s): Enter loads the text (a host over https, words as a web
 	-- search), focus selects it, and Escape puts back the page's address.
 	browser: string?,
+	-- A writing field (needs `multiline`): markdown is styled as it is
+	-- typed (headings bold, emphasis slanted, markup faded).
+	prose: boolean?,
+	-- Focus mode (needs `multiline`): the sentence or paragraph the caret is
+	-- in stays in full ink and the rest of the text fades.
+	dim: ("sentence" | "paragraph")?,
+	-- Keep the caret's line in the middle of the field (needs `multiline`).
+	typewriter: boolean?,
 }
 
 type RegionProps = {
