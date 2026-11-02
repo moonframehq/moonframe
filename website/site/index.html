@@ -107,6 +107,28 @@
   .toast i { width:8px; height:8px; border-radius:50%; background:#7be3a4 }
   .uptime { margin-right:auto; color:#8a8798 }
 
+
+  /* Film: a muted loop previews it; a click plays the whole film with controls */
+  .film { margin-top:40px }
+  .film .screen { position:relative; aspect-ratio:16 / 9; background:var(--paper2); border:1px solid var(--ink); box-shadow:0 40px 80px -40px #2a1a1066; overflow:hidden }
+  .film video { position:absolute; inset:0; width:100%; height:100%; display:block; background:var(--paper2) }
+  .film video[hidden] { display:none }
+  .film .play { position:absolute; left:50%; bottom:28px; transform:translateX(-50%); display:flex; gap:12px; align-items:center; padding:14px 22px 14px 16px; border:0; border-radius:999px; background:var(--ink); color:var(--paper); font:600 15px var(--sans); cursor:pointer; box-shadow:0 14px 30px #2a1a1055; transition:transform .2s, background .2s }
+  .film .play[hidden], .film .hold[hidden] { display:none }
+  .film .hold { position:absolute; top:12px; right:12px; padding:6px 12px; border:0; border-radius:999px; background:#2a1a10b3; color:var(--paper); font:500 12px var(--sans); cursor:pointer }
+  .film .hold:hover { background:var(--ink) }
+  .film .hold:focus-visible, .film .play:focus-visible { outline:2px solid var(--acc-hi); outline-offset:3px }
+  .film .play:hover { background:var(--acc); transform:translateX(-50%) translateY(-2px) }
+  .film .play i { width:30px; height:30px; border-radius:50%; background:var(--acc-hi); display:grid; place-items:center }
+  .film .play i::before { content:""; border-left:10px solid #fff; border-top:6px solid transparent; border-bottom:6px solid transparent; margin-left:3px }
+  .film .play span { font:500 13px var(--mono); color:#cbb89a }
+  .chapters { list-style:none; padding:0; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); border-top:2px solid var(--ink); margin-top:28px }
+  .chapters button { all:unset; box-sizing:border-box; width:100%; cursor:pointer; display:flex; gap:12px; align-items:baseline; padding:12px 14px 12px 0; border-bottom:1px solid var(--rule); font:16px/1.35 var(--serif); color:var(--ink2) }
+  .chapters button:hover, .chapters button:focus-visible { color:var(--acc) }
+  .chapters button:focus-visible { outline:2px solid var(--acc); outline-offset:2px }
+  .chapters time { font:600 12px var(--mono); color:var(--acc); flex-shrink:0 }
+  .chapters .on button { color:var(--ink); font-weight:600 } .chapters .on time { color:var(--acc-hi) }
+
   /* Sections */
   section { padding:88px 0; border-top:1px solid var(--rule) }
   h2 { font-size:52px; line-height:1.05; letter-spacing:-.025em; font-weight:500 }
@@ -256,6 +278,9 @@
     .body { grid-template-columns:1fr } .body .panel:first-child, .body .panel:last-child { display:none }
     .sbar { gap:10px } .uptime { display:none }
     section { padding:60px 0 } h2 { font-size:36px } .lead { font-size:17px }
+    .film .play { bottom:10px; gap:8px; padding:6px 14px 6px 6px; font-size:13px } .film .play i { width:24px; height:24px } .film .play span { display:none }
+    .film .hold { top:8px; right:8px; padding:4px 10px; font-size:11px }
+    .chapters { grid-template-columns:repeat(2, minmax(0, 1fr)) } .chapters button { font-size:15px; gap:8px }
     .three { grid-template-columns:1fr } .three > div { padding:22px 0; border-right:0; border-bottom:1px solid var(--rule) }
     .chat { position:static; width:auto; margin-top:16px }
     .comp-head, .plates-head { flex-direction:column; align-items:flex-start; gap:12px } .big-num { font-size:84px }
@@ -275,7 +300,7 @@
   <header class="mast">
     <span>Open source · MIT</span>
     <a class="name" href="#"><img src="img/icon.png" alt="">Moonframe</a>
-    <nav><a class="wide" href="#components">Components</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe">GitHub</a></nav>
+    <nav><a href="#tour">Tour</a><a class="wide" href="#components">Components</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a href="https://github.com/penso/moonframe">GitHub</a></nav>
   </header>
   <div class="sub"><span>Native desktop apps, <b>written in Rust</b></span><span>macOS · Linux · Windows</span></div>
 
@@ -313,6 +338,36 @@
       </div>
     </div>
     <p class="cap"><b>Fig. 1</b> An illustration of the loop. The code the agent writes follows the real status bar mods in <code>app/mods/</code>.</p>
+  </section>
+
+  <section id="tour">
+    <p class="kicker">The tour</p>
+    <h2>Moonframe in <i>sixty seconds.</i></h2>
+    <p class="lead">Live Luau, an app that changes when you ask it to, the inspector, components, terminals, coding agents, the sandbox, and the apps built on it.</p>
+    <figure class="film">
+      <div class="screen">
+        <video class="full" controls playsinline preload="none" poster="film/film-poster.webp" aria-label="A one-minute tour of Moonframe">
+          <source src="film/film.mp4" type="video/mp4">
+          <track kind="chapters" src="film/chapters.vtt" srclang="en" label="Chapters" default>
+        </video>
+        <video class="preview" muted loop playsinline preload="none" poster="film/loop-poster.webp" aria-hidden="true" hidden>
+          <source src="film/loop.mp4" type="video/mp4">
+        </video>
+        <button class="play" type="button" hidden><i></i>Watch the tour<span>1:00</span></button>
+        <button class="hold" type="button" aria-pressed="false" hidden>Pause preview</button>
+      </div>
+      <ol class="chapters">
+        <li><button type="button" data-t="4.3"><time>0:04</time>The window is Luau</button></li>
+        <li><button type="button" data-t="13.4"><time>0:13</time>Send feedback</button></li>
+        <li><button type="button" data-t="21.6"><time>0:21</time>Inspect Element</button></li>
+        <li><button type="button" data-t="27.0"><time>0:27</time>Components</button></li>
+        <li><button type="button" data-t="32.4"><time>0:32</time>Batteries included</button></li>
+        <li><button type="button" data-t="38.6"><time>0:38</time>Coding agents</button></li>
+        <li><button type="button" data-t="43.8"><time>0:44</time>The sandbox</button></li>
+        <li><button type="button" data-t="48.4"><time>0:48</time>Whole apps</button></li>
+      </ol>
+      <figcaption class="cap"><b>Fig. 2</b> A stylised tour, drawn from the app's own screenshots and code, not a screen recording. The agent's steps are illustrative.</figcaption>
+    </figure>
   </section>
 
   <section>
@@ -757,6 +812,49 @@ async function run() {
   }
 }
 run();
+</script>
+<script>
+// The tour: a muted loop plays while the section is on screen, unless the
+// visitor pauses it or asks for reduced motion (now or later). The button or a
+// chapter swaps in the whole film. Without script the film shows with controls.
+(() => {
+  const box = document.querySelector(".film .screen");
+  const full = box.querySelector(".full"), preview = box.querySelector(".preview");
+  const play = box.querySelector(".play"), hold = box.querySelector(".hold");
+  const items = [...document.querySelectorAll(".chapters li")];
+  const motion = matchMedia("(prefers-reduced-motion: reduce)");
+  let started = false, visible = false, paused = motion.matches;
+  full.hidden = true; preview.hidden = false; play.hidden = false; hold.hidden = false;
+  function sync() {
+    if (started) return;
+    if (visible && !paused) preview.play().catch(() => {}); else preview.pause();
+    hold.textContent = paused ? "Play preview" : "Pause preview";
+    hold.setAttribute("aria-pressed", String(paused));
+  }
+  const seen = new IntersectionObserver(([e]) => { visible = e.isIntersecting; sync(); }, { threshold: 0.4 });
+  seen.observe(box);
+  motion.addEventListener("change", () => { if (motion.matches) paused = true; sync(); });
+  hold.addEventListener("click", () => { paused = !paused; sync(); });
+  sync();
+  function start(at) {
+    if (!started) {
+      started = true;
+      seen.disconnect(); preview.pause();
+      preview.hidden = true; play.hidden = true; hold.hidden = true; full.hidden = false;
+      full.preload = "auto";
+    }
+    if (at != null) full.currentTime = at;
+    full.play().catch(() => {});
+    full.focus({ preventScroll: true });
+  }
+  play.addEventListener("click", () => start(0));
+  items.forEach((li) => li.querySelector("button").addEventListener("click", (ev) => start(Number(ev.currentTarget.dataset.t))));
+  full.addEventListener("timeupdate", () => {
+    let on = -1;
+    items.forEach((li, i) => { if (full.currentTime >= Number(li.querySelector("button").dataset.t)) on = i; });
+    items.forEach((li, i) => li.classList.toggle("on", i === on));
+  });
+})();
 </script>
 </body>
 </html>

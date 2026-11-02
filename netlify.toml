@@ -10,6 +10,12 @@ for = "/img/*"
 [headers.values]
 Cache-Control = "public, max-age=604800"
 
+# The tour film and its posters; render.sh rewrites them in place.
+[[headers]]
+for = "/film/*"
+[headers.values]
+Cache-Control = "public, max-age=604800"
+
 # Social cards are named by a hash of their bytes, so they never change in place.
 [[headers]]
 for = "/social/*"
