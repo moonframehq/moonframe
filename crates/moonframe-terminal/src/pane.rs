@@ -53,6 +53,13 @@ pub trait Pane: Send + Sync {
     fn answers_queries(&self) -> bool {
         false
     }
+
+    /// The folder its program is in now (the foreground program's, where
+    /// the backend knows it), when the backend can tell. It may block
+    /// briefly: it is asked off the window's thread.
+    fn cwd(&self) -> Option<PathBuf> {
+        None
+    }
 }
 
 /// A pane's output: blocks for the next chunk, and ends with the program.

@@ -27,7 +27,7 @@ pub use {
     keys::{Key, encode, paste},
     pane::{Backend, Open, Opened, Output, Pane},
     pty::Pty,
-    session::Session,
+    session::{Folder, Session},
 };
 
 /// Which emulator reads the shell's output.

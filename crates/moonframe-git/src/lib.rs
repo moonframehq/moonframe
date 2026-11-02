@@ -2,6 +2,10 @@
 //! `app.git`, and the writes a mod asks for (commit, push), each answered
 //! to the mod that asked.
 //!
+//! The repository is `LAYOUTS_REPO` when set; else the project the user
+//! works in (the repository of the terminal they last used), followed as
+//! it changes; else the one holding the app.
+//!
 //! It reads what `providers/git/git.sh` read, in the same shape (see the
 //! moonframe skill's "Built-in providers"), and runs every git command
 //! through herdr-vcs: no shell, no terminal prompts, bounded output, a
@@ -12,8 +16,14 @@
 //! - anything refreshes;
 //! - `{ diff = "<path>" }` adds that file's diff as `diff`, kept fresh
 //!   until `{ diff = false }`;
-//! - `{ commit = "<message>", id = ... }` stages everything and commits;
-//! - `{ push = true, id = ... }` pushes the branch to `origin`.
+//! - `{ commit = "<message>", root, id = ... }` stages everything and
+//!   commits;
+//! - `{ push = true, root, id = ... }` pushes the branch to `origin`.
+//!
+//! A write names the repository it is for (`root`, as `app.git.root` gave
+//! it) and is refused when the provider no longer watches that one: the
+//! repository follows the terminal's project, so a sheet drawn for one must
+//! never commit to another.
 //!
 //! Only the mods named in provider.toml's `writers` setting may commit or
 //! push; any other gets a refusal as its answer. Reading is open to all.
@@ -126,6 +136,8 @@ impl Repo {
 #[derive(Default)]
 pub struct Git {
     root: Option<PathBuf>,
+    /// The project it last moved to ([`moonframe_providers::project`]).
+    followed: Option<PathBuf>,
     /// The mods that may commit and push (`[settings] writers`).
     writers: Mods,
     /// When a message last made it read everything; one coming sooner
@@ -160,12 +172,17 @@ pub struct Git {
 impl Native for Git {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         self.root = repository(host.dir());
+        self.followed = moonframe_providers::project();
         self.writers = Mods::from_settings(host.settings(), "writers");
         self.refresh(host, true);
         Ok(())
     }
 
     fn tick(&mut self, host: &Handle) {
+        if self.follow(moonframe_providers::project()) {
+            self.refresh(host, true);
+            return;
+        }
         self.ticks += 1;
         let stale = self.stale.swap(false, Ordering::AcqRel);
         if stale || self.ticks >= LOOK_EVERY {
@@ -175,6 +192,11 @@ impl Native for Git {
     }
 
     fn receive(&mut self, host: &Handle, from: &str, message: Data) {
+        // A move first: a write asked for the old repository is refused
+        // below, with an answer, never run in the new one.
+        if self.follow(moonframe_providers::project()) {
+            self.refresh(host, true);
+        }
         let fields = match &message {
             Data::Map(fields) => Some(fields),
             _ => None,
@@ -185,10 +207,14 @@ impl Native for Git {
             Some(Data::Bool(false) | Data::Nil) => self.diff_path = None,
             _ => {},
         }
+        let root = match field("root") {
+            Some(Data::String(root)) => Some(root.as_str()),
+            _ => None,
+        };
         if let Some(Data::String(text)) = field("commit") {
-            self.act(host, from, field("id"), Action::Commit(text.clone()));
+            self.act(host, from, field("id"), root, Action::Commit(text.clone()));
         } else if let Some(Data::Bool(true)) = field("push") {
-            self.act(host, from, field("id"), Action::Push);
+            self.act(host, from, field("id"), root, Action::Push);
         }
         // Worktrees, branches, remote and stashes are some 60 git commands
         // with many worktrees: a mod sending a message each frame gets them
@@ -205,6 +231,35 @@ impl Native for Git {
 }
 
 impl Git {
+    /// Moves to `project`, the project the user works in now, unless
+    /// `LAYOUTS_REPO` names the repository; returns whether it moved.
+    /// Everything read of the old one goes; an action running there
+    /// finishes there.
+    fn follow(&mut self, project: Option<PathBuf>) -> bool {
+        if std::env::var_os("LAYOUTS_REPO").is_some() {
+            return false;
+        }
+        if project.is_none() || project == self.followed {
+            return false;
+        }
+        self.followed = project.clone();
+        let Some(root) = project.as_deref().and_then(toplevel) else {
+            return false;
+        };
+        if self.root.as_ref() == Some(&root) {
+            return false;
+        }
+        *self = Self {
+            root: Some(root),
+            followed: project,
+            writers: std::mem::take(&mut self.writers),
+            busy: self.busy.clone(),
+            stale: self.stale.clone(),
+            ..Self::default()
+        };
+        true
+    }
+
     /// Looks at the repository and publishes what changed; `force` reads
     /// everything and publishes even when nothing did.
     fn refresh(&mut self, host: &Handle, force: bool) {
@@ -329,8 +384,16 @@ impl Git {
         }
     }
 
-    /// Runs `action` on a thread of its own and answers `from` when it ends.
-    fn act(&self, host: &Handle, from: &str, id: Option<&Data>, action: Action) {
+    /// Runs `action` on a thread of its own and answers `from` when it ends,
+    /// if `asked` names the repository it watches.
+    fn act(
+        &self,
+        host: &Handle,
+        from: &str,
+        id: Option<&Data>,
+        asked: Option<&str>,
+        action: Action,
+    ) {
         let name = match action {
             Action::Commit(_) => "commit",
             Action::Push => "push",
@@ -367,6 +430,10 @@ impl Git {
             answer(Err("not a git repository".to_owned()));
             return;
         };
+        if let Err(problem) = same_repository(asked, &root) {
+            answer(Err(problem));
+            return;
+        }
         if self.busy.swap(true, Ordering::AcqRel) {
             answer(Err(herdr_vcs::git::Error::Busy.to_string()));
             return;
@@ -411,6 +478,21 @@ fn run(input: Input, action: Action) -> Result<String, String> {
     }
 }
 
+/// Whether `asked`, the repository a write is for, is `root`, the one
+/// watched now.
+fn same_repository(asked: Option<&str>, root: &Path) -> Result<(), String> {
+    let Some(asked) = asked else {
+        return Err("say which repository: `root`, as `app.git.root` gives it".to_owned());
+    };
+    if Path::new(asked) == root {
+        return Ok(());
+    }
+    Err(format!(
+        "the repository changed to {}; look at it before writing",
+        root.display()
+    ))
+}
+
 /// HEAD, or the empty tree before the first commit.
 fn base(repo: &Repo) -> String {
     if repo
@@ -427,14 +509,23 @@ fn base(repo: &Repo) -> String {
     }
 }
 
-/// The repository to watch: `LAYOUTS_REPO`, else the one holding the app
-/// folder this provider is in (two folders up), as git.sh did.
+/// The repository to watch: `LAYOUTS_REPO`, else the project the user
+/// works in, else the one holding the app folder this provider is in (two
+/// folders up), as git.sh did.
 fn repository(dir: &Path) -> Option<PathBuf> {
-    let start = std::env::var_os("LAYOUTS_REPO")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| dir.join("..").join(".."));
+    if let Some(named) = std::env::var_os("LAYOUTS_REPO") {
+        return toplevel(Path::new(&named));
+    }
+    moonframe_providers::project()
+        .as_deref()
+        .and_then(toplevel)
+        .or_else(|| toplevel(&dir.join("..").join("..")))
+}
+
+/// The repository holding `start`, as git names it.
+fn toplevel(start: &Path) -> Option<PathBuf> {
     // The app's folder may be relative (`moonframe app`); git runs elsewhere.
-    let start = std::path::absolute(&start).unwrap_or(start);
+    let start = std::path::absolute(start).unwrap_or_else(|_| start.to_owned());
     let top = Repo::at(&start).text(&["rev-parse", "--show-toplevel"], "find the repository")?;
     Some(PathBuf::from(top))
 }

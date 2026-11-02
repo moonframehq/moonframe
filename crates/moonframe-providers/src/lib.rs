@@ -143,6 +143,52 @@ pub fn launch_dir() -> Option<&'static Path> {
     LAUNCH_DIR.get().map(PathBuf::as_path)
 }
 
+/// The project the user works in, as the app last found it: the git
+/// repository of the terminal they last used. Set with [`set_project`].
+static PROJECT: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// Every project the app has followed, in this launch or (as the app
+/// restores them with [`remember_projects`]) an earlier one.
+static PROJECTS: std::sync::Mutex<BTreeSet<PathBuf>> = std::sync::Mutex::new(BTreeSet::new());
+
+/// Records the project the user works in now; returns whether it changed.
+/// [`Providers::tell_project`] then tells the running providers.
+pub fn set_project(dir: &Path) -> bool {
+    remember_projects([dir.to_owned()]);
+    let Ok(mut project) = PROJECT.lock() else {
+        return false;
+    };
+    if project.as_deref() == Some(dir) {
+        return false;
+    }
+    *project = Some(dir.to_owned());
+    true
+}
+
+/// Adds `dirs` to the projects the app has followed: those of earlier
+/// launches, which a tab restored from then may still name.
+pub fn remember_projects(dirs: impl IntoIterator<Item = PathBuf>) {
+    if let Ok(mut projects) = PROJECTS.lock() {
+        projects.extend(dirs);
+    }
+}
+
+/// Whether the app has followed `dir` as a project, now or in a launch it
+/// remembers: a folder the user worked in, never one a mod made up.
+pub fn followed(dir: &Path) -> bool {
+    PROJECTS.lock().is_ok_and(|projects| projects.contains(dir))
+}
+
+/// The project the user works in (the git repository of the terminal they
+/// last used), once the app found one: what the files, git and docs
+/// providers show, unless the user named a folder for them. Process
+/// providers see it as `MOONFRAME_PROJECT` when they start, and as a
+/// message `{ project = "<path>" }` from the app (an empty `from`, which no
+/// mod has) when it changes.
+pub fn project() -> Option<PathBuf> {
+    PROJECT.lock().ok().and_then(|project| project.clone())
+}
+
 pub struct Providers {
     roots: Roots,
     /// Where wasm providers are built.
@@ -183,6 +229,8 @@ struct Running {
     stop: Arc<AtomicBool>,
     /// Its folder when it started: a reload restarts it only if this changed.
     fingerprint: Fingerprint,
+    /// A process or native provider, which hears when the project changes.
+    follows_project: bool,
 }
 
 impl Drop for Running {
@@ -329,6 +377,7 @@ impl Providers {
                 },
             };
             tracing::info!(provider = %name, dir = %dir.display(), "starting");
+            let follows_project = matches!(manifest.kind, Kind::Process { .. } | Kind::Native);
             let (sender, messages) = mpsc::channel();
             let stop = Arc::new(AtomicBool::new(false));
             let context = Context {
@@ -355,6 +404,7 @@ impl Providers {
                         messages: sender,
                         stop,
                         fingerprint,
+                        follows_project,
                     });
                 },
                 Err(error) => (self.events)(Event::Failed {
@@ -393,6 +443,31 @@ impl Providers {
                 data: message,
             })
             .map_err(|_| Error::new(format!("provider `{name}` has stopped")))
+    }
+}
+
+impl Providers {
+    /// Tells the running process and native providers the project changed
+    /// ([`set_project`]), as a message from the app itself: an empty
+    /// `from`, which no mod has, so no mod can move a provider elsewhere.
+    pub fn tell_project(&self) {
+        let Some(project) = project() else {
+            return;
+        };
+        let message = Data::Map(BTreeMap::from([(
+            "project".to_owned(),
+            Data::String(project.to_string_lossy().into_owned()),
+        )]));
+        for running in self
+            .running
+            .values()
+            .filter(|running| running.follows_project)
+        {
+            let _ = running.messages.send(Message {
+                from: String::new(),
+                data: message.clone(),
+            });
+        }
     }
 }
 

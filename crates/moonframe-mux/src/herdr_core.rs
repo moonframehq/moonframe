@@ -259,7 +259,8 @@ impl Backend for HerdrCore {
             pane: Box::new(CorePane {
                 attachment: attachment.clone(),
                 detached: detached.clone(),
-                _core: core,
+                address,
+                core,
             }),
             output: Box::new(Reading {
                 attachment,
@@ -274,8 +275,10 @@ struct CorePane {
     attachment: Arc<Attachment>,
     /// Set when the pane goes, so the reader lets go of the stream too.
     detached: Arc<AtomicBool>,
+    /// The terminal, to find it in the core's list.
+    address: String,
     /// Kept so the connection outlives every stream from it.
-    _core: Arc<Core>,
+    core: Arc<Core>,
 }
 
 impl Drop for CorePane {
@@ -296,6 +299,23 @@ impl Pane for CorePane {
 
     fn answers_queries(&self) -> bool {
         true
+    }
+
+    /// The folder of what runs in the foreground (a program the shell
+    /// started, else the shell), as the core reports it.
+    fn cwd(&self) -> Option<PathBuf> {
+        let terminal = self
+            .core
+            .list(false)
+            .ok()?
+            .terminals
+            .into_iter()
+            .find(|terminal| terminal.address == self.address)?;
+        let foreground = terminal.foreground.map(|foreground| foreground.cwd);
+        [foreground.unwrap_or_default(), terminal.cwd]
+            .into_iter()
+            .find(|cwd| !cwd.is_empty())
+            .map(PathBuf::from)
     }
 }
 
