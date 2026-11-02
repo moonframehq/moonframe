@@ -113,7 +113,7 @@ return mod {
 		[".page-tabs"] = { margin = { 26, 0, 0, 0 } },
 		[".tabs-underline"] = { gap = 14, border_color = "border" },
 		[".tabs-underline-tab"] = { padding = { 8, 3, 10, 3 }, color = "muted-foreground", border = "bottom" },
-		[".tabs-underline-tab:hover"] = { color = "foreground", border_color = "#00000000" },
+		[".tabs-underline-idle:hover"] = { color = "foreground", border_color = "#00000000" },
 		[".tabs-underline-tab:selected"] = { color = "foreground", border_color = "accent" },
 		[".filters"] = { margin = { 30, 0, 22, 0 }, gap = 9 },
 		[".dropdown-trigger"] = { background = "card", radius = 7, padding = { 6, 8, 6, 10 } },

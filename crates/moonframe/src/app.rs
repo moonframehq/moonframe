@@ -45,6 +45,7 @@ use {
 
 // keep-sorted start
 mod dialogs;
+mod fonts;
 mod history;
 mod listeners;
 mod menu;
@@ -189,7 +190,7 @@ impl MoonframeApp {
             font_size: DEFAULT_FONT_SIZE,
             font_family: theme.font_family.clone(),
             mono_font_size: theme.mono_font_size,
-            mono_font_family: theme.mono_font_family.clone(),
+            mono_font_family: fonts::default_mono(cx, &theme.mono_font_family),
             radius: theme.radius,
         };
         workspace.set_dark(theme.is_dark());

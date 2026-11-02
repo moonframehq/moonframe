@@ -89,7 +89,7 @@ return component {
 		-- Tabs grow in as they open and shrink away as they close; "none"
 		-- stops it.
 		[".tabs-tab"] = { padding = { 5, 10 }, gap = 6, radius = 7, color = "muted-foreground", transition = "slide-fade fast ease-out" },
-		[".tabs-tab:hover"] = { background = "list-hover", color = "foreground" },
+		[".tabs-idle:hover"] = { background = "list-hover", color = "foreground" },
 		[".tabs-tab:selected"] = { color = "foreground" },
 		[".tabs-label"] = { weight = "medium" },
 		[".tabs-icon"] = { size = "small" },
@@ -111,7 +111,7 @@ return component {
 		-- underline: a line under the selected tab, over a rule.
 		[".tabs-underline"] = { gap = 4, border = "bottom", border_color = "border" },
 		[".tabs-underline-tab"] = { radius = 0, padding = { 7, 8 }, border = "bottom", border_color = "#00000000" },
-		[".tabs-underline-tab:hover"] = { background = "#00000000", border_color = "muted-foreground/40" },
+		[".tabs-underline-idle:hover"] = { background = "#00000000", border_color = "muted-foreground/40" },
 		[".tabs-underline-tab:selected"] = { border_color = "accent", color = "foreground" },
 
 		-- outline: a bordered box around the selected tab.
@@ -121,7 +121,7 @@ return component {
 		-- cards: tabs as cards on a sunken strip, the selected one raised.
 		[".tabs-cards"] = { background = "muted/60", padding = 3, radius = 9, gap = 3 },
 		[".tabs-cards-tab"] = { radius = 6 },
-		[".tabs-cards-tab:hover"] = { background = "background/50" },
+		[".tabs-cards-idle:hover"] = { background = "background/50" },
 		[".tabs-cards-tab:selected"] = { background = "background", shadow = "0 1 2 #0000001f", color = "foreground" },
 
 		-- compact: small and tight, for dense strips.
@@ -132,20 +132,20 @@ return component {
 		-- classic: flat tabs with dividers, the selected one the page colour.
 		[".tabs-classic"] = { gap = 0, background = "sidebar", border = "bottom", border_color = "border" },
 		[".tabs-classic-tab"] = { radius = 0, padding = { 7, 12 }, border = "right", border_color = "border" },
-		[".tabs-classic-tab:hover"] = { background = "list-hover" },
+		[".tabs-classic-idle:hover"] = { background = "list-hover" },
 		[".tabs-classic-tab:selected"] = { background = "background", color = "foreground" },
 
 		-- square: flat tabs with no rounding, the selected one filled.
 		[".tabs-square"] = { gap = 0, border = "bottom", border_color = "border" },
 		[".tabs-square-tab"] = { radius = 0, padding = { 7, 12 } },
-		[".tabs-square-tab:hover"] = { background = "list-hover" },
+		[".tabs-square-idle:hover"] = { background = "list-hover" },
 		[".tabs-square-tab:selected"] = { background = "accent/15", color = "foreground" },
 
 		-- browser: grey tabs of one width, the selected one white and
 		-- lifted, as a browser's tab strip in a light title bar.
 		[".tabs-browser"] = { gap = 8 },
 		[".tabs-browser-tab"] = { radius = 7, padding = { 6, 10 }, gap = 8, background = "foreground/6", color = "muted-foreground" },
-		[".tabs-browser-tab:hover"] = { background = "foreground/9", color = "foreground" },
+		[".tabs-browser-idle:hover"] = { background = "foreground/9", color = "foreground" },
 		[".tabs-browser-tab:selected"] = { background = "background", color = "foreground", shadow = "0 1px 2px #0000000f" },
 
 		-- In a bar with a line of its own, the strip's would double it.
@@ -157,7 +157,7 @@ return component {
 		-- foot. Recolor `.tabs-shoulder-left` and `-right` with the strip.
 		[".tabs-curved"] = { gap = 4 },
 		[".tabs-curved-tab"] = { radius = 8, padding = { 6, 12 }, margin = { bottom = 4 } },
-		[".tabs-curved-tab:hover"] = { background = "list-hover" },
+		[".tabs-curved-idle:hover"] = { background = "list-hover" },
 		[".tabs-curved-tab:selected"] = {
 			background = "card",
 			color = "foreground",
@@ -213,16 +213,22 @@ tabs {
 			-- A tab's own `closable = false` keeps it without a ×, selected or not.
 			local closable = if tab.closable ~= nil then tab.closable else (props.closable or selected)
 			local joined = selected and variant == "curved"
+			-- Only inactive tabs offer selection or change their look on hover.
+			local classes = { "tabs-tab", "tabs-" .. variant .. "-tab" }
+			if not selected then
+				table.insert(classes, "tabs-idle")
+				table.insert(classes, "tabs-" .. variant .. "-idle")
+			end
 			cells[#cells + 1] = ui.row {
 				key = key_of(id),
-				class = { "tabs-tab", "tabs-" .. variant .. "-tab" },
+				class = classes,
 				align = "center",
 				justify = if props.grow then "center" else nil,
 				grow = props.grow,
 				width = props.width,
 				shrink = if props.width then false else nil,
 				selected = selected,
-				msg = tab.msg or { [event] = id },
+				msg = if selected then nil else tab.msg or { [event] = id },
 				context = { [context] = id },
 				tooltip = tab.tooltip,
 				to = props.to,
