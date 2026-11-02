@@ -35,6 +35,7 @@ pub enum Node {
     Icon(Icon),
     Image(Image),
     Line(Line),
+    Paths(Paths),
     Hatch(Hatch),
     Terminal(Terminal),
     Browser(Browser),
@@ -335,6 +336,42 @@ tokens! {
     Dots {
         Last = "last",
         All = "all",
+    }
+}
+
+/// Lines through points the view places itself, in pixels from the box's
+/// top-left corner: arrows between dependent bars on a timeline, the
+/// connectors of a diagram. Each is stroked in its own `color`, else the
+/// look's `color`, else the theme's border color.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Paths {
+    pub look: Look,
+    pub paths: Vec<Polyline>,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+}
+
+/// One line of a `ui.paths`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Polyline {
+    /// Its corners in order, `{ x, y }` in pixels.
+    pub points: Vec<[f32; 2]>,
+    pub color: Option<crate::Color>,
+    /// The stroke's width in pixels.
+    pub stroke: f32,
+    pub dashed: bool,
+    /// Rounds each corner by this many pixels, as an elbow connector does.
+    pub radius: f32,
+    /// Which ends get an arrowhead.
+    pub arrow: Option<Arrow>,
+}
+
+tokens! {
+    /// Which ends of a `ui.paths` line get an arrowhead.
+    Arrow {
+        End = "end",
+        Start = "start",
+        Both = "both",
     }
 }
 

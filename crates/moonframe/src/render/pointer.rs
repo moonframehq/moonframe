@@ -48,7 +48,12 @@ pub(super) fn attach(
     place: &Place<'_>,
     cx: Cx,
 ) -> Stateful<Div> {
-    if pointer.is_empty() {
+    // `carry` and `accept` are drag and drop's, drawn by `carry`.
+    if pointer.press.is_none()
+        && pointer.wheel.is_none()
+        && pointer.drop.is_none()
+        && pointer.cursor.is_none()
+    {
         return element;
     }
     // The box as last laid out, for the fractions a press reports.
@@ -332,7 +337,7 @@ fn wheel(
 }
 
 /// Where `now` is in `bounds`, and how far it went from `start`.
-fn travel(bounds: Bounds<Pixels>, now: Point<Pixels>, start: Point<Pixels>) -> Travel {
+pub(super) fn travel(bounds: Bounds<Pixels>, now: Point<Pixels>, start: Point<Pixels>) -> Travel {
     let width = f32::from(bounds.size.width);
     let height = f32::from(bounds.size.height);
     let fraction = |offset: Pixels, size: f32| {

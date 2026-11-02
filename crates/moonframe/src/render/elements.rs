@@ -89,7 +89,10 @@ impl<'w> Draw<'w> for Stack {
             element
         };
         let element = match &self.pointer {
-            Some(pointer) => super::pointer::attach(element, pointer, place, cx),
+            Some(pointer) => {
+                let element = super::pointer::attach(element, pointer, place, cx);
+                super::carry::attach(element, pointer, painter, place, cx)
+            },
             None => element,
         };
         let element = match &self.action {

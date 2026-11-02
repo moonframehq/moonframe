@@ -195,6 +195,7 @@ fn describe(node: &Node) -> String {
         Node::Icon(icon) => format!("icon{} {}", classes(&icon.look), icon.name.name()),
         Node::Image(image) => format!("image{} {}", classes(&image.look), quote(&image.src)),
         Node::Line(line) => format!("line{} ({} points)", classes(&line.look), line.points.len()),
+        Node::Paths(paths) => format!("paths{} ({})", classes(&paths.look), paths.paths.len()),
         Node::Hatch(hatch) => format!("hatch{}", classes(&hatch.look)),
         Node::Terminal(terminal) => format!(
             "terminal{} {} ({})",
@@ -270,6 +271,7 @@ fn line(node: &Node) -> Option<u32> {
         Node::Icon(icon) => icon.look.line,
         Node::Image(image) => image.look.line,
         Node::Line(line) => line.look.line,
+        Node::Paths(paths) => paths.look.line,
         Node::Hatch(hatch) => hatch.look.line,
         Node::Terminal(terminal) => terminal.look.line,
         Node::Browser(browser) => browser.look.line,

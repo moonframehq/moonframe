@@ -22,11 +22,17 @@ pub struct Input {
     pub change: Option<Data>,
     /// Sent on Enter (single-line), or ⌘/Ctrl-Enter (multiline).
     pub submit: Option<Data>,
+    /// Sent with the text when the field loses keyboard focus: a title
+    /// edited in place is saved as the user clicks away.
+    pub blur: Option<Data>,
     /// Keys that send a message instead of editing while the field has focus.
     pub keys: Vec<(KeyChord, Data)>,
     pub multiline: bool,
     /// Visible lines of a multiline field; it scrolls past them.
     pub rows: u32,
+    /// A multiline field grows from `rows` with its lines up to this many,
+    /// then scrolls: a comment box, a title that wraps.
+    pub max_rows: Option<u32>,
     pub disabled: bool,
     /// Take keyboard focus when it appears, or when this turns true.
     pub focus: bool,
@@ -45,6 +51,31 @@ impl Input {
     pub const DEFAULT_ROWS: u32 = 3;
     /// Most `rows` a field can ask for.
     pub const MAX_ROWS: u32 = 200;
+
+    /// The lines a multiline field shows holding `text`: `rows`, or with
+    /// `max_rows` as many as its lines up to that.
+    pub fn visible_rows(&self, text: &str) -> u32 {
+        let Some(most) = self.max_rows else {
+            return self.rows;
+        };
+        let lines = u32::try_from(text.split('\n').count()).unwrap_or(u32::MAX);
+        lines.clamp(self.rows, most.max(self.rows))
+    }
+
+    /// What the field sends for `msg` when its text is `value` with the
+    /// caret `caret` bytes in: the message [`Input::message`] makes, with
+    /// `caret` added, so a mod can tell what was typed just before it (an
+    /// `@name` to complete).
+    pub fn message_at(msg: &Data, value: &str, caret: usize) -> Data {
+        let caret = Data::Integer(i64::try_from(caret).unwrap_or(i64::MAX));
+        match Self::message(msg, value) {
+            Data::Map(mut entries) => {
+                entries.insert("caret".to_owned(), caret);
+                Data::Map(entries)
+            },
+            other => other,
+        }
+    }
 
     /// What the field sends for `msg` when its text is `value`: a table
     /// `msg` is copied with `value` set; anything else becomes

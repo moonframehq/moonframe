@@ -835,6 +835,12 @@ impl MoonframeApp {
             Request::Appearance(appearance) => self.set_appearance(appearance, cx),
             Request::Sound(sound) => self.play(from, &sound),
             Request::Pick(pick) => self.pick(from, pick, cx),
+            Request::Edit(edit) => {
+                if let Err(problem) = self.inputs.edit(from, &edit, window, cx) {
+                    self.workspace
+                        .refuse(from, Error::new(format!("`app:edit`: {problem}")));
+                }
+            },
             Request::Notify(notification) => match self.alerts.notify(from, &notification) {
                 Ok(Posted::System) => {},
                 Ok(Posted::Toast) => {

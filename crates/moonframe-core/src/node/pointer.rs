@@ -1,8 +1,9 @@
 //! What a row or column hears from the pointer besides clicks: presses and
 //! drags (`pointer`), the wheel and trackpad pinches (`wheel`), files
-//! dropped on it (`drop`), and the cursor it shows (`cursor`). Each message
-//! is the mod's own `msg` with the event's fields added, as
-//! [`with_fields`] makes it.
+//! dropped on it (`drop`), things dragged inside the app (`carry` and
+//! `accept`), and the cursor it shows (`cursor`). Each message is the
+//! mod's own `msg` with the event's fields added, as [`with_fields`]
+//! makes it.
 
 use {super::*, std::collections::BTreeMap};
 
@@ -16,6 +17,12 @@ pub struct Pointer {
     pub wheel: Option<Data>,
     /// Sent when files are dropped on it from another app, with their paths.
     pub drop: Option<Data>,
+    /// Dragging it carries this to a row or column that `accept`s it: a
+    /// card to another column, a row to another place in its list.
+    pub carry: Option<Data>,
+    /// Sent as something carried moves over it, leaves it, and is dropped
+    /// on it: see [`Pointer::accept_message`].
+    pub accept: Option<Data>,
     /// The mod these go to; the drawing mod when unset.
     pub to: Option<String>,
     /// Also send `hover` as the pointer moves over it with no button held,
@@ -29,7 +36,25 @@ pub struct Pointer {
 
 impl Pointer {
     pub fn is_empty(&self) -> bool {
-        self.press.is_none() && self.wheel.is_none() && self.drop.is_none() && self.cursor.is_none()
+        self.press.is_none()
+            && self.wheel.is_none()
+            && self.drop.is_none()
+            && self.carry.is_none()
+            && self.accept.is_none()
+            && self.cursor.is_none()
+    }
+}
+
+tokens! {
+    /// What an `accept` message reports.
+    CarryPhase {
+        /// Something carried moved over it.
+        Over = "over",
+        /// It moved off it again.
+        Leave = "leave",
+        /// It was dropped on it: nothing follows, so the mod clears what
+        /// `over` showed.
+        Drop = "drop",
     }
 }
 
@@ -254,6 +279,28 @@ impl Pointer {
             .map(|path| Data::String(path.to_string_lossy().into_owned()))
             .collect();
         fields.insert("paths".to_owned(), Data::List(paths));
+        Some(with_fields(msg, fields))
+    }
+}
+
+impl Pointer {
+    /// What `accept` sends as `carry`, drawn by the mod `from`, moves over
+    /// it, leaves it or is dropped on it: `{ phase, carry, from, x, y,
+    /// width, height }`, `x` and `y` where the pointer is in its box.
+    pub fn accept_message(
+        &self,
+        phase: CarryPhase,
+        carry: &Data,
+        from: &str,
+        at: &Travel,
+    ) -> Option<Data> {
+        let msg = self.accept.as_ref()?;
+        let mut fields = travel_fields(at);
+        fields.remove("dx");
+        fields.remove("dy");
+        fields.insert("phase".to_owned(), Data::String(phase.name().to_owned()));
+        fields.insert("carry".to_owned(), carry.clone());
+        fields.insert("from".to_owned(), Data::String(from.to_owned()));
         Some(with_fields(msg, fields))
     }
 }

@@ -16,7 +16,7 @@ use {
         },
         *,
     },
-    moonframe_core::{Action, Data, Input, KeyChord},
+    moonframe_core::{Action, Data, Edit, Input, KeyChord},
     std::{cell::RefCell, collections::HashMap, rc::Rc},
 };
 
@@ -84,6 +84,17 @@ impl Editor {
             .update(cx, |state, cx| state.select_all(window, cx)))
     }
 
+    /// The selection, in bytes from the start; empty at the caret.
+    pub(crate) fn selection(&self, cx: &App) -> std::ops::Range<usize> {
+        on_state!(self, |state| state.read(cx).selected_range())
+    }
+
+    /// Selects `range`, in bytes from the start; empty puts the caret there.
+    pub(crate) fn select(&self, range: std::ops::Range<usize>, cx: &mut App) {
+        on_state!(self, |state| state
+            .update(cx, |state, cx| state.set_selected_range(range, cx)))
+    }
+
     fn set_disabled(&self, disabled: bool, cx: &mut App) {
         on_state!(self, |state| state
             .update(cx, |state, cx| state.set_disabled(disabled, cx)))
@@ -112,6 +123,7 @@ pub(crate) struct Wiring {
     pub(crate) to: Option<String>,
     pub(crate) change: Option<Data>,
     pub(crate) submit: Option<Data>,
+    pub(crate) blur: Option<Data>,
     pub(crate) keys: Vec<(KeyChord, Data)>,
     pub(crate) multiline: bool,
     pub(crate) disabled: bool,
@@ -126,6 +138,7 @@ impl Wiring {
             to: input.to.clone(),
             change: input.change.clone(),
             submit: input.submit.clone(),
+            blur: input.blur.clone(),
             keys: input.keys.clone(),
             multiline: input.multiline,
             disabled: input.disabled,
@@ -244,12 +257,12 @@ impl Inputs {
             editor.set_placeholder(input.placeholder.as_deref().unwrap_or(""), window, cx);
             field.placeholder = input.placeholder.clone();
         }
+        let rows = input.visible_rows(&editor.value(cx));
         if let Editor::Lines(state) = &editor
-            && field.rows != Some(input.rows)
+            && field.rows != Some(rows)
         {
-            let rows = input.rows as usize;
-            state.update(cx, |state, cx| state.set_rows(rows, cx));
-            field.rows = Some(input.rows);
+            state.update(cx, |state, cx| state.set_rows(rows as usize, cx));
+            field.rows = Some(rows);
         }
         editor.set_disabled(input.disabled, cx);
         let take_focus = input.focus && !field.focus && !input.disabled;
@@ -279,6 +292,34 @@ impl Inputs {
                 .find(|field| field.editor.focus_handle(cx).is_focused(window)),
         };
         field.map(|field| field.editor.clone())
+    }
+
+    /// Carries out `app:edit` from the mod `owner` on its field `edit.field`:
+    /// replaces the spliced text as one undoable edit, selects what the
+    /// edit leaves selected, and keeps the keyboard there. The field sends
+    /// its `change` as for any edit.
+    pub(crate) fn edit(
+        &self,
+        owner: &str,
+        edit: &Edit,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Result<(), String> {
+        let key = format!("{owner} {}", edit.field);
+        let editor = self
+            .editor(Some(&key), window, cx)
+            .ok_or_else(|| format!("no field with `id = \"{}\"` drawn by `{owner}`", edit.field))?;
+        let text = editor.value(cx).to_string();
+        let splice = edit.splice(&text, editor.selection(cx));
+        editor.select(splice.range, cx);
+        on_state!(&editor, |state| state.update(cx, |state, cx| {
+            state.replace(splice.text, window, cx);
+        }));
+        editor.select(splice.select, cx);
+        if !editor.focus_handle(cx).is_focused(window) {
+            editor.focus(window, cx);
+        }
+        Ok(())
     }
 
     /// Whether a field has keyboard focus in `window`.
@@ -357,8 +398,16 @@ impl MoonframeApp {
         let Some((wiring, value)) = self.inputs.wiring(key, cx) else {
             return;
         };
+        // An edit reports where the caret is, in bytes from the start.
+        let mut caret = None;
         let msg = match event {
-            InputEvent::Change => wiring.change.as_ref(),
+            InputEvent::Change => {
+                caret = self
+                    .inputs
+                    .editor(Some(key), window, cx)
+                    .map(|editor| editor.selection(cx).end);
+                wiring.change.as_ref()
+            },
             InputEvent::PressEnter { .. } if !wiring.multiline => {
                 // An address bar loads what it says, and hands the keyboard
                 // back so the next keys don't edit it.
@@ -383,11 +432,17 @@ impl MoonframeApp {
             },
             InputEvent::Blur => {
                 cx.notify();
-                None
+                wiring.blur.as_ref()
             },
         };
         if let Some(msg) = msg {
-            let action = wiring.send(msg, &value);
+            let action = match caret {
+                Some(caret) => Action::Send {
+                    to: wiring.to.clone(),
+                    msg: Input::message_at(msg, &value, caret),
+                },
+                None => wiring.send(msg, &value),
+            };
             self.dispatch(&wiring.owner, &action, window, cx);
         }
     }

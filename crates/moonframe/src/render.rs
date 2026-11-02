@@ -8,6 +8,7 @@
 //! rules (`Stylesheet::resolve`), and its own keys such as `padding`.
 
 mod browser;
+mod carry;
 mod elements;
 mod floating;
 mod gallery;
@@ -670,6 +671,7 @@ fn draw_node<'w>(
         Node::Icon(icon) => icon.draw(painter, place, cx),
         Node::Image(image) => image.draw(painter, place, cx),
         Node::Line(line) => line.draw(painter, place, cx),
+        Node::Paths(paths) => paths.draw(painter, place, cx),
         Node::Hatch(hatch) => hatch.draw(painter, place, cx),
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
         Node::Browser(browser) => browser.draw(painter, place, cx),

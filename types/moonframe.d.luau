@@ -272,8 +272,32 @@ type StackProps = {
 	-- Sent when files are dropped on it from another app, with `paths`
 	-- (and `x`, `y`). Dropped pictures may then show in this mod's `ui.image`.
 	drop: Data,
+	-- Dragging it carries this data to a row or column with `accept`: a
+	-- card to another column, a row to another place in its list. A box of
+	-- its size (the `carry` rule) follows the pointer while it dims.
+	-- Not with `pointer` or `drag`.
+	carry: Data,
+	-- Sent as something carried moves over it, leaves it and is dropped on
+	-- it, with a `CarryMsg`'s fields added. The innermost target under the
+	-- pointer takes the drop. To `to` if given.
+	accept: Data,
 	cursor: Cursor?,
 	[number]: Child,
+}
+
+-- What `accept` adds. `phase` is `"over"` as the carried thing moves over
+-- the target, `"leave"` as it moves off, and `"drop"` when it lands, after
+-- which nothing follows: clear what `over` showed then. `x` and `y` are
+-- where the pointer is, as fractions of the target's box (before or after
+-- a row's middle, say), `from` is the mod that drew what is carried.
+type CarryMsg = {
+	phase: "over" | "leave" | "drop",
+	carry: Data,
+	from: string,
+	x: number,
+	y: number,
+	width: number,
+	height: number,
 }
 
 type PanelProps = {
@@ -447,6 +471,7 @@ type IconName =
 	| "battery-warning"
 	| "bell"
 	| "bell-off"
+	| "bold"
 	| "book-open"
 	| "bookmark"
 	| "bot"
@@ -459,9 +484,11 @@ type IconName =
 	| "bug"
 	| "building-2"
 	| "calendar"
+	| "calendar-check"
 	| "calendar-days"
 	| "case-sensitive"
 	| "chart-column"
+	| "chart-gantt"
 	| "chart-line"
 	| "chart-pie"
 	| "check"
@@ -498,6 +525,7 @@ type IconName =
 	| "dash"
 	| "database"
 	| "delete"
+	| "diamond"
 	| "dot"
 	| "download"
 	| "ellipsis"
@@ -530,6 +558,7 @@ type IconName =
 	| "grip-vertical"
 	| "hard-drive"
 	| "hash"
+	| "heading"
 	| "headphones"
 	| "heart"
 	| "heart-off"
@@ -539,6 +568,7 @@ type IconName =
 	| "inbox"
 	| "info"
 	| "inspector"
+	| "italic"
 	| "key-round"
 	| "keyboard"
 	| "laptop"
@@ -548,6 +578,7 @@ type IconName =
 	| "link"
 	| "list"
 	| "list-checks"
+	| "list-ordered"
 	| "list-tree"
 	| "loader"
 	| "loader-circle"
@@ -595,6 +626,7 @@ type IconName =
 	| "redo-2"
 	| "refresh-ccw"
 	| "refresh-cw"
+	| "repeat"
 	| "replace"
 	| "reply"
 	| "resize-corner"
@@ -611,6 +643,7 @@ type IconName =
 	| "settings-2"
 	| "shield"
 	| "sliders-horizontal"
+	| "smile-plus"
 	| "sort-ascending"
 	| "sort-descending"
 	| "sparkles"
@@ -626,12 +659,15 @@ type IconName =
 	| "star"
 	| "star-fill"
 	| "star-off"
+	| "strikethrough"
 	| "sun"
 	| "tag"
 	| "tags"
 	| "terminal"
+	| "text-quote"
 	| "thumbs-down"
 	| "thumbs-up"
+	| "timer"
 	| "trash"
 	| "trash-2"
 	| "triangle-alert"
@@ -727,6 +763,30 @@ type LineProps = {
 	dashed: boolean?,
 	width: number?,
 	height: number?,
+}
+
+-- Lines through points the view places itself, in pixels from the box's
+-- top-left corner: arrows between dependent bars on a timeline, the
+-- connectors of a diagram. Each line is stroked in its `color`, else the
+-- style's `color`, else the border color. Without `width` and `height` it
+-- fills its parent; it takes no clicks, so it can float over what it links.
+type PathsProps = {
+	class: Class?,
+	style: Style?,
+	paths: { Polyline },
+	width: number?,
+	height: number?,
+}
+
+type Polyline = {
+	-- Corners in order, flat: { x1, y1, x2, y2, ... }, in pixels.
+	points: { number },
+	color: string?,
+	stroke: number?,
+	dashed: boolean?,
+	-- Rounds each corner by this many pixels, as an elbow connector does.
+	radius: number?,
+	arrow: ("end" | "start" | "both")?,
 }
 
 -- A box of diagonal stripes in its style's `color` over its `background`.
@@ -828,10 +888,14 @@ type InputProps = {
 	id: string?,
 	value: string?,
 	placeholder: string?,
-	-- Sent on each edit.
+	-- Sent on each edit, with `value` and `caret` (bytes before the caret:
+	-- `string.sub(value, 1, caret)` is what comes before it) added.
 	change: Data,
 	-- Sent on Enter, or ⌘/Ctrl-Enter when `multiline`.
 	submit: Data,
+	-- Sent with `value` when it loses keyboard focus: a title edited in
+	-- place is saved as the user clicks away.
+	blur: Data,
 	-- While focused, these keys send their message instead of editing:
 	-- `{ up = "prev", escape = "close", ["shift-tab"] = "back",
 	-- ["secondary-k"] = "clear" }` (`secondary` is ⌘ on macOS, Ctrl elsewhere).
@@ -841,6 +905,9 @@ type InputProps = {
 	multiline: boolean?,
 	-- Visible lines of a multiline field (default 3); it scrolls past them.
 	rows: number?,
+	-- A multiline field grows from `rows` with its lines up to this many,
+	-- then scrolls.
+	max_rows: number?,
 	disabled: boolean?,
 	-- Take keyboard focus when it appears, or when this turns true.
 	focus: boolean?,
@@ -972,6 +1039,7 @@ declare ui: {
 	icon: (props: IconName | IconProps) -> Element,
 	image: (props: string | ImageProps) -> Element,
 	line: (props: LineProps) -> Element,
+	paths: (props: PathsProps) -> Element,
 	hatch: (props: HatchProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,
 	browser: (props: string | BrowserProps) -> Element,
@@ -1455,12 +1523,29 @@ type PickMsg = {
 	folder: string?,
 }
 
+-- What `{ to = "app:edit", msg = ... }` does to the sending mod's input
+-- with `id = field`, around its selection, keeping undo and focus; the
+-- field then sends its `change`. `wrap` puts `{ before, after }` around the
+-- selection (taking them off when already there), `lines` starts each
+-- selected line with a prefix (taking it off when all have it), `insert`
+-- replaces the selection and the `back` bytes before it: an `@name`
+-- completed, an emoji. A toolbar button can send it directly with
+-- `to = "app:edit"`.
+type EditMsg = {
+	field: string,
+	wrap: { string }?,
+	lines: string?,
+	insert: string?,
+	back: number?,
+}
+
 -- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,
 -- `"provider:<name>"`, `"topic:<name>"`, or the app itself:
 -- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
 -- `AppearanceMode`), `"app:theme"` (`msg` `{ light: string?, dark: string? }`),
 -- `"app:sound"` (`msg` `"default"` or a sound file's path),
--- `"app:notify"` (`msg` a `NotifyMsg`) and `"app:pick"` (`msg` a `PickMsg`).
+-- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`)
+-- and `"app:edit"` (`msg` an `EditMsg`).
 type Send = {
 	to: string,
 	msg: Data,

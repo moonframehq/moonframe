@@ -10,9 +10,11 @@ impl Build for Input {
         "to",
         "change",
         "submit",
+        "blur",
         "keys",
         "multiline",
         "rows",
+        "max_rows",
         "disabled",
         "focus",
         "mono",
@@ -42,8 +44,29 @@ impl Build for Input {
                     .fail(format!("a whole number from 1 to {}", Self::MAX_ROWS)));
             },
         };
+        let max_rows = match fields.get::<f32>("max_rows")? {
+            None => None,
+            Some(_) if !multiline => {
+                return Err(fields
+                    .cx()
+                    .key("max_rows")
+                    .fail("`max_rows` goes with `multiline = true`"));
+            },
+            Some(most)
+                if most.fract() == 0.0 && (rows as f32..=Self::MAX_ROWS as f32).contains(&most) =>
+            {
+                Some(most as u32)
+            },
+            Some(_) => {
+                return Err(fields.cx().key("max_rows").fail(format!(
+                    "a whole number from `rows` ({rows}) to {}",
+                    Self::MAX_ROWS
+                )));
+            },
+        };
         let change = fields.get::<Data>("change")?;
         let submit = fields.get::<Data>("submit")?;
+        let blur = fields.get::<Data>("blur")?;
         let keys = fields
             .get::<InputKeys>("keys")?
             .map(|keys| keys.0)
@@ -53,13 +76,14 @@ impl Build for Input {
         if to.is_some()
             && change.is_none()
             && submit.is_none()
+            && blur.is_none()
             && keys.is_empty()
             && browser.is_none()
         {
             return Err(fields
                 .cx()
                 .key("to")
-                .fail("`to` goes with `change`, `submit`, `keys` or `browser`"));
+                .fail("`to` goes with `change`, `submit`, `blur`, `keys` or `browser`"));
         }
         Ok(Self {
             look: Look::from_fields(fields)?,
@@ -74,9 +98,11 @@ impl Build for Input {
             to,
             change,
             submit,
+            blur,
             keys,
             multiline,
             rows,
+            max_rows,
             disabled: fields.get("disabled")?.unwrap_or(false),
             focus: fields.get("focus")?.unwrap_or(false),
             mono: fields.get("mono")?.unwrap_or(false),

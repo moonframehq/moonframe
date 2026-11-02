@@ -6,6 +6,9 @@ use {
     crate::{APP, Action, Command},
 };
 
+/// The one app request a preview may make: edits of its own fields.
+const EDIT: &str = "app:edit";
+
 impl Workspace {
     /// Who a send from `from` to `to` reaches: `parent` is the module that
     /// drew an instance, and `tabbed#main` names an instance the sender drew
@@ -82,9 +85,15 @@ impl Workspace {
             }
             let to = self.resolve(&from, &to);
             // A preview, and every instance it drew at any depth, keeps to
-            // itself: no other mod, provider or topic hears it.
+            // itself: no other mod, provider or topic hears it. `app:edit`
+            // touches only the sender's own fields, so a demo may edit them.
             let root = self.root_owner(&from);
-            if root.starts_with(DEMO) && to != from && to != root && !self.owned_by(&to, &root) {
+            if root.starts_with(DEMO)
+                && to != from
+                && to != root
+                && to != EDIT
+                && !self.owned_by(&to, &root)
+            {
                 continue;
             }
             if let Some(provider) = to.strip_prefix(PROVIDER) {

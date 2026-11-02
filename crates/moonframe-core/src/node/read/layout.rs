@@ -16,6 +16,12 @@ impl Build for Stack {
     ];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
+        if fields.raw("carry").is_some() && fields.get::<bool>("drag")?.unwrap_or(false) {
+            return Err(fields
+                .cx()
+                .key("carry")
+                .fail("a title bar (`drag = true`) moves the window; it can't be carried too"));
+        }
         Ok(Self {
             look: Look::from_fields(fields)?,
             direction: match kind {

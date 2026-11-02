@@ -133,6 +133,67 @@ impl Build for Line {
     }
 }
 
+/// The most lines a `ui.paths` draws, and points each line has.
+const MOST_PATHS: usize = 500;
+const MOST_CORNERS: usize = 200;
+
+impl Build for Paths {
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &["paths", "width", "height"]];
+
+    fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
+        let paths: Vec<Polyline> = fields.get("paths")?.unwrap_or_default();
+        if paths.len() > MOST_PATHS {
+            return Err(fields
+                .cx()
+                .key("paths")
+                .fail(format!("at most {MOST_PATHS} paths")));
+        }
+        Ok(Self {
+            look: Look::from_fields(fields)?,
+            paths,
+            width: fields.number("width", PIXELS)?,
+            height: fields.number("height", PIXELS)?,
+        })
+    }
+}
+
+/// `{ points = { x1, y1, x2, y2, ... }, color, stroke, dashed, radius,
+/// arrow }`: the points in pixels, flat.
+impl Read for Polyline {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let fields = Fields::read(value, cx, &[&[
+            "points", "color", "stroke", "dashed", "radius", "arrow",
+        ]])?;
+        let flat: Vec<f32> = fields.need("points")?;
+        let points = cx.key("points");
+        if flat.len() % 2 != 0 || flat.len() < 4 {
+            return Err(
+                points.fail("points are x, y pairs, at least two of them: { x1, y1, x2, y2 }")
+            );
+        }
+        if flat.len() / 2 > MOST_CORNERS {
+            return Err(points.fail(format!("at most {MOST_CORNERS} points")));
+        }
+        if flat
+            .iter()
+            .any(|value| !value.is_finite() || value.abs() > 1e6)
+        {
+            return Err(points.fail("points are numbers of pixels"));
+        }
+        Ok(Self {
+            points: flat
+                .chunks_exact(2)
+                .map(|pair| [pair[0], pair[1]])
+                .collect(),
+            color: fields.get("color")?,
+            stroke: fields.number("stroke", 0.5..=8.0)?.unwrap_or(1.5),
+            dashed: fields.get("dashed")?.unwrap_or(false),
+            radius: fields.number("radius", 0.0..=64.0)?.unwrap_or(0.0),
+            arrow: fields.get("arrow")?,
+        })
+    }
+}
+
 impl Build for Hatch {
     const KEYS: &'static [&'static [&'static str]] =
         &[TYPE, LOOK, &["gap", "width", "height", "grow"]];

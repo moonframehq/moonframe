@@ -107,6 +107,14 @@ return style {
 			shadow = "0 6px 16px -4px #00000033, 0 1px 3px #0000001a",
 			transition = "slide-fade fast ease-out 400ms",
 		},
+		-- What follows the pointer while a row with `carry` is dragged.
+		carry = {
+			background = "card/90",
+			border = "all",
+			border_color = "accent/60",
+			radius = 8,
+			shadow = "0 12px 28px -8px #00000047, 0 2px 6px #0000001a",
+		},
 		[".sheet-title"] = { weight = "semibold", size = "large" },
 		[".muted"] = { size = "small", color = "muted-foreground" },
 		[".usage-tabs"] = { margin = { top = 4 } },

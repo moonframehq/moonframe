@@ -53,7 +53,10 @@ pub use {
     node::*,
     persist::Persist,
     read::MAX_DOCUMENT,
-    request::{APP, Appearance, Notification, Pick, PickKind, Request, SOUND_TYPES, Sound},
+    request::{
+        APP, Appearance, Edit, EditChange, Notification, Pick, PickKind, Request, SOUND_TYPES,
+        Sound, Splice,
+    },
     roots::{AppLayer, Roots, mod_name},
     style::{
         Case, Color, Corners, Curve, Font, Gradient, Look, MonoFont, Paint, Part, Resolved, Rules,

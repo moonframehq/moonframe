@@ -17,6 +17,7 @@ tokens! {
         Icon = "icon",
         Image = "image",
         Line = "line",
+        Paths = "paths",
         Hatch = "hatch",
         Terminal = "terminal",
         Browser = "browser",
