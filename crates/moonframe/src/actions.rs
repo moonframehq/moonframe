@@ -16,7 +16,9 @@ gpui_kit::actions!(moonframe, [
     BuildApp,
     CheckForUpdates,
     ToggleSlowAnimations,
-    ToggleDeveloperMode
+    ToggleDeveloperMode,
+    UndoChange,
+    RedoChange
 ]);
 
 /// Runs a shell menu item, found by its id (menu title and label).
@@ -66,6 +68,12 @@ pub(crate) fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("cmd-r", Reload, Some("MoonframeApp && developer")),
         KeyBinding::new("cmd-alt-i", Inspect, Some("MoonframeApp && developer")),
+        KeyBinding::new("cmd-alt-z", UndoChange, Some("MoonframeApp && developer")),
+        KeyBinding::new(
+            "cmd-alt-shift-z",
+            RedoChange,
+            Some("MoonframeApp && developer"),
+        ),
         KeyBinding::new(
             "cmd-shift-k",
             BrowseComponents,
@@ -91,7 +99,8 @@ pub(crate) fn bind_keys(cx: &mut App) {
 /// View, into which a shell menu called View merges, the Components menu
 /// listing `components` by category, and the shell's Window and Help.
 /// Outside Developer Mode only what the app's users need shows: no
-/// Components menu, Inspect Element, Reload Modules, or Slow Animations.
+/// Components menu, Inspect Element, Reload Modules, Undo and Redo of
+/// changes to the app's files, or Slow Animations.
 pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
     let title = crate::title();
     let mut app_items = vec![MenuItem::action(format!("About {title}"), AboutApp)];
@@ -173,6 +182,8 @@ pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
     view_items.extend([
         MenuItem::separator(),
         MenuItem::action("Reload Modules", Reload),
+        MenuItem::action("Undo Last Change", UndoChange),
+        MenuItem::action("Redo Change", RedoChange),
         MenuItem::action("Inspect Element", Inspect),
         MenuItem::action("Slow Animations", ToggleSlowAnimations).checked(crate::motion::is_slow()),
     ]);

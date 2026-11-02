@@ -32,6 +32,9 @@ Usage: moonframe [OPTIONS] [DIR]
                                          install and share mods; see `mod help`
        moonframe [--user DIR] app <COMMAND>
                                          install whole apps as profiles; see `app help`
+       moonframe [--user DIR] [--profile NAME] history [COMMAND]
+                                         undo and redo changes to your folder;
+                                         see `history help`
        moonframe init [DIR] [--name NAME] [--path CHECKOUT]
                                          start an app of your own on the Moonframe
                                          library, or add one to a crate; see `init help`
@@ -91,6 +94,8 @@ struct Args {
     packages: Option<Vec<String>>,
     /// The words after `app`, for profiles.
     apps: Option<Vec<String>>,
+    /// The words after `history`, to undo changes to the folder.
+    history: Option<Vec<String>>,
     /// The words after `init`, to start an app on the library.
     init: Option<Vec<String>>,
     /// The words after `bundle`, to bundle an app on the library.
@@ -112,6 +117,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
     let mut packages = None;
     let mut apps = None;
     let mut init = None;
+    let mut history = None;
     let mut bundle = None;
     let mut panes = None;
     let mut profile = None;
@@ -143,6 +149,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
             "mod" | "mods" if builtin.is_none() => {
                 packages = Some(args.by_ref().collect());
             },
+            "history" if builtin.is_none() => history = Some(args.by_ref().collect()),
             "init" if builtin.is_none() => init = Some(args.by_ref().collect()),
             "bundle" if builtin.is_none() => bundle = Some(args.by_ref().collect()),
             "pane" | "panes" if builtin.is_none() => panes = Some(args.by_ref().collect()),
@@ -194,6 +201,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
         component,
         packages,
         apps,
+        history,
         init,
         bundle,
         panes,
@@ -387,6 +395,9 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
             return ExitCode::from(2);
         };
         return packages::run(&own, words);
+    }
+    if let Some(words) = &args.history {
+        return crate::history::run(&folders, words);
     }
     if args.check {
         return check(folders.roots());

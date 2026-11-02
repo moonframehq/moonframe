@@ -36,6 +36,7 @@ mod demos;
 mod dock;
 mod embed;
 mod gallery;
+mod history;
 mod hosted;
 mod init;
 mod input;

@@ -827,6 +827,14 @@ Tabs open and close with the `.tabs-tab` rule's transition (see
    the user has in front, and they are usually working. Test behaviour
    with `just check`, unit tests and screenshots by PID; ask the user to try
    interactions themselves.
+6. Every change the window reloads for is kept as a snapshot of the user's
+   folder (or the profile's), whoever made it, so you need not commit as
+   you go. When the user asks to take a change back, use
+   `moonframe [--profile NAME] history undo` (`redo` to go forward again,
+   `list` and `restore ID` for an older one, `show ID` for its patch); the
+   window reloads with the files it writes back. Undo leaves
+   `settings.toml`, databases and installed packages as they are. The user
+   can do the same from View > Undo Last Change (⌥⌘Z) in Developer Mode.
 
 `just types` type-checks every `.luau` file in `app/` against
 `types/moonframe.d.luau` in strict mode (set in `app/.luaurc`). It runs in
