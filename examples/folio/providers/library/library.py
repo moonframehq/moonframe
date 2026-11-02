@@ -10,7 +10,7 @@
 #   current     the open document: { id, text, opened }. `text` is the file
 #               as it was when opened (and stays so while it is edited), so
 #               the editor never gets its own keystrokes back late; `opened`
-#               counts openings, so opening the same one again reloads it.
+#               identifies an opening across provider restarts too.
 #   folder      where the files are
 #
 # Messages (one key each):
@@ -24,7 +24,9 @@
 #
 # The folder is $XDG_DATA_HOME/moonframe/<profile>/documents (by default
 # under ~/.local/share), started with a few documents the first time. The
-# trash is its `.trash` folder; favorites are kept in `.favorites`.
+# trash is its `.trash` folder; favorites are kept in `.favorites`. Each
+# edit is journaled in `.pending` before publishing, then recovered on
+# startup if the host stopped the process before its debounced write.
 
 import json
 import os
@@ -32,7 +34,9 @@ import re
 import select
 import signal
 import sys
+import tempfile
 import time
+import uuid
 
 signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
@@ -43,6 +47,8 @@ DATA = (_xdg if _xdg.startswith("/") else HOME + "/.local/share") + "/moonframe/
 FOLDER = DATA + "/documents"
 TRASH = FOLDER + "/.trash"
 FAVORITES = FOLDER + "/.favorites"
+JOURNAL = FOLDER + "/.pending"
+SESSION = uuid.uuid4().hex
 QUIET = 0.6  # seconds without a keystroke before an edit is written
 LOOK = 30  # seconds between looks at the folder, for files changed elsewhere
 EXCERPT = 140  # characters of a document shown under its title
@@ -240,16 +246,44 @@ pending = None  # (id, text) not written yet
 typed = 0.0  # when the last edit came
 
 
+def atomic_write(path, body):
+    # Replacing a complete, synced file leaves either the previous text or
+    # the new text if the process is killed, never a truncated document.
+    fd, temporary = tempfile.mkstemp(prefix=".folio-", dir=os.path.dirname(path))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(body)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.remove(temporary)
+
+
+def recover():
+    global pending
+    try:
+        with open(JOURNAL, encoding="utf-8") as f:
+            saved = json.load(f)
+    except FileNotFoundError:
+        return
+    pending = (saved["id"], saved["text"])
+    flush()
+
+
 def flush():
     global pending
     if pending is None:
         return
     doc, body = pending
-    pending = None
     found = where(doc)
     if found:
-        with open(found[0], "w", encoding="utf-8") as f:
-            f.write(body)
+        atomic_write(found[0], body)
+    # Keep recovery available until the document has been replaced. A
+    # deleted document is deliberately not recreated by journal replay.
+    os.remove(JOURNAL)
+    pending = None
 
 
 def open_doc(doc):
@@ -259,7 +293,7 @@ def open_doc(doc):
     if not found:
         return
     opened += 1
-    current = {"id": doc, "text": read(found[0]), "opened": opened}
+    current = {"id": doc, "text": read(found[0]), "opened": "%s-%d" % (SESSION, opened)}
 
 
 def receive(line):
@@ -278,6 +312,7 @@ def receive(line):
         if isinstance(body, str) and where(doc):
             if pending and pending[0] != doc:
                 flush()
+            atomic_write(JOURNAL, encode({"id": doc, "text": body}))
             pending = (doc, body)
             typed = time.time()
     elif msg.get("new"):
@@ -307,6 +342,7 @@ def receive(line):
     elif "purge" in msg:
         found = where(msg["purge"])
         if found and found[1]:
+            flush()
             os.remove(found[0])
             if current and current["id"] == msg["purge"]:
                 current = None
@@ -321,6 +357,7 @@ def out():
 
 def main():
     ensure()
+    recover()
     last = ""
     buffer = b""
     stdin = sys.stdin.fileno()

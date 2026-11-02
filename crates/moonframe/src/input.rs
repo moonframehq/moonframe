@@ -215,18 +215,20 @@ impl Inputs {
         let mut registry = self.0.borrow_mut();
         let frame = registry.frame;
         let wiring = Wiring::of(owner, input);
-        // A field whose kind changed starts again with the text it had.
+        // A field whose kind changed keeps its text and last applied value,
+        // so an unchanged initial value cannot overwrite the carried edits.
         let carried = match registry.fields.get(key) {
             Some(field) if field.editor.other_kind(input) => {
                 let text = field.editor.value(cx).to_string();
+                let applied = field.applied.clone();
                 registry.fields.remove(key);
-                Some(text)
+                Some((text, applied))
             },
             _ => None,
         };
         if !registry.fields.contains_key(key) {
             let editor = Editor::new(input, window, cx);
-            if let Some(text) = &carried {
+            if let Some((text, _)) = &carried {
                 editor.set_value(text, window, cx);
             }
             let events = subscribe(app, &editor, key, window, cx)?;
@@ -238,7 +240,7 @@ impl Inputs {
             registry.fields.insert(key.to_owned(), Field {
                 editor,
                 wiring: wiring.clone(),
-                applied: None,
+                applied: carried.and_then(|(_, applied)| applied),
                 placeholder: None,
                 rows: None,
                 focus: false,

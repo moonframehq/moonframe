@@ -24,7 +24,7 @@ type State = {
 	lead: boolean,
 	-- What was typed in the opening `opened`, newer than the provider's copy.
 	text: string?,
-	opened: number?,
+	opened: string?,
 }
 
 local DIM_NEXT = { sentence = "paragraph", paragraph = "off", off = "sentence" }
@@ -74,6 +74,8 @@ return mod {
 			state.text = msg.value
 			state.opened = msg.opened
 			return state, { { to = "provider:library", msg = { save = { id = msg.typed, text = msg.value } } } }
+		elseif type(msg) == "table" and msg.new then
+			return state, { { to = "provider:library", msg = { new = true } } }
 		elseif what == "cycle-dim" then
 			local next = DIM_NEXT[state.dim or "off"]
 			state.dim = if next == "off" then nil else next
