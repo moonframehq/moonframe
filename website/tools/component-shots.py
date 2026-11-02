@@ -24,6 +24,8 @@ from PIL import Image, ImageChops
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 RAW = os.path.join(ROOT, "target", "components")
 OUT = os.path.join(ROOT, "website", "site", "img", "components")
+WINDOW_WIDTH = 900  # the components window's width, in points
+SCALE = 2  # the pictures are 2x; the website declares them so
 TITLE_BAR = 66  # the window's title bar, at 2x
 EDGE = 8  # the window's border and corners, at 2x
 PAD = 24  # white kept around the trimmed preview, at 2x
@@ -37,6 +39,10 @@ def names():
 
 def crop(name):
     image = Image.open(os.path.join(RAW, name + ".png")).convert("RGB")
+    # The crop is measured at 2x, and a 1x capture would show at half size.
+    scale = image.width / WINDOW_WIDTH
+    if scale != SCALE:
+        raise ValueError(f"captured at {scale:g}x; capture on a {SCALE}x (Retina) display")
     # Below the title bar, and clear of the window's edges and rounded foot.
     inside = image.crop((EDGE, TITLE_BAR, image.width - EDGE, image.height - 3 * EDGE))
     background = Image.new("RGB", inside.size, inside.getpixel((inside.width // 2, inside.height - 2)))

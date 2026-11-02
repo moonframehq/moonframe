@@ -958,15 +958,16 @@ mod tests {
                 ]),
                 Some(cwd)
             ),
-            args(&[
-                "--profile",
-                "notes",
-                "--user",
-                "/home/me/work/conf",
-                "--component",
-                "app",
-                "/home/me/work/my-app",
-            ])
+            // Joined as the platform joins them (`\` on Windows).
+            vec![
+                "--profile".into(),
+                "notes".into(),
+                "--user".into(),
+                cwd.join("conf").into_os_string(),
+                "--component".into(),
+                "app".into(),
+                cwd.join("my-app").into_os_string(),
+            ]
         );
         assert_eq!(
             relaunch_args(
