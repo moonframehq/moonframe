@@ -36,6 +36,9 @@ out: undo never changes them.";
 
 /// The history of the window's own folder, if it has one and git runs.
 pub(crate) fn open(folders: &Folders) -> Option<Arc<History>> {
+    if !cfg!(feature = "studio") {
+        return None;
+    }
     let own = folders.own()?;
     let state = paths::state(folders.profile.as_deref());
     let store = moonframe_history::store_in(state.parent()?, &own);

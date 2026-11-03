@@ -13,6 +13,9 @@ impl MoonframeApp {
     /// Shows the component `name` (or the last one, when empty) in the
     /// browser's window, opening it if it is closed.
     pub(crate) fn show_component(&mut self, name: &str, cx: &mut Context<Self>) {
+        if !cfg!(feature = "studio") {
+            return;
+        }
         if !name.is_empty() {
             self.chosen = name.to_owned();
         }

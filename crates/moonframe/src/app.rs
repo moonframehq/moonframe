@@ -5,6 +5,7 @@ use {
     crate::{
         actions::*,
         alerts::{Alerts, Posted},
+        backends::Backends,
         browser::Browsers,
         color::rgba_color,
         gallery::Gallery,
@@ -31,7 +32,6 @@ use {
         Action, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL, Sound,
         Stylesheet, Titlebar, Token, WindowRequest, WindowState, Workspace,
     },
-    moonframe_mux::Backends,
     moonframe_providers::{Event, Natives, Providers},
     notify::{RecommendedWatcher, RecursiveMode, Watcher as _},
     std::{
@@ -146,6 +146,7 @@ pub(crate) struct MoonframeApp {
     /// The app's providers, which publish data as `app.<name>`.
     pub(crate) providers: Providers,
     /// The repository of the terminal last used, which providers follow.
+    #[cfg(feature = "terminal")]
     pub(crate) project: crate::project::Project,
     /// The theme's own settings, restored when a stylesheet stops setting them.
     defaults: Defaults,
@@ -161,7 +162,7 @@ pub(crate) struct MoonframeApp {
     pub(crate) key_layers: HashMap<WindowId, Vec<KeyLayer>>,
     /// Sends keys to the topmost overlay or popover, else a focused
     /// terminal, before key bindings see them.
-    _terminal_keys: Subscription,
+    _keys: Subscription,
     /// The number of the last tab `moonframe pane new` opened, which names
     /// it: each one's is higher, even for two in the same millisecond.
     last_pane: i64,
@@ -225,8 +226,10 @@ impl MoonframeApp {
         let terminals = Terminals::new(backends, wake_on_output(cx));
         // Projects are kept only with the user's folder: `--no-user` runs
         // start fresh and keep nothing, as their state.
+        #[cfg(feature = "terminal")]
         let kept =
             (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
+        #[cfg(feature = "terminal")]
         let project = crate::project::Project::start(kept, cx);
         flush_on_quit(cx);
         let settings = folders.settings().into_iter().next();
@@ -300,13 +303,14 @@ impl MoonframeApp {
             focus,
             motion: Motion::default(),
             providers,
+            #[cfg(feature = "terminal")]
             project,
             defaults,
             main_window: window.window_handle().window_id(),
             key_layers: HashMap::new(),
             history,
             _watcher: watcher,
-            _terminal_keys: crate::terminal::intercept_keys(cx),
+            _keys: crate::keys::intercept(cx),
             last_pane: 0,
         };
         app.apply_theme(cx);
@@ -377,6 +381,7 @@ impl MoonframeApp {
             None => {},
         }
         Theme::change(mode, None, cx);
+        #[cfg(feature = "terminal")]
         self.terminals.set_palette(scheme.map(Scheme::palette));
         let sheet: &Stylesheet = self.workspace.stylesheet();
         let theme = Theme::global_mut(cx);

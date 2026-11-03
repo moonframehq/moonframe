@@ -16,11 +16,13 @@ pub(crate) mod images;
 mod input;
 mod keyed;
 mod list;
+#[cfg(feature = "markdown")]
 mod markdown;
 mod plot;
 mod pointer;
 mod popover;
 mod styling;
+#[cfg(feature = "terminal")]
 mod terminal;
 mod view;
 mod viewer;
@@ -246,6 +248,7 @@ pub(crate) struct Painter<'w, 'm> {
     /// inspecting: the highlight follows its corners.
     radii: RefCell<HashMap<String, moonframe_core::Corners>>,
     /// The shells terminals show.
+    #[cfg_attr(not(feature = "terminal"), allow(dead_code))]
     terminals: &'m mut Terminals,
     /// The text input fields edit.
     inputs: Inputs,
@@ -689,11 +692,17 @@ fn draw_node<'w>(
         Node::Line(line) => line.draw(painter, place, cx),
         Node::Paths(paths) => paths.draw(painter, place, cx),
         Node::Hatch(hatch) => hatch.draw(painter, place, cx),
+        #[cfg(feature = "terminal")]
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
+        #[cfg(not(feature = "terminal"))]
+        Node::Terminal(_) => broken("this build has no terminal support", place, cx),
         Node::Browser(browser) => browser.draw(painter, place, cx),
         Node::View(view) => view.draw(painter, place, cx),
         Node::Input(input) => input.draw(painter, place, cx),
+        #[cfg(feature = "markdown")]
         Node::Markdown(markdown) => markdown.draw(painter, place, cx),
+        #[cfg(not(feature = "markdown"))]
+        Node::Markdown(_) => broken("this build has no Markdown support", place, cx),
         Node::Region(region) => region.draw(painter, place, cx),
         Node::Divider => elements::divider(painter, place, cx),
         Node::Spacer => div().flex_1().into_any_element(),

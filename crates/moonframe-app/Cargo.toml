@@ -17,7 +17,7 @@ path = "src/main.rs"
 
 [features]
 # Every terminal emulator the library has; `ghostty` needs Zig.
-default = ["moonframe/ghostty"]
+default = ["moonframe/default", "moonframe/ghostty"]
 
 [dependencies]
-moonframe.workspace = true
+moonframe = { default-features = false, path = "../moonframe" }

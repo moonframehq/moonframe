@@ -64,6 +64,7 @@ impl Render for MoonframeApp {
             });
         }
         // The panels follow the project of the terminal last typed in.
+        #[cfg(feature = "terminal")]
         if let Some(folder) = self.terminals.focused_folder(window) {
             self.project.follow(folder);
         }

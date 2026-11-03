@@ -66,6 +66,7 @@ pub(crate) fn host_app(source: &AppSource) -> PathBuf {
 /// neither a bundle nor a checkout of this repository.
 #[derive(RustEmbed)]
 #[folder = "../../app"]
+#[cfg_attr(feature = "sealed", exclude = "**/*")]
 #[exclude = "providers/*/target/*"]
 #[exclude = "providers/*/Cargo.lock"]
 #[exclude = ".DS_Store"]
@@ -75,6 +76,9 @@ pub(crate) struct Toolbox;
 /// The toolbox's folder in this checkout, when the binary runs where it
 /// was built: edits to it then show live.
 pub(crate) fn toolbox_source() -> Option<PathBuf> {
+    if cfg!(feature = "sealed") {
+        return None;
+    }
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
     source
         .join("components")
@@ -205,6 +209,14 @@ impl Fnv {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "sealed")]
+    #[test]
+    fn sealed_builds_embed_no_fallback_toolbox() {
+        assert!(Toolbox::iter().next().is_none());
+        assert!(toolbox_source().is_none());
+    }
+
+    #[cfg(not(feature = "sealed"))]
     #[test]
     fn the_toolbox_is_written_once_and_whole() {
         let cache = tempfile::tempdir().unwrap();

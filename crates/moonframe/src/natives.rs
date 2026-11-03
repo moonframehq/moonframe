@@ -20,6 +20,7 @@ pub(crate) fn natives() -> Natives {
         ("acp", acp),
         ("chat", chat),
         // The demo gallery's (examples/demo): it opens apps on this binary.
+        #[cfg(feature = "studio")]
         ("demos", crate::demos::native),
         ("docs", docs),
         ("git", git),
@@ -179,7 +180,7 @@ mod tests {
     fn every_built_in_native_is_registered() {
         let natives = natives();
         for name in [
-            "acp", "chat", "demos", "docs", "git", "github", "gitlab", "shell", "usage",
+            "acp", "chat", "docs", "git", "github", "gitlab", "shell", "usage",
         ] {
             assert!(natives.contains_key(name), "{name}");
         }
