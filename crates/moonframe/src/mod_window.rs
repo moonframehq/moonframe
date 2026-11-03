@@ -102,6 +102,9 @@ impl Render for ModWindow {
             .font_family(theme.font_family.clone())
             .text_size(theme.font_size)
             .child(content)
+            // Covers its videos, as the main window's presenter does.
+            .child(crate::browser::presenter(Vec::new()))
+            .child(crate::video::sweep())
     }
 }
 
@@ -155,6 +158,7 @@ mod tests {
         let asked = ModWindowSize {
             size: None,
             min_size: Some((640., 480.)),
+            ..Default::default()
         };
         assert_eq!(fitted(asked, None), ((640., 560.), (640., 480.)));
         assert_eq!(
@@ -164,6 +168,7 @@ mod tests {
         let tall = ModWindowSize {
             size: None,
             min_size: Some((300., 700.)),
+            ..Default::default()
         };
         assert_eq!(fitted(tall, None), ((420., 700.), (300., 700.)));
         // A screen smaller than the minimum still limits both sizes.
@@ -180,6 +185,7 @@ mod tests {
         let asked = ModWindowSize {
             size: Some((860., 600.)),
             min_size: Some((640., 480.)),
+            ..Default::default()
         };
         assert_eq!(
             fitted(asked, Some((1920., 1080.))),
@@ -194,6 +200,7 @@ mod tests {
         let small = ModWindowSize {
             size: Some((240., 200.)),
             min_size: None,
+            ..Default::default()
         };
         assert_eq!(fitted(small, None), ((240., 200.), (240., 200.)));
     }

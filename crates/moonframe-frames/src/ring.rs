@@ -58,7 +58,7 @@ impl Drop for Mapping {
 
 impl Mapping {
     fn atomic(&self, offset: usize) -> &AtomicU64 {
-        debug_assert!(offset % 8 == 0 && offset + 8 <= self.size);
+        debug_assert!(offset.is_multiple_of(8) && offset + 8 <= self.size);
         // SAFETY: in the mapping, and 8-byte aligned: the mapping starts on
         // a page, and every offset used is a multiple of 8.
         unsafe { &*self.start.add(offset).cast::<AtomicU64>() }
@@ -128,13 +128,23 @@ fn map(descriptor: libc::c_int, size: usize, writable: bool) -> io::Result<Mappi
     })
 }
 
-/// The size of the memory behind `descriptor`.
-fn size_of(descriptor: libc::c_int) -> io::Result<usize> {
+/// The size of the memory behind `descriptor`, once it proves to be this
+/// user's alone. Names in shared memory are one namespace for the whole
+/// machine, so another user could otherwise make a ring first and have
+/// their pixels taken for the engine's.
+fn own_size(descriptor: libc::c_int) -> io::Result<usize> {
     // SAFETY: `fstat` fills the zeroed struct it is given.
     let mut stat: libc::stat = unsafe { std::mem::zeroed() };
     // SAFETY: as above.
     if unsafe { libc::fstat(descriptor, &raw mut stat) } != 0 {
         return Err(io::Error::last_os_error());
+    }
+    // SAFETY: takes nothing and cannot fail.
+    if stat.st_uid != unsafe { libc::geteuid() } {
+        return Err(invalid("a ring another user made"));
+    }
+    if u32::from(stat.st_mode) & 0o077 != 0 {
+        return Err(invalid("a ring other users can reach"));
     }
     usize::try_from(stat.st_size).map_err(io::Error::other)
 }
@@ -148,7 +158,10 @@ pub struct Reader {
 
 impl Reader {
     /// Opens the ring `name`. It fails until the writer made one; refuses
-    /// memory that isn't a ring, or says it is larger than it is.
+    /// memory that isn't this user's, isn't a ring, or says it is larger
+    /// than it is. The writer is trusted not to shrink the memory while
+    /// it is mapped, which would crash this process; only the user's own
+    /// programs can reach it.
     pub fn open(name: &str) -> io::Result<Self> {
         let path = path(name)?;
         // SAFETY: `path` is a valid C string.
@@ -156,7 +169,7 @@ impl Reader {
         if descriptor < 0 {
             return Err(io::Error::last_os_error());
         }
-        let size = match size_of(descriptor) {
+        let size = match own_size(descriptor) {
             Ok(size) if size >= HEADER => size,
             Ok(_) => {
                 // SAFETY: the descriptor is ours.
@@ -184,7 +197,7 @@ impl Reader {
         if slots == 0
             || slots > MAX_SLOTS
             || slot_size <= SLOT_HEADER
-            || slot_size % 8 != 0
+            || !slot_size.is_multiple_of(8)
             || !fits
         {
             return Err(invalid("a ring's header that does not add up"));
@@ -332,8 +345,8 @@ impl Writer {
         if pixels.len() > self.slot_size - SLOT_HEADER {
             return Err(invalid("a frame larger than its slot"));
         }
-        let stride = u32::try_from(width as usize * format.bytes_per_pixel())
-            .map_err(io::Error::other)?;
+        let stride =
+            u32::try_from(width as usize * format.bytes_per_pixel()).map_err(io::Error::other)?;
         if stride as usize * height as usize != pixels.len() {
             return Err(invalid("pixels that aren't width by height"));
         }
@@ -374,7 +387,7 @@ impl Drop for Writer {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, unsafe_code)]
 mod tests {
     use super::*;
 
@@ -454,6 +467,22 @@ mod tests {
                 .write(9, 9, Format::Rgba8, Pattern::Rggb, 0, &[0; 8])
                 .is_err()
         );
+    }
+
+    #[test]
+    fn a_ring_other_users_can_reach_is_refused() {
+        let name = name("open");
+        let writer = Writer::create(&name, 1, 8).unwrap();
+        // SAFETY: a valid C string and mode, widened as `fchmod` takes it.
+        unsafe {
+            let descriptor = libc::shm_open(writer.name.as_ptr(), libc::O_RDWR, 0);
+            assert!(descriptor >= 0);
+            if libc::fchmod(descriptor, 0o666) == 0 {
+                let opened = Reader::open(&name);
+                assert!(opened.is_err());
+            }
+            libc::close(descriptor);
+        }
     }
 
     #[test]

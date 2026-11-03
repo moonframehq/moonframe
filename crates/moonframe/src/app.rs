@@ -231,7 +231,9 @@ impl MoonframeApp {
             (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
         crate::project::restore(kept.as_deref());
         let providers = start_providers(&workspace, parts.natives, cx);
-        let views = Views::new(parts.views, deliver_from_views(cx));
+        let messages = deliver_from_views(cx);
+        crate::video::deliver_to(messages.clone());
+        let views = Views::new(parts.views, messages);
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         bind_menu_keys(workspace.menus(), cx);
@@ -694,7 +696,8 @@ impl MoonframeApp {
 
     /// Shares the window's state with the views as `app.window`.
     fn sync_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.workspace.set_window(window_state(self.chrome, window, cx));
+        self.workspace
+            .set_window(window_state(self.chrome, window, cx));
         cx.notify();
     }
 

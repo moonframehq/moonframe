@@ -218,7 +218,9 @@ impl Manifest {
             _ => {},
         }
         if file.socket.is_some() && !matches!(kind, Kind::Socket { .. }) {
-            return Err(problem("only a socket provider takes a `socket`".to_owned()));
+            return Err(problem(
+                "only a socket provider takes a `socket`".to_owned(),
+            ));
         }
         if !matches!(kind, Kind::Process { .. } | Kind::Socket { .. })
             && !(file.urgent.is_empty() && file.latest.is_empty())
@@ -233,7 +235,9 @@ impl Manifest {
             ));
         }
         if file.stop_grace.is_some() && !matches!(kind, Kind::Process { .. }) {
-            return Err(problem("only a process provider takes a `stop-grace`".to_owned()));
+            return Err(problem(
+                "only a process provider takes a `stop-grace`".to_owned(),
+            ));
         }
         let stop_grace = file.stop_grace.unwrap_or(STOP_GRACE);
         if !(0.0..=MAX_STOP_GRACE).contains(&stop_grace) {

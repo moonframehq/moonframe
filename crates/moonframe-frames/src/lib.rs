@@ -32,12 +32,12 @@ mod format;
 mod ring;
 mod tone;
 
+#[cfg(unix)]
+pub use ring::{FrameInfo, Reader, Writer};
 pub use {
     format::{Format, Pattern},
     tone::Tone,
 };
-#[cfg(unix)]
-pub use ring::{FrameInfo, Reader, Writer};
 
 /// A source's longest name: macOS allows 31 bytes with the leading `/`.
 pub const MAX_NAME: usize = 30;

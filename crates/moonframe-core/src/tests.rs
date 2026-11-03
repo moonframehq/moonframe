@@ -27,6 +27,7 @@ mod styles;
 mod switchyard;
 mod task_manager;
 mod topics;
+mod video;
 mod views;
 // keep-sorted end
 

@@ -504,6 +504,20 @@ pub(crate) fn cover() -> impl IntoElement {
     .inset_0()
 }
 
+/// What floats over the layout of the window `id` this frame, so far as
+/// its elements have laid out: all of it once painting starts.
+#[cfg(all(feature = "video", target_os = "macos"))]
+pub(crate) fn covers(id: WindowId) -> Vec<Bounds<Pixels>> {
+    COVERS.with(|covers| {
+        covers
+            .borrow()
+            .iter()
+            .filter(|(window, _)| *window == id)
+            .map(|(_, bounds)| *bounds)
+            .collect()
+    })
+}
+
 /// Shows each of `pages` drawn this frame where it drew, unless something
 /// covers it, and hides the rest. It draws nothing; put it anywhere in the
 /// window that has the pages, which it reads once every element has laid

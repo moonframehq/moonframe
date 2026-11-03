@@ -65,6 +65,11 @@ mod settings;
 mod terminal;
 mod theme_picker;
 mod themes;
+#[cfg(all(feature = "video", target_os = "macos"))]
+mod video;
+#[cfg(not(all(feature = "video", target_os = "macos")))]
+#[path = "video_left_out.rs"]
+mod video;
 
 #[cfg(feature = "tokio")]
 pub use moonframe_providers::{AsyncNative, on_runtime, runtime, tokio};

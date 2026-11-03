@@ -77,7 +77,10 @@ impl MoonframeApp {
         }
         guard.waiting = Some((closing, first));
         let (owner, reply) = (guard.owner.clone(), guard.reply.clone());
-        let msg = with_fields(&reply, [("closing".to_owned(), Data::from(closing.name()))].into());
+        let msg = with_fields(
+            &reply,
+            [("closing".to_owned(), Data::from(closing.name()))].into(),
+        );
         self.workspace.send("app:guard", &owner, msg);
         self.flush("app", cx);
         true

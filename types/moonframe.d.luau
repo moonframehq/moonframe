@@ -1047,6 +1047,52 @@ type ListProps = {
 	float: Float?,
 }
 
+-- A rectangle or line the host draws in a `ui.video`, in fractions of the
+-- picture; a line has no `width` or no `height`.
+type VideoGuide = {
+	x: number,
+	y: number,
+	width: number?,
+	height: number?,
+	-- #rrggbb or #rrggbbaa.
+	color: string?,
+}
+
+-- `ui.video { source = "camera" }`: frames from a ring in shared memory.
+type VideoProps = {
+	class: Class?,
+	style: Style?,
+	state: string?,
+	source: string,
+	id: string?,
+	-- Device pixels per picture pixel, 1 being 100 %; nil fits it.
+	zoom: number?,
+	center: { number }?,
+	filter: ("auto" | "nearest" | "linear")?,
+	color: ("srgb" | "display-p3" | "rec709" | "rec2020" | "linear-srgb" | "linear-p3" | "none")?,
+	extended: boolean?,
+	-- Code values, then what multiplies and encodes them, in this order.
+	black: number?,
+	white: number?,
+	gain: number?,
+	gamma: number?,
+	guides: { VideoGuide }?,
+	-- A point to read, in fractions of the box, as `pointer` gives it.
+	probe: { number }?,
+	-- Sent each second with `fps`, `shown`, `skipped`, `latency`, `live`,
+	-- `width`, `height`, `format`, `frame`, `fit` and `density` added.
+	stats: Data?,
+	-- Sent with `x`, `y`, `source`, `display` and `channel`? added.
+	probed: Data?,
+	width: number?,
+	height: number?,
+	tooltip: string?,
+	context: Data?,
+	copy: string?,
+	to: string?,
+	[number]: string,
+}
+
 -- Where a `ui.map` gets its tiles. `openstreetmap` and the `carto-*` maps
 -- need no key; the others need the provider's API key in `key`.
 type MapProvider =
@@ -1140,6 +1186,7 @@ declare ui: {
 	map: (props: MapProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,
 	browser: (props: string | BrowserProps) -> Element,
+	video: (props: string | VideoProps) -> Element,
 	view: (props: string | ViewProps) -> Element,
 	input: (props: InputProps) -> Element,
 	markdown: (props: string | MarkdownProps) -> Element,

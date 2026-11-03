@@ -51,15 +51,12 @@ pub(super) fn window(msg: &Data) -> Result<WindowRequest, Error> {
         Data::Map(fields) => fields,
         _ => return Err(fail(usage)),
     };
-    if let Some(key) = fields
-        .keys()
-        .find(|key| {
-            !matches!(
-                key.as_str(),
-                "open" | "send" | "close" | "display" | "fullscreen"
-            )
-        })
-    {
+    if let Some(key) = fields.keys().find(|key| {
+        !matches!(
+            key.as_str(),
+            "open" | "send" | "close" | "display" | "fullscreen"
+        )
+    }) {
         return Err(fail(&format!(
             "unknown key `{key}`; it takes open, send, display, fullscreen and close"
         )));
@@ -91,7 +88,10 @@ pub(super) fn window(msg: &Data) -> Result<WindowRequest, Error> {
         (None, Some(close)) if !fields.contains_key("send") && place.is_none() => {
             Ok(WindowRequest::Close(name(close)?))
         },
-        (None, Some(_)) => Err(fail("`send`, `display` and `fullscreen` go with `open`")),
+        (None, Some(_)) if place.is_some() => {
+            Err(fail("`display` and `fullscreen` go with `open`"))
+        },
+        (None, Some(_)) => Err(fail("`send` goes with `open`")),
         (Some(_), Some(_)) => Err(fail("takes `open` or `close`, not both")),
         (None, None) => Err(fail(usage)),
     }

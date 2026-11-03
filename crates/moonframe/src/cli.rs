@@ -379,6 +379,9 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         // Terminals start here, and the explorer shows its project.
         moonframe_providers::set_launch_dir(&dir);
     }
+    if let Some(resources) = paths::resources() {
+        moonframe_providers::set_payload(&resources.join("payload"));
+    }
     let host = launch.app.as_ref().filter(|_| launch.identity.hosted);
     if launch.identity.hosted && host.is_none() {
         eprintln!("{name}: the app names no folder: call `Moonframe::app_dir` or `embedded_app`");
@@ -533,7 +536,8 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
             crate::actions::bind_keys(cx);
             cx.set_menus(crate::actions::menus(&[]));
             cx.on_action(|_: &crate::actions::Quit, cx| crate::app::guard::quit(cx));
-            cx.on_window_closed(|cx, _| {
+            cx.on_window_closed(|cx, id| {
+                crate::video::window_closed(id);
                 if cx.windows().is_empty() {
                     cx.quit();
                 }

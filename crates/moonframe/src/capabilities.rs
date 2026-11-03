@@ -32,6 +32,7 @@ fn compiled() -> std::collections::BTreeMap<String, bool> {
         "tokio",
         "updates",
         "usage",
+        "video",
         "wasm",
         // keep-sorted end
     ]

@@ -42,6 +42,7 @@ default = [
   "tokio",
   "updates",
   "usage",
+  "video",
   "wasm",
   # keep-sorted end
 ]
@@ -66,6 +67,7 @@ terminal   = ["moonframe/terminal"]
 tokio      = ["moonframe/tokio"]
 updates    = ["moonframe/updates"]
 usage      = ["moonframe/usage"]
+video      = ["moonframe/video"]
 wasm       = ["moonframe/wasm"]
 # keep-sorted end
 # A separate developer app. Its catalog and sources never enter the starter

@@ -41,7 +41,8 @@ Features: `acp`, `alacritty`, `browser`, `chat`, `docs`, `forge`, `git`,
 `herdr-core`, `markdown`, `prose`, `shell`, `studio`, `tokio`, `updates`, `usage` and
 `wasm` by default. `ghostty` (a second terminal emulator, built from Ghostty's
 source with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`, and
-so is `map` (`ui.map` street maps), which few apps need.
+so are `map` (`ui.map` street maps) and `video` (`ui.video`), which few apps
+need.
 
 An app that needs none of git, the markdown editor or kept terminals can
 leave them out, and with them the herdr-gpui crates they build on:
@@ -76,6 +77,7 @@ ship only their selected components.
 | `terminal` | Terminal rendering, local PTYs and tmux; choose an engine below to run a shell. |
 | `alacritty`, `ghostty` | Each enables `terminal` and its respective emulator. |
 | `herdr-core` | herdr-core state storage and, with `terminal`, persistent terminals. |
+| `video` | `ui.video`: live frames from another process in a 16-bit, colour-managed Metal view (macOS). Off by default. See [Live video](video.md). |
 | `map` | `ui.map` street maps: tiles from OpenStreetMap and other listed providers, pins, and routes along streets, fetched over HTTP. Off by default. |
 | `markdown` | Rich `ui.markdown` rendering (headings, lists, tables, links and code). |
 | `prose` | The writing editor for `ui.input` with `prose`, `dim` or `typewriter`. Ordinary single-line and multiline inputs remain available without it. |

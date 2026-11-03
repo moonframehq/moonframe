@@ -65,6 +65,9 @@ herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
 # default, as few apps need one; the starter turns it on, and so do sealed
 # apps whose Luau uses `ui.map`.
 map = ["dep:ureq"]
+# `ui.video`: frames from another process in a Metal view of their own,
+# 16-bit and colour managed (macOS). Off by default: few apps need it.
+video = ["dep:core-graphics-types", "dep:metal", "dep:moonframe-frames", "dep:raw-window-handle"]
 # Rich read-only Markdown and the long-form writing editor are independent.
 markdown = []
 prose    = []
@@ -122,6 +125,10 @@ ureq                          = { optional = true, workspace = true }
 tempfile.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
+core-graphics-types = { optional = true, workspace = true }
+metal               = { optional = true, workspace = true }
+moonframe-frames    = { optional = true, workspace = true }
+raw-window-handle   = { optional = true, workspace = true }
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
 block2.workspace           = true
 objc2.workspace            = true

@@ -81,10 +81,7 @@ fn serve(context: &Context, stream: UnixStream, reporter: &mut Reporter) -> bool
     let outbox = std::sync::Arc::new(Outbox::new(&context.manifest));
     outbox.push(&Message {
         from: String::new(),
-        data: Data::Map(BTreeMap::from([(
-            "connected".to_owned(),
-            Data::Bool(true),
-        )])),
+        data: Data::Map(BTreeMap::from([("connected".to_owned(), Data::Bool(true))])),
     });
     let (ended, end) = mpsc::channel();
     let publisher = Publisher::of(context);

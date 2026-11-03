@@ -177,12 +177,7 @@ impl Read for ModWindowSize {
                 "titlebar and traffic_lights: only the shell (main.luau) sets them; a mod's `window` takes size, min_size, display and fullscreen",
             ));
         }
-        let fields = Fields::read(value, cx, &[&[
-            "size",
-            "min_size",
-            "display",
-            "fullscreen",
-        ]])?;
+        let fields = Fields::read(value, cx, &[&["size", "min_size", "display", "fullscreen"]])?;
         let pair = |key: &str| -> Result<Option<(f32, f32)>, Error> {
             let Some(value) = fields.raw(key) else {
                 return Ok(None);
@@ -207,9 +202,8 @@ impl Read for ModWindowSize {
         }
         let display = match fields.raw("display") {
             None => None,
-            Some(mlua::Value::String(name)) => Some(name.to_string_lossy().to_string()).and_then(
-                |name| Display::from_data(&Data::String(name)),
-            ),
+            Some(mlua::Value::String(name)) => Some(name.to_string_lossy().to_string())
+                .and_then(|name| Display::from_data(&Data::String(name))),
             Some(mlua::Value::Integer(id)) => Display::from_data(&Data::Integer(*id)),
             Some(_) => None,
         };

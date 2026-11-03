@@ -39,6 +39,10 @@ fn serve(context: &Context) -> Result<(), String> {
         // Which app it serves, to keep state of its own per app.
         child.env("MOONFRAME_PROFILE", profile);
     }
+    if let Some(dir) = crate::PAYLOAD.get() {
+        // What the bundle carries for it: a Python, an engine.
+        child.env("MOONFRAME_PAYLOAD", dir);
+    }
     if let Some(dir) = crate::launch_dir() {
         // Where the app was started, for one that shows that project.
         child.env("MOONFRAME_LAUNCH_DIR", dir);

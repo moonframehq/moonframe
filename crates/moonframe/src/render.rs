@@ -26,6 +26,7 @@ mod popover;
 mod styling;
 #[cfg_attr(not(feature = "terminal"), path = "render/terminal_left_out.rs")]
 mod terminal;
+mod video;
 mod view;
 mod viewer;
 
@@ -700,6 +701,7 @@ fn draw_node<'w>(
         Node::Map(map) => map.draw(painter, place, cx),
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
         Node::Browser(browser) => browser.draw(painter, place, cx),
+        Node::Video(video) => video.draw(painter, place, cx),
         Node::View(view) => view.draw(painter, place, cx),
         Node::Input(input) => input.draw(painter, place, cx),
         Node::Markdown(markdown) => markdown.draw(painter, place, cx),

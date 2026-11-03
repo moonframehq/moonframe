@@ -54,8 +54,8 @@ pub use {
     persist::Persist,
     read::MAX_DOCUMENT,
     request::{
-        APP, Appearance, Edit, EditChange, Guard, Notification, Pick, PickKind, Request, SOUND_TYPES,
-        Sound, Splice, WindowRequest,
+        APP, Appearance, Edit, EditChange, Guard, Notification, Pick, PickKind, Request,
+        SOUND_TYPES, Sound, Splice, WindowRequest,
     },
     roots::{AppLayer, Roots, mod_name},
     style::{

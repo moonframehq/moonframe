@@ -130,8 +130,8 @@ fn a_window_can_ask_for_a_screen_and_to_fill_it() {
         Request::Window(WindowRequest::Open {
             name: "settings".to_owned(),
             send: None,
-            place: Some(crate::WindowPlace {
-                display: Some(crate::Display::External),
+            place: Some(WindowPlace {
+                display: Some(Display::External),
                 fullscreen: true,
             }),
         })
@@ -251,7 +251,7 @@ fn a_mod_says_the_size_of_its_window() {
         Some(crate::ModWindowSize {
             size: Some((860., 600.)),
             min_size: Some((640., 480.)),
-            place: crate::WindowPlace::default(),
+            place: WindowPlace::default(),
         })
     );
     let meta = workspace.slot("asker").unwrap().meta().unwrap();

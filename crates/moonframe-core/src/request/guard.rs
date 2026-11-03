@@ -32,7 +32,8 @@ pub enum Guard {
 /// `{ release = true }`.
 pub(super) fn guard(msg: &Data) -> Result<Guard, Error> {
     let fail = |problem: &str| Error::new(format!("`{APP}guard`: {problem}"));
-    let usage = "takes { hold = <msg>, timeout = <seconds> }, { hold = false } or { release = true }";
+    let usage =
+        "takes { hold = <msg>, timeout = <seconds> }, { hold = false } or { release = true }";
     let Data::Map(fields) = msg else {
         return Err(fail(usage));
     };

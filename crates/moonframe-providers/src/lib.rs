@@ -164,10 +164,7 @@ pub struct Newest(Arc<Mutex<Option<Data>>>);
 impl Newest {
     /// Takes it, if a publish left any.
     pub fn take(&self) -> Option<Data> {
-        self.0
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .take()
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).take()
     }
 
     /// Keeps `data` over what was there; whether that was nothing, so
@@ -233,6 +230,17 @@ pub fn set_profile(name: &str) {
 /// state of its own per app.
 pub fn profile() -> Option<&'static str> {
     PROFILE.get().map(String::as_str)
+}
+
+/// The folder of what a bundled app carries besides itself, which process
+/// providers see as `MOONFRAME_PAYLOAD`; set once at launch.
+static PAYLOAD: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Tells process providers where the bundle's `payload` folder is.
+pub fn set_payload(dir: &Path) {
+    if dir.is_dir() {
+        let _ = PAYLOAD.set(dir.to_owned());
+    }
 }
 
 /// The folder the app was started from, which process providers see as

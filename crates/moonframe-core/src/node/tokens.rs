@@ -22,6 +22,7 @@ tokens! {
         Map = "map",
         Terminal = "terminal",
         Browser = "browser",
+        Video = "video",
         View = "view",
         Input = "input",
         Markdown = "markdown",

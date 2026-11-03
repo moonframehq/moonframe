@@ -18,9 +18,12 @@ mod map;
 mod pointer;
 mod read;
 mod tokens;
+mod video;
 // keep-sorted end
 
-pub use {embed::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*, tokens::*};
+pub use {
+    embed::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*, tokens::*, video::*,
+};
 
 pub(crate) use read::read;
 
@@ -42,6 +45,8 @@ pub enum Node {
     Map(Map),
     Terminal(Terminal),
     Browser(Browser),
+    /// Frames from another process, from a ring in shared memory.
+    Video(Video),
     /// A view the app writes in Rust, by name.
     View(View),
     Input(Input),
