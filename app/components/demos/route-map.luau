@@ -49,8 +49,10 @@ return mod {
 		if msg.provider then
 			state.provider = msg.provider
 		elseif msg.join then
-			state.join = msg.join
-			state.minutes = {}
+			if state.join ~= msg.join then
+				state.join = msg.join
+				state.minutes = {}
+			end
 		elseif msg.marker then
 			state.marker = msg.marker
 		elseif msg.stop then

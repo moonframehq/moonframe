@@ -85,6 +85,8 @@ pub(super) fn has_retina(provider: MapProvider) -> bool {
 
 /// What is known of a tile this run.
 enum State {
+    /// Available as a stand-in, but not yet checked for freshness.
+    Unchecked(PathBuf),
     Waiting,
     Ready(PathBuf),
     Failed(Instant),
@@ -118,7 +120,15 @@ fn shared() -> std::sync::MutexGuard<'static, Shared> {
 /// The file to show for `tile`, if there is one yet; asks for it (in the
 /// background) when it is missing or old. `key` is the provider's API key.
 pub(super) fn tile(tile: &Tile, key: Option<&str>) -> Option<PathBuf> {
-    let mut shared = shared();
+    tile_in(&mut shared(), tile, key, || tile.file())
+}
+
+fn tile_in(
+    shared: &mut Shared,
+    tile: &Tile,
+    key: Option<&str>,
+    file: impl FnOnce() -> PathBuf,
+) -> Option<PathBuf> {
     match shared.tiles.get(tile) {
         Some(State::Ready(path)) => return Some(path.clone()),
         Some(State::Waiting) => {
@@ -128,7 +138,7 @@ pub(super) fn tile(tile: &Tile, key: Option<&str>) -> Option<PathBuf> {
         Some(State::Failed(at)) if at.elapsed() < RETRY => return None,
         _ => {},
     }
-    let file = tile.file();
+    let file = file();
     let modified = std::fs::metadata(&file)
         .and_then(|metadata| metadata.modified())
         .ok();
@@ -146,14 +156,14 @@ pub(super) fn tile(tile: &Tile, key: Option<&str>) -> Option<PathBuf> {
         },
         // Old: shown while the server says whether it changed.
         Some(_) => {
-            ask(&mut shared, tile, key, modified);
+            ask(shared, tile, key, modified);
             shared
                 .tiles
                 .insert(tile.clone(), State::Ready(file.clone()));
             Some(file)
         },
         None => {
-            ask(&mut shared, tile, key, None);
+            ask(shared, tile, key, None);
             None
         },
     }
@@ -163,19 +173,25 @@ pub(super) fn tile(tile: &Tile, key: Option<&str>) -> Option<PathBuf> {
 /// any age, without asking for it: what a coarser zoom can show while
 /// finer tiles arrive.
 pub(super) fn ready(tile: &Tile) -> Option<PathBuf> {
-    let mut shared = shared();
+    ready_in(&mut shared(), tile, || tile.file())
+}
+
+fn ready_in(shared: &mut Shared, tile: &Tile, file: impl FnOnce() -> PathBuf) -> Option<PathBuf> {
     match shared.tiles.get(tile) {
-        Some(State::Ready(path)) => return Some(path.clone()),
+        Some(State::Ready(path) | State::Unchecked(path)) => return Some(path.clone()),
         Some(State::Waiting | State::Failed(_)) => return None,
         None => {},
     }
-    let file = tile.file();
+    let file = file();
     if !file.is_file() {
         return None;
     }
+    // Availability is not freshness: a stand-in may be years old. Leave
+    // it unchecked so a later `tile` call still revalidates it, without
+    // statting the same stand-in on every animation frame meanwhile.
     shared
         .tiles
-        .insert(tile.clone(), State::Ready(file.clone()));
+        .insert(tile.clone(), State::Unchecked(file.clone()));
     Some(file)
 }
 
@@ -405,5 +421,50 @@ mod tests {
         );
         assert!(!has_retina(MapProvider::OpenStreetMap));
         assert!(has_retina(MapProvider::CartoLight));
+    }
+
+    #[test]
+    fn an_old_stand_in_is_still_revalidated_when_requested()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let folder = tempfile::tempdir()?;
+        let file = folder.path().join("tile.png");
+        std::fs::write(&file, b"cached tile")?;
+        let old = SystemTime::now() - FRESH * 2;
+        std::fs::File::options()
+            .write(true)
+            .open(&file)?
+            .set_modified(old)?;
+        let modified = std::fs::metadata(&file)?.modified()?;
+        let tile = Tile {
+            provider: MapProvider::OpenStreetMap,
+            retina: false,
+            z: 1,
+            x: 0,
+            y: 0,
+        };
+        // Inspect the queue without starting workers or reaching the network.
+        let mut shared = Shared {
+            started: true,
+            ..Shared::default()
+        };
+        assert_eq!(
+            ready_in(&mut shared, &tile, || file.clone()),
+            Some(file.clone())
+        );
+        assert_eq!(
+            tile_in(&mut shared, &tile, None, || file.clone()),
+            Some(file.clone())
+        );
+        assert_eq!(
+            shared.queue.front(),
+            Some(&(tile.clone(), None, Some(modified)))
+        );
+        // The stale copy stays visible; drawing again must not queue a duplicate.
+        assert_eq!(
+            tile_in(&mut shared, &tile, None, || file.clone()),
+            Some(file)
+        );
+        assert_eq!(shared.queue.len(), 1);
+        Ok(())
     }
 }

@@ -58,7 +58,37 @@ impl Frame {
     /// Where `lat`, `lon` lands in the box, in pixels from its corner.
     pub(super) fn at(&self, lat: f64, lon: f64) -> (f32, f32) {
         let (x, y) = world(lat, lon);
-        self.at_world(x, y)
+        self.at_world(near(x, self.center.0), y)
+    }
+
+    /// Unwrap a route one segment at a time. Wrapping every corner around
+    /// the center independently would draw a line across the whole map
+    /// when a segment crosses the opposite meridian.
+    pub(super) fn route(&self, places: &[[f64; 2]]) -> Vec<(f32, f32)> {
+        let mut previous = self.center.0;
+        places
+            .iter()
+            .map(|&[lat, lon]| {
+                let (x, y) = world(lat, lon);
+                let x = near(x, previous);
+                previous = x;
+                self.at_world(x, y)
+            })
+            .collect()
+    }
+
+    /// World copies of a pin or unwrapped route that intersect the box,
+    /// including its marker/stroke padding. Low zooms can show several.
+    pub(super) fn copies(
+        &self,
+        left: f32,
+        right: f32,
+        padding: f32,
+    ) -> std::ops::RangeInclusive<i64> {
+        let span = self.span();
+        let first = ((-f64::from(padding) - f64::from(right)) / span).ceil() as i64;
+        let last = ((self.size.0 + f64::from(padding) - f64::from(left)) / span).floor() as i64;
+        first..=last
     }
 
     fn at_world(&self, x: f64, y: f64) -> (f32, f32) {
@@ -106,6 +136,12 @@ impl Frame {
         );
         after
     }
+}
+
+/// The copy of a world x-coordinate closest to `reference`, including
+/// when the user has panned several worlds away from the original one.
+fn near(x: f64, reference: f64) -> f64 {
+    x + (reference - x).round()
 }
 
 /// One map's state.
@@ -324,5 +360,50 @@ mod tests {
         assert!((left - 400.0).abs() < 1e-3 && (top - 300.0).abs() < 1e-3);
         let [lat, lon] = frame.middle();
         assert!((lat - 37.79).abs() < 1e-9 && (lon + 122.40).abs() < 1e-9);
+    }
+
+    #[test]
+    fn overlays_follow_tiles_across_the_dateline_and_repeated_worlds() {
+        let frame = Frame {
+            center: world(0.0, 179.9),
+            zoom: 10.0,
+            size: (800.0, 600.0),
+        };
+        let (x, y) = frame.at(0.0, -179.9);
+        let expected = 400.0 + 0.2 / 360.0 * frame.span();
+        assert!((f64::from(x) - expected).abs() < 0.001);
+        assert_eq!(y, 300.0);
+        for worlds in [-3.0, 2.0] {
+            let panned = Frame {
+                center: (frame.center.0 + worlds, frame.center.1),
+                ..frame
+            };
+            assert_eq!(panned.at(0.0, -179.9), (x, y));
+        }
+        let route = frame.route(&[[0.0, 179.9], [0.0, -179.9]]);
+        assert_eq!(route[0], (400.0, 300.0));
+        assert_eq!(route[1], (x, y));
+    }
+
+    #[test]
+    fn a_dateline_route_draws_at_both_edges_without_crossing_greenwich() {
+        let frame = Frame {
+            center: world(0.0, 0.0),
+            zoom: 1.0,
+            size: (512.0, 400.0),
+        };
+        let route = frame.route(&[[0.0, 179.0], [0.0, -179.0]]);
+        assert!(route[0].0 > 500.0 && route[1].0 > 512.0);
+        assert!(route[1].0 - route[0].0 < 3.0);
+        let copies: Vec<_> = frame.copies(route[0].0, route[1].0, 4.0).collect();
+        assert_eq!(copies, [-1, 0]);
+        // At zoom zero, all three visible copies of a pin are drawn.
+        let wide = Frame {
+            zoom: 0.0,
+            size: (800.0, 400.0),
+            ..frame
+        };
+        let (x, _) = wide.at(0.0, 0.0);
+        assert_eq!(wide.copies(x, x, 14.0).collect::<Vec<_>>(), [-1, 0, 1]);
     }
 }

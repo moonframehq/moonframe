@@ -88,8 +88,9 @@ impl<'w> Draw<'w> for Map {
             .children(pins::pins(self, frame, &sender, cx))
             .child(lines::announce(
                 &key,
+                painter.frame,
+                self,
                 ways.found,
-                self.routed.clone(),
                 &sender,
             ))
             .child(credit(self, cx))
@@ -197,6 +198,7 @@ fn interact(
     sender: &Sender,
 ) -> Stateful<Div> {
     let (press_key, wheel_key, pinch_key) = (key.to_owned(), key.to_owned(), key.to_owned());
+    let (press_moved, press_sender) = (moved.clone(), sender.clone());
     let (wheel_moved, wheel_sender) = (moved.clone(), sender.clone());
     let (pinch_moved, pinch_sender) = (moved, sender.clone());
     element
@@ -206,7 +208,8 @@ fn interact(
             cx.stop_propagation();
             if event.click_count == 2 {
                 let current = view::current(&press_key, frame);
-                view::zoom(&press_key, current, 1.0, event.position, most);
+                let zoomed = view::zoom(&press_key, current, 1.0, event.position, most);
+                tell(press_moved.as_ref(), zoomed, &press_sender, window, cx);
                 window.refresh();
                 return;
             }
@@ -216,6 +219,8 @@ fn interact(
                 event.position,
                 window,
             );
+            // The next paint installs the listeners that follow this press.
+            window.refresh();
         })
         .on_scroll(move |event, window, cx| {
             cx.stop_propagation();

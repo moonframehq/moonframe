@@ -35,14 +35,30 @@ pub(super) fn pins(map: &Map, frame: Frame, sender: &Sender, cx: &App) -> Vec<An
     order.sort_by_key(|&index| map.pins[index].selected);
     order
         .into_iter()
-        .filter_map(|index| pin(map, index, frame, sender, cx))
+        .flat_map(|index| {
+            let pin = &map.pins[index];
+            let (left, top) = frame.at(pin.lat, pin.lon);
+            frame
+                .copies(left, left, DISC * SELECTED + TAIL)
+                .filter_map(move |copy| {
+                    let left = left + (copy as f64 * frame.span()) as f32;
+                    self::pin(map, index, frame, sender, cx, copy, (left, top))
+                })
+        })
         .collect()
 }
 
-fn pin(map: &Map, index: usize, frame: Frame, sender: &Sender, cx: &App) -> Option<AnyElement> {
+fn pin(
+    map: &Map,
+    index: usize,
+    frame: Frame,
+    sender: &Sender,
+    cx: &App,
+    copy: i64,
+    (left, top): (f32, f32),
+) -> Option<AnyElement> {
     let theme = cx.theme();
     let pin = &map.pins[index];
-    let (left, top) = frame.at(pin.lat, pin.lon);
     let reach = DISC * SELECTED + TAIL;
     let outside = left < -reach
         || top < -reach
@@ -106,7 +122,7 @@ fn pin(map: &Map, index: usize, frame: Frame, sender: &Sender, cx: &App) -> Opti
                 )
         },
     };
-    let mut element = element.id(("pin", index));
+    let mut element = element.id(format!("pin/{index}/{copy}"));
     let clicked = match (&pin.msg, &map.select) {
         (Some(msg), _) => Some(msg.clone()),
         (None, Some(select)) => {

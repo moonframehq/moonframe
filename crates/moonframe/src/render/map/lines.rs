@@ -33,7 +33,10 @@ struct Line {
 }
 
 /// What the map's routes need painted.
-pub(super) struct Lines(Vec<Line>);
+pub(super) struct Lines {
+    frame: Frame,
+    lines: Vec<Line>,
+}
 
 /// The routed routes: whether any is still asked, and those found, with
 /// their index and what they were asked by.
@@ -72,10 +75,7 @@ pub(super) fn lines(map: &Map, frame: Frame, cx: &App) -> (Lines, Ways) {
                 },
             };
             Line {
-                corners: places
-                    .iter()
-                    .map(|&[lat, lon]| frame.at(lat, lon))
-                    .collect(),
+                corners: frame.route(&places),
                 color: route.color.map(|color| color.hsla(theme)),
                 stroke: route.stroke,
                 dashed: route.dashed || pending,
@@ -83,7 +83,7 @@ pub(super) fn lines(map: &Map, frame: Frame, cx: &App) -> (Lines, Ways) {
             }
         })
         .collect();
-    (Lines(lines), ways)
+    (Lines { frame, lines }, ways)
 }
 
 impl Lines {
@@ -93,14 +93,20 @@ impl Lines {
         canvas(
             |_, _, _| (),
             move |bounds, (), window, _| {
-                for line in &self.0 {
+                for line in &self.lines {
                     if line.corners.len() < 2 {
                         continue;
                     }
-                    let at = |&(x, y): &(f32, f32)| {
-                        point(bounds.origin.x + px(x), bounds.origin.y + px(y))
-                    };
-                    let points: Vec<Point<Pixels>> = line.corners.iter().map(at).collect();
+                    let left = line
+                        .corners
+                        .iter()
+                        .map(|&(x, _)| x)
+                        .fold(f32::INFINITY, f32::min);
+                    let right = line
+                        .corners
+                        .iter()
+                        .map(|&(x, _)| x)
+                        .fold(f32::NEG_INFINITY, f32::max);
                     let faint = if line.pending {
                         PENDING
                     } else {
@@ -108,20 +114,26 @@ impl Lines {
                     };
                     let color = line.color.unwrap_or(fallback);
                     let stroke = line.stroke;
-                    for (width, paint, dash) in [
-                        (stroke + 3.0, casing.opacity(0.85 * faint), false),
-                        (stroke, color.opacity(faint), line.dashed),
-                    ] {
-                        let mut path = PathBuilder::stroke(px(width));
-                        if dash {
-                            path = path.dash_array(&[px(stroke * 2.0), px(stroke * 1.5)]);
-                        }
-                        path.move_to(points[0]);
-                        for corner in &points[1..] {
-                            path.line_to(*corner);
-                        }
-                        if let Ok(path) = path.build() {
-                            window.paint_path(path, paint);
+                    for copy in self.frame.copies(left, right, stroke + 3.0) {
+                        let offset = (copy as f64 * self.frame.span()) as f32;
+                        let at = |&(x, y): &(f32, f32)| {
+                            point(bounds.origin.x + px(x + offset), bounds.origin.y + px(y))
+                        };
+                        for (width, paint, dash) in [
+                            (stroke + 3.0, casing.opacity(0.85 * faint), false),
+                            (stroke, color.opacity(faint), line.dashed),
+                        ] {
+                            let mut path = PathBuilder::stroke(px(width));
+                            if dash {
+                                path = path.dash_array(&[px(stroke * 2.0), px(stroke * 1.5)]);
+                            }
+                            path.move_to(at(&line.corners[0]));
+                            for corner in &line.corners[1..] {
+                                path.line_to(at(corner));
+                            }
+                            if let Ok(path) = path.build() {
+                                window.paint_path(path, paint);
+                            }
                         }
                     }
                 }
@@ -136,30 +148,62 @@ thread_local! {
     /// What each map's routes last told their mod, by map and route index:
     /// a route tells again whenever its stops or mode change, back and
     /// forth too, as the mod may have dropped what it was told.
-    static TOLD: RefCell<HashMap<(String, usize), Ask>> = RefCell::new(HashMap::new());
+    static TOLD: RefCell<HashMap<String, Announcements>> = RefCell::new(HashMap::new());
+}
+
+#[derive(Default)]
+struct Announcements {
+    frame: u64,
+    routes: HashMap<usize, Ask>,
+}
+
+impl Announcements {
+    fn take(
+        &mut self,
+        frame: u64,
+        asked: &[Option<Ask>],
+        found: Vec<(usize, Ask, Arc<Way>)>,
+    ) -> Vec<(usize, Arc<Way>)> {
+        // A remounted map may belong to a mod whose state started over.
+        if frame > 0 && self.frame + 1 < frame {
+            self.routes.clear();
+        }
+        self.frame = frame;
+        // Track the inputs, including drawn, removed and pending routes,
+        // rather than only replacing the last successfully announced way.
+        self.routes
+            .retain(|index, previous| asked.get(*index).and_then(Option::as_ref) == Some(previous));
+        found
+            .into_iter()
+            .filter_map(|(index, ask, way)| {
+                let new = self.routes.insert(index, ask.clone()).as_ref() != Some(&ask);
+                new.then_some((index, way))
+            })
+            .collect()
+    }
 }
 
 /// Tells the mod, with `routed`, how long each newly found way takes.
 pub(super) fn announce(
     key: &str,
+    frame: u64,
+    map: &Map,
     found: Vec<(usize, Ask, Arc<Way>)>,
-    routed: Option<Data>,
     sender: &Sender,
 ) -> impl IntoElement {
     let key = key.to_owned();
+    let asked: Vec<_> = map.routes.iter().map(Ask::of).collect();
+    let routed = map.routed.clone();
     let sender = sender.clone();
     canvas(
         move |_, window, cx| {
             let Some(msg) = routed else {
+                TOLD.with_borrow_mut(|told| told.remove(&key));
                 return;
             };
-            for (index, ask, way) in found {
-                let new = TOLD.with_borrow_mut(|told| {
-                    told.insert((key.clone(), index), ask.clone()).as_ref() != Some(&ask)
-                });
-                if !new {
-                    continue;
-                }
+            let newly_found = TOLD
+                .with_borrow_mut(|told| told.entry(key).or_default().take(frame, &asked, found));
+            for (index, way) in newly_found {
                 let fields = BTreeMap::from([
                     ("route".to_owned(), Data::Number((index + 1) as f64)),
                     ("seconds".to_owned(), Data::Number(way.seconds.round())),
@@ -180,4 +224,55 @@ pub(super) fn announce(
     )
     .absolute()
     .size_0()
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::{Announcements, Arc, Ask, Way},
+        moonframe_core::{Route, TravelMode},
+    };
+
+    #[test]
+    fn returning_to_a_route_announces_again_even_if_its_replacement_never_arrived() {
+        let route = Route {
+            points: Vec::new(),
+            via: vec![[0.0, 0.0], [0.0, 1.0]],
+            mode: TravelMode::Walk,
+            color: None,
+            stroke: 4.0,
+            dashed: false,
+        };
+        let walk = Ask::of(&route);
+        let bike = Ask::of(&Route {
+            mode: TravelMode::Bike,
+            ..route
+        });
+        let way = Arc::new(Way {
+            points: Vec::new(),
+            seconds: 60.0,
+            meters: 100.0,
+        });
+        let found = || {
+            walk.clone()
+                .map(|ask| (0, ask, way.clone()))
+                .into_iter()
+                .collect()
+        };
+        let asked = [walk.clone()];
+        let mut told = Announcements::default();
+        assert_eq!(told.take(1, &asked, found()).len(), 1);
+        assert!(told.take(2, &asked, found()).is_empty());
+        // Walk -> Drawn -> Walk; then Walk -> pending Bike -> Walk.
+        for (index, replacement) in [None, bike].into_iter().enumerate() {
+            let frame = 3 + 2 * index as u64;
+            assert!(told.take(frame, &[replacement], Vec::new()).is_empty());
+            assert_eq!(told.take(frame + 1, &asked, found()).len(), 1);
+        }
+        // Removing the route entirely also invalidates its announcement.
+        assert!(told.take(7, &[], Vec::new()).is_empty());
+        assert_eq!(told.take(8, &asked, found()).len(), 1);
+        // A map absent for a frame is newly mounted when it returns.
+        assert_eq!(told.take(10, &asked, found()).len(), 1);
+    }
 }

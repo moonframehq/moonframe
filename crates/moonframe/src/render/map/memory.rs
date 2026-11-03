@@ -24,6 +24,8 @@ const RECENT: Duration = Duration::from_secs(1);
 #[derive(Default)]
 struct Kept {
     cache: Option<Entity<RetainAllImageCache>>,
+    /// Drops this window's cache when the window closes.
+    closed: Option<Subscription>,
     /// When each tile was last drawn.
     drawn: HashMap<PathBuf, Instant>,
 }
@@ -61,6 +63,20 @@ impl ImageCacheProvider for TileCache {
     fn provide(&mut self, _: &mut Window, cx: &mut App) -> AnyImageCache {
         WINDOWS.with_borrow_mut(|windows| {
             let kept = windows.entry(self.0).or_default();
+            if kept.closed.is_none() {
+                let id = self.0;
+                kept.closed = Some(cx.on_window_closed(move |_, closed| {
+                    if closed == id {
+                        let kept = WINDOWS.with_borrow_mut(|windows| windows.remove(&id));
+                        if let Some(kept) = kept {
+                            super::stand_in::forget(&kept.drawn.into_keys().collect::<Vec<_>>());
+                        }
+                        if CURRENT.with_borrow(|current| *current == Some(id)) {
+                            CURRENT.set(None);
+                        }
+                    }
+                }));
+            }
             kept.cache
                 .get_or_insert_with(|| RetainAllImageCache::new(cx))
                 .clone()
