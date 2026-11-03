@@ -5053,6 +5053,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "moonframe-frames"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "moonframe-git"
 version = "0.1.0"
 dependencies = [
