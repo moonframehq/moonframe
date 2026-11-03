@@ -15,10 +15,17 @@ use {
 };
 
 /// A disc and a balloon's head, and a dot, in pixels across.
-const DISC: f32 = 26.0;
+const DISC: f32 = 28.0;
 const DOT: f32 = 12.0;
 /// A balloon's tail below its head, in pixels.
-const TAIL: f32 = 9.0;
+const TAIL: f32 = 10.0;
+/// A pin's fill when it gives no color.
+const PIN_FILL: Rgba = Rgba {
+    r: 0.11,
+    g: 0.11,
+    b: 0.12,
+    a: 1.0,
+};
 /// How much larger a selected pin is.
 const SELECTED: f32 = 1.25;
 
@@ -56,10 +63,11 @@ fn pin(map: &Map, index: usize, frame: Frame, sender: &Sender, cx: &App) -> Opti
     } else {
         1.0
     };
-    let fill = pin
-        .color
-        .map_or(theme.foreground, |color| color.hsla(theme));
-    let ink = theme.background;
+    // Dark with a white rim and face, whatever the app's theme: the map
+    // under them is light on most providers, and the rim keeps them clear
+    // on dark ones.
+    let fill = pin.color.map_or(PIN_FILL.into(), |color| color.hsla(theme));
+    let ink: Hsla = white();
     let element = match shape {
         PinShape::Dot => {
             let across = DOT * grow;
@@ -156,44 +164,85 @@ fn face(pin: &Pin, ink: Hsla, grow: f32) -> Option<AnyElement> {
     })
 }
 
-/// A balloon's body: a round head with a tail narrowing to a point under
-/// it, ringed in `ink`, over a soft shadow.
+/// A balloon's body: a round head ringed in `ink`, with a short tail
+/// tapering to a point `tail` pixels under it, the place; a soft shadow
+/// under the body and a small one on the ground at the tip.
 fn balloon(across: f32, tail: f32, fill: Hsla, ink: Hsla) -> Canvas<()> {
     canvas(
         |_, _, _| (),
         move |bounds, (), window, _| {
             let radius = across / 2.0;
-            let x = f32::from(bounds.origin.x) + radius;
-            let y = f32::from(bounds.origin.y) + radius;
-            let body = |grow: f32, dy: f32| {
-                let r = radius + grow;
-                // Where the tail leaves the head, either side, low on it.
-                let angle = 0.62_f32;
-                let (sin, cos) = angle.sin_cos();
-                let mut path = PathBuilder::fill();
-                path.move_to(point(px(x - r * sin), px(y + dy + r * cos)));
-                path.arc_to(
-                    point(px(r), px(r)),
-                    px(0.),
-                    true,
-                    true,
-                    point(px(x + r * sin), px(y + dy + r * cos)),
-                );
-                path.line_to(point(px(x), px(y + dy + radius + tail + grow * 0.5)));
-                path.close();
-                path.build().ok()
-            };
-            if let Some(shadow) = body(1.5, 1.5) {
-                window.paint_path(shadow, black().opacity(0.25));
+            let center = (
+                f32::from(bounds.origin.x) + radius,
+                f32::from(bounds.origin.y) + radius,
+            );
+            let tip = center.1 + radius + tail;
+            // The ground shadow: a flat oval where the tip meets the map.
+            if let Some(ground) = polygon(&oval((center.0, tip), radius * 0.45, 2.5)) {
+                window.paint_path(ground, black().opacity(0.22));
             }
-            if let Some(ring) = body(0.0, 0.0) {
-                window.paint_path(ring, ink);
-            }
-            if let Some(inside) = body(-2.0, 0.0) {
-                window.paint_path(inside, fill);
+            let shapes = [
+                // Shadow, a touch larger and lower.
+                (
+                    outline(center, radius + 1.5, tip + 1.5, 1.5),
+                    black().opacity(0.18),
+                ),
+                // The rim.
+                (outline(center, radius, tip, 0.0), ink),
+                // The head and tail inside it.
+                (outline(center, radius - 2.0, tip - 3.0, 0.0), fill),
+            ];
+            for (corners, color) in shapes {
+                if let Some(path) = polygon(&corners) {
+                    window.paint_path(path, color);
+                }
             }
         },
     )
     .absolute()
     .size_full()
+}
+
+/// The balloon's outline: around the head from where the tail leaves it
+/// on the right, over the top, to where it leaves on the left, then down
+/// to the tip. `drop` moves it all down (for the shadow).
+fn outline(center: (f32, f32), radius: f32, tip: f32, drop: f32) -> Vec<(f32, f32)> {
+    // How far round from straight down the tail leaves the head.
+    const LEAVES: f32 = 0.5;
+    const STEPS: usize = 40;
+    let sweep = std::f32::consts::TAU - 2.0 * LEAVES;
+    let mut corners: Vec<(f32, f32)> = (0..=STEPS)
+        .map(|step| {
+            // 0 is straight down; growing goes right, up, then left.
+            let angle = LEAVES + sweep * step as f32 / STEPS as f32;
+            (
+                center.0 + radius * angle.sin(),
+                center.1 + drop + radius * angle.cos(),
+            )
+        })
+        .collect();
+    corners.push((center.0, tip + drop));
+    corners
+}
+
+/// An oval around `center`, `wide` and `high` pixels from it.
+fn oval(center: (f32, f32), wide: f32, high: f32) -> Vec<(f32, f32)> {
+    (0..24)
+        .map(|step| {
+            let angle = std::f32::consts::TAU * step as f32 / 24.0;
+            (center.0 + wide * angle.cos(), center.1 + high * angle.sin())
+        })
+        .collect()
+}
+
+/// A filled path through `corners`, closed.
+fn polygon(corners: &[(f32, f32)]) -> Option<Path<Pixels>> {
+    let (&(x, y), rest) = corners.split_first()?;
+    let mut path = PathBuilder::fill();
+    path.move_to(point(px(x), px(y)));
+    for &(x, y) in rest {
+        path.line_to(point(px(x), px(y)));
+    }
+    path.close();
+    path.build().ok()
 }

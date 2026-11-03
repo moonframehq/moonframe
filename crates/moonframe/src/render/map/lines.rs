@@ -1,7 +1,8 @@
 //! A map's routes: drawn points as they are, a `via` route along the
-//! streets its router found (or, until then, straight and faint between
-//! its stops), each over a casing so it reads on any tile; and telling
-//! the mod how long each routed one takes, once.
+//! streets its router found (nothing until then, so a route never jumps
+//! from a guess to the real way; straight and faint between its stops if
+//! the router fails), each over a casing so it reads on any tile; and
+//! telling the mod how long each routed one takes, once.
 
 use {
     super::{
@@ -18,7 +19,7 @@ use {
     },
 };
 
-/// How faint a route is while its way along streets is not known.
+/// How faint a route is drawn straight when its router failed.
 const PENDING: f32 = 0.45;
 
 /// One line to paint, in pixels from the box's corner.
@@ -27,7 +28,7 @@ struct Line {
     color: Option<Hsla>,
     stroke: f32,
     dashed: bool,
-    /// Straight between stops while the router answers.
+    /// Straight between stops: its router failed.
     pending: bool,
 }
 
@@ -62,9 +63,10 @@ pub(super) fn lines(map: &Map, frame: Frame, cx: &App) -> (Lines, Ways) {
                         ways.found.push((index, ask, way));
                         (points, false)
                     },
+                    // Not drawn until its way arrives.
                     Routed::Waiting => {
                         ways.waiting = true;
-                        (route.via.clone(), true)
+                        (Vec::new(), false)
                     },
                     Routed::Failed(_) => (route.via.clone(), true),
                 },
@@ -162,7 +164,13 @@ pub(super) fn announce(
                 ]);
                 let msg = with_fields(&msg, fields);
                 let sender = sender.clone();
-                window.defer(cx, move |window, cx| sender.send(msg, window, cx));
+                // After the frame: the window is still drawing this one, and a
+                // deferred update would find it busy and be dropped.
+                window
+                    .spawn(cx, async move |cx| {
+                        let _ = cx.update(|window, cx| sender.send(msg, window, cx));
+                    })
+                    .detach();
             }
         },
         |_, (), _, _| {},
