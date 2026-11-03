@@ -16,7 +16,8 @@ type State = {
 	agent: string?,
 	picking: boolean,
 	-- The element picked with Inspect to go with the request:
-	-- { element, mod, at, report } from `app/inspect`.
+	-- { element, mod, at, report } from `app/inspect`. Dropped when the
+	-- dialog closes and not kept across launches.
 	attached: any?,
 	-- Picking for the dialog: it hides until the pick comes back.
 	inspecting: boolean,
@@ -127,7 +128,8 @@ return mod {
 			text = "",
 			agent = previous and previous.agent,
 			picking = false,
-			attached = previous and previous.attached,
+			-- Not kept: a pick belongs to the request being written.
+			attached = nil,
 			inspecting = false,
 			expanded = nil,
 			error = nil,
@@ -151,6 +153,10 @@ return mod {
 				state.seen = state.latest
 				if state.open then
 					state.error = nil
+				else
+					-- Closing drops the pick; Inspect hides the dialog
+					-- without `close`, so it survives picking.
+					state.attached = nil
 				end
 			elseif msg == "pick-agent" then
 				state.picking = not state.picking
