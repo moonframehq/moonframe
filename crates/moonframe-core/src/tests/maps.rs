@@ -41,6 +41,19 @@ fn a_map_refuses_what_it_cannot_show() {
         (r#"provider = "stadia-smooth""#, "needs an API key"),
         ("center = { 91, 0 }", "`center` is { lat, lon }"),
         ("routes = { { points = { 1, 2, 3 } } }", "lat, lon pairs"),
+        ("routes = { { color = \"accent\" } }", "one of them"),
+        (
+            "routes = { { points = { 1, 2, 3, 4 }, via = { 1, 2, 3, 4 } } }",
+            "one of them",
+        ),
+        (
+            "routes = { { points = { 1, 2, 3, 4 }, mode = \"car\" } }",
+            "how a `via` route travels",
+        ),
+        (
+            r#"pins = { { lat = 1, lon = 2, shape = "star" } }"#,
+            "unknown `star`",
+        ),
         (
             "routes = { { points = { 1, 2, 3, 200 } } }",
             "is not a place",
@@ -58,6 +71,19 @@ fn a_map_refuses_what_it_cannot_show() {
         let error = map_of(props).unwrap_err();
         assert!(error.contains(expected), "{props}: {error}");
     }
+    let routed = map_of(
+        r#"routes = { { via = { 37.78, -122.40, 37.79, -122.39 }, mode = "bike" } }, routed = "done",
+           pins = { { lat = 1, lon = 2, icon = "coffee", shape = "balloon", selected = true } }"#,
+    )
+    .unwrap();
+    let route = &routed.routes[0];
+    assert_eq!((route.via.len(), route.points.len()), (2, 0));
+    assert_eq!(route.mode, crate::TravelMode::Bike);
+    assert_eq!(route.places(), &route.via[..]);
+    assert!(routed.routed.is_some());
+    let pin = &routed.pins[0];
+    assert_eq!(pin.shape, Some(crate::PinShape::Balloon));
+    assert!(pin.selected && pin.icon.is_some());
     let keyed = map_of(r#"provider = "maptiler-streets", key = "abc123""#).unwrap();
     assert_eq!(keyed.key.as_deref(), Some("abc123"));
 }

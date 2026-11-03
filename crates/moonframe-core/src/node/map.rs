@@ -142,6 +142,9 @@ pub struct Map {
     pub moved: Option<Data>,
     /// Sent with `pin` (its index, from 1) added when a pin is clicked.
     pub select: Option<Data>,
+    /// Sent once a routed route's way is known, with `route` (its index,
+    /// from 1), `seconds` and `meters` added.
+    pub routed: Option<Data>,
     /// The mod `moved` and `select` go to; the drawing mod when unset.
     pub to: Option<String>,
     pub width: Option<f32>,
@@ -149,26 +152,70 @@ pub struct Map {
     pub grow: bool,
 }
 
-/// A marker on a map: a dot, or a disc with a short label such as `1`.
+/// A marker on a map: a dot, a disc with a short label such as `1` or an
+/// icon, or a balloon whose tip points at the place.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pin {
     pub lat: f64,
     pub lon: f64,
     pub label: Option<String>,
+    pub icon: Option<IconName>,
     pub color: Option<crate::Color>,
+    /// Unset: a disc with a label or icon, else a dot.
+    pub shape: Option<PinShape>,
+    /// Drawn larger, above the others.
+    pub selected: bool,
     /// Sent when it is clicked, instead of the map's `select`.
     pub msg: Option<Data>,
 }
 
-/// A line through places on a map: a route, a walk, a boundary.
+tokens! {
+    /// How a `ui.map` pin is drawn.
+    PinShape {
+        /// A small dot on the place.
+        Dot = "dot",
+        /// A disc centered on the place, with its label or icon.
+        Disc = "disc",
+        /// A balloon above the place, its tail's tip on it, with its label
+        /// or icon in the head: where something is, as native maps mark it.
+        Balloon = "balloon",
+    }
+}
+
+tokens! {
+    /// How a routed `ui.map` route travels.
+    TravelMode {
+        Walk = "walk",
+        Bike = "bike",
+        Car = "car",
+    }
+}
+
+/// A line through places on a map: a route, a walk, a boundary. Either its
+/// `points` are given, drawn as they are, or its `via` stops and `mode`,
+/// and the host asks a router for the way along streets between them.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Route {
-    /// `[lat, lon]` corners in order.
+    /// `[lat, lon]` corners in order; empty for a routed one.
     pub points: Vec<[f64; 2]>,
+    /// `[lat, lon]` stops to route through in order; empty for drawn points.
+    pub via: Vec<[f64; 2]>,
+    pub mode: TravelMode,
     pub color: Option<crate::Color>,
     /// The stroke's width in pixels.
     pub stroke: f32,
     pub dashed: bool,
+}
+
+impl Route {
+    /// The places it passes, as given: its points, or its stops.
+    pub fn places(&self) -> &[[f64; 2]] {
+        if self.via.is_empty() {
+            &self.points
+        } else {
+            &self.via
+        }
+    }
 }
 
 /// The deepest zoom any map takes, whatever its provider serves.
@@ -184,7 +231,7 @@ impl Map {
         let places = self.pins.iter().map(|pin| [pin.lat, pin.lon]).chain(
             self.routes
                 .iter()
-                .flat_map(|route| route.points.iter().copied()),
+                .flat_map(|route| route.places().iter().copied()),
         );
         let mut bounds: Option<([f64; 2], [f64; 2])> = None;
         for [lat, lon] in places {

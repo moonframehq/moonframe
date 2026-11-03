@@ -6,7 +6,10 @@
 //! blank.
 
 use {
-    super::tiles::{self, Tile},
+    super::{
+        memory,
+        tiles::{self, Tile},
+    },
     gpui_kit::*,
     std::{
         cell::RefCell,
@@ -40,6 +43,16 @@ pub(super) fn settled(file: &Path) -> bool {
     })
 }
 
+/// Forgets that `files` showed: let go from memory, each must decode
+/// again, so it gets its stand-in again.
+pub(super) fn forget(files: &[PathBuf]) {
+    SHOWN.with_borrow_mut(|shown| {
+        for file in files {
+            shown.remove(file);
+        }
+    });
+}
+
 /// The best stand-in at hand for `tile`, shown `size` pixels across.
 pub(super) fn stand_in(tile: &Tile, size: f64) -> Option<AnyElement> {
     coarser(tile, size).or_else(|| finer(tile, size))
@@ -60,7 +73,7 @@ fn coarser(tile: &Tile, size: f64) -> Option<AnyElement> {
         let offset_x = f64::from(tile.x - (parent.x << steps)) * size;
         let offset_y = f64::from(tile.y - (parent.y << steps)) * size;
         Some(
-            img(file)
+            memory::picture(file)
                 .absolute()
                 .left(px(-offset_x as f32))
                 .top(px(-offset_y as f32))
@@ -86,7 +99,7 @@ fn finer(tile: &Tile, size: f64) -> Option<AnyElement> {
         };
         let file = tiles::ready(&child)?;
         quarters.push(
-            img(file)
+            memory::picture(file)
                 .absolute()
                 .left(px((f64::from(dx) * half) as f32))
                 .top(px((f64::from(dy) * half) as f32))

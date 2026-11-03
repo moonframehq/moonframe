@@ -3,6 +3,11 @@
 //! it; the wheel, a pinch, a double click and the buttons zoom it.
 
 mod disk;
+mod layer;
+mod lines;
+mod memory;
+mod pins;
+mod routing;
 mod stand_in;
 mod tiles;
 mod view;
@@ -15,25 +20,12 @@ use {
     },
     crate::color::ThemeColor,
     gpui_kit::{component::ActiveTheme, *},
-    moonframe_core::{Data, Map, MapProvider, Part, Route, with_fields},
+    layer::Grid,
+    moonframe_core::{Data, Map, Part, with_fields},
     std::{cell::Cell, collections::BTreeMap},
-    tiles::Tile,
     view::Frame,
 };
 
-/// The most tiles one map draws: a huge box shows a coarser zoom's worth.
-const MOST_TILES: usize = 400;
-/// How many zooms coarser the layer under the whole map is: a handful of
-/// its tiles cover the box, so they arrive long before the rest and leave
-/// no blank while panning to somewhere new.
-const BASE: u8 = 3;
-/// How long a new tile takes to fade in.
-const FADE: std::time::Duration = std::time::Duration::from_millis(200);
-/// Tiles fetched beyond each edge of the box, so panning finds them ready.
-const RING: i64 = 1;
-/// A pin with a label, and a dot without one, in pixels across.
-const PIN: f32 = 26.0;
-const DOT: f32 = 12.0;
 /// Zoom steps per pixel of wheel or trackpad scroll.
 const SCROLL_ZOOM: f64 = 1.0 / 120.0;
 
@@ -59,7 +51,15 @@ impl<'w> Draw<'w> for Map {
             to: self.to.clone(),
         };
         let grid = Grid::new(view::origin(&key), scale);
-        let (layer, missing) = tile_layer(self, frame, scale, grid);
+        memory::begin(painter.window);
+        let (layer, tiles_missing) = layer::tile_layer(self, frame, scale, grid);
+        // Decoded tiles are bounded per window rather than kept for the run.
+        let layer = match painter.window {
+            Some(window) => layer.image_cache(memory::TileCache(window)),
+            None => layer,
+        };
+        let (lines, ways) = lines::lines(self, frame, cx);
+        let missing = tiles_missing || ways.waiting;
         if missing && !WAITING.get() {
             WAITING.set(true);
             let arrived = tiles::arrival();
@@ -79,19 +79,19 @@ impl<'w> Draw<'w> for Map {
             .relative()
             .overflow_hidden()
             .flex_shrink_0()
-            .bg(placeholder(self.provider))
+            .bg(layer::placeholder(self.provider))
             .look(&look, theme)
             .edges(look.base.border, &look.base, theme)
             .cursor_grab()
             .child(layer)
-            .child(routes(
-                &self.routes,
-                frame,
-                route_color,
-                theme.background,
-                cx,
+            .child(lines.paint(route_color, theme.background))
+            .children(pins::pins(self, frame, &sender, cx))
+            .child(lines::announce(
+                &key,
+                ways.found,
+                self.routed.clone(),
+                &sender,
             ))
-            .children(pins(self, frame, &sender, cx))
             .child(credit(self, cx))
             .child(zoom_buttons(
                 &key,
@@ -116,331 +116,6 @@ impl<'w> Draw<'w> for Map {
         element = interact(element, &key, frame, most, self.moved.clone(), &sender);
         element.into_any_element()
     }
-}
-
-/// The tiles under `frame`, and whether any is still on its way.
-/// The screen's own pixels, which tile edges snap to: the map box can sit
-/// between them, and GPUI rounds each tile's place and size apart, so
-/// edges rounded in the box's pixels can leave a one-pixel gap between
-/// neighbours while panning.
-#[derive(Clone, Copy)]
-struct Grid {
-    /// The box's corner in the window, in points.
-    origin: (f64, f64),
-    /// Device pixels per point.
-    scale: f64,
-}
-
-impl Grid {
-    fn new(origin: Point<Pixels>, scale: f32) -> Self {
-        Self {
-            origin: (f64::from(origin.x), f64::from(origin.y)),
-            scale: f64::from(scale.max(1.0)),
-        }
-    }
-
-    /// `left` (points from the box's corner) on the screen's pixel grid.
-    fn x(self, left: f64) -> f64 {
-        ((self.origin.0 + left) * self.scale).round() / self.scale - self.origin.0
-    }
-
-    fn y(self, top: f64) -> f64 {
-        ((self.origin.1 + top) * self.scale).round() / self.scale - self.origin.1
-    }
-
-    /// One device pixel, in points: what each tile reaches over its
-    /// neighbour, so no rounding can open a gap between them.
-    fn bleed(self) -> f64 {
-        1.0 / self.scale
-    }
-}
-
-fn tile_layer(map: &Map, frame: Frame, scale: f32, grid: Grid) -> (Div, bool) {
-    let source = map.provider.source();
-    let z = frame.zoom.round().clamp(0.0, f64::from(source.max_zoom)) as u8;
-    let count = 1i64 << z;
-    let size = 256.0 * (frame.zoom - f64::from(z)).exp2();
-    let span = frame.span();
-    let left = frame.center.0 * span - frame.size.0 / 2.0;
-    let top = frame.center.1 * span - frame.size.1 / 2.0;
-    let columns = (left / size).floor() as i64..=((left + frame.size.0) / size).floor() as i64;
-    let rows = (top / size).floor().max(0.0) as i64
-        ..=((top + frame.size.1) / size)
-            .floor()
-            .min(count as f64 - 1.0) as i64;
-    let retina = scale > 1.5 && tiles::has_retina(map.provider);
-    let key = map.key.as_deref();
-    let at = |column: i64, row: i64| Tile {
-        provider: map.provider,
-        retina,
-        z,
-        x: column.rem_euclid(count) as u32,
-        y: row as u32,
-    };
-    // The ring first: requests are served newest first, so what shows
-    // (asked for below) comes before it.
-    let ring_rows = (*rows.start() - RING).max(0)..=(*rows.end() + RING).min(count - 1);
-    let ring_columns = *columns.start() - RING..=*columns.end() + RING;
-    let with_ring = ring_rows.clone().count() * ring_columns.clone().count() <= MOST_TILES;
-    if with_ring {
-        for row in ring_rows.clone() {
-            for column in ring_columns.clone() {
-                if !rows.contains(&row) || !columns.contains(&column) {
-                    tiles::prefetch(&at(column, row), key);
-                }
-            }
-        }
-    }
-    let (mut layer, base) = base_layer(map, frame, z, grid);
-    let mut missing = false;
-    let mut drawn = 0;
-    let (all_rows, all_columns) = if with_ring {
-        (ring_rows, ring_columns)
-    } else {
-        (rows.clone(), columns.clone())
-    };
-    for row in all_rows {
-        for column in all_columns.clone() {
-            drawn += 1;
-            if drawn > MOST_TILES {
-                return (layer, missing);
-            }
-            // Whole pixels, so neighbours meet without a seam.
-            // On the screen's pixels, so neighbours share their edge, and a
-            // device pixel over it.
-            let x0 = grid.x(column as f64 * size - left);
-            let y0 = grid.y(row as f64 * size - top);
-            let x1 = grid.x((column + 1) as f64 * size - left) + grid.bleed();
-            let y1 = grid.y((row + 1) as f64 * size - top) + grid.bleed();
-            let tile = at(column, row);
-            let cell = div()
-                .absolute()
-                .overflow_hidden()
-                .left(px(x0 as f32))
-                .top(px(y0 as f32))
-                .w(px((x1 - x0) as f32))
-                .h(px((y1 - y0) as f32));
-            if !rows.contains(&row) || !columns.contains(&column) {
-                // Just outside the box, clipped away: drawn so GPUI has
-                // decoded it before a pan brings it in.
-                if let Some(file) = tiles::ready(&tile) {
-                    // Counted as shown: in view, it needs no fade.
-                    stand_in::settled(&file);
-                    layer = layer.child(cell.child(img(file).size_full()));
-                }
-                continue;
-            }
-            if let Some(file) = tiles::tile(&tile, key) {
-                // Until it has had time to decode, what stood in for it
-                // stays under it, so it never blinks blank; the next
-                // redraw after that drops it.
-                let fresh = !stand_in::settled(&file);
-                let under = fresh.then(|| stand_in::stand_in(&tile, x1 - x0)).flatten();
-                let picture = img(file).size_full();
-                // A new tile fades in over what stood in for it.
-                let picture = if fresh {
-                    let id = format!("{}/{}/{}/{}", tile.provider.name(), tile.z, tile.x, tile.y);
-                    picture
-                        .with_animation(
-                            ElementId::Name(id.into()),
-                            Animation::new(FADE).with_easing(ease_out_quint()),
-                            |picture, delta| picture.opacity(delta),
-                        )
-                        .into_any_element()
-                } else {
-                    picture.into_any_element()
-                };
-                layer = layer.child(cell.children(under).child(picture));
-                continue;
-            }
-            missing = true;
-            // Until it arrives: the same spot from another zoom, else the
-            // base layer under everything shows through.
-            if let Some(stand_in) = stand_in::stand_in(&tile, x1 - x0) {
-                layer = layer.child(cell.child(stand_in));
-            }
-        }
-    }
-    // Asked for last, so they arrive first: newest requests go first.
-    for tile in &base {
-        let _ = tiles::tile(tile, key);
-    }
-    (layer, missing)
-}
-
-/// The tiles [`BASE`] zooms coarser than `z` under the whole box, at
-/// standard density (it is enlarged anyway), as the layer the map's own
-/// tiles are drawn over; and those tiles, to ask for.
-fn base_layer(map: &Map, frame: Frame, z: u8, grid: Grid) -> (Div, Vec<Tile>) {
-    let layer = div().absolute().size_full();
-    let base = z.saturating_sub(BASE);
-    if base == z {
-        return (layer, Vec::new());
-    }
-    let count = 1i64 << base;
-    let size = 256.0 * (frame.zoom - f64::from(base)).exp2();
-    let span = frame.span();
-    let left = frame.center.0 * span - frame.size.0 / 2.0;
-    let top = frame.center.1 * span - frame.size.1 / 2.0;
-    let columns = (left / size).floor() as i64..=((left + frame.size.0) / size).floor() as i64;
-    let rows = (top / size).floor().max(0.0) as i64
-        ..=((top + frame.size.1) / size)
-            .floor()
-            .min(count as f64 - 1.0) as i64;
-    let mut tiles = Vec::new();
-    let mut images = Vec::new();
-    for row in rows {
-        for column in columns.clone() {
-            let tile = Tile {
-                provider: map.provider,
-                retina: false,
-                z: base,
-                x: column.rem_euclid(count) as u32,
-                y: row as u32,
-            };
-            if let Some(file) = tiles::ready(&tile) {
-                let x0 = grid.x(column as f64 * size - left);
-                let y0 = grid.y(row as f64 * size - top);
-                let x1 = grid.x((column + 1) as f64 * size - left) + grid.bleed();
-                let y1 = grid.y((row + 1) as f64 * size - top) + grid.bleed();
-                images.push(
-                    img(file)
-                        .absolute()
-                        .left(px(x0 as f32))
-                        .top(px(y0 as f32))
-                        .w(px((x1 - x0) as f32))
-                        .h(px((y1 - y0) as f32)),
-                );
-            }
-            tiles.push(tile);
-        }
-    }
-    (layer.children(images), tiles)
-}
-
-/// What shows where nothing has arrived yet: a land color close to the
-/// provider's own.
-fn placeholder(provider: MapProvider) -> Hsla {
-    let dark = matches!(
-        provider,
-        MapProvider::CartoDark | MapProvider::StadiaSmoothDark
-    );
-    if dark {
-        rgb(0x262626).into()
-    } else {
-        rgb(0xf2efe9).into()
-    }
-}
-
-/// The routes, each over a casing in the background color so it reads
-/// on any tile.
-fn routes(routes: &[Route], frame: Frame, fallback: Hsla, casing: Hsla, cx: Cx) -> Canvas<()> {
-    let theme = cx.theme();
-    let lines: Vec<(Vec<(f32, f32)>, Hsla, f32, bool)> = routes
-        .iter()
-        .map(|route| {
-            let corners = route
-                .points
-                .iter()
-                .map(|&[lat, lon]| frame.at(lat, lon))
-                .collect();
-            let color = route.color.map_or(fallback, |color| color.hsla(theme));
-            (corners, color, route.stroke, route.dashed)
-        })
-        .collect();
-    canvas(
-        |_, _, _| (),
-        move |bounds, (), window, _| {
-            for (corners, color, stroke, dashed) in &lines {
-                let at =
-                    |&(x, y): &(f32, f32)| point(bounds.origin.x + px(x), bounds.origin.y + px(y));
-                let points: Vec<Point<Pixels>> = corners.iter().map(at).collect();
-                for (width, paint, dash) in [
-                    (stroke + 3.0, casing.opacity(0.85), false),
-                    (*stroke, *color, *dashed),
-                ] {
-                    let mut path = PathBuilder::stroke(px(width));
-                    if dash {
-                        path = path.dash_array(&[px(stroke * 2.0), px(stroke * 1.5)]);
-                    }
-                    path.move_to(points[0]);
-                    for corner in &points[1..] {
-                        path.line_to(*corner);
-                    }
-                    if let Ok(path) = path.build() {
-                        window.paint_path(path, paint);
-                    }
-                }
-            }
-        },
-    )
-    .absolute()
-    .size_full()
-}
-
-/// The pins in the box, each a disc with its label (a dot without one);
-/// a click sends `select` with its index.
-fn pins(map: &Map, frame: Frame, sender: &Sender, cx: Cx) -> Vec<AnyElement> {
-    let theme = cx.theme();
-    map.pins
-        .iter()
-        .enumerate()
-        .filter_map(|(index, pin)| {
-            let (left, top) = frame.at(pin.lat, pin.lon);
-            let outside = left < -PIN
-                || top < -PIN
-                || f64::from(left) > frame.size.0 + f64::from(PIN)
-                || f64::from(top) > frame.size.1 + f64::from(PIN);
-            if outside {
-                return None;
-            }
-            let fill = pin
-                .color
-                .map_or(theme.foreground, |color| color.hsla(theme));
-            let across = if pin.label.is_some() {
-                PIN
-            } else {
-                DOT
-            };
-            let mut element = div()
-                .id(("pin", index))
-                .absolute()
-                .left(px(left - across / 2.0))
-                .top(px(top - across / 2.0))
-                .size(px(across))
-                .rounded_full()
-                .border_2()
-                .border_color(theme.background)
-                .bg(fill)
-                .shadow_md()
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_xs()
-                .font_weight(FontWeight::BOLD)
-                .text_color(theme.background)
-                .children(pin.label.clone());
-            let clicked = match (&pin.msg, &map.select) {
-                (Some(msg), _) => Some(msg.clone()),
-                (None, Some(select)) => {
-                    let at = BTreeMap::from([("pin".to_owned(), Data::Number((index + 1) as f64))]);
-                    Some(with_fields(select, at))
-                },
-                (None, None) => None,
-            };
-            if let Some(msg) = clicked {
-                let sender = sender.clone();
-                element = element.cursor_pointer().on_mouse_down(
-                    MouseButton::Left,
-                    move |_, window, cx| {
-                        cx.stop_propagation();
-                        sender.send(msg.clone(), window, cx);
-                    },
-                );
-            }
-            Some(element.into_any_element())
-        })
-        .collect()
 }
 
 /// The provider's credit in the bottom corner, and what went wrong
@@ -578,7 +253,8 @@ fn follow(key: &str, moved: Option<Data>, sender: &Sender) -> impl IntoElement {
                 }
             }
         },
-        move |_, (), window, _| {
+        move |_, (), window, cx| {
+            memory::evict(window, cx);
             if !view::dragging(&key, window) {
                 return;
             }

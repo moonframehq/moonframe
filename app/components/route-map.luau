@@ -1,16 +1,20 @@
 -- A day's stops on a street map: numbered pins in order, and the legs
--- between them as coloured lines (a walk green, a ride dashed). The map
--- frames them all; drag to pan, scroll or pinch to zoom.
+-- between them as coloured lines, given as points or routed along streets
+-- (`travel`). The map frames them all; drag to pan, scroll or pinch to
+-- zoom.
 
 type Stop = {
 	lat: number,
 	lon: number,
 	label: string?,
+	icon: string?,
 	color: string?,
 }
 
 type Leg = {
-	points: { number },
+	points: { number }?,
+	via: { number }?,
+	mode: string?,
 	color: string?,
 	dashed: boolean?,
 }
@@ -20,8 +24,11 @@ type Props = {
 	legs: { Leg }?,
 	provider: string?,
 	key: string?,
+	travel: string?,
+	marker: string?,
 	selected: number?,
 	event: string?,
+	routed: any,
 	height: number?,
 	grow: boolean?,
 	to: string?,
@@ -48,8 +55,11 @@ return component {
 	description = "A street map with numbered stops and the legs between them, framed to fit; a click on a stop sends { stop = index }.",
 	when = "Where a day's meetings are, a delivery round, a trip: places in order and the way between them. For one place without a route, `ui.map` with a pin is enough.",
 	props = {
-		["stops"] = "list of { lat, lon, label? (default its number), color? }",
-		["legs"] = "list of { points = { lat1, lon1, lat2, lon2, ... }, color?, dashed? }",
+		["stops"] = "list of { lat, lon, label? (default its number), icon? (instead of the label), color? }",
+		["legs"] = "list of { points = { lat1, lon1, ... } (drawn as they are) or via = { lat1, lon1, ... } and mode (\"walk\", \"bike\", \"car\", routed along streets), color?, dashed? }",
+		["travel"] = "without `legs`: join each stop to the next along streets, \"walk\", \"bike\" or \"car\"",
+		["marker"] = "how stops are drawn: \"disc\" (default) or \"balloon\" (a pin above the place)",
+		["routed"] = "sent once each routed leg's way is known, with `route` (the leg, from 1), `seconds` and `meters` added",
 		["provider"] = "where the tiles come from (default \"openstreetmap\"); see `MapProvider` in types/moonframe.d.luau",
 		["key"] = "the provider's API key, for those that need one",
 		["selected"] = "index of the stop drawn in the accent colour",
@@ -74,17 +84,30 @@ return component {
 			pins[index] = {
 				lat = stop.lat,
 				lon = stop.lon,
-				label = stop.label or tostring(index),
+				label = if stop.icon then nil else stop.label or tostring(index),
+				icon = stop.icon :: any,
 				color = if props.selected == index then "accent" else stop.color,
+				shape = props.marker :: any,
+				selected = props.selected == index,
 				msg = { [props.event or "stop"] = index },
 			}
+		end
+		local legs: { any }? = props.legs
+		if not legs and props.travel then
+			local routed = {}
+			for index = 2, #props.stops do
+				local from, to = props.stops[index - 1], props.stops[index]
+				routed[#routed + 1] = { via = { from.lat, from.lon, to.lat, to.lon }, mode = props.travel }
+			end
+			legs = routed
 		end
 		return ui.map {
 			class = "route-map",
 			provider = props.provider :: any,
 			key = props.key,
 			pins = pins,
-			routes = props.legs :: any,
+			routes = legs :: any,
+			routed = props.routed,
 			to = props.to,
 			height = props.height,
 			grow = props.grow,

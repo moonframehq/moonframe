@@ -190,6 +190,14 @@ pub(super) fn failure(provider: MapProvider) -> Option<String> {
     shared().failures.get(&provider).cloned()
 }
 
+/// Wakes every map waiting for something to arrive (a tile, a route),
+/// to draw again.
+pub(super) fn wake() {
+    for waiter in shared().waiters.drain(..) {
+        let _ = waiter.send(());
+    }
+}
+
 /// Resolves once a tile arrives (or fails), to draw again.
 pub(super) fn arrival() -> futures::channel::oneshot::Receiver<()> {
     let (sender, receiver) = futures::channel::oneshot::channel();

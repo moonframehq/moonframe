@@ -32,7 +32,7 @@ impl Given {
                 .chain(
                     map.routes
                         .iter()
-                        .flat_map(|route| route.points.iter().copied()),
+                        .flat_map(|route| route.places().iter().copied()),
                 )
                 .collect(),
         }

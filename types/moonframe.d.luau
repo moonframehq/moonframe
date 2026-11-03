@@ -1081,6 +1081,9 @@ type MapProps = {
 	move: any?,
 	-- Sent with `pin` (its index, from 1) added when a pin is clicked.
 	select: any?,
+	-- Sent once a `via` route's way along streets is known, with `route`
+	-- (its index, from 1), `seconds` and `meters` added.
+	routed: any?,
 	to: string?,
 	width: number?,
 	height: number?,
@@ -1092,14 +1095,27 @@ type MapPin = {
 	lon: number,
 	-- Up to three characters, drawn in the pin: "1", "A".
 	label: string?,
+	-- Drawn in the pin instead of a label.
+	icon: IconName?,
 	color: string?,
+	-- "dot" on the place, "disc" on it (the default with a label or
+	-- icon), or "balloon" above it with its tip on the place.
+	shape: ("dot" | "disc" | "balloon")?,
+	-- Drawn larger, above the others.
+	selected: boolean?,
 	-- Sent when it is clicked, instead of the map's `select`.
 	msg: any?,
 }
 
+-- Either `points`, drawn as they are, or `via` stops the host routes along
+-- streets (OpenStreetMap data, through routing.openstreetmap.de) by `mode`;
+-- straight and faint until the way is known.
 type MapRoute = {
 	-- Corners in order, flat: { lat1, lon1, lat2, lon2, ... }.
-	points: { number },
+	points: { number }?,
+	-- Stops in order, flat, two to 25 of them.
+	via: { number }?,
+	mode: ("walk" | "bike" | "car")?,
 	color: string?,
 	stroke: number?,
 	dashed: boolean?,
