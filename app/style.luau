@@ -75,12 +75,6 @@ return style {
 		[".status-label"] = { size = "small", color = "muted-foreground", weight = "medium" },
 		[".usage-widget"] = { padding = { 2, 6 }, radius = 6 },
 		[".usage-widget:hover"] = { background = "accent/10" },
-		[".track"] = { background = "muted-foreground/20", radius = 3 },
-		[".fill"] = { background = "accent", radius = 3 },
-		[".fill-hot"] = { background = "warning" },
-		[".sparkline"] = { gap = 1 },
-		[".spark"] = { background = "muted-foreground/60", radius = 1 },
-		[".spark-hot"] = { background = "warning" },
 
 		-- The usage sheet: a floating card that slides up and fades in.
 		popover = {
