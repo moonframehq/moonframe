@@ -16,6 +16,8 @@ pub(crate) mod images;
 mod input;
 mod keyed;
 mod list;
+#[cfg(feature = "map")]
+mod map;
 #[cfg(feature = "markdown")]
 mod markdown;
 mod plot;
@@ -692,6 +694,14 @@ fn draw_node<'w>(
         Node::Line(line) => line.draw(painter, place, cx),
         Node::Paths(paths) => paths.draw(painter, place, cx),
         Node::Hatch(hatch) => hatch.draw(painter, place, cx),
+        #[cfg(feature = "map")]
+        Node::Map(map) => map.draw(painter, place, cx),
+        #[cfg(not(feature = "map"))]
+        Node::Map(_) => broken(
+            "this build has no map support (the `map` feature)",
+            place,
+            cx,
+        ),
         #[cfg(feature = "terminal")]
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
         #[cfg(not(feature = "terminal"))]

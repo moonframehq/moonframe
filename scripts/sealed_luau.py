@@ -201,7 +201,7 @@ def references(text, provider_names):
                 refs.dynamic.append((category, token.line))
             if category == "providers" and name in provider_names:
                 refs.providers.add(name)
-            if category == "features" and name in ("terminal", "browser", "markdown"):
+            if category == "features" and name in ("terminal", "browser", "map", "markdown"):
                 refs.features.add(name)
                 if name == "terminal":
                     refs.features.add(terminal_engine(tokens, i + (3 if after.value == "." else 4)))

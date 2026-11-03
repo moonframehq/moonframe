@@ -13,6 +13,7 @@ use {
 mod checks;
 mod components;
 mod elements;
+mod maps;
 mod mods;
 mod motion;
 mod orbit;

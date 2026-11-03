@@ -19,6 +19,7 @@ tokens! {
         Line = "line",
         Paths = "paths",
         Hatch = "hatch",
+        Map = "map",
         Terminal = "terminal",
         Browser = "browser",
         View = "view",

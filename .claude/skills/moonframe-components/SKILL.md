@@ -45,6 +45,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
 | `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; links send `link` instead of opening, pictures are not loaded; styled by `markdown`, `markdown-code` and `markdown-quote` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width` |
 | `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
+| `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a double click and its buttons zoom; without `center`/`zoom` it frames the pins and routes. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `pins` (each `lat`, `lon`, `label` up to 3 characters, `color`, `msg`), `routes` (each `points` flat lat, lon pairs, `color`, `stroke`, `dashed`; the style's `color` otherwise), `move` (sent with `lat`, `lon`, `zoom` after the user moves it), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
 | `ui.view { name = "chart", id = "sales", props = {...} }` | a view the app writes in Rust and registers by `name` (apps on the Moonframe library; the starter registers none): what Luau can't draw, such as an editor or a canvas. Kept by mod and `id`, it gets `props` again when they change, and sends this mod's `update` messages of its own | `name`, `id`, `props`, `class`, `style` |
 
 ### Controls
@@ -264,6 +265,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`record-card`](#record-card) | Data | A record an agent or a person points at inside a message or a note, which a click opens. For a full row in a list use `list` or `pr-row`; for a dated item use `date-tile` beside text. |
 | [`relative-time`](#relative-time) | Data | An age or last-updated time in rows, cards and headers. Pass elapsed `seconds`: the mod computes them from a provider's timestamp and the current time. Use `compact` in tight columns (PR lists, tables). For a dated list of events use `timeline`. |
 | [`rich-text`](#rich-text) | Data | A sentence that mixes emphasis and labels in one line: an audit log's activity, a notification, a table cell ("Order #1213 marked as [Fulfilled]"). For a paragraph use `ui.text`; for a lone label use `pill` or `ui.badge`; for several labels use `tags`. |
+| [`route-map`](#route-map) | Data | Where a day's meetings are, a delivery round, a trip: places in order and the way between them. For one place without a route, `ui.map` with a pin is enough. |
 | [`series-chart`](#series-chart) | Data | Several readings over the same period compared on one scale (CPU, GPU and memory over 24 hours; requests and errors by hour), where the reader wants a sample's exact values. For counts stacked per bucket use `bar-chart`; for periods against a forecast with a picked day's card use `line-chart`; for one small trend use `ui.line` or `sparkline`; for a balance against a floor use `forecast-chart`. |
 | [`share-bar`](#share-bar) | Data | How a whole splits into a few parts, above a list of those parts (devices, engagement tiers, plans). For progress toward a target with stages use `progress-stack`; for one fraction use `meter`. |
 | [`sparkline`](#sparkline) | Data | Recent samples as tiny bars, like CPU over the last minute, in a status bar or header. |
@@ -2161,6 +2163,34 @@ rich_text { parts = {
 	{ tag = "New variant" },
 } }
 ```
+
+#### `route-map`
+
+**Route map.** A street map with numbered stops and the legs between them, framed to fit; a click on a stop sends { stop = index }.
+
+**When:** Where a day's meetings are, a delivery round, a trip: places in order and the way between them. For one place without a route, `ui.map` with a pin is enough.
+
+| Prop | Meaning |
+| --- | --- |
+| `event` | key of the message a click on a stop sends, default "stop": { stop = index } |
+| `grow` | take the free space along the parent's axis |
+| `height` | pixels (default: fill the parent) |
+| `key` | the provider's API key, for those that need one |
+| `legs` | list of { points = { lat1, lon1, lat2, lon2, ... }, color?, dashed? } |
+| `provider` | where the tiles come from (default "openstreetmap"); see `MapProvider` in types/moonframe.d.luau |
+| `selected` | index of the stop drawn in the accent colour |
+| `stops` | list of { lat, lon, label? (default its number), color? } |
+| `to` | mod to send messages to, if not the drawing one |
+
+**Styles:** `.route-map`
+
+```lua
+local route_map = use "route-map"
+
+route_map { height = 320, legs = { { color = "success", points = { 37.788, -122.404, 37.7872, -122.403, 37.7865, -122.3995 } }, { color = "success", points = { 37.7865, -122.3995, 37.7935, -122.394 } }, { color = "danger", dashed = true, points = { 37.7935, -122.394, 37.786, -122.403, 37.7885, -122.4045 } } }, selected = 2, stops = { { lat = 37.788, lon = -122.404 }, { lat = 37.7865, lon = -122.3995 }, { lat = 37.7935, lon = -122.394 }, { lat = 37.7885, lon = -122.4045 } } }
+```
+
+A whole mod using it, with state: `app/components/demos/route-map.luau`.
 
 #### `series-chart`
 

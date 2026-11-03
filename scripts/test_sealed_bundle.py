@@ -18,10 +18,11 @@ local text = "use \\"also-documentation\\""
 local card = use -- comment
   ("card")
 ui.markdown { text = note }
+ui.map { pins = {} }
 ''', {"git"})
         self.assertEqual(refs.components, {"card"})
         self.assertFalse(refs.providers)
-        self.assertEqual(refs.features, {"markdown"})
+        self.assertEqual(refs.features, {"map", "markdown"})
 
     def test_escaped_and_long_literal_imports(self):
         refs = references(r'''use "\x63ard"; use [=[badge]=]; use('\099ode')''', set())

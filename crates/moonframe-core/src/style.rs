@@ -90,6 +90,8 @@ tokens! {
         Line = "line",
         Paths = "paths",
         Hatch = "hatch",
+        /// A `ui.map`'s box; its `color` strokes routes without their own.
+        Map = "map",
         Terminal = "terminal",
         Browser = "browser",
         View = "view",
