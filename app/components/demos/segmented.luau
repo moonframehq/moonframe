@@ -18,9 +18,9 @@ return mod {
 			segmented {
 				selected = state.theme,
 				options = {
-					{ id = "light", label = "Light", icon = "sun" },
-					{ id = "dark", label = "Dark", icon = "moon" },
-					{ id = "system", label = "System", icon = "settings-2" },
+					{ id = "light", label = "Light" },
+					{ id = "dark", label = "Dark" },
+					{ id = "system", label = "System" },
 				},
 			},
 			ui.text { `Theme: {state.theme}`, tone = "muted", size = "small" },

@@ -562,6 +562,12 @@ impl<'w> Draw<'w> for Button {
         }
         if self.small {
             element = element.small();
+            // gpui-component's small button (24px tall, 8px sides) crowds its
+            // label; this matches herdr-gpui's compact controls. Icon-only
+            // ones keep their 24px square.
+            if !self.label.is_empty() {
+                element = element.h(px(28.)).px(px(10.));
+            }
         }
         // One handler for both: a button keeps only the last `on_click`.
         let send = self.action.as_ref().map(|action| place.click(action, cx));

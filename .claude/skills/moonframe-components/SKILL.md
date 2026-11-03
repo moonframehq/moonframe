@@ -954,7 +954,7 @@ A whole mod using it, with state: `app/components/demos/filter-dropdown.luau`.
 | `disabled` | greys it out and ignores clicks |
 | `icon` | icon name |
 | `msg` | message a click sends |
-| `size` | "normal" (28px, default) or "small" (22px) |
+| `size` | "normal" (32px, default) or "small" (26px) |
 | `to` | mod to send `msg` to, if not the drawing one |
 | `tone` | "danger" for a destructive action |
 | `tooltip` | text shown under the pointer (also its name for the user) |
@@ -1033,7 +1033,7 @@ A whole mod using it, with state: `app/components/demos/picker.luau`.
 | `grow` | fill the width, segments sharing it equally |
 | `options` | list of { id, label?, icon?, count? (a number or text after the label, in the accent colour), tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment |
 | `selected` | id of the chosen option |
-| `small` | smaller, tighter segments |
+| `small` | tighter segments, for a dense toolbar |
 | `to` | mod to send messages to, if not the drawing one |
 
 **Styles:** `.segmented` `.segmented-count` `.segmented-option` `.segmented-option:hover` `.segmented-option:selected` `.segmented-small`
@@ -1041,7 +1041,7 @@ A whole mod using it, with state: `app/components/demos/picker.luau`.
 ```lua
 local segmented = use "segmented"
 
-segmented { options = { { icon = "sun", id = "light", label = "Light" }, { icon = "moon", id = "dark", label = "Dark" }, { icon = "settings-2", id = "system", label = "System" } }, selected = "dark" }
+segmented { options = { { id = "light", label = "Light" }, { id = "dark", label = "Dark" }, { id = "system", label = "System" } }, selected = "dark" }
 ```
 
 A whole mod using it, with state: `app/components/demos/segmented.luau`.
