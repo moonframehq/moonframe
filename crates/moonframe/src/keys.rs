@@ -69,6 +69,9 @@ impl MoonframeApp {
             self.dismiss(cx);
             return Taken::Sent;
         }
+        if self.picking_keystroke(keystroke, window, cx) {
+            return Taken::Sent;
+        }
         // The highest priority in this window; of equals, the later in the
         // tree.
         let Some(top) = self

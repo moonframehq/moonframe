@@ -8,11 +8,13 @@ use {
             ActiveTheme as _, Sizable as _,
             button::{Button, ButtonVariants as _},
         },
+        prelude::FluentBuilder as _,
         *,
     },
 };
 
 mod highlight;
+mod trail;
 
 pub(crate) use highlight::Highlight;
 
@@ -49,18 +51,17 @@ impl MoonframeApp {
                         // Picking reaches what is under a page too.
                         .child(crate::browser::cover())
                         .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _, cx| {
-                            let hovered = this.inspector.at(event.position);
-                            if hovered.as_ref().map(|placed| &placed.path)
-                                != this.inspector.hovered.as_ref().map(|placed| &placed.path)
-                            {
-                                this.inspector.hovered = hovered;
+                            if this.inspector.point(event.position) {
                                 cx.notify();
                             }
                         }))
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(|this, event: &MouseDownEvent, _, cx| {
-                                let picked = this.inspector.at(event.position);
+                                // What ↑ and ↓ chose under the pointer.
+                                this.inspector.point(event.position);
+                                let picked = this.inspector.hovered.as_ref();
+                                let picked = picked.map(|target| target.placed.clone());
                                 this.select(picked, cx);
                             }),
                         ),
@@ -89,7 +90,7 @@ impl MoonframeApp {
                 self.inspector
                     .hovered
                     .as_ref()
-                    .map(|placed| placed.path.clone())
+                    .map(|target| target.placed.path.clone())
             })
             .flatten();
         let selected = self
@@ -214,14 +215,7 @@ impl MoonframeApp {
                         .gap_1()
                         .child(row("mod", mono(pick.owner).into_any_element()))
                         .child(row("file", mono(pick.at).into_any_element()))
-                        .child(row(
-                            "inside",
-                            div()
-                                .text_xs()
-                                .text_color(theme.muted_foreground)
-                                .child(pick.inside.join(" › "))
-                                .into_any_element(),
-                        )),
+                        .child(row("inside", self.trail(selected, cx))),
                 )
                 .child(
                     div()
@@ -270,6 +264,17 @@ impl MoonframeApp {
     }
 }
 
+/// A key, as the banner and label show it.
+fn key(theme: &component::Theme, name: &'static str) -> Div {
+    div()
+        .px_1p5()
+        .rounded(px(4.))
+        .bg(theme.muted)
+        .text_color(theme.muted_foreground)
+        .font_family("Menlo")
+        .child(name)
+}
+
 /// An element's size, as `120 × 32`.
 fn dimensions(size: Size<Pixels>) -> String {
     format!(
@@ -305,16 +310,13 @@ fn banner(theme: &component::Theme) -> AnyElement {
                     .text_xs()
                     .shadow_md()
                     .child(div().size(px(8.)).rounded_full().bg(theme.primary))
-                    .child("Click an element to select it")
-                    .child(
-                        div()
-                            .px_1p5()
-                            .rounded(px(4.))
-                            .bg(theme.muted)
-                            .text_color(theme.muted_foreground)
-                            .font_family("Menlo")
-                            .child("Esc"),
-                    ),
+                    .child("Click an element to select it,")
+                    .child(key(theme, "↑"))
+                    .child(key(theme, "↓"))
+                    .child("for the one around it or back,")
+                    .child(key(theme, "↵"))
+                    .child("to pick")
+                    .child(key(theme, "Esc")),
             ),
     )
     .with_priority(PRIORITY + 2)
@@ -324,11 +326,11 @@ fn banner(theme: &component::Theme) -> AnyElement {
 /// The hovered node's name, under it, or over it near the window's
 /// bottom; from its right edge in the window's right half.
 fn label(
-    hovered: &inspect::Placed,
+    hovered: &inspect::Target,
     viewport: Size<Pixels>,
     theme: &component::Theme,
 ) -> AnyElement {
-    let bounds = hovered.bounds;
+    let bounds = hovered.placed.visible;
     let gap = px(4. + 2.);
     let element = div().absolute();
     let element = if bounds.bottom() + px(LABEL_ROOM) > viewport.height {
@@ -355,9 +357,22 @@ fn label(
             .font_family("Menlo")
             .whitespace_nowrap()
             .shadow_md()
-            .child(hovered.crumb.label.clone())
-            .child(div().opacity(0.7).child(dimensions(bounds.size))),
+            .child(hovered.placed.crumb.label.clone())
+            .child(
+                div()
+                    .opacity(0.7)
+                    .child(dimensions(hovered.placed.bounds.size)),
+            )
+            // Where ↑ goes from here, the way out of a dense cell.
+            .when_some(hovered.around.as_deref(), |label, around| {
+                label.child(div().opacity(0.7).child(format!("↑ {}", short(around))))
+            }),
     )
     .with_priority(PRIORITY + 2)
     .into_any_element()
+}
+
+/// A label without its quoted text: `row.mail-row`.
+fn short(label: &str) -> &str {
+    label.split_once(' ').map_or(label, |(head, _)| head)
 }

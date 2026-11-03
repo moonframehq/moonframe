@@ -238,6 +238,15 @@ Selected in Moonframe (View > Inspect Element):
 - inside: mod shell > column > … > region "status-right" > mod status > row > text.status-text "⎇ main +29"
 ```
 
+The pointer finds the deepest element under it. While picking, **↑**
+targets the element around that one instead (a cell's row, the row's
+`ui.list`, the list's panel) and **↓** steps back in; Enter or a click picks
+the target. A level chosen with ↑ stays while the pointer moves over elements
+of the same kind, so moving down a list keeps picking rows. In the card, each
+element of "inside" (and those inside the selection, down to what was under
+the pointer) is a button that selects it instead. So a selection may be a
+row or panel the user chose on purpose, not just the leaf under the pointer.
+
 When the user says "here", "this", "the selected element" or "add X there"
 without saying where, read that file first. The `file:line` is the `ui` call
 that built the element. For an element a component built, it is the line in
@@ -2073,7 +2082,8 @@ has an `escape`. Other keys go on as usual.
   overlay cannot read keystrokes meant for a terminal behind it. For typing,
   use `ui.input` and its own `keys`.
 - Modifiers must match exactly: `down` does not fire for `shift-down`.
-- While the Inspector is picking or showing its card, Escape is its own.
+- While the Inspector is picking or showing its card, Escape is its own;
+  while it is picking, so are ↑, ↓ and Enter (they choose the element).
 
 **A new extension.** Create `app/mods/<name>/main.luau` with a `region` the
 shell already draws. It appears without touching the shell. To give it a new

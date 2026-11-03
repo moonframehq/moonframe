@@ -2,7 +2,8 @@
 //! tools, to tell an agent where to change or add something. While picking,
 //! every drawn node is wrapped in [`Tracked`], which records where it landed
 //! without adding a layout box; the pointer then finds the deepest node
-//! under it. The pick names the mod, its file and line, and the elements
+//! under it, and ↑ and ↓ step out to the nodes around it and back
+//! ([`aim`]). The pick names the mod, its file and line, and the elements
 //! around it, and is saved where agents read it (`paths::selection`).
 
 use {
@@ -10,6 +11,10 @@ use {
     moonframe_core::{Node, Workspace},
     std::{cell::RefCell, fmt::Write as _, path::Path, rc::Rc},
 };
+
+mod aim;
+
+pub(crate) use aim::Target;
 
 /// Longest text quoted in an element's label.
 const QUOTE: usize = 40;
@@ -22,15 +27,19 @@ pub(crate) struct Crumb {
     pub(crate) label: String,
     pub(crate) line: Option<u32>,
     pub(crate) owner: Option<String>,
+    /// The node's element path, as its [`Placed`] records it; none for a
+    /// mod's root marker, which is not drawn.
+    pub(crate) path: Option<String>,
     pub(crate) parent: Option<Rc<Crumb>>,
 }
 
 impl Crumb {
-    pub(crate) fn node(node: &Node, parent: Option<Rc<Crumb>>) -> Rc<Self> {
+    pub(crate) fn node(node: &Node, path: &str, parent: Option<Rc<Crumb>>) -> Rc<Self> {
         Rc::new(Self {
             label: describe(node),
             line: line(node),
             owner: None,
+            path: Some(path.to_owned()),
             parent,
         })
     }
@@ -40,12 +49,13 @@ impl Crumb {
             label: format!("mod {name}"),
             line: None,
             owner: Some(name.to_owned()),
+            path: None,
             parent,
         })
     }
 
     /// Outermost first.
-    fn trail(self: &Rc<Self>) -> Vec<Rc<Crumb>> {
+    pub(crate) fn trail(self: &Rc<Self>) -> Vec<Rc<Crumb>> {
         let mut trail = vec![self.clone()];
         while let Some(parent) = trail.last().and_then(|crumb| crumb.parent.clone()) {
             trail.push(parent);
@@ -59,6 +69,9 @@ impl Crumb {
 #[derive(Clone)]
 pub(crate) struct Placed {
     pub(crate) bounds: Bounds<Pixels>,
+    /// The part of it not clipped away by a box it is in (a scrolled
+    /// list, a pane): what the pointer can reach and the outline follows.
+    pub(crate) visible: Bounds<Pixels>,
     /// Its corner radii, as drawn, for the highlight to follow.
     pub(crate) corners: Corners<Pixels>,
     /// The node's element path, the same from frame to frame.
@@ -75,8 +88,13 @@ pub(crate) struct Inspector {
     /// Picking: the pointer highlights, a click selects.
     pub(crate) picking: bool,
     sink: Sink,
-    pub(crate) hovered: Option<Placed>,
+    /// What the pointer, and ↑ and ↓, aim at while picking.
+    aim: aim::Aim,
+    pub(crate) hovered: Option<Target>,
     pub(crate) selected: Option<Placed>,
+    /// The deepest node the selection's card offers in its trail: what
+    /// was under the pointer, when ↑ picked a node around it.
+    pub(crate) leaf: Option<Placed>,
     /// The mod that started this pick (`command = "inspect"`): it hears
     /// the pick on `app/inspect`, and no card opens.
     pub(crate) asker: Option<String>,
@@ -97,16 +115,6 @@ impl Inspector {
     pub(crate) fn recorded(&self) -> Sink {
         self.sink.clone()
     }
-
-    /// The deepest node under `point` in the last frame.
-    pub(crate) fn at(&self, point: Point<Pixels>) -> Option<Placed> {
-        self.sink
-            .borrow()
-            .iter()
-            .rev()
-            .find(|placed| placed.bounds.contains(&point))
-            .cloned()
-    }
 }
 
 /// A pick, for a mod that asked for one.
@@ -117,8 +125,6 @@ pub(crate) struct Pick {
     pub(crate) owner: String,
     /// The file and line that built it.
     pub(crate) at: String,
-    /// The elements it is inside, outermost first.
-    pub(crate) inside: Vec<String>,
     /// The whole report, as `report` writes it.
     pub(crate) report: String,
 }
@@ -129,12 +135,6 @@ pub(crate) fn pick(placed: &Placed, workspace: &Workspace) -> Pick {
         element: placed.crumb.label.clone(),
         owner,
         at,
-        inside: placed
-            .crumb
-            .trail()
-            .iter()
-            .map(|crumb| crumb.label.clone())
-            .collect(),
         report: report(placed, workspace),
     }
 }
@@ -391,6 +391,7 @@ impl Element for Tracked {
     ) -> Self::PrepaintState {
         self.sink.borrow_mut().push(Placed {
             bounds,
+            visible: bounds.intersect(&window.content_mask().bounds),
             corners: self.corners,
             path: self.path.clone(),
             crumb: self.crumb.clone(),
