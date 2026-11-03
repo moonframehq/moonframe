@@ -181,8 +181,8 @@ and live things (terminals, pages, text fields) need the host.
 
 The shell (`main.luau` only) adds menus and fills the About panel; the host
 puts its app menu first (About <title>, Quit <title>), then these, View (a
-shell menu titled "View" merges into it), Components outside a release, and
-Window and Help last.
+shell menu titled "View" merges into it), and Window and Help last. In
+Developer Mode, **View > Components…** opens the Components gallery.
 
 ```lua
 -- A typed local: items with `msg` and with `command` mix in one list.
@@ -221,7 +221,16 @@ which also has a release workflow to copy.
 
 ## Release mode and bundles
 
-- **Developer Mode** (app menu, beside About) switches the Components menu,
+- **Smaller, sealed bundles:** `just bundle-plan examples/ledger` previews
+  dependencies; `just bundle-sealed examples/ledger` builds from a folder,
+  or `just bundle-app-sealed NAME` from an installed/linked profile. Only
+  selected native capabilities, components and providers ship, with no full
+  embedded toolbox or user source overlays. Removed capabilities need a
+  rebuild. Computed imports need explicit `[bundle.dynamic]` declarations
+  in `moonframe.toml`. See `docs/sealed-bundles.md` for limits and the build
+  report. Python 3.11+ is required.
+
+- **Developer Mode** (app menu, beside About) switches View's Components…,
   Inspect Element and Reload Modules, and their keys, on and off live; the
   choice is kept per app and profile. Until the user picks, it is off in a
   bundle and in a library app's release build. `--release` and `--dev` set

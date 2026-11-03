@@ -4,6 +4,8 @@ use super::{toasts::toast, *};
 
 impl Render for MoonframeApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        #[cfg(feature = "capture")]
+        crate::capture::schedule(window, cx);
         let started = std::time::Instant::now();
         let gallery_open = self.gallery.is_some_and(|gallery| {
             cx.windows()
@@ -15,10 +17,12 @@ impl Render for MoonframeApp {
         }
         self.inputs.begin_frame();
         let last_keyed = self.motion.begin_frame();
+        #[cfg(feature = "terminal")]
         self.terminals.begin_frame();
         let mut painter = Painter::new(
             &self.workspace,
             &mut self.motion,
+            #[cfg(feature = "terminal")]
             &mut self.terminals,
             &self.inputs,
             self.inspector.sink(),
@@ -51,11 +55,14 @@ impl Render for MoonframeApp {
         self.after_frame(frame, window, cx);
         // A terminal that just appeared (a new tab, or one selected) takes
         // the keyboard, once it is drawn.
+        #[cfg(feature = "terminal")]
         if let Some(focus) = self.terminals.end_frame() {
             window.defer(cx, move |window, cx| focus.focus(window, cx));
         }
         // Shells that exited tell their mods (a tab closes), once drawn.
+        #[cfg(feature = "terminal")]
         let exits = self.terminals.take_exits();
+        #[cfg(feature = "terminal")]
         if !exits.is_empty() {
             cx.defer_in(window, move |app, _, cx| {
                 for (owner, msg) in exits {
@@ -64,6 +71,7 @@ impl Render for MoonframeApp {
             });
         }
         // The panels follow the project of the terminal last typed in.
+        #[cfg(feature = "terminal")]
         if let Some(folder) = self.terminals.focused_folder(window) {
             self.project.follow(folder);
         }

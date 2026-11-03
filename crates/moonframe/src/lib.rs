@@ -27,11 +27,16 @@ mod agent_files;
 mod alerts;
 mod app;
 mod assets;
+mod backends;
 mod branch_bar;
 mod browser;
 mod build;
+mod capabilities;
+#[cfg(feature = "capture")]
+mod capture;
 mod cli;
 mod color;
+#[cfg(feature = "studio")]
 mod demos;
 mod dock;
 mod embed;
@@ -48,6 +53,10 @@ mod motion;
 mod natives;
 mod overlay;
 mod panes;
+#[cfg(any(feature = "terminal", feature = "herdr-core"))]
+mod persist;
+#[cfg(not(any(feature = "terminal", feature = "herdr-core")))]
+#[path = "persist/sqlite.rs"]
 mod persist;
 mod profiles;
 mod project;
@@ -96,7 +105,7 @@ pub(crate) static RELEASE: AtomicBool = AtomicBool::new(false);
 
 /// Whether developer tools are left out; see [`RELEASE`].
 pub(crate) fn release() -> bool {
-    RELEASE.load(Ordering::Relaxed)
+    !cfg!(feature = "studio") || RELEASE.load(Ordering::Relaxed)
 }
 
 /// Where this app (or profile) keeps the user's Developer Mode choice:
@@ -113,9 +122,12 @@ pub(crate) fn developer_choice(file: &std::path::Path) -> Option<bool> {
 }
 
 /// Turns Developer Mode on or off for this run, and keeps the choice for
-/// the next ones: the Components menu, Inspect Element and Reload Modules,
+/// the next ones: View's Components…, Inspect Element and Reload Modules,
 /// and their keys.
 pub(crate) fn set_developer(on: bool) {
+    if !cfg!(feature = "studio") {
+        return;
+    }
     RELEASE.store(!on, Ordering::Relaxed);
     if let Some(file) = DEVELOPER_FILE.get() {
         let written = file

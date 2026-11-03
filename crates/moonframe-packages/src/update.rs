@@ -13,25 +13,32 @@
 //! `App-1.2.3-universal-apple-darwin.dmg`, and optionally a `SHA256SUMS`
 //! file the download is checked against. With **Beta Releases** on, the
 //! newest pre-release counts too.
+//!
+//! The `updates` feature enables networking and installation. Source metadata
+//! and repository validation stay available to manifests in every build.
 
 // keep-sorted start
+#[cfg(feature = "updates")]
 mod beta;
+#[cfg(feature = "updates")]
 mod install;
+#[cfg(feature = "updates")]
 mod release;
 // keep-sorted end
 
+#[cfg(feature = "updates")]
 pub use {
     beta::{beta, load as load_beta, set_beta},
     install::{relaunch, stage},
     release::{Found, Release, check},
 };
 
+#[cfg(feature = "updates")]
 use std::{
     fs,
-    path::PathBuf,
-    sync::OnceLock,
     time::{Duration, SystemTime},
 };
+use std::{path::PathBuf, sync::OnceLock};
 
 /// Where this run's updates come from.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -86,6 +93,7 @@ pub(crate) fn running_bundle() -> Option<PathBuf> {
 
 /// When the last automatic check ran, kept in the state folder per app and
 /// profile.
+#[cfg(feature = "updates")]
 fn stamp(profile: Option<&str>) -> PathBuf {
     crate::paths::state(profile).with_file_name(match profile {
         Some(profile) => format!("update-checked-{profile}"),
@@ -94,21 +102,25 @@ fn stamp(profile: Option<&str>) -> PathBuf {
 }
 
 /// How often the app checks by itself.
+#[cfg(feature = "updates")]
 const EVERY: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// How often an open app asks whether the daily check is due: it may stay
 /// open for days, and sleep through some of them.
+#[cfg(feature = "updates")]
 pub const POLL: Duration = Duration::from_secs(60 * 60);
 
 /// Whether this run checks by itself: an installed app (a bundle, or a
 /// Linux prefix), or an app on the library built for release. A run from
 /// source checks only when asked, and Developer Mode changes neither.
 pub fn checks_by_itself() -> bool {
-    crate::paths::in_bundle() || (crate::identity().hosted && !cfg!(debug_assertions))
+    cfg!(feature = "updates")
+        && (crate::paths::in_bundle() || (crate::identity().hosted && !cfg!(debug_assertions)))
 }
 
 /// Whether the automatic check is due: a day after the last check that
 /// reached GitHub.
+#[cfg(feature = "updates")]
 pub fn due(profile: Option<&str>) -> bool {
     !fs::metadata(stamp(profile))
         .and_then(|meta| meta.modified())
@@ -118,6 +130,7 @@ pub fn due(profile: Option<&str>) -> bool {
 }
 
 /// Notes that a check reached GitHub, so the next is a day away.
+#[cfg(feature = "updates")]
 pub fn checked(profile: Option<&str>) {
     let file = stamp(profile);
     let written = file

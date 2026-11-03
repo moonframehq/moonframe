@@ -31,6 +31,8 @@ pub(crate) struct Motion {
     pub(crate) tweens: RefCell<Tweens>,
     /// Where each `ui.list` is scrolled, by path.
     scrolls: Recent<ScrollHandle>,
+    /// Last requested child, so redraws do not undo wheel scrolling.
+    scroll_targets: Recent<Option<usize>>,
     /// Each popover's anchor and the side its content fits on, by path.
     rooms: Recent<Rc<Room>>,
 }
@@ -55,6 +57,7 @@ impl Default for Motion {
             sizes: Recent::default(),
             tweens: RefCell::default(),
             scrolls: Recent::keeping(FORGET_SCROLL),
+            scroll_targets: Recent::keeping(FORGET_SCROLL),
             rooms: Recent::default(),
         }
     }
@@ -355,6 +358,19 @@ impl Motion {
         self.scrolls
             .get_or(path, Instant::now(), ScrollHandle::default)
             .clone()
+    }
+
+    /// Reveal a direct child only when the view's request changes.
+    pub(crate) fn scroll_to(&mut self, path: &str, target: Option<usize>) -> ScrollHandle {
+        let handle = self.scroll(path);
+        let previous = self.scroll_targets.get_or(path, Instant::now(), || None);
+        if *previous != target {
+            if let Some(index) = target {
+                handle.scroll_to_item(index - 1);
+            }
+            *previous = target;
+        }
+        handle
     }
 
     /// What the popover at `path` measured.

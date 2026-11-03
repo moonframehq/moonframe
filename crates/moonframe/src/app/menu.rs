@@ -15,10 +15,11 @@ impl MoonframeApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        if !self.is_main(window)
-            || self.inputs.any_focused(window, cx)
-            || self.terminals.any_focused(window)
-        {
+        if !self.is_main(window) || self.inputs.any_focused(window, cx) {
+            return false;
+        }
+        #[cfg(feature = "terminal")]
+        if self.terminals.any_focused(window) {
             return false;
         }
         let modifiers = keystroke.modifiers;
@@ -163,10 +164,10 @@ pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
             if !developer && app.inspector.picking {
                 app.toggle_inspect(cx);
             }
-            cx.set_menus(menus(app.workspace.components(), app.workspace.menus()));
+            cx.set_menus(menus(app.workspace.menus()));
             app.show_toast(
                 if developer {
-                    "Developer Mode: the Components menu, Inspect Element (⌥⌘I) and Reload Modules (⌘R)"
+                    "Developer Mode: Components… (⇧⌘K), Inspect Element (⌥⌘I) and Reload Modules (⌘R)"
                 } else {
                     "Developer Mode is off"
                 },
@@ -180,7 +181,7 @@ pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
         crate::motion::set_slow(!crate::motion::is_slow());
         // The menu shows the switch checked while it is on.
         let _ = app.update(cx, |app, cx| {
-            cx.set_menus(menus(app.workspace.components(), app.workspace.menus()));
+            cx.set_menus(menus(app.workspace.menus()));
         });
         cx.refresh_windows();
     });

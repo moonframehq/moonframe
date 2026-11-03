@@ -59,6 +59,8 @@ impl Crumb {
 #[derive(Clone)]
 pub(crate) struct Placed {
     pub(crate) bounds: Bounds<Pixels>,
+    /// Its corner radii, as drawn, for the highlight to follow.
+    pub(crate) corners: Corners<Pixels>,
     /// The node's element path, the same from frame to frame.
     pub(crate) path: String,
     pub(crate) crumb: Rc<Crumb>,
@@ -78,6 +80,8 @@ pub(crate) struct Inspector {
     /// The mod that started this pick (`command = "inspect"`): it hears
     /// the pick on `app/inspect`, and no card opens.
     pub(crate) asker: Option<String>,
+    /// Where the highlight was last drawn, to animate it from there.
+    pub(crate) highlight: Rc<RefCell<crate::overlay::Highlight>>,
 }
 
 impl Inspector {
@@ -113,6 +117,8 @@ pub(crate) struct Pick {
     pub(crate) owner: String,
     /// The file and line that built it.
     pub(crate) at: String,
+    /// The elements it is inside, outermost first.
+    pub(crate) inside: Vec<String>,
     /// The whole report, as `report` writes it.
     pub(crate) report: String,
 }
@@ -123,6 +129,12 @@ pub(crate) fn pick(placed: &Placed, workspace: &Workspace) -> Pick {
         element: placed.crumb.label.clone(),
         owner,
         at,
+        inside: placed
+            .crumb
+            .trail()
+            .iter()
+            .map(|crumb| crumb.label.clone())
+            .collect(),
         report: report(placed, workspace),
     }
 }
@@ -195,6 +207,7 @@ fn describe(node: &Node) -> String {
         Node::Icon(icon) => format!("icon{} {}", classes(&icon.look), icon.name.name()),
         Node::Image(image) => format!("image{} {}", classes(&image.look), quote(&image.src)),
         Node::Line(line) => format!("line{} ({} points)", classes(&line.look), line.points.len()),
+        Node::Paths(paths) => format!("paths{} ({})", classes(&paths.look), paths.paths.len()),
         Node::Hatch(hatch) => format!("hatch{}", classes(&hatch.look)),
         Node::Terminal(terminal) => format!(
             "terminal{} {} ({})",
@@ -270,6 +283,7 @@ fn line(node: &Node) -> Option<u32> {
         Node::Icon(icon) => icon.look.line,
         Node::Image(image) => image.look.line,
         Node::Line(line) => line.look.line,
+        Node::Paths(paths) => paths.look.line,
         Node::Hatch(hatch) => hatch.look.line,
         Node::Terminal(terminal) => terminal.look.line,
         Node::Browser(browser) => browser.look.line,
@@ -289,6 +303,33 @@ fn line(node: &Node) -> Option<u32> {
     }
 }
 
+/// How round a node's corners are drawn: its style's radius, else the
+/// element's own (buttons and items take the theme's, badges are pills).
+/// A pill's radius is clamped to half its height when painted.
+pub(crate) fn corners(
+    node: &Node,
+    styled: Option<moonframe_core::Corners>,
+    theme: Pixels,
+) -> Corners<Pixels> {
+    if let Some(styled) = styled {
+        // A button takes one radius: its top left's.
+        if matches!(node, Node::Button(_)) {
+            return Corners::all(px(styled.top_left));
+        }
+        return Corners {
+            top_left: px(styled.top_left),
+            top_right: px(styled.top_right),
+            bottom_right: px(styled.bottom_right),
+            bottom_left: px(styled.bottom_left),
+        };
+    }
+    match node {
+        Node::Button(_) | Node::Item(_) => Corners::all(theme),
+        Node::Badge(_) => Corners::all(px(f32::MAX / 4.)),
+        _ => Corners::default(),
+    }
+}
+
 fn quote(text: &str) -> String {
     let mut short: String = text.chars().take(QUOTE).collect();
     if text.chars().count() > QUOTE {
@@ -301,6 +342,7 @@ fn quote(text: &str) -> String {
 /// child's layout straight through, so the layout is the same as without it.
 pub(crate) struct Tracked {
     pub(crate) child: AnyElement,
+    pub(crate) corners: Corners<Pixels>,
     pub(crate) path: String,
     pub(crate) crumb: Rc<Crumb>,
     pub(crate) sink: Sink,
@@ -347,6 +389,7 @@ impl Element for Tracked {
     ) -> Self::PrepaintState {
         self.sink.borrow_mut().push(Placed {
             bounds,
+            corners: self.corners,
             path: self.path.clone(),
             crumb: self.crumb.clone(),
         });

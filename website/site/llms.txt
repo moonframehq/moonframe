@@ -52,11 +52,13 @@ moonframe --profile NAME --check   # load everything headlessly; run after each 
 
 - `app new` writes the Moonframe skills to `DIR/.claude/skills/` (moonframe, moonframe-components, moonframe-apps), the Luau API to `DIR/types/moonframe.d.luau`, and a strict `.luaurc`. Read the skills before you write UI. Your harness may only load skills from the folder it started in; if so, read the `SKILL.md` files directly. If `DIR/.claude/skills` is missing after `app new`, the installed Moonframe is older than this: read the guides linked below instead.
 - Lay out the window in `main.luau` and add one mod per feature under `mods/`. Use components from the catalogue before writing new ones. Restyle in `style.luau`.
+- For a polished composition (workspace shell, switcher, issue card, onboarding checklist), browse [Patterns](https://docs.moonframe.dev/patterns/) and read [the pattern guide](https://raw.githubusercontent.com/moonframehq/moonframe/main/docs/patterns.md). Copy only the pattern files needed into your app's components/. In a Moonframe checkout, `just patterns` opens a separate live preview/source browser.
 - Data comes from providers in `providers/<name>/provider.toml`. Built-ins such as `git`, `files` and `system` are already there. Use `kind = "static"` for sample JSON, and `kind = "process"` for a program that prints one JSON value per line and reads messages from stdin. A process provider runs with the user's full access, so say so in its manifest. Never pass `--yes`, which allows such providers without asking, unless the user agrees.
 
 ## Rules for any path
 
 - Luau is sandboxed: no files, network or processes. Anything that touches the machine goes through a provider.
+- For sandboxed computation or the `system` host capability, use a WebAssembly (WASM) provider. Read [Building WebAssembly (WASM) providers](https://raw.githubusercontent.com/moonframehq/moonframe/main/docs/wasm-providers.md) before implementing one. It covers the complete Rust component, JSON payloads, Luau integration, build and runtime checks, and source versus prebuilt distribution. Building from source needs Rust and `wasm32-wasip2`, including in a profile app. WASM has no filesystem, HTTP or process capability; use a process or native provider when those are needed.
 - The window reloads as you save. Run `--check` after every change and fix what it reports before you go on.
 - To see your result, start the window with `--background` and take a screenshot of it.
 - Never overwrite the user's files to make a command succeed. `moonframe init` keeps existing files, and you should do the same.
@@ -70,6 +72,7 @@ moonframe --profile NAME --check   # load everything headlessly; run after each 
 
 ## Reference
 
+- [Building WebAssembly (WASM) providers](https://raw.githubusercontent.com/moonframehq/moonframe/main/docs/wasm-providers.md): step-by-step guide for humans and agents; [website version](https://docs.moonframe.dev/wasm-providers/).
 - [Using the library](https://raw.githubusercontent.com/moonframehq/moonframe/main/docs/library.md): the dependency, features, `Moonframe` builder calls, native and async providers, views, layers, bundles.
 - [Luau API types](https://raw.githubusercontent.com/moonframehq/moonframe/main/types/moonframe.d.luau): the declarations of the whole Luau API.
 - [README](https://raw.githubusercontent.com/moonframehq/moonframe/main/README.md): install, quick start, working with an agent, mods from git, apps as profiles, commands.

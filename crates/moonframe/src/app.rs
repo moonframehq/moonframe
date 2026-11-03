@@ -5,6 +5,7 @@ use {
     crate::{
         actions::*,
         alerts::{Alerts, Posted},
+        backends::Backends,
         browser::Browsers,
         color::rgba_color,
         gallery::Gallery,
@@ -17,7 +18,6 @@ use {
         paths::{self, Folders},
         render::{Finished, KeyLayer, ListRequest, Painter},
         settings,
-        terminal::Terminals,
         theme_picker::ThemePicker,
         themes::{self, Scheme},
     },
@@ -31,7 +31,6 @@ use {
         Action, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL, Sound,
         Stylesheet, Titlebar, Token, WindowRequest, WindowState, Workspace,
     },
-    moonframe_mux::Backends,
     moonframe_providers::{Event, Natives, Providers},
     notify::{RecommendedWatcher, RecursiveMode, Watcher as _},
     std::{
@@ -42,6 +41,9 @@ use {
         time::Duration,
     },
 };
+
+#[cfg(feature = "terminal")]
+use {crate::terminal::Terminals, listeners::wake_on_output};
 
 // keep-sorted start
 mod dialogs;
@@ -59,7 +61,7 @@ mod windows;
 // keep-sorted end
 
 use {
-    listeners::{deliver_from_views, flush_on_quit, report, start_providers, wake_on_output},
+    listeners::{deliver_from_views, flush_on_quit, report, start_providers},
     menu::{hear_notification_clicks, is_dark, menu_actions, name_of, stock_preview},
     watch::watch,
 };
@@ -92,6 +94,7 @@ pub(crate) struct MoonframeApp {
     /// Picking an element for an agent, and what was picked.
     pub(crate) inspector: Inspector,
     /// The shells `ui.terminal` elements show.
+    #[cfg(feature = "terminal")]
     pub(crate) terminals: Terminals,
     /// Saves what mods keep across launches; `None` keeps nothing.
     /// The pages `ui.browser` elements show.
@@ -135,6 +138,7 @@ pub(crate) struct MoonframeApp {
     /// A bundle is being built (Build App Bundle).
     building: bool,
     /// Checking for, or installing, an update.
+    #[cfg(feature = "updates")]
     updating: bool,
     /// When a mod last asked for a reload (`app:command`).
     requested_reload: Option<std::time::Instant>,
@@ -146,6 +150,7 @@ pub(crate) struct MoonframeApp {
     /// The app's providers, which publish data as `app.<name>`.
     pub(crate) providers: Providers,
     /// The repository of the terminal last used, which providers follow.
+    #[cfg(feature = "terminal")]
     pub(crate) project: crate::project::Project,
     /// The theme's own settings, restored when a stylesheet stops setting them.
     defaults: Defaults,
@@ -161,7 +166,7 @@ pub(crate) struct MoonframeApp {
     pub(crate) key_layers: HashMap<WindowId, Vec<KeyLayer>>,
     /// Sends keys to the topmost overlay or popover, else a focused
     /// terminal, before key bindings see them.
-    _terminal_keys: Subscription,
+    _keys: Subscription,
     /// The number of the last tab `moonframe pane new` opened, which names
     /// it: each one's is higher, even for two in the same millisecond.
     last_pane: i64,
@@ -215,18 +220,23 @@ impl MoonframeApp {
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
         let history = crate::history::open(&folders);
+        // Projects are kept only with the user's folder: `--no-user` runs
+        // start fresh and keep nothing, as their state.
+        let kept =
+            (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
+        crate::project::restore(kept.as_deref());
         let providers = start_providers(&workspace, parts.natives, cx);
         let views = Views::new(parts.views, deliver_from_views(cx));
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         bind_menu_keys(workspace.menus(), cx);
-        cx.set_menus(menus(workspace.components(), workspace.menus()));
+        cx.set_menus(menus(workspace.menus()));
         menu_actions(cx);
+        #[cfg(feature = "terminal")]
         let terminals = Terminals::new(backends, wake_on_output(cx));
-        // Projects are kept only with the user's folder: `--no-user` runs
-        // start fresh and keep nothing, as their state.
-        let kept =
-            (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
+        #[cfg(not(feature = "terminal"))]
+        let _ = backends;
+        #[cfg(feature = "terminal")]
         let project = crate::project::Project::start(kept, cx);
         flush_on_quit(cx);
         let settings = folders.settings().into_iter().next();
@@ -270,6 +280,7 @@ impl MoonframeApp {
         };
         show_appearance(appearance);
         let mut app = Self {
+            #[cfg(feature = "terminal")]
             terminals,
             browsers: Browsers::new(crate::browser::wake_on_report(cx)),
             inputs: Inputs::default(),
@@ -294,19 +305,21 @@ impl MoonframeApp {
             toast_notice: None,
             toasts: 0,
             building: false,
+            #[cfg(feature = "updates")]
             updating: false,
             requested_reload: None,
             alerts: Alerts::default(),
             focus,
             motion: Motion::default(),
             providers,
+            #[cfg(feature = "terminal")]
             project,
             defaults,
             main_window: window.window_handle().window_id(),
             key_layers: HashMap::new(),
             history,
             _watcher: watcher,
-            _terminal_keys: crate::terminal::intercept_keys(cx),
+            _keys: crate::keys::intercept(cx),
             last_pane: 0,
         };
         app.apply_theme(cx);
@@ -320,6 +333,7 @@ impl MoonframeApp {
         // while it stays open, whatever Developer Mode says; runs from
         // source and runs without the user's folder (checks, screenshots)
         // never do.
+        #[cfg(feature = "updates")]
         if crate::update::checks_by_itself()
             && crate::update::source().is_some()
             && app.folders.user.is_some()
@@ -377,6 +391,7 @@ impl MoonframeApp {
             None => {},
         }
         Theme::change(mode, None, cx);
+        #[cfg(feature = "terminal")]
         self.terminals.set_palette(scheme.map(Scheme::palette));
         let sheet: &Stylesheet = self.workspace.stylesheet();
         let theme = Theme::global_mut(cx);
@@ -468,7 +483,7 @@ impl MoonframeApp {
         self.preview = None;
         self.apply_theme(cx);
         show_appearance(appearance);
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         if let Some(path) = &self.settings
             && let Err(problem) = settings::save(path, &[(settings::APPEARANCE, appearance.name())])
         {
@@ -710,21 +725,29 @@ impl MoonframeApp {
         let main = self.main_window;
         let app = cx.entity();
         cx.defer(move |cx| {
-            let Some(window) = cx
-                .windows()
-                .into_iter()
-                .find(|window| window.window_id() == main)
-            else {
-                return;
-            };
-            let _ = window.update(cx, |_, window, cx| {
-                app.update(cx, |app, cx| {
-                    for (from, request) in requests {
+            for (from, request) in requests {
+                let target = match &request {
+                    Request::Edit(edit) => app
+                        .read(cx)
+                        .inputs
+                        .window(&from, &edit.field)
+                        .unwrap_or(main),
+                    _ => main,
+                };
+                let Some(window) = cx
+                    .windows()
+                    .into_iter()
+                    .find(|window| window.window_id() == target)
+                else {
+                    continue;
+                };
+                let _ = window.update(cx, |_, window, cx| {
+                    app.update(cx, |app, cx| {
                         app.request(&from, request, window, cx);
-                    }
-                    app.flush("app", cx);
+                        app.flush("app", cx);
+                    });
                 });
-            });
+            }
         });
     }
 
@@ -835,7 +858,20 @@ impl MoonframeApp {
             Request::Appearance(appearance) => self.set_appearance(appearance, cx),
             Request::Sound(sound) => self.play(from, &sound),
             Request::Pick(pick) => self.pick(from, pick, cx),
+            Request::Edit(edit) => {
+                if let Err(problem) = self.inputs.edit(from, &edit, window, cx) {
+                    self.workspace
+                        .refuse(from, Error::new(format!("`app:edit`: {problem}")));
+                }
+            },
             Request::Window(request) => self.window_request(from, request, cx),
+            Request::Open(url) => {
+                if self.alerts.may_open() {
+                    cx.open_url(&url);
+                } else {
+                    tracing::warn!("{from}: `app:open` asked too often; {url} not opened");
+                }
+            },
             Request::Notify(notification) => match self.alerts.notify(from, &notification) {
                 Ok(Posted::System) => {},
                 Ok(Posted::Toast) => {
@@ -875,7 +911,7 @@ impl MoonframeApp {
             self.show_toast("The window's title bar changes when the app restarts", cx);
         }
         bind_menu_keys(self.workspace.menus(), cx);
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         self.apply_theme(cx);
         report(&self.workspace);
         cx.notify();
@@ -897,7 +933,7 @@ impl MoonframeApp {
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
         bind_menu_keys(self.workspace.menus(), cx);
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         self.apply_theme(cx);
         report(&self.workspace);
         self.reload_providers(Some(roots), cx);

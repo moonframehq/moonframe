@@ -10,7 +10,7 @@
 //! laid out like a prefix (`bin/`, `share/<binary>/`, a `.desktop` file and
 //! an icon) to copy under `/usr/local` or `~/.local`.
 //!
-//! A bundle runs as a release: no Components menu or Inspect Element.
+//! A bundle runs as a release: no Components… or Inspect Element.
 //!
 //! With `--dist DIR` it is also packaged for a GitHub release: an archive
 //! named for its version and platform, and its line in `SHA256SUMS`, what

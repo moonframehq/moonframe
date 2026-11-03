@@ -44,6 +44,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`), `exit` (sent once, with `exited = true` added, as the shell exits; without it Enter starts another) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
 | `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; links send `link` instead of opening, pictures are not loaded; styled by `markdown`, `markdown-code` and `markdown-quote` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width` |
+| `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
 | `ui.view { name = "chart", id = "sales", props = {...} }` | a view the app writes in Rust and registers by `name` (apps on the Moonframe library; the starter registers none): what Luau can't draw, such as an editor or a canvas. Kept by mod and `id`, it gets `props` again when they change, and sends this mod's `update` messages of its own | `name`, `id`, `props`, `class`, `style` |
 
 ### Controls
@@ -52,7 +53,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
-| `ui.input { id = "name", change = "typed" }` | a text field the host edits, one line or a text area (`multiline`); a writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it | `id`, `value`, `placeholder`, `change`, `submit` and `keys` (sent with `value` added), `to`, `multiline`, `rows`, `grow`, `width`, `mono`, `focus`, `disabled`, `browser`, `prose`, `dim`, `typewriter` |
+| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value` and `caret`), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow`, `browser`, `prose`, `dim`, `typewriter` |
 
 ### Overlays
 
@@ -70,6 +71,11 @@ Names are modifiers (`ctrl`, `alt`, `shift`, `cmd`, `secondary` = cmd on
 macOS, ctrl elsewhere) then a key, joined by `-`.
 
 ### Shared keys
+
+- **Scroll to a child** (`row`, `column`): with `scroll` enabled,
+  `scroll_to = 12` reveals direct child 12 (one-based) when the index
+  changes. It scrolls only as far as needed and leaves wheel scrolling
+  free between changes. Set it to nil to reset the request.
 
 - **Frame keys** (`row`, `column`, `panel`): `grow`, `width`, `height`,
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `follow = true` (with `scroll`:
@@ -102,6 +108,16 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   apps (`paths`), which that mod's `ui.image` may then show; `cursor` sets the pointer's
   shape (`crosshair`, `grab`, `grabbing`, `ew-resize`, `ns-resize`,
   `nwse-resize`, `nesw-resize`, `move`, `pointer`, `text`, `not-allowed`).
+- **Drag and drop** (`row`, `column`): `carry = <data>` lets the user drag
+  it (a card, a row, a calendar event); a box of its size, the `carry`
+  rule, follows the pointer while it dims, and a click still clicks.
+  `accept = <msg>` on another row or column is sent as it moves over it
+  (`phase = "over"`), off it (`"leave"`) and is dropped on it (`"drop"`),
+  with `carry` (the data), `from` (the mod that drew it), and `x`, `y`
+  (fractions of the target's box: before or after a row's middle) added.
+  The innermost target takes the drop; nothing follows a drop, so clear
+  what `over` showed then. Other entered targets hear `leave` when the
+  drag ends, including cancellation. Not with `pointer` or `drag`.
 - **Children:** `false` and `nil` children are skipped, wherever they are.
 - **Look keys** (every element but splits): `class = "a b"`,
   `style = { ... }`, and `state = "open"`: a state of the view's own naming,
@@ -120,6 +136,16 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `open`, `folder` or `save` with `name` and `folder`); the answer comes
   back to the mod as `reply` with `paths` (`path` for a save) or
   `cancelled = true`. Picked files may then show in that mod's `ui.image`.
+- **Text edits:** `{ to = "app:edit", msg = { field = "notes", wrap = {
+  "**", "**" } } }` edits the mod's `ui.input` with that `id` around its
+  selection, keeping undo and focus: `wrap` puts the two around it (or
+  takes them off), `lines = "- "` starts each selected line with it (or
+  takes it off), `insert = "@Sam ", back = 3` replaces the selection and
+  the 3 bytes before it. A completion can add `at = <caret offset>` and
+  `expect = "@sa"`: it applies only with an empty selection there and that
+  exact preceding text (`back` must equal its byte length). The field then
+  sends its `change`. A toolbar button sends directly (`to = "app:edit"`);
+  editing restores focus in the field's own window.
 - **Keys anywhere:** `mod { keys = { ["secondary-1"] = "histogram" } }`
   sends its message when the key is pressed and nothing nearer (an open
   overlay, a terminal) took it, to every mod and every mounted copy of
@@ -196,6 +222,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`dropdown`](#dropdown) | Controls | Pick one of many options that do not fit a `segmented` control (more than 3 or 4, or long labels), or a button that opens a menu of actions. For 2 to 4 short choices use `segmented`; for a menu on right-click use `context-menu`; for the menu rows alone use `menu`. |
 | [`filter-dropdown`](#filter-dropdown) | Controls | Filters in a row over a table or list (activity type, author, date range), each narrowing it to one or a few values. For toggles that are each on or off use `chips`; for a setting rather than a filter use `dropdown`; for a free-text filter use `search-field`. |
 | [`icon-button`](#icon-button) | Controls | An action or toggle shown only as an icon: in a title bar, a panel header, a toolbar. Always give a `tooltip`. For buttons with words use `ui.button` or `toolbar`; for back/forward use `nav-buttons`; for joined icon choices use `button-group`. |
+| [`picker`](#picker) | Controls | A property of a record set from many options: assignee, labels, project, status, priority, "blocked by", in a task's detail panel or a row. For a setting in a form use `dropdown`; for a filter over a list use `filter-dropdown`; for 2 to 4 short choices use `segmented`; for addresses use `recipient-field`. |
 | [`segmented`](#segmented) | Controls | A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`. |
 | [`toolbar`](#toolbar) | Controls | A row of small quiet buttons above a panel or list. For icon-only buttons use `icon-button`; for one-of-many choices use `segmented`. |
 | [`avatar`](#avatar) | Data | Stand for a person, space, project or agent by its name: comment authors, workspace switchers, people lists. Use `comment-card` for an authored message (it draws one), `status-dot` for a state alone. |
@@ -210,8 +237,10 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`course-card`](#course-card) | Data | The one course, plan or program a page puts first, with where the reader is and a button to carry on. For a grid of guides use `guide-card`; for a figure with a trend use `stat-tile`; for a titled box of anything use `card`. |
 | [`date-tile`](#date-tile) | Data | Beside dated items in a list (deadlines, calls, distributions, events) where the date leads. For a date inside a line of text use plain text; for picking a day use `day-strip` or `month-grid`. |
 | [`dot-chart`](#dot-chart) | Data | A daily or weekly count compared with the period before (signups, orders), where the squares' rhythm reads better than smooth bars. For stacked counts by kind use `bar-chart`; for a balance against a floor use `forecast-chart`; for a trend line use `ui.line`. |
+| [`file-card`](#file-card) | Data | Attachments on a task, a comment or a message, in a grid of tiles or a list of rows, while they upload and after. For the area files are dropped on use `dropzone`; for a file in a tree use `tree` with `file-icon`; for a picture to look at closely use `image-viewer`. |
 | [`file-icon`](#file-icon) | Data | Beside a file name in a tree, a tab or a list of changes. For a generic icon use `ui.icon`. |
 | [`forecast-chart`](#forecast-chart) | Data | A balance or capacity projected over weeks or months against a minimum (cash against a floor, stock against a reorder point). For counts per bucket, stacked by kind, use `bar-chart`; for a small trend use `sparkline` or `ui.line`. |
+| [`gantt`](#gantt) | Data | A project's schedule or timeline: when tasks run, how far they are, what waits on what. For events placed in hours use `week-calendar`; for a dated list of events use `timeline`; for a board by status use `kanban-column`. |
 | [`guide-card`](#guide-card) | Data | Cards of reading material or courses the reader works through (guides, docs, tutorials), three or so to a row, each with how far the reader got. For one featured course with actions use `course-card`; for a plain titled box use `card`; for a linked record inside a message use `record-card`. |
 | [`heat-grid`](#heat-grid) | Data | Activity over days or weeks at a glance: lessons per week, posts per day, a streak, a course's progress as squares. For a GitHub-style calendar of days with months and weekdays use `contribution-graph`; for a count compared with the period before use `dot-chart`; for stacked counts with an axis use `bar-chart`; for one fraction use `meter` or `progress`. |
 | [`histogram`](#histogram) | Data | The spread of a picture's tones (red, green, blue, luminance), of latencies or of scores, where the shape matters more than any count; with draggable markers it is a levels control. For counts per labelled bucket use `bar-chart`; for a trend over time use `ui.line` or `series-chart`. |
@@ -228,8 +257,10 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`numbered-list`](#numbered-list) | Data | Ordered steps or suggestions in a message, a note or a help page. For a checklist use `task-row`; for events in time use `timeline`. |
 | [`pill`](#pill) | Data | A tag on a row ("Work", "Health") or a count inside a sentence ("2 events"), where colour carries meaning. For several read-only labels use `tags`; for filters the user toggles use `chips`; for a plain status word use `ui.badge`. |
 | [`pixel-icon`](#pixel-icon) | Data | A playful, recognisable mark for an agent, a bot, a project or a workspace, at any size from a list row (18 px) to a header (64 px). For a person's initial use `avatar`; for a generic glyph use `ui.icon`. |
+| [`priority-icon`](#priority-icon) | Data | Beside a task's title in a list, a board card or a detail panel, and in the menu that changes it. For a task's status use `status-icon`; for a coloured label use `pill`. |
 | [`progress`](#progress) | Data | Progress of a task: a download, an index, a build step. Use `busy = true` when the size is unknown. For a reading such as memory use `meter`; for a quota with a reset use `usage-bar`; for a spinner alone use `ui.icon { name = "loader-circle", spin = true }`. |
 | [`progress-stack`](#progress-stack) | Data | How far a goal is (a raise, a budget, a quota) split by stage: closed, out, soft, still needed, with where the pace leads. For one fraction use `meter`; for a quota with a reset use `usage-bar`; for task progress use `progress`. |
+| [`project-card`](#project-card) | Data | The projects page of a task manager, two to four cards to a row, each opening its project. For one project's row in a list use `list` or `table`; for a card on a board use `board-card`; for reading material use `guide-card`. |
 | [`record-card`](#record-card) | Data | A record an agent or a person points at inside a message or a note, which a click opens. For a full row in a list use `list` or `pr-row`; for a dated item use `date-tile` beside text. |
 | [`relative-time`](#relative-time) | Data | An age or last-updated time in rows, cards and headers. Pass elapsed `seconds`: the mod computes them from a provider's timestamp and the current time. Use `compact` in tight columns (PR lists, tables). For a dated list of events use `timeline`. |
 | [`rich-text`](#rich-text) | Data | A sentence that mixes emphasis and labels in one line: an audit log's activity, a notification, a table cell ("Order #1213 marked as [Fulfilled]"). For a paragraph use `ui.text`; for a lone label use `pill` or `ui.badge`; for several labels use `tags`. |
@@ -239,6 +270,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`spotlight-bars`](#spotlight-bars) | Data | One figure over a dozen periods where one period is the story (revenue by month, the best week), in a dashboard card that is wide and tall. For several series stacked use `bar-chart`; for a few small bars in a KPI strip use `mini-bars`; for a balance against a floor use `forecast-chart`. |
 | [`spreadsheet`](#spreadsheet) | Data | Data laid out as a spreadsheet the user (or an agent) fills cell by cell: research sheets, imports, editable records, with cells still loading shown as skeleton bars. For a read-only list of records with sorting use `table`; for label/value pairs use `key-values`. |
 | [`stat-tile`](#stat-tile) | Data | A headline number on a dashboard or overview: open PRs, tokens today, uptime, failing checks; put several in a wrapping row. For a status bar reading use `stat`; for a fraction use `meter`; for a quota use `usage-bar`; for a series use `bar-chart`. |
+| [`status-icon`](#status-icon) | Data | Beside a task's title in a list, a board card or a detail panel, and in the menu that changes it. For an agent's or job's state use `status-dot`; for a check the user ticks use `task-check`; for a priority use `priority-icon`. |
 | [`system-load`](#system-load) | Data | CPU and memory of a machine in a status bar, a host row of a sidebar, or a card header. Use `compact` beside a name in a tight row. For one reading alone use `sparkline`, `meter` or `vertical-bar`. |
 | [`table`](#table) | Data | Tabular data with several aligned fields per row: devices, processes, files, runs; an admin list (audit log, orders) as `bordered` and `checkable`, with `filter-dropdown`s over it and `pagination` under it. For one field per row use `list`; for pull requests use `pr-row`; for label/value pairs use `key-values`. |
 | [`tags`](#tags) | Data | A wrapping set of small labels: languages, topics, states. |
@@ -265,7 +297,11 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`choice-cards`](#choice-cards) | Forms | Pick one of several options that are best seen: a theme, a layout, a template, an agent. For short text options use `segmented` or `radio-group`; for a colour use `swatches`; for a menu use `dropdown`. |
 | [`composer`](#composer) | Forms | The bottom of a chat with an agent or a person. For a search box use `search-field`; for a longer form field use `ui.input` with `multiline`. |
 | [`curve-editor`](#curve-editor) | Forms | A tone or response curve the user shapes by hand: a photo's gradation curve per channel, an easing, a gain curve. For one value along a range use `slider`; for a fixed set of levels over a histogram use `histogram` with markers. |
+| [`date-picker`](#date-picker) | Forms | Setting a date on a record: a task's due date, a start date, a reminder, with presets for the usual ones. For the grid alone (a calendar view) use `month-grid`; for a time of day use `time-picker`; for a strip of days over a list use `day-strip`. |
+| [`dropzone`](#dropzone) | Forms | Adding attachments to a task, a message or a form: files dragged from other apps land on it, and browse opens the system's file panel (`{ to = "app:pick", ... }`). Show what was added under it with `file-card`. For a button alone use `ui.button`; for an empty list with one action use `empty-state`. |
+| [`filter-builder`](#filter-builder) | Forms | Filtering a list or board by conditions the user builds (status is Done, assignee is not Sarah), inside a `ui.popover` under a Filter button. For one filter per chip over a table use `filter-dropdown`; for toggles use `chips`; for a text query use `search-field`. |
 | [`form-grid`](#form-grid) | Forms | A dense form in a tool's sidebar or inspector: an output's size, a scanner's holder, a file name. For a settings page with descriptions use `settings-row`; for read-only label/value pairs use `key-values`. |
+| [`mention-field`](#mention-field) | Forms | A comment box, a task's description or a chat message where people are mentioned. For addresses on a message use `recipient-field`; for a chat with an agent use `composer`; for a plain field use `ui.input`. |
 | [`number-field`](#number-field) | Forms | A number the user sets exactly or nudges: a resolution, a frame number, a zoom, a count, in a dense settings form or inspector. Read `tonumber(msg.value)` for both typing and dragging. For a value along a range where the feel matters use `slider`; for a small count with buttons only use `stepper`. |
 | [`radio-group`](#radio-group) | Forms | Pick one of a few options that need a description or room to read (a mode, a policy). For 2 to 4 short values use `segmented`; for many values use `dropdown`; for options with a picture use `choice-cards`; for independent on/off options use `checkbox`. |
 | [`recipient-field`](#recipient-field) | Forms | The To, Cc and Bcc lines of a message being written, or inviting people by address. For tags the user only reads use `tags`; for filters use `chips`; for a single free-text value use `ui.input`; for a search box use `search-field`. |
@@ -276,12 +312,16 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`swatches`](#swatches) | Forms | Pick a colour from a short palette: a workspace or tag colour, an accent. For themes (many colours each) use `choice-cards` with a swatch row as the preview; to show colours without picking, use `ui.row`s with a background. |
 | [`switch`](#switch) | Forms | A setting that takes effect at once, on or off ("High contrast"). For a choice that is confirmed later or part of a list of options use `checkbox`; for one of several values use `segmented` or `radio-group`. |
 | [`task-check`](#task-check) | Forms | The check at the start of a task or to-do row; a click sends `msg` for the mod to flip it. For a form option use `checkbox`; for an agent's state use `status-dot`. |
+| [`text-editor`](#text-editor) | Forms | A task's or project's description, release notes, a long comment: text with some formatting, edited in place. For a markdown file of the project use `markdown-editor`; for markdown only shown use `markdown`; for a chat message use `composer`; for one line use `ui.input`. |
 | [`time-picker`](#time-picker) | Forms | Choosing when: Send Later, Snooze or a reminder's "Choose a Time…", beside a `month-grid` for the day. For a list of preset moments alone use `menu` or `dropdown`; for a number that is not a time use `stepper`; for a day use `month-grid` or `day-strip`. |
 | [`ahead-behind`](#ahead-behind) | Git | A branch's sync state beside its name: sidebars, title bars, branch lists. For lines changed use `diff-counts`. |
 | [`change-tree`](#change-tree) | Git | The changed files of a repository or a review, as the right pane's Changes shows `app.git.files`. For every file in a folder use `tree`; for a file's lines use `diff-view`. |
 | [`checks`](#checks) | Git | CI runs or readiness factors for a pull request or branch: a PR detail pane, a merge dialog. For a single summary dot use `pr-badge` or `pr-row` with `checks`; for an agent's state use `status-dot`. |
 | [`diff-counts`](#diff-counts) | Git | The size of a change beside a file, commit, branch or PR: file lists, rows, title bars. For commits ahead and behind use `ahead-behind`; for a whole diff use `diff-view`. |
 | [`diff-view`](#diff-view) | Git | Show a file's changes for review: a review pane, a checkpoint, a commit. Stack one per file in a scrolling column. For only the size of a change use `diff-counts`; for a file without changes use `code-view`. |
+| [`forge-account`](#forge-account) | Git | The account control beside `forge-pr` in a title bar or sidebar footer. What the click opens is the app's: show `forge-sign-in` in a `dialog` or a popover, or a settings page of your own. |
+| [`forge-pr`](#forge-pr) | Git | Wherever a branch shows its pull request: the title bar (the current branch, falling back to uncommitted lines), beside each worktree or branch in a sidebar (`branch = worktree.branch`). It reads the forge provider's data; for a number you already have use `pr-badge`, for a whole list row `pr-row`. |
+| [`forge-sign-in`](#forge-sign-in) | Git | The body of the app's own sign-in, opened from `forge-account` or a settings page. Draw your own instead from `app.github.auth` when it should look different; send the provider the same messages. |
 | [`pr-badge`](#pr-badge) | Git | A pull or merge request referenced inline: beside a branch in a sidebar, in a title bar, in a tab. For a full list row use `pr-row`; for CI details use `checks`; for an agent's state use `status-dot`. |
 | [`pr-row`](#pr-row) | Git | Lists of pull requests, merge requests or issues, as in an orchestrator or review queue; stack rows in a scrolling column, under `section` headings per group. For a PR referenced inline use `pr-badge`; for a generic data grid use `table`; for its CI use `checks`. |
 | [`mockups`](#mockups) | Layout | Showing the user a few ideas for a change before making it, so they can pick one: the moonframe-mockups skill builds a throwaway mod around it. Not for real content; for choosing between options inside the app use `choice-cards`. |
@@ -323,6 +363,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`confirm`](#confirm) | Overlays | Ask before doing something, especially destructive (close a window with running agents, delete a branch). For a modal with a form or custom body use `dialog`; for an undo-able action prefer doing it and showing a `toast` with an Undo action. |
 | [`context-menu`](#context-menu) | Overlays | Right-click actions on a row, tab, tile or file. It anchors the menu to the wrapped content, not the pointer. For a menu opened by a button use `dropdown`; for the menu rows alone use `menu`. On `tabs`, use its `context` (each tab already sends { tab_menu = id }) and put this around the strip, or a `ui.popover` with `menu`. |
 | [`dialog`](#dialog) | Overlays | Any modal that asks for attention: a form, a choice, details. For a yes/no question use `confirm`; for a panel sliding from an edge use `sheet`; for a non-blocking message use `toast` or `notice`; for content beside a control use `ui.popover`. |
+| [`emoji-picker`](#emoji-picker) | Overlays | Reacting to a comment or a message, or putting an emoji in a name: open it in a `ui.popover` from an add-reaction button (give the popover `class = "emoji-picker-popover"`). For a list of actions use `menu`; for colours use `swatches`. |
 | [`menu`](#menu) | Overlays | The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `command-palette`. |
 | [`notification-drawer`](#notification-drawer) | Overlays | The app's notification centre, opened from a bell: a list the user filters by kind (All, Error, Success, Info), marks read and dismisses. For transient pop-ups use `toasts`; for a message that stays in the page use `notice`; for any other side panel use `sheet`. |
 | [`onboarding`](#onboarding) | Overlays | A short guided tour or welcome on first launch or after a big update. For one release's changes use `release-notes`; for a single question use `confirm`; for any other modal use `dialog`. |
@@ -931,6 +972,55 @@ icon_button { icon = "delete", tooltip = "Delete", msg = "delete", size = "small
 
 A whole mod using it, with state: `app/components/demos/icon-button.luau`.
 
+#### `picker`
+
+**Picker.** A field's value as a quiet pill that opens a searchable list of options (people, labels, statuses); one or several, with a Create row; picking sends { pick = id }.
+
+**When:** A property of a record set from many options: assignee, labels, project, status, priority, "blocked by", in a task's detail panel or a row. For a setting in a form use `dropdown`; for a filter over a list use `filter-dropdown`; for 2 to 4 short choices use `segmented`; for addresses use `recipient-field`.
+
+| Prop | Meaning |
+| --- | --- |
+| `align` | "start" (default) or "end": which edge of the trigger the popover lines up with |
+| `create` | message of a "Create “text”" row under the list, shown while the query matches no label exactly; sent with `value` set to the query |
+| `dismiss` | message sent on a click outside or Escape |
+| `empty` | text while no option matches the query (default "No matches") |
+| `event` | key of the message a pick sends, default "pick": { pick = id } |
+| `highlight` | key of the message up and down send, default "highlight": { highlight = id } of the next row; Enter picks the highlighted row (or sends `create`) |
+| `highlighted` | id of the keyboard-highlighted option ("+create" for the Create row); the first shown one when unset or filtered out |
+| `icon` | icon before the placeholder, and before a picked option that has no icon, avatar or dot of its own |
+| `id` | keeps the search text across renders (default "picker") |
+| `keys` | more keys while open, e.g. { tab = "next-field" }; they replace the built-in up, down and enter |
+| `multiple` | several can be picked: each pick toggles one (the mod keeps the popover open) and the trigger shows them all (pills, avatars, or the first label and how many more) |
+| `open` | true while the popover shows |
+| `options` | list of { id, label, detail? (muted, on the right), icon?, avatar? (a person's name: a small round `avatar`), dot? (a colour: a small dot, as for a status), color? (a coloured label: a dot in the list, a `pill` on the trigger), disabled? } |
+| `placeholder` | trigger text while nothing is picked ("Add labels"), muted after `icon` |
+| `query` | the search text; the list shows the options whose label holds it, case aside (set it to "" on close) |
+| `search` | message sent on each edit of the search field, with `value` set to the text; no search field when unset |
+| `selected` | the picked id, or with `multiple` a list of ids |
+| `to` | mod to send messages to, if not the drawing one |
+| `toggle` | message the trigger sends (open or close) |
+| `trigger` | an element to open it from instead of the pill (it sends `toggle` itself) |
+| `width` | popover width in pixels (default 240) |
+
+**Styles:** `.picker-dot` `.picker-empty` `.picker-faces` `.picker-icon` `.picker-pills` `.picker-placeholder` `.picker-popover` `.picker-search` `.picker-search-icon` `.picker-search-input` `.picker-trigger` `.picker-trigger:hover` `.picker-trigger:selected`
+
+```lua
+local picker = use "picker"
+
+picker {
+	options = PEOPLE, selected = task.assignee, icon = "user", placeholder = "Assign",
+	open = state.open == "assignee", toggle = { open = "assignee" }, dismiss = "close",
+	query = state.query, search = "search", highlighted = state.highlighted,
+}
+-- update: msg.open opens (or closes) it; "close" closes it and sets
+-- state.query = ""; msg.msg == "search" sets state.query = msg.value;
+-- msg.highlight sets state.highlighted; msg.pick sets task.assignee and
+-- closes it. With multiple = true, selected is a list and each pick
+-- toggles one id; with create = "create", msg.value is the new label.
+```
+
+A whole mod using it, with state: `app/components/demos/picker.luau`.
+
 #### `segmented`
 
 **Segmented.** One-of-many choice as segments in a rounded track, the selected one raised; sends { select = id }.
@@ -1128,7 +1218,7 @@ A whole mod using it, with state: `app/components/demos/code-view.luau`.
 
 #### `comment-card`
 
-**Comment Card.** An authored message: avatar, bold author, "commented 3d ago", an optional file:line chip, a role badge, and the body.
+**Comment Card.** An authored message: avatar, bold author, "commented 3d ago", an optional file:line chip, a role badge, the body, and reactions with a button to add one.
 
 **When:** Comments in a pull request conversation, review threads, notes left by agents or people. Stack them in a column. For a numbered review note with a remove button use `note-card`; for events in order use `timeline`.
 
@@ -1137,6 +1227,7 @@ A whole mod using it, with state: `app/components/demos/code-view.luau`.
 | `[children]` | anything after the body: a code-view, a diff-view, buttons |
 | `action` | verb after the name (default "commented"), e.g. "approved", "requested changes" |
 | `actions` | elements at the header's right |
+| `add_reaction` | message the add-reaction button sends; no button without it. With `picker`, a click outside the open picker or Escape sends it again, so the mod toggles |
 | `age` | age text, e.g. "3d ago" |
 | `author` | author name (the avatar's initial and colour come from it) |
 | `avatar` | an image file for the avatar |
@@ -1144,15 +1235,19 @@ A whole mod using it, with state: `app/components/demos/code-view.luau`.
 | `body` | the text; blank lines split paragraphs |
 | `locate` | message the chip sends on a click (e.g. { open = "src/ledger.rs:26" }) |
 | `location` | a file:line chip, e.g. "src/ledger.rs:26" |
+| `picker` | an element, usually `emoji-picker`, shown in a popover on the add-reaction button |
+| `picker_open` | show `picker` |
+| `react` | the key a reaction's click sends its emoji under (default "react": `{ react = "👍" }`) |
+| `reactions` | list of { emoji, count, mine?, tooltip? }: pills under the body, `mine` tinted (the reader's own) |
 | `seconds` | age in seconds instead of `age` |
 | `to` | the mod to send `locate` to |
 
-**Styles:** `.comment-card` `.comment-card-author` `.comment-card-badge` `.comment-card-badge-text` `.comment-card-body` `.comment-card-location` `.comment-card-location:hover` `.comment-card-location-text` `.comment-card-meta` `.comment-card-text`
+**Styles:** `.comment-card` `.comment-card-add-reaction` `.comment-card-add-reaction:hover` `.comment-card-add-reaction:selected` `.comment-card-author` `.comment-card-badge` `.comment-card-badge-text` `.comment-card-body` `.comment-card-location` `.comment-card-location:hover` `.comment-card-location-text` `.comment-card-meta` `.comment-card-reaction` `.comment-card-reaction:hover` `.comment-card-reaction-count` `.comment-card-reaction-emoji` `.comment-card-reaction-mine` `.comment-card-reaction-mine:hover` `.comment-card-reactions` `.comment-card-text`
 
 ```lua
 local comment_card = use "comment-card"
 
-comment_card { action = "requested changes", age = "3d ago", author = "alice", badge = "reviewer", body = "Reject mixing currencies here: return a Result instead of silently grouping.\n\nA builder would also keep the call sites short.", location = "src/ledger.rs:26" }
+comment_card { action = "requested changes", add_reaction = "add-reaction", age = "3d ago", author = "alice", badge = "reviewer", body = "Reject mixing currencies here: return a Result instead of silently grouping.\n\nA builder would also keep the call sites short.", location = "src/ledger.rs:26", reactions = { { count = 3, emoji = "👍", mine = true }, { count = 1, emoji = "🎉", mine = false } } }
 ```
 
 A whole mod using it, with state: `app/components/demos/comment-card.luau`.
@@ -1328,6 +1423,40 @@ local dot_chart = use "dot-chart"
 dot_chart { columns = { { current = 48, previous = 60 }, { current = 70, previous = 61 }, { current = 55, previous = 66 }, { current = 90, previous = 85 }, { current = 82, previous = 74 }, { current = 104, previous = 118 } }, labels = { "Oct 2", "Oct 5", "Oct 8" }, max = 120, rows = 8, ticks = { "120", "60", "0" } }
 ```
 
+#### `file-card`
+
+**File Card.** An attached file: a thumbnail or its type's icon, the name, a muted line, a remove button, and a bar while it uploads; as a tile or a row.
+
+**When:** Attachments on a task, a comment or a message, in a grid of tiles or a list of rows, while they upload and after. For the area files are dropped on use `dropzone`; for a file in a tree use `tree` with `file-icon`; for a picture to look at closely use `image-viewer`.
+
+| Prop | Meaning |
+| --- | --- |
+| `detail` | a muted line under the name, e.g. "PDF · 2.4 MB" |
+| `layout` | "tile" (default: thumbnail on top, for a grid) or "row" (icon at the left, for a list) |
+| `msg` | message a click sends (open or preview it) |
+| `name` | the file's name; its extension picks the icon when there is no thumbnail |
+| `progress` | 0 to 1 while it uploads: a bar and the percentage instead of `detail` |
+| `remove` | message the × sends; no × without it |
+| `selected` | highlight it |
+| `src` | a picture file for the thumbnail (cropped to fill) |
+| `to` | mod to send the messages to, if not the drawing one |
+| `width` | pixels (default 168 for a tile; a row grows) |
+
+**Styles:** `.file-card` `.file-card:hover` `.file-card:selected` `.file-card-body` `.file-card-detail` `.file-card-fill` `.file-card-icon` `.file-card-name` `.file-card-remove` `.file-card-remove:hover` `.file-card-remove-over` `.file-card-remove-over:hover` `.file-card-row` `.file-card-thumb` `.file-card-tint` `.file-card-track`
+
+```lua
+local file_card = use "file-card"
+
+ui.row { gap = "normal", wrap = true,
+	file_card { name = "mockup.png", src = file.thumbnail, detail = "PNG · 840 KB",
+		msg = { open = file.id }, remove = { remove = file.id } },
+	file_card { name = "launch-plan.pdf", progress = upload.progress },
+}
+file_card { name = "notes.md", detail = "Markdown · 3 KB", layout = "row", remove = { remove = "notes" } }
+```
+
+A whole mod using it, with state: `app/components/demos/file-card.luau`.
+
 #### `file-icon`
 
 **File Icon.** A file's or folder's icon, coloured by its type, as an editor's file tree shows it.
@@ -1370,6 +1499,50 @@ local forecast_chart = use "forecast-chart"
 
 forecast_chart { bars = { { current = true, delta = "$46.8M", label = "Today", low = false, value = 46.8 }, { current = false, delta = "−2.8", label = "Nov 2", low = false, value = 44 }, { current = false, delta = "+9.2", label = "Nov 9", low = false, value = 53.2 }, { current = false, delta = "−16.8", label = "Nov 16", low = false, value = 36.4 }, { current = false, delta = "−15.3", label = "Nov 23", low = true, value = 21.1 }, { current = false, delta = "+11.9", label = "Nov 30", low = false, value = 33 } }, floor = 15, height = 160, max = 60, ticks = { "$60M", "$30M", "$0" } }
 ```
+
+#### `gantt`
+
+**Gantt.** Tasks as bars over days: names on the left, months and days on top, progress inside each bar, dependency arrows, milestones, weekends shaded and a line on today; bars drag to move and stretch.
+
+**When:** A project's schedule or timeline: when tasks run, how far they are, what waits on what. For events placed in hours use `week-calendar`; for a dated list of events use `timeline`; for a board by status use `kanban-column`.
+
+| Prop | Meaning |
+| --- | --- |
+| `day_width` | pixels per column (default 32) |
+| `days` | the columns, oldest first: { label ("12"), month? (shown from this day on, "October 2026"), weekend?, today? }; a column can stand for a week too |
+| `deps` | arrows from a task to one that waits on it: { from = id, to = id } |
+| `event` | key of the message a task's name sends, default "select": { select = id } |
+| `grow` | fill the parent and scroll the rows |
+| `height` | pixels: the rows scroll within it |
+| `label_width` | pixels for the names (default 220) |
+| `move` | key of the message a bar's drag sends, default "move": { move = id, phase, value }, `value` the whole columns moved; on `up` with `value = 0` it was a click |
+| `moving` | the drag in progress, drawn without changing the dates: { id, days, resize? }; apply it on `up` |
+| `resize` | key of the message a drag of a bar's right edge sends, default "resize": the same, for the last day |
+| `row_height` | pixels per row (default 36) |
+| `rows` | a task { id, label, start, finish (column indexes from 1, the last included), progress? (0 to 1), color?, avatar? (a name), done?, milestone? (a diamond on `start`) }, or a heading { heading, count?, color? } |
+| `selected` | id of the chosen task |
+| `to` | mod to send them to, if not the drawing one |
+
+**Styles:** `.gantt` `.gantt-bar` `.gantt-bar:selected` `.gantt-bar-after` `.gantt-bar-text` `.gantt-count` `.gantt-day` `.gantt-day-today` `.gantt-day-weekend` `.gantt-grip` `.gantt-group` `.gantt-head` `.gantt-heading` `.gantt-milestone` `.gantt-month` `.gantt-name` `.gantt-name:hover` `.gantt-name:selected` `.gantt-names` `.gantt-row` `.gantt-today` `.gantt-weekend`
+
+```lua
+local gantt = use "gantt"
+
+gantt {
+	days = state.days, -- { { label = "12", month = "October 2026", weekend = false, today = true }, ... }
+	rows = {
+		{ heading = "In Progress", count = 1 },
+		{ id = "nav", label = "Finalize navigation", start = 2, finish = 9, progress = 0.6, color = "#8b5cf6", avatar = "Tanjim Islam" },
+	},
+	deps = { { from = "nav", to = "handoff" } },
+	selected = state.selected, moving = state.moving, grow = true,
+}
+-- update: msg.select picks a task. msg.move and msg.resize carry the task's
+-- id, `phase` and `value` (whole days): keep { id, days = value, resize }
+-- as state.moving while it moves, add it to the dates on "up" and clear it.
+```
+
+A whole mod using it, with state: `app/components/demos/gantt.luau`.
 
 #### `guide-card`
 
@@ -1798,6 +1971,35 @@ local pixel_icon = use "pixel-icon"
 pixel_icon { colors = { "#6fd3e6", "#f4f4f7", "#c9a7e8" }, pattern = { "0011", "0122", "0011", "0002", "0011", "0002", "0022", "0111" }, size = 48 }
 ```
 
+#### `priority-icon`
+
+**Priority Icon.** A task's priority as signal bars: faint dashes for none, one to three bars lit for low, medium and high, a red square with "!" for urgent.
+
+**When:** Beside a task's title in a list, a board card or a detail panel, and in the menu that changes it. For a task's status use `status-icon`; for a coloured label use `pill`.
+
+| Prop | Meaning |
+| --- | --- |
+| `label` | `true` shows the priority's name after the glyph, a string shows that text |
+| `priority` | none (default), low, medium, high or urgent |
+| `size` | the glyph's side in pixels (default 14) |
+| `tooltip` | text under the pointer (default the priority's name) |
+
+**Styles:** `.priority-icon` `.priority-icon-bar` `.priority-icon-label` `.priority-icon-lit` `.priority-icon-mark` `.priority-icon-urgent`
+
+```lua
+local priority_icon = use "priority-icon"
+
+ui.row { align = "center", gap = "normal",
+	priority_icon { priority = "none" },
+	priority_icon { priority = "low" },
+	priority_icon { priority = "medium" },
+	priority_icon { priority = "high" },
+	priority_icon { priority = "urgent", label = true },
+}
+```
+
+A whole mod using it, with state: `app/components/demos/priority-icon.luau`.
+
 #### `progress`
 
 **Progress.** A thin rounded progress bar filled to a fraction, or a striped busy bar with a spinner, with an optional label and percentage.
@@ -1847,6 +2049,52 @@ local progress_stack = use "progress-stack"
 
 progress_stack { labels = { "$0M", "$25M", "$50M", "Target $75M" }, marker = { label = "Pace $69M", value = 69 }, segments = { { color = "accent", hatch = false, value = 41.3 }, { color = "accent/45", hatch = false, value = 8.5 }, { color = "accent/60", hatch = true, value = 12 }, { color = "danger", hatch = true, value = 13.2 } }, total = 75, width = 420 }
 ```
+
+#### `project-card`
+
+**Project Card.** A project in a grid: its icon on a tinted tile, name, status pill and star, two lines of description, a progress bar, tasks, due date, members and last change.
+
+**When:** The projects page of a task manager, two to four cards to a row, each opening its project. For one project's row in a list use `list` or `table`; for a card on a board use `board-card`; for reading material use `guide-card`.
+
+| Prop | Meaning |
+| --- | --- |
+| `color` | the project's colour: the icon and the tile's tint (default accent) |
+| `context` | message a right-click sends (a menu) |
+| `description` | what it is about, cut to two lines |
+| `due` | the due date, e.g. "Nov 28" |
+| `icon` | icon on the tile (default "layers") |
+| `msg` | message a click sends (open the project) |
+| `name` | the project's name |
+| `people` | members, as `avatar-stack` takes them: list of { name, src? } |
+| `progress` | 0 to 1: a bar and its percentage |
+| `selected` | highlight the card |
+| `star` | message the star sends on a click; no star without it |
+| `starred` | draw the star filled |
+| `status` | status text in a pill under the name ("On track", "At risk") |
+| `status_color` | any colour for the pill instead of a tone |
+| `tasks` | tasks done of all, e.g. "4/8" |
+| `to` | mod to send the messages to, if not the drawing one |
+| `tone` | the pill's tone: neutral (default), accent, success, warning or danger |
+| `updated` | when it last changed, e.g. "Updated 2h ago" |
+| `width` | pixels (default: grow to fill its share of the row) |
+
+**Styles:** `.project-card` `.project-card:hover` `.project-card:selected` `.project-card-description` `.project-card-fill` `.project-card-foot` `.project-card-meta` `.project-card-name` `.project-card-percent` `.project-card-star` `.project-card-star:hover` `.project-card-starred` `.project-card-starred:hover` `.project-card-tile` `.project-card-track` `.project-card-updated`
+
+```lua
+local project_card = use "project-card"
+
+ui.row { gap = "large",
+	project_card {
+		name = "Mobile app v2", icon = "rocket", color = "#7c5cff",
+		status = "On track", tone = "success", starred = project.starred, star = { star = project.id },
+		description = "Rebuild onboarding, offline sync and the new board view.",
+		progress = 0.62, tasks = "31/50", due = "Nov 28", updated = "Updated 2h ago",
+		people = project.members, msg = { open = project.id }, context = { menu = project.id },
+	},
+}
+```
+
+A whole mod using it, with state: `app/components/demos/project-card.luau`.
 
 #### `record-card`
 
@@ -2109,6 +2357,38 @@ stat_tile { delta = "+12%", detail = "vs. yesterday · 3 agents", icon = "activi
 
 A whole mod using it, with state: `app/components/demos/stat-tile.luau`.
 
+#### `status-icon`
+
+**Status Icon.** A task's status as a small round glyph: dotted ring (backlog), ring (todo), ring with a pie (in progress, in review), disc with a check (done) or a cross (cancelled).
+
+**When:** Beside a task's title in a list, a board card or a detail panel, and in the menu that changes it. For an agent's or job's state use `status-dot`; for a check the user ticks use `task-check`; for a priority use `priority-icon`.
+
+| Prop | Meaning |
+| --- | --- |
+| `color` | any colour instead of the status's own (warning in progress, accent in review, success done, muted otherwise) |
+| `label` | `true` shows the status's name after the glyph, a string shows that text |
+| `progress` | 0 to 1: how much of the pie is filled for progress and review, in quarters (default a half, and three quarters for review) |
+| `size` | the glyph's side in pixels (default 14) |
+| `status` | backlog, todo (default), progress, review, done or cancelled |
+| `tooltip` | text under the pointer (default the status's name) |
+
+**Styles:** `.status-icon` `.status-icon-disc` `.status-icon-label` `.status-icon-ring`
+
+```lua
+local status_icon = use "status-icon"
+
+ui.row { align = "center", gap = "normal",
+	status_icon { status = "backlog" },
+	status_icon { status = "todo" },
+	status_icon { status = "progress", progress = 0.25 },
+	status_icon { status = "review" },
+	status_icon { status = "done" },
+	status_icon { status = "cancelled", label = true },
+}
+```
+
+A whole mod using it, with state: `app/components/demos/status-icon.luau`.
+
 #### `system-load`
 
 **System Load.** A machine's CPU (a sparkline of recent samples) and memory (a meter), each with its percentage; `compact` shows two upright bars instead.
@@ -2140,6 +2420,7 @@ system_load { cpu = 0.14, history = { 0.1, 0.2, 0.1, 0.3, 0.2, 0.6, 0.4, 0.2, 0.
 
 | Prop | Meaning |
 | --- | --- |
+| `add_label` | the text of a group's Add row (default "Add") |
 | `bordered` | frame it as a rounded card with a tinted header in sentence case and lines between rows |
 | `check` | key of the message a row's box sends, default "check": { check = id } |
 | `check_all` | message the header's box sends (default { check_all = true }); it shows checked when every row is, a dash when some are |
@@ -2149,9 +2430,13 @@ system_load { cpu = 0.14, history = { 0.1, 0.2, 0.1, 0.3, 0.2, 0.6, 0.4, 0.2, 0.
 | `descending` | the sort arrow points down |
 | `empty` | text shown when there are no rows (default "Nothing to show") |
 | `event` | row message key instead of "select": sends { [event] = id } |
+| `fold` | key of the message a group's heading sends, default "fold": { fold = id } |
+| `groups` | rows in groups instead of `rows`: { id, title, rows, count? (default the rows), color? (a dot), icon?, collapsed?, add? (a message: an "Add" row under them) } |
 | `grow` | fill the parent and scroll the body |
 | `height` | pixels: the body scrolls within it |
 | `id` | names the list a long scrolling body becomes (default "table"); two long tables in one mod need two |
+| `marker` | draw a drop line by a row: { id, after? }, or { group } for a group's end |
+| `reorder` | rows drag to another place: a drop on a row sends { [reorder] = its id, group, phase, carry = { row, group }, y } (before it when `y < 0.5`), on a group's heading { [reorder] = true, group, ... } (its end); `over` and `leave` come the same way |
 | `rows` | list of maps: `id` plus a value per column key; a value may be a string, a number or an element |
 | `selected` | id of the selected row |
 | `sort` | key of the sorted column (shows an arrow) |
@@ -2159,7 +2444,7 @@ system_load { cpu = 0.14, history = { 0.1, 0.2, 0.1, 0.3, 0.2, 0.6, 0.4, 0.2, 0.
 | `to` | the mod to send { sort = key } and { select = id } to |
 | `zebra` | stripe every other row |
 
-**Styles:** `.table` `.table-bordered` `.table-cell` `.table-cell-bordered` `.table-cell-mono` `.table-cell-muted` `.table-check` `.table-check:hover` `.table-check:selected` `.table-empty` `.table-empty-text` `.table-header` `.table-header-bordered` `.table-heading` `.table-heading:hover` `.table-heading-sorted` `.table-heading-text` `.table-heading-text-bordered` `.table-row` `.table-row:hover` `.table-row:selected` `.table-row-bordered` `.table-row-last` `.table-row-odd`
+**Styles:** `.table` `.table-add` `.table-add:hover` `.table-bordered` `.table-cell` `.table-cell-bordered` `.table-cell-mono` `.table-cell-muted` `.table-check` `.table-check:hover` `.table-check:selected` `.table-empty` `.table-empty-text` `.table-group` `.table-group:hover` `.table-group-count` `.table-group-title` `.table-header` `.table-header-bordered` `.table-heading` `.table-heading:hover` `.table-heading-sorted` `.table-heading-text` `.table-heading-text-bordered` `.table-marker` `.table-row` `.table-row:hover` `.table-row:selected` `.table-row-bordered` `.table-row-last` `.table-row-odd`
 
 ```lua
 local table_view = use "table"
@@ -2361,8 +2646,10 @@ vertical_bar { label = "MEM", value = 0.5 }
 | `hour_height` | pixels per hour (default 96) |
 | `hours` | { from = 8, to = 18 }: the hours shown |
 | `more` | month: chips per day before "+N more" (default 3) |
+| `move` | events drag to another day (and hour): a drop sends { [move] = day id, phase = "drop", carry = { event = id }, y }, `y` the fraction down the hours shown in day and week; `over` and `leave` come the same way |
 | `next` | message the forward arrows send |
 | `now` | { day, hour }: a line across that day at that hour |
+| `over` | id of the day a dragged event is over: tint it |
 | `pick_day` | key of a day's message, default "day": { day = id } |
 | `previous` | message the back arrows send |
 | `selected` | id of the chosen event |
@@ -2375,7 +2662,7 @@ vertical_bar { label = "MEM", value = 0.5 }
 | `weekdays` | month: the heading's names (default Sun … Sat) |
 | `weeks` | month: weeks of 7 { id, day ("11"), today?, outside? } |
 
-**Styles:** `.week-calendar` `.week-calendar-arrow` `.week-calendar-arrow:hover` `.week-calendar-arrows` `.week-calendar-cell` `.week-calendar-cell:hover` `.week-calendar-cell-first` `.week-calendar-cell-number` `.week-calendar-cell-today` `.week-calendar-chip` `.week-calendar-chip:hover` `.week-calendar-chip:selected` `.week-calendar-chip-text` `.week-calendar-event` `.week-calendar-event:hover` `.week-calendar-event:selected` `.week-calendar-event-caption` `.week-calendar-event-head` `.week-calendar-event-time` `.week-calendar-event-title` `.week-calendar-grid` `.week-calendar-grip` `.week-calendar-head` `.week-calendar-head:hover` `.week-calendar-head-text` `.week-calendar-heads` `.week-calendar-hour` `.week-calendar-hour-label` `.week-calendar-hour-text` `.week-calendar-mark` `.week-calendar-mark-call` `.week-calendar-mark-chat` `.week-calendar-mark-meet` `.week-calendar-mark-plain` `.week-calendar-mark-video` `.week-calendar-month` `.week-calendar-month-name` `.week-calendar-more` `.week-calendar-nav` `.week-calendar-now` `.week-calendar-now-dot` `.week-calendar-outside` `.week-calendar-title` `.week-calendar-today` `.week-calendar-today-button` `.week-calendar-today-button:hover` `.week-calendar-top` `.week-calendar-week`
+**Styles:** `.week-calendar` `.week-calendar-arrow` `.week-calendar-arrow:hover` `.week-calendar-arrows` `.week-calendar-cell` `.week-calendar-cell:hover` `.week-calendar-cell:over` `.week-calendar-cell-first` `.week-calendar-cell-number` `.week-calendar-cell-today` `.week-calendar-chip` `.week-calendar-chip:hover` `.week-calendar-chip:selected` `.week-calendar-chip-text` `.week-calendar-drop:over` `.week-calendar-event` `.week-calendar-event:hover` `.week-calendar-event:selected` `.week-calendar-event-caption` `.week-calendar-event-head` `.week-calendar-event-time` `.week-calendar-event-title` `.week-calendar-grid` `.week-calendar-grip` `.week-calendar-head` `.week-calendar-head:hover` `.week-calendar-head-text` `.week-calendar-heads` `.week-calendar-hour` `.week-calendar-hour-label` `.week-calendar-hour-text` `.week-calendar-mark` `.week-calendar-mark-call` `.week-calendar-mark-chat` `.week-calendar-mark-meet` `.week-calendar-mark-plain` `.week-calendar-mark-video` `.week-calendar-month` `.week-calendar-month-name` `.week-calendar-more` `.week-calendar-nav` `.week-calendar-now` `.week-calendar-now-dot` `.week-calendar-outside` `.week-calendar-title` `.week-calendar-today` `.week-calendar-today-button` `.week-calendar-today-button:hover` `.week-calendar-top` `.week-calendar-week`
 
 ```lua
 local week_calendar = use "week-calendar"
@@ -2872,6 +3159,125 @@ curve_editor { points = { { 0, 0 }, { 0.3, 0.22 }, { 0.7, 0.82 }, { 1, 1 } }, si
 
 A whole mod using it, with state: `app/components/demos/curve-editor.luau`.
 
+#### `date-picker`
+
+**Date Picker.** A month calendar with its name, ‹ › arrows and Today over a `month-grid`, and presets beside it; inline, or a date pill that opens it in a popover.
+
+**When:** Setting a date on a record: a task's due date, a start date, a reminder, with presets for the usual ones. For the grid alone (a calendar view) use `month-grid`; for a time of day use `time-picker`; for a strip of days over a list use `day-strip`.
+
+| Prop | Meaning |
+| --- | --- |
+| `align` | "start" (default) or "end": which edge of the pill the popover lines up with |
+| `dismiss` | message sent on a click outside or Escape |
+| `event` | key of the message a day sends, default "select": { select = id } |
+| `next` | message the › arrow sends (show the month after) |
+| `open` | true while the popover shows |
+| `overdue` | draws the pill in the danger colour (a due date that has passed) |
+| `placeholder` | the pill's text while there is no `value` (default "Set date"), muted |
+| `preset` | key of the message a preset sends, default "preset": { preset = id } |
+| `presets` | list of { id, label, detail? (muted, on the right: "Mon", "Nov 9") }: Today, Tomorrow, Next week, No date |
+| `presets_side` | "left" (default: a column beside the calendar) or "bottom" (a row of chips under it) |
+| `previous` | message the ‹ arrow sends (show the month before) |
+| `selected` | id of the chosen day |
+| `title` | the month shown, over the grid ("November 2026") |
+| `to` | mod to send messages to, if not the drawing one |
+| `today` | message of a Today button in the header (show this month); none when unset |
+| `toggle` | message the trigger pill sends; with it the calendar is a popover under a pill, else it is drawn inline |
+| `value` | the pill's text, the date as the mod writes it ("Nov 14") |
+| `weekdays` | the grid's heading names, Monday first (default Mon … Sun) |
+| `weeks` | the month's weeks, passed to `month-grid`: each 7 of { id, day, today?, outside?, count? } |
+| `width` | popover width in pixels (default 300, or 450 with presets on the left) |
+
+**Styles:** `.date-picker` `.date-picker-chip` `.date-picker-chip:hover` `.date-picker-chips` `.date-picker-detail` `.date-picker-header` `.date-picker-icon` `.date-picker-overdue` `.date-picker-placeholder` `.date-picker-popover` `.date-picker-preset` `.date-picker-preset:hover` `.date-picker-presets` `.date-picker-title` `.date-picker-trigger` `.date-picker-trigger:hover` `.date-picker-trigger:selected`
+
+```lua
+local date_picker = use "date-picker"
+
+date_picker {
+	toggle = "toggle-due", open = state.due_open, dismiss = "close-due",
+	value = label(task.due), overdue = task.due < today,
+	title = month_title(state.month), weeks = weeks(state.month), selected = task.due,
+	previous = "previous-month", next = "next-month", today = "this-month",
+	presets = { { id = "today", label = "Today" }, { id = "none", label = "No date" } },
+}
+-- update: msg.select sets task.due (a day's id) and closes it; msg.preset
+-- sets it from the preset ("none" clears it); "previous-month" and
+-- "next-month" move state.month.
+```
+
+A whole mod using it, with state: `app/components/demos/date-picker.luau`.
+
+#### `dropzone`
+
+**Dropzone.** A dashed rounded box files are dropped on, with an icon, "Drop files here or browse" (browse a link) and a muted line; one line when compact.
+
+**When:** Adding attachments to a task, a message or a form: files dragged from other apps land on it, and browse opens the system's file panel (`{ to = "app:pick", ... }`). Show what was added under it with `file-card`. For a button alone use `ui.button`; for an empty list with one action use `empty-state`.
+
+| Prop | Meaning |
+| --- | --- |
+| `browse` | message the browse link sends (open `app:pick` from it); no link without it |
+| `compact` | one line, for inside a panel or under a list |
+| `detail` | a muted line on what it takes, e.g. "Up to 250 MB each" |
+| `drop` | message sent when files are dropped on it, with `paths` added |
+| `height` | pixels (default its content's) |
+| `icon` | icon over the text (default "upload") |
+| `title` | the text before the link (default "Drop files here") |
+| `to` | mod to send the messages to, if not the drawing one |
+| `width` | pixels (default: fill its parent) |
+
+**Styles:** `.dropzone` `.dropzone-body` `.dropzone-body-compact` `.dropzone-browse` `.dropzone-browse:hover` `.dropzone-corner` `.dropzone-dash` `.dropzone-detail` `.dropzone-icon` `.dropzone-title` `.dropzone-title-compact`
+
+```lua
+local dropzone = use "dropzone"
+
+dropzone { detail = "Up to 250 MB each", drop = "dropped", browse = "browse" }
+
+-- in update:
+if msg == "browse" then
+	return state, { { to = "app:pick", msg = { kind = "open", multiple = true, reply = "dropped" } } }
+elseif type(msg) == "table" and msg.paths then
+	-- add msg.paths
+end
+```
+
+A whole mod using it, with state: `app/components/demos/dropzone.luau`.
+
+#### `filter-builder`
+
+**Filter Builder.** The body of a Filter popover: match all or any, rows of field, operator and value with ×, Add filter, and Clear all and Done (they send "add", "clear" and "done").
+
+**When:** Filtering a list or board by conditions the user builds (status is Done, assignee is not Sarah), inside a `ui.popover` under a Filter button. For one filter per chip over a table use `filter-dropdown`; for toggles use `chips`; for a text query use `search-field`.
+
+| Prop | Meaning |
+| --- | --- |
+| `conditions` | list of { id, field, operator, value }: one row each (none shows a line saying so); a pick in a row sends { set = { id, key = "field" \| "operator" \| "value", value } }, typing a value { set = { id, key = "value" }, value = text } (the text beside `set`), its × { remove = id } |
+| `fields` | list of { id, label, icon?, operators (words, "is", or { id, label }), values? (`menu` options { id, label, icon?, dot?, avatar? }: the value is then a dropdown; without them, a text field) } |
+| `match` | "all" (default) or "any": whether every condition must hold or one is enough; its control sends { match = "any" } |
+| `open` | the open dropdown, as "<condition id>:field", ":operator" or ":value"; a click on a dropdown sends { open = that }, a click outside or Escape { open = "" } |
+| `to` | mod to send messages to, if not the drawing one |
+
+**Styles:** `.filter-builder` `.filter-builder-empty` `.filter-builder-footer` `.filter-builder-input` `.filter-builder-match` `.filter-builder-row` `.filter-builder-rows`
+
+```lua
+local filter_builder = use "filter-builder"
+
+ui.popover {
+	open = state.filtering, dismiss = "close-filter", width = 500,
+	content = filter_builder {
+		match = state.match, conditions = state.conditions, fields = FIELDS, open = state.open,
+	},
+	ui.button { "Filter", icon = "funnel", small = true, msg = "filter" },
+}
+-- update: msg.open sets state.open (or clears it when the same comes
+-- again); msg.set changes one key of that condition (msg.set.value, or
+-- msg.value when typed), and a new field resets its operator and value;
+-- msg.remove drops it; msg.match sets state.match; "add" appends
+-- { id = new_id(), field = FIELDS[1].id, operator = "is", value = "" };
+-- "clear" empties the list; "done" closes the popover.
+```
+
+A whole mod using it, with state: `app/components/demos/filter-builder.luau`.
+
 #### `form-grid`
 
 **Form Grid.** Rows of a label and its control in two aligned columns, with an optional hint under a control: a compact form.
@@ -2893,6 +3299,52 @@ form_grid { rows = { { control = { __line = 34, id = "form-grid-name", type = "i
 ```
 
 A whole mod using it, with state: `app/components/demos/form-grid.luau`.
+
+#### `mention-field`
+
+**Mention Field.** A text field that completes @names: people matching the word after an @ show under it, and picking one puts @Name in its place.
+
+**When:** A comment box, a task's description or a chat message where people are mentioned. For addresses on a message use `recipient-field`; for a chat with an agent use `composer`; for a plain field use `ui.input`.
+
+| Prop | Meaning |
+| --- | --- |
+| `blur` | sent with `value` when the field loses focus |
+| `caret` | where the caret is, kept from `change` (`msg.caret`), which also reports caret movement |
+| `change` | sent on each edit and selection movement, with `value` and `caret` |
+| `dismiss` | sent by Escape or a click outside the suggestions |
+| `event` | key of the message ↑ ↓ ↩ and Tab send while suggestions show, default "mention": { mention = "up" }, { mention = "down" }, or { mention = "choose", edit = <msg> }, which the mod sends on: `return state, { { to = "app:edit", msg = msg.edit } }` |
+| `focus` | take focus when it appears |
+| `grow` | fill the width |
+| `highlighted` | index of the keyboard-highlighted suggestion (default 1) |
+| `id` | the field's id: the suggestions edit it through `app:edit` |
+| `max_rows` | the most lines a multiline field grows to |
+| `most` | the most suggestions shown (default 6) |
+| `multiline` | a text area; `rows` and `max_rows` size it (default 2 to 8) |
+| `people` | who can be mentioned: { name, detail?, src? (an avatar image) } |
+| `placeholder` | grey text while empty |
+| `rows` | visible lines of a multiline field |
+| `submit` | sent on Enter (⌘↩ when multiline) while no suggestion shows |
+| `to` | mod its messages go to, if not the drawing one |
+| `value` | the text, kept from `change` (`msg.value`) |
+| `width` | the suggestions' width in pixels (default 260) |
+
+**Styles:** `.mention-field-detail` `.mention-field-head` `.mention-field-name` `.mention-field-popover` `.mention-field-row` `.mention-field-row:hover` `.mention-field-row:selected`
+
+```lua
+local mention_field = use "mention-field"
+
+mention_field {
+	id = "comment", value = state.text, caret = state.caret, people = MEMBERS,
+	change = "type", submit = "post", highlighted = state.highlighted,
+	multiline = true, placeholder = "Leave a comment… type @ to mention",
+}
+-- update: msg.msg == "type" keeps state.text = msg.value and state.caret =
+-- msg.caret (and sets state.highlighted = 1); msg.mention == "up"/"down"
+-- moves state.highlighted; "choose" sends on its edit:
+-- return state, { { to = "app:edit", msg = msg.edit } }
+```
+
+A whole mod using it, with state: `app/components/demos/mention-field.luau`.
 
 #### `number-field`
 
@@ -3199,6 +3651,44 @@ local task_check = use "task-check"
 task_check { state = if task.done then "done" else "open", msg = { toggle = task.id } }
 ```
 
+#### `text-editor`
+
+**Text Editor.** Formatted text written as markdown: a toolbar (bold, italic, code, link, heading, lists, quote) over a text area that grows with its lines, and a Write | Preview switch.
+
+**When:** A task's or project's description, release notes, a long comment: text with some formatting, edited in place. For a markdown file of the project use `markdown-editor`; for markdown only shown use `markdown`; for a chat message use `composer`; for one line use `ui.input`.
+
+| Prop | Meaning |
+| --- | --- |
+| `blur` | sent with `value` when the field loses focus: save it then |
+| `change` | sent on each edit (typed or from the toolbar), with `value` |
+| `empty` | what the preview says when there is no text (default "Nothing to preview") |
+| `focus` | take focus when it appears |
+| `id` | the field's id; the toolbar edits it through `app:edit` |
+| `max_rows` | the most lines it grows to before it scrolls (default 16) |
+| `placeholder` | grey text while empty |
+| `preview` | show the text rendered instead of the field |
+| `rows` | lines shown when empty (default 4) |
+| `submit` | sent on ⌘↩ |
+| `switch` | key of the message the Write \| Preview switch sends, { [switch] = "write" \| "preview" }; no switch without it |
+| `to` | mod `change`, `blur`, `submit` and `switch` go to, if not the drawing one |
+| `tools` | the buttons, in order: bold, italic, strike, code, link, heading, bullets, numbers, checklist, quote, and "\|" for a divider (default all) |
+| `value` | the markdown, kept from `change` |
+
+**Styles:** `.text-editor` `.text-editor:focus` `.text-editor-bar` `.text-editor-divider` `.text-editor-empty` `.text-editor-input` `.text-editor-preview` `.text-editor-tool` `.text-editor-tool:hover`
+
+```lua
+local text_editor = use "text-editor"
+
+text_editor {
+	id = "description", value = state.text, change = "type", blur = "save",
+	preview = state.preview, switch = "view", placeholder = "Add a description…",
+}
+-- update: msg.msg == "type" keeps state.text = msg.value; "save" stores it;
+-- msg.view == "preview" sets state.preview (and "write" clears it).
+```
+
+A whole mod using it, with state: `app/components/demos/text-editor.luau`.
+
 #### `time-picker`
 
 **Time Picker.** A time of day: hour and minutes with up and down arrows, AM and PM, and preset times as chips; sends { time = { hour, minute } }.
@@ -3373,6 +3863,69 @@ local diff_view = use "diff-view"
 ```
 
 A whole mod using it, with state: `app/components/demos/diff-view.luau`.
+
+#### `forge-account`
+
+**Forge Account.** The GitHub or GitLab account in a title bar: the user's picture, or the logo with a dot when signed out; a click opens the app's own sign-in.
+
+**When:** The account control beside `forge-pr` in a title bar or sidebar footer. What the click opens is the app's: show `forge-sign-in` in a `dialog` or a popover, or a settings page of your own.
+
+| Prop | Meaning |
+| --- | --- |
+| `brand` | github (default) \| gitlab: the logo when no one is signed in |
+| `forge` | `app.github` or `app.gitlab` |
+| `msg` | message sent on a click (open the app's sign-in) |
+| `to` | the mod to send `msg` to |
+
+**Styles:** `.forge-account` `.forge-account:hover` `.forge-account-dot`
+
+```lua
+local forge_account = use "forge-account"
+
+forge_account { brand = "github", forge = { auth = { cli = true, device = true, host = "github.com", status = "signed_out" }, available = false, host = "github.com", reason = "not signed in to GitHub" }, msg = "account" }
+```
+
+#### `forge-pr`
+
+**Forge PR.** A branch's GitHub pull request or GitLab merge request, read from app.github or app.gitlab: number by state, checks dot, +/− lines; a click opens it.
+
+**When:** Wherever a branch shows its pull request: the title bar (the current branch, falling back to uncommitted lines), beside each worktree or branch in a sidebar (`branch = worktree.branch`). It reads the forge provider's data; for a number you already have use `pr-badge`, for a whole list row `pr-row`.
+
+| Prop | Meaning |
+| --- | --- |
+| `branch` | the branch whose request to show, from `forge.branches`; default the current branch's (`forge.current_pr`) |
+| `brand` | show the forge's logo before the number |
+| `changes` | `{ added, deleted }` shown when there is no request (e.g. `app.git`), so the slot still says work is waiting |
+| `forge` | `app.github` or `app.gitlab` (nil while loading: draws nothing) |
+| `open` | open the request in the browser on a click (default true) |
+| `pr` | a pull request record to show instead of looking one up |
+
+**Styles:** `.forge-pr` `.forge-pr-brand` `.forge-pr-link:hover`
+
+```lua
+local forge_pr = use "forge-pr"
+
+forge_pr { brand = true, forge = { auth = { cli = false, device = true, host = "github.com", status = "signed_in" }, available = true, current_pr = { additions = 1204, checks = { failed = 0, passed = 3, pending = 0, skipped = 0, total = 3 }, deletions = 96, number = 850, title = "Add forge building blocks", tone = "ready", url = "https://github.com/moonframehq/moonframe/pull/850" }, host = "github.com" } }
+```
+
+#### `forge-sign-in`
+
+**Forge Sign-in.** Sign in to GitHub or GitLab from the provider's state: a device code with Open and Copy, the gh/glab sign-in; who is signed in and Sign out.
+
+**When:** The body of the app's own sign-in, opened from `forge-account` or a settings page. Draw your own instead from `app.github.auth` when it should look different; send the provider the same messages.
+
+| Prop | Meaning |
+| --- | --- |
+| `forge` | `app.github` or `app.gitlab` |
+| `provider` | github (default) \| gitlab: the provider its buttons talk to |
+
+**Styles:** `.forge-sign-in` `.forge-sign-in-code` `.forge-sign-in-error` `.forge-sign-in-muted`
+
+```lua
+local forge_sign_in = use "forge-sign-in"
+
+forge_sign_in { forge = { auth = { cli = true, code = "WDJB-MJHT", device = true, host = "github.com", status = "pending", url = "https://github.com/login/device" }, available = false, host = "github.com", reason = "not signed in to GitHub" }, provider = "github" }
+```
 
 #### `pr-badge`
 
@@ -3677,11 +4230,15 @@ A whole mod using it, with state: `app/components/demos/split-view.luau`.
 
 | Prop | Meaning |
 | --- | --- |
+| `accept` | message sent as a carried card moves over this one and is dropped on it, with `phase`, `carry` and `y` (above or below its middle) added |
 | `amount` | the figure at the bottom left |
 | `badge` | a small label on the right ("30%", "Won", "At risk") |
 | `badge_tone` | the badge's tone: success, danger, warning or muted (default) |
+| `carry` | data the card carries when dragged to a column or card with `accept` |
 | `context` | message a right-click sends (a menu of moves) |
 | `date` | a date beside it |
+| `key` | a short mono id at the bottom left ("WEB-112"), before the amount |
+| `labels` | small coloured labels over the title: { label, color? } |
 | `msg` | message a click sends |
 | `owner` | the owner's initials, in a round avatar |
 | `owner_color` | the avatar's colour |
@@ -3691,7 +4248,7 @@ A whole mod using it, with state: `app/components/demos/split-view.luau`.
 | `to` | mod to send them to, if not the drawing one |
 | `tone` | outline it: danger (at risk), warning, success |
 
-**Styles:** `.board-card` `.board-card:hover` `.board-card:selected` `.board-card-amount` `.board-card-badge` `.board-card-date` `.board-card-foot` `.board-card-sub` `.board-card-title`
+**Styles:** `.board-card` `.board-card:hover` `.board-card:selected` `.board-card-amount` `.board-card-badge` `.board-card-date` `.board-card-foot` `.board-card-key` `.board-card-label` `.board-card-labels` `.board-card-sub` `.board-card-title`
 
 ```lua
 local board_card = use "board-card"
@@ -3772,16 +4329,19 @@ A whole mod using it, with state: `app/components/demos/group-header.luau`.
 | Prop | Meaning |
 | --- | --- |
 | `[children]` | the cards |
+| `accept` | message sent as a carried card moves over the column, leaves it and is dropped on it, with `phase`, `carry` and `y` added (see `carry` on `ui.row`) |
 | `add` | message the Add button sends; no button without it |
 | `add_label` | the button's text (default "Add") |
 | `color` | the dot's and rule's colour (default accent) |
 | `count` | how many cards, in a small badge |
+| `marker` | draw a drop line before the card at this index (one past the last for the end) |
+| `over` | a card is over it: tint the column |
 | `title` | the stage's name |
 | `to` | mod to send `add` to, if not the drawing one |
 | `total` | a figure on the right ("$412K") |
 | `width` | pixels (default 232) |
 
-**Styles:** `.kanban-column` `.kanban-column-add` `.kanban-column-add:hover` `.kanban-column-cards` `.kanban-column-count` `.kanban-column-head` `.kanban-column-title` `.kanban-column-total`
+**Styles:** `.kanban-column` `.kanban-column:over` `.kanban-column-add` `.kanban-column-add:hover` `.kanban-column-cards` `.kanban-column-count` `.kanban-column-head` `.kanban-column-marker` `.kanban-column-title` `.kanban-column-total`
 
 ```lua
 local kanban_column = use "kanban-column"
@@ -3792,6 +4352,8 @@ kanban_column {
 	board_card { title = "Kestrel Airways", subtitle = "Crew rostering suite", amount = "$132,000", date = "Nov 29", badge = "50%" },
 }
 ```
+
+A whole mod using it, with state: `app/components/demos/kanban-column.luau`.
 
 #### `level-row`
 
@@ -3923,6 +4485,8 @@ ratio_row { color = "#7c5cff", count = "604", icon = "globe", label = "Website s
 
 | Prop | Meaning |
 | --- | --- |
+| `accept` | message sent as a carried row moves over this one and is dropped on it, with `phase`, `carry` and `y` (above or below its middle) added |
+| `carry` | data the row carries when dragged to a row or list with `accept` (to reorder or file it) |
 | `context` | message a right-click sends (a menu, or cycling its priority) |
 | `date` | its date, as shown ("Sat, Oct 31") |
 | `due` | the time in the danger colour: due or late |
@@ -4799,9 +5363,46 @@ dialog { open = state.renaming, dismiss = "close", title = "Rename workspace",
 
 A whole mod using it, with state: `app/components/demos/dialog.luau`.
 
+#### `emoji-picker`
+
+**Emoji Picker.** A grid of about eighty common emoji under Smileys, Gestures and Objects & Symbols, with a search field and a Frequently used row; a click sends the emoji.
+
+**When:** Reacting to a comment or a message, or putting an emoji in a name: open it in a `ui.popover` from an add-reaction button (give the popover `class = "emoji-picker-popover"`). For a list of actions use `menu`; for colours use `swatches`.
+
+| Prop | Meaning |
+| --- | --- |
+| `cancel` | message Escape sends from the search field (close the popover) |
+| `columns` | emoji per row (default 8) |
+| `event` | the key a click sends the emoji under (default "pick": `{ pick = "👍" }`) |
+| `focus` | focus the search field when it appears |
+| `height` | the most pixels it takes before it scrolls (default 260) |
+| `id` | keeps the search field's text across renders |
+| `query` | the search text (the mod keeps it from `search`); shows only emoji whose names match |
+| `recent` | emoji used most, shown first under Frequently used |
+| `search` | message each edit of the search field sends, with `value`; no field without it |
+| `to` | mod to send the messages to, if not the drawing one |
+
+**Styles:** `.emoji-picker` `.emoji-picker-cell` `.emoji-picker-cell:hover` `.emoji-picker-emoji` `.emoji-picker-empty` `.emoji-picker-heading` `.emoji-picker-popover`
+
+```lua
+local emoji_picker = use "emoji-picker"
+
+ui.popover {
+	class = "emoji-picker-popover",
+	open = state.picking,
+	dismiss = "close",
+	content = emoji_picker { recent = state.recent, query = state.query, search = "query", cancel = "close", focus = true },
+	ui.button { "React", small = true, msg = "open" },
+}
+
+-- in update: msg.pick is the emoji
+```
+
+A whole mod using it, with state: `app/components/demos/emoji-picker.luau`.
+
 #### `menu`
 
-**Menu.** Menu rows (icon, label, check, detail, shortcut, danger) with separators and headings; a click sends { pick = id }.
+**Menu.** Menu rows (icon, avatar or colour dot, label, check, detail, shortcut, danger) with separators and headings; a click sends { pick = id }.
 
 **When:** The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `command-palette`.
 
@@ -4811,12 +5412,13 @@ A whole mod using it, with state: `app/components/demos/dialog.luau`.
 | `expand` | key of the message an item with a submenu sends, default "expand": { expand = id } |
 | `expanded` | id of the item whose submenu shows beside it (on the right, or the left near the window's edge); a click on an item with `items` sends { expand = id } (the mod sets this, or clears it on a second click) |
 | `highlighted` | the keyboard-highlighted row: an item id, or its index in `items` |
-| `items` | list of { id, label, icon?, shortcut? (kbd keys, "cmd-s"), checked? (true/false shows the check column), danger?, disabled?, detail? (muted text on the right), items? (a submenu: the same kinds of entries, one level deep), msg? (sent instead of the default) }, the string "separator", or { heading = "Text" } |
+| `items` | list of { id, label, icon?, avatar? (a name: a small round `avatar` instead of the icon), dot? (a colour: a small round dot instead of the icon), shortcut? (kbd keys, "cmd-s"), checked? (true/false shows the check column), danger?, disabled?, detail? (muted text on the right), items? (a submenu: the same kinds of entries, one level deep), msg? (sent instead of the default) }, the string "separator", or { heading = "Text" } |
+| `max_height` | cap the menu height in pixels and scroll; changing `highlighted` reveals that row |
 | `submenu_highlighted` | the keyboard-highlighted row of the open submenu: an id or an index |
 | `submenu_width` | the submenu's width in pixels (default 200) |
 | `to` | mod to send messages to, if not the drawing one |
 
-**Styles:** `.menu` `.menu-check` `.menu-chevron` `.menu-detail` `.menu-heading` `.menu-icon` `.menu-item` `.menu-item:hover` `.menu-item:selected` `.menu-item-danger` `.menu-item-danger:hover` `.menu-item-danger-icon` `.menu-item-disabled` `.menu-separator` `.menu-submenu`
+**Styles:** `.menu` `.menu-check` `.menu-chevron` `.menu-detail` `.menu-dot` `.menu-heading` `.menu-icon` `.menu-item` `.menu-item:hover` `.menu-item:selected` `.menu-item-danger` `.menu-item-danger:hover` `.menu-item-danger-icon` `.menu-item-disabled` `.menu-separator` `.menu-submenu`
 
 ```lua
 local menu = use "menu"

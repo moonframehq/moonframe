@@ -91,6 +91,21 @@ impl Layer {
 }
 
 impl Roots {
+    /// A sealed profile: only the toolbox, required packages and app it ships.
+    /// Settings and saved state can still live outside these source layers.
+    pub fn bundled(toolbox: PathBuf, packages: Vec<PathBuf>, app: AppLayer) -> Self {
+        let layers = [Layer::new(toolbox, Role::Toolbox(app.keep))]
+            .into_iter()
+            .chain(
+                packages
+                    .into_iter()
+                    .map(|path| Layer::new(path, Role::Package)),
+            )
+            .chain([Layer::new(app.path, Role::App)])
+            .collect();
+        Self { layers }
+    }
+
     /// App folders, `layers` lowest first.
     pub fn new(layers: impl IntoIterator<Item = PathBuf>) -> Self {
         Self {

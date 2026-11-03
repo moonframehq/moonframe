@@ -8,6 +8,7 @@
 //! rules (`Stylesheet::resolve`), and its own keys such as `padding`.
 
 mod browser;
+mod carry;
 mod elements;
 mod floating;
 mod gallery;
@@ -15,11 +16,13 @@ pub(crate) mod images;
 mod input;
 mod keyed;
 mod list;
+#[cfg_attr(not(feature = "markdown"), path = "render/markdown_left_out.rs")]
 mod markdown;
 mod plot;
 mod pointer;
 mod popover;
 mod styling;
+#[cfg_attr(not(feature = "terminal"), path = "render/terminal_left_out.rs")]
 mod terminal;
 mod view;
 mod viewer;
@@ -33,7 +36,6 @@ use {
         input::Inputs,
         inspect::{Crumb, Sink, Tracked},
         motion::{Keyed, Motion, Shown, Snapshot},
-        terminal::Terminals,
     },
     gpui_kit::{
         component::{ActiveTheme, Icon, Sizable as _, Theme, tooltip::Tooltip},
@@ -44,13 +46,17 @@ use {
         SHELL, Shade, Slot, States, Transition, Workspace,
     },
     std::{
-        cell::Cell,
+        cell::{Cell, RefCell},
+        collections::HashMap,
         path::Path,
         rc::Rc,
         sync::LazyLock,
         time::{Duration, Instant},
     },
 };
+
+#[cfg(feature = "terminal")]
+use crate::terminal::Terminals;
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
 
@@ -240,7 +246,11 @@ pub(crate) struct Painter<'w, 'm> {
     /// The innermost node being drawn, while inspecting: what a mod mounted
     /// inside it is inside.
     outer: Option<Rc<Crumb>>,
+    /// Each element's corner radius from its style, by path, while
+    /// inspecting: the highlight follows its corners.
+    radii: RefCell<HashMap<String, moonframe_core::Corners>>,
     /// The shells terminals show.
+    #[cfg(feature = "terminal")]
     terminals: &'m mut Terminals,
     /// The text input fields edit.
     inputs: Inputs,
@@ -281,7 +291,7 @@ impl<'w, 'm> Painter<'w, 'm> {
     pub(crate) fn new(
         workspace: &'w Workspace,
         motion: &'m mut Motion,
-        terminals: &'m mut Terminals,
+        #[cfg(feature = "terminal")] terminals: &'m mut Terminals,
         inputs: &Inputs,
         sink: Option<Sink>,
         theme: &Theme,
@@ -302,6 +312,8 @@ impl<'w, 'm> Painter<'w, 'm> {
             key_layers: Vec::new(),
             sink,
             outer: None,
+            radii: RefCell::default(),
+            #[cfg(feature = "terminal")]
             terminals,
             inputs: inputs.clone(),
             preview: false,
@@ -566,6 +578,15 @@ impl<'w, 'm> Painter<'w, 'm> {
             .workspace
             .stylesheet()
             .resolve_in(part, look, states, local);
+        // Its own part's radius, which comes first, not a part inside it.
+        if self.sink.is_some()
+            && let Some(radius) = resolved.base.radius
+        {
+            self.radii
+                .borrow_mut()
+                .entry(place.path.clone())
+                .or_insert(radius);
+        }
         if let Some(state) = &look.state {
             self.tween(&mut resolved, state, place);
         }
@@ -642,8 +663,10 @@ impl<'w> Draw<'w> for Node {
         let outer = painter.outer.replace(crumb.clone());
         let child = draw_node(self, painter, &place, cx);
         painter.outer = outer;
+        let styled = painter.radii.borrow_mut().remove(&place.path);
         Tracked {
             child,
+            corners: crate::inspect::corners(self, styled, painter.theme.radius),
             path: place.path,
             crumb,
             sink,
@@ -670,6 +693,7 @@ fn draw_node<'w>(
         Node::Icon(icon) => icon.draw(painter, place, cx),
         Node::Image(image) => image.draw(painter, place, cx),
         Node::Line(line) => line.draw(painter, place, cx),
+        Node::Paths(paths) => paths.draw(painter, place, cx),
         Node::Hatch(hatch) => hatch.draw(painter, place, cx),
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
         Node::Browser(browser) => browser.draw(painter, place, cx),

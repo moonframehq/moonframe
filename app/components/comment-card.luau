@@ -1,6 +1,7 @@
 -- One authored message: an avatar, the author in bold, "commented 3d ago",
--- an optional file:line chip, and the body. For pull request
--- conversations, review threads and notes.
+-- an optional file:line chip, the body, and reactions under it with a
+-- button to add one. For pull request conversations, review threads and
+-- notes.
 
 type Props = {
 	author: string,
@@ -14,7 +15,19 @@ type Props = {
 	avatar: string?,
 	to: string?,
 	actions: { any }?,
+	reactions: { Reaction }?,
+	react: string?,
+	add_reaction: any,
+	picker: any,
+	picker_open: boolean?,
 	[number]: any,
+}
+
+type Reaction = {
+	emoji: string,
+	count: number?,
+	mine: boolean?,
+	tooltip: string?,
 }
 
 local avatar = use "avatar"
@@ -47,11 +60,64 @@ local function positional(props: any): { any }
 	return list
 end
 
+-- The reactions as small pills, then the button that adds one, with the
+-- picker in a popover on it while open.
+local function reactions(props: Props): any
+	local key = props.react or "react"
+	local pills = {}
+	local list: { Reaction } = props.reactions or {}
+	for _, reaction in list do
+		table.insert(pills, ui.row {
+			class = if reaction.mine then { "comment-card-reaction", "comment-card-reaction-mine" } else "comment-card-reaction",
+			align = "center",
+			hug = true,
+			shrink = false,
+			msg = { [key] = reaction.emoji },
+			to = props.to,
+			tooltip = reaction.tooltip,
+			ui.text { reaction.emoji, class = "comment-card-reaction-emoji" },
+			ui.text { tostring(reaction.count or 1), class = "comment-card-reaction-count" },
+		})
+	end
+	if props.add_reaction ~= nil then
+		local button = ui.row {
+			class = "comment-card-add-reaction",
+			height = 24,
+			align = "center",
+			hug = true,
+			shrink = false,
+			selected = props.picker_open == true,
+			msg = props.add_reaction,
+			to = props.to,
+			tooltip = "Add reaction",
+			ui.icon { name = "smile-plus", size = "small" },
+		}
+		if props.picker then
+			button = ui.popover {
+				class = "emoji-picker-popover",
+				open = props.picker_open == true,
+				dismiss = props.add_reaction,
+				to = props.to,
+				side = "bottom",
+				align = "start",
+				gap = 4,
+				content = props.picker,
+				button,
+			}
+		end
+		table.insert(pills, button)
+	end
+	if #pills == 0 then
+		return nil
+	end
+	return ui.row { class = "comment-card-reactions", align = "center", wrap = true, table.unpack(pills) }
+end
+
 return component {
 	title = "Comment Card",
 	category = "Data",
 	icon = "message-square",
-	description = "An authored message: avatar, bold author, \"commented 3d ago\", an optional file:line chip, a role badge, and the body.",
+	description = "An authored message: avatar, bold author, \"commented 3d ago\", an optional file:line chip, a role badge, the body, and reactions with a button to add one.",
 	when = "Comments in a pull request conversation, review threads, notes left by agents or people. Stack them in a column. For a numbered review note with a remove button use `note-card`; for events in order use `timeline`.",
 	props = {
 		["author"] = "author name (the avatar's initial and colour come from it)",
@@ -65,6 +131,11 @@ return component {
 		["avatar"] = "an image file for the avatar",
 		["to"] = "the mod to send `locate` to",
 		["actions"] = "elements at the header's right",
+		["reactions"] = "list of { emoji, count, mine?, tooltip? }: pills under the body, `mine` tinted (the reader's own)",
+		["react"] = "the key a reaction's click sends its emoji under (default \"react\": `{ react = \"👍\" }`)",
+		["add_reaction"] = "message the add-reaction button sends; no button without it. With `picker`, a click outside the open picker or Escape sends it again, so the mod toggles",
+		["picker"] = "an element, usually `emoji-picker`, shown in a popover on the add-reaction button",
+		["picker_open"] = "show `picker`",
 		["[children]"] = "anything after the body: a code-view, a diff-view, buttons",
 	},
 	styles = {
@@ -78,6 +149,16 @@ return component {
 		[".comment-card-location-text"] = { font = "mono", size = "small" },
 		[".comment-card-body"] = { gap = 6 },
 		[".comment-card-text"] = { size = "small" },
+		[".comment-card-reactions"] = { gap = 6, padding = { 2, 0, 0, 0 } },
+		[".comment-card-reaction"] = { height = 24, radius = 999, padding = { 0, 8 }, gap = 5, border = "all", border_color = "border", background = "background" },
+		[".comment-card-reaction:hover"] = { border_color = "muted-foreground/40" },
+		[".comment-card-reaction-mine"] = { background = "accent/10", border_color = "accent/45", color = "accent" },
+		[".comment-card-reaction-mine:hover"] = { border_color = "accent" },
+		[".comment-card-reaction-emoji"] = { size = "small" },
+		[".comment-card-reaction-count"] = { size = "small", weight = "medium" },
+		[".comment-card-add-reaction"] = { radius = 999, padding = { 0, 7 }, gap = 1, border = "all", border_color = "border", color = "muted-foreground" },
+		[".comment-card-add-reaction:hover"] = { color = "foreground", border_color = "muted-foreground/40" },
+		[".comment-card-add-reaction:selected"] = { color = "accent", border_color = "accent/45", background = "accent/10" },
 	},
 	example = {
 		author = "alice",
@@ -86,6 +167,8 @@ return component {
 		badge = "reviewer",
 		location = "src/ledger.rs:26",
 		body = "Reject mixing currencies here: return a Result instead of silently grouping.\n\nA builder would also keep the call sites short.",
+		reactions = { { emoji = "👍", count = 3, mine = true }, { emoji = "🎉", count = 1, mine = false } },
+		add_reaction = "add-reaction",
 	},
 
 	build = function(props: Props)
@@ -141,6 +224,7 @@ return component {
 					},
 				},
 				#paragraphs > 0 and ui.column { class = "comment-card-body", table.unpack(paragraphs) },
+				reactions(props),
 			},
 		}
 	end,

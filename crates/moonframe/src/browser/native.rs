@@ -11,12 +11,12 @@
 //!   Linux yet, so the element shows its address and opens it in the system
 //!   browser instead.
 
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(all(feature = "browser", any(target_os = "macos", windows)))]
 pub(crate) use platform::*;
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(not(all(feature = "browser", any(target_os = "macos", windows))))]
 pub(crate) use unsupported::*;
 
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(all(feature = "browser", any(target_os = "macos", windows)))]
 mod platform {
     use {
         super::super::{Event, Outbox, Page},
@@ -399,7 +399,7 @@ mod platform {
     }
 }
 
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(not(all(feature = "browser", any(target_os = "macos", windows))))]
 mod unsupported {
     use {
         super::super::{Outbox, Page},

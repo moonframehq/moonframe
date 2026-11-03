@@ -1,14 +1,18 @@
--- The inside of a menu: rows with an icon, a label, a check on the current
--- one, a detail and a shortcut, separated by lines and headings. Dropdowns
+-- The inside of a menu: rows with an icon (or a person's avatar, or a
+-- colour dot), a label, a check on the current one, a detail and a
+-- shortcut, separated by lines and headings. Dropdowns
 -- and context menus put it in a popover; it draws no popover itself, except
 -- the submenu of the row named by `expanded`, beside that row.
 
+local avatar = use "avatar"
 local kbd = use "kbd"
 
 type Item = {
 	id: string?,
 	label: string?,
 	icon: string?,
+	avatar: string?,
+	dot: string?,
 	shortcut: any,
 	checked: boolean?,
 	danger: boolean?,
@@ -21,6 +25,7 @@ type Item = {
 
 type Props = {
 	items: { any },
+	max_height: number?,
 	highlighted: any,
 	event: string?,
 	expanded: any,
@@ -52,6 +57,27 @@ local EXAMPLE: { any } = {
 	{ id = "close", label = "Close tab", icon = "close", shortcut = "cmd-w", danger = true },
 }
 
+-- What leads a row: a round avatar for `avatar`, a coloured dot for `dot`,
+-- else its icon, if any.
+local function lead(item: Item): any
+	if item.avatar then
+		return avatar { name = item.avatar, size = "small", shape = "circle" }
+	elseif item.dot then
+		return ui.row {
+			width = 16,
+			justify = "center",
+			shrink = false,
+			ui.row { class = "menu-dot", width = 8, height = 8, style = { background = item.dot } },
+		}
+	elseif item.icon then
+		return ui.icon {
+			name = item.icon :: any,
+			class = if item.danger then "menu-item-danger-icon" else "menu-icon",
+		}
+	end
+	return nil
+end
+
 -- The rows, and the open submenu's, which is drawn by this same function.
 local function draw(props: Props)
 	local event = props.event or "pick"
@@ -65,14 +91,16 @@ local function draw(props: Props)
 	end
 
 	local rows = {}
+	local scroll_to = nil
+	local scrolling = props.max_height ~= nil
 	for index, entry in props.items do
 		if entry == "separator" then
-			rows[#rows + 1] = ui.column { class = "menu-separator", ui.divider() }
+			rows[#rows + 1] = ui.column { class = "menu-separator", shrink = not scrolling, ui.divider() }
 			continue
 		end
 		local item = entry :: Item
 		if item.heading then
-			rows[#rows + 1] = ui.row { class = "menu-heading", ui.text { item.heading } }
+			rows[#rows + 1] = ui.row { class = "menu-heading", shrink = not scrolling, ui.text { item.heading } }
 			continue
 		end
 		local id = item.id or item.label
@@ -84,13 +112,19 @@ local function draw(props: Props)
 			table.insert(class, "menu-item-disabled")
 		end
 		local highlighted = props.highlighted ~= nil and (props.highlighted == id or props.highlighted == index)
+		if highlighted and not item.disabled then
+			scroll_to = index
+		end
 		local submenu = item.items
 		local open = submenu ~= nil and props.expanded ~= nil and props.expanded == id
 		local default = if submenu then { [expand] = id } else { [event] = id }
 		local row = ui.row {
 			class = class,
 			align = "center",
-			grow = true,
+			-- Scrolling rows keep their content height, rather than sharing
+			-- (and shrinking into) the capped menu's available height.
+			grow = not scrolling,
+			shrink = not scrolling,
 			selected = (highlighted or open) and not item.disabled,
 			msg = if item.disabled then nil else (item.msg or default),
 			to = props.to,
@@ -99,10 +133,7 @@ local function draw(props: Props)
 				justify = "center",
 				item.checked and ui.icon { name = "check", class = "menu-check" },
 			},
-			item.icon and ui.icon {
-				name = item.icon :: any,
-				class = if item.danger then "menu-item-danger-icon" else "menu-icon",
-			},
+			lead(item),
 			ui.row { grow = true, ui.text { item.label or id or "", truncate = true } },
 			item.detail and ui.text { item.detail, class = "menu-detail" },
 			item.shortcut and kbd { keys = item.shortcut, small = true, plain = true },
@@ -129,22 +160,29 @@ local function draw(props: Props)
 			}
 			else row
 	end
-	return ui.column { class = "menu", table.unpack(rows) }
+	return ui.column {
+		class = "menu",
+		max_height = props.max_height,
+		scroll = scrolling,
+		scroll_to = if props.max_height then scroll_to else nil,
+		table.unpack(rows),
+	}
 end
 
 return component {
 	title = "Menu",
 	category = "Overlays",
 	icon = "menu",
-	description = "Menu rows (icon, label, check, detail, shortcut, danger) with separators and headings; a click sends { pick = id }.",
+	description = "Menu rows (icon, avatar or colour dot, label, check, detail, shortcut, danger) with separators and headings; a click sends { pick = id }.",
 	when = "The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `command-palette`.",
 	props = {
-		["items"] = "list of { id, label, icon?, shortcut? (kbd keys, \"cmd-s\"), checked? (true/false shows the check column), danger?, disabled?, detail? (muted text on the right), items? (a submenu: the same kinds of entries, one level deep), msg? (sent instead of the default) }, the string \"separator\", or { heading = \"Text\" }",
+		["items"] = "list of { id, label, icon?, avatar? (a name: a small round `avatar` instead of the icon), dot? (a colour: a small round dot instead of the icon), shortcut? (kbd keys, \"cmd-s\"), checked? (true/false shows the check column), danger?, disabled?, detail? (muted text on the right), items? (a submenu: the same kinds of entries, one level deep), msg? (sent instead of the default) }, the string \"separator\", or { heading = \"Text\" }",
 		["expanded"] = "id of the item whose submenu shows beside it (on the right, or the left near the window's edge); a click on an item with `items` sends { expand = id } (the mod sets this, or clears it on a second click)",
 		["expand"] = "key of the message an item with a submenu sends, default \"expand\": { expand = id }",
 		["submenu_highlighted"] = "the keyboard-highlighted row of the open submenu: an id or an index",
 		["submenu_width"] = "the submenu's width in pixels (default 200)",
 		["highlighted"] = "the keyboard-highlighted row: an item id, or its index in `items`",
+		["max_height"] = "cap the menu height in pixels and scroll; changing `highlighted` reveals that row",
 		["event"] = "key of the message a click sends, default \"pick\": { pick = id }",
 		["to"] = "mod to send messages to, if not the drawing one",
 	},
@@ -159,6 +197,7 @@ return component {
 		[".menu-icon"] = { color = "muted-foreground" },
 		[".menu-item-danger-icon"] = { color = "danger" },
 		[".menu-check"] = { color = "accent" },
+		[".menu-dot"] = { radius = 999 },
 		[".menu-chevron"] = { color = "muted-foreground" },
 		[".menu-submenu"] = { padding = 0, radius = 10 },
 		[".menu-detail"] = { color = "muted-foreground", size = "small" },

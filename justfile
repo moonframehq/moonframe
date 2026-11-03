@@ -48,14 +48,46 @@ demo user="~/.local/share/moonframe/demo":
     fi
     exec "$bin" --user "$user" --profile demo
 
+# Browse reusable patterns in their own app, alongside the app being built.
+patterns:
+    python3 scripts/patterns-data.py
+    cargo run --quiet --release -p moonframe-app --bin moonframe-patterns --no-default-features --features patterns -- --dev
+
+# Validate patterns and their generated website/native catalogs.
+patterns-check:
+    python3 scripts/patterns-data.py --check
+    cargo run --quiet --release -p moonframe-app --bin moonframe-patterns --no-default-features --features patterns -- --check --no-user
+    just types patterns/app
+
+# Export real native previews to the docs, using the app's own GPU scene.
+pattern-shots:
+    cargo build --quiet --release -p moonframe-app --bin moonframe-patterns --no-default-features --features pattern-capture
+    python3 scripts/pattern-shots.py
+
 # Build Moonframe.app (release binary, staged app, icon) in target/bundle.
 bundle out="target/bundle":
     scripts/bundle-app.sh {{out}}
 
 # Build a profile's app as a standalone release bundle (its title, id and
-# icon; no Components menu or Inspect Element) in target/bundle.
+# icon; no Components… or Inspect Element) in target/bundle.
 bundle-app profile out="target/bundle":
     scripts/bundle-app.sh {{out}} {{profile}}
+
+# App-specific native features and only the Luau/provider dependency closure.
+bundle-app-sealed profile out="target/bundle":
+    scripts/bundle-app.sh "{{out}}" "{{profile}}" --sealed
+
+# The same from an app folder with local requirements, without installing it.
+bundle-sealed app out="target/bundle":
+    python3 scripts/bundle_sealed.py --app "{{app}}" --out "{{out}}"
+
+# Inspect what a sealed build keeps before compiling anything.
+bundle-plan app:
+    python3 scripts/bundle_sealed.py --app "{{app}}" --plan
+
+# Dependency closure, dynamic hints, overrides and resource pruning.
+test-sealed-bundles:
+    PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_sealed_bundle.py
 
 # Build a profile's app and write what its GitHub release carries to DIST:
 # the bundle as <Title>-<version>-<target>.zip (.tar.gz on Linux) and
@@ -168,10 +200,12 @@ lockfile-check:
 lint: lockfile-check
     cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
     cargo clippy --locked -p moonframe-providers -p moonframe --no-default-features --features moonframe/alacritty --all-targets -- -D warnings
+    cargo clippy --locked -p moonframe-app --no-default-features --features moonframe/sealed --all-targets -- -D warnings
 
 test:
     cargo test --locked --workspace
     cargo test --locked --workspace --all-features
+    cargo test --locked -p moonframe --no-default-features --features sealed --lib
 
 # Audit the GitHub workflows (zizmor, actionlint) and the dependency graph
 # (cargo-deny: advisories, licenses, sources) as CI does.
@@ -199,4 +233,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check check-file-size check-sorted lint test types providers providers-examples check-builtin components-check check-examples
+ci: format-check check-file-size check-sorted lint test test-sealed-bundles types providers providers-examples check-builtin components-check check-examples patterns-check

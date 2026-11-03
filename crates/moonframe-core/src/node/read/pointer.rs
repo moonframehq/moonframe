@@ -1,10 +1,12 @@
-//! A row's or column's `pointer`, `wheel`, `drop`, `hover`, `range` and
-//! `cursor`, and a frame's `area`.
+//! A row's or column's `pointer`, `wheel`, `drop`, `carry`, `accept`,
+//! `hover`, `range` and `cursor`, and a frame's `area`.
 
 use super::*;
 
 /// The keys [`Pointer`] reads.
-pub(super) const POINTER: &[&str] = &["pointer", "wheel", "drop", "hover", "range", "cursor"];
+pub(super) const POINTER: &[&str] = &[
+    "pointer", "wheel", "drop", "carry", "accept", "hover", "range", "cursor",
+];
 
 /// Most a range's ends can be, either way.
 const LIMIT: std::ops::RangeInclusive<f32> = -1e12..=1e12;
@@ -15,6 +17,8 @@ impl Pointer {
             press: fields.get("pointer")?,
             wheel: fields.get("wheel")?,
             drop: fields.get("drop")?,
+            carry: fields.get("carry")?,
+            accept: fields.get("accept")?,
             to: fields.get("to")?,
             hover: fields.get("hover")?.unwrap_or(false),
             range: fields.get("range")?,
@@ -32,12 +36,18 @@ impl Pointer {
                 .key("range")
                 .fail("`range` adds a `value` to `pointer` messages; give `pointer` too"));
         }
+        if pointer.carry.is_some() && pointer.press.is_some() {
+            return Err(fields.cx().key("carry").fail(
+                "`carry` and `pointer` both follow a press; a carried row hears its drop through \
+                 the target's `accept`",
+            ));
+        }
         Ok(pointer)
     }
 
     /// Whether `to` has something to go with.
     pub(super) fn sends(fields: &Fields) -> bool {
-        ["pointer", "wheel", "drop"]
+        ["pointer", "wheel", "drop", "accept"]
             .iter()
             .any(|key| fields.raw(key).is_some())
     }

@@ -4,6 +4,7 @@
 use {
     crate::{
         app::MoonframeApp,
+        backends::Backends,
         launch::{AppSource, Moonframe},
         packages,
         paths::{self, Folders},
@@ -14,8 +15,7 @@ use {
         component::{ActiveTheme as _, Root},
         point, px, size,
     },
-    moonframe_core::{AppLayer, Chrome, Roots, Titlebar, Workspace},
-    moonframe_mux::Backends,
+    moonframe_core::{AppLayer, Chrome, Roots, Titlebar},
     std::{
         fs,
         path::PathBuf,
@@ -64,7 +64,7 @@ Options:
                 install`. Its packages and mods are its own; only your
                 style.luau and theme follow you into it
   --check       load every module, report problems, and exit without a window
-  --release     Developer Mode off for this run: no Components menu, Inspect
+  --release     Developer Mode off for this run: no Components…, Inspect
                 Element, or Reload Modules (Developer Mode in the app menu
                 switches it, and is kept)
   --dev         Developer Mode on for this run
@@ -102,6 +102,17 @@ struct Args {
     bundle: Option<Vec<String>>,
     /// The words after `pane`, for the running window.
     panes: Option<Vec<String>>,
+}
+
+fn usage() -> &'static str {
+    if cfg!(feature = "sealed") {
+        "Usage: moonframe [--check] [--no-user | --user DIR] [--background]\n\n\
+         This sealed executable runs only its bundled app. Settings and state\n\
+         persist, but user source overlays and development tools are unavailable.\n\
+         Rebuild the app to add capabilities removed from this executable."
+    } else {
+        USAGE
+    }
 }
 
 fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>, String> {
@@ -171,6 +182,31 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
             extra => return Err(format!("unexpected argument: {extra}")),
         }
     }
+    if cfg!(feature = "sealed") {
+        if bundle.is_some() {
+            return Err("a sealed executable cannot build app bundles".to_owned());
+        }
+        let app = bundled
+            .as_ref()
+            .ok_or("a sealed executable must run inside its app bundle")?;
+        if builtin.is_some() || profile.as_ref().is_some_and(|name| name != &app.name) {
+            return Err("a sealed executable only runs its bundled app".to_owned());
+        }
+    }
+    if !cfg!(feature = "studio")
+        && (init.is_some()
+            || apps.is_some()
+            || packages.is_some()
+            || history.is_some()
+            || catalogue
+            || component.is_some()
+            || preview_only
+            || release == Some(false))
+    {
+        return Err(
+            "this build does not include development tools or package installation".to_owned(),
+        );
+    }
     // An app on the library: DIR is its own folder, over the toolbox.
     let (builtin, host) = match host {
         Some(source) => {
@@ -210,7 +246,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
 
 /// Loads every module headlessly: what an agent runs after an edit.
 fn check(roots: Roots) -> ExitCode {
-    let workspace = Workspace::open(roots.clone(), false);
+    let workspace = crate::capabilities::open(roots.clone(), false, None);
     let mut problems: Vec<(String, String)> = workspace
         .problems()
         .into_iter()
@@ -249,7 +285,7 @@ fn check(roots: Roots) -> ExitCode {
 
 /// Prints the catalogue the `moonframe-components` skill is made of.
 fn catalogue(roots: Roots) -> ExitCode {
-    let workspace = Workspace::open(roots, false);
+    let workspace = crate::capabilities::open(roots, false, None);
     let components = workspace.components();
     let mut failed = false;
     for component in components {
@@ -338,23 +374,31 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     let args = match parse_args(host, &launch.keep) {
         Ok(Some(args)) => args,
         Ok(None) => {
-            println!("{}", branded(USAGE));
+            println!("{}", branded(usage()));
             return ExitCode::SUCCESS;
         },
         Err(message) => {
-            eprintln!("{message}\n\n{}", branded(USAGE));
+            eprintln!("{message}\n\n{}", branded(usage()));
             return ExitCode::from(2);
         },
     };
-    if let Some(words) = &args.init {
+    if cfg!(feature = "studio")
+        && let Some(words) = &args.init
+    {
         return crate::init::run(words);
     }
-    if let Some(words) = &args.bundle {
+    // Packaging copies this executable, so hosts without developer tools
+    // must be able to bundle themselves too.
+    if !cfg!(feature = "sealed")
+        && let Some(words) = &args.bundle
+    {
         return crate::bundle::run(&args.folders, words);
     }
     let folders = args.folders;
     paths::set_user_folder(folders.user.clone());
-    if let Some(words) = &args.apps {
+    if cfg!(feature = "studio")
+        && let Some(words) = &args.apps
+    {
         let Some(user) = &folders.user else {
             eprintln!(
                 "{} app: profiles go in the user's folder; drop --no-user",
@@ -386,7 +430,9 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         };
         return crate::panes::run(user, folders.profile.as_deref(), &folders.title(), words);
     }
-    if let Some(words) = &args.packages {
+    if cfg!(feature = "studio")
+        && let Some(words) = &args.packages
+    {
         let Some(own) = folders.own() else {
             eprintln!(
                 "{} mod: packages go in the user's folder; drop --no-user",
@@ -396,13 +442,15 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         };
         return packages::run(&own, words);
     }
-    if let Some(words) = &args.history {
+    if cfg!(feature = "studio")
+        && let Some(words) = &args.history
+    {
         return crate::history::run(&folders, words);
     }
     if args.check {
         return check(folders.roots());
     }
-    if args.catalogue {
+    if cfg!(feature = "studio") && args.catalogue {
         return catalogue(folders.roots());
     }
 
@@ -435,8 +483,11 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         Ordering::Relaxed,
     );
     let _ = crate::TITLE.set(folders.title());
-    let _ = crate::update::SOURCE.set(folders.updates());
-    crate::update::load_beta(folders.profile.as_deref());
+    #[cfg(feature = "updates")]
+    {
+        let _ = crate::update::SOURCE.set(folders.updates());
+        crate::update::load_beta(folders.profile.as_deref());
+    }
     crate::dock::set_name(&crate::title());
     tracing::info!(
         "starting {} ({}{}) on {}",
@@ -465,7 +516,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
             gpui_kit::init(cx);
             crate::dock::set_icon(icon.as_deref());
             crate::actions::bind_keys(cx);
-            cx.set_menus(crate::actions::menus(&[], &[]));
+            cx.set_menus(crate::actions::menus(&[]));
             cx.on_action(|_: &crate::actions::Quit, cx| cx.quit());
             cx.on_window_closed(|cx, _| {
                 if cx.windows().is_empty() {
@@ -486,7 +537,8 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
                 .as_ref()
                 .and_then(|_| crate::persist::open(&backends, folders.profile.as_deref()));
             // The shell says what window it wants, so it loads first.
-            let workspace = Workspace::open_with(folders.roots(), cx.theme().is_dark(), persist);
+            let workspace =
+                crate::capabilities::open(folders.roots(), cx.theme().is_dark(), persist);
             let chrome = workspace.chrome();
             // The shell's size if it asks, kept within the screen.
             let (width, height) = chrome.size.unwrap_or((1280., 820.));

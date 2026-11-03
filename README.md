@@ -56,7 +56,7 @@ Moonframe as a library.
     <td width="50%" valign="top">
       <img src="docs/screenshots/components.png" alt="The Components window: a list of components by category on the left, and the List component on the right with a live preview of three rows, the Luau that uses it, and Copy code and Copy for agent buttons">
       <br>
-      <sub><b>Components.</b> Ready-made pieces mods <code>use</code>, browsed from the <b>Components</b> menu with a live preview, the code to paste, and <b>Copy for agent</b>.</sub>
+      <sub><b>Components.</b> Ready-made pieces mods <code>use</code>, browsed from <b>View &gt; Components…</b> in Developer Mode with a live preview, the code to paste, and <b>Copy for agent</b>.</sub>
     </td>
   </tr>
 </table>
@@ -88,7 +88,7 @@ Moonframe as a library.
   herdr-core or tmux installed, terminals keep running after the app quits
   and come back on the next launch.
 - **Providers** for data Luau can't reach, publishing what views read as
-  `app.<name>`: sandboxed WebAssembly components, plain processes, or Rust
+  `app.<name>`: sandboxed WebAssembly (WASM) components, plain processes, or Rust
   built into the app. The built-in ones cover git (status, diffs, commit and
   push), GitHub and GitLab, the project's files and markdown documents, the
   system's load, and coding agents.
@@ -112,7 +112,7 @@ Moonframe as a library.
   them too.
 - **A sandbox.** Luau runs with no files, network or process access, a
   memory cap and an instruction budget; anything that reaches the machine
-  goes through a provider or an element the host owns. WebAssembly
+  goes through a provider or an element the host owns. WASM
   providers run sandboxed too, so a provider you install from someone else
   can have no access to your machine at all. See
   [What runs with what access](#what-runs-with-what-access).
@@ -149,7 +149,9 @@ and points at any problem, and `just types` type-checks the Luau.
 
 The Ghostty terminal builds libghostty-vt from source with Zig 0.17 (pinned
 in `mise.toml`). To build without it, use
-`cargo run --no-default-features --features alacritty`.
+`cargo run -p moonframe-app --no-default-features --features moonframe/default`.
+For a lean app, select only its capabilities; see
+[feature flags](docs/library.md#choosing-capabilities).
 
 Moonframe is developed on macOS. CI builds, lints and tests it on macOS,
 Linux (x86_64 and ARM64) and Windows (x86_64), and each release ships a macOS disk
@@ -292,10 +294,10 @@ Packages ship source only, so everything they run can be read first.
 | Code | Runs | Can reach |
 |---|---|---|
 | Mods (Luau) | in the host's Luau sandbox, with memory and instruction caps | only the elements and providers the host offers |
-| Wasm providers (`kind = "wasm"`) | on [wasmtime](https://wasmtime.dev), with 64 MiB and a fresh instruction budget per call | only the host calls listed under `capabilities` in `provider.toml` (today `system`, the machine's load) |
+| WASM providers (`kind = "wasm"`) | on [wasmtime](https://wasmtime.dev), with 64 MiB and a fresh instruction budget per call | only the host calls listed under `capabilities` in `provider.toml` (today `system`, the machine's load) |
 | Process and native providers | as your user | anything you can: git, forges, coding agents, your files |
 
-Write a provider as a Wasm component if it only shapes data or if it comes
+Write a provider as a WASM component if it only shapes data or if it comes
 from someone else. A bug or bad actor in it can't read your files or reach
 the network. Keep process and native providers for things the sandbox
 can't reach, and read them as you would any script.
@@ -305,11 +307,15 @@ your user, including proc macros and dependency build scripts. The host
 refuses build scripts in the provider or its local crates, and toolchains
 named by path, and runs Cargo outside its folders, so no Cargo config there
 applies. It also refuses any package that ships a binary, so what runs is
-always source you can read. Bundled apps ship their Wasm providers prebuilt
+always source you can read. Bundled apps ship their WASM providers prebuilt
 and build nothing on your machine.
 
-Apps with no Wasm providers can turn off the `wasm` feature, which is on by
+Apps with no WASM providers can turn off the `wasm` feature, which is on by
 default (see [docs/library.md](docs/library.md)).
+
+**Build one:** [Building WebAssembly (WASM) providers](https://docs.moonframe.dev/wasm-providers/)
+walks through a complete Rust component, Luau messages, live reload and
+packaging, for people and coding agents. [Markdown source](docs/wasm-providers.md).
 
 ## Whole apps as profiles
 
@@ -350,7 +356,7 @@ into each.
 `just bundle-app NAME` builds a profile's app as a standalone release:
 `target/bundle/<Title>.app` on macOS, or a prefix with a `.desktop` file
 on Linux, with the app's title, id and icon. A bundle starts with
-Developer Mode off: no Components menu, Inspect Element or Reload. **Developer
+Developer Mode off: no Components…, Inspect Element or Reload. **Developer
 Mode** in the app menu turns them on live, for anyone who wants to change
 their app, and the choice is kept; `--release` and `--dev` set it for one
 run. Outside a release,
@@ -583,6 +589,8 @@ it uses the app's own runtime (`.tokio(handle)`, or the one
 | `just bundle-app NAME` | builds the profile NAME's app as a standalone release |
 | `just check-examples` | loads and type-checks the apps in `examples/` |
 | `just demo` | opens the gallery of every example app, to open and compare them |
+| `just patterns` | opens the independent pattern browser: categories, search, live previews and Luau source |
+| `just patterns-check` | validates the patterns, their types and the generated web/native catalogs |
 | `just install` | builds the app and installs it in `/Applications` |
 | `just ci` | formatting, lints, tests, types, providers and check |
 | `just audit` | zizmor and actionlint on the workflows, cargo-deny on the dependencies |

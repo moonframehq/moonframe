@@ -37,9 +37,10 @@ opt-level = 2
 library needs the toolchain in [rust-toolchain.toml](../rust-toolchain.toml)
 or newer.
 
-Features: `acp`, `alacritty`, `docs`, `git`, `herdr-core`, `tokio` and
-`wasm` by default. `ghostty` (a second terminal emulator, built from Ghostty's source
-with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`.
+Features: `acp`, `alacritty`, `browser`, `chat`, `docs`, `forge`, `git`,
+`herdr-core`, `markdown`, `prose`, `shell`, `studio`, `tokio`, `updates`, `usage` and
+`wasm` by default. `ghostty` (a second terminal emulator, built from Ghostty's
+source with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`.
 
 An app that needs none of git, the markdown editor or kept terminals can
 leave them out, and with them the herdr-gpui crates they build on:
@@ -52,12 +53,129 @@ A built-in provider a feature leaves out (`git`, `docs`, `acp`) publishes
 nothing: the starter's mods reading `app.git` see nil and carry on, and only
 a message to it reports that the feature is off.
 
-`wasm` is the runtime for sandboxed WebAssembly providers (wasmtime, the
+`wasm` is the runtime for sandboxed WebAssembly (WASM) providers (wasmtime, the
 largest dependency). An app whose providers are all native or processes
 leaves it out to build faster and ship a smaller binary; the line above
-does, with no `wasm`. Its Wasm providers then behave the same way, the
+does, with no `wasm`. Its WASM providers then behave the same way, the
 toolbox's `system` among them: nothing published, and a message to one
 says the feature is off. `bundle` then builds none of them.
+
+To add a sandboxed component alongside native providers, follow
+[Building WebAssembly (WASM) providers](wasm-providers.md).
+
+### Choosing capabilities
+
+Flags follow native capabilities and their dependencies. Basic UI and the
+Luau component library remain available in ordinary builds; sealed bundles
+ship only their selected components.
+
+| Feature | What it includes |
+| --- | --- |
+| `browser` | Native web views and Wry on macOS/Windows. Linux keeps its system-browser fallback. |
+| `terminal` | Terminal rendering, local PTYs and tmux; choose an engine below to run a shell. |
+| `alacritty`, `ghostty` | Each enables `terminal` and its respective emulator. |
+| `herdr-core` | herdr-core state storage and, with `terminal`, persistent terminals. |
+| `markdown` | Rich `ui.markdown` rendering (headings, lists, tables, links and code). |
+| `prose` | The writing editor for `ui.input` with `prose`, `dim` or `typewriter`. Ordinary single-line and multiline inputs remain available without it. |
+| `sealed` | Staged app resources instead of the full embedded toolbox. |
+| `studio` | Development commands and the component gallery. |
+| `updates` | Release checks, downloads and in-place app updates. Omitting it hides the updater menu and disables automatic checks. |
+| `acp`, `chat`, `docs`, `forge`, `git`, `shell`, `usage` | The respective built-in native providers. |
+| `tokio` | Async native-provider support. |
+| `wasm` | Wasmtime and building/running Wasm providers. |
+
+An app with just ordinary UI can use `default-features = false` with no
+features. SQLite state saving still works. Without `terminal`, Moonframe's
+terminal crate and PTY dependency are omitted. `herdr-core` is independent:
+it can keep state without Moonframe terminals, although its upstream client
+currently brings its own terminal dependencies.
+
+Views can check `app.capabilities.browser`, `app.capabilities.alacritty`,
+`app.capabilities.wasm`, etc. Every feature above has a boolean entry;
+hyphenated names use brackets (`app.capabilities["herdr-core"]`). These are
+compiled capabilities, not checks that a backend is installed, a provider
+is configured, or the platform implements native web views. They are present
+in headless checks as well as the window. Requesting an omitted browser or
+terminal displays a diagnostic explaining which feature to enable.
+The same applies to rich Markdown and writing fields. The `docs` file
+provider, `markdown` renderer and `prose` editor are independent; select the
+ones the app uses. For example, a Markdown preview needs `markdown`, while
+a prose-writing app needs `prose`. `chat-markdown` is a Luau component and
+does not require the native `markdown` renderer.
+
+`updates` controls the host's updater, not all networking: providers such
+as `forge` and `usage` can bring their own HTTP dependencies. With every
+optional capability off, Ureq, Rustls and Ring are absent. Some shared GPUI
+dependencies (including Markdown parsing and image codecs) are unconditional
+upstream, so renderer flags remove linked code but do not eliminate those
+crates from the build graph.
+
+The starter forwards these same flags explicitly:
+
+```sh
+# Full starter (including both terminal engines), as before:
+cargo build -p moonframe-app --release
+# The library's defaults, including Alacritty, without Ghostty/Zig:
+cargo build -p moonframe-app --release --no-default-features --features moonframe/default
+# Basic UI, with no optional capabilities:
+cargo build -p moonframe-app --release --no-default-features
+# Local/tmux terminals and web views, with no Wasm or built-in providers:
+cargo build -p moonframe-app --release --no-default-features --features alacritty,browser
+```
+
+Select one app/package when building lean. Cargo features are additive:
+building the entire workspace or another app that enables defaults can
+enable those dependencies again. Changing Luau at runtime cannot change
+what the executable includes; changing capabilities requires a rebuild.
+
+For comparisons, build each selection in a fresh `--target-dir` with
+`--release --timings`, then repeat the same build to measure the warm-cache
+case. Compare executable and staged bundle sizes separately. The embedded
+Luau toolbox and shared GPUI dependencies remain in lean builds, so dependency
+removal does not imply the same proportional reduction in bundle size.
+
+The first macOS release measurement, after gating browser and terminal
+support but before adding `markdown`, `prose` and `updates`, used fresh Cargo
+target directories and cached downloads:
+
+| | Full starter | Minimal |
+| --- | ---: | ---: |
+| Clean build, wall time | 4m28s | 3m52s |
+| Executable | 73.2 MiB | 38.0 MiB |
+| Staged `.app` bundle | 74.8 MiB | 39.8 MiB |
+
+These are single-run timings, with some Cargo cache-lock contention. Warm
+no-change builds took 8.29s and 16.44s respectively, so this run demonstrates
+size savings rather than a reliable incremental-build speedup. Both bundles
+used the same staging script and retained the toolbox resources.
+
+With `markdown`, `prose` and `updates` also optional, the same macOS release
+profile produces a **35.36 MiB** minimal executable and **37.18 MiB** staged
+bundle, versus **73.22 MiB** for the full executable. That saves another
+2.60 MiB (6.8%) over the first minimal build, or 51.7% versus full. The
+minimal build graph drops from 450 to 437 distinct packages (full: 614).
+
+Enabling each new capability alone on that minimal build gives:
+
+| Selection | Executable | Added over minimal |
+| --- | ---: | ---: |
+| Minimal | 35.36 MiB | — |
+| `markdown` | 35.45 MiB | 88.5 KiB |
+| `prose` | 35.58 MiB | 219.8 KiB |
+| `updates` | 37.75 MiB | 2.39 MiB |
+
+These marginal sizes are not additive: capabilities can share linked code.
+All five measured selections (these four and full) passed the headless
+starter check. Build timings were not repeated for this second comparison.
+
+`python3 scripts/check-features.py --lint` checks dependency removal and
+lints minimal and individual-capability builds; CI runs it on every platform.
+
+The `bundle` command remains available without `studio`, so a library host
+can package its executable without including developer tools.
+
+For profile apps, [sealed bundles](sealed-bundles.md) select these features
+from the app's Luau and provider manifests and prune the shipped toolbox.
 
 Use the GPUI the library re-exports, `moonframe::gpui_kit` (GPUI with
 gpui-component): one app links one GPUI. If your crates name `gpui`
@@ -255,14 +373,14 @@ cargo run --release -- bundle --dist dist   # and dist/<Title>-<version>-<target
 ```
 
 `bundle` ships the running binary with the app's folder and the toolbox,
-each with its Wasm providers prebuilt and no sources, plus an icon and an
+each with its WASM providers prebuilt and no sources, plus an icon and an
 Info.plist, signed ad hoc. `--dist DIR` also writes what a GitHub release
 carries: the bundle archived under a name with its version and platform,
 and `SHA256SUMS`. With [`.updates("owner/repo")`](updates.md), the app
 finds and installs those releases itself.
 
 **Developer Mode**, in the app menu beside About, switches the tools for
-changing the app as it runs (the Components menu, Inspect Element ⌥⌘I,
+changing the app as it runs (View's Components…, Inspect Element ⌥⌘I,
 Reload Modules ⌘R) on and off, at once and without a rebuild, and is kept
 for the app (and each profile) in `$XDG_STATE_HOME/<name>/developer`. Until
 the user picks, it is on in a debug build (`cargo run`) and off in a release

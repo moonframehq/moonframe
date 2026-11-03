@@ -23,6 +23,35 @@ pub(crate) enum Taken {
 /// `secondary` means ⌘ here, Ctrl elsewhere.
 const MAC: bool = cfg!(target_os = "macos");
 
+/// Shared key routing also runs in builds without a terminal: text fields,
+/// overlays and mod shortcuts must keep working there.
+pub(crate) fn intercept(cx: &mut Context<MoonframeApp>) -> Subscription {
+    let app = cx.entity().downgrade();
+    cx.intercept_keystrokes(move |event, window, cx| {
+        if event.keystroke.key == "escape" && cx.stop_active_drag(window) {
+            cx.stop_propagation();
+            return;
+        }
+        let taken = app
+            .update(cx, |app, cx| {
+                match app.layer_keystroke(&event.keystroke, window, cx) {
+                    Taken::Sent => true,
+                    Taken::Blocked => app.input_keystroke(&event.keystroke, window, cx),
+                    Taken::Free => {
+                        app.input_keystroke(&event.keystroke, window, cx)
+                            || app.terminal_keystroke(&event.keystroke, window, cx)
+                            || app.mod_keystroke(&event.keystroke, window, cx)
+                            || app.menu_keystroke(&event.keystroke, window, cx)
+                    },
+                }
+            })
+            .unwrap_or(false);
+        if taken {
+            cx.stop_propagation();
+        }
+    })
+}
+
 impl MoonframeApp {
     /// Offers `keystroke` to the topmost open overlay or popover.
     pub(crate) fn layer_keystroke(
@@ -32,11 +61,13 @@ impl MoonframeApp {
         cx: &mut Context<Self>,
     ) -> Taken {
         // Escape belongs to the inspector while it is picking or showing
-        // its card, which sit above everything.
+        // its card, which sit above everything: before a focused terminal
+        // or field, which would keep it from the app's key bindings.
         if keystroke.key == "escape"
             && (self.inspector.picking || self.inspector.selected.is_some())
         {
-            return Taken::Free;
+            self.dismiss(cx);
+            return Taken::Sent;
         }
         // The highest priority in this window; of equals, the later in the
         // tree.

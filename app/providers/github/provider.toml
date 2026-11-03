@@ -1,8 +1,25 @@
 # The app repository's GitHub state, shared as `app.github`: the signed-in
-# viewer, the current branch's pull request with its checks, open pull
-# requests and open issues, each pull request with a `tone` for its badge.
-# A process provider: it runs the `gh` CLI with your own access and sign-in
-# (it never reads a token), outside the wasm sandbox. Needs bash and gh;
-# curl for avatars.
-command = ["bash", "github.sh"]
-kind    = "process"
+# viewer, the current branch's pull request with its checks and line
+# counts, the pull request of every branch a worktree has out
+# (`branches`), open pull requests and open issues, each pull request with
+# a `tone` for its badge; and where the sign-in stands (`auth`).
+# A native provider: Rust built into the app (crates/moonframe-forge, the
+# `forge` feature), calling GitHub's API with your own sign-in. Mods draw
+# the sign-in however they like and send it `{ sign_in = true }` (a device
+# code), `{ token = "..." }`, `{ use_cli = true }` (gh's own sign-in),
+# `{ cancel = true }` or `{ sign_out = true }`; any other message reads
+# GitHub again.
+interval = 1.0
+kind     = "native"
+
+[settings]
+# The mods that may sign in and out; any other is refused.
+accounts = ["forge"]
+# The public client id of the GitHub OAuth app device sign-ins go
+# through: Moonframe's own, which every app may use. An app that wants
+# its name on GitHub's approval page sets its own (an OAuth app with the
+# device flow enabled) here, or MOONFRAME_GITHUB_CLIENT_ID. Empty: only a
+# pasted token, gh's sign-in or GH_TOKEN sign in.
+client_id = "Ov23li3guDH0OX4UpgRq"
+# Seconds between reads of GitHub, 15 to 3600.
+poll = 60

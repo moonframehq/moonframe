@@ -55,6 +55,8 @@ impl Engine {
 
     /// A new emulator of this kind; `None` when the build leaves it out.
     fn emulator(self, size: Size) -> Option<Box<dyn Emulator>> {
+        #[cfg(not(any(feature = "alacritty", feature = "ghostty")))]
+        let _ = size;
         match self {
             #[cfg(feature = "alacritty")]
             Self::Alacritty => Some(Box::new(alacritty::Alacritty::new(size))),

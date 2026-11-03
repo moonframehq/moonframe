@@ -7,7 +7,11 @@ impl MoonframeApp {
     pub(crate) fn toggle_inspect(&mut self, cx: &mut Context<Self>) {
         self.inspector.picking = !self.inspector.picking;
         self.inspector.hovered = None;
-        if !self.inspector.picking {
+        if self.inspector.picking {
+            // A new pick replaces the last: its outline and card go now,
+            // not once something else is clicked.
+            self.forget_selection();
+        } else {
             // Stopped without a pick: the mod that asked hears so.
             self.answer_asker(None);
         }
@@ -30,7 +34,7 @@ impl MoonframeApp {
         {
             self.answer_asker(None);
         }
-        self.inspector.selected = None;
+        self.forget_selection();
         self.inspector.asker = Some(from.to_owned());
         self.inspector.picking = true;
         self.inspector.hovered = None;
@@ -67,28 +71,22 @@ impl MoonframeApp {
             .app_topic("inspect", &asker, Data::Map(fields));
     }
 
+    /// Drops the current selection, on screen and where agents read it.
+    fn forget_selection(&mut self) {
+        if self.inspector.selected.take().is_some() {
+            save_selection(None);
+        }
+    }
+
     /// Selects `picked` (or nothing) and saves it where agents read it.
     pub(crate) fn select(&mut self, picked: Option<Placed>, cx: &mut Context<Self>) {
         self.inspector.picking = false;
         self.inspector.hovered = None;
-        let path = paths::selection();
-        let saved = match &picked {
-            Some(picked) => path
-                .parent()
-                .map_or(Ok(()), std::fs::create_dir_all)
-                .and_then(|()| std::fs::write(&path, inspect::report(picked, &self.workspace))),
-            None => match std::fs::remove_file(&path) {
-                Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
-                _ => Ok(()),
-            },
-        };
-        match saved {
-            Ok(()) if picked.is_some() => tracing::info!("selection saved to {}", path.display()),
-            Ok(()) => {},
-            Err(error) => {
-                tracing::warn!("cannot save the selection to {}: {error}", path.display())
-            },
-        }
+        save_selection(
+            picked
+                .as_ref()
+                .map(|picked| inspect::report(picked, &self.workspace)),
+        );
         if self.inspector.asker.is_some() {
             // Picked for a mod: it shows the pick itself, so no card.
             self.answer_asker(picked.as_ref());
@@ -115,11 +113,34 @@ impl MoonframeApp {
     }
 
     /// Esc: stops picking, else clears the selection.
-    pub(super) fn dismiss(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn dismiss(&mut self, cx: &mut Context<Self>) {
         if self.inspector.picking {
             self.toggle_inspect(cx);
         } else if self.inspector.selected.is_some() {
             self.select(None, cx);
         }
+    }
+}
+
+/// Saves `report` where agents read the selection, or removes what is
+/// there when there is none.
+fn save_selection(report: Option<String>) {
+    let path = paths::selection();
+    let saved = match &report {
+        Some(report) => path
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| std::fs::write(&path, report)),
+        None => match std::fs::remove_file(&path) {
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
+            _ => Ok(()),
+        },
+    };
+    match saved {
+        Ok(()) if report.is_some() => tracing::info!("selection saved to {}", path.display()),
+        Ok(()) => {},
+        Err(error) => {
+            tracing::warn!("cannot save the selection to {}: {error}", path.display())
+        },
     }
 }

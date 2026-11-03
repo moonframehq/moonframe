@@ -1,7 +1,6 @@
 use {
     gpui_kit::{App, KeyBinding, Menu, MenuItem},
-    moonframe_core::{AppMenu, Appearance, Chord, Component, MenuEntry},
-    std::collections::BTreeMap,
+    moonframe_core::{AppMenu, Appearance, Chord, MenuEntry},
 };
 
 gpui_kit::actions!(moonframe, [
@@ -97,15 +96,17 @@ pub(crate) fn bind_keys(cx: &mut App) {
 
 /// The menu bar: the app menu (About, Check for Updates and Beta Releases
 /// when the app names its repository, Quit), the shell's `menus`, then
-/// View, into which a shell menu called View merges, the Components menu
-/// listing `components` by category, and the shell's Window and Help.
+/// View, into which a shell menu called View merges, and the shell's
+/// Window and Help. View's Components… opens the gallery, which lists
+/// every component itself.
 /// Outside Developer Mode only what the app's users need shows: no
-/// Components menu, Inspect Element, Reload Modules, Undo and Redo of
+/// Components…, Inspect Element, Reload Modules, Undo and Redo of
 /// changes to the app's files, or Slow Animations.
-pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
+pub(crate) fn menus(shell: &[AppMenu]) -> Vec<Menu> {
     let title = crate::title();
     let mut app_items = vec![MenuItem::action(format!("About {title}"), AboutApp)];
     // An app that names the GitHub repository it is released from.
+    #[cfg(feature = "updates")]
     if crate::update::source().is_some() {
         app_items.push(MenuItem::action("Check for Updates…", CheckForUpdates));
         app_items.push(
@@ -114,11 +115,15 @@ pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
     }
     // Developer Mode: the tools for changing the app as it runs, which
     // its users can turn on too; the choice is kept.
-    app_items.extend([
-        MenuItem::separator(),
-        MenuItem::action("Developer Mode", ToggleDeveloperMode).checked(!crate::release()),
-        MenuItem::separator(),
-    ]);
+    if cfg!(feature = "studio") {
+        app_items.extend([
+            MenuItem::separator(),
+            MenuItem::action("Developer Mode", ToggleDeveloperMode).checked(!crate::release()),
+            MenuItem::separator(),
+        ]);
+    } else {
+        app_items.push(MenuItem::separator());
+    }
     // Outside a release, the starter builds itself as one; an app on the
     // library bundles with its own `bundle` command.
     if !crate::release() && !crate::identity().hosted {
@@ -167,41 +172,16 @@ pub(crate) fn menus(components: &[Component], shell: &[AppMenu]) -> Vec<Menu> {
         bar.extend(last);
         return bar;
     }
-    let mut categories: BTreeMap<&str, Vec<&Component>> = BTreeMap::new();
-    for component in components {
-        categories
-            .entry(&component.category)
-            .or_default()
-            .push(component);
-    }
-    let listed = categories.into_iter().map(|(category, members)| {
-        MenuItem::submenu(
-            Menu::new(category.to_owned()).items(members.into_iter().map(|component| {
-                MenuItem::action(component.title.clone(), ShowComponent {
-                    name: component.name.clone(),
-                })
-            })),
-        )
-    });
     view_items.extend([
         MenuItem::separator(),
+        MenuItem::action("Components…", BrowseComponents),
         MenuItem::action("Reload Modules", Reload),
         MenuItem::action("Undo Last Change", UndoChange),
         MenuItem::action("Redo Change", RedoChange),
         MenuItem::action("Inspect Element", Inspect),
         MenuItem::action("Slow Animations", ToggleSlowAnimations).checked(crate::motion::is_slow()),
     ]);
-    bar.extend([
-        Menu::new("View").items(view_items),
-        Menu::new("Components").items(
-            [
-                MenuItem::action("Browse Components…", BrowseComponents),
-                MenuItem::separator(),
-            ]
-            .into_iter()
-            .chain(listed),
-        ),
-    ]);
+    bar.push(Menu::new("View").items(view_items));
     bar.extend(last);
     bar
 }
@@ -263,4 +243,78 @@ pub(crate) fn keystroke(chord: &Chord) -> String {
     }
     parts.push(&chord.key);
     parts.join("-")
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, gpui_kit::Action, std::sync::atomic::Ordering};
+
+    /// Every action item in `menus`, submenus included, as (name, action).
+    fn actions(menus: &[Menu]) -> Vec<(String, &dyn Action)> {
+        fn walk<'a>(items: &'a [MenuItem], out: &mut Vec<(String, &'a dyn Action)>) {
+            for item in items {
+                match item {
+                    MenuItem::Action { name, action, .. } => {
+                        out.push((name.to_string(), action.as_ref()));
+                    },
+                    MenuItem::Submenu(menu) => walk(&menu.items, out),
+                    _ => {},
+                }
+            }
+        }
+        let mut out = Vec::new();
+        for menu in menus {
+            walk(&menu.items, &mut out);
+        }
+        out
+    }
+
+    fn browses(action: &dyn Action) -> bool {
+        action.as_any().is::<BrowseComponents>()
+    }
+
+    #[test]
+    fn components_is_one_view_item_in_developer_mode_only() {
+        let was = crate::RELEASE.load(Ordering::Relaxed);
+
+        crate::RELEASE.store(false, Ordering::Relaxed);
+        let bar = menus(&[]);
+        assert!(bar.iter().all(|menu| menu.name != "Components"));
+        let view: Vec<Menu> = menus(&[])
+            .into_iter()
+            .filter(|menu| menu.name == "View")
+            .collect();
+        assert_eq!(view.len(), 1, "one View menu");
+        let browsing: Vec<String> = actions(&view)
+            .into_iter()
+            .filter(|(_, action)| browses(*action))
+            .map(|(name, _)| name)
+            .collect();
+        let expected: &[&str] = if cfg!(feature = "studio") {
+            &["Components…"]
+        } else {
+            &[]
+        };
+        assert_eq!(browsing, expected);
+        let everything = actions(&bar);
+        assert!(
+            everything
+                .iter()
+                .all(|(_, action)| !action.as_any().is::<ShowComponent>()),
+            "no menu item opens one component"
+        );
+        assert_eq!(
+            everything
+                .iter()
+                .filter(|(_, action)| browses(*action))
+                .count(),
+            expected.len()
+        );
+
+        crate::RELEASE.store(true, Ordering::Relaxed);
+        let bar = menus(&[]);
+        assert!(actions(&bar).iter().all(|(_, action)| !browses(*action)));
+
+        crate::RELEASE.store(was, Ordering::Relaxed);
+    }
 }

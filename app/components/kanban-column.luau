@@ -1,6 +1,8 @@
 -- One column of a kanban board: a header (a coloured dot, the title, a
 -- count, a total on the right) over a rule in the column's colour, its
 -- cards, and an "Add" button at the bottom. The board is a row of these.
+-- Cards dragged with `carry` land on it through `accept`; `marker` draws
+-- where one would go.
 
 type Props = {
 	title: string,
@@ -11,6 +13,9 @@ type Props = {
 	add_label: string?,
 	to: string?,
 	width: number?,
+	accept: any,
+	over: boolean?,
+	marker: number?,
 	[number]: any,
 }
 
@@ -46,6 +51,9 @@ return component {
 		["add_label"] = "the button's text (default \"Add\")",
 		["to"] = "mod to send `add` to, if not the drawing one",
 		["width"] = "pixels (default 232)",
+		["accept"] = "message sent as a carried card moves over the column, leaves it and is dropped on it, with `phase`, `carry` and `y` added (see `carry` on `ui.row`)",
+		["over"] = "a card is over it: tint the column",
+		["marker"] = "draw a drop line before the card at this index (one past the last for the end)",
 		["[children]"] = "the cards",
 	},
 	styles = {
@@ -57,6 +65,8 @@ return component {
 		[".kanban-column-cards"] = { gap = 8 },
 		[".kanban-column-add"] = { padding = { 6, 8 }, radius = 8, gap = 6, color = "muted-foreground" },
 		[".kanban-column-add:hover"] = { background = "list-hover" },
+		[".kanban-column:over"] = { background = "accent/8" },
+		[".kanban-column-marker"] = { background = "accent", radius = 1 },
 	},
 	example = { title = "Proposal", color = "#a78bfa", count = 3, total = "$284K", add = "add" },
 	usage = [[local kanban_column = use "kanban-column"
@@ -70,8 +80,30 @@ kanban_column {
 	build = function(props: Props)
 		local color = props.color or "accent"
 		local cards = positional(props)
+		local marker = if props.marker then math.clamp(props.marker, 1, #cards + 1) else nil
+		-- Keep each card at the same path and size while the marker moves.
+		-- The line is a floating second child, never a sibling of the cards.
+		for index, card in cards do
+			local before = marker == index
+			local after = index == #cards and marker == #cards + 1
+			cards[index] = ui.column {
+				gap = "none",
+				card,
+				(before or after) and ui.row {
+					class = "kanban-column-marker",
+					height = 2,
+					float = if before then "top" else "bottom",
+				},
+			}
+		end
+		if #cards == 0 and marker then
+			table.insert(cards, ui.row { class = "kanban-column-marker", height = 2, float = "top" })
+		end
 		return ui.column {
 			class = "kanban-column",
+			state = if props.over then "over" else nil,
+			accept = props.accept,
+			to = if props.accept ~= nil then props.to else nil,
 			width = props.width or 232,
 			shrink = false,
 			ui.row {

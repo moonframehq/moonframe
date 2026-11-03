@@ -6,6 +6,9 @@ impl MoonframeApp {
     /// Builds the app this window runs as a release bundle, in the
     /// background, and shows it in Finder when it is done.
     pub(crate) fn build_app(&mut self, cx: &mut Context<Self>) {
+        if !cfg!(feature = "studio") {
+            return;
+        }
         if self.building {
             self.show_toast("The app is already being built", cx);
             return;
@@ -54,11 +57,12 @@ impl MoonframeApp {
 
     /// Turns Beta Releases on or off, and on, looks for a pre-release at
     /// once rather than at the next daily check.
+    #[cfg(feature = "updates")]
     pub(crate) fn toggle_beta_releases(&mut self, cx: &mut Context<Self>) {
         let on = !crate::update::beta();
         crate::update::set_beta(on);
         // The menu shows the switch checked while it is on.
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         if on {
             self.show_toast("Beta Releases: updates include pre-releases", cx);
             self.check_for_updates(false, cx);
@@ -70,6 +74,7 @@ impl MoonframeApp {
     /// Asks the app's repository for a newer release and offers it. `asked`:
     /// the user chose Check for Updates, so every outcome is told; the
     /// daily check speaks only of a newer release.
+    #[cfg(feature = "updates")]
     pub(crate) fn check_for_updates(&mut self, asked: bool, cx: &mut Context<Self>) {
         let Some(source) = crate::update::source().cloned() else {
             if asked {
@@ -184,6 +189,7 @@ impl MoonframeApp {
     /// Downloads `release` and puts it in place of the running app, which
     /// quits and starts again; on a failure, says why and opens the
     /// release's page to download it from.
+    #[cfg(feature = "updates")]
     fn install_update(
         &mut self,
         release: crate::update::Release,
@@ -223,5 +229,21 @@ impl MoonframeApp {
             }
         })
         .detach();
+    }
+}
+
+#[cfg(not(feature = "updates"))]
+impl MoonframeApp {
+    pub(crate) fn toggle_beta_releases(&mut self, cx: &mut Context<Self>) {
+        self.check_for_updates(true, cx);
+    }
+
+    pub(crate) fn check_for_updates(&mut self, asked: bool, cx: &mut Context<Self>) {
+        if asked {
+            self.show_toast(
+                "App updates were left out of this build; enable `updates`",
+                cx,
+            );
+        }
     }
 }

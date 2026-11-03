@@ -88,6 +88,7 @@ tokens! {
         Icon = "icon",
         Image = "image",
         Line = "line",
+        Paths = "paths",
         Hatch = "hatch",
         Terminal = "terminal",
         Browser = "browser",
@@ -108,6 +109,9 @@ tokens! {
         Divider = "divider",
         Popover = "popover",
         Tooltip = "tooltip",
+        /// What follows the pointer while a row or column with `carry` is
+        /// dragged: a box of its size.
+        Carry = "carry",
         Overlay = "overlay",
         /// What dims the window behind an overlay with `backdrop = true`.
         OverlayBackdrop = "overlay-backdrop",
