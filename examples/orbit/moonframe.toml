@@ -1,0 +1,5 @@
+[app]
+# A task workspace: draggable boards, grouped lists, calendars and timelines,
+# with rich task details, comments and local attachments. Sample data.
+name = "orbit"
+title = "Orbit"

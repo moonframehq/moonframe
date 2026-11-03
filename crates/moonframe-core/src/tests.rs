@@ -15,6 +15,7 @@ mod components;
 mod elements;
 mod mods;
 mod motion;
+mod orbit;
 mod overlays;
 mod packages;
 mod paint;
