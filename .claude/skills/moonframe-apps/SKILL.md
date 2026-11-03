@@ -221,7 +221,7 @@ which also has a release workflow to copy.
 
 ## Release mode and bundles
 
-- **Developer Mode** (app menu, beside About) switches the Components menu,
+- **Developer Mode** (app menu, beside About) switches View's Components…,
   Inspect Element and Reload Modules, and their keys, on and off live; the
   choice is kept per app and profile. Until the user picks, it is off in a
   bundle and in a library app's release build. `--release` and `--dev` set

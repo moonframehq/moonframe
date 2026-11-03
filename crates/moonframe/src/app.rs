@@ -220,7 +220,7 @@ impl MoonframeApp {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         bind_menu_keys(workspace.menus(), cx);
-        cx.set_menus(menus(workspace.components(), workspace.menus()));
+        cx.set_menus(menus(workspace.menus()));
         menu_actions(cx);
         let terminals = Terminals::new(backends, wake_on_output(cx));
         // Projects are kept only with the user's folder: `--no-user` runs
@@ -468,7 +468,7 @@ impl MoonframeApp {
         self.preview = None;
         self.apply_theme(cx);
         show_appearance(appearance);
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         if let Some(path) = &self.settings
             && let Err(problem) = settings::save(path, &[(settings::APPEARANCE, appearance.name())])
         {
@@ -896,7 +896,7 @@ impl MoonframeApp {
             self.show_toast("The window's title bar changes when the app restarts", cx);
         }
         bind_menu_keys(self.workspace.menus(), cx);
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         self.apply_theme(cx);
         report(&self.workspace);
         cx.notify();
@@ -918,7 +918,7 @@ impl MoonframeApp {
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
         bind_menu_keys(self.workspace.menus(), cx);
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         self.apply_theme(cx);
         report(&self.workspace);
         self.reload_providers(Some(roots), cx);

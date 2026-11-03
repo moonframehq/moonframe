@@ -13,7 +13,7 @@
 # packages it requires are staged in Contents/Resources/bundle, it takes the
 # app's title, id (dev.moonframe.app.NAME), version (its manifest's
 # `version`, else Moonframe's) and icon (its manifest's `icon`, else
-# icon.png), and it runs as a release, without the Components menu or
+# icon.png), and it runs as a release, without Components… or
 # Inspect Element. What its users add goes in
 # ~/.config/moonframe/profiles/NAME. MOONFRAME_USER names another user
 # folder to find the profile in.
