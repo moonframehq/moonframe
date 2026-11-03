@@ -7,22 +7,25 @@
 //! mod's `update`, shaped by [`moonframe_core::Input::message`]. A field
 //! with `browser` is that page's address bar: Enter loads what it says,
 //! focus selects it, and Escape puts back the page's address. A field
-//! with `prose`, `dim` or `typewriter` is a writing field ([`prose`]).
+//! with `prose`, `dim` or `typewriter` is a writing field (the `prose` feature).
 
+#[cfg(feature = "prose")]
 mod prose;
 
 use {
     crate::app::MoonframeApp,
     gpui_kit::{
         base::input::{
-            Editor as ProseElement, EditorState, Input as LineElement, InputEditorStyle,
-            InputEvent, InputState, Textarea, TextareaState,
+            Input as LineElement, InputEditorStyle, InputEvent, InputState, Textarea, TextareaState,
         },
         *,
     },
     moonframe_core::{Action, Data, Input, KeyChord},
     std::{cell::RefCell, collections::HashMap, rc::Rc},
 };
+
+#[cfg(feature = "prose")]
+use gpui_kit::base::input::{Editor as ProseElement, EditorState};
 
 /// Fields the app keeps at once. Past this the ones drawn longest ago go,
 /// so a mod drawing inputs from data can't grow the set without end.
@@ -33,6 +36,7 @@ const MAX_FIELDS: usize = 256;
 pub(crate) enum Editor {
     Line(Entity<InputState>),
     Lines(Entity<TextareaState>),
+    #[cfg(feature = "prose")]
     Prose(Entity<EditorState>, Rc<prose::Writing>),
 }
 
@@ -42,6 +46,7 @@ macro_rules! on_state {
         match $editor {
             Editor::Line($state) => $body,
             Editor::Lines($state) => $body,
+            #[cfg(feature = "prose")]
             Editor::Prose($state, _) => $body,
         }
     };
@@ -49,10 +54,12 @@ macro_rules! on_state {
 
 impl Editor {
     fn new(input: &Input, window: &mut Window, cx: &mut App) -> Self {
+        #[cfg(feature = "prose")]
         if input.writing() {
             let writing = Rc::new(prose::Writing::default());
-            Self::Prose(prose::editor(&writing, window, cx), writing)
-        } else if input.multiline {
+            return Self::Prose(prose::editor(&writing, window, cx), writing);
+        }
+        if input.multiline {
             Self::Lines(cx.new(|cx| TextareaState::new(window, cx)))
         } else {
             Self::Line(cx.new(|cx| InputState::new(window, cx)))
@@ -64,6 +71,7 @@ impl Editor {
         let (multiline, writing) = match self {
             Self::Line(_) => (false, false),
             Self::Lines(_) => (true, false),
+            #[cfg(feature = "prose")]
             Self::Prose(..) => (true, true),
         };
         multiline != input.multiline || writing != input.writing()
@@ -116,6 +124,7 @@ impl Editor {
         match self {
             Self::Line(state) => LineElement::new(state).into_any_element(),
             Self::Lines(state) => Textarea::new(state).into_any_element(),
+            #[cfg(feature = "prose")]
             Self::Prose(state, _) => ProseElement::new(state).into_any_element(),
         }
     }
@@ -212,6 +221,9 @@ impl Inputs {
         window: &mut Window,
         cx: &mut App,
     ) -> Option<Editor> {
+        if input.writing() && !cfg!(feature = "prose") {
+            return None;
+        }
         let mut registry = self.0.borrow_mut();
         let frame = registry.frame;
         let wiring = Wiring::of(owner, input);
@@ -233,6 +245,7 @@ impl Inputs {
             }
             let events = subscribe(app, &editor, key, window, cx)?;
             let caret = match &editor {
+                #[cfg(feature = "prose")]
                 Editor::Prose(state, writing) => Some(prose::follow(writing, state, cx)),
                 _ => None,
             };
@@ -276,6 +289,7 @@ impl Inputs {
             state.update(cx, |state, cx| state.set_rows(rows, cx));
             field.rows = Some(input.rows);
         }
+        #[cfg(feature = "prose")]
         if let Editor::Prose(state, writing) = &editor {
             writing.apply(input, state, window, cx);
         }

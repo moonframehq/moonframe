@@ -110,6 +110,15 @@ impl Workspace {
             }),
             ("window".to_owned(), self.window.data()),
             (
+                "capabilities".to_owned(),
+                Data::Map(
+                    self.capabilities
+                        .iter()
+                        .map(|(name, enabled)| (name.clone(), Data::Bool(*enabled)))
+                        .collect(),
+                ),
+            ),
+            (
                 "mods".to_owned(),
                 Data::List(self.mod_names().map(Data::from).collect()),
             ),

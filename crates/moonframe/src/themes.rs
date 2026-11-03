@@ -12,7 +12,6 @@ use {
         component::{ThemeConfig, ThemeConfigColors, ThemeMode},
     },
     moonframe_core::Data,
-    moonframe_terminal::Ansi,
     std::{collections::BTreeMap, sync::LazyLock},
 };
 
@@ -299,7 +298,8 @@ impl Scheme {
     }
 
     /// The 16 terminal colors.
-    pub(crate) fn palette(&self) -> Ansi {
+    #[cfg(any(feature = "terminal", test))]
+    pub(crate) fn palette(&self) -> [(u8, u8, u8); 16] {
         self.ansi.map(|color| {
             let [_, red, green, blue] = color.to_be_bytes();
             (red, green, blue)

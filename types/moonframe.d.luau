@@ -1538,6 +1538,8 @@ type App = {
 	dark: boolean,
 	appearance: Appearance,
 	window: WindowState,
+	-- Cargo feature names mapped to whether this host compiled them in.
+	capabilities: { [string]: boolean },
 	mods: { string },
 	regions: { [string]: { string } },
 	-- Nil until the first sample arrives (from the `system` provider).

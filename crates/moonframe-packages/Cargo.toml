@@ -12,6 +12,9 @@ version.workspace      = true
 workspace = true
 
 [features]
+default = ["updates"]
+# Network release checks and installation, independent of package metadata.
+updates = ["dep:ureq"]
 # A bundle prebuilds its Wasm providers only when the app it bundles can
 # run them: set by `moonframe/wasm`.
 wasm = []
@@ -24,4 +27,4 @@ serde_json.workspace          = true
 tempfile.workspace            = true
 toml.workspace                = true
 tracing.workspace             = true
-ureq.workspace                = true
+ureq                          = { optional = true, workspace = true }

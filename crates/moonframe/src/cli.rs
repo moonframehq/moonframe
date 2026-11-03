@@ -14,7 +14,7 @@ use {
         component::{ActiveTheme as _, Root},
         point, px, size,
     },
-    moonframe_core::{AppLayer, Chrome, Roots, Titlebar, Workspace},
+    moonframe_core::{AppLayer, Chrome, Roots, Titlebar},
     moonframe_mux::Backends,
     std::{
         fs,
@@ -210,7 +210,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
 
 /// Loads every module headlessly: what an agent runs after an edit.
 fn check(roots: Roots) -> ExitCode {
-    let workspace = Workspace::open(roots.clone(), false);
+    let workspace = crate::capabilities::open(roots.clone(), false, None);
     let mut problems: Vec<(String, String)> = workspace
         .problems()
         .into_iter()
@@ -249,7 +249,7 @@ fn check(roots: Roots) -> ExitCode {
 
 /// Prints the catalogue the `moonframe-components` skill is made of.
 fn catalogue(roots: Roots) -> ExitCode {
-    let workspace = Workspace::open(roots, false);
+    let workspace = crate::capabilities::open(roots, false, None);
     let components = workspace.components();
     let mut failed = false;
     for component in components {
@@ -435,8 +435,11 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         Ordering::Relaxed,
     );
     let _ = crate::TITLE.set(folders.title());
-    let _ = crate::update::SOURCE.set(folders.updates());
-    crate::update::load_beta(folders.profile.as_deref());
+    #[cfg(feature = "updates")]
+    {
+        let _ = crate::update::SOURCE.set(folders.updates());
+        crate::update::load_beta(folders.profile.as_deref());
+    }
     crate::dock::set_name(&crate::title());
     tracing::info!(
         "starting {} ({}{}) on {}",
@@ -486,7 +489,8 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
                 .as_ref()
                 .and_then(|_| crate::persist::open(&backends, folders.profile.as_deref()));
             // The shell says what window it wants, so it loads first.
-            let workspace = Workspace::open_with(folders.roots(), cx.theme().is_dark(), persist);
+            let workspace =
+                crate::capabilities::open(folders.roots(), cx.theme().is_dark(), persist);
             let chrome = workspace.chrome();
             // The shell's size if it asks, kept within the screen.
             let (width, height) = chrome.size.unwrap_or((1280., 820.));

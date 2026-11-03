@@ -11,13 +11,15 @@ version.workspace      = true
 workspace = true
 
 [features]
-default = ["herdr-core"]
+default = ["herdr-core", "terminal"]
 # Terminals kept by herdr-core (`hc`), through herdr-gpui's client.
 herdr-core = ["dep:herdr-core-client"]
+# PTYs and terminal backends; document storage works independently.
+terminal = ["dep:moonframe-terminal"]
 
 [dependencies]
 herdr-core-client    = { optional = true, workspace = true }
-moonframe-terminal   = { workspace = true }
+moonframe-terminal   = { optional = true, workspace = true }
 serde_json.workspace = true
 tracing.workspace    = true
 

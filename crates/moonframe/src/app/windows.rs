@@ -131,6 +131,7 @@ impl MoonframeApp {
         let mut painter = Painter::new(
             &self.workspace,
             &mut self.motion,
+            #[cfg(feature = "terminal")]
             &mut self.terminals,
             &self.inputs,
             None,
@@ -189,6 +190,7 @@ impl MoonframeApp {
         let mut painter = Painter::new(
             &self.workspace,
             &mut self.motion,
+            #[cfg(feature = "terminal")]
             &mut self.terminals,
             &self.inputs,
             None,

@@ -15,10 +15,11 @@ impl MoonframeApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        if !self.is_main(window)
-            || self.inputs.any_focused(window, cx)
-            || self.terminals.any_focused(window)
-        {
+        if !self.is_main(window) || self.inputs.any_focused(window, cx) {
+            return false;
+        }
+        #[cfg(feature = "terminal")]
+        if self.terminals.any_focused(window) {
             return false;
         }
         let modifiers = keystroke.modifiers;

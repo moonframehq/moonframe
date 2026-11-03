@@ -30,6 +30,7 @@ mod assets;
 mod branch_bar;
 mod browser;
 mod build;
+mod capabilities;
 mod cli;
 mod color;
 mod demos;
@@ -50,6 +51,7 @@ mod overlay;
 mod panes;
 mod persist;
 mod profiles;
+#[cfg(feature = "terminal")]
 mod project;
 mod render;
 mod settings;

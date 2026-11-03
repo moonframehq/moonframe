@@ -15,11 +15,13 @@ pub(crate) mod images;
 mod input;
 mod keyed;
 mod list;
+#[cfg_attr(not(feature = "markdown"), path = "render/markdown_left_out.rs")]
 mod markdown;
 mod plot;
 mod pointer;
 mod popover;
 mod styling;
+#[cfg_attr(not(feature = "terminal"), path = "render/terminal_left_out.rs")]
 mod terminal;
 mod view;
 mod viewer;
@@ -33,7 +35,6 @@ use {
         input::Inputs,
         inspect::{Crumb, Sink, Tracked},
         motion::{Keyed, Motion, Shown, Snapshot},
-        terminal::Terminals,
     },
     gpui_kit::{
         component::{ActiveTheme, Icon, Sizable as _, Theme, tooltip::Tooltip},
@@ -52,6 +53,9 @@ use {
         time::{Duration, Instant},
     },
 };
+
+#[cfg(feature = "terminal")]
+use crate::terminal::Terminals;
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
 
@@ -245,6 +249,7 @@ pub(crate) struct Painter<'w, 'm> {
     /// inspecting: the highlight follows its corners.
     radii: RefCell<HashMap<String, moonframe_core::Corners>>,
     /// The shells terminals show.
+    #[cfg(feature = "terminal")]
     terminals: &'m mut Terminals,
     /// The text input fields edit.
     inputs: Inputs,
@@ -285,7 +290,7 @@ impl<'w, 'm> Painter<'w, 'm> {
     pub(crate) fn new(
         workspace: &'w Workspace,
         motion: &'m mut Motion,
-        terminals: &'m mut Terminals,
+        #[cfg(feature = "terminal")] terminals: &'m mut Terminals,
         inputs: &Inputs,
         sink: Option<Sink>,
         theme: &Theme,
@@ -307,6 +312,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             sink,
             outer: None,
             radii: RefCell::default(),
+            #[cfg(feature = "terminal")]
             terminals,
             inputs: inputs.clone(),
             preview: false,

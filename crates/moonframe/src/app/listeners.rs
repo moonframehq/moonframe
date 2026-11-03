@@ -5,6 +5,7 @@ use super::*;
 
 /// A callback for terminal sessions, which run on threads of their own: each
 /// call asks for one more frame, and a burst of calls makes one.
+#[cfg(feature = "terminal")]
 pub(super) fn wake_on_output(cx: &mut Context<MoonframeApp>) -> Arc<dyn Fn() + Send + Sync> {
     let (sender, mut woken) = futures::channel::mpsc::unbounded::<()>();
     cx.spawn(async move |this, cx| {

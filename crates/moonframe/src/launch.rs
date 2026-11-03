@@ -107,6 +107,8 @@ impl Moonframe {
     /// release's tag (`v1.2.3`) with [`version`](Self::version), and on
     /// macOS installs its `.dmg` over the running `.app` and starts again.
     /// An installed or release build also checks by itself once a day.
+    /// Requires the `updates` feature to check or install; without it this
+    /// only records the repository in the app's metadata.
     pub fn updates(mut self, repo: &str) -> Self {
         if crate::update::valid_repo(repo) {
             self.identity.updates = Some(repo.to_owned());
