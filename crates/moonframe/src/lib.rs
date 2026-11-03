@@ -30,6 +30,8 @@ mod assets;
 mod branch_bar;
 mod browser;
 mod build;
+#[cfg(feature = "capture")]
+mod capture;
 mod cli;
 mod color;
 mod demos;

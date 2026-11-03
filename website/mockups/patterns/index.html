@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moonframe — Pattern browser directions</title>
+  <link rel="stylesheet" href="patterns.css">
+  <script src="/.herdr/kit.js"></script>
+  <script defer src="patterns.js"></script>
+</head>
+<body>
+  <header class="review-bar">
+    <div><span class="review-label">DESIGN STUDY</span><strong>Browsing patterns</strong></div>
+    <nav aria-label="Design directions" id="directions">
+      <button data-direction="A" class="active">A <span>Library</span></button>
+      <button data-direction="B">B <span>Workbench</span></button>
+      <button data-direction="C">C <span>Cookbook</span></button>
+    </nav>
+    <div class="review-actions"><button id="theme" aria-label="Toggle dark mode">◐</button><button id="pick" class="pick">Pick this direction ↗</button></div>
+  </header>
+  <div class="direction-note"><span id="direction-note"></span><span>Standalone browser: <code>just patterns</code> · proposed launch command</span></div>
+  <main id="app"></main>
+  <div id="toast" role="status"></div>
+</body>
+</html>

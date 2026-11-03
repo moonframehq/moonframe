@@ -19,6 +19,8 @@ acp = ["dep:moonframe-acp"]
 # libghostty-vt with Zig (see mise.toml), so an app on the
 # library opts into it; the starter (crates/moonframe-app) has both.
 alacritty = ["moonframe-terminal/alacritty"]
+# Developer-only export of this app's own rendered frame, without desktop capture.
+capture = ["dep:gpui-capture", "dep:gpui-platform-capture"]
 # The `chat` native provider (`app.chat`): agent chats run by herdr-acp,
 # attached over herdr's chat protocol.
 chat = ["dep:moonframe-chat"]
@@ -62,8 +64,11 @@ usage = ["dep:moonframe-usage"]
 wasm = ["moonframe-packages/wasm", "moonframe-providers/wasm"]
 
 [dependencies]
+# Enable export on the same GPUI version as gpui-kit, without its test harness.
 futures.workspace             = true
+gpui-capture                  = { default-features = false, features = ["test-support"], optional = true, package = "gpui-pre", version = "=0.3.10" }
 gpui-kit.workspace            = true
+gpui-platform-capture         = { default-features = false, features = ["test-support"], optional = true, package = "gpui-pre-platform", version = "=0.3.10" }
 imagesize.workspace           = true
 moonframe-acp                 = { optional = true, workspace = true }
 moonframe-chat                = { optional = true, workspace = true }

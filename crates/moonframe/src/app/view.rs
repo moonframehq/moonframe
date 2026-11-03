@@ -4,6 +4,8 @@ use super::{toasts::toast, *};
 
 impl Render for MoonframeApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        #[cfg(feature = "capture")]
+        crate::capture::schedule(window);
         let started = std::time::Instant::now();
         let gallery_open = self.gallery.is_some_and(|gallery| {
             cx.windows()
