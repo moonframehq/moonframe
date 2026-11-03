@@ -46,7 +46,7 @@ fn a_packaged_app_follows_projects_and_rejects_old_repository_data() {
     forge.look_project(&handle, None);
     assert!(forge.root.is_none());
     forge.look_project(&handle, Some(first.clone()));
-    assert_eq!(forge.root, Some(first));
+    assert_eq!(forge.root.as_ref().unwrap().canonicalize().unwrap(), first);
     assert_eq!(forge.target().unwrap().path, "owner/one");
     forge.status = Status::SignedIn;
     forge.credential = Some(Credential::new(
@@ -57,7 +57,7 @@ fn a_packaged_app_follows_projects_and_rejects_old_repository_data() {
     forge.data = json!({ "current_pr": { "number": 1 } });
     forge.fetching = true;
     forge.look_project(&handle, Some(second.clone()));
-    assert_eq!(forge.root, Some(second.clone()));
+    assert_eq!(forge.root.as_ref().unwrap().canonicalize().unwrap(), second);
     assert!(forge.data.is_null());
     assert_eq!(forge.target().unwrap().path, "owner/two");
     forge.take_in(&handle, Done::Fetched {
@@ -69,7 +69,7 @@ fn a_packaged_app_follows_projects_and_rejects_old_repository_data() {
     assert!(forge.data.is_null());
     assert!(forge.due(Instant::now()));
     forge.look_project(&handle, None);
-    assert_eq!(forge.root, Some(second));
+    assert_eq!(forge.root.as_ref().unwrap().canonicalize().unwrap(), second);
 }
 
 #[test]
