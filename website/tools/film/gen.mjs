@@ -2,8 +2,11 @@
 // palette, with the repository's real screenshots embedded. Writes one SVG per
 // frame into $FILM_WORK/frames (default target/film/frames); render.sh
 // prepares the images it reads, renders the frames and encodes the videos.
-// Usage: node gen.mjs            -> every frame
-//        node gen.mjs 120 300    -> only those frames (for checking a scene)
+// Usage: node gen.mjs              -> every frame
+//        node gen.mjs 120 300      -> only those frames (for checking a scene)
+//        node gen.mjs --schedule   -> each scene's place in the film, for the
+//                                     chapters, the posters and the loop
+// How the film is built and how to add a scene: README.md beside this file.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,7 +16,8 @@ const WORK = process.env.FILM_WORK || path.join(REPO, "target/film");
 const OUT = path.join(WORK, "frames");
 fs.mkdirSync(OUT, { recursive: true });
 const W = 1920, H = 1080, FPS = 30, DUR = 60.0;
-const ONLY = process.argv.slice(2).map(Number);
+const SCHEDULE = process.argv[2] === "--schedule";
+const ONLY = SCHEDULE ? [] : process.argv.slice(2).map(Number);
 
 // ---------- palette (website/site/index.html) ----------
 const C = {
@@ -641,6 +645,22 @@ function frame(n) {
   </defs>
   <rect width="${W}" height="${H}" fill="url(#bg)"/>
   ${body}${bar}</svg>`;
+}
+
+if (SCHEDULE) {
+  // A chapter seeks a little past its scene's start, where the cross-fade has
+  // finished (start + 0.2s), and its button shows that time rounded. Start
+  // and end keep their tenths: chapters.vtt and the preview loop need them.
+  const mmss = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, "0")}`;
+  console.log("scene     no  start   end  seek  label  frames");
+  for (const k of ORDER) {
+    const p = PLACE[k];
+    const no = NUM[k] ? String(NUM[k]).padStart(2, "0") : "  ";
+    console.log(`${k.padEnd(9)} ${no}  ${p.start.toFixed(1).padStart(5)}  ${p.end.toFixed(1).padStart(4)}  ${(p.start + 0.2).toFixed(1).padStart(4)}  ${mmss(Math.round(p.start + 0.2)).padEnd(5)}  ${Math.round(p.start * FPS)}-${Math.round(p.end * FPS) - 1}`);
+  }
+  const last = PLACE[ORDER[ORDER.length - 1]].end;
+  if (Math.abs(last - DUR) > 0.01) console.log(`\nThe scenes run ${last.toFixed(1)}s but DUR is ${DUR}s: set DUR to match.`);
+  process.exit(0);
 }
 
 const total = Math.round(DUR * FPS);

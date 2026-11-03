@@ -59,27 +59,12 @@ delete one only once nothing should point at it.
 
 ## The tour film
 
-The film under the hero is a stylised motion graphic, not a screen recording:
-`tools/film/gen.mjs` draws each frame as SVG around the real screenshots in
-`docs/screenshots/`, the agent icons in `assets/icons/` and the names in
-`app/components/`. After changing a scene or a screenshot it uses, re-render
-from the repo root (needs node, librsvg, ffmpeg with libx264,
-and cwebp; about two minutes, with frames kept in `target/film`):
-
-```sh
-website/tools/film/render.sh
-```
-
-To check a scene first, draw only some frames (30 a second) and look at them:
-
-```sh
-node website/tools/film/gen.mjs 300 605 && rsvg-convert target/film/frames/f0605.svg -o /tmp/f.png
-```
-
-It writes `film.mp4`, its poster, and the muted `loop`
-that previews the film (the first two scenes). Chapter times live in both
-`film/chapters.vtt` and the chapter buttons in `index.html`; move them
-together when a scene's timing changes.
+The film in the tour section is a stylised motion graphic, drawn by
+`tools/film/gen.mjs` around the real screenshots and rendered by
+`tools/film/render.sh` into `site/film/`. When a feature lands that it should
+show, or a screenshot it uses changes, follow
+[tools/film/README.md](tools/film/README.md): how the film is built, how to
+add a scene, what to check, and the chapter times to move with it.
 
 ## Hosting
 
