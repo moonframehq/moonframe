@@ -1,10 +1,6 @@
 default:
     @just --list
 
-# The `ghostty` terminal feature builds Ghostty with Zig 0.15; this wrapper
-# makes that work on macOS 27 (see tools/zig/zig).
-export PATH := justfile_directory() / "tools/zig" + ":" + env_var("PATH")
-
 # rustfmt.toml uses unstable options, so formatting runs on nightly while
 # builds, clippy and tests use the stable rust-toolchain.toml.
 nightly_toolchain := "nightly-2026-06-20"

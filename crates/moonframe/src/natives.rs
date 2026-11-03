@@ -16,10 +16,14 @@ use {
 
 pub(crate) fn natives() -> Natives {
     let built_in: &[(&str, fn() -> Box<dyn Native>)] = &[
+        // keep-sorted start
         ("acp", acp),
+        ("chat", chat),
         ("docs", docs),
         ("git", git),
+        ("shell", shell),
         ("usage", usage),
+        // keep-sorted end
         // The demo gallery's (examples/demo): it opens apps on this binary.
         ("demos", crate::demos::native),
     ];
@@ -37,6 +41,11 @@ fn acp() -> Box<dyn Native> {
     moonframe_acp::native()
 }
 
+#[cfg(feature = "chat")]
+fn chat() -> Box<dyn Native> {
+    moonframe_chat::native()
+}
+
 #[cfg(feature = "docs")]
 fn docs() -> Box<dyn Native> {
     moonframe_docs::native()
@@ -47,6 +56,11 @@ fn git() -> Box<dyn Native> {
     moonframe_git::native()
 }
 
+#[cfg(feature = "shell")]
+fn shell() -> Box<dyn Native> {
+    moonframe_shell::native()
+}
+
 #[cfg(feature = "usage")]
 fn usage() -> Box<dyn Native> {
     moonframe_usage::native()
@@ -54,6 +68,16 @@ fn usage() -> Box<dyn Native> {
 
 #[cfg(not(feature = "acp"))]
 fn acp() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "chat"))]
+fn chat() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "shell"))]
+fn shell() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
@@ -75,7 +99,14 @@ fn usage() -> Box<dyn Native> {
 /// A built-in provider this build leaves out: it publishes nothing.
 // With every feature on, only the tests make one.
 #[cfg_attr(
-    all(feature = "acp", feature = "docs", feature = "git", feature = "usage"),
+    all(
+        feature = "acp",
+        feature = "chat",
+        feature = "docs",
+        feature = "git",
+        feature = "shell",
+        feature = "usage"
+    ),
     allow(dead_code)
 )]
 struct LeftOut;
@@ -124,7 +155,7 @@ mod tests {
     #[test]
     fn every_built_in_native_is_registered() {
         let natives = natives();
-        for name in ["acp", "docs", "git", "usage", "demos"] {
+        for name in ["acp", "chat", "docs", "git", "shell", "usage", "demos"] {
             assert!(natives.contains_key(name), "{name}");
         }
     }

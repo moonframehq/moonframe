@@ -1,0 +1,11 @@
+[app]
+# A workspace for coding agents: your repositories and their worktrees on
+# the left, chats with agents in the middle (herdr-acp, over herdr's chat
+# protocol) with `!` shell commands in the same thread, a terminal and run
+# scripts under them, and the worktree's files, changes and checks on the
+# right. `moonframe --profile switchyard` opens it.
+keep  = ["feedback"]
+name  = "switchyard"
+title = "Switchyard"
+# The projects provider and the file, change and code components.
+requires = ["../projects"]

@@ -181,6 +181,13 @@ end }"#;
         panic!("expected a column");
     };
     assert_eq!(column.frame.scroll, crate::Scroll::Both);
+    assert!(!column.frame.follow);
+    let chat =
+        r#"return mod { view = function() return ui.column { scroll = true, follow = true } end }"#;
+    let Node::Stack(column) = view_of(chat).unwrap() else {
+        panic!("expected a column");
+    };
+    assert!(column.frame.follow);
     let float = row.frame.float.unwrap();
     assert_eq!(
         (float.top, float.right, float.left),

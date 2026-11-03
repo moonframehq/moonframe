@@ -147,10 +147,9 @@ Now edit `app/mods/explorer/main.luau` or `app/style.luau` and save: the
 window changes as you type. `just check` loads everything without a window
 and points at any problem, and `just types` type-checks the Luau.
 
-The Ghostty terminal builds libghostty-vt from source with Zig 0.15. To
-build without it, use `cargo run --no-default-features --features alacritty`.
-On macOS 27, Zig 0.15 needs the wrapper in `tools/zig`, which mise and the
-justfile put first on `PATH`, and a macOS SDK of version 15 or older.
+The Ghostty terminal builds libghostty-vt from source with Zig 0.17 (pinned
+in `mise.toml`). To build without it, use
+`cargo run --no-default-features --features alacritty`.
 
 Moonframe is developed on macOS. CI builds, lints and tests it on macOS,
 Linux (x86_64 and ARM64) and Windows (x86_64), and each release ships a macOS disk

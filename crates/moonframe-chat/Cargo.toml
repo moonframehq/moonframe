@@ -1,0 +1,26 @@
+[package]
+description            = "The `chat` native provider: agent chats on herdr-acp, attached over herdr's chat protocol"
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-chat"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[dependencies]
+herdr-chat-protocol.workspace = true
+moonframe-core.workspace      = true
+moonframe-providers.workspace = true
+serde_json.workspace          = true
+tracing.workspace             = true
+
+# Ending a chat: its program and the agent under it, as one process group.
+[target.'cfg(unix)'.dependencies]
+rustix = { features = ["process"], workspace = true }
+
+[dev-dependencies]
+tempfile.workspace = true
