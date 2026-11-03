@@ -1220,9 +1220,11 @@ type ForgePr = {
 	-- The badge: "draft", "waiting", "ready", "attention", "merged",
 	-- "closed" or "held".
 	tone: string,
-	-- GitHub only.
+	-- Lines added and removed; on GitLab only for `current_pr`.
 	additions: number?,
 	deletions: number?,
+	-- Files changed; GitHub only.
+	files: number?,
 	-- `current_pr` only: each check by name, at most 50; `outcome` is
 	-- "passed", "failed", "pending" or "skipped".
 	check_list: { { name: string, outcome: string, url: string? } }?,
@@ -1238,15 +1240,50 @@ type ForgeIssue = {
 	assignees: { string },
 }
 
--- `app.github` and `app.gitlab`. When `available` is false only `reason`
--- is set.
+-- Where a forge's sign-in stands. The app draws it as it likes and
+-- sends `provider:github` (or `provider:gitlab`) `{ sign_in = true }`,
+-- `{ token = "..." }`, `{ use_cli = true }`, `{ cancel = true }` or
+-- `{ sign_out = true }`, from a mod in the provider's `accounts`.
+type ForgeAuth = {
+	-- "checking", "signed_out", "pending" (a device code is up),
+	-- "verifying" or "signed_in".
+	status: string,
+	-- The host signed in to: the remote's, else github.com or gitlab.com.
+	host: string,
+	login: string?,
+	-- "saved", "env" or "cli".
+	source: string?,
+	-- Whether a device sign-in is set up (the provider has a client id).
+	device: boolean,
+	-- Whether the CLI (gh, glab) is signed in and could be used.
+	cli: boolean,
+	-- While pending: the code to enter, where, the page with it filled
+	-- in (GitLab), and when it expires (Unix seconds).
+	code: string?,
+	url: string?,
+	complete_url: string?,
+	expires: number?,
+	-- What went wrong last, as the user's next step.
+	error: string?,
+}
+
+-- `app.github` and `app.gitlab`. `auth` and `host` are always there; when
+-- `available` is false the rest is not, only `reason`.
 type Forge = {
 	available: boolean,
 	reason: string?,
+	host: string,
+	-- Whether the checkout's remote belongs to this configured provider,
+	-- including self-hosted GitLab, even before sign-in succeeds.
+	matches_remote: boolean,
+	auth: ForgeAuth,
 	repo: { name_with_owner: string, url: string, default_branch: string? },
 	viewer: ForgePerson?,
-	-- The current branch's, or nil.
+	-- The current branch's newest, open or not, or nil.
 	current_pr: ForgePr?,
+	-- The newest pull request of each branch the worktrees have out (the
+	-- current one first, at most 20), by branch name.
+	branches: { [string]: ForgePr }?,
 	-- Open ones, most recently updated first, at most 30.
 	prs: { ForgePr },
 	issues: { ForgeIssue },
@@ -1570,8 +1607,9 @@ type WindowMsg = string | { open: string, send: Data? } | { close: string }
 -- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
 -- `AppearanceMode`), `"app:theme"` (`msg` `{ light: string?, dark: string? }`),
 -- `"app:sound"` (`msg` `"default"` or a sound file's path),
--- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`)
--- and `"app:window"` (`msg` a `WindowMsg`).
+-- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
+-- `"app:window"` (`msg` a `WindowMsg`) and `"app:open"` (`msg` a web
+-- address, opened in the system's browser).
 type Send = {
 	to: string,
 	msg: Data,

@@ -280,6 +280,9 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`checks`](#checks) | Git | CI runs or readiness factors for a pull request or branch: a PR detail pane, a merge dialog. For a single summary dot use `pr-badge` or `pr-row` with `checks`; for an agent's state use `status-dot`. |
 | [`diff-counts`](#diff-counts) | Git | The size of a change beside a file, commit, branch or PR: file lists, rows, title bars. For commits ahead and behind use `ahead-behind`; for a whole diff use `diff-view`. |
 | [`diff-view`](#diff-view) | Git | Show a file's changes for review: a review pane, a checkpoint, a commit. Stack one per file in a scrolling column. For only the size of a change use `diff-counts`; for a file without changes use `code-view`. |
+| [`forge-account`](#forge-account) | Git | The account control beside `forge-pr` in a title bar or sidebar footer. What the click opens is the app's: show `forge-sign-in` in a `dialog` or a popover, or a settings page of your own. |
+| [`forge-pr`](#forge-pr) | Git | Wherever a branch shows its pull request: the title bar (the current branch, falling back to uncommitted lines), beside each worktree or branch in a sidebar (`branch = worktree.branch`). It reads the forge provider's data; for a number you already have use `pr-badge`, for a whole list row `pr-row`. |
+| [`forge-sign-in`](#forge-sign-in) | Git | The body of the app's own sign-in, opened from `forge-account` or a settings page. Draw your own instead from `app.github.auth` when it should look different; send the provider the same messages. |
 | [`pr-badge`](#pr-badge) | Git | A pull or merge request referenced inline: beside a branch in a sidebar, in a title bar, in a tab. For a full list row use `pr-row`; for CI details use `checks`; for an agent's state use `status-dot`. |
 | [`pr-row`](#pr-row) | Git | Lists of pull requests, merge requests or issues, as in an orchestrator or review queue; stack rows in a scrolling column, under `section` headings per group. For a PR referenced inline use `pr-badge`; for a generic data grid use `table`; for its CI use `checks`. |
 | [`mockups`](#mockups) | Layout | Showing the user a few ideas for a change before making it, so they can pick one: the moonframe-mockups skill builds a throwaway mod around it. Not for real content; for choosing between options inside the app use `choice-cards`. |
@@ -3319,6 +3322,69 @@ local diff_view = use "diff-view"
 ```
 
 A whole mod using it, with state: `app/components/demos/diff-view.luau`.
+
+#### `forge-account`
+
+**Forge Account.** The GitHub or GitLab account in a title bar: the user's picture, or the logo with a dot when signed out; a click opens the app's own sign-in.
+
+**When:** The account control beside `forge-pr` in a title bar or sidebar footer. What the click opens is the app's: show `forge-sign-in` in a `dialog` or a popover, or a settings page of your own.
+
+| Prop | Meaning |
+| --- | --- |
+| `brand` | github (default) \| gitlab: the logo when no one is signed in |
+| `forge` | `app.github` or `app.gitlab` |
+| `msg` | message sent on a click (open the app's sign-in) |
+| `to` | the mod to send `msg` to |
+
+**Styles:** `.forge-account` `.forge-account:hover` `.forge-account-dot`
+
+```lua
+local forge_account = use "forge-account"
+
+forge_account { brand = "github", forge = { auth = { cli = true, device = true, host = "github.com", status = "signed_out" }, available = false, host = "github.com", reason = "not signed in to GitHub" }, msg = "account" }
+```
+
+#### `forge-pr`
+
+**Forge PR.** A branch's GitHub pull request or GitLab merge request, read from app.github or app.gitlab: number by state, checks dot, +/− lines; a click opens it.
+
+**When:** Wherever a branch shows its pull request: the title bar (the current branch, falling back to uncommitted lines), beside each worktree or branch in a sidebar (`branch = worktree.branch`). It reads the forge provider's data; for a number you already have use `pr-badge`, for a whole list row `pr-row`.
+
+| Prop | Meaning |
+| --- | --- |
+| `branch` | the branch whose request to show, from `forge.branches`; default the current branch's (`forge.current_pr`) |
+| `brand` | show the forge's logo before the number |
+| `changes` | `{ added, deleted }` shown when there is no request (e.g. `app.git`), so the slot still says work is waiting |
+| `forge` | `app.github` or `app.gitlab` (nil while loading: draws nothing) |
+| `open` | open the request in the browser on a click (default true) |
+| `pr` | a pull request record to show instead of looking one up |
+
+**Styles:** `.forge-pr` `.forge-pr-brand` `.forge-pr-link:hover`
+
+```lua
+local forge_pr = use "forge-pr"
+
+forge_pr { brand = true, forge = { auth = { cli = false, device = true, host = "github.com", status = "signed_in" }, available = true, current_pr = { additions = 1204, checks = { failed = 0, passed = 3, pending = 0, skipped = 0, total = 3 }, deletions = 96, number = 850, title = "Add forge building blocks", tone = "ready", url = "https://github.com/moonframehq/moonframe/pull/850" }, host = "github.com" } }
+```
+
+#### `forge-sign-in`
+
+**Forge Sign-in.** Sign in to GitHub or GitLab from the provider's state: a device code with Open and Copy, the gh/glab sign-in; who is signed in and Sign out.
+
+**When:** The body of the app's own sign-in, opened from `forge-account` or a settings page. Draw your own instead from `app.github.auth` when it should look different; send the provider the same messages.
+
+| Prop | Meaning |
+| --- | --- |
+| `forge` | `app.github` or `app.gitlab` |
+| `provider` | github (default) \| gitlab: the provider its buttons talk to |
+
+**Styles:** `.forge-sign-in` `.forge-sign-in-code` `.forge-sign-in-error` `.forge-sign-in-muted`
+
+```lua
+local forge_sign_in = use "forge-sign-in"
+
+forge_sign_in { forge = { auth = { cli = true, code = "WDJB-MJHT", device = true, host = "github.com", status = "pending", url = "https://github.com/login/device" }, available = false, host = "github.com", reason = "not signed in to GitHub" }, provider = "github" }
+```
 
 #### `pr-badge`
 

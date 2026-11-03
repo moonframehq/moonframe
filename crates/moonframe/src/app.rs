@@ -836,6 +836,13 @@ impl MoonframeApp {
             Request::Sound(sound) => self.play(from, &sound),
             Request::Pick(pick) => self.pick(from, pick, cx),
             Request::Window(request) => self.window_request(from, request, cx),
+            Request::Open(url) => {
+                if self.alerts.may_open() {
+                    cx.open_url(&url);
+                } else {
+                    tracing::warn!("{from}: `app:open` asked too often; {url} not opened");
+                }
+            },
             Request::Notify(notification) => match self.alerts.notify(from, &notification) {
                 Ok(Posted::System) => {},
                 Ok(Posted::Toast) => {

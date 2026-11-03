@@ -2,7 +2,7 @@
 //! ask the host for.
 //!
 //! ```toml
-//! kind = "wasm"            # or "process" with `command = ["bash", "github.sh"]`,
+//! kind = "wasm"            # or "process" with `command = ["bash", "herdr.sh"]`,
 //!                          # or "native": the Rust one the app built in
 //!                          # under this folder's name, or "static" with
 //!                          # `file = "sample.json"`: that file, published

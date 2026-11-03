@@ -1,0 +1,30 @@
+[package]
+description            = "The github and gitlab native providers: pull requests, checks and sign-in over the forges' own APIs"
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-forge"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[dependencies]
+herdr-credentials.workspace   = true
+herdr-vcs.workspace           = true
+moonframe-core.workspace      = true
+moonframe-git.workspace       = true
+moonframe-packages.workspace  = true
+moonframe-providers.workspace = true
+secrecy.workspace             = true
+serde_json.workspace          = true
+tracing.workspace             = true
+ureq.workspace                = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix = { features = ["process"], workspace = true }
