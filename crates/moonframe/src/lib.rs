@@ -31,6 +31,7 @@ mod backends;
 mod branch_bar;
 mod browser;
 mod build;
+mod capabilities;
 #[cfg(feature = "capture")]
 mod capture;
 mod cli;
@@ -58,14 +59,9 @@ mod persist;
 #[path = "persist/sqlite.rs"]
 mod persist;
 mod profiles;
-#[cfg(feature = "terminal")]
 mod project;
 mod render;
 mod settings;
-#[cfg(feature = "terminal")]
-mod terminal;
-#[cfg(not(feature = "terminal"))]
-#[path = "terminal/disabled.rs"]
 mod terminal;
 mod theme_picker;
 mod themes;

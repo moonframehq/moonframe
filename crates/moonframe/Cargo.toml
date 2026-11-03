@@ -19,13 +19,15 @@ acp = ["dep:moonframe-acp"]
 # libghostty-vt with Zig (see mise.toml), so an app on the
 # library opts into it; the starter (crates/moonframe-app) has both.
 alacritty = ["moonframe-terminal/alacritty", "terminal"]
-browser   = ["dep:objc2-web-kit", "dep:wry"]
+# Native web views for `ui.browser` (WebKit on macOS, WebView2 on Windows).
+browser = ["dep:objc2-web-kit", "dep:wry"]
 # Developer-only export of this app's own rendered frame, without desktop capture.
 capture = ["dep:gpui-capture", "dep:gpui-platform-capture"]
 # The `chat` native provider (`app.chat`): agent chats run by herdr-acp,
 # attached over herdr's chat protocol.
 chat = ["dep:moonframe-chat"]
 default = [
+  # keep-sorted start
   "acp",
   "alacritty",
   "browser",
@@ -35,11 +37,14 @@ default = [
   "git",
   "herdr-core",
   "markdown",
+  "prose",
   "shell",
   "studio",
   "tokio",
+  "updates",
   "usage",
   "wasm",
+  # keep-sorted end
 ]
 # The `docs` native provider: reads and saves the project's text files
 # for the markdown editor.
@@ -53,22 +58,27 @@ git = ["dep:moonframe-git", "moonframe-history/herdr"]
 # The `shell` native provider (`app.shell`): a mod's shell commands, with
 # their output in colour.
 shell = ["dep:moonframe-shell"]
-# Terminals kept by herdr-core (`hc`) when it is installed; tmux and a
-# local pty need no feature.
+# State kept by herdr-core (`hc`) when installed; with `terminal`, it also
+# keeps shells across launches. tmux and local PTYs only need `terminal`.
 herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
-# Optional host elements and the development commands/gallery. A sealed
-# executable relies on its staged resources, with no full embedded toolbox.
-# `map` is `ui.map`, street maps from tile providers fetched over HTTP: off
-# by default, as few apps need one; the starter and sealed apps that use
-# `ui.map` turn it on.
-map      = ["dep:ureq"]
+# `ui.map`: street maps from tile providers, fetched over HTTP. Off by
+# default, as few apps need one; the starter turns it on, and so do sealed
+# apps whose Luau uses `ui.map`.
+map = ["dep:ureq"]
+# Rich read-only Markdown and the long-form writing editor are independent.
 markdown = []
-sealed   = ["moonframe-packages/sealed"]
-studio   = []
-terminal = ["dep:moonframe-mux", "dep:moonframe-terminal"]
+prose    = []
+# A sealed executable uses staged resources instead of the full toolbox.
+sealed = ["moonframe-packages/sealed"]
+# Development commands and the component gallery.
+studio = []
+# Terminal rendering and local/tmux sessions. Engines enable this too.
+terminal = ["dep:moonframe-mux", "dep:moonframe-terminal", "moonframe-mux/terminal"]
 # Native providers written with `async fn` (`.native_async`), and a tokio
 # runtime they and the app's views share (`.tokio`, `on_runtime`).
 tokio = ["moonframe-providers/tokio"]
+# Release checks, downloads and in-place app updates.
+updates = ["moonframe-packages/updates"]
 # The `usage` native provider (`app.usage`): plan usage of the AI services
 # signed in here (Claude, Codex, Copilot, ...), read by herdr-usage.
 usage = ["dep:moonframe-usage"]
@@ -92,7 +102,7 @@ moonframe-forge               = { optional = true, workspace = true }
 moonframe-git                 = { optional = true, workspace = true }
 moonframe-history.workspace   = true
 moonframe-mux                 = { optional = true, workspace = true }
-moonframe-packages.workspace  = true
+moonframe-packages            = { default-features = false, path = "../moonframe-packages" }
 moonframe-providers.workspace = true
 moonframe-shell               = { optional = true, workspace = true }
 moonframe-store.workspace     = true

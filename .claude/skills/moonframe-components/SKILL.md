@@ -251,7 +251,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`kpi-meter`](#kpi-meter) | Data | A strip of headline figures where each one is a part of a whole (on time / late, fixed / open, one segment per notice). For a figure with a change pill use `kpi-cell`; for one fraction use `meter`; for a whole split into labelled parts in a card use `share-bar`. |
 | [`line-chart`](#line-chart) | Data | A measure over days or weeks compared with a forecast or a target (actual against predicted, this year against last), where the user picks a day to read its figures. For several readings on one scale with a legend and a crosshair use `series-chart`; for bars against a floor use `forecast-chart`; for stacked counts use `bar-chart`; for a bare trend use `ui.line` or `sparkline`. |
 | [`message-header`](#message-header) | Data | Above the body of an email or a thread's message in a reading pane. For a row in the message list use `mail-row`; for a comment in a review use `comment-card`; for a chat turn use `chat-message`. |
-| [`meter`](#meter) | Data | A fraction (0 to 1) as a bar with its percentage: memory, quota, progress of a known size. For work with no known size use `progress` with `busy`. |
+| [`meter`](#meter) | Data | A fraction (0 to 1) as a bar with its percentage: memory, quota, progress of a known size. For work with no known size use `progress` with `busy`; for a narrow upright bar in a tight row use `vertical-bar`. |
 | [`metric`](#metric) | Data | Headline figures across the top of a dashboard card: cash today, the lowest week, a total. For a figure in its own tile with a trend use `stat-tile`; for a status bar reading use `stat`; for a fraction use `meter`. |
 | [`mini-bars`](#mini-bars) | Data | A figure over a few periods in a KPI strip or a card header (revenue by month, signups by week). For a live trend in a status bar use `sparkline`; for a full chart with an axis use `bar-chart` or `forecast-chart`. |
 | [`note-card`](#note-card) | Data | Notes a person leaves on lines while reviewing, to send to an agent; list them in a column beside a `diff-view`. For an authored comment use `comment-card`. |
@@ -268,17 +268,19 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`route-map`](#route-map) | Data | Where a day's meetings are, a delivery round, a trip: places in order and the way between them. For one place without a route, `ui.map` with a pin is enough. |
 | [`series-chart`](#series-chart) | Data | Several readings over the same period compared on one scale (CPU, GPU and memory over 24 hours; requests and errors by hour), where the reader wants a sample's exact values. For counts stacked per bucket use `bar-chart`; for periods against a forecast with a picked day's card use `line-chart`; for one small trend use `ui.line` or `sparkline`; for a balance against a floor use `forecast-chart`. |
 | [`share-bar`](#share-bar) | Data | How a whole splits into a few parts, above a list of those parts (devices, engagement tiers, plans). For progress toward a target with stages use `progress-stack`; for one fraction use `meter`. |
-| [`sparkline`](#sparkline) | Data | Recent samples as tiny bars, like CPU over the last minute, in a status bar or header. |
+| [`sparkline`](#sparkline) | Data | Recent samples as tiny bars, like CPU over the last minute, in a status bar or header. For the latest sample alone in a tight row use `vertical-bar`. |
 | [`spotlight-bars`](#spotlight-bars) | Data | One figure over a dozen periods where one period is the story (revenue by month, the best week), in a dashboard card that is wide and tall. For several series stacked use `bar-chart`; for a few small bars in a KPI strip use `mini-bars`; for a balance against a floor use `forecast-chart`. |
 | [`spreadsheet`](#spreadsheet) | Data | Data laid out as a spreadsheet the user (or an agent) fills cell by cell: research sheets, imports, editable records, with cells still loading shown as skeleton bars. For a read-only list of records with sorting use `table`; for label/value pairs use `key-values`. |
 | [`stat-tile`](#stat-tile) | Data | A headline number on a dashboard or overview: open PRs, tokens today, uptime, failing checks; put several in a wrapping row. For a status bar reading use `stat`; for a fraction use `meter`; for a quota use `usage-bar`; for a series use `bar-chart`. |
 | [`status-icon`](#status-icon) | Data | Beside a task's title in a list, a board card or a detail panel, and in the menu that changes it. For an agent's or job's state use `status-dot`; for a check the user ticks use `task-check`; for a priority use `priority-icon`. |
+| [`system-load`](#system-load) | Data | CPU and memory of a machine in a status bar, a host row of a sidebar, or a card header. Use `compact` beside a name in a tight row. For one reading alone use `sparkline`, `meter` or `vertical-bar`. |
 | [`table`](#table) | Data | Tabular data with several aligned fields per row: devices, processes, files, runs; an admin list (audit log, orders) as `bordered` and `checkable`, with `filter-dropdown`s over it and `pagination` under it. For one field per row use `list`; for pull requests use `pr-row`; for label/value pairs use `key-values`. |
 | [`tags`](#tags) | Data | A wrapping set of small labels: languages, topics, states. |
 | [`threshold-line`](#threshold-line) | Data | A metric against its target or limit in a dashboard card: % within SLA against 95%, latency against 2s, lag against 5 minutes. For a line without a target use `ui.line`; for tiny bars use `sparkline`; for bars against a floor use `forecast-chart`. |
 | [`tick-meter`](#tick-meter) | Data | A resource's utilization in a dense, technical dashboard (CPU, GPU, memory, a queue's depth), where a striped instrument reads better than a smooth bar. For a compact bar with its percentage use `meter`; for a quota with a reset use `usage-bar`; for task progress use `progress`. |
 | [`timeline`](#timeline) | Data | Events in order: checkpoints, commits, deploys, an agent's steps. For a flat selectable list use `list`; for comments use `comment-card`; for a table of runs use `table`. |
 | [`usage-bar`](#usage-bar) | Data | A rate limit or quota with a reset (an AI plan's weekly or 5-hour window, an API budget), in a usage sheet or settings page. For a plain fraction use `meter`; for task progress use `progress`; for a single big number use `stat-tile`. |
+| [`vertical-bar`](#vertical-bar) | Data | A fraction in a row with no room for a horizontal bar: a host's CPU or memory beside its name in a sidebar, a queue's depth in a tab. For a bar with room to spread use `meter`; for a history use `sparkline`. |
 | [`week-calendar`](#week-calendar) | Data | Meetings, bookings or shifts placed in time: a day or week of hours where events span their length and overlapping ones share the column, or a month of them. For picking a day without events use `month-grid` or `day-strip`; for events in order without hours use `timeline`; for a day's list use `task-row`. |
 | [`banner`](#banner) | Feedback | A message across the whole window or pane that stays until dealt with: the current worktree's branch, a failed provider, an update ready. For a transient message use a toast (`ui.overlay` at `bottom-end`); for a status inside a row use `status-dot` or `ui.badge`; for an empty pane use `empty-state`. |
 | [`empty-state`](#empty-state) | Feedback | A list, panel or page with nothing to show yet, optionally with one action to fix that. For loading use `loading-row`; for failures use `notice`. |
@@ -1814,14 +1816,17 @@ message_header {
 
 **Meter.** A bar filled to a fraction from 0 to 1, with the percentage beside it; it warns past a threshold.
 
-**When:** A fraction (0 to 1) as a bar with its percentage: memory, quota, progress of a known size. For work with no known size use `progress` with `busy`.
+**When:** A fraction (0 to 1) as a bar with its percentage: memory, quota, progress of a known size. For work with no known size use `progress` with `busy`; for a narrow upright bar in a tight row use `vertical-bar`.
 
 | Prop | Meaning |
 | --- | --- |
 | `label` | text before the bar |
+| `percent` | false hides the percentage |
 | `value` | 0 to 1 |
 | `warn` | fraction past which it shows the warning color |
 | `width` | bar width in pixels |
+
+**Styles:** `.meter-fill` `.meter-hot` `.meter-label` `.meter-percent` `.meter-track`
 
 ```lua
 local meter = use "meter"
@@ -2259,7 +2264,7 @@ share_bar { shares = { { color = "#a78bfa", label = "Mobile", share = 51 }, { co
 
 **Sparkline.** Recent samples (0 to 1) as tiny bars, newest on the right, in a fixed width; samples past `hot` turn to the warning color.
 
-**When:** Recent samples as tiny bars, like CPU over the last minute, in a status bar or header.
+**When:** Recent samples as tiny bars, like CPU over the last minute, in a status bar or header. For the latest sample alone in a tight row use `vertical-bar`.
 
 | Prop | Meaning |
 | --- | --- |
@@ -2267,6 +2272,8 @@ share_bar { shares = { { color = "#a78bfa", label = "Mobile", share = 51 }, { co
 | `hot` | value past which a bar turns warning |
 | `samples` | how many bars to show |
 | `values` | samples from 0 to 1, oldest first |
+
+**Styles:** `.sparkline` `.sparkline-bar` `.sparkline-hot`
 
 ```lua
 local sparkline = use "sparkline"
@@ -2414,6 +2421,29 @@ ui.row { align = "center", gap = "normal",
 ```
 
 A whole mod using it, with state: `app/components/demos/status-icon.luau`.
+
+#### `system-load`
+
+**System Load.** A machine's CPU (a sparkline of recent samples) and memory (a meter), each with its percentage; `compact` shows two upright bars instead.
+
+**When:** CPU and memory of a machine in a status bar, a host row of a sidebar, or a card header. Use `compact` beside a name in a tight row. For one reading alone use `sparkline`, `meter` or `vertical-bar`.
+
+| Prop | Meaning |
+| --- | --- |
+| `compact` | two upright bars with percentages, for a tight row |
+| `cpu` | CPU use, 0 to 1 |
+| `history` | recent CPU samples, 0 to 1, oldest first |
+| `icons` | label with cpu and memory icons instead of CPU and MEM |
+| `memory` | memory use, 0 to 1 |
+| `samples` | how many CPU samples the sparkline shows (default 16) |
+
+**Styles:** `.system-load-label` `.system-load-percent`
+
+```lua
+local system_load = use "system-load"
+
+system_load { cpu = 0.14, history = { 0.1, 0.2, 0.1, 0.3, 0.2, 0.6, 0.4, 0.2, 0.1, 0.14 }, memory = 0.5 }
+```
 
 #### `table`
 
@@ -2604,6 +2634,30 @@ usage_bar { left = 0.97, note = "36% in reserve · Lasts until reset", pace = 0.
 ```
 
 A whole mod using it, with state: `app/components/demos/usage-bar.luau`.
+
+#### `vertical-bar`
+
+**Vertical Bar.** A narrow upright bar filled from the bottom to a fraction (0 to 1), with an optional label and the percentage; it warns past a threshold.
+
+**When:** A fraction in a row with no room for a horizontal bar: a host's CPU or memory beside its name in a sidebar, a queue's depth in a tab. For a bar with room to spread use `meter`; for a history use `sparkline`.
+
+| Prop | Meaning |
+| --- | --- |
+| `height` | bar height in pixels (default 12) |
+| `label` | text before the bar |
+| `percent` | false hides the percentage |
+| `tooltip` | text under the pointer (default the percentage) |
+| `value` | 0 to 1 |
+| `warn` | fraction past which it shows the warning color (default 0.85) |
+| `width` | bar width in pixels (default 3) |
+
+**Styles:** `.vertical-bar-fill` `.vertical-bar-hot` `.vertical-bar-label` `.vertical-bar-percent` `.vertical-bar-track`
+
+```lua
+local vertical_bar = use "vertical-bar"
+
+vertical_bar { label = "MEM", value = 0.5 }
+```
 
 #### `week-calendar`
 

@@ -5,31 +5,40 @@
 //! program's queries itself.
 //!
 //! This is the only module that knows herdr-core's client: the app sees a
-//! [`Backend`], so another runtime can take its place.
+//! terminal backend, so another runtime can take its place. Its document
+//! store is available independently of terminal support.
 
 use {
     crate::{document::Store, program},
-    herdr_core_client::{Attachment, Core, End, Endpoint, PROGRAM, wire},
+    herdr_core_client::{Core, Endpoint, PROGRAM},
+    std::{
+        path::PathBuf,
+        sync::{Arc, Mutex},
+        time::Duration,
+    },
+};
+#[cfg(feature = "terminal")]
+use {
+    herdr_core_client::{Attachment, End, wire},
     moonframe_terminal::{Backend, Open, Opened, Pane, Size},
     std::{
         collections::BTreeMap,
-        path::PathBuf,
-        sync::{
-            Arc, Mutex,
-            atomic::{AtomicBool, Ordering},
-        },
-        time::Duration,
+        sync::atomic::{AtomicBool, Ordering},
     },
 };
 
 /// The label that holds a terminal's key.
+#[cfg(feature = "terminal")]
 const LABEL: &str = "moonframe";
 /// The label that holds the app a terminal belongs to; the starter's
 /// terminals from before it existed have none.
+#[cfg(feature = "terminal")]
 const APP: &str = "moonframe-app";
 /// Scrollback lines the core paints first when a terminal attaches.
+#[cfg(feature = "terminal")]
 const HISTORY: u32 = 2000;
 /// How long a read waits before checking the stream again.
+#[cfg(feature = "terminal")]
 const POLL: Duration = Duration::from_millis(500);
 /// How long starting a core may take.
 const START: Duration = Duration::from_secs(5);
@@ -38,6 +47,7 @@ const START: Duration = Duration::from_secs(5);
 pub struct HerdrCore {
     endpoint: Endpoint,
     /// Whose terminals it opens; see [`HerdrCore::for_app`].
+    #[cfg(feature = "terminal")]
     app: String,
     /// The connection, made again when it is lost.
     core: Mutex<Option<Arc<Core>>>,
@@ -78,6 +88,7 @@ impl HerdrCore {
         };
         Some(Self {
             endpoint,
+            #[cfg(feature = "terminal")]
             app: crate::STARTER.to_owned(),
             core: Mutex::new(Some(Arc::new(core))),
         })
@@ -85,9 +96,17 @@ impl HerdrCore {
 
     /// The same core, opening the terminals of the app `namespace` only.
     pub fn for_app(self, namespace: &str) -> Self {
-        Self {
-            app: namespace.to_owned(),
-            ..self
+        #[cfg(feature = "terminal")]
+        {
+            Self {
+                app: namespace.to_owned(),
+                ..self
+            }
+        }
+        #[cfg(not(feature = "terminal"))]
+        {
+            let _ = namespace;
+            self
         }
     }
 
@@ -161,6 +180,7 @@ impl Store for CoreStore {
 
 /// A terminal name herdr-core takes for `key` (1 to 32 of `a-z 0-9 - _ .`,
 /// starting with a letter or digit), or `None` when none fits.
+#[cfg(feature = "terminal")]
 fn terminal_name(key: &str) -> Option<String> {
     let name: String = key
         .chars()
@@ -180,6 +200,7 @@ fn terminal_name(key: &str) -> Option<String> {
 
 /// Whether a terminal labelled `labels` belongs to the app `app`: the
 /// starter also owns the unlabelled ones it made before apps had labels.
+#[cfg(feature = "terminal")]
 pub(crate) fn owns(app: &str, labels: &BTreeMap<String, String>) -> bool {
     match labels.get(APP) {
         Some(owner) => owner == app,
@@ -196,6 +217,7 @@ pub fn installed() -> Option<PathBuf> {
     })
 }
 
+#[cfg(feature = "terminal")]
 impl Backend for HerdrCore {
     fn name(&self) -> &'static str {
         "herdr-core"
@@ -274,6 +296,7 @@ impl Backend for HerdrCore {
     }
 }
 
+#[cfg(feature = "terminal")]
 struct CorePane {
     attachment: Arc<Attachment>,
     /// Set when the pane goes, so the reader lets go of the stream too.
@@ -285,6 +308,7 @@ struct CorePane {
     core: Arc<Core>,
 }
 
+#[cfg(feature = "terminal")]
 impl Drop for CorePane {
     /// Detaches once the reader notices: the terminal keeps running.
     fn drop(&mut self) {
@@ -292,6 +316,7 @@ impl Drop for CorePane {
     }
 }
 
+#[cfg(feature = "terminal")]
 impl Pane for CorePane {
     fn exited(&self) -> bool {
         self.exited.load(Ordering::Acquire)
@@ -330,6 +355,7 @@ impl Pane for CorePane {
 /// The attachment's bytes until its stream ends: the program ended, or the
 /// connection dropped (the program most likely still runs; Enter attaches
 /// again).
+#[cfg(feature = "terminal")]
 struct Reading {
     attachment: Arc<Attachment>,
     detached: Arc<AtomicBool>,
@@ -337,6 +363,7 @@ struct Reading {
     done: bool,
 }
 
+#[cfg(feature = "terminal")]
 impl Iterator for Reading {
     type Item = Vec<u8>;
 
@@ -361,12 +388,13 @@ impl Iterator for Reading {
 
 /// A detached stream has an empty CLOSE; a lost connection has no exit
 /// information. Only the core's explicit process outcome closes a tab.
+#[cfg(feature = "terminal")]
 fn shell_exited(end: &End) -> bool {
     matches!(end, End::Closed(closed) if closed.exit_code.is_some()
         || matches!(closed.reason.as_deref(), Some("exited" | "killed")))
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "terminal"))]
 mod tests {
     use super::{shell_exited, terminal_name};
 

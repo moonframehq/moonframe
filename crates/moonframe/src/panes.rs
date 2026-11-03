@@ -327,6 +327,12 @@ pub(crate) fn run(user: &Path, profile: Option<&str>, title: &str, words: &[Stri
             return ExitCode::from(2);
         },
     };
+    if !cfg!(feature = "terminal") {
+        eprintln!(
+            "{app} pane: terminal support was left out of this build; enable `alacritty` or `ghostty`"
+        );
+        return ExitCode::FAILURE;
+    }
     // The window creates it as it starts; made now, it names the same
     // inbox before and after.
     if let Err(error) = fs::create_dir_all(user) {
@@ -473,6 +479,28 @@ mod tests {
 
     fn words(text: &[&str]) -> Vec<String> {
         text.iter().map(|word| (*word).to_owned()).collect()
+    }
+
+    #[cfg(not(feature = "terminal"))]
+    #[test]
+    fn terminal_free_commands_fail_before_creating_the_user_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let user = dir.path().join("user");
+        assert_eq!(
+            run(
+                &user,
+                None,
+                "Moonframe",
+                &words(&["new", "--agent", "claude"])
+            ),
+            ExitCode::FAILURE
+        );
+        assert!(!user.exists());
+        assert_eq!(
+            run(&user, None, "Moonframe", &words(&["help"])),
+            ExitCode::SUCCESS
+        );
+        assert!(!user.exists());
     }
 
     #[test]

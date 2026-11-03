@@ -39,11 +39,15 @@ fallback definitions are omitted.
 - `start = "always"` providers are kept even without a reference.
 - Native provider manifests select their Cargo features. Any selected Wasm
   provider enables Wasmtime; only selected Wasm providers are built.
-- `ui.terminal`, `ui.browser` and `ui.markdown` select their host capabilities.
+- `ui.terminal`, `ui.browser`, `ui.map` and `ui.markdown` select their host capabilities.
   Literal terminal property tables select their engine, defaulting to
   Alacritty; literal `ghostty` and `herdr-core` selections enable those
   optional capabilities too. Otherwise
   automatic terminal backend selection uses tmux or a local pty.
+- `ui.input` with `prose`, `dim` or `typewriter` selects the writing editor.
+  Nonliteral input properties and computed property keys retain it conservatively;
+  ordinary literal inputs do not require the `prose` capability.
+- App `updates` metadata selects the `updates` capability.
 - Component demos, unused built-in mods/providers/components, development
   folders and Wasm build sources are omitted. Other app/package files are
   preserved, because process providers and image paths can use them dynamically.
@@ -84,8 +88,8 @@ explicit declarations. Comments and quoted documentation are not scanned as
 code. A runtime trace alone would miss unopened screens and is not used.
 
 Supported extra features are `acp`, `alacritty`, `browser`, `chat`, `docs`,
-`forge`, `ghostty`, `git`, `herdr-core`, `markdown`, `shell`, `terminal`,
-`tokio`, `usage`, and `wasm`. A custom Rust native provider needs a custom
+`forge`, `ghostty`, `git`, `herdr-core`, `map`, `markdown`, `prose`, `shell`, `terminal`,
+`tokio`, `updates`, `usage`, and `wasm`. A custom Rust native provider needs a custom
 library host; the profile bundler cannot compile an unknown native provider.
 
 ## Behaviour and verification

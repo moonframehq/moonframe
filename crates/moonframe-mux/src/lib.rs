@@ -9,32 +9,40 @@
 //!
 //! The first two outlive the app, and a terminal attaches to the same
 //! program again on the next launch. Each is a
-//! [`moonframe_terminal::Backend`], so the app never depends on one.
+//! `moonframe_terminal::Backend`, so the app never depends on one.
+//! Without `terminal`, only document storage and backend discovery remain.
 
 pub mod document;
 #[cfg(feature = "herdr-core")]
 mod herdr_core;
+#[cfg(any(feature = "terminal", feature = "herdr-core"))]
 mod program;
+#[cfg(feature = "terminal")]
 mod tmux;
 
+pub use document::Store;
 #[cfg(feature = "herdr-core")]
 pub use herdr_core::{CoreStore, HerdrCore};
-pub use {document::Store, tmux::Tmux};
+#[cfg(feature = "terminal")]
+pub use tmux::Tmux;
 
-use {
-    moonframe_terminal::{Backend, Open, Opened, Pty},
-    std::{
-        sync::{Arc, Mutex},
-        time::{Duration, Instant},
-    },
+#[cfg(feature = "terminal")]
+use moonframe_terminal::{Backend, Open, Opened, Pty};
+use std::sync::Arc;
+#[cfg(any(feature = "terminal", feature = "herdr-core"))]
+use std::{
+    sync::Mutex,
+    time::{Duration, Instant},
 };
 
 /// How long a backend found missing stays missing before it is looked for
 /// again, so one installed while the app runs is picked up.
+#[cfg(any(feature = "terminal", feature = "herdr-core"))]
 const LOOK_AGAIN: Duration = Duration::from_secs(10);
 
 /// Which backend a terminal asks for.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg(feature = "terminal")]
 pub enum Preference {
     /// The best one this machine has.
     #[default]
@@ -46,10 +54,12 @@ pub enum Preference {
 }
 
 /// One backend, once found; looked for again a while after it was missing.
+#[cfg(any(feature = "terminal", feature = "herdr-core"))]
 struct Found<T> {
     value: Mutex<(Option<Arc<T>>, Option<Instant>)>,
 }
 
+#[cfg(any(feature = "terminal", feature = "herdr-core"))]
 impl<T> Default for Found<T> {
     fn default() -> Self {
         Self {
@@ -58,6 +68,7 @@ impl<T> Default for Found<T> {
     }
 }
 
+#[cfg(any(feature = "terminal", feature = "herdr-core"))]
 impl<T> Found<T> {
     fn get(&self, find: impl FnOnce() -> Option<T>) -> Option<Arc<T>> {
         let mut value = self.value.lock().ok()?;
@@ -81,6 +92,7 @@ pub struct Backends {
     namespace: String,
     #[cfg(feature = "herdr-core")]
     herdr_core: Found<HerdrCore>,
+    #[cfg(feature = "terminal")]
     tmux: Found<Tmux>,
 }
 
@@ -103,6 +115,7 @@ impl Backends {
             namespace: namespace.to_owned(),
             #[cfg(feature = "herdr-core")]
             herdr_core: Found::default(),
+            #[cfg(feature = "terminal")]
             tmux: Found::default(),
         }
     }
@@ -119,6 +132,7 @@ impl Backends {
     }
 
     /// herdr-core, when it is installed and starts. Blocks on first use.
+    #[cfg(feature = "terminal")]
     pub fn herdr_core(&self) -> Option<Arc<dyn Backend>> {
         #[cfg(feature = "herdr-core")]
         {
@@ -129,6 +143,7 @@ impl Backends {
     }
 
     /// tmux, when it is installed. Blocks on first use.
+    #[cfg(feature = "terminal")]
     pub fn tmux(&self) -> Option<Arc<dyn Backend>> {
         self.tmux
             .get(|| Tmux::find().map(|tmux| tmux.on_socket(&self.namespace)))
@@ -137,6 +152,7 @@ impl Backends {
 
     /// The backends to try for `preference`, best first; the local shell is
     /// always last, so a terminal opens whatever this machine lacks.
+    #[cfg(feature = "terminal")]
     pub fn candidates(&self, preference: Preference) -> Vec<Arc<dyn Backend>> {
         let mut candidates = match preference {
             Preference::Pty => Vec::new(),
@@ -154,6 +170,7 @@ impl Backends {
     }
 
     /// Opens `open` on the best backend that manages it, and says which.
+    #[cfg(feature = "terminal")]
     pub fn open(
         &self,
         preference: Preference,
@@ -201,6 +218,6 @@ pub fn herdr_core_installed() -> bool {
     false
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "terminal"))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests;

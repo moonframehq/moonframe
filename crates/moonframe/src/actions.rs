@@ -106,6 +106,7 @@ pub(crate) fn menus(shell: &[AppMenu]) -> Vec<Menu> {
     let title = crate::title();
     let mut app_items = vec![MenuItem::action(format!("About {title}"), AboutApp)];
     // An app that names the GitHub repository it is released from.
+    #[cfg(feature = "updates")]
     if crate::update::source().is_some() {
         app_items.push(MenuItem::action("Check for Updates…", CheckForUpdates));
         app_items.push(

@@ -225,12 +225,15 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Test
         run: cargo test --locked --workspace --all-features
-      # An app on the library can leave out the optional providers and the
-      # Wasm runtime; that build has code of its own (wasm_left_out.rs).
-      - name: Lint and test the lean library build
+      # A workspace build unifies features and can hide accidental defaults.
+      # Check the dependency boundaries and each capability on its own.
+      - name: Check minimal and individual capability builds
         run: |
-          cargo clippy --locked -p moonframe-providers -p moonframe --no-default-features --features moonframe/alacritty --all-targets -- -D warnings
+          python3 scripts/check-features.py --lint
+          cargo test --locked -p moonframe --no-default-features
+          cargo test --locked -p moonframe-packages --no-default-features
           cargo test --locked -p moonframe-providers
+          cargo clippy --locked -p moonframe-mux --no-default-features --features herdr-core --all-targets -- -D warnings
       - name: Load every built-in module headlessly
         run: cargo run --locked -p moonframe-app -- --check --no-user app
       - name: Load every example app headlessly

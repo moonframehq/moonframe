@@ -149,7 +149,9 @@ and points at any problem, and `just types` type-checks the Luau.
 
 The Ghostty terminal builds libghostty-vt from source with Zig 0.17 (pinned
 in `mise.toml`). To build without it, use
-`cargo run --no-default-features --features alacritty`.
+`cargo run -p moonframe-app --no-default-features --features moonframe/default`.
+For a lean app, select only its capabilities; see
+[feature flags](docs/library.md#choosing-capabilities).
 
 Moonframe is developed on macOS. CI builds, lints and tests it on macOS,
 Linux (x86_64 and ARM64) and Windows (x86_64), and each release ships a macOS disk

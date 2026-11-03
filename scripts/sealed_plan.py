@@ -11,7 +11,7 @@ from sealed_luau import references
 NATIVES = {"acp": "acp", "chat": "chat", "docs": "docs", "git": "git",
            "github": "forge", "gitlab": "forge", "shell": "shell", "usage": "usage"}
 FEATURES = set(NATIVES.values()) | {"alacritty", "browser", "ghostty", "herdr-core",
-                                  "map", "markdown", "terminal", "tokio", "wasm"}
+                                  "map", "markdown", "prose", "terminal", "tokio", "updates", "wasm"}
 SKIP = {".git", ".claude", ".DS_Store", ".moonframe-embedded", "target", "types",
         "__pycache__", ".luaurc"}
 
@@ -155,6 +155,8 @@ class Plan:
             elif kind not in ("process", "static"):
                 raise ValueError(f"{folder}: unknown provider kind {kind}")
         features = self.chosen["features"]
+        if self.metadata.get("updates"):
+            features.add("updates")
         if features - FEATURES:
             raise ValueError(f"unknown bundle features: {sorted(features - FEATURES)}")
         if "terminal" in features and not features & {"alacritty", "ghostty"}:

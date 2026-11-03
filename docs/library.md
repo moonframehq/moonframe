@@ -38,9 +38,10 @@ library needs the toolchain in [rust-toolchain.toml](../rust-toolchain.toml)
 or newer.
 
 Features: `acp`, `alacritty`, `browser`, `chat`, `docs`, `forge`, `git`,
-`herdr-core`, `markdown`, `shell`, `studio`, `tokio`, `usage` and `wasm` by
-default. `ghostty` (a second terminal emulator, built from Ghostty's source
-with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`.
+`herdr-core`, `markdown`, `prose`, `shell`, `studio`, `tokio`, `updates`, `usage` and
+`wasm` by default. `ghostty` (a second terminal emulator, built from Ghostty's
+source with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`, and
+so is `map` (`ui.map` street maps), which few apps need.
 
 An app that needs none of git, the markdown editor or kept terminals can
 leave them out, and with them the herdr-gpui crates they build on:
@@ -63,11 +64,114 @@ says the feature is off. `bundle` then builds none of them.
 To add a sandboxed component alongside native providers, follow
 [Building WebAssembly (WASM) providers](wasm-providers.md).
 
-`alacritty` and `ghostty` enable `terminal`; without it the terminal renderer,
-PTY integration and project-following code are absent. `browser` enables the
-native web view and `markdown` the Markdown renderer. `studio` enables
-development commands and the component gallery. Keep the capabilities your
-app uses when disabling defaults.
+### Choosing capabilities
+
+Flags follow native capabilities and their dependencies. Basic UI and the
+Luau component library remain available in ordinary builds; sealed bundles
+ship only their selected components.
+
+| Feature | What it includes |
+| --- | --- |
+| `browser` | Native web views and Wry on macOS/Windows. Linux keeps its system-browser fallback. |
+| `terminal` | Terminal rendering, local PTYs and tmux; choose an engine below to run a shell. |
+| `alacritty`, `ghostty` | Each enables `terminal` and its respective emulator. |
+| `herdr-core` | herdr-core state storage and, with `terminal`, persistent terminals. |
+| `map` | `ui.map` street maps: tiles from OpenStreetMap and other listed providers, pins, and routes along streets, fetched over HTTP. Off by default. |
+| `markdown` | Rich `ui.markdown` rendering (headings, lists, tables, links and code). |
+| `prose` | The writing editor for `ui.input` with `prose`, `dim` or `typewriter`. Ordinary single-line and multiline inputs remain available without it. |
+| `sealed` | Staged app resources instead of the full embedded toolbox. |
+| `studio` | Development commands and the component gallery. |
+| `updates` | Release checks, downloads and in-place app updates. Omitting it hides the updater menu and disables automatic checks. |
+| `acp`, `chat`, `docs`, `forge`, `git`, `shell`, `usage` | The respective built-in native providers. |
+| `tokio` | Async native-provider support. |
+| `wasm` | Wasmtime and building/running Wasm providers. |
+
+An app with just ordinary UI can use `default-features = false` with no
+features. SQLite state saving still works. Without `terminal`, Moonframe's
+terminal crate and PTY dependency are omitted. `herdr-core` is independent:
+it can keep state without Moonframe terminals, although its upstream client
+currently brings its own terminal dependencies.
+
+Views can check `app.capabilities.browser`, `app.capabilities.alacritty`,
+`app.capabilities.wasm`, etc. Every feature above has a boolean entry;
+hyphenated names use brackets (`app.capabilities["herdr-core"]`). These are
+compiled capabilities, not checks that a backend is installed, a provider
+is configured, or the platform implements native web views. They are present
+in headless checks as well as the window. Requesting an omitted browser or
+terminal displays a diagnostic explaining which feature to enable.
+The same applies to rich Markdown and writing fields. The `docs` file
+provider, `markdown` renderer and `prose` editor are independent; select the
+ones the app uses. For example, a Markdown preview needs `markdown`, while
+a prose-writing app needs `prose`. `chat-markdown` is a Luau component and
+does not require the native `markdown` renderer.
+
+`updates` controls the host's updater, not all networking: providers such
+as `forge` and `usage` can bring their own HTTP dependencies. With every
+optional capability off, Ureq, Rustls and Ring are absent. Some shared GPUI
+dependencies (including Markdown parsing and image codecs) are unconditional
+upstream, so renderer flags remove linked code but do not eliminate those
+crates from the build graph.
+
+The starter forwards these same flags explicitly:
+
+```sh
+# Full starter (including both terminal engines), as before:
+cargo build -p moonframe-app --release
+# The library's defaults, including Alacritty, without Ghostty/Zig:
+cargo build -p moonframe-app --release --no-default-features --features moonframe/default
+# Basic UI, with no optional capabilities:
+cargo build -p moonframe-app --release --no-default-features
+# Local/tmux terminals and web views, with no Wasm or built-in providers:
+cargo build -p moonframe-app --release --no-default-features --features alacritty,browser
+```
+
+Select one app/package when building lean. Cargo features are additive:
+building the entire workspace or another app that enables defaults can
+enable those dependencies again. Changing Luau at runtime cannot change
+what the executable includes; changing capabilities requires a rebuild.
+
+For comparisons, build each selection in a fresh `--target-dir` with
+`--release --timings`, then repeat the same build to measure the warm-cache
+case. Compare executable and staged bundle sizes separately. The embedded
+Luau toolbox and shared GPUI dependencies remain in lean builds, so dependency
+removal does not imply the same proportional reduction in bundle size.
+
+The first macOS release measurement, after gating browser and terminal
+support but before adding `markdown`, `prose` and `updates`, used fresh Cargo
+target directories and cached downloads:
+
+| | Full starter | Minimal |
+| --- | ---: | ---: |
+| Clean build, wall time | 4m28s | 3m52s |
+| Executable | 73.2 MiB | 38.0 MiB |
+| Staged `.app` bundle | 74.8 MiB | 39.8 MiB |
+
+These are single-run timings, with some Cargo cache-lock contention. Warm
+no-change builds took 8.29s and 16.44s respectively, so this run demonstrates
+size savings rather than a reliable incremental-build speedup. Both bundles
+used the same staging script and retained the toolbox resources.
+
+With `markdown`, `prose` and `updates` also optional, the same macOS release
+profile produces a **35.36 MiB** minimal executable and **37.18 MiB** staged
+bundle, versus **73.22 MiB** for the full executable. That saves another
+2.60 MiB (6.8%) over the first minimal build, or 51.7% versus full. The
+minimal build graph drops from 450 to 437 distinct packages (full: 614).
+
+Enabling each new capability alone on that minimal build gives:
+
+| Selection | Executable | Added over minimal |
+| --- | ---: | ---: |
+| Minimal | 35.36 MiB | — |
+| `markdown` | 35.45 MiB | 88.5 KiB |
+| `prose` | 35.58 MiB | 219.8 KiB |
+| `updates` | 37.75 MiB | 2.39 MiB |
+
+These marginal sizes are not additive: capabilities can share linked code.
+All five measured selections (these four and full) passed the headless
+starter check. Build timings were not repeated for this second comparison.
+
+`python3 scripts/check-features.py --lint` checks dependency removal and
+lints minimal and individual-capability builds; CI runs it on every platform.
 
 The `bundle` command remains available without `studio`, so a library host
 can package its executable without including developer tools.
