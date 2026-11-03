@@ -61,8 +61,8 @@ fn patterns_search_categories_and_each_detail_render() {
         .filter(|component| {
             component
                 .path
-                .to_string_lossy()
-                .contains("patterns/app/components")
+                .parent()
+                .is_some_and(|parent| parent.ends_with("patterns/app/components"))
                 && component.name != "pattern-browser"
         })
         .map(|component| component.name.clone())
