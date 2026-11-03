@@ -14,7 +14,7 @@ use {
     moonframe_core::{Data, Map, with_fields},
     std::{
         cell::RefCell,
-        collections::{BTreeMap, HashSet},
+        collections::{BTreeMap, HashMap},
         sync::Arc,
     },
 };
@@ -133,9 +133,10 @@ impl Lines {
 }
 
 thread_local! {
-    /// The routed routes each map has told its mod of: by map, index and
-    /// what it was asked by, so a route is told again once its stops change.
-    static TOLD: RefCell<HashSet<(String, usize, Ask)>> = RefCell::new(HashSet::new());
+    /// What each map's routes last told their mod, by map and route index:
+    /// a route tells again whenever its stops or mode change, back and
+    /// forth too, as the mod may have dropped what it was told.
+    static TOLD: RefCell<HashMap<(String, usize), Ask>> = RefCell::new(HashMap::new());
 }
 
 /// Tells the mod, with `routed`, how long each newly found way takes.
@@ -153,7 +154,9 @@ pub(super) fn announce(
                 return;
             };
             for (index, ask, way) in found {
-                let new = TOLD.with_borrow_mut(|told| told.insert((key.clone(), index, ask)));
+                let new = TOLD.with_borrow_mut(|told| {
+                    told.insert((key.clone(), index), ask.clone()).as_ref() != Some(&ask)
+                });
                 if !new {
                     continue;
                 }
