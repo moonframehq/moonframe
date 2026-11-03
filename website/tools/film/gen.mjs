@@ -649,13 +649,14 @@ function frame(n) {
 
 if (SCHEDULE) {
   // A chapter seeks a little past its scene's start, where the cross-fade has
-  // finished (start + 0.2s), and its button shows that time rounded.
+  // finished (start + 0.2s), and its button shows that time rounded. Start
+  // and end keep their tenths: chapters.vtt and the preview loop need them.
   const mmss = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, "0")}`;
-  console.log("scene     no  start  end    seek  label  frames");
+  console.log("scene     no  start   end  seek  label  frames");
   for (const k of ORDER) {
     const p = PLACE[k];
     const no = NUM[k] ? String(NUM[k]).padStart(2, "0") : "  ";
-    console.log(`${k.padEnd(9)} ${no}  ${mmss(p.start).padEnd(5)}  ${mmss(p.end).padEnd(5)}  ${(p.start + 0.2).toFixed(1).padStart(4)}  ${mmss(Math.round(p.start + 0.2)).padEnd(5)}  ${Math.round(p.start * FPS)}-${Math.round(p.end * FPS) - 1}`);
+    console.log(`${k.padEnd(9)} ${no}  ${p.start.toFixed(1).padStart(5)}  ${p.end.toFixed(1).padStart(4)}  ${(p.start + 0.2).toFixed(1).padStart(4)}  ${mmss(Math.round(p.start + 0.2)).padEnd(5)}  ${Math.round(p.start * FPS)}-${Math.round(p.end * FPS) - 1}`);
   }
   const last = PLACE[ORDER[ORDER.length - 1]].end;
   if (Math.abs(last - DUR) > 0.01) console.log(`\nThe scenes run ${last.toFixed(1)}s but DUR is ${DUR}s: set DUR to match.`);
