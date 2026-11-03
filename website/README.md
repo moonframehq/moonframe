@@ -41,6 +41,24 @@ uv run --with pillow website/tools/component-shots.py NAME ...
 
 A component without a picture shows a pointer to the app instead.
 
+## Patterns
+
+The home page's editorial Patterns section and `site/docs/patterns/` share
+`site/docs/patterns/data.js`, generated from the real Luau pattern definitions
+and preview mods. The docs offer a searchable category grid and a side-by-side
+preview/code detail page, with deep links to each pattern.
+
+```sh
+python3 scripts/patterns-data.py
+just patterns-check
+just pattern-shots  # macOS; exports the app's own GPU frame
+```
+
+Previews are real native screenshots in `site/docs/patterns/previews/`, in
+light and dark variants. The website identifies them as screenshots; the
+interactive previews run in the independent app opened by `just patterns`.
+See [the pattern guide](../docs/patterns.md) for authoring and distribution.
+
 The social title, description and image alt text live in `PAGES` in
 `tools/og-images.py`; the tool writes them into each page's
 `<!-- social -->` block, so edit them there, not in the page (the page's

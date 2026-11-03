@@ -587,6 +587,8 @@ it uses the app's own runtime (`.tokio(handle)`, or the one
 | `just bundle-app NAME` | builds the profile NAME's app as a standalone release |
 | `just check-examples` | loads and type-checks the apps in `examples/` |
 | `just demo` | opens the gallery of every example app, to open and compare them |
+| `just patterns` | opens the independent pattern browser: categories, search, live previews and Luau source |
+| `just patterns-check` | validates the patterns, their types and the generated web/native catalogs |
 | `just install` | builds the app and installs it in `/Applications` |
 | `just ci` | formatting, lints, tests, types, providers and check |
 | `just audit` | zizmor and actionlint on the workflows, cargo-deny on the dependencies |

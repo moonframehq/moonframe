@@ -31,6 +31,8 @@ mod backends;
 mod branch_bar;
 mod browser;
 mod build;
+#[cfg(feature = "capture")]
+mod capture;
 mod cli;
 mod color;
 #[cfg(feature = "studio")]

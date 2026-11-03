@@ -48,6 +48,22 @@ demo user="~/.local/share/moonframe/demo":
     fi
     exec "$bin" --user "$user" --profile demo
 
+# Browse reusable patterns in their own app, alongside the app being built.
+patterns:
+    python3 scripts/patterns-data.py
+    cargo run --quiet --release -p moonframe-app --bin moonframe-patterns --no-default-features --features patterns -- --dev
+
+# Validate patterns and their generated website/native catalogs.
+patterns-check:
+    python3 scripts/patterns-data.py --check
+    cargo run --quiet --release -p moonframe-app --bin moonframe-patterns --no-default-features --features patterns -- --check --no-user
+    just types patterns/app
+
+# Export real native previews to the docs, using the app's own GPU scene.
+pattern-shots:
+    cargo build --quiet --release -p moonframe-app --bin moonframe-patterns --no-default-features --features pattern-capture
+    python3 scripts/pattern-shots.py
+
 # Build Moonframe.app (release binary, staged app, icon) in target/bundle.
 bundle out="target/bundle":
     scripts/bundle-app.sh {{out}}
@@ -217,4 +233,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check check-file-size check-sorted lint test test-sealed-bundles types providers providers-examples check-builtin components-check check-examples
+ci: format-check check-file-size check-sorted lint test test-sealed-bundles types providers providers-examples check-builtin components-check check-examples patterns-check
