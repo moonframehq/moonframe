@@ -11,7 +11,8 @@
 //!   that posted it hears it.
 //!
 //! Both are rate-limited, so a mod in a loop cannot flood the speakers or
-//! the notification centre.
+//! the notification centre; so are web pages opened (`app:open`), so it
+//! cannot flood the browser either.
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -30,6 +31,8 @@ const SOUND_GAP: Duration = Duration::from_millis(150);
 /// At most this many notifications in [`NOTIFY_WINDOW`].
 const NOTIFY_BURST: usize = 5;
 const NOTIFY_WINDOW: Duration = Duration::from_secs(10);
+/// At most this many web pages opened in [`NOTIFY_WINDOW`].
+const OPEN_BURST: usize = 3;
 /// Largest sound file played.
 pub(crate) const MAX_SOUND_BYTES: u64 = 2 * 1024 * 1024;
 
@@ -51,12 +54,35 @@ pub(crate) enum Posted {
 pub(crate) struct Alerts {
     last_sound: Option<Instant>,
     posted: VecDeque<Instant>,
+    opened: VecDeque<Instant>,
     sequence: u64,
     #[cfg(target_os = "macos")]
     sounds: macos::Sounds,
 }
 
+/// Keeps the times in `times` within [`NOTIFY_WINDOW`] and adds now,
+/// unless `burst` of them are there already.
+fn admit(times: &mut VecDeque<Instant>, burst: usize) -> bool {
+    let now = Instant::now();
+    while times
+        .front()
+        .is_some_and(|at| now.duration_since(*at) >= NOTIFY_WINDOW)
+    {
+        times.pop_front();
+    }
+    if times.len() >= burst {
+        return false;
+    }
+    times.push_back(now);
+    true
+}
+
 impl Alerts {
+    /// Whether a web page may open now (`app:open`).
+    pub(crate) fn may_open(&mut self) -> bool {
+        admit(&mut self.opened, OPEN_BURST)
+    }
+
     /// Plays `file`, or the chime when `None`. Too soon after the last one
     /// is an error, as is a file the platform cannot play.
     pub(crate) fn play(&mut self, file: Option<&Path>) -> Result<(), String> {
@@ -138,21 +164,12 @@ impl Alerts {
         from: &str,
         notification: &Notification,
     ) -> Result<Posted, String> {
-        let now = Instant::now();
-        while self
-            .posted
-            .front()
-            .is_some_and(|at| now.duration_since(*at) >= NOTIFY_WINDOW)
-        {
-            self.posted.pop_front();
-        }
-        if self.posted.len() >= NOTIFY_BURST {
+        if !admit(&mut self.posted, NOTIFY_BURST) {
             return Err(format!(
                 "more than {NOTIFY_BURST} notifications in {} s are dropped",
                 NOTIFY_WINDOW.as_secs()
             ));
         }
-        self.posted.push_back(now);
         self.sequence += 1;
         let identifier = identifier(self.sequence, from, notification.id.as_deref());
         #[cfg(target_os = "macos")]

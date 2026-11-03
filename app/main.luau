@@ -108,6 +108,8 @@ return mod {
 			-- The main tab strip; its content fills the main area (mods/editor).
 			tabbed { id = "main", show = "bar", start = "component:terminal", variant = tabs_look },
 			ui.spacer(),
+			-- The branch's pull request and the forge account (mods/forge).
+			cell(ui.mount "forge"),
 			-- The layout picker (mods/looks), in a window of its own that stays
 			-- open while you try looks.
 			cell(ui.row {

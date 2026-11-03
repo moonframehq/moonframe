@@ -32,11 +32,13 @@ impl MoonframeApp {
         cx: &mut Context<Self>,
     ) -> Taken {
         // Escape belongs to the inspector while it is picking or showing
-        // its card, which sit above everything.
+        // its card, which sit above everything: before a focused terminal
+        // or field, which would keep it from the app's key bindings.
         if keystroke.key == "escape"
             && (self.inspector.picking || self.inspector.selected.is_some())
         {
-            return Taken::Free;
+            self.dismiss(cx);
+            return Taken::Sent;
         }
         // The highest priority in this window; of equals, the later in the
         // tree.

@@ -36,6 +36,10 @@ mod diff;
 mod refs;
 mod status;
 
+/// A remote URL's host, owner and repository, as `app.git.remote` gives
+/// them; the forge providers read their repository with it.
+pub use refs::remote_json;
+
 use {
     herdr_github::pull_request::Input,
     herdr_vcs::git::{self as vcs, Action},

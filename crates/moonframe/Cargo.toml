@@ -27,6 +27,7 @@ default = [
   "alacritty",
   "chat",
   "docs",
+  "forge",
   "git",
   "herdr-core",
   "shell",
@@ -36,7 +37,10 @@ default = [
 ]
 # The `docs` native provider: reads and saves the project's text files
 # for the markdown editor.
-docs    = ["dep:moonframe-docs"]
+docs = ["dep:moonframe-docs"]
+# The `github` and `gitlab` native providers: pull requests, checks and
+# sign-in over the forges' own APIs.
+forge   = ["dep:moonframe-forge"]
 ghostty = ["moonframe-terminal/ghostty"]
 # The `git` native provider (`app.git`, commit and push), on herdr-vcs.
 git = ["dep:moonframe-git", "moonframe-history/herdr"]
@@ -65,6 +69,7 @@ moonframe-acp                 = { optional = true, workspace = true }
 moonframe-chat                = { optional = true, workspace = true }
 moonframe-core.workspace      = true
 moonframe-docs                = { optional = true, workspace = true }
+moonframe-forge               = { optional = true, workspace = true }
 moonframe-git                 = { optional = true, workspace = true }
 moonframe-history.workspace   = true
 moonframe-mux.workspace       = true

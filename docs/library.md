@@ -52,12 +52,15 @@ A built-in provider a feature leaves out (`git`, `docs`, `acp`) publishes
 nothing: the starter's mods reading `app.git` see nil and carry on, and only
 a message to it reports that the feature is off.
 
-`wasm` is the runtime for sandboxed WebAssembly providers (wasmtime, the
+`wasm` is the runtime for sandboxed WebAssembly (WASM) providers (wasmtime, the
 largest dependency). An app whose providers are all native or processes
 leaves it out to build faster and ship a smaller binary; the line above
-does, with no `wasm`. Its Wasm providers then behave the same way, the
+does, with no `wasm`. Its WASM providers then behave the same way, the
 toolbox's `system` among them: nothing published, and a message to one
 says the feature is off. `bundle` then builds none of them.
+
+To add a sandboxed component alongside native providers, follow
+[Building WebAssembly (WASM) providers](wasm-providers.md).
 
 Use the GPUI the library re-exports, `moonframe::gpui_kit` (GPUI with
 gpui-component): one app links one GPUI. If your crates name `gpui`
@@ -255,7 +258,7 @@ cargo run --release -- bundle --dist dist   # and dist/<Title>-<version>-<target
 ```
 
 `bundle` ships the running binary with the app's folder and the toolbox,
-each with its Wasm providers prebuilt and no sources, plus an icon and an
+each with its WASM providers prebuilt and no sources, plus an icon and an
 Info.plist, signed ad hoc. `--dist DIR` also writes what a GitHub release
 carries: the bundle archived under a name with its version and platform,
 and `SHA256SUMS`. With [`.updates("owner/repo")`](updates.md), the app

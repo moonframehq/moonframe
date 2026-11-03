@@ -1,0 +1,139 @@
+//! The checkout the provider asks the forge about: its remote, the branch
+//! it is on, and the branches its worktrees have out, read with git
+//! through herdr-vcs (no shell, no prompts, a deadline).
+
+use {
+    herdr_vcs::git,
+    std::{
+        path::{Path, PathBuf},
+        time::{Duration, Instant},
+    },
+};
+
+/// Branches asked about at most, the current one first.
+pub const BRANCHES: usize = 20;
+
+fn text(root: &Path, args: &[&str]) -> Option<String> {
+    let bytes = git::git_bytes(
+        &root.to_string_lossy(),
+        args,
+        "read for the forge",
+        Instant::now() + Duration::from_secs(10),
+        &|| false,
+        1 << 20,
+    )
+    .ok()?;
+    Some(String::from_utf8_lossy(&bytes).trim_end().to_owned())
+}
+
+/// The repository the git provider watches: an explicit override, the
+/// terminal's project, then the app's folder.
+pub fn root(dir: &Path) -> Option<PathBuf> {
+    if let Some(named) = std::env::var_os("LAYOUTS_REPO") {
+        return toplevel(Path::new(&named));
+    }
+    moonframe_providers::project()
+        .as_deref()
+        .and_then(toplevel)
+        .or_else(|| toplevel(&dir.join("..").join("..")))
+}
+
+pub fn toplevel(start: &Path) -> Option<PathBuf> {
+    let start = std::path::absolute(start).unwrap_or_else(|_| start.to_owned());
+    text(&start, &["rev-parse", "--show-toplevel"]).map(PathBuf::from)
+}
+
+/// What the provider reads from git.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Checkout {
+    /// The remote's host and path (`owner/repo`, `group/sub/repo`).
+    pub remote: Option<(String, String)>,
+    pub branch: String,
+    /// The current branch, then each worktree's, without repeats.
+    pub branches: Vec<String>,
+}
+
+pub fn read(root: &Path) -> Checkout {
+    let branch = text(root, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_default();
+    let remote = remote(root, &branch);
+    let mut branches = Vec::new();
+    if !branch.is_empty() && branch != "HEAD" {
+        branches.push(branch.clone());
+    }
+    if let Some(list) = text(root, &["worktree", "list", "--porcelain"]) {
+        for name in worktree_branches(&list) {
+            if branches.len() >= BRANCHES {
+                break;
+            }
+            if !branches.contains(&name) {
+                branches.push(name);
+            }
+        }
+    }
+    Checkout {
+        remote,
+        branch,
+        branches,
+    }
+}
+
+/// The branches `git worktree list --porcelain` names.
+pub fn worktree_branches(list: &str) -> Vec<String> {
+    list.lines()
+        .filter_map(|line| line.strip_prefix("branch refs/heads/"))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// The remote the branch tracks, else `origin`, else the first.
+fn remote(root: &Path, branch: &str) -> Option<(String, String)> {
+    let tracked = (branch != "HEAD" && !branch.is_empty())
+        .then(|| {
+            text(root, &[
+                "config",
+                "--get",
+                &format!("branch.{branch}.remote"),
+            ])
+        })
+        .flatten()
+        .filter(|name| !name.is_empty() && name != ".");
+    let name = tracked
+        .or_else(|| {
+            text(root, &["config", "--get", "remote.origin.url"]).map(|_| "origin".to_owned())
+        })
+        .or_else(|| {
+            text(root, &["remote"]).and_then(|names| names.lines().next().map(str::to_owned))
+        })?;
+    let url = text(root, &["remote", "get-url", &name])?;
+    let remote = moonframe_git::remote_json(&name, &url);
+    let mut host = remote["host"].as_str()?.to_ascii_lowercase();
+    // An HTTPS remote's port is where its API answers too; an SSH port is
+    // the SSH server's, never the web's.
+    if let Some(port) = https_port(&url) {
+        host = format!("{host}:{port}");
+    }
+    let owner = remote["owner"].as_str()?;
+    let repo = remote["repo"].as_str()?;
+    (!host.is_empty() && !owner.is_empty() && !repo.is_empty())
+        .then(|| (host, format!("{owner}/{repo}")))
+}
+
+/// The port an `https://` (or `http://`) remote names, unless it is the
+/// default one.
+pub fn https_port(url: &str) -> Option<u16> {
+    let (scheme, rest) = url.split_once("://")?;
+    if !scheme.eq_ignore_ascii_case("https") && !scheme.eq_ignore_ascii_case("http") {
+        return None;
+    }
+    let authority = rest.split('/').next()?;
+    let authority = authority.rsplit('@').next()?;
+    // An IPv6 literal (`[::1]:8443`) keeps its colons inside the brackets.
+    let after_host = authority.rsplit(']').next()?;
+    let port: u16 = after_host.rsplit_once(':')?.1.parse().ok()?;
+    let default = if scheme.eq_ignore_ascii_case("https") {
+        443
+    } else {
+        80
+    };
+    (port != default).then_some(port)
+}

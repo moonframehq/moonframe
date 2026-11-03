@@ -19,13 +19,15 @@ pub(crate) fn natives() -> Natives {
         // keep-sorted start
         ("acp", acp),
         ("chat", chat),
+        // The demo gallery's (examples/demo): it opens apps on this binary.
+        ("demos", crate::demos::native),
         ("docs", docs),
         ("git", git),
+        ("github", github),
+        ("gitlab", gitlab),
         ("shell", shell),
         ("usage", usage),
         // keep-sorted end
-        // The demo gallery's (examples/demo): it opens apps on this binary.
-        ("demos", crate::demos::native),
     ];
     built_in
         .iter()
@@ -54,6 +56,16 @@ fn docs() -> Box<dyn Native> {
 #[cfg(feature = "git")]
 fn git() -> Box<dyn Native> {
     moonframe_git::native()
+}
+
+#[cfg(feature = "forge")]
+fn github() -> Box<dyn Native> {
+    moonframe_forge::github()
+}
+
+#[cfg(feature = "forge")]
+fn gitlab() -> Box<dyn Native> {
+    moonframe_forge::gitlab()
 }
 
 #[cfg(feature = "shell")]
@@ -91,6 +103,16 @@ fn git() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(not(feature = "forge"))]
+fn github() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "forge"))]
+fn gitlab() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 #[cfg(not(feature = "usage"))]
 fn usage() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -103,6 +125,7 @@ fn usage() -> Box<dyn Native> {
         feature = "acp",
         feature = "chat",
         feature = "docs",
+        feature = "forge",
         feature = "git",
         feature = "shell",
         feature = "usage"
@@ -155,7 +178,9 @@ mod tests {
     #[test]
     fn every_built_in_native_is_registered() {
         let natives = natives();
-        for name in ["acp", "chat", "docs", "git", "shell", "usage", "demos"] {
+        for name in [
+            "acp", "chat", "demos", "docs", "git", "github", "gitlab", "shell", "usage",
+        ] {
             assert!(natives.contains_key(name), "{name}");
         }
     }

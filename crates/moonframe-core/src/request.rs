@@ -52,6 +52,9 @@ pub enum Request {
     /// `app:window`: opens a mod in a window of its own, or raises it,
     /// first delivering what it is sent; or closes it.
     Window(WindowRequest),
+    /// `app:open`: opens a web address (`https://` or `http://`) in the
+    /// system's browser: a pull request, a sign-in page.
+    Open(String),
 }
 
 /// What `app:sound` plays.
@@ -123,6 +126,7 @@ impl Request {
             "pick" => pick::pick(msg).map(Self::Pick),
             "edit" => edit::edit(msg).map(Self::Edit),
             "window" => window::window(msg).map(Self::Window),
+            "open" => open(msg).map(Self::Open),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -145,7 +149,21 @@ pub const NAMES: &[&str] = &[
     "pick",
     "edit",
     "window",
+    "open",
 ];
+
+/// Longest address `app:open` opens.
+const MAX_URL: usize = 2048;
+
+/// A web address, never a file or another program's scheme.
+fn open(msg: &Data) -> Result<String, Error> {
+    match msg {
+        Data::String(url) if url.len() <= MAX_URL && crate::is_remote_url(url) => Ok(url.clone()),
+        _ => Err(Error::new(format!(
+            "`{APP}open` takes a web address (https:// or http://, at most {MAX_URL} bytes)"
+        ))),
+    }
+}
 
 /// `"default"`, or a sound file's path: never an address.
 fn sound(msg: &Data) -> Result<Sound, Error> {

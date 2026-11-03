@@ -228,7 +228,7 @@ fn without_credentials(url: &str) -> String {
 /// `name` and `url` with the host, owner and repository the URL names:
 /// scp-like `user@host:owner/repo`, or `scheme://[user@]host[:port]/owner/repo`.
 /// Credentials in the URL are left out.
-pub(crate) fn remote_json(name: &str, url: &str) -> Value {
+pub fn remote_json(name: &str, url: &str) -> Value {
     let url = without_credentials(url);
     let url = url.as_str();
     let (host, path) = if let Some((_, rest)) = url.split_once("://") {
