@@ -42,7 +42,9 @@ return style {
 		-- Padding and margin take one value, { y, x }, { top, right, bottom, left },
 		-- or named edges such as { x = 14, top = 10 }.
 		["panel-header"] = { border = "none", padding = { top = 10, x = 14 }, color = "accent" },
-		item = { padding = { 6, 10 } },
+		-- Navigation rows sit inset from the pane's edges, so the hover and
+		-- selected backgrounds are rounded pills, not edge-to-edge bars.
+		item = { padding = { 6, 10 }, margin = { x = 8 }, radius = 8 },
 
 		-- Side panels slide in and out when the toolbar hides or shows them.
 		-- Kinds: slide, fade, slide-fade, none. Curves: linear, ease, ease-in,
