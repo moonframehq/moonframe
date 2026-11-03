@@ -8,11 +8,13 @@
 use crate::{Command, Data, Error};
 
 mod edit;
+mod guard;
 mod pick;
 mod window;
 
 pub use {
     edit::{Edit, EditChange, Splice},
+    guard::Guard,
     pick::{Pick, PickKind},
     window::WindowRequest,
 };
@@ -52,6 +54,9 @@ pub enum Request {
     /// `app:window`: opens a mod in a window of its own, or raises it,
     /// first delivering what it is sent; or closes it.
     Window(WindowRequest),
+    /// `app:guard`: holds back closing the main window and quitting, so
+    /// a mod can finish something first.
+    Guard(Guard),
     /// `app:open`: opens a web address (`https://` or `http://`) in the
     /// system's browser: a pull request, a sign-in page.
     Open(String),
@@ -126,6 +131,7 @@ impl Request {
             "pick" => pick::pick(msg).map(Self::Pick),
             "edit" => edit::edit(msg).map(Self::Edit),
             "window" => window::window(msg).map(Self::Window),
+            "guard" => guard::guard(msg).map(Self::Guard),
             "open" => open(msg).map(Self::Open),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",

@@ -45,8 +45,14 @@ impl MoonframeApp {
         }
     }
 
-    /// Opens the mod `name` in a window of its own, or raises it.
-    pub(super) fn show_mod_window(&mut self, name: &str, cx: &mut Context<Self>) {
+    /// Opens the mod `name` in a window of its own, or raises it; `place`
+    /// outranks where the mod's `window` key puts it.
+    pub(super) fn show_mod_window(
+        &mut self,
+        name: &str,
+        place: Option<moonframe_core::WindowPlace>,
+        cx: &mut Context<Self>,
+    ) {
         let Some(slot) = self.workspace.slot(name) else {
             tracing::warn!("no mod `{name}` to open in a window");
             return;
@@ -55,7 +61,10 @@ impl MoonframeApp {
             .meta()
             .and_then(|meta| meta.title.clone())
             .unwrap_or_else(|| name.to_owned());
-        let sizing = slot.meta().and_then(|meta| meta.window).unwrap_or_default();
+        let mut sizing = slot.meta().and_then(|meta| meta.window).unwrap_or_default();
+        if let Some(place) = place {
+            sizing.place = place;
+        }
         // After this update, as for the components window: the click may
         // have come from that window, which is busy until it returns.
         // Look up the handle then too: an earlier request in this batch
@@ -108,7 +117,7 @@ impl MoonframeApp {
                     Error::new(format!("`app:window`: no mod named `{name}`")),
                 );
             },
-            WindowRequest::Open { name, .. } => self.show_mod_window(&name, cx),
+            WindowRequest::Open { name, place, .. } => self.show_mod_window(&name, place, cx),
             WindowRequest::Close(name) => {
                 // After this update: the mod may have asked from its own
                 // window, which is busy until it returns. Resolve its

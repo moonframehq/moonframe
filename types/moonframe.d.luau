@@ -1183,6 +1183,30 @@ type WindowState = {
 	fullscreen: boolean,
 	-- The frontmost window.
 	active: boolean,
+	-- The screen it is on: an `id` from `app.displays`.
+	display: number?,
+}
+
+-- A screen, in `app.displays`. `x`, `y`, `width` and `height` are its
+-- place among the others, in points.
+type DisplayInfo = {
+	id: number,
+	primary: boolean,
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+}
+
+-- How a process or socket provider's link stands, in `app.links`.
+type ProviderLink = {
+	-- Whether a socket provider has its program; nil for a process.
+	connected: boolean?,
+	-- Messages not yet written.
+	waiting: number,
+	-- Messages dropped since it started: the queue was full or, for a
+	-- socket, no one was there to hear them.
+	dropped: number,
 }
 
 -- Light, dark, or as the system is (switching as it does).
@@ -1685,6 +1709,10 @@ type App = {
 	dark: boolean,
 	appearance: Appearance,
 	window: WindowState,
+	-- Every screen, the primary one first.
+	displays: { DisplayInfo }?,
+	-- Each process or socket provider that has had something to report.
+	links: { [string]: ProviderLink }?,
 	-- Cargo feature names mapped to whether this host compiled them in.
 	capabilities: { [string]: boolean },
 	mods: { string },
@@ -1801,6 +1829,11 @@ type Window = {
 type ModWindow = {
 	size: { width: number, height: number }?,
 	min_size: { width: number, height: number }?,
+	-- The screen it opens on: an `id` from `app.displays`. "external" is the
+	-- first screen that isn't the primary one, or the primary one if alone.
+	display: ("primary" | "external" | number)?,
+	-- Opens filling its screen.
+	fullscreen: boolean?,
 }
 
 -- A menu item in the shell's `menus`: it sends `msg` (to the shell, or to

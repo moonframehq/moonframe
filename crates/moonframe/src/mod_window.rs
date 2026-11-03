@@ -10,7 +10,8 @@ use {
         component::{ActiveTheme as _, Root},
         *,
     },
-    moonframe_core::ModWindowSize,
+    moonframe_core::{Display, ModWindowSize},
+    std::rc::Rc,
 };
 
 /// The size a mod's window opens at, and its smallest, when its `window`
@@ -36,15 +37,23 @@ impl ModWindow {
         sizing: ModWindowSize,
         cx: &mut App,
     ) -> Option<WindowHandle<Root>> {
-        let screen = cx
-            .primary_display()
+        let display = chosen(sizing.place.display, cx);
+        let screen = display
+            .clone()
+            .or_else(|| cx.primary_display())
             .map(|display| display.bounds().size)
             .map(|screen| (f32::from(screen.width), f32::from(screen.height)));
         let (opens, smallest) = fitted(sizing, screen);
-        let bounds = Bounds::centered(None, size(px(opens.0), px(opens.1)), cx);
+        let display_id = display.map(|display| display.id());
+        let bounds = Bounds::centered(display_id, size(px(opens.0), px(opens.1)), cx);
         let options = WindowOptions {
             focus: !crate::background(),
-            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            display_id,
+            window_bounds: Some(if sizing.place.fullscreen {
+                WindowBounds::Fullscreen(bounds)
+            } else {
+                WindowBounds::Windowed(bounds)
+            }),
             window_min_size: Some(size(px(smallest.0), px(smallest.1))),
             titlebar: Some(TitlebarOptions {
                 title: Some(title.into()),
@@ -93,6 +102,26 @@ impl Render for ModWindow {
             .font_family(theme.font_family.clone())
             .text_size(theme.font_size)
             .child(content)
+    }
+}
+
+/// The screen a window asks for, if it is there: one that went away leaves
+/// the choice to the system.
+fn chosen(wanted: Option<Display>, cx: &App) -> Option<Rc<dyn PlatformDisplay>> {
+    let primary = cx.primary_display();
+    match wanted? {
+        Display::Primary => primary,
+        Display::External => {
+            let primary_id = primary.as_ref().map(|display| display.id());
+            cx.displays()
+                .into_iter()
+                .find(|display| Some(display.id()) != primary_id)
+                .or(primary)
+        },
+        Display::Id(id) => cx
+            .displays()
+            .into_iter()
+            .find(|display| crate::app::display_number(display.id()) == id),
     }
 }
 

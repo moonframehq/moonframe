@@ -164,6 +164,7 @@ pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
             if !developer && app.inspector.picking {
                 app.toggle_inspect(cx);
             }
+            app.rewatch(cx);
             cx.set_menus(menus(app.workspace.menus()));
             app.show_toast(
                 if developer {

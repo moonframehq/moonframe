@@ -112,6 +112,7 @@ impl Workspace {
                         if let Request::Window(WindowRequest::Open {
                             name,
                             send: Some(send),
+                            ..
                         }) = &request
                         {
                             queue.push_back((from.clone(), name.clone(), send.clone()));

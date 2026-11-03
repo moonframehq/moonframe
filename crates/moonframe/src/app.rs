@@ -48,6 +48,7 @@ use {crate::terminal::Terminals, listeners::wake_on_output};
 // keep-sorted start
 mod dialogs;
 mod fonts;
+pub(crate) mod guard;
 mod history;
 mod listeners;
 mod menu;
@@ -58,12 +59,14 @@ mod updates;
 mod view;
 mod watch;
 mod windows;
+
+pub(crate) use listeners::display_number;
 // keep-sorted end
 
 use {
     listeners::{deliver_from_views, flush_on_quit, report, start_providers},
     menu::{hear_notification_clicks, is_dark, menu_actions, name_of, stock_preview},
-    watch::watch,
+    watch::watching,
 };
 
 /// Editors save in several steps; wait this long and take the burst as one.
@@ -161,6 +164,10 @@ pub(crate) struct MoonframeApp {
     _watcher: Option<RecommendedWatcher>,
     /// The main window, the one this view draws.
     main_window: WindowId,
+    /// The mod holding back closing and quitting, if one is.
+    close_guard: Option<guard::CloseGuard>,
+    /// How each process or socket provider's link stands: `app.links`.
+    links: std::collections::BTreeMap<String, Data>,
     /// The open popovers and overlays each window's last frame drew, which
     /// take their `keys` before anything else in that window only.
     pub(crate) key_layers: HashMap<WindowId, Vec<KeyLayer>>,
@@ -201,7 +208,7 @@ impl MoonframeApp {
             radius: theme.radius,
         };
         workspace.set_dark(theme.is_dark());
-        workspace.set_window(window_state(chrome, window));
+        workspace.set_window(window_state(chrome, window, cx));
         report(&workspace);
         cx.observe_window_bounds(window, |this, window, cx| this.sync_window(window, cx))
             .detach();
@@ -216,9 +223,7 @@ impl MoonframeApp {
             }
         })
         .detach();
-        let watcher = watch(&workspace, &folders, cx)
-            .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
-            .ok();
+        let watcher = watching(&workspace, &folders, cx);
         let history = crate::history::open(&folders);
         // Projects are kept only with the user's folder: `--no-user` runs
         // start fresh and keep nothing, as their state.
@@ -239,6 +244,8 @@ impl MoonframeApp {
         #[cfg(feature = "terminal")]
         let project = crate::project::Project::start(kept, cx);
         flush_on_quit(cx);
+        Self::watch_closing(window, cx);
+        Self::watch_displays(cx);
         let settings = folders.settings().into_iter().next();
         let saved = |key| {
             folders
@@ -316,6 +323,8 @@ impl MoonframeApp {
             project,
             defaults,
             main_window: window.window_handle().window_id(),
+            close_guard: None,
+            links: Default::default(),
             key_layers: HashMap::new(),
             history,
             _watcher: watcher,
@@ -610,7 +619,7 @@ impl MoonframeApp {
         if let Action::Window(name) = action {
             // A preview opens nothing.
             if !from.starts_with(moonframe_core::DEMO) {
-                self.show_mod_window(name, cx);
+                self.show_mod_window(name, None, cx);
             }
             return;
         }
@@ -661,6 +670,7 @@ impl MoonframeApp {
 
     fn run(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
         match command {
+            Command::Quit if self.held(guard::Closing::Quit, cx) => {},
             Command::Quit => cx.quit(),
             Command::Reload => self.reload(cx),
             // The other of light and dark, whatever the system is.
@@ -674,6 +684,7 @@ impl MoonframeApp {
             ),
             Command::Minimize => window.minimize_window(),
             Command::Maximize => window.zoom_window(),
+            Command::CloseWindow if self.held(guard::Closing::Window, cx) => {},
             Command::CloseWindow => window.remove_window(),
             Command::ShowThemes => self.show_themes(cx),
             Command::Inspect => self.inspect_for(SHELL, cx),
@@ -683,7 +694,7 @@ impl MoonframeApp {
 
     /// Shares the window's state with the views as `app.window`.
     fn sync_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.workspace.set_window(window_state(self.chrome, window));
+        self.workspace.set_window(window_state(self.chrome, window, cx));
         cx.notify();
     }
 
@@ -865,6 +876,7 @@ impl MoonframeApp {
                 }
             },
             Request::Window(request) => self.window_request(from, request, cx),
+            Request::Guard(request) => self.guard_request(from, request, window, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);
@@ -929,9 +941,7 @@ impl MoonframeApp {
         crate::render::images::forget();
         self.workspace.set_roots(roots.clone());
         self.forward("packages", cx);
-        self._watcher = watch(&self.workspace, &self.folders, cx)
-            .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
-            .ok();
+        self.rewatch(cx);
         bind_menu_keys(self.workspace.menus(), cx);
         cx.set_menus(menus(self.workspace.menus()));
         self.apply_theme(cx);
@@ -961,7 +971,7 @@ impl MoonframeApp {
 
 /// The window as views see it. The title bar is hidden only where the
 /// system went along: a Linux compositor may keep its own decorations.
-fn window_state(chrome: Chrome, window: &Window) -> WindowState {
+fn window_state(chrome: Chrome, window: &Window, cx: &App) -> WindowState {
     let platform = Platform::current();
     let titlebar = match (chrome.titlebar, platform, window.window_decorations()) {
         (Titlebar::Hidden, Platform::Linux, Decorations::Server) => Titlebar::System,
@@ -973,5 +983,8 @@ fn window_state(chrome: Chrome, window: &Window) -> WindowState {
         maximized: window.is_maximized(),
         fullscreen: window.is_fullscreen(),
         active: window.is_window_active(),
+        display: window
+            .display(cx)
+            .map(|display| display_number(display.id())),
     }
 }

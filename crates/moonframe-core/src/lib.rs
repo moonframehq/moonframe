@@ -54,7 +54,7 @@ pub use {
     persist::Persist,
     read::MAX_DOCUMENT,
     request::{
-        APP, Appearance, Edit, EditChange, Notification, Pick, PickKind, Request, SOUND_TYPES,
+        APP, Appearance, Edit, EditChange, Guard, Notification, Pick, PickKind, Request, SOUND_TYPES,
         Sound, Splice, WindowRequest,
     },
     roots::{AppLayer, Roots, mod_name},
@@ -64,7 +64,7 @@ pub use {
         Transition, TransitionKind,
     },
     vm::printable,
-    window::{Chrome, ModWindowSize, Platform, Titlebar, WindowState},
+    window::{Chrome, Display, ModWindowSize, Platform, Titlebar, WindowPlace, WindowState},
     workspace::{DEMO, PROVIDER, SHELL, Slot, TOPIC, Workspace},
 };
 

@@ -64,16 +64,17 @@ pub(super) fn start_providers(
         while let Some(event) = events.next().await {
             let handled = this.update(cx, |this, cx| {
                 match event {
-                    Event::Published { provider, data } => {
-                        // No view read it: the window looks the same.
-                        let drawn = this.workspace.set_host(&provider, data);
-                        // Mods that heard it may have asked a provider.
-                        this.forward(&provider, cx);
-                        if drawn > 0 {
-                            // A view may fail on the new data: say so.
-                            report(&this.workspace);
-                            cx.notify();
+                    Event::Published { provider, data } => this.published(&provider, data, cx),
+                    // The newest there is by now, not what was first sent.
+                    Event::Newest { provider, newest } => {
+                        if let Some(data) = newest.take() {
+                            this.published(&provider, data, cx);
                         }
+                    },
+                    Event::Link { provider, link } => {
+                        this.links.insert(provider, link.data());
+                        let links = Data::Map(this.links.clone());
+                        this.published("links", links, cx);
                     },
                     Event::Failed { provider, problem } => {
                         tracing::warn!("provider {provider}: {problem}");
@@ -105,12 +106,74 @@ pub(super) fn report(workspace: &Workspace) {
     }
 }
 
-/// Saves the state that changed since the last save, waiting for it, as
-/// the app quits: the workspace saves as it goes, but writes are queued.
+/// Saves the state that changed since the last save, waiting for it, and
+/// lets processes leave, as the app quits: the workspace saves as it goes,
+/// but writes are queued. This runs before GPUI's timeout on quitting
+/// starts, which is too short for a process given a `stop-grace`.
 pub(super) fn flush_on_quit(cx: &mut Context<MoonframeApp>) {
     cx.on_app_quit(|app, _| {
         app.workspace.flush();
+        app.providers.shutdown();
         async {}
     })
     .detach();
+}
+
+impl MoonframeApp {
+    /// Shares `data` as `app.<key>`, drawing again if a view read it.
+    fn published(&mut self, key: &str, data: Data, cx: &mut Context<Self>) {
+        // No view read it: the window looks the same.
+        let drawn = self.workspace.set_host(key, data);
+        // Mods that heard it may have asked a provider.
+        self.forward(key, cx);
+        if drawn > 0 {
+            // A view may fail on the new data: say so.
+            report(&self.workspace);
+            cx.notify();
+        }
+    }
+
+    /// Shares the screens as `app.displays`, now and as they change.
+    pub(super) fn watch_displays(cx: &mut Context<Self>) {
+        let app = cx.entity().downgrade();
+        let share = move |cx: &mut App| {
+            let displays = displays(cx);
+            let _ = app.update(cx, |app, cx| app.published("displays", displays, cx));
+        };
+        let again = share.clone();
+        cx.observe_displays(move |_, cx| again(cx)).detach();
+        cx.defer(share);
+    }
+}
+
+/// A screen's `id` as views read it.
+pub(crate) fn display_number(id: DisplayId) -> i64 {
+    i64::try_from(u64::from(id)).unwrap_or(i64::MAX)
+}
+
+/// Every screen, the primary one first, as views read them.
+fn displays(cx: &App) -> Data {
+    let primary = cx.primary_display().map(|display| display.id());
+    let mut displays = cx.displays();
+    displays.sort_by_key(|display| Some(display.id()) != primary);
+    Data::List(
+        displays
+            .iter()
+            .map(|display| {
+                let bounds = display.bounds();
+                let number = |value: Pixels| Data::Number(f64::from(f32::from(value)));
+                Data::Map(std::collections::BTreeMap::from([
+                    ("id".to_owned(), Data::Integer(display_number(display.id()))),
+                    (
+                        "primary".to_owned(),
+                        Data::Bool(Some(display.id()) == primary),
+                    ),
+                    ("x".to_owned(), number(bounds.origin.x)),
+                    ("y".to_owned(), number(bounds.origin.y)),
+                    ("width".to_owned(), number(bounds.size.width)),
+                    ("height".to_owned(), number(bounds.size.height)),
+                ]))
+            })
+            .collect(),
+    )
 }
