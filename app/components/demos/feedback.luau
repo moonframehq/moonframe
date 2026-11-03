@@ -78,7 +78,7 @@ return mod {
 
 	view = function(state)
 		return ui.column {
-			ui.row { ui.button { "Send feedback…", icon = "circle-help", variant = "outline", msg = "open" } },
+			ui.row { ui.button { "Send feedback…", icon = "sparkles", variant = "outline", msg = "open" } },
 			feedback {
 				open = state.open,
 				dismiss = "close",

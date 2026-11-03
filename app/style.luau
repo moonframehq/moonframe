@@ -134,7 +134,7 @@ return style {
 		[".tool:hover"] = { background = "accent/10", color = "foreground" },
 		[".tool-on"] = { color = "accent" },
 		[".tool-on:hover"] = { background = "accent/12", color = "accent" },
-		-- The Send feedback `?` (mods/feedback) where an app without a title
+		-- The Make it yours sparkles (mods/feedback) where an app without a title
 		-- bar of tools floats it over a corner of the window.
 		[".feedback-corner"] = { background = "card", border = "all", border_color = "border", radius = 999, padding = 2, shadow = "0 4px 12px -4px #00000033" },
 		-- Its button is round, so its hover fits a round corner.
