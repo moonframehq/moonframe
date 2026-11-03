@@ -244,6 +244,9 @@ fn shape_of(recorded: &[Placed], path: &str) -> Option<Shape> {
     recorded
         .iter()
         .find(|placed| placed.path == path)
+        // Fully clipped rows can remain recorded in a list's overscan.
+        // Do not expand their empty bounds into a visible outline.
+        .filter(|placed| !placed.visible.is_empty())
         .map(|placed| Shape {
             bounds: placed.visible,
             corners: placed.corners,

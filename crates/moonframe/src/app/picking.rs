@@ -102,7 +102,8 @@ impl MoonframeApp {
 
     /// Keys while picking: ↑ targets the node around the one under the
     /// pointer (a cell's row, a row's list), ↓ steps back in, Enter picks
-    /// the target. The app's own bindings for them wait until picking ends.
+    /// the target. Only the main window shows the picker; other windows
+    /// keep their keys. Its own bindings wait until picking ends.
     pub(crate) fn picking_keystroke(
         &mut self,
         keystroke: &Keystroke,
@@ -111,6 +112,7 @@ impl MoonframeApp {
     ) -> bool {
         let modifiers = keystroke.modifiers;
         if !self.inspector.picking
+            || !self.is_main(window)
             || modifiers.control
             || modifiers.alt
             || modifiers.platform
