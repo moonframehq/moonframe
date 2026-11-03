@@ -1047,6 +1047,80 @@ type ListProps = {
 	float: Float?,
 }
 
+-- Where a `ui.map` gets its tiles. `openstreetmap` and the `carto-*` maps
+-- need no key; the others need the provider's API key in `key`.
+type MapProvider =
+	"openstreetmap"
+	| "carto-light"
+	| "carto-dark"
+	| "carto-voyager"
+	| "esri-streets"
+	| "stadia-smooth"
+	| "stadia-smooth-dark"
+	| "maptiler-streets"
+	| "mapbox-streets"
+	| "thunderforest-transport"
+
+-- A street map from a tile provider, with pins and routes over it. Drag to
+-- pan; the wheel, a pinch, a double click and its buttons zoom. Without
+-- `center` and `zoom` it frames the pins and routes. Its style's `color`
+-- strokes routes without their own.
+type MapProps = {
+	class: Class?,
+	style: Style?,
+	provider: MapProvider?,
+	-- The provider's API key, for those that need one.
+	key: string?,
+	-- { lat, lon } at the middle.
+	center: { number }?,
+	-- 0 (the whole world) to about 20 (a street).
+	zoom: number?,
+	pins: { MapPin }?,
+	routes: { MapRoute }?,
+	-- Sent with `lat`, `lon` and `zoom` added after the user moves the map.
+	move: any?,
+	-- Sent with `pin` (its index, from 1) added when a pin is clicked.
+	select: any?,
+	-- Sent once a `via` route's way along streets is known, with `route`
+	-- (its index, from 1), `seconds` and `meters` added.
+	routed: any?,
+	to: string?,
+	width: number?,
+	height: number?,
+	grow: boolean?,
+}
+
+type MapPin = {
+	lat: number,
+	lon: number,
+	-- Up to three characters, drawn in the pin: "1", "A".
+	label: string?,
+	-- Drawn in the pin instead of a label.
+	icon: IconName?,
+	color: string?,
+	-- "dot" on the place, "disc" on it (the default with a label or
+	-- icon), or "balloon" above it with its tip on the place.
+	shape: ("dot" | "disc" | "balloon")?,
+	-- Drawn larger, above the others.
+	selected: boolean?,
+	-- Sent when it is clicked, instead of the map's `select`.
+	msg: any?,
+}
+
+-- Either `points`, drawn as they are, or `via` stops the host routes along
+-- streets (OpenStreetMap data, through routing.openstreetmap.de) by `mode`;
+-- straight and faint until the way is known.
+type MapRoute = {
+	-- Corners in order, flat: { lat1, lon1, lat2, lon2, ... }.
+	points: { number }?,
+	-- Stops in order, flat, two to 25 of them.
+	via: { number }?,
+	mode: ("walk" | "bike" | "car")?,
+	color: string?,
+	stroke: number?,
+	dashed: boolean?,
+}
+
 declare ui: {
 	row: (props: StackProps) -> Element,
 	column: (props: StackProps) -> Element,
@@ -1063,6 +1137,7 @@ declare ui: {
 	line: (props: LineProps) -> Element,
 	paths: (props: PathsProps) -> Element,
 	hatch: (props: HatchProps) -> Element,
+	map: (props: MapProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,
 	browser: (props: string | BrowserProps) -> Element,
 	view: (props: string | ViewProps) -> Element,

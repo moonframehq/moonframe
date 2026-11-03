@@ -34,6 +34,7 @@ default = [
   "ghostty",
   "git",
   "herdr-core",
+  "map",
   "markdown",
   "prose",
   "shell",
@@ -55,6 +56,7 @@ forge      = ["moonframe/forge"]
 ghostty    = ["moonframe/ghostty"]
 git        = ["moonframe/git"]
 herdr-core = ["moonframe/herdr-core"]
+map        = ["moonframe/map"]
 markdown   = ["moonframe/markdown"]
 prose      = ["moonframe/prose"]
 sealed     = ["moonframe/sealed"]

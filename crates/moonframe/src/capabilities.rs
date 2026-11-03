@@ -22,6 +22,7 @@ fn compiled() -> std::collections::BTreeMap<String, bool> {
         "ghostty",
         "git",
         "herdr-core",
+        "map",
         "markdown",
         "prose",
         "sealed",

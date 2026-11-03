@@ -61,6 +61,10 @@ shell = ["dep:moonframe-shell"]
 # State kept by herdr-core (`hc`) when installed; with `terminal`, it also
 # keeps shells across launches. tmux and local PTYs only need `terminal`.
 herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
+# `ui.map`: street maps from tile providers, fetched over HTTP. Off by
+# default, as few apps need one; the starter turns it on, and so do sealed
+# apps whose Luau uses `ui.map`.
+map = ["dep:ureq"]
 # Rich read-only Markdown and the long-form writing editor are independent.
 markdown = []
 prose    = []
@@ -112,6 +116,7 @@ tempfile.workspace            = true
 toml.workspace                = true
 tracing.workspace             = true
 tracing-subscriber.workspace  = true
+ureq                          = { optional = true, workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true

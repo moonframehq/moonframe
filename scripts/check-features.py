@@ -44,7 +44,10 @@ def main():
     assert features == set(starter) - {"default"} - starter_only, "starter must forward every capability"
     for name in features:
         assert starter[name] == [f"moonframe/{name}"], name
-    assert set(starter["default"]) == set(library["default"]) | {"ghostty"}
+    # Off in the library, on in the starter: Ghostty needs Zig, and few apps
+    # need a street map.
+    opt_in = {"ghostty", "map"}
+    assert set(starter["default"]) == set(library["default"]) | opt_in
 
     optional = {
         # keep-sorted start
@@ -59,7 +62,7 @@ def main():
         # keep-sorted end
     }
     for feature in ["", "browser", "terminal", "alacritty", "ghostty", "herdr-core",
-                    "markdown", "prose", "updates"]:
+                    "map", "markdown", "prose", "updates"]:
         for package in ["moonframe", "moonframe-app"]:
             deps = dependencies(package, feature)
             terminal = feature in {"terminal", "alacritty", "ghostty"}
@@ -74,9 +77,11 @@ def main():
                 assert ("alacritty_terminal" in deps) == (feature == "alacritty"), (package, feature, "alacritty")
             for capability, dependency in optional.items():
                 assert dependency not in deps, (package, feature, capability)
-            if feature in {"", "browser", "terminal", "alacritty", "ghostty", "markdown", "prose", "updates"}:
+            if feature in {"", "browser", "terminal", "alacritty", "ghostty", "map", "markdown",
+                           "prose", "updates"}:
+                # HTTP only for the updater and the map's tiles and routes.
                 for dependency in ["ureq", "rustls", "ring"]:
-                    assert (dependency in deps) == (feature == "updates"), (package, feature, dependency)
+                    assert (dependency in deps) == (feature in {"map", "updates"}), (package, feature, dependency)
         print(f"ok: dependency boundaries ({feature or 'minimal'})", flush=True)
 
     if args.lint:

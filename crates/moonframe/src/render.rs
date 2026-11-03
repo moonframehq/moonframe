@@ -16,6 +16,8 @@ pub(crate) mod images;
 mod input;
 mod keyed;
 mod list;
+#[cfg_attr(not(feature = "map"), path = "render/map_left_out.rs")]
+mod map;
 #[cfg_attr(not(feature = "markdown"), path = "render/markdown_left_out.rs")]
 mod markdown;
 mod plot;
@@ -695,6 +697,7 @@ fn draw_node<'w>(
         Node::Line(line) => line.draw(painter, place, cx),
         Node::Paths(paths) => paths.draw(painter, place, cx),
         Node::Hatch(hatch) => hatch.draw(painter, place, cx),
+        Node::Map(map) => map.draw(painter, place, cx),
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
         Node::Browser(browser) => browser.draw(painter, place, cx),
         Node::View(view) => view.draw(painter, place, cx),

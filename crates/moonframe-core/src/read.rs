@@ -213,6 +213,20 @@ impl Read for f32 {
     }
 }
 
+impl Read for f64 {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let number = match value {
+            Value::Integer(number) => *number as f64,
+            Value::Number(number) => *number,
+            _ => return Err(cx.fail("expected a number")),
+        };
+        if !number.is_finite() {
+            return Err(cx.fail("expected a finite number"));
+        }
+        Ok(number)
+    }
+}
+
 impl Read for i64 {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
         match value {

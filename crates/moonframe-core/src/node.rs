@@ -14,12 +14,13 @@ mod icon;
 mod input;
 mod instance;
 mod layout;
+mod map;
 mod pointer;
 mod read;
 mod tokens;
 // keep-sorted end
 
-pub use {embed::*, icon::*, input::*, instance::*, layout::*, pointer::*, tokens::*};
+pub use {embed::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*, tokens::*};
 
 pub(crate) use read::read;
 
@@ -37,6 +38,8 @@ pub enum Node {
     Line(Line),
     Paths(Paths),
     Hatch(Hatch),
+    /// A street map from a tile provider, with pins and routes.
+    Map(Map),
     Terminal(Terminal),
     Browser(Browser),
     /// A view the app writes in Rust, by name.

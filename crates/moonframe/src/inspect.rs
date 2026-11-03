@@ -209,6 +209,7 @@ fn describe(node: &Node) -> String {
         Node::Line(line) => format!("line{} ({} points)", classes(&line.look), line.points.len()),
         Node::Paths(paths) => format!("paths{} ({})", classes(&paths.look), paths.paths.len()),
         Node::Hatch(hatch) => format!("hatch{}", classes(&hatch.look)),
+        Node::Map(map) => format!("map{} {}", classes(&map.look), map.provider.name()),
         Node::Terminal(terminal) => format!(
             "terminal{} {} ({})",
             classes(&terminal.look),
@@ -285,6 +286,7 @@ fn line(node: &Node) -> Option<u32> {
         Node::Line(line) => line.look.line,
         Node::Paths(paths) => paths.look.line,
         Node::Hatch(hatch) => hatch.look.line,
+        Node::Map(map) => map.look.line,
         Node::Terminal(terminal) => terminal.look.line,
         Node::Browser(browser) => browser.look.line,
         Node::View(view) => view.look.line,

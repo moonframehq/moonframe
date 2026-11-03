@@ -39,7 +39,7 @@ fallback definitions are omitted.
 - `start = "always"` providers are kept even without a reference.
 - Native provider manifests select their Cargo features. Any selected Wasm
   provider enables Wasmtime; only selected Wasm providers are built.
-- `ui.terminal`, `ui.browser` and `ui.markdown` select their host capabilities.
+- `ui.terminal`, `ui.browser`, `ui.map` and `ui.markdown` select their host capabilities.
   Literal terminal property tables select their engine, defaulting to
   Alacritty; literal `ghostty` and `herdr-core` selections enable those
   optional capabilities too. Otherwise
@@ -88,7 +88,7 @@ explicit declarations. Comments and quoted documentation are not scanned as
 code. A runtime trace alone would miss unopened screens and is not used.
 
 Supported extra features are `acp`, `alacritty`, `browser`, `chat`, `docs`,
-`forge`, `ghostty`, `git`, `herdr-core`, `markdown`, `prose`, `shell`, `terminal`,
+`forge`, `ghostty`, `git`, `herdr-core`, `map`, `markdown`, `prose`, `shell`, `terminal`,
 `tokio`, `updates`, `usage`, and `wasm`. A custom Rust native provider needs a custom
 library host; the profile bundler cannot compile an unknown native provider.
 
