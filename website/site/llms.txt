@@ -57,6 +57,7 @@ moonframe --profile NAME --check   # load everything headlessly; run after each 
 ## Rules for any path
 
 - Luau is sandboxed: no files, network or processes. Anything that touches the machine goes through a provider.
+- For sandboxed computation or the `system` host capability, use a WebAssembly (WASM) provider. Read [Building WebAssembly (WASM) providers](https://raw.githubusercontent.com/moonframehq/moonframe/main/docs/wasm-providers.md) before implementing one. It covers the complete Rust component, JSON payloads, Luau integration, build and runtime checks, and source versus prebuilt distribution. Building from source needs Rust and `wasm32-wasip2`, including in a profile app. WASM has no filesystem, HTTP or process capability; use a process or native provider when those are needed.
 - The window reloads as you save. Run `--check` after every change and fix what it reports before you go on.
 - To see your result, start the window with `--background` and take a screenshot of it.
 - Never overwrite the user's files to make a command succeed. `moonframe init` keeps existing files, and you should do the same.
@@ -70,6 +71,7 @@ moonframe --profile NAME --check   # load everything headlessly; run after each 
 
 ## Reference
 
+- [Building WebAssembly (WASM) providers](https://raw.githubusercontent.com/moonframehq/moonframe/main/docs/wasm-providers.md): step-by-step guide for humans and agents; [website version](https://docs.moonframe.dev/wasm-providers/).
 - [Using the library](https://raw.githubusercontent.com/moonframehq/moonframe/main/docs/library.md): the dependency, features, `Moonframe` builder calls, native and async providers, views, layers, bundles.
 - [Luau API types](https://raw.githubusercontent.com/moonframehq/moonframe/main/types/moonframe.d.luau): the declarations of the whole Luau API.
 - [README](https://raw.githubusercontent.com/moonframehq/moonframe/main/README.md): install, quick start, working with an agent, mods from git, apps as profiles, commands.

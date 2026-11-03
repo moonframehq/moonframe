@@ -4,9 +4,9 @@
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| `ci.yml` | every pull request, pushes to `main` | only what the changed files can affect (a `Changes` job decides; a website- or docs-only change runs no build): zizmor on the workflows; formatting, `Cargo.lock`, Luau types (the app and the examples) and Wasm providers; clippy, tests, the headless `--check` of the app and every example app, and the component catalogue on macOS, Linux x86_64/ARM64 and Windows x86_64 |
+| `ci.yml` | every pull request, pushes to `main` | only what the changed files can affect (a `Changes` job decides; a website- or docs-only change runs no build): zizmor on the workflows; formatting, `Cargo.lock`, Luau types (the app and the examples) and WebAssembly (WASM) providers; clippy, tests, the headless `--check` of the app and every example app, and the component catalogue on macOS, Linux x86_64/ARM64 and Windows x86_64 |
 | `package.yml` | pull requests touching packaging, each release | optimized builds and the unsigned packages for every platform, each checked headlessly against the app it ships |
-| `supply-chain.yml` | dependency changes, weekly | cargo-deny: advisories, bans, licenses, sources; advisories for the Wasm providers' own lockfiles |
+| `supply-chain.yml` | dependency changes, weekly | cargo-deny: advisories, bans, licenses, sources; advisories for the WASM providers' own lockfiles |
 | `release.yml` | `just release` | the release, below |
 
 Every action is pinned to a commit SHA (Dependabot moves them, after a
@@ -58,7 +58,7 @@ an approval.
 | `Moonframe-<v>-universal-apple-darwin.dmg` | macOS 13+, Apple Silicon and Intel: drag Moonframe onto the Applications shortcut |
 | `Moonframe-<v>-{x86_64,aarch64}-unknown-linux-gnu.tar.gz` | Linux: run `moonframe` from the unpacked folder |
 | `Moonframe-<v>-x86_64-pc-windows-msvc.zip` | Windows: run `moonframe.exe` from the unpacked folder |
-| `Moonframe-<v>.cdx.json`, `Moonframe-<v>-provider-*.cdx.json` | the SBOMs of the executable and of each prebuilt Wasm provider |
+| `Moonframe-<v>.cdx.json`, `Moonframe-<v>-provider-*.cdx.json` | the SBOMs of the executable and of each prebuilt WASM provider |
 | `SHA256SUMS` | the checksum of every file above |
 | `*.sigstore.json` | the Sigstore bundle of each file |
 
@@ -105,7 +105,7 @@ written against the volume being built keeps its background. The window is
 `scripts/draw-dmg-background.swift`.
 
 The app runs under the hardened runtime with the entitlements in
-`assets/macos/Moonframe.entitlements`: wasmtime compiles the Wasm providers
+`assets/macos/Moonframe.entitlements`: wasmtime compiles the WASM providers
 to executable memory, which the hardened runtime otherwise refuses.
 
 ## Setting up Windows signing
