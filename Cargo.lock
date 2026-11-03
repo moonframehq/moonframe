@@ -5111,6 +5111,7 @@ name = "moonframe-providers"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "libc",
  "moonframe-core",
  "serde",
  "serde_json",

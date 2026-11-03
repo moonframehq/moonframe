@@ -152,7 +152,7 @@ class Plan:
                 self.chosen["features"].add(NATIVES[name])
             elif kind == "wasm":
                 self.chosen["features"].add("wasm")
-            elif kind not in ("process", "static"):
+            elif kind not in ("process", "socket", "static"):
                 raise ValueError(f"{folder}: unknown provider kind {kind}")
         features = self.chosen["features"]
         if self.metadata.get("updates"):

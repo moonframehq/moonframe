@@ -31,6 +31,9 @@ pub struct Contents {
 pub(crate) enum Provider {
     /// A command, with the user's access.
     Process(Vec<String>),
+    /// A socket it connects to: whatever listens there acts on what it
+    /// sends, which may be any program of the user's.
+    Socket(String),
     /// A Rust crate the app builds with Cargo, which runs its build code
     /// with the user's access; the component it builds runs sandboxed.
     Source,
@@ -117,6 +120,10 @@ impl Contents {
                     ..
                 }) => Provider::Process(command),
                 Ok(Manifest {
+                    kind: Kind::Socket { path },
+                    ..
+                }) => Provider::Socket(path),
+                Ok(Manifest {
                     kind: Kind::Native,
                     settings,
                     ..
@@ -172,7 +179,10 @@ impl Contents {
             .filter(|(_, how)| {
                 matches!(
                     how,
-                    Provider::Process(_) | Provider::Source | Provider::Native(_)
+                    Provider::Process(_)
+                        | Provider::Socket(_)
+                        | Provider::Source
+                        | Provider::Native(_)
                 )
             })
             .map(|(name, how)| (name.as_str(), how))
@@ -372,6 +382,7 @@ impl fmt::Display for Provider {
                 let words: Vec<String> = command.iter().map(|word| format!("{word:?}")).collect();
                 write!(f, "runs [{}] with your access", words.join(" "))
             },
+            Self::Socket(path) => write!(f, "talks to the socket {}", printable(path)),
             Self::Source => f.write_str("built with Cargo, with your access"),
             Self::Native(settings) => write!(
                 f,

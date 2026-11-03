@@ -138,6 +138,16 @@ fn events() -> (crate::Events, mpsc::Receiver<Event>) {
     (events, receiver)
 }
 
+/// The next event but those saying how a provider's queue stands.
+fn not_link(received: &mpsc::Receiver<Event>, time: Duration) -> Event {
+    loop {
+        match received.recv_timeout(time).unwrap() {
+            Event::Link { .. } => {},
+            event => return event,
+        }
+    }
+}
+
 #[test]
 fn a_process_publishes_lines_and_answers_messages() {
     let dir = tempfile::tempdir().unwrap();
@@ -155,7 +165,7 @@ fn a_process_publishes_lines_and_answers_messages() {
     let (events, received) = events();
     let mut providers = Providers::start(root.into(), root.join("build"), events);
     assert_eq!(providers.names().collect::<Vec<_>>(), ["echo"]);
-    let next = || received.recv_timeout(Duration::from_secs(5)).unwrap();
+    let next = || not_link(&received, Duration::from_secs(5));
     let Event::Published { provider, data } = next() else {
         panic!("not published");
     };
@@ -382,7 +392,7 @@ fn a_process_that_never_reads_its_messages_still_publishes() {
     );
     let (events, received) = events();
     let mut providers = Providers::start(root.into(), root.join("build"), events);
-    let next = || received.recv_timeout(Duration::from_secs(10)).unwrap();
+    let next = || not_link(&received, Duration::from_secs(10));
     let Event::Published { .. } = next() else {
         panic!("not published");
     };
