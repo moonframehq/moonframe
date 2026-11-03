@@ -351,3 +351,17 @@ fn gitlab_extra_requests_stop_on_a_rate_limit() {
         Err(Failure::Unauthorized)
     );
 }
+
+#[test]
+fn device_start_errors_name_the_setting_to_fix() {
+    let words = device::start_error(kind::Kind::GitLab, "access_denied", &json!({}));
+    assert!(words.contains("Device authorization grant"), "{words}");
+    let words = device::start_error(kind::Kind::GitHub, "invalid_client", &json!({}));
+    assert!(words.contains("Confidential"), "{words}");
+    let words = device::start_error(
+        kind::Kind::GitHub,
+        "slow_down",
+        &json!({ "error_description": "wait" }),
+    );
+    assert_eq!(words, "wait");
+}

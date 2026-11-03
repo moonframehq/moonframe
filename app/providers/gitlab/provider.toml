@@ -16,7 +16,8 @@ kind     = "native"
 accounts = ["forge"]
 # The application id device sign-ins on gitlab.com go through:
 # Moonframe's own, which every app may use. An app may set its own (a
-# non-confidential application with scopes read_api and read_user), or
+# non-confidential application with "Device authorization grant" ticked
+# and scopes read_api and read_user), or
 # MOONFRAME_GITLAB_CLIENT_ID. Self-hosted instances need one of their own:
 # client_ids = { "gitlab.example.com" = "..." }
 client_id = "8cac6a8a1722b18c0787b58eeb40eed9e255f671407fc98679d82ba78cb966d1"

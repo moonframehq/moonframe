@@ -35,8 +35,8 @@ pub fn start(agent: &ureq::Agent, kind: Kind, host: &str, client: &str) -> Resul
         ("client_id", client),
         ("scope", kind.scopes()),
     ])?;
-    if answer.get("error").is_some() {
-        return Err(Failure::Status(400, oauth_error(&answer)));
+    if let Some(error) = answer.get("error").and_then(Value::as_str) {
+        return Err(Failure::Status(400, start_error(kind, error, &answer)));
     }
     let text = |key: &str| answer.get(key).and_then(Value::as_str).map(str::to_owned);
     let device = text("device_code").filter(|code| crate::credentials::plausible(code));
@@ -171,6 +171,22 @@ fn token(answer: &Value, source: Source) -> Option<Credential> {
             .map(|seconds| now() + seconds),
         source,
     })
+}
+
+/// Why the forge would not start a device sign-in, as the step that fixes
+/// it: the OAuth application's settings, which the app's author controls.
+pub(crate) fn start_error(kind: Kind, error: &str, answer: &Value) -> String {
+    match (kind, error) {
+        (_, "invalid_client") => format!(
+            "{} does not know this app's OAuth client, or it is confidential: \
+             check its client id, and untick Confidential",
+            kind.title()
+        ),
+        (Kind::GitLab, "access_denied") => "GitLab refused device sign-in for this application: \
+             tick \"Device authorization grant\" in its settings"
+            .to_owned(),
+        _ => oauth_error(answer),
+    }
 }
 
 fn oauth_error(answer: &Value) -> String {
