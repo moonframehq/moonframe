@@ -61,7 +61,7 @@ jobs:
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
-          version: 0.15.2
+          version: 0.17.0
           use-cache: false
       - name: Require Rosetta for the x86_64 check
         run: arch -x86_64 /usr/bin/true || sudo softwareupdate --install-rosetta --agree-to-license
@@ -111,7 +111,7 @@ jobs:
           test "$(rustc -vV | sed -n 's/^host: //p')" = "$TARGET"
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
-          version: 0.15.2
+          version: 0.17.0
           use-cache: false
       - name: Build the optimized executable
         run: cargo build --locked --release -p moonframe-app --target "$TARGET"
@@ -149,7 +149,7 @@ jobs:
           test "$(rustc -vV | sed -n 's/^host: //p')" = "$TARGET"
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
-          version: 0.15.2
+          version: 0.17.0
           use-cache: false
       - name: Build the optimized executable
         run: cargo build --locked --release -p moonframe-app --target "$TARGET"

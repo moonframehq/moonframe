@@ -39,7 +39,7 @@ or newer.
 
 Features: `acp`, `alacritty`, `docs`, `git`, `herdr-core`, `tokio` and
 `wasm` by default. `ghostty` (a second terminal emulator, built from Ghostty's source
-with Zig; see `tools/zig`) is opt-in: `features = ["ghostty"]`.
+with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`.
 
 An app that needs none of git, the markdown editor or kept terminals can
 leave them out, and with them the herdr-gpui crates they build on:

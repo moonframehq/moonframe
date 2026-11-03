@@ -215,7 +215,7 @@ jobs:
       # The `ghostty` terminal builds libghostty-vt with Zig (see mise.toml).
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
-          version: 0.15.2
+          version: 0.17.0
           use-cache: false
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:

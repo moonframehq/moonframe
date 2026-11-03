@@ -9,7 +9,7 @@ use {
         render::{CellIterator, RenderState, RowIterator},
         screen::CellWide,
         style::{RgbColor, Underline},
-        terminal::{Mode, Options, ScrollViewport},
+        terminal::{Mode, ScrollViewport},
     },
     std::{cell::RefCell, rc::Rc},
 };
@@ -28,11 +28,8 @@ pub(crate) struct Ghostty {
 
 impl Ghostty {
     pub(crate) fn new(size: Size) -> libghostty_vt::error::Result<Self> {
-        let mut terminal = Terminal::new(Options {
-            cols: size.cols,
-            rows: size.rows,
-            max_scrollback: SCROLLBACK,
-        })?;
+        let mut terminal = Terminal::new(size.cols, size.rows)?;
+        terminal.set_scrollback_max_lines(Some(SCROLLBACK))?;
         terminal.resize(
             size.cols,
             size.rows,
