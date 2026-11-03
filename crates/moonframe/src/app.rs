@@ -230,7 +230,7 @@ impl MoonframeApp {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         bind_menu_keys(workspace.menus(), cx);
-        cx.set_menus(menus(workspace.components(), workspace.menus()));
+        cx.set_menus(menus(workspace.menus()));
         menu_actions(cx);
         #[cfg(feature = "terminal")]
         let terminals = Terminals::new(backends, wake_on_output(cx));
@@ -483,7 +483,7 @@ impl MoonframeApp {
         self.preview = None;
         self.apply_theme(cx);
         show_appearance(appearance);
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         if let Some(path) = &self.settings
             && let Err(problem) = settings::save(path, &[(settings::APPEARANCE, appearance.name())])
         {
@@ -725,21 +725,29 @@ impl MoonframeApp {
         let main = self.main_window;
         let app = cx.entity();
         cx.defer(move |cx| {
-            let Some(window) = cx
-                .windows()
-                .into_iter()
-                .find(|window| window.window_id() == main)
-            else {
-                return;
-            };
-            let _ = window.update(cx, |_, window, cx| {
-                app.update(cx, |app, cx| {
-                    for (from, request) in requests {
+            for (from, request) in requests {
+                let target = match &request {
+                    Request::Edit(edit) => app
+                        .read(cx)
+                        .inputs
+                        .window(&from, &edit.field)
+                        .unwrap_or(main),
+                    _ => main,
+                };
+                let Some(window) = cx
+                    .windows()
+                    .into_iter()
+                    .find(|window| window.window_id() == target)
+                else {
+                    continue;
+                };
+                let _ = window.update(cx, |_, window, cx| {
+                    app.update(cx, |app, cx| {
                         app.request(&from, request, window, cx);
-                    }
-                    app.flush("app", cx);
+                        app.flush("app", cx);
+                    });
                 });
-            });
+            }
         });
     }
 
@@ -850,6 +858,12 @@ impl MoonframeApp {
             Request::Appearance(appearance) => self.set_appearance(appearance, cx),
             Request::Sound(sound) => self.play(from, &sound),
             Request::Pick(pick) => self.pick(from, pick, cx),
+            Request::Edit(edit) => {
+                if let Err(problem) = self.inputs.edit(from, &edit, window, cx) {
+                    self.workspace
+                        .refuse(from, Error::new(format!("`app:edit`: {problem}")));
+                }
+            },
             Request::Window(request) => self.window_request(from, request, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
@@ -897,7 +911,7 @@ impl MoonframeApp {
             self.show_toast("The window's title bar changes when the app restarts", cx);
         }
         bind_menu_keys(self.workspace.menus(), cx);
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         self.apply_theme(cx);
         report(&self.workspace);
         cx.notify();
@@ -919,7 +933,7 @@ impl MoonframeApp {
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
         bind_menu_keys(self.workspace.menus(), cx);
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         self.apply_theme(cx);
         report(&self.workspace);
         self.reload_providers(Some(roots), cx);

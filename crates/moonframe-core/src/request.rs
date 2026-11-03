@@ -7,10 +7,12 @@
 
 use crate::{Command, Data, Error};
 
+mod edit;
 mod pick;
 mod window;
 
 pub use {
+    edit::{Edit, EditChange, Splice},
     pick::{Pick, PickKind},
     window::WindowRequest,
 };
@@ -44,6 +46,9 @@ pub enum Request {
     /// `app:pick`: the system's panel to open files, pick folders or
     /// name a file to save; the answer comes back to the mod that asked.
     Pick(Pick),
+    /// `app:edit`: changes the text of one of the sending mod's fields
+    /// around its selection, as a formatting toolbar or a completion does.
+    Edit(Edit),
     /// `app:window`: opens a mod in a window of its own, or raises it,
     /// first delivering what it is sent; or closes it.
     Window(WindowRequest),
@@ -119,6 +124,7 @@ impl Request {
             "sound" => sound(msg).map(Self::Sound),
             "notify" => notification(msg).map(Self::Notify),
             "pick" => pick::pick(msg).map(Self::Pick),
+            "edit" => edit::edit(msg).map(Self::Edit),
             "window" => window::window(msg).map(Self::Window),
             "open" => open(msg).map(Self::Open),
             _ => Err(Error::new(format!(
@@ -141,6 +147,7 @@ pub const NAMES: &[&str] = &[
     "sound",
     "notify",
     "pick",
+    "edit",
     "window",
     "open",
 ];

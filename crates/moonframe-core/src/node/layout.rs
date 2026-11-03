@@ -73,6 +73,9 @@ pub struct Stack {
     /// Matches `:selected` rules, as a selected item does: a tab, a
     /// segment, a row.
     pub selected: bool,
+    /// Reveal this direct child (one-based) when it changes; scrolling
+    /// by hand remains free between changes.
+    pub scroll_to: Option<usize>,
     /// What clicking anywhere in it does, as on a button.
     pub action: Option<Action>,
     pub extras: Extras,

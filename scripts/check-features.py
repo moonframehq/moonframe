@@ -40,7 +40,8 @@ def main():
     manifests = {package["name"]: package["features"] for package in metadata["packages"]}
     library, starter = manifests["moonframe"], manifests["moonframe-app"]
     features = set(library) - {"default"}
-    assert features == set(starter) - {"default"}, "starter must forward every capability"
+    starter_only = {"pattern-capture", "patterns"}
+    assert features == set(starter) - {"default"} - starter_only, "starter must forward every capability"
     for name in features:
         assert starter[name] == [f"moonframe/{name}"], name
     assert set(starter["default"]) == set(library["default"]) | {"ghostty"}

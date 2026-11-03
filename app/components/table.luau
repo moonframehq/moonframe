@@ -5,7 +5,10 @@
 -- With `checkable`, a column of checkboxes leads each row and the header:
 -- a row's box sends `{ check = id }`, the header's `check_all` (checked,
 -- dashed when only some rows are). `bordered` frames it as a card with a
--- tinted header row in sentence case, as admin tables are.
+-- tinted header row in sentence case, as admin tables are. With `groups`,
+-- rows come in foldable groups (by status, by assignee) under a heading
+-- with a count and an Add row; with `reorder` they drag between and within
+-- them.
 
 type Column = {
 	key: string,
@@ -19,7 +22,7 @@ type Column = {
 
 type Props = {
 	columns: { Column },
-	rows: { { [string]: any } },
+	rows: { { [string]: any } }?,
 	selected: any,
 	sort: string?,
 	descending: boolean?,
@@ -36,6 +39,11 @@ type Props = {
 	check_all: any,
 	bordered: boolean?,
 	id: string?,
+	groups: { any }?,
+	fold: string?,
+	add_label: string?,
+	reorder: string?,
+	marker: any,
 }
 
 local JUSTIFY = { left = "start", start = "start", center = "center", right = "end", ["end"] = "end" }
@@ -70,6 +78,11 @@ return component {
 		["check"] = "key of the message a row's box sends, default \"check\": { check = id }",
 		["check_all"] = "message the header's box sends (default { check_all = true }); it shows checked when every row is, a dash when some are",
 		["bordered"] = "frame it as a rounded card with a tinted header in sentence case and lines between rows",
+		["groups"] = "rows in groups instead of `rows`: { id, title, rows, count? (default the rows), color? (a dot), icon?, collapsed?, add? (a message: an \"Add\" row under them) }",
+		["fold"] = "key of the message a group's heading sends, default \"fold\": { fold = id }",
+		["add_label"] = "the text of a group's Add row (default \"Add\")",
+		["reorder"] = "rows drag to another place: a drop on a row sends { [reorder] = its id, group, phase, carry = { row, group }, y } (before it when `y < 0.5`), on a group's heading { [reorder] = true, group, ... } (its end); `over` and `leave` come the same way",
+		["marker"] = "draw a drop line by a row: { id, after? }, or { group } for a group's end",
 	},
 	styles = {
 		[".table"] = { gap = 0 },
@@ -98,6 +111,13 @@ return component {
 		[".table-bordered"] = { border = "all", border_color = "border", radius = 8, background = "background" },
 		[".table-header-bordered"] = { padding = { 9, 16 }, background = "muted-foreground/5", radius = { 8, 8, 0, 0 } },
 		[".table-heading-text-bordered"] = { case = "none", size = "normal", weight = "normal" },
+		[".table-group"] = { padding = { 6, 10 }, gap = 8, background = "muted-foreground/5", border = "bottom", border_color = "border/60" },
+		[".table-group:hover"] = { background = "muted-foreground/8" },
+		[".table-group-title"] = { size = "small", weight = "semibold" },
+		[".table-group-count"] = { size = "small", color = "muted-foreground" },
+		[".table-add"] = { padding = { 6, 10 }, gap = 6, color = "muted-foreground", border = "bottom", border_color = "border/60" },
+		[".table-add:hover"] = { background = "list-hover", color = "foreground" },
+		[".table-marker"] = { background = "accent" },
 		[".table-row-bordered"] = { padding = { 7, 16 }, border_color = "border" },
 		[".table-row-last"] = { border = "none" },
 		[".table-cell-bordered"] = { size = "normal" },
@@ -230,19 +250,51 @@ table_view {
 			}
 		end
 
-		local count = #props.rows
-		local all, some = count > 0, false
-		for index, row in props.rows do
-			local on = checked[row.id or index] == true
-			all = all and on
-			some = some or on
+		local plain: { { [string]: any } } = props.rows or {}
+		local count = #plain
+		local total, checked_count = 0, 0
+		local function tally(rows: { any })
+			for index, row in rows do
+				total += 1
+				if checked[row.id or index] then
+					checked_count += 1
+				end
+			end
 		end
+		-- Flatten data, not elements: a grouped list must be just as cheap to
+		-- draw as an ordinary list. Folded rows still count for select-all.
+		local entries: { any } = {}
+		if props.groups then
+			for _, group in props.groups do
+				local rows = group.rows or {}
+				tally(rows)
+				table.insert(entries, { kind = "heading", group = group })
+				if not group.collapsed then
+					for index, row in rows do
+						table.insert(entries, { kind = "row", group = group, row = row, index = index })
+					end
+					if group.add ~= nil then
+						table.insert(entries, { kind = "add", group = group })
+					end
+				end
+			end
+		else
+			tally(plain)
+		end
+		local all, some = total > 0 and checked_count == total, checked_count > 0
 		local scrolls = props.height ~= nil or props.grow == true
-		local listed = scrolls and count > LIST_AFTER
+		local shown_count = if props.groups then #entries else count
+		local listed = scrolls and shown_count > LIST_AFTER
 		local row_height = if bordered then BORDERED_ROW_HEIGHT else ROW_HEIGHT
+		local marker = props.marker or {}
+		-- Markers float inside their row, keeping virtual rows equal-height
+		-- and the paths of drag targets stable as the marker moves.
+		local function line(after: boolean)
+			return ui.row { class = "table-marker", float = if after then "bottom" else "top", height = 2 }
+		end
 
-		local function draw(index: number)
-			local row = props.rows[index]
+		local function draw(index: number, given: any?, group: any?)
+			local row: any = given or plain[index]
 			local id = row.id or index
 			local on = checked[id] == true
 			local cells = {}
@@ -258,9 +310,16 @@ table_view {
 			end
 			if bordered then
 				table.insert(classes, "table-row-bordered")
-				if index == count then
+				if index == (if group then #(group.rows or {}) else count) then
 					table.insert(classes, "table-row-last")
 				end
+			end
+			local reorder = props.reorder
+			local group_id = if group then group.id else nil
+			if marker.id == id then
+				table.insert(cells, line(marker.after == true))
+			elseif group and marker.group == group_id and marker.id == nil and index == #(group.rows or {}) then
+				table.insert(cells, line(true))
 			end
 			return ui.row {
 				class = classes,
@@ -269,13 +328,61 @@ table_view {
 				height = if listed then row_height else nil,
 				selected = id == props.selected,
 				msg = row.msg or { [props.event or "select"] = id },
+				carry = if reorder then { row = id, group = group_id } else nil,
+				accept = if reorder then { [reorder] = id, group = group_id } else nil,
 				to = props.to,
 				table.unpack(cells),
 			}
 		end
 
+		local function draw_grouped(index: number)
+			local entry = entries[index]
+			local group = entry.group
+			if entry.kind == "row" then
+				return draw(entry.index, entry.row, group)
+			elseif entry.kind == "heading" then
+				local rows = group.rows or {}
+				return ui.row {
+					class = "table-group",
+					height = if listed then row_height else nil,
+					align = "center",
+					shrink = false,
+					msg = { [props.fold or "fold"] = group.id },
+					accept = if props.reorder then { [props.reorder] = true, group = group.id } else nil,
+					to = props.to,
+					ui.icon { name = if group.collapsed then "chevron-right" else "chevron-down", size = "small", tone = "muted" },
+					group.icon and ui.icon { name = group.icon, size = "small", style = if group.color then { color = group.color } else nil },
+					not group.icon and group.color and ui.row { width = 8, height = 8, style = { background = group.color, radius = 4 } },
+					ui.text { group.title or tostring(group.id), class = "table-group-title" },
+					ui.text { tostring(group.count or #rows), class = "table-group-count" },
+					marker.group == group.id and marker.id == nil and (group.collapsed or #rows == 0) and line(true),
+				}
+			end
+			return ui.row {
+				class = "table-add",
+				height = if listed then row_height else nil,
+				align = "center",
+				shrink = false,
+				msg = group.add,
+				to = props.to,
+				ui.icon { name = "plus", size = "small" },
+				ui.text { props.add_label or "Add", size = "small" },
+			}
+		end
+
 		local body
-		if count == 0 then
+		if listed then
+			body = ui.list {
+				id = props.id or "table", count = shown_count, row_height = row_height,
+				row = if props.groups then draw_grouped else draw, grow = true,
+			}
+		elseif props.groups then
+			local grouped = {}
+			for index = 1, #entries do
+				table.insert(grouped, draw_grouped(index))
+			end
+			body = ui.column { gap = "none", grow = scrolls, scroll = scrolls, table.unpack(grouped) }
+		elseif count == 0 then
 			body = ui.column {
 				gap = "none",
 				grow = scrolls,
@@ -285,8 +392,6 @@ table_view {
 					ui.text { props.empty or "Nothing to show", class = "table-empty-text" },
 				},
 			}
-		elseif listed then
-			body = ui.list { id = props.id or "table", count = count, row_height = row_height, row = draw, grow = true }
 		else
 			local rows = table.create(count)
 			for index = 1, count do

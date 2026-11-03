@@ -121,10 +121,12 @@ impl RenderOnce for Field {
         let theme = cx.theme();
         let size = text_pixels(look.base.size, theme);
         let line = (size * LINE).round();
-        let rows = if self.input.multiline {
-            self.input.rows
-        } else {
-            1
+        let rows = match (&editor, self.input.multiline) {
+            (_, false) => 1,
+            (Some(editor), true) => self.input.visible_rows(&editor.value(cx)),
+            (None, true) => self
+                .input
+                .visible_rows(self.input.value.as_deref().unwrap_or_default()),
         };
         let mut frame = div()
             .id(self.id)

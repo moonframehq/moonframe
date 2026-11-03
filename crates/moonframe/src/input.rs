@@ -20,7 +20,7 @@ use {
         },
         *,
     },
-    moonframe_core::{Action, Data, Input, KeyChord},
+    moonframe_core::{Action, Data, Edit, Input, KeyChord},
     std::{cell::RefCell, collections::HashMap, rc::Rc},
 };
 
@@ -107,6 +107,21 @@ impl Editor {
             .update(cx, |state, cx| state.select_all(window, cx)))
     }
 
+    /// The selection, in bytes from the start; empty at the caret.
+    pub(crate) fn selection(&self, cx: &App) -> std::ops::Range<usize> {
+        on_state!(self, |state| state.read(cx).selected_range())
+    }
+
+    fn caret(&self, cx: &App) -> usize {
+        on_state!(self, |state| state.read(cx).cursor())
+    }
+
+    /// Selects `range`, in bytes from the start; empty puts the caret there.
+    pub(crate) fn select(&self, range: std::ops::Range<usize>, cx: &mut App) {
+        on_state!(self, |state| state
+            .update(cx, |state, cx| state.set_selected_range(range, cx)))
+    }
+
     fn set_disabled(&self, disabled: bool, cx: &mut App) {
         on_state!(self, |state| state
             .update(cx, |state, cx| state.set_disabled(disabled, cx)))
@@ -136,7 +151,9 @@ pub(crate) struct Wiring {
     pub(crate) owner: String,
     pub(crate) to: Option<String>,
     pub(crate) change: Option<Data>,
+    pub(crate) select: Option<Data>,
     pub(crate) submit: Option<Data>,
+    pub(crate) blur: Option<Data>,
     pub(crate) keys: Vec<(KeyChord, Data)>,
     pub(crate) multiline: bool,
     pub(crate) disabled: bool,
@@ -150,7 +167,9 @@ impl Wiring {
             owner: owner.to_owned(),
             to: input.to.clone(),
             change: input.change.clone(),
+            select: input.select.clone(),
             submit: input.submit.clone(),
+            blur: input.blur.clone(),
             keys: input.keys.clone(),
             multiline: input.multiline,
             disabled: input.disabled,
@@ -185,7 +204,10 @@ struct Field {
     focus: bool,
     /// The frame it was last drawn in.
     seen: u64,
+    window: WindowId,
+    selection: (std::ops::Range<usize>, usize),
     _events: Subscription,
+    _selection: Subscription,
     /// A writing field follows its caret, for what it keeps in focus.
     _caret: Option<Subscription>,
 }
@@ -244,6 +266,7 @@ impl Inputs {
                 editor.set_value(text, window, cx);
             }
             let events = subscribe(app, &editor, key, window, cx)?;
+            let selection = observe_selection(app, &editor, key, window, cx)?;
             let caret = match &editor {
                 #[cfg(feature = "prose")]
                 Editor::Prose(state, writing) => Some(prose::follow(writing, state, cx)),
@@ -251,6 +274,7 @@ impl Inputs {
             };
             prune(&mut registry.fields, frame, window, cx);
             registry.fields.insert(key.to_owned(), Field {
+                selection: (editor.selection(cx), editor.caret(cx)),
                 editor,
                 wiring: wiring.clone(),
                 applied: carried.and_then(|(_, applied)| applied),
@@ -258,7 +282,9 @@ impl Inputs {
                 rows: None,
                 focus: false,
                 seen: frame,
+                window: window.window_handle().window_id(),
                 _events: events,
+                _selection: selection,
                 _caret: caret,
             });
         }
@@ -268,6 +294,7 @@ impl Inputs {
             field.focus = false;
         }
         field.seen = frame;
+        field.window = window.window_handle().window_id();
         field.wiring = wiring;
         let editor = field.editor.clone();
         if input.value != field.applied {
@@ -282,12 +309,12 @@ impl Inputs {
             editor.set_placeholder(input.placeholder.as_deref().unwrap_or(""), window, cx);
             field.placeholder = input.placeholder.clone();
         }
+        let rows = input.visible_rows(&editor.value(cx));
         if let Editor::Lines(state) = &editor
-            && field.rows != Some(input.rows)
+            && field.rows != Some(rows)
         {
-            let rows = input.rows as usize;
-            state.update(cx, |state, cx| state.set_rows(rows, cx));
-            field.rows = Some(input.rows);
+            state.update(cx, |state, cx| state.set_rows(rows as usize, cx));
+            field.rows = Some(rows);
         }
         #[cfg(feature = "prose")]
         if let Editor::Prose(state, writing) = &editor {
@@ -321,6 +348,46 @@ impl Inputs {
                 .find(|field| field.editor.focus_handle(cx).is_focused(window)),
         };
         field.map(|field| field.editor.clone())
+    }
+
+    /// Carries out `app:edit` from the mod `owner` on its field `edit.field`:
+    /// replaces the spliced text as one undoable edit, selects what the
+    /// edit leaves selected, and keeps the keyboard there. The field sends
+    /// its `change` as for any edit.
+    pub(crate) fn edit(
+        &self,
+        owner: &str,
+        edit: &Edit,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Result<(), String> {
+        let key = format!("{owner} {}", edit.field);
+        let editor = self
+            .editor(Some(&key), window, cx)
+            .ok_or_else(|| format!("no field with `id = \"{}\"` drawn by `{owner}`", edit.field))?;
+        let text = editor.value(cx).to_string();
+        if !edit.applies(&text, editor.selection(cx)) {
+            return Ok(());
+        }
+        let splice = edit.splice(&text, editor.selection(cx));
+        editor.select(splice.range, cx);
+        on_state!(&editor, |state| state.update(cx, |state, cx| {
+            state.replace(splice.text, window, cx);
+        }));
+        editor.select(splice.select, cx);
+        if !editor.focus_handle(cx).is_focused(window) {
+            editor.focus(window, cx);
+        }
+        Ok(())
+    }
+
+    /// App edits must run in the window that actually draws the field.
+    pub(crate) fn window(&self, owner: &str, field: &str) -> Option<WindowId> {
+        self.0
+            .borrow()
+            .fields
+            .get(&format!("{owner} {field}"))
+            .map(|field| field.window)
     }
 
     /// Whether a field has keyboard focus in `window`.
@@ -361,6 +428,28 @@ fn subscribe(
     .ok()
 }
 
+/// gpui-base notifies on caret movement without emitting a text Change.
+/// Compare selections so cursor blinking and styling don't send messages.
+fn observe_selection(
+    app: &WeakEntity<MoonframeApp>,
+    editor: &Editor,
+    key: &str,
+    window: &mut Window,
+    cx: &mut App,
+) -> Option<Subscription> {
+    let key = key.to_owned();
+    app.update(cx, |_, cx| {
+        on_state!(editor, |state| cx.observe_in(
+            state,
+            window,
+            move |app, _, window, cx| {
+                app.input_selection(&key, window, cx);
+            }
+        ))
+    })
+    .ok()
+}
+
 /// Makes room for one more field: drops those drawn longest ago, never one
 /// with focus.
 fn prune(fields: &mut HashMap<String, Field>, frame: u64, window: &Window, cx: &App) {
@@ -386,6 +475,29 @@ fn prune(fields: &mut HashMap<String, Field>, frame: u64, window: &Window, cx: &
 }
 
 impl MoonframeApp {
+    fn input_selection(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let send = {
+            let mut registry = self.inputs.0.borrow_mut();
+            let Some(field) = registry.fields.get_mut(key) else {
+                return;
+            };
+            let selection = (field.editor.selection(cx), field.editor.caret(cx));
+            if field.selection == selection {
+                return;
+            }
+            field.selection = selection.clone();
+            field.wiring.select.as_ref().map(|msg| {
+                (field.wiring.owner.clone(), Action::Send {
+                    to: field.wiring.to.clone(),
+                    msg: Input::message_at(msg, &field.editor.value(cx), selection.1),
+                })
+            })
+        };
+        if let Some((owner, action)) = send {
+            self.dispatch(&owner, &action, window, cx);
+        }
+    }
+
     /// Something happened in the field at `key`: an edit sends its `change`,
     /// Enter in a single-line field its `submit`; focus and blur redraw it
     /// in its `:focus` look or out of it.
@@ -399,8 +511,16 @@ impl MoonframeApp {
         let Some((wiring, value)) = self.inputs.wiring(key, cx) else {
             return;
         };
+        // An edit reports where the caret is, in bytes from the start.
+        let mut caret = None;
         let msg = match event {
-            InputEvent::Change => wiring.change.as_ref(),
+            InputEvent::Change => {
+                caret = self
+                    .inputs
+                    .editor(Some(key), window, cx)
+                    .map(|editor| editor.caret(cx));
+                wiring.change.as_ref()
+            },
             InputEvent::PressEnter { .. } if !wiring.multiline => {
                 // An address bar loads what it says, and hands the keyboard
                 // back so the next keys don't edit it.
@@ -425,11 +545,17 @@ impl MoonframeApp {
             },
             InputEvent::Blur => {
                 cx.notify();
-                None
+                wiring.blur.as_ref()
             },
         };
         if let Some(msg) = msg {
-            let action = wiring.send(msg, &value);
+            let action = match caret {
+                Some(caret) => Action::Send {
+                    to: wiring.to.clone(),
+                    msg: Input::message_at(msg, &value, caret),
+                },
+                None => wiring.send(msg, &value),
+            };
             self.dispatch(&wiring.owner, &action, window, cx);
         }
     }

@@ -41,6 +41,8 @@ type Props = {
 	event: string?,
 	switch: string?,
 	pick_day: string?,
+	move: string?,
+	over: string?,
 	to: string?,
 	grow: boolean?,
 	height: number?,
@@ -218,6 +220,20 @@ local function grid_view(props: Props, events: { Event }): any
 		end
 	end
 	local cards = {}
+	-- With `move`, each day's column takes events dropped on it.
+	if props.move then
+		for index, column in days do
+			table.insert(cards, ui.column {
+				class = "week-calendar-drop",
+				state = if props.over == column.id then "over" else nil,
+				float = { top = 0, left = gutter + (index - 1) * width },
+				width = width,
+				height = (to_hour - from) * hour,
+				accept = { [props.move] = column.id },
+				to = props.to,
+			})
+		end
+	end
 	for _, column in days do
 		local day = column.id
 		local list: { Event } = by_day[day] or {}
@@ -241,6 +257,7 @@ local function grid_view(props: Props, events: { Event }): any
 					width = lane_width - (if place.lanes > 1 then 4 else 0),
 					height = h,
 					msg = { [key] = event.id },
+					carry = if props.move then { event = event.id } else nil,
 					to = props.to,
 					tooltip = event.tooltip,
 					ui.row {
@@ -338,6 +355,7 @@ local function month_view(props: Props, events: { Event }): any
 					selected = event.id == props.selected,
 					align = "center",
 					msg = { [key] = event.id },
+					carry = if props.move then { event = event.id } else nil,
 					to = props.to,
 					tooltip = event.time,
 					event.mark ~= nil and mark_of(event.mark, 12),
@@ -353,9 +371,11 @@ local function month_view(props: Props, events: { Event }): any
 			end
 			table.insert(cells, ui.column {
 				class = class,
+				state = if props.over == day.id then "over" else nil,
 				grow = true,
 				width = 1,
 				msg = { [pick] = day.id },
+				accept = if props.move then { [props.move] = day.id } else nil,
 				to = props.to,
 				ui.row {
 					ui.text { day.day or day.label or day.id, class = if day.today then { "week-calendar-cell-number", "week-calendar-cell-today" } else "week-calendar-cell-number" },
@@ -397,6 +417,8 @@ return component {
 		["event"] = "key of an event's message, default \"select\": { select = id }",
 		["switch"] = "key of the switch's message, default \"view\": { view = id }",
 		["pick_day"] = "key of a day's message, default \"day\": { day = id }",
+		["move"] = "events drag to another day (and hour): a drop sends { [move] = day id, phase = \"drop\", carry = { event = id }, y }, `y` the fraction down the hours shown in day and week; `over` and `leave` come the same way",
+		["over"] = "id of the day a dragged event is over: tint it",
 		["to"] = "mod to send them to, if not the drawing one",
 		["grow"] = "fill the parent (default true)",
 		["height"] = "pixels instead of growing",
@@ -450,6 +472,8 @@ return component {
 		[".week-calendar-cell"] = { padding = { 6, 6 }, gap = 3, border = "left", border_color = "border/70" },
 		[".week-calendar-cell-first"] = { border = "none" },
 		[".week-calendar-cell:hover"] = { background = "list-hover" },
+		[".week-calendar-cell:over"] = { background = "accent/10" },
+		[".week-calendar-drop:over"] = { background = "accent/6" },
 		[".week-calendar-outside"] = { opacity = 0.4 },
 		[".week-calendar-cell-number"] = { size = "small", weight = "medium", padding = { 0, 2 } },
 		[".week-calendar-cell-today"] = { color = "accent" },

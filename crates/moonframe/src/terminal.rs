@@ -18,6 +18,12 @@ use {
 pub(crate) fn intercept_keys(cx: &mut Context<MoonframeApp>) -> Subscription {
     let app = cx.entity().downgrade();
     cx.intercept_keystrokes(move |event, window, cx| {
+        // Cancel before overlays, fields or a secondary window dismiss.
+        // Releasing the ghost also clears every entered drop target.
+        if event.keystroke.key == "escape" && cx.stop_active_drag(window) {
+            cx.stop_propagation();
+            return;
+        }
         let taken = app
             .update(cx, |app, cx| {
                 match app.layer_keystroke(&event.keystroke, window, cx) {

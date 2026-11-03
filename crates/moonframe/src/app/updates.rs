@@ -59,7 +59,7 @@ impl MoonframeApp {
         let on = !crate::update::beta();
         crate::update::set_beta(on);
         // The menu shows the switch checked while it is on.
-        cx.set_menus(menus(self.workspace.components(), self.workspace.menus()));
+        cx.set_menus(menus(self.workspace.menus()));
         if on {
             self.show_toast("Beta Releases: updates include pre-releases", cx);
             self.check_for_updates(false, cx);

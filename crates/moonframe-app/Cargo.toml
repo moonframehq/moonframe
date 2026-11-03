@@ -1,4 +1,5 @@
 [package]
+default-run            = "moonframe"
 description            = "The Moonframe starter app: the window on app/, with ~/.config/moonframe over it"
 edition.workspace      = true
 license.workspace      = true
@@ -14,6 +15,11 @@ workspace = true
 [[bin]]
 name = "moonframe"
 path = "src/main.rs"
+
+[[bin]]
+name              = "moonframe-patterns"
+path              = "src/patterns.rs"
+required-features = ["patterns"]
 
 [features]
 # Keep the starter's full experience, while allowing an explicitly lean build.
@@ -41,6 +47,7 @@ default = [
 acp        = ["moonframe/acp"]
 alacritty  = ["moonframe/alacritty"]
 browser    = ["moonframe/browser"]
+capture    = ["moonframe/capture"]
 chat       = ["moonframe/chat"]
 docs       = ["moonframe/docs"]
 forge      = ["moonframe/forge"]
@@ -56,6 +63,11 @@ updates    = ["moonframe/updates"]
 usage      = ["moonframe/usage"]
 wasm       = ["moonframe/wasm"]
 # keep-sorted end
+# A separate developer app. Its catalog and sources never enter the starter
+# or an app built on the moonframe library.
+patterns = []
+# Native preview export, also excluded from ordinary builds.
+pattern-capture = ["moonframe/capture", "patterns"]
 
 [dependencies]
 # Keep this explicit: other workspace hosts use the library's defaults.

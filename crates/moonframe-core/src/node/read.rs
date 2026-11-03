@@ -122,6 +122,7 @@ impl Tree<'_> {
             Element::Icon => Node::Icon(self.build(kind, table, &cx)?),
             Element::Image => Node::Image(self.build(kind, table, &cx)?),
             Element::Line => Node::Line(self.build(kind, table, &cx)?),
+            Element::Paths => Node::Paths(self.build(kind, table, &cx)?),
             Element::Hatch => Node::Hatch(self.build(kind, table, &cx)?),
             Element::Terminal => Node::Terminal(self.build(kind, table, &cx)?),
             Element::Browser => Node::Browser(self.build(kind, table, &cx)?),

@@ -67,7 +67,7 @@ impl<'w> Draw<'w> for Stack {
         } else {
             element
         };
-        let handle = painter.motion.scroll(&place.path);
+        let handle = painter.motion.scroll_to(&place.path, self.scroll_to);
         let element = element.children(children).scrollbars(
             &self.frame,
             self.direction,
@@ -98,7 +98,11 @@ impl<'w> Draw<'w> for Stack {
                 .on_click(place.click(action, cx)),
             None => element,
         };
-        with_extras(element, &self.extras, painter, place, cx).into_any_element()
+        let element = with_extras(element, &self.extras, painter, place, cx);
+        match &self.pointer {
+            Some(pointer) => super::carry::attach(element, pointer, painter, place, cx),
+            None => element.into_any_element(),
+        }
     }
 }
 /// An element's tooltip, right-click and copy, on the element that draws it.

@@ -31,6 +31,8 @@ mod branch_bar;
 mod browser;
 mod build;
 mod capabilities;
+#[cfg(feature = "capture")]
+mod capture;
 mod cli;
 mod color;
 mod demos;
@@ -114,7 +116,7 @@ pub(crate) fn developer_choice(file: &std::path::Path) -> Option<bool> {
 }
 
 /// Turns Developer Mode on or off for this run, and keeps the choice for
-/// the next ones: the Components menu, Inspect Element and Reload Modules,
+/// the next ones: View's Components…, Inspect Element and Reload Modules,
 /// and their keys.
 pub(crate) fn set_developer(on: bool) {
     RELEASE.store(!on, Ordering::Relaxed);

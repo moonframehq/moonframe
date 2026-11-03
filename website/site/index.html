@@ -7,6 +7,7 @@
 <meta name="description" content="Native desktop apps in Rust, with every panel in Luau. Ask for a change and watch the running app reshape itself: no rebuild, no restart.">
 <link rel="canonical" href="https://moonframe.dev/">
 <link rel="alternate" type="text/markdown" title="Moonframe for coding agents" href="/llms.txt">
+<link rel="stylesheet" href="docs/patterns/patterns.css">
 <meta name="theme-color" content="#f6eedc">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Moonframe">
@@ -302,7 +303,7 @@
   <header class="mast">
     <span>Open source · MIT</span>
     <a class="name" href="#"><img src="img/icon.png" alt="">Moonframe</a>
-    <nav><a href="#tour">Tour</a><a class="wide" href="#components">Components</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a href="https://github.com/moonframehq/moonframe">GitHub</a></nav>
+    <nav><a href="#tour">Tour</a><a class="wide" href="#components">Components</a><a href="#patterns">Patterns</a><a href="#apps">Apps</a><a href="/docs/">Docs</a><a href="https://github.com/moonframehq/moonframe">GitHub</a></nav>
   </header>
   <div class="sub"><span>Native desktop apps, <b>written in Rust</b></span><span>macOS · Linux · Windows</span></div>
 
@@ -431,11 +432,15 @@ just install   # into /Applications</pre></div>
     </div>
   </section>
 
+  <section id="patterns" class="patterns-home">
+    <div id="patterns-home"><p class="pb-eyebrow">The pattern book</p><h2>Build on good decisions.</h2><p>Reusable compositions, with the reasoning left in. <a href="https://docs.moonframe.dev/patterns/">Browse the pattern library →</a></p></div>
+  </section>
+
   <section id="apps">
     <div class="plates-head">
       <div><p class="kicker">The plates</p><h2>Every one of these runs <i>on the same engine.</i></h2>
         <p class="lead">Whole apps install beside the starter as profiles, each with its own shell, mods, menus, icon and theme, and bundle into a standalone release.</p></div>
-      <div class="big-num">23</div>
+      <div class="big-num" id="app-count"></div>
     </div>
     <div class="plates" id="plates"></div>
     <div class="installbar"><span><b>Install one from git.</b> Packages ship source only, so everything they run can be read first.</span><pre>moonframe app install github.com/owner/some-app</pre></div>
@@ -609,7 +614,7 @@ end,</pre></div>
 
   <footer>
     <div><span class="name"><img src="img/icon.png" alt="">Moonframe</span>Native desktop apps in Rust, shaped live in Luau.<br>MIT licensed.</div>
-    <div><b>Learn</b><a href="/docs/">Docs</a><a href="https://github.com/moonframehq/moonframe#quick-start">Quick start</a><a class="wide" href="#components">Components</a></div>
+    <div><b>Learn</b><a href="/docs/">Docs</a><a href="https://github.com/moonframehq/moonframe#quick-start">Quick start</a><a class="wide" href="#components">Components</a><a href="https://docs.moonframe.dev/patterns/">Patterns</a></div>
     <div><b>Build</b><a href="https://github.com/moonframehq/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/moonframehq/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/moonframehq/moonframe/blob/main/docs/library.md">The library</a><a href="/llms.txt">For agents</a></div>
     <div><b>Project</b><a href="https://github.com/moonframehq/moonframe">GitHub</a><a href="https://github.com/moonframehq/moonframe/issues">Issues</a><a href="https://github.com/moonframehq/moonframe/blob/main/LICENSE">License</a></div>
   </footer>
@@ -622,6 +627,8 @@ end,</pre></div>
   <button class="lb-cmd" id="lb-cmd" title="Copy the command" hidden><code></code><span>Copy</span></button>
 </div>
 
+<script src="docs/patterns/data.js"></script>
+<script src="docs/patterns/browser.js"></script>
 <script src="data/components.js"></script>
 <script src="components-browser.js"></script>
 <script>
@@ -653,10 +660,18 @@ const APPS = [
   ["hearth","Hearth","a code review bot's analytics"],
   ["storefront","Storefront","a store's admin with its audit log"],
   ["folio","Folio","a quiet place to write, with focus mode"],
+  ["orbit","Orbit","a task workspace with connected boards, lists, calendars and timelines"],
 ];
-const ROMAN = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX","XXI","XXII","XXIII","XXIV"];
+function roman(n) {
+  let label = "";
+  for (const [value, glyph] of [[1000,"M"],[900,"CM"],[500,"D"],[400,"CD"],[100,"C"],[90,"XC"],[50,"L"],[40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]]) {
+    while (n >= value) { label += glyph; n -= value; }
+  }
+  return label;
+}
+document.getElementById("app-count").textContent = APPS.length;
 document.getElementById("plates").innerHTML = APPS.map(([id, title, d], i) =>
-  `<figure class="plate" data-i="${i}"><img src="img/${id}.webp" alt="${title}" loading="lazy"><p><span>PL. ${ROMAN[i]}</span><b>${title}.</b> ${d[0].toUpperCase() + d.slice(1)}.</p></figure>`).join("");
+  `<figure class="plate" data-i="${i}"><img src="img/${id}.webp" alt="${title}" loading="lazy"><p><span>PL. ${roman(i + 1)}</span><b>${title}.</b> ${d[0].toUpperCase() + d.slice(1)}.</p></figure>`).join("");
 
 // Plates open full size. The thumbnail shows at once, blurred; the full PNG
 // streams in behind it with a progress bar, then fades over it.

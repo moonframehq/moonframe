@@ -356,7 +356,7 @@ into each.
 `just bundle-app NAME` builds a profile's app as a standalone release:
 `target/bundle/<Title>.app` on macOS, or a prefix with a `.desktop` file
 on Linux, with the app's title, id and icon. A bundle starts with
-Developer Mode off: no Components menu, Inspect Element or Reload. **Developer
+Developer Mode off: no Components…, Inspect Element or Reload. **Developer
 Mode** in the app menu turns them on live, for anyone who wants to change
 their app, and the choice is kept; `--release` and `--dev` set it for one
 run. Outside a release,
@@ -589,6 +589,8 @@ it uses the app's own runtime (`.tokio(handle)`, or the one
 | `just bundle-app NAME` | builds the profile NAME's app as a standalone release |
 | `just check-examples` | loads and type-checks the apps in `examples/` |
 | `just demo` | opens the gallery of every example app, to open and compare them |
+| `just patterns` | opens the independent pattern browser: categories, search, live previews and Luau source |
+| `just patterns-check` | validates the patterns, their types and the generated web/native catalogs |
 | `just install` | builds the app and installs it in `/Applications` |
 | `just ci` | formatting, lints, tests, types, providers and check |
 | `just audit` | zizmor and actionlint on the workflows, cargo-deny on the dependencies |

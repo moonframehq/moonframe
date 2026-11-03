@@ -11,11 +11,32 @@ impl Build for Stack {
         LOOK,
         ACTION,
         EXTRAS,
-        &["align", "justify", "wrap", "selected", "drag", "key"],
+        &[
+            "align",
+            "justify",
+            "wrap",
+            "selected",
+            "drag",
+            "key",
+            "scroll_to",
+        ],
         pointer::POINTER,
     ];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
+        let scroll_to = fields.get::<i64>("scroll_to")?;
+        if scroll_to.is_some_and(|index| index < 1) {
+            return Err(fields
+                .cx()
+                .key("scroll_to")
+                .fail("expected a positive child index"));
+        }
+        if fields.raw("carry").is_some() && fields.get::<bool>("drag")?.unwrap_or(false) {
+            return Err(fields
+                .cx()
+                .key("carry")
+                .fail("a title bar (`drag = true`) moves the window; it can't be carried too"));
+        }
         Ok(Self {
             look: Look::from_fields(fields)?,
             direction: match kind {
@@ -27,6 +48,7 @@ impl Build for Stack {
             justify: fields.get("justify")?.unwrap_or(Justify::Start),
             wrap: fields.get("wrap")?.unwrap_or(false),
             selected: fields.get("selected")?.unwrap_or(false),
+            scroll_to: scroll_to.map(|index| index as usize),
             action: Action::from_fields(fields)?,
             extras: Extras::from_fields(fields)?,
             drag: fields.get("drag")?.unwrap_or(false),

@@ -102,12 +102,13 @@
   <a class="name" href="https://moonframe.dev/"><img src="/img/icon.png" alt="">Moonframe</a><span class="sec">Docs</span>
   <button class="menu" id="menu" aria-expanded="false" aria-controls="side">Contents ▾</button>
   <label class="search"><input id="q" type="search" placeholder="Search the docs…" aria-label="Search the docs"><kbd>⌘K</kbd></label>
-  <div class="r"><a class="on" href="/">Guide</a><a href="https://github.com/moonframehq/moonframe/blob/main/types/moonframe.d.luau">Luau API</a><a href="https://moonframe.dev/#components">Components</a><a href="https://moonframe.dev/#apps">Apps</a><a href="https://github.com/moonframehq/moonframe">GitHub</a></div>
+  <div class="r"><a class="on" href="/">Guide</a><a href="patterns/">Patterns</a><a href="https://github.com/moonframehq/moonframe/blob/main/types/moonframe.d.luau">Luau API</a><a href="https://moonframe.dev/#components">Components</a><a href="https://moonframe.dev/#apps">Apps</a><a href="https://github.com/moonframehq/moonframe">GitHub</a></div>
 </header>
 <div class="layout">
   <aside id="side">
     <h4>Start</h4><a class="on" href="/">Introduction</a><a href="https://github.com/moonframehq/moonframe#quick-start">Quick start</a><a href="https://github.com/moonframehq/moonframe#make-it-yours">Make it yours</a>
     <h4>Building blocks</h4><a href="#a-mod-is-one-file">Mods</a><a href="#where-things-go">Where things go</a><a href="https://docs.moonframe.dev/wasm-providers/">WebAssembly (WASM) providers</a><a href="https://github.com/moonframehq/moonframe/blob/main/.claude/skills/moonframe/SKILL.md">The full guide</a><a href="https://moonframe.dev/#components">Components</a><a href="https://github.com/moonframehq/moonframe/blob/main/.claude/skills/moonframe-components/SKILL.md">Component catalogue</a>
+    <a href="patterns/">Patterns: compositions and source</a>
     <h4>Working with agents</h4><a href="/llms.txt">For agents: llms.txt</a><a href="https://github.com/moonframehq/moonframe#working-with-an-agent">Inspect Element and the skill</a><a href="https://github.com/moonframehq/moonframe/blob/main/.claude/skills/moonframe-mockups/SKILL.md">Mockups</a>
     <h4>Distribute</h4><a href="https://github.com/moonframehq/moonframe#mods-from-git">Mods from git</a><a href="https://github.com/moonframehq/moonframe#whole-apps-as-profiles">Apps as profiles</a><a href="https://github.com/moonframehq/moonframe/blob/main/.claude/skills/moonframe-apps/SKILL.md">Building and bundling apps</a><a href="https://github.com/moonframehq/moonframe/blob/main/docs/library.md">Using the library</a><a href="https://github.com/moonframehq/moonframe/blob/main/docs/releasing.md">Releasing</a>
     <h4>Reference</h4><a href="https://github.com/moonframehq/moonframe#commands">Commands</a><a href="https://github.com/moonframehq/moonframe/blob/main/types/moonframe.d.luau">Luau API types</a><a href="https://github.com/moonframehq/moonframe/blob/main/wit/provider.wit">Provider interface</a>
@@ -125,6 +126,7 @@
       <a href="https://github.com/moonframehq/moonframe#quick-start"><b>Quick start →</b><span>Clone, run, edit a file, watch it change.</span></a>
       <a href="#a-mod-is-one-file"><b>Your first mod →</b><span>State, init, update, view.</span></a>
       <a href="https://moonframe.dev/#components"><b>Component catalogue →</b><span>Every <code>ui.*</code> element and <code>use</code> piece.</span></a>
+      <a href="patterns/"><b>Pattern library →</b><span>Curated compositions, native previews and the actual Luau source. Browse alongside your app with <code>just patterns</code>.</span></a>
       <a href="https://github.com/moonframehq/moonframe#whole-apps-as-profiles"><b>Build an app →</b><span><code>moonframe.toml</code>, profiles, bundles.</span></a>
     </div>
     <figure><img src="/img/window.webp" alt=""><figcaption><b>Fig. 1</b> The window that ships: explorer, terminal tabs, changes, status bar. Each is a mod in <code>app/mods/</code>.</figcaption></figure>
