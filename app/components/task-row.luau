@@ -15,6 +15,8 @@ type Props = {
 	due: boolean?,
 	icon: string?,
 	tags: { any }?,
+	carry: any,
+	accept: any,
 	leading: any,
 	toggle: any,
 	msg: any,
@@ -30,6 +32,8 @@ return component {
 	description = "A task (round check, title struck through when done) or an event (a dot), with date, due time and tag pills under it.",
 	when = "Rows of tasks, to-dos, habits or events in a planner, an inbox or a day view; stack them in a column under `section` headings. For a plain selectable row use `list`; for pull requests use `pr-row`.",
 	props = {
+		["carry"] = "data the row carries when dragged to a row or list with `accept` (to reorder or file it)",
+		["accept"] = "message sent as a carried row moves over this one and is dropped on it, with `phase`, `carry` and `y` (above or below its middle) added",
 		["title"] = "what to do",
 		["state"] = "the check: open (default), important, progress or done",
 		["event"] = "an event: a dot instead of a check",
@@ -104,6 +108,8 @@ return component {
 			selected = props.selected,
 			msg = props.msg,
 			context = props.context,
+			carry = props.carry,
+			accept = props.accept,
 			to = props.to,
 			lead,
 			ui.column {

@@ -29,6 +29,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`), `exit` (sent once, with `exited = true` added, as the shell exits; without it Enter starts another) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
 | `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; links send `link` instead of opening, pictures are not loaded; styled by `markdown`, `markdown-code` and `markdown-quote` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width` |
+| `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
 | `ui.view { name = "chart", id = "sales", props = {...} }` | a view the app writes in Rust and registers by `name` (apps on the Moonframe library; the starter registers none): what Luau can't draw, such as an editor or a canvas. Kept by mod and `id`, it gets `props` again when they change, and sends this mod's `update` messages of its own | `name`, `id`, `props`, `class`, `style` |
 
 ### Controls
@@ -37,7 +38,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
-| `ui.input { id = "name", change = "typed" }` | a text field the host edits, one line or a text area (`multiline`); a writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it | `id`, `value`, `placeholder`, `change`, `submit` and `keys` (sent with `value` added), `to`, `multiline`, `rows`, `grow`, `width`, `mono`, `focus`, `disabled`, `browser`, `prose`, `dim`, `typewriter` |
+| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value` and `caret`), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow`, `browser`, `prose`, `dim`, `typewriter` |
 
 ### Overlays
 
@@ -55,6 +56,11 @@ Names are modifiers (`ctrl`, `alt`, `shift`, `cmd`, `secondary` = cmd on
 macOS, ctrl elsewhere) then a key, joined by `-`.
 
 ### Shared keys
+
+- **Scroll to a child** (`row`, `column`): with `scroll` enabled,
+  `scroll_to = 12` reveals direct child 12 (one-based) when the index
+  changes. It scrolls only as far as needed and leaves wheel scrolling
+  free between changes. Set it to nil to reset the request.
 
 - **Frame keys** (`row`, `column`, `panel`): `grow`, `width`, `height`,
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `follow = true` (with `scroll`:
@@ -87,6 +93,16 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   apps (`paths`), which that mod's `ui.image` may then show; `cursor` sets the pointer's
   shape (`crosshair`, `grab`, `grabbing`, `ew-resize`, `ns-resize`,
   `nwse-resize`, `nesw-resize`, `move`, `pointer`, `text`, `not-allowed`).
+- **Drag and drop** (`row`, `column`): `carry = <data>` lets the user drag
+  it (a card, a row, a calendar event); a box of its size, the `carry`
+  rule, follows the pointer while it dims, and a click still clicks.
+  `accept = <msg>` on another row or column is sent as it moves over it
+  (`phase = "over"`), off it (`"leave"`) and is dropped on it (`"drop"`),
+  with `carry` (the data), `from` (the mod that drew it), and `x`, `y`
+  (fractions of the target's box: before or after a row's middle) added.
+  The innermost target takes the drop; nothing follows a drop, so clear
+  what `over` showed then. Other entered targets hear `leave` when the
+  drag ends, including cancellation. Not with `pointer` or `drag`.
 - **Children:** `false` and `nil` children are skipped, wherever they are.
 - **Look keys** (every element but splits): `class = "a b"`,
   `style = { ... }`, and `state = "open"`: a state of the view's own naming,
@@ -105,6 +121,16 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `open`, `folder` or `save` with `name` and `folder`); the answer comes
   back to the mod as `reply` with `paths` (`path` for a save) or
   `cancelled = true`. Picked files may then show in that mod's `ui.image`.
+- **Text edits:** `{ to = "app:edit", msg = { field = "notes", wrap = {
+  "**", "**" } } }` edits the mod's `ui.input` with that `id` around its
+  selection, keeping undo and focus: `wrap` puts the two around it (or
+  takes them off), `lines = "- "` starts each selected line with it (or
+  takes it off), `insert = "@Sam ", back = 3` replaces the selection and
+  the 3 bytes before it. A completion can add `at = <caret offset>` and
+  `expect = "@sa"`: it applies only with an empty selection there and that
+  exact preceding text (`back` must equal its byte length). The field then
+  sends its `change`. A toolbar button sends directly (`to = "app:edit"`);
+  editing restores focus in the field's own window.
 - **Keys anywhere:** `mod { keys = { ["secondary-1"] = "histogram" } }`
   sends its message when the key is pressed and nothing nearer (an open
   overlay, a terminal) took it, to every mod and every mounted copy of

@@ -15,6 +15,7 @@ mod components;
 mod elements;
 mod mods;
 mod motion;
+mod orbit;
 mod overlays;
 mod packages;
 mod paint;
@@ -23,6 +24,7 @@ mod shell;
 mod state;
 mod styles;
 mod switchyard;
+mod task_manager;
 mod topics;
 mod views;
 // keep-sorted end

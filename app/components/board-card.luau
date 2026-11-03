@@ -1,7 +1,8 @@
 -- A card on a board: a title with a small badge (a percentage, a status),
 -- a muted line under it, then a figure, a date and the owner's initials at
 -- the bottom. A tone outlines it (at risk). Clicks and right-clicks send
--- messages, for opening it or a menu of moves.
+-- messages, for opening it or a menu of moves; with `carry` it can be
+-- dragged to another column or place.
 
 local avatar = use "avatar"
 
@@ -19,6 +20,10 @@ type Props = {
 	context: any,
 	to: string?,
 	selected: boolean?,
+	labels: { any }?,
+	key: string?,
+	carry: any,
+	accept: any,
 }
 
 local TONES = { danger = "danger", warning = "warning", success = "success", accent = "accent" }
@@ -43,6 +48,10 @@ return component {
 		["context"] = "message a right-click sends (a menu of moves)",
 		["to"] = "mod to send them to, if not the drawing one",
 		["selected"] = "highlight it",
+		["labels"] = "small coloured labels over the title: { label, color? }",
+		["key"] = "a short mono id at the bottom left (\"WEB-112\"), before the amount",
+		["carry"] = "data the card carries when dragged to a column or card with `accept`",
+		["accept"] = "message sent as a carried card moves over this one and is dropped on it, with `phase`, `carry` and `y` (above or below its middle) added",
 	},
 	styles = {
 		[".board-card"] = { background = "background", radius = 10, padding = { 10, 12 }, gap = 4, border = true, border_color = "border", shadow = "0 1px 2px #0000000a" },
@@ -54,6 +63,9 @@ return component {
 		[".board-card-amount"] = { weight = "bold" },
 		[".board-card-date"] = { size = "small", color = "muted-foreground" },
 		[".board-card-foot"] = { gap = 8, padding = { 6, 0, 0, 0 } },
+		[".board-card-labels"] = { gap = 4, padding = { 0, 0, 2, 0 } },
+		[".board-card-label"] = { size = "small", radius = 5, padding = { 0, 6 }, weight = "medium" },
+		[".board-card-key"] = { size = "small", color = "muted-foreground", font = "mono" },
 	},
 	example = {
 		title = "Lumen Retail",
@@ -69,13 +81,26 @@ return component {
 	build = function(props: Props)
 		local badge_tone = props.badge_tone and TONES[props.badge_tone]
 		local outline = props.tone and TONES[props.tone]
+		local labels = {}
+		local tags: { any } = props.labels or {}
+		for _, tag in tags do
+			local color = tag.color or "muted-foreground"
+			table.insert(labels, ui.text {
+				tag.label,
+				class = "board-card-label",
+				style = { background = `{color}/14`, color = color },
+			})
+		end
 		return ui.column {
 			class = "board-card",
 			selected = props.selected,
 			msg = props.msg,
 			context = props.context,
+			carry = props.carry,
+			accept = props.accept,
 			to = props.to,
 			style = if outline then { border_color = `{outline}/50`, background = `{outline}/4` } else nil,
+			#labels > 0 and ui.row { class = "board-card-labels", wrap = true, table.unpack(labels) },
 			ui.row {
 				align = "center",
 				gap = "small",
@@ -91,6 +116,7 @@ return component {
 			ui.row {
 				class = "board-card-foot",
 				align = "center",
+				props.key and ui.text { props.key, class = "board-card-key" },
 				props.amount and ui.text { props.amount, class = "board-card-amount" },
 				ui.spacer(),
 				props.date and ui.text { props.date, class = "board-card-date" },
