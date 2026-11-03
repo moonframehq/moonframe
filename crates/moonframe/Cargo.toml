@@ -19,13 +19,30 @@ acp = ["dep:moonframe-acp"]
 # libghostty-vt with Zig (see mise.toml), so an app on the
 # library opts into it; the starter (crates/moonframe-app) has both.
 alacritty = ["moonframe-terminal/alacritty"]
-default   = ["acp", "alacritty", "docs", "git", "herdr-core", "tokio", "usage", "wasm"]
+# The `chat` native provider (`app.chat`): agent chats run by herdr-acp,
+# attached over herdr's chat protocol.
+chat = ["dep:moonframe-chat"]
+default = [
+  "acp",
+  "alacritty",
+  "chat",
+  "docs",
+  "git",
+  "herdr-core",
+  "shell",
+  "tokio",
+  "usage",
+  "wasm",
+]
 # The `docs` native provider: reads and saves the project's text files
 # for the markdown editor.
 docs    = ["dep:moonframe-docs"]
 ghostty = ["moonframe-terminal/ghostty"]
 # The `git` native provider (`app.git`, commit and push), on herdr-vcs.
 git = ["dep:moonframe-git", "moonframe-history/herdr"]
+# The `shell` native provider (`app.shell`): a mod's shell commands, with
+# their output in colour.
+shell = ["dep:moonframe-shell"]
 # Terminals kept by herdr-core (`hc`) when it is installed; tmux and a
 # local pty need no feature.
 herdr-core = ["moonframe-mux/herdr-core"]
@@ -45,6 +62,7 @@ futures.workspace             = true
 gpui-kit.workspace            = true
 imagesize.workspace           = true
 moonframe-acp                 = { optional = true, workspace = true }
+moonframe-chat                = { optional = true, workspace = true }
 moonframe-core.workspace      = true
 moonframe-docs                = { optional = true, workspace = true }
 moonframe-git                 = { optional = true, workspace = true }
@@ -52,6 +70,7 @@ moonframe-history.workspace   = true
 moonframe-mux.workspace       = true
 moonframe-packages.workspace  = true
 moonframe-providers.workspace = true
+moonframe-shell               = { optional = true, workspace = true }
 moonframe-store.workspace     = true
 moonframe-terminal.workspace  = true
 moonframe-usage               = { optional = true, workspace = true }

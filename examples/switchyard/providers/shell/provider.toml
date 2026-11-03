@@ -1,0 +1,10 @@
+# Shell commands the user runs from a chat (`!git status`) and the run
+# scripts under it: the built-in `shell` provider (crates/moonframe-shell).
+# Each runs in your login shell, in the worktree, with your access; its
+# output is shared in colour as it comes.
+interval = 0.25
+kind     = "native"
+
+[settings]
+# The mods that may run commands.
+runners = ["chat", "console"]

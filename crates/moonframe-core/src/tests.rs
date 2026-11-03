@@ -22,6 +22,7 @@ mod pointer;
 mod shell;
 mod state;
 mod styles;
+mod switchyard;
 mod topics;
 mod views;
 // keep-sorted end

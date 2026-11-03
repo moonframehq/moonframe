@@ -38,6 +38,8 @@
 #   select = "<path>"   open that project
 #   scope = "uncommitted" | "branch" | "last"   which changes `current` lists
 #   open = "a\na/b"     the open project's open folders, one per line
+#   complete = "a/b", cwd = "<project>"  also list this folder for a composer;
+#                       independent of `open`, discarded on project changes
 #   read = "<path>"     read that file of the open project; false stops
 #   refresh = true      look again now
 #   forge = true        ask `gh` for the open project's pull requests and
@@ -329,6 +331,8 @@ def summarise_all(projects):
 # ------------------------------------------------------------- current ----
 
 state = {"select": None, "scope": "uncommitted", "open": [], "read": None}
+# A composer's directory listing is independent of the inspector's folds.
+completion = None
 SCOPE = r"^(uncommitted|branch|last)$"
 
 # What the app asked for, kept across restarts (an edit to this folder, an
@@ -754,7 +758,7 @@ def emit(force):
             out["forge"] = forge
         dirs = {}
         count = 0
-        for rel in [""] + [text_of(p) for p in state["open"]]:
+        for rel in dict.fromkeys([""] + ([completion] if completion else []) + [text_of(p) for p in state["open"]]):
             if not inside(rel):
                 continue
             if count > MAX_DIRS:
@@ -778,6 +782,7 @@ def emit(force):
 
 
 def receive(line):
+    global completion
     try:
         value = json.loads(line.decode("utf-8", "replace"))
     except ValueError:
@@ -792,6 +797,7 @@ def receive(line):
         path = expand(path)
         if state["select"] != path:
             state["select"] = path
+            completion = None
             state["open"] = []
             state["read"] = None
     scope = text_of(msg.get("scope"))
@@ -799,6 +805,8 @@ def receive(line):
         state["scope"] = scope
     if "open" in msg and not isinstance(msg["open"], (list, dict, bool)):
         state["open"] = [p for p in (text_of(msg["open"]) or "").split("\n") if p]
+    if "complete" in msg and text_of(msg.get("cwd")) == state["select"]:
+        completion = text_of(msg["complete"])
     if "read" in msg:
         state["read"] = text_of(msg["read"])
     if "forge" in msg:
