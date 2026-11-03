@@ -244,6 +244,19 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
     }))
 }
 
+/// Runs `run` with the stack views are read on: 8 MiB, the main thread's
+/// on macOS and Linux. Windows gives its main thread 1 MiB, which a debug
+/// build's frames reading a deep view (an example app, in CI) outgrow.
+fn on_a_view_stack(run: impl FnOnce() -> ExitCode + Send + 'static) -> ExitCode {
+    std::thread::Builder::new()
+        .name("check".to_owned())
+        .stack_size(8 * 1024 * 1024)
+        .spawn(run)
+        .ok()
+        .and_then(|thread| thread.join().ok())
+        .unwrap_or(ExitCode::FAILURE)
+}
+
 /// Loads every module headlessly: what an agent runs after an edit.
 fn check(roots: Roots) -> ExitCode {
     let workspace = crate::capabilities::open(roots.clone(), false, None);
@@ -448,10 +461,12 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         return crate::history::run(&folders, words);
     }
     if args.check {
-        return check(folders.roots());
+        let roots = folders.roots();
+        return on_a_view_stack(move || check(roots));
     }
     if cfg!(feature = "studio") && args.catalogue {
-        return catalogue(folders.roots());
+        let roots = folders.roots();
+        return on_a_view_stack(move || catalogue(roots));
     }
 
     // The user's folder, or the bundled app's profile in it, exists from
