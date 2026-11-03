@@ -44,7 +44,8 @@ use {
         SHELL, Shade, Slot, States, Transition, Workspace,
     },
     std::{
-        cell::Cell,
+        cell::{Cell, RefCell},
+        collections::HashMap,
         path::Path,
         rc::Rc,
         sync::LazyLock,
@@ -240,6 +241,9 @@ pub(crate) struct Painter<'w, 'm> {
     /// The innermost node being drawn, while inspecting: what a mod mounted
     /// inside it is inside.
     outer: Option<Rc<Crumb>>,
+    /// Each element's corner radius from its style, by path, while
+    /// inspecting: the highlight follows its corners.
+    radii: RefCell<HashMap<String, moonframe_core::Corners>>,
     /// The shells terminals show.
     terminals: &'m mut Terminals,
     /// The text input fields edit.
@@ -302,6 +306,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             key_layers: Vec::new(),
             sink,
             outer: None,
+            radii: RefCell::default(),
             terminals,
             inputs: inputs.clone(),
             preview: false,
@@ -566,6 +571,15 @@ impl<'w, 'm> Painter<'w, 'm> {
             .workspace
             .stylesheet()
             .resolve_in(part, look, states, local);
+        // Its own part's radius, which comes first, not a part inside it.
+        if self.sink.is_some()
+            && let Some(radius) = resolved.base.radius
+        {
+            self.radii
+                .borrow_mut()
+                .entry(place.path.clone())
+                .or_insert(radius);
+        }
         if let Some(state) = &look.state {
             self.tween(&mut resolved, state, place);
         }
@@ -642,8 +656,10 @@ impl<'w> Draw<'w> for Node {
         let outer = painter.outer.replace(crumb.clone());
         let child = draw_node(self, painter, &place, cx);
         painter.outer = outer;
+        let styled = painter.radii.borrow_mut().remove(&place.path);
         Tracked {
             child,
+            corners: crate::inspect::corners(self, styled, painter.theme.radius),
             path: place.path,
             crumb,
             sink,
