@@ -183,6 +183,9 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
         }
     }
     if cfg!(feature = "sealed") {
+        if bundle.is_some() {
+            return Err("a sealed executable cannot build app bundles".to_owned());
+        }
         let app = bundled
             .as_ref()
             .ok_or("a sealed executable must run inside its app bundle")?;
@@ -195,7 +198,6 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
     }
     if !cfg!(feature = "studio")
         && (init.is_some()
-            || bundle.is_some()
             || apps.is_some()
             || packages.is_some()
             || history.is_some()
@@ -388,7 +390,9 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     {
         return crate::init::run(words);
     }
-    if cfg!(feature = "studio")
+    // Packaging copies this executable, so hosts without developer tools
+    // must be able to bundle themselves too.
+    if !cfg!(feature = "sealed")
         && let Some(words) = &args.bundle
     {
         return crate::bundle::run(&args.folders, words);

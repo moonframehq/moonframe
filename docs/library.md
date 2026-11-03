@@ -69,6 +69,9 @@ native web view and `markdown` the Markdown renderer. `studio` enables
 development commands and the component gallery. Keep the capabilities your
 app uses when disabling defaults.
 
+The `bundle` command remains available without `studio`, so a library host
+can package its executable without including developer tools.
+
 For profile apps, [sealed bundles](sealed-bundles.md) select these features
 from the app's Luau and provider manifests and prune the shipped toolbox.
 

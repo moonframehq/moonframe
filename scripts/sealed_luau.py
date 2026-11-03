@@ -176,6 +176,12 @@ def references(text, provider_names):
         next2 = tokens[i + 2] if i + 2 < len(tokens) else empty
         next3 = tokens[i + 3] if i + 3 < len(tokens) else empty
         if token.kind == "name" and token.value == "use" and before.value not in (".", ":"):
+            # A record field such as `msg = { use = name }` is not an
+            # import. Still scan its value, which may itself call `use`.
+            if (before.kind == "symbol" and before.value in ("{", ",", ";")
+                    and after.kind == "symbol" and after.value == "="
+                    and not (next2.kind == "symbol" and next2.value == "=")):
+                continue
             literal = after if after.kind == "string" else next2
             if after.kind == "string" or (after.value == "(" and next2.kind == "string" and next3.value == ")"):
                 refs.components.add(literal.value)

@@ -38,6 +38,17 @@ return { to = "provider:docs", subscribe = { "provider/system" }, app["usage"] }
         self.assertEqual({category for category, _ in refs.dynamic}, {"components", "providers", "features"})
         self.assertFalse(refs.components)
 
+    def test_use_record_fields_are_not_imports(self):
+        refs = references('''local msg = { use = template.name }
+local options = { title = "Card", use = use "card" }
+local action = { title = "Open"; use = template.name }
+local literal = { use = "=" }
+''', set())
+        self.assertEqual(refs.components, {"card"})
+        self.assertFalse(refs.dynamic)
+        # Equality reads the importer, even immediately after a table opener.
+        self.assertTrue(references('local same = { use == importer }', set()).dynamic)
+
     def test_interpolation_scans_expressions_but_not_text(self):
         refs = references('ui.text `app.git {app.system.cpu} {({ nested = app.usage }).nested}`', {"git", "system", "usage"})
         self.assertEqual(refs.providers, {"system", "usage"})
