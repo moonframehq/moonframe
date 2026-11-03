@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Patterns — Moonframe Docs</title>
+  <meta name="description" content="Thoughtful, reusable native UI compositions. Browse Moonframe patterns by category, see real previews, and copy the Luau that builds them.">
+  <link rel="canonical" href="https://docs.moonframe.dev/patterns/">
+  <link rel="stylesheet" href="patterns.css">
+  <script defer src="data.js"></script>
+  <script defer src="browser.js"></script>
+</head>
+<body class="pb-page">
+  <header class="pb-top">
+    <a class="pb-brand" href="https://moonframe.dev/"><span aria-hidden="true">◒</span>moonframe <small>Docs</small></a>
+    <nav aria-label="Documentation"><a href="../">Guide</a><a aria-current="page" href="./">Patterns</a><a href="https://moonframe.dev/#components">Components</a><a href="https://github.com/moonframehq/moonframe/tree/main/patterns">Source ↗</a></nav>
+    <button id="pb-theme" class="pb-button" aria-label="Toggle dark mode">◐ Theme</button>
+  </header>
+  <div id="pattern-browser" class="pb-layout">
+    <aside class="pb-sidebar">
+      <p class="pb-eyebrow">The pattern library</p>
+      <label class="pb-search"><span aria-hidden="true">⌕</span><input id="pb-search" type="search" placeholder="Find a pattern…" aria-label="Search patterns"><kbd>/</kbd></label>
+      <nav id="pb-categories" aria-label="Pattern categories"></nav>
+      <div class="pb-side-note"><strong>A companion to your app.</strong><p>Browse live, in a separate native window:</p><code>just patterns</code><a href="#using-patterns">How to use patterns ↓</a></div>
+    </aside>
+    <main id="pb-content" class="pb-content" tabindex="-1"></main>
+  </div>
+  <section id="using-patterns" class="pb-guide">
+    <div><p class="pb-eyebrow">From browsing to building</p><h2>Take the pattern. Make it yours.</h2><p>Components are the individual pieces. Patterns compose them with deliberate layout and visual hierarchy. Demos show complete applications.</p></div>
+    <div><h3>1. Copy the pattern</h3><p>Copy the <b>Pattern source</b> into <code>components/&lt;name&gt;.luau</code> in your app. Its dependencies are built-in Moonframe components.</p><h3>2. Try the example</h3><p>The <b>Example</b> tab is a complete mod with sample data, state and message handlers. Copy it into <code>mods/example/main.luau</code> and mount it in your shell with <code>ui.mount "example"</code>.</p><h3>3. Connect your data</h3><p>Keep the component's styling hooks; replace the sample data and handle actions in your own mod.</p></div>
+    <div><h3>Browse alongside your app</h3><pre>just patterns</pre><p>In a Moonframe checkout, this opens the standalone native browser with live previews and source. It has its own identity and state.</p><h3>Ship only what you use</h3><p>The <code>patterns</code> Cargo feature enables a separate <code>moonframe-patterns</code> executable. It is off by default. The starter and apps using the library include neither this showcase nor its catalog; copy only the pattern files you need.</p></div>
+  </section>
+  <p class="pb-status" id="pb-status" role="status" aria-live="polite"></p>
+  <noscript><p>Enable JavaScript to filter the library, or <a href="https://github.com/moonframehq/moonframe/tree/main/patterns/app/components">browse the pattern source files</a>.</p></noscript>
+</body>
+</html>

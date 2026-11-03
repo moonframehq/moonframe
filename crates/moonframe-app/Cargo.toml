@@ -1,4 +1,5 @@
 [package]
+default-run            = "moonframe"
 description            = "The Moonframe starter app: the window on app/, with ~/.config/moonframe over it"
 edition.workspace      = true
 license.workspace      = true
@@ -15,9 +16,19 @@ workspace = true
 name = "moonframe"
 path = "src/main.rs"
 
+[[bin]]
+name              = "moonframe-patterns"
+path              = "src/patterns.rs"
+required-features = ["patterns"]
+
 [features]
 # Every terminal emulator the library has; `ghostty` needs Zig.
 default = ["moonframe/ghostty"]
+# A separate developer app. Its catalog and sources never enter the starter
+# or an app built on the moonframe library.
+patterns = []
+# Native preview export, also excluded from ordinary builds.
+pattern-capture = ["moonframe/capture", "patterns"]
 
 [dependencies]
 moonframe.workspace = true
