@@ -88,7 +88,7 @@ Moonframe as a library.
   herdr-core or tmux installed, terminals keep running after the app quits
   and come back on the next launch.
 - **Providers** for data Luau can't reach, publishing what views read as
-  `app.<name>`: sandboxed WebAssembly components, plain processes, or Rust
+  `app.<name>`: sandboxed WebAssembly (WASM) components, plain processes, or Rust
   built into the app. The built-in ones cover git (status, diffs, commit and
   push), GitHub and GitLab, the project's files and markdown documents, the
   system's load, and coding agents.
@@ -112,7 +112,7 @@ Moonframe as a library.
   them too.
 - **A sandbox.** Luau runs with no files, network or process access, a
   memory cap and an instruction budget; anything that reaches the machine
-  goes through a provider or an element the host owns. WebAssembly
+  goes through a provider or an element the host owns. WASM
   providers run sandboxed too, so a provider you install from someone else
   can have no access to your machine at all. See
   [What runs with what access](#what-runs-with-what-access).
@@ -292,10 +292,10 @@ Packages ship source only, so everything they run can be read first.
 | Code | Runs | Can reach |
 |---|---|---|
 | Mods (Luau) | in the host's Luau sandbox, with memory and instruction caps | only the elements and providers the host offers |
-| Wasm providers (`kind = "wasm"`) | on [wasmtime](https://wasmtime.dev), with 64 MiB and a fresh instruction budget per call | only the host calls listed under `capabilities` in `provider.toml` (today `system`, the machine's load) |
+| WASM providers (`kind = "wasm"`) | on [wasmtime](https://wasmtime.dev), with 64 MiB and a fresh instruction budget per call | only the host calls listed under `capabilities` in `provider.toml` (today `system`, the machine's load) |
 | Process and native providers | as your user | anything you can: git, forges, coding agents, your files |
 
-Write a provider as a Wasm component if it only shapes data or if it comes
+Write a provider as a WASM component if it only shapes data or if it comes
 from someone else. A bug or bad actor in it can't read your files or reach
 the network. Keep process and native providers for things the sandbox
 can't reach, and read them as you would any script.
@@ -305,11 +305,15 @@ your user, including proc macros and dependency build scripts. The host
 refuses build scripts in the provider or its local crates, and toolchains
 named by path, and runs Cargo outside its folders, so no Cargo config there
 applies. It also refuses any package that ships a binary, so what runs is
-always source you can read. Bundled apps ship their Wasm providers prebuilt
+always source you can read. Bundled apps ship their WASM providers prebuilt
 and build nothing on your machine.
 
-Apps with no Wasm providers can turn off the `wasm` feature, which is on by
+Apps with no WASM providers can turn off the `wasm` feature, which is on by
 default (see [docs/library.md](docs/library.md)).
+
+**Build one:** [Building WebAssembly (WASM) providers](https://docs.moonframe.dev/wasm-providers/)
+walks through a complete Rust component, Luau messages, live reload and
+packaging, for people and coding agents. [Markdown source](docs/wasm-providers.md).
 
 ## Whole apps as profiles
 
