@@ -1849,11 +1849,11 @@ type Stylesheet = {
 declare function style(sheet: Stylesheet): Stylesheet
 
 -- A component in components/<name>.luau: a ready-made piece of view that
--- mods `use`, listed in the Components menu with a preview of `example`.
+-- mods `use`, listed in the Components gallery with a preview of `example`.
 type Component<Props> = {
 	title: string?,
 	description: string?,
-	-- The Components menu's submenu.
+	-- The heading it is listed under in the Components gallery.
 	category: string?,
 	-- When to reach for it, and what to use instead; the catalogue's lead.
 	when: string?,

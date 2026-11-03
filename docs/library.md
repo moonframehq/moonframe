@@ -265,7 +265,7 @@ and `SHA256SUMS`. With [`.updates("owner/repo")`](updates.md), the app
 finds and installs those releases itself.
 
 **Developer Mode**, in the app menu beside About, switches the tools for
-changing the app as it runs (the Components menu, Inspect Element ⌥⌘I,
+changing the app as it runs (View's Components…, Inspect Element ⌥⌘I,
 Reload Modules ⌘R) on and off, at once and without a rebuild, and is kept
 for the app (and each profile) in `$XDG_STATE_HOME/<name>/developer`. Until
 the user picks, it is on in a debug build (`cargo run`) and off in a release

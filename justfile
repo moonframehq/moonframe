@@ -53,7 +53,7 @@ bundle out="target/bundle":
     scripts/bundle-app.sh {{out}}
 
 # Build a profile's app as a standalone release bundle (its title, id and
-# icon; no Components menu or Inspect Element) in target/bundle.
+# icon; no Components… or Inspect Element) in target/bundle.
 bundle-app profile out="target/bundle":
     scripts/bundle-app.sh {{out}} {{profile}}
 

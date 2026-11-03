@@ -354,7 +354,7 @@ into each.
 `just bundle-app NAME` builds a profile's app as a standalone release:
 `target/bundle/<Title>.app` on macOS, or a prefix with a `.desktop` file
 on Linux, with the app's title, id and icon. A bundle starts with
-Developer Mode off: no Components menu, Inspect Element or Reload. **Developer
+Developer Mode off: no Components…, Inspect Element or Reload. **Developer
 Mode** in the app menu turns them on live, for anyone who wants to change
 their app, and the choice is kept; `--release` and `--dev` set it for one
 run. Outside a release,
