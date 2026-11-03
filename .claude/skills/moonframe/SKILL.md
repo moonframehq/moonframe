@@ -1604,6 +1604,15 @@ can grow long (see "Long lists"). Several mods in one region stack. Give
 and in `update` set `state.selected` and send the choice on to whatever
 shows it.
 
+**Navigation rows are inset.** Unless the user asks otherwise, every
+navigation list (sidebar, settings pages, folders, views) keeps its rows off
+the pane's edges: the list or each row gets a left and right margin (about
+8px), each row gets inner padding (about `{ 6, 10 }`), and the hover and
+selected backgrounds are rounded (`radius = 8`). The highlight is then a pill
+floating inside the pane, never a bar from edge to edge. `ui.item` does this
+by default (`item` in `style.luau`), as do `side-nav` and `settings-nav`;
+give custom clickable rows the same margin, padding and radius.
+
 **Tabs.** Draw a row of small buttons in a panel's `actions`, with
 `variant = state.tab == id and "primary" or "ghost"` and `msg = { tab = id }`,
 then switch the body on `state.tab`.
