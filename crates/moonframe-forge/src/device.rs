@@ -140,10 +140,17 @@ pub fn refresh(
         ("grant_type", "refresh_token"),
         ("refresh_token", refresh.expose_secret()),
     ])?;
-    if answer.get("error").is_some() {
-        return Err(Failure::Unauthorized);
+    refreshed(&answer, credential.source)
+}
+
+fn refreshed(answer: &Value, source: Source) -> Result<Credential, Failure> {
+    match answer.get("error").and_then(Value::as_str) {
+        Some("invalid_grant" | "invalid_token" | "access_denied") => Err(Failure::Unauthorized),
+        Some("slow_down") => Err(Failure::RateLimited),
+        Some(_) => Err(Failure::Status(400, oauth_error(answer))),
+        None => token(answer, source)
+            .ok_or_else(|| Failure::Body("the renewal answer has no token".into())),
     }
-    token(&answer, credential.source).ok_or(Failure::Unauthorized)
 }
 
 /// The token in an OAuth answer.
@@ -186,6 +193,30 @@ fn oauth_error(answer: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use {super::*, serde_json::json};
+
+    #[test]
+    fn only_a_definitive_oauth_refusal_signs_out() {
+        for error in ["invalid_grant", "invalid_token", "access_denied"] {
+            assert!(matches!(
+                refreshed(&json!({ "error": error }), Source::Saved),
+                Err(Failure::Unauthorized)
+            ));
+        }
+        for error in ["temporarily_unavailable", "server_error", "invalid_client"] {
+            assert!(matches!(
+                refreshed(&json!({ "error": error }), Source::Saved),
+                Err(Failure::Status(_, _))
+            ));
+        }
+        assert!(matches!(
+            refreshed(&json!({ "error": "slow_down" }), Source::Saved),
+            Err(Failure::RateLimited)
+        ));
+        assert!(matches!(
+            refreshed(&json!({}), Source::Saved),
+            Err(Failure::Body(_))
+        ));
+    }
 
     #[test]
     fn slowdowns_accumulate_and_pending_keeps_the_increased_interval() {

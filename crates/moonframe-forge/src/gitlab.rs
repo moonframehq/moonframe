@@ -16,7 +16,10 @@ use {
 
 const LISTED: usize = 30;
 
+// keep-sorted start
 mod diffs;
+mod pages;
+// keep-sorted end
 
 /// `text` as one URL path segment or query value.
 pub(crate) fn encode(text: &str) -> String {
@@ -42,6 +45,9 @@ pub fn fetch(
     let get = |url: &str| http::get(agent, url, token);
     let viewer = get(&format!("{api}/user"))?;
     let repo = get(&project)?;
+    let project_id = repo["id"]
+        .as_u64()
+        .ok_or_else(|| Failure::Body("the project answer has no id".into()))?;
     let listed = get(&format!(
         "{project}/merge_requests?state=opened&order_by=updated_at&per_page={LISTED}"
     ))?;
@@ -51,12 +57,12 @@ pub fn fetch(
     .unwrap_or(Value::Array(Vec::new()));
     let mut by_branch = Vec::new();
     for branch in &target.branches {
-        let found = optional(get(&format!(
-            "{project}/merge_requests?source_branch={}&order_by=updated_at&per_page=1",
-            encode(branch)
-        )))?;
-        let Some(mr) =
-            found.and_then(|found| found.as_array().and_then(|list| list.first().cloned()))
+        let Some(mr) = pages::branch(project_id, |page| {
+            get(&format!(
+                "{project}/merge_requests?source_branch={}&state=all&order_by=updated_at&sort=desc&per_page=100&page={page}",
+                encode(branch)
+            ))
+        })?
         else {
             continue;
         };
@@ -122,9 +128,13 @@ fn current(
         .as_ref()
         .and_then(|mr| mr["head_pipeline"]["id"].as_u64())
     {
-        Some(pipeline) => get(&format!("{project}/pipelines/{pipeline}/jobs?per_page=50"))?
-            .and_then(|jobs| jobs.as_array().cloned())
-            .unwrap_or_default(),
+        Some(pipeline) => pages::jobs(|page| {
+            http::get(
+                agent,
+                &format!("{project}/pipelines/{pipeline}/jobs?per_page=100&page={page}"),
+                token,
+            )
+        })?,
         None => Vec::new(),
     };
     // The pages are read through a closure that can only say "nothing";
@@ -244,6 +254,18 @@ fn merge_request(mr: &Value, details: &Details, avatars: &Avatars) -> Value {
         for job in &details.jobs {
             checks.add(outcome(job["status"].as_str().unwrap_or_default()));
         }
+        // Bridge/downstream pipelines and a changing pipeline may have a
+        // worse outcome than the ordinary jobs endpoint currently shows.
+        // In that case publish the pipeline summary, not a false green.
+        if let Some(status) = full["head_pipeline"]["status"].as_str() {
+            let overall = outcome(status);
+            if (overall == "failed" && checks.failed == 0)
+                || (overall == "pending" && checks.pending == 0 && checks.failed == 0)
+            {
+                checks = Checks::default();
+                checks.add(overall);
+            }
+        }
     }
     let standing = Standing {
         state,
@@ -282,6 +304,7 @@ fn merge_request(mr: &Value, details: &Details, avatars: &Avatars) -> Value {
         value["check_list"] = details
             .jobs
             .iter()
+            .take(50)
             .map(|job| {
                 json!({
                     "name": shape::text(job.get("name")),
@@ -293,6 +316,10 @@ fn merge_request(mr: &Value, details: &Details, avatars: &Avatars) -> Value {
     }
     value
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests;
 
 /// Who `token` belongs to on `host`.
 pub fn login(agent: &ureq::Agent, host: &str, token: &SecretString) -> Result<String, Failure> {

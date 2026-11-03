@@ -9,7 +9,7 @@
 //! mod, the log or published data.
 
 use {
-    crate::kind::Kind,
+    crate::{http::Failure, kind::Kind},
     herdr_credentials::{Entry, Store},
     secrecy::{ExposeSecret, SecretString},
     serde_json::{Map, Value, json},
@@ -19,6 +19,9 @@ use {
         time::{SystemTime, UNIX_EPOCH},
     },
 };
+
+mod command;
+use command::run_for;
 
 /// Where a token came from, as `auth.source` says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -294,7 +297,7 @@ impl Saved {
         &self,
         host: &str,
         current: &Credential,
-        renew: impl FnOnce(&Credential) -> Option<Credential>,
+        renew: impl FnOnce(&Credential) -> Result<Credential, Failure>,
     ) -> Renewal {
         self.locked(|| {
             let mut saved = match self.load(host) {
@@ -345,10 +348,11 @@ impl Saved {
         host: &str,
         current: &Credential,
         spent: Option<SecretString>,
-        renew: impl FnOnce(&Credential) -> Option<Credential>,
+        renew: impl FnOnce(&Credential) -> Result<Credential, Failure>,
     ) -> Renewal {
-        let Some(renewed) = renew(current) else {
-            return Renewal::Failed;
+        let renewed = match renew(current) {
+            Ok(renewed) => renewed,
+            Err(failure) => return Renewal::Failed(failure),
         };
         if let Err(problem) = self.write_record(host, &renewed) {
             tracing::warn!(
@@ -405,8 +409,8 @@ impl Saved {
 /// What [`Saved::renew`] did.
 pub enum Renewal {
     // keep-sorted start
-    /// The forge would not renew it.
-    Failed,
+    /// A refusal or a retryable failure; only a refusal signs out.
+    Failed(Failure),
     /// Signed out meanwhile: nothing to renew.
     Gone,
     /// Another app renewed it first: its token, as saved.
@@ -456,32 +460,51 @@ pub fn environment(kind: Kind) -> Option<Credential> {
 /// The token the forge's CLI is signed in with on `host`, if it is
 /// installed and signed in. Runs a program: call it off the provider's
 /// thread.
-pub fn cli(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Credential> {
+pub fn cli(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Result<Option<Credential>, Failure> {
     let (program, args) = kind.cli(host);
-    let program = moonframe_providers::program::find(program, path)?;
+    let program = moonframe_providers::program::find(program, path)
+        .ok_or_else(|| Failure::Network("the forge CLI is not installed".into()))?;
     let mut command = cli_command(&program, kind, host, path);
     command.args(args);
     let (succeeded, stdout) = run_within(command, true)?;
-    if !succeeded || stdout.len() > 4096 {
-        return None;
+    if !succeeded {
+        return Err(Failure::Network(
+            "the forge CLI could not read its sign-in".into(),
+        ));
     }
-    let token = String::from_utf8(stdout).ok()?;
+    let token = String::from_utf8(stdout)
+        .map_err(|_| Failure::Body("the forge CLI returned an invalid token".into()))?;
     let token = token.trim();
-    plausible(token).then(|| Credential::new(SecretString::from(token.to_owned()), Source::Cli))
+    if token.is_empty() {
+        return Ok(None);
+    }
+    if !plausible(token) {
+        return Err(Failure::Body(
+            "the forge CLI returned an invalid token".into(),
+        ));
+    }
+    Ok(Some(Credential::new(
+        SecretString::from(token.to_owned()),
+        Source::Cli,
+    )))
 }
 
 /// Resolve the chosen CLI account immediately before use. glab refreshes
 /// OAuth credentials through its API transport, not `config get token`, so
-/// it is asked once first. That call failing (offline, GitLab down) is not
-/// a sign-out: the CLI's token is still used, and only the forge refusing
-/// it signs the user out. `None` means the CLI has no sign-in at all.
-pub fn cli_ready(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Credential> {
+/// it is asked once first. A failed call is retryable, not a sign-out:
+/// its saved token may have expired while OAuth is temporarily unavailable.
+pub fn cli_ready(
+    kind: Kind,
+    host: &str,
+    path: &std::ffi::OsStr,
+) -> Result<Option<Credential>, Failure> {
     if kind == Kind::GitLab {
-        let program = moonframe_providers::program::find("glab", path)?;
+        let program = moonframe_providers::program::find("glab", path)
+            .ok_or_else(|| Failure::Network("glab is not installed".into()))?;
         let mut command = cli_command(&program, kind, host, path);
         command.args(["api", "user", "--hostname", host]);
-        if !run_within(command, false).is_some_and(|(succeeded, _)| succeeded) {
-            tracing::debug!("gitlab: glab could not reach {host}; using its saved token");
+        if !run_within(command, false)?.0 {
+            return Err(Failure::Network("glab could not check its sign-in".into()));
         }
     }
     cli(kind, host, path)
@@ -493,51 +516,9 @@ pub fn cli_ready(kind: Kind, host: &str, path: &std::ffi::OsStr) -> Option<Crede
 const CLI_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// Runs `command` for at most [`CLI_TIMEOUT`] (`run_for`: `timeout`): whether it succeeded, and
-/// what it printed (at most 8 KiB) when `capture`. `None` when it could not
-/// start or ran out of time, and was killed.
-fn run_within(command: Command, capture: bool) -> Option<(bool, Vec<u8>)> {
+/// what it printed (at most 8 KiB) when `capture`, or a retryable error.
+fn run_within(command: Command, capture: bool) -> Result<(bool, Vec<u8>), Failure> {
     run_for(command, capture, CLI_TIMEOUT)
-}
-
-fn run_for(
-    mut command: Command,
-    capture: bool,
-    timeout: std::time::Duration,
-) -> Option<(bool, Vec<u8>)> {
-    use std::io::Read;
-    command.stdout(if capture {
-        Stdio::piped()
-    } else {
-        Stdio::null()
-    });
-    let mut child = command.spawn().ok()?;
-    // Read on a thread, so a full pipe never stalls the program.
-    let reader = child.stdout.take().map(|stdout| {
-        std::thread::spawn(move || {
-            let mut bytes = Vec::new();
-            let _ = stdout.take(8192).read_to_end(&mut bytes);
-            bytes
-        })
-    });
-    let deadline = std::time::Instant::now() + timeout;
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if std::time::Instant::now() < deadline => {
-                std::thread::sleep(std::time::Duration::from_millis(50));
-            },
-            _ => {
-                tracing::warn!("a forge CLI ran past {}s; stopped", timeout.as_secs());
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            },
-        }
-    };
-    let stdout = reader
-        .and_then(|reader| reader.join().ok())
-        .unwrap_or_default();
-    Some((status.success(), stdout))
 }
 
 /// A CLI choice is resolved afresh rather than reusing a captured token.
@@ -546,11 +527,11 @@ pub fn for_fetch(
     host: &str,
     path: &std::ffi::OsStr,
     credential: Credential,
-) -> Option<Credential> {
+) -> Result<Credential, Failure> {
     if credential.source == Source::Cli {
-        cli_ready(kind, host, path)
+        cli_ready(kind, host, path)?.ok_or(Failure::Unauthorized)
     } else {
-        Some(credential)
+        Ok(credential)
     }
 }
 

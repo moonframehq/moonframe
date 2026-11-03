@@ -26,6 +26,8 @@ use {
     },
 };
 
+mod fetch;
+
 /// Who asked for an action, to answer them.
 #[derive(Clone, Debug)]
 pub struct Asker {
@@ -65,6 +67,7 @@ pub enum Done {
         credential: Option<Credential>,
         cli: bool,
         error: Option<String>,
+        retry: bool,
     },
     /// A sign-in that did not happen.
     Refused { error: String, asker: Asker },
@@ -118,11 +121,19 @@ impl Context {
     pub fn load(&self, host: String, epoch: u64) {
         self.spawn(move |context| {
             let mut error = None;
+            let mut retry = false;
             let cli = credentials::cli(context.kind, &host, &context.path);
             let credential = match context.saved.load(&host) {
                 Ok(Some(Remembered::Token(credential))) => Some(credential),
                 Ok(Some(Remembered::Cli)) => {
-                    credentials::cli_ready(context.kind, &host, &context.path)
+                    match credentials::cli_ready(context.kind, &host, &context.path) {
+                        Ok(credential) => credential,
+                        Err(failure) => {
+                            retry = true;
+                            error = Some(failure.to_string());
+                            None
+                        },
+                    }
                 },
                 Ok(None) => None,
                 Err(problem) => {
@@ -132,25 +143,31 @@ impl Context {
             }
             .or_else(|| {
                 // The environment's token goes only to the host it is for.
-                context
-                    .kind
-                    .env_serves(&host)
-                    .then(|| credentials::environment(context.kind))
+                (!retry)
+                    .then(|| {
+                        context
+                            .kind
+                            .env_serves(&host)
+                            .then(|| credentials::environment(context.kind))
+                            .flatten()
+                    })
                     .flatten()
             });
             context.send(Done::Loaded {
                 host,
                 epoch,
                 credential,
-                cli: cli.is_some(),
+                cli: cli.is_ok_and(|credential| credential.is_some()),
                 error,
+                retry,
             });
         });
     }
 
     pub fn probe_cli(&self, host: String, epoch: u64) {
         self.spawn(move |context| {
-            let available = credentials::cli(context.kind, &host, &context.path).is_some();
+            let available = credentials::cli(context.kind, &host, &context.path)
+                .is_ok_and(|credential| credential.is_some());
             context.send(Done::Cli {
                 host,
                 epoch,
@@ -191,14 +208,18 @@ impl Context {
     pub fn use_cli(&self, host: String, asker: Asker) {
         self.spawn(move |context| {
             match credentials::cli_ready(context.kind, &host, &context.path) {
-                Some(credential) => context.keep(&host, credential, asker),
-                None => {
+                Ok(Some(credential)) => context.keep(&host, credential, asker),
+                Ok(None) => {
                     let (program, _) = context.kind.cli(&host);
                     context.send(Done::Refused {
                         error: format!("{program} is not installed or not signed in to {host}"),
                         asker,
                     });
                 },
+                Err(failure) => context.send(Done::Refused {
+                    error: failure.to_string(),
+                    asker,
+                }),
             }
         });
     }
@@ -263,24 +284,25 @@ impl Context {
     pub fn fetch(
         &self,
         target: Target,
-        mut credential: Credential,
+        credential: Credential,
         client: Option<String>,
         epoch: u64,
     ) {
         self.spawn(move |context| {
-            let cli = credential.source == Source::Cli;
-            let Some(fresh) =
-                credentials::for_fetch(context.kind, &target.host, &context.path, credential)
-            else {
-                context.send(Done::Fetched {
-                    target,
-                    epoch,
-                    result: Err(Failure::Unauthorized),
-                    credential: None,
-                });
-                return;
-            };
-            credential = fresh;
+            let credential =
+                match credentials::for_fetch(context.kind, &target.host, &context.path, credential)
+                {
+                    Ok(credential) => credential,
+                    Err(failure) => {
+                        context.send(Done::Fetched {
+                            target,
+                            epoch,
+                            result: Err(failure),
+                            credential: None,
+                        });
+                        return;
+                    },
+                };
             let avatars = Avatars {
                 folder: &context.images,
                 prefix: match context.kind {
@@ -293,7 +315,10 @@ impl Context {
             // renewal: if refused, it can still be renewed once.
             let renew = |credential: &Credential| {
                 let Some(client) = client.as_deref() else {
-                    return Renewal::Failed;
+                    return Renewal::Failed(Failure::Status(
+                        400,
+                        "no OAuth client id to renew the sign-in".into(),
+                    ));
                 };
                 context.saved.renew(&target.host, credential, |credential| {
                     device::refresh(
@@ -303,53 +328,18 @@ impl Context {
                         client,
                         credential,
                     )
-                    .ok()
                 })
             };
-            let mut renewed = false;
-            let mut updated = cli;
-            if credential.expiring() {
-                match renew(&credential) {
-                    Renewal::Renewed(fresh) => {
-                        credential = fresh;
-                        renewed = true;
-                        updated = true;
-                    },
-                    Renewal::Newer(fresh) => {
-                        credential = fresh;
-                        updated = true;
-                    },
-                    Renewal::Gone => {
-                        context.send(Done::Fetched {
-                            target,
-                            epoch,
-                            result: Err(Failure::Unauthorized),
-                            credential: None,
-                        });
-                        return;
-                    },
-                    Renewal::Failed => {},
-                }
-            }
             let read = |credential: &Credential| match context.kind {
                 Kind::GitHub => github::fetch(&context.agent, &credential.token, &target, &avatars),
                 Kind::GitLab => gitlab::fetch(&context.agent, &credential.token, &target, &avatars),
             };
-            let mut result = read(&credential);
-            if result == Err(Failure::Unauthorized)
-                && !renewed
-                && credential.refresh.is_some()
-                && let Renewal::Renewed(fresh) | Renewal::Newer(fresh) = renew(&credential)
-            {
-                credential = fresh;
-                updated = true;
-                result = read(&credential);
-            }
+            let (result, credential) = fetch::read(credential, renew, read);
             context.send(Done::Fetched {
                 target,
                 epoch,
                 result,
-                credential: updated.then_some(credential),
+                credential,
             });
         });
     }

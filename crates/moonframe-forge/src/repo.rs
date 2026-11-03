@@ -26,13 +26,20 @@ fn text(root: &Path, args: &[&str]) -> Option<String> {
     Some(String::from_utf8_lossy(&bytes).trim_end().to_owned())
 }
 
-/// The repository the app's folder is in, as the git provider finds it:
-/// `$LAYOUTS_REPO`, else two folders up from the provider's.
+/// The repository the git provider watches: an explicit override, the
+/// terminal's project, then the app's folder.
 pub fn root(dir: &Path) -> Option<PathBuf> {
-    let start = std::env::var_os("LAYOUTS_REPO")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| dir.join("..").join(".."));
-    let start = std::path::absolute(&start).unwrap_or(start);
+    if let Some(named) = std::env::var_os("LAYOUTS_REPO") {
+        return toplevel(Path::new(&named));
+    }
+    moonframe_providers::project()
+        .as_deref()
+        .and_then(toplevel)
+        .or_else(|| toplevel(&dir.join("..").join("..")))
+}
+
+pub fn toplevel(start: &Path) -> Option<PathBuf> {
+    let start = std::path::absolute(start).unwrap_or_else(|_| start.to_owned());
     text(&start, &["rev-parse", "--show-toplevel"]).map(PathBuf::from)
 }
 

@@ -74,6 +74,7 @@ pub(crate) struct Forge {
     context: Option<Context>,
     done: Option<Receiver<Done>>,
     root: Option<PathBuf>,
+    followed: Option<PathBuf>,
     accounts: Mods,
     settings: Value,
     /// Every this long, the forge is read again.
@@ -83,6 +84,7 @@ pub(crate) struct Forge {
     /// The host signed in to: the remote's, else the forge's own.
     host: String,
     loaded: Option<String>,
+    load_retry: Option<Instant>,
     status: Status,
     credential: Option<Credential>,
     login: Option<String>,
@@ -114,6 +116,7 @@ impl Forge {
             context: None,
             done: None,
             root: None,
+            followed: None,
             accounts: Mods::default(),
             settings: Value::Null,
             every: Duration::from_secs(60),
@@ -121,6 +124,7 @@ impl Forge {
             ticks: 0,
             host: kind.default_host().to_owned(),
             loaded: None,
+            load_retry: None,
             status: Status::Checking,
             credential: None,
             login: None,
@@ -195,6 +199,13 @@ impl Forge {
     }
 
     fn look(&mut self, handle: &Handle) {
+        self.look_project(handle, moonframe_providers::project());
+    }
+
+    fn look_project(&mut self, handle: &Handle, project: Option<PathBuf>) {
+        if std::env::var_os("LAYOUTS_REPO").is_none() {
+            self.follow(project);
+        }
         let checkout = self.root.as_deref().map(repo::read).unwrap_or_default();
         if checkout != self.checkout {
             self.checkout = checkout;
@@ -221,6 +232,24 @@ impl Forge {
         }
     }
 
+    /// Follow the same trusted project as `app.git`, retaining the last
+    /// repository when the terminal is outside one.
+    fn follow(&mut self, project: Option<PathBuf>) {
+        if project.is_none() || project == self.followed {
+            return;
+        }
+        self.followed = project.clone();
+        let Some(root) = project.as_deref().and_then(repo::toplevel) else {
+            return;
+        };
+        if self.root.as_ref() != Some(&root) {
+            self.root = Some(root);
+            self.checkout = Checkout::default();
+            self.data = Value::Null;
+            self.next = Some(Instant::now());
+        }
+    }
+
     fn take_in(&mut self, host: &Handle, done: Done) {
         match done {
             Done::Cli {
@@ -241,12 +270,18 @@ impl Forge {
                 credential,
                 cli,
                 error,
+                retry,
             } => {
                 if loaded != self.host || epoch != self.epoch || self.status != Status::Checking {
                     return;
                 }
                 self.cli = cli;
                 self.error = error;
+                if retry {
+                    self.load_retry = Some(Instant::now() + UNREACHABLE);
+                    return;
+                }
+                self.load_retry = None;
                 self.status = if credential.is_some() {
                     Status::SignedIn
                 } else {
@@ -416,6 +451,7 @@ impl Forge {
 
     fn stop_sign_in(&mut self, host: &Handle, error: &str) {
         self.end_device();
+        self.load_retry = None;
         self.attempt += 1;
         if let Some(asker) = self.waiting.take() {
             reply(host, &asker, false, json!({ "error": error }));
@@ -706,6 +742,7 @@ impl Native for Forge {
         });
         self.done = Some(receiver);
         self.root = repo::root(host.dir());
+        self.followed = moonframe_providers::project();
         self.look(host);
         self.publish(host);
         Ok(())
@@ -725,12 +762,28 @@ impl Native for Forge {
         for done in done {
             self.take_in(host, done);
         }
+        if self.status == Status::Checking
+            && self.load_retry.is_some_and(|next| Instant::now() >= next)
+            && let Some(context) = &self.context
+        {
+            self.load_retry = None;
+            context.load(self.host.clone(), self.epoch);
+        }
         self.expire_device(host, crate::credentials::now());
         self.fetch_if_due();
         self.publish(host);
     }
 
     fn receive(&mut self, host: &Handle, from: &str, message: Data) {
+        // Resolve a move before handling account actions or throttling a
+        // refresh. Only the host's trusted project selects the repository.
+        let project = moonframe_providers::project();
+        if project.is_some()
+            && project != self.followed
+            && std::env::var_os("LAYOUTS_REPO").is_none()
+        {
+            self.look_project(host, project);
+        }
         let flag = |key: &str| {
             message
                 .get(key)
@@ -770,6 +823,11 @@ impl Native for Forge {
     }
 }
 
+// keep-sorted start
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod project_tests;
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests;
+// keep-sorted end

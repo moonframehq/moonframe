@@ -1,6 +1,6 @@
 use {super::*, moonframe_providers::Event, std::sync::Mutex};
 
-fn handle() -> (Handle, Arc<Mutex<Vec<Event>>>) {
+pub(super) fn handle() -> (Handle, Arc<Mutex<Vec<Event>>>) {
     let events = Arc::new(Mutex::new(Vec::new()));
     let seen = Arc::clone(&events);
     let host = Handle::new(
@@ -48,6 +48,7 @@ fn authentication_is_initialized_without_a_checkout() {
         credential: None,
         cli: true,
         error: None,
+        retry: false,
     });
     let data = forge.snapshot();
     assert_eq!(data["reason"], "not a git repository");
@@ -347,6 +348,7 @@ fn an_old_load_cannot_restore_a_signed_out_account_after_a_host_round_trip() {
         )),
         cli: true,
         error: Some("old error".into()),
+        retry: false,
     };
     forge.act(
         &host,
@@ -368,6 +370,7 @@ fn an_old_load_cannot_restore_a_signed_out_account_after_a_host_round_trip() {
         credential: None,
         cli: false,
         error: None,
+        retry: false,
     });
     assert_eq!(forge.status, Status::SignedOut);
 }
@@ -427,4 +430,53 @@ fn an_obsolete_cli_probe_cannot_replace_the_current_one() {
     });
     assert!(forge.cli);
     assert!(forge.cli_probe.is_none());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_saved_cli_choice_retries_after_startup_read_failure() {
+    use std::os::unix::fs::PermissionsExt;
+    let (host, _) = handle();
+    let dir = tempfile::tempdir().unwrap();
+    let (mut forge, saved) = with_store(dir.path());
+    saved
+        .save(
+            "github.com",
+            &Credential::new(SecretString::from("fake-token"), Source::Cli),
+        )
+        .unwrap();
+    forge.status = Status::Checking;
+    forge.context.as_mut().unwrap().path = dir.path().as_os_str().to_owned();
+    let cli = dir.path().join("gh");
+    std::fs::write(&cli, "#!/bin/sh\nexit 1\n").unwrap();
+    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o700)).unwrap();
+    forge
+        .context
+        .as_ref()
+        .unwrap()
+        .load(forge.host.clone(), forge.epoch);
+    let result = forge
+        .done
+        .as_ref()
+        .unwrap()
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap();
+    forge.take_in(&host, result);
+    assert_eq!(forge.status, Status::Checking);
+    assert!(forge.load_retry.is_some());
+    assert!(forge.error.is_some());
+    std::fs::write(&cli, "#!/bin/sh\nprintf recovered-token\n").unwrap();
+    forge.load_retry = Some(Instant::now());
+    forge.tick(&host);
+    let result = forge
+        .done
+        .as_ref()
+        .unwrap()
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap();
+    forge.take_in(&host, result);
+    assert_eq!(forge.status, Status::SignedIn);
+    assert_eq!(forge.credential.as_ref().unwrap().source, Source::Cli);
+    assert!(forge.load_retry.is_none());
+    assert!(forge.error.is_none());
 }

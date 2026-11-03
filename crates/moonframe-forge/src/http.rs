@@ -107,6 +107,9 @@ pub(crate) fn form(
         .send_form(fields.iter().copied())
         .map_err(|error| Failure::Network(error.to_string()))?;
     let status = response.status().as_u16();
+    if status == 429 {
+        return Err(Failure::RateLimited);
+    }
     let value = read(&mut response)?;
     if status == 200 || (400..500).contains(&status) && value.get("error").is_some() {
         Ok(value)

@@ -1838,7 +1838,10 @@ gitlab.com, `$GITLAB_HOST`, or a host listed in `[settings] hosts`): native
 sign-in, every `poll` seconds (60), when the worktrees' branches change,
 and on any other message. Same shape; GitLab merge requests fill `prs`,
 `current_pr` and `branches`. `auth` and `host` are always there, also when
-`available` is false.
+`available` is false. Both follow the same trusted active project as
+`app.git`: `LAYOUTS_REPO` overrides it, and the app folder is the startup
+fallback. Switching repositories clears the previous repository's results;
+switching hosts also cancels an in-progress sign-in.
 
 **Signing in is the provider's, drawing it is the app's.** `auth` says where
 it stands, and a mod in the provider's `[settings] accounts` (`forge` as
@@ -1859,6 +1862,10 @@ Without one, `auth.device` is false and the other ways remain.
 `$GITLAB_HOST` when set, otherwise gitlab.com. Tokens stay in
 the provider (the system keyring, or a private file under
 `~/.local/state/moonframe` where the build has none) and never reach a mod.
+Temporary OAuth or CLI failures retain the sign-in and retry; an unreadable
+saved CLI choice stays `checking` until it can be read. CLI execution and
+output collection share a deadline. A definitive token refusal still
+requires signing in again.
 Components: `forge-pr` (a branch's request: number by tone, checks dot,
 +/− lines, opens on click; `branch = worktree.branch` beside worktrees),
 `forge-account` (the title bar's account button), `forge-sign-in` (a
@@ -1874,7 +1881,7 @@ starter's title bar. `{ to = "app:open", msg = url }` opens a web page.
 | `current_pr` | the same for the current branch (its newest, open or not) plus `check_list = { { name, outcome, url } }`, or nil |
 | `branches` | `{ [branch] = pr }`: the newest pull request of the current branch and each worktree's (20 at most), for `forge-pr { branch = ... }` |
 | `auth` | `{ status ("checking" "signed_out" "pending" "verifying" "signed_in"), host, login?, source? ("saved" "env" "cli"), device, cli, code?, url?, complete_url?, expires?, error? }` |
-| `checks` | `{ total, passed, failed, pending, skipped }` (GitLab lists show the head pipeline only on `current_pr`) |
+| `checks` | `{ total, passed, failed, pending, skipped }`; GitLab's `current_pr` counts all job pages (only 50 jobs appear in `check_list`), falling back to the head pipeline when jobs are inaccessible or miss a worse pipeline outcome |
 | `tone` | `"merged"`, `"closed"`, `"draft"`, `"attention"` (conflicts, failed checks, changes requested), `"waiting"` (checks running, review required), `"ready"`, `"held"` (blocked or behind) |
 | `issues` | 30 open: `{ number, title, url, author, updated, labels = { { name, color } }, assignees = { login } }` |
 

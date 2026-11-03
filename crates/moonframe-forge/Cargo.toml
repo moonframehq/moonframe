@@ -25,3 +25,6 @@ ureq.workspace                = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix = { features = ["process"], workspace = true }

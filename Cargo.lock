@@ -4950,6 +4950,7 @@ dependencies = [
  "moonframe-git",
  "moonframe-packages",
  "moonframe-providers",
+ "rustix",
  "secrecy",
  "serde_json",
  "tempfile",
