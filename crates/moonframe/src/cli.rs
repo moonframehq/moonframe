@@ -64,7 +64,7 @@ Options:
                 install`. Its packages and mods are its own; only your
                 style.luau and theme follow you into it
   --check       load every module, report problems, and exit without a window
-  --release     Developer Mode off for this run: no Components menu, Inspect
+  --release     Developer Mode off for this run: no Components…, Inspect
                 Element, or Reload Modules (Developer Mode in the app menu
                 switches it, and is kept)
   --dev         Developer Mode on for this run
@@ -516,7 +516,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
             gpui_kit::init(cx);
             crate::dock::set_icon(icon.as_deref());
             crate::actions::bind_keys(cx);
-            cx.set_menus(crate::actions::menus(&[], &[]));
+            cx.set_menus(crate::actions::menus(&[]));
             cx.on_action(|_: &crate::actions::Quit, cx| cx.quit());
             cx.on_window_closed(|cx, _| {
                 if cx.windows().is_empty() {

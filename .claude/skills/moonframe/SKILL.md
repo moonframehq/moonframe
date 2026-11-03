@@ -267,11 +267,11 @@ instruction.
 
 `components/<name>.luau` (in `app/` or `~/.config/moonframe`, which
 wins by name) holds a component: a function from props to elements, plus
-what the Components menu shows. The user browses them in their own window
-with **Components > Browse Components…** (⇧⌘K), or picks one by category
-from that menu. Each gets its icon, a live preview of `example`, and its
-usage; **Copy for agent** asks you to add it at the selection. Adding or
-editing a component file updates the menu and the window live.
+what the Components gallery shows. The user browses them, by category, in
+their own window with **View > Components…** (⇧⌘K, Developer Mode). Each
+gets its icon, a live preview of `example`, and its usage; **Copy for
+agent** asks you to add it at the selection. Adding or editing a component
+file updates the gallery live.
 
 Use one in a mod with `use`, and call it wherever an element goes:
 
@@ -300,8 +300,8 @@ A new component looks like this:
 
 ```lua
 return component {
-	title = "Stat",                 -- the menu and gallery name
-	category = "Status bar",        -- the Components submenu
+	title = "Stat",                 -- the gallery name
+	category = "Status bar",        -- its heading in the gallery
 	icon = "cpu",                   -- beside its title in the browser
 	description = "One line on what it is for.",
 	-- For the catalogue: when to use it, and what to use instead.
@@ -1483,8 +1483,8 @@ return mod {
 The shell (`main.luau` only) can add menus to the menu bar and say what the
 About panel shows. The host puts its app menu first (About <App>, Quit, named
 after the app's title), then the shell's menus, then View (a shell menu titled
-"View" merges into it), Components outside a release, and the shell's Window
-and Help last.
+"View" merges into it), and the shell's Window and Help last. In Developer
+Mode, **View > Components…** opens the Components gallery.
 
 ```lua
 -- A typed local: items with `msg` and with `command` mix in one list.
@@ -2131,7 +2131,7 @@ file.
 7. A test in `crates/moonframe-core/src/tests.rs`, then `just ci`.
 8. This skill: the element table, the selector list, and a recipe if it is
    something agents will reach for. A component wrapping it makes it show up
-   in the Components menu.
+   in the Components gallery.
 
 Anything that runs code or touches the machine belongs in a provider or
 behind a host element that the mod can only parameterise (as terminals take

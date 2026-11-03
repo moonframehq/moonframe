@@ -56,7 +56,7 @@ Moonframe as a library.
     <td width="50%" valign="top">
       <img src="docs/screenshots/components.png" alt="The Components window: a list of components by category on the left, and the List component on the right with a live preview of three rows, the Luau that uses it, and Copy code and Copy for agent buttons">
       <br>
-      <sub><b>Components.</b> Ready-made pieces mods <code>use</code>, browsed from the <b>Components</b> menu with a live preview, the code to paste, and <b>Copy for agent</b>.</sub>
+      <sub><b>Components.</b> Ready-made pieces mods <code>use</code>, browsed from <b>View &gt; Components…</b> in Developer Mode with a live preview, the code to paste, and <b>Copy for agent</b>.</sub>
     </td>
   </tr>
 </table>
@@ -354,7 +354,7 @@ into each.
 `just bundle-app NAME` builds a profile's app as a standalone release:
 `target/bundle/<Title>.app` on macOS, or a prefix with a `.desktop` file
 on Linux, with the app's title, id and icon. A bundle starts with
-Developer Mode off: no Components menu, Inspect Element or Reload. **Developer
+Developer Mode off: no Components…, Inspect Element or Reload. **Developer
 Mode** in the app menu turns them on live, for anyone who wants to change
 their app, and the choice is kept; `--release` and `--dev` set it for one
 run. Outside a release,
