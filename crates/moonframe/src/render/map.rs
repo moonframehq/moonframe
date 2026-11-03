@@ -26,6 +26,9 @@ use {
     view::Frame,
 };
 
+/// One breath of a pulsing pin's halo, before `animation_speed`.
+const PULSE: std::time::Duration = std::time::Duration::from_millis(2200);
+
 /// Zoom steps per pixel of wheel or trackpad scroll.
 const SCROLL_ZOOM: f64 = 1.0 / 120.0;
 
@@ -70,6 +73,12 @@ impl<'w> Draw<'w> for Map {
             })
             .detach();
         }
+        // Only a map with a pulsing pin asks for frame after frame.
+        let pulse = if self.pins.iter().any(|pin| pin.pulse) {
+            painter.phase(PULSE)
+        } else {
+            None
+        };
         let route_color = look
             .base
             .color
@@ -85,7 +94,7 @@ impl<'w> Draw<'w> for Map {
             .cursor_grab()
             .child(layer)
             .child(lines.paint(route_color, theme.background))
-            .children(pins::pins(self, frame, &sender, cx))
+            .children(pins::pins(self, frame, &sender, pulse, cx))
             .child(lines::announce(
                 &key,
                 painter.frame,

@@ -1103,6 +1103,9 @@ type MapPin = {
 	shape: ("dot" | "disc" | "balloon")?,
 	-- Drawn larger, above the others.
 	selected: boolean?,
+	-- A halo breathes out from it without end, in its color: where the
+	-- user is. A still glow while animations are off.
+	pulse: boolean?,
 	-- Sent when it is clicked, instead of the map's `select`.
 	msg: any?,
 }

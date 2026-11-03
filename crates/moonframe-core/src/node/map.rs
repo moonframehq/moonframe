@@ -165,6 +165,9 @@ pub struct Pin {
     pub shape: Option<PinShape>,
     /// Drawn larger, above the others.
     pub selected: bool,
+    /// A halo breathes out from it without end: where the user is, as
+    /// native maps mark it. Still, as a soft glow, with animations off.
+    pub pulse: bool,
     /// Sent when it is clicked, instead of the map's `select`.
     pub msg: Option<Data>,
 }

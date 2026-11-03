@@ -91,11 +91,11 @@ fn place(lat: f64, lon: f64, cx: &Cx) -> Result<[f64; 2], Error> {
     Ok([lat, lon])
 }
 
-/// `{ lat, lon, label, icon, color, shape, selected, msg }`.
+/// `{ lat, lon, label, icon, color, shape, selected, pulse, msg }`.
 impl Read for Pin {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
         let fields = Fields::read(value, cx, &[&[
-            "lat", "lon", "label", "icon", "color", "shape", "selected", "msg",
+            "lat", "lon", "label", "icon", "color", "shape", "selected", "pulse", "msg",
         ]])?;
         let [lat, lon] = place(fields.need("lat")?, fields.need("lon")?, cx)?;
         let label: Option<String> = fields.get("label")?;
@@ -115,6 +115,7 @@ impl Read for Pin {
             color: fields.get("color")?,
             shape: fields.get("shape")?,
             selected: fields.get("selected")?.unwrap_or(false),
+            pulse: fields.get("pulse")?.unwrap_or(false),
             msg: fields.get("msg")?,
         })
     }
