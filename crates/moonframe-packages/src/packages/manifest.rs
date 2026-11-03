@@ -12,6 +12,9 @@ use {
 #[serde(deny_unknown_fields)]
 struct ManifestFile {
     app: App,
+    /// Build-time dependency hints, interpreted by scripts/bundle_sealed.py.
+    #[serde(default, rename = "bundle")]
+    _bundle: Option<toml::Table>,
 }
 
 /// An app package's `[app]`.

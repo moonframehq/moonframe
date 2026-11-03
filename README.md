@@ -56,7 +56,7 @@ Moonframe as a library.
     <td width="50%" valign="top">
       <img src="docs/screenshots/components.png" alt="The Components window: a list of components by category on the left, and the List component on the right with a live preview of three rows, the Luau that uses it, and Copy code and Copy for agent buttons">
       <br>
-      <sub><b>Components.</b> Ready-made pieces mods <code>use</code>, browsed from the <b>Components</b> menu with a live preview, the code to paste, and <b>Copy for agent</b>.</sub>
+      <sub><b>Components.</b> Ready-made pieces mods <code>use</code>, browsed from <b>View &gt; Components…</b> in Developer Mode with a live preview, the code to paste, and <b>Copy for agent</b>.</sub>
     </td>
   </tr>
 </table>

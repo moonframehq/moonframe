@@ -38,7 +38,7 @@ library needs the toolchain in [rust-toolchain.toml](../rust-toolchain.toml)
 or newer.
 
 Features: `acp`, `alacritty`, `browser`, `chat`, `docs`, `forge`, `git`,
-`herdr-core`, `markdown`, `prose`, `shell`, `tokio`, `updates`, `usage` and
+`herdr-core`, `markdown`, `prose`, `shell`, `studio`, `tokio`, `updates`, `usage` and
 `wasm` by default. `ghostty` (a second terminal emulator, built from Ghostty's
 source with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`.
 
@@ -66,7 +66,8 @@ To add a sandboxed component alongside native providers, follow
 ### Choosing capabilities
 
 Flags follow native capabilities and their dependencies. Basic UI and the
-Luau component library remain available in every build.
+Luau component library remain available in ordinary builds; sealed bundles
+ship only their selected components.
 
 | Feature | What it includes |
 | --- | --- |
@@ -76,6 +77,8 @@ Luau component library remain available in every build.
 | `herdr-core` | herdr-core state storage and, with `terminal`, persistent terminals. |
 | `markdown` | Rich `ui.markdown` rendering (headings, lists, tables, links and code). |
 | `prose` | The writing editor for `ui.input` with `prose`, `dim` or `typewriter`. Ordinary single-line and multiline inputs remain available without it. |
+| `sealed` | Staged app resources instead of the full embedded toolbox. |
+| `studio` | Development commands and the component gallery. |
 | `updates` | Release checks, downloads and in-place app updates. Omitting it hides the updater menu and disables automatic checks. |
 | `acp`, `chat`, `docs`, `forge`, `git`, `shell`, `usage` | The respective built-in native providers. |
 | `tokio` | Async native-provider support. |
@@ -167,6 +170,12 @@ starter check. Build timings were not repeated for this second comparison.
 
 `python3 scripts/check-features.py --lint` checks dependency removal and
 lints minimal and individual-capability builds; CI runs it on every platform.
+
+The `bundle` command remains available without `studio`, so a library host
+can package its executable without including developer tools.
+
+For profile apps, [sealed bundles](sealed-bundles.md) select these features
+from the app's Luau and provider manifests and prune the shipped toolbox.
 
 Use the GPUI the library re-exports, `moonframe::gpui_kit` (GPUI with
 gpui-component): one app links one GPUI. If your crates name `gpui`

@@ -53,6 +53,51 @@ pub fn in_bundle() -> bool {
     resources().is_some()
 }
 
+#[cfg(all(test, feature = "sealed"))]
+#[allow(clippy::unwrap_used)]
+mod sealed_tests {
+    use super::*;
+
+    #[test]
+    fn bundle_layers_work_without_a_user_and_ignore_user_sources() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("toolbox");
+        let app = dir.path().join("app");
+        let package = dir.path().join("package");
+        let user = dir.path().join("user");
+        let own = user.join("profiles/test");
+        for folder in [&base, &app, &package, &own] {
+            std::fs::create_dir_all(folder).unwrap();
+            std::fs::write(folder.join("main.luau"), "return mod {}").unwrap();
+        }
+        std::fs::write(own.join("style.luau"), "error('must not load')").unwrap();
+        let mut folders = Folders {
+            builtin: base.clone(),
+            host: None,
+            user: None,
+            profile: Some("test".into()),
+            bundled: Some(Bundled {
+                name: "test".into(),
+                app: AppLayer {
+                    path: app.clone(),
+                    keep: Vec::new(),
+                },
+                packages: vec![package.clone()],
+            }),
+        };
+        let roots = folders.roots();
+        assert_eq!(roots.file("main.luau"), Some(app.join("main.luau")));
+        assert_eq!(roots.layers().collect::<Vec<_>>(), [
+            base.as_path(),
+            package.as_path(),
+            app.as_path()
+        ]);
+        folders.user = Some(user);
+        assert_eq!(folders.roots(), roots);
+        assert!(folders.settings().contains(&own.join("settings.toml")));
+    }
+}
+
 /// `$XDG_CACHE_HOME/<name>`, by default `~/.cache/<name>`.
 pub fn cache() -> PathBuf {
     xdg("XDG_CACHE_HOME", ".cache").unwrap_or_else(|| private().join("cache"))
@@ -202,6 +247,15 @@ impl Folders {
     /// and the user's folder. In a profile, under the profile's packages,
     /// its app, the user's stylesheet, and the profile's folder.
     pub fn roots(&self) -> Roots {
+        if cfg!(feature = "sealed")
+            && let Some(bundled) = &self.bundled
+        {
+            return Roots::bundled(
+                self.builtin.clone(),
+                bundled.packages.clone(),
+                bundled.app.clone(),
+            );
+        }
         match (&self.user, &self.profile) {
             (Some(user), Some(name)) => {
                 let own = profile(user, name);

@@ -13,6 +13,7 @@ workspace = true
 
 [features]
 default = ["updates"]
+sealed  = []
 # Network release checks and installation, independent of package metadata.
 updates = ["dep:ureq"]
 # A bundle prebuilds its Wasm providers only when the app it bundles can

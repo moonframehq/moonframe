@@ -39,6 +39,7 @@ default = [
   "markdown",
   "prose",
   "shell",
+  "studio",
   "tokio",
   "updates",
   "usage",
@@ -59,12 +60,16 @@ git = ["dep:moonframe-git", "moonframe-history/herdr"]
 shell = ["dep:moonframe-shell"]
 # State kept by herdr-core (`hc`) when installed; with `terminal`, it also
 # keeps shells across launches. tmux and local PTYs only need `terminal`.
-herdr-core = ["moonframe-mux/herdr-core"]
+herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
 # Rich read-only Markdown and the long-form writing editor are independent.
 markdown = []
 prose    = []
+# A sealed executable uses staged resources instead of the full toolbox.
+sealed = ["moonframe-packages/sealed"]
+# Development commands and the component gallery.
+studio = []
 # Terminal rendering and local/tmux sessions. Engines enable this too.
-terminal = ["dep:moonframe-terminal", "moonframe-mux/terminal"]
+terminal = ["dep:moonframe-mux", "dep:moonframe-terminal", "moonframe-mux/terminal"]
 # Native providers written with `async fn` (`.native_async`), and a tokio
 # runtime they and the app's views share (`.tokio`, `on_runtime`).
 tokio = ["moonframe-providers/tokio"]
@@ -92,7 +97,7 @@ moonframe-docs                = { optional = true, workspace = true }
 moonframe-forge               = { optional = true, workspace = true }
 moonframe-git                 = { optional = true, workspace = true }
 moonframe-history.workspace   = true
-moonframe-mux.workspace       = true
+moonframe-mux                 = { optional = true, workspace = true }
 moonframe-packages            = { default-features = false, path = "../moonframe-packages" }
 moonframe-providers.workspace = true
 moonframe-shell               = { optional = true, workspace = true }

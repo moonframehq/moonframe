@@ -4,6 +4,7 @@
 use {
     crate::{
         app::MoonframeApp,
+        backends::Backends,
         launch::{AppSource, Moonframe},
         packages,
         paths::{self, Folders},
@@ -15,7 +16,6 @@ use {
         point, px, size,
     },
     moonframe_core::{AppLayer, Chrome, Roots, Titlebar},
-    moonframe_mux::Backends,
     std::{
         fs,
         path::PathBuf,
@@ -104,6 +104,17 @@ struct Args {
     panes: Option<Vec<String>>,
 }
 
+fn usage() -> &'static str {
+    if cfg!(feature = "sealed") {
+        "Usage: moonframe [--check] [--no-user | --user DIR] [--background]\n\n\
+         This sealed executable runs only its bundled app. Settings and state\n\
+         persist, but user source overlays and development tools are unavailable.\n\
+         Rebuild the app to add capabilities removed from this executable."
+    } else {
+        USAGE
+    }
+}
+
 fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>, String> {
     let mut builtin = None;
     let mut user = paths::user();
@@ -170,6 +181,31 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
             path if builtin.is_none() => builtin = Some(PathBuf::from(path)),
             extra => return Err(format!("unexpected argument: {extra}")),
         }
+    }
+    if cfg!(feature = "sealed") {
+        if bundle.is_some() {
+            return Err("a sealed executable cannot build app bundles".to_owned());
+        }
+        let app = bundled
+            .as_ref()
+            .ok_or("a sealed executable must run inside its app bundle")?;
+        if builtin.is_some() || profile.as_ref().is_some_and(|name| name != &app.name) {
+            return Err("a sealed executable only runs its bundled app".to_owned());
+        }
+    }
+    if !cfg!(feature = "studio")
+        && (init.is_some()
+            || apps.is_some()
+            || packages.is_some()
+            || history.is_some()
+            || catalogue
+            || component.is_some()
+            || preview_only
+            || release == Some(false))
+    {
+        return Err(
+            "this build does not include development tools or package installation".to_owned(),
+        );
     }
     // An app on the library: DIR is its own folder, over the toolbox.
     let (builtin, host) = match host {
@@ -338,23 +374,31 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     let args = match parse_args(host, &launch.keep) {
         Ok(Some(args)) => args,
         Ok(None) => {
-            println!("{}", branded(USAGE));
+            println!("{}", branded(usage()));
             return ExitCode::SUCCESS;
         },
         Err(message) => {
-            eprintln!("{message}\n\n{}", branded(USAGE));
+            eprintln!("{message}\n\n{}", branded(usage()));
             return ExitCode::from(2);
         },
     };
-    if let Some(words) = &args.init {
+    if cfg!(feature = "studio")
+        && let Some(words) = &args.init
+    {
         return crate::init::run(words);
     }
-    if let Some(words) = &args.bundle {
+    // Packaging copies this executable, so hosts without developer tools
+    // must be able to bundle themselves too.
+    if !cfg!(feature = "sealed")
+        && let Some(words) = &args.bundle
+    {
         return crate::bundle::run(&args.folders, words);
     }
     let folders = args.folders;
     paths::set_user_folder(folders.user.clone());
-    if let Some(words) = &args.apps {
+    if cfg!(feature = "studio")
+        && let Some(words) = &args.apps
+    {
         let Some(user) = &folders.user else {
             eprintln!(
                 "{} app: profiles go in the user's folder; drop --no-user",
@@ -386,7 +430,9 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         };
         return crate::panes::run(user, folders.profile.as_deref(), &folders.title(), words);
     }
-    if let Some(words) = &args.packages {
+    if cfg!(feature = "studio")
+        && let Some(words) = &args.packages
+    {
         let Some(own) = folders.own() else {
             eprintln!(
                 "{} mod: packages go in the user's folder; drop --no-user",
@@ -396,13 +442,15 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         };
         return packages::run(&own, words);
     }
-    if let Some(words) = &args.history {
+    if cfg!(feature = "studio")
+        && let Some(words) = &args.history
+    {
         return crate::history::run(&folders, words);
     }
     if args.check {
         return check(folders.roots());
     }
-    if args.catalogue {
+    if cfg!(feature = "studio") && args.catalogue {
         return catalogue(folders.roots());
     }
 
