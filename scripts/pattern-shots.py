@@ -22,7 +22,7 @@ def capture(binary, name, dark, folder):
     app.mkdir()
     for item in ("components", "mods", "style.luau"):
         (app / item).symlink_to(APP / item)
-    width = 820 if name == "workspace-shell" else 560
+    width = 820 if name == "workspace-shell" else 640
     mode = "dark" if dark else "light"
     sends = '{ to = "app:appearance", msg = "' + mode + '" }'
     if name == "workspace-switcher":
@@ -37,6 +37,8 @@ def capture(binary, name, dark, folder):
 ''')
     dest = OUT / f'{name}{"-dark" if dark else ""}.png'
     rendered = folder / "render.png"
+    subprocess.run([str(binary), "--check", "--no-user", str(app)],
+                   cwd=ROOT, check=True, capture_output=True, text=True)
     with (folder / "app.log").open("w") as log:
         process = subprocess.Popen([str(binary), "--background", "--no-user", str(app)],
                                    cwd=ROOT, stdout=log, stderr=log,
@@ -44,7 +46,9 @@ def capture(binary, name, dark, folder):
                                         "XDG_STATE_HOME": str(folder / "state"),
                                         "MOONFRAME_CAPTURE": str(rendered)})
         try:
-            process.wait(timeout=30)
+            # AppKit can spend over a minute loading system writing-tools on
+            # busy macOS hosts before the first frame reaches our exporter.
+            process.wait(timeout=180)
             if process.returncode != 0 or not rendered.is_file():
                 raise RuntimeError((folder / "app.log").read_text())
             rendered.replace(dest)
