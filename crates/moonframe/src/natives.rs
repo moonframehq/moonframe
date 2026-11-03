@@ -18,12 +18,14 @@ pub(crate) fn natives() -> Natives {
     let built_in: &[(&str, fn() -> Box<dyn Native>)] = &[
         // keep-sorted start
         ("acp", acp),
+        ("chat", chat),
         // The demo gallery's (examples/demo): it opens apps on this binary.
         ("demos", crate::demos::native),
         ("docs", docs),
         ("git", git),
         ("github", github),
         ("gitlab", gitlab),
+        ("shell", shell),
         ("usage", usage),
         // keep-sorted end
     ];
@@ -39,6 +41,11 @@ pub(crate) fn natives() -> Natives {
 #[cfg(feature = "acp")]
 fn acp() -> Box<dyn Native> {
     moonframe_acp::native()
+}
+
+#[cfg(feature = "chat")]
+fn chat() -> Box<dyn Native> {
+    moonframe_chat::native()
 }
 
 #[cfg(feature = "docs")]
@@ -61,6 +68,11 @@ fn gitlab() -> Box<dyn Native> {
     moonframe_forge::gitlab()
 }
 
+#[cfg(feature = "shell")]
+fn shell() -> Box<dyn Native> {
+    moonframe_shell::native()
+}
+
 #[cfg(feature = "usage")]
 fn usage() -> Box<dyn Native> {
     moonframe_usage::native()
@@ -68,6 +80,16 @@ fn usage() -> Box<dyn Native> {
 
 #[cfg(not(feature = "acp"))]
 fn acp() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "chat"))]
+fn chat() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "shell"))]
+fn shell() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
@@ -101,9 +123,11 @@ fn usage() -> Box<dyn Native> {
 #[cfg_attr(
     all(
         feature = "acp",
+        feature = "chat",
         feature = "docs",
         feature = "forge",
         feature = "git",
+        feature = "shell",
         feature = "usage"
     ),
     allow(dead_code)
@@ -154,7 +178,9 @@ mod tests {
     #[test]
     fn every_built_in_native_is_registered() {
         let natives = natives();
-        for name in ["acp", "docs", "git", "github", "gitlab", "usage", "demos"] {
+        for name in [
+            "acp", "chat", "demos", "docs", "git", "github", "gitlab", "shell", "usage",
+        ] {
             assert!(natives.contains_key(name), "{name}");
         }
     }

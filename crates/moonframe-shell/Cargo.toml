@@ -1,0 +1,25 @@
+[package]
+description            = "The `shell` native provider: runs a mod's shell commands in the workspace, with their output in colour"
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-shell"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[dependencies]
+moonframe-core.workspace      = true
+moonframe-providers.workspace = true
+serde_json.workspace          = true
+tracing.workspace             = true
+
+# Stopping a command and everything it started, as one process group.
+[target.'cfg(unix)'.dependencies]
+rustix = { features = ["process"], workspace = true }
+
+[dev-dependencies]
+tempfile.workspace = true

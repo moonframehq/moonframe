@@ -1,0 +1,16 @@
+# Chats with coding agents: the built-in `chat` provider (crates/moonframe-
+# chat). Each chat runs in herdr-gpui's `herdr-acp` program with no view of
+# its own, found on PATH or in an installed Herdr.app; the app attaches to
+# it over herdr's chat protocol. Chats outlive the app and are attached
+# again at the next launch. The agents run with your access and ask you
+# before acting, unless you turn on auto-accept in a chat.
+interval = 0.25
+kind     = "native"
+
+[settings]
+# The agent a new chat gets when none is picked.
+agent = "claude"
+# The mods that may start and drive chats.
+starters = ["chat"]
+# Where herdr-acp is, when it is neither on PATH nor in Herdr.app:
+# program = "~/code/herdr-gpui/target/release/herdr-acp"

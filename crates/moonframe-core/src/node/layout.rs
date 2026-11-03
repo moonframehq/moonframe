@@ -17,6 +17,9 @@ pub struct Frame {
     pub border: Option<Border>,
     /// Scroll along the container's axis when its children overflow.
     pub scroll: Scroll,
+    /// While scrolled to its end, stay there as the content grows: a chat
+    /// or a log. Scrolled back, it stays where the user put it.
+    pub follow: bool,
     /// Give up space when the parent is short of it (the default); `false`
     /// keeps the content's size, so a strip is never squeezed.
     pub shrink: bool,

@@ -3379,6 +3379,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "herdr-chat-protocol"
+version = "0.1.0"
+source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
 name = "herdr-client"
 version = "0.1.0"
 source = "git+https://github.com/penso/herdr-gpui?rev=9133cb18b143c9b3f12777fe69e3058eb4ecc8bf#9133cb18b143c9b3f12777fe69e3058eb4ecc8bf"
@@ -3710,7 +3721,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.57.0",
 ]
 
 [[package]]
@@ -4381,9 +4392,8 @@ dependencies = [
 
 [[package]]
 name = "libghostty-vt"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16c7287a8dc35c3436224b39358af81ab9ea54bafa0f7ea2e068bd2a47bdcb2d"
+version = "0.2.1"
+source = "git+https://github.com/uzaaft/libghostty-rs?rev=575ed6b8ceb79ffaf247ecf7e34333876b0d5be4#575ed6b8ceb79ffaf247ecf7e34333876b0d5be4"
 dependencies = [
  "bitflags 2.13.2",
  "int-enum",
@@ -4392,9 +4402,8 @@ dependencies = [
 
 [[package]]
 name = "libghostty-vt-sys"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df233d9b287cded4bbebba3463c6df7a8bdb516c0341ed984e870ef5594c2e6f"
+version = "0.2.1"
+source = "git+https://github.com/uzaaft/libghostty-rs?rev=575ed6b8ceb79ffaf247ecf7e34333876b0d5be4#575ed6b8ceb79ffaf247ecf7e34333876b0d5be4"
 
 [[package]]
 name = "libloading"
@@ -4849,6 +4858,7 @@ dependencies = [
  "imagesize 0.15.0",
  "lb-wry",
  "moonframe-acp",
+ "moonframe-chat",
  "moonframe-core",
  "moonframe-docs",
  "moonframe-forge",
@@ -4857,6 +4867,7 @@ dependencies = [
  "moonframe-mux",
  "moonframe-packages",
  "moonframe-providers",
+ "moonframe-shell",
  "moonframe-store",
  "moonframe-terminal",
  "moonframe-usage",
@@ -4894,6 +4905,19 @@ name = "moonframe-app"
 version = "0.1.0"
 dependencies = [
  "moonframe",
+]
+
+[[package]]
+name = "moonframe-chat"
+version = "0.1.0"
+dependencies = [
+ "herdr-chat-protocol",
+ "moonframe-core",
+ "moonframe-providers",
+ "rustix",
+ "serde_json",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]
@@ -5003,6 +5027,18 @@ dependencies = [
  "tracing",
  "wasmtime",
  "wasmtime-wasi",
+]
+
+[[package]]
+name = "moonframe-shell"
+version = "0.1.0"
+dependencies = [
+ "moonframe-core",
+ "moonframe-providers",
+ "rustix",
+ "serde_json",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]
@@ -9815,7 +9851,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

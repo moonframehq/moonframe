@@ -4,6 +4,7 @@ members = [
   "crates/moonframe",
   "crates/moonframe-acp",
   "crates/moonframe-app",
+  "crates/moonframe-chat",
   "crates/moonframe-core",
   "crates/moonframe-docs",
   "crates/moonframe-forge",
@@ -12,6 +13,7 @@ members = [
   "crates/moonframe-mux",
   "crates/moonframe-packages",
   "crates/moonframe-providers",
+  "crates/moonframe-shell",
   "crates/moonframe-store",
   "crates/moonframe-terminal",
   "crates/moonframe-usage",
@@ -47,18 +49,21 @@ tokio              = { default-features = false, version = "1.54" }
 # them beside this app, patch them to a local checkout:
 #   [patch."https://github.com/penso/herdr-gpui"]
 #   herdr-core-client = { path = "../herdr-gpui/crates/herdr-core-client" }
-herdr-client      = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-core-client = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-credentials = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-github      = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-usage       = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-vcs         = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-chat-protocol = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-client        = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-core-client   = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-credentials   = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-github        = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-usage         = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
 # `ui.image` zooms by the picture's own size, read from its header.
-imagesize                = "0.15"
-libghostty-vt            = "0.2.2"
+imagesize = "0.15"
+# Unreleased: the Ghostty it pins builds with Zig 0.17, which links on macOS 27.
+libghostty-vt            = { git = "https://github.com/uzaaft/libghostty-rs", rev = "575ed6b8ceb79ffaf247ecf7e34333876b0d5be4" }
 mlua                     = { features = ["luau"], version = "0.12.2" }
 moonframe                = { path = "crates/moonframe" }
 moonframe-acp            = { path = "crates/moonframe-acp" }
+moonframe-chat           = { path = "crates/moonframe-chat" }
 moonframe-core           = { path = "crates/moonframe-core" }
 moonframe-docs           = { path = "crates/moonframe-docs" }
 moonframe-forge          = { path = "crates/moonframe-forge" }
@@ -67,6 +72,7 @@ moonframe-history        = { path = "crates/moonframe-history" }
 moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }
 moonframe-packages       = { path = "crates/moonframe-packages" }
 moonframe-providers      = { path = "crates/moonframe-providers" }
+moonframe-shell          = { path = "crates/moonframe-shell" }
 moonframe-store          = { path = "crates/moonframe-store" }
 moonframe-terminal       = { default-features = false, path = "crates/moonframe-terminal" }
 moonframe-usage          = { path = "crates/moonframe-usage" }
