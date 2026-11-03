@@ -51,7 +51,6 @@ mod overlay;
 mod panes;
 mod persist;
 mod profiles;
-#[cfg(feature = "terminal")]
 mod project;
 mod render;
 mod settings;

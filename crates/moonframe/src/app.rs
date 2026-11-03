@@ -220,6 +220,11 @@ impl MoonframeApp {
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
         let history = crate::history::open(&folders);
+        // Projects are kept only with the user's folder: `--no-user` runs
+        // start fresh and keep nothing, as their state.
+        let kept =
+            (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
+        crate::project::restore(kept.as_deref());
         let providers = start_providers(&workspace, parts.natives, cx);
         let views = Views::new(parts.views, deliver_from_views(cx));
         let focus = cx.focus_handle();
@@ -231,11 +236,6 @@ impl MoonframeApp {
         let terminals = Terminals::new(backends, wake_on_output(cx));
         #[cfg(not(feature = "terminal"))]
         let _ = backends;
-        // Projects are kept only with the user's folder: `--no-user` runs
-        // start fresh and keep nothing, as their state.
-        #[cfg(feature = "terminal")]
-        let kept =
-            (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
         #[cfg(feature = "terminal")]
         let project = crate::project::Project::start(kept, cx);
         flush_on_quit(cx);

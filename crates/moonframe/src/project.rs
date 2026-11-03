@@ -12,13 +12,15 @@
 //! adds its project under a lock to what the file holds then, and replaces
 //! it whole, so neither loses the other's. A `--no-user` run keeps none.
 
+use std::path::{Path, PathBuf};
+
+#[cfg(feature = "terminal")]
 use {
     crate::app::MoonframeApp,
     futures::StreamExt as _,
     gpui_kit::*,
     moonframe_terminal::Folder,
     std::{
-        path::{Path, PathBuf},
         process::{Command, Stdio},
         sync::{
             Arc, Mutex,
@@ -30,25 +32,25 @@ use {
 };
 
 /// How often the followed terminal is asked for its folder.
+#[cfg(feature = "terminal")]
 const LOOK_EVERY: Duration = Duration::from_secs(1);
 /// Projects kept across launches, the most recent last.
+#[cfg(any(feature = "terminal", test))]
 const KEEP: usize = 64;
 
 /// The terminal followed, shared with the thread that asks it.
+#[cfg(feature = "terminal")]
 pub(crate) struct Project {
     followed: Arc<Mutex<Option<Folder>>>,
     /// Wakes the thread to look at once: another terminal is followed.
     poke: mpsc::Sender<()>,
 }
 
+#[cfg(feature = "terminal")]
 impl Project {
     /// Starts following; the providers hear each move through the app.
     /// `kept` is the file projects are kept in, if any.
     pub(crate) fn start(kept: Option<PathBuf>, cx: &mut Context<MoonframeApp>) -> Self {
-        // Remembered before any provider is asked to read: a tab restored
-        // from an earlier launch may name one at once. The docs provider
-        // checks one is still a repository's top folder before using it.
-        moonframe_providers::remember_projects(kept.as_deref().map(read_kept).unwrap_or_default());
         let followed = Arc::new(Mutex::new(None));
         let (poke, poked) = mpsc::channel();
         let (moved, mut moves) = futures::channel::mpsc::unbounded::<()>();
@@ -123,6 +125,12 @@ impl Project {
     }
 }
 
+/// Restores projects before providers start, including in terminal-free
+/// builds. The docs provider checks each is still a repository's top folder.
+pub(crate) fn restore(kept: Option<&Path>) {
+    moonframe_providers::remember_projects(kept.map(read_kept).unwrap_or_default());
+}
+
 /// The file the projects followed are kept in: beside the app's state,
 /// one per profile.
 pub(crate) fn kept_file(profile: Option<&str>) -> PathBuf {
@@ -147,6 +155,7 @@ fn read_kept(file: &Path) -> Vec<PathBuf> {
 /// run of the profile may write it too: under a lock (a file beside it),
 /// it reads what the file holds now, adds to that, and puts a new file in
 /// its place whole, so a reader never sees half of one.
+#[cfg(any(feature = "terminal", test))]
 fn keep(file: &Path, project: PathBuf) {
     let written = (|| -> std::io::Result<()> {
         if let Some(parent) = file.parent() {
@@ -183,6 +192,7 @@ fn keep(file: &Path, project: PathBuf) {
 
 /// The git repository holding `dir`, with links resolved, unless it is
 /// home.
+#[cfg(feature = "terminal")]
 fn repository(dir: &Path) -> Option<PathBuf> {
     let output = Command::new("git")
         .arg("-C")
@@ -206,7 +216,20 @@ fn repository(dir: &Path) -> Option<PathBuf> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     // Not `super::*`: gpui_kit's `test` would replace the standard one.
-    use super::{KEEP, keep, read_kept};
+    use super::{KEEP, keep, read_kept, restore};
+
+    #[test]
+    fn restores_projects_for_providers_without_starting_terminal_tracking() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("projects.txt");
+        let project = dir.path().join("repository");
+        keep(&file, project.clone());
+        assert!(!moonframe_providers::followed(&project));
+        restore(None);
+        assert!(!moonframe_providers::followed(&project));
+        restore(Some(&file));
+        assert!(moonframe_providers::followed(&project));
+    }
 
     #[test]
     fn kept_projects_come_back_newest_last_without_repeats_or_excess() {
