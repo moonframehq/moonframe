@@ -1,4 +1,4 @@
--- A "Send feedback" dialog: a text area for what should change, a note on
+-- A "Make it yours" dialog: a text area for what should change, a note on
 -- who acts on it, the mod's own controls (an agent picker), Cancel and Send,
 -- and under them what came of earlier requests ("Feedback & fixes"): agent
 -- runs from `app.acp`, each request with its follow-ups (runs whose `thread`
@@ -177,7 +177,7 @@ end
 return component {
 	title = "Send Feedback",
 	category = "Agents",
-	icon = "circle-help",
+	icon = "sparkles",
 	description = "A dialog to ask an agent for a change to the app: a text area, a note on who acts on it, Cancel and Send, and the agent runs that came of earlier requests.",
 	when = "Let the user ask for a change to the app itself, from inside it, and follow what the agent does (`app.acp`). For one run on its own use `agent-run`; for a plain form use `dialog`; for chatting with an agent use `composer`.",
 	props = {
@@ -319,7 +319,7 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 				gap = "none",
 				ui.column {
 					class = "feedback-body",
-					ui.text { "Send feedback", class = "feedback-title" },
+					ui.text { "Make it yours", class = "feedback-title" },
 					ui.input {
 						id = props.id or "feedback",
 						value = props.value,

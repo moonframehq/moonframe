@@ -1,9 +1,9 @@
--- Send feedback: a ? in the title bar opens a dialog where the user writes
--- what should change in the app. The `acp` provider hands it to a coding
--- agent (Claude by default, over the Agent Client Protocol) working on the
--- app's own files, so the window reloads with the change; the dialog
--- follows each run under "Feedback & fixes", where the agent asks before
--- each change unless providers/acp's `allow` lets it. The icon
+-- Make it yours: accent sparkles in the title bar open a dialog where the
+-- user writes what should change in the app. The `acp` provider hands it
+-- to a coding agent (Claude by default, over the Agent Client Protocol)
+-- working on the app's own files, so the window reloads with the change;
+-- the dialog follows each run under "Feedback & fixes", where the agent
+-- asks before each change unless providers/acp's `allow` lets it. The icon
 -- spins while an agent works, and shows a dot when one finished since the
 -- dialog was last open. Inspect in the dialog picks an element in the
 -- window to attach. The shell mounts it in its title bar.
@@ -333,7 +333,8 @@ return mod {
 			note = `A background agent ({title}) in {short(acp.workdir)}{if acp.app and acp.app ~= "." then "/" .. acp.app else ""} implements it, asking you here before each change unless providers/acp allows it; your window reloads with the change, and it reports back under Feedback & fixes. It gets what you're looking at, your window and the build.`
 		end
 
-		local icon = if asking then "circle-alert" elseif running > 0 then "loader-circle" else "circle-help"
+		-- Sparkles, not a help `?`: this changes the app, it is not docs.
+		local icon = if asking then "circle-alert" elseif running > 0 then "loader-circle" else "sparkles"
 		return ui.row {
 			gap = "none",
 			-- The dialog is beside the button, not in it, so clicks in the
@@ -341,14 +342,14 @@ return mod {
 			ui.row {
 				-- `feedback-button` lets an app reshape the button (a round one
 				-- in a round corner) without restyling every `tool`.
-				class = if asking then "tool feedback-button feedback-asking" else "tool feedback-button",
+				class = if asking then "tool feedback-button feedback-magic feedback-asking" else "tool feedback-button feedback-magic",
 				align = "center",
 				justify = "center",
 				msg = "open",
 				tooltip = if asking
 					then "An agent needs your answer"
-					elseif running > 0 then "Send feedback (an agent is working)"
-					else "Send feedback",
+					elseif running > 0 then "Make it yours (an agent is working)"
+					else "Make it yours: point at anything, say what to change",
 				ui.icon { name = icon :: any, spin = running > 0 and not asking },
 				unseen and running == 0 and ui.row { class = "feedback-dot", float = { top = 3, right = 3 } },
 			},
@@ -387,6 +388,10 @@ return mod {
 
 	styles = {
 		[".feedback-dot"] = { width = 6, height = 6, radius = 3, background = "accent" },
+		-- Accent, so it stands apart from the other tools.
+		[".feedback-magic"] = { color = "accent" },
+		[".feedback-magic:hover"] = { background = "accent/14", color = "accent" },
 		[".feedback-asking"] = { color = "warning" },
+		[".feedback-asking:hover"] = { color = "warning" },
 	},
 }
