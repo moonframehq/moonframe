@@ -69,6 +69,11 @@
     if (category) { state.category = category.dataset.category; browse(); }
     else if (code) { state.code = code.dataset.code; render(); content.querySelector(`[data-code="${state.code}"]`).focus(); }
     else if (e.target.closest('[data-back]')) { e.preventDefault(); browse(); }
+    else if (e.target.closest('a[href="#using-patterns"]') && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+      // The hash identifies the pattern; the guide is only a scroll target.
+      e.preventDefault();
+      document.querySelector('#using-patterns').scrollIntoView();
+    }
     else if (e.target.closest('#pb-copy')) {
       const p = selected();
       try { await navigator.clipboard.writeText(state.code==='source'?p.source:p.example); notify('Copied the actual Luau source.'); }
