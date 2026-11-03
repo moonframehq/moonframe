@@ -245,7 +245,7 @@ fn shape_of(recorded: &[Placed], path: &str) -> Option<Shape> {
         .iter()
         .find(|placed| placed.path == path)
         .map(|placed| Shape {
-            bounds: placed.bounds,
+            bounds: placed.visible,
             corners: placed.corners,
         })
 }

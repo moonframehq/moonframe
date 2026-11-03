@@ -266,7 +266,8 @@ The window reloads while an agent edits it, so you can watch it work.
   tells an agent where a feature belongs, how to build it, and how to check
   it with `just check` and `just types`.
 - **"Add it here."** <b>View &gt; Inspect Element</b> (⌥⌘I), click an
-  element, and say "add a list of branches here". The selection, with its
+  element (↑ and ↓ first for the row, list or panel around it), and say
+  "add a list of branches here". The selection, with its
   file and line, is saved where the agent reads it.
 - **Pick a component.** In the Components window, <b>Copy for agent</b>
   copies a request to add that component at your selection.
