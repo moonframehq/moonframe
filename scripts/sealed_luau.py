@@ -166,6 +166,26 @@ def terminal_engine(tokens, at):
     return "alacritty"
 
 
+def writing_input(tokens, at):
+    """Ordinary literal inputs need no prose engine; unknown props retain it."""
+    if at < len(tokens) and tokens[at].value == "(":
+        at += 1
+    if at >= len(tokens) or tokens[at].value != "{":
+        return True
+    depth = 0
+    for token in tokens[at:]:
+        if token.kind == "symbol" and token.value == "{":
+            depth += 1
+        elif token.kind == "symbol" and token.value == "}":
+            depth -= 1
+            if depth == 0:
+                return False
+        if depth == 1 and (token.value in ("prose", "dim", "typewriter")
+                           or (token.kind == "symbol" and token.value == "[")):
+            return True
+    return True
+
+
 def references(text, provider_names):
     tokens = Lexer(text).tokens()
     refs = References()
@@ -205,6 +225,9 @@ def references(text, provider_names):
                 refs.features.add(name)
                 if name == "terminal":
                     refs.features.add(terminal_engine(tokens, i + (3 if after.value == "." else 4)))
+            if category == "features" and name == "input":
+                if writing_input(tokens, i + (3 if after.value == "." else 4)):
+                    refs.features.add("prose")
         if token.kind == "dynamic-provider":
             refs.dynamic.append(("providers", token.line))
         if token.kind == "string":

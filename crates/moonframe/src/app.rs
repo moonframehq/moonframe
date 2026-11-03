@@ -18,7 +18,6 @@ use {
         paths::{self, Folders},
         render::{Finished, KeyLayer, ListRequest, Painter},
         settings,
-        terminal::Terminals,
         theme_picker::ThemePicker,
         themes::{self, Scheme},
     },
@@ -43,6 +42,9 @@ use {
     },
 };
 
+#[cfg(feature = "terminal")]
+use {crate::terminal::Terminals, listeners::wake_on_output};
+
 // keep-sorted start
 mod dialogs;
 mod fonts;
@@ -59,7 +61,7 @@ mod windows;
 // keep-sorted end
 
 use {
-    listeners::{deliver_from_views, flush_on_quit, report, start_providers, wake_on_output},
+    listeners::{deliver_from_views, flush_on_quit, report, start_providers},
     menu::{hear_notification_clicks, is_dark, menu_actions, name_of, stock_preview},
     watch::watch,
 };
@@ -92,6 +94,7 @@ pub(crate) struct MoonframeApp {
     /// Picking an element for an agent, and what was picked.
     pub(crate) inspector: Inspector,
     /// The shells `ui.terminal` elements show.
+    #[cfg(feature = "terminal")]
     pub(crate) terminals: Terminals,
     /// Saves what mods keep across launches; `None` keeps nothing.
     /// The pages `ui.browser` elements show.
@@ -135,6 +138,7 @@ pub(crate) struct MoonframeApp {
     /// A bundle is being built (Build App Bundle).
     building: bool,
     /// Checking for, or installing, an update.
+    #[cfg(feature = "updates")]
     updating: bool,
     /// When a mod last asked for a reload (`app:command`).
     requested_reload: Option<std::time::Instant>,
@@ -216,6 +220,11 @@ impl MoonframeApp {
             .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
             .ok();
         let history = crate::history::open(&folders);
+        // Projects are kept only with the user's folder: `--no-user` runs
+        // start fresh and keep nothing, as their state.
+        let kept =
+            (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
+        crate::project::restore(kept.as_deref());
         let providers = start_providers(&workspace, parts.natives, cx);
         let views = Views::new(parts.views, deliver_from_views(cx));
         let focus = cx.focus_handle();
@@ -223,12 +232,10 @@ impl MoonframeApp {
         bind_menu_keys(workspace.menus(), cx);
         cx.set_menus(menus(workspace.menus()));
         menu_actions(cx);
-        let terminals = Terminals::new(backends, wake_on_output(cx));
-        // Projects are kept only with the user's folder: `--no-user` runs
-        // start fresh and keep nothing, as their state.
         #[cfg(feature = "terminal")]
-        let kept =
-            (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
+        let terminals = Terminals::new(backends, wake_on_output(cx));
+        #[cfg(not(feature = "terminal"))]
+        let _ = backends;
         #[cfg(feature = "terminal")]
         let project = crate::project::Project::start(kept, cx);
         flush_on_quit(cx);
@@ -273,6 +280,7 @@ impl MoonframeApp {
         };
         show_appearance(appearance);
         let mut app = Self {
+            #[cfg(feature = "terminal")]
             terminals,
             browsers: Browsers::new(crate::browser::wake_on_report(cx)),
             inputs: Inputs::default(),
@@ -297,6 +305,7 @@ impl MoonframeApp {
             toast_notice: None,
             toasts: 0,
             building: false,
+            #[cfg(feature = "updates")]
             updating: false,
             requested_reload: None,
             alerts: Alerts::default(),
@@ -324,6 +333,7 @@ impl MoonframeApp {
         // while it stays open, whatever Developer Mode says; runs from
         // source and runs without the user's folder (checks, screenshots)
         // never do.
+        #[cfg(feature = "updates")]
         if crate::update::checks_by_itself()
             && crate::update::source().is_some()
             && app.folders.user.is_some()

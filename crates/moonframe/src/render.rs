@@ -16,13 +16,13 @@ pub(crate) mod images;
 mod input;
 mod keyed;
 mod list;
-#[cfg(feature = "markdown")]
+#[cfg_attr(not(feature = "markdown"), path = "render/markdown_left_out.rs")]
 mod markdown;
 mod plot;
 mod pointer;
 mod popover;
 mod styling;
-#[cfg(feature = "terminal")]
+#[cfg_attr(not(feature = "terminal"), path = "render/terminal_left_out.rs")]
 mod terminal;
 mod view;
 mod viewer;
@@ -36,7 +36,6 @@ use {
         input::Inputs,
         inspect::{Crumb, Sink, Tracked},
         motion::{Keyed, Motion, Shown, Snapshot},
-        terminal::Terminals,
     },
     gpui_kit::{
         component::{ActiveTheme, Icon, Sizable as _, Theme, tooltip::Tooltip},
@@ -55,6 +54,9 @@ use {
         time::{Duration, Instant},
     },
 };
+
+#[cfg(feature = "terminal")]
+use crate::terminal::Terminals;
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
 
@@ -248,7 +250,7 @@ pub(crate) struct Painter<'w, 'm> {
     /// inspecting: the highlight follows its corners.
     radii: RefCell<HashMap<String, moonframe_core::Corners>>,
     /// The shells terminals show.
-    #[cfg_attr(not(feature = "terminal"), allow(dead_code))]
+    #[cfg(feature = "terminal")]
     terminals: &'m mut Terminals,
     /// The text input fields edit.
     inputs: Inputs,
@@ -289,7 +291,7 @@ impl<'w, 'm> Painter<'w, 'm> {
     pub(crate) fn new(
         workspace: &'w Workspace,
         motion: &'m mut Motion,
-        terminals: &'m mut Terminals,
+        #[cfg(feature = "terminal")] terminals: &'m mut Terminals,
         inputs: &Inputs,
         sink: Option<Sink>,
         theme: &Theme,
@@ -311,6 +313,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             sink,
             outer: None,
             radii: RefCell::default(),
+            #[cfg(feature = "terminal")]
             terminals,
             inputs: inputs.clone(),
             preview: false,
@@ -692,17 +695,11 @@ fn draw_node<'w>(
         Node::Line(line) => line.draw(painter, place, cx),
         Node::Paths(paths) => paths.draw(painter, place, cx),
         Node::Hatch(hatch) => hatch.draw(painter, place, cx),
-        #[cfg(feature = "terminal")]
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
-        #[cfg(not(feature = "terminal"))]
-        Node::Terminal(_) => broken("this build has no terminal support", place, cx),
         Node::Browser(browser) => browser.draw(painter, place, cx),
         Node::View(view) => view.draw(painter, place, cx),
         Node::Input(input) => input.draw(painter, place, cx),
-        #[cfg(feature = "markdown")]
         Node::Markdown(markdown) => markdown.draw(painter, place, cx),
-        #[cfg(not(feature = "markdown"))]
-        Node::Markdown(_) => broken("this build has no Markdown support", place, cx),
         Node::Region(region) => region.draw(painter, place, cx),
         Node::Divider => elements::divider(painter, place, cx),
         Node::Spacer => div().flex_1().into_any_element(),

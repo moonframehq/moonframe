@@ -298,8 +298,8 @@ impl Scheme {
     }
 
     /// The 16 terminal colors.
-    #[cfg(feature = "terminal")]
-    pub(crate) fn palette(&self) -> moonframe_terminal::Ansi {
+    #[cfg(any(feature = "terminal", test))]
+    pub(crate) fn palette(&self) -> [(u8, u8, u8); 16] {
         self.ansi.map(|color| {
             let [_, red, green, blue] = color.to_be_bytes();
             (red, green, blue)
@@ -532,7 +532,6 @@ mod tests {
         assert_eq!(config.colors.popover.as_deref(), Some("#282828"));
         assert_eq!(config.colors.primary.as_deref(), Some("#458588"));
         assert_eq!(config.colors.danger.as_deref(), Some("#cc241d"));
-        #[cfg(feature = "terminal")]
         assert_eq!(gruvbox.palette()[1], (0xcc, 0x24, 0x1d));
         assert_eq!(
             find("Gruvbox Light").unwrap().config().mode,

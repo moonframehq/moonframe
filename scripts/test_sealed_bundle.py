@@ -96,6 +96,18 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(plan.chosen["features"], {"git"})
         self.assertNotIn("wasm", plan.chosen["features"])
 
+    def test_writing_inputs_and_release_metadata_keep_their_capabilities(self):
+        for props in ('{ prose = true }', '{ dim = mode }', '{ typewriter = true }',
+                      'props', '{ [key] = value }'):
+            with self.subTest(props=props):
+                self.write(self.app / "main.luau", f'return ui.input({props})')
+                self.assertIn("prose", self.plan().chosen["features"])
+        self.write(self.app / "main.luau", 'return ui.input { multiline = true }')
+        self.assertNotIn("prose", self.plan().chosen["features"])
+        with (self.app / "moonframe.toml").open("a") as f:
+            f.write('updates = "owner/test"\n')
+        self.assertIn("updates", self.plan().chosen["features"])
+
     def test_staging_removes_unused_fallbacks_and_development_files(self):
         self.write(self.app / "components/card.luau", 'return component {}')
         self.write(self.app / "providers/git/provider.toml", 'kind = "static"\nfile = "data.json"')

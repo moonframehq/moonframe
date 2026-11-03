@@ -68,6 +68,8 @@ pub struct Workspace {
     appearance: (Appearance, BTreeMap<String, Data>),
     /// The window as views see it, `app.window`.
     window: WindowState,
+    /// Compile-time host capabilities; separate from provider-published data.
+    capabilities: BTreeMap<String, bool>,
     /// What the host shares with every view under `app`, such as
     /// `app.system`; modules cannot read the machine themselves.
     host: BTreeMap<String, Data>,
@@ -244,6 +246,17 @@ impl Workspace {
         dark: bool,
         persist: Option<Box<dyn Persist>>,
     ) -> Self {
+        Self::open_with_capabilities(roots, dark, persist, BTreeMap::new())
+    }
+
+    /// Loads with the host's compiled capabilities already available to
+    /// the very first view as `app.capabilities`, including headless checks.
+    pub fn open_with_capabilities(
+        roots: impl Into<Roots>,
+        dark: bool,
+        persist: Option<Box<dyn Persist>>,
+        capabilities: BTreeMap<String, bool>,
+    ) -> Self {
         let mut workspace = Self {
             roots: roots.into(),
             library: Library::default(),
@@ -256,6 +269,7 @@ impl Workspace {
             style_error: None,
             dark,
             window: WindowState::default(),
+            capabilities,
             host: BTreeMap::new(),
             host_problems: BTreeMap::new(),
             outbox: Vec::new(),

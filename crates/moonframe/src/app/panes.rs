@@ -32,6 +32,10 @@ impl MoonframeApp {
     /// its folder (the window's own user folder by default), with the
     /// agent's command typed into it.
     fn open_pane(&mut self, request: crate::panes::Request, cx: &mut Context<Self>) {
+        if !cfg!(feature = "terminal") {
+            self.show_toast("Terminal support was left out of this build", cx);
+            return;
+        }
         const OPEN: &str = "tabs/main/open";
         if !self.workspace.hears(OPEN) {
             tracing::warn!(
@@ -53,7 +57,10 @@ impl MoonframeApp {
         let cwd = request.cwd.clone().or_else(|| self.folders.own());
         let shell = crate::panes::Shell::current();
         if let Some(bytes) = request.typed(shell) {
+            #[cfg(feature = "terminal")]
             self.terminals.type_on_start(&id, cwd.clone(), bytes);
+            #[cfg(not(feature = "terminal"))]
+            let _ = bytes;
         }
         let mut props = Vec::new();
         if let Some(cwd) = &cwd {

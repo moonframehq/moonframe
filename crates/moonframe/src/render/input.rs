@@ -30,6 +30,12 @@ const SELECTION_ALPHA: f32 = 0.3;
 
 impl<'w> Draw<'w> for Input {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
+        if self.writing() && !cfg!(feature = "prose") {
+            return super::problem(
+                "Writing editor support was left out of this build; enable `prose`".into(),
+                cx,
+            );
+        }
         let at = |focus| States {
             selected: false,
             focus,
