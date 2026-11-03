@@ -53,7 +53,9 @@ return mod {
 			if msg.phase == "over" then
 				state.over = msg.move
 			elseif msg.phase == "leave" then
-				state.over = nil
+				if state.over == msg.move then
+					state.over = nil
+				end
 			elseif msg.phase == "drop" then
 				state.over = nil
 				local id = msg.carry.event

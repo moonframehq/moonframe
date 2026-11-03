@@ -226,6 +226,8 @@ type StackProps = {
 	border: Border?,
 	-- `true` scrolls along its axis; or "x", "y", "both".
 	scroll: (boolean | "x" | "y" | "both")?,
+	-- Reveal this direct child (one-based) when the index changes.
+	scroll_to: number?,
 	-- false keeps the content's size when the parent is short of space.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.

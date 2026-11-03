@@ -57,6 +57,11 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
 
 ### Shared keys
 
+- **Scroll to a child** (`row`, `column`): with `scroll` enabled,
+  `scroll_to = 12` reveals direct child 12 (one-based) when the index
+  changes. It scrolls only as far as needed and leaves wheel scrolling
+  free between changes. Set it to nil to reset the request.
+
 - **Frame keys** (`row`, `column`, `panel`): `grow`, `width`, `height`,
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `shrink = false` (keep
   the content's size instead of being squeezed), `self_align` (`start`,

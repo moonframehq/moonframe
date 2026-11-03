@@ -67,7 +67,7 @@ impl<'w> Draw<'w> for Stack {
         } else {
             element
         };
-        let handle = painter.motion.scroll(&place.path);
+        let handle = painter.motion.scroll_to(&place.path, self.scroll_to);
         let element = element.children(children).scrollbars(
             &self.frame,
             self.direction,

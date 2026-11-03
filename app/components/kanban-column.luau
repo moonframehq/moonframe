@@ -80,9 +80,24 @@ kanban_column {
 	build = function(props: Props)
 		local color = props.color or "accent"
 		local cards = positional(props)
-		if props.marker then
-			local line = ui.row { class = "kanban-column-marker", height = 2 }
-			table.insert(cards, math.clamp(props.marker, 1, #cards + 1), line)
+		local marker = if props.marker then math.clamp(props.marker, 1, #cards + 1) else nil
+		-- Keep each card at the same path and size while the marker moves.
+		-- The line is a floating second child, never a sibling of the cards.
+		for index, card in cards do
+			local before = marker == index
+			local after = index == #cards and marker == #cards + 1
+			cards[index] = ui.column {
+				gap = "none",
+				card,
+				(before or after) and ui.row {
+					class = "kanban-column-marker",
+					height = 2,
+					float = if before then "top" else "bottom",
+				},
+			}
+		end
+		if #cards == 0 and marker then
+			table.insert(cards, ui.row { class = "kanban-column-marker", height = 2, float = "top" })
 		end
 		return ui.column {
 			class = "kanban-column",

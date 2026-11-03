@@ -123,7 +123,7 @@ text_editor {
 				grow = true,
 				if value == ""
 					then ui.text { props.empty or "Nothing to preview", class = "text-editor-empty" }
-					else ui.markdown { text = value, grow = true },
+					else ui.markdown { text = value, grow = true, scroll = true },
 			}
 		else
 			body = ui.input {

@@ -281,3 +281,198 @@ end }
     assert!(edit.applies("hi @sa", 6..6));
     assert!(!edit.applies("hi @sa", 5..5));
 }
+
+#[test]
+fn kanban_hover_preserves_card_paths_and_in_flow_layout() {
+    let (_dir, mut workspace) = demo("kanban-column", &["kanban-column", "board-card", "avatar"]);
+    let cards = |workspace: &Workspace| {
+        let mut cards = vec![];
+        walk(tree(workspace), &mut vec![], &mut |node, path| {
+            if let Node::Stack(stack) = node
+                && stack.pointer.as_ref().is_some_and(|p| p.carry.is_some())
+            {
+                cards.push((path.to_vec(), stack.clone()));
+            }
+        });
+        cards
+    };
+    let before = cards(&workspace);
+    for (target, y) in [("web121", 0.01), ("web124", 0.75), ("web130", 0.99)] {
+        send(&mut workspace, &[
+            ("over_card", Data::from(target)),
+            ("phase", Data::from("over")),
+            ("y", Data::Number(y)),
+        ]);
+        assert_eq!(cards(&workspace), before);
+        let mut markers = 0;
+        walk(tree(&workspace), &mut vec![], &mut |node, _| {
+            if let Node::Stack(stack) = node
+                && stack
+                    .look
+                    .class
+                    .iter()
+                    .any(|class| class == "kanban-column-marker")
+            {
+                assert!(
+                    stack.frame.float.is_some(),
+                    "a marker must not shift the drop target"
+                );
+                assert!(stack.pointer.is_none(), "the card keeps its drop target");
+                markers += 1;
+            }
+        });
+        assert_eq!(markers, 1);
+    }
+    send(&mut workspace, &[
+        ("over_card", Data::from("web121")),
+        ("phase", Data::from("drop")),
+        ("y", Data::Number(0.01)),
+        ("carry", map(&[("card", Data::from("web112"))])),
+    ]);
+    assert_eq!(&carried_rows(&workspace, "card", None)[..4], [
+        "web112", "web121", "web124", "web130"
+    ]);
+}
+
+#[test]
+fn leaving_an_old_calendar_or_table_target_keeps_the_new_indicator() {
+    for (name, components, old, new) in [
+        (
+            "week-calendar",
+            vec!["week-calendar", "segmented", "month-grid"],
+            vec![("move", Data::from("2026-11-03"))],
+            vec![("move", Data::from("2026-11-02"))],
+        ),
+        (
+            "table",
+            vec!["table", "switch"],
+            vec![
+                ("move", Data::from("web124")),
+                ("group", Data::from("todo")),
+                ("y", Data::Number(0.2)),
+            ],
+            vec![
+                ("move", Data::from("web121")),
+                ("group", Data::from("todo")),
+                ("y", Data::Number(0.2)),
+            ],
+        ),
+        (
+            "table",
+            vec!["table", "switch"],
+            vec![
+                ("move", Data::Bool(true)),
+                ("group", Data::from("progress")),
+            ],
+            vec![("move", Data::Bool(true)), ("group", Data::from("todo"))],
+        ),
+    ] {
+        let (_dir, mut workspace) = demo(name, &components);
+        let mut event = |fields: &[(&str, Data)], phase: &str| {
+            let mut fields = fields.to_vec();
+            fields.push(("phase", Data::from(phase)));
+            send(&mut workspace, &fields);
+            tree(&workspace).clone()
+        };
+        event(&old, "over");
+        let entered = event(&new, "over");
+        assert_eq!(event(&old, "leave"), entered, "{name}: stale leave");
+        assert_ne!(event(&new, "leave"), entered, "{name}: current leave");
+    }
+}
+
+#[test]
+fn long_editor_text_remains_available_in_a_scrollable_preview() {
+    let (_dir, mut workspace) = demo("text-editor", &["text-editor", "segmented"]);
+    let text = "A paragraph of the description.\n\n".repeat(100);
+    send(&mut workspace, &[
+        ("msg", Data::from("type")),
+        ("value", Data::from(text.as_str())),
+    ]);
+    send(&mut workspace, &[("view", Data::from("preview"))]);
+    let mut preview = None;
+    walk(tree(&workspace), &mut vec![], &mut |node, _| {
+        if let Node::Markdown(markdown) = node {
+            preview = Some(markdown);
+        }
+    });
+    let preview = preview.unwrap();
+    assert_eq!(preview.text, text);
+    assert!(preview.scroll && preview.grow);
+}
+
+#[test]
+fn picker_navigation_reveals_the_actual_child_including_disabled_rows_and_create() {
+    let (_dir, mut workspace) = fixture(
+        r#"
+local picker = use "picker"
+return mod {
+  init = function() return { highlighted = nil, query = "Option" } end,
+  update = function(state, msg)
+    if msg.highlight then state.highlighted = msg.highlight end
+    if msg.query then state.query = msg.query end
+  end,
+  view = function(state)
+    local options = {}
+    for i = 1, 100 do
+      options[i] = { id = tostring(i), label = "Option " .. i, disabled = i % 3 == 0 }
+    end
+    return picker { open = true, options = options, query = state.query,
+      highlighted = state.highlighted, create = "create" }
+  end,
+}
+"#,
+        &["picker", "menu", "avatar", "pill", "kbd"],
+    );
+    let inspect = |workspace: &Workspace, key: &str| {
+        let Node::Popover(popover) = tree(workspace) else {
+            panic!("no picker")
+        };
+        let mut target = None;
+        walk(&popover.content, &mut vec![], &mut |node, _| {
+            if let Node::Stack(stack) = node
+                && let Some(index) = stack.scroll_to
+            {
+                assert_eq!(stack.frame.max_height, Some(300.));
+                assert_ne!(stack.frame.scroll, crate::Scroll::No);
+                let Node::Stack(row) = &stack.children[index - 1] else {
+                    panic!("not a row")
+                };
+                assert!(row.selected);
+                assert!(!row.frame.grow && !row.frame.shrink);
+                target = row.action.clone();
+            }
+        });
+        let enter = &popover
+            .keys
+            .0
+            .iter()
+            .find(|(k, _)| k.key == "enter")
+            .unwrap()
+            .1;
+        assert_eq!(
+            target,
+            Some(Action::Send {
+                to: None,
+                msg: enter.clone()
+            })
+        );
+        popover
+            .keys
+            .0
+            .iter()
+            .find(|(k, _)| k.key == key)
+            .unwrap()
+            .1
+            .clone()
+    };
+    // Past the viewport, all the way to Create, then back up through it.
+    for key in ["down", "up"] {
+        for _ in 0..100 {
+            let msg = inspect(&workspace, key);
+            workspace.send("tasks", "tasks", msg);
+        }
+    }
+    send(&mut workspace, &[("query", Data::from("Option 98"))]);
+    inspect(&workspace, "down"); // filtered-out highlight falls back to the match
+}

@@ -130,7 +130,10 @@ return mod {
 			if msg.phase == "over" then
 				state.marker = if target then { id = target, after = after } else { group = msg.group }
 			elseif msg.phase == "leave" then
-				state.marker = nil
+				local marker = state.marker
+				if marker and (if target then marker.id == target else marker.group == msg.group) then
+					state.marker = nil
+				end
 			elseif msg.phase == "drop" then
 				state.marker = nil
 				local before = target

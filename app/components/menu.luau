@@ -25,6 +25,7 @@ type Item = {
 
 type Props = {
 	items: { any },
+	max_height: number?,
 	highlighted: any,
 	event: string?,
 	expanded: any,
@@ -90,14 +91,16 @@ local function draw(props: Props)
 	end
 
 	local rows = {}
+	local scroll_to = nil
+	local scrolling = props.max_height ~= nil
 	for index, entry in props.items do
 		if entry == "separator" then
-			rows[#rows + 1] = ui.column { class = "menu-separator", ui.divider() }
+			rows[#rows + 1] = ui.column { class = "menu-separator", shrink = not scrolling, ui.divider() }
 			continue
 		end
 		local item = entry :: Item
 		if item.heading then
-			rows[#rows + 1] = ui.row { class = "menu-heading", ui.text { item.heading } }
+			rows[#rows + 1] = ui.row { class = "menu-heading", shrink = not scrolling, ui.text { item.heading } }
 			continue
 		end
 		local id = item.id or item.label
@@ -109,13 +112,19 @@ local function draw(props: Props)
 			table.insert(class, "menu-item-disabled")
 		end
 		local highlighted = props.highlighted ~= nil and (props.highlighted == id or props.highlighted == index)
+		if highlighted and not item.disabled then
+			scroll_to = index
+		end
 		local submenu = item.items
 		local open = submenu ~= nil and props.expanded ~= nil and props.expanded == id
 		local default = if submenu then { [expand] = id } else { [event] = id }
 		local row = ui.row {
 			class = class,
 			align = "center",
-			grow = true,
+			-- Scrolling rows keep their content height, rather than sharing
+			-- (and shrinking into) the capped menu's available height.
+			grow = not scrolling,
+			shrink = not scrolling,
 			selected = (highlighted or open) and not item.disabled,
 			msg = if item.disabled then nil else (item.msg or default),
 			to = props.to,
@@ -151,7 +160,13 @@ local function draw(props: Props)
 			}
 			else row
 	end
-	return ui.column { class = "menu", table.unpack(rows) }
+	return ui.column {
+		class = "menu",
+		max_height = props.max_height,
+		scroll = scrolling,
+		scroll_to = if props.max_height then scroll_to else nil,
+		table.unpack(rows),
+	}
 end
 
 return component {
@@ -167,6 +182,7 @@ return component {
 		["submenu_highlighted"] = "the keyboard-highlighted row of the open submenu: an id or an index",
 		["submenu_width"] = "the submenu's width in pixels (default 200)",
 		["highlighted"] = "the keyboard-highlighted row: an item id, or its index in `items`",
+		["max_height"] = "cap the menu height in pixels and scroll; changing `highlighted` reveals that row",
 		["event"] = "key of the message a click sends, default \"pick\": { pick = id }",
 		["to"] = "mod to send messages to, if not the drawing one",
 	},

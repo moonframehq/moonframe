@@ -306,10 +306,12 @@ picker {
 					},
 				},
 				if #items > 0
-					then ui.column {
+					then menu {
 						max_height = 300,
-						scroll = true,
-						menu { items = items, highlighted = current, event = event, to = props.to },
+						items = items,
+						highlighted = current,
+						event = event,
+						to = props.to,
 					}
 					else ui.row { class = "picker-empty", ui.text { props.empty or "No matches" } },
 			},

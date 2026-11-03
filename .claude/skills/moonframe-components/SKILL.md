@@ -72,6 +72,11 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
 
 ### Shared keys
 
+- **Scroll to a child** (`row`, `column`): with `scroll` enabled,
+  `scroll_to = 12` reveals direct child 12 (one-based) when the index
+  changes. It scrolls only as far as needed and leaves wheel scrolling
+  free between changes. Set it to nil to reset the request.
+
 - **Frame keys** (`row`, `column`, `panel`): `grow`, `width`, `height`,
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `shrink = false` (keep
   the content's size instead of being squeezed), `self_align` (`start`,
@@ -5286,6 +5291,7 @@ A whole mod using it, with state: `app/components/demos/emoji-picker.luau`.
 | `expanded` | id of the item whose submenu shows beside it (on the right, or the left near the window's edge); a click on an item with `items` sends { expand = id } (the mod sets this, or clears it on a second click) |
 | `highlighted` | the keyboard-highlighted row: an item id, or its index in `items` |
 | `items` | list of { id, label, icon?, avatar? (a name: a small round `avatar` instead of the icon), dot? (a colour: a small round dot instead of the icon), shortcut? (kbd keys, "cmd-s"), checked? (true/false shows the check column), danger?, disabled?, detail? (muted text on the right), items? (a submenu: the same kinds of entries, one level deep), msg? (sent instead of the default) }, the string "separator", or { heading = "Text" } |
+| `max_height` | cap the menu height in pixels and scroll; changing `highlighted` reveals that row |
 | `submenu_highlighted` | the keyboard-highlighted row of the open submenu: an id or an index |
 | `submenu_width` | the submenu's width in pixels (default 200) |
 | `to` | mod to send messages to, if not the drawing one |

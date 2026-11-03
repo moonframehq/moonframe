@@ -206,6 +206,7 @@ impl<'w> Draw<'w> for Paths {
             .relative()
             .flex_shrink_0()
             .look(&look, theme)
+            .edges(look.base.border, &look.base, theme)
             .child(plot);
         element = match self.width {
             Some(width) => element.w(px(width)),
