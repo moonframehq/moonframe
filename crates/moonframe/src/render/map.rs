@@ -58,7 +58,8 @@ impl<'w> Draw<'w> for Map {
             owner: place.owner.to_owned(),
             to: self.to.clone(),
         };
-        let (layer, missing) = tile_layer(self, frame, scale);
+        let grid = Grid::new(view::origin(&key), scale);
+        let (layer, missing) = tile_layer(self, frame, scale, grid);
         if missing && !WAITING.get() {
             WAITING.set(true);
             let arrived = tiles::arrival();
@@ -118,7 +119,43 @@ impl<'w> Draw<'w> for Map {
 }
 
 /// The tiles under `frame`, and whether any is still on its way.
-fn tile_layer(map: &Map, frame: Frame, scale: f32) -> (Div, bool) {
+/// The screen's own pixels, which tile edges snap to: the map box can sit
+/// between them, and GPUI rounds each tile's place and size apart, so
+/// edges rounded in the box's pixels can leave a one-pixel gap between
+/// neighbours while panning.
+#[derive(Clone, Copy)]
+struct Grid {
+    /// The box's corner in the window, in points.
+    origin: (f64, f64),
+    /// Device pixels per point.
+    scale: f64,
+}
+
+impl Grid {
+    fn new(origin: Point<Pixels>, scale: f32) -> Self {
+        Self {
+            origin: (f64::from(origin.x), f64::from(origin.y)),
+            scale: f64::from(scale.max(1.0)),
+        }
+    }
+
+    /// `left` (points from the box's corner) on the screen's pixel grid.
+    fn x(self, left: f64) -> f64 {
+        ((self.origin.0 + left) * self.scale).round() / self.scale - self.origin.0
+    }
+
+    fn y(self, top: f64) -> f64 {
+        ((self.origin.1 + top) * self.scale).round() / self.scale - self.origin.1
+    }
+
+    /// One device pixel, in points: what each tile reaches over its
+    /// neighbour, so no rounding can open a gap between them.
+    fn bleed(self) -> f64 {
+        1.0 / self.scale
+    }
+}
+
+fn tile_layer(map: &Map, frame: Frame, scale: f32, grid: Grid) -> (Div, bool) {
     let source = map.provider.source();
     let z = frame.zoom.round().clamp(0.0, f64::from(source.max_zoom)) as u8;
     let count = 1i64 << z;
@@ -154,7 +191,7 @@ fn tile_layer(map: &Map, frame: Frame, scale: f32) -> (Div, bool) {
             }
         }
     }
-    let (mut layer, base) = base_layer(map, frame, z);
+    let (mut layer, base) = base_layer(map, frame, z, grid);
     let mut missing = false;
     let mut drawn = 0;
     let (all_rows, all_columns) = if with_ring {
@@ -169,10 +206,12 @@ fn tile_layer(map: &Map, frame: Frame, scale: f32) -> (Div, bool) {
                 return (layer, missing);
             }
             // Whole pixels, so neighbours meet without a seam.
-            let x0 = (column as f64 * size - left).floor();
-            let y0 = (row as f64 * size - top).floor();
-            let x1 = ((column + 1) as f64 * size - left).floor();
-            let y1 = ((row + 1) as f64 * size - top).floor();
+            // On the screen's pixels, so neighbours share their edge, and a
+            // device pixel over it.
+            let x0 = grid.x(column as f64 * size - left);
+            let y0 = grid.y(row as f64 * size - top);
+            let x1 = grid.x((column + 1) as f64 * size - left) + grid.bleed();
+            let y1 = grid.y((row + 1) as f64 * size - top) + grid.bleed();
             let tile = at(column, row);
             let cell = div()
                 .absolute()
@@ -232,7 +271,7 @@ fn tile_layer(map: &Map, frame: Frame, scale: f32) -> (Div, bool) {
 /// The tiles [`BASE`] zooms coarser than `z` under the whole box, at
 /// standard density (it is enlarged anyway), as the layer the map's own
 /// tiles are drawn over; and those tiles, to ask for.
-fn base_layer(map: &Map, frame: Frame, z: u8) -> (Div, Vec<Tile>) {
+fn base_layer(map: &Map, frame: Frame, z: u8, grid: Grid) -> (Div, Vec<Tile>) {
     let layer = div().absolute().size_full();
     let base = z.saturating_sub(BASE);
     if base == z {
@@ -260,15 +299,17 @@ fn base_layer(map: &Map, frame: Frame, z: u8) -> (Div, Vec<Tile>) {
                 y: row as u32,
             };
             if let Some(file) = tiles::ready(&tile) {
-                let x0 = (column as f64 * size - left).floor();
-                let y0 = (row as f64 * size - top).floor();
+                let x0 = grid.x(column as f64 * size - left);
+                let y0 = grid.y(row as f64 * size - top);
+                let x1 = grid.x((column + 1) as f64 * size - left) + grid.bleed();
+                let y1 = grid.y((row + 1) as f64 * size - top) + grid.bleed();
                 images.push(
                     img(file)
                         .absolute()
                         .left(px(x0 as f32))
                         .top(px(y0 as f32))
-                        .w(px(size.ceil() as f32 + 1.0))
-                        .h(px(size.ceil() as f32 + 1.0)),
+                        .w(px((x1 - x0) as f32))
+                        .h(px((y1 - y0) as f32)),
                 );
             }
             tiles.push(tile);

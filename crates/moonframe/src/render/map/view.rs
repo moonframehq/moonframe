@@ -271,6 +271,14 @@ pub(super) fn current(key: &str, drawn: Frame) -> Frame {
     moved(key).unwrap_or(drawn)
 }
 
+/// The corner of the map `key`'s box in the window, as last laid out.
+pub(super) fn origin(key: &str) -> Point<Pixels> {
+    KEPT.with_borrow(|kept| {
+        kept.get(key)
+            .map_or_else(Point::default, |kept| kept.bounds.origin)
+    })
+}
+
 /// The middle of the map `key`'s box, in the window.
 pub(super) fn middle(key: &str) -> Point<Pixels> {
     KEPT.with_borrow(|kept| {
