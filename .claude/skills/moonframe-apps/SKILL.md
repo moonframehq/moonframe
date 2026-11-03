@@ -181,8 +181,8 @@ and live things (terminals, pages, text fields) need the host.
 
 The shell (`main.luau` only) adds menus and fills the About panel; the host
 puts its app menu first (About <title>, Quit <title>), then these, View (a
-shell menu titled "View" merges into it), Components outside a release, and
-Window and Help last.
+shell menu titled "View" merges into it), and Window and Help last. In
+Developer Mode, **View > Components…** opens the Components gallery.
 
 ```lua
 -- A typed local: items with `msg` and with `command` mix in one list.

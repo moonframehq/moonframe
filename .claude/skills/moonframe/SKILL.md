@@ -1483,8 +1483,8 @@ return mod {
 The shell (`main.luau` only) can add menus to the menu bar and say what the
 About panel shows. The host puts its app menu first (About <App>, Quit, named
 after the app's title), then the shell's menus, then View (a shell menu titled
-"View" merges into it), Components outside a release, and the shell's Window
-and Help last.
+"View" merges into it), and the shell's Window and Help last. In Developer
+Mode, **View > Components…** opens the Components gallery.
 
 ```lua
 -- A typed local: items with `msg` and with `command` mix in one list.
