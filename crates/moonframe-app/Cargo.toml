@@ -23,12 +23,12 @@ required-features = ["patterns"]
 
 [features]
 # Every terminal emulator the library has; `ghostty` needs Zig.
-default = ["moonframe/ghostty"]
+default = ["moonframe/default", "moonframe/ghostty"]
 # A separate developer app. Its catalog and sources never enter the starter
 # or an app built on the moonframe library.
-patterns = []
+patterns = ["moonframe/default"]
 # Native preview export, also excluded from ordinary builds.
 pattern-capture = ["moonframe/capture", "patterns"]
 
 [dependencies]
-moonframe.workspace = true
+moonframe = { default-features = false, path = "../moonframe" }

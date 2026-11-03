@@ -221,6 +221,15 @@ which also has a release workflow to copy.
 
 ## Release mode and bundles
 
+- **Smaller, sealed bundles:** `just bundle-plan examples/ledger` previews
+  dependencies; `just bundle-sealed examples/ledger` builds from a folder,
+  or `just bundle-app-sealed NAME` from an installed/linked profile. Only
+  selected native capabilities, components and providers ship, with no full
+  embedded toolbox or user source overlays. Removed capabilities need a
+  rebuild. Computed imports need explicit `[bundle.dynamic]` declarations
+  in `moonframe.toml`. See `docs/sealed-bundles.md` for limits and the build
+  report. Python 3.11+ is required.
+
 - **Developer Mode** (app menu, beside About) switches View's Components…,
   Inspect Element and Reload Modules, and their keys, on and off live; the
   choice is kept per app and profile. Until the user picks, it is off in a

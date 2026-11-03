@@ -36,6 +36,10 @@ icon=assets/icon.png
 version=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
 binary=${MOONFRAME_BINARY:-}
 
+if [ "${3:-}" = --sealed ]; then
+    exec python3 scripts/bundle_sealed.py --profile "${profile:?--sealed needs a profile}" --out "$out"
+fi
+
 if [ -z "$binary" ]; then
     cargo build --quiet --release --locked -p moonframe-app
     binary="target/release/$exe"
@@ -43,6 +47,15 @@ fi
 
 app=
 packages=()
+# A sealed build already resolved its profile before compiling the reduced
+# executable, which deliberately has no package-management commands.
+app_paths() {
+    if [ -n "${MOONFRAME_BUNDLE_PATHS:-}" ]; then
+        cat "$MOONFRAME_BUNDLE_PATHS"
+    else
+        "$binary" ${MOONFRAME_USER:+--user "$MOONFRAME_USER"} app paths "$profile"
+    fi
+}
 if [ -n "$profile" ]; then
     while IFS=$'\t' read -r kind value; do
         case $kind in
@@ -53,7 +66,7 @@ if [ -n "$profile" ]; then
             version) version=$value ;;
             package) packages+=("$value") ;;
         esac
-    done < <("$binary" ${MOONFRAME_USER:+--user "$MOONFRAME_USER"} app paths "$profile")
+    done < <(app_paths)
     [ -n "$app" ] || { echo "no app in the profile $profile" >&2; exit 1; }
     case $title in
         "" | .* | */* | *'\'* | *'<'* | *'>'* | *'&'* | *:*)
@@ -97,6 +110,11 @@ dist() {
 
 # Stages the app, and the profile's app with its packages, under $1.
 stage() {
+    if [ -n "${MOONFRAME_STAGED_RESOURCES:-}" ]; then
+        mkdir -p "$1"
+        cp -R "$MOONFRAME_STAGED_RESOURCES"/. "$1"/
+        return
+    fi
     scripts/stage-app.sh "$1/app" >/dev/null
     if [ -n "$app" ]; then
         scripts/stage-app.sh "$1/bundle/app" "$app" >/dev/null
@@ -128,6 +146,9 @@ if [ "$(uname)" != Darwin ]; then
     cp "$binary" "$bundle/bin/$bin"
     stage "$bundle/share/$bin"
     cp "$icon" "$bundle/share/icons/hicolor/512x512/apps/$id.png"
+    if [ -n "${MOONFRAME_STAGED_RESOURCES:-}" ]; then
+        "$bundle/bin/$bin" --no-user --check
+    fi
     cat > "$bundle/share/applications/$id.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
@@ -179,6 +200,10 @@ cat > "$bundle/Contents/Info.plist" <<PLIST
 PLIST
 
 cp LICENSE "$bundle/Contents/Resources/LICENSE"
+
+if [ -n "${MOONFRAME_STAGED_RESOURCES:-}" ]; then
+    "$bundle/Contents/MacOS/$exe" --no-user --check
+fi
 
 codesign --force --deep --sign - "$bundle" 2>/dev/null
 dist "$bundle"

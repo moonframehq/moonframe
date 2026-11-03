@@ -37,8 +37,9 @@ opt-level = 2
 library needs the toolchain in [rust-toolchain.toml](../rust-toolchain.toml)
 or newer.
 
-Features: `acp`, `alacritty`, `docs`, `git`, `herdr-core`, `tokio` and
-`wasm` by default. `ghostty` (a second terminal emulator, built from Ghostty's source
+Features: `acp`, `alacritty`, `browser`, `chat`, `docs`, `forge`, `git`,
+`herdr-core`, `markdown`, `shell`, `studio`, `tokio`, `usage` and `wasm` by
+default. `ghostty` (a second terminal emulator, built from Ghostty's source
 with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`.
 
 An app that needs none of git, the markdown editor or kept terminals can
@@ -61,6 +62,18 @@ says the feature is off. `bundle` then builds none of them.
 
 To add a sandboxed component alongside native providers, follow
 [Building WebAssembly (WASM) providers](wasm-providers.md).
+
+`alacritty` and `ghostty` enable `terminal`; without it the terminal renderer,
+PTY integration and project-following code are absent. `browser` enables the
+native web view and `markdown` the Markdown renderer. `studio` enables
+development commands and the component gallery. Keep the capabilities your
+app uses when disabling defaults.
+
+The `bundle` command remains available without `studio`, so a library host
+can package its executable without including developer tools.
+
+For profile apps, [sealed bundles](sealed-bundles.md) select these features
+from the app's Luau and provider manifests and prune the shipped toolbox.
 
 Use the GPUI the library re-exports, `moonframe::gpui_kit` (GPUI with
 gpui-component): one app links one GPUI. If your crates name `gpui`

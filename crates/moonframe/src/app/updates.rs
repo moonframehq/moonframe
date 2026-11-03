@@ -6,6 +6,9 @@ impl MoonframeApp {
     /// Builds the app this window runs as a release bundle, in the
     /// background, and shows it in Finder when it is done.
     pub(crate) fn build_app(&mut self, cx: &mut Context<Self>) {
+        if !cfg!(feature = "studio") {
+            return;
+        }
         if self.building {
             self.show_toast("The app is already being built", cx);
             return;

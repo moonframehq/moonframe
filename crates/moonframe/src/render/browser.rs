@@ -18,6 +18,9 @@ const MIN_HEIGHT: f32 = 120.;
 
 impl<'w> Draw<'w> for Browser {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
+        if !cfg!(feature = "browser") {
+            return problem("this build has no browser support".to_owned(), cx);
+        }
         let look = painter.look(Part::Browser, &self.look, false, place);
         let theme = cx.theme();
         let frame = div()

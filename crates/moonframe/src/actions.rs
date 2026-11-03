@@ -114,11 +114,15 @@ pub(crate) fn menus(shell: &[AppMenu]) -> Vec<Menu> {
     }
     // Developer Mode: the tools for changing the app as it runs, which
     // its users can turn on too; the choice is kept.
-    app_items.extend([
-        MenuItem::separator(),
-        MenuItem::action("Developer Mode", ToggleDeveloperMode).checked(!crate::release()),
-        MenuItem::separator(),
-    ]);
+    if cfg!(feature = "studio") {
+        app_items.extend([
+            MenuItem::separator(),
+            MenuItem::action("Developer Mode", ToggleDeveloperMode).checked(!crate::release()),
+            MenuItem::separator(),
+        ]);
+    } else {
+        app_items.push(MenuItem::separator());
+    }
     // Outside a release, the starter builds itself as one; an app on the
     // library bundles with its own `bundle` command.
     if !crate::release() && !crate::identity().hosted {
@@ -285,7 +289,12 @@ mod tests {
             .filter(|(_, action)| browses(*action))
             .map(|(name, _)| name)
             .collect();
-        assert_eq!(browsing, ["Components…"]);
+        let expected: &[&str] = if cfg!(feature = "studio") {
+            &["Components…"]
+        } else {
+            &[]
+        };
+        assert_eq!(browsing, expected);
         let everything = actions(&bar);
         assert!(
             everything
@@ -298,7 +307,7 @@ mod tests {
                 .iter()
                 .filter(|(_, action)| browses(*action))
                 .count(),
-            1
+            expected.len()
         );
 
         crate::RELEASE.store(true, Ordering::Relaxed);
