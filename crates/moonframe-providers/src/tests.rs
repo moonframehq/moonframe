@@ -502,6 +502,34 @@ fn a_reload_restarts_only_providers_that_changed() {
 }
 
 #[test]
+fn a_restart_starts_an_unchanged_provider_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/a/provider.toml",
+        "kind = 'process'\ncommand = ['sh', 'p.sh']\n",
+    );
+    write(root, "providers/a/p.sh", "echo \"$$\"\nsleep 30\n");
+    let (events, received) = events();
+    let mut providers = Providers::start(root.into(), root.join("build"), events);
+    let started = || {
+        matches!(
+            not_link(&received, Duration::from_secs(5)),
+            Event::Published { provider, .. } if provider == "a"
+        )
+    };
+    assert!(started());
+    providers.reload();
+    assert!(
+        received.recv_timeout(Duration::from_millis(300)).is_err(),
+        "a reload restarted an unchanged provider"
+    );
+    providers.restart("a").unwrap();
+    assert!(started(), "a restart did not start it again");
+}
+
+#[test]
 fn a_higher_layer_replaces_a_provider_of_the_same_name() {
     let dir = tempfile::tempdir().unwrap();
     let (builtin, user) = (dir.path().join("app"), dir.path().join("user"));

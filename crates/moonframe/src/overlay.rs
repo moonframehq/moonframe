@@ -14,9 +14,13 @@ use {
 };
 
 mod highlight;
+mod measure;
 mod trail;
 
-pub(crate) use highlight::Highlight;
+pub(crate) use {
+    highlight::Highlight,
+    measure::{Measure, Measuring},
+};
 
 /// Above every overlay, popover and the toast, so picking reaches inside an
 /// open dialog; the picker, card, banner and label sit one or two above.
@@ -39,6 +43,7 @@ impl MoonframeApp {
         }
         let theme = cx.theme();
         let mut layers = vec![self.highlight(cx)];
+        layers.extend(self.measure_layer(cx));
         if inspector.picking {
             layers.push(
                 deferred(
@@ -69,7 +74,7 @@ impl MoonframeApp {
                 .with_priority(PRIORITY + 1)
                 .into_any_element(),
             );
-            layers.push(banner(theme));
+            layers.push(banner(theme, self.measure_switch(cx)));
             if let Some(hovered) = &inspector.hovered {
                 layers.push(label(hovered, viewport, theme));
             }
@@ -285,7 +290,7 @@ fn dimensions(size: Size<Pixels>) -> String {
 }
 
 /// Says what picking does, across the top.
-fn banner(theme: &component::Theme) -> AnyElement {
+fn banner(theme: &component::Theme, measure: AnyElement) -> AnyElement {
     deferred(
         div()
             .absolute()
@@ -316,7 +321,9 @@ fn banner(theme: &component::Theme) -> AnyElement {
                     .child("for the one around it or back,")
                     .child(key(theme, "↵"))
                     .child("to pick")
-                    .child(key(theme, "Esc")),
+                    .child(key(theme, "Esc"))
+                    .child(div().w(px(1.)).h(px(14.)).bg(theme.border))
+                    .child(measure),
             ),
     )
     .with_priority(PRIORITY + 2)

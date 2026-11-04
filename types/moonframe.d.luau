@@ -1873,6 +1873,8 @@ type WindowMsg = string | { open: string, send: Data? } | { close: string }
 -- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
 -- `AppearanceMode`), `"app:theme"` (`msg` `{ light: string?, dark: string? }`),
 -- `"app:sound"` (`msg` `"default"` or a sound file's path),
+-- `"app:icon"` (`msg` `"default"` or an image file's path: the app's icon
+-- in the Dock, changed at once until the app quits; macOS only),
 -- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`)
 -- and `"app:open"` (`msg` a web address, opened in the system's browser).

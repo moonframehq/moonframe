@@ -591,10 +591,12 @@ impl Providers {
         }
     }
 
-    /// Starts the provider `name` again, or for the first time, however
-    /// it stands: for a process that went and stays gone, once the user
-    /// has dealt with what stopped it.
+    /// Starts the provider `name` again from its folder, changed or not,
+    /// or for the first time, however it stands: a retry after it failed
+    /// (a build that needed a tool installed), or for a process that went
+    /// and stays gone, once the user has dealt with what stopped it.
     pub fn restart(&mut self, name: &str) -> Result<(), Error> {
+        self.found = discover(&self.roots);
         if !self.found.contains_key(name) {
             return Err(Error::new(format!("no provider named `{name}`")));
         }

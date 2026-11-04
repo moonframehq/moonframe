@@ -28,8 +28,8 @@ use {
         *,
     },
     moonframe_core::{
-        Action, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL, Sound,
-        Stylesheet, Titlebar, Token, WindowRequest, WindowState, Workspace,
+        Action, AppIcon, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL,
+        Sound, Stylesheet, Titlebar, Token, WindowRequest, WindowState, Workspace,
     },
     moonframe_providers::{Event, Natives, Providers},
     notify::{RecommendedWatcher, RecursiveMode, Watcher as _},
@@ -50,11 +50,14 @@ mod dialogs;
 mod fonts;
 pub(crate) mod guard;
 mod history;
+mod icon;
 mod listeners;
 mod machine;
+mod measuring;
 mod menu;
 mod panes;
 mod picking;
+mod problems;
 mod toasts;
 mod updates;
 mod view;
@@ -97,6 +100,8 @@ pub(crate) struct MoonframeApp {
     pub(crate) drag: bool,
     /// Picking an element for an agent, and what was picked.
     pub(crate) inspector: Inspector,
+    /// The stylesheet's and providers' problems: open, or dismissed.
+    problem_state: problems::Problems,
     /// The shells `ui.terminal` elements show.
     #[cfg(feature = "terminal")]
     pub(crate) terminals: Terminals,
@@ -302,6 +307,7 @@ impl MoonframeApp {
             asked: chrome,
             drag: false,
             inspector: Inspector::default(),
+            problem_state: problems::Problems::default(),
             chosen: String::new(),
             gallery: None,
             light_scheme,
@@ -337,6 +343,7 @@ impl MoonframeApp {
             _keys: crate::keys::intercept(cx),
             last_pane: 0,
         };
+        app.load_measure();
         app.apply_theme(cx);
         // What changed while the app was closed is a snapshot of its own.
         app.snapshot("launch", cx);
@@ -811,26 +818,7 @@ impl MoonframeApp {
         let file = match sound {
             Sound::Chime => None,
             Sound::File(src) => {
-                let folder = self
-                    .workspace
-                    .slot(from)
-                    .and_then(|slot| slot.source())
-                    .and_then(Path::parent)
-                    .unwrap_or(Path::new("."));
-                let allowed: Vec<PathBuf> = self
-                    .workspace
-                    .roots()
-                    .layers()
-                    .map(Path::to_owned)
-                    .collect();
-                let home = std::env::home_dir();
-                let Some(file) = moonframe_core::resolve_file(
-                    src,
-                    folder,
-                    home.as_deref(),
-                    &allowed,
-                    crate::alerts::MAX_SOUND_BYTES,
-                ) else {
+                let Some(file) = self.mod_file(from, src, crate::alerts::MAX_SOUND_BYTES) else {
                     self.workspace.refuse(
                         from,
                         Error::new(format!(
@@ -875,6 +863,7 @@ impl MoonframeApp {
             Request::Command(command) => self.run(command, window, cx),
             Request::Appearance(appearance) => self.set_appearance(appearance, cx),
             Request::Sound(sound) => self.play(from, &sound),
+            Request::Icon(icon) => self.show_icon(from, &icon),
             Request::Pick(pick) => self.pick(from, pick, cx),
             Request::Edit(edit) => {
                 if let Err(problem) = self.inputs.edit(from, &edit, window, cx) {

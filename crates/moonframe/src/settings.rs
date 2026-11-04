@@ -12,6 +12,8 @@ pub(crate) const LIGHT_THEME: &str = "light_theme";
 pub(crate) const DARK_THEME: &str = "dark_theme";
 /// `system`, `light` or `dark`.
 pub(crate) const APPEARANCE: &str = "appearance";
+/// How Inspect measures: `off`, `redlines`, `rulers`, `box` or `between`.
+pub(crate) const INSPECT_MEASURE: &str = "inspect_measure";
 
 /// The text saved under `key`, if any.
 pub(crate) fn get(path: &Path, key: &str) -> Option<String> {

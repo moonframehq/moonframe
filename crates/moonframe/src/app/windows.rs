@@ -154,6 +154,12 @@ impl MoonframeApp {
         let content = painter.window(name, cx);
         let frame = painter.finish();
         let animating = self.after_frame(frame, window, cx);
+        let content = div()
+            .relative()
+            .size_full()
+            .child(content)
+            .children(self.problems_layer(cx))
+            .into_any_element();
         (content, animating)
     }
 

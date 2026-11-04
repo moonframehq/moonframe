@@ -75,6 +75,7 @@ impl Render for MoonframeApp {
         if let Some(folder) = self.terminals.focused_folder(window) {
             self.project.follow(folder);
         }
+        let problems = self.problems_layer(cx);
         let layers = self.inspector_layers(window.viewport_size(), cx);
         let toast = self.toast.as_ref().map(|(id, message)| {
             let notice = self
@@ -116,6 +117,7 @@ impl Render for MoonframeApp {
             // The shell takes what the branch bar leaves.
             .child(div().flex_1().min_h_0().child(body))
             .children(crate::branch_bar::label().map(crate::branch_bar::render))
+            .children(problems)
             .children(layers)
             .children(toast)
             .child(crate::browser::presenter(self.browsers.pages()))

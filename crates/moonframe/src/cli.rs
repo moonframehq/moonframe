@@ -538,7 +538,9 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         .with_assets(crate::assets::Assets)
         .run(move |cx| {
             gpui_kit::init(cx);
-            crate::dock::set_icon(icon.as_deref());
+            if let Err(problem) = crate::dock::set_icon(icon.as_deref()) {
+                tracing::warn!("{problem}");
+            }
             crate::actions::bind_keys(cx);
             cx.set_menus(crate::actions::menus(&[]));
             cx.on_action(|_: &crate::actions::Quit, cx| crate::app::guard::quit(cx));

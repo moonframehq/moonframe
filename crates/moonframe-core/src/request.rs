@@ -11,6 +11,7 @@ mod awake;
 mod dock;
 mod edit;
 mod guard;
+mod icon;
 mod pick;
 mod window;
 
@@ -19,6 +20,7 @@ pub use {
     dock::Dock,
     edit::{Edit, EditChange, Splice},
     guard::Guard,
+    icon::{AppIcon, ICON_TYPES},
     pick::{Pick, PickKind},
     window::WindowRequest,
 };
@@ -68,6 +70,10 @@ pub enum Request {
     Dock(Dock),
     /// `app:restart`: starts a provider again, by name.
     Restart(String),
+    /// `app:icon`: shows another image as the app's icon in the Dock and
+    /// the app switcher, until the app quits or a mod asks again; or the
+    /// app's own icon back.
+    Icon(AppIcon),
     /// `app:open`: opens a web address (`https://` or `http://`) in the
     /// system's browser: a pull request, a sign-in page.
     Open(String),
@@ -147,6 +153,7 @@ impl Request {
             "dock" => dock::dock(msg).map(Self::Dock),
             "restart" => restart(msg).map(Self::Restart),
             "open" => open(msg).map(Self::Open),
+            "icon" => icon::icon(msg).map(Self::Icon),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -174,6 +181,7 @@ pub const NAMES: &[&str] = &[
     "dock",
     "restart",
     "open",
+    "icon",
 ];
 
 /// Longest address `app:open` opens.
