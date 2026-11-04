@@ -1,4 +1,4 @@
--- A theme picker: click a segment to choose it.
+-- A theme picker, plain and with icons: click a segment to choose it.
 local segmented = use "segmented"
 
 return mod {
@@ -21,6 +21,14 @@ return mod {
 					{ id = "light", label = "Light" },
 					{ id = "dark", label = "Dark" },
 					{ id = "system", label = "System" },
+				},
+			},
+			segmented {
+				selected = state.theme,
+				options = {
+					{ id = "light", label = "Light", icon = "sun" },
+					{ id = "dark", label = "Dark", icon = "moon" },
+					{ id = "system", label = "System", icon = "settings-2" },
 				},
 			},
 			ui.text { `Theme: {state.theme}`, tone = "muted", size = "small" },

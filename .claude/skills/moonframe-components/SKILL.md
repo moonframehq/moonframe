@@ -1031,7 +1031,7 @@ A whole mod using it, with state: `app/components/demos/picker.luau`.
 | --- | --- |
 | `event` | key of the message a click sends, default "select": { select = id } |
 | `grow` | fill the width, segments sharing it equally |
-| `options` | list of { id, label?, icon?, count? (a number or text after the label, in the accent colour), tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment |
+| `options` | list of { id, label?, icon? (optional, before the label), count? (a number or text after the label, in the accent colour), tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment |
 | `selected` | id of the chosen option |
 | `small` | tighter segments, for a dense toolbar |
 | `to` | mod to send messages to, if not the drawing one |

@@ -26,7 +26,7 @@ return component {
 	description = "One-of-many choice as segments in a rounded track, the selected one raised; sends { select = id }.",
 	when = "A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`.",
 	props = {
-		["options"] = "list of { id, label?, icon?, count? (a number or text after the label, in the accent colour), tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment",
+		["options"] = "list of { id, label?, icon? (optional, before the label), count? (a number or text after the label, in the accent colour), tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment",
 		["selected"] = "id of the chosen option",
 		["event"] = "key of the message a click sends, default \"select\": { select = id }",
 		["small"] = "tighter segments, for a dense toolbar",
@@ -72,7 +72,7 @@ return component {
 				tooltip = option.tooltip,
 				msg = option.msg or { [event] = id },
 				to = props.to,
-				option.icon and ui.icon { name = option.icon :: any },
+				option.icon and ui.icon { name = option.icon :: any, size = "small" },
 				option.label and ui.text { option.label },
 				option.count ~= nil and ui.text { tostring(option.count), class = "segmented-count" },
 			}
