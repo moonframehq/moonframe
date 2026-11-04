@@ -210,6 +210,7 @@ fn main() -> std::process::ExitCode {
 | `.updates("owner/repo")` | the GitHub repository it is released from: **Check for Updates…** in the app menu, a daily check in a release build, and on macOS an install over the running `.app`; see [updates.md](updates.md) |
 | `.app_dir(path)` | its app folder while it runs from source; edits reload live |
 | `.embedded_app::<E>()` | its app folder compiled in (`#[derive(moonframe::rust_embed::RustEmbed)]`, `#[crate_path = "moonframe::rust_embed"]`), for a lone executable |
+| `.project_dir(path)` | the source checkout for an embedded app's debug branch bar; pass `env!("CARGO_MANIFEST_DIR")` from the host crate, including when Cargo builds into an external target folder |
 | `.keep(mods)` | the starter's mods it shows (from `app/mods` here), as a profile's `keep` |
 | `.native(name, make)` | a native provider (below) |
 | `.native_async(name, make)` | a native provider written with `async fn`, on tokio (below) |
@@ -217,6 +218,11 @@ fn main() -> std::process::ExitCode {
 | `.view(name, make)` | a view (below) |
 | `.log(filter)` | the log filter when `RUST_LOG` is unset |
 | `.run()` | the command line: the window, `--check`, `--release`, `--profile`, `mod`, `app`, `init`, `bundle`; see `--help` |
+
+The debug branch bar reads the selected app folder (`DIR`, then the bundle's
+app folder, then `.app_dir`). An embedded app instead uses `.project_dir`;
+without it, no checkout is assumed and no bar is shown. Release builds and
+checkouts on `main` or `master` show no bar.
 
 ### Its layers
 
