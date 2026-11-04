@@ -14,6 +14,7 @@ type Props = {
 	reason: string?,
 	variant: string?,
 	size: string?,
+	disabled: boolean?,
 }
 
 local icon_button = use "icon-button"
@@ -30,6 +31,7 @@ return component {
 		["reason"] = "why, for the system's list of what is keeping it awake",
 		["variant"] = "as `icon-button`",
 		["size"] = "as `icon-button`",
+		["disabled"] = "greys it out: for while a job holds by itself, which the cup can't let go of",
 	},
 	example = { awake = { held = true, display = true }, reason = "Scanning" },
 	usage = [[local caffeine = use "caffeine"
@@ -51,6 +53,7 @@ caffeine { awake = app.awake, scope = "system", reason = "Scanning" }]],
 			active = held,
 			variant = props.variant,
 			size = props.size,
+			disabled = props.disabled,
 			to = "app:awake",
 			msg = if held
 				then { hold = false }

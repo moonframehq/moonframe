@@ -850,6 +850,7 @@ A whole mod using it, with state: `app/components/demos/button-group.luau`.
 | Prop | Meaning |
 | --- | --- |
 | `awake` | `app.awake`, for it to show how things stand |
+| `disabled` | greys it out: for while a job holds by itself, which the cup can't let go of |
 | `reason` | why, for the system's list of what is keeping it awake |
 | `scope` | "display" keeps the screen on too (default); "system" lets it sleep and lock |
 | `size` | as `icon-button` |

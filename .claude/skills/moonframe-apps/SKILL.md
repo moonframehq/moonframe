@@ -272,7 +272,7 @@ and over 16 ms at `warn`; fast ones stay at `debug`. Measure in a release build
 
 ## Examples
 
-`examples/` has seven apps and a package two of them share; read them first:
+`examples/` has its apps and a package two of them share; read them first:
 
 - **sessions**: repositories as sessions with a shell each and their changes.
 - **workbench**: terminal tabs, an editor with highlighting, files and
@@ -289,6 +289,9 @@ and over 16 ms at `warn`; fast ones stay at `debug`. Measure in a release build
   chat panel; deals move through a card's menu.
 - **stage**: the components on a bento board with sample data, for stills
   (View > Show or Hide Captions, backdrops).
+- **lightbox**: a pretend film scanner: `video-viewer` and live instruments
+  from a Python engine the app starts, surviving a crash mid-scan, with
+  `app:awake`, `app:guard`, `app:dock` and the `caffeine` cup.
 - **projects**: a Python provider for repositories, their files and changes,
   and the `file-tree`, `change-tree`, `code` and `file-icon` components.
 

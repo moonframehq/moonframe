@@ -42,7 +42,7 @@ return mod {
 					{ name = "Blue", color = "#3b82f6", low = BLUE_LOW, high = BLUE_HIGH },
 				},
 			},
-			switch { label = "Parade", value = state.parade, change = "parade" },
+			switch { label = "Parade", on = state.parade, msg = "parade" },
 		}
 	end,
 }

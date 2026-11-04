@@ -96,7 +96,7 @@ icon_button { icon = "delete", tooltip = "Delete", msg = "delete", size = "small
 			tooltip = props.tooltip,
 			msg = if props.disabled then nil else props.msg,
 			command = if props.disabled then nil else props.command,
-			to = props.to,
+			to = if props.disabled then nil else props.to,
 			ui.icon { name = props.icon :: any },
 			badge and ui.row { class = "icon-button-badge", ui.text { tostring(props.badge) } },
 		} }
