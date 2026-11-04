@@ -76,7 +76,7 @@ impl Action {
                 if fields.raw("context").is_none() && !Pointer::sends(fields) =>
             {
                 Err(fields.cx().key("to").fail(
-                    "`to` goes with a `msg`, `context`, `pointer`, `wheel`, `drop` or browser `command`",
+                    "`to` goes with a `msg`, `context`, `pointer`, `wheel`, `drop`, a gesture or browser `command`",
                 ))
             },
             (None, _, Some(AnyCommand::App(command))) => Ok(Some(Self::Command(command))),

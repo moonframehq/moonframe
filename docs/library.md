@@ -366,6 +366,11 @@ impl Render for Editor { /* ... */ }
 - When the mod's `props` change, `set_props` runs and the view draws again.
 - The `view` stylesheet rule styles the box it fills (`radius`, `padding`,
   `border`, ...). Previews in the Components window show a placeholder.
+- Trackpad gestures: GPUI's `on_pinch` and `on_mouse_pressure` work as
+  usual, and `moonframe::gestures::gestures()` adds what it lacks, as a
+  child of the element it listens for (macOS; elsewhere it hears nothing):
+  `div().relative().child(gestures().on_rotate(|event, window, cx| ...))`,
+  with `on_smart_zoom` and `on_swipe` beside it.
 
 `moonframe::Data` is what crosses between Rust and Luau: `Data::map`,
 `get`, `as_str`, `as_i64`, `as_f64`, `as_bool`, and `From` for strings,

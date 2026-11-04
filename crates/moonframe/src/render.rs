@@ -332,6 +332,7 @@ impl<'w, 'm> Painter<'w, 'm> {
     pub(crate) fn in_window(mut self, window: WindowId) -> Self {
         self.window = Some(window);
         self.frame = viewer::begin_frame(window);
+        crate::gestures::begin_frame(window);
         self
     }
 

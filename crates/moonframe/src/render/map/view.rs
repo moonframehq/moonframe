@@ -1,5 +1,9 @@
 //! Where each `ui.map` looks: what its view gives, or where the user
-//! dragged and zoomed it to, kept by window and place across frames.
+//! dragged, zoomed and turned it to, kept by window and place across frames.
+//! Turned, the box's own axes no longer run along the world's: every step
+//! between pixels in the box and places in the world goes through
+//! [`Frame::turn`] or [`Frame::unturn`], so pins, routes, drags and zooms
+//! all agree with the tiles.
 
 use {
     gpui_kit::*,
@@ -16,6 +20,11 @@ const MARGIN: f64 = 48.0;
 /// How many screens away a glide still goes. Farther, the map jumps: a
 /// slide that long would blur past and fetch tiles nobody sees.
 const GLIDE_SCREENS: f64 = 8.0;
+/// Degrees two fingers turn before the map follows: a pinch always turns a
+/// little, and that must not tip the map.
+const TURN_FROM: f64 = 6.0;
+/// Degrees from north a turn settles back to north when the fingers lift.
+const NORTH_WITHIN: f64 = 4.0;
 
 /// What the view gave, which, once it changes, wins over where the user
 /// left the map.
@@ -54,6 +63,9 @@ pub(super) struct Frame {
     pub(super) zoom: f64,
     /// The box, in pixels.
     pub(super) size: (f64, f64),
+    /// The compass direction up the box, in degrees clockwise from north,
+    /// from 0 up to 360.
+    pub(super) bearing: f64,
 }
 
 impl Frame {
@@ -61,8 +73,14 @@ impl Frame {
     fn same_as(&self, other: &Self) -> bool {
         let span = self.span();
         (self.zoom - other.zoom).abs() < 0.001
+            && self.turn_to(other).abs() < 0.01
             && (near(self.center.0, other.center.0) - other.center.0).abs() * span < 0.5
             && (self.center.1 - other.center.1).abs() * span < 0.5
+    }
+
+    /// The short way round from this bearing to `to`'s, in degrees.
+    fn turn_to(&self, to: &Self) -> f64 {
+        (to.bearing - self.bearing + 540.0).rem_euclid(360.0) - 180.0
     }
 
     /// Whether a glide from here reaches `to`: not too many screens away,
@@ -86,7 +104,25 @@ impl Frame {
             ),
             zoom: self.zoom + (to.zoom - self.zoom) * eased,
             size: to.size,
+            bearing: (self.bearing + self.turn_to(to) * eased).rem_euclid(360.0),
         }
+    }
+
+    /// Whether north is anywhere but straight up.
+    pub(super) fn turned(&self) -> bool {
+        self.bearing.min(360.0 - self.bearing) > 0.001
+    }
+
+    /// `(x, y)` along the world's axes, as seen along the box's.
+    fn turn(&self, (x, y): (f64, f64)) -> (f64, f64) {
+        let (sin, cos) = self.bearing.to_radians().sin_cos();
+        (x * cos + y * sin, y * cos - x * sin)
+    }
+
+    /// `(x, y)` along the box's axes, as seen along the world's.
+    pub(super) fn unturn(&self, (x, y): (f64, f64)) -> (f64, f64) {
+        let (sin, cos) = self.bearing.to_radians().sin_cos();
+        (x * cos - y * sin, y * cos + x * sin)
     }
 
     /// The world's width in pixels at this zoom.
@@ -118,32 +154,66 @@ impl Frame {
 
     /// World copies of a pin or unwrapped route that intersect the box,
     /// including its marker/stroke padding. Low zooms can show several.
+    /// `low` and `high` are its corners in the box. Copies lie a world
+    /// apart along the box's turned east, so each axis bounds them.
     pub(super) fn copies(
         &self,
-        left: f32,
-        right: f32,
+        low: (f32, f32),
+        high: (f32, f32),
         padding: f32,
     ) -> std::ops::RangeInclusive<i64> {
-        let span = self.span();
-        let first = ((-f64::from(padding) - f64::from(right)) / span).ceil() as i64;
-        let last = ((self.size.0 + f64::from(padding) - f64::from(left)) / span).floor() as i64;
-        first..=last
+        let (step_x, step_y) = self.turn((self.span(), 0.0));
+        let padding = f64::from(padding);
+        let reach = |low: f32, high: f32, size: f64, step: f64| {
+            let (low, high) = (f64::from(low), f64::from(high));
+            if step.abs() < 1e-9 {
+                let inside = high >= -padding && low <= size + padding;
+                return if inside {
+                    (f64::NEG_INFINITY, f64::INFINITY)
+                } else {
+                    (1.0, 0.0)
+                };
+            }
+            let (a, b) = ((-padding - high) / step, (size + padding - low) / step);
+            (a.min(b), a.max(b))
+        };
+        let (x_from, x_to) = reach(low.0, high.0, self.size.0, step_x);
+        let (y_from, y_to) = reach(low.1, high.1, self.size.1, step_y);
+        x_from.max(y_from).ceil() as i64..=x_to.min(y_to).floor() as i64
+    }
+
+    /// How far world copy `copy` of something lies from it, in the box.
+    pub(super) fn copy_offset(&self, copy: i64) -> (f32, f32) {
+        let (x, y) = self.turn((copy as f64 * self.span(), 0.0));
+        (x as f32, y as f32)
     }
 
     fn at_world(&self, x: f64, y: f64) -> (f32, f32) {
         let span = self.span();
-        let left = (x - self.center.0) * span + self.size.0 / 2.0;
-        let top = (y - self.center.1) * span + self.size.1 / 2.0;
-        (left as f32, top as f32)
+        let (left, top) = self.turn(((x - self.center.0) * span, (y - self.center.1) * span));
+        (
+            (left + self.size.0 / 2.0) as f32,
+            (top + self.size.1 / 2.0) as f32,
+        )
     }
 
     /// The point of the world square under `(left, top)` in the box.
-    fn world_at(&self, left: f64, top: f64) -> (f64, f64) {
+    pub(super) fn world_at(&self, left: f64, top: f64) -> (f64, f64) {
         let span = self.span();
-        (
-            self.center.0 + (left - self.size.0 / 2.0) / span,
-            self.center.1 + (top - self.size.1 / 2.0) / span,
-        )
+        let (x, y) = self.unturn((left - self.size.0 / 2.0, top - self.size.1 / 2.0));
+        (self.center.0 + x / span, self.center.1 + y / span)
+    }
+
+    /// The least and most of the world square the box shows, x and y.
+    pub(super) fn world_box(&self) -> ((f64, f64), (f64, f64)) {
+        let (width, height) = self.size;
+        let corners = [(0.0, 0.0), (width, 0.0), (0.0, height), (width, height)]
+            .map(|(left, top)| self.world_at(left, top));
+        corners
+            .iter()
+            .fold((corners[0], corners[0]), |(low, high), &(x, y)| {
+                ((low.0.min(x), low.1.min(y)), (high.0.max(x), high.1.max(y)))
+            })
     }
 
     /// `[lat, lon]` at the middle.
@@ -154,6 +224,7 @@ impl Frame {
     /// Moved by `(dx, dy)` pixels of the pointer: the map follows it.
     fn dragged(self, dx: f64, dy: f64) -> Self {
         let span = self.span();
+        let (dx, dy) = self.unturn((dx, dy));
         let (_, top) = world(MAX_LATITUDE, 0.0);
         let center = (
             self.center.0 - dx / span,
@@ -196,6 +267,34 @@ struct Kept {
     bounds: Bounds<Pixels>,
     /// The window's scale, for `@2x` tiles.
     scale: f32,
+    /// Where the map points, kept apart from `moved`: a view that follows
+    /// `move` with `center` must not undo a turn it did not echo.
+    bearing: f64,
+    /// The `bearing` the view last gave.
+    given_bearing: Option<f32>,
+    /// Two fingers turning it, if they are.
+    turn: Option<Turn>,
+}
+
+/// One two-finger turn, from the first touch.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct Turn {
+    /// How far the fingers have gone, while the map has not followed.
+    waited: f64,
+    /// The map follows: past [`TURN_FROM`].
+    following: bool,
+}
+
+impl Turn {
+    /// The fingers turned `degrees` more: what the map turns by.
+    fn by(&mut self, degrees: f64) -> f64 {
+        if self.following {
+            return degrees;
+        }
+        self.waited += degrees;
+        self.following = self.waited.abs() >= TURN_FROM;
+        0.0
+    }
 }
 
 thread_local! {
@@ -226,6 +325,9 @@ pub(super) fn frame(
             glide: None,
             bounds: Bounds::default(),
             scale: 2.0,
+            bearing: compass(map.bearing),
+            given_bearing: map.bearing,
+            turn: None,
         });
         // The view moved it: that wins over where the user left it.
         let mut sent = false;
@@ -234,6 +336,16 @@ pub(super) fn frame(
             entry.given = given;
             entry.moved = None;
         }
+        // While the fingers turn it they lead, and the view's echo of their
+        // last move trails behind: it would pull the map back.
+        if entry.given_bearing != map.bearing {
+            entry.given_bearing = map.bearing;
+            if map.bearing.is_some() && !entry.turn.is_some_and(|turn| turn.following) {
+                entry.bearing = compass(map.bearing);
+                sent = true;
+            }
+        }
+        let bearing = entry.bearing;
         let laid = entry.bounds.size;
         let size = if laid.width > px(0.) && laid.height > px(0.) {
             (f64::from(laid.width), f64::from(laid.height))
@@ -241,15 +353,20 @@ pub(super) fn frame(
             fallback
         };
         let frame = match entry.moved {
-            Some(moved) => Frame { size, ..moved },
+            Some(moved) => Frame {
+                size,
+                bearing,
+                ..moved
+            },
             None => {
-                let (framed, fit) = map.framing(size.0, size.1, MARGIN);
+                let (framed, fit) = map.framing(size.0, size.1, MARGIN, bearing);
                 let [lat, lon] = map.center.unwrap_or(framed);
                 let zoom = map.zoom.map_or(fit, f64::from).clamp(0.0, most_zoom(map));
                 Frame {
                     center: world(lat, lon),
                     zoom,
                     size,
+                    bearing,
                 }
             },
         };
@@ -281,6 +398,11 @@ pub(super) fn frame(
 /// Whether the map `key` is on its way somewhere, and wants another frame.
 pub(super) fn gliding(key: &str) -> bool {
     KEPT.with_borrow(|kept| kept.get(key).is_some_and(|kept| kept.glide.is_some()))
+}
+
+/// `bearing` as a frame holds it, from 0 up to 360.
+fn compass(bearing: Option<f32>) -> f64 {
+    f64::from(bearing.unwrap_or(0.0)).rem_euclid(360.0)
 }
 
 /// Keeps the box `key` was laid out in; whether it changed size.
@@ -375,15 +497,68 @@ pub(super) fn zoom(
     zoomed
 }
 
+/// Two fingers turned `degrees` clockwise over the map `key`, in `phase`;
+/// the frame to tell the view about, if the map moved. The map turns with
+/// them, about its middle, once they mean it; lifted close to north, it
+/// settles there.
+pub(super) fn turn(key: &str, drawn: Frame, degrees: f64, phase: TouchPhase) -> Option<Frame> {
+    let frame = current(key, drawn);
+    let (bearing, moved) = KEPT.with_borrow_mut(|kept| {
+        let entry = kept.get_mut(key)?;
+        let mut turn = match phase {
+            TouchPhase::Started => Turn::default(),
+            _ => entry.turn.unwrap_or_default(),
+        };
+        // Turning the map clockwise brings what lay left of north up.
+        let bearing = (entry.bearing - turn.by(degrees)).rem_euclid(360.0);
+        let ended = matches!(phase, TouchPhase::Ended | TouchPhase::Cancelled);
+        let bearing = if ended && turn.following {
+            settled(bearing)
+        } else {
+            bearing
+        };
+        let moved = bearing != entry.bearing || (ended && turn.following);
+        entry.bearing = bearing;
+        entry.turn = (!ended).then_some(turn);
+        Some((bearing, moved))
+    })?;
+    if !moved {
+        return None;
+    }
+    // Held where it is: a map framing its pins would refit as it turns.
+    let turned = Frame { bearing, ..frame };
+    keep(key, turned);
+    Some(turned)
+}
+
+/// A turn's last `bearing`, close to north becoming north.
+fn settled(bearing: f64) -> f64 {
+    if bearing.min(360.0 - bearing) < NORTH_WITHIN {
+        0.0
+    } else {
+        bearing
+    }
+}
+
 /// Where the user left the map `key`, if they moved it.
 pub(super) fn moved(key: &str) -> Option<Frame> {
-    KEPT.with_borrow(|kept| kept.get(key).and_then(|kept| kept.moved))
+    KEPT.with_borrow(|kept| {
+        let kept = kept.get(key)?;
+        kept.moved.map(|moved| Frame {
+            bearing: kept.bearing,
+            ..moved
+        })
+    })
 }
 
 /// Where the map `key` looks now: where the user left it, else `drawn`,
-/// as the last frame drew it. Events between two frames see each other.
+/// as the last frame drew it, turned as it now is. Events between two
+/// frames see each other.
 pub(super) fn current(key: &str, drawn: Frame) -> Frame {
-    moved(key).unwrap_or(drawn)
+    moved(key).unwrap_or_else(|| Frame {
+        bearing: KEPT.with_borrow(|kept| kept.get(key).map_or(drawn.bearing, |kept| kept.bearing)),
+        ..drawn
+    })
 }
 
 /// The corner of the map `key`'s box in the window, as last laid out.
@@ -414,7 +589,7 @@ fn keep(key: &str, frame: Frame) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Frame, world};
+    use super::{Frame, Turn, settled, world};
 
     #[test]
     fn zooming_keeps_the_place_under_the_pointer() {
@@ -422,6 +597,7 @@ mod tests {
             center: world(37.79, -122.40),
             zoom: 14.0,
             size: (800.0, 600.0),
+            bearing: 0.0,
         };
         let under = frame.world_at(100.0, 50.0);
         let zoomed = frame.zoomed(1.5, 100.0, 50.0, 20.0);
@@ -436,6 +612,7 @@ mod tests {
             center: world(37.79, -122.40),
             zoom: 14.0,
             size: (800.0, 600.0),
+            bearing: 0.0,
         };
         let to = Frame {
             center: world(37.80, -122.41),
@@ -456,11 +633,30 @@ mod tests {
     }
 
     #[test]
+    fn a_glide_turns_the_short_way_round_past_north() {
+        let from = Frame {
+            center: world(37.79, -122.40),
+            zoom: 14.0,
+            size: (800.0, 600.0),
+            bearing: 350.0,
+        };
+        let to = Frame {
+            bearing: 10.0,
+            ..from
+        };
+        assert!(!from.same_as(&to));
+        assert!(from.toward(&to, 1.0).same_as(&to));
+        let half = from.toward(&to, 0.2).bearing;
+        assert!(!(10.0..350.0).contains(&half), "{half}");
+    }
+
+    #[test]
     fn a_glide_takes_the_short_way_over_the_dateline() {
         let from = Frame {
             center: world(0.0, 179.99),
             zoom: 10.0,
             size: (800.0, 600.0),
+            bearing: 0.0,
         };
         let to = Frame {
             center: world(0.0, -179.99),
@@ -477,6 +673,7 @@ mod tests {
             center: world(37.79, -122.40),
             zoom: 14.0,
             size: (800.0, 600.0),
+            bearing: 0.0,
         };
         let (left, top) = frame.at(37.79, -122.40);
         assert!((left - 400.0).abs() < 1e-3 && (top - 300.0).abs() < 1e-3);
@@ -490,6 +687,7 @@ mod tests {
             center: world(0.0, 179.9),
             zoom: 10.0,
             size: (800.0, 600.0),
+            bearing: 0.0,
         };
         let (x, y) = frame.at(0.0, -179.9);
         let expected = 400.0 + 0.2 / 360.0 * frame.span();
@@ -513,11 +711,12 @@ mod tests {
             center: world(0.0, 0.0),
             zoom: 1.0,
             size: (512.0, 400.0),
+            bearing: 0.0,
         };
         let route = frame.route(&[[0.0, 179.0], [0.0, -179.0]]);
         assert!(route[0].0 > 500.0 && route[1].0 > 512.0);
         assert!(route[1].0 - route[0].0 < 3.0);
-        let copies: Vec<_> = frame.copies(route[0].0, route[1].0, 4.0).collect();
+        let copies: Vec<_> = frame.copies(route[0], route[1], 4.0).collect();
         assert_eq!(copies, [-1, 0]);
         // At zoom zero, all three visible copies of a pin are drawn.
         let wide = Frame {
@@ -526,6 +725,109 @@ mod tests {
             ..frame
         };
         let (x, _) = wide.at(0.0, 0.0);
-        assert_eq!(wide.copies(x, x, 14.0).collect::<Vec<_>>(), [-1, 0, 1]);
+        let at = wide.at(0.0, 0.0);
+        assert_eq!(at.0, x);
+        assert_eq!(wide.copies(at, at, 14.0).collect::<Vec<_>>(), [-1, 0, 1]);
+    }
+
+    fn turned(bearing: f64) -> Frame {
+        Frame {
+            center: world(37.79, -122.40),
+            zoom: 14.0,
+            size: (800.0, 600.0),
+            bearing,
+        }
+    }
+
+    fn close(a: (f64, f64), b: (f64, f64)) -> bool {
+        (a.0 - b.0).abs() < 1e-3 && (a.1 - b.1).abs() < 1e-3
+    }
+
+    #[test]
+    fn east_up_puts_north_on_the_left() {
+        let frame = turned(90.0);
+        let (left, top) = frame.at(37.80, -122.40);
+        assert!(left < 300.0 && (top - 300.0).abs() < 0.01, "{left}, {top}");
+        let (left, top) = frame.at(37.79, -122.39);
+        assert!((left - 400.0).abs() < 0.01 && top < 200.0, "{left}, {top}");
+    }
+
+    #[test]
+    fn a_place_and_its_pixel_agree_at_any_bearing() {
+        for bearing in [0.0, 17.0, 90.0, 133.5, 270.0, 359.0] {
+            let frame = turned(bearing);
+            let (left, top) = frame.at(37.80, -122.41);
+            let (x, y) = frame.world_at(f64::from(left), f64::from(top));
+            let (want_x, want_y) = world(37.80, -122.41);
+            assert!((x - want_x).abs() < 1e-7 && (y - want_y).abs() < 1e-7);
+        }
+    }
+
+    #[test]
+    fn a_drag_keeps_the_place_under_the_pointer_when_turned() {
+        for bearing in [0.0, 30.0, 200.0] {
+            let frame = turned(bearing);
+            let under = frame.world_at(100.0, 50.0);
+            let dragged = frame.dragged(35.0, -20.0);
+            let after = dragged.world_at(135.0, 30.0);
+            assert!((under.0 - after.0).abs() < 1e-9 && (under.1 - after.1).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn zooming_keeps_the_place_under_the_pointer_when_turned() {
+        let frame = turned(75.0);
+        let under = frame.world_at(100.0, 50.0);
+        let after = frame.zoomed(1.5, 100.0, 50.0, 20.0).world_at(100.0, 50.0);
+        assert!((under.0 - after.0).abs() < 1e-12 && (under.1 - after.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_world_box_covers_every_corner_of_a_turned_box() {
+        let frame = turned(45.0);
+        let (low, high) = frame.world_box();
+        for corner in [(0.0, 0.0), (800.0, 0.0), (0.0, 600.0), (800.0, 600.0)] {
+            let (x, y) = frame.world_at(corner.0, corner.1);
+            assert!(low.0 <= x && x <= high.0 && low.1 <= y && y <= high.1);
+        }
+        let north = turned(0.0).world_box();
+        assert!(high.0 - low.0 > north.1.0 - north.0.0);
+    }
+
+    #[test]
+    fn world_copies_of_a_place_lie_along_the_turned_east() {
+        // A quarter turn: copies repeat up and down the box, not across it.
+        let frame = Frame {
+            center: world(0.0, 0.0),
+            zoom: 0.0,
+            size: (300.0, 800.0),
+            bearing: 90.0,
+        };
+        let at = frame.at(0.0, 0.0);
+        assert_eq!(frame.copies(at, at, 14.0).collect::<Vec<_>>(), [-1, 0, 1]);
+        let (x, y) = frame.copy_offset(1);
+        assert!(close((f64::from(x), f64::from(y)), (0.0, -frame.span())));
+        // Off the box's side, no copy along its length brings it in.
+        let aside = (at.0 + 1000.0, at.1);
+        assert_eq!(frame.copies(aside, aside, 14.0).count(), 0);
+    }
+
+    #[test]
+    fn a_pinch_s_small_turn_does_not_tip_the_map() {
+        let mut turn = Turn::default();
+        assert_eq!(turn.by(3.0), 0.0);
+        assert_eq!(turn.by(-2.0), 0.0);
+        assert!(!turn.following);
+        assert_eq!(turn.by(5.5), 0.0);
+        assert!(turn.following);
+        assert_eq!(turn.by(1.5), 1.5);
+    }
+
+    #[test]
+    fn a_turn_left_close_to_north_settles_there() {
+        assert_eq!(settled(3.0), 0.0);
+        assert_eq!(settled(358.0), 0.0);
+        assert_eq!(settled(10.0), 10.0);
+        assert_eq!(settled(350.0), 350.0);
     }
 }

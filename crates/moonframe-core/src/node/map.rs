@@ -125,7 +125,8 @@ providers! {
 
 /// A street map. Unset, `center` and `zoom` frame the pins and routes;
 /// once the user drags or scrolls it, the map keeps where they left it
-/// until the view gives another `center` or `zoom`.
+/// until the view gives another `center` or `zoom`. `bearing` is kept apart
+/// from those: giving another one turns the map where it stands.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Map {
     pub look: Look,
@@ -136,11 +137,16 @@ pub struct Map {
     pub center: Option<[f64; 2]>,
     /// The zoom level, 0 (the whole world) to the provider's deepest.
     pub zoom: Option<f32>,
-    /// A new `center` or `zoom` eases the map there, instead of jumping.
+    /// A new `center`, `zoom` or `bearing` eases the map there, instead of
+    /// jumping.
     pub glide: bool,
+    /// The compass direction at the top of the box, in degrees clockwise
+    /// from north. Unset: north, until the user turns it.
+    pub bearing: Option<f32>,
     pub pins: Vec<Pin>,
     pub routes: Vec<Route>,
-    /// Sent with `lat`, `lon` and `zoom` added after the user moves the map.
+    /// Sent with `lat`, `lon`, `zoom` and `bearing` added after the user
+    /// moves the map.
     pub moved: Option<Data>,
     /// Sent with `pin` (its index, from 1) added when a pin is clicked.
     pub select: Option<Data>,
@@ -230,17 +236,21 @@ pub const MAX_LATITUDE: f64 = 85.051_128_78;
 
 impl Map {
     /// The zoom and center that frame the pins and routes in a box of
-    /// `width` by `height` pixels, leaving `margin` pixels around them;
-    /// the whole world with nothing to frame.
-    pub fn framing(&self, width: f64, height: f64, margin: f64) -> ([f64; 2], f64) {
+    /// `width` by `height` pixels turned to `bearing` degrees, leaving
+    /// `margin` pixels around them; the whole world with nothing to frame.
+    pub fn framing(&self, width: f64, height: f64, margin: f64, bearing: f64) -> ([f64; 2], f64) {
         let places = self.pins.iter().map(|pin| [pin.lat, pin.lon]).chain(
             self.routes
                 .iter()
                 .flat_map(|route| route.places().iter().copied()),
         );
+        // Measured along the box's own edges: turned, its frame is not the
+        // world's.
+        let (sin, cos) = bearing.to_radians().sin_cos();
         let mut bounds: Option<([f64; 2], [f64; 2])> = None;
         for [lat, lon] in places {
             let (x, y) = world(lat, lon);
+            let (x, y) = (x * cos + y * sin, y * cos - x * sin);
             bounds = Some(match bounds {
                 None => ([x, y], [x, y]),
                 Some((low, high)) => ([low[0].min(x), low[1].min(y)], [
@@ -253,7 +263,8 @@ impl Map {
         let Some((low, high)) = bounds else {
             return ([0.0, 0.0], 1.0);
         };
-        let center = unworld((low[0] + high[0]) / 2.0, (low[1] + high[1]) / 2.0);
+        let (x, y) = ((low[0] + high[0]) / 2.0, (low[1] + high[1]) / 2.0);
+        let center = unworld(x * cos - y * sin, y * cos + x * sin);
         let (span_x, span_y) = (high[0] - low[0], high[1] - low[1]);
         let room_x = (width - 2.0 * margin).max(1.0);
         let room_y = (height - 2.0 * margin).max(1.0);
