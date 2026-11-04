@@ -94,6 +94,8 @@ tokens! {
         Map = "map",
         Terminal = "terminal",
         Browser = "browser",
+        /// A `ui.video`'s box.
+        Video = "video",
         View = "view",
         Input = "input",
         /// An input's placeholder; its `color` colors it.

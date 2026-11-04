@@ -1105,6 +1105,52 @@ type ListProps = {
 	float: Float?,
 }
 
+-- A rectangle or line the host draws in a `ui.video`, in fractions of the
+-- picture; a line has no `width` or no `height`.
+type VideoGuide = {
+	x: number,
+	y: number,
+	width: number?,
+	height: number?,
+	-- #rrggbb or #rrggbbaa.
+	color: string?,
+}
+
+-- `ui.video { source = "camera" }`: frames from a ring in shared memory.
+type VideoProps = {
+	class: Class?,
+	style: Style?,
+	state: string?,
+	source: string,
+	id: string?,
+	-- Device pixels per picture pixel, 1 being 100 %; nil fits it.
+	zoom: number?,
+	center: { number }?,
+	filter: ("auto" | "nearest" | "linear")?,
+	color: ("srgb" | "display-p3" | "rec709" | "rec2020" | "linear-srgb" | "linear-p3" | "none")?,
+	extended: boolean?,
+	-- Code values, then what multiplies and encodes them, in this order.
+	black: number?,
+	white: number?,
+	gain: number?,
+	gamma: number?,
+	guides: { VideoGuide }?,
+	-- A point to read, in fractions of the box, as `pointer` gives it.
+	probe: { number }?,
+	-- Sent each second with `fps`, `shown`, `skipped`, `latency`, `live`,
+	-- `width`, `height`, `format`, `frame`, `fit` and `density` added.
+	stats: Data?,
+	-- Sent with `x`, `y`, `source`, `display` and `channel`? added.
+	probed: Data?,
+	width: number?,
+	height: number?,
+	tooltip: string?,
+	context: Data?,
+	copy: string?,
+	to: string?,
+	[number]: string,
+}
+
 -- Where a `ui.map` gets its tiles. `openstreetmap` and the `carto-*` maps
 -- need no key; the others need the provider's API key in `key`.
 type MapProvider =
@@ -1211,6 +1257,7 @@ declare ui: {
 	map: (props: MapProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,
 	browser: (props: string | BrowserProps) -> Element,
+	video: (props: string | VideoProps) -> Element,
 	view: (props: string | ViewProps) -> Element,
 	input: (props: InputProps) -> Element,
 	markdown: (props: string | MarkdownProps) -> Element,
@@ -1254,6 +1301,48 @@ type WindowState = {
 	fullscreen: boolean,
 	-- The frontmost window.
 	active: boolean,
+	-- The screen it is on: an `id` from `app.displays`.
+	display: number?,
+}
+
+-- A screen, in `app.displays`. `x`, `y`, `width` and `height` are its
+-- place among the others, in points.
+type DisplayInfo = {
+	id: number,
+	primary: boolean,
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+}
+
+-- How a process or socket provider's link stands, in `app.links`.
+type ProviderLink = {
+	-- Whether the provider has its program.
+	connected: boolean?,
+	-- Messages not yet written.
+	waiting: number,
+	-- Messages dropped since it started: the queue was full or, for a
+	-- socket, no one was there to hear them.
+	dropped: number,
+}
+
+-- How `app:awake` stands, in `app.awake`.
+type AwakeState = {
+	-- Whether the system agreed to stay awake.
+	held: boolean,
+	-- Whether the display stays on too.
+	display: boolean,
+	-- Why it would not, if it would not.
+	problem: string?,
+}
+
+-- The last run's panic, in `app.crash`.
+type CrashReport = {
+	-- What it said.
+	message: string,
+	-- The report's path, for the user to read or send.
+	report: string,
 }
 
 -- Light, dark, or as the system is (switching as it does).
@@ -1756,6 +1845,14 @@ type App = {
 	dark: boolean,
 	appearance: Appearance,
 	window: WindowState,
+	-- Every screen, the primary one first.
+	displays: { DisplayInfo }?,
+	-- Each process or socket provider that has had something to report.
+	links: { [string]: ProviderLink }?,
+	-- Nil until a mod first asks `app:awake`.
+	awake: AwakeState?,
+	-- Nil unless the last run panicked.
+	crash: CrashReport?,
 	-- Cargo feature names mapped to whether this host compiled them in.
 	capabilities: { [string]: boolean },
 	mods: { string },
@@ -1874,6 +1971,11 @@ type Window = {
 type ModWindow = {
 	size: { width: number, height: number }?,
 	min_size: { width: number, height: number }?,
+	-- The screen it opens on: an `id` from `app.displays`. "external" is the
+	-- first screen that isn't the primary one, or the primary one if alone.
+	display: ("primary" | "external" | number)?,
+	-- Opens filling its screen.
+	fullscreen: boolean?,
 	titlebar: Titlebar?,
 	traffic_lights: { x: number?, y: number? }?,
 }

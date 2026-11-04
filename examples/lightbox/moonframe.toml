@@ -1,0 +1,8 @@
+[app]
+# A pretend film scanner, to see Moonframe's live pieces working together:
+# the picture, its instruments, and what a long unattended job needs. Its
+# engine is a Python process the app starts, with no dependencies.
+keep     = []
+name     = "lightbox"
+requires = []
+title    = "Lightbox"

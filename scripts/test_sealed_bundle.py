@@ -24,6 +24,16 @@ ui.map { pins = {} }
         self.assertFalse(refs.providers)
         self.assertEqual(refs.features, {"map", "markdown"})
 
+    def test_what_a_live_app_asks_for_selects_its_features(self):
+        refs = references('''
+ui.video { source = "scan" }
+local asked = { { to = "app:awake" }, { to = "app:dock" }, { to = "app:guard" }, { to = "app:restart" } }
+local notice = app.crash
+local shown = app.displays
+local spot = { display = "external" }
+''', set())
+        self.assertEqual(refs.features, {"awake", "crash", "displays", "dock", "guard", "restart", "video"})
+
     def test_escaped_and_long_literal_imports(self):
         refs = references(r'''use "\x63ard"; use [=[badge]=]; use('\099ode')''', set())
         self.assertEqual(refs.components, {"card", "badge", "code"})
@@ -96,6 +106,11 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(plan.chosen["providers"], {"git"})
         self.assertEqual(plan.chosen["features"], {"git"})
         self.assertNotIn("wasm", plan.chosen["features"])
+
+    def test_lightbox_keeps_video_and_awake_in_its_sealed_build(self):
+        repo = Path(__file__).resolve().parent.parent
+        plan = Plan(repo / "app", repo / "examples/lightbox", [])
+        self.assertTrue({"video", "awake"} <= plan.chosen["features"])
 
     def test_writing_inputs_and_release_metadata_keep_their_capabilities(self):
         for props in ('{ prose = true }', '{ dim = mode }', '{ typewriter = true }',

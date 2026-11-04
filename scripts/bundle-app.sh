@@ -18,6 +18,12 @@
 # ~/.config/moonframe/profiles/NAME. MOONFRAME_USER names another user
 # folder to find the profile in.
 #
+# PAYLOAD=DIR copies DIR as it is beside the app's files, as `payload`: what
+# the app needs that isn't Moonframe's (a Python and its libraries, an
+# engine). It stays out of the app's own folder, as a package ships source
+# only, to be reviewed. Process providers find it as $MOONFRAME_PAYLOAD;
+# scripts/sign-app.sh signs what it holds.
+#
 # MOONFRAME_BINARY bundles a prebuilt executable (the release's universal
 # one) instead of building for this Mac.
 #
@@ -108,8 +114,18 @@ dist() {
     echo "$DIST/$archive" >&2
 }
 
+# Copies PAYLOAD under $1, keeping links, as a Python needs.
+payload() {
+    if [ -n "${PAYLOAD:-}" ]; then
+        [ -d "$PAYLOAD" ] || { echo "PAYLOAD: no folder $PAYLOAD" >&2; exit 1; }
+        mkdir -p "$1"
+        cp -RP "$PAYLOAD" "$1/payload"
+    fi
+}
+
 # Stages the app, and the profile's app with its packages, under $1.
 stage() {
+    payload "$1"
     if [ -n "${MOONFRAME_STAGED_RESOURCES:-}" ]; then
         mkdir -p "$1"
         cp -R "$MOONFRAME_STAGED_RESOURCES"/. "$1"/

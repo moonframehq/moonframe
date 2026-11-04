@@ -46,6 +46,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; links send `link` instead of opening, pictures are not loaded; styled by `markdown`, `markdown-code` and `markdown-quote` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width` |
 | `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
 | `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a two-finger double tap, a double click and its buttons zoom, and two fingers turn it (it settles on north within a few degrees); without `center`/`zoom` it frames the pins and routes. With `glide`, a new `center`, `zoom` or `bearing` eases the map there. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `bearing` (the compass direction up the box, degrees clockwise from north; a new one turns the map where it stands, so feed `move`'s back in and a compass shown while it is not 0 sets it to 0 on a click), `pins` (each `lat`, `lon`, `label` up to 3 characters or `icon`, `color`, `shape` `dot` `disc` `balloon`, `selected`, `pulse` (a halo breathes out of it: where the user is), `msg`), `routes` (each `points` flat lat, lon pairs drawn as they are, or `via` stops and `mode` `walk` `bike` `car` routed along streets by routing.openstreetmap.de; `color`, `stroke`, `dashed`; the style's `color` otherwise), `routed` (sent with `route`, `seconds`, `meters` once a `via` route is found), `move` (sent with `lat`, `lon`, `zoom`, `bearing` after the user moves it, as they go), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
+| `ui.video { source = "camera", white = 4095 }` | live frames from another process, from a ring in shared memory, in a 16-bit colour-managed native view that fills its space (macOS, the `video` feature); nothing draws over it, so `guides` draws crop frames and lines in the picture. `source`, `id`, `zoom`, `center`, `filter` (`auto` `nearest` `linear`), `color` (`srgb` `display-p3` `rec709` `rec2020` `linear-srgb` `linear-p3` `none`), `extended`, `black`, `white`, `gain`, `gamma`, `guides`, `probe`, `stats`, `probed`, `width`, `height`. Most apps want `video-viewer`; see `docs/video.md` |
 | `ui.view { name = "chart", id = "sales", props = {...} }` | a view the app writes in Rust and registers by `name` (apps on the Moonframe library; the starter registers none): what Luau can't draw, such as an editor or a canvas. Kept by mod and `id`, it gets `props` again when they change, and sends this mod's `update` messages of its own | `name`, `id`, `props`, `class`, `style` |
 
 ### Controls
@@ -227,7 +228,9 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`markdown`](#markdown) | Content | Show markdown read-only: a README, notes, an agent's answer, release notes written in markdown. For editing a file use `markdown-editor`; for a chat answer streaming in, or one with source chips, use `chat-markdown`; for code alone use `code-view`; for one line of text use `ui.text`. |
 | [`markdown-editor`](#markdown-editor) | Content | Editing a markdown file of the project in a tab or a pane. For showing markdown without editing use `markdown`; for code read-only use `code-view`; for a short text field use `ui.input`. |
 | [`prose-editor`](#prose-editor) | Content | Writing long text: a draft, an article, notes, a journal, where the words are the whole screen. For a markdown file with a preview beside it use `markdown-editor`; for a short field in a form use `ui.input` (with `multiline` for a text area); for a chat box use `composer`. |
+| [`video-viewer`](#video-viewer) | Content | Previewing a camera or scanner, or inspecting a full-resolution frame, with an engine writing a frame ring (`ui.video`). The mod keeps `zoom` and `center`. For a picture in a file use `image-viewer`. |
 | [`button-group`](#button-group) | Controls | Related actions or view modes side by side in a header: Unified \| Split, Uncommitted \| Branch, zoom − \| +. For a settings choice in a track use `segmented`; for separate quiet buttons use `toolbar`; for back/forward use `nav-buttons`. |
+| [`caffeine`](#caffeine) | Controls | A scan, render or copy that runs unattended: put it in a status bar or toolbar for the user to turn on. A mod that knows when its job starts and ends should send `app:awake` itself instead. |
 | [`chips`](#chips) | Controls | Filters over a list where any number can be on (Open, Mine, Has agent). For exactly one of a few use `segmented`; for read-only labels use `tags`; for a single on/off setting use `switch`. |
 | [`copy-field`](#copy-field) | Controls | Text the user will paste elsewhere: an install command, a token, a URL, a path. For read-only label/value pairs use `key-values`; for an editable field wait for `ui.input`. |
 | [`dropdown`](#dropdown) | Controls | Pick one of many options that do not fit a `segmented` control (more than 3 or 4, or long labels), or a button that opens a menu of actions. For 2 to 4 short choices use `segmented`; for a menu on right-click use `context-menu`; for the menu rows alone use `menu`. |
@@ -236,6 +239,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`picker`](#picker) | Controls | A property of a record set from many options: assignee, labels, project, status, priority, "blocked by", in a task's detail panel or a row. For a setting in a form use `dropdown`; for a filter over a list use `filter-dropdown`; for 2 to 4 short choices use `segmented`; for addresses use `recipient-field`. |
 | [`segmented`](#segmented) | Controls | A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`. |
 | [`toolbar`](#toolbar) | Controls | A row of small quiet buttons above a panel or list. For icon-only buttons use `icon-button`; for one-of-many choices use `segmented`. |
+| [`audio-meter`](#audio-meter) | Data | Sound levels while recording or playing, from values an engine published. For a fraction that isn't sound use `vertical-bar` or `meter`. |
 | [`avatar`](#avatar) | Data | Stand for a person, space, project or agent by its name: comment authors, workspace switchers, people lists. Use `comment-card` for an authored message (it draws one), `status-dot` for a state alone. |
 | [`avatar-stack`](#avatar-stack) | Data | Who is in a group, in a card or a row (38 investors, 3 reviewers), when their names matter less than how many. For one person use `avatar`; for a list of people use `list` or `table`. |
 | [`bar-chart`](#bar-chart) | Data | Counts over time or per category: tokens per day, runs per hour, alerts per device, stacked by kind. For a tiny live trend in a status bar use `sparkline`; for one fraction use `meter`; for one headline number use `stat-tile`. |
@@ -290,7 +294,9 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`tick-meter`](#tick-meter) | Data | A resource's utilization in a dense, technical dashboard (CPU, GPU, memory, a queue's depth), where a striped instrument reads better than a smooth bar. For a compact bar with its percentage use `meter`; for a quota with a reset use `usage-bar`; for task progress use `progress`. |
 | [`timeline`](#timeline) | Data | Events in order: checkpoints, commits, deploys, an agent's steps. For a flat selectable list use `list`; for comments use `comment-card`; for a table of runs use `table`. |
 | [`usage-bar`](#usage-bar) | Data | A rate limit or quota with a reset (an AI plan's weekly or 5-hour window, an API budget), in a usage sheet or settings page. For a plain fraction use `meter`; for task progress use `progress`; for a single big number use `stat-tile`. |
+| [`vectorscope`](#vectorscope) | Data | Judging colour balance and saturation from points an engine measured and published (up to 480, thinned out; more are left out). For levels across the picture use `waveform`; for tones use `histogram`. |
 | [`vertical-bar`](#vertical-bar) | Data | A fraction in a row with no room for a horizontal bar: a host's CPU or memory beside its name in a sidebar, a queue's depth in a tab. For a bar with room to spread use `meter`; for a history use `sparkline`. |
+| [`waveform`](#waveform) | Data | Setting exposure or light against a picture's levels, from values an engine measured and published (a few hundred columns). For the spread of tones with no position use `histogram`; for hue and saturation use `vectorscope`. |
 | [`week-calendar`](#week-calendar) | Data | Meetings, bookings or shifts placed in time: a day or week of hours where events span their length and overlapping ones share the column, or a month of them. For picking a day without events use `month-grid` or `day-strip`; for events in order without hours use `timeline`; for a day's list use `task-row`. |
 | [`banner`](#banner) | Feedback | A message across the whole window or pane that stays until dealt with: the current worktree's branch, a failed provider, an update ready. For a transient message use a toast (`ui.overlay` at `bottom-end`); for a status inside a row use `status-dot` or `ui.badge`; for an empty pane use `empty-state`. |
 | [`empty-state`](#empty-state) | Feedback | A list, panel or page with nothing to show yet, optionally with one action to fix that. For loading use `loading-row`; for failures use `notice`. |
@@ -782,6 +788,43 @@ prose_editor { dim = "sentence", measure = 520, value = "# A quiet page\n\nThe s
 
 A whole mod using it, with state: `app/components/demos/prose-editor.luau`.
 
+#### `video-viewer`
+
+**Video Viewer.** Live frames from another process that fit their space and zoom, pan by wheel or drag, go between fitted and 100 % on a double-click, and read the pixel under a press, with the controls under the picture.
+
+**When:** Previewing a camera or scanner, or inspecting a full-resolution frame, with an engine writing a frame ring (`ui.video`). The mod keeps `zoom` and `center`. For a picture in a file use `image-viewer`.
+
+| Prop | Meaning |
+| --- | --- |
+| `black` | the code value shown as black |
+| `center` | the point of the picture in the middle, { x, y } fractions of it |
+| `change` | message sent as the view changes, with `zoom` (nil when fitted), `center` and `viewed = true` added |
+| `color` | what the pixels are: srgb, display-p3, rec709, rec2020, linear-srgb, linear-p3, or none to send them to the screen as they are |
+| `controls` | a row under the picture: zoom out, the zoom, zoom in, fit, 100 % |
+| `extended` | lets values above 1 reach a screen that can show them |
+| `gain` | multiplies the result |
+| `gamma` | a display gamma to encode with; 1 changes nothing |
+| `guides` | rectangles and lines the host draws in the picture: { x, y, width, height, color } in fractions of it |
+| `height` | pixels; fills its parent when unset |
+| `id` | keeps its state apart from another viewer's in the same mod (default "main") |
+| `max` | the most zoom (default 32) |
+| `probed` | message sent with `x`, `y`, `source`, `display` and on a Bayer frame `channel` added, for the pixel pressed |
+| `source` | the frame ring's name, as the engine made it |
+| `stats` | message sent each second with `fps`, `shown`, `skipped`, `latency` (ms), `live`, `width`, `height`, `format`, `frame`, `fit` and `density` added |
+| `white` | the code value shown as white (4095 for 12 bits in 16); the format's full range when unset |
+| `width` | pixels; fills its parent when unset |
+| `zoom` | device pixels per picture pixel (1 is 100 %); nil fits it |
+
+**Styles:** `.video-viewer` `.video-viewer-button` `.video-viewer-button:hover` `.video-viewer-controls` `.video-viewer-zoom`
+
+```lua
+local video_viewer = use "video-viewer"
+
+video_viewer { controls = true, height = 280, source = "preview", width = 420 }
+```
+
+A whole mod using it, with state: `app/components/demos/video-viewer.luau`.
+
 ### Controls
 
 #### `button-group`
@@ -807,6 +850,29 @@ button_group { buttons = { { icon = "rows-2", id = "unified", label = "Unified" 
 ```
 
 A whole mod using it, with state: `app/components/demos/button-group.luau`.
+
+#### `caffeine`
+
+**Caffeine.** A cup that keeps the machine awake while on, so a long job is not cut off by sleep.
+
+**When:** A scan, render or copy that runs unattended: put it in a status bar or toolbar for the user to turn on. A mod that knows when its job starts and ends should send `app:awake` itself instead.
+
+| Prop | Meaning |
+| --- | --- |
+| `awake` | `app.awake`, for it to show how things stand |
+| `disabled` | greys it out: for while a job holds by itself, which the cup can't let go of |
+| `reason` | why, for the system's list of what is keeping it awake |
+| `scope` | "display" keeps the screen on too (default); "system" lets it sleep and lock |
+| `size` | as `icon-button` |
+| `variant` | as `icon-button` |
+
+```lua
+local caffeine = use "caffeine"
+
+caffeine { awake = app.awake, scope = "system", reason = "Scanning" }
+```
+
+A whole mod using it, with state: `app/components/demos/caffeine.luau`.
 
 #### `chips`
 
@@ -1077,6 +1143,31 @@ toolbar { buttons = { { label = "New", msg = "new" }, { label = "Refresh", msg =
 A whole mod using it, with state: `app/components/demos/toolbar.luau`.
 
 ### Data
+
+#### `audio-meter`
+
+**Audio Meter.** A vertical bar per channel in dBFS, with a held peak and colours near full scale.
+
+**When:** Sound levels while recording or playing, from values an engine published. For a fraction that isn't sound use `vertical-bar` or `meter`.
+
+| Prop | Meaning |
+| --- | --- |
+| `bar` | each bar's width in pixels (default 10) |
+| `channels` | list of { level, peak?, name? }, levels in dBFS (0 is full scale) |
+| `danger` | the level it turns to the danger colour at (default -3) |
+| `floor` | the level at the bottom, in dBFS (default -60) |
+| `height` | pixels (default 140) |
+| `warn` | the level it turns to the warning colour at (default -12) |
+
+**Styles:** `.audio-meter-danger` `.audio-meter-fill` `.audio-meter-label` `.audio-meter-peak` `.audio-meter-track` `.audio-meter-warn`
+
+```lua
+local audio_meter = use "audio-meter"
+
+audio_meter { channels = { { level = -18, name = "L", peak = -9 }, { level = -14, name = "R", peak = -2 } }, height = 120 }
+```
+
+A whole mod using it, with state: `app/components/demos/audio-meter.luau`.
 
 #### `avatar`
 
@@ -2645,6 +2736,29 @@ usage_bar { left = 0.97, note = "36% in reserve · Lasts until reset", pace = 0.
 
 A whole mod using it, with state: `app/components/demos/usage-bar.luau`.
 
+#### `vectorscope`
+
+**Vectorscope.** A picture's chroma as dots in a circle, with a skin-tone line and the primaries and secondaries marked.
+
+**When:** Judging colour balance and saturation from points an engine measured and published (up to 480, thinned out; more are left out). For levels across the picture use `waveform`; for tones use `histogram`.
+
+| Prop | Meaning |
+| --- | --- |
+| `color` | the dots' colour (default a soft green) |
+| `points` | flat list x1, y1, x2, y2, ...: Cb and Cr, each -1 to 1 |
+| `size` | pixels across (default 200) |
+| `targets` | false hides the marks for the primaries and secondaries |
+
+**Styles:** `.vectorscope`
+
+```lua
+local vectorscope = use "vectorscope"
+
+vectorscope { points = { 0, 0, 0.1, 0.2, 0.2, 0.3, 0.1, 0.1, -0.1, -0.15, -0.2, -0.1, -0.1, 0.05, 0, 0 }, size = 180 }
+```
+
+A whole mod using it, with state: `app/components/demos/vectorscope.luau`.
+
 #### `vertical-bar`
 
 **Vertical Bar.** A narrow upright bar filled from the bottom to a fraction (0 to 1), with an optional label and the percentage; it warns past a threshold.
@@ -2668,6 +2782,30 @@ local vertical_bar = use "vertical-bar"
 
 vertical_bar { label = "MEM", value = 0.5 }
 ```
+
+#### `waveform`
+
+**Waveform.** A picture's levels across its width: each column's lowest and highest value per channel, overlaid or as an RGB parade, over graticule lines.
+
+**When:** Setting exposure or light against a picture's levels, from values an engine measured and published (a few hundred columns). For the spread of tones with no position use `histogram`; for hue and saturation use `vectorscope`.
+
+| Prop | Meaning |
+| --- | --- |
+| `channels` | list of { low, high (each 0 to 1, one per column), color?, name? }; or { bands = list of { low, high } } for a real picture, each band a slice of the rows, as one range per column fills in the gaps between its tones |
+| `height` | pixels (default 140) |
+| `lines` | levels for graticule lines, 0 to 1 (default 0, 0.25, 0.5, 0.75, 1) |
+| `parade` | side by side instead of overlaid |
+| `width` | pixels (default 320) |
+
+**Styles:** `.waveform`
+
+```lua
+local waveform = use "waveform"
+
+waveform { channels = { { color = "#ef4444", high = { 0.5, 0.7, 0.8, 0.6, 0.4, 0.5 }, low = { 0.1, 0.2, 0.3, 0.2, 0.1, 0.15 } }, { color = "#22c55e", high = { 0.6, 0.75, 0.9, 0.7, 0.5, 0.6 }, low = { 0.2, 0.25, 0.35, 0.3, 0.2, 0.2 } }, { color = "#3b82f6", high = { 0.4, 0.5, 0.6, 0.4, 0.3, 0.35 }, low = { 0.05, 0.1, 0.2, 0.1, 0.05, 0.1 } } }, height = 120, parade = true, width = 280 }
+```
+
+A whole mod using it, with state: `app/components/demos/waveform.luau`.
 
 #### `week-calendar`
 

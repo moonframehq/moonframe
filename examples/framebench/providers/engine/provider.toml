@@ -1,0 +1,11 @@
+# The engine runs on its own and keeps running when the app quits, reloads
+# or restarts; this only talks to it. It has the user's access to what
+# listens on that socket.
+kind   = "socket"
+socket = "/tmp/moonframe-framebench.sock"
+# Readings repeat, so only the newest matters.
+publish = "latest"
+# A stop goes ahead of everything waiting.
+urgent = ["stop"]
+# A dragged slider leaves one value in the queue, not one per pixel.
+latest = ["gain"]

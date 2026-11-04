@@ -15,6 +15,85 @@ fn fallback() -> &'static [u8] {
     crate::identity().icon.unwrap_or(ICON)
 }
 
+/// `icon` with a bar along its foot, `fraction` of it filled. Drawn into the
+/// picture, as the tile is a snapshot: a progress control placed in it paints
+/// no more than a speck.
+#[cfg(target_os = "macos")]
+fn with_bar(
+    icon: objc2::rc::Retained<objc2_app_kit::NSImage>,
+    size: objc2_foundation::NSSize,
+    fraction: f64,
+) -> objc2::rc::Retained<objc2_app_kit::NSImage> {
+    use {
+        objc2::runtime::Bool,
+        objc2_app_kit::{NSBezierPath, NSColor, NSImage},
+        objc2_foundation::{NSPoint, NSRect, NSSize},
+    };
+    let draw = block2::RcBlock::new(move |area: NSRect| {
+        icon.drawInRect(area);
+        let (width, height) = (area.size.width, area.size.height);
+        let pill = |left: f64, bottom: f64, long: f64, tall: f64, color: &NSColor| {
+            let rect = NSRect::new(NSPoint::new(left, bottom), NSSize::new(long, tall));
+            color.setFill();
+            NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(rect, tall / 2.0, tall / 2.0)
+                .fill();
+        };
+        let (left, bottom) = (width * 0.14, height * 0.13);
+        let (long, tall) = (width * 0.72, height * 0.1);
+        let inset = tall * 0.2;
+        let inner = tall - inset * 2.0;
+        let track = NSColor::colorWithSRGBRed_green_blue_alpha(0.0, 0.0, 0.0, 0.7);
+        let filled = NSColor::colorWithSRGBRed_green_blue_alpha(1.0, 1.0, 1.0, 1.0);
+        pill(left, bottom, long, tall, &track);
+        pill(
+            left + inset,
+            bottom + inset,
+            ((long - inset * 2.0) * fraction.clamp(0.0, 1.0)).max(inner),
+            inner,
+            &filled,
+        );
+        Bool::YES
+    });
+    NSImage::imageWithSize_flipped_drawingHandler(size, false, &draw)
+}
+
+/// Does what a mod asked with `app:dock`. Runs on the main thread, where
+/// requests are carried out.
+#[cfg(target_os = "macos")]
+pub(crate) fn show(dock: &moonframe_core::Dock) {
+    use {
+        objc2::MainThreadMarker,
+        objc2_app_kit::{NSApplication, NSImageView},
+        objc2_foundation::{NSPoint, NSRect, NSString},
+    };
+    let Some(main) = MainThreadMarker::new() else {
+        tracing::warn!("the Dock tile is set from the main thread only");
+        return;
+    };
+    let app = NSApplication::sharedApplication(main);
+    let tile = app.dockTile();
+    if let Some(badge) = &dock.badge {
+        let badge = badge.as_deref().map(NSString::from_str);
+        tile.setBadgeLabel(badge.as_deref());
+    }
+    let Some(progress) = dock.progress else {
+        return;
+    };
+    match (progress, app.applicationIconImage()) {
+        (Some(fraction), Some(icon)) => {
+            let size = tile.size();
+            let view = NSImageView::imageViewWithImage(&with_bar(icon, size, fraction), main);
+            view.setFrame(NSRect::new(NSPoint::new(0.0, 0.0), size));
+            tile.setContentView(Some(&view));
+        },
+        _ => tile.setContentView(None),
+    }
+    tile.display();
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn show(_: &moonframe_core::Dock) {}
+
 /// Shows `icon` (an image file AppKit reads), else the app's fallback, as
 /// the app's icon; why not, if it cannot.
 #[cfg(target_os = "macos")]

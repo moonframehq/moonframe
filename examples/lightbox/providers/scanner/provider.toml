@@ -1,0 +1,12 @@
+# The app starts the engine, and starts it again if it goes: it picks up the
+# scan where it left off. Printed readings repeat, so only the newest matters.
+command = ["python3", "engine.py"]
+kind    = "process"
+publish = "latest"
+restart = "on-failure"
+# Time to save its place once stdin closes.
+stop-grace = 1.0
+# A stop goes ahead of everything waiting.
+urgent = ["stop"]
+# A dragged slider leaves one value in the queue, not one per pixel.
+latest = ["exposure"]

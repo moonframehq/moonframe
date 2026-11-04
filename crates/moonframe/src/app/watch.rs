@@ -14,7 +14,30 @@ struct Changes {
 /// Watches every layer, and the list of packages in the window's own
 /// folder. Other profiles, inside the user's folder, are none of its
 /// business.
-pub(super) fn watch(
+/// Watches the app's folders for changes to load, unless it is a bundle
+/// out of Developer Mode: what ships does not change under its users, and
+/// nothing they or another process write there reloads or restarts it.
+pub(super) fn watching(
+    workspace: &Workspace,
+    folders: &Folders,
+    cx: &mut Context<MoonframeApp>,
+) -> Option<RecommendedWatcher> {
+    if paths::in_bundle() && crate::release() {
+        return None;
+    }
+    watch(workspace, folders, cx)
+        .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
+        .ok()
+}
+
+impl MoonframeApp {
+    /// Watches again: the folders or Developer Mode changed.
+    pub(super) fn rewatch(&mut self, cx: &mut Context<Self>) {
+        self._watcher = watching(&self.workspace, &self.folders, cx);
+    }
+}
+
+fn watch(
     workspace: &Workspace,
     folders: &Folders,
     cx: &mut Context<MoonframeApp>,

@@ -1,0 +1,9 @@
+[app]
+# The smallest honest test of live video on Moonframe: an engine of its own
+# replays frames at 18, 25 or 50 per second, and this measures what reaches
+# the screen. Run `python3 examples/framebench/engine/engine.py` first, then
+# `moonframe --profile framebench`.
+keep     = []
+name     = "framebench"
+requires = []
+title    = "Framebench"

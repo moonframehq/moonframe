@@ -144,7 +144,9 @@ impl MoonframeApp {
                     .on_click(cx.listener(move |this, _, _, cx| {
                         // Gone until it fails again.
                         this.workspace.clear_host(&name, None);
-                        this.providers.restart(&name);
+                        if let Err(problem) = this.providers.restart(&name) {
+                            tracing::warn!("{problem}");
+                        }
                         this.problem_state.open = false;
                         cx.notify();
                     }))

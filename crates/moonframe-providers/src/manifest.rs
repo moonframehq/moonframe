@@ -3,11 +3,18 @@
 //!
 //! ```toml
 //! kind = "wasm"            # or "process" with `command = ["bash", "herdr.sh"]`,
+//!                          # or "socket" with `socket = "/tmp/engine.sock"`: a
+//!                          # program that runs on its own,
 //!                          # or "native": the Rust one the app built in
 //!                          # under this folder's name, or "static" with
 //!                          # `file = "sample.json"`: that file, published
 //! interval = 1.0           # seconds between ticks (wasm)
 //! capabilities = ["system"]
+//! publish = "latest"       # keep only the newest, for readings that repeat
+//! urgent = ["stop"]        # messages that jump the queue (process, socket)
+//! latest = ["exposure"]    # messages the next of that name replaces (same)
+//! stop-grace = 2.0         # seconds a process has once stdin closes
+//! restart = "on-failure"   # start a process again when it goes by itself
 //!
 //! [settings]               # handed to the provider's `start`
 //! history = 16
@@ -24,6 +31,9 @@ pub const PREBUILT: &str = "provider.wasm";
 
 const MIN_INTERVAL: f64 = 0.1;
 const MAX_INTERVAL: f64 = 3600.0;
+/// How long a process has once its stdin closes, unless it says.
+const STOP_GRACE: f64 = 0.25;
+const MAX_STOP_GRACE: f64 = 30.0;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Manifest {
@@ -34,6 +44,16 @@ pub struct Manifest {
     pub capabilities: Vec<Capability>,
     /// The `[settings]` table, as JSON for the provider's `start`.
     pub settings: serde_json::Value,
+    /// What becomes of a publish the app has not got to yet.
+    pub publish: Publish,
+    /// Messages that jump the queue, by name (process and socket).
+    pub urgent: Vec<String>,
+    /// Messages the next of that name replaces while waiting (the same).
+    pub latest: Vec<String>,
+    /// How long a process has to leave once its stdin closes.
+    pub stop_grace: Duration,
+    /// Whether a process that goes by itself starts again.
+    pub restart: Restart,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -42,6 +62,8 @@ pub enum Kind {
     Wasm,
     /// A command run in the folder.
     Process { command: Vec<String> },
+    /// A program that runs on its own, reached over a Unix socket.
+    Socket { path: String },
     /// Rust the app was built with, registered under the folder's name.
     Native,
     /// A JSON file in the folder, published as it is: no code runs.
@@ -59,6 +81,33 @@ pub enum Start {
     OnDemand,
     /// With the app, whether or not anything reads it yet.
     Always,
+}
+
+/// What becomes of a publish the app has not got to yet.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Publish {
+    /// It is delivered, each in turn: mods that hear the provider's topic
+    /// see every one.
+    #[default]
+    All,
+    /// The next replaces it: however fast the provider publishes, the app
+    /// only ever has the newest to handle. For readings, where only the
+    /// last one matters.
+    Latest,
+}
+
+/// Whether a process that goes by itself starts again.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Restart {
+    /// It stays gone, with its problem shown, until `app:restart` or a
+    /// reload.
+    #[default]
+    Never,
+    /// It starts again, waiting longer each time it goes soon after
+    /// starting.
+    OnFailure,
 }
 
 /// What a wasm provider may ask the host for.
@@ -79,7 +128,17 @@ struct File {
     #[serde(default)]
     command: Vec<String>,
     file: Option<String>,
+    socket: Option<String>,
     interval: Option<f64>,
+    #[serde(default)]
+    publish: Publish,
+    #[serde(default)]
+    urgent: Vec<String>,
+    #[serde(default)]
+    latest: Vec<String>,
+    stop_grace: Option<f64>,
+    #[serde(default)]
+    restart: Restart,
     #[serde(default)]
     capabilities: Vec<Capability>,
     #[serde(default)]
@@ -125,9 +184,19 @@ impl Manifest {
             ("static", false) => {
                 return Err(problem("a static provider takes no `command`".to_owned()));
             },
+            ("socket", true) => Kind::Socket {
+                path: file
+                    .socket
+                    .clone()
+                    .filter(|path| !path.is_empty())
+                    .ok_or_else(|| problem("a socket provider needs a `socket`".to_owned()))?,
+            },
+            ("socket", false) => {
+                return Err(problem("a socket provider takes no `command`".to_owned()));
+            },
             (other, _) => {
                 return Err(problem(format!(
-                    "unknown kind `{other}`; expected wasm, process, native or static"
+                    "unknown kind `{other}`; expected wasm, process, socket, native or static"
                 )));
             },
         };
@@ -168,6 +237,39 @@ impl Manifest {
             },
             _ => {},
         }
+        if file.socket.is_some() && !matches!(kind, Kind::Socket { .. }) {
+            return Err(problem(
+                "only a socket provider takes a `socket`".to_owned(),
+            ));
+        }
+        if !matches!(kind, Kind::Process { .. } | Kind::Socket { .. })
+            && !(file.urgent.is_empty() && file.latest.is_empty())
+        {
+            return Err(problem(
+                "`urgent` and `latest` are for process and socket providers".to_owned(),
+            ));
+        }
+        if matches!(kind, Kind::Static { .. }) && file.publish != Publish::All {
+            return Err(problem(
+                "a static provider publishes its file; it takes no `publish`".to_owned(),
+            ));
+        }
+        if file.stop_grace.is_some() && !matches!(kind, Kind::Process { .. }) {
+            return Err(problem(
+                "only a process provider takes a `stop-grace`".to_owned(),
+            ));
+        }
+        if file.restart != Restart::Never && !matches!(kind, Kind::Process { .. }) {
+            return Err(problem(
+                "only a process provider takes a `restart`".to_owned(),
+            ));
+        }
+        let stop_grace = file.stop_grace.unwrap_or(STOP_GRACE);
+        if !(0.0..=MAX_STOP_GRACE).contains(&stop_grace) {
+            return Err(problem(format!(
+                "`stop-grace` is 0 to {MAX_STOP_GRACE} seconds"
+            )));
+        }
         if kind == Kind::Wasm && !dir.join(PREBUILT).is_file() && !dir.join("Cargo.toml").is_file()
         {
             return Err(problem(format!(
@@ -194,6 +296,11 @@ impl Manifest {
             interval: Duration::from_secs_f64(interval),
             capabilities: file.capabilities,
             settings,
+            publish: file.publish,
+            urgent: file.urgent,
+            latest: file.latest,
+            stop_grace: Duration::from_secs_f64(stop_grace),
+            restart: file.restart,
         })
     }
 }

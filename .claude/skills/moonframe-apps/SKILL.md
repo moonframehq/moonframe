@@ -135,6 +135,7 @@ skill has each one's props; the apps in `examples/` use all of them.
 | columns of rounded squares | `dot-chart` |
 | a line, a curve in a table cell, a dashed rule | `ui.line` (`baseline`, `area`, `dots`, `dashed`) |
 | a tiny trend | `sparkline` (bars) or `ui.line` |
+| live video, a camera, a scanner | `video-viewer`; instruments: `waveform`, `vectorscope`, `histogram`, `audio-meter`; see `docs/video.md` |
 | one bar split into shares | `share-bar`; a row with label, count, %, bar under: `ratio-row` |
 | progress to a target in stages, with a marker | `progress-stack`; one fraction: `meter`; a quota with a reset: `usage-bar` |
 | hatched, held, pending, missing | `ui.hatch` |
@@ -235,6 +236,12 @@ which also has a release workflow to copy.
   choice is kept per app and profile. Until the user picks, it is off in a
   bundle and in a library app's release build. `--release` and `--dev` set
   it for one run.
+- **Carrying more than Luau:** `PAYLOAD=DIR just bundle-app NAME` puts a
+  folder into the bundle as it is (a Python, native libraries, an engine),
+  and process providers find it as `$MOONFRAME_PAYLOAD`. Keep it out of the
+  app's folder: a package ships source only. `scripts/sign-app.sh APP
+  IDENTITY` signs each binary inside, then the app; `NOTARY_PROFILE=NAME`
+  also notarizes it. `docs/stability.md` says what may change.
 - `just bundle-app NAME` builds the profile's app standalone:
   `target/bundle/<Title>.app` on macOS (id `dev.moonframe.app.NAME`, its
   icon, its packages staged inside, Wasm providers prebuilt), or on Linux a
@@ -265,7 +272,7 @@ and over 16 ms at `warn`; fast ones stay at `debug`. Measure in a release build
 
 ## Examples
 
-`examples/` has seven apps and a package two of them share; read them first:
+`examples/` has its apps and a package two of them share; read them first:
 
 - **sessions**: repositories as sessions with a shell each and their changes.
 - **workbench**: terminal tabs, an editor with highlighting, files and
@@ -282,6 +289,9 @@ and over 16 ms at `warn`; fast ones stay at `debug`. Measure in a release build
   chat panel; deals move through a card's menu.
 - **stage**: the components on a bento board with sample data, for stills
   (View > Show or Hide Captions, backdrops).
+- **lightbox**: a pretend film scanner: `video-viewer` and live instruments
+  from a Python engine the app starts, surviving a crash mid-scan, with
+  `app:awake`, `app:guard`, `app:dock` and the `caffeine` cup.
 - **projects**: a Python provider for repositories, their files and changes,
   and the `file-tree`, `change-tree`, `code` and `file-icon` components.
 

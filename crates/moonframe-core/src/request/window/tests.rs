@@ -101,6 +101,7 @@ fn update_opens_raises_and_closes_a_mods_window() {
     let open = WindowRequest::Open {
         name: "settings".to_owned(),
         send: None,
+        place: None,
     };
     assert_eq!(workspace.take_requests(), [
         ("asker".to_owned(), Request::Window(open.clone())),
@@ -110,6 +111,39 @@ fn update_opens_raises_and_closes_a_mods_window() {
             Request::Window(WindowRequest::Close("settings".to_owned()))
         ),
     ]);
+}
+
+#[test]
+fn a_window_can_ask_for_a_screen_and_to_fill_it() {
+    let (_dir, mut workspace) = workspace();
+    ask(
+        &mut workspace,
+        map(&[
+            ("open", Data::from("settings")),
+            ("display", Data::from("external")),
+            ("fullscreen", Data::Bool(true)),
+        ]),
+    );
+    assert_eq!(error(&workspace), "");
+    assert_eq!(workspace.take_requests(), [(
+        "asker".to_owned(),
+        Request::Window(WindowRequest::Open {
+            name: "settings".to_owned(),
+            send: None,
+            place: Some(WindowPlace {
+                display: Some(Display::External),
+                fullscreen: true,
+            }),
+        })
+    )]);
+    ask(
+        &mut workspace,
+        map(&[
+            ("open", Data::from("settings")),
+            ("display", Data::from("moon")),
+        ]),
+    );
+    assert!(error(&workspace).contains("`display` is"));
 }
 
 #[test]
@@ -130,6 +164,7 @@ fn what_a_window_opens_with_reaches_its_mod_first() {
         Request::Window(WindowRequest::Open {
             name: "settings".to_owned(),
             send: Some(send),
+            place: None,
         })
     )]);
 }

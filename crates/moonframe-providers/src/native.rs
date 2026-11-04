@@ -49,6 +49,7 @@ pub struct Handle {
     dir: PathBuf,
     settings: Data,
     events: crate::Events,
+    publisher: crate::Publisher,
 }
 
 impl Handle {
@@ -60,6 +61,11 @@ impl Handle {
             name: name.to_owned(),
             dir: dir.to_owned(),
             settings,
+            publisher: crate::Publisher::new(
+                name.to_owned(),
+                Arc::clone(&events),
+                crate::Publish::All,
+            ),
             events,
         }
     }
@@ -81,10 +87,7 @@ impl Handle {
 
     /// Shares `data` as `app.<name>`.
     pub fn publish(&self, data: Data) {
-        (self.events)(Event::Published {
-            provider: self.name.clone(),
-            data,
-        });
+        self.publisher.publish(data);
     }
 
     /// Shares JSON as `app.<name>`, bounded like a process provider's; one
@@ -127,6 +130,7 @@ pub(crate) fn run(context: &Context, factory: Option<Factory>) {
         dir: context.dir.clone(),
         settings: json::from_json(&context.manifest.settings).unwrap_or(Data::Nil),
         events: Arc::clone(&context.events),
+        publisher: crate::Publisher::of(context),
     };
     // A panic in the provider is its own failure; the app goes on.
     let guarded = |call: &mut dyn FnMut() -> Result<(), String>| {

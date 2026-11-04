@@ -5,7 +5,7 @@ use {
         fs,
         path::Path,
         sync::{Arc, Mutex, mpsc},
-        time::Duration,
+        time::{Duration, Instant},
     },
 };
 
@@ -138,6 +138,16 @@ fn events() -> (crate::Events, mpsc::Receiver<Event>) {
     (events, receiver)
 }
 
+/// The next event but those saying how a provider's queue stands.
+fn not_link(received: &mpsc::Receiver<Event>, time: Duration) -> Event {
+    loop {
+        match received.recv_timeout(time).unwrap() {
+            Event::Link { .. } => {},
+            event => return event,
+        }
+    }
+}
+
 #[test]
 fn a_process_publishes_lines_and_answers_messages() {
     let dir = tempfile::tempdir().unwrap();
@@ -155,7 +165,7 @@ fn a_process_publishes_lines_and_answers_messages() {
     let (events, received) = events();
     let mut providers = Providers::start(root.into(), root.join("build"), events);
     assert_eq!(providers.names().collect::<Vec<_>>(), ["echo"]);
-    let next = || received.recv_timeout(Duration::from_secs(5)).unwrap();
+    let next = || not_link(&received, Duration::from_secs(5));
     let Event::Published { provider, data } = next() else {
         panic!("not published");
     };
@@ -205,7 +215,7 @@ fn a_process_that_exits_or_prints_garbage_fails() {
         );
         let (events, received) = events();
         let _providers = Providers::start(root.into(), root.join("build"), events);
-        let event = received.recv_timeout(Duration::from_secs(5)).unwrap();
+        let event = not_link(&received, Duration::from_secs(5));
         let Event::Failed { problem, .. } = event else {
             panic!("{script}: did not fail");
         };
@@ -382,7 +392,7 @@ fn a_process_that_never_reads_its_messages_still_publishes() {
     );
     let (events, received) = events();
     let mut providers = Providers::start(root.into(), root.join("build"), events);
-    let next = || received.recv_timeout(Duration::from_secs(10)).unwrap();
+    let next = || not_link(&received, Duration::from_secs(10));
     let Event::Published { .. } = next() else {
         panic!("not published");
     };
@@ -463,9 +473,7 @@ fn a_reload_restarts_only_providers_that_changed() {
     let (events, received) = events();
     let mut providers = Providers::start(root.into(), root.join("build"), events);
     let started = || {
-        let Event::Published { provider, .. } =
-            received.recv_timeout(Duration::from_secs(5)).unwrap()
-        else {
+        let Event::Published { provider, .. } = not_link(&received, Duration::from_secs(5)) else {
             panic!("not published");
         };
         provider
@@ -477,10 +485,16 @@ fn a_reload_restarts_only_providers_that_changed() {
     write(root, "providers/b/p.sh", "echo \"$$\"\nsleep 31\n");
     providers.reload();
     assert_eq!(started(), "b");
-    assert!(
-        received.recv_timeout(Duration::from_millis(300)).is_err(),
-        "an unchanged provider restarted"
-    );
+    let quiet = Instant::now();
+    while quiet.elapsed() < Duration::from_millis(300) {
+        assert!(
+            !matches!(
+                received.recv_timeout(Duration::from_millis(50)),
+                Ok(Event::Published { .. })
+            ),
+            "an unchanged provider restarted"
+        );
+    }
 
     fs::remove_dir_all(root.join("providers/a")).unwrap();
     providers.reload();
@@ -501,8 +515,8 @@ fn a_restart_starts_an_unchanged_provider_again() {
     let mut providers = Providers::start(root.into(), root.join("build"), events);
     let started = || {
         matches!(
-            received.recv_timeout(Duration::from_secs(5)),
-            Ok(Event::Published { provider, .. }) if provider == "a"
+            not_link(&received, Duration::from_secs(5)),
+            Event::Published { provider, .. } if provider == "a"
         )
     };
     assert!(started());
@@ -511,7 +525,7 @@ fn a_restart_starts_an_unchanged_provider_again() {
         received.recv_timeout(Duration::from_millis(300)).is_err(),
         "a reload restarted an unchanged provider"
     );
-    providers.restart("a");
+    providers.restart("a").unwrap();
     assert!(started(), "a restart did not start it again");
 }
 

@@ -122,19 +122,52 @@ fn traffic_lights(fields: &Fields, cx: &Cx) -> Result<Option<(f32, f32)>, Error>
 }
 
 /// The window a mod opens in, of its own (`window = { size = { width,
-/// height }, min_size = { width, height }, titlebar = "hidden",
-/// traffic_lights = { x, y } }` on a mod other than the shell): the size it
-/// opens at, the smallest the user can make it, and whether its layout goes
-/// under the title bar, as [`Chrome`] says for the shell. The host keeps it
-/// within the screen and falls back to its own size for what is unset.
+/// height }, min_size = { width, height }, display = "external",
+/// fullscreen = true, titlebar = "hidden", traffic_lights = { x, y } }` on a
+/// mod other than the shell): the size it opens at, the smallest the user can
+/// make it, where, and whether its layout goes under the title bar, as
+/// [`Chrome`] says for the shell. The host keeps it within the screen and
+/// falls back to its own size for what is unset.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ModWindowSize {
     pub size: Option<(f32, f32)>,
     pub min_size: Option<(f32, f32)>,
+    pub place: WindowPlace,
     pub titlebar: Titlebar,
     /// Where macOS puts its traffic lights under a hidden title bar: the
     /// first button's offset from the window's top left, in pixels.
     pub traffic_lights: Option<(f32, f32)>,
+}
+
+/// Where a mod's window opens: on which screen, and whether it fills it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WindowPlace {
+    pub display: Option<Display>,
+    pub fullscreen: bool,
+}
+
+/// A screen a window can ask for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Display {
+    /// The screen with the menu bar.
+    Primary,
+    /// The first screen that is not the primary one; the primary one when
+    /// there is no other, so a preview still opens.
+    External,
+    /// An `id` from `app.displays`.
+    Id(i64),
+}
+
+impl Display {
+    /// Reads `"primary"`, `"external"` or an `id` from `app.displays`.
+    pub(crate) fn from_data(value: &Data) -> Option<Self> {
+        match value {
+            Data::String(name) if name == "primary" => Some(Self::Primary),
+            Data::String(name) if name == "external" => Some(Self::External),
+            Data::Integer(id) => Some(Self::Id(*id)),
+            _ => None,
+        }
+    }
 }
 
 /// The sizes a mod's window may ask for, opening and at its smallest.
@@ -146,6 +179,8 @@ impl Read for ModWindowSize {
         let fields = Fields::read(value, cx, &[&[
             "size",
             "min_size",
+            "display",
+            "fullscreen",
             "titlebar",
             "traffic_lights",
         ]])?;
@@ -171,9 +206,30 @@ impl Read for ModWindowSize {
                 .key("min_size")
                 .fail("is larger than `size`, the size the window opens at"));
         }
+        let display = match fields.raw("display") {
+            None => None,
+            Some(mlua::Value::String(name)) => Some(name.to_string_lossy().to_string())
+                .and_then(|name| Display::from_data(&Data::String(name))),
+            Some(mlua::Value::Integer(id)) => Display::from_data(&Data::Integer(*id)),
+            Some(_) => None,
+        };
+        if fields.raw("display").is_some() && display.is_none() {
+            return Err(cx
+                .key("display")
+                .fail("is \"primary\", \"external\" or an id from `app.displays`"));
+        }
+        let fullscreen = match fields.raw("fullscreen") {
+            None => false,
+            Some(mlua::Value::Boolean(fullscreen)) => *fullscreen,
+            Some(_) => return Err(cx.key("fullscreen").fail("is true or false")),
+        };
         Ok(Self {
             size,
             min_size,
+            place: WindowPlace {
+                display,
+                fullscreen,
+            },
             titlebar: fields.get("titlebar")?.unwrap_or_default(),
             traffic_lights: traffic_lights(&fields, cx)?,
         })
@@ -191,6 +247,8 @@ pub struct WindowState {
     pub fullscreen: bool,
     /// Whether it is the frontmost window, which title bars often show.
     pub active: bool,
+    /// The screen it is on: an `id` from `app.displays`.
+    pub display: Option<i64>,
 }
 
 impl Default for WindowState {
@@ -201,18 +259,23 @@ impl Default for WindowState {
             maximized: false,
             fullscreen: false,
             active: true,
+            display: None,
         }
     }
 }
 
 impl WindowState {
     pub(crate) fn data(&self) -> Data {
-        Data::Map(BTreeMap::from([
+        let mut fields = BTreeMap::from([
             ("platform".to_owned(), Data::from(self.platform.name())),
             ("titlebar".to_owned(), Data::from(self.titlebar.name())),
             ("maximized".to_owned(), Data::Bool(self.maximized)),
             ("fullscreen".to_owned(), Data::Bool(self.fullscreen)),
             ("active".to_owned(), Data::Bool(self.active)),
-        ]))
+        ]);
+        if let Some(display) = self.display {
+            fields.insert("display".to_owned(), Data::Integer(display));
+        }
+        Data::Map(fields)
     }
 }

@@ -10,8 +10,10 @@ from sealed_luau import references
 
 NATIVES = {"acp": "acp", "chat": "chat", "docs": "docs", "git": "git",
            "github": "forge", "gitlab": "forge", "shell": "shell", "usage": "usage"}
-FEATURES = set(NATIVES.values()) | {"alacritty", "browser", "ghostty", "herdr-core",
-                                  "map", "markdown", "prose", "terminal", "tokio", "updates", "wasm"}
+FEATURES = set(NATIVES.values()) | {"alacritty", "awake", "browser", "crash", "displays", "dock",
+                                  "ghostty", "guard", "herdr-core", "map", "markdown", "video",
+                                  "prose", "restart", "socket", "terminal", "tokio", "updates",
+                                  "wasm"}
 SKIP = {".git", ".claude", ".DS_Store", ".moonframe-embedded", "target", "types",
         "__pycache__", ".luaurc"}
 
@@ -143,7 +145,12 @@ class Plan:
                 self.chosen["providers"].add(name)
         for name in sorted(self.chosen["providers"]):
             folder = self.require("providers", name)
-            kind = manifest(folder / "provider.toml").get("kind")
+            provider = manifest(folder / "provider.toml")
+            kind = provider.get("kind")
+            if provider.get("restart", "never") != "never":
+                self.chosen["features"].add("restart")
+            if kind == "socket":
+                self.chosen["features"].add("socket")
             if kind == "native":
                 if name == "demos":
                     raise ValueError("the demos provider needs the development tools omitted by sealed builds")
@@ -152,7 +159,7 @@ class Plan:
                 self.chosen["features"].add(NATIVES[name])
             elif kind == "wasm":
                 self.chosen["features"].add("wasm")
-            elif kind not in ("process", "static"):
+            elif kind not in ("process", "socket", "static"):
                 raise ValueError(f"{folder}: unknown provider kind {kind}")
         features = self.chosen["features"]
         if self.metadata.get("updates"):

@@ -27,7 +27,13 @@
 //!   data with no code at all.
 //! - **process**: any command that prints one JSON value per line and reads
 //!   messages from stdin, each with the mod that sent it. It runs with the user's full access, for data a
-//!   sandbox cannot reach.
+//!   sandbox cannot reach. It sees stdin close when it should leave.
+//! - **socket**: the same lines over a Unix socket, to a program that runs
+//!   on its own (see [`socket`]): the app connects, connects again when the
+//!   link drops, and leaves the program running when it goes.
+//!
+//! How a process's or socket's queue stands, and whether a socket is
+//! linked, appears to every view as `app.links.<name>`.
 //!
 //! What a provider publishes appears to every view as `app.<name>`; a mod
 //! sends it a message with `to = "provider:<name>"`. In the app a provider
@@ -45,8 +51,12 @@ pub mod lines;
 mod manifest;
 mod mods;
 pub mod native;
+mod outbox;
 mod process;
 pub mod program;
+#[cfg(all(unix, feature = "socket"))]
+mod socket;
+mod stream;
 #[cfg(feature = "wasm")]
 mod system;
 #[cfg(feature = "wasm")]
@@ -62,7 +72,7 @@ pub use {
 };
 pub use {
     json::{from_json, to_json},
-    manifest::{Capability, Kind, Manifest, PREBUILT, Start},
+    manifest::{Capability, Kind, Manifest, PREBUILT, Publish, Restart, Start},
     mods::{Mods, owner},
     native::{Handle, Native, Natives},
 };
@@ -74,11 +84,12 @@ use {
         collections::{BTreeMap, BTreeSet},
         path::{Path, PathBuf},
         sync::{
-            Arc,
+            Arc, Mutex, PoisonError,
             atomic::{AtomicBool, Ordering},
             mpsc,
         },
         thread,
+        time::{Duration, Instant},
     },
 };
 
@@ -95,6 +106,11 @@ pub(crate) struct Message {
 pub enum Event {
     /// Data to share as `app.<provider>`.
     Published { provider: String, data: Data },
+    /// A `publish = "latest"` provider has something new: what to share is
+    /// whatever [`Newest::take`] gives when this is handled.
+    Newest { provider: String, newest: Newest },
+    /// How a process or socket provider's link stands now.
+    Link { provider: String, link: Link },
     /// The provider stopped or could not start; it shares nothing until it
     /// is reloaded.
     Failed { provider: String, problem: Error },
@@ -108,6 +124,97 @@ pub enum Event {
 
 /// Where events go: called on provider threads.
 pub type Events = Arc<dyn Fn(Event) + Send + Sync>;
+
+/// How a process or socket provider's link stands, for `app.links.<name>`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Link {
+    /// Whether a process or socket provider has its program.
+    pub connected: Option<bool>,
+    /// Messages not yet written.
+    pub waiting: usize,
+    /// Messages dropped since it started: the queue was full or, for a
+    /// socket, there was no one to hear them.
+    pub dropped: u64,
+}
+
+impl Link {
+    /// As views read it.
+    pub fn data(&self) -> Data {
+        let mut map = BTreeMap::from([
+            (
+                "waiting".to_owned(),
+                Data::Integer(i64::try_from(self.waiting).unwrap_or(i64::MAX)),
+            ),
+            (
+                "dropped".to_owned(),
+                Data::Integer(i64::try_from(self.dropped).unwrap_or(i64::MAX)),
+            ),
+        ]);
+        if let Some(connected) = self.connected {
+            map.insert("connected".to_owned(), Data::Bool(connected));
+        }
+        Data::Map(map)
+    }
+}
+
+/// The newest of a `publish = "latest"` provider's data.
+#[derive(Clone, Debug, Default)]
+pub struct Newest(Arc<Mutex<Option<Data>>>);
+
+impl Newest {
+    /// Takes it, if a publish left any.
+    pub fn take(&self) -> Option<Data> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).take()
+    }
+
+    /// Keeps `data` over what was there; whether that was nothing, so
+    /// the app has yet to hear of it.
+    fn put(&self, data: Data) -> bool {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .replace(data)
+            .is_none()
+    }
+}
+
+/// Publishes for one provider, from any of its threads.
+#[derive(Clone)]
+pub(crate) struct Publisher {
+    pub(crate) name: String,
+    events: Events,
+    /// Where the data goes if the provider is `publish = "latest"`.
+    newest: Option<Newest>,
+}
+
+impl Publisher {
+    fn new(name: String, events: Events, publish: Publish) -> Self {
+        Self {
+            name,
+            events,
+            newest: (publish == Publish::Latest).then(Newest::default),
+        }
+    }
+
+    pub(crate) fn of(context: &Context) -> Self {
+        context.publisher.clone()
+    }
+
+    pub(crate) fn publish(&self, data: Data) {
+        let provider = self.name.clone();
+        match &self.newest {
+            None => (self.events)(Event::Published { provider, data }),
+            Some(newest) => {
+                if newest.put(data) {
+                    (self.events)(Event::Newest {
+                        provider,
+                        newest: newest.clone(),
+                    });
+                }
+            },
+        }
+    }
+}
 
 /// The providers of an app, each running on its own thread.
 /// The profile this run serves, if any, which process providers see as
@@ -123,6 +230,17 @@ pub fn set_profile(name: &str) {
 /// state of its own per app.
 pub fn profile() -> Option<&'static str> {
     PROFILE.get().map(String::as_str)
+}
+
+/// The folder of what a bundled app carries besides itself, which process
+/// providers see as `MOONFRAME_PAYLOAD`; set once at launch.
+static PAYLOAD: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Tells process providers where the bundle's `payload` folder is.
+pub fn set_payload(dir: &Path) {
+    if dir.is_dir() {
+        let _ = PAYLOAD.set(dir.to_owned());
+    }
 }
 
 /// The folder the app was started from, which process providers see as
@@ -145,11 +263,11 @@ pub fn launch_dir() -> Option<&'static Path> {
 
 /// The project the user works in, as the app last found it: the git
 /// repository of the terminal they last used. Set with [`set_project`].
-static PROJECT: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+static PROJECT: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 /// Every project the app has followed, in this launch or (as the app
 /// restores them with [`remember_projects`]) an earlier one.
-static PROJECTS: std::sync::Mutex<BTreeSet<PathBuf>> = std::sync::Mutex::new(BTreeSet::new());
+static PROJECTS: Mutex<BTreeSet<PathBuf>> = Mutex::new(BTreeSet::new());
 
 /// Records the project the user works in now; returns whether it changed.
 /// [`Providers::tell_project`] then tells the running providers.
@@ -223,14 +341,21 @@ impl Wanted {
     }
 }
 
+/// Past what a process was given to leave, what [`Providers::shutdown`]
+/// allows for its thread to see it stop and for the last steps.
+const SHUTDOWN_SLACK: Duration = Duration::from_millis(200);
+
 /// A provider's thread, and how to reach and stop it.
 struct Running {
     messages: mpsc::Sender<Message>,
     stop: Arc<AtomicBool>,
-    /// Its folder when it started: a reload restarts it only if this changed.
-    fingerprint: Fingerprint,
+    /// Its folder when it started: a reload restarts it only if this
+    /// changed. `None` once asked to restart, whatever the folder holds.
+    fingerprint: Option<Fingerprint>,
     /// A process or native provider, which hears when the project changes.
     follows_project: bool,
+    /// A process, and how long it may take to leave; set once it has.
+    leaving: Option<(Duration, Arc<AtomicBool>)>,
 }
 
 impl Drop for Running {
@@ -249,6 +374,9 @@ pub(crate) struct Context {
     pub(crate) messages: mpsc::Receiver<Message>,
     pub(crate) stop: Arc<AtomicBool>,
     pub(crate) events: Events,
+    /// Set once the process this one replaces has left.
+    pub(crate) replaces: Option<Arc<AtomicBool>>,
+    publisher: Publisher,
 }
 
 impl Context {
@@ -257,10 +385,7 @@ impl Context {
     }
 
     pub(crate) fn publish(&self, data: Data) {
-        (self.events)(Event::Published {
-            provider: self.name.clone(),
-            data,
-        });
+        self.publisher.publish(data);
     }
 
     pub(crate) fn fail(&self, problem: impl Into<String>) {
@@ -339,13 +464,6 @@ impl Providers {
         self.sync();
     }
 
-    /// Starts the provider `name` again from its folder, changed or not:
-    /// a retry after it failed (a build that needed a tool installed).
-    pub fn restart(&mut self, name: &str) {
-        self.running.remove(name);
-        self.reload();
-    }
-
     /// Runs the providers found that are wanted, or always run, each from
     /// its folder as it is now.
     fn sync(&mut self) {
@@ -367,12 +485,16 @@ impl Providers {
             if self
                 .running
                 .get(&name)
-                .is_some_and(|running| running.fingerprint == fingerprint)
+                .is_some_and(|running| running.fingerprint == Some(fingerprint))
             {
                 continue;
             }
-            // Stops the old one, if any.
-            self.running.remove(&name);
+            // Stops the old one, if any. Its process may take a while to
+            // leave, and the new one must not start beside it.
+            let replaces = self
+                .running
+                .remove(&name)
+                .and_then(|running| running.leaving.as_ref().map(|(_, left)| left.clone()));
             let manifest = match manifest {
                 Ok(manifest) => manifest,
                 Err(problem) => {
@@ -387,6 +509,10 @@ impl Providers {
             let follows_project = matches!(manifest.kind, Kind::Process { .. } | Kind::Native);
             let (sender, messages) = mpsc::channel();
             let stop = Arc::new(AtomicBool::new(false));
+            let left = Arc::new(AtomicBool::new(false));
+            let leaving = matches!(manifest.kind, Kind::Process { .. })
+                .then(|| (manifest.stop_grace + process::TERM_GRACE, left.clone()));
+            let publisher = Publisher::new(name.clone(), self.events.clone(), manifest.publish);
             let context = Context {
                 name: name.clone(),
                 dir,
@@ -395,23 +521,35 @@ impl Providers {
                 messages,
                 stop: stop.clone(),
                 events: self.events.clone(),
+                replaces,
+                publisher,
             };
             let native = self.natives.get(name.as_str()).cloned();
             let spawned = thread::Builder::new()
                 .name(format!("provider-{name}"))
-                .spawn(move || match context.manifest.kind {
-                    Kind::Wasm => wasm::run(&context),
-                    Kind::Process { .. } => process::run(&context),
-                    Kind::Native => native::run(&context, native),
-                    Kind::Static { .. } => fixed::run(&context),
+                .spawn(move || {
+                    match context.manifest.kind {
+                        Kind::Wasm => wasm::run(&context),
+                        Kind::Process { .. } => process::run(&context),
+                        #[cfg(all(unix, feature = "socket"))]
+                        Kind::Socket { .. } => socket::run(&context),
+                        #[cfg(not(all(unix, feature = "socket")))]
+                        Kind::Socket { .. } => {
+                            context.fail("socket providers need the `socket` feature, on Unix");
+                        },
+                        Kind::Native => native::run(&context, native),
+                        Kind::Static { .. } => fixed::run(&context),
+                    }
+                    left.store(true, Ordering::Relaxed);
                 });
             match spawned {
                 Ok(_) => {
                     self.running.insert(name, Running {
                         messages: sender,
                         stop,
-                        fingerprint,
+                        fingerprint: Some(fingerprint),
                         follows_project,
+                        leaving,
                     });
                 },
                 Err(error) => (self.events)(Event::Failed {
@@ -431,6 +569,43 @@ impl Providers {
 
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.running.keys().map(String::as_str)
+    }
+
+    /// Stops every provider, as the app quits, and waits for processes to
+    /// leave, however long they were given to: without this they would
+    /// only see stdin close as the app died, and one that ignores it
+    /// would outlive it. All leave at once, so the wait is the longest
+    /// one's. A socket provider's program is not the app's, and stays.
+    pub fn shutdown(&mut self) {
+        let leaving: Vec<(Duration, Arc<AtomicBool>)> = self
+            .running
+            .values()
+            .filter_map(|running| running.leaving.clone())
+            .collect();
+        self.running.clear();
+        let started = Instant::now();
+        for (time, left) in leaving {
+            while !left.load(Ordering::Relaxed) && started.elapsed() < time + SHUTDOWN_SLACK {
+                thread::sleep(Duration::from_millis(5));
+            }
+        }
+    }
+
+    /// Starts the provider `name` again from its folder, changed or not,
+    /// or for the first time, however it stands: a retry after it failed
+    /// (a build that needed a tool installed), or for a process that went
+    /// and stays gone, once the user has dealt with what stopped it.
+    pub fn restart(&mut self, name: &str) -> Result<(), Error> {
+        self.found = discover(&self.roots);
+        if !self.found.contains_key(name) {
+            return Err(Error::new(format!("no provider named `{name}`")));
+        }
+        if let Some(running) = self.running.get_mut(name) {
+            running.fingerprint = None;
+        }
+        self.want(Some(BTreeSet::from([name.to_owned()])));
+        self.sync();
+        Ok(())
     }
 
     /// Hands `message`, from the mod `from`, to the provider `name`,
@@ -504,6 +679,9 @@ fn discover(roots: &Roots) -> BTreeMap<String, (PathBuf, Result<Manifest, Error>
         .collect()
 }
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod link_tests;
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests;

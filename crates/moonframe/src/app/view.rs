@@ -121,5 +121,6 @@ impl Render for MoonframeApp {
             .children(layers)
             .children(toast)
             .child(crate::browser::presenter(self.browsers.pages()))
+            .child(crate::video::sweep())
     }
 }

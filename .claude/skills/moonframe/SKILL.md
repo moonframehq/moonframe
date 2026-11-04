@@ -779,6 +779,22 @@ update = function(state, msg)
 end,
 ```
 
+- `app:guard`, `msg` `{ hold = <msg>, timeout = 30 }`: closing the main
+  window and quitting wait for this mod, which hears its `hold` message
+  with `closing` (`"window"` or `"quit"`) added, then says
+  `{ release = true }` to go ahead or `{ hold = false }` to stop holding.
+  Past `timeout` the next attempt goes through. Quit from the Dock and
+  logging out go around it.
+- `app:awake`, `msg` `{ hold = true, display = false, reason = "Scanning" }`
+  or `{ hold = false }`: keeps the machine from sleeping when idle until
+  this mod lets go (`display` starts on); `app.awake` says `held`, `display`
+  and any `problem`. Needs the `awake` feature. The `caffeine` component is
+  this as a switch for the user.
+- `app:dock`, `msg` `{ badge = "3", progress = 0.4 }`, either or both, each
+  `false` to clear it: the Dock icon, on macOS.
+- `app:restart`, `msg` a provider's name: starts it again, for a Retry
+  button. A process provider with `restart = "on-failure"` does this by
+  itself, and `app.links.<name>.connected` says whether it is there.
 - `app:window`, `msg` a mod's name, `{ open = "<mod>", send = <msg>? }`
   or `{ close = "<mod>" }`: opens that mod in a window of its own (or
   raises it), as a control's `window = "<mod>"` does, or closes it. `send`
@@ -791,7 +807,9 @@ end,
   window opens). Any mod may open or close any mod's window, as any
   control may: the window shows that mod's own view and `send` is an
   ordinary message, so nothing new crosses. The shell is the main window
-  and is never opened this way. Close a mod's own window from its
+  and is never opened this way. `open` takes `display` (`"primary"`,
+  `"external"` or an `id` from `app.displays`) and `fullscreen`, as a
+  mod's `window` key does. Close a mod's own window from its
   `update` with `{ close = "<mod>" }`: `app:command` `close-window` runs in
   the main window and would close that.
 
@@ -1764,6 +1782,25 @@ terminal log. There are four kinds:
   - The host refuses a line over 1 MiB or with over 10,000 values.
   - `app/providers/herdr` is the example, and shows how to check who sent
     a message.
+  - When it stops (a reload that changed its folder, the app quitting) its
+    stdin closes; it has `stop-grace` seconds in provider.toml (0.25 by
+    default, up to 30) to leave, then SIGTERM, then a kill, which reach
+    all it started: each runs in a process group of its own.
+  - When it goes by itself it stays gone, unless provider.toml says
+    `restart = "on-failure"` or a mod sends `app:restart`.
+- **`kind = "socket"`, `socket = "<path>"`:** the same lines over a Unix
+  socket, to a program that runs on its own and outlives the app. It
+  connects when it can and again when the link drops, and each connection
+  starts with `{"from":"","message":{"connected":true}}`, so the program
+  can publish how things really stand. Messages with no link are dropped
+  and counted, never kept. `docs/video.md` says what is guaranteed.
+- **Under load** (process and socket): `urgent = ["stop"]` names messages
+  that jump the queue and are never dropped; `latest = ["exposure"]` those
+  the next of that name replaces while waiting. A message goes by the
+  string itself or a key of its table. `publish = "latest"` (any kind but
+  static) keeps only the newest publish; mods hearing the topic then miss
+  those in between, so use it for readings. `app.links.<name>` is
+  `{ connected?, waiting, dropped }`.
 - **`kind = "native"`:** Rust compiled into the app, registered under the
   folder's name (`crates/moonframe/src/natives.rs`, each behind a cargo
   feature); a build without it shows why in the provider's problem pill. For

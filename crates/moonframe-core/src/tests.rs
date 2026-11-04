@@ -14,6 +14,7 @@ mod checks;
 mod components;
 mod elements;
 mod gestures;
+mod lightbox;
 mod maps;
 mod mods;
 mod motion;
@@ -28,6 +29,7 @@ mod styles;
 mod switchyard;
 mod task_manager;
 mod topics;
+mod video;
 mod views;
 mod windows;
 // keep-sorted end

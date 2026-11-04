@@ -1,6 +1,46 @@
 use super::*;
 
 #[test]
+fn waveform_chunks_fit_the_host_and_keep_every_column_connected() {
+    for columns in [100, 101, 199, 200, 256] {
+        let source = format!(
+            r#"
+local waveform = use "waveform"
+return mod {{ view = function()
+    return waveform {{ lines = {{}}, channels = {{ {{
+        low = table.create({columns}, 0.25), high = table.create({columns}, 0.75),
+    }} }} }}
+end }}
+"#
+        );
+        let dir = app(&[("scope", &source)]);
+        write(
+            dir.path(),
+            "components/waveform.luau",
+            include_str!("../../../../app/components/waveform.luau"),
+        );
+        let workspace = Workspace::open(dir.path(), false);
+        let slot = workspace.slot("scope").unwrap();
+        assert!(slot.error().is_none(), "{columns}: {:?}", slot.error());
+        let Some(Node::Paths(paths)) = slot.view() else {
+            panic!("expected waveform paths");
+        };
+        let mut points = 0;
+        let mut previous = None;
+        for path in &paths.paths {
+            assert!(path.points.len() <= 200);
+            if let Some(last) = previous {
+                assert_eq!(path.points.first(), Some(&last));
+                points -= 1;
+            }
+            points += path.points.len();
+            previous = path.points.last().copied();
+        }
+        assert_eq!(points, columns * 2);
+    }
+}
+
+#[test]
 fn elements_carry_the_line_of_the_mod_that_built_them() {
     // Lines 3 and 4 build the row and text; the component is used on line 5.
     let source = "local pill = use \"pill\"\nreturn mod { view = function()\n  return ui.column {\n    ui.text { \"a\" },\n    pill { label = \"x\", value = 1 },\n  }\nend }\n";

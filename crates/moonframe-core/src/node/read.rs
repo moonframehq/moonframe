@@ -10,6 +10,7 @@ mod input;
 mod layout;
 mod map;
 mod pointer;
+mod video;
 // keep-sorted end
 
 use {
@@ -128,6 +129,7 @@ impl Tree<'_> {
             Element::Map => Node::Map(self.build(kind, table, &cx)?),
             Element::Terminal => Node::Terminal(self.build(kind, table, &cx)?),
             Element::Browser => Node::Browser(self.build(kind, table, &cx)?),
+            Element::Video => Node::Video(self.build(kind, table, &cx)?),
             Element::View => Node::View(self.build(kind, table, &cx)?),
             Element::Input => Node::Input(self.build(kind, table, &cx)?),
             Element::Markdown => Node::Markdown(self.build(kind, table, &cx)?),

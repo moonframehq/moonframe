@@ -7,7 +7,7 @@
 
 use {
     super::APP,
-    crate::{Data, Error, SHELL},
+    crate::{Data, Display, Error, SHELL, WindowPlace},
 };
 
 /// What `app:window` asks.
@@ -15,12 +15,18 @@ use {
 pub enum WindowRequest {
     /// Opens the mod `name`'s window, or raises it. `send`, delivered to
     /// its `update` before the window draws, lets it open on a page.
-    Open { name: String, send: Option<Data> },
+    /// `place`, when given, outranks what the mod's `window` key says.
+    Open {
+        name: String,
+        send: Option<Data>,
+        place: Option<WindowPlace>,
+    },
     /// Closes the mod `name`'s window, if it is open.
     Close(String),
 }
 
-/// `"<mod>"`, `{ open = "<mod>", send = <msg> }` or `{ close = "<mod>" }`.
+/// `"<mod>"`, `{ open = "<mod>", send = <msg>, display = "external",
+/// fullscreen = true }` or `{ close = "<mod>" }`.
 pub(super) fn window(msg: &Data) -> Result<WindowRequest, Error> {
     let fail = |problem: &str| Error::new(format!("`{APP}window`: {problem}"));
     let usage = "takes \"<mod>\", { open = \"<mod>\", send = <msg> } or { close = \"<mod>\" }";
@@ -39,19 +45,37 @@ pub(super) fn window(msg: &Data) -> Result<WindowRequest, Error> {
             return Ok(WindowRequest::Open {
                 name: name(msg)?,
                 send: None,
+                place: None,
             });
         },
         Data::Map(fields) => fields,
         _ => return Err(fail(usage)),
     };
-    if let Some(key) = fields
-        .keys()
-        .find(|key| !matches!(key.as_str(), "open" | "send" | "close"))
-    {
+    if let Some(key) = fields.keys().find(|key| {
+        !matches!(
+            key.as_str(),
+            "open" | "send" | "close" | "display" | "fullscreen"
+        )
+    }) {
         return Err(fail(&format!(
-            "unknown key `{key}`; it takes open, send and close"
+            "unknown key `{key}`; it takes open, send, display, fullscreen and close"
         )));
     }
+    let display = match fields.get("display") {
+        None | Some(Data::Nil) => None,
+        Some(display) => Some(Display::from_data(display).ok_or_else(|| {
+            fail("`display` is \"primary\", \"external\" or an id from `app.displays`")
+        })?),
+    };
+    let fullscreen = match fields.get("fullscreen") {
+        None | Some(Data::Nil) => None,
+        Some(Data::Bool(fullscreen)) => Some(*fullscreen),
+        Some(_) => return Err(fail("`fullscreen` is true or false")),
+    };
+    let place = (display.is_some() || fullscreen.is_some()).then_some(WindowPlace {
+        display,
+        fullscreen: fullscreen.unwrap_or(false),
+    });
     match (fields.get("open"), fields.get("close")) {
         (Some(open), None) => Ok(WindowRequest::Open {
             name: name(open)?,
@@ -59,9 +83,13 @@ pub(super) fn window(msg: &Data) -> Result<WindowRequest, Error> {
                 .get("send")
                 .cloned()
                 .filter(|send| *send != Data::Nil),
+            place,
         }),
-        (None, Some(close)) if !fields.contains_key("send") => {
+        (None, Some(close)) if !fields.contains_key("send") && place.is_none() => {
             Ok(WindowRequest::Close(name(close)?))
+        },
+        (None, Some(_)) if place.is_some() => {
+            Err(fail("`display` and `fullscreen` go with `open`"))
         },
         (None, Some(_)) => Err(fail("`send` goes with `open`")),
         (Some(_), Some(_)) => Err(fail("takes `open` or `close`, not both")),

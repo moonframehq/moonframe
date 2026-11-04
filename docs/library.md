@@ -41,7 +41,9 @@ Features: `acp`, `alacritty`, `browser`, `chat`, `docs`, `forge`, `git`,
 `herdr-core`, `markdown`, `prose`, `shell`, `studio`, `tokio`, `updates`, `usage` and
 `wasm` by default. `ghostty` (a second terminal emulator, built from Ghostty's
 source with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`, and
-so is `map` (`ui.map` street maps), which few apps need.
+so are `map` (`ui.map` street maps), `video` (`ui.video`) and what long runs
+and live machines ask for (`awake`, `crash`, `displays`, `dock`, `guard`,
+`restart`, `socket`), which few apps need. The starter has them all.
 
 An app that needs none of git, the markdown editor or kept terminals can
 leave them out, and with them the herdr-gpui crates they build on:
@@ -72,10 +74,18 @@ ship only their selected components.
 
 | Feature | What it includes |
 | --- | --- |
+| `awake` | `app:awake`: keeping the machine from sleeping during a long job, on macOS, Windows and Linux. Off by default. See [Live video](video.md#long-runs). |
+| `crash` | A panic leaves a report in the state folder, and the next launch offers it as `app.crash`. Off by default. |
+| `displays` | `app.displays`, and a mod's window placed with `display` and `fullscreen`. Off by default; without it such a window opens where it would have, and the mod hears why. |
+| `dock` | `app:dock`: a badge and a progress bar on the Dock icon (macOS). Off by default. |
+| `guard` | `app:guard`: a mod holds back closing and quitting. Off by default. |
+| `restart` | `app:restart`, and `restart = "on-failure"` for process providers. Off by default; without it a process that goes stays gone. |
+| `socket` | Socket providers (`kind = "socket"`), on Unix. Off by default; without it one fails as it starts. |
 | `browser` | Native web views and Wry on macOS/Windows. Linux keeps its system-browser fallback. |
 | `terminal` | Terminal rendering, local PTYs and tmux; choose an engine below to run a shell. |
 | `alacritty`, `ghostty` | Each enables `terminal` and its respective emulator. |
 | `herdr-core` | herdr-core state storage and, with `terminal`, persistent terminals. |
+| `video` | `ui.video`: live frames from another process in a 16-bit, colour-managed Metal view (macOS). Off by default. See [Live video](video.md). |
 | `map` | `ui.map` street maps: tiles from OpenStreetMap and other listed providers, pins, and routes along streets, fetched over HTTP. Off by default. |
 | `markdown` | Rich `ui.markdown` rendering (headings, lists, tables, links and code). |
 | `prose` | The writing editor for `ui.input` with `prose`, `dim` or `typewriter`. Ordinary single-line and multiline inputs remain available without it. |

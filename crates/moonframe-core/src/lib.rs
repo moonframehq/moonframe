@@ -54,8 +54,8 @@ pub use {
     persist::Persist,
     read::MAX_DOCUMENT,
     request::{
-        APP, AppIcon, Appearance, Edit, EditChange, ICON_TYPES, Notification, Pick, PickKind,
-        Request, SOUND_TYPES, Sound, Splice, WindowRequest,
+        APP, AppIcon, Appearance, Awake, Dock, Edit, EditChange, Guard, ICON_TYPES, Notification,
+        Pick, PickKind, Request, SOUND_TYPES, Sound, Splice, WindowRequest,
     },
     roots::{AppLayer, Roots, mod_name},
     style::{
@@ -64,7 +64,7 @@ pub use {
         Transition, TransitionKind,
     },
     vm::printable,
-    window::{Chrome, ModWindowSize, Platform, Titlebar, WindowState},
+    window::{Chrome, Display, ModWindowSize, Platform, Titlebar, WindowPlace, WindowState},
     workspace::{DEMO, PROVIDER, SHELL, Slot, TOPIC, Workspace},
 };
 

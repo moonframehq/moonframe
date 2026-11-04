@@ -13,7 +13,8 @@ use {
         component::{ActiveTheme as _, Root},
         *,
     },
-    moonframe_core::{ModWindowSize, Titlebar},
+    moonframe_core::{Display, ModWindowSize, Titlebar},
+    std::rc::Rc,
 };
 
 /// The size a mod's window opens at, and its smallest, when its `window`
@@ -40,16 +41,24 @@ impl ModWindow {
         sizing: ModWindowSize,
         cx: &mut App,
     ) -> Option<WindowHandle<Root>> {
-        let screen = cx
-            .primary_display()
+        let display = chosen(sizing.place.display, cx);
+        let screen = display
+            .clone()
+            .or_else(|| cx.primary_display())
             .map(|display| display.bounds().size)
             .map(|screen| (f32::from(screen.width), f32::from(screen.height)));
         let hidden = sizing.titlebar == Titlebar::Hidden;
         let (opens, smallest) = fitted(sizing, screen);
-        let bounds = Bounds::centered(None, size(px(opens.0), px(opens.1)), cx);
+        let display_id = display.map(|display| display.id());
+        let bounds = Bounds::centered(display_id, size(px(opens.0), px(opens.1)), cx);
         let options = WindowOptions {
             focus: !crate::background(),
-            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            display_id,
+            window_bounds: Some(if sizing.place.fullscreen {
+                WindowBounds::Fullscreen(bounds)
+            } else {
+                WindowBounds::Windowed(bounds)
+            }),
             window_min_size: Some(size(px(smallest.0), px(smallest.1))),
             titlebar: Some(TitlebarOptions {
                 title: Some(title.into()),
@@ -99,7 +108,7 @@ impl ModWindow {
     }
 
     fn sync_window(&self, window: &Window, cx: &mut Context<Self>) {
-        let state = window_state(self.titlebar, window);
+        let state = window_state(self.titlebar, window, cx);
         self.app.update(cx, |app, cx| {
             app.sync_mod_window(&self.name, Some(state), cx);
         });
@@ -128,6 +137,29 @@ impl Render for ModWindow {
             .font_family(theme.font_family.clone())
             .text_size(theme.font_size)
             .child(content)
+            // Covers its videos, as the main window's presenter does.
+            .child(crate::browser::presenter(Vec::new()))
+            .child(crate::video::sweep())
+    }
+}
+
+/// The screen a window asks for, if it is there: one that went away leaves
+/// the choice to the system.
+fn chosen(wanted: Option<Display>, cx: &App) -> Option<Rc<dyn PlatformDisplay>> {
+    let primary = cx.primary_display();
+    match wanted? {
+        Display::Primary => primary,
+        Display::External => {
+            let primary_id = primary.as_ref().map(|display| display.id());
+            cx.displays()
+                .into_iter()
+                .find(|display| Some(display.id()) != primary_id)
+                .or(primary)
+        },
+        Display::Id(id) => cx
+            .displays()
+            .into_iter()
+            .find(|display| crate::app::display_number(display.id()) == id),
     }
 }
 
@@ -161,7 +193,7 @@ mod tests {
         let asked = ModWindowSize {
             size: None,
             min_size: Some((640., 480.)),
-            ..ModWindowSize::default()
+            ..Default::default()
         };
         assert_eq!(fitted(asked, None), ((640., 560.), (640., 480.)));
         assert_eq!(
@@ -171,7 +203,7 @@ mod tests {
         let tall = ModWindowSize {
             size: None,
             min_size: Some((300., 700.)),
-            ..ModWindowSize::default()
+            ..Default::default()
         };
         assert_eq!(fitted(tall, None), ((420., 700.), (300., 700.)));
         // A screen smaller than the minimum still limits both sizes.
@@ -188,7 +220,7 @@ mod tests {
         let asked = ModWindowSize {
             size: Some((860., 600.)),
             min_size: Some((640., 480.)),
-            ..ModWindowSize::default()
+            ..Default::default()
         };
         assert_eq!(
             fitted(asked, Some((1920., 1080.))),
@@ -203,7 +235,7 @@ mod tests {
         let small = ModWindowSize {
             size: Some((240., 200.)),
             min_size: None,
-            ..ModWindowSize::default()
+            ..Default::default()
         };
         assert_eq!(fitted(small, None), ((240., 200.), (240., 200.)));
     }

@@ -227,6 +227,12 @@ fn describe(node: &Node) -> String {
                 .as_deref()
                 .map_or_else(|| "about:blank".to_owned(), quote)
         ),
+        Node::Video(video) => format!(
+            "video{} {} {}",
+            classes(&video.look),
+            quote(&video.id),
+            quote(&video.source)
+        ),
         Node::View(view) => format!(
             "view{} {} {}",
             classes(&view.look),
@@ -291,6 +297,7 @@ fn line(node: &Node) -> Option<u32> {
         Node::Map(map) => map.look.line,
         Node::Terminal(terminal) => terminal.look.line,
         Node::Browser(browser) => browser.look.line,
+        Node::Video(video) => video.look.line,
         Node::View(view) => view.look.line,
         Node::Input(input) => input.look.line,
         Node::Markdown(markdown) => markdown.look.line,

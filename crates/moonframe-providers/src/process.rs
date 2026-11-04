@@ -4,40 +4,61 @@
 //! lines on stdin. Its stderr goes to the app's log.
 
 use {
-    crate::{Context, Kind, Message, json},
-    moonframe_core::{Data, Error},
+    crate::{
+        Context, Kind, Publisher, Restart,
+        outbox::Outbox,
+        stream::{self, Ended, Pumped, Reporter},
+    },
     std::{
-        io::{BufRead, BufReader, Read, Write},
-        process::{Child, ChildStdin, Command, Stdio},
-        sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError},
+        process::{Child, Command, Stdio},
+        sync::{Arc, atomic::Ordering, mpsc},
         thread,
-        time::Duration,
+        time::{Duration, Instant},
     },
 };
 
-/// How often the provider's thread looks for output while it waits.
-const POLL: Duration = Duration::from_millis(100);
-/// Messages waiting for a process that is slow to read them; past this it
-/// is not reading, and new ones are dropped rather than held.
-const INPUT_QUEUE: usize = 256;
-/// Lines read but not yet published; past this the reader waits, and so
-/// does a process printing faster than they are published.
-const OUTPUT_QUEUE: usize = 256;
-
-/// A line the process printed, or the end of its output.
-enum Line {
-    Text(String),
-    TooLong,
-    End,
-}
+/// How long a process has after SIGTERM, on top of `stop-grace` after its
+/// stdin closes, before it is killed.
+pub(crate) const TERM_GRACE: Duration = Duration::from_millis(250);
+/// How often a stopping process is looked at.
+const STOPPING_POLL: Duration = Duration::from_millis(5);
+/// The first wait before starting a process again; each doubles, up to
+/// [`SLOWEST`], until one stays up for [`SETTLED`].
+const QUICKEST: Duration = Duration::from_millis(500);
+const SLOWEST: Duration = Duration::from_secs(30);
+const SETTLED: Duration = Duration::from_secs(60);
 
 pub(crate) fn run(context: &Context) {
-    if let Err(problem) = serve(context) {
+    if let Some(left) = &context.replaces {
+        // Bounded: `finish` runs out of steps.
+        while !left.load(Ordering::Relaxed) {
+            thread::sleep(STOPPING_POLL);
+        }
+    }
+    let mut reporter = Reporter::new(context);
+    let mut delay = QUICKEST;
+    while !context.stopped() {
+        let started = Instant::now();
+        let result = serve(context, &mut reporter);
+        reporter.connected(false);
+        let Err(problem) = result else {
+            return;
+        };
         context.fail(problem);
+        if context.manifest.restart != Restart::OnFailure || !cfg!(feature = "restart") {
+            return;
+        }
+        if started.elapsed() >= SETTLED {
+            delay = QUICKEST;
+        }
+        if !stream::wait(context, delay, &mut reporter) {
+            return;
+        }
+        delay = (delay * 2).min(SLOWEST);
     }
 }
 
-fn serve(context: &Context) -> Result<(), String> {
+fn serve(context: &Context, reporter: &mut Reporter) -> Result<(), String> {
     let Kind::Process { command } = &context.manifest.kind else {
         return Err("not a process provider".to_owned());
     };
@@ -47,6 +68,10 @@ fn serve(context: &Context) -> Result<(), String> {
         // Which app it serves, to keep state of its own per app.
         child.env("MOONFRAME_PROFILE", profile);
     }
+    if let Some(dir) = crate::PAYLOAD.get() {
+        // What the bundle carries for it: a Python, an engine.
+        child.env("MOONFRAME_PAYLOAD", dir);
+    }
     if let Some(dir) = crate::launch_dir() {
         // Where the app was started, for one that shows that project.
         child.env("MOONFRAME_LAUNCH_DIR", dir);
@@ -55,6 +80,10 @@ fn serve(context: &Context) -> Result<(), String> {
         // The repository of the terminal the user last used.
         child.env("MOONFRAME_PROJECT", dir);
     }
+    // A group of its own, for stopping to reach what it started as well: a
+    // shell script's Python, an engine's helpers.
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut child, 0);
     let mut child = child
         .args(arguments)
         .current_dir(&context.dir)
@@ -63,13 +92,87 @@ fn serve(context: &Context) -> Result<(), String> {
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|error| format!("cannot start `{program}`: {error}"))?;
-    let result = drive(context, &mut child);
-    let _ = child.kill();
-    let _ = child.wait();
+    let outbox = Arc::new(Outbox::new(&context.manifest));
+    reporter.connected(true);
+    let result = drive(context, &mut child, &outbox, reporter);
+    finish(&mut child, &outbox, context.manifest.stop_grace);
+    reporter.carry(outbox.load().1);
     result
 }
 
-fn drive(context: &Context, child: &mut Child) -> Result<(), String> {
+/// Stops `child` and what it started, in order, each step only if the last
+/// did not do it: closing its stdin, which a provider should take as its
+/// cue to leave and may use `stop-grace` for; SIGTERM; then killing them.
+fn finish(child: &mut Child, outbox: &Outbox, grace: Duration) {
+    outbox.close();
+    if gone(child, grace, || false) {
+        return;
+    }
+    terminate(child);
+    if !gone(child, TERM_GRACE, || false) {
+        kill(child);
+    }
+}
+
+/// Whether `child` and what it started ended within `time`, unless the
+/// caller interrupts the wait to start shutdown's own grace period.
+fn gone(child: &mut Child, time: Duration, interrupted: impl Fn() -> bool) -> bool {
+    let until = Instant::now() + time;
+    loop {
+        if !matches!(child.try_wait(), Ok(None)) && !lingering(child) {
+            return true;
+        }
+        if interrupted() || Instant::now() >= until {
+            return false;
+        }
+        thread::sleep(STOPPING_POLL);
+    }
+}
+
+/// Sends `signal` to the group `child` leads; whether anyone is there.
+#[cfg(unix)]
+#[allow(unsafe_code, reason = "sending a signal; see SAFETY")]
+fn signal_group(child: &Child, signal: libc::c_int) -> bool {
+    libc::pid_t::try_from(child.id()).is_ok_and(|pid| {
+        // SAFETY: `kill` takes plain integers. The group keeps the leader's
+        // id for as long as anyone is in it, and the moments between the
+        // last one leaving and this call are too few for it to be reused.
+        unsafe { libc::kill(-pid, signal) == 0 }
+    })
+}
+
+/// Whether anything `child` started is still there.
+#[cfg(unix)]
+fn lingering(child: &Child) -> bool {
+    signal_group(child, 0)
+}
+
+#[cfg(not(unix))]
+fn lingering(_: &Child) -> bool {
+    false
+}
+
+#[cfg(unix)]
+fn terminate(child: &Child) {
+    signal_group(child, libc::SIGTERM);
+}
+
+#[cfg(not(unix))]
+fn terminate(_: &Child) {}
+
+fn kill(child: &mut Child) {
+    #[cfg(unix)]
+    signal_group(child, libc::SIGKILL);
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+fn drive(
+    context: &Context,
+    child: &mut Child,
+    outbox: &Arc<Outbox>,
+    reporter: &mut Reporter,
+) -> Result<(), String> {
     let stdin = child.stdin.take().ok_or("no stdin")?;
     let stdout = child.stdout.take().ok_or("no stdout")?;
     let stderr = child.stderr.take().ok_or("no stderr")?;
@@ -79,121 +182,32 @@ fn drive(context: &Context, child: &mut Child) -> Result<(), String> {
             tracing::info!(provider = %name, "{}", moonframe_core::printable(&line));
         });
     });
-    let (lines, output) = mpsc::sync_channel(OUTPUT_QUEUE);
-    thread::spawn(move || read_lines(stdout, &lines));
-    // Written on a thread of its own: a process that never reads its
-    // messages fills the pipe, and that must hold up nothing here, or its
-    // output and its end would go unseen. Killing it ends the thread.
-    let (input, queue) = mpsc::sync_channel(INPUT_QUEUE);
-    thread::spawn(move || write_lines(stdin, &queue));
-    let mut dropping = false;
-    loop {
-        match context.messages.recv_timeout(POLL) {
-            Ok(message) => match input.try_send(line(&message)) {
-                Ok(()) => dropping = false,
-                Err(TrySendError::Full(_)) => {
-                    if !dropping {
-                        tracing::warn!(
-                            provider = %context.name,
-                            "not reading its messages; dropping them until it does"
-                        );
-                    }
-                    dropping = true;
-                },
-                // It stopped reading: noticed when its output ends.
-                Err(TrySendError::Disconnected(_)) => {},
-            },
-            Err(RecvTimeoutError::Timeout) => {},
-            Err(RecvTimeoutError::Disconnected) => return Ok(()),
-        }
-        if context.stopped() {
-            return Ok(());
-        }
-        while let Ok(line) = output.try_recv() {
-            match line {
-                Line::Text(text) if text.trim().is_empty() => {},
-                Line::Text(text) => match parse(context, &text) {
-                    Ok(data) => context.publish(data),
-                    Err(problem) => return Err(problem.to_string()),
-                },
-                Line::TooLong => {
-                    return Err(format!(
-                        "printed a line longer than {} bytes",
-                        json::MAX_JSON
-                    ));
-                },
-                Line::End => {
-                    let status = child.wait().map_err(|error| error.to_string())?;
-                    return Err(format!("exited ({status})"));
-                },
-            }
-        }
-    }
-}
-
-/// Reads `text` as JSON, timing it for the perf log.
-fn parse(context: &Context, text: &str) -> Result<Data, Error> {
-    let started = std::time::Instant::now();
-    let parsed = json::data(text);
-    let elapsed = started.elapsed();
-    moonframe_core::perf!(
-        elapsed,
-        "provider {}: {} bytes read in {elapsed:.1?}",
-        context.name,
-        text.len()
-    );
-    parsed
-}
-
-/// Writes each queued line to the process, until it stops reading.
-fn write_lines(mut stdin: ChildStdin, queue: &Receiver<String>) {
-    for line in queue {
-        if writeln!(stdin, "{line}").is_err() {
-            return;
-        }
-    }
-}
-
-/// Reads lines no longer than [`json::MAX_JSON`], so a runaway process
-/// cannot fill memory with one line.
-fn read_lines(stdout: impl Read, lines: &SyncSender<Line>) {
-    let mut reader = BufReader::new(stdout);
-    loop {
-        let mut line = Vec::new();
-        let limit = json::MAX_JSON as u64 + 1;
-        let line = match reader.by_ref().take(limit).read_until(b'\n', &mut line) {
-            Ok(0) | Err(_) => Line::End,
-            Ok(_) if line.len() as u64 >= limit && line.last() != Some(&b'\n') => Line::TooLong,
-            Ok(_) => Line::Text(String::from_utf8_lossy(&line).into_owned()),
-        };
-        let end = !matches!(line, Line::Text(_));
-        if lines.send(line).is_err() || end {
-            return;
-        }
-    }
-}
-
-/// The line a message is written as: compact JSON, `from` first, so a
-/// script can match a whole line exactly (the `herdr` provider does).
-fn line(message: &Message) -> String {
-    serde_json::json!({
-        "from": message.from,
-        "message": json::json(&message.data),
-    })
-    .to_string()
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use {super::*, moonframe_core::Data};
-
-    #[test]
-    fn a_message_is_one_compact_line_with_its_sender_first() {
-        let message = Message {
-            from: "herdr".into(),
-            data: Data::from("install"),
-        };
-        assert_eq!(line(&message), r#"{"from":"herdr","message":"install"}"#);
+    // Each on a thread of its own: output is published the moment it is
+    // read, and a process that never reads its messages fills the pipe,
+    // which must hold up nothing here. Closing the outbox ends the writer
+    // and with it stdin; killing the process ends either if stuck.
+    let (ended, end) = mpsc::channel();
+    let publisher = Publisher::of(context);
+    let stop = context.stop.clone();
+    thread::spawn(move || {
+        let _ = ended.send(stream::publish_lines(stdout, &publisher, &stop));
+    });
+    let writing = outbox.clone();
+    thread::spawn(move || stream::write_lines(stdin, &writing));
+    let pumped = stream::pump(context, outbox, &end, reporter, || {
+        !matches!(child.try_wait(), Ok(None))
+    });
+    match pumped {
+        Pumped::Stopped => Ok(()),
+        Pumped::Ended(Ended::Problem(problem)) => Err(problem),
+        Pumped::Ended(Ended::Closed) => {
+            // Allow a normal exit to report its status, but leave this
+            // wait as soon as shutdown asks: `finish` owns the stop grace.
+            gone(child, context.manifest.stop_grace, || context.stopped());
+            Err(match child.try_wait() {
+                Ok(Some(status)) => format!("exited ({status})"),
+                _ => "closed its output".to_owned(),
+            })
+        },
     }
 }

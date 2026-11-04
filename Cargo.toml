@@ -8,6 +8,7 @@ members = [
   "crates/moonframe-core",
   "crates/moonframe-docs",
   "crates/moonframe-forge",
+  "crates/moonframe-frames",
   "crates/moonframe-git",
   "crates/moonframe-history",
   "crates/moonframe-mux",
@@ -49,6 +50,7 @@ tokio              = { default-features = false, version = "1.54" }
 # them beside this app, patch them to a local checkout:
 #   [patch."https://github.com/penso/herdr-gpui"]
 #   herdr-core-client = { path = "../herdr-gpui/crates/herdr-core-client" }
+core-graphics-types = "0.2"
 herdr-chat-protocol = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
 herdr-client        = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
 herdr-core-client   = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
@@ -60,8 +62,11 @@ herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", rev = "9133
 image = { default-features = false, version = "0.25" }
 # `ui.image` zooms by the picture's own size, read from its header.
 imagesize = "0.15"
+libc      = "0.2"
 # Unreleased: the Ghostty it pins builds with Zig 0.17, which links on macOS 27.
+keepawake                = { default-features = false, version = "0.6.1" }
 libghostty-vt            = { git = "https://github.com/uzaaft/libghostty-rs", rev = "575ed6b8ceb79ffaf247ecf7e34333876b0d5be4" }
+metal                    = "0.33"
 mlua                     = { features = ["luau"], version = "0.12.2" }
 moonframe                = { path = "crates/moonframe" }
 moonframe-acp            = { path = "crates/moonframe-acp" }
@@ -69,6 +74,7 @@ moonframe-chat           = { path = "crates/moonframe-chat" }
 moonframe-core           = { path = "crates/moonframe-core" }
 moonframe-docs           = { path = "crates/moonframe-docs" }
 moonframe-forge          = { path = "crates/moonframe-forge" }
+moonframe-frames         = { path = "crates/moonframe-frames" }
 moonframe-git            = { path = "crates/moonframe-git" }
 moonframe-history        = { path = "crates/moonframe-history" }
 moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }

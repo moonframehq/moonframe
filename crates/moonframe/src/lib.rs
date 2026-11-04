@@ -29,6 +29,7 @@ mod agent_files;
 mod alerts;
 mod app;
 mod assets;
+mod awake;
 mod backends;
 mod branch_bar;
 mod browser;
@@ -39,6 +40,7 @@ mod capture;
 mod checkout;
 mod cli;
 mod color;
+mod crash;
 #[cfg(feature = "studio")]
 mod demos;
 mod dock;
@@ -69,6 +71,11 @@ mod settings;
 mod terminal;
 mod theme_picker;
 mod themes;
+#[cfg(all(feature = "video", target_os = "macos"))]
+mod video;
+#[cfg(not(all(feature = "video", target_os = "macos")))]
+#[path = "video_left_out.rs"]
+mod video;
 
 #[cfg(feature = "tokio")]
 pub use moonframe_providers::{AsyncNative, on_runtime, runtime, tokio};
@@ -94,6 +101,17 @@ use {
 
 /// This run's app id, set once at launch: a profile's adds its name.
 pub(crate) static RUNNING_ID: OnceLock<String> = OnceLock::new();
+
+/// Where this run's panics leave their reports, set once at launch.
+pub(crate) static CRASH_DIR: OnceLock<std::path::PathBuf> = OnceLock::new();
+
+/// Where panics leave their reports.
+pub(crate) fn crash_dir() -> std::path::PathBuf {
+    CRASH_DIR
+        .get()
+        .cloned()
+        .unwrap_or_else(|| paths::state(None).with_extension("crashes"))
+}
 
 /// The app id every window of this run opens with.
 pub(crate) fn app_id() -> String {

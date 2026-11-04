@@ -11,6 +11,11 @@ version.workspace      = true
 workspace = true
 
 [features]
+# `restart = "on-failure"`: a process that goes by itself starts again.
+# Without it the manifest still loads, and the process stays gone.
+restart = []
+# Socket providers (`kind = "socket"`). Without it one fails as it starts.
+socket = []
 # Native providers written with `async fn` (`AsyncNative`), on a tokio
 # runtime the app's views can use too.
 tokio = ["dep:tokio"]
@@ -29,6 +34,9 @@ toml.workspace           = true
 tracing.workspace        = true
 wasmtime                 = { optional = true, workspace = true }
 wasmtime-wasi            = { optional = true, workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
 
 [dev-dependencies]
 futures.workspace  = true

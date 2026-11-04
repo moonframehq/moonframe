@@ -19,6 +19,9 @@ acp = ["dep:moonframe-acp"]
 # libghostty-vt with Zig (see mise.toml), so an app on the
 # library opts into it; the starter (crates/moonframe-app) has both.
 alacritty = ["moonframe-terminal/alacritty", "terminal"]
+# `app:awake`: keeping the machine from sleeping while a long job runs. Off
+# by default; the starter turns it on, and so do sealed apps that ask for it.
+awake = ["dep:keepawake"]
 # Native web views for `ui.browser` (WebKit on macOS, WebView2 on Windows).
 browser = ["dep:objc2-web-kit", "dep:wry"]
 # Developer-only export of this app's own rendered frame, without desktop capture.
@@ -46,6 +49,15 @@ default = [
   "wasm",
   # keep-sorted end
 ]
+# `app.crash`: a panic leaves a report in the state folder, and the next
+# launch offers it. Off by default; the starter turns it on.
+crash = []
+# `app.displays`, and a mod's window placed with `display` and `fullscreen`.
+# Off by default; the starter turns it on.
+displays = []
+# `app:dock`: a badge and a progress bar on the Dock icon (macOS). Off by
+# default; the starter turns it on.
+dock = []
 # The `docs` native provider: reads and saves the project's text files
 # for the markdown editor.
 docs = ["dep:moonframe-docs"]
@@ -58,6 +70,9 @@ git = ["dep:moonframe-git", "moonframe-history/herdr"]
 # The `shell` native provider (`app.shell`): a mod's shell commands, with
 # their output in colour.
 shell = ["dep:moonframe-shell"]
+# `app:guard`: a mod holds back closing and quitting. Off by default; the
+# starter turns it on.
+guard = []
 # State kept by herdr-core (`hc`) when installed; with `terminal`, it also
 # keeps shells across launches. tmux and local PTYs only need `terminal`.
 herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
@@ -65,11 +80,20 @@ herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
 # default, as few apps need one; the starter turns it on, and so do sealed
 # apps whose Luau uses `ui.map`.
 map = ["dep:image", "dep:ureq"]
+# `ui.video`: frames from another process in a Metal view of their own,
+# 16-bit and colour managed (macOS). Off by default: few apps need it.
+video = ["dep:core-graphics-types", "dep:metal", "dep:moonframe-frames"]
 # Rich read-only Markdown and the long-form writing editor are independent.
 markdown = []
 prose    = []
+# `app:restart`, and `restart = "on-failure"` for process providers. Off by
+# default; the starter turns it on.
+restart = ["moonframe-providers/restart"]
 # A sealed executable uses staged resources instead of the full toolbox.
 sealed = ["moonframe-packages/sealed"]
+# Socket providers (`kind = "socket"`): a program that runs on its own. Off
+# by default; the starter turns it on.
+socket = ["moonframe-providers/socket"]
 # Development commands and the component gallery.
 studio = []
 # Terminal rendering and local/tmux sessions. Engines enable this too.
@@ -95,6 +119,7 @@ gpui-kit.workspace            = true
 gpui-platform-capture         = { default-features = false, features = ["test-support"], optional = true, package = "gpui-pre-platform", version = "=0.3.10" }
 image                         = { optional = true, workspace = true }
 imagesize.workspace           = true
+keepawake                     = { optional = true, workspace = true }
 moonframe-acp                 = { optional = true, workspace = true }
 moonframe-chat                = { optional = true, workspace = true }
 moonframe-core.workspace      = true
@@ -123,10 +148,13 @@ ureq                          = { optional = true, workspace = true }
 tempfile.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
+core-graphics-types = { optional = true, workspace = true }
+metal               = { optional = true, workspace = true }
+moonframe-frames    = { optional = true, workspace = true }
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
 block2.workspace           = true
 objc2.workspace            = true
-objc2-app-kit              = { features = ["NSEvent", "NSRunningApplication", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
+objc2-app-kit              = { features = ["NSBezierPath", "NSColor", "NSControl", "NSDockTile", "NSEvent", "NSImageView", "NSRunningApplication", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
 objc2-foundation.workspace = true
 # Finding the AppKit window a trackpad gesture happened in.
 raw-window-handle.workspace = true
