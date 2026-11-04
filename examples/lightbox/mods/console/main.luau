@@ -59,7 +59,7 @@ return mod {
 	subscribe = { "provider/scanner" },
 
 	init = function(previous)
-		return previous or {
+		local state = previous or {
 			exposure = 1,
 			parade = true,
 			zoom = nil :: number?,
@@ -70,6 +70,11 @@ return mod {
 			closing = nil :: string?,
 			leaving = false,
 		}
+		-- Holds and pending close attempts belong to the app process, not
+		-- its saved state. Restore protection until the engine reports back.
+		state.closing, state.leaving = nil, false
+		state.percent = -1
+		return state, if state.running then began() else {}
 	end,
 
 	update = function(state, msg)

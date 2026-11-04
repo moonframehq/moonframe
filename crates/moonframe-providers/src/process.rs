@@ -105,23 +105,24 @@ fn serve(context: &Context, reporter: &mut Reporter) -> Result<(), String> {
 /// cue to leave and may use `stop-grace` for; SIGTERM; then killing them.
 fn finish(child: &mut Child, outbox: &Outbox, grace: Duration) {
     outbox.close();
-    if gone(child, grace) {
+    if gone(child, grace, || false) {
         return;
     }
     terminate(child);
-    if !gone(child, TERM_GRACE) {
+    if !gone(child, TERM_GRACE, || false) {
         kill(child);
     }
 }
 
-/// Whether `child` and what it started ended within `time`.
-fn gone(child: &mut Child, time: Duration) -> bool {
+/// Whether `child` and what it started ended within `time`, unless the
+/// caller interrupts the wait to start shutdown's own grace period.
+fn gone(child: &mut Child, time: Duration, interrupted: impl Fn() -> bool) -> bool {
     let until = Instant::now() + time;
     loop {
         if !matches!(child.try_wait(), Ok(None)) && !lingering(child) {
             return true;
         }
-        if Instant::now() >= until {
+        if interrupted() || Instant::now() >= until {
             return false;
         }
         thread::sleep(STOPPING_POLL);
@@ -200,9 +201,9 @@ fn drive(
         Pumped::Stopped => Ok(()),
         Pumped::Ended(Ended::Problem(problem)) => Err(problem),
         Pumped::Ended(Ended::Closed) => {
-            // A process may close its output and carry on: waiting for it
-            // here would hold up stopping it.
-            gone(child, context.manifest.stop_grace);
+            // Allow a normal exit to report its status, but leave this
+            // wait as soon as shutdown asks: `finish` owns the stop grace.
+            gone(child, context.manifest.stop_grace, || context.stopped());
             Err(match child.try_wait() {
                 Ok(Some(status)) => format!("exited ({status})"),
                 _ => "closed its output".to_owned(),

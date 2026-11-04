@@ -405,6 +405,43 @@ fn a_process_that_closes_its_output_is_still_stopped() {
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn shutdown_reaps_a_process_already_waiting_after_stdout_closed() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/quiet/provider.toml",
+        "kind = 'process'\ncommand = ['sh', 'quiet.sh']\nstop-grace = 2.0\nstart = 'always'\n",
+    );
+    write(
+        root,
+        "providers/quiet/quiet.sh",
+        "trap '' TERM\necho $$\nexec 1>&-\nwhile :; do sleep 0.05; done\n",
+    );
+    let (events, received) = events();
+    let mut providers = Providers::start(root.into(), root.join("build"), events);
+    let (Data::Integer(pid), _) = published(&received) else {
+        panic!("the provider did not publish its pid");
+    };
+    let pid = libc::pid_t::try_from(pid).unwrap();
+    // Let the reader report EOF and the driver enter its grace wait.
+    std::thread::sleep(Duration::from_millis(250));
+    providers.shutdown();
+    // SAFETY: signal 0 only checks this test's child; SIGKILL cleans up
+    // its process group if the regression left it alive.
+    #[allow(unsafe_code)]
+    let alive = unsafe {
+        let alive = libc::kill(pid, 0) == 0;
+        if alive {
+            libc::kill(-pid, libc::SIGKILL);
+        }
+        alive
+    };
+    assert!(!alive, "shutdown returned before its process was reaped");
+}
+
 #[cfg(all(unix, feature = "socket"))]
 mod socket {
     use {
