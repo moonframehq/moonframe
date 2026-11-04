@@ -26,16 +26,16 @@ return component {
 	description = "One-of-many choice as segments in a rounded track, the selected one raised; sends { select = id }.",
 	when = "A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`.",
 	props = {
-		["options"] = "list of { id, label?, icon?, count? (a number or text after the label, in the accent colour), tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment",
+		["options"] = "list of { id, label?, icon? (optional, before the label), count? (a number or text after the label, in the accent colour), tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment",
 		["selected"] = "id of the chosen option",
 		["event"] = "key of the message a click sends, default \"select\": { select = id }",
-		["small"] = "smaller, tighter segments",
+		["small"] = "tighter segments, for a dense toolbar",
 		["grow"] = "fill the width, segments sharing it equally",
 		["to"] = "mod to send messages to, if not the drawing one",
 	},
 	styles = {
-		[".segmented"] = { background = "muted", border = "all", border_color = "border", radius = 9, padding = 2, gap = 2 },
-		[".segmented-option"] = { padding = { 4, 12 }, gap = 6, radius = 7, color = "muted-foreground" },
+		[".segmented"] = { background = "muted", border = "all", border_color = "border", radius = 8, padding = 2, gap = 0 },
+		[".segmented-option"] = { padding = { 3, 10 }, gap = 5, radius = 6, size = "small", color = "muted-foreground" },
 		[".segmented-option:hover"] = { color = "foreground" },
 		[".segmented-option:selected"] = {
 			background = "background",
@@ -43,14 +43,14 @@ return component {
 			shadow = "0 1 2 #00000024",
 		},
 		[".segmented-count"] = { color = "accent", weight = "medium" },
-		[".segmented-small"] = { padding = { 2, 8 }, size = "small", radius = 6 },
+		[".segmented-small"] = { padding = { 1, 7 }, radius = 5 },
 	},
 	example = {
 		selected = "dark",
 		options = {
-			{ id = "light", label = "Light", icon = "sun" },
-			{ id = "dark", label = "Dark", icon = "moon" },
-			{ id = "system", label = "System", icon = "settings-2" },
+			{ id = "light", label = "Light" },
+			{ id = "dark", label = "Dark" },
+			{ id = "system", label = "System" },
 		},
 	},
 
@@ -72,7 +72,7 @@ return component {
 				tooltip = option.tooltip,
 				msg = option.msg or { [event] = id },
 				to = props.to,
-				option.icon and ui.icon { name = option.icon :: any },
+				option.icon and ui.icon { name = option.icon :: any, size = "small" },
 				option.label and ui.text { option.label },
 				option.count ~= nil and ui.text { tostring(option.count), class = "segmented-count" },
 			}

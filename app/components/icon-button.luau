@@ -30,7 +30,7 @@ return component {
 		["msg"] = "message a click sends",
 		["command"] = "an app command to run instead of `msg`",
 		["variant"] = "\"ghost\" (default), \"outline\" or \"solid\"",
-		["size"] = "\"normal\" (28px, default) or \"small\" (22px)",
+		["size"] = "\"normal\" (32px, default) or \"small\" (26px)",
 		["active"] = "show it pressed, for a toggle that is on",
 		["badge"] = "a small count or dot text beside the icon",
 		["disabled"] = "greys it out and ignores clicks",
@@ -38,7 +38,7 @@ return component {
 		["to"] = "mod to send `msg` to, if not the drawing one",
 	},
 	styles = {
-		[".icon-button"] = { radius = 7, gap = 3, color = "muted-foreground" },
+		[".icon-button"] = { radius = 8, gap = 4, color = "muted-foreground" },
 		[".icon-button:hover"] = { background = "list-hover", color = "foreground" },
 		[".icon-button:selected"] = { background = "accent/15", color = "accent" },
 		[".icon-button-outline"] = { border = "all", border_color = "border", background = "background" },
@@ -46,7 +46,7 @@ return component {
 		[".icon-button-solid"] = { background = "secondary", color = "foreground" },
 		[".icon-button-solid:hover"] = { background = "muted-foreground/25" },
 		[".icon-button-solid:selected"] = { background = "accent", color = "accent-foreground" },
-		[".icon-button-small"] = { radius = 5, size = "small" },
+		[".icon-button-small"] = { radius = 6, size = "small" },
 		[".icon-button-danger"] = { color = "danger" },
 		[".icon-button-danger:hover"] = { background = "danger/12", color = "danger" },
 		[".icon-button-disabled"] = { opacity = 0.4 },
@@ -68,7 +68,7 @@ icon_button { icon = "delete", tooltip = "Delete", msg = "delete", size = "small
 
 	build = function(props: Props)
 		local small = props.size == "small"
-		local side = if small then 22 else 28
+		local side = if small then 26 else 32
 		local class = { "icon-button" }
 		local variant = if props.variant and VARIANTS[props.variant] then props.variant else "ghost"
 		if variant ~= "ghost" then
@@ -89,7 +89,7 @@ icon_button { icon = "delete", tooltip = "Delete", msg = "delete", size = "small
 			class = class,
 			width = if badge then nil else side,
 			height = side,
-			style = if badge then { padding = { x = if small then 4 else 6 } } else nil,
+			style = if badge then { padding = { x = if small then 6 else 8 } } else nil,
 			align = "center",
 			justify = "center",
 			selected = props.active == true,

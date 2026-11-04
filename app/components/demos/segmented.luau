@@ -1,4 +1,4 @@
--- A theme picker: click a segment to choose it.
+-- A theme picker, plain and with icons: click a segment to choose it.
 local segmented = use "segmented"
 
 return mod {
@@ -15,6 +15,14 @@ return mod {
 	view = function(state)
 		return ui.column {
 			gap = "normal",
+			segmented {
+				selected = state.theme,
+				options = {
+					{ id = "light", label = "Light" },
+					{ id = "dark", label = "Dark" },
+					{ id = "system", label = "System" },
+				},
+			},
 			segmented {
 				selected = state.theme,
 				options = {
