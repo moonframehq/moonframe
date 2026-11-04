@@ -33,6 +33,8 @@ const NOTIFY_BURST: usize = 5;
 const NOTIFY_WINDOW: Duration = Duration::from_secs(10);
 /// At most this many web pages opened in [`NOTIFY_WINDOW`].
 const OPEN_BURST: usize = 3;
+/// `app:icon` requests closer together than this are refused.
+const ICON_GAP: Duration = Duration::from_millis(100);
 /// Largest sound file played.
 pub(crate) const MAX_SOUND_BYTES: u64 = 2 * 1024 * 1024;
 
@@ -53,6 +55,7 @@ pub(crate) enum Posted {
 #[derive(Default)]
 pub(crate) struct Alerts {
     last_sound: Option<Instant>,
+    last_icon: Option<Instant>,
     posted: VecDeque<Instant>,
     opened: VecDeque<Instant>,
     sequence: u64,
@@ -81,6 +84,18 @@ impl Alerts {
     /// Whether a web page may open now (`app:open`).
     pub(crate) fn may_open(&mut self) -> bool {
         admit(&mut self.opened, OPEN_BURST)
+    }
+
+    /// Whether the app's icon may change now (`app:icon`).
+    pub(crate) fn may_change_icon(&mut self) -> bool {
+        let now = Instant::now();
+        let may = self
+            .last_icon
+            .is_none_or(|last| now.duration_since(last) >= ICON_GAP);
+        if may {
+            self.last_icon = Some(now);
+        }
+        may
     }
 
     /// Plays `file`, or the chime when `None`. Too soon after the last one

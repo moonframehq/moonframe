@@ -1,7 +1,8 @@
 //! The app's icon in the Dock and the app switcher. A bundle takes it from
 //! its Info.plist; run straight from Cargo there is none, so the app sets
 //! it at launch: a profile's app's `icon.png`, else Moonframe's, which
-//! `scripts/draw-icon.swift` draws in `assets/icon.png`.
+//! `scripts/draw-icon.swift` draws in `assets/icon.png`. A mod can change
+//! it while the app runs (`app:icon`), bundled or not.
 
 /// Moonframe's own icon, for an app that names none.
 #[cfg(target_os = "macos")]
@@ -14,33 +15,42 @@ fn fallback() -> &'static [u8] {
     crate::identity().icon.unwrap_or(ICON)
 }
 
-/// Must run on the main thread once the application exists.
+/// Shows `icon` (an image file AppKit reads), else the app's fallback, as
+/// the app's icon; why not, if it cannot.
+#[cfg(target_os = "macos")]
+pub(crate) fn set_icon(icon: Option<&std::path::Path>) -> Result<(), String> {
+    match icon {
+        Some(path) => show_icon(
+            &std::fs::read(path)
+                .map_err(|error| format!("cannot read {}: {error}", path.display()))?,
+        ),
+        None => show_icon(fallback()),
+    }
+}
+
+/// Shows the image in `bytes` as the app's icon. Must run on the main
+/// thread once the application exists: at launch, and whenever a mod asks
+/// (`app:icon`).
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code, reason = "one AppKit setter; see SAFETY")]
-pub(crate) fn set_icon(icon: Option<&std::path::Path>) {
+pub(crate) fn show_icon(bytes: &[u8]) -> Result<(), String> {
     use {
         objc2::{AllocAnyThread as _, MainThreadMarker},
         objc2_app_kit::{NSApplication, NSImage},
         objc2_foundation::NSData,
     };
     let Some(main) = MainThreadMarker::new() else {
-        tracing::warn!("the Dock icon is set from the main thread only");
-        return;
+        return Err("the Dock icon is set from the main thread only".to_owned());
     };
-    let own = icon.and_then(|path| {
-        std::fs::read(path)
-            .inspect_err(|error| tracing::warn!("cannot read {}: {error}", path.display()))
-            .ok()
-    });
-    let data = NSData::with_bytes(own.as_deref().unwrap_or_else(|| fallback()));
+    let data = NSData::with_bytes(bytes);
     let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) else {
-        tracing::warn!("cannot read the app icon");
-        return;
+        return Err("not an image AppKit reads".to_owned());
     };
     let app = NSApplication::sharedApplication(main);
     // SAFETY: on the main thread, as the marker proves, with a valid image
     // that AppKit retains.
     unsafe { app.setApplicationIconImage(Some(&image)) };
+    Ok(())
 }
 
 /// Names the process `name`, before the app starts: macOS titles the app
@@ -159,5 +169,14 @@ pub(crate) fn about_panel(_: &str, _: &moonframe_core::About, _: Option<&std::pa
     false
 }
 
+/// Elsewhere the window system takes the icon from the app's desktop
+/// entry, so it stays as installed.
 #[cfg(not(target_os = "macos"))]
-pub(crate) fn set_icon(_: Option<&std::path::Path>) {}
+pub(crate) fn set_icon(_: Option<&std::path::Path>) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn show_icon(_: &[u8]) -> Result<(), String> {
+    Ok(())
+}

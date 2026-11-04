@@ -8,11 +8,13 @@
 use crate::{Command, Data, Error};
 
 mod edit;
+mod icon;
 mod pick;
 mod window;
 
 pub use {
     edit::{Edit, EditChange, Splice},
+    icon::{AppIcon, ICON_TYPES},
     pick::{Pick, PickKind},
     window::WindowRequest,
 };
@@ -52,6 +54,10 @@ pub enum Request {
     /// `app:window`: opens a mod in a window of its own, or raises it,
     /// first delivering what it is sent; or closes it.
     Window(WindowRequest),
+    /// `app:icon`: shows another image as the app's icon in the Dock and
+    /// the app switcher, until the app quits or a mod asks again; or the
+    /// app's own icon back.
+    Icon(AppIcon),
     /// `app:open`: opens a web address (`https://` or `http://`) in the
     /// system's browser: a pull request, a sign-in page.
     Open(String),
@@ -127,6 +133,7 @@ impl Request {
             "edit" => edit::edit(msg).map(Self::Edit),
             "window" => window::window(msg).map(Self::Window),
             "open" => open(msg).map(Self::Open),
+            "icon" => icon::icon(msg).map(Self::Icon),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -150,6 +157,7 @@ pub const NAMES: &[&str] = &[
     "edit",
     "window",
     "open",
+    "icon",
 ];
 
 /// Longest address `app:open` opens.

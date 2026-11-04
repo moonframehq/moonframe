@@ -28,8 +28,8 @@ use {
         *,
     },
     moonframe_core::{
-        Action, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL, Sound,
-        Stylesheet, Titlebar, Token, WindowRequest, WindowState, Workspace,
+        Action, AppIcon, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL,
+        Sound, Stylesheet, Titlebar, Token, WindowRequest, WindowState, Workspace,
     },
     moonframe_providers::{Event, Natives, Providers},
     notify::{RecommendedWatcher, RecursiveMode, Watcher as _},
@@ -49,6 +49,7 @@ use {crate::terminal::Terminals, listeners::wake_on_output};
 mod dialogs;
 mod fonts;
 mod history;
+mod icon;
 mod listeners;
 mod measuring;
 mod menu;
@@ -799,26 +800,7 @@ impl MoonframeApp {
         let file = match sound {
             Sound::Chime => None,
             Sound::File(src) => {
-                let folder = self
-                    .workspace
-                    .slot(from)
-                    .and_then(|slot| slot.source())
-                    .and_then(Path::parent)
-                    .unwrap_or(Path::new("."));
-                let allowed: Vec<PathBuf> = self
-                    .workspace
-                    .roots()
-                    .layers()
-                    .map(Path::to_owned)
-                    .collect();
-                let home = std::env::home_dir();
-                let Some(file) = moonframe_core::resolve_file(
-                    src,
-                    folder,
-                    home.as_deref(),
-                    &allowed,
-                    crate::alerts::MAX_SOUND_BYTES,
-                ) else {
+                let Some(file) = self.mod_file(from, src, crate::alerts::MAX_SOUND_BYTES) else {
                     self.workspace.refuse(
                         from,
                         Error::new(format!(
@@ -863,6 +845,7 @@ impl MoonframeApp {
             Request::Command(command) => self.run(command, window, cx),
             Request::Appearance(appearance) => self.set_appearance(appearance, cx),
             Request::Sound(sound) => self.play(from, &sound),
+            Request::Icon(icon) => self.show_icon(from, &icon),
             Request::Pick(pick) => self.pick(from, pick, cx),
             Request::Edit(edit) => {
                 if let Err(problem) = self.inputs.edit(from, &edit, window, cx) {
