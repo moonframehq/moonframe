@@ -4037,7 +4037,7 @@ A whole mod using it, with state: `app/components/demos/pr-row.luau`.
 
 #### `mockups`
 
-**Mockups.** Variants of one change side by side, each live in a lettered card with a Pick button that copies which one to apply.
+**Mockups.** Variants of one change one under another, each live in a lettered card with a Pick button that copies which one to apply.
 
 **When:** Showing the user a few ideas for a change before making it, so they can pick one: the moonframe-mockups skill builds a throwaway mod around it. Not for real content; for choosing between options inside the app use `choice-cards`.
 

@@ -100,6 +100,8 @@ pub(crate) struct Inspector {
     pub(crate) asker: Option<String>,
     /// Where the highlight was last drawn, to animate it from there.
     pub(crate) highlight: Rc<RefCell<crate::overlay::Highlight>>,
+    /// How it measures, and what that needs.
+    pub(crate) measuring: crate::overlay::Measuring,
 }
 
 impl Inspector {

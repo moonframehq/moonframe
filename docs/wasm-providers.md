@@ -387,7 +387,7 @@ compiled components in a source package.
 
 | Symptom | Check |
 | --- | --- |
-| Nothing builds; `app.counter` stays nil | Is the mod drawn, and does its view read `app.counter`? Does the shell place its region? Check the provider banner and terminal log. |
+| Nothing builds; `app.counter` stays nil | Is the mod drawn, and does its view read `app.counter`? Does the shell place its region? Check the red problem pill at the top of the window and the terminal log. |
 | Cannot find `std` for the target | Install `wasm32-wasip2` for the toolchain actually building the provider. |
 | Cannot find the WIT file | The macro path is relative to the provider crate root. Keep `wit/provider.wit` inside it. |
 | Missing exports or component instantiation error | Use `wasm32-wasip2`, the matching WIT, all three `Guest` methods and `export!(Counter)`. |

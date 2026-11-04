@@ -1153,7 +1153,8 @@ browser).
 ## Stylesheet
 
 `app/style.luau` returns `style { ... }`. A broken stylesheet keeps the
-previous one and shows its error at the top of the window, and in
+previous one and shows a red pill at the top of the window (a click
+opens the error), and in
 `just check` under `style`.
 
 ```lua
@@ -1667,7 +1668,8 @@ something wants it: a drawn view reads `app.<name>` (a view that loops
 over all of `app` wants every one), a mod subscribes to
 `provider/<name>`, or a mod sends it a message; once started it keeps
 running. `start = "always"` in provider.toml starts it with the app
-instead, for one whose work matters before anything shows it. A failed provider shows a banner, and its error appears in the
+instead, for one whose work matters before anything shows it. A failed provider shows a red pill at the top of the window (a click
+opens its error, with Retry), and its error appears in the
 terminal log. There are four kinds:
 
 - **`kind = "wasm"`:** a WebAssembly (WASM) component implementing
@@ -1719,7 +1721,7 @@ terminal log. There are four kinds:
     the git repository of the terminal they last used. When that changes,
     the app sends `{"from":"","message":{"project":"<path>"}}`; an empty
     `from` is the app itself (no mod has one), so trust only that line.
-  - If it exits, the provider fails (a banner) and stays stopped until its
+  - If it exits, the provider fails (a red pill) and stays stopped until its
     folder changes, so never exit on an error: publish
     `{"available":false,"reason":"..."}` and keep polling. Exit only when
     stdin closes. Under macOS's bash 3.2, `read -t` returns 1 for both a
@@ -1732,7 +1734,7 @@ terminal log. There are four kinds:
     a message.
 - **`kind = "native"`:** Rust compiled into the app, registered under the
   folder's name (`crates/moonframe/src/natives.rs`, each behind a cargo
-  feature); a build without it shows why in the provider's banner. For
+  feature); a build without it shows why in the provider's problem pill. For
   what needs real libraries and the user's own access: git (on herdr-vcs),
   the forges (`crates/moonframe-forge`), and later herdr-core.
   - It implements `moonframe_providers::Native` (`start`, `tick` every
@@ -1744,7 +1746,7 @@ terminal log. There are four kinds:
     `{ reply = <id the mod sent, else the action's name>, action, ok,
     message | error }`; keep what is waiting in the mod's state and clear
     it on the reply (`app/mods/status` does, for commit and push).
-  - A panic stops that provider with a banner, never the app.
+  - A panic stops that provider with a problem pill, never the app.
   - `crates/moonframe-git` is the example, with tests that drive it through
     a `Handle::new`.
 

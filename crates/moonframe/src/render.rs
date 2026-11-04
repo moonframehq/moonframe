@@ -369,8 +369,9 @@ impl<'w, 'm> Painter<'w, 'm> {
         }
     }
 
-    /// The whole window: the shell, under the stylesheet's and providers'
-    /// problems if any, the backdrops of open popovers, and open overlays.
+    /// The whole window: the shell, the backdrops of open popovers, and
+    /// open overlays. The app draws the stylesheet's and providers'
+    /// problems over it.
     pub(crate) fn shell(&mut self, cx: Cx) -> AnyElement {
         self.root(SHELL, cx)
     }
@@ -381,39 +382,10 @@ impl<'w, 'm> Painter<'w, 'm> {
         self.root(name, cx)
     }
 
-    /// The mod `name` filling a window, under the problems if any, with the
-    /// backdrops of open popovers and the open overlays.
+    /// The mod `name` filling a window, with the backdrops of open
+    /// popovers and the open overlays.
     fn root(&mut self, name: &'w str, cx: Cx) -> AnyElement {
         let shell = self.slot(name, cx);
-        // The stylesheet's problem and each provider's, above the shell.
-        let banners: Vec<_> = self
-            .workspace
-            .style_error()
-            .map(|error| format!("style: {error}"))
-            .into_iter()
-            .chain(
-                self.workspace
-                    .host_problems()
-                    .map(|(name, error)| format!("{name}: {error}")),
-            )
-            .map(|message| problem(message, cx))
-            .collect();
-        // Over the shell's top edge rather than above it, so a broken
-        // stylesheet or provider never moves the layout.
-        let banners = (!banners.is_empty()).then(|| {
-            deferred(
-                div()
-                    .absolute()
-                    .top(px(4.))
-                    .left_0()
-                    .right_0()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .children(banners),
-            )
-            .with_priority(1)
-        });
         let backdrops: Vec<_> = std::mem::take(&mut self.backdrops)
             .into_iter()
             .enumerate()
@@ -447,7 +419,6 @@ impl<'w, 'm> Painter<'w, 'm> {
             .flex()
             .flex_col()
             .child(shell)
-            .children(banners)
             .children(backdrops)
             .children(overlays)
             .into_any_element()

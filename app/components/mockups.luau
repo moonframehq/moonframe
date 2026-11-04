@@ -1,4 +1,4 @@
--- Ideas for one change, drawn side by side before any of them is made: each
+-- Ideas for one change, drawn one under another before any of them is made: each
 -- variant is live UI in a lettered card, with a button that copies "apply
 -- this one" for the agent that drew them. Stateless; the moonframe-mockups
 -- skill writes a throwaway mod around it.
@@ -37,7 +37,7 @@ return component {
 	title = "Mockups",
 	category = "Layout",
 	icon = "sparkles",
-	description = "Variants of one change side by side, each live in a lettered card with a Pick button that copies which one to apply.",
+	description = "Variants of one change one under another, each live in a lettered card with a Pick button that copies which one to apply.",
 	when = "Showing the user a few ideas for a change before making it, so they can pick one: the moonframe-mockups skill builds a throwaway mod around it. Not for real content; for choosing between options inside the app use `choice-cards`.",
 	props = {
 		["ask"] = "what the user asked for, shown on top and quoted in the pick",
@@ -113,7 +113,9 @@ mockups { ask = "a busier status bar", file = "~/.config/moonframe/mods/mockup/m
 			gap = "normal",
 			style = { padding = 16 },
 			props.ask and ui.text { props.ask, weight = "medium" },
-			ui.row { wrap = true, gap = "normal", align = "start", table.unpack(cards) },
+			-- One under another: a wrapping row inside a scrolling column is
+			-- measured as one line, so the cards past it could not be scrolled to.
+			ui.column { shrink = false, gap = "normal", align = "start", table.unpack(cards) },
 		}
 	end,
 }
