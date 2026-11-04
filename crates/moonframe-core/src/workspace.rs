@@ -14,6 +14,7 @@ mod load;
 mod messages;
 mod render;
 mod slot;
+mod windows;
 // keep-sorted end
 
 use {
@@ -68,6 +69,8 @@ pub struct Workspace {
     appearance: (Appearance, BTreeMap<String, Data>),
     /// The window as views see it, `app.window`.
     window: WindowState,
+    /// Open mod windows, whose views see their own state instead of the shell's.
+    mod_windows: BTreeMap<String, WindowState>,
     /// Compile-time host capabilities; separate from provider-published data.
     capabilities: BTreeMap<String, bool>,
     /// What the host shares with every view under `app`, such as
@@ -152,11 +155,21 @@ enum Stamp {
     Keys(Vec<(String, u64)>),
 }
 
+impl Stamp {
+    fn reads(&self, key: &str) -> bool {
+        match self {
+            Self::All(_) => true,
+            Self::Keys(keys) => keys.iter().any(|(name, _)| name == key),
+        }
+    }
+}
+
 /// What a view was drawn from, besides its state and props.
 #[derive(Debug)]
 struct Drawn {
     style_generation: u64,
     stamp: Stamp,
+    window: Option<WindowState>,
 }
 
 /// An instance the app keeps: its module, and what it is an instance of.
@@ -269,6 +282,7 @@ impl Workspace {
             style_error: None,
             dark,
             window: WindowState::default(),
+            mod_windows: BTreeMap::new(),
             capabilities,
             host: BTreeMap::new(),
             host_problems: BTreeMap::new(),

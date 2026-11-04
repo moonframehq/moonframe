@@ -508,7 +508,15 @@ impl<'w, 'm> Painter<'w, 'm> {
     /// How far round a spinning icon is this frame, from 0 to 1, asking for
     /// another frame; `None` while `animation_speed` turns animations off.
     fn spin(&mut self) -> Option<f32> {
-        let period = self.workspace.stylesheet().scaled(SPIN_PERIOD);
+        self.phase(SPIN_PERIOD)
+    }
+
+    /// How far through a repeating animation of `period` (before
+    /// `animation_speed`) this frame is, from 0 to 1, asking for another
+    /// frame; `None` while animations are off. Every caller with the same
+    /// period moves in step.
+    fn phase(&mut self, period: Duration) -> Option<f32> {
+        let period = self.workspace.stylesheet().scaled(period);
         if period.is_zero() {
             return None;
         }

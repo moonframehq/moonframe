@@ -1,5 +1,6 @@
 //! Optional developer export of our GPU scene, not the user's desktop.
-//! `MOONFRAME_CAPTURE=/absolute/file.png` saves once, then exits this process.
+//! `MOONFRAME_CAPTURE=/absolute/file.png` saves once, then exits this process;
+//! `MOONFRAME_CAPTURE_DELAY=<ms>` waits that long first (750 by default).
 use {
     gpui_kit::{App, Window},
     std::{
@@ -18,13 +19,17 @@ pub(super) fn schedule(window: &Window, cx: &App) {
     if !path.is_absolute() || SCHEDULED.swap(true, Ordering::Relaxed) {
         return;
     }
+    // `MOONFRAME_CAPTURE_DELAY` (milliseconds) waits longer, for providers
+    // and network content such as map tiles to arrive first.
+    let delay = std::env::var("MOONFRAME_CAPTURE_DELAY")
+        .ok()
+        .and_then(|ms| ms.parse().ok())
+        .map_or(Duration::from_millis(750), Duration::from_millis);
     // A background window may stop receiving frame callbacks when occluded.
     // A timer still completes after its initial layout and theme settle.
     window
         .spawn(cx, async move |cx| {
-            cx.background_executor()
-                .timer(Duration::from_millis(750))
-                .await;
+            cx.background_executor().timer(delay).await;
             let _ = cx.update(|window, cx| {
                 match window.render_to_image() {
                     Ok(image) => {

@@ -215,7 +215,7 @@ impl MoonframeApp {
             radius: theme.radius,
         };
         workspace.set_dark(theme.is_dark());
-        workspace.set_window(window_state(chrome, window, cx));
+        workspace.set_window(window_state(chrome.titlebar, window, cx));
         report(&workspace);
         cx.observe_window_bounds(window, |this, window, cx| this.sync_window(window, cx))
             .detach();
@@ -708,7 +708,7 @@ impl MoonframeApp {
     /// Shares the window's state with the views as `app.window`.
     fn sync_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.workspace
-            .set_window(window_state(self.chrome, window, cx));
+            .set_window(window_state(self.chrome.titlebar, window, cx));
         cx.notify();
     }
 
@@ -970,9 +970,9 @@ impl MoonframeApp {
 
 /// The window as views see it. The title bar is hidden only where the
 /// system went along: a Linux compositor may keep its own decorations.
-fn window_state(chrome: Chrome, window: &Window, cx: &App) -> WindowState {
+pub(crate) fn window_state(titlebar: Titlebar, window: &Window, cx: &App) -> WindowState {
     let platform = Platform::current();
-    let titlebar = match (chrome.titlebar, platform, window.window_decorations()) {
+    let titlebar = match (titlebar, platform, window.window_decorations()) {
         (Titlebar::Hidden, Platform::Linux, Decorations::Server) => Titlebar::System,
         (titlebar, ..) => titlebar,
     };

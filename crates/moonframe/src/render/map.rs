@@ -26,6 +26,12 @@ use {
     view::Frame,
 };
 
+/// One breath of a pulsing pin's halo, before `animation_speed`.
+const PULSE: std::time::Duration = std::time::Duration::from_millis(2200);
+
+/// How long a `glide` takes, before `animation_speed`.
+const GLIDE: std::time::Duration = std::time::Duration::from_millis(600);
+
 /// Zoom steps per pixel of wheel or trackpad scroll.
 const SCROLL_ZOOM: f64 = 1.0 / 120.0;
 
@@ -43,7 +49,11 @@ impl<'w> Draw<'w> for Map {
             f64::from(self.width.unwrap_or(0.0)),
             f64::from(self.height.unwrap_or(0.0)),
         );
-        let (frame, scale) = view::frame(self, &key, fallback);
+        let glide = painter.workspace.stylesheet().scaled(GLIDE);
+        let (frame, scale) = view::frame(self, &key, fallback, painter.now, glide);
+        if view::gliding(&key) {
+            painter.animating = true;
+        }
         let most = view::most_zoom(self);
         let sender = Sender {
             app: cx.entity().downgrade(),
@@ -70,6 +80,12 @@ impl<'w> Draw<'w> for Map {
             })
             .detach();
         }
+        // Only a map with a pulsing pin asks for frame after frame.
+        let pulse = if self.pins.iter().any(|pin| pin.pulse) {
+            painter.phase(PULSE)
+        } else {
+            None
+        };
         let route_color = look
             .base
             .color
@@ -85,7 +101,7 @@ impl<'w> Draw<'w> for Map {
             .cursor_grab()
             .child(layer)
             .child(lines.paint(route_color, theme.background))
-            .children(pins::pins(self, frame, &sender, cx))
+            .children(pins::pins(self, frame, &sender, pulse, cx))
             .child(lines::announce(
                 &key,
                 painter.frame,

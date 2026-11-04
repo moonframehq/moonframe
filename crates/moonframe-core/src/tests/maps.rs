@@ -25,6 +25,12 @@ fn a_map_reads_its_provider_place_pins_and_routes() {
     assert_eq!(map.zoom, Some(14.0));
     assert_eq!(map.pins.len(), 2);
     assert_eq!(map.pins[0].label.as_deref(), Some("1"));
+    assert!(!map.pins[0].pulse);
+    let here =
+        map_of(r##"pins = { { lat = 37.33, lon = -122.03, color = "#0a84ff", pulse = true } }"##)
+            .unwrap();
+    assert!(here.pins[0].pulse);
+    assert!(!map.glide && map_of("glide = true").unwrap().glide);
     assert_eq!(map.routes[0].points, vec![[37.787, -122.404], [
         37.79, -122.39
     ]]);
@@ -67,6 +73,8 @@ fn a_map_refuses_what_it_cannot_show() {
             "without spaces",
         ),
         ("zoom = 40", "zoom"),
+        ("pins = { { lat = 1, lon = 2, pulse = 1 } }", "pulse"),
+        ("glide = 1", "glide"),
     ] {
         let error = map_of(props).unwrap_err();
         assert!(error.contains(expected), "{props}: {error}");

@@ -35,6 +35,7 @@ mod build;
 mod capabilities;
 #[cfg(feature = "capture")]
 mod capture;
+mod checkout;
 mod cli;
 mod color;
 mod crash;

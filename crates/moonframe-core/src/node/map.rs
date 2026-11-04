@@ -136,6 +136,8 @@ pub struct Map {
     pub center: Option<[f64; 2]>,
     /// The zoom level, 0 (the whole world) to the provider's deepest.
     pub zoom: Option<f32>,
+    /// A new `center` or `zoom` eases the map there, instead of jumping.
+    pub glide: bool,
     pub pins: Vec<Pin>,
     pub routes: Vec<Route>,
     /// Sent with `lat`, `lon` and `zoom` added after the user moves the map.
@@ -165,6 +167,9 @@ pub struct Pin {
     pub shape: Option<PinShape>,
     /// Drawn larger, above the others.
     pub selected: bool,
+    /// A halo breathes out from it without end: where the user is, as
+    /// native maps mark it. Still, as a soft glow, with animations off.
+    pub pulse: bool,
     /// Sent when it is clicked, instead of the map's `select`.
     pub msg: Option<Data>,
 }

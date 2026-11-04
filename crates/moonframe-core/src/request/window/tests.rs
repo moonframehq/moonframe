@@ -251,11 +251,36 @@ fn a_mod_says_the_size_of_its_window() {
         Some(crate::ModWindowSize {
             size: Some((860., 600.)),
             min_size: Some((640., 480.)),
-            place: WindowPlace::default(),
+            ..Default::default()
         })
     );
     let meta = workspace.slot("asker").unwrap().meta().unwrap();
     assert_eq!(meta.window, None);
+}
+
+#[test]
+fn a_mod_can_hide_its_windows_title_bar() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "main.luau", SHELL_SOURCE);
+    write(dir.path(), "mods/asker/main.luau", ASKER);
+    write(
+        dir.path(),
+        "mods/settings/main.luau",
+        r#"return mod {
+            window = { titlebar = "hidden", traffic_lights = { x = 20, y = 18 } },
+            view = function() return ui.text "settings" end,
+        }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let meta = workspace.slot("settings").unwrap().meta().unwrap();
+    assert_eq!(
+        meta.window,
+        Some(crate::ModWindowSize {
+            titlebar: crate::Titlebar::Hidden,
+            traffic_lights: Some((20., 18.)),
+            ..Default::default()
+        })
+    );
 }
 
 #[test]
@@ -270,7 +295,8 @@ fn a_mods_window_size_is_checked() {
             "{ size = { width = 400, height = 300 }, min_size = { width = 500, height = 200 } }",
             "is larger than `size`",
         ),
-        ("{ titlebar = \"hidden\" }", "only the shell"),
+        ("{ titlebar = \"glass\" }", "titlebar"),
+        ("{ traffic_lights = { x = 900 } }", "traffic_lights"),
     ] {
         let dir = tempfile::tempdir().unwrap();
         write(dir.path(), "main.luau", SHELL_SOURCE);

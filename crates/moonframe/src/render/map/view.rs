@@ -4,11 +4,18 @@
 use {
     gpui_kit::*,
     moonframe_core::{MAX_LATITUDE, Map, unworld, world},
-    std::{cell::RefCell, collections::HashMap},
+    std::{
+        cell::RefCell,
+        collections::HashMap,
+        time::{Duration, Instant},
+    },
 };
 
 /// Pixels left around the pins and routes a map frames.
 const MARGIN: f64 = 48.0;
+/// How many screens away a glide still goes. Farther, the map jumps: a
+/// slide that long would blur past and fetch tiles nobody sees.
+const GLIDE_SCREENS: f64 = 8.0;
 
 /// What the view gave, which, once it changes, wins over where the user
 /// left the map.
@@ -50,6 +57,38 @@ pub(super) struct Frame {
 }
 
 impl Frame {
+    /// Whether the two frames look the same, to within half a pixel.
+    fn same_as(&self, other: &Self) -> bool {
+        let span = self.span();
+        (self.zoom - other.zoom).abs() < 0.001
+            && (near(self.center.0, other.center.0) - other.center.0).abs() * span < 0.5
+            && (self.center.1 - other.center.1).abs() * span < 0.5
+    }
+
+    /// Whether a glide from here reaches `to`: not too many screens away,
+    /// measured at the wider of the two zooms.
+    fn glides_to(&self, to: &Self) -> bool {
+        let span = 256.0 * self.zoom.min(to.zoom).exp2();
+        let across = (near(self.center.0, to.center.0) - to.center.0)
+            .abs()
+            .max((self.center.1 - to.center.1).abs());
+        across * span <= GLIDE_SCREENS * to.size.0.max(to.size.1)
+    }
+
+    /// `progress` of the way, 0 to 1, from here to `to`, easing out.
+    fn toward(&self, to: &Self, progress: f64) -> Self {
+        let eased = 1.0 - (1.0 - progress.clamp(0.0, 1.0)).powi(3);
+        let from = near(self.center.0, to.center.0);
+        Self {
+            center: (
+                from + (to.center.0 - from) * eased,
+                self.center.1 + (to.center.1 - self.center.1) * eased,
+            ),
+            zoom: self.zoom + (to.zoom - self.zoom) * eased,
+            size: to.size,
+        }
+    }
+
     /// The world's width in pixels at this zoom.
     pub(super) fn span(&self) -> f64 {
         256.0 * self.zoom.exp2()
@@ -149,6 +188,10 @@ struct Kept {
     given: Given,
     /// Where the user left it, once they move it.
     moved: Option<Frame>,
+    /// What the last frame showed.
+    drawn: Option<Frame>,
+    /// Where a glide under way left from, and when.
+    glide: Option<(Frame, Instant)>,
     /// The box as last laid out, in window pixels.
     bounds: Bounds<Pixels>,
     /// The window's scale, for `@2x` tiles.
@@ -167,17 +210,27 @@ pub(super) fn most_zoom(map: &Map) -> f64 {
 
 /// Where the map kept as `key` looks this frame, in a box of `fallback`
 /// pixels until it has been laid out.
-pub(super) fn frame(map: &Map, key: &str, fallback: (f64, f64)) -> (Frame, f32) {
+pub(super) fn frame(
+    map: &Map,
+    key: &str,
+    fallback: (f64, f64),
+    now: Instant,
+    glide: Duration,
+) -> (Frame, f32) {
     let given = Given::of(map);
     KEPT.with_borrow_mut(|kept| {
         let entry = kept.entry(key.to_owned()).or_insert_with(|| Kept {
             given: given.clone(),
             moved: None,
+            drawn: None,
+            glide: None,
             bounds: Bounds::default(),
             scale: 2.0,
         });
         // The view moved it: that wins over where the user left it.
+        let mut sent = false;
         if entry.given != given {
+            sent = entry.given.center != given.center || entry.given.zoom != given.zoom;
             entry.given = given;
             entry.moved = None;
         }
@@ -200,8 +253,34 @@ pub(super) fn frame(map: &Map, key: &str, fallback: (f64, f64)) -> (Frame, f32) 
                 }
             },
         };
-        (frame, entry.scale)
+        if sent
+            && map.glide
+            && !glide.is_zero()
+            && let Some(from) = entry.drawn
+        {
+            entry.glide = (!from.same_as(&frame) && from.glides_to(&frame)).then_some((from, now));
+        }
+        let shown = match entry.glide {
+            Some((from, start)) => {
+                let progress = now.saturating_duration_since(start).as_secs_f64()
+                    / glide.as_secs_f64().max(f64::EPSILON);
+                if progress >= 1.0 {
+                    entry.glide = None;
+                    frame
+                } else {
+                    from.toward(&frame, progress)
+                }
+            },
+            None => frame,
+        };
+        entry.drawn = Some(shown);
+        (shown, entry.scale)
     })
+}
+
+/// Whether the map `key` is on its way somewhere, and wants another frame.
+pub(super) fn gliding(key: &str) -> bool {
+    KEPT.with_borrow(|kept| kept.get(key).is_some_and(|kept| kept.glide.is_some()))
 }
 
 /// Keeps the box `key` was laid out in; whether it changed size.
@@ -327,6 +406,8 @@ fn keep(key: &str, frame: Frame) {
     KEPT.with_borrow_mut(|kept| {
         if let Some(entry) = kept.get_mut(key) {
             entry.moved = Some(frame);
+            // The user took over.
+            entry.glide = None;
         }
     });
 }
@@ -347,6 +428,47 @@ mod tests {
         let after = zoomed.world_at(100.0, 50.0);
         assert!((under.0 - after.0).abs() < 1e-12 && (under.1 - after.1).abs() < 1e-12);
         assert_eq!(zoomed.zoom, 15.5);
+    }
+
+    #[test]
+    fn a_glide_eases_to_its_end_and_refuses_long_trips() {
+        let from = Frame {
+            center: world(37.79, -122.40),
+            zoom: 14.0,
+            size: (800.0, 600.0),
+        };
+        let to = Frame {
+            center: world(37.80, -122.41),
+            zoom: 15.0,
+            ..from
+        };
+        assert_eq!(from.toward(&to, 0.0), from);
+        assert!(from.toward(&to, 1.0).same_as(&to));
+        let half = from.toward(&to, 0.5);
+        assert!(half.zoom > 14.5 && half.zoom < 15.0);
+        assert!(from.glides_to(&to));
+        let far = Frame {
+            center: world(40.71, -74.0),
+            ..to
+        };
+        assert!(!from.glides_to(&far));
+        assert!(from.same_as(&from.toward(&from, 0.5)));
+    }
+
+    #[test]
+    fn a_glide_takes_the_short_way_over_the_dateline() {
+        let from = Frame {
+            center: world(0.0, 179.99),
+            zoom: 10.0,
+            size: (800.0, 600.0),
+        };
+        let to = Frame {
+            center: world(0.0, -179.99),
+            ..from
+        };
+        assert!(from.glides_to(&to));
+        let half = from.toward(&to, 0.2);
+        assert!((half.center.0 - to.center.0).abs() < 1e-3);
     }
 
     #[test]

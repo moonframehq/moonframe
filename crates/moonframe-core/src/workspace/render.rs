@@ -186,13 +186,20 @@ impl Workspace {
         }
         let app = self.app.clone();
         let style = self.style_generation;
-        let mut ran = usize::from(
-            self.shell
-                .render(&app, &self.versions, &self.stylesheet, style),
-        );
-        let demos = self.demos.values_mut().filter(|_| self.demos_shown);
-        for slot in self.mods.values_mut().chain(demos) {
-            ran += usize::from(slot.render(&app, &self.versions, &self.stylesheet, style));
+        let mut ran =
+            usize::from(
+                self.shell
+                    .render(&app, &self.versions, &self.stylesheet, style, None),
+            );
+        let demos = self.demos.iter_mut().filter(|_| self.demos_shown);
+        for (name, slot) in self.mods.iter_mut().chain(demos) {
+            ran += usize::from(slot.render(
+                &app,
+                &self.versions,
+                &self.stylesheet,
+                style,
+                self.mod_windows.get(name).copied(),
+            ));
         }
         self.views_run += ran;
         self.render_instances(&app);
@@ -250,6 +257,7 @@ impl Workspace {
     /// drawn inside instances. Those no longer drawn are dropped; their
     /// state stays saved, so they resume where they were if drawn again.
     fn render_instances(&mut self, app: &Rc<AppData>) {
+        let mut windows = self.mod_windows.clone();
         let mut queue: Vec<(String, Instance)> = Vec::new();
         let collect = |owner: &str, view: Option<&Node>, queue: &mut Vec<(String, Instance)>| {
             if let Some(view) = view {
@@ -275,6 +283,10 @@ impl Workspace {
                 break;
             }
             drawn.insert(key.clone());
+            let window = windows.get(&key).or_else(|| windows.get(&owner)).copied();
+            if let Some(window) = window {
+                windows.insert(key.clone(), window);
+            }
             if !self.instances.contains_key(&key) {
                 let restored = if owner.starts_with(DEMO) {
                     None
@@ -297,10 +309,13 @@ impl Workspace {
                 continue;
             };
             mounted.slot.set_props(&instance.props);
-            if mounted
-                .slot
-                .render(app, &self.versions, &self.stylesheet, self.style_generation)
-            {
+            if mounted.slot.render(
+                app,
+                &self.versions,
+                &self.stylesheet,
+                self.style_generation,
+                window,
+            ) {
                 self.views_run += 1;
             }
             collect(&key, mounted.slot.view(), &mut queue);

@@ -45,7 +45,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
 | `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; links send `link` instead of opening, pictures are not loaded; styled by `markdown`, `markdown-code` and `markdown-quote` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width` |
 | `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
-| `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a double click and its buttons zoom; without `center`/`zoom` it frames the pins and routes. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `pins` (each `lat`, `lon`, `label` up to 3 characters or `icon`, `color`, `shape` `dot` `disc` `balloon`, `selected`, `msg`), `routes` (each `points` flat lat, lon pairs drawn as they are, or `via` stops and `mode` `walk` `bike` `car` routed along streets by routing.openstreetmap.de; `color`, `stroke`, `dashed`; the style's `color` otherwise), `routed` (sent with `route`, `seconds`, `meters` once a `via` route is found), `move` (sent with `lat`, `lon`, `zoom` after the user moves it), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
+| `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a double click and its buttons zoom; without `center`/`zoom` it frames the pins and routes. With `glide`, a new `center` or `zoom` eases the map there. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `pins` (each `lat`, `lon`, `label` up to 3 characters or `icon`, `color`, `shape` `dot` `disc` `balloon`, `selected`, `pulse` (a halo breathes out of it: where the user is), `msg`), `routes` (each `points` flat lat, lon pairs drawn as they are, or `via` stops and `mode` `walk` `bike` `car` routed along streets by routing.openstreetmap.de; `color`, `stroke`, `dashed`; the style's `color` otherwise), `routed` (sent with `route`, `seconds`, `meters` once a `via` route is found), `move` (sent with `lat`, `lon`, `zoom` after the user moves it), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
 | `ui.video { source = "camera", white = 4095 }` | live frames from another process, from a ring in shared memory, in a 16-bit colour-managed native view that fills its space (macOS, the `video` feature); nothing draws over it, so `guides` draws crop frames and lines in the picture. `source`, `id`, `zoom`, `center`, `filter` (`auto` `nearest` `linear`), `color` (`srgb` `display-p3` `rec709` `rec2020` `linear-srgb` `linear-p3` `none`), `extended`, `black`, `white`, `gain`, `gamma`, `guides`, `probe`, `stats`, `probed`, `width`, `height`. Most apps want `video-viewer`; see `docs/video.md` |
 | `ui.view { name = "chart", id = "sales", props = {...} }` | a view the app writes in Rust and registers by `name` (apps on the Moonframe library; the starter registers none): what Luau can't draw, such as an editor or a canvas. Kept by mod and `id`, it gets `props` again when they change, and sends this mod's `update` messages of its own | `name`, `id`, `props`, `class`, `style` |
 
@@ -158,7 +158,12 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   startup only); `app.window` tells views the `platform`, `titlebar`,
   `maximized`, `fullscreen` and `active`, so a title bar knows whether to
   draw window buttons or leave room for traffic lights.
-- **A mod's own window:** `window = "<mod>"` on a row or column opens that
+- **A mod's own window** takes `titlebar = "hidden"` and `traffic_lights`
+  in its `window` too, beside `size` and `min_size`, with `drag = true` on
+  what moves it. While open, the mod and its instances read that window's
+  state as `app.window`; closing it restores the main window's state.
+  The mod's view is shared wherever it is mounted.
+  `window = "<mod>"` on a row or column opens that
   mod in a window of its own; from `update`, send `{ to = "app:window",
   msg = { open = "<mod>", send = <msg> } }` to open it on a page (`send`
   reaches its `update` first) or `{ close = "<mod>" }` to close it. The
@@ -1022,7 +1027,7 @@ A whole mod using it, with state: `app/components/demos/filter-dropdown.luau`.
 | `disabled` | greys it out and ignores clicks |
 | `icon` | icon name |
 | `msg` | message a click sends |
-| `size` | "normal" (28px, default) or "small" (22px) |
+| `size` | "normal" (32px, default) or "small" (26px) |
 | `to` | mod to send `msg` to, if not the drawing one |
 | `tone` | "danger" for a destructive action |
 | `tooltip` | text shown under the pointer (also its name for the user) |
@@ -1099,9 +1104,9 @@ A whole mod using it, with state: `app/components/demos/picker.luau`.
 | --- | --- |
 | `event` | key of the message a click sends, default "select": { select = id } |
 | `grow` | fill the width, segments sharing it equally |
-| `options` | list of { id, label?, icon?, count? (a number or text after the label, in the accent colour), tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment |
+| `options` | list of { id, label?, icon? (optional, before the label), count? (a number or text after the label, in the accent colour), tooltip?, msg? (sent instead of the default) }; an icon without a label makes an icon-only segment |
 | `selected` | id of the chosen option |
-| `small` | smaller, tighter segments |
+| `small` | tighter segments, for a dense toolbar |
 | `to` | mod to send messages to, if not the drawing one |
 
 **Styles:** `.segmented` `.segmented-count` `.segmented-option` `.segmented-option:hover` `.segmented-option:selected` `.segmented-small`
@@ -1109,7 +1114,7 @@ A whole mod using it, with state: `app/components/demos/picker.luau`.
 ```lua
 local segmented = use "segmented"
 
-segmented { options = { { icon = "sun", id = "light", label = "Light" }, { icon = "moon", id = "dark", label = "Dark" }, { icon = "settings-2", id = "system", label = "System" } }, selected = "dark" }
+segmented { options = { { id = "light", label = "Light" }, { id = "dark", label = "Dark" }, { id = "system", label = "System" } }, selected = "dark" }
 ```
 
 A whole mod using it, with state: `app/components/demos/segmented.luau`.

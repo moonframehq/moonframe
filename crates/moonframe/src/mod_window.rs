@@ -5,12 +5,15 @@
 //! shows in both at once.
 
 use {
-    crate::{actions::Dismiss, app::MoonframeApp},
+    crate::{
+        actions::Dismiss,
+        app::{MoonframeApp, window_state},
+    },
     gpui_kit::{
         component::{ActiveTheme as _, Root},
         *,
     },
-    moonframe_core::{Display, ModWindowSize},
+    moonframe_core::{Display, ModWindowSize, Titlebar},
     std::rc::Rc,
 };
 
@@ -23,8 +26,9 @@ pub(crate) struct ModWindow {
     app: Entity<MoonframeApp>,
     /// The mod it shows.
     name: String,
+    titlebar: Titlebar,
     focus: FocusHandle,
-    _changes: Subscription,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl ModWindow {
@@ -43,6 +47,7 @@ impl ModWindow {
             .or_else(|| cx.primary_display())
             .map(|display| display.bounds().size)
             .map(|screen| (f32::from(screen.width), f32::from(screen.height)));
+        let hidden = sizing.titlebar == Titlebar::Hidden;
         let (opens, smallest) = fitted(sizing, screen);
         let display_id = display.map(|display| display.id());
         let bounds = Bounds::centered(display_id, size(px(opens.0), px(opens.1)), cx);
@@ -57,26 +62,56 @@ impl ModWindow {
             window_min_size: Some(size(px(smallest.0), px(smallest.1))),
             titlebar: Some(TitlebarOptions {
                 title: Some(title.into()),
-                ..Default::default()
+                appears_transparent: hidden,
+                traffic_light_position: sizing
+                    .traffic_lights
+                    .filter(|_| hidden)
+                    .map(|(x, y)| point(px(x), px(y))),
             }),
+            window_decorations: hidden.then_some(WindowDecorations::Client),
+            app_owns_titlebar_drag: hidden,
             app_id: Some(crate::APP_ID.into()),
             ..Default::default()
         };
         cx.open_window(options, |window, cx| {
-            let view = cx.new(|cx| {
+            let view = cx.new(|cx: &mut Context<Self>| {
                 let focus = cx.focus_handle();
                 focus.focus(window, cx);
-                Self {
-                    _changes: cx.observe(&app, |_, _, cx| cx.notify()),
+                let subscriptions = vec![
+                    cx.observe(&app, |_, _, cx| cx.notify()),
+                    cx.observe_window_bounds(window, |this, window, cx| {
+                        this.sync_window(window, cx);
+                    }),
+                    cx.observe_window_activation(window, |this, window, cx| {
+                        this.sync_window(window, cx);
+                    }),
+                    cx.on_release(|this, cx| {
+                        this.app.update(cx, |app, cx| {
+                            app.sync_mod_window(&this.name, None, cx);
+                        });
+                    }),
+                ];
+                let this = Self {
+                    _subscriptions: subscriptions,
                     app,
                     name,
+                    titlebar: sizing.titlebar,
                     focus,
-                }
+                };
+                this.sync_window(window, cx);
+                this
             });
             cx.new(|cx| Root::new(view, window, cx))
         })
         .inspect_err(|error| tracing::warn!("cannot open a mod's window: {error}"))
         .ok()
+    }
+
+    fn sync_window(&self, window: &Window, cx: &mut Context<Self>) {
+        let state = window_state(self.titlebar, window, cx);
+        self.app.update(cx, |app, cx| {
+            app.sync_mod_window(&self.name, Some(state), cx);
+        });
     }
 }
 
