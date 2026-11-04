@@ -28,6 +28,7 @@ mod switchyard;
 mod task_manager;
 mod topics;
 mod views;
+mod windows;
 // keep-sorted end
 
 const SHELL_SOURCE: &str = r#"

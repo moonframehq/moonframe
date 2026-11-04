@@ -100,34 +100,41 @@ impl Read for Chrome {
                 ))
             },
         };
-        let traffic_lights = match fields.raw("traffic_lights") {
-            None => None,
-            Some(value) => {
-                let cx = cx.key("traffic_lights");
-                let point = Fields::read(value, &cx, &[&["x", "y"]])?;
-                Some((
-                    point.number("x", TRAFFIC_LIGHTS)?.unwrap_or(0.0),
-                    point.number("y", TRAFFIC_LIGHTS)?.unwrap_or(0.0),
-                ))
-            },
-        };
         Ok(Self {
             titlebar: fields.get("titlebar")?.unwrap_or_default(),
-            traffic_lights,
+            traffic_lights: traffic_lights(&fields, cx)?,
             size,
         })
     }
 }
 
+/// Where a `window` table puts the traffic lights.
+fn traffic_lights(fields: &Fields, cx: &Cx) -> Result<Option<(f32, f32)>, Error> {
+    let Some(value) = fields.raw("traffic_lights") else {
+        return Ok(None);
+    };
+    let cx = cx.key("traffic_lights");
+    let point = Fields::read(value, &cx, &[&["x", "y"]])?;
+    Ok(Some((
+        point.number("x", TRAFFIC_LIGHTS)?.unwrap_or(0.0),
+        point.number("y", TRAFFIC_LIGHTS)?.unwrap_or(0.0),
+    )))
+}
+
 /// The window a mod opens in, of its own (`window = { size = { width,
-/// height }, min_size = { width, height } }` on a mod other than the
-/// shell): the size it opens at and the smallest the user can make it.
-/// The host keeps it within the screen and falls back to its own size for
-/// what is unset.
+/// height }, min_size = { width, height }, titlebar = "hidden",
+/// traffic_lights = { x, y } }` on a mod other than the shell): the size it
+/// opens at, the smallest the user can make it, and whether its layout goes
+/// under the title bar, as [`Chrome`] says for the shell. The host keeps it
+/// within the screen and falls back to its own size for what is unset.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ModWindowSize {
     pub size: Option<(f32, f32)>,
     pub min_size: Option<(f32, f32)>,
+    pub titlebar: Titlebar,
+    /// Where macOS puts its traffic lights under a hidden title bar: the
+    /// first button's offset from the window's top left, in pixels.
+    pub traffic_lights: Option<(f32, f32)>,
 }
 
 /// The sizes a mod's window may ask for, opening and at its smallest.
@@ -136,16 +143,12 @@ const MOD_WINDOW_HEIGHT: std::ops::RangeInclusive<f32> = 160.0..=3000.0;
 
 impl Read for ModWindowSize {
     fn read(value: &mlua::Value, cx: &Cx) -> Result<Self, Error> {
-        if let mlua::Value::Table(table) = value
-            && ["titlebar", "traffic_lights"]
-                .iter()
-                .any(|key| table.contains_key(*key).unwrap_or(false))
-        {
-            return Err(cx.fail(
-                "titlebar and traffic_lights: only the shell (main.luau) sets them; a mod's `window` takes size and min_size",
-            ));
-        }
-        let fields = Fields::read(value, cx, &[&["size", "min_size"]])?;
+        let fields = Fields::read(value, cx, &[&[
+            "size",
+            "min_size",
+            "titlebar",
+            "traffic_lights",
+        ]])?;
         let pair = |key: &str| -> Result<Option<(f32, f32)>, Error> {
             let Some(value) = fields.raw(key) else {
                 return Ok(None);
@@ -168,7 +171,12 @@ impl Read for ModWindowSize {
                 .key("min_size")
                 .fail("is larger than `size`, the size the window opens at"));
         }
-        Ok(Self { size, min_size })
+        Ok(Self {
+            size,
+            min_size,
+            titlebar: fields.get("titlebar")?.unwrap_or_default(),
+            traffic_lights: traffic_lights(&fields, cx)?,
+        })
     }
 }
 
