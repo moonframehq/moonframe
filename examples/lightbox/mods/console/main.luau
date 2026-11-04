@@ -169,9 +169,9 @@ return mod {
 							height = 170,
 							parade = state.parade,
 							channels = {
-								{ name = "Red", color = RED, bands = wave[1] },
-								{ name = "Green", color = GREEN, bands = wave[2] },
-								{ name = "Blue", color = BLUE, bands = wave[3] },
+								{ name = "Red", color = RED .. "c0", bands = wave[1] },
+								{ name = "Green", color = GREEN .. "c0", bands = wave[2] },
+								{ name = "Blue", color = BLUE .. "c0", bands = wave[3] },
 							},
 						},
 						switch { label = "Parade", on = state.parade, msg = "parade" },

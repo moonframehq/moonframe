@@ -74,6 +74,9 @@ return component {
 			local bands: { Band } = channel.bands or { { low = channel.low or {}, high = channel.high or {} } }
 			for _, band in bands do
 				local columns = #band.low
+				-- As wide as a column's share, so that columns meet, within
+				-- what `ui.paths` takes.
+				local stroke = math.clamp(span / math.max(columns, 1), 1, 8)
 				local points = {}
 				for column = 1, columns do
 					local x = left + (column - 0.5) * span / columns
@@ -89,12 +92,12 @@ return component {
 					table.insert(points, x)
 					table.insert(points, second)
 					if #points >= MOST_POINTS * 2 then
-						table.insert(paths, { points = points, color = color, stroke = 1 })
+						table.insert(paths, { points = points, color = color, stroke = stroke })
 						points = { x, second }
 					end
 				end
 				if #points >= 4 then
-					table.insert(paths, { points = points, color = color, stroke = 1 })
+					table.insert(paths, { points = points, color = color, stroke = stroke })
 				end
 			end
 		end
