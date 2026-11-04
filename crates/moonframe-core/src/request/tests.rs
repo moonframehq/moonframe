@@ -248,6 +248,31 @@ fn update_plays_a_sound_file_or_the_chime() {
 }
 
 #[test]
+fn update_changes_the_app_icon_or_puts_it_back() {
+    let (_dir, mut workspace) = workspace();
+    ask(&mut workspace, "app:icon", Data::from("icons/Busy.PNG"));
+    ask(&mut workspace, "app:icon", Data::from("default"));
+    assert_eq!(workspace.take_requests(), [
+        (
+            "asker".to_owned(),
+            Request::Icon(AppIcon::File("icons/Busy.PNG".to_owned()))
+        ),
+        ("asker".to_owned(), Request::Icon(AppIcon::Default)),
+    ]);
+    for (wrong, problem) in [
+        ("https://example.com/a.png", "is an address"),
+        ("notes.txt", "is not an image file"),
+        ("", "is not an image file"),
+    ] {
+        ask(&mut workspace, "app:icon", Data::from(wrong));
+        assert!(error(&workspace).contains(problem), "{}", error(&workspace));
+    }
+    ask(&mut workspace, "app:icon", Data::Bool(true));
+    assert!(error(&workspace).contains("takes \"default\""));
+    assert!(workspace.take_requests().is_empty());
+}
+
+#[test]
 fn update_posts_a_notification() {
     let (_dir, mut workspace) = workspace();
     let map = |entries: &[(&str, &str)]| {

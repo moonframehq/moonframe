@@ -738,6 +738,25 @@ return mod {
 }
 ```
 
+- `app:icon`, `msg` an image file (`.png` `.icns` `.jpg` `.jpeg` `.tiff`
+  `.pdf`, at most 4 MiB, found as `app:sound` finds sounds) or `"default"`:
+  changes the app's icon in the Dock and the app switcher at once, while
+  it runs, bundled or not; `"default"` puts back the one the app started
+  with (its `icon.png`, else Moonframe's). It lasts until the app quits or
+  a mod asks again, and is not kept across launches, so a mod showing a
+  state (busy, unread, recording) sends it again from its first `update`.
+  macOS only; elsewhere the desktop entry's icon stays, and it does
+  nothing.
+
+```lua
+update = function(state, msg)
+	if type(msg) == "table" and msg.busy ~= nil then
+		state.busy = msg.busy
+		return state, { { to = "app:icon", msg = if msg.busy then "icons/busy.png" else "default" } }
+	end
+end,
+```
+
 - `app:pick`, `msg` `{ kind = "open" | "folder" | "save", reply, multiple?,
   prompt?, types?, name?, folder? }`: the system's panel to open files
   (`types` keeps those extensions), pick folders, or name a file to save
