@@ -437,10 +437,11 @@ fn installed_rig(kind: &str, path: &str) -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let bundle = dir.path().join("A.app");
     std::fs::create_dir_all(&bundle).unwrap();
-    let path = path.replace("BUNDLE", &bundle.display().to_string());
+    // As JSON: a Windows path's backslashes would spoil the agent's line.
+    let path = json!(path.replace("BUNDLE", &bundle.display().to_string()));
     let agent = AGENT.replace(
         r#""kind":"edit","status":"in_progress""#,
-        &format!(r#""kind":"{kind}","status":"in_progress","locations":[{{"path":"{path}"}}]"#),
+        &format!(r#""kind":"{kind}","status":"in_progress","locations":[{{"path":{path}}}]"#),
     );
     let mut rig = rig_with(&agent, json!({ "feedback": "all" }));
     rig.acp.installed = Some(Installed {
