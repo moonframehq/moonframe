@@ -136,7 +136,7 @@ raw-window-handle   = { optional = true, workspace = true }
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
 block2.workspace           = true
 objc2.workspace            = true
-objc2-app-kit              = { features = ["NSControl", "NSDockTile", "NSEvent", "NSImageView", "NSProgressIndicator", "NSRunningApplication", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
+objc2-app-kit              = { features = ["NSBezierPath", "NSColor", "NSControl", "NSDockTile", "NSEvent", "NSImageView", "NSRunningApplication", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
 objc2-foundation.workspace = true
 # `app:notify`: system notifications, and hearing their clicks.
 objc2-user-notifications.workspace = true

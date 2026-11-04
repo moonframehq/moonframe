@@ -14,16 +14,46 @@ fn fallback() -> &'static [u8] {
     crate::identity().icon.unwrap_or(ICON)
 }
 
-/// The icon with a bar over it, kept while the app runs.
+/// `icon` with a bar along its foot, `fraction` of it filled. Drawn into the
+/// picture, as the tile is a snapshot: a progress control placed in it paints
+/// no more than a speck.
 #[cfg(target_os = "macos")]
-struct ProgressTile {
-    view: objc2::rc::Retained<objc2_app_kit::NSImageView>,
-    bar: objc2::rc::Retained<objc2_app_kit::NSProgressIndicator>,
-}
-
-#[cfg(target_os = "macos")]
-thread_local! {
-    static PROGRESS: std::cell::RefCell<Option<ProgressTile>> = const { std::cell::RefCell::new(None) };
+fn with_bar(
+    icon: objc2::rc::Retained<objc2_app_kit::NSImage>,
+    size: objc2_foundation::NSSize,
+    fraction: f64,
+) -> objc2::rc::Retained<objc2_app_kit::NSImage> {
+    use {
+        objc2::runtime::Bool,
+        objc2_app_kit::{NSBezierPath, NSColor, NSImage},
+        objc2_foundation::{NSPoint, NSRect, NSSize},
+    };
+    let draw = block2::RcBlock::new(move |area: NSRect| {
+        icon.drawInRect(area);
+        let (width, height) = (area.size.width, area.size.height);
+        let pill = |left: f64, bottom: f64, long: f64, tall: f64, color: &NSColor| {
+            let rect = NSRect::new(NSPoint::new(left, bottom), NSSize::new(long, tall));
+            color.setFill();
+            NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(rect, tall / 2.0, tall / 2.0)
+                .fill();
+        };
+        let (left, bottom) = (width * 0.14, height * 0.13);
+        let (long, tall) = (width * 0.72, height * 0.1);
+        let inset = tall * 0.2;
+        let inner = tall - inset * 2.0;
+        let track = NSColor::colorWithSRGBRed_green_blue_alpha(0.0, 0.0, 0.0, 0.7);
+        let filled = NSColor::colorWithSRGBRed_green_blue_alpha(1.0, 1.0, 1.0, 1.0);
+        pill(left, bottom, long, tall, &track);
+        pill(
+            left + inset,
+            bottom + inset,
+            ((long - inset * 2.0) * fraction.clamp(0.0, 1.0)).max(inner),
+            inner,
+            &filled,
+        );
+        Bool::YES
+    });
+    NSImage::imageWithSize_flipped_drawingHandler(size, false, &draw)
 }
 
 /// Does what a mod asked with `app:dock`. Runs on the main thread, where
@@ -31,11 +61,9 @@ thread_local! {
 #[cfg(target_os = "macos")]
 pub(crate) fn show(dock: &moonframe_core::Dock) {
     use {
-        objc2::{MainThreadMarker, MainThreadOnly as _},
-        objc2_app_kit::{
-            NSApplication, NSImageView, NSProgressIndicator, NSProgressIndicatorStyle,
-        },
-        objc2_foundation::{NSPoint, NSRect, NSSize, NSString},
+        objc2::MainThreadMarker,
+        objc2_app_kit::{NSApplication, NSImageView},
+        objc2_foundation::{NSPoint, NSRect, NSString},
     };
     let Some(main) = MainThreadMarker::new() else {
         tracing::warn!("the Dock tile is set from the main thread only");
@@ -50,36 +78,14 @@ pub(crate) fn show(dock: &moonframe_core::Dock) {
     let Some(progress) = dock.progress else {
         return;
     };
-    match progress {
-        None => {
-            tile.setContentView(None);
+    match (progress, app.applicationIconImage()) {
+        (Some(fraction), Some(icon)) => {
+            let size = tile.size();
+            let view = NSImageView::imageViewWithImage(&with_bar(icon, size, fraction), main);
+            view.setFrame(NSRect::new(NSPoint::new(0.0, 0.0), size));
+            tile.setContentView(Some(&view));
         },
-        Some(fraction) => PROGRESS.with_borrow_mut(|progress| {
-            let shown = progress.get_or_insert_with(|| {
-                let size = tile.size();
-                let image = app.applicationIconImage();
-                let view = match image {
-                    Some(image) => NSImageView::imageViewWithImage(&image, main),
-                    None => NSImageView::new(main),
-                };
-                view.setFrame(NSRect::new(NSPoint::new(0.0, 0.0), size));
-                let bar = NSProgressIndicator::initWithFrame(
-                    NSProgressIndicator::alloc(main),
-                    NSRect::new(
-                        NSPoint::new(size.width * 0.1, size.height * 0.06),
-                        NSSize::new(size.width * 0.8, size.height * 0.12),
-                    ),
-                );
-                bar.setStyle(NSProgressIndicatorStyle::Bar);
-                bar.setIndeterminate(false);
-                bar.setMinValue(0.0);
-                bar.setMaxValue(1.0);
-                view.addSubview(&bar);
-                ProgressTile { view, bar }
-            });
-            shown.bar.setDoubleValue(fraction);
-            tile.setContentView(Some(&shown.view));
-        }),
+        _ => tile.setContentView(None),
     }
     tile.display();
 }
