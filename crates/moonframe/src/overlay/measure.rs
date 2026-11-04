@@ -97,7 +97,7 @@ impl MoonframeApp {
         let inspector = &self.inspector;
         let style = inspector.measuring.style;
         let subject = if inspector.picking {
-            inspector.hovered.as_ref()
+            inspector.hovered.as_ref().map(|target| &target.placed)
         } else {
             inspector.selected.as_ref()
         };

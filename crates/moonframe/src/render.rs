@@ -628,7 +628,7 @@ impl<'w> Draw<'w> for Node {
         let Some(sink) = painter.sink.clone() else {
             return draw_node(self, painter, place, cx);
         };
-        let crumb = Crumb::node(self, place.crumb.clone());
+        let crumb = Crumb::node(self, &place.path, place.crumb.clone());
         let place = Place {
             crumb: Some(crumb.clone()),
             ..place.clone()
