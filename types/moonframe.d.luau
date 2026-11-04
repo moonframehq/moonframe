@@ -1726,6 +1726,8 @@ type Window = {
 type ModWindow = {
 	size: { width: number, height: number }?,
 	min_size: { width: number, height: number }?,
+	titlebar: Titlebar?,
+	traffic_lights: { x: number?, y: number? }?,
 }
 
 -- A menu item in the shell's `menus`: it sends `msg` (to the shell, or to

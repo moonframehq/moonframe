@@ -156,7 +156,9 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   startup only); `app.window` tells views the `platform`, `titlebar`,
   `maximized`, `fullscreen` and `active`, so a title bar knows whether to
   draw window buttons or leave room for traffic lights.
-- **A mod's own window:** `window = "<mod>"` on a row or column opens that
+- **A mod's own window** takes `titlebar = "hidden"` and `traffic_lights`
+  in its `window` too, beside `size` and `min_size`, with `drag = true` on
+  what moves it. `window = "<mod>"` on a row or column opens that
   mod in a window of its own; from `update`, send `{ to = "app:window",
   msg = { open = "<mod>", send = <msg> } }` to open it on a page (`send`
   reaches its `update` first) or `{ close = "<mod>" }` to close it. The
