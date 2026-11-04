@@ -1075,6 +1075,9 @@ type MapProps = {
 	center: { number }?,
 	-- 0 (the whole world) to about 20 (a street).
 	zoom: number?,
+	-- A new `center` or `zoom` eases the map there instead of jumping,
+	-- unless it is many screens away or animations are off.
+	glide: boolean?,
 	pins: { MapPin }?,
 	routes: { MapRoute }?,
 	-- Sent with `lat`, `lon` and `zoom` added after the user moves the map.
@@ -1103,6 +1106,9 @@ type MapPin = {
 	shape: ("dot" | "disc" | "balloon")?,
 	-- Drawn larger, above the others.
 	selected: boolean?,
+	-- A halo breathes out from it without end, in its color: where the
+	-- user is. A still glow while animations are off.
+	pulse: boolean?,
 	-- Sent when it is clicked, instead of the map's `select`.
 	msg: any?,
 }

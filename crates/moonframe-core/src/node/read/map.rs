@@ -14,7 +14,7 @@ const LONGEST_KEY: usize = 512;
 impl Build for Map {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
         "provider", "key", "center", "zoom", "pins", "routes", "move", "select", "routed", "to",
-        "width", "height", "grow",
+        "width", "height", "grow", "glide",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
@@ -77,6 +77,7 @@ impl Build for Map {
             width: fields.number("width", PIXELS)?,
             height: fields.number("height", PIXELS)?,
             grow: fields.get("grow")?.unwrap_or(false),
+            glide: fields.get("glide")?.unwrap_or(false),
         })
     }
 }
@@ -91,11 +92,11 @@ fn place(lat: f64, lon: f64, cx: &Cx) -> Result<[f64; 2], Error> {
     Ok([lat, lon])
 }
 
-/// `{ lat, lon, label, icon, color, shape, selected, msg }`.
+/// `{ lat, lon, label, icon, color, shape, selected, pulse, msg }`.
 impl Read for Pin {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
         let fields = Fields::read(value, cx, &[&[
-            "lat", "lon", "label", "icon", "color", "shape", "selected", "msg",
+            "lat", "lon", "label", "icon", "color", "shape", "selected", "pulse", "msg",
         ]])?;
         let [lat, lon] = place(fields.need("lat")?, fields.need("lon")?, cx)?;
         let label: Option<String> = fields.get("label")?;
@@ -115,6 +116,7 @@ impl Read for Pin {
             color: fields.get("color")?,
             shape: fields.get("shape")?,
             selected: fields.get("selected")?.unwrap_or(false),
+            pulse: fields.get("pulse")?.unwrap_or(false),
             msg: fields.get("msg")?,
         })
     }

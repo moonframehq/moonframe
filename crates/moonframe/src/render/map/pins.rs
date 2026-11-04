@@ -28,9 +28,22 @@ const PIN_FILL: Rgba = Rgba {
 };
 /// How much larger a selected pin is.
 const SELECTED: f32 = 1.25;
+/// A pulsing pin's halo at the end of a breath, and its still glow, in
+/// pin widths; and how strong each is at its strongest.
+const HALO: f32 = 3.4;
+const GLOW: f32 = 2.0;
+const HALO_ALPHA: f32 = 0.42;
+const GLOW_ALPHA: f32 = 0.16;
 
-/// The pins in `frame`, selected ones last so they sit above the rest.
-pub(super) fn pins(map: &Map, frame: Frame, sender: &Sender, cx: &App) -> Vec<AnyElement> {
+/// The pins in `frame`, selected ones last so they sit above the rest;
+/// a pulsing pin's halo just under it, `pulse` through its breath.
+pub(super) fn pins(
+    map: &Map,
+    frame: Frame,
+    sender: &Sender,
+    pulse: Option<f32>,
+    cx: &App,
+) -> Vec<AnyElement> {
     let mut order: Vec<usize> = (0..map.pins.len()).collect();
     order.sort_by_key(|&index| map.pins[index].selected);
     order
@@ -40,9 +53,14 @@ pub(super) fn pins(map: &Map, frame: Frame, sender: &Sender, cx: &App) -> Vec<An
             let (left, top) = frame.at(pin.lat, pin.lon);
             frame
                 .copies(left, left, DISC * SELECTED + TAIL)
-                .filter_map(move |copy| {
+                .flat_map(move |copy| {
                     let left = left + (copy as f64 * frame.span()) as f32;
-                    self::pin(map, index, frame, sender, cx, copy, (left, top))
+                    let marker = self::pin(map, index, frame, sender, cx, copy, (left, top));
+                    let halo = (pin.pulse && marker.is_some())
+                        .then(|| halo(pin, (left, top), pulse, cx))
+                        .into_iter()
+                        .flatten();
+                    halo.chain(marker)
                 })
         })
         .collect()
@@ -142,6 +160,41 @@ fn pin(
                 });
     }
     Some(element.into_any_element())
+}
+
+/// A pulsing pin's still glow and, while animations run, the ring that
+/// breathes out of it: wide and faint as `phase` goes from 0 to 1. Neither
+/// takes clicks, so the map still pans under them.
+fn halo(pin: &Pin, (left, top): (f32, f32), phase: Option<f32>, cx: &App) -> Vec<AnyElement> {
+    let fill = pin
+        .color
+        .map_or(PIN_FILL.into(), |color| color.hsla(cx.theme()));
+    let dot = DOT
+        * if pin.selected {
+            SELECTED
+        } else {
+            1.0
+        };
+    let ring = |across: f32, alpha: f32| {
+        div()
+            .absolute()
+            .left(px(left - across / 2.0))
+            .top(px(top - across / 2.0))
+            .size(px(across))
+            .rounded_full()
+            .bg(fill.opacity(alpha))
+            .into_any_element()
+    };
+    let mut rings = vec![ring(dot * GLOW, GLOW_ALPHA)];
+    if let Some(phase) = phase {
+        // Out quickly, then slowing as it fades: a breath, not a blink.
+        let out = 1.0 - (1.0 - phase).powi(3);
+        rings.push(ring(
+            dot * (1.0 + (HALO - 1.0) * out),
+            HALO_ALPHA * (1.0 - phase),
+        ));
+    }
+    rings
 }
 
 /// A round marker `across` pixels wide, ringed in `ink`.
