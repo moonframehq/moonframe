@@ -39,6 +39,7 @@ mod color;
 #[cfg(feature = "studio")]
 mod demos;
 mod dock;
+mod doctor;
 mod embed;
 mod gallery;
 mod history;

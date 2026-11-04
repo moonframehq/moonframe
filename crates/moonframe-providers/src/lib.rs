@@ -40,6 +40,7 @@
 mod asynchronous;
 mod fingerprint;
 mod fixed;
+mod installed;
 mod json;
 pub mod lines;
 mod manifest;
@@ -110,6 +111,8 @@ pub enum Event {
 pub type Events = Arc<dyn Fn(Event) + Send + Sync>;
 
 /// The providers of an app, each running on its own thread.
+pub use installed::{Installed, installed, set_installed};
+
 /// The profile this run serves, if any, which process providers see as
 /// `MOONFRAME_PROFILE`; set once at launch with [`set_profile`].
 static PROFILE: std::sync::OnceLock<String> = std::sync::OnceLock::new();

@@ -15,7 +15,7 @@ use {
         component::{ActiveTheme as _, Root},
         point, px, size,
     },
-    moonframe_core::{AppLayer, Chrome, Roots, Titlebar},
+    moonframe_core::{AppLayer, Chrome, Roots, Titlebar, Workspace},
     std::{
         fs,
         path::PathBuf,
@@ -35,6 +35,9 @@ Usage: moonframe [OPTIONS] [DIR]
        moonframe [--user DIR] [--profile NAME] history [COMMAND]
                                          undo and redo changes to your folder;
                                          see `history help`
+       moonframe [--user DIR] [--profile NAME] doctor [--fix]
+                                         find what in your folder breaks the app,
+                                         and move it aside; see `doctor help`
        moonframe init [DIR] [--name NAME] [--path CHECKOUT]
                                          start an app of your own on the Moonframe
                                          library, or add one to a crate; see `init help`
@@ -96,6 +99,8 @@ struct Args {
     apps: Option<Vec<String>>,
     /// The words after `history`, to undo changes to the folder.
     history: Option<Vec<String>>,
+    /// The words after `doctor`, to find broken files in the folder.
+    doctor: Option<Vec<String>>,
     /// The words after `init`, to start an app on the library.
     init: Option<Vec<String>>,
     /// The words after `bundle`, to bundle an app on the library.
@@ -129,6 +134,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
     let mut apps = None;
     let mut init = None;
     let mut history = None;
+    let mut doctor = None;
     let mut bundle = None;
     let mut panes = None;
     let mut profile = None;
@@ -161,6 +167,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
                 packages = Some(args.by_ref().collect());
             },
             "history" if builtin.is_none() => history = Some(args.by_ref().collect()),
+            "doctor" if builtin.is_none() => doctor = Some(args.by_ref().collect()),
             "init" if builtin.is_none() => init = Some(args.by_ref().collect()),
             "bundle" if builtin.is_none() => bundle = Some(args.by_ref().collect()),
             "pane" | "panes" if builtin.is_none() => panes = Some(args.by_ref().collect()),
@@ -198,6 +205,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
             || apps.is_some()
             || packages.is_some()
             || history.is_some()
+            || doctor.is_some()
             || catalogue
             || component.is_some()
             || preview_only
@@ -238,6 +246,7 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
         packages,
         apps,
         history,
+        doctor,
         init,
         bundle,
         panes,
@@ -257,19 +266,30 @@ fn on_a_view_stack(run: impl FnOnce() -> ExitCode + Send + 'static) -> ExitCode 
         .unwrap_or(ExitCode::FAILURE)
 }
 
-/// Loads every module headlessly: what an agent runs after an edit.
-fn check(roots: Roots) -> ExitCode {
+/// Each problem loading `roots`, with what it is in.
+pub(crate) fn problems(roots: Roots) -> Vec<(String, String)> {
     let workspace = crate::capabilities::open(roots.clone(), false, None);
+    problems_in(&workspace, &roots)
+}
+
+fn problems_in(workspace: &Workspace, roots: &Roots) -> Vec<(String, String)> {
     let mut problems: Vec<(String, String)> = workspace
         .problems()
         .into_iter()
         .map(|(name, error)| (name.to_owned(), error.to_string()))
         .collect();
     problems.extend(
-        moonframe_providers::check(&roots)
+        moonframe_providers::check(roots)
             .into_iter()
             .map(|(name, error)| (format!("provider {name}"), error.to_string())),
     );
+    problems
+}
+
+/// Loads every module headlessly: what an agent runs after an edit.
+fn check(roots: Roots) -> ExitCode {
+    let workspace = crate::capabilities::open(roots.clone(), false, None);
+    let problems = problems_in(&workspace, &roots);
     if problems.is_empty() {
         let mods = workspace.mod_names().collect::<Vec<_>>();
         let providers = moonframe_providers::names(&roots);
@@ -460,6 +480,11 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     {
         return crate::history::run(&folders, words);
     }
+    if cfg!(feature = "studio")
+        && let Some(words) = args.doctor
+    {
+        return on_a_view_stack(move || crate::doctor::run(&folders, &words));
+    }
     if args.check {
         let roots = folders.roots();
         return on_a_view_stack(move || check(roots));
@@ -520,6 +545,9 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     crate::BACKGROUND.store(background, Ordering::Relaxed);
     crate::PREVIEW_ONLY.store(args.preview_only, Ordering::Relaxed);
     let _ = crate::RUNNING_ID.set(folders.app_id());
+    if let Some(installed) = folders.installed() {
+        moonframe_providers::set_installed(installed);
+    }
     if let Some(profile) = &folders.profile {
         moonframe_providers::set_profile(profile);
     }

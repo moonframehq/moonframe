@@ -26,13 +26,20 @@
 //!   answers its permission question (false refuses). An option that
 //!   allows always is refused: a mod answers once at most.
 //! - Anything else publishes again.
+//!
+//! In an installed app, agents work in the user's folder, whose files win
+//! over the app's at the same path, and may not write in the signed bundle
+//! (see `guard`): `app.acp.installed` says where each is, for a mod's
+//! instructions, and a run's `warning` says what it was stopped from doing
+//! or that the bundle's signature broke.
 
 mod agents;
+mod guard;
 mod run;
 
 use {
     moonframe_core::Data,
-    moonframe_providers::{Handle, Mods, Native, to_json},
+    moonframe_providers::{Handle, Installed, Mods, Native, to_json},
     run::{Allow, Inbound, Run, Start, Status},
     serde_json::{Value, json},
     std::{
@@ -85,6 +92,8 @@ pub struct Acp {
     /// The app folder this provider is in, from `cwd` (`app`,
     /// `examples/ledger`), when agents work around it.
     app: Option<String>,
+    /// The app as installed, if it is.
+    installed: Option<Installed>,
     /// The folders agents are looked for in.
     path: OsString,
     /// Commands replacing an agent's own (`[settings] commands`), by name.
@@ -132,11 +141,14 @@ impl Native for Acp {
             std::env::var_os("PATH").as_deref(),
             home.as_deref(),
         );
-        self.cwd = workdir(
-            host.dir(),
-            settings.get("cwd").and_then(Value::as_str),
-            home.as_deref(),
-        );
+        self.installed = moonframe_providers::installed().cloned();
+        let cwd = settings.get("cwd").and_then(Value::as_str);
+        self.cwd = match (&self.installed, cwd) {
+            // Whatever folder the provider was copied to, and even with a
+            // repository around it: the window runs the bundle and this.
+            (Some(installed), None) => installed.folder.clone(),
+            _ => workdir(host.dir(), cwd, home.as_deref()),
+        };
         self.app = app_folder(host.dir(), &self.cwd);
         let state = std::env::var_os("XDG_STATE_HOME")
             .map(PathBuf::from)
@@ -165,6 +177,7 @@ impl Native for Acp {
                 }
             }
         }
+        self.check_seal();
         self.publish(host);
     }
 
@@ -222,6 +235,49 @@ impl Drop for Acp {
 }
 
 impl Acp {
+    /// Checks the bundle's signature after each run, on a thread of its own:
+    /// a shell command can write there without a tool saying so.
+    fn check_seal(&self) {
+        let Some(installed) = &self.installed else {
+            return;
+        };
+        let finished: Vec<String> = lock(&self.state)
+            .runs
+            .iter_mut()
+            .filter_map(Run::take_unchecked)
+            .collect();
+        if finished.is_empty() {
+            return;
+        }
+        let bundle = installed.bundle.clone();
+        let shared = Arc::clone(&self.state);
+        let checking = std::thread::Builder::new()
+            .name("acp-seal".to_owned())
+            .spawn(move || {
+                if !guard::broken(&bundle) {
+                    return;
+                }
+                let mut state = lock(&shared);
+                for run in &mut state.runs {
+                    if finished.contains(&run.id) {
+                        run.warn(format!(
+                            "{} no longer matches its signature, and the next update will replace \
+                             what changed in it. Reinstall it to repair it.",
+                            bundle.display()
+                        ));
+                    }
+                }
+                state.dirty = true;
+                state.unsaved = true;
+            });
+        if let Err(error) = checking {
+            tracing::warn!(
+                provider = "acp",
+                "cannot check the app's signature: {error}"
+            );
+        }
+    }
+
     fn start_run(
         &mut self,
         host: &Handle,
@@ -308,6 +364,7 @@ impl Acp {
                     .find(|(name, _)| name == moonframe_providers::owner(from))
                     .map_or(Allow::Ask, |(_, allow)| *allow),
                 cwd: self.cwd.clone(),
+                installed: self.installed.clone(),
                 now,
             },
             Some(host.clone()),
@@ -414,6 +471,14 @@ impl Acp {
             "agent": self.default_agent,
             "workdir": self.cwd,
             "app": self.app,
+            // Only when agents work over it: `cwd` sends them elsewhere.
+            "installed": self.installed.as_ref().filter(|installed| installed.folder == self.cwd).map(|installed| json!({
+                "bundle": installed.bundle,
+                "files": installed.files,
+                "folder": installed.folder,
+                "check": installed.check,
+                "skill": installed.skill,
+            })),
             // The window's process, for an agent to screenshot its work.
             "pid": std::process::id(),
             "running": running,

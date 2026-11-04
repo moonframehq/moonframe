@@ -104,7 +104,12 @@ Moonframe as a library.
   and line drew it.
 - **Your folder over the app.** `~/.config/moonframe` holds your own mods,
   providers and stylesheet, laid over the built-in app; updates never touch
-  it, and mods install from git into it.
+  it, and mods install from git into it. A file there wins over the app's at
+  the same path, so to change a built-in one, copy it there: the window
+  reloads with the copy, and removing it brings the app's back. The installed
+  app itself stays signed: agents are kept out of it and work on such copies.
+  `moonframe doctor` names what in your folder breaks the app, and
+  `--fix` moves it aside.
 - **A skill for agents** in `.claude/skills/moonframe` that teaches them to
   build with all of the above. The app offers to copy its skills to
   `~/.config/moonframe/.claude/skills` (only if you agree, and again when an

@@ -7,7 +7,8 @@
 # A native provider: Rust built into the app (crates/moonframe-acp, the
 # `acp` feature). The agents run with your access, in the app's repository
 # (else ~/.config/moonframe), and ask you before what `allow` doesn't
-# cover.
+# cover. In an installed app they work in your folder, and nothing `allow`
+# says lets them write in the signed app.
 interval = 0.25
 kind     = "native"
 

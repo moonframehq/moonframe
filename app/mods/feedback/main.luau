@@ -38,6 +38,9 @@ type State = {
 	runs: { any },
 	folder: string?,
 	pid: number?,
+	-- From `app.acp`, in an installed app: where its signed files are, and
+	-- the user's folder over them, which agents change instead.
+	installed: any?,
 }
 
 -- How the agent checks its change in the user's window, the process `pid`.
@@ -48,12 +51,33 @@ local function look(pid: number?): string
 	return `Then look at it: screenshot it with {shot}, read the picture, and check it shows what they asked for. Checks passing is not enough. If it does not, find out why, fix it, and look again, until it does or you know why it cannot.`
 end
 
+-- How the agent looks at the window of an installed app, which has no
+-- justfile around it.
+local function look_installed(pid: number?): string
+	local window = if pid then `the user's window (process {pid})` else "the user's window"
+	return `Then look at it: screenshot {window}, which reloaded with your change (on macOS, find its window number with CGWindowListCopyWindowInfo, then \`screencapture -x -o -l<number> <file>\`), read the picture, and check it shows what they asked for. Checks passing is not enough. If it does not, find out why, fix it, and look again, until it does or you know why it cannot. If this machine will not let you take a screenshot, say so.`
+end
+
+-- Where an agent works on the installed app: never in its signed bundle.
+local function overlay(installed: any): string
+	return `This is the installed app. Its files are in {installed.files}, inside {installed.bundle}, which is signed: read and copy from there, but never change, add or delete anything in {installed.bundle}, by any means, shell commands included. That breaks the signature, and the next update takes the change away. Work in {installed.folder}, the user's folder, laid out the same way: a file there wins over the one at the same path in the app, the open window reloads at once, and removing it brings the app's back. So to change a built-in file, copy it to the same path there and change the copy. Keep the override as small as you can, because a copied mod no longer gets that mod's updates: a style.luau there is merged over the app's, so for looks write only the rules that change.`
+end
+
 -- How the agent should work on the app in `folder` (from the repository
--- agents work in: `app`, or an app package such as `examples/ledger`); the
--- user's words follow.
-local function instructions(folder: string?, pid: number?, follow: boolean): string
+-- agents work in: `app`, or an app package such as `examples/ledger`), or
+-- on the `installed` app; the user's words follow.
+local function instructions(folder: string?, pid: number?, follow: boolean, installed: any?): string
 	local where, check
-	if folder == nil or folder == "app" or folder == "." then
+	local guide = "Read the moonframe skill (.claude/skills/moonframe/SKILL.md in the Moonframe repository) before changing anything, and the moonframe-components catalogue before writing UI."
+	local seen = look(pid)
+	if installed then
+		where = overlay(installed)
+		check = `Run \`{installed.check}\` until it passes.`
+		seen = look_installed(pid)
+		guide = if installed.skill
+			then `Read the moonframe skill ({installed.skill}) before changing anything, and the moonframe-components skill beside it before writing UI.`
+			else "Read the moonframe skill, if you have it, before changing anything."
+	elseif folder == nil or folder == "app" or folder == "." then
 		where =
 			"The UI is Luau under app/ (or ~/.config/moonframe, laid out the same way), and the user's open window reloads as files change, so a change that passes the checks is live at once."
 		check = "Run `just check` and `just types` (or `moonframe --check <folder>` where there is no justfile) until they pass."
@@ -65,12 +89,12 @@ local function instructions(folder: string?, pid: number?, follow: boolean): str
 The user of this Moonframe app wrote this in the app's "Send feedback" dialog. Change the app so it does what they ask.
 
 How to work:
-- Read the moonframe skill (.claude/skills/moonframe/SKILL.md in the Moonframe repository) before changing anything, and the moonframe-components catalogue before writing UI. ]] .. where .. [[
+- ]] .. guide .. " " .. where .. [[
 
 - Keep the change to what they ask for.
 - ]] .. check .. [[
 
-- ]] .. look(pid) .. [[
+- ]] .. seen .. [[
 
 - Do not commit, push, or stop the user's running app.
 - End with two or three plain sentences for the user: what you changed and where, and what you saw in the window; or why you did not.]]
@@ -140,6 +164,7 @@ return mod {
 			following = nil,
 			runs = {},
 			folder = nil,
+			installed = nil,
 			pid = nil,
 		}
 	end,
@@ -187,6 +212,7 @@ return mod {
 		elseif msg.topic == "provider/acp" then
 			state.runs = ours(msg.value)
 			state.folder = msg.value and msg.value.app
+			state.installed = msg.value and msg.value.installed
 			state.pid = msg.value and msg.value.pid
 			state.latest = newest(state.runs)
 			if state.open then
@@ -236,7 +262,7 @@ return mod {
 							id = "feedback",
 							thread = msg.follow,
 							agent = state.agent,
-							instructions = instructions(state.folder, state.pid, true),
+							instructions = instructions(state.folder, state.pid, true, state.installed),
 							context = { main_tab = state.tab, conversation = said },
 						},
 					},
@@ -264,7 +290,7 @@ return mod {
 							start = text,
 							id = "feedback",
 							agent = state.agent,
-							instructions = instructions(state.folder, state.pid, false),
+							instructions = instructions(state.folder, state.pid, false, state.installed),
 							context = context,
 						},
 					},

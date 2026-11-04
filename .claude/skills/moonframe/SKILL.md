@@ -34,8 +34,10 @@ bundle), then the user's folder, `~/.config/moonframe` (or
 - Where to write: when working on this repository, edit `app/`. When the
   user wants to customise the app they use (or it is installed), write to
   `~/.config/moonframe` and never into the bundle, which is signed and
-  replaced by each update. To change one built-in mod, copy its folder there
-  and edit the copy.
+  replaced by each update. To change one built-in file, copy it to the same
+  path there and edit the copy: it wins over the app's at once, and removing
+  it brings the app's back. `moonframe doctor` names what in the folder breaks
+  the app, and `--fix` moves it to `.broken/`.
 - The window watches both folders, so either kind of edit reloads live.
 - **Packages** go between the two: mods others publish as git repositories,
   installed with `moonframe mod install` (see "Sharing mods"). A package
@@ -237,6 +239,9 @@ Selected in Moonframe (View > Inspect Element):
 - mod: status, drawn by /…/app/mods/status/main.luau:33
 - inside: mod shell > column > … > region "status-right" > mod status > row > text.status-text "⎇ main +29"
 ```
+
+In an installed app the report ends with a `- read-only:` line when that file
+ships in the signed bundle: copy it where it says and change the copy.
 
 The pointer finds the deepest element under it. While picking, **↑**
 targets the element around that one instead (a cell's row, the row's
