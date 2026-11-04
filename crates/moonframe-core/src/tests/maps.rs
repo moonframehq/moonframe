@@ -23,6 +23,8 @@ fn a_map_reads_its_provider_place_pins_and_routes() {
     assert_eq!(map.provider, MapProvider::CartoLight);
     assert_eq!(map.center, Some([37.79, -122.40]));
     assert_eq!(map.zoom, Some(14.0));
+    assert_eq!(map.bearing, None);
+    assert_eq!(map_of("bearing = -45").unwrap().bearing, Some(-45.0));
     assert_eq!(map.pins.len(), 2);
     assert_eq!(map.pins[0].label.as_deref(), Some("1"));
     assert!(!map.pins[0].pulse);
@@ -75,6 +77,7 @@ fn a_map_refuses_what_it_cannot_show() {
         ("zoom = 40", "zoom"),
         ("pins = { { lat = 1, lon = 2, pulse = 1 } }", "pulse"),
         ("glide = 1", "glide"),
+        ("bearing = 400", "bearing"),
     ] {
         let error = map_of(props).unwrap_err();
         assert!(error.contains(expected), "{props}: {error}");
@@ -94,4 +97,16 @@ fn a_map_refuses_what_it_cannot_show() {
     assert!(pin.selected && pin.icon.is_some());
     let keyed = map_of(r#"provider = "maptiler-streets", key = "abc123""#).unwrap();
     assert_eq!(keyed.key.as_deref(), Some("abc123"));
+}
+
+#[test]
+fn a_turned_map_frames_along_its_own_edges() {
+    // Two places a long way apart east to west: north up the box is wide
+    // enough, turned a quarter the box is tall enough for less.
+    let map = map_of("pins = { { lat = 0, lon = -40 }, { lat = 0, lon = 40 } }").unwrap();
+    let (center, north_up) = map.framing(1000.0, 200.0, 0.0, 0.0);
+    let (turned_center, turned) = map.framing(1000.0, 200.0, 0.0, 90.0);
+    assert!(turned < north_up, "{turned} < {north_up}");
+    assert!((center[0] - turned_center[0]).abs() < 1e-9);
+    assert!((center[1] - turned_center[1]).abs() < 1e-9);
 }

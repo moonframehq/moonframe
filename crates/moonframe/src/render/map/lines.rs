@@ -97,16 +97,13 @@ impl Lines {
                     if line.corners.len() < 2 {
                         continue;
                     }
-                    let left = line
-                        .corners
-                        .iter()
-                        .map(|&(x, _)| x)
-                        .fold(f32::INFINITY, f32::min);
-                    let right = line
-                        .corners
-                        .iter()
-                        .map(|&(x, _)| x)
-                        .fold(f32::NEG_INFINITY, f32::max);
+                    let corner = |pick: fn(f32, f32) -> f32, start: f32| {
+                        line.corners.iter().fold((start, start), |(x, y), corner| {
+                            (pick(x, corner.0), pick(y, corner.1))
+                        })
+                    };
+                    let low = corner(f32::min, f32::INFINITY);
+                    let high = corner(f32::max, f32::NEG_INFINITY);
                     let faint = if line.pending {
                         PENDING
                     } else {
@@ -114,10 +111,10 @@ impl Lines {
                     };
                     let color = line.color.unwrap_or(fallback);
                     let stroke = line.stroke;
-                    for copy in self.frame.copies(left, right, stroke + 3.0) {
-                        let offset = (copy as f64 * self.frame.span()) as f32;
+                    for copy in self.frame.copies(low, high, stroke + 3.0) {
+                        let (dx, dy) = self.frame.copy_offset(copy);
                         let at = |&(x, y): &(f32, f32)| {
-                            point(bounds.origin.x + px(x + offset), bounds.origin.y + px(y))
+                            point(bounds.origin.x + px(x + dx), bounds.origin.y + px(y + dy))
                         };
                         for (width, paint, dash) in [
                             (stroke + 3.0, casing.opacity(0.85 * faint), false),

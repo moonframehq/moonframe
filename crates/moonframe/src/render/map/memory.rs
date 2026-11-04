@@ -56,6 +56,28 @@ pub(super) fn picture(file: PathBuf) -> Img {
     img(file)
 }
 
+/// The decoded tile in `file`, counted as drawn now, for pixels of our own
+/// rather than a picture; `None` if it cannot be decoded.
+pub(super) fn decoded(file: &Path, window: &mut Window, cx: &mut App) -> Option<Decoded> {
+    let id = window.window_handle().window_id();
+    WINDOWS.with_borrow_mut(|windows| {
+        let drawn = &mut windows.entry(id).or_default().drawn;
+        drawn.insert(file.to_owned(), Instant::now());
+    });
+    let cache = TileCache(id).provide(window, cx);
+    match cache.load(&Resource::Path(file.into()), window, cx) {
+        None => Some(Decoded::Waiting),
+        Some(Ok(image)) => Some(Decoded::Ready(image)),
+        Some(Err(_)) => None,
+    }
+}
+
+/// A tile on its way to pixels.
+pub(super) enum Decoded {
+    Waiting,
+    Ready(Arc<RenderImage>),
+}
+
 /// The cache a window's tiles are drawn through, made on first use.
 pub(super) struct TileCache(pub(super) WindowId);
 
@@ -71,6 +93,7 @@ impl ImageCacheProvider for TileCache {
                         if let Some(kept) = kept {
                             super::stand_in::forget(&kept.drawn.into_keys().collect::<Vec<_>>());
                         }
+                        super::rotated::forget(id);
                         if CURRENT.with_borrow(|current| *current == Some(id)) {
                             CURRENT.set(None);
                         }

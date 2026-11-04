@@ -50,14 +50,15 @@ pub(super) fn pins(
         .into_iter()
         .flat_map(|index| {
             let pin = &map.pins[index];
-            let (left, top) = frame.at(pin.lat, pin.lon);
+            let at = frame.at(pin.lat, pin.lon);
             frame
-                .copies(left, left, DISC * SELECTED + TAIL)
+                .copies(at, at, DISC * SELECTED + TAIL)
                 .flat_map(move |copy| {
-                    let left = left + (copy as f64 * frame.span()) as f32;
-                    let marker = self::pin(map, index, frame, sender, cx, copy, (left, top));
+                    let (dx, dy) = frame.copy_offset(copy);
+                    let at = (at.0 + dx, at.1 + dy);
+                    let marker = self::pin(map, index, frame, sender, cx, copy, at);
                     let halo = (pin.pulse && marker.is_some())
-                        .then(|| halo(pin, (left, top), pulse, cx))
+                        .then(|| halo(pin, at, pulse, cx))
                         .into_iter()
                         .flatten();
                     halo.chain(marker)

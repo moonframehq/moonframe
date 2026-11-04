@@ -32,6 +32,8 @@ pub struct Pointer {
     pub range: Option<Range>,
     /// The cursor shown over it.
     pub cursor: Option<Cursor>,
+    /// Trackpad gestures beyond the wheel's scrolls and pinches.
+    pub gestures: Gestures,
 }
 
 impl Pointer {
@@ -42,6 +44,7 @@ impl Pointer {
             && self.carry.is_none()
             && self.accept.is_none()
             && self.cursor.is_none()
+            && self.gestures.is_empty()
     }
 }
 
@@ -190,7 +193,7 @@ pub struct Held {
 }
 
 impl Held {
-    fn fields(&self, fields: &mut BTreeMap<String, Data>) {
+    pub(super) fn fields(&self, fields: &mut BTreeMap<String, Data>) {
         for (name, on) in [
             ("shift", self.shift),
             ("alt", self.alt),
@@ -222,7 +225,7 @@ pub fn with_fields(msg: &Data, fields: BTreeMap<String, Data>) -> Data {
     }
 }
 
-fn number(value: f32) -> Data {
+pub(super) fn number(value: f32) -> Data {
     // Whole numbers arrive as integers, so `value == 3` holds in Luau; the
     // rest are rounded in f64, so 0.1 arrives as 0.1, not 0.10000000149.
     if value.fract() == 0.0 && value.abs() < 1e15 {
@@ -305,7 +308,7 @@ impl Pointer {
     }
 }
 
-fn travel_fields(travel: &Travel) -> BTreeMap<String, Data> {
+pub(super) fn travel_fields(travel: &Travel) -> BTreeMap<String, Data> {
     // Fractions to four places and pixels to two keep messages short and
     // comparable without losing anything a view can show.
     let fraction = |value: f32| number((value * 10_000.0).round() / 10_000.0);

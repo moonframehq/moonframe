@@ -64,7 +64,7 @@ herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
 # `ui.map`: street maps from tile providers, fetched over HTTP. Off by
 # default, as few apps need one; the starter turns it on, and so do sealed
 # apps whose Luau uses `ui.map`.
-map = ["dep:ureq"]
+map = ["dep:image", "dep:ureq"]
 # Rich read-only Markdown and the long-form writing editor are independent.
 markdown = []
 prose    = []
@@ -93,6 +93,7 @@ futures.workspace             = true
 gpui-capture                  = { default-features = false, features = ["test-support"], optional = true, package = "gpui-pre", version = "=0.3.10" }
 gpui-kit.workspace            = true
 gpui-platform-capture         = { default-features = false, features = ["test-support"], optional = true, package = "gpui-pre-platform", version = "=0.3.10" }
+image                         = { optional = true, workspace = true }
 imagesize.workspace           = true
 moonframe-acp                 = { optional = true, workspace = true }
 moonframe-chat                = { optional = true, workspace = true }
@@ -127,6 +128,8 @@ block2.workspace           = true
 objc2.workspace            = true
 objc2-app-kit              = { features = ["NSEvent", "NSRunningApplication", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
 objc2-foundation.workspace = true
+# Finding the AppKit window a trackpad gesture happened in.
+raw-window-handle.workspace = true
 # `app:notify`: system notifications, and hearing their clicks.
 objc2-user-notifications.workspace = true
 objc2-web-kit                      = { optional = true, workspace = true }

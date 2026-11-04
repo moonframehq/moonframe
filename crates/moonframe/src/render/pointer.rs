@@ -1,4 +1,5 @@
-//! A row's or column's `pointer`, `wheel`, `drop` and `cursor`. A press is
+//! A row's or column's `pointer`, `wheel`, `drop`, `cursor` and trackpad
+//! gestures. A press is
 //! followed wherever the pointer goes until the button comes up, so a
 //! slider keeps up when the pointer leaves its track; positions stay
 //! fractions of the box as it was when the button went down.
@@ -7,7 +8,9 @@ use {
     super::{Cx, Place},
     crate::app::MoonframeApp,
     gpui_kit::*,
-    moonframe_core::{Action, Cursor, Data, Held, Pointer, PointerPhase, Range, Travel},
+    moonframe_core::{
+        Action, Cursor, Data, GesturePhase, Held, Pointer, PointerPhase, Range, Travel,
+    },
     std::{
         cell::{Cell, RefCell},
         rc::Rc,
@@ -39,6 +42,8 @@ struct Drag {
 
 thread_local! {
     static DRAG: RefCell<Option<Drag>> = const { RefCell::new(None) };
+    /// Whether the press under way has reached a force click.
+    static FORCED: Cell<bool> = const { Cell::new(false) };
 }
 
 /// `element` with `pointer`'s listeners and cursor.
@@ -53,6 +58,7 @@ pub(super) fn attach(
         && pointer.wheel.is_none()
         && pointer.drop.is_none()
         && pointer.cursor.is_none()
+        && pointer.gestures.is_empty()
     {
         return element;
     }
@@ -72,6 +78,9 @@ pub(super) fn attach(
     }
     if pointer.wheel.is_some() {
         element = wheel(element, pointer, &bounds, &sender);
+    }
+    if !pointer.gestures.is_empty() {
+        element = gestures(element, pointer, &bounds, &sender);
     }
     if pointer.drop.is_some() {
         let pointer = pointer.clone();
@@ -334,6 +343,69 @@ fn wheel(
                 sender.send(msg, window, cx);
             }
         })
+}
+
+/// The trackpad's other gestures over it, and its force click.
+fn gestures(
+    element: Stateful<Div>,
+    pointer: &Pointer,
+    bounds: &Rc<Cell<Bounds<Pixels>>>,
+    sender: &Sender,
+) -> Stateful<Div> {
+    let wanted = &pointer.gestures;
+    let at = |bounds: &Rc<Cell<Bounds<Pixels>>>, position| travel(bounds.get(), position, position);
+    let mut area = crate::gestures::gestures();
+    if wanted.rotate.is_some() {
+        let (wanted, bounds, sender) = (wanted.clone(), bounds.clone(), sender.clone());
+        area = area.on_rotate(move |event, window, cx| {
+            let phase = match event.phase {
+                TouchPhase::Started => GesturePhase::Start,
+                TouchPhase::Moved => GesturePhase::Move,
+                _ => GesturePhase::End,
+            };
+            let at = at(&bounds, event.position);
+            let held = held(&event.modifiers);
+            if let Some(msg) = wanted.rotate_message(&at, event.degrees, phase, held) {
+                sender.send(msg, window, cx);
+            }
+        });
+    }
+    if wanted.smart_zoom.is_some() {
+        let (wanted, bounds, sender) = (wanted.clone(), bounds.clone(), sender.clone());
+        area = area.on_smart_zoom(move |event, window, cx| {
+            let at = at(&bounds, event.position);
+            if let Some(msg) = wanted.smart_zoom_message(&at, held(&event.modifiers)) {
+                sender.send(msg, window, cx);
+            }
+        });
+    }
+    if wanted.swipe.is_some() {
+        let (wanted, bounds, sender) = (wanted.clone(), bounds.clone(), sender.clone());
+        area = area.on_swipe(move |event, window, cx| {
+            let at = at(&bounds, event.position);
+            if let Some(msg) = wanted.swipe_message(&at, event.direction, held(&event.modifiers)) {
+                sender.send(msg, window, cx);
+            }
+        });
+    }
+    let element = element.child(area);
+    if wanted.force.is_none() {
+        return element;
+    }
+    let (wanted, bounds, sender) = (wanted.clone(), bounds.clone(), sender.clone());
+    element.on_mouse_pressure(move |event: &MousePressureEvent, window, cx| {
+        // One message per force click, however long it is held: the stage
+        // outlives the frames drawn during the press.
+        let forced = event.stage == PressureStage::Force;
+        if FORCED.replace(forced) || !forced {
+            return;
+        }
+        let at = at(&bounds, event.position);
+        let held = held(&event.modifiers);
+        if let Some(msg) = wanted.force_message(&at, event.pressure, held) {
+            sender.send(msg, window, cx);
+        }
+    })
 }
 
 /// Where `now` is in `bounds`, and how far it went from `start`.
