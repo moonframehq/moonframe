@@ -87,14 +87,16 @@ return component {
 					if column % 2 == 0 then
 						first, second = bottom, top
 					end
+					-- Leave room for both ends, including the point kept
+					-- from the preceding path so the line stays connected.
+					if #points + 4 > MOST_POINTS * 2 then
+						table.insert(paths, { points = points, color = color, stroke = stroke })
+						points = { points[#points - 1], points[#points] }
+					end
 					table.insert(points, x)
 					table.insert(points, first)
 					table.insert(points, x)
 					table.insert(points, second)
-					if #points >= MOST_POINTS * 2 then
-						table.insert(paths, { points = points, color = color, stroke = stroke })
-						points = { x, second }
-					end
 				end
 				if #points >= 4 then
 					table.insert(paths, { points = points, color = color, stroke = stroke })

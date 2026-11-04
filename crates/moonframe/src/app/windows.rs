@@ -65,6 +65,11 @@ impl MoonframeApp {
         if let Some(place) = place {
             sizing.place = place;
         }
+        if sizing.place != moonframe_core::WindowPlace::default()
+            && !self.built_with(name, cfg!(feature = "displays"), "displays")
+        {
+            sizing.place = moonframe_core::WindowPlace::default();
+        }
         // After this update, as for the components window: the click may
         // have come from that window, which is busy until it returns.
         // Look up the handle then too: an earlier request in this batch

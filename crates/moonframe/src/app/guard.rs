@@ -95,7 +95,9 @@ impl MoonframeApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if from.starts_with(moonframe_core::DEMO) {
+        if from.starts_with(moonframe_core::DEMO)
+            || !self.built_with(from, cfg!(feature = "guard"), "guard")
+        {
             return;
         }
         if let Some(guard) = &self.close_guard

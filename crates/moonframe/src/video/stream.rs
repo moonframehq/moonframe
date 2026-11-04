@@ -178,14 +178,14 @@ pub(super) fn run(
                 last_number = latest;
             }
         }
-        if fresh || generation != drawn_generation {
-            if let Some(info) = &frame {
-                renderer.draw(info, &view);
-                drawn_generation = generation;
-                if fresh {
-                    counts.shown += 1;
-                    counts.age += age(info.time);
-                }
+        if let Some(info) = &frame
+            && (fresh || generation != drawn_generation)
+        {
+            renderer.draw(info, &view);
+            drawn_generation = generation;
+            if fresh {
+                counts.shown += 1;
+                counts.age += age(info.time);
             }
         } else {
             thread::sleep(POLL);

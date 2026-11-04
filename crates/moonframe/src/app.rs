@@ -874,7 +874,7 @@ impl MoonframeApp {
             Request::Window(request) => self.window_request(from, request, cx),
             Request::Guard(request) => self.guard_request(from, request, window, cx),
             Request::Awake(request) => self.awake_request(from, request, cx),
-            Request::Dock(dock) => crate::dock::show(&dock),
+            Request::Dock(dock) => self.dock_request(from, &dock),
             Request::Restart(name) => self.restart_provider(from, &name),
             Request::Open(url) => {
                 if self.alerts.may_open() {

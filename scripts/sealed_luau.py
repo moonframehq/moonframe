@@ -132,6 +132,12 @@ class Lexer:
         return result
 
 
+# What an app's Luau reads or asks for, and the feature that brings it.
+APP_DATA = {"crash": "crash", "displays": "displays"}
+APP_REQUESTS = {"app:awake": "awake", "app:dock": "dock", "app:guard": "guard",
+                "app:restart": "restart"}
+
+
 @dataclass
 class References:
     components: set = field(default_factory=set)
@@ -221,13 +227,19 @@ def references(text, provider_names):
                 refs.dynamic.append((category, token.line))
             if category == "providers" and name in provider_names:
                 refs.providers.add(name)
-            if category == "features" and name in ("terminal", "browser", "map", "markdown"):
+            if category == "providers" and name in APP_DATA:
+                refs.features.add(APP_DATA[name])
+            if category == "features" and name in ("terminal", "browser", "map", "markdown", "video"):
                 refs.features.add(name)
                 if name == "terminal":
                     refs.features.add(terminal_engine(tokens, i + (3 if after.value == "." else 4)))
             if category == "features" and name == "input":
                 if writing_input(tokens, i + (3 if after.value == "." else 4)):
                     refs.features.add("prose")
+        if (token.kind == "name" and token.value in ("display", "fullscreen")
+                and before.value in ("{", ",", ";") and after.value == "="
+                and next2.value != "="):
+            refs.features.add("displays")
         if token.kind == "dynamic-provider":
             refs.dynamic.append(("providers", token.line))
         if token.kind == "string":
@@ -239,6 +251,8 @@ def references(text, provider_names):
                         target.add(name)
                     else:
                         refs.dynamic.append(("components" if prefix == "component:" else "providers", token.line))
+            if token.value in APP_REQUESTS:
+                refs.features.add(APP_REQUESTS[token.value])
             if token.value == "ghostty":
                 refs.features.add("ghostty")
             if token.value == "herdr-core":

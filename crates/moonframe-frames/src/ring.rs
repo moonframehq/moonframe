@@ -143,7 +143,7 @@ fn own_size(descriptor: libc::c_int) -> io::Result<usize> {
     if stat.st_uid != unsafe { libc::geteuid() } {
         return Err(invalid("a ring another user made"));
     }
-    if u32::from(stat.st_mode) & 0o077 != 0 {
+    if stat.st_mode & 0o077 != 0 {
         return Err(invalid("a ring other users can reach"));
     }
     usize::try_from(stat.st_size).map_err(io::Error::other)

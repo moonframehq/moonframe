@@ -135,6 +135,9 @@ impl MoonframeApp {
 
     /// Shares the screens as `app.displays`, now and as they change.
     pub(super) fn watch_displays(cx: &mut Context<Self>) {
+        if !cfg!(feature = "displays") {
+            return;
+        }
         let app = cx.entity().downgrade();
         let share = move |cx: &mut App| {
             let displays = displays(cx);

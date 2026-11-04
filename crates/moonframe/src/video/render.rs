@@ -5,9 +5,9 @@
 use {
     super::geometry,
     metal::{
-        CommandBufferRef, CommandQueue, Device, MTLClearColor, MTLLoadAction, MTLOrigin,
-        MTLPixelFormat, MTLPrimitiveType, MTLRegion, MTLResourceOptions, MTLSize, MTLStorageMode,
-        MTLStoreAction, MTLTextureUsage, MetalLayer, RenderPassDescriptor,
+        CommandBuffer, CommandBufferRef, CommandQueue, Device, MTLClearColor, MTLLoadAction,
+        MTLOrigin, MTLPixelFormat, MTLPrimitiveType, MTLRegion, MTLResourceOptions, MTLSize,
+        MTLStorageMode, MTLStoreAction, MTLTextureUsage, MetalLayer, RenderPassDescriptor,
         RenderPipelineDescriptor, RenderPipelineState, Texture, TextureDescriptor, TextureRef,
     },
     moonframe_core::VideoView,
@@ -51,7 +51,7 @@ pub(super) struct Renderer {
     device: Device,
     frame: RenderPipelineState,
     guides: RenderPipelineState,
-    textures: Vec<Texture>,
+    textures: Vec<FrameTexture>,
     /// What the textures were made for.
     made: Option<(u32, u32, Format)>,
     /// The one filled last, and the one to fill next.
@@ -59,6 +59,13 @@ pub(super) struct Renderer {
     next: usize,
     /// The drawable's size, as last drawn.
     size: Cell<[f32; 2]>,
+}
+
+/// CPU uploads must wait for the last GPU read of this texture. Keeping
+/// three textures lets other frames proceed while earlier ones finish.
+struct FrameTexture {
+    texture: Texture,
+    reading: Option<CommandBuffer>,
 }
 
 fn texture_format(format: Format) -> MTLPixelFormat {
@@ -122,7 +129,10 @@ impl Renderer {
             descriptor.set_storage_mode(MTLStorageMode::Shared);
             descriptor.set_usage(MTLTextureUsage::ShaderRead);
             self.textures = (0..TEXTURES)
-                .map(|_| self.device.new_texture(&descriptor))
+                .map(|_| FrameTexture {
+                    texture: self.device.new_texture(&descriptor),
+                    reading: None,
+                })
                 .collect();
             self.made = Some(wanted);
             self.next = 0;
@@ -135,12 +145,15 @@ impl Renderer {
                 depth: 1,
             },
         };
-        self.textures[self.next].replace_region(
-            region,
-            0,
-            pixels.cast::<c_void>(),
-            info.stride.into(),
-        );
+        let texture = &mut self.textures[self.next];
+        if let Some(reading) = texture.reading.take() {
+            // This is the video's worker, never the UI thread. The ring
+            // reader checks afterwards whether the frame was lapped.
+            reading.wait_until_completed();
+        }
+        texture
+            .texture
+            .replace_region(region, 0, pixels.cast::<c_void>(), info.stride.into());
     }
 
     pub(super) fn commit(&mut self) {
@@ -154,13 +167,14 @@ impl Renderer {
     }
 
     /// Draws the current texture as `view` says.
-    pub(super) fn draw(&self, info: &FrameInfo, view: &VideoView) {
+    pub(super) fn draw(&mut self, info: &FrameInfo, view: &VideoView) {
         objc2::rc::autoreleasepool(|_| {
-            let Some(drawable) = self.layer.next_drawable() else {
+            let layer = self.layer.clone();
+            let Some(drawable) = layer.next_drawable() else {
                 return;
             };
-            let commands = self.queue.new_command_buffer();
-            self.encode(commands, drawable.texture(), info, view);
+            let commands = self.queue.new_command_buffer().to_owned();
+            self.encode(&commands, drawable.texture(), info, view);
             commands.present_drawable(drawable);
             commands.commit();
         });
@@ -168,7 +182,7 @@ impl Renderer {
 
     /// Records drawing the current texture into `target`.
     fn encode(
-        &self,
+        &mut self,
         commands: &CommandBufferRef,
         target: &TextureRef,
         info: &FrameInfo,
@@ -196,7 +210,7 @@ impl Renderer {
             size_of::<Uniforms>() as u64,
             (&raw const uniforms).cast(),
         );
-        encoder.set_fragment_texture(0, Some(texture));
+        encoder.set_fragment_texture(0, Some(&texture.texture));
         encoder.draw_primitives(MTLPrimitiveType::TriangleStrip, 0, 4);
         let vertices: Vec<GuideVertex> = view
             .guides
@@ -219,6 +233,9 @@ impl Renderer {
             encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, vertices.len() as u64);
         }
         encoder.end_encoding();
+        // All draws use one queue, so completion of the last read also
+        // covers earlier draws of the same frame (zoom, pan or resize).
+        self.textures[self.current].reading = Some(commands.to_owned());
     }
 }
 
@@ -314,8 +331,8 @@ mod tests {
         descriptor.set_storage_mode(MTLStorageMode::Managed);
         descriptor.set_usage(MTLTextureUsage::RenderTarget);
         let target = device.new_texture(&descriptor);
-        let commands = renderer.queue.new_command_buffer();
-        renderer.encode(commands, &target, &info, view);
+        let commands = renderer.queue.new_command_buffer().to_owned();
+        renderer.encode(&commands, &target, &info, view);
         let blit = commands.new_blit_command_encoder();
         blit.synchronize_resource(&target);
         blit.end_encoding();
@@ -358,6 +375,75 @@ mod tests {
             .iter()
             .flat_map(|value| value.to_le_bytes())
             .collect()
+    }
+
+    #[test]
+    fn reusing_a_texture_waits_for_its_gpu_read() {
+        let Some(device) = Device::system_default() else {
+            return;
+        };
+        let mut renderer = Renderer::new(device.clone(), MetalLayer::new()).unwrap();
+        let info = FrameInfo {
+            number: 1,
+            width: 1,
+            height: 1,
+            format: Format::Rgba8,
+            stride: 4,
+            time: 0,
+            pattern: Pattern::Rggb,
+        };
+        renderer.upload(&info, [255u8; 4].as_ptr());
+        renderer.commit();
+        let descriptor = TextureDescriptor::new();
+        descriptor.set_pixel_format(LAYER_FORMAT);
+        descriptor.set_width(1);
+        descriptor.set_height(1);
+        descriptor.set_storage_mode(MTLStorageMode::Managed);
+        descriptor.set_usage(MTLTextureUsage::RenderTarget);
+        let target = device.new_texture(&descriptor);
+        let gate = device.new_shared_event();
+        let commands = renderer.queue.new_command_buffer().to_owned();
+        commands.encode_wait_for_event(&gate, 1);
+        renderer.encode(&commands, &target, &info, &view());
+        let blit = commands.new_blit_command_encoder();
+        blit.synchronize_resource(&target);
+        blit.end_encoding();
+        commands.commit();
+
+        let (uploaded, finished) = std::sync::mpsc::channel();
+        // Always release the GPU, even if an assertion fails later.
+        let signal = std::thread::spawn(move || {
+            let early = finished
+                .recv_timeout(std::time::Duration::from_millis(100))
+                .is_ok();
+            gate.set_signaled_value(1);
+            early
+        });
+        for _ in 0..TEXTURES {
+            renderer.upload(&info, [0u8; 4].as_ptr());
+            renderer.commit();
+        }
+        let _ = uploaded.send(());
+        assert!(
+            !signal.join().unwrap(),
+            "overwrote a texture still being read"
+        );
+        commands.wait_until_completed();
+        let mut pixel = [0u16; 4];
+        target.get_bytes(
+            pixel.as_mut_ptr().cast(),
+            8,
+            MTLRegion {
+                origin: MTLOrigin { x: 0, y: 0, z: 0 },
+                size: MTLSize {
+                    width: 1,
+                    height: 1,
+                    depth: 1,
+                },
+            },
+            0,
+        );
+        near(geometry::half(pixel[0]), 1.);
     }
 
     #[test]

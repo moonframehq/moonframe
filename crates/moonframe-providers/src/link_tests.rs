@@ -6,7 +6,6 @@ use {
     moonframe_core::Data,
     std::{
         fs,
-        io::{BufRead, BufReader, Write},
         path::Path,
         sync::{Arc, Mutex, mpsc},
         time::{Duration, Instant},
@@ -207,6 +206,7 @@ fn next_data(received: &mpsc::Receiver<Event>) -> Data {
     }
 }
 
+#[cfg(feature = "restart")]
 #[test]
 fn a_process_that_goes_starts_again_when_it_says_so() {
     let dir = tempfile::tempdir().unwrap();
@@ -226,6 +226,46 @@ fn a_process_that_goes_starts_again_when_it_says_so() {
     let _providers = Providers::start(root.into(), root.join("build"), events);
     assert!(failed(&received).contains("exited"));
     assert_eq!(next_data(&received), Data::Integer(2));
+}
+
+#[cfg(not(feature = "restart"))]
+#[test]
+fn without_the_feature_a_process_that_goes_stays_gone() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/flaky/provider.toml",
+        "kind = 'process'\ncommand = ['sh', '-c', 'exit 3']\nrestart = 'on-failure'\nstart = 'always'\n",
+    );
+    let (events, received) = events();
+    let _providers = Providers::start(root.into(), root.join("build"), events);
+    failed(&received);
+    let started = Instant::now();
+    while started.elapsed() < Duration::from_millis(800) {
+        assert!(
+            !matches!(
+                received.recv_timeout(Duration::from_millis(100)),
+                Ok(Event::Failed { .. })
+            ),
+            "it started again by itself"
+        );
+    }
+}
+
+#[cfg(not(feature = "socket"))]
+#[test]
+fn without_the_feature_a_socket_provider_says_so() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/engine/provider.toml",
+        "kind = 'socket'\nsocket = '/tmp/no-such-engine.sock'\nstart = 'always'\n",
+    );
+    let (events, received) = events();
+    let _providers = Providers::start(root.into(), root.join("build"), events);
+    assert!(failed(&received).contains("`socket` feature"));
 }
 
 #[test]
@@ -365,9 +405,15 @@ fn a_process_that_closes_its_output_is_still_stopped() {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "socket"))]
 mod socket {
-    use {super::*, std::os::unix::net::UnixListener};
+    use {
+        super::*,
+        std::{
+            io::{BufRead, BufReader, Write},
+            os::unix::net::UnixListener,
+        },
+    };
 
     fn provider(root: &Path, extra: &str) -> std::path::PathBuf {
         let path = root.join("engine.sock");

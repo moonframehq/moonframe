@@ -45,7 +45,7 @@ pub(crate) fn run(context: &Context) {
             return;
         };
         context.fail(problem);
-        if context.manifest.restart != Restart::OnFailure {
+        if context.manifest.restart != Restart::OnFailure || !cfg!(feature = "restart") {
             return;
         }
         if started.elapsed() >= SETTLED {

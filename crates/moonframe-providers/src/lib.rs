@@ -54,7 +54,7 @@ pub mod native;
 mod outbox;
 mod process;
 pub mod program;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "socket"))]
 mod socket;
 mod stream;
 #[cfg(feature = "wasm")]
@@ -531,11 +531,11 @@ impl Providers {
                     match context.manifest.kind {
                         Kind::Wasm => wasm::run(&context),
                         Kind::Process { .. } => process::run(&context),
-                        #[cfg(unix)]
+                        #[cfg(all(unix, feature = "socket"))]
                         Kind::Socket { .. } => socket::run(&context),
-                        #[cfg(not(unix))]
+                        #[cfg(not(all(unix, feature = "socket")))]
                         Kind::Socket { .. } => {
-                            context.fail("socket providers need a Unix socket");
+                            context.fail("socket providers need the `socket` feature, on Unix");
                         },
                         Kind::Native => native::run(&context, native),
                         Kind::Static { .. } => fixed::run(&context),

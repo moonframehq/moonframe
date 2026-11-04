@@ -2,9 +2,33 @@
 //! (`app:awake`), and starting a provider again (`app:restart`). Also tells
 //! them of the last launch's crash, as `app.crash`.
 
-use {super::*, moonframe_core::Awake as AwakeRequest};
+use {
+    super::*,
+    moonframe_core::{Awake as AwakeRequest, Dock},
+};
 
 impl MoonframeApp {
+    /// Whether the app was `built` with `feature`; if not, the mod `from`,
+    /// which asked for something that needs it, hears so.
+    pub(super) fn built_with(&mut self, from: &str, built: bool, feature: &str) -> bool {
+        if !built {
+            self.workspace.refuse(
+                from,
+                Error::new(format!(
+                    "this app was built without the `{feature}` feature"
+                )),
+            );
+        }
+        built
+    }
+
+    /// Does what the mod `from` asked with `app:dock`.
+    pub(super) fn dock_request(&mut self, from: &str, dock: &Dock) {
+        if self.built_with(from, cfg!(feature = "dock"), "dock") {
+            crate::dock::show(dock);
+        }
+    }
+
     /// Does what the mod `from` asked with `app:awake`, and says how it
     /// stands in `app.awake` once the system has answered.
     pub(super) fn awake_request(
@@ -21,11 +45,7 @@ impl MoonframeApp {
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
-                .spawn(async move {
-                    answer
-                        .recv()
-                        .unwrap_or_else(|_| Err("the keep-awake thread stopped".to_owned()))
-                })
+                .spawn(async move { answer.wait() })
                 .await;
             let _ = this.update(cx, |app, cx| {
                 app.awake.settled(result);
@@ -37,6 +57,9 @@ impl MoonframeApp {
 
     /// Starts the provider `name` again, for the mod `from`.
     pub(super) fn restart_provider(&mut self, from: &str, name: &str) {
+        if !self.built_with(from, cfg!(feature = "restart"), "restart") {
+            return;
+        }
         if let Err(problem) = self.providers.restart(name) {
             self.workspace
                 .refuse(from, Error::new(format!("`app:restart`: {problem}")));
@@ -45,6 +68,9 @@ impl MoonframeApp {
 
     /// Shares the last launch's crash, if it left a report.
     pub(super) fn tell_last_crash(cx: &mut Context<Self>) {
+        if !cfg!(feature = "crash") {
+            return;
+        }
         let Some(crash) = crate::crash::last(&crate::crash_dir()) else {
             return;
         };

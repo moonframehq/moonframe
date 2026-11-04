@@ -49,6 +49,15 @@ default = [
   "wasm",
   # keep-sorted end
 ]
+# `app.crash`: a panic leaves a report in the state folder, and the next
+# launch offers it. Off by default; the starter turns it on.
+crash = []
+# `app.displays`, and a mod's window placed with `display` and `fullscreen`.
+# Off by default; the starter turns it on.
+displays = []
+# `app:dock`: a badge and a progress bar on the Dock icon (macOS). Off by
+# default; the starter turns it on.
+dock = []
 # The `docs` native provider: reads and saves the project's text files
 # for the markdown editor.
 docs = ["dep:moonframe-docs"]
@@ -61,6 +70,9 @@ git = ["dep:moonframe-git", "moonframe-history/herdr"]
 # The `shell` native provider (`app.shell`): a mod's shell commands, with
 # their output in colour.
 shell = ["dep:moonframe-shell"]
+# `app:guard`: a mod holds back closing and quitting. Off by default; the
+# starter turns it on.
+guard = []
 # State kept by herdr-core (`hc`) when installed; with `terminal`, it also
 # keeps shells across launches. tmux and local PTYs only need `terminal`.
 herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
@@ -74,8 +86,14 @@ video = ["dep:core-graphics-types", "dep:metal", "dep:moonframe-frames", "dep:ra
 # Rich read-only Markdown and the long-form writing editor are independent.
 markdown = []
 prose    = []
+# `app:restart`, and `restart = "on-failure"` for process providers. Off by
+# default; the starter turns it on.
+restart = ["moonframe-providers/restart"]
 # A sealed executable uses staged resources instead of the full toolbox.
 sealed = ["moonframe-packages/sealed"]
+# Socket providers (`kind = "socket"`): a program that runs on its own. Off
+# by default; the starter turns it on.
+socket = ["moonframe-providers/socket"]
 # Development commands and the component gallery.
 studio = []
 # Terminal rendering and local/tmux sessions. Engines enable this too.

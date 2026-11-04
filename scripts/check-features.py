@@ -45,8 +45,9 @@ def main():
     for name in features:
         assert starter[name] == [f"moonframe/{name}"], name
     # Off in the library, on in the starter: Ghostty needs Zig, and few apps
-    # need a street map.
-    opt_in = {"ghostty", "map"}
+    # need a street map, live video or what long runs ask of the machine.
+    opt_in = {"awake", "crash", "displays", "dock", "ghostty", "guard", "map", "restart",
+              "socket", "video"}
     assert set(starter["default"]) == set(library["default"]) | opt_in
 
     optional = {

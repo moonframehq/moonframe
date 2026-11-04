@@ -4,6 +4,9 @@
 without passing through Luau or the window's drawing. It is for a camera, a
 scanner or a player in an engine of its own. macOS only, behind the `video`
 feature (the starter has it; a library app adds `features = ["video"]`).
+The rest of what this page covers has flags of its own, on in the starter
+and off in the library: `socket`, `restart`, `guard`, `awake`, `dock`, `crash`
+and `displays`.
 
 `examples/framebench` is a whole working app, with a stand-in engine in
 Python and the figures to judge it by. Run it before building anything.

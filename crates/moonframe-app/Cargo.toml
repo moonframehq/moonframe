@@ -30,15 +30,21 @@ default = [
   "awake",
   "browser",
   "chat",
+  "crash",
+  "displays",
+  "dock",
   "docs",
   "forge",
   "ghostty",
   "git",
+  "guard",
   "herdr-core",
   "map",
   "markdown",
   "prose",
+  "restart",
   "shell",
+  "socket",
   "studio",
   "tokio",
   "updates",
@@ -54,16 +60,22 @@ awake      = ["moonframe/awake"]
 browser    = ["moonframe/browser"]
 capture    = ["moonframe/capture"]
 chat       = ["moonframe/chat"]
+crash      = ["moonframe/crash"]
+displays   = ["moonframe/displays"]
+dock       = ["moonframe/dock"]
 docs       = ["moonframe/docs"]
 forge      = ["moonframe/forge"]
 ghostty    = ["moonframe/ghostty"]
 git        = ["moonframe/git"]
+guard      = ["moonframe/guard"]
 herdr-core = ["moonframe/herdr-core"]
 map        = ["moonframe/map"]
 markdown   = ["moonframe/markdown"]
 prose      = ["moonframe/prose"]
+restart    = ["moonframe/restart"]
 sealed     = ["moonframe/sealed"]
 shell      = ["moonframe/shell"]
+socket     = ["moonframe/socket"]
 studio     = ["moonframe/studio"]
 terminal   = ["moonframe/terminal"]
 tokio      = ["moonframe/tokio"]
