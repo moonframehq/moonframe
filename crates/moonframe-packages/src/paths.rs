@@ -9,6 +9,7 @@
 use {
     crate::packages,
     moonframe_core::{AppLayer, Roots},
+    moonframe_providers::Installed,
     std::{
         env,
         path::{Path, PathBuf},
@@ -46,6 +47,45 @@ pub fn resources() -> Option<PathBuf> {
     ]
     .into_iter()
     .find(|folder| folder.join("app").is_dir())
+}
+
+/// All that ships around `resources`: the `.app` it is in, else itself.
+fn installation(resources: &Path) -> PathBuf {
+    resources
+        .ancestors()
+        .nth(2)
+        .filter(|folder| folder.extension().is_some_and(|found| found == "app"))
+        .unwrap_or(resources)
+        .to_owned()
+}
+
+/// The path from the user's folder that replaces `source`, a file of the
+/// app under `resources`: the same path, whichever of the bundle's layers
+/// it is in. None for a file that does not ship, or one with no such path.
+fn overlay_of(source: &Path, resources: &Path) -> Option<PathBuf> {
+    let source = source.canonicalize().ok()?;
+    let resources = resources.canonicalize().ok()?;
+    let shipped = source.strip_prefix(&resources).ok()?;
+    if let Ok(path) = shipped
+        .strip_prefix("app")
+        .or_else(|_| shipped.strip_prefix("bundle/app"))
+    {
+        return Some(path.to_owned());
+    }
+    // A package's folder, then its path; a single-mod package has none.
+    let path: PathBuf = shipped
+        .strip_prefix("bundle/packages")
+        .ok()?
+        .components()
+        .skip(1)
+        .collect();
+    (path.components().count() > 1).then_some(path)
+}
+
+/// Where in the user's folder a copy of the shipped file `source` goes, to
+/// win over it.
+pub fn overlay(source: &Path) -> Option<PathBuf> {
+    overlay_of(source, &resources()?)
 }
 
 /// Whether the binary runs from a bundle.
@@ -95,6 +135,44 @@ mod sealed_tests {
         folders.user = Some(user);
         assert_eq!(folders.roots(), roots);
         assert!(folders.settings().contains(&own.join("settings.toml")));
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod overlay_tests {
+    use super::*;
+
+    #[test]
+    fn a_shipped_file_keeps_its_path_in_the_users_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let resources = dir.path().join("A.app/Contents/Resources");
+        let file = |path: &str| {
+            let file = resources.join(path);
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(&file, "").unwrap();
+            file
+        };
+        let overlaid = |path: &str| overlay_of(&file(path), &resources);
+        assert_eq!(
+            overlaid("app/mods/status/main.luau"),
+            Some("mods/status/main.luau".into())
+        );
+        assert_eq!(overlaid("bundle/app/main.luau"), Some("main.luau".into()));
+        assert_eq!(
+            overlaid("bundle/packages/kit/components/card.luau"),
+            Some("components/card.luau".into())
+        );
+        // A single-mod package's main.luau is no shell.
+        assert_eq!(overlaid("bundle/packages/kit/main.luau"), None);
+        let outside = dir.path().join("mine.luau");
+        std::fs::write(&outside, "").unwrap();
+        assert_eq!(overlay_of(&outside, &resources), None);
+        assert_eq!(
+            installation(&resources.canonicalize().unwrap()).extension(),
+            Some("app".as_ref())
+        );
+        assert_eq!(installation(dir.path()), dir.path());
     }
 }
 
@@ -240,6 +318,36 @@ impl Folders {
         Some(match &self.profile {
             Some(name) => profile(user, name),
             None => user.clone(),
+        })
+    }
+
+    /// The app as installed, when it runs from its bundle's own files: an
+    /// installed binary can be pointed at a folder of the user's instead.
+    pub fn installed(&self) -> Option<Installed> {
+        let resources = resources()?.canonicalize().ok()?;
+        let builtin = self.builtin.canonicalize().ok()?;
+        if !builtin.starts_with(&resources) {
+            return None;
+        }
+        let binary = env::current_exe().and_then(|exe| exe.canonicalize()).ok()?;
+        let mut check = format!("\"{}\"", binary.display());
+        if let Some(user) = &self.user {
+            check.push_str(&format!(" --user \"{}\"", user.display()));
+        }
+        if let Some(profile) = &self.profile {
+            check.push_str(&format!(" --profile {profile}"));
+        }
+        check.push_str(" --check");
+        let skill = builtin.join("providers/skills/skills/moonframe/SKILL.md");
+        Some(Installed {
+            bundle: installation(&resources),
+            files: self
+                .bundled
+                .as_ref()
+                .map_or_else(|| builtin.clone(), |bundled| bundled.app.path.clone()),
+            folder: self.own().or_else(user)?,
+            check,
+            skill: skill.is_file().then_some(skill),
         })
     }
 

@@ -7,7 +7,7 @@
 
 use {
     acp::v1 as wire,
-    moonframe_providers::Handle,
+    moonframe_providers::{Handle, Installed},
     serde_json::{Value, json},
     std::{
         collections::{BTreeMap, VecDeque},
@@ -78,6 +78,8 @@ pub(crate) struct Tool {
     title: String,
     kind: String,
     status: String,
+    /// The files it said it works on, for the permission question it asks.
+    paths: Vec<PathBuf>,
 }
 
 /// A permission question the agent asked, waiting on the user.
@@ -133,6 +135,12 @@ pub(crate) struct Run {
     /// Which permission questions are answered without asking.
     allow: Allow,
     cwd: PathBuf,
+    /// The app as installed, which the agent may not write in.
+    installed: Option<Installed>,
+    /// What the user should know beyond the agent's answer.
+    warning: Option<String>,
+    /// Finished, and the bundle's signature was checked after it.
+    checked: bool,
     session: Option<String>,
     next: i64,
     pending: BTreeMap<i64, Pending>,
@@ -189,6 +197,7 @@ pub(crate) struct Start {
     pub(crate) prompt: String,
     pub(crate) allow: Allow,
     pub(crate) cwd: PathBuf,
+    pub(crate) installed: Option<Installed>,
     pub(crate) now: u64,
 }
 
@@ -215,6 +224,9 @@ impl Run {
             question: None,
             allow: start.allow,
             cwd: start.cwd,
+            installed: start.installed,
+            warning: None,
+            checked: false,
             session: None,
             next: 0,
             pending: BTreeMap::new(),
@@ -227,6 +239,19 @@ impl Run {
 
     pub(crate) fn started(&self) -> u64 {
         self.started
+    }
+
+    /// The run's id, once, when it finished with the signature unchecked.
+    pub(crate) fn take_unchecked(&mut self) -> Option<String> {
+        if !self.status.finished() || self.checked {
+            return None;
+        }
+        self.checked = true;
+        Some(self.id.clone())
+    }
+
+    pub(crate) fn warn(&mut self, warning: String) {
+        self.warning = Some(warning);
     }
 
     /// Takes the agent's pipes and starts the session: the threads hand
@@ -430,11 +455,17 @@ impl Run {
                     title: call.title,
                     kind: enum_name(&call.kind),
                     status: enum_name(&call.status),
+                    paths: crate::guard::paths(
+                        &call.content,
+                        &call.locations,
+                        call.raw_input.as_ref(),
+                    ),
                 });
             },
             wire::SessionUpdate::ToolCallUpdate(update) => {
                 let id = update.tool_call_id.0.to_string();
                 if let Some(tool) = self.tools.iter_mut().find(|tool| tool.id == id) {
+                    tool.paths.extend(fields_paths(&update.fields));
                     if let Some(title) = update.fields.title {
                         tool.title = title;
                     }
@@ -484,6 +515,14 @@ impl Run {
                     .find(|tool| tool.id == call && !tool.kind.is_empty())
                     .map(|tool| tool.kind.clone())
             });
+        let mut paths = fields_paths(&request.tool_call.fields);
+        if let Some(tool) = self.tools.iter().find(|tool| tool.id == call) {
+            paths.extend(tool.paths.iter().cloned());
+        }
+        let refused = self.installed.as_ref().and_then(|installed| {
+            crate::guard::refused(installed, kind.as_deref(), &paths, &self.cwd)
+        });
+        let refused = refused.cloned();
         let title = request
             .tool_call
             .fields
@@ -506,6 +545,19 @@ impl Run {
                 )
             })
             .collect();
+        // Whatever `allow` says, and without asking: no answer makes this
+        // safe. The agent's instructions say where to write instead.
+        if let Some(path) = refused {
+            self.warning = Some(format!(
+                "The agent tried to change {}, which ships in the signed app, and was stopped.",
+                path.display()
+            ));
+            let rejected = options.iter().find(|option| option.2 == "reject_once");
+            return self.respond(
+                &id,
+                Ok(rejected.map_or_else(cancelled, |(option, ..)| selected(option))),
+            );
+        }
         // Allowed once, never always; without an "allow once" option the
         // user decides.
         if self.allow.covers(kind.as_deref())
@@ -697,6 +749,7 @@ impl Run {
             "tool_count": self.tool_count,
             "plan": plan,
             "question": question,
+            "warning": self.warning,
         })
     }
 
@@ -722,6 +775,7 @@ impl Run {
                 prompt: String::new(),
                 allow: Allow::Ask,
                 cwd: PathBuf::new(),
+                installed: None,
                 now: value.get("started").and_then(Value::as_u64).unwrap_or(0),
             },
             None,
@@ -732,6 +786,8 @@ impl Run {
             .and_then(Value::as_u64)
             .or(Some(run.started));
         run.error = text("error");
+        run.warning = text("warning");
+        run.checked = true;
         run.stop_reason = text("stop_reason");
         run.message = text("message").unwrap_or_default();
         run.tool_count = value
@@ -756,6 +812,7 @@ impl Run {
                 title: field("title"),
                 kind: field("kind"),
                 status: field("status"),
+                paths: Vec::new(),
             });
         }
         for entry in value
@@ -775,6 +832,15 @@ impl Run {
         }
         Some(run)
     }
+}
+
+/// The files a tool call's fields name.
+fn fields_paths(fields: &wire::ToolCallUpdateFields) -> Vec<PathBuf> {
+    crate::guard::paths(
+        fields.content.as_deref().unwrap_or_default(),
+        fields.locations.as_deref().unwrap_or_default(),
+        fields.raw_input.as_ref(),
+    )
 }
 
 fn selected(option: &str) -> Value {

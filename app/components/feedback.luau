@@ -120,6 +120,9 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 			end
 			local latest = turn == run
 			table.insert(body, agent_run { run = turn, lines = if latest then 10 else 4, tools = if latest then 6 else 3 })
+			if turn.warning then
+				table.insert(body, ui.text { turn.warning, class = "feedback-error", wrap = true })
+			end
 		end
 		local blank = string.match(props.reply or "", "^%s*$") ~= nil
 		if props.follow and not going then

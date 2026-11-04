@@ -44,6 +44,7 @@ mod crash;
 #[cfg(feature = "studio")]
 mod demos;
 mod dock;
+mod doctor;
 mod embed;
 mod gallery;
 pub mod gestures;

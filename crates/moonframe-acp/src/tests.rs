@@ -44,9 +44,14 @@ fn rig() -> Rig {
 
 /// A rig whose `[settings] allow` is `allow`.
 fn rig_allowing(allow: Value) -> Rig {
+    rig_with(AGENT, allow)
+}
+
+/// A rig whose stand-in agent is `agent`.
+fn rig_with(agent: &str, allow: Value) -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let script = dir.path().join("agent.sh");
-    std::fs::write(&script, AGENT).unwrap();
+    std::fs::write(&script, agent).unwrap();
     let sent = dir.path().join("sent.jsonl");
     let settings = json!({
         "starters": ["feedback"],
@@ -424,4 +429,100 @@ fn allowed_to_read_means_tools_that_only_look() {
     assert!(Allow::parse("all").unwrap().covers(None));
     assert!(!Allow::Ask.covers(Some("read")));
     assert_eq!(Allow::parse("always"), None);
+}
+
+/// A rig over an installed app, whose stand-in agent's tool is of `kind` on
+/// the file `path`; the bundle is `<dir>/A.app`.
+fn installed_rig(kind: &str, path: &str) -> Rig {
+    let dir = tempfile::tempdir().unwrap();
+    let bundle = dir.path().join("A.app");
+    std::fs::create_dir_all(&bundle).unwrap();
+    // As JSON: a Windows path's backslashes would spoil the agent's line.
+    let path = json!(path.replace("BUNDLE", &bundle.display().to_string()));
+    let agent = AGENT.replace(
+        r#""kind":"edit","status":"in_progress""#,
+        &format!(r#""kind":"{kind}","status":"in_progress","locations":[{{"path":{path}}}]"#),
+    );
+    let mut rig = rig_with(&agent, json!({ "feedback": "all" }));
+    rig.acp.installed = Some(Installed {
+        bundle: bundle.clone(),
+        files: bundle.join("Contents/Resources/app"),
+        folder: dir.path().join("user"),
+        check: "moonframe --check".to_owned(),
+        skill: None,
+    });
+    // Kept for the rig's life, as the bundle is.
+    std::mem::forget(dir);
+    rig
+}
+
+fn answered(rig: &Rig) -> String {
+    rig.sent()
+        .iter()
+        .find_map(|line| {
+            Some(
+                line.get("result")?
+                    .get("outcome")?
+                    .get("optionId")?
+                    .as_str()?
+                    .to_owned(),
+            )
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn nothing_writes_in_the_signed_app_even_allowed_everything() {
+    let mut rig = installed_rig("edit", "BUNDLE/Contents/Resources/app/main.luau");
+    rig.send("feedback", json!({ "start": "Make the title bold" }));
+    let run = rig.wait_for("done");
+    assert_eq!(answered(&rig), "no");
+    assert!(
+        run["warning"].as_str().unwrap().contains("signed app"),
+        "{run}"
+    );
+}
+
+#[test]
+fn the_signed_app_can_be_read_and_elsewhere_written() {
+    let mut rig = installed_rig("read", "BUNDLE/Contents/Resources/app/main.luau");
+    rig.send("feedback", json!({ "start": "Read it" }));
+    let run = rig.wait_for("done");
+    assert_eq!(answered(&rig), "yes");
+    assert!(run["warning"].is_null(), "{run}");
+
+    let mut rig = installed_rig("edit", "/somewhere/else/main.luau");
+    rig.send("feedback", json!({ "start": "Change the copy" }));
+    let run = rig.wait_for("done");
+    assert_eq!(answered(&rig), "yes");
+    assert!(run["warning"].is_null(), "{run}");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn a_changed_bundle_no_longer_matches_its_signature() {
+    let dir = tempfile::tempdir().unwrap();
+    let bundle = dir.path().join("A.app");
+    let contents = bundle.join("Contents");
+    std::fs::create_dir_all(contents.join("MacOS")).unwrap();
+    std::fs::create_dir_all(contents.join("Resources")).unwrap();
+    std::fs::copy("/usr/bin/true", contents.join("MacOS/a")).unwrap();
+    std::fs::write(
+        contents.join("Info.plist"),
+        r#"<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>a</string><key>CFBundleIdentifier</key><string>a.a</string></dict></plist>"#,
+    )
+    .unwrap();
+    std::fs::write(contents.join("Resources/main.luau"), "a").unwrap();
+    // Never signed: nothing to break. (`true` is signed; a bundle isn't yet.)
+    let sign = Command::new("codesign")
+        .args(["--force", "--sign", "-"])
+        .arg(&bundle)
+        .status()
+        .unwrap();
+    assert!(sign.success());
+    assert!(!guard::broken(&bundle));
+    std::fs::write(contents.join("Resources/main.luau"), "b").unwrap();
+    assert!(guard::broken(&bundle));
+    // Not an app bundle: nothing to verify.
+    assert!(!guard::broken(dir.path()));
 }

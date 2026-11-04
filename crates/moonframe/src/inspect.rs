@@ -7,6 +7,7 @@
 //! around it, and is saved where agents read it (`paths::selection`).
 
 use {
+    crate::paths,
     gpui_kit::*,
     moonframe_core::{Node, Workspace},
     std::{cell::RefCell, fmt::Write as _, path::Path, rc::Rc},
@@ -167,7 +168,26 @@ pub(crate) fn report(placed: &Placed, workspace: &Workspace) -> String {
     let _ = writeln!(out, "- mod: {owner}, drawn by {at}");
     let path: Vec<&str> = trail.iter().map(|crumb| crumb.label.as_str()).collect();
     let _ = writeln!(out, "- inside: {}", path.join(" > "));
+    if let Some(copy) = copy_to(workspace.slot(&owner).and_then(|slot| slot.source())) {
+        let _ = writeln!(out, "{copy}");
+    }
     out
+}
+
+/// What to do with `source` when it ships in the installed app: it is
+/// signed, so the change goes in a copy, which wins over it.
+fn copy_to(source: Option<&Path>) -> Option<String> {
+    let folder = &moonframe_providers::installed()?.folder;
+    let path = paths::overlay(source?)?;
+    Some(read_only(&folder.join(path)))
+}
+
+fn read_only(copy: &Path) -> String {
+    format!(
+        "- read-only: that file ships in the signed app. Copy it to {} and change the copy, \
+         which replaces it at once",
+        copy.display()
+    )
 }
 
 fn location(source: Option<&Path>, line: Option<u32>) -> String {
