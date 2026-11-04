@@ -28,22 +28,26 @@ from ring import RGBA16, Ring  # noqa: E402
 
 RING = "lightbox"
 SLOTS = 4
-WIDTH, HEIGHT = 640, 360
+WIDTH, HEIGHT = 1280, 720
 # The strip wraps around, so a scan can be any length.
-STRIP = 1280
+STRIP = 2560
 RATE = 24
 TOTAL = 720
 # Pixels the film moves each frame.
-PULL = 3
+PULL = 6
 # Frames between readings, and between saving the scan's place.
 READING = 3
 SAVING = RATE
 # A sample every this many pixels feeds the instruments.
-COLUMN_STEP = 5
-ROW_STEP = 6
+COLUMN_STEP = 16
+ROW_STEP = 12
+# Each column is measured in slices of its rows: one range from top to bottom
+# would fill in the gap between dark hills and a bright sky.
+BANDS = 8
 BINS = 32
-POINTS_PER_COLUMN = 3
-FRAME_LINE = 320
+POINTS_PER_COLUMN = 6
+FRAME_LINE = 640
+FRAME_LINE_WIDTH = 12
 PLACE = os.path.join(
     tempfile.gettempdir(),
     f"moonframe-lightbox-{os.environ.get('MOONFRAME_PROFILE', 'default')}.json",
@@ -64,7 +68,7 @@ def hill(u, depth):
 
 def pixel(x, v, far, near):
     """Red, green and blue from 0 to 1 at column `x`, `v` down the frame."""
-    if x % FRAME_LINE < 6:
+    if x % FRAME_LINE < FRAME_LINE_WIDTH:
         return 0.02, 0.02, 0.025
     u = x / STRIP
     if v > near:
@@ -112,9 +116,11 @@ class Film:
 
 
 def measure(samples):
-    """One column's lows, highs, tones and chroma."""
-    low = [min(sample[channel] for sample in samples) for channel in range(3)]
-    high = [max(sample[channel] for sample in samples) for channel in range(3)]
+    """One column's lows and highs in each band, tones and chroma."""
+    size = -(-len(samples) // BANDS)
+    slices = [samples[start : start + size] for start in range(0, len(samples), size)]
+    low = [[min(sample[channel] for sample in part) for part in slices] for channel in range(3)]
+    high = [[max(sample[channel] for sample in part) for part in slices] for channel in range(3)]
     bins = [[0] * BINS for _ in range(3)]
     for sample in samples:
         for channel in range(3):
@@ -137,10 +143,13 @@ def reading(film, at, exposure):
         return round(min(value * exposure, 1.0), 3)
 
     waveform = [
-        {
-            "low": [level(column[0][channel]) for column in columns],
-            "high": [level(column[1][channel]) for column in columns],
-        }
+        [
+            {
+                "low": [level(column[0][channel][band]) for column in columns],
+                "high": [level(column[1][channel][band]) for column in columns],
+            }
+            for band in range(len(columns[0][0][channel]))
+        ]
         for channel in range(3)
     ]
     tones = [[0] * BINS for _ in range(3)]
@@ -149,7 +158,7 @@ def reading(film, at, exposure):
             for bin, amount in enumerate(column[2][channel]):
                 tones[channel][min(int(bin * exposure), BINS - 1)] += amount
     points = []
-    for column in columns[::2]:
+    for column in columns:
         for cb, cr in column[3]:
             points.append(round(max(min(cb * exposure, 1), -1), 3))
             points.append(round(max(min(cr * exposure, 1), -1), 3))
@@ -185,6 +194,7 @@ class Scan:
             return
         self.frame, self.running = saved["frame"], saved["running"]
         self.crashes = saved["crashes"]
+        self.done = self.frame >= TOTAL
         if self.running and not saved["clean"]:
             self.crashes += 1
 

@@ -3,9 +3,15 @@
 -- side as a parade. The engine measures; this only draws, at whatever rate
 -- it publishes.
 
-type Channel = {
+type Band = {
 	low: { number },
 	high: { number },
+}
+
+type Channel = {
+	low: { number }?,
+	high: { number }?,
+	bands: { Band }?,
 	color: string?,
 	name: string?,
 }
@@ -29,7 +35,7 @@ return component {
 	description = "A picture's levels across its width: each column's lowest and highest value per channel, overlaid or as an RGB parade, over graticule lines.",
 	when = "Setting exposure or light against a picture's levels, from values an engine measured and published (a few hundred columns). For the spread of tones with no position use `histogram`; for hue and saturation use `vectorscope`.",
 	props = {
-		["channels"] = "list of { low, high (each 0 to 1, one per column), color?, name? }",
+		["channels"] = "list of { low, high (each 0 to 1, one per column), color?, name? }; or { bands = list of { low, high } } for a real picture, each band a slice of the rows, as one range per column fills in the gaps between its tones",
 		["parade"] = "side by side instead of overlaid",
 		["width"] = "pixels (default 320)",
 		["height"] = "pixels (default 140)",
@@ -62,29 +68,34 @@ return component {
 		for index, channel in props.channels do
 			local left = if props.parade then (index - 1) * width / count else 0
 			local span = if props.parade then width / count else width
-			local columns = #channel.low
 			local color = channel.color or "#e5e7eb"
-			local points = {}
-			for column = 1, columns do
-				local x = left + (column - 0.5) * span / columns
-				local top = (1 - math.clamp(channel.high[column] or 0, 0, 1)) * height
-				local bottom = (1 - math.clamp(channel.low[column] or 0, 0, 1)) * height
-				-- Down one column and up the next: one line for many columns.
-				local first, second = top, bottom
-				if column % 2 == 0 then
-					first, second = bottom, top
+			-- A column's picture is rarely one range: a dark hill under a
+			-- bright sky leaves a gap, which only bands can show.
+			local bands: { Band } = channel.bands or { { low = channel.low or {}, high = channel.high or {} } }
+			for _, band in bands do
+				local columns = #band.low
+				local points = {}
+				for column = 1, columns do
+					local x = left + (column - 0.5) * span / columns
+					local top = (1 - math.clamp(band.high[column] or 0, 0, 1)) * height
+					local bottom = (1 - math.clamp(band.low[column] or 0, 0, 1)) * height
+					-- Down one column and up the next: one line for many columns.
+					local first, second = top, bottom
+					if column % 2 == 0 then
+						first, second = bottom, top
+					end
+					table.insert(points, x)
+					table.insert(points, first)
+					table.insert(points, x)
+					table.insert(points, second)
+					if #points >= MOST_POINTS * 2 then
+						table.insert(paths, { points = points, color = color, stroke = 1 })
+						points = { x, second }
+					end
 				end
-				table.insert(points, x)
-				table.insert(points, first)
-				table.insert(points, x)
-				table.insert(points, second)
-				if #points >= MOST_POINTS * 2 then
+				if #points >= 4 then
 					table.insert(paths, { points = points, color = color, stroke = 1 })
-					points = { x, second }
 				end
-			end
-			if #points >= 4 then
-				table.insert(paths, { points = points, color = color, stroke = 1 })
 			end
 		end
 		return ui.paths { class = "waveform", width = width, height = height, paths = paths }

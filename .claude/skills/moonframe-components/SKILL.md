@@ -284,7 +284,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`tick-meter`](#tick-meter) | Data | A resource's utilization in a dense, technical dashboard (CPU, GPU, memory, a queue's depth), where a striped instrument reads better than a smooth bar. For a compact bar with its percentage use `meter`; for a quota with a reset use `usage-bar`; for task progress use `progress`. |
 | [`timeline`](#timeline) | Data | Events in order: checkpoints, commits, deploys, an agent's steps. For a flat selectable list use `list`; for comments use `comment-card`; for a table of runs use `table`. |
 | [`usage-bar`](#usage-bar) | Data | A rate limit or quota with a reset (an AI plan's weekly or 5-hour window, an API budget), in a usage sheet or settings page. For a plain fraction use `meter`; for task progress use `progress`; for a single big number use `stat-tile`. |
-| [`vectorscope`](#vectorscope) | Data | Judging colour balance and saturation from points an engine measured and published (a few thousand at most, thinned out). For levels across the picture use `waveform`; for tones use `histogram`. |
+| [`vectorscope`](#vectorscope) | Data | Judging colour balance and saturation from points an engine measured and published (up to 480, thinned out; more are left out). For levels across the picture use `waveform`; for tones use `histogram`. |
 | [`vertical-bar`](#vertical-bar) | Data | A fraction in a row with no room for a horizontal bar: a host's CPU or memory beside its name in a sidebar, a queue's depth in a tab. For a bar with room to spread use `meter`; for a history use `sparkline`. |
 | [`waveform`](#waveform) | Data | Setting exposure or light against a picture's levels, from values an engine measured and published (a few hundred columns). For the spread of tones with no position use `histogram`; for hue and saturation use `vectorscope`. |
 | [`week-calendar`](#week-calendar) | Data | Meetings, bookings or shifts placed in time: a day or week of hours where events span their length and overlapping ones share the column, or a month of them. For picking a day without events use `month-grid` or `day-strip`; for events in order without hours use `timeline`; for a day's list use `task-row`. |
@@ -2728,13 +2728,13 @@ A whole mod using it, with state: `app/components/demos/usage-bar.luau`.
 
 #### `vectorscope`
 
-**Vectorscope.** A picture's chroma as a trace in a circle, with a skin-tone line and the primaries and secondaries marked.
+**Vectorscope.** A picture's chroma as dots in a circle, with a skin-tone line and the primaries and secondaries marked.
 
-**When:** Judging colour balance and saturation from points an engine measured and published (a few thousand at most, thinned out). For levels across the picture use `waveform`; for tones use `histogram`.
+**When:** Judging colour balance and saturation from points an engine measured and published (up to 480, thinned out; more are left out). For levels across the picture use `waveform`; for tones use `histogram`.
 
 | Prop | Meaning |
 | --- | --- |
-| `color` | the trace's colour (default a soft green) |
+| `color` | the dots' colour (default a soft green) |
 | `points` | flat list x1, y1, x2, y2, ...: Cb and Cr, each -1 to 1 |
 | `size` | pixels across (default 200) |
 | `targets` | false hides the marks for the primaries and secondaries |
@@ -2781,7 +2781,7 @@ vertical_bar { label = "MEM", value = 0.5 }
 
 | Prop | Meaning |
 | --- | --- |
-| `channels` | list of { low, high (each 0 to 1, one per column), color?, name? } |
+| `channels` | list of { low, high (each 0 to 1, one per column), color?, name? }; or { bands = list of { low, high } } for a real picture, each band a slice of the rows, as one range per column fills in the gaps between its tones |
 | `height` | pixels (default 140) |
 | `lines` | levels for graticule lines, 0 to 1 (default 0, 0.25, 0.5, 0.75, 1) |
 | `parade` | side by side instead of overlaid |

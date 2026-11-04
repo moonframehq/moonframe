@@ -1,5 +1,5 @@
--- Hue and saturation as an instrument draws them: a picture's chroma as a
--- trace in a circle, with the primaries marked. The engine measures; this
+-- Hue and saturation as an instrument draws them: a picture's chroma as
+-- dots in a circle, with the primaries marked. The engine measures; this
 -- only draws, at whatever rate it publishes.
 
 type Props = {
@@ -20,20 +20,20 @@ local TARGETS = {
 	{ x = 0.31, y = 0.25, color = "#d946ef" },
 }
 local RING = 48
--- The most points `ui.paths` takes in one line.
-local MOST_POINTS = 200
+-- Each dot is a line of its own, and `ui.paths` takes 500 with the marks.
+local MOST_DOTS = 480
 local MARK = 4
 
 return component {
 	title = "Vectorscope",
 	category = "Data",
 	icon = "circle-dot",
-	description = "A picture's chroma as a trace in a circle, with a skin-tone line and the primaries and secondaries marked.",
-	when = "Judging colour balance and saturation from points an engine measured and published (a few thousand at most, thinned out). For levels across the picture use `waveform`; for tones use `histogram`.",
+	description = "A picture's chroma as dots in a circle, with a skin-tone line and the primaries and secondaries marked.",
+	when = "Judging colour balance and saturation from points an engine measured and published (up to 480, thinned out; more are left out). For levels across the picture use `waveform`; for tones use `histogram`.",
 	props = {
 		["points"] = "flat list x1, y1, x2, y2, ...: Cb and Cr, each -1 to 1",
 		["size"] = "pixels across (default 200)",
-		["color"] = "the trace's colour (default a soft green)",
+		["color"] = "the dots' colour (default a soft green)",
 		["targets"] = "false hides the marks for the primaries and secondaries",
 	},
 	styles = {
@@ -80,19 +80,12 @@ return component {
 				})
 			end
 		end
-		local trace = {}
 		local color = props.color or "#86efac"
-		for index = 1, #props.points - 1, 2 do
+		-- Dots: neighbours in the list are not neighbours in the picture, so
+		-- a line between them would mean nothing.
+		for index = 1, math.min(#props.points - 1, MOST_DOTS * 2), 2 do
 			local x, y = at(props.points[index], props.points[index + 1])
-			table.insert(trace, x)
-			table.insert(trace, y)
-			if #trace >= MOST_POINTS * 2 then
-				table.insert(paths, { points = trace, color = color, stroke = 1 })
-				trace = { x, y }
-			end
-		end
-		if #trace >= 4 then
-			table.insert(paths, { points = trace, color = color, stroke = 1 })
+			table.insert(paths, { points = { x - 1, y, x + 1, y }, color = color, stroke = 2 })
 		end
 		return ui.paths { class = "vectorscope", width = size, height = size, paths = paths }
 	end,

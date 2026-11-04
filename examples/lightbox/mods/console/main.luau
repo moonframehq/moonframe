@@ -103,7 +103,7 @@ return mod {
 	view = function(state, app)
 		local scanner: any = (app :: any).scanner or {}
 		local stats: any = state.stats
-		local wave: any = scanner.waveform or { { low = {}, high = {} }, { low = {}, high = {} }, { low = {}, high = {} } }
+		local wave: any = scanner.waveform or { {}, {}, {} }
 		local tones: any = scanner.tones or { {}, {}, {} }
 		local frame, total = scanner.frame or 0, scanner.total or 1
 		return ui.row {
@@ -151,10 +151,8 @@ return mod {
 					},
 					ui.spacer(),
 					ui.text { `{string.format("%.0f", stats.fps or 0)} i/s shown`, size = "small", tone = "muted" },
-					ui.column {
-						ui.text { "Exposure", size = "small" },
-						slider { value = state.exposure, min = 0.25, max = 2, width = 150, change = { exposure = true } },
-					},
+					ui.text { "Exposure", size = "small" },
+					slider { value = state.exposure, min = 0.25, max = 2, width = 150, change = { exposure = true } },
 				},
 			},
 			ui.column {
@@ -168,12 +166,12 @@ return mod {
 						gap = "small",
 						waveform {
 							width = SIDE - 26,
-							height = 150,
+							height = 170,
 							parade = state.parade,
 							channels = {
-								{ name = "Red", color = RED, low = wave[1].low, high = wave[1].high },
-								{ name = "Green", color = GREEN, low = wave[2].low, high = wave[2].high },
-								{ name = "Blue", color = BLUE, low = wave[3].low, high = wave[3].high },
+								{ name = "Red", color = RED, bands = wave[1] },
+								{ name = "Green", color = GREEN, bands = wave[2] },
+								{ name = "Blue", color = BLUE, bands = wave[3] },
 							},
 						},
 						switch { label = "Parade", on = state.parade, msg = "parade" },
@@ -191,7 +189,8 @@ return mod {
 					"Tones",
 					histogram {
 						width = SIDE - 26,
-						height = 90,
+						height = 110,
+						log = true,
 						channels = {
 							{ color = RED, values = tones[1] },
 							{ color = GREEN, values = tones[2] },

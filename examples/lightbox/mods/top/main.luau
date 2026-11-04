@@ -24,6 +24,7 @@ return mod {
 		return ui.row {
 			class = "top-bar",
 			grow = true,
+			drag = true,
 			align = "center",
 			ui.text { "Lightbox", weight = "semibold" },
 			pill {
