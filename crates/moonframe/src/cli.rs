@@ -18,7 +18,7 @@ use {
     moonframe_core::{AppLayer, Chrome, Roots, Titlebar},
     std::{
         fs,
-        path::PathBuf,
+        path::{Path, PathBuf},
         process::ExitCode,
         sync::{Arc, atomic::Ordering},
     },
@@ -81,6 +81,8 @@ Options:
 
 struct Args {
     folders: Folders,
+    /// The host's selected source checkout, never its embedded-file cache.
+    checkout: Option<PathBuf>,
     check: bool,
     /// Open without activating the app or focusing its window.
     background: bool,
@@ -115,7 +117,11 @@ fn usage() -> &'static str {
     }
 }
 
-fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>, String> {
+fn parse_args(
+    host: Option<&AppSource>,
+    keep: &[String],
+    project: Option<&Path>,
+) -> Result<Option<Args>, String> {
     let mut builtin = None;
     let mut user = paths::user();
     let bundled = paths::bundled();
@@ -208,20 +214,24 @@ fn parse_args(host: Option<&AppSource>, keep: &[String]) -> Result<Option<Args>,
         );
     }
     // An app on the library: DIR is its own folder, over the toolbox.
-    let (builtin, host) = match host {
+    let (builtin, host, checkout) = match host {
         Some(source) => {
-            let app = builtin.unwrap_or_else(|| crate::embed::host_app(source));
+            let selected = builtin.or_else(|| paths::resources().map(|dir| dir.join("app")));
+            let checkout = crate::branch_bar::host_dir(source, selected.as_deref(), project);
+            let app = selected.unwrap_or_else(|| crate::embed::host_app(source));
             (
                 crate::embed::toolbox_folder(),
                 Some(AppLayer {
                     path: app,
                     keep: keep.to_vec(),
                 }),
+                checkout,
             )
         },
-        None => (builtin.unwrap_or_else(crate::embed::builtin), None),
+        None => (builtin.unwrap_or_else(crate::embed::builtin), None, None),
     };
     Ok(Some(Args {
+        checkout,
         folders: Folders {
             builtin,
             host,
@@ -384,8 +394,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         eprintln!("{name}: the app names no folder: call `Moonframe::app_dir` or `embedded_app`");
         return ExitCode::from(2);
     }
-    crate::branch_bar::init(host);
-    let args = match parse_args(host, &launch.keep) {
+    let args = match parse_args(host, &launch.keep, launch.project.as_deref()) {
         Ok(Some(args)) => args,
         Ok(None) => {
             println!("{}", branded(usage()));
@@ -469,6 +478,8 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         let roots = folders.roots();
         return on_a_view_stack(move || catalogue(roots));
     }
+
+    crate::branch_bar::init(launch.identity.hosted, args.checkout.as_deref());
 
     // The user's folder, or the bundled app's profile in it, exists from
     // the first run, so it is watched and easy to find.

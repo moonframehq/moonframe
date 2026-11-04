@@ -25,6 +25,7 @@ use {
 pub struct Moonframe {
     pub(crate) identity: Identity,
     pub(crate) app: Option<AppSource>,
+    pub(crate) project: Option<PathBuf>,
     pub(crate) keep: Vec<String>,
     pub(crate) natives: Natives,
     pub(crate) views: Registry,
@@ -59,6 +60,7 @@ impl Moonframe {
             log: format!("error,moonframe=info,{}=info", name.replace('-', "_")),
             identity,
             app: None,
+            project: None,
             keep: Vec::new(),
             natives: crate::natives::natives(),
             views: Registry::default(),
@@ -127,8 +129,19 @@ impl Moonframe {
         self
     }
 
+    /// The source checkout for an embedded app's debug branch bar, usually
+    /// `env!("CARGO_MANIFEST_DIR")` in the host crate. This works even when
+    /// Cargo's target folder is outside the checkout. An app folder selected
+    /// with `app_dir`, on the command line, or from a bundle takes precedence.
+    pub fn project_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.project = Some(dir.into());
+        self
+    }
+
     /// Its app folder compiled into the binary, for an app shipped as a
     /// lone executable: written to `~/.cache/<name>/app/<hash>` to run.
+    /// Set [`project_dir`](Self::project_dir) to name its source checkout in
+    /// the debug branch bar; without it, embedded files show no branch bar.
     ///
     /// ```ignore
     /// #[derive(moonframe::rust_embed::RustEmbed)]
@@ -136,7 +149,9 @@ impl Moonframe {
     /// #[folder = "app"]
     /// struct AppFiles;
     ///
-    /// moonframe::Moonframe::new("notes").embedded_app::<AppFiles>()
+    /// moonframe::Moonframe::new("notes")
+    ///     .project_dir(env!("CARGO_MANIFEST_DIR"))
+    ///     .embedded_app::<AppFiles>()
     /// ```
     pub fn embedded_app<E: rust_embed::RustEmbed + 'static>(mut self) -> Self {
         self.app = Some(AppSource::Embedded(Arc::new(|cache| {
