@@ -60,6 +60,10 @@ impl MoonframeApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Taken {
+        // While picking, 1 to 5 choose how it measures.
+        if self.measure_keystroke(keystroke, cx) {
+            return Taken::Sent;
+        }
         // Escape belongs to the inspector while it is picking or showing
         // its card, which sit above everything: before a focused terminal
         // or field, which would keep it from the app's key bindings.

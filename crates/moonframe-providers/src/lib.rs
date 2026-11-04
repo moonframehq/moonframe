@@ -339,6 +339,13 @@ impl Providers {
         self.sync();
     }
 
+    /// Starts the provider `name` again from its folder, changed or not:
+    /// a retry after it failed (a build that needed a tool installed).
+    pub fn restart(&mut self, name: &str) {
+        self.running.remove(name);
+        self.reload();
+    }
+
     /// Runs the providers found that are wanted, or always run, each from
     /// its folder as it is now.
     fn sync(&mut self) {

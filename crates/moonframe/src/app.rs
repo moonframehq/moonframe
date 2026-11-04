@@ -50,9 +50,11 @@ mod dialogs;
 mod fonts;
 mod history;
 mod listeners;
+mod measuring;
 mod menu;
 mod panes;
 mod picking;
+mod problems;
 mod toasts;
 mod updates;
 mod view;
@@ -93,6 +95,8 @@ pub(crate) struct MoonframeApp {
     pub(crate) drag: bool,
     /// Picking an element for an agent, and what was picked.
     pub(crate) inspector: Inspector,
+    /// The stylesheet's and providers' problems: open, or dismissed.
+    problem_state: problems::Problems,
     /// The shells `ui.terminal` elements show.
     #[cfg(feature = "terminal")]
     pub(crate) terminals: Terminals,
@@ -290,6 +294,7 @@ impl MoonframeApp {
             asked: chrome,
             drag: false,
             inspector: Inspector::default(),
+            problem_state: problems::Problems::default(),
             chosen: String::new(),
             gallery: None,
             light_scheme,
@@ -322,6 +327,7 @@ impl MoonframeApp {
             _keys: crate::keys::intercept(cx),
             last_pane: 0,
         };
+        app.load_measure();
         app.apply_theme(cx);
         // What changed while the app was closed is a snapshot of its own.
         app.snapshot("launch", cx);
