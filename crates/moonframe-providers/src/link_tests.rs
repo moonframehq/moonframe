@@ -57,28 +57,54 @@ fn link(received: &mpsc::Receiver<Event>, wanted: impl Fn(&Link) -> bool) {
 }
 
 #[test]
-fn output_is_published_as_it_is_printed_not_on_a_timer() {
-    let dir = tempfile::tempdir().unwrap();
-    let root = dir.path();
-    write(
-        root,
-        "providers/quick/provider.toml",
-        "kind = 'process'\ncommand = ['sh', 'quick.sh']\n",
-    );
-    // The first line starts the clock, the second comes right after a
-    // pause that ends between two of the old polls.
-    write(
-        root,
-        "providers/quick/quick.sh",
-        "echo 1\nsleep 0.15\necho 2\ncat >/dev/null\n",
-    );
+fn output_is_published_before_reading_the_next_line() {
+    use std::{
+        io::{self, Read},
+        sync::atomic::AtomicBool,
+    };
+
+    struct Output {
+        sent: u8,
+        received: mpsc::Receiver<Event>,
+    }
+
+    impl Read for Output {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            if buffer.is_empty() {
+                return Ok(0);
+            }
+            if self.sent > 0 {
+                let Event::Published { provider, data } = self.received.try_recv().expect(
+                    "the previous line must be published before another read, without a pump tick",
+                ) else {
+                    panic!("expected a published line");
+                };
+                assert_eq!(provider, "quick");
+                assert_eq!(data, Data::Integer(i64::from(self.sent)));
+            }
+            if self.sent == 2 {
+                return Ok(0);
+            }
+            self.sent += 1;
+            // The BufReader asks for a full buffer; give it only one line
+            // so its next read checks publication before more input or EOF.
+            buffer[..2].copy_from_slice(&[b'0' + self.sent, b'\n']);
+            Ok(2)
+        }
+    }
+
     let (events, received) = events();
-    let _providers = Providers::start(root.into(), root.join("build"), events);
-    published(&received);
-    let (data, took) = published(&received);
-    assert_eq!(data, Data::Integer(2));
-    // The sleep, and nowhere near a further 100 ms poll on a loaded host.
-    assert!(took < Duration::from_millis(240), "took {took:?}");
+    let publisher = crate::Publisher::new("quick".into(), events, crate::Publish::All);
+    // Run only the output reader: no process, scheduler deadline or polling
+    // loop can deliver on its behalf. A slow CI host cannot change the order.
+    assert!(matches!(
+        crate::stream::publish_lines(
+            Output { sent: 0, received },
+            &publisher,
+            &Arc::new(AtomicBool::new(false)),
+        ),
+        crate::stream::Ended::Closed
+    ));
 }
 
 #[test]
