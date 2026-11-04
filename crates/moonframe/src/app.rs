@@ -51,6 +51,7 @@ mod fonts;
 pub(crate) mod guard;
 mod history;
 mod listeners;
+mod machine;
 mod menu;
 mod panes;
 mod picking;
@@ -166,6 +167,7 @@ pub(crate) struct MoonframeApp {
     main_window: WindowId,
     /// The mod holding back closing and quitting, if one is.
     close_guard: Option<guard::CloseGuard>,
+    awake: crate::awake::Awake,
     /// How each process or socket provider's link stands: `app.links`.
     links: std::collections::BTreeMap<String, Data>,
     /// The open popovers and overlays each window's last frame drew, which
@@ -248,6 +250,7 @@ impl MoonframeApp {
         flush_on_quit(cx);
         Self::watch_closing(window, cx);
         Self::watch_displays(cx);
+        Self::tell_last_crash(cx);
         let settings = folders.settings().into_iter().next();
         let saved = |key| {
             folders
@@ -326,6 +329,7 @@ impl MoonframeApp {
             defaults,
             main_window: window.window_handle().window_id(),
             close_guard: None,
+            awake: Default::default(),
             links: Default::default(),
             key_layers: HashMap::new(),
             history,
@@ -880,6 +884,9 @@ impl MoonframeApp {
             },
             Request::Window(request) => self.window_request(from, request, cx),
             Request::Guard(request) => self.guard_request(from, request, window, cx),
+            Request::Awake(request) => self.awake_request(from, request, cx),
+            Request::Dock(dock) => crate::dock::show(&dock),
+            Request::Restart(name) => self.restart_provider(from, &name),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);

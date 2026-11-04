@@ -10,7 +10,7 @@ from sealed_luau import references
 
 NATIVES = {"acp": "acp", "chat": "chat", "docs": "docs", "git": "git",
            "github": "forge", "gitlab": "forge", "shell": "shell", "usage": "usage"}
-FEATURES = set(NATIVES.values()) | {"alacritty", "browser", "ghostty", "herdr-core",
+FEATURES = set(NATIVES.values()) | {"alacritty", "awake", "browser", "ghostty", "herdr-core",
                                   "map", "markdown", "video", "prose", "terminal", "tokio", "updates", "wasm"}
 SKIP = {".git", ".claude", ".DS_Store", ".moonframe-embedded", "target", "types",
         "__pycache__", ".luaurc"}

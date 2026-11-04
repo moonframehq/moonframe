@@ -27,6 +27,7 @@ default = [
   # keep-sorted start
   "acp",
   "alacritty",
+  "awake",
   "browser",
   "chat",
   "docs",
@@ -49,6 +50,7 @@ default = [
 # keep-sorted start
 acp        = ["moonframe/acp"]
 alacritty  = ["moonframe/alacritty"]
+awake      = ["moonframe/awake"]
 browser    = ["moonframe/browser"]
 capture    = ["moonframe/capture"]
 chat       = ["moonframe/chat"]

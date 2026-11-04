@@ -14,6 +14,79 @@ fn fallback() -> &'static [u8] {
     crate::identity().icon.unwrap_or(ICON)
 }
 
+/// The icon with a bar over it, kept while the app runs.
+#[cfg(target_os = "macos")]
+struct ProgressTile {
+    view: objc2::rc::Retained<objc2_app_kit::NSImageView>,
+    bar: objc2::rc::Retained<objc2_app_kit::NSProgressIndicator>,
+}
+
+#[cfg(target_os = "macos")]
+thread_local! {
+    static PROGRESS: std::cell::RefCell<Option<ProgressTile>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Does what a mod asked with `app:dock`. Runs on the main thread, where
+/// requests are carried out.
+#[cfg(target_os = "macos")]
+pub(crate) fn show(dock: &moonframe_core::Dock) {
+    use {
+        objc2::{MainThreadMarker, MainThreadOnly as _},
+        objc2_app_kit::{
+            NSApplication, NSImageView, NSProgressIndicator, NSProgressIndicatorStyle,
+        },
+        objc2_foundation::{NSPoint, NSRect, NSSize, NSString},
+    };
+    let Some(main) = MainThreadMarker::new() else {
+        tracing::warn!("the Dock tile is set from the main thread only");
+        return;
+    };
+    let app = NSApplication::sharedApplication(main);
+    let tile = app.dockTile();
+    if let Some(badge) = &dock.badge {
+        let badge = badge.as_deref().map(NSString::from_str);
+        tile.setBadgeLabel(badge.as_deref());
+    }
+    let Some(progress) = dock.progress else {
+        return;
+    };
+    match progress {
+        None => {
+            tile.setContentView(None);
+        },
+        Some(fraction) => PROGRESS.with_borrow_mut(|progress| {
+            let shown = progress.get_or_insert_with(|| {
+                let size = tile.size();
+                let image = app.applicationIconImage();
+                let view = match image {
+                    Some(image) => NSImageView::imageViewWithImage(&image, main),
+                    None => NSImageView::new(main),
+                };
+                view.setFrame(NSRect::new(NSPoint::new(0.0, 0.0), size));
+                let bar = NSProgressIndicator::initWithFrame(
+                    NSProgressIndicator::alloc(main),
+                    NSRect::new(
+                        NSPoint::new(size.width * 0.1, size.height * 0.06),
+                        NSSize::new(size.width * 0.8, size.height * 0.12),
+                    ),
+                );
+                bar.setStyle(NSProgressIndicatorStyle::Bar);
+                bar.setIndeterminate(false);
+                bar.setMinValue(0.0);
+                bar.setMaxValue(1.0);
+                view.addSubview(&bar);
+                ProgressTile { view, bar }
+            });
+            shown.bar.setDoubleValue(fraction);
+            tile.setContentView(Some(&shown.view));
+        }),
+    }
+    tile.display();
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn show(_: &moonframe_core::Dock) {}
+
 /// Must run on the main thread once the application exists.
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code, reason = "one AppKit setter; see SAFETY")]

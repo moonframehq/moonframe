@@ -196,6 +196,13 @@ impl MoonframeApp {
         source: crate::update::Source,
         cx: &mut Context<Self>,
     ) {
+        // Installing quits: a mod holding that back is in the middle of
+        // something, and the download would only wait on it.
+        if self.close_guard.is_some() {
+            self.updating = false;
+            self.show_toast_text("Finish what is running, then update.".into(), cx);
+            return;
+        }
         // Stays up until the download ends.
         let id = self.next_toast();
         self.toast = Some((
@@ -216,7 +223,9 @@ impl MoonframeApp {
             match staged {
                 Ok(()) => {
                     tracing::info!("installing {} and starting again", release.version);
-                    cx.update(|cx| cx.quit());
+                    // A mod may have started holding since: the installer
+                    // waits for the app to go, whenever that is.
+                    cx.update(guard::quit);
                 },
                 Err(problem) => {
                     tracing::warn!("installing the update: {problem}");

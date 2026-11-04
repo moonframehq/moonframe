@@ -72,7 +72,7 @@ pub use {
 };
 pub use {
     json::{from_json, to_json},
-    manifest::{Capability, Kind, Manifest, PREBUILT, Publish, Start},
+    manifest::{Capability, Kind, Manifest, PREBUILT, Publish, Restart, Start},
     mods::{Mods, owner},
     native::{Handle, Native, Natives},
 };
@@ -128,7 +128,7 @@ pub type Events = Arc<dyn Fn(Event) + Send + Sync>;
 /// How a process or socket provider's link stands, for `app.links.<name>`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Link {
-    /// Whether a socket provider has its program; `None` for a process.
+    /// Whether a process or socket provider has its program.
     pub connected: Option<bool>,
     /// Messages not yet written.
     pub waiting: usize,
@@ -349,8 +349,9 @@ const SHUTDOWN_SLACK: Duration = Duration::from_millis(200);
 struct Running {
     messages: mpsc::Sender<Message>,
     stop: Arc<AtomicBool>,
-    /// Its folder when it started: a reload restarts it only if this changed.
-    fingerprint: Fingerprint,
+    /// Its folder when it started: a reload restarts it only if this
+    /// changed. `None` once asked to restart, whatever the folder holds.
+    fingerprint: Option<Fingerprint>,
     /// A process or native provider, which hears when the project changes.
     follows_project: bool,
     /// A process, and how long it may take to leave; set once it has.
@@ -373,6 +374,8 @@ pub(crate) struct Context {
     pub(crate) messages: mpsc::Receiver<Message>,
     pub(crate) stop: Arc<AtomicBool>,
     pub(crate) events: Events,
+    /// Set once the process this one replaces has left.
+    pub(crate) replaces: Option<Arc<AtomicBool>>,
     publisher: Publisher,
 }
 
@@ -482,12 +485,16 @@ impl Providers {
             if self
                 .running
                 .get(&name)
-                .is_some_and(|running| running.fingerprint == fingerprint)
+                .is_some_and(|running| running.fingerprint == Some(fingerprint))
             {
                 continue;
             }
-            // Stops the old one, if any.
-            self.running.remove(&name);
+            // Stops the old one, if any. Its process may take a while to
+            // leave, and the new one must not start beside it.
+            let replaces = self
+                .running
+                .remove(&name)
+                .and_then(|running| running.leaving.as_ref().map(|(_, left)| left.clone()));
             let manifest = match manifest {
                 Ok(manifest) => manifest,
                 Err(problem) => {
@@ -514,6 +521,7 @@ impl Providers {
                 messages,
                 stop: stop.clone(),
                 events: self.events.clone(),
+                replaces,
                 publisher,
             };
             let native = self.natives.get(name.as_str()).cloned();
@@ -539,7 +547,7 @@ impl Providers {
                     self.running.insert(name, Running {
                         messages: sender,
                         stop,
-                        fingerprint,
+                        fingerprint: Some(fingerprint),
                         follows_project,
                         leaving,
                     });
@@ -581,6 +589,21 @@ impl Providers {
                 thread::sleep(Duration::from_millis(5));
             }
         }
+    }
+
+    /// Starts the provider `name` again, or for the first time, however
+    /// it stands: for a process that went and stays gone, once the user
+    /// has dealt with what stopped it.
+    pub fn restart(&mut self, name: &str) -> Result<(), Error> {
+        if !self.found.contains_key(name) {
+            return Err(Error::new(format!("no provider named `{name}`")));
+        }
+        if let Some(running) = self.running.get_mut(name) {
+            running.fingerprint = None;
+        }
+        self.want(Some(BTreeSet::from([name.to_owned()])));
+        self.sync();
+        Ok(())
     }
 
     /// Hands `message`, from the mod `from`, to the provider `name`,

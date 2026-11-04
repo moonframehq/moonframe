@@ -123,6 +123,81 @@ which is one more reason to keep capture safe in the engine.
 
 A `kind = "process"` provider sees stdin close, has `stop-grace` seconds (0.25
 by default, up to 30) to leave, then gets SIGTERM, then 0.25 s, then a kill.
+SIGTERM and the kill reach everything it started, as each process provider
+runs in a process group of its own, so a launcher script can't leave an engine
+behind. Because of that, Ctrl-C in a terminal running the app doesn't reach
+the provider: it sees stdin close instead, so it must watch for that. A
+replacement never starts beside the old process: a reload or `app:restart`
+waits for it to leave.
+
+## When the engine goes
+
+A `socket` provider reconnects by itself. A `process` provider that exits, or
+closes its output, stays gone unless you say otherwise:
+
+```toml
+kind    = "process"
+command = ["sh", "run-engine.sh"]
+restart = "on-failure"
+```
+
+It starts again after 0.5 s, doubling up to 30 s, back to 0.5 s once a run has
+lasted a minute. Messages sent while it is down are dropped and counted. Either
+way, `app.links.<name>.connected` says whether it is there and `app.<name>`
+shows the failure until it publishes again. A mod can also start it again by
+hand, which suits a Retry button after the user fixes a cable:
+
+```lua
+return state, { { to = "app:restart", msg = "engine" } }
+```
+
+Restarting is the app's half. Whether the scan can resume, and where, is the
+engine's to work out and publish.
+
+## Long runs
+
+`app:awake` keeps the machine from sleeping when idle, and by default keeps the
+display on, until the mod lets go. Each mod holds for itself. Closing a
+laptop's lid still sleeps, and quitting or crashing ends every hold. It needs
+the `awake` cargo feature.
+
+```lua
+-- As the scan starts; `display = false` lets the screen sleep and lock.
+return state, { { to = "app:awake", msg = { hold = true, display = false, reason = "Scanning" } } }
+
+-- When it ends:
+return state, { { to = "app:awake", msg = { hold = false } } }
+```
+
+`app.awake` says `held`, `display` and any `problem`. For a switch the user
+turns on, use the `caffeine` component:
+
+```lua
+local caffeine = use "caffeine"
+
+caffeine { awake = app.awake, scope = "system", reason = "Scanning" }
+```
+
+`app:dock` shows progress on the Dock icon while the window is out of sight
+(macOS; elsewhere it does nothing). Pair it with `app:notify` for the end:
+
+```lua
+return state, { { to = "app:dock", msg = { progress = 0.4, badge = "12" } } }
+return state, { { to = "app:dock", msg = { progress = false, badge = false } } }
+```
+
+## After a crash
+
+A panic in the app writes a report beside its state (`state.crashes/`, or
+`state-<profile>.crashes/`), with the message, version, thread and backtrace.
+The next launch sets `app.crash` to `{ message, report }` once, so a mod can
+offer to show it. Nothing is sent anywhere by itself, and the last 20 reports
+are kept. A panic a provider's thread survives is written too. A crash below
+Rust isn't caught: macOS keeps those in `~/Library/Logs/DiagnosticReports`.
+
+An update installs by quitting, so **Install and Relaunch** refuses while a mod
+holds `app:guard`. If a mod starts holding during the download, the installer
+waits for the app to leave.
 This is also what a reload does when its folder changed, and quitting waits
 for it. A socket provider's program is left alone.
 

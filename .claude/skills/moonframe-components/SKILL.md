@@ -220,6 +220,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`prose-editor`](#prose-editor) | Content | Writing long text: a draft, an article, notes, a journal, where the words are the whole screen. For a markdown file with a preview beside it use `markdown-editor`; for a short field in a form use `ui.input` (with `multiline` for a text area); for a chat box use `composer`. |
 | [`video-viewer`](#video-viewer) | Content | Previewing a camera or scanner, or inspecting a full-resolution frame, with an engine writing a frame ring (`ui.video`). The mod keeps `zoom` and `center`. For a picture in a file use `image-viewer`. |
 | [`button-group`](#button-group) | Controls | Related actions or view modes side by side in a header: Unified \| Split, Uncommitted \| Branch, zoom − \| +. For a settings choice in a track use `segmented`; for separate quiet buttons use `toolbar`; for back/forward use `nav-buttons`. |
+| [`caffeine`](#caffeine) | Controls | A scan, render or copy that runs unattended: put it in a status bar or toolbar for the user to turn on. A mod that knows when its job starts and ends should send `app:awake` itself instead. |
 | [`chips`](#chips) | Controls | Filters over a list where any number can be on (Open, Mine, Has agent). For exactly one of a few use `segmented`; for read-only labels use `tags`; for a single on/off setting use `switch`. |
 | [`copy-field`](#copy-field) | Controls | Text the user will paste elsewhere: an install command, a token, a URL, a path. For read-only label/value pairs use `key-values`; for an editable field wait for `ui.input`. |
 | [`dropdown`](#dropdown) | Controls | Pick one of many options that do not fit a `segmented` control (more than 3 or 4, or long labels), or a button that opens a menu of actions. For 2 to 4 short choices use `segmented`; for a menu on right-click use `context-menu`; for the menu rows alone use `menu`. |
@@ -839,6 +840,28 @@ button_group { buttons = { { icon = "rows-2", id = "unified", label = "Unified" 
 ```
 
 A whole mod using it, with state: `app/components/demos/button-group.luau`.
+
+#### `caffeine`
+
+**Caffeine.** A cup that keeps the machine awake while on, so a long job is not cut off by sleep.
+
+**When:** A scan, render or copy that runs unattended: put it in a status bar or toolbar for the user to turn on. A mod that knows when its job starts and ends should send `app:awake` itself instead.
+
+| Prop | Meaning |
+| --- | --- |
+| `awake` | `app.awake`, for it to show how things stand |
+| `reason` | why, for the system's list of what is keeping it awake |
+| `scope` | "display" keeps the screen on too (default); "system" lets it sleep and lock |
+| `size` | as `icon-button` |
+| `variant` | as `icon-button` |
+
+```lua
+local caffeine = use "caffeine"
+
+caffeine { awake = app.awake, scope = "system", reason = "Scanning" }
+```
+
+A whole mod using it, with state: `app/components/demos/caffeine.luau`.
 
 #### `chips`
 

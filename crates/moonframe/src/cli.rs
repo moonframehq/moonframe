@@ -412,6 +412,12 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     }
     let folders = args.folders;
     paths::set_user_folder(folders.user.clone());
+    let _ =
+        crate::CRASH_DIR.set(paths::state(folders.profile.as_deref()).with_extension("crashes"));
+    crate::crash::install(
+        crate::crash_dir(),
+        format!("{} {}", launch.identity.title, launch.identity.version),
+    );
     if cfg!(feature = "studio")
         && let Some(words) = &args.apps
     {

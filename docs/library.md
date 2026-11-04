@@ -73,6 +73,7 @@ ship only their selected components.
 
 | Feature | What it includes |
 | --- | --- |
+| `awake` | `app:awake`: keeping the machine from sleeping during a long job, on macOS, Windows and Linux. Off by default. See [Live video](video.md#long-runs). |
 | `browser` | Native web views and Wry on macOS/Windows. Linux keeps its system-browser fallback. |
 | `terminal` | Terminal rendering, local PTYs and tmux; choose an engine below to run a shell. |
 | `alacritty`, `ghostty` | Each enables `terminal` and its respective emulator. |

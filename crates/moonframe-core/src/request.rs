@@ -7,12 +7,16 @@
 
 use crate::{Command, Data, Error};
 
+mod awake;
+mod dock;
 mod edit;
 mod guard;
 mod pick;
 mod window;
 
 pub use {
+    awake::Awake,
+    dock::Dock,
     edit::{Edit, EditChange, Splice},
     guard::Guard,
     pick::{Pick, PickKind},
@@ -57,6 +61,13 @@ pub enum Request {
     /// `app:guard`: holds back closing the main window and quitting, so
     /// a mod can finish something first.
     Guard(Guard),
+    /// `app:awake`: keeps the machine, and by default the display, from
+    /// sleeping until this mod lets go; `app.awake` says how that stands.
+    Awake(Awake),
+    /// `app:dock`: a badge or a progress bar on the app's Dock icon.
+    Dock(Dock),
+    /// `app:restart`: starts a provider again, by name.
+    Restart(String),
     /// `app:open`: opens a web address (`https://` or `http://`) in the
     /// system's browser: a pull request, a sign-in page.
     Open(String),
@@ -132,6 +143,9 @@ impl Request {
             "edit" => edit::edit(msg).map(Self::Edit),
             "window" => window::window(msg).map(Self::Window),
             "guard" => guard::guard(msg).map(Self::Guard),
+            "awake" => awake::awake(msg).map(Self::Awake),
+            "dock" => dock::dock(msg).map(Self::Dock),
+            "restart" => restart(msg).map(Self::Restart),
             "open" => open(msg).map(Self::Open),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
@@ -155,11 +169,25 @@ pub const NAMES: &[&str] = &[
     "pick",
     "edit",
     "window",
+    "guard",
+    "awake",
+    "dock",
+    "restart",
     "open",
 ];
 
 /// Longest address `app:open` opens.
 const MAX_URL: usize = 2048;
+
+/// A provider's name.
+fn restart(msg: &Data) -> Result<String, Error> {
+    match msg {
+        Data::String(name) if !name.is_empty() => Ok(name.clone()),
+        _ => Err(Error::new(format!(
+            "`{APP}restart` takes a provider's name"
+        ))),
+    }
+}
 
 /// A web address, never a file or another program's scheme.
 fn open(msg: &Data) -> Result<String, Error> {

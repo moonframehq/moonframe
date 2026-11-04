@@ -17,13 +17,8 @@ use {
     },
     moonframe_core::Data,
     std::{
-        collections::BTreeMap,
-        net::Shutdown,
-        os::unix::net::UnixStream,
-        path::Path,
-        sync::mpsc::{self, RecvTimeoutError},
-        thread,
-        time::Duration,
+        collections::BTreeMap, net::Shutdown, os::unix::net::UnixStream, path::Path, sync::mpsc,
+        thread, time::Duration,
     },
 };
 
@@ -55,7 +50,7 @@ pub(crate) fn run(context: &Context) {
                 tracing::debug!(provider = %context.name, "cannot connect: {error}");
             },
         }
-        if !wait(context, delay, &mut reporter) {
+        if !stream::wait(context, delay, &mut reporter) {
             return;
         }
         delay = (delay * 2).min(SLOWEST);
@@ -92,7 +87,7 @@ fn serve(context: &Context, stream: UnixStream, reporter: &mut Reporter) -> bool
     let writing = outbox.clone();
     thread::spawn(move || stream::write_lines(writer, &writing));
     reporter.connected(true);
-    let pumped = stream::pump(context, &outbox, &end, reporter);
+    let pumped = stream::pump(context, &outbox, &end, reporter, || false);
     // Wakes the reader and a writer stuck on a full socket.
     let _ = stream.shutdown(Shutdown::Both);
     outbox.close();
@@ -105,21 +100,5 @@ fn serve(context: &Context, stream: UnixStream, reporter: &mut Reporter) -> bool
             tracing::warn!(provider = %context.name, "dropping the link: {problem}");
             false
         },
-    }
-}
-
-/// Waits `delay`, dropping what arrives; whether to go on.
-fn wait(context: &Context, delay: Duration, reporter: &mut Reporter) -> bool {
-    let until = std::time::Instant::now() + delay;
-    loop {
-        let left = until.saturating_duration_since(std::time::Instant::now());
-        if left.is_zero() {
-            return !context.stopped();
-        }
-        match context.messages.recv_timeout(left) {
-            Ok(message) => stream::unheard(reporter, message),
-            Err(RecvTimeoutError::Timeout) => return !context.stopped(),
-            Err(RecvTimeoutError::Disconnected) => return false,
-        }
     }
 }

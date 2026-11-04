@@ -14,6 +14,7 @@ fn compiled() -> std::collections::BTreeMap<String, bool> {
         // keep-sorted start
         "acp",
         "alacritty",
+        "awake",
         "browser",
         "capture",
         "chat",

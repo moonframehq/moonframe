@@ -3,7 +3,7 @@
 //! [`Outbox`], and the loop between them.
 
 use {
-    crate::{Context, Event, Link, Message, Publisher, json, outbox::Outbox},
+    crate::{Context, Event, Link, Publisher, json, outbox::Outbox},
     moonframe_core::{Data, Error},
     std::{
         io::{BufRead, BufReader, Read, Write},
@@ -96,12 +96,14 @@ pub(crate) fn write_lines(mut input: impl Write, outbox: &Outbox) {
 }
 
 /// Queues the provider's messages for the program until it is told to
-/// stop or the output ends (`ended` hears why).
+/// stop, the output ends (`ended` hears why), or `exited` says the program
+/// went: what it started may hold its output open long after.
 pub(crate) fn pump(
     context: &Context,
     outbox: &Outbox,
     ended: &Receiver<Ended>,
     reporter: &mut Reporter,
+    mut exited: impl FnMut() -> bool,
 ) -> Pumped {
     let mut warned = 0;
     loop {
@@ -117,6 +119,11 @@ pub(crate) fn pump(
             Ok(why) => return Pumped::Ended(why),
             Err(TryRecvError::Empty) => {},
             Err(TryRecvError::Disconnected) => return Pumped::Ended(Ended::Closed),
+        }
+        if exited() {
+            // Its last lines go out before it is said to have gone.
+            let why = ended.recv_timeout(POLL).unwrap_or(Ended::Closed);
+            return Pumped::Ended(why);
         }
         let (waiting, dropped) = outbox.load();
         if dropped > warned {
@@ -164,15 +171,13 @@ impl Reporter {
         }
     }
 
-    /// Whether a socket provider's program is there, told at once.
-    #[cfg_attr(not(unix), allow(dead_code))]
+    /// Whether the provider's program is there, told at once.
     pub(crate) fn connected(&mut self, connected: bool) {
         self.link.connected = Some(connected);
         self.tell();
     }
 
     /// Adds `dropped` to what is kept across connections.
-    #[cfg_attr(not(unix), allow(dead_code))]
     pub(crate) fn carry(&mut self, dropped: u64) {
         self.carried += dropped;
         self.link.dropped = self.carried;
@@ -191,9 +196,22 @@ impl Reporter {
     }
 }
 
-/// Counts `message` as dropped: nothing is there to hear it.
-#[cfg_attr(not(unix), allow(dead_code))]
-pub(crate) fn unheard(reporter: &mut Reporter, _: Message) {
-    reporter.carry(1);
-    reporter.tell();
+/// Waits `delay` with the program gone, counting what arrives as dropped;
+/// whether to go on.
+pub(crate) fn wait(context: &Context, delay: Duration, reporter: &mut Reporter) -> bool {
+    let until = Instant::now() + delay;
+    loop {
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return !context.stopped();
+        }
+        match context.messages.recv_timeout(left) {
+            Ok(_) => {
+                reporter.carry(1);
+                reporter.tell();
+            },
+            Err(RecvTimeoutError::Timeout) => {},
+            Err(RecvTimeoutError::Disconnected) => return false,
+        }
+    }
 }

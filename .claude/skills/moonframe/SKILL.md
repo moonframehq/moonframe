@@ -763,6 +763,16 @@ end,
   `{ release = true }` to go ahead or `{ hold = false }` to stop holding.
   Past `timeout` the next attempt goes through. Quit from the Dock and
   logging out go around it.
+- `app:awake`, `msg` `{ hold = true, display = false, reason = "Scanning" }`
+  or `{ hold = false }`: keeps the machine from sleeping when idle until
+  this mod lets go (`display` starts on); `app.awake` says `held`, `display`
+  and any `problem`. Needs the `awake` feature. The `caffeine` component is
+  this as a switch for the user.
+- `app:dock`, `msg` `{ badge = "3", progress = 0.4 }`, either or both, each
+  `false` to clear it: the Dock icon, on macOS.
+- `app:restart`, `msg` a provider's name: starts it again, for a Retry
+  button. A process provider with `restart = "on-failure"` does this by
+  itself, and `app.links.<name>.connected` says whether it is there.
 - `app:window`, `msg` a mod's name, `{ open = "<mod>", send = <msg>? }`
   or `{ close = "<mod>" }`: opens that mod in a window of its own (or
   raises it), as a control's `window = "<mod>"` does, or closes it. `send`

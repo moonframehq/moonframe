@@ -121,7 +121,7 @@ pub(super) fn flush_on_quit(cx: &mut Context<MoonframeApp>) {
 
 impl MoonframeApp {
     /// Shares `data` as `app.<key>`, drawing again if a view read it.
-    fn published(&mut self, key: &str, data: Data, cx: &mut Context<Self>) {
+    pub(super) fn published(&mut self, key: &str, data: Data, cx: &mut Context<Self>) {
         // No view read it: the window looks the same.
         let drawn = self.workspace.set_host(key, data);
         // Mods that heard it may have asked a provider.

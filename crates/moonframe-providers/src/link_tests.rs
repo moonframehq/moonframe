@@ -189,6 +189,182 @@ fn a_process_that_ignores_everything_is_killed_in_the_end() {
     assert!(started.elapsed() < Duration::from_secs(2));
 }
 
+/// The next problem, skipping the rest.
+fn failed(received: &mpsc::Receiver<Event>) -> String {
+    loop {
+        if let Event::Failed { problem, .. } = received.recv_timeout(LONG).unwrap() {
+            return problem.to_string();
+        }
+    }
+}
+
+/// The next publish, past any failures.
+fn next_data(received: &mpsc::Receiver<Event>) -> Data {
+    loop {
+        if let Event::Published { data, .. } = received.recv_timeout(LONG).unwrap() {
+            return data;
+        }
+    }
+}
+
+#[test]
+fn a_process_that_goes_starts_again_when_it_says_so() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/flaky/provider.toml",
+        "kind = 'process'\ncommand = ['sh', 'flaky.sh']\nrestart = 'on-failure'\nstart = 'always'\n",
+    );
+    // Dies on its first run, stays up on its second.
+    write(
+        root,
+        "providers/flaky/flaky.sh",
+        "if [ -e ran ]; then echo 2; cat >/dev/null; else touch ran; exit 3; fi\n",
+    );
+    let (events, received) = events();
+    let _providers = Providers::start(root.into(), root.join("build"), events);
+    assert!(failed(&received).contains("exited"));
+    assert_eq!(next_data(&received), Data::Integer(2));
+}
+
+#[test]
+fn a_process_that_goes_stays_gone_until_asked() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/once/provider.toml",
+        "kind = 'process'\ncommand = ['sh', 'once.sh']\nstart = 'always'\n",
+    );
+    write(
+        root,
+        "providers/once/once.sh",
+        "if [ -e ran ]; then echo 2; cat >/dev/null; else touch ran; exit 3; fi\n",
+    );
+    let (events, received) = events();
+    let mut providers = Providers::start(root.into(), root.join("build"), events);
+    failed(&received);
+    // Longer than an `on-failure` provider's first wait.
+    let started = Instant::now();
+    while started.elapsed() < Duration::from_millis(800) {
+        assert!(
+            !matches!(
+                received.recv_timeout(Duration::from_millis(100)),
+                Ok(Event::Published { .. })
+            ),
+            "it started again by itself"
+        );
+    }
+    providers.restart("once").unwrap();
+    assert_eq!(next_data(&received), Data::Integer(2));
+    assert!(providers.restart("nothing").is_err());
+}
+
+#[test]
+fn a_process_says_when_it_is_there_and_when_it_went() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/brief/provider.toml",
+        "kind = 'process'\ncommand = ['sh', 'brief.sh']\nstart = 'always'\n",
+    );
+    write(root, "providers/brief/brief.sh", "sleep 0.2\nexit 1\n");
+    let (events, received) = events();
+    let _providers = Providers::start(root.into(), root.join("build"), events);
+    link(&received, |link| link.connected == Some(true));
+    let started = Instant::now();
+    loop {
+        assert!(started.elapsed() < LONG, "never said it went");
+        if let Event::Link { link, .. } = received.recv_timeout(LONG).unwrap()
+            && link.connected == Some(false)
+        {
+            return;
+        }
+    }
+}
+
+#[test]
+fn a_restart_waits_for_the_old_process_to_leave() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/slow/provider.toml",
+        "kind = 'process'\ncommand = ['sh', 'slow.sh']\nstop-grace = 3.0\nstart = 'always'\n",
+    );
+    // Holds `busy`, as an engine holds its scanner; a second one beside it
+    // would find it and say so.
+    write(
+        root,
+        "providers/slow/slow.sh",
+        "if [ -e busy ]; then echo 0; else echo 1; fi\ntouch busy\ncat >/dev/null\nsleep 0.3\nrm busy\n",
+    );
+    let (events, received) = events();
+    let mut providers = Providers::start(root.into(), root.join("build"), events);
+    assert_eq!(next_data(&received), Data::Integer(1));
+    providers.restart("slow").unwrap();
+    assert_eq!(next_data(&received), Data::Integer(1));
+}
+
+#[cfg(unix)]
+#[test]
+fn stopping_reaches_what_the_process_started() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/wrapper/provider.toml",
+        "kind = 'process'\ncommand = ['sh', 'wrapper.sh']\nstop-grace = 0.05\n",
+    );
+    // A launcher and an engine that takes no notice of stdin closing.
+    write(
+        root,
+        "providers/wrapper/wrapper.sh",
+        "sleep 60 &\necho $! > engine\necho 1\nwait\n",
+    );
+    let (events, received) = events();
+    let mut providers = Providers::start(root.into(), root.join("build"), events);
+    published(&received);
+    let engine = fs::read_to_string(root.join("providers/wrapper/engine")).unwrap();
+    let engine: libc::pid_t = engine.trim().parse().unwrap();
+    providers.shutdown();
+    // SAFETY: `kill` with signal 0 only asks whether the process exists.
+    #[allow(unsafe_code)]
+    let alive = unsafe { libc::kill(engine, 0) } == 0;
+    assert!(!alive, "the engine outlived its launcher");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_process_that_closes_its_output_is_still_stopped() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        "providers/quiet/provider.toml",
+        "kind = 'process'\ncommand = ['sh', 'quiet.sh']\nstop-grace = 0.05\nstart = 'always'\n",
+    );
+    write(
+        root,
+        "providers/quiet/quiet.sh",
+        "echo $$ > pid\nexec 1>&-\nwhile :; do sleep 0.05; done\n",
+    );
+    let (events, received) = events();
+    let _providers = Providers::start(root.into(), root.join("build"), events);
+    assert!(failed(&received).contains("closed its output"));
+    let pid = fs::read_to_string(root.join("providers/quiet/pid")).unwrap();
+    let pid: libc::pid_t = pid.trim().parse().unwrap();
+    let started = Instant::now();
+    // SAFETY: `kill` with signal 0 only asks whether the process exists.
+    #[allow(unsafe_code)]
+    while unsafe { libc::kill(pid, 0) } == 0 {
+        assert!(started.elapsed() < LONG, "it was left running");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
 #[cfg(unix)]
 mod socket {
     use {super::*, std::os::unix::net::UnixListener};

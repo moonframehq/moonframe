@@ -5,7 +5,7 @@ use {
         fs,
         path::Path,
         sync::{Arc, Mutex, mpsc},
-        time::Duration,
+        time::{Duration, Instant},
     },
 };
 
@@ -215,7 +215,7 @@ fn a_process_that_exits_or_prints_garbage_fails() {
         );
         let (events, received) = events();
         let _providers = Providers::start(root.into(), root.join("build"), events);
-        let event = received.recv_timeout(Duration::from_secs(5)).unwrap();
+        let event = not_link(&received, Duration::from_secs(5));
         let Event::Failed { problem, .. } = event else {
             panic!("{script}: did not fail");
         };
@@ -473,9 +473,7 @@ fn a_reload_restarts_only_providers_that_changed() {
     let (events, received) = events();
     let mut providers = Providers::start(root.into(), root.join("build"), events);
     let started = || {
-        let Event::Published { provider, .. } =
-            received.recv_timeout(Duration::from_secs(5)).unwrap()
-        else {
+        let Event::Published { provider, .. } = not_link(&received, Duration::from_secs(5)) else {
             panic!("not published");
         };
         provider
@@ -487,10 +485,16 @@ fn a_reload_restarts_only_providers_that_changed() {
     write(root, "providers/b/p.sh", "echo \"$$\"\nsleep 31\n");
     providers.reload();
     assert_eq!(started(), "b");
-    assert!(
-        received.recv_timeout(Duration::from_millis(300)).is_err(),
-        "an unchanged provider restarted"
-    );
+    let quiet = Instant::now();
+    while quiet.elapsed() < Duration::from_millis(300) {
+        assert!(
+            !matches!(
+                received.recv_timeout(Duration::from_millis(50)),
+                Ok(Event::Published { .. })
+            ),
+            "an unchanged provider restarted"
+        );
+    }
 
     fs::remove_dir_all(root.join("providers/a")).unwrap();
     providers.reload();

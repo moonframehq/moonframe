@@ -3,6 +3,8 @@
 //!
 //! ```toml
 //! kind = "wasm"            # or "process" with `command = ["bash", "herdr.sh"]`,
+//!                          # or "socket" with `socket = "/tmp/engine.sock"`: a
+//!                          # program that runs on its own,
 //!                          # or "native": the Rust one the app built in
 //!                          # under this folder's name, or "static" with
 //!                          # `file = "sample.json"`: that file, published
@@ -12,6 +14,7 @@
 //! urgent = ["stop"]        # messages that jump the queue (process, socket)
 //! latest = ["exposure"]    # messages the next of that name replaces (same)
 //! stop-grace = 2.0         # seconds a process has once stdin closes
+//! restart = "on-failure"   # start a process again when it goes by itself
 //!
 //! [settings]               # handed to the provider's `start`
 //! history = 16
@@ -49,6 +52,8 @@ pub struct Manifest {
     pub latest: Vec<String>,
     /// How long a process has to leave once its stdin closes.
     pub stop_grace: Duration,
+    /// Whether a process that goes by itself starts again.
+    pub restart: Restart,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -92,6 +97,19 @@ pub enum Publish {
     Latest,
 }
 
+/// Whether a process that goes by itself starts again.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Restart {
+    /// It stays gone, with its problem shown, until `app:restart` or a
+    /// reload.
+    #[default]
+    Never,
+    /// It starts again, waiting longer each time it goes soon after
+    /// starting.
+    OnFailure,
+}
+
 /// What a wasm provider may ask the host for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -119,6 +137,8 @@ struct File {
     #[serde(default)]
     latest: Vec<String>,
     stop_grace: Option<f64>,
+    #[serde(default)]
+    restart: Restart,
     #[serde(default)]
     capabilities: Vec<Capability>,
     #[serde(default)]
@@ -239,6 +259,11 @@ impl Manifest {
                 "only a process provider takes a `stop-grace`".to_owned(),
             ));
         }
+        if file.restart != Restart::Never && !matches!(kind, Kind::Process { .. }) {
+            return Err(problem(
+                "only a process provider takes a `restart`".to_owned(),
+            ));
+        }
         let stop_grace = file.stop_grace.unwrap_or(STOP_GRACE);
         if !(0.0..=MAX_STOP_GRACE).contains(&stop_grace) {
             return Err(problem(format!(
@@ -275,6 +300,7 @@ impl Manifest {
             urgent: file.urgent,
             latest: file.latest,
             stop_grace: Duration::from_secs_f64(stop_grace),
+            restart: file.restart,
         })
     }
 }

@@ -1247,13 +1247,31 @@ type DisplayInfo = {
 
 -- How a process or socket provider's link stands, in `app.links`.
 type ProviderLink = {
-	-- Whether a socket provider has its program; nil for a process.
+	-- Whether the provider has its program.
 	connected: boolean?,
 	-- Messages not yet written.
 	waiting: number,
 	-- Messages dropped since it started: the queue was full or, for a
 	-- socket, no one was there to hear them.
 	dropped: number,
+}
+
+-- How `app:awake` stands, in `app.awake`.
+type AwakeState = {
+	-- Whether the system agreed to stay awake.
+	held: boolean,
+	-- Whether the display stays on too.
+	display: boolean,
+	-- Why it would not, if it would not.
+	problem: string?,
+}
+
+-- The last run's panic, in `app.crash`.
+type CrashReport = {
+	-- What it said.
+	message: string,
+	-- The report's path, for the user to read or send.
+	report: string,
 }
 
 -- Light, dark, or as the system is (switching as it does).
@@ -1760,6 +1778,10 @@ type App = {
 	displays: { DisplayInfo }?,
 	-- Each process or socket provider that has had something to report.
 	links: { [string]: ProviderLink }?,
+	-- Nil until a mod first asks `app:awake`.
+	awake: AwakeState?,
+	-- Nil unless the last run panicked.
+	crash: CrashReport?,
 	-- Cargo feature names mapped to whether this host compiled them in.
 	capabilities: { [string]: boolean },
 	mods: { string },
