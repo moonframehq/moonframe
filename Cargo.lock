@@ -5031,6 +5031,7 @@ dependencies = [
  "gpui-kit",
  "gpui-pre",
  "gpui-pre-platform",
+ "image",
  "imagesize 0.15.0",
  "keepawake",
  "lb-wry",

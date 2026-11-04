@@ -859,6 +859,16 @@ A row or column hears more than clicks:
   `speed`, counted from the value at the press (a scrubbed number).
 - `wheel = <msg>` gets scrolls and trackpad pinches over it (`dx`, `dy`,
   `zoom`, `x`, `y`), and keeps them from scrolling what is around it.
+- Trackpad gestures, on macOS, each with `x`, `y`, `width`, `height` and the
+  keys held: `rotate = <msg>` as two fingers turn (`angle`, degrees
+  clockwise since the last message, and `phase`: `start`, `move`, `end`);
+  `smart_zoom = <msg>` on a two-finger double tap (Smart zoom on in System
+  Settings); `swipe = <msg>` when a swipe ends (`direction`: `back`,
+  `forward`, `up`, `down`), three fingers if the system leaves those to
+  apps, or two across, which also scrolls; `force = <msg>` on a force click
+  (`pressure`, 0 to 1), once per press. Nested, the smallest element over
+  the place takes a gesture. Elsewhere they are never sent, so keep another
+  way to do the same.
 - `drop = <msg>` gets files dropped from other apps (`paths`); the mod's
   `ui.image` may show them from then on.
 - `cursor = "crosshair"` (`grab`, `grabbing`, `ew-resize`, `move`, ...).

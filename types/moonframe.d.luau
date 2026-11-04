@@ -185,6 +185,51 @@ type PointerMsg = {
 	secondary: boolean?,
 }
 
+-- What a `rotate` message carries: `angle` the degrees two fingers turned
+-- since the last message, clockwise, how far through the turn it is, and
+-- where over the box (`x`, `y`), with the keys held. On macOS.
+type RotateMsg = {
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	angle: number,
+	phase: "start" | "move" | "end",
+	shift: boolean?,
+	alt: boolean?,
+	ctrl: boolean?,
+	cmd: boolean?,
+	secondary: boolean?,
+}
+
+-- What a `swipe` message carries: which way it went, as a browser reads it.
+type SwipeMsg = {
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	direction: "back" | "forward" | "up" | "down",
+	shift: boolean?,
+	alt: boolean?,
+	ctrl: boolean?,
+	cmd: boolean?,
+	secondary: boolean?,
+}
+
+-- What a `force` message carries: how hard the press is, from 0 to 1.
+type ForceMsg = {
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	pressure: number,
+	shift: boolean?,
+	alt: boolean?,
+	ctrl: boolean?,
+	cmd: boolean?,
+	secondary: boolean?,
+}
+
 -- What a `wheel` message carries: `dx`, `dy` the pixels scrolled, `zoom`
 -- a trackpad pinch's change (0.1 is 10 % larger, 0 for a scroll), and
 -- where over the box (`x`, `y`), with the keys held.
@@ -274,6 +319,19 @@ type StackProps = {
 	-- Sent as the wheel or trackpad scrolls or pinches over it, with a
 	-- `WheelMsg`'s fields; what is around it does not scroll.
 	wheel: Data,
+	-- Sent as two fingers turn over it, with a `RotateMsg`'s fields. This
+	-- and the next three come from a Mac trackpad; elsewhere never.
+	rotate: Data,
+	-- Sent on a two-finger double tap over it, with `x`, `y`, `width`,
+	-- `height` and the keys held.
+	smart_zoom: Data,
+	-- Sent when a swipe over it ends, with a `SwipeMsg`'s fields: three
+	-- fingers where the system leaves those to apps, or two across, which
+	-- also scroll.
+	swipe: Data,
+	-- Sent once when a press over it goes on to a force click, with a
+	-- `ForceMsg`'s fields.
+	force: Data,
 	-- Sent when files are dropped on it from another app, with `paths`
 	-- (and `x`, `y`). Dropped pictures may then show in this mod's `ui.image`.
 	drop: Data,
@@ -1108,8 +1166,9 @@ type MapProvider =
 	| "thunderforest-transport"
 
 -- A street map from a tile provider, with pins and routes over it. Drag to
--- pan; the wheel, a pinch, a double click and its buttons zoom. Without
--- `center` and `zoom` it frames the pins and routes. Its style's `color`
+-- pan; the wheel, a pinch, a two-finger double tap, a double click and its
+-- buttons zoom; two fingers turn it. Without `center` and `zoom` it frames
+-- the pins and routes. Its style's `color`
 -- strokes routes without their own.
 type MapProps = {
 	class: Class?,
@@ -1121,12 +1180,18 @@ type MapProps = {
 	center: { number }?,
 	-- 0 (the whole world) to about 20 (a street).
 	zoom: number?,
-	-- A new `center` or `zoom` eases the map there instead of jumping,
+	-- A new `center`, `zoom` or `bearing` eases the map there instead of jumping,
 	-- unless it is many screens away or animations are off.
 	glide: boolean?,
+	-- The compass direction up the box, in degrees clockwise from north. A
+	-- new one turns the map where it stands. To draw a compass, feed the
+	-- `bearing` from `move` back in, show it while that is not 0, and set
+	-- this to 0 on a click.
+	bearing: number?,
 	pins: { MapPin }?,
 	routes: { MapRoute }?,
-	-- Sent with `lat`, `lon` and `zoom` added after the user moves the map.
+	-- Sent with `lat`, `lon`, `zoom` and `bearing` (0 up to 360) added as
+	-- the user moves the map.
 	move: any?,
 	-- Sent with `pin` (its index, from 1) added when a pin is clicked.
 	select: any?,

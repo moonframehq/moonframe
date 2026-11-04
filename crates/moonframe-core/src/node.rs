@@ -10,6 +10,7 @@ use {
 
 // keep-sorted start
 mod embed;
+mod gesture;
 mod icon;
 mod input;
 mod instance;
@@ -22,7 +23,8 @@ mod video;
 // keep-sorted end
 
 pub use {
-    embed::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*, tokens::*, video::*,
+    embed::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*, tokens::*,
+    video::*,
 };
 
 pub(crate) use read::read;

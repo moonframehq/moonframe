@@ -21,6 +21,8 @@
 //! ```
 //!
 //! Use the GPUI this crate re-exports ([`gpui_kit`]): an app links one GPUI.
+//! A view hears a trackpad's rotate, smart zoom and swipe through
+//! [`gestures`], beside GPUI's own `on_pinch` and `on_mouse_pressure`.
 
 mod actions;
 mod agent_files;
@@ -44,6 +46,7 @@ mod demos;
 mod dock;
 mod embed;
 mod gallery;
+pub mod gestures;
 mod history;
 mod hosted;
 mod init;

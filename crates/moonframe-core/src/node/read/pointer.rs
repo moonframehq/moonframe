@@ -1,11 +1,22 @@
 //! A row's or column's `pointer`, `wheel`, `drop`, `carry`, `accept`,
-//! `hover`, `range` and `cursor`, and a frame's `area`.
+//! `hover`, `range`, `cursor` and trackpad gestures, and a frame's `area`.
 
 use super::*;
 
 /// The keys [`Pointer`] reads.
 pub(super) const POINTER: &[&str] = &[
-    "pointer", "wheel", "drop", "carry", "accept", "hover", "range", "cursor",
+    "pointer",
+    "wheel",
+    "drop",
+    "carry",
+    "accept",
+    "hover",
+    "range",
+    "cursor",
+    "rotate",
+    "smart_zoom",
+    "swipe",
+    "force",
 ];
 
 /// Most a range's ends can be, either way.
@@ -23,6 +34,12 @@ impl Pointer {
             hover: fields.get("hover")?.unwrap_or(false),
             range: fields.get("range")?,
             cursor: fields.get("cursor")?,
+            gestures: Gestures {
+                rotate: fields.get("rotate")?,
+                smart_zoom: fields.get("smart_zoom")?,
+                swipe: fields.get("swipe")?,
+                force: fields.get("force")?,
+            },
         };
         if pointer.hover && pointer.press.is_none() {
             return Err(fields
@@ -47,9 +64,18 @@ impl Pointer {
 
     /// Whether `to` has something to go with.
     pub(super) fn sends(fields: &Fields) -> bool {
-        ["pointer", "wheel", "drop", "accept"]
-            .iter()
-            .any(|key| fields.raw(key).is_some())
+        [
+            "pointer",
+            "wheel",
+            "drop",
+            "accept",
+            "rotate",
+            "smart_zoom",
+            "swipe",
+            "force",
+        ]
+        .iter()
+        .any(|key| fields.raw(key).is_some())
     }
 }
 

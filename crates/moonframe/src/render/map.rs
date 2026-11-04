@@ -1,12 +1,16 @@
 //! `ui.map`: tiles from the map's provider, its routes painted over them,
 //! then its pins, the provider's credit and zoom buttons. Dragging pans
-//! it; the wheel, a pinch, a double click and the buttons zoom it.
+//! it; the wheel, a pinch, a two-finger double tap, a double click and the
+//! buttons zoom it; two fingers turn it. Its tiles are drawn as sprites
+//! with north up, and through [`rotated`] turned; everything over them is
+//! placed by [`view::Frame`] and stays upright.
 
 mod disk;
 mod layer;
 mod lines;
 mod memory;
 mod pins;
+mod rotated;
 mod routing;
 mod stand_in;
 mod tiles;
@@ -18,7 +22,10 @@ use {
         pointer::Sender,
         styling::{LookExt as _, StyleExt as _},
     },
-    crate::color::ThemeColor,
+    crate::{
+        color::ThemeColor,
+        gestures::{Gestures, gestures},
+    },
     gpui_kit::{component::ActiveTheme, *},
     layer::Grid,
     moonframe_core::{Data, Map, Part, with_fields},
@@ -62,7 +69,11 @@ impl<'w> Draw<'w> for Map {
         };
         let grid = Grid::new(view::origin(&key), scale);
         memory::begin(painter.window);
-        let (layer, tiles_missing) = layer::tile_layer(self, frame, scale, grid);
+        let (layer, tiles_missing) = if frame.turned() {
+            rotated::layer(self, frame, scale, &key)
+        } else {
+            layer::tile_layer(self, frame, scale, grid)
+        };
         // Decoded tiles are bounded per window rather than kept for the run.
         let layer = match painter.window {
             Some(window) => layer.image_cache(memory::TileCache(window)),
@@ -118,7 +129,8 @@ impl<'w> Draw<'w> for Map {
                 &sender,
                 cx,
             ))
-            .child(follow(&key, self.moved.clone(), &sender));
+            .child(follow(&key, frame.turned(), self.moved.clone(), &sender))
+            .child(trackpad(&key, frame, most, self.moved.clone(), &sender));
         element = match self.width {
             Some(width) => element.w(px(width)),
             None => element.w_full(),
@@ -204,6 +216,27 @@ fn zoom_buttons(
         .child(button("−", -1.0))
 }
 
+/// What only a trackpad does: two fingers turning the map, and a
+/// two-finger double tap zooming it in.
+fn trackpad(key: &str, frame: Frame, most: f64, moved: Option<Data>, sender: &Sender) -> Gestures {
+    let (turn_key, turn_moved, turn_sender) = (key.to_owned(), moved.clone(), sender.clone());
+    let (zoom_key, zoom_sender) = (key.to_owned(), sender.clone());
+    gestures()
+        .on_rotate(move |event, window, cx| {
+            let degrees = f64::from(event.degrees);
+            if let Some(turned) = view::turn(&turn_key, frame, degrees, event.phase) {
+                tell(turn_moved.as_ref(), turned, &turn_sender, window, cx);
+                window.refresh();
+            }
+        })
+        .on_smart_zoom(move |event, window, cx| {
+            let current = view::current(&zoom_key, frame);
+            let zoomed = view::zoom(&zoom_key, current, 1.0, event.position, most);
+            tell(moved.as_ref(), zoomed, &zoom_sender, window, cx);
+            window.refresh();
+        })
+}
+
 /// Pressing, the wheel, a pinch and a double click.
 fn interact(
     element: Stateful<Div>,
@@ -262,7 +295,7 @@ fn interact(
 
 /// A canvas over the box that keeps its bounds and, while the map is the
 /// one pressed, follows the pointer across the whole window.
-fn follow(key: &str, moved: Option<Data>, sender: &Sender) -> impl IntoElement {
+fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl IntoElement {
     let key = key.to_owned();
     let sender = sender.clone();
     canvas(
@@ -276,6 +309,9 @@ fn follow(key: &str, moved: Option<Data>, sender: &Sender) -> impl IntoElement {
         },
         move |_, (), window, cx| {
             memory::evict(window, cx);
+            if !turned {
+                rotated::release(&key, window, cx);
+            }
             if !view::dragging(&key, window) {
                 return;
             }
@@ -312,7 +348,7 @@ fn follow(key: &str, moved: Option<Data>, sender: &Sender) -> impl IntoElement {
     .size_full()
 }
 
-/// Sends `move` with where the map now looks.
+/// Sends `move` with where the map now looks and points.
 fn tell(moved: Option<&Data>, frame: Frame, sender: &Sender, window: &mut Window, cx: &mut App) {
     let Some(msg) = moved else {
         return;
@@ -326,6 +362,7 @@ fn tell(moved: Option<&Data>, frame: Frame, sender: &Sender, window: &mut Window
         ("lat".to_owned(), Data::Number(round(lat, 6))),
         ("lon".to_owned(), Data::Number(round(lon, 6))),
         ("zoom".to_owned(), Data::Number(round(frame.zoom, 2))),
+        ("bearing".to_owned(), Data::Number(round(frame.bearing, 2))),
     ]);
     sender.send(with_fields(msg, fields), window, cx);
 }

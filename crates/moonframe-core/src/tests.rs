@@ -13,6 +13,7 @@ use {
 mod checks;
 mod components;
 mod elements;
+mod gestures;
 mod lightbox;
 mod maps;
 mod mods;
