@@ -384,6 +384,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
         eprintln!("{name}: the app names no folder: call `Moonframe::app_dir` or `embedded_app`");
         return ExitCode::from(2);
     }
+    crate::branch_bar::init(host);
     let args = match parse_args(host, &launch.keep) {
         Ok(Some(args)) => args,
         Ok(None) => {
