@@ -62,8 +62,7 @@ impl Grid {
 
 /// The tiles under `frame`, and whether any is still on its way.
 pub(super) fn tile_layer(map: &Map, frame: Frame, scale: f32, grid: Grid) -> (Div, bool) {
-    let source = map.provider.source();
-    let z = frame.zoom.round().clamp(0.0, f64::from(source.max_zoom)) as u8;
+    let z = tiles::level(map.provider, frame.zoom, scale);
     let count = 1i64 << z;
     let size = 256.0 * (frame.zoom - f64::from(z)).exp2();
     let span = frame.span();
