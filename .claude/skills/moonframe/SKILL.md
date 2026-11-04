@@ -1750,7 +1750,10 @@ terminal log. There are four kinds:
     a message.
   - When it stops (a reload that changed its folder, the app quitting) its
     stdin closes; it has `stop-grace` seconds in provider.toml (0.25 by
-    default, up to 30) to leave, then SIGTERM, then a kill.
+    default, up to 30) to leave, then SIGTERM, then a kill, which reach
+    all it started: each runs in a process group of its own.
+  - When it goes by itself it stays gone, unless provider.toml says
+    `restart = "on-failure"` or a mod sends `app:restart`.
 - **`kind = "socket"`, `socket = "<path>"`:** the same lines over a Unix
   socket, to a program that runs on its own and outlives the app. It
   connects when it can and again when the link drops, and each connection
