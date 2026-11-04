@@ -15,7 +15,7 @@ pub enum AppIcon {
 }
 
 /// The images `app:icon` shows, by extension: those AppKit reads.
-pub const ICON_TYPES: &[&str] = &["png", "icns", "jpg", "jpeg", "tiff", "pdf"];
+pub const ICON_TYPES: &[&str] = &["png", "icns", "jpg", "jpeg", "tiff"];
 
 /// Longest an icon file's name can be.
 const MAX_PATH: usize = 1024;

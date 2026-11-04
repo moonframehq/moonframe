@@ -738,13 +738,16 @@ return mod {
 }
 ```
 
-- `app:icon`, `msg` an image file (`.png` `.icns` `.jpg` `.jpeg` `.tiff`
-  `.pdf`, at most 4 MiB, found as `app:sound` finds sounds) or `"default"`:
+- `app:icon`, `msg` an image file (`.png` `.icns` `.jpg` `.jpeg` `.tiff`,
+  at most 4 MiB and 4096 pixels a side, found as `app:sound` finds sounds)
+  or `"default"`:
   changes the app's icon in the Dock and the app switcher at once, while
   it runs, bundled or not; `"default"` puts back the one the app started
   with (its `icon.png`, else Moonframe's). It lasts until the app quits or
   a mod asks again, and is not kept across launches, so a mod showing a
   state (busy, unread, recording) sends it again from its first `update`.
+  Requests closer than 100 ms apart are the sender's error, and the icon
+  stays as it was.
   macOS only; elsewhere the desktop entry's icon stays, and it does
   nothing.
 

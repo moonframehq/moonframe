@@ -16,12 +16,24 @@ fn fallback() -> &'static [u8] {
 }
 
 /// Shows `icon` (an image file AppKit reads), else the app's fallback, as
-/// the app's icon; why not, if it cannot. Must run on the main thread
-/// once the application exists; at launch, and again whenever a mod asks
+/// the app's icon; why not, if it cannot.
+#[cfg(target_os = "macos")]
+pub(crate) fn set_icon(icon: Option<&std::path::Path>) -> Result<(), String> {
+    match icon {
+        Some(path) => show_icon(
+            &std::fs::read(path)
+                .map_err(|error| format!("cannot read {}: {error}", path.display()))?,
+        ),
+        None => show_icon(fallback()),
+    }
+}
+
+/// Shows the image in `bytes` as the app's icon. Must run on the main
+/// thread once the application exists: at launch, and whenever a mod asks
 /// (`app:icon`).
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code, reason = "one AppKit setter; see SAFETY")]
-pub(crate) fn set_icon(icon: Option<&std::path::Path>) -> Result<(), String> {
+pub(crate) fn show_icon(bytes: &[u8]) -> Result<(), String> {
     use {
         objc2::{AllocAnyThread as _, MainThreadMarker},
         objc2_app_kit::{NSApplication, NSImage},
@@ -30,19 +42,9 @@ pub(crate) fn set_icon(icon: Option<&std::path::Path>) -> Result<(), String> {
     let Some(main) = MainThreadMarker::new() else {
         return Err("the Dock icon is set from the main thread only".to_owned());
     };
-    let own = match icon {
-        Some(path) => Some(
-            std::fs::read(path)
-                .map_err(|error| format!("cannot read {}: {error}", path.display()))?,
-        ),
-        None => None,
-    };
-    let data = NSData::with_bytes(own.as_deref().unwrap_or_else(|| fallback()));
+    let data = NSData::with_bytes(bytes);
     let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) else {
-        return Err(match icon {
-            Some(path) => format!("{} is not an image AppKit reads", path.display()),
-            None => "cannot read the app icon".to_owned(),
-        });
+        return Err("not an image AppKit reads".to_owned());
     };
     let app = NSApplication::sharedApplication(main);
     // SAFETY: on the main thread, as the marker proves, with a valid image
@@ -171,5 +173,10 @@ pub(crate) fn about_panel(_: &str, _: &moonframe_core::About, _: Option<&std::pa
 /// entry, so it stays as installed.
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn set_icon(_: Option<&std::path::Path>) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn show_icon(_: &[u8]) -> Result<(), String> {
     Ok(())
 }
