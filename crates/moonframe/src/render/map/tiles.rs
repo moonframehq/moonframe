@@ -21,6 +21,8 @@ use {
 
 /// Connections open to tile servers at once, across every map.
 const WORKERS: usize = 2;
+/// How much sooner a high-density screen moves to a finer level, in zoom steps.
+const FINER_ON_DENSE_SCREENS: f64 = 0.5;
 /// Requests waiting beyond this drop the oldest: the map moved on.
 const MOST_WAITING: usize = 256;
 /// How long a tile on disk is used before it is fetched again (and shown
@@ -76,6 +78,20 @@ impl Tile {
             .replace("{r}", retina)
             .replace("{key}", key.unwrap_or_default())
     }
+}
+
+/// The tile level to draw `zoom` with. A high-density screen takes the next
+/// finer level early when the provider has no `@2x` tiles, so a tile's pixel
+/// never covers more than two of the screen's.
+pub(super) fn level(provider: MapProvider, zoom: f64, scale: f32) -> u8 {
+    let finer = if scale > 1.5 && !has_retina(provider) {
+        FINER_ON_DENSE_SCREENS
+    } else {
+        0.0
+    };
+    (zoom + finer)
+        .round()
+        .clamp(0.0, f64::from(provider.source().max_zoom)) as u8
 }
 
 /// Whether the provider has `@2x` tiles.
@@ -393,6 +409,18 @@ fn fetch(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dense_screens_take_finer_tiles_without_2x() {
+        let plain = MapProvider::OpenStreetMap;
+        assert_eq!(level(plain, 15.3, 1.0), 15);
+        assert_eq!(level(plain, 15.3, 2.0), 16);
+        assert_eq!(level(plain, 15.0, 2.0), 16);
+        assert_eq!(level(plain, 14.9, 2.0), 15);
+        assert_eq!(level(MapProvider::CartoLight, 15.3, 2.0), 15);
+        let most = plain.source().max_zoom;
+        assert_eq!(level(plain, f64::from(most), 2.0), most);
+    }
 
     #[test]
     fn a_tile_fills_in_its_address_and_keeps_its_key_out_of_its_file() {

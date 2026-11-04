@@ -65,8 +65,7 @@ struct Choice {
 /// The tiles under a turned `frame`, as a layer, and whether any is still
 /// on its way.
 pub(super) fn layer(map: &Map, frame: Frame, scale: f32, key: &str) -> (Div, bool) {
-    let source = map.provider.source();
-    let round = frame.zoom.round().clamp(0.0, f64::from(source.max_zoom)) as u8;
+    let round = tiles::level(map.provider, frame.zoom, scale);
     let cover = cover(frame, round);
     let count = 1i64 << cover.z;
     let retina = scale > 1.5 && tiles::has_retina(map.provider);
