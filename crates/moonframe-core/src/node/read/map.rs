@@ -14,7 +14,7 @@ const LONGEST_KEY: usize = 512;
 impl Build for Map {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
         "provider", "key", "center", "zoom", "pins", "routes", "move", "select", "routed", "to",
-        "width", "height", "grow",
+        "width", "height", "grow", "glide",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
@@ -77,6 +77,7 @@ impl Build for Map {
             width: fields.number("width", PIXELS)?,
             height: fields.number("height", PIXELS)?,
             grow: fields.get("grow")?.unwrap_or(false),
+            glide: fields.get("glide")?.unwrap_or(false),
         })
     }
 }

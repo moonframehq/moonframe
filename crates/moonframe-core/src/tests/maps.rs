@@ -30,6 +30,7 @@ fn a_map_reads_its_provider_place_pins_and_routes() {
         map_of(r##"pins = { { lat = 37.33, lon = -122.03, color = "#0a84ff", pulse = true } }"##)
             .unwrap();
     assert!(here.pins[0].pulse);
+    assert!(!map.glide && map_of("glide = true").unwrap().glide);
     assert_eq!(map.routes[0].points, vec![[37.787, -122.404], [
         37.79, -122.39
     ]]);
@@ -73,6 +74,7 @@ fn a_map_refuses_what_it_cannot_show() {
         ),
         ("zoom = 40", "zoom"),
         ("pins = { { lat = 1, lon = 2, pulse = 1 } }", "pulse"),
+        ("glide = 1", "glide"),
     ] {
         let error = map_of(props).unwrap_err();
         assert!(error.contains(expected), "{props}: {error}");
