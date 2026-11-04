@@ -151,18 +151,29 @@ impl Slot {
         versions: &Versions,
         sheet: &Stylesheet,
         style: u64,
+        window: Option<WindowState>,
     ) -> bool {
         let Some(module) = &self.module else {
             return false;
         };
-        let current = self
-            .drawn
-            .as_ref()
-            .is_some_and(|drawn| drawn.style_generation == style && versions.current(&drawn.stamp));
+        let current = self.drawn.as_ref().is_some_and(|drawn| {
+            drawn.style_generation == style
+                && versions.current(&drawn.stamp)
+                && (drawn.window == window || !drawn.stamp.reads("window"))
+        });
         if current && !self.dirty {
             return false;
         }
         self.dirty = false;
+        let scoped;
+        let app = if let Some(window) = window {
+            let mut data = (**app).clone();
+            data.insert("window".to_owned(), window.data());
+            scoped = Rc::new(data);
+            &scoped
+        } else {
+            app
+        };
         match module
             .rules(sheet)
             .and_then(|rules| Ok((rules, module.view(app, sheet, &self.lists)?)))
@@ -175,6 +186,7 @@ impl Slot {
                 self.drawn = Some(Drawn {
                     style_generation: style,
                     stamp: versions.stamp(&reads),
+                    window,
                 });
             },
             Err(error) => {

@@ -4,6 +4,17 @@
 use super::*;
 
 impl MoonframeApp {
+    /// Publishes a mod window's state, or forgets it when the window closes.
+    pub(crate) fn sync_mod_window(
+        &mut self,
+        name: &str,
+        state: Option<WindowState>,
+        cx: &mut Context<Self>,
+    ) {
+        self.workspace.set_mod_window(name, state);
+        self.flush("window", cx);
+    }
+
     /// Whether `window` is the main window, not a mod's, the components
     /// browser or the theme picker.
     pub(crate) fn is_main(&self, window: &Window) -> bool {
