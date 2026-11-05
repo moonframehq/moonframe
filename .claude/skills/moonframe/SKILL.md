@@ -66,6 +66,7 @@ Pick the lowest layer that can do the job:
 | git status, a file's diff, commit or push | read `app.git`; send `provider:git` a message | in a mod | no (git is built in) |
 | markdown shown, or a project file read and saved | `ui.markdown` or `use "markdown"`; `use "markdown-editor"`, which reads and saves through `provider:docs` | in a mod | no (docs is built in) |
 | a coding agent doing a task (Claude, Codex, Gemini...) | send `provider:acp` `{ start = ... }`; show the run with `use "agent-run"` | in a mod | no (acp is built in) |
+| talking instead of typing (a prompt, a note) | `use "dictation"` beside the field; list the mod in `providers/speech`'s `recorders` | in a mod | no (speech is built in) |
 | AI plan usage (Claude, Codex, Copilot limits, resets, pace) | read `app.usage`; draw each window with `use "usage-bar"` | in a mod | no (usage is built in) |
 | a provider that needs a Rust library or answers actions | a **native provider** | `crates/` + `providers/<name>/provider.toml` | yes, and the app restarts |
 | a look change | a rule in `style.luau`, or the mod's `styles` | | no |
@@ -1874,8 +1875,9 @@ the new `version`, but refuses with `conflict = true` when the file
 changed since `version` (or exists and none is given) unless `force =
 true`; `{ close = "<path>" }` stops watching. Paths are relative to the
 root, without `.`, `..` or `.git`, and must stay in it through links.
-Anyone may read; only `[settings] writers` (`editor` as shipped) and the
-components they draw may write. `use "markdown-editor"` is the whole
+Anyone may read a project; only `[settings] writers` (`editor` as shipped)
+and the components they draw may write, or read in the home folder, which
+holds the user's keys. `use "markdown-editor"` is the whole
 example.
 
 A document can be long: `ui.markdown`'s `text` and a multiline
@@ -1986,8 +1988,8 @@ starter's title bar. `{ to = "app:open", msg = url }` opens a web page.
 root is `MOONFRAME_FILES`, else the git repository of the terminal the user
 last typed in (followed as they `cd` or switch tabs; a terminal outside any
 repository leaves it where it was), else the git repository `moonframe` was
-started in, else the one the app runs from; with none it is unavailable
-(never home). `cwd` is where a terminal starts: that project, else the
+started in, else the one the app runs from, else home (`root` is then `~`;
+an installed app opened from the Dock starts here). `cwd` is where a terminal starts: that project, else the
 launch folder, else the root. Only the root and the open folders are
 listed, so a large folder costs nothing until it is opened: send
 `{ open = "app\napp/mods" }`, the open folders' paths one per line, the
@@ -2051,6 +2053,26 @@ herdr's own (`Transcript` in herdr-chat-protocol: `entries`, `status`,
 `permissions`, `plan`, `options`, `modes`, `usage`, `queued`, `commands`),
 trimmed (see crates/moonframe-chat/src/project.rs). `examples/switchyard`
 is the whole example.
+
+`app.speech` (speech, native, the `speech` feature, crates/moonframe-speech):
+dictation. Only `[settings] recorders` may listen, and a take obeys only the
+mod that started it: `{ start = true, id?, engine? }` (answered `{ reply,
+action = "start", ok, engine | error }`), `{ stop = true }` (answered `{
+reply, action = "transcript", ok, text | error, engine }`), `{ release = true
+}` (the button coming up: a stop for a take held 350 ms, nothing for a tap),
+`{ cancel = true }` (answered as a transcript with `cancelled = true`). Any other message
+checks the engines again. It publishes `{ available, reason?, engine?,
+engines, state ("idle" "recording" "transcribing"), owner?, level, seconds
+}`, each engine `{ name, title, kind ("apple" "command" "remote"), remote,
+ready, reason? }`; what was said goes only to the mod that asked. Engines are
+`[settings.engines.<name>]`: `kind = "apple"` (macOS, on device, the bundled
+app only), `"command"` (`command = { ..., "{file}" }`, run without a shell,
+its output is the text), `"remote"` (`url`, `model`, `key_env`: OpenAI's
+`audio/transcriptions` request, https or http on this machine). `prefer`
+lists those picked by themselves, best first; a remote one is used by default
+only if the user lists it there. A mod that stops drawing `dictation` while
+listening (a closing dialog) sends `{ cancel = true }` itself, or the
+microphone stays on until `max_seconds`. `mods/feedback` is the example.
 
 `app.shell` (shell, native, crates/moonframe-shell): shell commands a mod
 runs for the user, in their login shell, with output in colour as it

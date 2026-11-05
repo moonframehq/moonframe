@@ -90,7 +90,7 @@ code. A runtime trace alone would miss unopened screens and is not used.
 
 Supported extra features are `acp`, `alacritty`, `awake`, `browser`, `chat`, `crash`,
 `displays`, `dock`, `docs`, `forge`, `ghostty`, `git`, `guard`, `herdr-core`, `map`,
-`markdown`, `prose`, `restart`, `shell`, `socket`, `terminal`, `tokio`, `updates`, `usage`,
+`markdown`, `prose`, `restart`, `shell`, `socket`, `speech`, `terminal`, `tokio`, `updates`, `usage`,
 `video`, and `wasm`. A custom Rust native provider needs a custom
 library host; the profile bundler cannot compile an unknown native provider.
 

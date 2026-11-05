@@ -41,7 +41,7 @@ Features: `acp`, `alacritty`, `browser`, `chat`, `docs`, `forge`, `git`,
 `herdr-core`, `markdown`, `prose`, `shell`, `studio`, `tokio`, `updates`, `usage` and
 `wasm` by default. `ghostty` (a second terminal emulator, built from Ghostty's
 source with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`, and
-so are `map` (`ui.map` street maps), `video` (`ui.video`) and what long runs
+so are `map` (`ui.map` street maps), `speech` (dictation), `video` (`ui.video`) and what long runs
 and live machines ask for (`awake`, `crash`, `displays`, `dock`, `guard`,
 `restart`, `socket`), which few apps need. The starter has them all.
 
@@ -93,6 +93,7 @@ ship only their selected components.
 | `studio` | Development commands and the component gallery. |
 | `updates` | Release checks, downloads and in-place app updates. Omitting it hides the updater menu and disables automatic checks. |
 | `acp`, `chat`, `docs`, `forge`, `git`, `shell`, `usage` | The respective built-in native providers. |
+| `speech` | The `speech` native provider: dictation from the microphone (`use "dictation"`), through Apple's on-device recognizer, a local program or a remote service. Opt-in. |
 | `tokio` | Async native-provider support. |
 | `wasm` | Wasmtime and building/running Wasm providers. |
 

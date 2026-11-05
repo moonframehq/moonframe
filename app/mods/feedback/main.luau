@@ -6,9 +6,15 @@
 -- asks before each change unless providers/acp's `allow` lets it. The icon
 -- spins while an agent works, and shows a dot when one finished since the
 -- dialog was last open. Inspect in the dialog picks an element in the
--- window to attach. The shell mounts it in its title bar.
+-- window to attach. The mic beside it dictates the request instead (see
+-- providers/speech). The shell mounts it in its title bar.
 local feedback = use "feedback"
 local dropdown = use "dropdown"
+local dictation = use "dictation"
+
+-- The dialog going away takes the mic button with it, so the take is
+-- cancelled here or the microphone would stay on until the limit.
+local STOP_LISTENING = { to = "provider:speech", msg = { cancel = true } }
 
 type State = {
 	open: boolean,
@@ -21,6 +27,8 @@ type State = {
 	attached: any?,
 	-- Picking for the dialog: it hides until the pick comes back.
 	inspecting: boolean,
+	-- The mic button is listening or transcribing.
+	listening: boolean?,
 	expanded: string?,
 	error: string?,
 	-- The newest time one of our runs finished, and the newest the user has
@@ -182,6 +190,10 @@ return mod {
 					-- Closing drops the pick; Inspect hides the dialog
 					-- without `close`, so it survives picking.
 					state.attached = nil
+					if state.listening then
+						state.listening = false
+						return state, { STOP_LISTENING }
+					end
 				end
 			elseif msg == "pick-agent" then
 				state.picking = not state.picking
@@ -200,6 +212,10 @@ return mod {
 			elseif pick.picking then
 				state.inspecting = true
 				state.open = false
+				if state.listening then
+					state.listening = false
+					return state, { STOP_LISTENING }
+				end
 			elseif state.inspecting then
 				state.inspecting = false
 				state.open = true
@@ -220,6 +236,13 @@ return mod {
 			end
 		elseif msg.msg == "type" then
 			state.text = msg.value
+		elseif msg.msg == "dictated" then
+			local blank = string.match(state.text or "", "^%s*$") ~= nil
+			state.text = if blank then msg.value else `{state.text} {msg.value}`
+		elseif msg.msg == "listening" then
+			state.listening = msg.value
+		elseif msg.msg == "dictation-failed" then
+			state.error = msg.value
 		elseif msg.agent_pick then
 			state.agent = msg.agent_pick
 			state.picking = false
@@ -282,19 +305,23 @@ return mod {
 			state.open = false
 			state.error = nil
 			state.attached = nil
-			return state,
+			local sends: { any } = {
 				{
-					{
-						to = "provider:acp",
-						msg = {
-							start = text,
-							id = "feedback",
-							agent = state.agent,
-							instructions = instructions(state.folder, state.pid, false, state.installed),
-							context = context,
-						},
+					to = "provider:acp",
+					msg = {
+						start = text,
+						id = "feedback",
+						agent = state.agent,
+						instructions = instructions(state.folder, state.pid, false, state.installed),
+						context = context,
 					},
-				}
+				},
+			}
+			if state.listening then
+				state.listening = false
+				table.insert(sends, STOP_LISTENING)
+			end
+			return state, sends
 		elseif msg.reply == "feedback" and msg.action == "start" then
 			local following = state.following
 			state.following = nil
@@ -399,7 +426,8 @@ return mod {
 				follow = true,
 				reply = state.reply,
 				actions = {
-					#options > 0 and dropdown {
+					dictation { id = "prompt", text = "dictated", failed = "dictation-failed", listening = "listening" },
+					(#options > 0 and dropdown {
 						label = "Agent",
 						open = state.picking,
 						toggle = "pick-agent",
@@ -409,7 +437,7 @@ return mod {
 						options = options,
 						event = "agent_pick",
 						side = "top",
-					},
+					}) :: any,
 				},
 				inspect = true,
 				attached = state.attached,

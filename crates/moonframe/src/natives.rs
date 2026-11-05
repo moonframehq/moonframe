@@ -27,6 +27,7 @@ pub(crate) fn natives() -> Natives {
         ("github", github),
         ("gitlab", gitlab),
         ("shell", shell),
+        ("speech", speech),
         ("usage", usage),
         // keep-sorted end
     ];
@@ -74,6 +75,11 @@ fn shell() -> Box<dyn Native> {
     moonframe_shell::native()
 }
 
+#[cfg(feature = "speech")]
+fn speech() -> Box<dyn Native> {
+    moonframe_speech::native()
+}
+
 #[cfg(feature = "usage")]
 fn usage() -> Box<dyn Native> {
     moonframe_usage::native()
@@ -114,6 +120,11 @@ fn gitlab() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(not(feature = "speech"))]
+fn speech() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 #[cfg(not(feature = "usage"))]
 fn usage() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -129,6 +140,7 @@ fn usage() -> Box<dyn Native> {
         feature = "forge",
         feature = "git",
         feature = "shell",
+        feature = "speech",
         feature = "usage"
     ),
     allow(dead_code)
