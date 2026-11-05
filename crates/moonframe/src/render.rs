@@ -517,11 +517,17 @@ impl<'w, 'm> Painter<'w, 'm> {
     /// frame; `None` while animations are off. Every caller with the same
     /// period moves in step.
     fn phase(&mut self, period: Duration) -> Option<f32> {
+        let phase = self.quiet_phase(period);
+        self.animating |= phase.is_some();
+        phase
+    }
+
+    /// As [`Self::phase`], for what paces its own frames.
+    fn quiet_phase(&self, period: Duration) -> Option<f32> {
         let period = self.workspace.stylesheet().scaled(period);
         if period.is_zero() {
             return None;
         }
-        self.animating = true;
         let elapsed = self.now.saturating_duration_since(*SPIN_EPOCH);
         Some((elapsed.as_secs_f64() / period.as_secs_f64()).fract() as f32)
     }

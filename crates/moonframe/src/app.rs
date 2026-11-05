@@ -63,6 +63,7 @@ mod updates;
 mod view;
 mod watch;
 mod windows;
+pub(crate) use fonts::list_ahead as list_fonts_ahead;
 
 pub(crate) use listeners::display_number;
 // keep-sorted end

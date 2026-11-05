@@ -28,6 +28,7 @@ fn compiled() -> std::collections::BTreeMap<String, bool> {
         "guard",
         "herdr-core",
         "map",
+        "map-benchmark",
         "markdown",
         "prose",
         "restart",
