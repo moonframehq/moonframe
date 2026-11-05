@@ -10,6 +10,7 @@ type Props = {
 	zoom: number?,
 	center: { number }?,
 	change: any,
+	to: string?,
 	overlay: { any }?,
 	controls: boolean?,
 	min: number?,
@@ -59,6 +60,7 @@ return component {
 		["zoom"] = "screen pixels per picture pixel (1 is 100 %); nil fits it",
 		["center"] = "the point of the picture in the middle, { x, y } fractions of it; the middle when unset",
 		["change"] = "message sent as the view changes, with `zoom` (nil when fitted) and `center` added",
+		["to"] = "mod to send view changes to, if not the drawing one",
 		["overlay"] = "elements drawn over the picture; their `area` is in fractions of the picture, a `pointer` there takes presses before panning does, and their messages reach the mod as they are",
 		["controls"] = "a pill in the corner: zoom out, the zoom, zoom in, fit, 100 %",
 		["min"] = "the least zoom (default a quarter of fitted)",
@@ -114,7 +116,7 @@ return component {
 		local most = props.max or 32
 		local function send(next_zoom: number?, next_center: { number })
 			next_center = { math.clamp(next_center[1], 0, 1), math.clamp(next_center[2], 0, 1) }
-			return state, { { to = "parent", msg = message(props.change, next_zoom, next_center) } }
+			return state, { { to = props.to or "parent", msg = message(props.change, next_zoom, next_center) } }
 		end
 		-- Zooms to `next_zoom`, keeping the picture's point under (x, y)
 		-- (fractions of the box) where it is.

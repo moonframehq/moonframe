@@ -197,6 +197,8 @@ impl Wiring {
 /// One field the host keeps.
 struct Field {
     editor: Editor,
+    /// The editor's value survives unmounting; its key routing does not.
+    mounted: WeakEntity<()>,
     wiring: Wiring,
     /// The last `value` the mod passed, to tell a new one from the same.
     applied: Option<String>,
@@ -248,6 +250,11 @@ impl Inputs {
         if input.writing() && !cfg!(feature = "prose") {
             return None;
         }
+        let mounted = window.use_keyed_state(
+            SharedString::from(format!("input/{key}/mounted")),
+            cx,
+            |_, _| (),
+        );
         let mut registry = self.0.borrow_mut();
         let frame = registry.frame;
         let wiring = Wiring::of(owner, input);
@@ -278,6 +285,7 @@ impl Inputs {
             registry.fields.insert(key.to_owned(), Field {
                 selection: (editor.selection(cx), editor.caret(cx)),
                 editor,
+                mounted: mounted.downgrade(),
                 wiring: wiring.clone(),
                 applied: carried.and_then(|(_, applied)| applied),
                 placeholder: None,
@@ -296,6 +304,7 @@ impl Inputs {
             field.focus = false;
         }
         field.seen = frame;
+        field.mounted = mounted.downgrade();
         field.window = window.window_handle().window_id();
         field.wiring = wiring;
         let editor = field.editor.clone();
@@ -344,10 +353,10 @@ impl Inputs {
         let registry = self.0.borrow();
         let field = match key {
             Some(key) => registry.fields.get(key),
-            None => registry
-                .fields
-                .values()
-                .find(|field| field.editor.focus_handle(cx).is_focused(window)),
+            None => registry.fields.values().find(|field| {
+                field.mounted.upgrade().is_some()
+                    && field.editor.focus_handle(cx).is_focused(window)
+            }),
         };
         field.map(|field| field.editor.clone())
     }
@@ -403,7 +412,10 @@ impl Inputs {
         registry
             .fields
             .values()
-            .find(|field| field.editor.focus_handle(cx).is_focused(window))
+            .find(|field| {
+                field.mounted.upgrade().is_some()
+                    && field.editor.focus_handle(cx).is_focused(window)
+            })
             .map(|field| (field.wiring.clone(), field.editor.value(cx).to_string()))
     }
 }

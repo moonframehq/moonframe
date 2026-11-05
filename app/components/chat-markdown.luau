@@ -12,7 +12,7 @@ type Props = {
 	to: string?,
 }
 
--- The marks a line leaves open, closed in order, innermost first.
+-- The marks a paragraph leaves open, closed in order, innermost first.
 local function closers(paragraph: string): string
 	local stack: { string } = {}
 	local function flip(mark: string)
@@ -39,9 +39,15 @@ local function closers(paragraph: string): string
 			flip(pair)
 			i += 2
 		elseif c == "*" or c == "_" then
-			-- Inside a word (snake_case) a `_` is a letter.
+			-- A closing underscore follows a word; an intraword one has a
+			-- word on both sides. Only the latter belongs to snake_case.
 			local before = string.sub(paragraph, i - 1, i - 1)
-			if c == "*" or i == 1 or string.match(before, "[%s%p]") then
+			local after = string.sub(paragraph, i + 1, i + 1)
+			local closes = stack[#stack] == "_" and before ~= "" and not string.match(before, "%s")
+				and (after == "" or string.match(after, "[%s%p]"))
+			local opens = after ~= "" and not string.match(after, "%s")
+				and (i == 1 or string.match(before, "[%s%p]"))
+			if c == "*" or closes or opens then
 				flip(c)
 			end
 			i += 1
@@ -56,29 +62,48 @@ local function closers(paragraph: string): string
 	return closing
 end
 
--- Whether a fence is still open at the end of `text`.
-local function in_fence(text: string): boolean
-	local open = false
+-- Whether a fence is open, or the last nonblank line closed one. A fence
+-- only closes with the same mark and at least as many of it.
+local function fence_tail(text: string): (boolean, boolean)
+	local open: string? = nil
+	local closed = false
 	for line in string.gmatch(text, "[^\n]+") do
-		if string.match(line, "^%s*```") or string.match(line, "^%s*~~~") then
-			open = not open
+		local mark, rest = string.match(line, "^%s*(```+)(.*)$")
+		if not mark then
+			mark, rest = string.match(line, "^%s*(~~~+)(.*)$")
+		end
+		if string.find(line, "%S") then
+			closed = false
+		end
+		if mark then
+			if not open then
+				open = mark
+			elseif string.sub(mark, 1, 1) == string.sub(open, 1, 1) and #mark >= #open
+				and string.match(rest or "", "^%s*$") then
+				open = nil
+				closed = true
+			end
 		end
 	end
-	return open
+	return open ~= nil, closed
 end
 
 -- `text` as it should read while still being written.
 local function growing(text: string): string
-	if in_fence(text) then
+	local open, closed = fence_tail(text)
+	if open then
 		return text
 	end
-	local last = string.match(text, "([^\n]*)$") or ""
+	local kept = string.gsub(text, "%s+$", "")
+	if closed then
+		return `{kept}\n\n[](cursor:)`
+	end
+	local last = string.match(kept, ".*\n%s*\n(.*)$") or kept
 	local closing = closers(last)
 	-- A `*` alone at the start of a line is a list about to begin.
 	if string.match(last, "^%s*[%*%-%+]%s*$") then
 		closing = ""
 	end
-	local kept = string.gsub(text, "%s+$", "")
 	return `{kept}{closing} [](cursor:)`
 end
 

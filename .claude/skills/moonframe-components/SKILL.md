@@ -696,6 +696,7 @@ A whole mod using it, with state: `app/components/demos/chat-markdown.luau`.
 | `min` | the least zoom (default a quarter of fitted) |
 | `overlay` | elements drawn over the picture; their `area` is in fractions of the picture, a `pointer` there takes presses before panning does, and their messages reach the mod as they are |
 | `src` | the picture: an absolute or `~/` path (a file the user picked or dropped, the image cache, the app's folders), or one relative to the components folder, which draws it |
+| `to` | mod to send view changes to, if not the drawing one |
 | `width` | pixels; fills its parent when unset |
 | `zoom` | screen pixels per picture pixel (1 is 100 %); nil fits it |
 
@@ -5797,7 +5798,7 @@ A whole mod using it, with state: `app/components/demos/emoji-picker.luau`.
 | `to` | mod to send them to, if not the drawing one |
 | `zoom` | as `image-viewer`; nil fits it |
 
-**Styles:** `.lightbox` `.lightbox-bar` `.lightbox-place` `.lightbox-title`
+**Styles:** `.lightbox` `.lightbox-bar` `.lightbox-overlay` `.lightbox-place` `.lightbox-title`
 
 ```lua
 local lightbox = use "lightbox"

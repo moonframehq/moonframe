@@ -89,7 +89,8 @@ impl MarkdownPlugin for Inline {
         let Node::InlineMath(math) = node else {
             return None;
         };
-        let end = node.position()?.end.offset.checked_sub(cx.offset())?;
+        // AST positions already index this fragment, including on append.
+        let end = node.position()?.end.offset;
         let after = cx.source().get(end..).and_then(|rest| rest.chars().next());
         parts::inline_math(&math.value, after)
             .then(|| MarkdownNode::new(INLINE, math.value.clone()).text(math.value.clone()))

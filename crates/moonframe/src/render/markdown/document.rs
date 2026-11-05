@@ -80,6 +80,8 @@ struct Kept {
     /// The last `reveal` taken, and one waiting for its text to parse.
     reveal: Option<Reveal>,
     pending: Option<usize>,
+    /// One post-layout callback at a time, waiting for the list's items.
+    revealing: bool,
     outline: Arc<Outline>,
     /// The text `outline` is of.
     outlined: Option<String>,
@@ -145,6 +147,12 @@ impl RenderOnce for Document {
         kept.update(cx, |kept, cx| {
             kept.take(&self.markdown, self.colors, &state, window, cx);
             kept.settle(&state, window, cx);
+            let rendered = state.read(cx).rendered_text();
+            if kept.pending.is_some() && !kept.revealing && rendered.source() == kept.text {
+                // Schedule from render, rather than the parse observer: the
+                // list will lay out this version before the next frame.
+                kept.reveal_after_layout(&state, rendered, window, cx);
+            }
         });
         let extensions = kept.read(cx).extensions.clone();
         let mut view = TextView::new(&state)
@@ -162,7 +170,11 @@ impl RenderOnce for Document {
             .blockquote_style(self.quote)
             .on_link_click(blocks::link_click(&shared));
         if let Some(lines) = self.markdown.lines {
-            view = view.max_lines(lines);
+            view = view.max_lines(lines).on_link_click(|_, _, _, cx| {
+                // TextView stops mouse-up propagation before calling us.
+                // In a preview the original click belongs to its card.
+                cx.propagate();
+            });
         }
         if self.markdown.stream {
             view = view.motion(
@@ -196,6 +208,7 @@ impl Kept {
             revealed_match: None,
             reveal: None,
             pending: None,
+            revealing: false,
             outline: Arc::default(),
             outlined: None,
             outlining: None,
@@ -298,7 +311,7 @@ impl Kept {
         );
     }
 
-    /// Carries out what waits on the view's text: the search and a reveal.
+    /// Updates the search and current section as the view's parse lands.
     fn settle(
         &mut self,
         state: &Entity<TextViewState>,
@@ -306,20 +319,49 @@ impl Kept {
         cx: &mut Context<Self>,
     ) {
         let rendered = state.read(cx).rendered_text();
-        if let Some(at) = self.pending
-            && rendered.source() == self.text
-        {
-            self.pending = None;
-            let scroll = self.shared.lock().is_ok_and(|shared| shared.scroll);
-            let outline = Outline::parse(rendered.source());
-            go_to(state, &rendered, &outline, at, scroll, cx);
-        }
         self.search(state, rendered, window, cx);
         // A reveal moves the view without a scroll event.
         if self.section_msg.is_some() {
             let block = state.read(cx).list_state().logical_scroll_top().item_ix;
             self.scrolled(block, window, cx);
         }
+    }
+
+    /// Parsing precedes layout. `TextView` resets its list when the block
+    /// count changes, so a jump before that reset would be lost.
+    fn reveal_after_layout(
+        &mut self,
+        state: &Entity<TextViewState>,
+        rendered: RenderedText,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.revealing = true;
+        let kept = cx.entity().downgrade();
+        let state = state.downgrade();
+        window.on_next_frame(move |window, cx| {
+            let Some(state) = state.upgrade() else {
+                return;
+            };
+            kept.update(cx, |kept, cx| {
+                kept.revealing = false;
+                let current = state.read(cx).rendered_text();
+                // A newer parse or request may have arrived in the meantime.
+                if current == rendered
+                    && current.source() == kept.text
+                    && let Some(at) = kept.pending.take()
+                {
+                    let scroll = kept.shared.lock().is_ok_and(|shared| shared.scroll);
+                    let outline = Outline::parse(current.source());
+                    go_to(&state, &current, &outline, at, scroll, cx);
+                }
+                kept.settle(&state, window, cx);
+                if kept.pending.is_some() {
+                    cx.notify();
+                }
+            })
+            .ok();
+        });
     }
 
     fn search(

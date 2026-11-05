@@ -6,6 +6,8 @@
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+mod regressions;
+
 use {
     crate::{
         app::{MoonframeApp, Parts},
@@ -102,7 +104,10 @@ impl Window<'_> {
     fn settle(&mut self) {
         for _ in 0..4 {
             self.cx.run_until_parked();
-            self.cx.update(|window, _| window.refresh());
+            self.cx.update(|window, cx| {
+                window.simulate_next_frame(cx);
+                window.refresh();
+            });
             self.cx.run_until_parked();
         }
     }

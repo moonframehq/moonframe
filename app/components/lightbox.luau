@@ -37,6 +37,7 @@ return component {
 		["to"] = "mod to send them to, if not the drawing one",
 	},
 	styles = {
+		[".lightbox-overlay"] = { padding = 0 },
 		[".lightbox"] = { background = "background", radius = 12, gap = 0, clip = true, shadow = "large" },
 		[".lightbox-bar"] = { padding = { 6, 8, 6, 14 }, gap = 8, border = "bottom", border_color = "border" },
 		[".lightbox-title"] = { weight = "medium" },
@@ -73,14 +74,16 @@ lightbox {
 		return ui.overlay {
 			open = true,
 			place = "center",
+			width = 960,
+			height = 680,
+			class = "lightbox-overlay",
 			backdrop = true,
 			dismiss = props.dismiss,
 			to = props.to,
 			keys = keys,
 			content = ui.column {
 				class = "lightbox",
-				width = 960,
-				height = 680,
+				grow = true,
 				ui.row {
 					class = "lightbox-bar",
 					align = "center",
@@ -96,6 +99,7 @@ lightbox {
 					zoom = props.zoom,
 					center = props.center,
 					change = props.change,
+					to = props.to,
 					controls = true,
 				},
 			},
