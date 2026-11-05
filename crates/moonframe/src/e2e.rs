@@ -413,7 +413,11 @@ return mod {
 }"#;
     let mut window = open(cx, main);
     assert!(!window.shows("selection-toolbar-tool"));
-    window.keys(if cfg!(target_os = "macos") { "cmd-a" } else { "ctrl-a" });
+    window.keys(if cfg!(target_os = "macos") {
+        "cmd-a"
+    } else {
+        "ctrl-a"
+    });
     window.click("selection-toolbar-tool");
     assert!(window.log().contains("text=**words**"), "{}", window.log());
 }

@@ -146,7 +146,8 @@ pub struct Map {
     pub pins: Vec<Pin>,
     pub routes: Vec<Route>,
     /// Sent with `lat`, `lon`, `zoom` and `bearing` added after the user
-    /// moves the map.
+    /// moves the map: ten times a second at most while it moves, and always
+    /// with where it ended up.
     pub moved: Option<Data>,
     /// Sent with `pin` (its index, from 1) added when a pin is clicked.
     pub select: Option<Data>,

@@ -579,10 +579,8 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     gpui_kit::application()
         .with_assets(crate::assets::Assets)
         .run(move |cx| {
+            crate::app::list_fonts_ahead(cx);
             gpui_kit::init(cx);
-            if let Err(problem) = crate::dock::set_icon(icon.as_deref()) {
-                tracing::warn!("{problem}");
-            }
             crate::actions::bind_keys(cx);
             cx.set_menus(crate::actions::menus(&[]));
             cx.on_action(|_: &crate::actions::Quit, cx| crate::app::guard::quit(cx));
@@ -651,6 +649,10 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
             }
             if !background {
                 cx.activate(true);
+            }
+            // After the window: nothing waits for it, and it takes a while.
+            if let Err(problem) = crate::dock::set_icon(icon.as_deref()) {
+                tracing::warn!("{problem}");
             }
         });
     ExitCode::SUCCESS
