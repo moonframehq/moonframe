@@ -40,12 +40,13 @@ pub(crate) fn current() -> Option<&'static Scheme> {
     *CURRENT.read().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// The folder holding Omarchy's current theme, if `home` has one.
+/// The parent of Omarchy's theme, even while the theme itself is absent
+/// during a swap. Prefer local state without falling back mid-swap.
 fn folder(home: &Path) -> Option<PathBuf> {
     FOLDERS
         .iter()
         .map(|folder| home.join(folder))
-        .find(|folder| folder.join(THEME).join(COLORS).is_file())
+        .find(|folder| folder.is_dir())
 }
 
 /// Reads Omarchy's theme, and returns whether it changed. Keeps the one it
@@ -54,6 +55,9 @@ pub(crate) fn load() -> bool {
     let Some(folder) = std::env::home_dir().and_then(|home| folder(&home)) else {
         return false;
     };
+    if !folder.join(THEME).join(COLORS).is_file() {
+        return false;
+    }
     let scheme = match read(&folder.join(THEME)) {
         Ok(scheme) => scheme,
         Err(problem) => {
@@ -74,7 +78,17 @@ pub(crate) fn load() -> bool {
 pub(crate) fn watch(
     changed: impl Fn() + Send + 'static,
 ) -> notify::Result<Option<RecommendedWatcher>> {
-    let Some(folder) = std::env::home_dir().and_then(|home| folder(&home)) else {
+    let Some(home) = std::env::home_dir() else {
+        return Ok(None);
+    };
+    watch_home(&home, changed)
+}
+
+fn watch_home(
+    home: &Path,
+    changed: impl Fn() + Send + 'static,
+) -> notify::Result<Option<RecommendedWatcher>> {
+    let Some(folder) = folder(home) else {
         return Ok(None);
     };
     let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
@@ -297,14 +311,39 @@ bright_magenta = "#bb9af7"
         fs::write(older.join(THEME).join(COLORS), TOKYO_NIGHT).unwrap();
         assert_eq!(folder(home.path()), Some(older));
 
-        // A folder without colors, as in the middle of a swap, is passed over.
+        // Keep the new parent even while its theme is being swapped out.
         let newer = home.path().join(FOLDERS[0]);
+        fs::create_dir_all(&newer).unwrap();
+        assert_eq!(folder(home.path()).as_ref(), Some(&newer));
         fs::create_dir_all(newer.join(THEME)).unwrap();
-        assert_ne!(folder(home.path()).as_ref(), Some(&newer));
         fs::write(newer.join(THEME).join(COLORS), TOKYO_NIGHT).unwrap();
         assert_eq!(folder(home.path()), Some(newer.clone()));
 
         fs::write(newer.join(THEME).join(LIGHT_MARKER), "").unwrap();
         assert!(read(&newer.join(THEME)).unwrap().dark(), "mode wins");
+    }
+
+    #[test]
+    fn watching_starts_between_removing_and_replacing_the_theme() {
+        let home = tempfile::tempdir().unwrap();
+        let current = home.path().join(FOLDERS[0]);
+        let next = current.join("next-theme");
+        fs::create_dir_all(&next).unwrap();
+        fs::write(next.join(COLORS), TOKYO_NIGHT).unwrap();
+        assert!(!current.join(THEME).exists());
+
+        let (sender, changes) = std::sync::mpsc::channel();
+        let _watcher = watch_home(home.path(), move || {
+            let _ = sender.send(());
+        })
+        .unwrap()
+        .expect("the parent must be watched even without theme/colors.toml");
+
+        fs::rename(next, current.join(THEME)).unwrap();
+        fs::write(current.join(THEME_NAME), "tokyo-night").unwrap();
+        changes
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("finishing the swap must notify the app");
+        assert_eq!(read(&current.join(THEME)).unwrap().background, 0x1a1b26);
     }
 }
