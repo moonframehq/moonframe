@@ -2,8 +2,8 @@
 //! same spot from a coarser zoom, enlarged, or from the next finer zoom,
 //! shrunk. A tile whose file is ready still takes GPUI a moment to decode,
 //! and draws nothing meanwhile, so a stand-in stays under each new tile
-//! until it has had time to show: what was there is never replaced by a
-//! blank.
+//! until it has decoded and faded in, and only a tile that shows stands in:
+//! what was there is never replaced by a blank.
 
 use {
     super::{
@@ -21,9 +21,9 @@ use {
 
 /// Coarser zooms looked at for a stand-in.
 const COARSER: u8 = 4;
-/// How long a tile keeps a stand-in under it after it first shows: longer
-/// than decoding a tile takes.
-const SETTLE: Duration = Duration::from_millis(600);
+/// How long a tile keeps a stand-in under it once it has decoded: longer
+/// than it takes to fade in.
+const SETTLE: Duration = Duration::from_millis(250);
 /// Tiles remembered as shown; past this the memory starts over.
 const MOST_REMEMBERED: usize = 4096;
 
@@ -32,8 +32,11 @@ thread_local! {
     static SHOWN: RefCell<HashMap<PathBuf, Instant>> = RefCell::new(HashMap::new());
 }
 
-/// Whether `file` showed long enough ago to be drawn by now.
+/// Whether `file` decoded long enough ago to have faded in.
 pub(super) fn settled(file: &Path) -> bool {
+    if !memory::shows(file) {
+        return false;
+    }
     SHOWN.with_borrow_mut(|shown| {
         if shown.len() > MOST_REMEMBERED {
             shown.clear();
@@ -53,9 +56,15 @@ pub(super) fn forget(files: &[PathBuf]) {
     });
 }
 
-/// The best stand-in at hand for `tile`, shown `size` pixels across.
-pub(super) fn stand_in(tile: &Tile, size: f64) -> Option<AnyElement> {
-    coarser(tile, size).or_else(|| finer(tile, size))
+/// The best stand-in at hand for `tile`, shown `size` pixels across, coming
+/// `from` another level if it is.
+pub(super) fn stand_in(tile: &Tile, size: f64, from: Option<u8>) -> Option<AnyElement> {
+    // Zooming out, what was just there is the finer tiles.
+    if from.is_some_and(|from| from > tile.z) {
+        finer(tile, size).or_else(|| coarser(tile, size))
+    } else {
+        coarser(tile, size).or_else(|| finer(tile, size))
+    }
 }
 
 /// A coarser tile at hand, enlarged and cropped to `tile`'s place: what
@@ -68,7 +77,7 @@ fn coarser(tile: &Tile, size: f64) -> Option<AnyElement> {
             y: tile.y >> steps,
             ..tile.clone()
         };
-        let file = tiles::ready(&parent)?;
+        let file = tiles::ready(&parent).filter(|file| memory::shows(file))?;
         let across = f64::from(1u32 << steps);
         let offset_x = f64::from(tile.x - (parent.x << steps)) * size;
         let offset_y = f64::from(tile.y - (parent.y << steps)) * size;
@@ -97,7 +106,7 @@ fn finer(tile: &Tile, size: f64) -> Option<AnyElement> {
             y: tile.y * 2 + dy,
             ..tile.clone()
         };
-        let file = tiles::ready(&child)?;
+        let file = tiles::ready(&child).filter(|file| memory::shows(file))?;
         quarters.push(
             memory::picture(file)
                 .absolute()

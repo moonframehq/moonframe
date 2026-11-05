@@ -5,9 +5,9 @@
 
 use {
     super::{
-        memory, stand_in,
+        benchmark, memory, stand_in,
         tiles::{self, Tile},
-        view::Frame,
+        view::{Crossing, Frame},
     },
     gpui_kit::*,
     moonframe_core::{Map, MapProvider},
@@ -19,8 +19,8 @@ const MOST_TILES: usize = 400;
 /// its tiles cover the box, so they arrive long before the rest and leave
 /// no blank while panning to somewhere new.
 const BASE: u8 = 3;
-/// How long a new tile takes to fade in.
-const FADE: std::time::Duration = std::time::Duration::from_millis(200);
+/// How long a new tile, or a new level of them, takes to fade in.
+pub(super) const FADE: std::time::Duration = std::time::Duration::from_millis(200);
 /// Tiles fetched beyond each edge of the box, so panning finds them ready.
 const RING: i64 = 1;
 
@@ -60,9 +60,63 @@ impl Grid {
     }
 }
 
-/// The tiles under `frame`, and whether any is still on its way.
-pub(super) fn tile_layer(map: &Map, frame: Frame, scale: f32, grid: Grid) -> (Div, bool) {
-    let z = tiles::level(map.provider, frame.zoom, scale);
+/// Asks for the tiles under `frame`: those at its middle go first, as what is
+/// asked for last is fetched first.
+pub(super) fn ask_for(map: &Map, frame: Frame, scale: f32) {
+    ask_at(
+        map,
+        frame,
+        tiles::level(map.provider, frame.zoom, scale),
+        scale,
+    );
+}
+
+fn ask_at(map: &Map, frame: Frame, z: u8, scale: f32) {
+    let count = 1i64 << z;
+    let size = 256.0 * (frame.zoom - f64::from(z)).exp2();
+    let span = frame.span();
+    let (middle_x, middle_y) = (frame.center.0 * span, frame.center.1 * span);
+    let (left, top) = (middle_x - frame.size.0 / 2.0, middle_y - frame.size.1 / 2.0);
+    let columns = (left / size).floor() as i64..=((left + frame.size.0) / size).floor() as i64;
+    let rows = (top / size).floor().max(0.0) as i64
+        ..=((top + frame.size.1) / size)
+            .floor()
+            .min(count as f64 - 1.0) as i64;
+    let mut under: Vec<(i64, i64)> = rows
+        .flat_map(|row| columns.clone().map(move |column| (column, row)))
+        .take(MOST_TILES)
+        .collect();
+    let away = |&(column, row): &(i64, i64)| {
+        let across = (column as f64 + 0.5) * size - middle_x;
+        let down = (row as f64 + 0.5) * size - middle_y;
+        across * across + down * down
+    };
+    under.sort_by(|a, b| away(b).total_cmp(&away(a)));
+    let retina = scale > 1.5 && tiles::has_retina(map.provider);
+    for (column, row) in under {
+        let tile = Tile {
+            provider: map.provider,
+            retina,
+            z,
+            x: column.rem_euclid(count) as u32,
+            y: row as u32,
+        };
+        tiles::prefetch(&tile, map.key.as_deref());
+    }
+}
+
+/// The tiles under `frame`, and whether any is still on its way. `ahead` is
+/// where a zoom going on reaches the next level: its tiles are fetched before
+/// the ring, which is no use to a map that is about to change level.
+pub(super) fn tile_layer(
+    map: &Map,
+    frame: Frame,
+    (z, crossing): (u8, Option<Crossing>),
+    ahead: Option<Frame>,
+    scale: f32,
+    grid: Grid,
+) -> (Div, bool) {
+    let from = crossing.map(|crossing| crossing.from);
     let count = 1i64 << z;
     let size = 256.0 * (frame.zoom - f64::from(z)).exp2();
     let span = frame.span();
@@ -96,6 +150,10 @@ pub(super) fn tile_layer(map: &Map, frame: Frame, scale: f32, grid: Grid) -> (Di
             }
         }
     }
+    if let Some(ahead) = ahead {
+        ask_for(map, ahead, scale);
+    }
+    ask_at(map, frame, z, scale);
     let (mut layer, base) = base_layer(map, frame, z, grid);
     let mut missing = false;
     let mut drawn = 0;
@@ -139,11 +197,20 @@ pub(super) fn tile_layer(map: &Map, frame: Frame, scale: f32, grid: Grid) -> (Di
                 // Until it has had time to decode, what stood in for it
                 // stays under it, so it never blinks blank; the next
                 // redraw after that drops it.
+                let shows = memory::shows(&file);
                 let fresh = !stand_in::settled(&file);
-                let under = fresh.then(|| stand_in::stand_in(&tile, x1 - x0)).flatten();
+                let under = (fresh || crossing.is_some())
+                    .then(|| stand_in::stand_in(&tile, x1 - x0, from))
+                    .flatten();
+                benchmark::cell(shows || under.is_some());
                 let picture = memory::picture(file).size_full();
-                // A new tile fades in over what stood in for it.
-                let picture = if fresh {
+                // A new tile fades in over what stood in for it, once it has
+                // decoded: drawn until then, unseen, so that it does.
+                let picture = if !shows {
+                    picture.opacity(0.).into_any_element()
+                } else if let Some(crossing) = crossing.filter(|_| under.is_some()) {
+                    picture.opacity(crossing.shown).into_any_element()
+                } else if fresh {
                     let id = format!("{}/{}/{}/{}", tile.provider.name(), tile.z, tile.x, tile.y);
                     picture
                         .with_animation(
@@ -161,7 +228,9 @@ pub(super) fn tile_layer(map: &Map, frame: Frame, scale: f32, grid: Grid) -> (Di
             missing = true;
             // Until it arrives: the same spot from another zoom, else the
             // base layer under everything shows through.
-            if let Some(stand_in) = stand_in::stand_in(&tile, x1 - x0) {
+            let stand_in = stand_in::stand_in(&tile, x1 - x0, from);
+            benchmark::cell(stand_in.is_some());
+            if let Some(stand_in) = stand_in {
                 layer = layer.child(cell.child(stand_in));
             }
         }

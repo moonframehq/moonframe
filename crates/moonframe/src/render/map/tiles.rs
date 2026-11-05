@@ -3,8 +3,8 @@
 //!
 //! Tile servers ask for a client that identifies itself, keeps what it
 //! fetched (a week at least, by OpenStreetMap's policy) and holds few
-//! connections open, so two workers fetch, newest request first, and a
-//! tile that failed is not asked for again for a while. A tile past its
+//! connections open, so a few workers fetch, newest request first, only
+//! two of them from OpenStreetMap's volunteers, and a tile that failed is not asked for again for a while. A tile past its
 //! week still shows while the server is asked whether it changed; a
 //! request no map has wanted for a while is dropped unfetched.
 
@@ -19,8 +19,11 @@ use {
     },
 };
 
-/// Connections open to tile servers at once, across every map.
-const WORKERS: usize = 2;
+/// Connections open to tile servers at once, across every map. A screen of
+/// tiles takes a quarter of the time it takes over two.
+const WORKERS: usize = 8;
+/// Connections open to OpenStreetMap's own servers, which ask for few.
+const OSM_WORKERS: usize = 2;
 /// How much sooner a high-density screen moves to a finer level, in zoom steps.
 const FINER_ON_DENSE_SCREENS: f64 = 0.5;
 /// Requests waiting beyond this drop the oldest: the map moved on.
@@ -108,6 +111,9 @@ enum State {
     Failed(Instant),
 }
 
+/// A tile to fetch, its key, and the date of the copy it already has.
+type Job = (Tile, Option<String>, Option<SystemTime>);
+
 #[derive(Default)]
 struct Shared {
     tiles: HashMap<Tile, State>,
@@ -115,7 +121,9 @@ struct Shared {
     wanted: HashMap<Tile, Instant>,
     /// Newest last; workers take from the back. With the tile, its key and
     /// the file it already has, past its week, to revalidate.
-    queue: VecDeque<(Tile, Option<String>, Option<SystemTime>)>,
+    queue: VecDeque<Job>,
+    /// Fetches under way, by provider.
+    running: HashMap<MapProvider, usize>,
     /// What to wake once a tile arrives.
     waiters: Vec<futures::channel::oneshot::Sender<()>>,
     /// The last failure, by provider: a wrong key says so on the map.
@@ -278,6 +286,42 @@ fn forget(shared: &mut Shared, tile: &Tile) {
     }
 }
 
+/// The most tiles fetched from `provider` at once.
+fn connections(provider: MapProvider) -> usize {
+    match provider {
+        MapProvider::OpenStreetMap => OSM_WORKERS,
+        _ => WORKERS,
+    }
+}
+
+/// The newest request its provider has a connection for, counted as running.
+/// One nobody asked for lately goes: the map moved on, and drawing again lets
+/// a map that still shows it ask anew.
+fn next(shared: &mut Shared) -> Option<Job> {
+    let mut index = shared.queue.len();
+    while index > 0 {
+        index -= 1;
+        let tile = shared.queue[index].0.clone();
+        let unwanted = shared
+            .wanted
+            .get(&tile)
+            .is_none_or(|at| at.elapsed() > UNWANTED);
+        if unwanted {
+            shared.queue.remove(index);
+            forget(shared, &tile);
+            for waiter in shared.waiters.drain(..) {
+                let _ = waiter.send(());
+            }
+        } else if shared.running.get(&tile.provider).copied().unwrap_or(0)
+            < connections(tile.provider)
+        {
+            *shared.running.entry(tile.provider).or_default() += 1;
+            return shared.queue.remove(index);
+        }
+    }
+    None
+}
+
 /// A worker: takes the newest request, fetches it, and says it arrived.
 fn work() {
     let agent = ureq::Agent::config_builder()
@@ -295,20 +339,7 @@ fn work() {
         let (tile, key, since) = {
             let mut shared = shared();
             loop {
-                match shared.queue.pop_back() {
-                    // Nobody asked for it lately: the map moved on. Drawing
-                    // again lets a map that still shows it ask anew.
-                    Some((tile, ..))
-                        if shared
-                            .wanted
-                            .get(&tile)
-                            .is_none_or(|at| at.elapsed() > UNWANTED) =>
-                    {
-                        forget(&mut shared, &tile);
-                        for waiter in shared.waiters.drain(..) {
-                            let _ = waiter.send(());
-                        }
-                    },
+                match next(&mut shared) {
                     Some(job) => break job,
                     None => {
                         shared = SHARED
@@ -322,6 +353,11 @@ fn work() {
         let fetched = fetch(&agent, &tile, key.as_deref(), since);
         let mut shared = shared();
         shared.wanted.remove(&tile);
+        if let Some(running) = shared.running.get_mut(&tile.provider) {
+            *running = running.saturating_sub(1);
+        }
+        // A request held back for this connection can go now.
+        SHARED.1.notify_all();
         match fetched {
             Ok(path) => {
                 shared.failures.remove(&tile.provider);
@@ -494,5 +530,38 @@ mod tests {
         );
         assert_eq!(shared.queue.len(), 1);
         Ok(())
+    }
+
+    #[test]
+    fn openstreetmap_keeps_to_two_connections_while_others_take_more() {
+        let tile = |provider, x| Tile {
+            provider,
+            retina: false,
+            z: 3,
+            x,
+            y: 1,
+        };
+        let mut shared = Shared::default();
+        for x in 0..3 {
+            let osm = tile(MapProvider::OpenStreetMap, x);
+            shared.wanted.insert(osm.clone(), Instant::now());
+            shared.queue.push_back((osm, None, None));
+        }
+        let voyager = tile(MapProvider::CartoVoyager, 0);
+        shared.wanted.insert(voyager.clone(), Instant::now());
+        shared.queue.push_front((voyager.clone(), None, None));
+
+        let taken: Vec<Tile> = std::iter::from_fn(|| next(&mut shared))
+            .map(|(tile, ..)| tile)
+            .collect();
+
+        // The newest two from OpenStreetMap; the third waits, and what is
+        // behind it does not wait with it.
+        assert_eq!(taken, [
+            tile(MapProvider::OpenStreetMap, 2),
+            tile(MapProvider::OpenStreetMap, 1),
+            voyager,
+        ]);
+        assert_eq!(shared.queue.len(), 1);
     }
 }

@@ -5,6 +5,10 @@
 //!
 //! The Ghostty theme files in `assets/themes/` are unmodified copies from
 //! iTerm2-Color-Schemes; see `assets/themes/NOTICE.md`.
+//!
+//! On the Omarchy desktop, its theme is one more: see [`omarchy`].
+
+pub(crate) mod omarchy;
 
 use {
     gpui_kit::{
@@ -27,6 +31,8 @@ pub(crate) struct Scheme {
     pub(crate) foreground: u32,
     pub(crate) cursor: u32,
     pub(crate) selection: Option<u32>,
+    accent: u32,
+    dark: bool,
     pub(crate) ansi: [u32; 16],
 }
 
@@ -111,6 +117,8 @@ static SCHEMES: LazyLock<Vec<Scheme>> = LazyLock::new(|| {
             foreground,
             cursor: foreground,
             selection: None,
+            accent: ansi[4],
+            dark: luminance(background) < 0.5,
             ansi,
         })
         .chain(BUNDLED.iter().filter_map(|(name, text)| {
@@ -123,9 +131,12 @@ static SCHEMES: LazyLock<Vec<Scheme>> = LazyLock::new(|| {
     schemes
 });
 
-/// Every theme's name: the stock one first, then the schemes.
+/// Every theme's name: the stock one first, then Omarchy's on Omarchy, then
+/// the schemes.
 pub(crate) fn names() -> impl Iterator<Item = &'static str> {
-    std::iter::once(DEFAULT).chain(SCHEMES.iter().map(|scheme| scheme.name))
+    std::iter::once(DEFAULT)
+        .chain(omarchy::current().map(|scheme| scheme.name))
+        .chain(SCHEMES.iter().map(|scheme| scheme.name))
 }
 
 /// The themes made for dark windows, or for light ones: the stock look
@@ -151,13 +162,14 @@ pub(crate) fn shown(
 }
 
 /// Whether `name` is a theme for dark windows (or for light ones, when
-/// `dark` is false): the stock look is for both.
+/// `dark` is false): the stock look is for both, and so is Omarchy's, which
+/// is one or the other as Omarchy changes it.
 pub(crate) fn fits(name: &str, dark: bool) -> Result<Option<&'static Scheme>, String> {
     if name == DEFAULT {
         return Ok(None);
     }
     let scheme = find(name).ok_or_else(|| format!("no theme called `{name}`"))?;
-    if scheme.dark() != dark {
+    if scheme.name != omarchy::NAME && scheme.dark() != dark {
         let (kind, other) = if dark {
             ("dark", "light")
         } else {
@@ -215,14 +227,15 @@ impl Preview {
 /// Every theme as views read it in `app.appearance.themes`: `{ name,
 /// dark, background, foreground, accent, colors }`, the stock look twice
 /// (in `light` and in `dark`, its colors as the stylesheet makes them),
-/// then each scheme, by name.
+/// then Omarchy's on Omarchy, then each scheme, by name.
 pub(crate) fn listing(light: Preview, dark: Preview) -> Data {
     Data::List(
         [light.data(DEFAULT, false), dark.data(DEFAULT, true)]
             .into_iter()
             .chain(
-                SCHEMES
-                    .iter()
+                omarchy::current()
+                    .into_iter()
+                    .chain(SCHEMES.iter())
                     .map(|scheme| scheme.preview().data(scheme.name, scheme.dark())),
             )
             .collect(),
@@ -232,7 +245,10 @@ pub(crate) fn listing(light: Preview, dark: Preview) -> Data {
 /// The scheme called `name`; `None` for the stock look or a name no theme
 /// has.
 pub(crate) fn find(name: &str) -> Option<&'static Scheme> {
-    SCHEMES.iter().find(|scheme| scheme.name == name)
+    omarchy::current()
+        .into_iter()
+        .chain(SCHEMES.iter())
+        .find(|scheme| scheme.name == name)
 }
 
 impl Scheme {
@@ -245,6 +261,8 @@ impl Scheme {
             foreground: 0xffffff,
             cursor: 0xffffff,
             selection: None,
+            accent: XTERM[4],
+            dark: true,
             ansi: XTERM,
         };
         let mut cursor = None;
@@ -279,11 +297,13 @@ impl Scheme {
             }
         }
         scheme.cursor = cursor.unwrap_or(scheme.foreground);
+        scheme.accent = scheme.ansi[4];
+        scheme.dark = luminance(scheme.background) < 0.5;
         Ok(scheme)
     }
 
     pub(crate) fn dark(&self) -> bool {
-        luminance(self.background) < 0.5
+        self.dark
     }
 
     fn preview(&self) -> Preview {
@@ -292,7 +312,7 @@ impl Scheme {
         Preview {
             background: self.background,
             foreground: self.foreground,
-            accent: self.ansi[4],
+            accent: self.accent,
             colors,
         }
     }
@@ -307,14 +327,14 @@ impl Scheme {
     }
 
     /// The window's colors: chrome blended from the background toward the
-    /// foreground, the blue as the accent, and the terminal colors for
+    /// foreground, the accent (the blue, unless the theme has its own), and the terminal colors for
     /// success, warning, and danger. Panels (`card`, gpui's popover) are the
     /// theme's own background, so a terminal in one shows the scheme as
     /// drawn; the sidebar behind them is set apart: darker in a dark theme,
     /// tinted toward the text in a light one.
     pub(crate) fn config(&self) -> ThemeConfig {
         let blend = |percent| color(mix(self.background, self.foreground, percent));
-        let accent = self.ansi[4];
+        let accent = self.accent;
         let sidebar = if self.dark() {
             color(mix(self.background, 0x000000, 25))
         } else {

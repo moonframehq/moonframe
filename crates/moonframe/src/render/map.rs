@@ -5,6 +5,12 @@
 //! with north up, and through [`rotated`] turned; everything over them is
 //! placed by [`view::Frame`] and stays upright.
 
+#[cfg(feature = "map-benchmark")]
+mod benchmark;
+#[cfg(not(feature = "map-benchmark"))]
+mod benchmark {
+    pub(super) const fn cell(_: bool) {}
+}
 mod disk;
 mod layer;
 mod lines;
@@ -15,6 +21,7 @@ mod routing;
 mod stand_in;
 mod tiles;
 mod view;
+mod wake;
 
 use {
     super::{
@@ -29,26 +36,45 @@ use {
     gpui_kit::{component::ActiveTheme, *},
     layer::Grid,
     moonframe_core::{Data, Map, Part, with_fields},
-    std::{cell::Cell, collections::BTreeMap},
+    std::{
+        cell::RefCell,
+        collections::{BTreeMap, HashMap},
+        time::Instant,
+    },
     view::Frame,
 };
 
 /// One breath of a pulsing pin's halo, before `animation_speed`.
 const PULSE: std::time::Duration = std::time::Duration::from_millis(2200);
 
-/// How long a `glide` takes, before `animation_speed`.
-const GLIDE: std::time::Duration = std::time::Duration::from_millis(600);
+/// Zoom steps per notch of a mouse wheel.
+const WHEEL_ZOOM: f64 = 1.0 / 3.0;
 
-/// Zoom steps per pixel of wheel or trackpad scroll.
-const SCROLL_ZOOM: f64 = 1.0 / 120.0;
+/// How much a pixel of trackpad scroll changes the scale: Apple Maps' figure.
+const SCROLL_SCALE: f64 = 0.01;
 
 thread_local! {
-    /// Whether a task already waits for tiles to arrive, to draw again.
-    static WAITING: Cell<bool> = const { Cell::new(false) };
+    /// Each map's live view, by key, in windows that keep the rest still.
+    static LIVE: RefCell<HashMap<String, EntityId>> = RefCell::new(HashMap::new());
+}
+
+/// Draws the map `key` again, and of its window as little as it can.
+fn redraw(key: &str, window: &mut Window, cx: &mut App) {
+    match live_view(key) {
+        Some(view) => cx.notify(view),
+        None => window.refresh(),
+    }
+}
+
+/// The live view of the map `key`, if it has one.
+fn live_view(key: &str) -> Option<EntityId> {
+    LIVE.with_borrow(|live| live.get(key).copied())
 }
 
 impl<'w> Draw<'w> for Map {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
+        #[cfg(feature = "map-benchmark")]
+        benchmark::start(cx);
         let look = painter.look(Part::Map, &self.look, false, place);
         let theme = cx.theme();
         let key = format!("{:?}/{}", painter.window, place.path);
@@ -56,11 +82,19 @@ impl<'w> Draw<'w> for Map {
             f64::from(self.width.unwrap_or(0.0)),
             f64::from(self.height.unwrap_or(0.0)),
         );
-        let glide = painter.workspace.stylesheet().scaled(GLIDE);
-        let (frame, scale) = view::frame(self, &key, fallback, painter.now, glide);
-        if view::gliding(&key) {
-            painter.animating = true;
-        }
+        let live = painter.live_view(place);
+        LIVE.with_borrow_mut(|views| match live {
+            Some(view) => {
+                views.insert(key.clone(), view);
+            },
+            None => {
+                views.remove(&key);
+            },
+        });
+        let stylesheet = painter.workspace.stylesheet();
+        let (frame, scale) = view::frame(self, &key, fallback, painter.now, |pace| {
+            stylesheet.scaled(pace)
+        });
         let most = view::most_zoom(self);
         let sender = Sender {
             app: cx.entity().downgrade(),
@@ -69,11 +103,31 @@ impl<'w> Draw<'w> for Map {
         };
         let grid = Grid::new(view::origin(&key), scale);
         memory::begin(painter.window);
+        let ahead = view::ahead(&key, painter.now, |zoom| {
+            tiles::level(self.provider, zoom, scale)
+        });
+        let level = view::level(
+            &key,
+            frame.zoom,
+            painter.now,
+            stylesheet.scaled(layer::FADE),
+            |zoom| tiles::level(self.provider, zoom, scale),
+        );
+        if view::gliding(&key) || level.1.is_some() {
+            match live {
+                Some(view) => painter.live_again(view),
+                None => painter.animating = true,
+            }
+        }
         let (layer, tiles_missing) = if frame.turned() {
             rotated::layer(self, frame, scale, &key)
         } else {
-            layer::tile_layer(self, frame, scale, grid)
+            layer::tile_layer(self, frame, level, ahead, scale, grid)
         };
+        // Its tiles set off now, not when the map arrives.
+        if let Some(heading) = view::heading(&key) {
+            layer::ask_for(self, heading, scale);
+        }
         // Decoded tiles are bounded per window rather than kept for the run.
         let layer = match painter.window {
             Some(window) => layer.image_cache(memory::TileCache(window)),
@@ -81,22 +135,21 @@ impl<'w> Draw<'w> for Map {
         };
         let (lines, ways) = lines::lines(self, frame, cx);
         let missing = tiles_missing || ways.waiting;
-        if missing && !WAITING.get() {
-            WAITING.set(true);
-            let arrived = tiles::arrival();
-            cx.spawn(async move |this, cx| {
-                let _ = arrived.await;
-                WAITING.set(false);
-                let _ = this.update(cx, |_, cx| cx.notify());
-            })
-            .detach();
+        #[cfg(feature = "map-benchmark")]
+        benchmark::frame(level.0, tiles_missing);
+        let target = live.unwrap_or_else(|| cx.entity_id());
+        if missing {
+            wake::arrival(target, cx);
         }
         // Only a map with a pulsing pin asks for frame after frame.
         let pulse = if self.pins.iter().any(|pin| pin.pulse) {
-            painter.phase(PULSE)
+            painter.quiet_phase(PULSE)
         } else {
             None
         };
+        if pulse.is_some() {
+            wake::pulse(target, cx);
+        }
         let route_color = look
             .base
             .color
@@ -143,7 +196,7 @@ impl<'w> Draw<'w> for Map {
             element = element.flex_1();
         }
         element = interact(element, &key, frame, most, self.moved.clone(), &sender);
-        element.into_any_element()
+        painter.in_live_view(element.into_any_element(), place)
     }
 }
 
@@ -193,10 +246,9 @@ fn zoom_buttons(
             .on_click(move |_, window, cx| {
                 // Around the middle of the box.
                 let middle = view::middle(&key);
-                let current = view::current(&key, frame);
-                let zoomed = view::zoom(&key, current, steps, middle, most);
-                tell(moved.as_ref(), zoomed, &sender, window, cx);
-                window.refresh();
+                let zoomed = view::glide_zoom(&key, frame, steps, middle, most);
+                tell(&key, moved.as_ref(), zoomed, &sender, window, cx);
+                redraw(&key, window, cx);
             })
     };
     div()
@@ -225,15 +277,21 @@ fn trackpad(key: &str, frame: Frame, most: f64, moved: Option<Data>, sender: &Se
         .on_rotate(move |event, window, cx| {
             let degrees = f64::from(event.degrees);
             if let Some(turned) = view::turn(&turn_key, frame, degrees, event.phase) {
-                tell(turn_moved.as_ref(), turned, &turn_sender, window, cx);
-                window.refresh();
+                tell(
+                    &turn_key,
+                    turn_moved.as_ref(),
+                    turned,
+                    &turn_sender,
+                    window,
+                    cx,
+                );
+                redraw(&turn_key, window, cx);
             }
         })
         .on_smart_zoom(move |event, window, cx| {
-            let current = view::current(&zoom_key, frame);
-            let zoomed = view::zoom(&zoom_key, current, 1.0, event.position, most);
-            tell(moved.as_ref(), zoomed, &zoom_sender, window, cx);
-            window.refresh();
+            let zoomed = view::glide_zoom(&zoom_key, frame, 1.0, event.position, most);
+            tell(&zoom_key, moved.as_ref(), zoomed, &zoom_sender, window, cx);
+            redraw(&zoom_key, window, cx);
         })
 }
 
@@ -256,10 +314,16 @@ fn interact(
             // does not move.
             cx.stop_propagation();
             if event.click_count == 2 {
-                let current = view::current(&press_key, frame);
-                let zoomed = view::zoom(&press_key, current, 1.0, event.position, most);
-                tell(press_moved.as_ref(), zoomed, &press_sender, window, cx);
-                window.refresh();
+                let zoomed = view::glide_zoom(&press_key, frame, 1.0, event.position, most);
+                tell(
+                    &press_key,
+                    press_moved.as_ref(),
+                    zoomed,
+                    &press_sender,
+                    window,
+                    cx,
+                );
+                redraw(&press_key, window, cx);
                 return;
             }
             view::press(
@@ -269,28 +333,51 @@ fn interact(
                 window,
             );
             // The next paint installs the listeners that follow this press.
-            window.refresh();
+            redraw(&press_key, window, cx);
         })
         .on_scroll(move |event, window, cx| {
             cx.stop_propagation();
-            let delta = event.delta.pixel_delta(px(40.));
-            let steps = -f64::from(delta.y) * SCROLL_ZOOM;
+            let steps = scroll_steps(event.delta);
             if steps == 0.0 {
                 return;
             }
             let current = view::current(&wheel_key, frame);
             let zoomed = view::zoom(&wheel_key, current, steps, event.position, most);
-            tell(wheel_moved.as_ref(), zoomed, &wheel_sender, window, cx);
-            window.refresh();
+            tell(
+                &wheel_key,
+                wheel_moved.as_ref(),
+                zoomed,
+                &wheel_sender,
+                window,
+                cx,
+            );
+            redraw(&wheel_key, window, cx);
         })
         .on_pinch(move |event, window, cx| {
             cx.stop_propagation();
-            let steps = f64::from(1.0 + event.delta).max(0.01).log2();
-            let current = view::current(&pinch_key, frame);
-            let zoomed = view::zoom(&pinch_key, current, steps, event.position, most);
-            tell(pinch_moved.as_ref(), zoomed, &pinch_sender, window, cx);
-            window.refresh();
+            let delta = f64::from(event.delta);
+            let zoomed = view::pinch(&pinch_key, frame, delta, event.phase, event.position, most);
+            tell(
+                &pinch_key,
+                pinch_moved.as_ref(),
+                zoomed,
+                &pinch_sender,
+                window,
+                cx,
+            );
+            redraw(&pinch_key, window, cx);
         })
+}
+
+/// The zoom steps a wheel or trackpad scroll of `delta` makes.
+fn scroll_steps(delta: ScrollDelta) -> f64 {
+    match delta {
+        ScrollDelta::Lines(lines) => -f64::from(lines.y) * WHEEL_ZOOM,
+        ScrollDelta::Pixels(pixels) => {
+            let pixels = -f64::from(pixels.y);
+            (1.0 + pixels.abs() * SCROLL_SCALE).log2().copysign(pixels)
+        },
+    }
 }
 
 /// A canvas over the box that keeps its bounds and, while the map is the
@@ -308,6 +395,7 @@ fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl
             }
         },
         move |_, (), window, cx| {
+            memory::settle(window, cx);
             memory::evict(window, cx);
             if !turned {
                 rotated::release(&key, window, cx);
@@ -316,7 +404,7 @@ fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl
                 return;
             }
             let moving = key.clone();
-            window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, _| {
+            window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
                 if phase != DispatchPhase::Capture || !view::dragging(&moving, window) {
                     return;
                 }
@@ -325,7 +413,7 @@ fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl
                     return;
                 }
                 if view::drag_to(event.position).is_some() {
-                    window.refresh();
+                    redraw(&moving, window, cx);
                 }
             });
             let (released, moved, sender) = (key.clone(), moved.clone(), sender.clone());
@@ -339,7 +427,7 @@ fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl
                 if view::release(&released)
                     && let Some(frame) = view::moved(&released)
                 {
-                    tell(moved.as_ref(), frame, &sender, window, cx);
+                    tell(&released, moved.as_ref(), frame, &sender, window, cx);
                 }
             });
         },
@@ -348,21 +436,68 @@ fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl
     .size_full()
 }
 
-/// Sends `move` with where the map now looks and points.
-fn tell(moved: Option<&Data>, frame: Frame, sender: &Sender, window: &mut Window, cx: &mut App) {
+/// Tells the view through `move` where the map now looks and points: at once,
+/// or with the latest place once it has been told recently.
+fn tell(
+    key: &str,
+    moved: Option<&Data>,
+    frame: Frame,
+    sender: &Sender,
+    window: &mut Window,
+    cx: &mut App,
+) {
     let Some(msg) = moved else {
         return;
     };
-    let [lat, lon] = frame.middle();
-    let round = |value: f64, places: i32| {
-        let scale = 10f64.powi(places);
-        (value * scale).round() / scale
-    };
+    match view::tell(key, frame, Instant::now()) {
+        view::Tell::Now => send_move(msg, frame, sender, window, cx),
+        view::Tell::Held => {},
+        view::Tell::After(wait) => {
+            let (key, msg, sender) = (key.to_owned(), msg.clone(), sender.clone());
+            window
+                .spawn(cx, async move |cx| {
+                    cx.background_executor().timer(wait).await;
+                    let _ = cx.update(|window, cx| {
+                        if let Some(frame) = view::late(&key, Instant::now()) {
+                            send_move(&msg, frame, &sender, window, cx);
+                        }
+                    });
+                })
+                .detach();
+        },
+    }
+}
+
+/// Sends `move` with where the map looks and points.
+fn send_move(msg: &Data, frame: Frame, sender: &Sender, window: &mut Window, cx: &mut App) {
+    let ([lat, lon], zoom) = frame.told();
     let fields = BTreeMap::from([
-        ("lat".to_owned(), Data::Number(round(lat, 6))),
-        ("lon".to_owned(), Data::Number(round(lon, 6))),
-        ("zoom".to_owned(), Data::Number(round(frame.zoom, 2))),
-        ("bearing".to_owned(), Data::Number(round(frame.bearing, 2))),
+        ("lat".to_owned(), Data::Number(lat)),
+        ("lon".to_owned(), Data::Number(lon)),
+        ("zoom".to_owned(), Data::Number(zoom)),
+        (
+            "bearing".to_owned(),
+            Data::Number((frame.bearing * 100.0).round() / 100.0),
+        ),
     ]);
     sender.send(with_fields(msg, fields), window, cx);
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::scroll_steps,
+        gpui_kit::{ScrollDelta, point, px},
+    };
+
+    #[test]
+    fn a_trackpad_zooms_by_scale_and_a_wheel_by_notches() {
+        let pixels = |y: f32| ScrollDelta::Pixels(point(px(0.), px(y)));
+        // A hundred pixels doubles the scale, either way.
+        assert!((scroll_steps(pixels(-100.)) - 1.0).abs() < 1e-9);
+        assert!((scroll_steps(pixels(100.)) + 1.0).abs() < 1e-9);
+        let notch = ScrollDelta::Lines(point(0., -3.));
+        assert!((scroll_steps(notch) - 1.0).abs() < 1e-6);
+        assert_eq!(scroll_steps(pixels(0.)), 0.0);
+    }
 }

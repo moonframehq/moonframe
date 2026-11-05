@@ -1,6 +1,10 @@
 //! Drawing the main window.
 
-use super::{toasts::toast, *};
+use {
+    super::{toasts::toast, *},
+    crate::render::cached::{Kept, Source},
+    std::rc::Rc,
+};
 
 impl Render for MoonframeApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -15,6 +19,9 @@ impl Render for MoonframeApp {
         if !gallery_open {
             self.workspace.show_demos(false);
         }
+        self.cached.prepare(cx);
+        let inspecting = self.inspector.sink().is_some();
+        self.cached.begin(window.viewport_size(), inspecting);
         self.inputs.begin_frame();
         let last_keyed = self.motion.begin_frame();
         #[cfg(feature = "terminal")]
@@ -31,12 +38,22 @@ impl Render for MoonframeApp {
         .with_browsers(&mut self.browsers)
         .with_views(&mut self.views)
         .with_keyed(&last_keyed)
+        .with_cached(&mut self.cached)
         .in_window(window.window_handle().window_id());
         let body = painter.shell(cx);
-        let frame = painter.finish();
+        let mut frame = painter.finish();
+        self.cached.finish();
         let animating = frame.animating;
         if animating {
             window.request_animation_frame();
+        }
+        let live_again = std::mem::take(&mut frame.live_again);
+        if !live_again.is_empty() {
+            window.on_next_frame(move |_, cx| {
+                for view in live_again {
+                    cx.notify(view);
+                }
+            });
         }
         // Building the element tree from the views; GPUI lays it out and
         // paints it after. Slow frames are worth seeing in the log; fast
@@ -122,5 +139,29 @@ impl Render for MoonframeApp {
             .children(toast)
             .child(crate::browser::presenter(self.browsers.pages()))
             .child(crate::video::sweep())
+    }
+}
+
+impl MoonframeApp {
+    /// A kept view again, for GPUI drawing it without a frame having asked.
+    pub(crate) fn redraw_kept(
+        &mut self,
+        source: &Source,
+        size: Option<Size<Pixels>>,
+        kept: &Rc<Kept>,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        Painter::new(
+            &self.workspace,
+            &mut self.motion,
+            #[cfg(feature = "terminal")]
+            &mut self.terminals,
+            &self.inputs,
+            None,
+            cx.theme(),
+        )
+        .kept_in(window.window_handle().window_id())
+        .redraw(source, size, kept, cx)
     }
 }
