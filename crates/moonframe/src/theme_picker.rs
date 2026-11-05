@@ -30,6 +30,8 @@ pub(crate) struct ThemePicker {
     search: Entity<InputState>,
     /// Whether it lists the themes for dark windows or for light ones.
     dark: bool,
+    /// Available names can change even when the window's appearance is fixed.
+    catalog: Vec<&'static str>,
     /// The names matching the search, in catalog order.
     shown: Vec<&'static str>,
     selected: usize,
@@ -86,6 +88,7 @@ impl ThemePicker {
             app,
             search,
             dark,
+            catalog: shown.clone(),
             shown,
             selected,
             scroll,
@@ -96,7 +99,10 @@ impl ThemePicker {
 
     fn filter(&mut self, cx: &mut Context<Self>) {
         let query = self.search.read(cx).value().trim().to_lowercase();
-        self.shown = themes::names_for(self.dark)
+        self.shown = self
+            .catalog
+            .iter()
+            .copied()
             .filter(|name| name.to_lowercase().contains(&query))
             .collect();
         self.selected = 0;
@@ -222,14 +228,16 @@ fn swatch(scheme: Option<&Scheme>) -> Div {
 
 impl Render for ThemePicker {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // The window turned light or dark: list the themes for that.
+        // Omarchy may enter or leave this catalog even in a fixed appearance.
         let dark = self.app.read(cx).dark();
-        if dark != self.dark {
+        let catalog: Vec<_> = themes::names_for(dark).collect();
+        if dark != self.dark || catalog != self.catalog {
             self.dark = dark;
+            self.catalog = catalog;
             self.filter(cx);
         }
         let current = self.app.read(cx).theme_name();
-        let total = themes::names_for(dark).count();
+        let total = self.catalog.len();
         let kind = if dark {
             "dark"
         } else {

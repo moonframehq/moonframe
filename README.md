@@ -51,7 +51,7 @@ Moonframe as a library.
     <td width="50%" valign="top">
       <img src="docs/screenshots/dark.png" alt="The same window in the Catppuccin Macchiato dark theme">
       <br>
-      <sub><b>Themes.</b> Pick one of the bundled color schemes from the palette button or <b>View &gt; Themes…</b>; the window, its controls and the terminals all follow it. <code>style.luau</code> restyles anything on top.</sub>
+      <sub><b>Themes.</b> Pick one of the bundled color schemes from the palette button or <b>View &gt; Themes…</b>; the window, its controls and the terminals all follow it. On <a href="https://omarchy.org">Omarchy</a> the desktop's theme is the default, and changes with it. <code>style.luau</code> restyles anything on top.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/components.png" alt="The Components window: a list of components by category on the left, and the List component on the right with a live preview of three rows, the Luau that uses it, and Copy code and Copy for agent buttons">
