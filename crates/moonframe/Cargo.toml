@@ -176,7 +176,12 @@ tracing-subscriber.workspace  = true
 ureq                          = { optional = true, workspace = true }
 
 [dev-dependencies]
-tempfile.workspace = true
+# Real windows, headless: `src/e2e.rs` clicks and types in them. As for
+# `capture`, on GPUI itself: gpui-kit's `test-support` can't resolve with the
+# locked taffy.
+gpui-capture          = { default-features = false, features = ["test-support"], package = "gpui-pre", version = "=0.3.10" }
+gpui-platform-capture = { default-features = false, features = ["test-support"], package = "gpui-pre-platform", version = "=0.3.10" }
+tempfile.workspace    = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics-types = { optional = true, workspace = true }

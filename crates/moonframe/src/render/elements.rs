@@ -41,6 +41,7 @@ impl<'w> Draw<'w> for Stack {
         let theme = cx.theme();
         let element = div()
             .id(place.id())
+            .debug_selector(|| self.look.class.first().cloned().unwrap_or_default())
             .flex()
             .look(&look, theme)
             .placed(&self.frame, &look.base, theme)

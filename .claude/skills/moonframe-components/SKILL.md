@@ -3528,14 +3528,13 @@ A whole mod using it, with state: `app/components/demos/filter-builder.luau`.
 | Prop | Meaning |
 | --- | --- |
 | `change` | sent on each edit, with `value` set to the text |
-| `close` | sent by × and Escape |
+| `closable` | false hides the × (default true) |
 | `count` | how many matches there are |
+| `event` | key of the message the buttons and keys send, default "find": { find = "next" } (Enter, ↓), { find = "previous" } (Shift-Enter, ↑), { find = "close" } (×, Escape) |
 | `focus` | take focus when it appears |
 | `id` | keeps the text across renders (default "find") |
 | `index` | which one is current, from 1 |
-| `next` | sent by ↓ and Enter |
 | `placeholder` | grey text while empty (default "Find") |
-| `previous` | sent by ↑ and Shift-Enter |
 | `replace` | show the replace line |
 | `replace_all` | sent by Replace all |
 | `replace_change` | sent on each edit of the replacement, with `value` |
@@ -3552,11 +3551,11 @@ local find_bar = use "find-bar"
 
 find_bar {
 	value = state.query, count = state.count, index = state.match, focus = true,
-	change = "query", previous = "previous", next = "next", close = "close-find",
+	change = "query",
 }
 -- update: msg.msg == "query" sets state.query = msg.value and state.match = 1;
--- "next" and "previous" move state.match round state.count; "close-find"
--- hides it. Give `state.query` and `state.match` to `ui.markdown`'s `find` and
+-- msg.find == "next" and "previous" move state.match round state.count;
+-- "close" hides it. Give `state.query` and `state.match` to `ui.markdown`'s `find` and
 -- `find_index`, and keep `count` from its `found` message.
 ```
 
@@ -3839,18 +3838,16 @@ A whole mod using it, with state: `app/components/demos/settings-row.luau`.
 
 #### `shortcut-field`
 
-**Shortcut Field.** A shortcut shown as key caps; a click starts recording, and the next chord pressed is sent as { keys = "cmd-shift-p" }.
+**Shortcut Field.** A shortcut shown as key caps; a click starts recording, and the next chord pressed is sent with its name in `keys`.
 
 **When:** Letting the user rebind a shortcut, in a `settings-row` or a `shortcuts` page. For showing a shortcut use `kbd`; for a list of them use `shortcuts`.
 
 | Prop | Meaning |
 | --- | --- |
-| `cancel` | sent by Escape and by leaving the field |
-| `change` | message the chord sends, with `keys` added |
-| `clear` | message the × sends; no × without it |
+| `clearable` | show a × while it has a value |
+| `event` | key of its messages, default "shortcut": { shortcut = "record" } on a click, { shortcut = "set", keys = "cmd-shift-p" } for the chord pressed, { shortcut = "cancel" } on Escape or leaving the field, { shortcut = "clear" } from the × |
 | `id` | keeps the field apart from another (default "shortcut") |
 | `placeholder` | text while unset (default "Not set") |
-| `record` | message a click sends, to start recording |
 | `recording` | listening for keys |
 | `to` | mod to send them to, if not the drawing one |
 | `value` | the shortcut, as `kbd` takes it ("cmd-shift-p"); none when unset |
@@ -3861,12 +3858,9 @@ A whole mod using it, with state: `app/components/demos/settings-row.luau`.
 ```lua
 local shortcut_field = use "shortcut-field"
 
-shortcut_field {
-	value = state.keys, recording = state.recording,
-	record = "record", change = "keys", cancel = "stop", clear = "clear",
-}
--- update: "record" sets state.recording; msg.keys is the chord pressed (keep
--- it, stop recording); "stop" stops; "clear" sets state.keys = nil.
+shortcut_field { value = state.keys, recording = state.recording, clearable = true }
+-- update: msg.shortcut == "record" sets state.recording; "set" keeps msg.keys
+-- and stops; "cancel" stops; "clear" sets state.keys = nil.
 ```
 
 A whole mod using it, with state: `app/components/demos/shortcut-field.luau`.

@@ -9,10 +9,8 @@ type Props = {
 	id: string?,
 	value: string?,
 	recording: boolean?,
-	record: any,
-	change: any,
-	cancel: any,
-	clear: any,
+	event: string?,
+	clearable: boolean?,
 	placeholder: string?,
 	width: number?,
 	to: string?,
@@ -22,16 +20,14 @@ return component {
 	title = "Shortcut Field",
 	category = "Forms",
 	icon = "keyboard",
-	description = "A shortcut shown as key caps; a click starts recording, and the next chord pressed is sent as { keys = \"cmd-shift-p\" }.",
+	description = "A shortcut shown as key caps; a click starts recording, and the next chord pressed is sent with its name in `keys`.",
 	when = "Letting the user rebind a shortcut, in a `settings-row` or a `shortcuts` page. For showing a shortcut use `kbd`; for a list of them use `shortcuts`.",
 	props = {
 		["id"] = "keeps the field apart from another (default \"shortcut\")",
 		["value"] = "the shortcut, as `kbd` takes it (\"cmd-shift-p\"); none when unset",
 		["recording"] = "listening for keys",
-		["record"] = "message a click sends, to start recording",
-		["change"] = "message the chord sends, with `keys` added",
-		["cancel"] = "sent by Escape and by leaving the field",
-		["clear"] = "message the × sends; no × without it",
+		["event"] = "key of its messages, default \"shortcut\": { shortcut = \"record\" } on a click, { shortcut = \"set\", keys = \"cmd-shift-p\" } for the chord pressed, { shortcut = \"cancel\" } on Escape or leaving the field, { shortcut = \"clear\" } from the ×",
+		["clearable"] = "show a × while it has a value",
 		["placeholder"] = "text while unset (default \"Not set\")",
 		["width"] = "pixels (default 160)",
 		["to"] = "mod to send them to, if not the drawing one",
@@ -43,18 +39,18 @@ return component {
 		[".shortcut-field-input"] = { background = "#00000000", border = "none", shadow = "none", padding = 0 },
 		[".shortcut-field-none"] = { color = "muted-foreground" },
 	},
-	example = { value = "cmd-shift-p", clear = "clear" },
+	example = { value = "cmd-shift-p", clearable = true },
 	usage = [[local shortcut_field = use "shortcut-field"
 
-shortcut_field {
-	value = state.keys, recording = state.recording,
-	record = "record", change = "keys", cancel = "stop", clear = "clear",
-}
--- update: "record" sets state.recording; msg.keys is the chord pressed (keep
--- it, stop recording); "stop" stops; "clear" sets state.keys = nil.]],
+shortcut_field { value = state.keys, recording = state.recording, clearable = true }
+-- update: msg.shortcut == "record" sets state.recording; "set" keeps msg.keys
+-- and stops; "cancel" stops; "clear" sets state.keys = nil.]],
 
 	build = function(props: Props)
 		local width = props.width or 160
+		local event = props.event or "shortcut"
+		-- Tables, as a field's keys and a click then read the same.
+		local cancel = { [event] = "cancel" }
 		if props.recording then
 			return ui.row {
 				class = "shortcut-field shortcut-field-recording",
@@ -65,9 +61,9 @@ shortcut_field {
 					class = "shortcut-field-input",
 					value = "",
 					placeholder = "Press keys…",
-					capture = props.change,
-					keys = { escape = props.cancel },
-					blur = props.cancel,
+					capture = { [event] = "set" },
+					keys = { escape = cancel },
+					blur = cancel,
 					focus = true,
 					to = props.to,
 					grow = true,
@@ -78,13 +74,13 @@ shortcut_field {
 			class = "shortcut-field",
 			width = width,
 			align = "center",
-			msg = props.record,
+			msg = { [event] = "record" },
 			to = props.to,
 			if props.value
 				then kbd { keys = props.value, small = true }
 				else ui.text { props.placeholder or "Not set", class = "shortcut-field-none" },
 			ui.spacer(),
-			props.value and props.clear and icon_button { icon = "close", tooltip = "Clear", size = "small", msg = props.clear, to = props.to },
+			props.value and props.clearable and icon_button { icon = "close", tooltip = "Clear", size = "small", msg = { [event] = "clear" }, to = props.to },
 		}
 	end,
 }

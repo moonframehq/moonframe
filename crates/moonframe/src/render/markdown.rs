@@ -84,6 +84,7 @@ impl<'w> Draw<'w> for Markdown {
         };
         let mut frame = div()
             .id(place.id())
+            .debug_selector(|| "markdown".to_owned())
             .flex()
             .flex_col()
             .min_w_0()

@@ -8,22 +8,19 @@ return mod {
 	end,
 
 	update = function(state, msg)
-		if msg == "record" then
+		if msg.shortcut == "record" then
 			state.recording = true
-		elseif msg == "stop" then
+		elseif msg.shortcut == "cancel" then
 			state.recording = false
-		elseif msg == "clear" then
+		elseif msg.shortcut == "clear" then
 			state.keys = nil
-		elseif type(msg) == "table" and msg.keys then
+		elseif msg.shortcut == "set" then
 			state.keys = msg.keys
 			state.recording = false
 		end
 	end,
 
 	view = function(state)
-		return shortcut_field {
-			value = state.keys, recording = state.recording,
-			record = "record", change = "keys", cancel = "stop", clear = "clear",
-		}
+		return shortcut_field { value = state.keys, recording = state.recording, clearable = true }
 	end,
 }

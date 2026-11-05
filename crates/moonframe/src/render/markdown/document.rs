@@ -45,6 +45,7 @@ pub(super) struct Shared {
     pub(super) roots: Vec<PathBuf>,
     pub(super) alert: Style,
     pub(super) state: Option<WeakEntity<TextViewState>>,
+    pub(super) scroll: bool,
 }
 
 pub(super) type SharedRef = Arc<Mutex<Shared>>;
@@ -123,6 +124,7 @@ impl RenderOnce for Document {
             roots: self.roots.clone(),
             alert: self.alert.clone(),
             state: Some(state.downgrade()),
+            scroll: self.markdown.scroll,
         }));
         let kept = window.use_keyed_state(SharedString::from(format!("{key}/kept")), cx, {
             let shared = shared.clone();
@@ -308,9 +310,9 @@ impl Kept {
             && rendered.source() == self.text
         {
             self.pending = None;
-            if let Some(range) = place(&rendered, at) {
-                state.update(cx, |state, cx| state.reveal_range(range, cx).ok());
-            }
+            let scroll = self.shared.lock().is_ok_and(|shared| shared.scroll);
+            let outline = Outline::parse(rendered.source());
+            go_to(state, &rendered, &outline, at, scroll, cx);
         }
         self.search(state, rendered, window, cx);
         // A reveal moves the view without a scroll event.
@@ -377,9 +379,31 @@ impl Kept {
     }
 }
 
+/// Takes the reader to the byte `at` of the source. A scrolling document
+/// puts its block at the top, as a jump to a heading should; `reveal_range`
+/// would stop as soon as the place shows, at the bottom edge.
+pub(super) fn go_to(
+    state: &Entity<TextViewState>,
+    rendered: &RenderedText,
+    outline: &Outline,
+    at: usize,
+    scroll: bool,
+    cx: &mut App,
+) {
+    if scroll {
+        state.read(cx).list_state().scroll_to(ListOffset {
+            item_ix: outline.block_at(at),
+            offset_in_item: px(0.),
+        });
+        state.update(cx, |_, cx| cx.notify());
+    } else if let Some(range) = place(rendered, at) {
+        state.update(cx, |state, cx| state.reveal_range(range, cx).ok());
+    }
+}
+
 /// The start of what is rendered from `at` in the source on: a heading's
 /// marks render nothing, so the line is asked for, not one byte.
-pub(super) fn place(rendered: &RenderedText, at: usize) -> Option<Range<usize>> {
+fn place(rendered: &RenderedText, at: usize) -> Option<Range<usize>> {
     let source = rendered.source();
     let at = (0..=at.min(source.len()))
         .rev()

@@ -13,9 +13,8 @@ type Props = {
 	count: number?,
 	index: number?,
 	change: any,
-	previous: any,
-	next: any,
-	close: any,
+	event: string?,
+	closable: boolean?,
 	focus: boolean?,
 	replace: boolean?,
 	replacement: string?,
@@ -39,9 +38,8 @@ return component {
 		["count"] = "how many matches there are",
 		["index"] = "which one is current, from 1",
 		["change"] = "sent on each edit, with `value` set to the text",
-		["previous"] = "sent by ↑ and Shift-Enter",
-		["next"] = "sent by ↓ and Enter",
-		["close"] = "sent by × and Escape",
+		["event"] = "key of the message the buttons and keys send, default \"find\": { find = \"next\" } (Enter, ↓), { find = \"previous\" } (Shift-Enter, ↑), { find = \"close\" } (×, Escape)",
+		["closable"] = "false hides the × (default true)",
 		["focus"] = "take focus when it appears",
 		["replace"] = "show the replace line",
 		["replacement"] = "the replacement text",
@@ -63,22 +61,27 @@ return component {
 
 find_bar {
 	value = state.query, count = state.count, index = state.match, focus = true,
-	change = "query", previous = "previous", next = "next", close = "close-find",
+	change = "query",
 }
 -- update: msg.msg == "query" sets state.query = msg.value and state.match = 1;
--- "next" and "previous" move state.match round state.count; "close-find"
--- hides it. Give `state.query` and `state.match` to `ui.markdown`'s `find` and
+-- msg.find == "next" and "previous" move state.match round state.count;
+-- "close" hides it. Give `state.query` and `state.match` to `ui.markdown`'s `find` and
 -- `find_index`, and keep `count` from its `found` message.]],
 
 	build = function(props: Props)
 		local value = props.value or ""
 		local count = props.count or 0
+		local event = props.event or "find"
+		-- Tables, as a field's keys and a button's click then read the same.
+		local next = { [event] = "next" }
+		local previous = { [event] = "previous" }
+		local close = { [event] = "close" }
 		local keys = {
-			enter = props.next,
-			["shift-enter"] = props.previous,
-			down = props.next,
-			up = props.previous,
-			escape = props.close,
+			enter = next,
+			["shift-enter"] = previous,
+			down = next,
+			up = previous,
+			escape = close,
 		}
 		local status = nil
 		if value ~= "" then
@@ -102,9 +105,9 @@ find_bar {
 				grow = true,
 			},
 			status,
-			icon_button { icon = "chevron-up", tooltip = "Previous", size = "small", msg = props.previous, to = props.to, disabled = not stepping },
-			icon_button { icon = "chevron-down", tooltip = "Next", size = "small", msg = props.next, to = props.to, disabled = not stepping },
-			props.close and icon_button { icon = "close", tooltip = "Close", size = "small", msg = props.close, to = props.to },
+			icon_button { icon = "chevron-up", tooltip = "Previous", size = "small", msg = previous, to = props.to, disabled = not stepping },
+			icon_button { icon = "chevron-down", tooltip = "Next", size = "small", msg = next, to = props.to, disabled = not stepping },
+			props.closable ~= false and icon_button { icon = "close", tooltip = "Close", size = "small", msg = close, to = props.to },
 		}
 		local replace = nil
 		if props.replace then
@@ -117,7 +120,7 @@ find_bar {
 					value = props.replacement,
 					placeholder = "Replace",
 					change = props.replace_change,
-					keys = { escape = props.close },
+					keys = { escape = close },
 					to = props.to,
 					grow = true,
 				},

@@ -53,12 +53,12 @@ return mod {
 	end,
 
 	update = function(state, msg)
-		if type(msg) ~= "table" then
-			if msg == "next" and state.count > 0 then
-				state.match = state.match % state.count + 1
-			elseif msg == "previous" and state.count > 0 then
-				state.match = (state.match - 2) % state.count + 1
-			end
+		if msg.find == "next" and state.count > 0 then
+			state.match = state.match % state.count + 1
+		elseif msg.find == "previous" and state.count > 0 then
+			state.match = (state.match - 2) % state.count + 1
+		elseif msg.find == "close" then
+			state.query = ""
 		elseif msg.link then
 			state.clicked = msg.url
 		elseif msg.msg == "headings" then
@@ -82,7 +82,7 @@ return mod {
 			height = 460,
 			find_bar {
 				value = state.query, count = state.count, index = state.match,
-				change = "query", previous = "previous", next = "next", width = 420,
+				change = "query", width = 420,
 			},
 			ui.text {
 				if state.clicked then `Clicked: {state.clicked}` else "Click a link",

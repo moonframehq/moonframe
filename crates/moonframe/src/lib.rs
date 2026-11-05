@@ -45,6 +45,8 @@ mod crash;
 mod demos;
 mod dock;
 mod doctor;
+#[cfg(all(test, unix, feature = "markdown"))]
+mod e2e;
 mod embed;
 mod gallery;
 pub mod gestures;

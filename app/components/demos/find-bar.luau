@@ -14,14 +14,16 @@ return mod {
 	end,
 
 	update = function(state, msg)
-		if msg == "next" and state.count > 0 then
+		if msg.find == "next" and state.count > 0 then
 			state.match = state.match % state.count + 1
-		elseif msg == "previous" and state.count > 0 then
+		elseif msg.find == "previous" and state.count > 0 then
 			state.match = (state.match - 2) % state.count + 1
-		elseif type(msg) == "table" and msg.msg == "query" then
+		elseif msg.find == "close" then
+			state.query = ""
+		elseif msg.msg == "query" then
 			state.query = msg.value
 			state.match = 1
-		elseif type(msg) == "table" and msg.msg == "found" then
+		elseif msg.msg == "found" then
 			state.count = msg.count
 		end
 	end,
@@ -31,7 +33,7 @@ return mod {
 			gap = "normal",
 			find_bar {
 				value = state.query, count = state.count, index = state.match,
-				change = "query", previous = "previous", next = "next",
+				change = "query",
 			},
 			markdown { text = TEXT, find = state.query, find_index = state.match, found = "found" },
 		}

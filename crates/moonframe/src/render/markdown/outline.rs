@@ -41,6 +41,8 @@ pub(super) struct Outline {
     pub(super) headings: Vec<Heading>,
     /// Bytes into the source of each footnote's definition, by identifier.
     pub(super) footnotes: BTreeMap<String, usize>,
+    /// Bytes into the source of each top-level block.
+    blocks: Vec<usize>,
 }
 
 impl Outline {
@@ -56,6 +58,7 @@ impl Outline {
         let mut seen = HashSet::new();
         for (block, node) in root.children.iter().enumerate() {
             let at = node.position().map_or(0, |position| position.start.offset);
+            outline.blocks.push(at);
             match node {
                 Node::Heading(heading) => {
                     let text = node.to_string();
@@ -82,6 +85,13 @@ impl Outline {
         self.headings
             .iter()
             .find(|heading| heading.slug == fragment)
+    }
+
+    /// Which top-level block the byte `at` of the source is in.
+    pub(super) fn block_at(&self, at: usize) -> usize {
+        self.blocks
+            .partition_point(|start| *start <= at)
+            .saturating_sub(1)
     }
 
     /// Which heading a reader at top-level block `block` is under, from 0.
@@ -125,6 +135,7 @@ fn unique(slug: String, seen: &mut HashSet<String>) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -177,6 +188,15 @@ mod tests {
         let outline = Outline::parse("---\ntitle: x\n---\n\n# Real\n");
         let texts: Vec<_> = outline.headings.iter().map(|h| h.text.as_str()).collect();
         assert_eq!(texts, ["Real"]);
+    }
+
+    #[test]
+    fn a_place_belongs_to_the_block_around_it() {
+        let source = "# A\n\ntext\n\n# B\n";
+        let outline = Outline::parse(source);
+        assert_eq!(outline.block_at(0), 0);
+        assert_eq!(outline.block_at(source.find("text").unwrap() + 2), 1);
+        assert_eq!(outline.block_at(source.len()), 2);
     }
 
     #[test]

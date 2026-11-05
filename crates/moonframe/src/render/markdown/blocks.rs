@@ -6,7 +6,7 @@
 
 use {
     super::{
-        document::{SharedRef, place},
+        document::{SharedRef, go_to},
         outline::Outline,
         parts::{self, AlertKind},
         send,
@@ -195,6 +195,7 @@ fn draw_picture(
     }
     div()
         .id(("markdown-picture", id))
+        .debug_selector(|| "markdown-picture".to_owned())
         .cursor_pointer()
         .child(element)
         .on_click(move |_, window, cx| {
@@ -276,12 +277,12 @@ fn jump(shared: &SharedRef, cx: &mut App, find: impl Fn(&Outline) -> Option<usiz
         return false;
     };
     let rendered = state.read(cx).rendered_text();
-    let Some(at) = find(&Outline::parse(rendered.source())) else {
+    let outline = Outline::parse(rendered.source());
+    let Some(at) = find(&outline) else {
         return false;
     };
-    if let Some(range) = place(&rendered, at) {
-        state.update(cx, |state, cx| state.reveal_range(range, cx).ok());
-    }
+    let scroll = shared.lock().is_ok_and(|shared| shared.scroll);
+    go_to(&state, &rendered, &outline, at, scroll, cx);
     true
 }
 
@@ -305,6 +306,7 @@ pub(super) fn code_actions(block: &CodeBlock, _: &mut Window, cx: &mut App) -> A
         .child(
             div()
                 .id("copy")
+                .debug_selector(|| "markdown-copy".to_owned())
                 .cursor_pointer()
                 .hover(move |this| this.text_color(foreground))
                 .child(GpuiIcon::default().path("icons/copy.svg"))
@@ -353,6 +355,7 @@ impl MarkdownPlugin for Footnotes {
         Some(InlineElement::new(
             div()
                 .id(("markdown-footnote", id))
+                .debug_selector(|| "markdown-footnote".to_owned())
                 .cursor_pointer()
                 .text_size(size)
                 .text_color(accent)
