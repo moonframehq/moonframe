@@ -45,6 +45,7 @@ default = [
   "restart",
   "shell",
   "socket",
+  "speech",
   "studio",
   "tokio",
   "updates",
@@ -77,6 +78,7 @@ restart       = ["moonframe/restart"]
 sealed        = ["moonframe/sealed"]
 shell         = ["moonframe/shell"]
 socket        = ["moonframe/socket"]
+speech        = ["moonframe/speech"]
 studio        = ["moonframe/studio"]
 terminal      = ["moonframe/terminal"]
 tokio         = ["moonframe/tokio"]

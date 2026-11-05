@@ -19,6 +19,7 @@ fn docs(writers: &[&str]) -> (Docs, Handle, Arc<Mutex<Vec<Event>>>, tempfile::Te
         followed: None,
         roots: BTreeSet::from([dir.path().canonicalize().unwrap()]),
         writers: writers.iter().copied().collect(),
+        home: None,
         open: BTreeMap::new(),
         uses: 0,
     };
@@ -638,4 +639,25 @@ fn a_tab_restored_from_an_earlier_launch_reads_its_remembered_project() {
         ]),
     );
     assert_eq!(sent(&seen)[0].1.get("ok"), Some(&Data::Bool(false)));
+}
+
+#[test]
+fn in_the_home_folder_only_the_writers_read() {
+    let (mut docs, _host, _seen, dir) = docs(&["editor"]);
+    docs.home = Some(dir.path().canonicalize().unwrap());
+    fs::create_dir(dir.path().join(".ssh")).unwrap();
+    fs::write(dir.path().join(".ssh/id_ed25519"), "secret").unwrap();
+    let refused = docs.read("other", ".ssh/id_ed25519", None).unwrap_err();
+    assert!(refused.error.contains("home folder"), "{}", refused.error);
+    let refused = docs
+        .read("other/markdown#a", ".ssh/id_ed25519", None)
+        .unwrap_err();
+    assert!(refused.error.contains("`other`"), "{}", refused.error);
+    assert!(
+        docs.read("editor/markdown-editor#a", ".ssh/id_ed25519", None)
+            .is_ok()
+    );
+    // In a project anyone still may.
+    docs.home = None;
+    assert!(docs.read("other", ".ssh/id_ed25519", None).is_ok());
 }

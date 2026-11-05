@@ -462,6 +462,8 @@ fn info_plist(title: &str, id: &str, exe: &str, version: &str) -> String {
     <key>CFBundleVersion</key><string>{version}</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSMicrophoneUsageDescription</key><string>{title} listens only while you dictate.</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>{title} turns what you dictate into text on this Mac.</string>
 </dict>
 </plist>
 "#

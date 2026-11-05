@@ -9,7 +9,7 @@ import tomllib
 from sealed_luau import references
 
 NATIVES = {"acp": "acp", "chat": "chat", "docs": "docs", "git": "git",
-           "github": "forge", "gitlab": "forge", "shell": "shell", "usage": "usage"}
+           "github": "forge", "gitlab": "forge", "shell": "shell", "speech": "speech", "usage": "usage"}
 FEATURES = set(NATIVES.values()) | {"alacritty", "awake", "browser", "crash", "displays", "dock",
                                   "ghostty", "guard", "herdr-core", "map", "markdown", "video",
                                   "prose", "restart", "socket", "terminal", "tokio", "updates",
