@@ -29,22 +29,29 @@ use {
     gpui_kit::{component::ActiveTheme, *},
     layer::Grid,
     moonframe_core::{Data, Map, Part, with_fields},
-    std::{cell::Cell, collections::BTreeMap},
+    std::{cell::Cell, collections::BTreeMap, time::Instant},
     view::Frame,
 };
 
 /// One breath of a pulsing pin's halo, before `animation_speed`.
 const PULSE: std::time::Duration = std::time::Duration::from_millis(2200);
 
-/// How long a `glide` takes, before `animation_speed`.
-const GLIDE: std::time::Duration = std::time::Duration::from_millis(600);
+/// How long after a frame a pulsing pin asks for the next, which then waits
+/// for the screen: thirty frames a second on a 60 Hz one. A slow breath needs
+/// no more, and each frame draws the whole window.
+const PULSE_FRAME: std::time::Duration = std::time::Duration::from_millis(20);
 
-/// Zoom steps per pixel of wheel or trackpad scroll.
-const SCROLL_ZOOM: f64 = 1.0 / 120.0;
+/// Zoom steps per notch of a mouse wheel.
+const WHEEL_ZOOM: f64 = 1.0 / 3.0;
+
+/// How much a pixel of trackpad scroll changes the scale: Apple Maps' figure.
+const SCROLL_SCALE: f64 = 0.01;
 
 thread_local! {
     /// Whether a task already waits for tiles to arrive, to draw again.
     static WAITING: Cell<bool> = const { Cell::new(false) };
+    /// Whether a pulsing pin's next frame is already due.
+    static PULSING: Cell<bool> = const { Cell::new(false) };
 }
 
 impl<'w> Draw<'w> for Map {
@@ -56,8 +63,10 @@ impl<'w> Draw<'w> for Map {
             f64::from(self.width.unwrap_or(0.0)),
             f64::from(self.height.unwrap_or(0.0)),
         );
-        let glide = painter.workspace.stylesheet().scaled(GLIDE);
-        let (frame, scale) = view::frame(self, &key, fallback, painter.now, glide);
+        let stylesheet = painter.workspace.stylesheet();
+        let (frame, scale) = view::frame(self, &key, fallback, painter.now, |pace| {
+            stylesheet.scaled(pace)
+        });
         if view::gliding(&key) {
             painter.animating = true;
         }
@@ -69,11 +78,18 @@ impl<'w> Draw<'w> for Map {
         };
         let grid = Grid::new(view::origin(&key), scale);
         memory::begin(painter.window);
+        let ahead = view::ahead(&key, painter.now, |zoom| {
+            tiles::level(self.provider, zoom, scale)
+        });
         let (layer, tiles_missing) = if frame.turned() {
             rotated::layer(self, frame, scale, &key)
         } else {
-            layer::tile_layer(self, frame, scale, grid)
+            layer::tile_layer(self, frame, ahead, scale, grid)
         };
+        // Its tiles set off now, not when the map arrives.
+        if let Some(heading) = view::heading(&key) {
+            layer::ask_for(self, heading, scale);
+        }
         // Decoded tiles are bounded per window rather than kept for the run.
         let layer = match painter.window {
             Some(window) => layer.image_cache(memory::TileCache(window)),
@@ -91,12 +107,22 @@ impl<'w> Draw<'w> for Map {
             })
             .detach();
         }
-        // Only a map with a pulsing pin asks for frame after frame.
+        // Only a map with a pulsing pin asks for frame after frame, and at its
+        // own pace: each one draws the whole window.
         let pulse = if self.pins.iter().any(|pin| pin.pulse) {
-            painter.phase(PULSE)
+            painter.quiet_phase(PULSE)
         } else {
             None
         };
+        if pulse.is_some() && !PULSING.get() {
+            PULSING.set(true);
+            cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(PULSE_FRAME).await;
+                PULSING.set(false);
+                let _ = this.update(cx, |_, cx| cx.notify());
+            })
+            .detach();
+        }
         let route_color = look
             .base
             .color
@@ -193,9 +219,8 @@ fn zoom_buttons(
             .on_click(move |_, window, cx| {
                 // Around the middle of the box.
                 let middle = view::middle(&key);
-                let current = view::current(&key, frame);
-                let zoomed = view::zoom(&key, current, steps, middle, most);
-                tell(moved.as_ref(), zoomed, &sender, window, cx);
+                let zoomed = view::glide_zoom(&key, frame, steps, middle, most);
+                tell(&key, moved.as_ref(), zoomed, &sender, window, cx);
                 window.refresh();
             })
     };
@@ -225,14 +250,20 @@ fn trackpad(key: &str, frame: Frame, most: f64, moved: Option<Data>, sender: &Se
         .on_rotate(move |event, window, cx| {
             let degrees = f64::from(event.degrees);
             if let Some(turned) = view::turn(&turn_key, frame, degrees, event.phase) {
-                tell(turn_moved.as_ref(), turned, &turn_sender, window, cx);
+                tell(
+                    &turn_key,
+                    turn_moved.as_ref(),
+                    turned,
+                    &turn_sender,
+                    window,
+                    cx,
+                );
                 window.refresh();
             }
         })
         .on_smart_zoom(move |event, window, cx| {
-            let current = view::current(&zoom_key, frame);
-            let zoomed = view::zoom(&zoom_key, current, 1.0, event.position, most);
-            tell(moved.as_ref(), zoomed, &zoom_sender, window, cx);
+            let zoomed = view::glide_zoom(&zoom_key, frame, 1.0, event.position, most);
+            tell(&zoom_key, moved.as_ref(), zoomed, &zoom_sender, window, cx);
             window.refresh();
         })
 }
@@ -256,9 +287,15 @@ fn interact(
             // does not move.
             cx.stop_propagation();
             if event.click_count == 2 {
-                let current = view::current(&press_key, frame);
-                let zoomed = view::zoom(&press_key, current, 1.0, event.position, most);
-                tell(press_moved.as_ref(), zoomed, &press_sender, window, cx);
+                let zoomed = view::glide_zoom(&press_key, frame, 1.0, event.position, most);
+                tell(
+                    &press_key,
+                    press_moved.as_ref(),
+                    zoomed,
+                    &press_sender,
+                    window,
+                    cx,
+                );
                 window.refresh();
                 return;
             }
@@ -273,24 +310,47 @@ fn interact(
         })
         .on_scroll(move |event, window, cx| {
             cx.stop_propagation();
-            let delta = event.delta.pixel_delta(px(40.));
-            let steps = -f64::from(delta.y) * SCROLL_ZOOM;
+            let steps = scroll_steps(event.delta);
             if steps == 0.0 {
                 return;
             }
             let current = view::current(&wheel_key, frame);
             let zoomed = view::zoom(&wheel_key, current, steps, event.position, most);
-            tell(wheel_moved.as_ref(), zoomed, &wheel_sender, window, cx);
+            tell(
+                &wheel_key,
+                wheel_moved.as_ref(),
+                zoomed,
+                &wheel_sender,
+                window,
+                cx,
+            );
             window.refresh();
         })
         .on_pinch(move |event, window, cx| {
             cx.stop_propagation();
-            let steps = f64::from(1.0 + event.delta).max(0.01).log2();
-            let current = view::current(&pinch_key, frame);
-            let zoomed = view::zoom(&pinch_key, current, steps, event.position, most);
-            tell(pinch_moved.as_ref(), zoomed, &pinch_sender, window, cx);
+            let delta = f64::from(event.delta);
+            let zoomed = view::pinch(&pinch_key, frame, delta, event.phase, event.position, most);
+            tell(
+                &pinch_key,
+                pinch_moved.as_ref(),
+                zoomed,
+                &pinch_sender,
+                window,
+                cx,
+            );
             window.refresh();
         })
+}
+
+/// The zoom steps a wheel or trackpad scroll of `delta` makes.
+fn scroll_steps(delta: ScrollDelta) -> f64 {
+    match delta {
+        ScrollDelta::Lines(lines) => -f64::from(lines.y) * WHEEL_ZOOM,
+        ScrollDelta::Pixels(pixels) => {
+            let pixels = -f64::from(pixels.y);
+            (1.0 + pixels.abs() * SCROLL_SCALE).log2().copysign(pixels)
+        },
+    }
 }
 
 /// A canvas over the box that keeps its bounds and, while the map is the
@@ -339,7 +399,7 @@ fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl
                 if view::release(&released)
                     && let Some(frame) = view::moved(&released)
                 {
-                    tell(moved.as_ref(), frame, &sender, window, cx);
+                    tell(&released, moved.as_ref(), frame, &sender, window, cx);
                 }
             });
         },
@@ -348,21 +408,68 @@ fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl
     .size_full()
 }
 
-/// Sends `move` with where the map now looks and points.
-fn tell(moved: Option<&Data>, frame: Frame, sender: &Sender, window: &mut Window, cx: &mut App) {
+/// Tells the view through `move` where the map now looks and points: at once,
+/// or with the latest place once it has been told recently.
+fn tell(
+    key: &str,
+    moved: Option<&Data>,
+    frame: Frame,
+    sender: &Sender,
+    window: &mut Window,
+    cx: &mut App,
+) {
     let Some(msg) = moved else {
         return;
     };
-    let [lat, lon] = frame.middle();
-    let round = |value: f64, places: i32| {
-        let scale = 10f64.powi(places);
-        (value * scale).round() / scale
-    };
+    match view::tell(key, frame, Instant::now()) {
+        view::Tell::Now => send_move(msg, frame, sender, window, cx),
+        view::Tell::Held => {},
+        view::Tell::After(wait) => {
+            let (key, msg, sender) = (key.to_owned(), msg.clone(), sender.clone());
+            window
+                .spawn(cx, async move |cx| {
+                    cx.background_executor().timer(wait).await;
+                    let _ = cx.update(|window, cx| {
+                        if let Some(frame) = view::late(&key, Instant::now()) {
+                            send_move(&msg, frame, &sender, window, cx);
+                        }
+                    });
+                })
+                .detach();
+        },
+    }
+}
+
+/// Sends `move` with where the map looks and points.
+fn send_move(msg: &Data, frame: Frame, sender: &Sender, window: &mut Window, cx: &mut App) {
+    let ([lat, lon], zoom) = frame.told();
     let fields = BTreeMap::from([
-        ("lat".to_owned(), Data::Number(round(lat, 6))),
-        ("lon".to_owned(), Data::Number(round(lon, 6))),
-        ("zoom".to_owned(), Data::Number(round(frame.zoom, 2))),
-        ("bearing".to_owned(), Data::Number(round(frame.bearing, 2))),
+        ("lat".to_owned(), Data::Number(lat)),
+        ("lon".to_owned(), Data::Number(lon)),
+        ("zoom".to_owned(), Data::Number(zoom)),
+        (
+            "bearing".to_owned(),
+            Data::Number((frame.bearing * 100.0).round() / 100.0),
+        ),
     ]);
     sender.send(with_fields(msg, fields), window, cx);
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::scroll_steps,
+        gpui_kit::{ScrollDelta, point, px},
+    };
+
+    #[test]
+    fn a_trackpad_zooms_by_scale_and_a_wheel_by_notches() {
+        let pixels = |y: f32| ScrollDelta::Pixels(point(px(0.), px(y)));
+        // A hundred pixels doubles the scale, either way.
+        assert!((scroll_steps(pixels(-100.)) - 1.0).abs() < 1e-9);
+        assert!((scroll_steps(pixels(100.)) + 1.0).abs() < 1e-9);
+        let notch = ScrollDelta::Lines(point(0., -3.));
+        assert!((scroll_steps(notch) - 1.0).abs() < 1e-6);
+        assert_eq!(scroll_steps(pixels(0.)), 0.0);
+    }
 }

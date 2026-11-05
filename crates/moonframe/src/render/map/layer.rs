@@ -60,8 +60,53 @@ impl Grid {
     }
 }
 
-/// The tiles under `frame`, and whether any is still on its way.
-pub(super) fn tile_layer(map: &Map, frame: Frame, scale: f32, grid: Grid) -> (Div, bool) {
+/// Asks for the tiles under `frame`: those at its middle go first, as what is
+/// asked for last is fetched first.
+pub(super) fn ask_for(map: &Map, frame: Frame, scale: f32) {
+    let z = tiles::level(map.provider, frame.zoom, scale);
+    let count = 1i64 << z;
+    let size = 256.0 * (frame.zoom - f64::from(z)).exp2();
+    let span = frame.span();
+    let (middle_x, middle_y) = (frame.center.0 * span, frame.center.1 * span);
+    let (left, top) = (middle_x - frame.size.0 / 2.0, middle_y - frame.size.1 / 2.0);
+    let columns = (left / size).floor() as i64..=((left + frame.size.0) / size).floor() as i64;
+    let rows = (top / size).floor().max(0.0) as i64
+        ..=((top + frame.size.1) / size)
+            .floor()
+            .min(count as f64 - 1.0) as i64;
+    let mut under: Vec<(i64, i64)> = rows
+        .flat_map(|row| columns.clone().map(move |column| (column, row)))
+        .take(MOST_TILES)
+        .collect();
+    let away = |&(column, row): &(i64, i64)| {
+        let across = (column as f64 + 0.5) * size - middle_x;
+        let down = (row as f64 + 0.5) * size - middle_y;
+        across * across + down * down
+    };
+    under.sort_by(|a, b| away(b).total_cmp(&away(a)));
+    let retina = scale > 1.5 && tiles::has_retina(map.provider);
+    for (column, row) in under {
+        let tile = Tile {
+            provider: map.provider,
+            retina,
+            z,
+            x: column.rem_euclid(count) as u32,
+            y: row as u32,
+        };
+        tiles::prefetch(&tile, map.key.as_deref());
+    }
+}
+
+/// The tiles under `frame`, and whether any is still on its way. `ahead` is
+/// where a zoom going on reaches the next level: its tiles are fetched before
+/// the ring, which is no use to a map that is about to change level.
+pub(super) fn tile_layer(
+    map: &Map,
+    frame: Frame,
+    ahead: Option<Frame>,
+    scale: f32,
+    grid: Grid,
+) -> (Div, bool) {
     let z = tiles::level(map.provider, frame.zoom, scale);
     let count = 1i64 << z;
     let size = 256.0 * (frame.zoom - f64::from(z)).exp2();
@@ -96,6 +141,10 @@ pub(super) fn tile_layer(map: &Map, frame: Frame, scale: f32, grid: Grid) -> (Di
             }
         }
     }
+    if let Some(ahead) = ahead {
+        ask_for(map, ahead, scale);
+    }
+    ask_for(map, frame, scale);
     let (mut layer, base) = base_layer(map, frame, z, grid);
     let mut missing = false;
     let mut drawn = 0;

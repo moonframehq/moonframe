@@ -15,6 +15,14 @@ use {
     },
 };
 
+/// How often a moving map tells its view where it is. Telling runs the view
+/// and reads its whole tree, which took as long as drawing the frame when
+/// every event did it; nothing the map draws waits for it.
+const TELL_EVERY: Duration = Duration::from_millis(100);
+/// How long after the last step a zoom still counts as going on.
+const STILL_ZOOMING: Duration = Duration::from_millis(300);
+/// Zoom steps looked ahead at a time for where the next tile level starts.
+const AHEAD_STEP: f64 = 0.1;
 /// Pixels left around the pins and routes a map frames.
 const MARGIN: f64 = 48.0;
 /// How many screens away a glide still goes. Farther, the map jumps: a
@@ -25,6 +33,77 @@ const GLIDE_SCREENS: f64 = 8.0;
 const TURN_FROM: f64 = 6.0;
 /// Degrees from north a turn settles back to north when the fingers lift.
 const NORTH_WITHIN: f64 = 4.0;
+/// A pinch that last moved longer ago than this has stopped: letting go of
+/// it does not coast. Apple Maps' figure, as the next three are.
+const STILL_PINCHING: Duration = Duration::from_millis(150);
+/// A change of scale smaller than this is the fingers resting.
+const PINCH_MOVES: f64 = 0.01;
+/// Zoom steps a pinch coasts on for each unit of its last rate of change:
+/// Apple Maps adds a quarter of that rate per frame, fading over 30 frames.
+const COAST_STEPS: f64 = 7.2;
+/// A coast shorter than this, in zoom steps, is not worth a glide.
+const SMALLEST_COAST: f64 = 0.01;
+
+/// How a map gets somewhere on its own: Apple Maps' zoom takes a quarter of a
+/// second, easing both ways, and a pinch let go coasts for half of one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Pace {
+    /// To another place, however far the view sent it.
+    Trip,
+    /// Closer or further, staying over the same place.
+    Zoom,
+    /// On from a pinch that let go still moving.
+    Coast,
+}
+
+impl Pace {
+    fn length(self) -> Duration {
+        match self {
+            Self::Trip => Duration::from_millis(600),
+            Self::Zoom => Duration::from_millis(250),
+            Self::Coast => Duration::from_millis(500),
+        }
+    }
+
+    /// How far along a glide is, 0 to 1, `progress` of the way through it.
+    fn eased(self, progress: f64) -> f64 {
+        let progress = progress.clamp(0.0, 1.0);
+        match self {
+            Self::Trip => 1.0 - (1.0 - progress).powi(3),
+            Self::Zoom => progress * progress * (3.0 - 2.0 * progress),
+            // Its speed falls as `1 - progress²`, from the fingers' own.
+            Self::Coast => (3.0 * progress - progress.powi(3)) / 2.0,
+        }
+    }
+}
+
+/// A glide under way.
+#[derive(Clone, Copy, Debug)]
+struct Glide {
+    from: Frame,
+    start: Instant,
+    pace: Pace,
+}
+
+/// A pinch, as it goes, for how fast it is moving when it ends.
+#[derive(Clone, Copy, Debug)]
+struct Pinch {
+    /// The scale of the latest change, smoothed over the last few.
+    rate: f64,
+    /// When the fingers last really moved.
+    moved: Instant,
+}
+
+/// The way a scroll or a pinch is zooming.
+#[derive(Clone, Copy, Debug)]
+struct Trend {
+    /// In, or out.
+    inward: bool,
+    /// What stays put, from the box's corner.
+    around: (f64, f64),
+    most: f64,
+    at: Instant,
+}
 
 /// What the view gave, which, once it changes, wins over where the user
 /// left the map.
@@ -83,6 +162,15 @@ impl Frame {
         (to.bearing - self.bearing + 540.0).rem_euclid(360.0) - 180.0
     }
 
+    /// Whether `to` looks at the same place, to within a pixel.
+    fn stays_over(&self, to: &Self) -> bool {
+        let span = 256.0 * self.zoom.max(to.zoom).exp2();
+        let across = (near(self.center.0, to.center.0) - to.center.0)
+            .abs()
+            .max((self.center.1 - to.center.1).abs());
+        across * span < 1.0
+    }
+
     /// Whether a glide from here reaches `to`: not too many screens away,
     /// measured at the wider of the two zooms.
     fn glides_to(&self, to: &Self) -> bool {
@@ -93,16 +181,40 @@ impl Frame {
         across * span <= GLIDE_SCREENS * to.size.0.max(to.size.1)
     }
 
-    /// `progress` of the way, 0 to 1, from here to `to`, easing out.
-    fn toward(&self, to: &Self, progress: f64) -> Self {
-        let eased = 1.0 - (1.0 - progress.clamp(0.0, 1.0)).powi(3);
+    /// `[lat, lon]` and zoom as `move` tells them, rounded.
+    pub(super) fn told(&self) -> ([f64; 2], f64) {
+        let round = |value: f64, places: i32| {
+            let scale = 10f64.powi(places);
+            (value * scale).round() / scale
+        };
+        let [lat, lon] = self.middle();
+        ([round(lat, 6), round(lon, 6)], round(self.zoom, 2))
+    }
+
+    /// Whether `given` is only the view handing back what `move` told it.
+    fn echoed_by(&self, given: &Given) -> bool {
+        let (center, zoom) = self.told();
+        given.center == Some(center) && given.zoom == Some(zoom as f32)
+    }
+
+    /// `eased` of the way, 0 to 1, from here to `to`. What stays put on the
+    /// screen stays put all the way: the center moves with the scale, not
+    /// with the zoom, which is its logarithm.
+    fn toward(&self, to: &Self, eased: f64) -> Self {
         let from = near(self.center.0, to.center.0);
+        let zoom = self.zoom + (to.zoom - self.zoom) * eased;
+        let scaled = 1.0 - (self.zoom - to.zoom).exp2();
+        let along = if scaled.abs() < 1e-9 {
+            eased
+        } else {
+            (1.0 - (self.zoom - zoom).exp2()) / scaled
+        };
         Self {
             center: (
-                from + (to.center.0 - from) * eased,
-                self.center.1 + (to.center.1 - self.center.1) * eased,
+                from + (to.center.0 - from) * along,
+                self.center.1 + (to.center.1 - self.center.1) * along,
             ),
-            zoom: self.zoom + (to.zoom - self.zoom) * eased,
+            zoom,
             size: to.size,
             bearing: (self.bearing + self.turn_to(to) * eased).rem_euclid(360.0),
         }
@@ -261,8 +373,18 @@ struct Kept {
     moved: Option<Frame>,
     /// What the last frame showed.
     drawn: Option<Frame>,
-    /// Where a glide under way left from, and when.
-    glide: Option<(Frame, Instant)>,
+    /// The glide under way.
+    glide: Option<Glide>,
+    /// Where that glide ends.
+    heading: Option<Frame>,
+    /// The pinch under way.
+    pinch: Option<Pinch>,
+    /// The way the map last zoomed by scroll or pinch.
+    trend: Option<Trend>,
+    /// The last place `move` told the view, and when.
+    told: Option<(Frame, Instant)>,
+    /// The latest place held back, to tell once [`TELL_EVERY`] has passed.
+    untold: Option<Frame>,
     /// The box as last laid out, in window pixels.
     bounds: Bounds<Pixels>,
     /// The window's scale, for `@2x` tiles.
@@ -314,7 +436,7 @@ pub(super) fn frame(
     key: &str,
     fallback: (f64, f64),
     now: Instant,
-    glide: Duration,
+    scaled: impl Fn(Duration) -> Duration,
 ) -> (Frame, f32) {
     let given = Given::of(map);
     KEPT.with_borrow_mut(|kept| {
@@ -323,6 +445,11 @@ pub(super) fn frame(
             moved: None,
             drawn: None,
             glide: None,
+            heading: None,
+            pinch: None,
+            trend: None,
+            told: None,
+            untold: None,
             bounds: Bounds::default(),
             scale: 2.0,
             bearing: compass(map.bearing),
@@ -331,10 +458,16 @@ pub(super) fn frame(
         });
         // The view moved it: that wins over where the user left it.
         let mut sent = false;
+        // Handing back what `move` told it is no order: it would pull a
+        // gesture back to where it was when it was told.
         if entry.given != given {
-            sent = entry.given.center != given.center || entry.given.zoom != given.zoom;
+            if !entry.told.is_some_and(|(told, _)| told.echoed_by(&given)) {
+                sent = entry.given.center != given.center || entry.given.zoom != given.zoom;
+                entry.moved = None;
+                entry.told = None;
+                entry.untold = None;
+            }
             entry.given = given;
-            entry.moved = None;
         }
         // While the fingers turn it they lead, and the view's echo of their
         // last move trails behind: it would pull the map back.
@@ -372,24 +505,33 @@ pub(super) fn frame(
         };
         if sent
             && map.glide
-            && !glide.is_zero()
             && let Some(from) = entry.drawn
         {
-            entry.glide = (!from.same_as(&frame) && from.glides_to(&frame)).then_some((from, now));
+            let pace = if from.stays_over(&frame) {
+                Pace::Zoom
+            } else {
+                Pace::Trip
+            };
+            entry.glide = (!from.same_as(&frame) && from.glides_to(&frame)).then_some(Glide {
+                from,
+                start: now,
+                pace,
+            });
         }
         let shown = match entry.glide {
-            Some((from, start)) => {
-                let progress = now.saturating_duration_since(start).as_secs_f64()
-                    / glide.as_secs_f64().max(f64::EPSILON);
+            Some(glide) => {
+                let progress = now.saturating_duration_since(glide.start).as_secs_f64()
+                    / scaled(glide.pace.length()).as_secs_f64().max(f64::EPSILON);
                 if progress >= 1.0 {
                     entry.glide = None;
                     frame
                 } else {
-                    from.toward(&frame, progress)
+                    glide.from.toward(&frame, glide.pace.eased(progress))
                 }
             },
             None => frame,
         };
+        entry.heading = entry.glide.is_some().then_some(frame);
         entry.drawn = Some(shown);
         (shown, entry.scale)
     })
@@ -398,6 +540,12 @@ pub(super) fn frame(
 /// Whether the map `key` is on its way somewhere, and wants another frame.
 pub(super) fn gliding(key: &str) -> bool {
     KEPT.with_borrow(|kept| kept.get(key).is_some_and(|kept| kept.glide.is_some()))
+}
+
+/// Where the map `key` is gliding to, if it is: its tiles can be on their way
+/// before it arrives.
+pub(super) fn heading(key: &str) -> Option<Frame> {
+    KEPT.with_borrow(|kept| kept.get(key).and_then(|kept| kept.heading))
 }
 
 /// `bearing` as a frame holds it, from 0 up to 360.
@@ -486,15 +634,138 @@ pub(super) fn zoom(
     position: Point<Pixels>,
     most: f64,
 ) -> Frame {
-    let origin = KEPT.with_borrow(|kept| {
-        kept.get(key)
-            .map_or_else(Point::default, |kept| kept.bounds.origin)
+    let origin = KEPT.with_borrow_mut(|kept| {
+        let entry = kept.get_mut(key)?;
+        let origin = entry.bounds.origin;
+        let around = (
+            f64::from(position.x - origin.x),
+            f64::from(position.y - origin.y),
+        );
+        entry.trend = Some(Trend {
+            inward: steps > 0.0,
+            around,
+            most,
+            at: Instant::now(),
+        });
+        Some(origin)
     });
+    let origin = origin.unwrap_or_default();
     let left = f64::from(position.x - origin.x);
     let top = f64::from(position.y - origin.y);
     let zoomed = frame.zoomed(steps, left, top, most);
     keep(key, zoomed);
     zoomed
+}
+
+/// Where the map `key`, still zooming at `now`, reaches the next tile level,
+/// as `level` tells them apart: its tiles can set off before it gets there.
+pub(super) fn ahead(key: &str, now: Instant, level: impl Fn(f64) -> u8) -> Option<Frame> {
+    let (frame, trend) = KEPT.with_borrow(|kept| {
+        let entry = kept.get(key)?;
+        Some((entry.moved?, entry.trend?))
+    })?;
+    if now.saturating_duration_since(trend.at) > STILL_ZOOMING {
+        return None;
+    }
+    let (left, top) = trend.around;
+    let step = if trend.inward {
+        AHEAD_STEP
+    } else {
+        -AHEAD_STEP
+    };
+    let here = level(frame.zoom);
+    (1..=(1.0 / AHEAD_STEP) as u32 + 1)
+        .map(|steps| frame.zoomed(step * f64::from(steps), left, top, trend.most))
+        .find(|there| level(there.zoom) != here)
+}
+
+/// Zooms the map `key` by `steps` around `position` in the window, gliding
+/// there. A second click on the way adds to where the first was going.
+pub(super) fn glide_zoom(
+    key: &str,
+    drawn: Frame,
+    steps: f64,
+    position: Point<Pixels>,
+    most: f64,
+) -> Frame {
+    let target = moved(key).unwrap_or(drawn);
+    let from = shown(key, drawn);
+    let zoomed = zoom(key, target, steps, position, most);
+    glide(key, from, Pace::Zoom);
+    zoomed
+}
+
+/// Sets the map `key` off from `from` to where it was just kept.
+fn glide(key: &str, from: Frame, pace: Pace) {
+    KEPT.with_borrow_mut(|kept| {
+        if let Some(entry) = kept.get_mut(key) {
+            entry.glide = Some(Glide {
+                from,
+                start: Instant::now(),
+                pace,
+            });
+        }
+    });
+}
+
+/// A pinch's `delta`, in `phase`, around `position` over the map `key`: the
+/// frame to tell the view about. Let go while still moving it coasts on, as
+/// Apple Maps' does.
+pub(super) fn pinch(
+    key: &str,
+    drawn: Frame,
+    delta: f64,
+    phase: TouchPhase,
+    position: Point<Pixels>,
+    most: f64,
+) -> Frame {
+    let scale = (1.0 + delta).max(0.01);
+    let now = Instant::now();
+    let rate = KEPT.with_borrow_mut(|kept| {
+        let entry = kept.get_mut(key)?;
+        let pinch = entry
+            .pinch
+            .filter(|_| !matches!(phase, TouchPhase::Started))
+            .map_or(
+                Pinch {
+                    rate: scale,
+                    moved: now,
+                },
+                |pinch| pinch.after(scale, delta, now),
+            );
+        let ended = matches!(phase, TouchPhase::Ended | TouchPhase::Cancelled);
+        entry.pinch = (!ended).then_some(pinch);
+        (ended && now.duration_since(pinch.moved) < STILL_PINCHING).then_some(pinch.rate)
+    });
+    let frame = current(key, drawn);
+    let zoomed = zoom(key, frame, scale.log2(), position, most);
+    let coast = rate.map_or(0.0, |rate| (rate - 1.0) * COAST_STEPS);
+    if coast.abs() < SMALLEST_COAST {
+        return zoomed;
+    }
+    let coasting = zoom(key, zoomed, coast, position, most);
+    glide(key, zoomed, Pace::Coast);
+    coasting
+}
+
+impl Pinch {
+    /// After another `scale`, a change of `delta`, at `now`: recent changes
+    /// are averaged, as one alone says little of the fingers' speed.
+    fn after(self, scale: f64, delta: f64, now: Instant) -> Self {
+        let recent = now.duration_since(self.moved) <= STILL_PINCHING;
+        Self {
+            rate: if recent {
+                (scale + 2.0 * self.rate) / 3.0
+            } else {
+                scale
+            },
+            moved: if delta.abs() > PINCH_MOVES {
+                now
+            } else {
+                self.moved
+            },
+        }
+    }
 }
 
 /// Two fingers turned `degrees` clockwise over the map `key`, in `phase`;
@@ -540,6 +811,52 @@ fn settled(bearing: f64) -> f64 {
     }
 }
 
+/// What to do about telling the view that the map moved to a place.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Tell {
+    /// Tell it now.
+    Now,
+    /// Held back: ask [`late`] after this long.
+    After(Duration),
+    /// Held back, with [`late`] already due.
+    Held,
+}
+
+/// Whether the map `key`, moved to `frame`, tells its view `now`.
+pub(super) fn tell(key: &str, frame: Frame, now: Instant) -> Tell {
+    KEPT.with_borrow_mut(|kept| {
+        let Some(entry) = kept.get_mut(key) else {
+            return Tell::Now;
+        };
+        if entry.untold.is_some() {
+            entry.untold = Some(frame);
+            return Tell::Held;
+        }
+        let since = entry.told.map(|(_, at)| now.saturating_duration_since(at));
+        match since.filter(|since| *since < TELL_EVERY) {
+            Some(since) => {
+                entry.untold = Some(frame);
+                Tell::After(TELL_EVERY - since)
+            },
+            None => {
+                entry.told = Some((frame, now));
+                Tell::Now
+            },
+        }
+    })
+}
+
+/// The latest place held back from the view of the map `key`, now told.
+/// `None` if the view moved the map since: its order stands.
+pub(super) fn late(key: &str, now: Instant) -> Option<Frame> {
+    KEPT.with_borrow_mut(|kept| {
+        let entry = kept.get_mut(key)?;
+        let frame = entry.untold.take()?;
+        entry.told = Some((frame, now));
+        Some(frame)
+    })
+}
+
 /// Where the user left the map `key`, if they moved it.
 pub(super) fn moved(key: &str) -> Option<Frame> {
     KEPT.with_borrow(|kept| {
@@ -553,11 +870,26 @@ pub(super) fn moved(key: &str) -> Option<Frame> {
 
 /// Where the map `key` looks now: where the user left it, else `drawn`,
 /// as the last frame drew it, turned as it now is. Events between two
-/// frames see each other.
+/// frames see each other. A glide stops where it shows: the fingers take
+/// the map from there, not from where it was going.
 pub(super) fn current(key: &str, drawn: Frame) -> Frame {
+    if gliding(key) {
+        return shown(key, drawn);
+    }
     moved(key).unwrap_or_else(|| Frame {
         bearing: KEPT.with_borrow(|kept| kept.get(key).map_or(drawn.bearing, |kept| kept.bearing)),
         ..drawn
+    })
+}
+
+/// What the last frame showed of the map `key`, turned as it now is.
+fn shown(key: &str, drawn: Frame) -> Frame {
+    KEPT.with_borrow(|kept| {
+        let kept = kept.get(key);
+        Frame {
+            bearing: kept.map_or(drawn.bearing, |kept| kept.bearing),
+            ..kept.and_then(|kept| kept.drawn).unwrap_or(drawn)
+        }
     })
 }
 
@@ -588,246 +920,5 @@ fn keep(key: &str, frame: Frame) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{Frame, Turn, settled, world};
-
-    #[test]
-    fn zooming_keeps_the_place_under_the_pointer() {
-        let frame = Frame {
-            center: world(37.79, -122.40),
-            zoom: 14.0,
-            size: (800.0, 600.0),
-            bearing: 0.0,
-        };
-        let under = frame.world_at(100.0, 50.0);
-        let zoomed = frame.zoomed(1.5, 100.0, 50.0, 20.0);
-        let after = zoomed.world_at(100.0, 50.0);
-        assert!((under.0 - after.0).abs() < 1e-12 && (under.1 - after.1).abs() < 1e-12);
-        assert_eq!(zoomed.zoom, 15.5);
-    }
-
-    #[test]
-    fn a_glide_eases_to_its_end_and_refuses_long_trips() {
-        let from = Frame {
-            center: world(37.79, -122.40),
-            zoom: 14.0,
-            size: (800.0, 600.0),
-            bearing: 0.0,
-        };
-        let to = Frame {
-            center: world(37.80, -122.41),
-            zoom: 15.0,
-            ..from
-        };
-        assert_eq!(from.toward(&to, 0.0), from);
-        assert!(from.toward(&to, 1.0).same_as(&to));
-        let half = from.toward(&to, 0.5);
-        assert!(half.zoom > 14.5 && half.zoom < 15.0);
-        assert!(from.glides_to(&to));
-        let far = Frame {
-            center: world(40.71, -74.0),
-            ..to
-        };
-        assert!(!from.glides_to(&far));
-        assert!(from.same_as(&from.toward(&from, 0.5)));
-    }
-
-    #[test]
-    fn a_glide_turns_the_short_way_round_past_north() {
-        let from = Frame {
-            center: world(37.79, -122.40),
-            zoom: 14.0,
-            size: (800.0, 600.0),
-            bearing: 350.0,
-        };
-        let to = Frame {
-            bearing: 10.0,
-            ..from
-        };
-        assert!(!from.same_as(&to));
-        assert!(from.toward(&to, 1.0).same_as(&to));
-        let half = from.toward(&to, 0.2).bearing;
-        assert!(!(10.0..350.0).contains(&half), "{half}");
-    }
-
-    #[test]
-    fn a_glide_takes_the_short_way_over_the_dateline() {
-        let from = Frame {
-            center: world(0.0, 179.99),
-            zoom: 10.0,
-            size: (800.0, 600.0),
-            bearing: 0.0,
-        };
-        let to = Frame {
-            center: world(0.0, -179.99),
-            ..from
-        };
-        assert!(from.glides_to(&to));
-        let half = from.toward(&to, 0.2);
-        assert!((half.center.0 - to.center.0).abs() < 1e-3);
-    }
-
-    #[test]
-    fn a_place_lands_where_the_frame_says() {
-        let frame = Frame {
-            center: world(37.79, -122.40),
-            zoom: 14.0,
-            size: (800.0, 600.0),
-            bearing: 0.0,
-        };
-        let (left, top) = frame.at(37.79, -122.40);
-        assert!((left - 400.0).abs() < 1e-3 && (top - 300.0).abs() < 1e-3);
-        let [lat, lon] = frame.middle();
-        assert!((lat - 37.79).abs() < 1e-9 && (lon + 122.40).abs() < 1e-9);
-    }
-
-    #[test]
-    fn overlays_follow_tiles_across_the_dateline_and_repeated_worlds() {
-        let frame = Frame {
-            center: world(0.0, 179.9),
-            zoom: 10.0,
-            size: (800.0, 600.0),
-            bearing: 0.0,
-        };
-        let (x, y) = frame.at(0.0, -179.9);
-        let expected = 400.0 + 0.2 / 360.0 * frame.span();
-        assert!((f64::from(x) - expected).abs() < 0.001);
-        assert_eq!(y, 300.0);
-        for worlds in [-3.0, 2.0] {
-            let panned = Frame {
-                center: (frame.center.0 + worlds, frame.center.1),
-                ..frame
-            };
-            assert_eq!(panned.at(0.0, -179.9), (x, y));
-        }
-        let route = frame.route(&[[0.0, 179.9], [0.0, -179.9]]);
-        assert_eq!(route[0], (400.0, 300.0));
-        assert_eq!(route[1], (x, y));
-    }
-
-    #[test]
-    fn a_dateline_route_draws_at_both_edges_without_crossing_greenwich() {
-        let frame = Frame {
-            center: world(0.0, 0.0),
-            zoom: 1.0,
-            size: (512.0, 400.0),
-            bearing: 0.0,
-        };
-        let route = frame.route(&[[0.0, 179.0], [0.0, -179.0]]);
-        assert!(route[0].0 > 500.0 && route[1].0 > 512.0);
-        assert!(route[1].0 - route[0].0 < 3.0);
-        let copies: Vec<_> = frame.copies(route[0], route[1], 4.0).collect();
-        assert_eq!(copies, [-1, 0]);
-        // At zoom zero, all three visible copies of a pin are drawn.
-        let wide = Frame {
-            zoom: 0.0,
-            size: (800.0, 400.0),
-            ..frame
-        };
-        let (x, _) = wide.at(0.0, 0.0);
-        let at = wide.at(0.0, 0.0);
-        assert_eq!(at.0, x);
-        assert_eq!(wide.copies(at, at, 14.0).collect::<Vec<_>>(), [-1, 0, 1]);
-    }
-
-    fn turned(bearing: f64) -> Frame {
-        Frame {
-            center: world(37.79, -122.40),
-            zoom: 14.0,
-            size: (800.0, 600.0),
-            bearing,
-        }
-    }
-
-    fn close(a: (f64, f64), b: (f64, f64)) -> bool {
-        (a.0 - b.0).abs() < 1e-3 && (a.1 - b.1).abs() < 1e-3
-    }
-
-    #[test]
-    fn east_up_puts_north_on_the_left() {
-        let frame = turned(90.0);
-        let (left, top) = frame.at(37.80, -122.40);
-        assert!(left < 300.0 && (top - 300.0).abs() < 0.01, "{left}, {top}");
-        let (left, top) = frame.at(37.79, -122.39);
-        assert!((left - 400.0).abs() < 0.01 && top < 200.0, "{left}, {top}");
-    }
-
-    #[test]
-    fn a_place_and_its_pixel_agree_at_any_bearing() {
-        for bearing in [0.0, 17.0, 90.0, 133.5, 270.0, 359.0] {
-            let frame = turned(bearing);
-            let (left, top) = frame.at(37.80, -122.41);
-            let (x, y) = frame.world_at(f64::from(left), f64::from(top));
-            let (want_x, want_y) = world(37.80, -122.41);
-            assert!((x - want_x).abs() < 1e-7 && (y - want_y).abs() < 1e-7);
-        }
-    }
-
-    #[test]
-    fn a_drag_keeps_the_place_under_the_pointer_when_turned() {
-        for bearing in [0.0, 30.0, 200.0] {
-            let frame = turned(bearing);
-            let under = frame.world_at(100.0, 50.0);
-            let dragged = frame.dragged(35.0, -20.0);
-            let after = dragged.world_at(135.0, 30.0);
-            assert!((under.0 - after.0).abs() < 1e-9 && (under.1 - after.1).abs() < 1e-9);
-        }
-    }
-
-    #[test]
-    fn zooming_keeps_the_place_under_the_pointer_when_turned() {
-        let frame = turned(75.0);
-        let under = frame.world_at(100.0, 50.0);
-        let after = frame.zoomed(1.5, 100.0, 50.0, 20.0).world_at(100.0, 50.0);
-        assert!((under.0 - after.0).abs() < 1e-12 && (under.1 - after.1).abs() < 1e-12);
-    }
-
-    #[test]
-    fn the_world_box_covers_every_corner_of_a_turned_box() {
-        let frame = turned(45.0);
-        let (low, high) = frame.world_box();
-        for corner in [(0.0, 0.0), (800.0, 0.0), (0.0, 600.0), (800.0, 600.0)] {
-            let (x, y) = frame.world_at(corner.0, corner.1);
-            assert!(low.0 <= x && x <= high.0 && low.1 <= y && y <= high.1);
-        }
-        let north = turned(0.0).world_box();
-        assert!(high.0 - low.0 > north.1.0 - north.0.0);
-    }
-
-    #[test]
-    fn world_copies_of_a_place_lie_along_the_turned_east() {
-        // A quarter turn: copies repeat up and down the box, not across it.
-        let frame = Frame {
-            center: world(0.0, 0.0),
-            zoom: 0.0,
-            size: (300.0, 800.0),
-            bearing: 90.0,
-        };
-        let at = frame.at(0.0, 0.0);
-        assert_eq!(frame.copies(at, at, 14.0).collect::<Vec<_>>(), [-1, 0, 1]);
-        let (x, y) = frame.copy_offset(1);
-        assert!(close((f64::from(x), f64::from(y)), (0.0, -frame.span())));
-        // Off the box's side, no copy along its length brings it in.
-        let aside = (at.0 + 1000.0, at.1);
-        assert_eq!(frame.copies(aside, aside, 14.0).count(), 0);
-    }
-
-    #[test]
-    fn a_pinch_s_small_turn_does_not_tip_the_map() {
-        let mut turn = Turn::default();
-        assert_eq!(turn.by(3.0), 0.0);
-        assert_eq!(turn.by(-2.0), 0.0);
-        assert!(!turn.following);
-        assert_eq!(turn.by(5.5), 0.0);
-        assert!(turn.following);
-        assert_eq!(turn.by(1.5), 1.5);
-    }
-
-    #[test]
-    fn a_turn_left_close_to_north_settles_there() {
-        assert_eq!(settled(3.0), 0.0);
-        assert_eq!(settled(358.0), 0.0);
-        assert_eq!(settled(10.0), 10.0);
-        assert_eq!(settled(350.0), 350.0);
-    }
-}
+#[path = "view_tests.rs"]
+mod tests;
