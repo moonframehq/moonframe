@@ -1,7 +1,7 @@
 use {
     super::{
-        Frame, Pace, STILL_ZOOMING, TELL_EVERY, Tell, Turn, ahead, current, frame, glide_zoom,
-        heading, late, pinch, settled, tell, world, zoom,
+        Crossing, Frame, Pace, STILL_ZOOMING, TELL_EVERY, Tell, Turn, ahead, current, frame,
+        glide_zoom, heading, late, level, pinch, settled, tell, world, zoom,
     },
     gpui_kit::{Point, TouchPhase, px},
     moonframe_core::{Look, Map, MapProvider},
@@ -192,6 +192,30 @@ fn a_zoom_looks_ahead_to_the_next_level_while_it_goes_on() {
 
     let later = Instant::now() + STILL_ZOOMING * 2;
     assert!(ahead(key, later, level).is_none(), "it stopped");
+}
+
+#[test]
+fn a_new_tile_level_fades_in_and_hovering_at_the_edge_keeps_the_old_one() {
+    let key = "level";
+    let map = following([37.79, -122.40], 14.0);
+    let now = Instant::now();
+    let _ = frame(&map, key, (800.0, 600.0), now, |pace| pace);
+    let fade = Duration::from_millis(200);
+    let rounded = |zoom: f64| zoom.round() as u8;
+    let at = |zoom, after| level(key, zoom, now + Duration::from_millis(after), fade, rounded);
+
+    assert_eq!(at(14.0, 0), (14, None));
+    // Just past the edge, and back: nothing swaps.
+    assert_eq!(at(14.55, 10), (14, None));
+    assert_eq!(at(14.45, 20), (14, None));
+    // Well past it, the new level starts to fade in.
+    assert_eq!(at(14.7, 30).0, 15);
+    let halfway = at(14.7, 130);
+    assert_eq!(halfway.0, 15);
+    assert!(halfway.1.is_some_and(|crossing: Crossing| {
+        crossing.from == 14 && (crossing.shown - 0.5).abs() < 1e-3
+    }));
+    assert_eq!(at(14.7, 231), (15, None));
 }
 
 #[test]

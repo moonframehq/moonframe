@@ -19,6 +19,10 @@ use {
 /// and reads its whole tree, which took as long as drawing the frame when
 /// every event did it; nothing the map draws waits for it.
 const TELL_EVERY: Duration = Duration::from_millis(100);
+/// How far past the point where the next tile level starts a zoom must go
+/// to change level, in zoom steps: one hovering there would swap every tile
+/// back and forth.
+const LEVEL_SLACK: f64 = 0.12;
 /// How long after the last step a zoom still counts as going on.
 const STILL_ZOOMING: Duration = Duration::from_millis(300);
 /// Zoom steps looked ahead at a time for where the next tile level starts.
@@ -92,6 +96,23 @@ struct Pinch {
     rate: f64,
     /// When the fingers last really moved.
     moved: Instant,
+}
+
+/// The tile level a map draws, and the change it is fading out of.
+#[derive(Clone, Copy, Debug)]
+struct Level {
+    level: u8,
+    from: Option<(u8, Instant)>,
+}
+
+/// A change of tile level on its way: the new tiles fade in over the old, as
+/// swapping a whole screen of them at once flashes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct Crossing {
+    /// The level it comes from.
+    pub(super) from: u8,
+    /// How far the new tiles have faded in, 0 to 1.
+    pub(super) shown: f32,
 }
 
 /// The way a scroll or a pinch is zooming.
@@ -381,6 +402,8 @@ struct Kept {
     pinch: Option<Pinch>,
     /// The way the map last zoomed by scroll or pinch.
     trend: Option<Trend>,
+    /// The tile level it draws.
+    level: Option<Level>,
     /// The last place `move` told the view, and when.
     told: Option<(Frame, Instant)>,
     /// The latest place held back, to tell once [`TELL_EVERY`] has passed.
@@ -448,6 +471,7 @@ pub(super) fn frame(
             heading: None,
             pinch: None,
             trend: None,
+            level: None,
             told: None,
             untold: None,
             bounds: Bounds::default(),
@@ -655,6 +679,53 @@ pub(super) fn zoom(
     let zoomed = frame.zoomed(steps, left, top, most);
     keep(key, zoomed);
     zoomed
+}
+
+/// The tile level the map `key` draws at `zoom`, as `level` works it out, and
+/// the change to it still fading in over `fade`.
+pub(super) fn level(
+    key: &str,
+    zoom: f64,
+    now: Instant,
+    fade: Duration,
+    level: impl Fn(f64) -> u8,
+) -> (u8, Option<Crossing>) {
+    KEPT.with_borrow_mut(|kept| {
+        let Some(entry) = kept.get_mut(key) else {
+            return (level(zoom), None);
+        };
+        let wanted = match entry.level {
+            Some(kept)
+                if level(zoom - LEVEL_SLACK) == kept.level
+                    || level(zoom + LEVEL_SLACK) == kept.level =>
+            {
+                kept.level
+            },
+            _ => level(zoom),
+        };
+        let mut held = entry.level.unwrap_or(Level {
+            level: wanted,
+            from: None,
+        });
+        if held.level != wanted {
+            held = Level {
+                level: wanted,
+                from: (!fade.is_zero()).then_some((held.level, now)),
+            };
+        }
+        let crossing = held.from.and_then(|(from, at)| {
+            let shown = now.saturating_duration_since(at).as_secs_f64() / fade.as_secs_f64();
+            (shown < 1.0).then_some(Crossing {
+                from,
+                shown: shown as f32,
+            })
+        });
+        if crossing.is_none() {
+            held.from = None;
+        }
+        entry.level = Some(held);
+        (wanted, crossing)
+    })
 }
 
 /// Where the map `key`, still zooming at `now`, reaches the next tile level,

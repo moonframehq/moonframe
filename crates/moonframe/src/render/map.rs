@@ -5,6 +5,12 @@
 //! with north up, and through [`rotated`] turned; everything over them is
 //! placed by [`view::Frame`] and stays upright.
 
+#[cfg(feature = "map-benchmark")]
+mod benchmark;
+#[cfg(not(feature = "map-benchmark"))]
+mod benchmark {
+    pub(super) const fn cell(_: bool) {}
+}
 mod disk;
 mod layer;
 mod lines;
@@ -56,6 +62,8 @@ thread_local! {
 
 impl<'w> Draw<'w> for Map {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
+        #[cfg(feature = "map-benchmark")]
+        benchmark::start(cx);
         let look = painter.look(Part::Map, &self.look, false, place);
         let theme = cx.theme();
         let key = format!("{:?}/{}", painter.window, place.path);
@@ -81,10 +89,20 @@ impl<'w> Draw<'w> for Map {
         let ahead = view::ahead(&key, painter.now, |zoom| {
             tiles::level(self.provider, zoom, scale)
         });
+        let level = view::level(
+            &key,
+            frame.zoom,
+            painter.now,
+            stylesheet.scaled(layer::FADE),
+            |zoom| tiles::level(self.provider, zoom, scale),
+        );
+        if level.1.is_some() {
+            painter.animating = true;
+        }
         let (layer, tiles_missing) = if frame.turned() {
             rotated::layer(self, frame, scale, &key)
         } else {
-            layer::tile_layer(self, frame, ahead, scale, grid)
+            layer::tile_layer(self, frame, level, ahead, scale, grid)
         };
         // Its tiles set off now, not when the map arrives.
         if let Some(heading) = view::heading(&key) {
@@ -97,6 +115,8 @@ impl<'w> Draw<'w> for Map {
         };
         let (lines, ways) = lines::lines(self, frame, cx);
         let missing = tiles_missing || ways.waiting;
+        #[cfg(feature = "map-benchmark")]
+        benchmark::frame(level.0, tiles_missing);
         if missing && !WAITING.get() {
             WAITING.set(true);
             let arrived = tiles::arrival();
@@ -368,6 +388,7 @@ fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl
             }
         },
         move |_, (), window, cx| {
+            memory::settle(window, cx);
             memory::evict(window, cx);
             if !turned {
                 rotated::release(&key, window, cx);
