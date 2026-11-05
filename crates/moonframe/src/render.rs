@@ -24,6 +24,8 @@ mod plot;
 mod pointer;
 mod popover;
 mod styling;
+#[cfg_attr(not(feature = "syntax"), path = "render/syntax_left_out.rs")]
+mod syntax;
 #[cfg_attr(not(feature = "terminal"), path = "render/terminal_left_out.rs")]
 mod terminal;
 mod video;

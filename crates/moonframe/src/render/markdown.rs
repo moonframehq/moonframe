@@ -1,64 +1,87 @@
 //! `ui.markdown`: a document the host renders with gpui-component's
-//! `TextView`. The frame takes the `markdown` rule; code and quotes take
-//! `markdown-code` and `markdown-quote`. A link click goes to the mod as its
-//! `link` message and never opens anything; pictures are never loaded.
+//! `TextView`. The frame takes the `markdown` rule; code, quotes and alerts
+//! take `markdown-code`, `markdown-quote` and `markdown-alert`. A link click
+//! goes to the mod as its `link` message and never opens anything, a
+//! `#heading` link scrolls to its heading, and pictures show only with
+//! `images`, from files a `ui.image` could show.
+
+mod blocks;
+mod document;
+#[cfg(feature = "math")]
+mod math;
+mod outline;
+mod parts;
+mod search;
 
 use {
     super::{
         Cx, Draw, Painter, Place,
         styling::{LookExt as _, StyleExt as _},
     },
-    crate::color::ThemeColor as _,
+    crate::{app::MoonframeApp, color::ThemeColor as _},
+    document::{Colors, Document},
     gpui_kit::{
-        component::{
-            ActiveTheme as _, Theme,
-            text::{TextView, TextViewStyle},
-        },
+        component::{ActiveTheme as _, Theme},
         *,
     },
-    moonframe_core::{Action, Markdown, Part, Style},
+    moonframe_core::{Markdown, Part, Style},
+    std::path::{Path, PathBuf},
 };
+
+/// The find colors when the stylesheet sets none: the warning color, light
+/// enough to read the text through, and stronger for the current match.
+const FIND_ALPHA: f32 = 0.3;
+const CURRENT_ALPHA: f32 = 0.6;
 
 impl<'w> Draw<'w> for Markdown {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
         let look = painter.look(Part::Markdown, &self.look, false, place);
-        let code = painter
-            .look(Part::MarkdownCode, &Default::default(), false, place)
-            .base;
-        let quote = painter
-            .look(Part::MarkdownQuote, &Default::default(), false, place)
-            .base;
+        let base = |painter: &Painter<'w, '_>, part| {
+            painter.look(part, &Default::default(), false, place).base
+        };
+        let code = base(painter, Part::MarkdownCode);
+        let quote = base(painter, Part::MarkdownQuote);
+        let alert = base(painter, Part::MarkdownAlert);
+        let find = base(painter, Part::MarkdownFind);
+        let current = base(painter, Part::MarkdownFindCurrent);
         let theme = cx.theme();
-        let mut view = TextView::markdown(place.part("text").id(), self.text.clone())
-            .selectable(true)
-            .scrollable(self.scroll)
-            // A document may name any address as a picture: none is loaded,
-            // so rendering one never reaches the network or the disk.
-            .image_source(|_| ImageSource::from(std::path::PathBuf::new()))
-            .style(TextViewStyle {
-                code_block: refinement(&code, theme),
-                ..TextViewStyle::default()
-            })
-            .inline_code_style(inline(&code, theme))
-            .blockquote_style(refinement(&quote, theme));
-        if let Some(link) = &self.link {
-            let owner = place.owner.to_owned();
-            let to = self.to.clone();
-            let link = link.clone();
-            let app = cx.entity().downgrade();
-            view = view.on_link_click(move |url, _, window, cx| {
-                let action = Action::Send {
-                    to: to.clone(),
-                    msg: Markdown::message(&link, url),
-                };
-                app.update(cx, |this, cx| this.dispatch(&owner, &action, window, cx))
-                    .ok();
-            });
+        let folder = painter
+            .folder(place.owner)
+            .unwrap_or(Path::new("."))
+            .to_owned();
+        let roots: Vec<PathBuf> = if self.images {
+            painter
+                .workspace
+                .roots()
+                .layers()
+                .map(Path::to_owned)
+                .chain([crate::paths::images()])
+                .collect()
         } else {
-            // Without a `link`, a click on one does nothing: the default
-            // would open it in the system browser.
-            view = view.on_link_click(|_, _, _, _| {});
-        }
+            Vec::new()
+        };
+        let document = Document {
+            id: place.part("text").id(),
+            owner: place.owner.to_owned(),
+            app: cx.entity().downgrade(),
+            markdown: self.clone(),
+            folder,
+            roots,
+            code: refinement(&code, theme),
+            inline_code: inline(&code, theme),
+            quote: refinement(&quote, theme),
+            alert,
+            colors: Colors {
+                find: find
+                    .background
+                    .map_or(theme.warning.opacity(FIND_ALPHA), |color| color.hsla(theme)),
+                current: current
+                    .background
+                    .map_or(theme.warning.opacity(CURRENT_ALPHA), |color| {
+                        color.hsla(theme)
+                    }),
+            },
+        };
         let mut frame = div()
             .id(place.id())
             .flex()
@@ -80,12 +103,7 @@ impl<'w> Draw<'w> for Markdown {
         if let Some(width) = self.max_width {
             frame = frame.max_w(px(width));
         }
-        let view = if self.scroll {
-            view.size_full().into_any_element()
-        } else {
-            view.w_full().into_any_element()
-        };
-        frame.child(view).into_any_element()
+        frame.child(document).into_any_element()
     }
 }
 
@@ -115,4 +133,22 @@ fn inline(style: &Style, theme: &Theme) -> StyleRefinement {
         refined = refined.cornered(radius);
     }
     refined
+}
+
+/// Sends `msg` from the mod `owner`, once the frame being drawn is done.
+fn send(
+    app: &WeakEntity<MoonframeApp>,
+    owner: &str,
+    to: Option<String>,
+    msg: moonframe_core::Data,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let app = app.clone();
+    let owner = owner.to_owned();
+    window.defer(cx, move |window, cx| {
+        let action = moonframe_core::Action::Send { to, msg };
+        app.update(cx, |this, cx| this.dispatch(&owner, &action, window, cx))
+            .ok();
+    });
 }

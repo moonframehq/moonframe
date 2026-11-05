@@ -20,7 +20,7 @@ use {
         },
         *,
     },
-    moonframe_core::{Action, Data, Edit, Input, KeyChord},
+    moonframe_core::{Action, Data, Edit, Input, KeyChord, Markdown},
     std::{cell::RefCell, collections::HashMap, rc::Rc},
 };
 
@@ -155,6 +155,7 @@ pub(crate) struct Wiring {
     pub(crate) submit: Option<Data>,
     pub(crate) blur: Option<Data>,
     pub(crate) keys: Vec<(KeyChord, Data)>,
+    pub(crate) capture: Option<Data>,
     pub(crate) multiline: bool,
     pub(crate) disabled: bool,
     /// The browser it is the address bar of.
@@ -171,6 +172,7 @@ impl Wiring {
             submit: input.submit.clone(),
             blur: input.blur.clone(),
             keys: input.keys.clone(),
+            capture: input.capture.clone(),
             multiline: input.multiline,
             disabled: input.disabled,
             browser: input.browser.clone(),
@@ -489,7 +491,12 @@ impl MoonframeApp {
             field.wiring.select.as_ref().map(|msg| {
                 (field.wiring.owner.clone(), Action::Send {
                     to: field.wiring.to.clone(),
-                    msg: Input::message_at(msg, &field.editor.value(cx), selection.1),
+                    msg: Input::selection_message(
+                        msg,
+                        &field.editor.value(cx),
+                        selection.1,
+                        selection.0.len(),
+                    ),
                 })
             })
         };
@@ -598,6 +605,18 @@ impl MoonframeApp {
                 wiring.multiline && pressed(&KeyChord::parse("secondary-enter").ok()?, keystroke);
             submits.then_some(wiring.submit.as_ref()).flatten()
         });
+        if msg.is_none()
+            && let Some(capture) = &wiring.capture
+        {
+            if let Some(keys) = chord_name(keystroke) {
+                let action = Action::Send {
+                    to: wiring.to.clone(),
+                    msg: Markdown::note(capture, [("keys", Data::String(keys))]),
+                };
+                self.dispatch(&wiring.owner, &action, window, cx);
+            }
+            return true;
+        }
         let Some(msg) = msg else {
             return false;
         };
@@ -605,6 +624,30 @@ impl MoonframeApp {
         self.dispatch(&wiring.owner, &action, window, cx);
         true
     }
+}
+
+/// A keystroke's name as `kbd` and `keys` write it, such as `cmd-shift-p`.
+/// Bare characters aren't shortcuts: they would take over typing. A key
+/// with no character (`f5`, `escape`) stands alone.
+fn chord_name(keystroke: &Keystroke) -> Option<String> {
+    let held = keystroke.modifiers;
+    let modified = held.control || held.alt || held.platform;
+    if !modified && keystroke.key.chars().count() == 1 {
+        return None;
+    }
+    let mut parts = Vec::new();
+    for (on, name) in [
+        (held.control, "ctrl"),
+        (held.alt, "alt"),
+        (held.shift, "shift"),
+        (held.platform, "cmd"),
+    ] {
+        if on {
+            parts.push(name);
+        }
+    }
+    parts.push(&keystroke.key);
+    Some(parts.join("-"))
 }
 
 /// Whether `keystroke` is `chord`, modifiers exactly. `secondary` is ⌘ on
@@ -621,4 +664,27 @@ pub(crate) fn pressed(chord: &KeyChord, keystroke: &Keystroke) -> bool {
         && held.alt == chord.alt
         && held.shift == chord.shift
         && held.platform == cmd
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod chord_tests {
+    use {super::chord_name, gpui_kit::Keystroke};
+
+    fn named(keys: &'static str) -> Option<String> {
+        chord_name(&Keystroke::parse(keys).unwrap())
+    }
+
+    #[test]
+    fn names_a_chord_as_kbd_writes_it() {
+        assert_eq!(named("cmd-shift-p").as_deref(), Some("shift-cmd-p"));
+        assert_eq!(named("ctrl-k").as_deref(), Some("ctrl-k"));
+        assert_eq!(named("f5").as_deref(), Some("f5"));
+    }
+
+    #[test]
+    fn a_bare_character_is_no_shortcut() {
+        assert_eq!(named("a"), None);
+        assert_eq!(named("shift-a"), None);
+    }
 }

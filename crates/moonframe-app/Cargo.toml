@@ -41,6 +41,7 @@ default = [
   "herdr-core",
   "map",
   "markdown",
+  "math",
   "prose",
   "restart",
   "shell",
@@ -71,12 +72,14 @@ guard      = ["moonframe/guard"]
 herdr-core = ["moonframe/herdr-core"]
 map        = ["moonframe/map"]
 markdown   = ["moonframe/markdown"]
+math       = ["moonframe/math"]
 prose      = ["moonframe/prose"]
 restart    = ["moonframe/restart"]
 sealed     = ["moonframe/sealed"]
 shell      = ["moonframe/shell"]
 socket     = ["moonframe/socket"]
 studio     = ["moonframe/studio"]
+syntax     = ["moonframe/syntax"]
 terminal   = ["moonframe/terminal"]
 tokio      = ["moonframe/tokio"]
 updates    = ["moonframe/updates"]

@@ -110,6 +110,13 @@ tokens! {
         MarkdownCode = "markdown-code",
         /// A `ui.markdown`'s block quotes: `background`, `color`, `border`.
         MarkdownQuote = "markdown-quote",
+        /// A `ui.markdown`'s `> [!NOTE]` alerts: `background`, `border`,
+        /// `radius`, `padding`, and a `color` for their text.
+        MarkdownAlert = "markdown-alert",
+        /// Matches of `find` in a `ui.markdown`: its `background`.
+        MarkdownFind = "markdown-find",
+        /// The current match of `find`: its `background`.
+        MarkdownFindCurrent = "markdown-find-current",
         Divider = "divider",
         Popover = "popover",
         Tooltip = "tooltip",

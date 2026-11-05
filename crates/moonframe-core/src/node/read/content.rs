@@ -5,7 +5,7 @@ use super::*;
 
 impl Build for Text {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ATTACHED, &[
-        "text", "tone", "size", "weight", "truncate", "lines", "wrap", "strike",
+        "text", "tone", "size", "weight", "truncate", "lines", "wrap", "strike", "syntax",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
@@ -21,6 +21,7 @@ impl Build for Text {
                 .map(|lines| lines as u8),
             wrap: fields.get("wrap")?.unwrap_or(true),
             strike: fields.get("strike")?.unwrap_or(false),
+            syntax: fields.get("syntax")?,
             extras: Extras::from_fields(fields)?,
         })
     }

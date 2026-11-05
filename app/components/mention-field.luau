@@ -2,11 +2,12 @@
 -- starts with `@`, the people whose names match show under it, and picking
 -- one puts `@Name ` in place of what was typed (through `app:edit`, so the
 -- caret, undo and focus stay right). The mod keeps the text and the caret
--- from `change`, as for any field.
+-- from `change`, as for any field. Another `trigger` makes it a menu: `/`
+-- with `id`s on the entries is a slash menu whose picks reach the mod.
 
 local avatar = use "avatar"
 
-type Person = { name: string, detail: string?, src: string? }
+type Person = { name: string, detail: string?, src: string?, icon: any, id: string?, insert: string? }
 
 type Props = {
 	id: string,
@@ -28,14 +29,17 @@ type Props = {
 	grow: boolean?,
 	focus: boolean?,
 	to: string?,
+	trigger: string?,
+	heading: string?,
 }
 
 -- The `@query` just before the caret, and where its `@` is; nil when the
 -- caret isn't in one. The `@` starts the text or follows a space, so an
 -- address (sam@studio) does not count.
-local function query_at(value: string, caret: number?): string?
+local function query_at(value: string, caret: number?, trigger: string): string?
 	local before = string.sub(value, 1, caret or #value)
-	local at, query = string.match(before, "()@([%w%.%-_]*)$")
+	local pattern = `()%{trigger}([%w%.%-_]*)$`
+	local at: any, query: any = (string.match :: any)(before, pattern)
 	if not at then
 		return nil
 	end
@@ -78,7 +82,7 @@ return component {
 		["id"] = "the field's id: the suggestions edit it through `app:edit`",
 		["value"] = "the text, kept from `change` (`msg.value`)",
 		["caret"] = "where the caret is, kept from `change` (`msg.caret`), which also reports caret movement",
-		["people"] = "who can be mentioned: { name, detail?, src? (an avatar image) }",
+		["people"] = "who can be mentioned, or what can be picked: { name, detail?, src? (an avatar image), icon? (instead of the avatar), insert? (the text put in, default the trigger and the name, then a space), id? (a pick also reaches the mod: { mention = \"choose\", item = id, edit }) }",
 		["change"] = "sent on each edit and selection movement, with `value` and `caret`",
 		["submit"] = "sent on Enter (⌘↩ when multiline) while no suggestion shows",
 		["blur"] = "sent with `value` when the field loses focus",
@@ -94,6 +98,8 @@ return component {
 		["grow"] = "fill the width",
 		["focus"] = "take focus when it appears",
 		["to"] = "mod its messages go to, if not the drawing one",
+		["trigger"] = "the character that starts a completion (default \"@\"); a punctuation mark",
+		["heading"] = "the suggestions' heading (default \"People\"; \"\" for none)",
 	},
 	styles = {
 		[".mention-field-popover"] = { padding = 4, radius = 10 },
@@ -115,11 +121,19 @@ mention_field {
 -- update: msg.msg == "type" keeps state.text = msg.value and state.caret =
 -- msg.caret (and sets state.highlighted = 1); msg.mention == "up"/"down"
 -- moves state.highlighted; "choose" sends on its edit:
--- return state, { { to = "app:edit", msg = msg.edit } }]],
+-- return state, { { to = "app:edit", msg = msg.edit } }
+
+-- A slash menu: picks carry the entry's id for the mod to act on.
+mention_field {
+	id = "note", value = state.text, caret = state.caret, trigger = "/", heading = "",
+	people = { { id = "file", name = "Attach a file", icon = "file", insert = "" } },
+	change = "type", multiline = true,
+}]],
 
 	build = function(props: Props)
 		local value = props.value or ""
-		local query = query_at(value, props.caret)
+		local trigger = props.trigger or "@"
+		local query = query_at(value, props.caret, trigger)
 		local people: { Person } = props.people or {}
 		local found: { Person } = if query then matching(people, query, props.most or 6) else {}
 		local event = props.event or "mention"
@@ -127,8 +141,14 @@ mention_field {
 
 		-- What picking someone does: replace the `@query` with `@Name `.
 		local function edit(person: Person)
-			local expected = "@" .. (query or "")
-			return { field = props.id, insert = `@{person.name} `, back = #expected, at = props.caret or #value, expect = expected }
+			local expected = trigger .. (query or "")
+			local insert = person.insert or `{trigger}{person.name} `
+			return { field = props.id, insert = insert, back = #expected, at = props.caret or #value, expect = expected }
+		end
+
+		-- A pick with an `id` is the mod's to act on: it sends the edit on.
+		local function choose(person: Person)
+			return { [event] = "choose", item = person.id, edit = edit(person) }
 		end
 
 		local rows = {}
@@ -137,9 +157,11 @@ mention_field {
 				class = "mention-field-row",
 				selected = index == highlighted,
 				align = "center",
-				msg = edit(person),
-				to = "app:edit",
-				avatar { name = person.name, src = person.src, size = "small", shape = "circle", letters = 2 },
+				msg = if person.id then choose(person) else edit(person),
+				to = if person.id then props.to else "app:edit",
+				if person.icon
+					then ui.icon(person.icon)
+					else avatar { name = person.name, src = person.src, size = "small", shape = "circle", letters = 2 },
 				ui.text { person.name, class = "mention-field-name" },
 				person.detail and ui.text { person.detail, class = "mention-field-detail" },
 			})
@@ -148,16 +170,17 @@ mention_field {
 		local open = #found > 0
 		local keys = nil
 		if open then
-			local choose = { [event] = "choose", edit = edit(found[highlighted]) }
+			local picked = choose(found[highlighted])
 			keys = {
 				up = { [event] = "up" },
 				down = { [event] = "down" },
-				enter = choose,
-				tab = choose,
+				enter = picked,
+				tab = picked,
 				escape = props.dismiss,
 			}
 		end
 		local multiline = props.multiline == true
+		local heading = props.heading or "People"
 		return ui.popover {
 			class = "mention-field-popover",
 			open = open,
@@ -170,7 +193,7 @@ mention_field {
 			width = props.width or 260,
 			content = ui.column {
 				gap = "none",
-				ui.text { "People", class = "mention-field-head" },
+				heading ~= "" and ui.text { heading, class = "mention-field-head" },
 				table.unpack(rows),
 			},
 			ui.input {

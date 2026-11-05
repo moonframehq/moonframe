@@ -439,6 +439,8 @@ type TextProps = {
 	wrap: boolean?,
 	-- A line through it: a task done.
 	strike: boolean?,
+	-- Color it as code in this language, a line at a time.
+	syntax: string?,
 	-- Shown under the pointer; sent on a right-click (to the mod `to`, else
 	-- this one); copied on a click.
 	tooltip: string?,
@@ -867,18 +869,21 @@ type HatchProps = {
 }
 
 -- Markdown the host renders: headings, emphasis, lists, task lists, tables,
--- quotes and highlighted code, up to 1 MiB. The `markdown` rule styles the
--- box, `markdown-code` its code and `markdown-quote` its quotes. A link never
--- opens by itself: a click sends `link`, a table getting a `url` field and
--- anything else arriving as `{ msg = link, url = url }`. Pictures are not
--- loaded.
+-- quotes, GitHub alerts, footnotes, frontmatter and highlighted code with a
+-- copy button, up to 1 MiB; math too in a build with `math`. The `markdown`
+-- rule styles the box, `markdown-code` its code, `markdown-quote` its quotes,
+-- `markdown-alert` its alerts, `markdown-find` and `markdown-find-current`
+-- the matches of `find`. A link never opens by itself: a click sends `link`, a
+-- table getting a `url` field and anything else arriving as
+-- `{ msg = link, url = url }`; a `#heading` link scrolls to its heading. A
+-- `[label](cite:source)` link draws a source chip.
 type MarkdownProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
 	text: string?,
 	link: Data,
-	-- The mod `link` goes to; this one when unset.
+	-- The mod its messages go to; this one when unset.
 	to: string?,
 	grow: boolean?,
 	-- Scroll its own content; give it `grow` or a `height`.
@@ -886,6 +891,29 @@ type MarkdownProps = {
 	width: number?,
 	height: number?,
 	max_width: number?,
+	-- Show at most this many lines of text (not with `scroll`).
+	lines: number?,
+	-- Show pictures from files a `ui.image` could show, never from the web.
+	images: boolean?,
+	-- Sent when a picture on a line of its own is clicked, with `src` and
+	-- `alt` added.
+	image: Data,
+	-- Sent as the headings change, with `headings` added:
+	-- { level, text, at (bytes into the text), slug }.
+	outline: Data,
+	-- Sent as a scrolling document passes a heading, with `heading`, its
+	-- index, added.
+	section: Data,
+	-- Scrolls there when it changes; a new `seq` goes to one place again.
+	reveal: { at: number, seq: number? }?,
+	-- Text to mark wherever it shows.
+	find: string?,
+	-- Which match is current, from 1: marked strongly and scrolled to.
+	find_index: number?,
+	-- Sent as the number of matches changes, with `count` added.
+	found: Data,
+	-- Fade in what is added to `text`, as an answer streams in.
+	stream: boolean?,
 	[number]: string,
 }
 
@@ -972,6 +1000,9 @@ type InputProps = {
 	-- `{ up = "prev", escape = "close", ["shift-tab"] = "back",
 	-- ["secondary-k"] = "clear" }` (`secondary` is ⌘ on macOS, Ctrl elsewhere).
 	keys: { [string]: any }?,
+	-- Takes every chord pressed in it, sent with `keys` added ("cmd-shift-p"),
+	-- instead of editing: a field that records a shortcut.
+	capture: Data,
 	-- The mod the messages go to; the drawing mod when unset.
 	to: string?,
 	multiline: boolean?,

@@ -507,7 +507,11 @@ impl<'w> Draw<'w> for Text {
             Some(Case::Lower) => self.text.to_lowercase(),
             Some(Case::None) | None => self.text.clone(),
         };
-        with_extras(element.child(text), &self.extras, painter, place, cx).into_any_element()
+        let element = match super::syntax::styled(self.syntax.as_deref(), &text, theme) {
+            Some(styled) => element.child(styled),
+            None => element.child(text),
+        };
+        with_extras(element, &self.extras, painter, place, cx).into_any_element()
     }
 }
 

@@ -13,6 +13,7 @@ impl Build for Input {
         "submit",
         "blur",
         "keys",
+        "capture",
         "multiline",
         "rows",
         "max_rows",
@@ -87,6 +88,7 @@ impl Build for Input {
         let select = fields.get::<Data>("select")?;
         let submit = fields.get::<Data>("submit")?;
         let blur = fields.get::<Data>("blur")?;
+        let capture = fields.get::<Data>("capture")?;
         let keys = fields
             .get::<InputKeys>("keys")?
             .map(|keys| keys.0)
@@ -99,6 +101,7 @@ impl Build for Input {
             && submit.is_none()
             && blur.is_none()
             && keys.is_empty()
+            && capture.is_none()
             && browser.is_none()
         {
             return Err(fields
@@ -122,6 +125,7 @@ impl Build for Input {
             submit,
             blur,
             keys,
+            capture,
             multiline,
             rows,
             max_rows,
@@ -148,14 +152,58 @@ impl Build for Markdown {
         "width",
         "height",
         "max_width",
+        "lines",
+        "images",
+        "image",
+        "outline",
+        "section",
+        "reveal",
+        "find",
+        "find_index",
+        "found",
+        "stream",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         let link = fields.get::<Data>("link")?;
         let to = fields.get::<String>("to")?;
-        if to.is_some() && link.is_none() {
+        let image = fields.get::<Data>("image")?;
+        let outline = fields.get::<Data>("outline")?;
+        let section = fields.get::<Data>("section")?;
+        let found = fields.get::<Data>("found")?;
+        let sends = [&link, &image, &outline, &section, &found]
+            .iter()
+            .any(|msg| msg.is_some());
+        if to.is_some() && !sends {
             return Err(fields.cx().key("to").fail("`to` goes with `link`"));
         }
+        let scroll = fields.get("scroll")?.unwrap_or(false);
+        let lines = fields.get::<f32>("lines")?;
+        let lines = match lines {
+            None => None,
+            Some(_) if scroll => {
+                return Err(fields.cx().key("lines").fail("`lines` is not for `scroll`"));
+            },
+            Some(lines) if lines.fract() == 0.0 && (1.0..=MAX_LINES).contains(&lines) => {
+                Some(lines as usize)
+            },
+            Some(_) => {
+                return Err(fields
+                    .cx()
+                    .key("lines")
+                    .fail("`lines` is a whole number of lines, from 1"));
+            },
+        };
+        let find_index = match fields.get::<f32>("find_index")? {
+            None => None,
+            Some(index) if index.fract() == 0.0 && index >= 1.0 => Some(index as usize),
+            Some(_) => {
+                return Err(fields
+                    .cx()
+                    .key("find_index")
+                    .fail("`find_index` is a match's number, from 1"));
+            },
+        };
         Ok(Self {
             look: Look::from_fields(fields)?,
             text: fields
@@ -165,10 +213,38 @@ impl Build for Markdown {
             link,
             to,
             grow: fields.get("grow")?.unwrap_or(false),
-            scroll: fields.get("scroll")?.unwrap_or(false),
+            scroll,
             width: fields.number("width", PIXELS)?,
             height: fields.number("height", PIXELS)?,
             max_width: fields.number("max_width", PIXELS)?,
+            lines,
+            images: fields.get("images")?.unwrap_or(false),
+            image,
+            outline,
+            section,
+            reveal: fields.get("reveal")?,
+            find: fields.get("find")?,
+            find_index,
+            found,
+            stream: fields.get("stream")?.unwrap_or(false),
+        })
+    }
+}
+
+/// Most lines a `ui.markdown` can be cut to.
+const MAX_LINES: f32 = 1000.0;
+
+impl Read for Reveal {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let fields = Fields::read(value, cx, &[&["at", "seq"]])?;
+        let Some(at) = fields.number("at", 0.0..=f32::MAX)? else {
+            return Err(cx
+                .key("at")
+                .fail("`reveal` needs `at`, bytes into the text"));
+        };
+        Ok(Self {
+            at: at as usize,
+            seq: fields.get::<f32>("seq")?.unwrap_or(0.0) as i64,
         })
     }
 }
