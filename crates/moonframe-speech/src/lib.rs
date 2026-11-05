@@ -172,6 +172,9 @@ impl Speech {
 
     /// Ends the take and hands it to its engine.
     fn transcribe(&mut self, host: &Handle) {
+        if !matches!(self.phase, Phase::Recording { .. }) {
+            return;
+        }
         let Phase::Recording { asker, take, .. } = std::mem::replace(&mut self.phase, Phase::Idle)
         else {
             return;

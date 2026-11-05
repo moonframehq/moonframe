@@ -15,6 +15,8 @@ type Props = {
 type State = {
 	-- This button started what the provider is doing now.
 	mine: boolean,
+	-- Opening the microphone counts as listening for the parent's cleanup.
+	pending: boolean?,
 	-- The press under way started listening, so letting go may end it.
 	held: boolean?,
 	error: string?,
@@ -47,7 +49,7 @@ return component {
 		["id"] = "names this button, so a mod can reach it as `dictation#<id>` (\"toggle\" or \"cancel\", for a shortcut); default \"dictation\"",
 		["text"] = "sent to the mod with `value` set to what was said, as `ui.input`'s `change` is",
 		["failed"] = "sent with `value` set to why it failed, to show it (it is on the button's tooltip anyway)",
-		["listening"] = "sent with `value` true as it starts listening and false once it is done",
+		["listening"] = "sent with `value` true when microphone startup is requested and false once it is done",
 		["engine"] = "an engine's name from providers/speech; default the first ready in its `prefer`",
 		["speech"] = "stands in for `app.speech`, for a preview",
 	},
@@ -77,9 +79,15 @@ if msg.msg == "dictated" then
 end
 ]],
 
-	-- What it was doing ended with the last run.
-	init = function(): State
-		return { mine = false }
+	-- A live reload leaves the provider running. End the old take before
+	-- resetting ownership; persisted state from a prior launch is harmless.
+	init = function(previous: State?, props: any)
+		local sends: { any } = {}
+		if previous and (previous.mine or previous.pending) then
+			table.insert(sends, { to = "provider:speech", msg = { cancel = true } })
+			tell(sends, props.listening, false)
+		end
+		return { mine = false }, sends
 	end,
 
 	update = function(state: State, msg: any, props: any)
@@ -98,10 +106,15 @@ end
 			end
 		end
 		if msg == "toggle" then
-			msg = if state.mine then "stop" else "start"
+			msg = if state.pending then "cancel" elseif state.mine then "stop" else "start"
 		end
 		if msg == "start" then
+			if state.mine or state.pending then
+				return nil
+			end
 			state.error = nil
+			state.pending = true
+			tell(sends, props.listening, true)
 			table.insert(sends, { to = "provider:speech", msg = { start = true, id = "dictation", engine = props.engine } })
 		elseif msg == "stop" then
 			table.insert(sends, { to = "provider:speech", msg = { stop = true } })
@@ -109,12 +122,18 @@ end
 			table.insert(sends, { to = "provider:speech", msg = { cancel = true } })
 		elseif type(msg) == "table" and msg.reply == "dictation" then
 			if msg.action == "start" and msg.ok then
-				state.mine = true
-				tell(sends, props.listening, true)
-			else
-				if state.mine then
-					tell(sends, props.listening, false)
+				-- A reply queued before a reload must not resurrect its take.
+				if not state.pending then
+					return state, { { to = "provider:speech", msg = { cancel = true } } }
 				end
+				state.pending = false
+				state.mine = true
+			else
+				if not state.mine and not state.pending then
+					return nil
+				end
+				tell(sends, props.listening, false)
+				state.pending = false
 				state.mine = false
 				if msg.ok and msg.text ~= "" then
 					tell(sends, props.text, msg.text)
@@ -136,16 +155,28 @@ end
 		end
 		local doing = speech.state or "idle"
 		local ours = props.speech ~= nil or state.mine
+		local available, reason = speech.available, speech.reason
+		if props.engine then
+			available, reason = false, `No speech engine named \`{props.engine}\``
+			for _, engine in speech.engines or {} do
+				if engine.name == props.engine then
+					available, reason = engine.ready, engine.reason
+					break
+				end
+			end
+		end
 		local look, tip, icon = "idle", "Hold to talk, or tap to start and stop", "mic"
 		local press: string? = "start"
-		if doing ~= "idle" and not ours then
+		if state.pending then
+			look, tip, icon, press = "transcribing", "Opening microphone… click to cancel", "loader-circle", "cancel"
+		elseif doing ~= "idle" and not ours then
 			look, tip, press = "off", "Another mod is listening", nil
 		elseif doing == "recording" then
 			look, tip, icon, press = "recording", "Listening: let go, or tap to finish", "square", "stop"
 		elseif doing == "transcribing" then
 			look, tip, icon, press = "transcribing", "Transcribing… click to cancel", "loader-circle", "cancel"
-		elseif not speech.available then
-			look, tip, press = "off", speech.reason or "No speech engine is ready", nil
+		elseif not available then
+			look, tip, press = "off", reason or "No speech engine is ready", nil
 		elseif state.error then
 			look, tip = "failed", state.error
 		end
@@ -161,7 +192,7 @@ end
 			shrink = false,
 			tooltip = tip,
 			pointer = if press then { press = press } else nil,
-			ui.icon { name = icon :: any, size = "small", spin = doing == "transcribing" and ours },
+			ui.icon { name = icon :: any, size = "small", spin = state.pending == true or (doing == "transcribing" and ours) },
 			doing == "recording" and ours and ui.row {
 				class = "dictation-level",
 				float = { bottom = 3, left = 6 },

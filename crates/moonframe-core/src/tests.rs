@@ -12,6 +12,7 @@ use {
 // keep-sorted start
 mod checks;
 mod components;
+mod dictation;
 mod elements;
 mod gestures;
 mod lightbox;

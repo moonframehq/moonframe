@@ -1,6 +1,8 @@
 // The stub program and the login shell need a Unix shell.
 #![cfg_attr(not(unix), allow(dead_code, unused_imports))]
 
+mod remote_cancel;
+
 use {
     super::{audio::*, *},
     moonframe_providers::Event,
@@ -436,6 +438,26 @@ fn the_release_of_the_tap_that_stopped_a_take_does_nothing() {
     rig.tell("editor", json!({ "release": true }));
     assert_eq!(rig.state()["state"], "transcribing");
     assert_eq!(rig.answer("editor", "transcript")["text"], "tapped");
+}
+
+#[cfg(unix)]
+#[test]
+fn repeated_stops_preserve_the_pending_transcript() {
+    let (_dir, settings) = stub("echo finished");
+    let mut rig = Rig::new(settings);
+    rig.tell("editor", json!({ "start": true }));
+    rig.tell("editor", json!({ "stop": true }));
+    rig.tell("editor", json!({ "stop": true }));
+    assert_eq!(rig.state()["state"], "transcribing");
+    assert_eq!(rig.answer("editor", "transcript")["text"], "finished");
+    assert_eq!(rig.state()["state"], "idle");
+    assert_eq!(
+        lock(&rig.sent)
+            .iter()
+            .filter(|(_, reply)| reply["action"] == "transcript")
+            .count(),
+        1
+    );
 }
 
 /// One request answered with `status` and `body`; hands back what it read.

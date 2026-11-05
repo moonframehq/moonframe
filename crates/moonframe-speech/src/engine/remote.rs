@@ -3,6 +3,7 @@
 //! from an environment variable named in the settings, never from a mod.
 
 use {
+    super::Cancel,
     serde_json::Value,
     std::{path::Path, time::Duration},
     ureq::Agent,
@@ -48,7 +49,10 @@ impl Remote {
             .then(|| format!("Set {name} to use this engine"))
     }
 
-    pub(super) fn transcribe(&self, file: &Path) -> Result<String, String> {
+    pub(super) fn transcribe(&self, file: &Path, cancel: &Cancel) -> Result<String, String> {
+        if cancel.is_set() {
+            return Err("Cancelled".into());
+        }
         let audio =
             std::fs::read(file).map_err(|error| format!("Could not read the take: {error}"))?;
         let agent: Agent = Agent::config_builder()
@@ -56,6 +60,7 @@ impl Remote {
             .http_status_as_error(false)
             .build()
             .into();
+        cancel.http(&agent)?;
         let mut request = agent
             .post(format!("{}/audio/transcriptions", self.url))
             .header(
@@ -74,6 +79,9 @@ impl Remote {
             .body_mut()
             .read_to_string()
             .map_err(|error| format!("Could not read the speech service: {error}"))?;
+        if cancel.is_set() {
+            return Err("Cancelled".into());
+        }
         let answer: Option<Value> = serde_json::from_str(&body).ok();
         if !status.is_success() {
             return Err(failure(status.as_u16(), answer.as_ref()));

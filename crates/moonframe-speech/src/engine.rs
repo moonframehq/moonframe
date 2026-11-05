@@ -16,7 +16,7 @@ use {
     std::{
         path::Path,
         sync::{
-            Arc,
+            Arc, Mutex,
             atomic::{AtomicBool, Ordering},
         },
     },
@@ -24,15 +24,38 @@ use {
 
 /// Set when the user cancels, so a slow engine stops waiting.
 #[derive(Clone, Default)]
-pub(crate) struct Cancel(Arc<AtomicBool>);
+pub(crate) struct Cancel(Arc<Cancellation>);
+
+#[derive(Default)]
+struct Cancellation {
+    stopped: AtomicBool,
+    /// Each take has its own agent, so shutdown interrupts only its I/O.
+    http: Mutex<Option<ureq::Agent>>,
+}
 
 impl Cancel {
     pub(crate) fn set(&self) {
-        self.0.store(true, Ordering::SeqCst);
+        self.0.stopped.store(true, Ordering::SeqCst);
+        let agent = crate::lock(&self.0.http).take();
+        if let Some(agent) = agent {
+            agent.shutdown();
+        }
     }
 
     pub(crate) fn is_set(&self) -> bool {
-        self.0.load(Ordering::SeqCst)
+        self.0.stopped.load(Ordering::SeqCst)
+    }
+
+    /// Register before making a request, including when cancellation won
+    /// the race with the worker starting. `set` and registration serialize.
+    pub(super) fn http(&self, agent: &ureq::Agent) -> Result<(), String> {
+        let mut held = crate::lock(&self.0.http);
+        if self.is_set() {
+            agent.clone().shutdown();
+            return Err("Cancelled".into());
+        }
+        *held = Some(agent.clone());
+        Ok(())
     }
 }
 
@@ -106,10 +129,13 @@ impl Engine {
 
     /// The words in the WAV file at `file`.
     pub(crate) fn transcribe(&self, file: &Path, cancel: &Cancel) -> Result<String, String> {
+        if cancel.is_set() {
+            return Err("Cancelled".into());
+        }
         let text = match &self.kind {
             Kind::Apple { language } => apple::transcribe(file, language.as_deref(), cancel),
             Kind::Command(command) => command.transcribe(file, cancel),
-            Kind::Remote(remote) => remote.transcribe(file),
+            Kind::Remote(remote) => remote.transcribe(file, cancel),
         }?;
         Ok(text.trim().to_owned())
     }

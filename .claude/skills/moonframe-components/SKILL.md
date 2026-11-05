@@ -3400,7 +3400,7 @@ A whole mod using it, with state: `app/components/demos/date-picker.luau`.
 | `engine` | an engine's name from providers/speech; default the first ready in its `prefer` |
 | `failed` | sent with `value` set to why it failed, to show it (it is on the button's tooltip anyway) |
 | `id` | names this button, so a mod can reach it as `dictation#<id>` ("toggle" or "cancel", for a shortcut); default "dictation" |
-| `listening` | sent with `value` true as it starts listening and false once it is done |
+| `listening` | sent with `value` true when microphone startup is requested and false once it is done |
 | `speech` | stands in for `app.speech`, for a preview |
 | `text` | sent to the mod with `value` set to what was said, as `ui.input`'s `change` is |
 

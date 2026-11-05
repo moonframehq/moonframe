@@ -240,7 +240,10 @@ return mod {
 			local blank = string.match(state.text or "", "^%s*$") ~= nil
 			state.text = if blank then msg.value else `{state.text} {msg.value}`
 		elseif msg.msg == "listening" then
-			state.listening = msg.value
+			state.listening = msg.value and state.open
+			if msg.value and not state.open then
+				return state, { STOP_LISTENING }
+			end
 		elseif msg.msg == "dictation-failed" then
 			state.error = msg.value
 		elseif msg.agent_pick then
