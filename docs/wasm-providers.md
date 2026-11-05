@@ -225,9 +225,57 @@ That envelope belongs to process providers. WASM's current interface does
 not expose the sender or provide native-provider reply routing; publish
 results for views or `provider/counter` subscribers to consume.
 
-The `STATE` value survives calls, but resets when the provider restarts or
-reloads. It is not saved between app launches. Use a mod's persisted state
-for UI choices that should survive quitting.
+The `STATE` value survives calls, but resets when a new build replaces the
+provider, unless it [keeps its state](#keep-state-across-a-new-build). It is
+never saved between app launches. Use a mod's persisted state for UI choices
+that should survive quitting.
+
+## Keep state across a new build
+
+Editing a provider rebuilds and restarts it. To carry its state over, as a
+mod's state is across a reload, generate the bindings from the
+`stateful-provider` world and add two exports:
+
+```rust
+wit_bindgen::generate!({ path: "wit/provider.wit", world: "stateful-provider" });
+```
+
+```rust
+// In `impl Guest for Counter`:
+fn save() -> Option<String> {
+    Some(STATE.with_borrow(snapshot))
+}
+
+fn restore(state: String) -> Result<(), String> {
+    let saved: Value = serde_json::from_str(&state)
+        .map_err(|error| error.to_string())?;
+    let count = saved.get("count")
+        .and_then(Value::as_u64)
+        .and_then(|count| u32::try_from(count).ok())
+        .ok_or("no count in the saved state")?;
+    STATE.with_borrow_mut(|state| state.count = count);
+    Ok(())
+}
+```
+
+| Export | Called when | Result |
+| --- | --- | --- |
+| `save()` | This build stops, because a new one replaces it | `Some(text)` hands it to the next build; `None` keeps nothing. |
+| `restore(state)` | On a new build, after `start` and before the first tick | `Ok(())`, or `Err(message)` to start fresh. |
+
+The state is any text, usually JSON, and stays in memory for this launch.
+`start` still runs first, so settings stay current: restore only what the
+user built up. Plain `provider` components keep working and start over.
+`examples/research/providers/research` is a working example, including how to
+let a changed setting win over the saved state.
+
+- **Your state changed shape.** Read what you can in `restore`, with defaults
+  for what is new. Return `Err` if nothing fits: the provider starts fresh
+  and the reason goes to the terminal log. The saved state is then gone.
+- **A build fails.** A compile error, a panic in `restore`, or a panic on the
+  first tick loses nothing: the state waits for the build that fixes it.
+- **A running provider panics.** It has nothing left to save, so the next
+  build starts fresh. Only state from a clean stop is handed on.
 
 ## Draw it and send messages
 
@@ -294,6 +342,7 @@ component too, then verify in the running app:
 2. **Add one** updates the count immediately; **Reset** restores `initial`.
 3. Changing `initial` in `provider.toml` restarts this provider with the new value.
 4. Editing `src/lib.rs` rebuilds it; a compile error shows as a provider problem.
+5. With `save` and `restore`, the count survives that edit.
 
 Agents should report which checks they ran and which runtime interactions
 still need the user's verification.
