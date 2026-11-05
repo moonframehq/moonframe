@@ -62,7 +62,6 @@ impl Handoff {
         context: &Context,
         store: &mut Store<State>,
     ) -> Result<(), String> {
-        wait_for_old_build(context);
         let Some(state) = context.kept.get(&context.dir) else {
             return Ok(());
         };
@@ -96,19 +95,29 @@ impl Handoff {
     }
 }
 
-/// Waits until the build this one replaces has saved.
-fn wait_for_old_build(context: &Context) {
-    let Some(left) = &context.replaces else {
-        return;
-    };
+/// Waits for every older build of this folder, including ones hidden by a
+/// failed replacement. Cancellation must leave the saved state untouched.
+pub(super) fn wait_for_old_build(context: &Context) -> bool {
     let until = Instant::now() + LEAVE_MAX;
-    while !left.load(Ordering::Relaxed) && !context.stopped() {
+    while context
+        .wasm_build
+        .as_ref()
+        .is_some_and(|build| build.waiting())
+        || context
+            .replaces
+            .as_ref()
+            .is_some_and(|left| !left.load(Ordering::Relaxed))
+    {
+        if context.stopped() {
+            return false;
+        }
         if Instant::now() >= until {
             tracing::warn!(provider = %context.name, "the last build has not stopped; its state may be lost");
-            return;
+            break;
         }
         thread::sleep(LEAVE_POLL);
     }
+    !context.stopped()
 }
 
 #[cfg(test)]

@@ -63,11 +63,17 @@ fn serve(context: &Context) -> Result<(), String> {
     let instance = linker.instantiate(&mut store, &component).map_err(text)?;
     let provider = Provider::new(&mut store, &instance).map_err(text)?;
     let handoff = Handoff::find(&instance, &mut store)?;
+    if !state::wait_for_old_build(context) {
+        return Ok(());
+    }
     refuel(&mut store)?;
     provider
         .call_start(&mut store, &context.manifest.settings.to_string())
         .map_err(text)?
         .map_err(|problem| format!("start: {problem}"))?;
+    if context.stopped() {
+        return Ok(());
+    }
     tracing::info!(provider = %context.name, "running");
     if let Some(handoff) = &handoff {
         handoff.restore(context, &mut store)?;

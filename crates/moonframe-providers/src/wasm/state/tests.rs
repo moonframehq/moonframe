@@ -8,7 +8,11 @@ use {
     std::{
         fs,
         path::Path,
-        sync::{Arc, Mutex, mpsc},
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, Ordering},
+            mpsc,
+        },
         time::Duration,
     },
 };
@@ -97,6 +101,10 @@ struct Harness {
 
 impl Harness {
     fn start(wasm: &str) -> Self {
+        Self::start_with(wasm, |_| {})
+    }
+
+    fn start_with(wasm: &str, before_event: impl Fn(&Event) + Send + Sync + 'static) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let folder = dir.path().join("providers/count");
         fs::create_dir_all(&folder).unwrap();
@@ -112,6 +120,7 @@ impl Harness {
             dir.path().into(),
             dir.path().join("build"),
             Arc::new(move |event| {
+                before_event(&event);
                 let _ = sender.lock().unwrap().send(event);
             }),
         );
@@ -165,6 +174,43 @@ impl Harness {
         }
         count
     }
+
+    /// Stops inside publication of the first message, before the old build
+    /// can save. The caller releases it after installing replacements.
+    fn blocked() -> (Self, mpsc::Sender<()>) {
+        let (entered, waiting) = mpsc::channel();
+        let (release, released) = mpsc::channel();
+        let released = Mutex::new(released);
+        let blocked = AtomicBool::new(false);
+        let mut harness = Self::start_with(&good(1), move |event| {
+            if matches!(event, Event::Published {
+                data: Data::Integer(1),
+                ..
+            }) && !blocked.swap(true, Ordering::Relaxed)
+            {
+                entered.send(()).unwrap();
+                released
+                    .lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_secs(20))
+                    .unwrap();
+            }
+        });
+        assert_eq!(harness.count(), 0);
+        harness
+            .providers
+            .send("count", "main", Data::from("add"))
+            .unwrap();
+        waiting.recv_timeout(Duration::from_secs(20)).unwrap();
+        (harness, release)
+    }
+
+    fn quiet(&self) {
+        assert!(matches!(
+            self.received.recv_timeout(Duration::from_millis(100)),
+            Err(mpsc::RecvTimeoutError::Timeout)
+        ));
+    }
 }
 
 #[test]
@@ -189,6 +235,30 @@ fn a_new_build_waits_for_the_old_one_to_save() {
         .unwrap();
     // The old build is in that call, and saves only once it returns.
     harness.install(&good(2));
+    assert_eq!(harness.count(), 1);
+}
+
+#[test]
+fn a_failed_replacement_keeps_waiting_for_the_original_build() {
+    let (mut harness, release) = Harness::blocked();
+    harness.install("not a component");
+    harness.failed();
+    harness.install(&good(3));
+    harness.quiet();
+    release.send(()).unwrap();
+    assert_eq!(harness.count(), 1); // The old publication, then the restored one.
+    assert_eq!(harness.count(), 1);
+}
+
+#[test]
+fn a_cancelled_replacement_keeps_waiting_for_the_original_build() {
+    let (mut harness, release) = Harness::blocked();
+    harness.install(&good(2));
+    harness.quiet();
+    harness.install(&good(3));
+    harness.quiet();
+    release.send(()).unwrap();
+    assert_eq!(harness.count(), 1);
     assert_eq!(harness.count(), 1);
 }
 

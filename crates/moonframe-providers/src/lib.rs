@@ -388,6 +388,9 @@ pub(crate) struct Context {
     /// State wasm providers hand to their next build.
     #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
     pub(crate) kept: Kept,
+    /// All older wasm builds of this folder that could still save state.
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+    pub(crate) wasm_build: Option<kept::Build>,
     publisher: Publisher,
 }
 
@@ -532,6 +535,7 @@ impl Providers {
             let publisher = Publisher::new(name.clone(), self.events.clone(), manifest.publish);
             let context = Context {
                 name: name.clone(),
+                wasm_build: matches!(manifest.kind, Kind::Wasm).then(|| self.kept.begin(&dir)),
                 dir,
                 manifest,
                 build_dir: self.build_dir.clone(),
