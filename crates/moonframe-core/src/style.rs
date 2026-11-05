@@ -179,6 +179,10 @@ tokens! {
         /// It fades in or out, then takes or gives back its space.
         Fade = "fade",
         SlideFade = "slide-fade",
+        /// A keyed child, at its full size, rises from below its box and
+        /// sinks back out of it. The next one waits for it to be gone, so
+        /// one sheet leaves before another comes up.
+        Rise = "rise",
         None = "none",
     }
 }

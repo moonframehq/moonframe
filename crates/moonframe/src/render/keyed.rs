@@ -1,7 +1,8 @@
 //! Keyed children: a row's or column's children with a `key` stay
 //! themselves as their siblings come and go. One with a `transition` rule
 //! grows in when it appears, and when it goes its last drawing stays where
-//! it was, shrinking away, as tabs open and close.
+//! it was, shrinking away, as tabs open and close. With `rise` it moves
+//! instead, whole, out of the foot of its box, and what replaces it waits.
 
 use {
     super::{Cx, Draw, Painter, Place, Shown},
@@ -10,6 +11,10 @@ use {
     moonframe_core::{Direction, Node, Part, Stack, Transition, TransitionKind},
     std::rc::Rc,
 };
+
+/// How far below its box's top a `rise` child starts and ends, in heights
+/// of the box: a little past its foot, so that its shadow leaves too.
+const SUNK: f32 = 1.05;
 
 /// The key of a keyed child, and the stack it is.
 fn keyed(node: &Node) -> Option<(&Stack, &str)> {
@@ -48,6 +53,17 @@ impl<'w> Painter<'w, '_> {
         // `None` when the container was not drawn last frame: what it holds
         // as it appears is where it starts, not something arriving.
         let before = last.containers.get(&place.path);
+        let sinking = before.is_some_and(|before| {
+            before.kept.iter().any(|kept| {
+                let stays = nodes
+                    .iter()
+                    .any(|node| keyed(node).is_some_and(|(_, key)| key == kept.key));
+                let child = place.keyed(&kept.key, direction);
+                kept.transition.kind == TransitionKind::Rise
+                    && !stays
+                    && !self.shown(&child, false, Some(&kept.transition)).hidden()
+            })
+        });
         let mut drawn = Drawn::default();
         let mut elements = Vec::with_capacity(nodes.len());
         for (index, node) in nodes.iter().enumerate() {
@@ -56,12 +72,21 @@ impl<'w> Painter<'w, '_> {
                 continue;
             };
             let child = place.keyed(key, direction);
-            drawn.keys.push(key.to_owned());
             let Some(transition) = self.keyed_transition(stack, &child) else {
+                drawn.keys.push(key.to_owned());
                 elements.push(node.draw(self, &child, cx));
                 continue;
             };
-            if before.is_some_and(|before| !before.keys.iter().any(|seen| seen == key)) {
+            let arriving = before.is_some_and(|before| !before.keys.iter().any(|seen| seen == key));
+            // Not drawn, nor noted as drawn: it arrives once the way is clear.
+            if arriving && sinking && transition.kind == TransitionKind::Rise {
+                continue;
+            }
+            drawn.keys.push(key.to_owned());
+            // One called back while leaving turns round where it is.
+            let leaving =
+                before.is_some_and(|before| before.kept.iter().any(|kept| kept.key == key));
+            if arriving && !leaving {
                 self.motion.enter(&child.path);
             }
             let shown = self.shown(&child, true, Some(&transition));
@@ -137,6 +162,9 @@ impl<'w> Painter<'w, '_> {
         place: &Place<'w>,
         leaving: bool,
     ) -> AnyElement {
+        if kind == TransitionKind::Rise {
+            return risen(element, shown, leaving);
+        }
         let size = self.motion.size(&place.path);
         let measured = size.get();
         let outer = div().flex().on_children_prepainted({
@@ -203,4 +231,24 @@ impl<'w> Painter<'w, '_> {
         };
         outer.into_any_element()
     }
+}
+
+/// A `rise` child: it fills its box and moves as a whole, out of a box that
+/// need not clip it, without being measured.
+fn risen(element: AnyElement, shown: Shown, leaving: bool) -> AnyElement {
+    let sunk = shown.moving().map_or(0., |amount| (1. - amount) * SUNK);
+    let outer = div()
+        .absolute()
+        .left_0()
+        .top(relative(sunk))
+        .size_full()
+        .flex()
+        .flex_col()
+        .child(element);
+    let outer = if leaving {
+        outer.child(div().absolute().inset_0().occlude())
+    } else {
+        outer
+    };
+    outer.into_any_element()
 }

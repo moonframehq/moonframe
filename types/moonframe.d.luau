@@ -46,7 +46,7 @@ type ShadowLayer = {
 }
 -- A preset (`"small"`), a CSS string (`"0 4px 12px #0003"`), a layer, or layers.
 type Shadow = string | ShadowLayer | { string | ShadowLayer }
-type TransitionKind = "slide" | "fade" | "slide-fade" | "none"
+type TransitionKind = "slide" | "fade" | "slide-fade" | "rise" | "none"
 -- `"slide 220ms ease-out"`, or a table; durations are ms, `"220ms"`, or a speed.
 type Transition = string | {
 	kind: TransitionKind?,
