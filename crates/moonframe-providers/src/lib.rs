@@ -48,6 +48,7 @@ mod fingerprint;
 mod fixed;
 mod installed;
 mod json;
+mod kept;
 pub mod lines;
 mod manifest;
 mod mods;
@@ -80,6 +81,7 @@ pub use {
 
 use {
     fingerprint::Fingerprint,
+    kept::Kept,
     moonframe_core::{Data, Error, Roots},
     std::{
         collections::{BTreeMap, BTreeSet},
@@ -322,6 +324,8 @@ pub struct Providers {
     found: BTreeMap<String, (PathBuf, Result<Manifest, Error>)>,
     /// Which of them run, besides those that always do.
     wanted: Wanted,
+    /// State wasm providers hand to their next build.
+    kept: Kept,
 }
 
 /// Which providers something wants running.
@@ -357,7 +361,9 @@ struct Running {
     fingerprint: Option<Fingerprint>,
     /// A process or native provider, which hears when the project changes.
     follows_project: bool,
-    /// A process, and how long it may take to leave; set once it has.
+    /// A process or wasm provider, and how long it may take to leave; set
+    /// once it has. A wasm provider's next build waits for this, as it may
+    /// have state to hand on, but quitting does not.
     leaving: Option<(Duration, Arc<AtomicBool>)>,
 }
 
@@ -377,8 +383,14 @@ pub(crate) struct Context {
     pub(crate) messages: mpsc::Receiver<Message>,
     pub(crate) stop: Arc<AtomicBool>,
     pub(crate) events: Events,
-    /// Set once the process this one replaces has left.
+    /// Set once the process or wasm provider this one replaces has left.
     pub(crate) replaces: Option<Arc<AtomicBool>>,
+    /// State wasm providers hand to their next build.
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+    pub(crate) kept: Kept,
+    /// All older wasm builds of this folder that could still save state.
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+    pub(crate) wasm_build: Option<kept::Build>,
     publisher: Publisher,
 }
 
@@ -435,6 +447,7 @@ impl Providers {
             natives,
             found: BTreeMap::new(),
             wanted: wanted.map_or(Wanted::All, Wanted::Names),
+            kept: Kept::default(),
         };
         providers.reload();
         providers
@@ -513,11 +526,16 @@ impl Providers {
             let (sender, messages) = mpsc::channel();
             let stop = Arc::new(AtomicBool::new(false));
             let left = Arc::new(AtomicBool::new(false));
-            let leaving = matches!(manifest.kind, Kind::Process { .. })
-                .then(|| (manifest.stop_grace + process::TERM_GRACE, left.clone()));
+            let leaving = match manifest.kind {
+                Kind::Process { .. } => Some(manifest.stop_grace + process::TERM_GRACE),
+                Kind::Wasm => Some(Duration::ZERO),
+                _ => None,
+            }
+            .map(|time| (time, left.clone()));
             let publisher = Publisher::new(name.clone(), self.events.clone(), manifest.publish);
             let context = Context {
                 name: name.clone(),
+                wasm_build: matches!(manifest.kind, Kind::Wasm).then(|| self.kept.begin(&dir)),
                 dir,
                 manifest,
                 build_dir: self.build_dir.clone(),
@@ -525,6 +543,7 @@ impl Providers {
                 stop: stop.clone(),
                 events: self.events.clone(),
                 replaces,
+                kept: self.kept.clone(),
                 publisher,
             };
             let native = self.natives.get(name.as_str()).cloned();

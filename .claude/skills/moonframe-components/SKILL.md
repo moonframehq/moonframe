@@ -23,7 +23,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 | Element | Use it for | Keys (besides children) |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `key` (names it among its siblings: with a `transition` rule it grows in as it appears and shrinks away as it goes), `msg`/`to`, `command` or `window` (a mod opened in a window of its own), pointer keys, extras |
+| `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `key` (names it among its siblings: with a `transition` rule it grows in as it appears and shrinks away as it goes; with `rise` it fills its box and comes up from below it whole, once the one it replaces has sunk away), `msg`/`to`, `command` or `window` (a mod opened in a window of its own), pointer keys, extras |
 | `ui.panel { ... }` | a titled section with header actions over a body | frame keys, `title`, `actions = { elements }` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | areas the user resizes by dragging; children must be `ui.pane` | `id` |
 | `ui.pane { ... }` | one side of a split; slides in and out when `visible` changes; `lazy = true` starts what it mounts only once it first shows, and keeps it asleep (not run, not drawn) while hidden | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` |
@@ -317,6 +317,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`composer`](#composer) | Forms | The bottom of a chat with an agent or a person. For a search box use `search-field`; for a longer form field use `ui.input` with `multiline`. |
 | [`curve-editor`](#curve-editor) | Forms | A tone or response curve the user shapes by hand: a photo's gradation curve per channel, an easing, a gain curve. For one value along a range use `slider`; for a fixed set of levels over a histogram use `histogram` with markers. |
 | [`date-picker`](#date-picker) | Forms | Setting a date on a record: a task's due date, a start date, a reminder, with presets for the usual ones. For the grid alone (a calendar view) use `month-grid`; for a time of day use `time-picker`; for a strip of days over a list use `day-strip`. |
+| [`dictation`](#dictation) | Forms | Let the user talk instead of type: beside a prompt, in `composer`'s `actions`. The drawing mod must be in `recorders` of providers/speech. Give it `listening`, and send `provider:speech` `{ cancel = true }` if it stops being drawn while listening (a closing dialog), or the microphone stays on until the limit. |
 | [`dropzone`](#dropzone) | Forms | Adding attachments to a task, a message or a form: files dragged from other apps land on it, and browse opens the system's file panel (`{ to = "app:pick", ... }`). Show what was added under it with `file-card`. For a button alone use `ui.button`; for an empty list with one action use `empty-state`. |
 | [`filter-builder`](#filter-builder) | Forms | Filtering a list or board by conditions the user builds (status is Done, assignee is not Sarah), inside a `ui.popover` under a Filter button. For one filter per chip over a table use `filter-dropdown`; for toggles use `chips`; for a text query use `search-field`. |
 | [`find-bar`](#find-bar) | Forms | Finding text in the document or pane on screen (⌘F). For filtering a list use `search-field`; for running commands use `command-palette`. |
@@ -3448,6 +3449,41 @@ date_picker {
 ```
 
 A whole mod using it, with state: `app/components/demos/date-picker.luau`.
+
+#### `dictation`
+
+**Dictation.** A mic button, held or tapped, that turns what the user says into text for the mod, through a local or remote speech engine.
+
+**When:** Let the user talk instead of type: beside a prompt, in `composer`'s `actions`. The drawing mod must be in `recorders` of providers/speech. Give it `listening`, and send `provider:speech` `{ cancel = true }` if it stops being drawn while listening (a closing dialog), or the microphone stays on until the limit.
+
+| Prop | Meaning |
+| --- | --- |
+| `engine` | an engine's name from providers/speech; default the first ready in its `prefer` |
+| `failed` | sent with `value` set to why it failed, to show it (it is on the button's tooltip anyway) |
+| `id` | names this button, so a mod can reach it as `dictation#<id>` ("toggle" or "cancel", for a shortcut); default "dictation" |
+| `listening` | sent with `value` true when microphone startup is requested and false once it is done |
+| `speech` | stands in for `app.speech`, for a preview |
+| `text` | sent to the mod with `value` set to what was said, as `ui.input`'s `change` is |
+
+**Styles:** `.dictation` `.dictation:hover` `.dictation:failed` `.dictation:off` `.dictation:recording` `.dictation:transcribing` `.dictation-level`
+
+```lua
+local dictation = use "dictation"
+
+-- in view: beside the field, with the words added to the draft
+composer {
+	value = state.draft,
+	change = "draft",
+	actions = { dictation { id = "prompt", text = "dictated", listening = "listening" } },
+}
+
+-- in update
+if msg.msg == "dictated" then
+	state.draft = if state.draft == "" then msg.value else state.draft .. " " .. msg.value
+end
+```
+
+A whole mod using it, with state: `app/components/demos/dictation.luau`.
 
 #### `dropzone`
 

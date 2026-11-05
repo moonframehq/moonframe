@@ -70,6 +70,8 @@ pub struct Docs {
     roots: BTreeSet<PathBuf>,
     /// The mods that may save (`[settings] writers`).
     writers: Mods,
+    /// The user's home, with links resolved: see [`Docs::may_read`].
+    home: Option<PathBuf>,
     /// The files mods read, by mod and path.
     open: BTreeMap<(String, String), Watch>,
     /// Counts reads and saves, to tell which watch is the oldest.
@@ -86,6 +88,7 @@ struct Watch {
 
 impl Native for Docs {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
+        self.home = home();
         self.followed = moonframe_providers::project();
         self.root = root(host.dir(), self.followed.as_deref());
         self.roots.extend(self.root.clone());
@@ -207,6 +210,11 @@ impl Docs {
         if self.roots.contains(&root) {
             return Ok(root);
         }
+        // A tab kept across launches, on a file from when home was shown.
+        if self.home.as_ref() == Some(&root) && std::env::var_os("MOONFRAME_FILES").is_none() {
+            self.roots.insert(root.clone());
+            return Ok(root);
+        }
         // A folder the user named stays the only one: then no project is
         // followed, nor a remembered one reached. A remembered one is
         // checked once, whatever the file it was kept in says.
@@ -231,9 +239,7 @@ impl Docs {
                 ("available", Data::Bool(false)),
                 (
                     "reason",
-                    Data::from(
-                        "not in a git repository; set MOONFRAME_FILES to the folder to edit",
-                    ),
+                    Data::from("no folder to edit; set MOONFRAME_FILES to one"),
                 ),
             ]),
         });
@@ -304,8 +310,20 @@ impl Docs {
         });
     }
 
+    /// Anyone may read a project, but home holds the user's keys and
+    /// passwords (`.ssh`, `.aws`), and a mod is sandboxed from those: there
+    /// only the mods that may save, the editor as shipped, read.
+    fn may_read(&self, from: &str, root: &Path) -> Result<(), Refusal> {
+        if self.home.as_deref() == Some(root) && !self.writers.allows(from) {
+            let owner = moonframe_providers::owner(from);
+            return Err(format!("`{owner}` may not read files in the home folder").into());
+        }
+        Ok(())
+    }
+
     fn read(&mut self, from: &str, path: &str, root: Option<&str>) -> Answer {
         let root = self.root_for(from, path, root)?;
+        self.may_read(from, &root)?;
         let file = existing(&root, path)?;
         let meta = file.metadata().map_err(|error| error.to_string())?;
         if meta.len() > MAX_DOCUMENT as u64 {
@@ -694,8 +712,8 @@ fn save(file: &Path, text: &str, over: &Over) -> Result<(), Saved> {
 
 /// The project: `MOONFRAME_FILES`, else the repository of `project` (the
 /// one the user works in), else the git repository the app was started
-/// in, else the one holding the app's folder (two above the provider's);
-/// never home. Found as the `files` provider finds it (git's own answer,
+/// in, else the one holding the app's folder (two above the provider's),
+/// else home. Found as the `files` provider finds it (git's own answer,
 /// so a repository git refuses is skipped by both), so a path the explorer
 /// gives names the same file here.
 fn root(dir: &Path, project: Option<&Path>) -> Option<PathBuf> {
@@ -706,12 +724,17 @@ fn root(dir: &Path, project: Option<&Path>) -> Option<PathBuf> {
         .and_then(repository)
         .or_else(|| moonframe_providers::launch_dir().and_then(repository))
         .or_else(|| repository(&dir.join("..").join("..")))
+        .or_else(home)
+}
+
+fn home() -> Option<PathBuf> {
+    std::env::home_dir().and_then(|home| home.canonicalize().ok())
 }
 
 /// The repository holding `start`, unless it is home (a dotfiles
 /// repository).
 fn repository(start: &Path) -> Option<PathBuf> {
-    let home = std::env::home_dir().and_then(|home| home.canonicalize().ok());
+    let home = home();
     toplevel(start).filter(|found| Some(found) != home.as_ref())
 }
 

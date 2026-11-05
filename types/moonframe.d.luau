@@ -46,7 +46,7 @@ type ShadowLayer = {
 }
 -- A preset (`"small"`), a CSS string (`"0 4px 12px #0003"`), a layer, or layers.
 type Shadow = string | ShadowLayer | { string | ShadowLayer }
-type TransitionKind = "slide" | "fade" | "slide-fade" | "none"
+type TransitionKind = "slide" | "fade" | "slide-fade" | "rise" | "none"
 -- `"slide 220ms ease-out"`, or a table; durations are ms, `"220ms"`, or a speed.
 type Transition = string | {
 	kind: TransitionKind?,
@@ -1663,11 +1663,11 @@ type FileEntry = {
 }
 
 type Files = {
-	-- False outside a git repository unless MOONFRAME_FILES is set; then
-	-- only `reason` comes with it.
+	-- False only when the folder can't be read; then only `reason` comes
+	-- with it. Outside any repository it lists home.
 	available: boolean,
 	reason: string?,
-	-- The root folder's name, and its absolute path.
+	-- The root folder's name (`~` for home), and its absolute path.
 	root: string,
 	path: string,
 	-- Where a terminal starts: the project of the terminal last used,
@@ -1852,6 +1852,33 @@ type Acp = {
 	runs: { AcpRun },
 }
 
+-- `app.speech`, from providers/speech: dictation, for `use "dictation"`.
+type SpeechEngine = {
+	name: string,
+	title: string,
+	kind: "apple" | "command" | "remote",
+	-- Whether the user's voice leaves this machine.
+	remote: boolean,
+	ready: boolean,
+	-- What the user can do about it, when it is not ready.
+	reason: string?,
+}
+
+type Speech = {
+	-- Some engine in `prefer` is ready; `reason` says why not otherwise.
+	available: boolean,
+	reason: string?,
+	-- The engine a start without `engine` gets.
+	engine: string?,
+	engines: { SpeechEngine },
+	state: "idle" | "recording" | "transcribing",
+	-- The mod listening. What it hears goes only to that mod.
+	owner: string?,
+	-- How loud it is, from 0 to 1, and how long it has listened.
+	level: number,
+	seconds: number,
+}
+
 -- A native provider's answer to an action a mod asked for, arriving in that
 -- mod's `update`: `reply` is the `id` the mod sent, else the action's name.
 type Reply = {
@@ -1899,6 +1926,7 @@ type App = {
 	docs: Docs?,
 	herdr: Herdr?,
 	acp: Acp?,
+	speech: Speech?,
 	usage: Usage?,
 	-- What tab bars can open: each component and mod with a `tab` entry.
 	kinds: { TabKind },

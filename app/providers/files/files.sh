@@ -18,10 +18,11 @@
 # (MOONFRAME_PROJECT at start, then `{ project = "<path>" }` from the app as
 # it moves), else the git repository `moonframe` was started in
 # (MOONFRAME_LAUNCH_DIR), else the one the app runs from; set MOONFRAME_FILES
-# to show another folder. Without any it publishes `available = false`: it
-# never falls back to a folder as broad as home. Plain bash (3.2 or later), no
-# jq or python: every string goes through `jstr`.
+# to show another folder. Without any, as for an installed app opened from
+# the Dock, it lists home, named `~`. Plain bash (3.2 or later), no jq or
+# python: every string goes through `jstr`.
 
+USER_HOME=${HOME:-$USERPROFILE}
 POLL=3             # seconds between looks
 MAX_ENTRIES=500    # entries listed per folder
 MAX_OPEN=100       # folders listed besides the root
@@ -202,9 +203,11 @@ list_dir() {
 }
 
 emit() {
-    local force=$1 dir out sep=, count=0
+    local force=$1 dir name out sep=, count=0
     list_dir "" || return
-    jstr "${ROOT##*/}" && out="{\"available\":true,\"root\":$J"
+    name=${ROOT##*/}
+    [ "$ROOT" -ef "$USER_HOME" ] && name='~'
+    jstr "$name" && out="{\"available\":true,\"root\":$J"
     jstr "$ROOT" && out+=",\"path\":$J"
     jstr "$CWD" && out+=",\"cwd\":$J"
     out+=",\"dirs\":{\"\":[$ENTRIES_JSON]"
@@ -230,13 +233,13 @@ emit() {
 repository() {
     local top
     top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) || return 1
-    [ -n "$top" ] && ! [ "$top" -ef "$HOME" ] && printf '%s' "$top"
+    [ -n "$top" ] && ! [ "$top" -ef "$USER_HOME" ] && printf '%s' "$top"
 }
 
 # Sets ROOT, ROOT_REAL, CWD and GIT: MOONFRAME_FILES, else the repository of
 # the project the user works in (PROJECT: the terminal they last used),
-# else the one `moonframe` was started in, else the one holding the app.
-# The docs provider finds the same root, so the editor opens the file the
+# else the one `moonframe` was started in, else the one holding the app,
+# else home. The docs provider finds the same root, so the editor opens the file the
 # explorer names.
 choose_root() {
     if [ -n "$MOONFRAME_FILES" ]; then
@@ -246,6 +249,7 @@ choose_root() {
         [ -n "$PROJECT" ] && ROOT=$(repository "$PROJECT")
         [ -n "$ROOT" ] || { [ -n "$MOONFRAME_LAUNCH_DIR" ] && ROOT=$(repository "$MOONFRAME_LAUNCH_DIR"); }
         [ -n "$ROOT" ] || ROOT=$(repository ../..)
+        [ -n "$ROOT" ] || ROOT=$USER_HOME
     fi
     ROOT=${ROOT%/}
     ROOT_REAL=$(cd "$ROOT" 2>/dev/null && pwd -P)
@@ -260,8 +264,9 @@ choose_root() {
     [ -n "$ROOT_REAL" ] && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 && GIT=1
 }
 
-# What it prints with no root to list.
-UNAVAILABLE='{"available":false,"reason":"not in a git repository; set MOONFRAME_FILES to the folder to show"}'
+# What it prints with no root to list: a home that can't be read, or a
+# MOONFRAME_FILES that isn't a folder.
+UNAVAILABLE='{"available":false,"reason":"no folder to show; set MOONFRAME_FILES to one"}'
 
 PROJECT=$MOONFRAME_PROJECT
 choose_root

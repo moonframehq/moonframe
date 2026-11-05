@@ -47,7 +47,7 @@ def main():
     # Off in the library, on in the starter: Ghostty needs Zig, and few apps
     # need a street map, LaTeX, live video or what long runs ask of the machine.
     opt_in = {"awake", "crash", "displays", "dock", "ghostty", "guard", "map", "math", "restart",
-              "socket", "video"}
+              "socket", "speech", "video"}
     assert set(starter["default"]) == set(library["default"]) | opt_in
 
     optional = {
@@ -58,6 +58,7 @@ def main():
         "forge": "moonframe-forge",
         "git": "moonframe-git",
         "shell": "moonframe-shell",
+        "speech": "moonframe-speech",
         "usage": "moonframe-usage",
         "wasm": "wasmtime",
         # keep-sorted end

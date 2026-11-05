@@ -70,6 +70,9 @@ git = ["dep:moonframe-git", "moonframe-history/herdr"]
 # The `shell` native provider (`app.shell`): a mod's shell commands, with
 # their output in colour.
 shell = ["dep:moonframe-shell"]
+# The `speech` native provider (`app.speech`): dictation from the microphone
+# through a local or remote engine. Off by default; the starter turns it on.
+speech = ["dep:moonframe-speech"]
 # `app:guard`: a mod holds back closing and quitting. Off by default; the
 # starter turns it on.
 guard = []
@@ -164,6 +167,7 @@ moonframe-mux                 = { optional = true, workspace = true }
 moonframe-packages            = { default-features = false, path = "../moonframe-packages" }
 moonframe-providers.workspace = true
 moonframe-shell               = { optional = true, workspace = true }
+moonframe-speech              = { optional = true, workspace = true }
 moonframe-store.workspace     = true
 moonframe-terminal            = { optional = true, workspace = true }
 moonframe-usage               = { optional = true, workspace = true }
