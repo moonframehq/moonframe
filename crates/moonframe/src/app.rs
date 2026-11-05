@@ -48,7 +48,6 @@ use {crate::terminal::Terminals, listeners::wake_on_output};
 // keep-sorted start
 mod dialogs;
 mod fonts;
-pub(crate) use fonts::list_ahead as list_fonts_ahead;
 pub(crate) mod guard;
 mod history;
 mod icon;
@@ -64,6 +63,7 @@ mod updates;
 mod view;
 mod watch;
 mod windows;
+pub(crate) use fonts::list_ahead as list_fonts_ahead;
 
 pub(crate) use listeners::display_number;
 // keep-sorted end
