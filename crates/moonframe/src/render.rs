@@ -21,6 +21,7 @@ mod list;
 mod map;
 #[cfg_attr(not(feature = "markdown"), path = "render/markdown_left_out.rs")]
 mod markdown;
+mod place;
 mod plot;
 mod pointer;
 mod popover;
@@ -417,7 +418,7 @@ impl<'w, 'm> Painter<'w, 'm> {
     /// The mod `name` filling a window, with the backdrops of open
     /// popovers and the open overlays.
     fn root(&mut self, name: &'w str, cx: Cx) -> AnyElement {
-        let shell = self.slot(name, cx);
+        let shell = self.slot(name, None, cx);
         let backdrops: Vec<_> = std::mem::take(&mut self.backdrops)
             .into_iter()
             .enumerate()
@@ -457,7 +458,7 @@ impl<'w, 'm> Painter<'w, 'm> {
     }
 
     /// A module's last good view, under its problem when it has one.
-    fn slot(&mut self, name: &'w str, cx: Cx) -> AnyElement {
+    fn slot(&mut self, name: &'w str, at: Option<&Place<'w>>, cx: Cx) -> AnyElement {
         if self.mounted.contains(&name) || self.mounted.len() == MAX_MOUNTS {
             return problem(format!("`{name}` is mounted inside itself"), cx);
         }
@@ -465,7 +466,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             return problem(format!("no mod named `{name}`"), cx);
         };
         self.mounted.push(name);
-        let mut root = Place::root(name);
+        let mut root = at.map_or_else(|| Place::root(name), |at| at.mounted(name));
         if self.sink.is_some() {
             root.crumb = Some(Crumb::module(name, self.outer.clone()));
         }
@@ -503,11 +504,11 @@ impl<'w, 'm> Painter<'w, 'm> {
     }
 
     /// The mods in a region, in order.
-    fn region(&mut self, name: &str, cx: Cx) -> Vec<AnyElement> {
+    fn region(&mut self, name: &str, place: &Place<'w>, cx: Cx) -> Vec<AnyElement> {
         self.workspace
             .region(name)
             .into_iter()
-            .map(|member| self.slot(member, cx))
+            .map(|member| self.slot(member, Some(place), cx))
             .collect()
     }
 
@@ -724,10 +725,10 @@ fn draw_node<'w>(
         Node::Region(region) => region.draw(painter, place, cx),
         Node::Divider => elements::divider(painter, place, cx),
         Node::Spacer => div().flex_1().into_any_element(),
-        Node::Mount(name) => painter.slot(name, cx),
+        Node::Mount(name) => painter.slot(name, Some(place), cx),
         // Drawn where it is, from the state the app keeps for it.
         Node::Instance(instance) => match painter.workspace.instance(place.owner, instance) {
-            Some((key, _)) => painter.slot(key, cx),
+            Some((key, _)) => painter.slot(key, Some(place), cx),
             None => problem(
                 format!("`{}` is not running", instance.key(place.owner)),
                 cx,

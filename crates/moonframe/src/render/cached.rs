@@ -498,7 +498,7 @@ fn nodes(node: &Node) -> Option<usize> {
         Node::Item(node) => steady(&node.look),
         Node::Badge(node) => steady(&node.look),
         Node::Icon(node) if !node.spin => steady(&node.look),
-        Node::Image(node) if node.overlay.is_empty() => steady(&node.look),
+        Node::Image(node) if !super::viewer::wanted(node) => steady(&node.look),
         Node::Line(node) => steady(&node.look),
         Node::Divider | Node::Spacer => Some(1),
         _ => None,
@@ -516,7 +516,9 @@ mod tests {
     use {
         super::{Cached, nodes, pinned},
         gpui_kit::{Position, Size, StyleRefinement, px, size},
-        moonframe_core::{Align, Direction, Frame, Justify, Look, Node, Scroll, Stack},
+        moonframe_core::{
+            Align, Data, Direction, Fit, Frame, Image, Justify, Look, Node, Scroll, Stack,
+        },
     };
 
     fn stack(children: Vec<Node>) -> Stack {
@@ -641,6 +643,41 @@ mod tests {
         }
         let holding = stack(vec![Node::Problem("no".to_owned())]);
         assert_eq!(nodes(&Node::Stack(holding)), None);
+    }
+
+    #[test]
+    fn image_viewers_keep_their_per_frame_bookkeeping() {
+        let image = Image {
+            look: Look::default(),
+            src: "photo.png".to_owned(),
+            width: Some(100.),
+            height: Some(100.),
+            fit: Fit::Contain,
+            zoom: None,
+            center: None,
+            measure: None,
+            to: None,
+            overlay: Vec::new(),
+            extras: Default::default(),
+        };
+        let container = |image| Node::Stack(stack(vec![Node::Image(image), Node::Divider]));
+        assert_eq!(nodes(&container(image.clone())), Some(3));
+        for viewer in [
+            Image {
+                zoom: Some(1.),
+                ..image.clone()
+            },
+            Image {
+                measure: Some(Data::from("measured")),
+                ..image.clone()
+            },
+            Image {
+                overlay: vec![Node::Divider],
+                ..image
+            },
+        ] {
+            assert_eq!(nodes(&container(viewer)), None);
+        }
     }
 
     #[test]

@@ -15,6 +15,7 @@ mod routing;
 mod stand_in;
 mod tiles;
 mod view;
+mod wake;
 
 use {
     super::{
@@ -23,7 +24,6 @@ use {
         styling::{LookExt as _, StyleExt as _},
     },
     crate::{
-        app::MoonframeApp,
         color::ThemeColor,
         gestures::{Gestures, gestures},
     },
@@ -31,7 +31,7 @@ use {
     layer::Grid,
     moonframe_core::{Data, Map, Part, with_fields},
     std::{
-        cell::{Cell, RefCell},
+        cell::RefCell,
         collections::{BTreeMap, HashMap},
         time::Instant,
     },
@@ -41,11 +41,6 @@ use {
 /// One breath of a pulsing pin's halo, before `animation_speed`.
 const PULSE: std::time::Duration = std::time::Duration::from_millis(2200);
 
-/// How long after a frame a pulsing pin asks for the next, which then waits
-/// for the screen: thirty frames a second on a 60 Hz one. A slow breath needs
-/// no more, and each frame draws the whole window.
-const PULSE_FRAME: std::time::Duration = std::time::Duration::from_millis(20);
-
 /// Zoom steps per notch of a mouse wheel.
 const WHEEL_ZOOM: f64 = 1.0 / 3.0;
 
@@ -53,10 +48,6 @@ const WHEEL_ZOOM: f64 = 1.0 / 3.0;
 const SCROLL_SCALE: f64 = 0.01;
 
 thread_local! {
-    /// Whether a task already waits for tiles to arrive, to draw again.
-    static WAITING: Cell<bool> = const { Cell::new(false) };
-    /// Whether a pulsing pin's next frame is already due.
-    static PULSING: Cell<bool> = const { Cell::new(false) };
     /// Each map's live view, by key, in windows that keep the rest still.
     static LIVE: RefCell<HashMap<String, EntityId>> = RefCell::new(HashMap::new());
 }
@@ -129,31 +120,18 @@ impl<'w> Draw<'w> for Map {
         };
         let (lines, ways) = lines::lines(self, frame, cx);
         let missing = tiles_missing || ways.waiting;
-        if missing && !WAITING.get() {
-            WAITING.set(true);
-            let arrived = tiles::arrival();
-            cx.spawn(async move |this, cx| {
-                let _ = arrived.await;
-                WAITING.set(false);
-                let _ = this.update(cx, |_, cx| notify(live, cx));
-            })
-            .detach();
+        let target = live.unwrap_or_else(|| cx.entity_id());
+        if missing {
+            wake::arrival(target, cx);
         }
-        // Only a map with a pulsing pin asks for frame after frame, and at its
-        // own pace: each one draws the whole window.
+        // Only a map with a pulsing pin asks for frame after frame.
         let pulse = if self.pins.iter().any(|pin| pin.pulse) {
             painter.quiet_phase(PULSE)
         } else {
             None
         };
-        if pulse.is_some() && !PULSING.get() {
-            PULSING.set(true);
-            cx.spawn(async move |this, cx| {
-                cx.background_executor().timer(PULSE_FRAME).await;
-                PULSING.set(false);
-                let _ = this.update(cx, |_, cx| notify(live, cx));
-            })
-            .detach();
+        if pulse.is_some() {
+            wake::pulse(target, cx);
         }
         let route_color = look
             .base
@@ -202,14 +180,6 @@ impl<'w> Draw<'w> for Map {
         }
         element = interact(element, &key, frame, most, self.moved.clone(), &sender);
         painter.in_live_view(element.into_any_element(), place)
-    }
-}
-
-/// Draws the map with the live view `live`, or the app it is in without one.
-fn notify(live: Option<EntityId>, cx: &mut Context<MoonframeApp>) {
-    match live {
-        Some(view) => App::notify(cx, view),
-        None => cx.notify(),
     }
 }
 
