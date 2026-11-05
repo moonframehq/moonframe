@@ -8,7 +8,7 @@ use {
     gpui_kit::*,
     std::{
         cell::RefCell,
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         path::{Path, PathBuf},
         sync::Arc,
         time::{Duration, Instant},
@@ -28,6 +28,10 @@ struct Kept {
     closed: Option<Subscription>,
     /// When each tile was last drawn.
     drawn: HashMap<PathBuf, Instant>,
+    /// Tiles known to be decoded, so that a picture of them shows.
+    decoded: HashSet<PathBuf>,
+    /// Tiles drawn since the last look that were not known to be.
+    decoding: HashSet<PathBuf>,
 }
 
 thread_local! {
@@ -46,14 +50,59 @@ pub(super) fn begin(window: Option<WindowId>) {
 pub(super) fn picture(file: PathBuf) -> Img {
     if let Some(window) = CURRENT.with_borrow(|current| *current) {
         WINDOWS.with_borrow_mut(|windows| {
-            windows
-                .entry(window)
-                .or_default()
-                .drawn
-                .insert(file.clone(), Instant::now());
+            let kept = windows.entry(window).or_default();
+            kept.drawn.insert(file.clone(), Instant::now());
+            if !kept.decoded.contains(&file) {
+                kept.decoding.insert(file.clone());
+            }
         });
     }
     img(file)
+}
+
+/// Whether a picture of `file` shows: one still decoding draws nothing. In a
+/// preview, whose tiles GPUI keeps, it is taken to.
+pub(super) fn shows(file: &Path) -> bool {
+    let Some(window) = CURRENT.with_borrow(|current| *current) else {
+        return true;
+    };
+    WINDOWS.with_borrow(|windows| {
+        windows
+            .get(&window)
+            .is_some_and(|kept| kept.decoded.contains(file))
+    })
+}
+
+/// Looks at which tiles drawn this frame finished decoding, and draws again
+/// to show those that did: until then they stand behind what stands in.
+pub(super) fn settle(window: &mut Window, cx: &mut App) {
+    let id = window.window_handle().window_id();
+    let (cache, decoding) = WINDOWS.with_borrow_mut(|windows| {
+        windows.get_mut(&id).map_or((None, HashSet::new()), |kept| {
+            (kept.cache.clone(), std::mem::take(&mut kept.decoding))
+        })
+    });
+    let Some(cache) = cache else {
+        return;
+    };
+    let done: Vec<PathBuf> = cache.update(cx, |cache, cx| {
+        decoding
+            .into_iter()
+            .filter(|file| {
+                let source = Resource::Path(file.as_path().into());
+                matches!(cache.load(&source, window, cx), Some(Ok(_)))
+            })
+            .collect()
+    });
+    if done.is_empty() {
+        return;
+    }
+    WINDOWS.with_borrow_mut(|windows| {
+        if let Some(kept) = windows.get_mut(&id) {
+            kept.decoded.extend(done);
+        }
+    });
+    window.on_next_frame(|window, _| window.refresh());
 }
 
 /// The decoded tile in `file`, counted as drawn now, for pixels of our own
@@ -116,6 +165,9 @@ pub(super) fn evict(window: &mut Window, cx: &mut App) {
             return (None, Vec::new());
         };
         let gone = oldest(&mut kept.drawn, MOST, Instant::now());
+        for file in &gone {
+            kept.decoded.remove(file);
+        }
         (kept.cache.clone(), gone)
     });
     let Some(cache) = cache else {

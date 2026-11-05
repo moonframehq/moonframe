@@ -87,6 +87,7 @@ ship only their selected components.
 | `herdr-core` | herdr-core state storage and, with `terminal`, persistent terminals. |
 | `video` | `ui.video`: live frames from another process in a 16-bit, colour-managed Metal view (macOS). Off by default. See [Live video](video.md). |
 | `map` | `ui.map` street maps: tiles from OpenStreetMap and other listed providers, pins, and routes along streets, fetched over HTTP. Off by default. |
+| `map-benchmark` | A `ui.map` run with `MOONFRAME_MAP_BENCHMARK` drives itself through input events, reports what that cost, and quits. For measuring; off by default. |
 | `markdown` | Rich `ui.markdown` rendering (headings, lists, tables, links and code). |
 | `prose` | The writing editor for `ui.input` with `prose`, `dim` or `typewriter`. Ordinary single-line and multiline inputs remain available without it. |
 | `sealed` | Staged app resources instead of the full embedded toolbox. |
