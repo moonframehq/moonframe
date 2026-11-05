@@ -98,6 +98,7 @@ impl<'w> Draw<'w> for Stack {
                 .on_click(place.click(action, cx)),
             None => element,
         };
+        let element = painter.at_root(element, place);
         let element = with_extras(element, &self.extras, painter, place, cx);
         match &self.pointer {
             Some(pointer) => super::carry::attach(element, pointer, painter, place, cx),

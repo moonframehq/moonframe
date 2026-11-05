@@ -8,6 +8,7 @@
 //! rules (`Stylesheet::resolve`), and its own keys such as `padding`.
 
 mod browser;
+pub(crate) mod cached;
 mod carry;
 mod elements;
 mod floating;
@@ -217,6 +218,9 @@ impl Place<'_> {
 pub(crate) struct Finished {
     /// Something still moves: draw again next frame.
     pub(crate) animating: bool,
+    /// The live views that move on by themselves, the rest of the window
+    /// keeping still.
+    pub(crate) live_again: Vec<EntityId>,
     /// The rows lists asked for.
     pub(crate) list_requests: Vec<ListRequest>,
     /// The open popovers and overlays it drew, for their keys.
@@ -284,6 +288,14 @@ pub(crate) struct Painter<'w, 'm> {
     /// How many frames that window has drawn, this one included: what was
     /// not drawn in the frame before this one was gone in between.
     frame: u64,
+    /// What this window keeps from frame to frame; none where nothing is.
+    cached: Option<&'m mut cached::Cached>,
+    /// The next node is the root of a kept view.
+    root: Option<cached::Root>,
+    /// Drawing inside a kept view.
+    in_kept: bool,
+    /// The live views that asked for another frame.
+    live_again: Vec<EntityId>,
 }
 
 /// A list's rows a mod should build, which the app asks the workspace for
@@ -326,6 +338,10 @@ impl<'w, 'm> Painter<'w, 'm> {
             last_keyed: None,
             window: None,
             frame: 0,
+            cached: None,
+            root: None,
+            in_kept: false,
+            live_again: Vec::new(),
         }
     }
 
@@ -350,6 +366,19 @@ impl<'w, 'm> Painter<'w, 'm> {
         self
     }
 
+    /// For the main window, which keeps what does not move.
+    pub(crate) fn with_cached(mut self, cached: &'m mut cached::Cached) -> Self {
+        self.cached = Some(cached);
+        self
+    }
+
+    /// For a kept view drawn by itself in `window`: unlike
+    /// [`Self::in_window`], not a frame of that window.
+    pub(crate) fn kept_in(mut self, window: WindowId) -> Self {
+        self.window = Some(window);
+        self
+    }
+
     /// For windows that show the app's own views.
     pub(crate) fn with_views(mut self, views: &'m mut Views) -> Self {
         self.views = Some(views);
@@ -366,6 +395,7 @@ impl<'w, 'm> Painter<'w, 'm> {
     pub(crate) fn finish(self) -> Finished {
         Finished {
             animating: self.animating || self.tweening.get(),
+            live_again: self.live_again,
             list_requests: self.list_requests,
             key_layers: self.key_layers,
         }
@@ -491,7 +521,7 @@ impl<'w, 'm> Painter<'w, 'm> {
         nodes
             .iter()
             .enumerate()
-            .map(|(index, node)| node.draw(self, &place.child(index, direction), cx))
+            .map(|(index, node)| self.kept_child(node, &place.child(index, direction), cx))
             .collect()
     }
 

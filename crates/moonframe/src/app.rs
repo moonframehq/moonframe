@@ -16,7 +16,7 @@ use {
         motion::Motion,
         packages,
         paths::{self, Folders},
-        render::{Finished, KeyLayer, ListRequest, Painter},
+        render::{Finished, KeyLayer, ListRequest, Painter, cached::Cached},
         settings,
         theme_picker::ThemePicker,
         themes::{self, Scheme},
@@ -156,6 +156,7 @@ pub(crate) struct MoonframeApp {
     focus: FocusHandle,
     /// Where each animated pane is in its transition.
     motion: Motion,
+    cached: Cached,
     /// The app's providers, which publish data as `app.<name>`.
     pub(crate) providers: Providers,
     /// The repository of the terminal last used, which providers follow.
@@ -329,6 +330,7 @@ impl MoonframeApp {
             alerts: Alerts::default(),
             focus,
             motion: Motion::default(),
+            cached: Cached::default(),
             providers,
             #[cfg(feature = "terminal")]
             project,
