@@ -4,6 +4,7 @@
 
 use {
     crate::{Capability, Context, PREBUILT, json, system::SystemLoad},
+    state::Handoff,
     std::{
         collections::HashSet,
         env, fs,
@@ -17,6 +18,8 @@ use {
     },
     wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView},
 };
+
+mod state;
 
 wasmtime::component::bindgen!({ path: "../../wit/provider.wit", world: "provider" });
 
@@ -57,18 +60,39 @@ fn serve(context: &Context) -> Result<(), String> {
 
     // Instantiating runs the component's own setup, which burns fuel too.
     refuel(&mut store)?;
-    let provider = Provider::instantiate(&mut store, &component, &linker).map_err(text)?;
+    let instance = linker.instantiate(&mut store, &component).map_err(text)?;
+    let provider = Provider::new(&mut store, &instance).map_err(text)?;
+    let handoff = Handoff::find(&instance, &mut store)?;
     refuel(&mut store)?;
     provider
         .call_start(&mut store, &context.manifest.settings.to_string())
         .map_err(text)?
         .map_err(|problem| format!("start: {problem}"))?;
     tracing::info!(provider = %context.name, "running");
+    if let Some(handoff) = &handoff {
+        handoff.restore(context, &mut store)?;
+    }
     refuel(&mut store)?;
     let mut published = provider.call_tick(&mut store).map_err(text)?;
+    if handoff.is_some() {
+        // Only now: a build that fails this early leaves it for the next.
+        context.kept.forget(&context.dir);
+    }
+    // After a trap the instance cannot be called, so only these ends save.
+    let hand_on = |store: &mut Store<State>| {
+        if let Some(handoff) = &handoff {
+            handoff.save(context, store);
+        }
+    };
     loop {
         if let Some(text) = published.take() {
-            context.publish(json::data(&text).map_err(|problem| problem.to_string())?);
+            match json::data(&text) {
+                Ok(data) => context.publish(data),
+                Err(problem) => {
+                    hand_on(&mut store);
+                    return Err(problem.to_string());
+                },
+            }
         }
         let call = match context.messages.recv_timeout(context.manifest.interval) {
             Ok(message) => {
@@ -79,9 +103,15 @@ fn serve(context: &Context) -> Result<(), String> {
                 refuel(&mut store)?;
                 provider.call_tick(&mut store)
             },
-            Err(RecvTimeoutError::Disconnected) => return Ok(()),
+            Err(RecvTimeoutError::Disconnected) => {
+                hand_on(&mut store);
+                return Ok(());
+            },
         };
         if context.stopped() {
+            if call.is_ok() {
+                hand_on(&mut store);
+            }
             return Ok(());
         }
         published = call.map_err(text)?;

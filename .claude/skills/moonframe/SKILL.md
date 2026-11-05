@@ -1743,6 +1743,9 @@ terminal log. There are four kinds:
     (`rustup target add wasm32-wasip2`). Otherwise it loads `provider.wasm`.
   - Installed apps ship `provider.wasm` only: `just stage` copies `app/`
     as the bundle holds it, each wasm provider prebuilt, without sources.
+  - A new build starts over, unless the crate uses the `stateful-provider`
+    world and exports `save()` and `restore(state)`. Add them when losing the
+    provider's in-memory state on each edit would get in the way.
   - It runs sandboxed: no files, network or environment, a 64 MB memory cap,
     and an instruction budget per call.
   - It reaches the machine only through `capabilities`. Today that is

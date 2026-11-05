@@ -34,3 +34,17 @@ world provider {
     // A message from a mod, as JSON; may return JSON to publish at once.
     export receive: func(message: string) -> option<string>;
 }
+
+// A provider that keeps its state when a new build replaces it. It has all
+// of `provider`, and generates its bindings from this world instead.
+world stateful-provider {
+    include provider;
+
+    // Called as this build stops, to hand its state to the next one: any
+    // text, usually JSON. None keeps nothing.
+    export save: func() -> option<string>;
+
+    // Called on a new build after `start` and before the first `tick`, with
+    // what the last build saved. An error starts it fresh, and is logged.
+    export restore: func(state: string) -> result<_, string>;
+}

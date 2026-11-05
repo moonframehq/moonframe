@@ -19,8 +19,11 @@
 //!
 //! Messages (any mod): "toggle" pauses or plays (and replays once done),
 //! "restart" starts over.
+//!
+//! A new build of this crate carries on from the same tick, paused or not,
+//! unless `start_tick` changed, which asks for that tick instead.
 
-wit_bindgen::generate!({ path: "wit/provider.wit", world: "provider" });
+wit_bindgen::generate!({ path: "wit/provider.wit", world: "stateful-provider" });
 
 use {
     serde_json::{Value, json},
@@ -72,6 +75,8 @@ struct State {
     script: Script,
     tick: u64,
     playing: bool,
+    /// The setting this run began from, to tell when it changed.
+    start_tick: u64,
 }
 
 thread_local! {
@@ -179,6 +184,7 @@ impl Guest for Research {
                 script,
                 tick,
                 playing: true,
+                start_tick: tick,
             })
         });
         Ok(())
@@ -187,18 +193,20 @@ impl Guest for Research {
     fn tick() -> Option<String> {
         STATE.with_borrow_mut(|state| {
             let state = state.as_mut()?;
+            // The first call publishes where the run starts, paused or not
+            // (a new build can restore a paused run); each after it plays a
+            // tick.
+            if state.data.get("run").is_none() {
+                return Some(state.publish());
+            }
             if !state.playing {
                 return None;
             }
-            // The first call publishes where the run starts; each after it
-            // plays a tick.
-            if state.data.get("run").is_some() {
-                state.tick = if state.tick + 1 >= state.script.replay {
-                    0
-                } else {
-                    state.tick + 1
-                };
-            }
+            state.tick = if state.tick + 1 >= state.script.replay {
+                0
+            } else {
+                state.tick + 1
+            };
             Some(state.publish())
         })
     }
@@ -220,6 +228,37 @@ impl Guest for Research {
                 _ => return None,
             }
             Some(state.publish())
+        })
+    }
+
+    fn save() -> Option<String> {
+        STATE.with_borrow(|state| {
+            let state = state.as_ref()?;
+            Some(
+                json!({
+                    "tick": state.tick,
+                    "playing": state.playing,
+                    "start_tick": state.start_tick,
+                })
+                .to_string(),
+            )
+        })
+    }
+
+    fn restore(saved: String) -> Result<(), String> {
+        let saved: Value = serde_json::from_str(&saved).map_err(|error| error.to_string())?;
+        STATE.with_borrow_mut(|state| {
+            let state = state.as_mut().ok_or("not started")?;
+            // A changed `start_tick` asks for that tick, not the old run.
+            if saved["start_tick"].as_u64() != Some(state.start_tick) {
+                return Ok(());
+            }
+            state.tick = saved["tick"]
+                .as_u64()
+                .filter(|tick| *tick < state.script.replay)
+                .ok_or("the saved tick is not in this run")?;
+            state.playing = saved["playing"].as_bool().ok_or("no `playing` saved")?;
+            Ok(())
         })
     }
 }
