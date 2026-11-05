@@ -80,6 +80,8 @@ herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
 # default, as few apps need one; the starter turns it on, and so do sealed
 # apps whose Luau uses `ui.map`.
 map = ["dep:image", "dep:ureq"]
+# Drives a map through input events and reports what it cost.
+map-benchmark = ["map"]
 # `ui.video`: frames from another process in a Metal view of their own,
 # 16-bit and colour managed (macOS). Off by default: few apps need it.
 video = ["dep:core-graphics-types", "dep:metal", "dep:moonframe-frames"]
