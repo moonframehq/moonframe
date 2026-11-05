@@ -683,6 +683,9 @@ return ui.row { table.unpack(buttons) }
   the light one; `"Default"` (the stock look with the stylesheet's colors)
   is either. A name that does not fit is the sender's error. View > Themes
   lists the themes for the appearance the window is in and picks for it.
+  On the Omarchy desktop there is also `"Omarchy"`, its current theme, which
+  is either too: it is the default wherever nothing was picked, follows
+  `omarchy theme set` live, and its light or dark is the system's appearance.
   Views read `app.appearance.theme` (showing now), `light_theme`,
   `dark_theme`, and `themes`: every theme as `{ name, dark, background,
   foreground, accent, colors }` (hex strings; `colors` is red, green,

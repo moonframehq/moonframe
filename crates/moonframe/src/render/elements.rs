@@ -98,6 +98,7 @@ impl<'w> Draw<'w> for Stack {
                 .on_click(place.click(action, cx)),
             None => element,
         };
+        let element = painter.at_root(element, place);
         let element = with_extras(element, &self.extras, painter, place, cx);
         match &self.pointer {
             Some(pointer) => super::carry::attach(element, pointer, painter, place, cx),
@@ -790,8 +791,8 @@ fn pill(
 }
 
 impl<'w> Draw<'w> for Region {
-    fn draw(&'w self, painter: &mut Painter<'w, '_>, _: &Place<'w>, cx: Cx) -> AnyElement {
-        let members = painter.region(&self.name, cx);
+    fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
+        let members = painter.region(&self.name, place, cx);
         let element = div().flex().min_h_0().min_w_0().gap(px(self.gap.pixels()));
         let (element, members) = match self.direction {
             // A row of mods, such as a status bar, never spills onto its

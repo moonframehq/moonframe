@@ -21,6 +21,7 @@ mod routing;
 mod stand_in;
 mod tiles;
 mod view;
+mod wake;
 
 use {
     super::{
@@ -35,17 +36,16 @@ use {
     gpui_kit::{component::ActiveTheme, *},
     layer::Grid,
     moonframe_core::{Data, Map, Part, with_fields},
-    std::{cell::Cell, collections::BTreeMap, time::Instant},
+    std::{
+        cell::RefCell,
+        collections::{BTreeMap, HashMap},
+        time::Instant,
+    },
     view::Frame,
 };
 
 /// One breath of a pulsing pin's halo, before `animation_speed`.
 const PULSE: std::time::Duration = std::time::Duration::from_millis(2200);
-
-/// How long after a frame a pulsing pin asks for the next, which then waits
-/// for the screen: thirty frames a second on a 60 Hz one. A slow breath needs
-/// no more, and each frame draws the whole window.
-const PULSE_FRAME: std::time::Duration = std::time::Duration::from_millis(20);
 
 /// Zoom steps per notch of a mouse wheel.
 const WHEEL_ZOOM: f64 = 1.0 / 3.0;
@@ -54,10 +54,21 @@ const WHEEL_ZOOM: f64 = 1.0 / 3.0;
 const SCROLL_SCALE: f64 = 0.01;
 
 thread_local! {
-    /// Whether a task already waits for tiles to arrive, to draw again.
-    static WAITING: Cell<bool> = const { Cell::new(false) };
-    /// Whether a pulsing pin's next frame is already due.
-    static PULSING: Cell<bool> = const { Cell::new(false) };
+    /// Each map's live view, by key, in windows that keep the rest still.
+    static LIVE: RefCell<HashMap<String, EntityId>> = RefCell::new(HashMap::new());
+}
+
+/// Draws the map `key` again, and of its window as little as it can.
+fn redraw(key: &str, window: &mut Window, cx: &mut App) {
+    match live_view(key) {
+        Some(view) => cx.notify(view),
+        None => window.refresh(),
+    }
+}
+
+/// The live view of the map `key`, if it has one.
+fn live_view(key: &str) -> Option<EntityId> {
+    LIVE.with_borrow(|live| live.get(key).copied())
 }
 
 impl<'w> Draw<'w> for Map {
@@ -71,13 +82,19 @@ impl<'w> Draw<'w> for Map {
             f64::from(self.width.unwrap_or(0.0)),
             f64::from(self.height.unwrap_or(0.0)),
         );
+        let live = painter.live_view(place);
+        LIVE.with_borrow_mut(|views| match live {
+            Some(view) => {
+                views.insert(key.clone(), view);
+            },
+            None => {
+                views.remove(&key);
+            },
+        });
         let stylesheet = painter.workspace.stylesheet();
         let (frame, scale) = view::frame(self, &key, fallback, painter.now, |pace| {
             stylesheet.scaled(pace)
         });
-        if view::gliding(&key) {
-            painter.animating = true;
-        }
         let most = view::most_zoom(self);
         let sender = Sender {
             app: cx.entity().downgrade(),
@@ -96,8 +113,11 @@ impl<'w> Draw<'w> for Map {
             stylesheet.scaled(layer::FADE),
             |zoom| tiles::level(self.provider, zoom, scale),
         );
-        if level.1.is_some() {
-            painter.animating = true;
+        if view::gliding(&key) || level.1.is_some() {
+            match live {
+                Some(view) => painter.live_again(view),
+                None => painter.animating = true,
+            }
         }
         let (layer, tiles_missing) = if frame.turned() {
             rotated::layer(self, frame, scale, &key)
@@ -117,31 +137,18 @@ impl<'w> Draw<'w> for Map {
         let missing = tiles_missing || ways.waiting;
         #[cfg(feature = "map-benchmark")]
         benchmark::frame(level.0, tiles_missing);
-        if missing && !WAITING.get() {
-            WAITING.set(true);
-            let arrived = tiles::arrival();
-            cx.spawn(async move |this, cx| {
-                let _ = arrived.await;
-                WAITING.set(false);
-                let _ = this.update(cx, |_, cx| cx.notify());
-            })
-            .detach();
+        let target = live.unwrap_or_else(|| cx.entity_id());
+        if missing {
+            wake::arrival(target, cx);
         }
-        // Only a map with a pulsing pin asks for frame after frame, and at its
-        // own pace: each one draws the whole window.
+        // Only a map with a pulsing pin asks for frame after frame.
         let pulse = if self.pins.iter().any(|pin| pin.pulse) {
             painter.quiet_phase(PULSE)
         } else {
             None
         };
-        if pulse.is_some() && !PULSING.get() {
-            PULSING.set(true);
-            cx.spawn(async move |this, cx| {
-                cx.background_executor().timer(PULSE_FRAME).await;
-                PULSING.set(false);
-                let _ = this.update(cx, |_, cx| cx.notify());
-            })
-            .detach();
+        if pulse.is_some() {
+            wake::pulse(target, cx);
         }
         let route_color = look
             .base
@@ -189,7 +196,7 @@ impl<'w> Draw<'w> for Map {
             element = element.flex_1();
         }
         element = interact(element, &key, frame, most, self.moved.clone(), &sender);
-        element.into_any_element()
+        painter.in_live_view(element.into_any_element(), place)
     }
 }
 
@@ -241,7 +248,7 @@ fn zoom_buttons(
                 let middle = view::middle(&key);
                 let zoomed = view::glide_zoom(&key, frame, steps, middle, most);
                 tell(&key, moved.as_ref(), zoomed, &sender, window, cx);
-                window.refresh();
+                redraw(&key, window, cx);
             })
     };
     div()
@@ -278,13 +285,13 @@ fn trackpad(key: &str, frame: Frame, most: f64, moved: Option<Data>, sender: &Se
                     window,
                     cx,
                 );
-                window.refresh();
+                redraw(&turn_key, window, cx);
             }
         })
         .on_smart_zoom(move |event, window, cx| {
             let zoomed = view::glide_zoom(&zoom_key, frame, 1.0, event.position, most);
             tell(&zoom_key, moved.as_ref(), zoomed, &zoom_sender, window, cx);
-            window.refresh();
+            redraw(&zoom_key, window, cx);
         })
 }
 
@@ -316,7 +323,7 @@ fn interact(
                     window,
                     cx,
                 );
-                window.refresh();
+                redraw(&press_key, window, cx);
                 return;
             }
             view::press(
@@ -326,7 +333,7 @@ fn interact(
                 window,
             );
             // The next paint installs the listeners that follow this press.
-            window.refresh();
+            redraw(&press_key, window, cx);
         })
         .on_scroll(move |event, window, cx| {
             cx.stop_propagation();
@@ -344,7 +351,7 @@ fn interact(
                 window,
                 cx,
             );
-            window.refresh();
+            redraw(&wheel_key, window, cx);
         })
         .on_pinch(move |event, window, cx| {
             cx.stop_propagation();
@@ -358,7 +365,7 @@ fn interact(
                 window,
                 cx,
             );
-            window.refresh();
+            redraw(&pinch_key, window, cx);
         })
 }
 
@@ -397,7 +404,7 @@ fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl
                 return;
             }
             let moving = key.clone();
-            window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, _| {
+            window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
                 if phase != DispatchPhase::Capture || !view::dragging(&moving, window) {
                     return;
                 }
@@ -406,7 +413,7 @@ fn follow(key: &str, turned: bool, moved: Option<Data>, sender: &Sender) -> impl
                     return;
                 }
                 if view::drag_to(event.position).is_some() {
-                    window.refresh();
+                    redraw(&moving, window, cx);
                 }
             });
             let (released, moved, sender) = (key.clone(), moved.clone(), sender.clone());
