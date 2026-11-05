@@ -55,6 +55,7 @@ mod listeners;
 mod machine;
 mod measuring;
 mod menu;
+mod omarchy;
 mod panes;
 mod picking;
 mod problems;
@@ -168,6 +169,7 @@ pub(crate) struct MoonframeApp {
     history: Option<Arc<moonframe_history::History>>,
     /// Dropping it stops the events.
     _watcher: Option<RecommendedWatcher>,
+    _omarchy: Option<RecommendedWatcher>,
     /// The main window, the one this view draws.
     main_window: WindowId,
     /// The mod holding back closing and quitting, if one is.
@@ -263,6 +265,9 @@ impl MoonframeApp {
                 .iter()
                 .find_map(|path| settings::get(path, key))
         };
+        themes::omarchy::load();
+        // Omarchy's theme is the default, for those who never picked one.
+        let default = saved(settings::THEME).map_or_else(themes::omarchy::current, |_| None);
         // The one theme kept before light and dark had one each.
         let scheme = saved(settings::THEME).and_then(|name| {
             let scheme = themes::find(&name);
@@ -277,7 +282,7 @@ impl MoonframeApp {
                     tracing::warn!("{key}: {problem}; using {}", themes::DEFAULT);
                 })
                 .unwrap_or(None),
-            None => scheme.filter(|scheme| scheme.dark() == dark),
+            None => scheme.filter(|scheme| scheme.dark() == dark).or(default),
         };
         let (light_scheme, dark_scheme) = (
             slot(settings::LIGHT_THEME, false),
@@ -340,6 +345,7 @@ impl MoonframeApp {
             key_layers: HashMap::new(),
             history,
             _watcher: watcher,
+            _omarchy: omarchy::watching(cx),
             _keys: crate::keys::intercept(cx),
             last_pane: 0,
         };
@@ -388,7 +394,7 @@ impl MoonframeApp {
     /// each time, so a removed override goes away. A picked theme brings its
     /// own colors, so the stylesheet's apply to the stock look alone.
     fn apply_theme(&mut self, cx: &mut App) {
-        let dark = self.appearance.is_dark(self.system_dark);
+        let dark = self.dark();
         // A theme shows in the appearance it is made for; in the other the
         // stock look does, and the theme stays picked.
         let scheme = themes::shown(self.preview, self.scheme(dark), dark);
@@ -514,9 +520,11 @@ impl MoonframeApp {
         cx.notify();
     }
 
-    /// Whether the window is dark.
+    /// Whether the window is dark. On Omarchy the system is as dark as its
+    /// theme, which may tell the desktop so only after it has changed.
     pub(crate) fn dark(&self) -> bool {
-        self.appearance.is_dark(self.system_dark)
+        let omarchy = themes::omarchy::current().map(Scheme::dark);
+        self.appearance.is_dark(omarchy.unwrap_or(self.system_dark))
     }
 
     /// The theme picked for dark windows, or for light ones.
@@ -688,7 +696,7 @@ impl MoonframeApp {
             Command::Reload => self.reload(cx),
             // The other of light and dark, whatever the system is.
             Command::ToggleTheme => self.set_appearance(
-                if self.appearance.is_dark(self.system_dark) {
+                if self.dark() {
                     Appearance::Light
                 } else {
                     Appearance::Dark
