@@ -5,7 +5,11 @@
 #     "error", "fresh" }
 # `status` is "missing" (none of them there), "stale" (some missing or
 # different) or "current"; `version` is a checksum of the shipped skills, so
-# a mod can tell one release's offer from the next. Every 60 seconds, and at
+# a mod can tell one release's offer from the next. A checkout's skills change
+# with nearly every commit, and an agent there reads the repository's own, so
+# from a checkout only a missing skill is "stale" and `version` covers the
+# names alone: an answer to the offer lasts past the next rebuild. Every 60
+# seconds, and at
 # once on any message. The message "install" from the `skills` mod copies
 # them over, each skill folder replaced whole; other skills there are left
 # alone. Exits when the app closes its stdin.
@@ -17,10 +21,12 @@
 POLL=60
 export LC_ALL=C
 
+CHECKOUT=false
 if [ -d skills ]; then
     SOURCE=$PWD/skills
 elif [ -d ../../../.claude/skills ]; then
     SOURCE=$(cd ../../../.claude/skills && pwd)
+    CHECKOUT=true
 else
     SOURCE=
 fi
@@ -63,22 +69,29 @@ ERROR=
 FRESH=false
 LAST=
 publish() {
-    local available=false skills="[]" status=null version=null error=null name present=0
+    local available=false skills="[]" status=null version=null error=null name present=0 count=0
     if [ -n "$SOURCE" ] && [ -n "$(names)" ]; then
         available=true
         skills=
         for name in $(names); do
             jstr "$name"
             skills="${skills:+$skills,}$J"
+            count=$((count + 1))
             [ -d "$TARGET/$name" ] && present=$((present + 1))
         done
         skills="[$skills]"
         local shipped
-        shipped=$(digest "$SOURCE")
+        if [ "$CHECKOUT" = true ]; then
+            shipped=$(names | cksum | tr ' ' '-')
+        else
+            shipped=$(digest "$SOURCE")
+        fi
         jstr "$shipped"
         version=$J
         if [ "$present" -eq 0 ]; then
             status='"missing"'
+        elif [ "$CHECKOUT" = true ]; then
+            [ "$present" -eq "$count" ] && status='"current"' || status='"stale"'
         elif [ "$(digest "$TARGET")" = "$shipped" ]; then
             status='"current"'
         else
