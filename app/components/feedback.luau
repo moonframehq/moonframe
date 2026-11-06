@@ -34,10 +34,15 @@ type Props = {
 	-- An Inspect button: the app's Inspect Element, for the mod to attach
 	-- what the user picks (it hears it on `app/inspect`).
 	inspect: boolean?,
-	-- The element attached, { element, at }, shown as a chip.
-	attached: { element: string, at: string? }?,
+	-- The element attached, { element, at, report }, shown as a chip. With a
+	-- `report`, the chip's Copy button puts it on the clipboard, to paste in
+	-- an agent of the user's own.
+	attached: { element: string, at: string?, report: string? }?,
 	-- Sent by the chip's ×.
 	detach: any,
+	-- Sent by the chip's Copy button, and whether it has been pressed.
+	copy: any,
+	copied: boolean?,
 	to: string?,
 }
 
@@ -200,8 +205,10 @@ return component {
 		["reply"] = "the reply the mod has from `follow_type`; Reply is greyed out while it is blank",
 		["actions"] = "elements on the footer's left, such as an agent `dropdown`",
 		["inspect"] = "show an Inspect button that starts Inspect Element for the mod (`command = \"inspect\"`); the pick comes back on the topic `app/inspect`",
-		["attached"] = "the element attached to the request, `{ element, at }`, shown as a chip",
+		["attached"] = "the element attached to the request, `{ element, at, report }`, shown as a chip; with a `report`, a Copy button on the chip puts it on the clipboard",
 		["detach"] = "msg the chip's × sends",
+		["copy"] = "msg the chip's Copy button sends, as well as copying, e.g. to set `copied`",
+		["copied"] = "show \"Copied\" with a check on the chip's button",
 		["to"] = "mod its own messages go to, if not the drawing one",
 	},
 	styles = {
@@ -248,7 +255,11 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 		dismiss = "close",
 		text = "",
 		inspect = true,
-		attached = { element = 'text.status-text "⎇ main +29"', at = "/code/moonframe/app/mods/status/main.luau:33" },
+		attached = {
+			element = 'text.status-text "⎇ main +29"',
+			at = "/code/moonframe/app/mods/status/main.luau:33",
+			report = 'Selected in Moonframe (View > Inspect Element):\n  element: text.status-text "⎇ main +29"',
+		},
 		note = "A background agent (Claude) in ~/code/moonframe implements it, asking you here before each change, then reports back under Feedback & fixes. It gets what you're looking at, your window and the build.",
 		expanded = "1",
 		follow = true,
@@ -297,7 +308,7 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 				icon = "inspector",
 				variant = "outline",
 				command = "inspect",
-				tooltip = "Pick an element in the window to attach",
+				tooltip = "Pick an element in the window to attach or copy",
 			})
 		end
 		local actions: { any } = props.actions or {}
@@ -347,6 +358,16 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 							class = "feedback-chip-at",
 							truncate = true,
 							tooltip = props.attached.at,
+						},
+						props.attached.report ~= nil and ui.button {
+							if props.copied then "Copied" else "Copy",
+							icon = if props.copied then "check" else "copy",
+							variant = "ghost",
+							small = true,
+							copy = props.attached.report,
+							msg = props.copy,
+							to = props.to,
+							tooltip = "Copy the element, to paste in your own agent",
 						},
 						ui.row {
 							class = "feedback-action",

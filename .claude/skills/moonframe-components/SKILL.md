@@ -434,8 +434,10 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | Prop | Meaning |
 | --- | --- |
 | `actions` | elements on the footer's left, such as an agent `dropdown` |
-| `attached` | the element attached to the request, `{ element, at }`, shown as a chip |
+| `attached` | the element attached to the request, `{ element, at, report }`, shown as a chip; with a `report`, a Copy button on the chip puts it on the clipboard |
 | `change` | sent on each edit, with `value` set to the text |
+| `copied` | show "Copied" with a check on the chip's button |
+| `copy` | msg the chip's Copy button sends, as well as copying, e.g. to set `copied` |
 | `detach` | msg the chip's × sends |
 | `dismiss` | msg sent by Cancel, Escape or a backdrop click |
 | `error` | why the last send failed, shown above the buttons |

@@ -60,6 +60,7 @@ mod omarchy;
 mod panes;
 mod picking;
 mod problems;
+mod quick_inspect;
 mod toasts;
 mod updates;
 mod view;
@@ -251,6 +252,7 @@ impl MoonframeApp {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         bind_menu_keys(workspace.menus(), cx);
+        quick_inspect::bind(&folders, cx);
         cx.set_menus(menus(workspace.menus()));
         menu_actions(cx);
         #[cfg(feature = "terminal")]

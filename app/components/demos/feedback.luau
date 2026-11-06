@@ -33,9 +33,13 @@ return mod {
 			},
 		}
 		local expanded: string? = "1"
-		local attached: any = { element = 'text.status-text "⎇ main +29"', at = "app/mods/status/main.luau:33" }
+		local attached: any = {
+			element = 'text.status-text "⎇ main +29"',
+			at = "app/mods/status/main.luau:33",
+			report = 'Selected in Moonframe (View > Inspect Element):\n  element: text.status-text "⎇ main +29"',
+		}
 		return previous
-			or { open = true, text = "", reply = "", count = 2, runs = runs, expanded = expanded, attached = attached }
+			or { open = true, text = "", reply = "", count = 2, runs = runs, expanded = expanded, attached = attached, copied = false }
 	end,
 
 	update = function(state, msg)
@@ -45,6 +49,9 @@ return mod {
 			state.open = false
 		elseif msg == "detach" then
 			state.attached = nil
+			state.copied = false
+		elseif msg == "copied" then
+			state.copied = true
 		elseif type(msg) == "table" and msg.msg == "type" then
 			state.text = msg.value
 		elseif type(msg) == "table" and msg.follow_type then
@@ -96,6 +103,8 @@ return mod {
 				inspect = true,
 				attached = state.attached,
 				detach = "detach",
+				copy = "copied",
+				copied = state.copied,
 			},
 		}
 	end,

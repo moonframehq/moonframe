@@ -14,6 +14,9 @@ pub(crate) const DARK_THEME: &str = "dark_theme";
 pub(crate) const APPEARANCE: &str = "appearance";
 /// How Inspect measures: `off`, `redlines`, `rulers`, `box` or `between`.
 pub(crate) const INSPECT_MEASURE: &str = "inspect_measure";
+/// The key that picks an element for the feedback dialog, named as `keys`
+/// name keys; `""` for none.
+pub(crate) const INSPECT_SHORTCUT: &str = "inspect_shortcut";
 
 /// The text saved under `key`, if any.
 pub(crate) fn get(path: &Path, key: &str) -> Option<String> {

@@ -8,6 +8,7 @@ gpui_kit::actions!(moonframe, [
     Reload,
     ToggleTheme,
     Inspect,
+    QuickInspect,
     Dismiss,
     BrowseComponents,
     ShowThemes,

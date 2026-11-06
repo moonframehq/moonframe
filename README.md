@@ -261,7 +261,11 @@ The window reloads while an agent edits it, so you can watch it work.
   your settings.
 - **Send feedback.** The `?` in the title bar (or in a corner of an example
   app) opens a box: write what should change, attach an element picked with
-  Inspect if it helps, and send. A coding agent in the background changes
+  Inspect if it helps, and send. Or press Copy on the picked element and
+  paste it into an agent of your own. ⇧⌘X (Ctrl-Shift-X elsewhere) goes
+  straight to picking, and a click opens the box with that element
+  attached; set `inspect_shortcut` in `settings.toml` to use another key,
+  or `""` for none. A coding agent in the background changes
   that app's own files with every permission, checks them, then screenshots
   your window and looks at the result before it answers; the window reloads
   with the change. Each request becomes a conversation under **Feedback &

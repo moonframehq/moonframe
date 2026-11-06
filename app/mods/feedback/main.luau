@@ -6,7 +6,9 @@
 -- asks before each change unless providers/acp's `allow` lets it. The icon
 -- spins while an agent works, and shows a dot when one finished since the
 -- dialog was last open. Inspect in the dialog picks an element in the
--- window to attach. The mic beside it dictates the request instead (see
+-- window to attach, or to copy for an agent of the user's own; the app's
+-- quick inspect shortcut does the same with the dialog closed, and a pick
+-- opens it. The mic beside it dictates the request instead (see
 -- providers/speech). The shell mounts it in its title bar.
 local feedback = use "feedback"
 local dropdown = use "dropdown"
@@ -25,8 +27,12 @@ type State = {
 	-- { element, mod, at, report } from `app/inspect`. Dropped when the
 	-- dialog closes and not kept across launches.
 	attached: any?,
+	-- The attached element's Copy button was pressed.
+	copied: boolean,
 	-- Picking for the dialog: it hides until the pick comes back.
 	inspecting: boolean,
+	-- The dialog was open when picking started.
+	reopen: boolean,
 	-- The mic button is listening or transcribing.
 	listening: boolean?,
 	expanded: string?,
@@ -162,7 +168,9 @@ return mod {
 			picking = false,
 			-- Not kept: a pick belongs to the request being written.
 			attached = nil,
+			copied = false,
 			inspecting = false,
+			reopen = false,
 			expanded = nil,
 			error = nil,
 			latest = seen,
@@ -190,6 +198,7 @@ return mod {
 					-- Closing drops the pick; Inspect hides the dialog
 					-- without `close`, so it survives picking.
 					state.attached = nil
+					state.copied = false
 					if state.listening then
 						state.listening = false
 						return state, { STOP_LISTENING }
@@ -201,6 +210,9 @@ return mod {
 				state.picking = false
 			elseif msg == "detach" then
 				state.attached = nil
+				state.copied = false
+			elseif msg == "copied" then
+				state.copied = true
 			end
 			return nil
 		end
@@ -210,6 +222,11 @@ return mod {
 			if pick.asker ~= "feedback" then
 				return nil
 			elseif pick.picking then
+				-- Escape goes back to how it was; a pick always opens the dialog,
+				-- as the app's quick inspect shortcut starts from no dialog.
+				if not state.inspecting then
+					state.reopen = state.open
+				end
 				state.inspecting = true
 				state.open = false
 				if state.listening then
@@ -218,9 +235,13 @@ return mod {
 				end
 			elseif state.inspecting then
 				state.inspecting = false
-				state.open = true
+				state.open = pick.picked or state.reopen
+				if state.open then
+					state.seen = state.latest
+				end
 				if pick.picked then
 					state.attached = { element = pick.element, mod = pick.mod, at = pick.at, report = pick.report }
+					state.copied = false
 				end
 			end
 		elseif msg.topic == "tabs/main" then
@@ -445,6 +466,8 @@ return mod {
 				inspect = true,
 				attached = state.attached,
 				detach = "detach",
+				copy = "copied",
+				copied = state.copied,
 			},
 		}
 	end,

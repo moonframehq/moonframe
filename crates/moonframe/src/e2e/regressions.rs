@@ -2,6 +2,50 @@
 
 use super::*;
 
+/// A window whose shell mounts the real `mods/feedback`.
+fn with_feedback(cx: &mut TestAppContext) -> Window<'_> {
+    let dir = folder(
+        r#"
+return mod {
+    init = function() return { log = "" } end,
+    view = function(state)
+        return shell(state, ui.column { grow = true,
+            ui.row { class = "target", ui.text "Pick me" }, ui.mount "feedback" })
+    end,
+}"#,
+    );
+    let app = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
+    std::fs::create_dir(dir.path().join("mods")).unwrap();
+    std::os::unix::fs::symlink(app.join("mods/feedback"), dir.path().join("mods/feedback"))
+        .unwrap();
+    open_in(cx, dir)
+}
+
+#[gpui_kit::test]
+fn the_inspect_shortcut_opens_the_dialog_on_a_pick(cx: &mut TestAppContext) {
+    let mut window = with_feedback(cx);
+    assert!(!window.shows("feedback-chip"));
+    window.keys("cmd-shift-x");
+    window.click("target");
+    assert!(window.shows("feedback-chip"), "a pick opens the dialog");
+    // The chip's Copy button sits just left of its ×.
+    let chip = window.bounds("feedback-chip");
+    window.click_at(point(chip.right() - px(60.), chip.center().y));
+    let copied = window.cx.read_from_clipboard().and_then(|item| item.text());
+    assert!(
+        copied.is_some_and(|text| text.starts_with("Selected in Moonframe")),
+        "Copy puts the report on the clipboard"
+    );
+}
+
+#[gpui_kit::test]
+fn escaping_the_inspect_shortcut_leaves_the_dialog_closed(cx: &mut TestAppContext) {
+    let mut window = with_feedback(cx);
+    window.keys("cmd-shift-x");
+    window.keys("escape");
+    assert!(!window.shows("feedback-body"), "nothing was picked");
+}
+
 #[gpui_kit::test]
 fn a_finished_recorder_releases_the_keyboard(cx: &mut TestAppContext) {
     let mut window = open(cx, RECORDER);
