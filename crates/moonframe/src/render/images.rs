@@ -3,7 +3,7 @@
 //! several filesystem calls per image per frame while anything animates.
 
 use {
-    moonframe_core::{Image, MAX_IMAGE_BYTES},
+    moonframe_core::{Image, MAX_IMAGE_BYTES, resolve_file},
     std::{
         cell::RefCell,
         collections::{HashMap, HashSet},
@@ -110,7 +110,18 @@ pub(super) fn resolve(
     folder: &Path,
     allowed: impl FnOnce() -> Vec<PathBuf>,
 ) -> Option<PathBuf> {
-    let key = (owner.to_owned(), folder.to_owned(), image.src.clone());
+    resolve_src(&image.src, owner, folder, allowed)
+}
+
+/// [`resolve`] for a picture named by its address alone, as a markdown
+/// document names one.
+pub(super) fn resolve_src(
+    src: &str,
+    owner: &str,
+    folder: &Path,
+    allowed: impl FnOnce() -> Vec<PathBuf>,
+) -> Option<PathBuf> {
+    let key = (owner.to_owned(), folder.to_owned(), src.to_owned());
     let now = Instant::now();
     let cached = CACHE.with_borrow(|cache| match cache.get(&key) {
         Some(Resolved::Found(path)) => Some(Some(path.clone())),
@@ -121,9 +132,8 @@ pub(super) fn resolve(
         return cached;
     }
     let home = std::env::home_dir();
-    let path = image
-        .resolve(folder, home.as_deref(), &allowed())
-        .or_else(|| granted_file(owner, &image.src, folder, home.as_deref()));
+    let path = resolve_file(src, folder, home.as_deref(), &allowed(), MAX_IMAGE_BYTES)
+        .or_else(|| granted_file(owner, src, folder, home.as_deref()));
     let resolved = match &path {
         Some(path) => Resolved::Found(path.clone()),
         None => Resolved::Missing(now),

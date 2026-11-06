@@ -9,6 +9,7 @@ type Props = {
 	highlight: { number }?,
 	numbers: boolean?,
 	path: string?,
+	language: string?,
 	height: number?,
 	grow: boolean?,
 	event: string?,
@@ -22,11 +23,25 @@ type Props = {
 local LIST_AFTER = 500
 local LINE_HEIGHT = 20
 
+-- What a file's extension says it is written in, for the grammars the host has.
+local LANGUAGES: { [string]: string } = {
+	bash = "bash", c = "c", cc = "cpp", cpp = "cpp", css = "css", go = "go", h = "c", hpp = "cpp",
+	htm = "html", html = "html", java = "java", js = "javascript", json = "json", jsx = "javascript",
+	lua = "lua", luau = "lua", mjs = "javascript", py = "python", rb = "ruby", rs = "rust", sh = "bash",
+	sql = "sql", swift = "swift", toml = "toml", ts = "typescript", tsx = "tsx", yaml = "yaml",
+	yml = "yaml", zsh = "bash",
+}
+
+local function language_of(path: string?): string?
+	local extension = path and string.match(path, "%.(%w+)$")
+	return if extension then LANGUAGES[string.lower(extension)] else nil
+end
+
 return component {
 	title = "Code View",
 	category = "Data",
 	icon = "file-text",
-	description = "Read-only mono lines with line numbers, highlighted lines, a start line and an optional path header; no wrapping; scrolls.",
+	description = "Read-only mono lines, colored by language, with line numbers, highlighted lines, a start line and an optional path header; no wrapping; scrolls.",
 	when = "Show code or a log read-only: a file at a line, a snippet in a comment, a test's output. For changes use `diff-view`; for a live shell use `terminal`.",
 	props = {
 		["text"] = "the code; split into lines on \\n",
@@ -35,6 +50,7 @@ return component {
 		["highlight"] = "line numbers to highlight",
 		["numbers"] = "false hides line numbers",
 		["path"] = "a header with the file path",
+		["language"] = "color the code as this language (\"rust\", \"lua\"); the extension of `path` when unset. A line at a time, so a block comment over several lines colors only where it shows it",
 		["height"] = "pixels: scrolls within it",
 		["grow"] = "fill the parent and scroll",
 		["event"] = "line click message key: sends { [event] = line number } (no click without it)",
@@ -86,6 +102,8 @@ code_view {
 		local scrolls = props.height ~= nil or props.grow == true
 		local listed = scrolls and #lines > LIST_AFTER
 
+		local syntax = props.language or language_of(props.path)
+
 		local function draw(index: number)
 			local text = lines[index]
 			local number = start + index - 1
@@ -106,7 +124,7 @@ code_view {
 					justify = "end",
 					ui.text { tostring(number), class = "code-view-number" },
 				},
-				ui.text { if text == "" then " " else text, class = "code-view-text", wrap = false },
+				ui.text { if text == "" then " " else text, class = "code-view-text", wrap = false, syntax = syntax },
 			}
 		end
 

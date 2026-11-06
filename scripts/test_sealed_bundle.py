@@ -112,6 +112,13 @@ class PlanTests(unittest.TestCase):
         plan = Plan(repo / "app", repo / "examples/lightbox", [])
         self.assertTrue({"video", "awake"} <= plan.chosen["features"])
 
+    def test_document_capabilities_can_be_requested_explicitly(self):
+        for feature in ("math", "syntax"):
+            with self.subTest(feature=feature):
+                self.write(self.app / "moonframe.toml",
+                           f'[app]\nname = "test"\n[bundle]\nfeatures = ["{feature}"]\n')
+                self.assertIn(feature, self.plan().chosen["features"])
+
     def test_writing_inputs_and_release_metadata_keep_their_capabilities(self):
         for props in ('{ prose = true }', '{ dim = mode }', '{ typewriter = true }',
                       'props', '{ [key] = value }'):

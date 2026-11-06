@@ -138,12 +138,42 @@ impl<'w> Draw<'w> for Overlay {
         if self.backdrop {
             layer = layer.child(crate::browser::cover());
         }
+        let sheet = BoundedSheet {
+            content: sheet.child(content).child(crate::browser::cover()),
+            place: self.place,
+            margin: look.base.margin,
+        };
         painter.overlays[index] = Some(
-            deferred(layer.child(sheet.child(content).child(crate::browser::cover())))
+            deferred(layer.child(sheet))
                 .with_priority(priority)
                 .into_any_element(),
         );
         placeholder
+    }
+}
+
+/// Explicit overlay sizes are preferred sizes: keep the sheet inside the
+/// current viewport, including its margins, as the window is resized.
+#[derive(IntoElement)]
+struct BoundedSheet {
+    content: Stateful<Div>,
+    place: Placement,
+    margin: moonframe_core::Sides,
+}
+
+impl RenderOnce for BoundedSheet {
+    fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
+        let (top, side, bottom) = match self.place {
+            Placement::Top => (HANG, EDGE, 0.),
+            Placement::Bottom | Placement::Left | Placement::Right => (0., 0., 0.),
+            _ => (EDGE, EDGE, EDGE),
+        };
+        let width = self.margin.left.unwrap_or(side) + self.margin.right.unwrap_or(side);
+        let height = self.margin.top.unwrap_or(top) + self.margin.bottom.unwrap_or(bottom);
+        let viewport = window.viewport_size();
+        self.content
+            .max_w((viewport.width - px(width)).max(px(0.)))
+            .max_h((viewport.height - px(height)).max(px(0.)))
     }
 }
 

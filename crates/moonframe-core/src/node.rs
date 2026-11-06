@@ -169,6 +169,8 @@ pub struct Text {
     pub wrap: bool,
     /// A line through it: a task done, a price struck.
     pub strike: bool,
+    /// Colored as code in this language, a line at a time.
+    pub syntax: Option<String>,
     pub extras: Extras,
 }
 
@@ -183,6 +185,7 @@ impl Text {
             weight: None,
             truncate: false,
             lines: None,
+            syntax: None,
             wrap: true,
             strike: false,
             extras: Extras::default(),
@@ -398,17 +401,18 @@ pub struct Hatch {
 }
 
 /// Markdown the host renders: headings, emphasis, lists, task lists,
-/// tables, quotes and highlighted code. Links never open by themselves:
-/// a click sends `link` with the address as `url`, for the mod to decide.
-/// Pictures are not loaded, so a document cannot make the app fetch
-/// anything.
+/// tables, quotes, alerts, footnotes and highlighted code. Links never open
+/// by themselves: a click sends `link` with the address as `url`, for the
+/// mod to decide, and a `#heading` link scrolls to its heading. Pictures
+/// show only with `images`, and then only files a `ui.image` could, so a
+/// document cannot make the app fetch anything.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Markdown {
     pub look: Look,
     pub text: String,
     /// Sent when a link is clicked, shaped as [`Markdown::message`].
     pub link: Option<Data>,
-    /// The mod `link` goes to; the drawing mod when unset.
+    /// The mod its messages go to; the drawing mod when unset.
     pub to: Option<String>,
     /// Take the free space along the parent's axis.
     pub grow: bool,
@@ -417,6 +421,37 @@ pub struct Markdown {
     pub width: Option<f32>,
     pub height: Option<f32>,
     pub max_width: Option<f32>,
+    /// Show at most this many lines of body text (not with `scroll`).
+    pub lines: Option<usize>,
+    /// Show pictures from files, as `ui.image` would.
+    pub images: bool,
+    /// Sent when a picture on a line of its own is clicked, with `src`,
+    /// its address, and `alt`.
+    pub image: Option<Data>,
+    /// Sent with `headings` each time the document's headings change.
+    pub outline: Option<Data>,
+    /// Sent with `heading`, the index of the one being read, as a
+    /// scrolling document passes it.
+    pub section: Option<Data>,
+    /// Where to scroll to; a new one scrolls.
+    pub reveal: Option<Reveal>,
+    /// Text to highlight wherever it shows.
+    pub find: Option<String>,
+    /// The match to mark as current and scroll to, from 1.
+    pub find_index: Option<usize>,
+    /// Sent with `count` each time the number of matches changes.
+    pub found: Option<Data>,
+    /// Fade in what is added to `text`, as an answer streams in.
+    pub stream: bool,
+}
+
+/// A place in a document to scroll to: bytes into its text, as `headings`
+/// gives them. `seq` tells two requests for one place apart, as the same
+/// heading can be picked again after scrolling away.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Reveal {
+    pub at: usize,
+    pub seq: i64,
 }
 
 impl Markdown {
@@ -432,6 +467,16 @@ impl Markdown {
             },
             other => Data::Map([("msg".to_owned(), other.clone()), ("url".to_owned(), url)].into()),
         }
+    }
+
+    /// `msg` with `fields` added, in the shape of [`Markdown::message`].
+    pub fn note<const N: usize>(msg: &Data, fields: [(&str, Data); N]) -> Data {
+        let mut entries = match msg {
+            Data::Map(entries) => entries.clone(),
+            other => [("msg".to_owned(), other.clone())].into(),
+        };
+        entries.extend(fields.map(|(key, value)| (key.to_owned(), value)));
+        Data::Map(entries)
     }
 }
 

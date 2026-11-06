@@ -37,13 +37,13 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 | Element | Use it for | Keys |
 | --- | --- | --- |
-| `ui.text "..."` | any text; a bare string child is plain text | `text`, `tone`, `size`, `weight` (`light` `normal` `medium` `semibold` `bold`), `truncate` (one line), `lines` (at most N lines), `wrap = false` (keep lines whole, for code that scrolls sideways), extras |
+| `ui.text "..."` | any text; a bare string child is plain text | `text`, `tone`, `size`, `weight` (`light` `normal` `medium` `semibold` `bold`), `truncate` (one line), `lines` (at most N lines), `wrap = false` (keep lines whole, for code that scrolls sideways), `syntax` (color it as code in this language, a line at a time), extras |
 | `ui.icon "name"` | a bundled icon at the text's size and color; `spin = true` turns it (loaders). Lucide glyphs (git: `git-branch` `git-commit-horizontal` `git-merge` `git-pull-request` `git-pull-request-draft` `git-pull-request-closed` `git-compare` `circle-dot`), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, brands `brand-github` `brand-gitlab` `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama`; the full list is `IconName` in types/moonframe.d.luau | `name`, `tone`, `size`, `spin`, extras |
 | `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), `zoom` (screen pixels per picture pixel, 1 is 100 %: a viewer that fills its parent unless sized) panned to `center = { x, y }` (fractions of the picture), `overlay = { elements }` drawn over the picture wherever it lands (their `area` is in fractions of the picture: a crop frame, spots), `measure` (sent with the picture's `width`, `height`, `box_width`, `box_height` and the `fit` zoom when they change), extras |
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone`, extras |
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`), `exit` (sent once, with `exited = true` added, as the shell exits; without it Enter starts another) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
-| `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; links send `link` instead of opening, pictures are not loaded; styled by `markdown`, `markdown-code` and `markdown-quote` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width` |
+| `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, `> [!NOTE]` alerts, footnotes, frontmatter, highlighted code with a copy button; LaTeX in a build with `math`), up to 1 MiB; links send `link` instead of opening, a `#heading` link scrolls there, a `[label](cite:source)` link draws a source chip, and pictures show only with `images`, never from the web; styled by `markdown`, `markdown-code`, `markdown-quote`, `markdown-alert`, `markdown-find` and `markdown-find-current` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `lines` (at most N lines, for a preview), `images`, `image` (a click on a picture on its own line, with `src` and `alt`), `outline` (sent with `headings`: `level`, `text`, `at`, `slug`), `section` (sent with `heading`, the index being read), `reveal = { at, seq }` (scrolls there when it changes), `find`, `find_index`, `found` (sent with `count`), `stream` (fade in what is added) |
 | `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
 | `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a two-finger double tap, a double click and its buttons zoom, and two fingers turn it (it settles on north within a few degrees); without `center`/`zoom` it frames the pins and routes. With `glide`, a new `center`, `zoom` or `bearing` eases the map there. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `bearing` (the compass direction up the box, degrees clockwise from north; a new one turns the map where it stands, so feed `move`'s back in and a compass shown while it is not 0 sets it to 0 on a click), `pins` (each `lat`, `lon`, `label` up to 3 characters or `icon`, `color`, `shape` `dot` `disc` `balloon`, `selected`, `pulse` (a halo breathes out of it: where the user is), `msg`), `routes` (each `points` flat lat, lon pairs drawn as they are, or `via` stops and `mode` `walk` `bike` `car` routed along streets by routing.openstreetmap.de; `color`, `stroke`, `dashed`; the style's `color` otherwise), `routed` (sent with `route`, `seconds`, `meters` once a `via` route is found), `move` (sent with `lat`, `lon`, `zoom`, `bearing` after the user moves it, as they go), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
 | `ui.video { source = "camera", white = 4095 }` | live frames from another process, from a ring in shared memory, in a 16-bit colour-managed native view that fills its space (macOS, the `video` feature); nothing draws over it, so `guides` draws crop frames and lines in the picture. `source`, `id`, `zoom`, `center`, `filter` (`auto` `nearest` `linear`), `color` (`srgb` `display-p3` `rec709` `rec2020` `linear-srgb` `linear-p3` `none`), `extended`, `black`, `white`, `gain`, `gamma`, `guides`, `probe`, `stats`, `probed`, `width`, `height`. Most apps want `video-viewer`; see `docs/video.md` |
@@ -55,7 +55,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
-| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value` and `caret`), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow`, `browser`, `prose`, `dim`, `typewriter` |
+| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow`, `browser`, `prose`, `dim`, `typewriter` |
 
 ### Overlays
 
@@ -204,7 +204,7 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
 element's own; on containers),
 `transition` (a second duration is its delay: `"fade 150ms 40ms"`), `delay`
 (replaces the transition's delay, set inline per item to stagger a list),
-`clip = true` (hide what overflows the box). Selectors: a part (`row`, `item`, `list`, `popover`, `overlay`, `overlay-backdrop`, `tooltip`, `image`, `markdown`, `markdown-code`, `markdown-quote`, ...),
+`clip = true` (hide what overflows the box). Selectors: a part (`row`, `item`, `list`, `popover`, `overlay`, `overlay-backdrop`, `tooltip`, `image`, `markdown`, `markdown-code`, `markdown-quote`, `markdown-alert`, `markdown-find`, `markdown-find-current`, ...),
 a class (`.tab`), and a state: `:hover`, `:selected`, `:focus`,
 `:disabled`, or one the view names with `state = "..."` (`.drawer:open`).
 
@@ -251,6 +251,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`country-code`](#country-code) | Data | Beside a country's name in lists of locations or settings, in place of a flag (no flag images ship). For any short label use `ui.badge` or `pill`. |
 | [`course-card`](#course-card) | Data | The one course, plan or program a page puts first, with where the reader is and a button to carry on. For a grid of guides use `guide-card`; for a figure with a trend use `stat-tile`; for a titled box of anything use `card`. |
 | [`date-tile`](#date-tile) | Data | Beside dated items in a list (deadlines, calls, distributions, events) where the date leads. For a date inside a line of text use plain text; for picking a day use `day-strip` or `month-grid`. |
+| [`document-card`](#document-card) | Data | A home screen or a folder of notes shown as a grid. For a list beside an editor use `document-row`; for attached files use `file-card`; for reading material with progress use `guide-card`. |
 | [`dot-chart`](#dot-chart) | Data | A daily or weekly count compared with the period before (signups, orders), where the squares' rhythm reads better than smooth bars. For stacked counts by kind use `bar-chart`; for a balance against a floor use `forecast-chart`; for a trend line use `ui.line`. |
 | [`file-card`](#file-card) | Data | Attachments on a task, a comment or a message, in a grid of tiles or a list of rows, while they upload and after. For the area files are dropped on use `dropzone`; for a file in a tree use `tree` with `file-icon`; for a picture to look at closely use `image-viewer`. |
 | [`file-icon`](#file-icon) | Data | Beside a file name in a tree, a tab or a list of changes. For a generic icon use `ui.icon`. |
@@ -319,13 +320,16 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`dictation`](#dictation) | Forms | Let the user talk instead of type: beside a prompt, in `composer`'s `actions`. The drawing mod must be in `recorders` of providers/speech. Give it `listening`, and send `provider:speech` `{ cancel = true }` if it stops being drawn while listening (a closing dialog), or the microphone stays on until the limit. |
 | [`dropzone`](#dropzone) | Forms | Adding attachments to a task, a message or a form: files dragged from other apps land on it, and browse opens the system's file panel (`{ to = "app:pick", ... }`). Show what was added under it with `file-card`. For a button alone use `ui.button`; for an empty list with one action use `empty-state`. |
 | [`filter-builder`](#filter-builder) | Forms | Filtering a list or board by conditions the user builds (status is Done, assignee is not Sarah), inside a `ui.popover` under a Filter button. For one filter per chip over a table use `filter-dropdown`; for toggles use `chips`; for a text query use `search-field`. |
+| [`find-bar`](#find-bar) | Forms | Finding text in the document or pane on screen (⌘F). For filtering a list use `search-field`; for running commands use `command-palette`. |
 | [`form-grid`](#form-grid) | Forms | A dense form in a tool's sidebar or inspector: an output's size, a scanner's holder, a file name. For a settings page with descriptions use `settings-row`; for read-only label/value pairs use `key-values`. |
 | [`mention-field`](#mention-field) | Forms | A comment box, a task's description or a chat message where people are mentioned. For addresses on a message use `recipient-field`; for a chat with an agent use `composer`; for a plain field use `ui.input`. |
 | [`number-field`](#number-field) | Forms | A number the user sets exactly or nudges: a resolution, a frame number, a zoom, a count, in a dense settings form or inspector. Read `tonumber(msg.value)` for both typing and dragging. For a value along a range where the feel matters use `slider`; for a small count with buttons only use `stepper`. |
 | [`radio-group`](#radio-group) | Forms | Pick one of a few options that need a description or room to read (a mode, a policy). For 2 to 4 short values use `segmented`; for many values use `dropdown`; for options with a picture use `choice-cards`; for independent on/off options use `checkbox`. |
 | [`recipient-field`](#recipient-field) | Forms | The To, Cc and Bcc lines of a message being written, or inviting people by address. For tags the user only reads use `tags`; for filters use `chips`; for a single free-text value use `ui.input`; for a search box use `search-field`. |
 | [`search-field`](#search-field) | Forms | A query box over a list or palette: filter files, branches or commands as the user types, with up and down to move through results. For a longer value use `ui.input` (multiline for a text area); for one-of-many choices use `segmented` or `dropdown`. |
+| [`selection-toolbar`](#selection-toolbar) | Forms | A `ui.input` or `prose-editor` that keeps its chrome out of the way until words are selected. For a bar that always shows use `text-editor`; for actions on a row use `context-menu`. |
 | [`settings-row`](#settings-row) | Forms | Each line of a settings page or preferences card, holding a `switch`, `segmented`, `dropdown` or button. Group rows under `settings-page` sections; for read-only properties use `key-values`; for a labelled switch on its own use `switch` with `label`. |
+| [`shortcut-field`](#shortcut-field) | Forms | Letting the user rebind a shortcut, in a `settings-row` or a `shortcuts` page. For showing a shortcut use `kbd`; for a list of them use `shortcuts`. |
 | [`slider`](#slider) | Forms | A setting along a continuous range where the feel matters more than the exact number: contrast, saturation, an amount, a radius, a volume. For a number the user types or nudges use `number-field` or `stepper`; for a fraction shown read-only use `meter`; for a few named values use `segmented`. |
 | [`stepper`](#stepper) | Forms | A small number nudged up or down: a font size, a column count, a delay. For a fraction shown as a bar use `meter`; for one of a few named sizes use `segmented`. |
 | [`swatches`](#swatches) | Forms | Pick a colour from a short palette: a workspace or tag colour, an accent. For themes (many colours each) use `choice-cards` with a swatch row as the preview; to show colours without picking, use `ui.row`s with a background. |
@@ -364,6 +368,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`day-strip`](#day-strip) | Navigation | Picking a day in a planner, an agenda or a log, over the list for that day. For a whole month use a calendar grid; for steps of a flow use `pager`; for a few named views use `segmented`. |
 | [`month-grid`](#month-grid) | Navigation | A calendar view or a date picker's body: choosing a day in a month. For a strip of days over a list use `day-strip`; for events in order use `timeline`. |
 | [`nav-buttons`](#nav-buttons) | Navigation | History navigation in a title bar, a browser tab or a pane that keeps a back stack. For onboarding steps use `pager`; for a single icon action use `icon-button`. |
+| [`outline`](#outline) | Navigation | Beside a long document: a README, a note, a report read in a `markdown`. For a file tree use `tree`; for an app's navigation use `side-nav`; for steps use `numbered-list`. |
 | [`pager`](#pager) | Navigation | Steps of an onboarding or welcome flow, or pages of a carousel. For history back/forward use `nav-buttons`; for switching views use `tabs` or `segmented`. |
 | [`pagination`](#pagination) | Navigation | Under a table or list too long to show at once (an audit log, orders, invoices), when the user steps through it by page. For a list that scrolls use `ui.list`; for steps of an onboarding flow use `pager`; for history use `nav-buttons`. |
 | [`pill-tabs`](#pill-tabs) | Navigation | Switching the few views of one list from a sidebar or header (Inbox, All, Last 7 Days), where the current view deserves its name and the rest only an icon. For settings choices use `segmented`; for documents or sessions use `tabs`; for the app's main views use `activity-bar`. |
@@ -383,6 +388,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`context-menu`](#context-menu) | Overlays | Right-click actions on a row, tab, tile or file. It anchors the menu to the wrapped content, not the pointer. For a menu opened by a button use `dropdown`; for the menu rows alone use `menu`. On `tabs`, use its `context` (each tab already sends { tab_menu = id }) and put this around the strip, or a `ui.popover` with `menu`. |
 | [`dialog`](#dialog) | Overlays | Any modal that asks for attention: a form, a choice, details. For a yes/no question use `confirm`; for a panel sliding from an edge use `sheet`; for a non-blocking message use `toast` or `notice`; for content beside a control use `ui.popover`. |
 | [`emoji-picker`](#emoji-picker) | Overlays | Reacting to a comment or a message, or putting an emoji in a name: open it in a `ui.popover` from an add-reaction button (give the popover `class = "emoji-picker-popover"`). For a list of actions use `menu`; for colours use `swatches`. |
+| [`lightbox`](#lightbox) | Overlays | Opening a picture from a document, a gallery or a message to see it large. For a viewer that stays in a pane use `image-viewer`; for a picture at a fixed size use `ui.image`. |
 | [`menu`](#menu) | Overlays | The content of any menu: put it in a `ui.popover` or `ui.overlay` yourself, or use `dropdown` (a button that opens one) or `context-menu` (opens on right-click), which already do. For a selectable sidebar list use `list`; for a command palette with a search field use `command-palette`. |
 | [`notification-drawer`](#notification-drawer) | Overlays | The app's notification centre, opened from a bell: a list the user filters by kind (All, Error, Success, Info), marks read and dismisses. For transient pop-ups use `toasts`; for a message that stays in the page use `notice`; for any other side panel use `sheet`. |
 | [`onboarding`](#onboarding) | Overlays | A short guided tour or welcome on first launch or after a big update. For one release's changes use `release-notes`; for a single question use `confirm`; for any other modal use `dialog`. |
@@ -659,11 +665,12 @@ A whole mod using it, with state: `app/components/demos/browser.luau`.
 
 | Prop | Meaning |
 | --- | --- |
-| `cursor` | draw a dot after the last word, while the text is still being written |
+| `cursor` | the text is still being written: new words fade in, open marks style what follows them, and a dot follows the last word |
+| `link` | message a link click sends, with `url` added, as `markdown` sends it |
 | `text` | the markdown; a `[label](cite:source)` link draws a source chip |
-| `to` | unused for now: links show their target as a tooltip |
+| `to` | mod to send `link` to, if not the drawing one |
 
-**Styles:** `.chat-markdown` `.chat-markdown-bold` `.chat-markdown-cell` `.chat-markdown-cite` `.chat-markdown-cite-letter` `.chat-markdown-cite-mark` `.chat-markdown-cite-text` `.chat-markdown-code` `.chat-markdown-cursor` `.chat-markdown-gap` `.chat-markdown-h1` `.chat-markdown-h2` `.chat-markdown-h3` `.chat-markdown-italic` `.chat-markdown-item` `.chat-markdown-line` `.chat-markdown-link` `.chat-markdown-list` `.chat-markdown-marker` `.chat-markdown-pre` `.chat-markdown-pre-body` `.chat-markdown-pre-copy` `.chat-markdown-pre-copy:hover` `.chat-markdown-pre-head` `.chat-markdown-pre-language` `.chat-markdown-pre-line` `.chat-markdown-quote` `.chat-markdown-rule` `.chat-markdown-space` `.chat-markdown-table` `.chat-markdown-th` `.chat-markdown-thead` `.chat-markdown-tr`
+**Styles:** `.chat-markdown`
 
 ```lua
 local chat_markdown = use "chat-markdown"
@@ -690,6 +697,7 @@ A whole mod using it, with state: `app/components/demos/chat-markdown.luau`.
 | `min` | the least zoom (default a quarter of fitted) |
 | `overlay` | elements drawn over the picture; their `area` is in fractions of the picture, a `pointer` there takes presses before panning does, and their messages reach the mod as they are |
 | `src` | the picture: an absolute or `~/` path (a file the user picked or dropped, the image cache, the app's folders), or one relative to the components folder, which draws it |
+| `to` | mod to send view changes to, if not the drawing one |
 | `width` | pixels; fills its parent when unset |
 | `zoom` | screen pixels per picture pixel (1 is 100 %); nil fits it |
 
@@ -705,18 +713,28 @@ A whole mod using it, with state: `app/components/demos/image-viewer.luau`.
 
 #### `markdown`
 
-**Markdown.** A markdown document: headings, emphasis, lists, task lists, tables, quotes and highlighted code; links send a message instead of opening.
+**Markdown.** A markdown document: headings, emphasis, lists, task lists, tables, quotes, alerts, footnotes and highlighted code; links send a message instead of opening.
 
 **When:** Show markdown read-only: a README, notes, an agent's answer, release notes written in markdown. For editing a file use `markdown-editor`; for a chat answer streaming in, or one with source chips, use `chat-markdown`; for code alone use `code-view`; for one line of text use `ui.text`.
 
 | Prop | Meaning |
 | --- | --- |
+| `find` | text to mark wherever it shows |
+| `find_index` | which match is current, from 1: marked strongly and scrolled to |
+| `found` | message sent as the number of matches changes, with `count` |
 | `grow` | fill the parent's free space |
+| `image` | message a click on a picture on its own line sends, with `src` and `alt` added, to open it in a `lightbox` |
+| `images` | show pictures, from files a `ui.image` could show; never from the web. Without it a picture on its own line shows its alt text |
+| `lines` | show at most this many lines, for a preview (not with `scroll`) |
 | `link` | message a link click sends, with `url` added (a table gets the field; anything else arrives as { msg = link, url }) |
 | `max_width` | pixels: a readable measure for long prose |
+| `outline` | message sent as the headings change, with `headings`: { level, text, at, slug }; feed it to `outline` |
+| `reveal` | { at = <a heading's `at`>, seq = <a number> }: scrolls there when it changes (with `scroll`); a new `seq` goes there again |
 | `scroll` | scroll its own content (with `grow` or a fixed height around it) |
+| `section` | message sent as a scrolling document passes a heading, with `heading`, its index |
+| `stream` | fade in what is added to `text`, as an answer streams in |
 | `text` | the markdown, up to 1 MiB |
-| `to` | mod to send `link` to, if not the drawing one |
+| `to` | mod to send its messages to, if not the drawing one |
 
 **Styles:** `.markdown`
 
@@ -725,6 +743,16 @@ local markdown = use "markdown"
 
 markdown { text = state.notes, grow = true, scroll = true, link = "open-link" }
 -- update: msg.msg == "open-link" carries the address in msg.url
+
+-- A preview of a note, cut to four lines:
+markdown { text = note.body, lines = 4 }
+
+-- A document beside its `outline`, with a `find-bar` over it:
+markdown {
+	text = state.text, grow = true, scroll = true,
+	outline = "headings", section = "reading", reveal = state.reveal,
+	find = state.query, find_index = state.match, found = "found",
+}
 ```
 
 A whole mod using it, with state: `app/components/demos/markdown.luau`.
@@ -1289,7 +1317,7 @@ chat_message {
 
 #### `code-view`
 
-**Code View.** Read-only mono lines with line numbers, highlighted lines, a start line and an optional path header; no wrapping; scrolls.
+**Code View.** Read-only mono lines, colored by language, with line numbers, highlighted lines, a start line and an optional path header; no wrapping; scrolls.
 
 **When:** Show code or a log read-only: a file at a line, a snippet in a comment, a test's output. For changes use `diff-view`; for a live shell use `terminal`.
 
@@ -1300,6 +1328,7 @@ chat_message {
 | `height` | pixels: scrolls within it |
 | `highlight` | line numbers to highlight |
 | `id` | names the list a long scrolling view becomes (default "code-view"); two long views in one mod need two |
+| `language` | color the code as this language ("rust", "lua"); the extension of `path` when unset. A line at a time, so a block comment over several lines colors only where it shows it |
 | `lines` | the lines instead of `text` |
 | `numbers` | false hides line numbers |
 | `path` | a header with the file path |
@@ -1500,6 +1529,38 @@ A whole mod using it, with state: `app/components/demos/course-card.luau`.
 local date_tile = use "date-tile"
 
 date_tile { day = "9", month = "Nov", tone = "danger" }
+```
+
+#### `document-card`
+
+**Document Card.** A document as a grid tile: its title, a preview of its first lines rendered as markdown, the date it changed and a star.
+
+**When:** A home screen or a folder of notes shown as a grid. For a list beside an editor use `document-row`; for attached files use `file-card`; for reading material with progress use `guide-card`.
+
+| Prop | Meaning |
+| --- | --- |
+| `context` | message a right-click sends (a menu) |
+| `date` | when it last changed, as shown ("Today, 14:02") |
+| `favorite` | draw the star filled |
+| `height` | pixels (default 200) |
+| `lines` | lines of preview shown (default 5) |
+| `msg` | message a click sends (open it) |
+| `selected` | highlight it |
+| `star` | message the star sends; no star without it |
+| `text` | its markdown, cut to `lines` lines |
+| `title` | the document's title |
+| `to` | mod to send them to, if not the drawing one |
+| `width` | pixels (default 240) |
+
+**Styles:** `.document-card` `.document-card:hover` `.document-card:selected` `.document-card-date` `.document-card-preview` `.document-card-title`
+
+```lua
+local document_card = use "document-card"
+
+ui.row { wrap = true, gap = "large",
+	document_card { title = note.title, text = note.body, date = note.changed,
+		favorite = note.starred, star = { star = note.id }, msg = { open = note.id } },
+}
 ```
 
 #### `dot-chart`
@@ -3495,6 +3556,48 @@ ui.popover {
 
 A whole mod using it, with state: `app/components/demos/filter-builder.luau`.
 
+#### `find-bar`
+
+**Find Bar.** A find box with "3 of 12", previous and next, and close; Enter and Shift-Enter step through matches, and `replace` adds a replace line.
+
+**When:** Finding text in the document or pane on screen (⌘F). For filtering a list use `search-field`; for running commands use `command-palette`.
+
+| Prop | Meaning |
+| --- | --- |
+| `change` | sent on each edit, with `value` set to the text |
+| `closable` | false hides the × (default true) |
+| `count` | how many matches there are |
+| `event` | key of the message the buttons and keys send, default "find": { find = "next" } (Enter, ↓), { find = "previous" } (Shift-Enter, ↑), { find = "close" } (×, Escape) |
+| `focus` | take focus when it appears |
+| `id` | keeps the text across renders (default "find") |
+| `index` | which one is current, from 1 |
+| `placeholder` | grey text while empty (default "Find") |
+| `replace` | show the replace line |
+| `replace_all` | sent by Replace all |
+| `replace_change` | sent on each edit of the replacement, with `value` |
+| `replace_one` | sent by Replace |
+| `replacement` | the replacement text |
+| `to` | mod to send them to, if not the drawing one |
+| `value` | the query; applied when it changes, so `""` clears it |
+| `width` | pixels (default 340) |
+
+**Styles:** `.find-bar` `.find-bar-count` `.find-bar-input` `.find-bar-line` `.find-bar-none`
+
+```lua
+local find_bar = use "find-bar"
+
+find_bar {
+	value = state.query, count = state.count, index = state.match, focus = true,
+	change = "query",
+}
+-- update: msg.msg == "query" sets state.query = msg.value and state.match = 1;
+-- msg.find == "next" and "previous" move state.match round state.count;
+-- "close" hides it. Give `state.query` and `state.match` to `ui.markdown`'s `find` and
+-- `find_index`, and keep `count` from its `found` message.
+```
+
+A whole mod using it, with state: `app/components/demos/find-bar.luau`.
+
 #### `form-grid`
 
 **Form Grid.** Rows of a label and its control in two aligned columns, with an optional hint under a control: a compact form.
@@ -3532,16 +3635,18 @@ A whole mod using it, with state: `app/components/demos/form-grid.luau`.
 | `event` | key of the message ↑ ↓ ↩ and Tab send while suggestions show, default "mention": { mention = "up" }, { mention = "down" }, or { mention = "choose", edit = <msg> }, which the mod sends on: `return state, { { to = "app:edit", msg = msg.edit } }` |
 | `focus` | take focus when it appears |
 | `grow` | fill the width |
+| `heading` | the suggestions' heading (default "People"; "" for none) |
 | `highlighted` | index of the keyboard-highlighted suggestion (default 1) |
 | `id` | the field's id: the suggestions edit it through `app:edit` |
 | `max_rows` | the most lines a multiline field grows to |
 | `most` | the most suggestions shown (default 6) |
 | `multiline` | a text area; `rows` and `max_rows` size it (default 2 to 8) |
-| `people` | who can be mentioned: { name, detail?, src? (an avatar image) } |
+| `people` | who can be mentioned, or what can be picked: { name, detail?, src? (an avatar image), icon? (instead of the avatar), insert? (the text put in, default the trigger and the name, then a space), id? (a pick also reaches the mod: { mention = "choose", item = id, edit }) } |
 | `placeholder` | grey text while empty |
 | `rows` | visible lines of a multiline field |
 | `submit` | sent on Enter (⌘↩ when multiline) while no suggestion shows |
 | `to` | mod its messages go to, if not the drawing one |
+| `trigger` | the character that starts a completion (default "@"); a punctuation mark |
 | `value` | the text, kept from `change` (`msg.value`) |
 | `width` | the suggestions' width in pixels (default 260) |
 
@@ -3559,6 +3664,13 @@ mention_field {
 -- msg.caret (and sets state.highlighted = 1); msg.mention == "up"/"down"
 -- moves state.highlighted; "choose" sends on its edit:
 -- return state, { { to = "app:edit", msg = msg.edit } }
+
+-- A slash menu: picks carry the entry's id for the mod to act on.
+mention_field {
+	id = "note", value = state.text, caret = state.caret, trigger = "/", heading = "",
+	people = { { id = "file", name = "Attach a file", icon = "file", insert = "" } },
+	change = "type", multiline = true,
+}
 ```
 
 A whole mod using it, with state: `app/components/demos/mention-field.luau`.
@@ -3703,6 +3815,33 @@ search {
 
 A whole mod using it, with state: `app/components/demos/search-field.luau`.
 
+#### `selection-toolbar`
+
+**Selection Toolbar.** Bold, italic, code and link buttons that float over a text field while text is selected, and edit it in place.
+
+**When:** A `ui.input` or `prose-editor` that keeps its chrome out of the way until words are selected. For a bar that always shows use `text-editor`; for actions on a row use `context-menu`.
+
+| Prop | Meaning |
+| --- | --- |
+| `[children]` | the field |
+| `field` | the `id` of the `ui.input` it edits |
+| `selected` | bytes selected, from the field's `select` message (`msg.selected`); it shows above 0 |
+| `side` | "top" (default) or "bottom" of the field |
+| `tools` | the buttons, in order: bold, italic, strike, code, link, quote (default all) |
+
+**Styles:** `.selection-toolbar` `.selection-toolbar-tool` `.selection-toolbar-tool:hover`
+
+```lua
+local selection_toolbar = use "selection-toolbar"
+
+selection_toolbar { field = "notes", selected = state.selected,
+	ui.input { id = "notes", multiline = true, change = "type", select = "moved" },
+}
+-- update: msg.msg == "moved" keeps state.selected = msg.selected.
+```
+
+A whole mod using it, with state: `app/components/demos/selection-toolbar.luau`.
+
 #### `settings-row`
 
 **Settings row.** A setting: title, source tag and muted description on the left, its control on the right, a line under it.
@@ -3733,6 +3872,35 @@ settings_row { title = "Show agents", description = "List running agents under t
 ```
 
 A whole mod using it, with state: `app/components/demos/settings-row.luau`.
+
+#### `shortcut-field`
+
+**Shortcut Field.** A shortcut shown as key caps; a click starts recording, and the next chord pressed is sent with its name in `keys`.
+
+**When:** Letting the user rebind a shortcut, in a `settings-row` or a `shortcuts` page. For showing a shortcut use `kbd`; for a list of them use `shortcuts`.
+
+| Prop | Meaning |
+| --- | --- |
+| `clearable` | show a × while it has a value |
+| `event` | key of its messages, default "shortcut": { shortcut = "record" } on a click, { shortcut = "set", keys = "cmd-shift-p" } for the chord pressed, { shortcut = "cancel" } on Escape or leaving the field, { shortcut = "clear" } from the × |
+| `id` | keeps the field apart from another (default "shortcut") |
+| `placeholder` | text while unset (default "Not set") |
+| `recording` | listening for keys |
+| `to` | mod to send them to, if not the drawing one |
+| `value` | the shortcut, as `kbd` takes it ("cmd-shift-p"); none when unset |
+| `width` | pixels (default 160) |
+
+**Styles:** `.shortcut-field` `.shortcut-field:hover` `.shortcut-field-input` `.shortcut-field-none` `.shortcut-field-recording`
+
+```lua
+local shortcut_field = use "shortcut-field"
+
+shortcut_field { value = state.keys, recording = state.recording, clearable = true }
+-- update: msg.shortcut == "record" sets state.recording; "set" keeps msg.keys
+-- and stops; "cancel" stops; "clear" sets state.keys = nil.
+```
+
+A whole mod using it, with state: `app/components/demos/shortcut-field.luau`.
 
 #### `slider`
 
@@ -4930,6 +5098,37 @@ nav_buttons { back = "back", can_back = true, can_forward = false, forward = "fo
 
 A whole mod using it, with state: `app/components/demos/nav-buttons.luau`.
 
+#### `outline`
+
+**Outline.** A document's headings, indented by level, with the one being read marked; a click sends { heading = index }.
+
+**When:** Beside a long document: a README, a note, a report read in a `markdown`. For a file tree use `tree`; for an app's navigation use `side-nav`; for steps use `numbered-list`.
+
+| Prop | Meaning |
+| --- | --- |
+| `current` | index of the heading being read, as its `section` message sends |
+| `depth` | deepest level shown (default all) |
+| `empty` | text when there are no headings (none when unset) |
+| `event` | key of the message a click sends, default "heading": { heading = index } |
+| `headings` | list of { level, text, at? }, as `ui.markdown`'s `outline` message sends them |
+| `indent` | pixels per level (default 12) |
+| `to` | mod to send it to, if not the drawing one |
+
+**Styles:** `.outline` `.outline-empty` `.outline-row` `.outline-row:hover` `.outline-row:selected` `.outline-top`
+
+```lua
+local outline = use "outline"
+local markdown = use "markdown"
+
+outline { headings = state.headings, current = state.section }
+markdown { text = state.text, grow = true, scroll = true, reveal = state.reveal,
+	outline = "headings", section = "reading" }
+-- update: msg.msg == "headings" keeps state.headings = msg.headings;
+-- msg.msg == "reading" keeps state.section = msg.heading; msg.heading on its
+-- own is a click: state.reveal = { at = state.headings[msg.heading].at,
+-- seq = state.seq } after adding one to state.seq.
+```
+
 #### `pager`
 
 **Pager.** Dots for pages with the current one stretched, and optional Back and Next buttons; sends `back`, `next` or { page = n }.
@@ -5616,6 +5815,40 @@ ui.popover {
 ```
 
 A whole mod using it, with state: `app/components/demos/emoji-picker.luau`.
+
+#### `lightbox`
+
+**Lightbox.** A picture over the whole window with its title and place in the set: zoom and pan, ← and → through the set, Escape to close.
+
+**When:** Opening a picture from a document, a gallery or a message to see it large. For a viewer that stays in a pane use `image-viewer`; for a picture at a fixed size use `ui.image`.
+
+| Prop | Meaning |
+| --- | --- |
+| `center` | as `image-viewer` |
+| `change` | as `image-viewer`: sent as the view changes, with `zoom` and `center` |
+| `dismiss` | sent by ×, Escape and a click on the backdrop |
+| `event` | key of the message ← and → send, default "picture": { picture = index } |
+| `index` | which one shows, from 1 (default 1) |
+| `open` | show it |
+| `pictures` | list of { src, title? } |
+| `to` | mod to send them to, if not the drawing one |
+| `zoom` | as `image-viewer`; nil fits it |
+
+**Styles:** `.lightbox` `.lightbox-bar` `.lightbox-overlay` `.lightbox-place` `.lightbox-title`
+
+```lua
+local lightbox = use "lightbox"
+
+lightbox {
+	open = state.viewing ~= nil, dismiss = "close-picture",
+	pictures = state.pictures, index = state.viewing,
+	zoom = state.zoom, center = state.center, change = "viewed",
+}
+-- update: msg.picture steps to that one (and clears zoom and center);
+-- msg.msg == "viewed" keeps msg.zoom and msg.center.
+```
+
+A whole mod using it, with state: `app/components/demos/lightbox.luau`.
 
 #### `menu`
 

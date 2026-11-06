@@ -89,8 +89,12 @@ map-benchmark = ["map"]
 # 16-bit and colour managed (macOS). Off by default: few apps need it.
 video = ["dep:core-graphics-types", "dep:metal", "dep:moonframe-frames"]
 # Rich read-only Markdown and the long-form writing editor are independent.
-markdown = []
-prose    = []
+# Markdown takes `syntax`, for its code blocks.
+markdown = ["dep:markdown", "syntax"]
+# LaTeX in a `ui.markdown`, drawn by latex-rust, which carries its math font.
+# Off by default, as few apps need one; the starter turns it on.
+math  = ["dep:latex-rust", "markdown"]
+prose = []
 # `app:restart`, and `restart = "on-failure"` for process providers. Off by
 # default; the starter turns it on.
 restart = ["moonframe-providers/restart"]
@@ -101,6 +105,31 @@ sealed = ["moonframe-packages/sealed"]
 socket = ["moonframe-providers/socket"]
 # Development commands and the component gallery.
 studio = []
+# Highlighting of code: the languages most documents show.
+syntax = [
+  # keep-sorted start
+  "gpui-kit/tree-sitter",
+  "gpui-kit/tree-sitter-bash",
+  "gpui-kit/tree-sitter-c",
+  "gpui-kit/tree-sitter-cpp",
+  "gpui-kit/tree-sitter-css",
+  "gpui-kit/tree-sitter-diff",
+  "gpui-kit/tree-sitter-go",
+  "gpui-kit/tree-sitter-html",
+  "gpui-kit/tree-sitter-java",
+  "gpui-kit/tree-sitter-javascript",
+  "gpui-kit/tree-sitter-lua",
+  "gpui-kit/tree-sitter-python",
+  "gpui-kit/tree-sitter-ruby",
+  "gpui-kit/tree-sitter-rust",
+  "gpui-kit/tree-sitter-sql",
+  "gpui-kit/tree-sitter-swift",
+  "gpui-kit/tree-sitter-toml",
+  "gpui-kit/tree-sitter-tsx",
+  "gpui-kit/tree-sitter-typescript",
+  "gpui-kit/tree-sitter-yaml",
+  # keep-sorted end
+]
 # Terminal rendering and local/tmux sessions. Engines enable this too.
 terminal = ["dep:moonframe-mux", "dep:moonframe-terminal", "moonframe-mux/terminal"]
 # Native providers written with `async fn` (`.native_async`), and a tokio
@@ -125,6 +154,8 @@ gpui-platform-capture         = { default-features = false, features = ["test-su
 image                         = { optional = true, workspace = true }
 imagesize.workspace           = true
 keepawake                     = { optional = true, workspace = true }
+latex-rust                    = { optional = true, workspace = true }
+markdown                      = { optional = true, workspace = true }
 moonframe-acp                 = { optional = true, workspace = true }
 moonframe-chat                = { optional = true, workspace = true }
 moonframe-core.workspace      = true
@@ -151,7 +182,12 @@ tracing-subscriber.workspace  = true
 ureq                          = { optional = true, workspace = true }
 
 [dev-dependencies]
-tempfile.workspace = true
+# Real windows, headless: `src/e2e.rs` clicks and types in them. As for
+# `capture`, on GPUI itself: gpui-kit's `test-support` can't resolve with the
+# locked taffy.
+gpui-capture          = { default-features = false, features = ["test-support"], package = "gpui-pre", version = "=0.3.10" }
+gpui-platform-capture = { default-features = false, features = ["test-support"], package = "gpui-pre-platform", version = "=0.3.10" }
+tempfile.workspace    = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics-types = { optional = true, workspace = true }

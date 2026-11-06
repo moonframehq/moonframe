@@ -22,7 +22,9 @@ pub(super) fn watching(
     folders: &Folders,
     cx: &mut Context<MoonframeApp>,
 ) -> Option<RecommendedWatcher> {
-    if paths::in_bundle() && crate::release() {
+    // The watcher reports from a thread of its own, which the deterministic
+    // scheduler of `e2e` refuses.
+    if cfg!(test) || (paths::in_bundle() && crate::release()) {
         return None;
     }
     watch(workspace, folders, cx)

@@ -399,6 +399,76 @@ fn inputs_read_their_text_messages_and_keys() {
 }
 
 #[test]
+fn markdown_reads_what_a_mod_asks_of_a_document() {
+    use crate::{Markdown, Reveal};
+    let Ok(Node::Markdown(doc)) = input_view(
+        r##"ui.markdown { "# Notes", lines = 4, images = true, image = "open",
+            outline = "headings", section = "reading", reveal = { at = 12, seq = 3 },
+            find = "note", find_index = 2, found = "found", stream = true, to = "reader" }"##,
+    ) else {
+        panic!("no markdown");
+    };
+    assert_eq!(doc.lines, Some(4));
+    assert!(doc.images && doc.stream);
+    assert_eq!(doc.reveal, Some(Reveal { at: 12, seq: 3 }));
+    assert_eq!(doc.find.as_deref(), Some("note"));
+    assert_eq!(doc.find_index, Some(2));
+    assert_eq!(doc.to.as_deref(), Some("reader"));
+    assert_eq!(
+        Markdown::note(&Data::from("found"), [("count", Data::Integer(3))]),
+        Data::Map(
+            [
+                ("msg".to_owned(), Data::from("found")),
+                ("count".to_owned(), Data::Integer(3)),
+            ]
+            .into()
+        ),
+    );
+}
+
+#[test]
+fn markdown_refuses_what_makes_no_sense() {
+    for (source, expected) in [
+        ("ui.markdown { 'a', lines = 0 }", "whole number of lines"),
+        ("ui.markdown { 'a', lines = 1.5 }", "whole number of lines"),
+        (
+            "ui.markdown { 'a', lines = 2, scroll = true }",
+            "not for `scroll`",
+        ),
+        ("ui.markdown { 'a', find_index = 0 }", "from 1"),
+        ("ui.markdown { 'a', reveal = {} }", "needs `at`"),
+    ] {
+        let Err(error) = input_view(source) else {
+            panic!("{source} should fail");
+        };
+        assert!(error.to_string().contains(expected), "{source}: {error}");
+    }
+}
+
+#[test]
+fn an_input_captures_keys_and_reports_what_is_selected() {
+    use crate::Input;
+    let Ok(Node::Input(input)) = input_view(r#"ui.input { capture = "chord", to = "keys" }"#)
+    else {
+        panic!("no input");
+    };
+    assert_eq!(input.capture, Some(Data::from("chord")));
+    let Data::Map(entries) = Input::selection_message(&Data::from("moved"), "text", 3, 2) else {
+        panic!("not a map");
+    };
+    assert_eq!(entries.get("selected"), Some(&Data::Integer(2)));
+    assert_eq!(entries.get("caret"), Some(&Data::Integer(3)));
+}
+
+#[test]
+fn text_takes_a_language() {
+    let Ok(Node::Text(text)) = input_view(r#"ui.text { "let x", syntax = "rust" }"#) else {
+        panic!("no text");
+    };
+    assert_eq!(text.syntax.as_deref(), Some("rust"));
+}
+
+#[test]
 fn markdown_reads_a_document_and_its_link() {
     use crate::Markdown;
     let Ok(Node::Markdown(doc)) = input_view(

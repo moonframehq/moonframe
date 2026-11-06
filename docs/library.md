@@ -114,8 +114,10 @@ terminal displays a diagnostic explaining which feature to enable.
 The same applies to rich Markdown and writing fields. The `docs` file
 provider, `markdown` renderer and `prose` editor are independent; select the
 ones the app uses. For example, a Markdown preview needs `markdown`, while
-a prose-writing app needs `prose`. `chat-markdown` is a Luau component and
-does not require the native `markdown` renderer.
+a prose-writing app needs `prose`. `chat-markdown` draws through the native
+renderer, so it needs `markdown` too. `markdown` brings `syntax`, the
+tree-sitter grammars its code blocks are highlighted with, and `math` adds
+LaTeX through latex-rust, with its font.
 
 `updates` controls the host's updater, not all networking: providers such
 as `forge` and `usage` can bring their own HTTP dependencies. With every

@@ -29,6 +29,9 @@ pub struct Input {
     pub blur: Option<Data>,
     /// Keys that send a message instead of editing while the field has focus.
     pub keys: Vec<(KeyChord, Data)>,
+    /// Takes every chord pressed in it, sent with `keys` set to its name,
+    /// instead of editing: a field that records a shortcut.
+    pub capture: Option<Data>,
     pub multiline: bool,
     /// Visible lines of a multiline field; it scrolls past them.
     pub rows: u32,
@@ -90,6 +93,19 @@ impl Input {
         match Self::message(msg, value) {
             Data::Map(mut entries) => {
                 entries.insert("caret".to_owned(), caret);
+                Data::Map(entries)
+            },
+            other => other,
+        }
+    }
+
+    /// What a selection movement sends: [`Input::message_at`], with
+    /// `selected`, the bytes selected, added.
+    pub fn selection_message(msg: &Data, value: &str, caret: usize, selected: usize) -> Data {
+        let selected = Data::Integer(i64::try_from(selected).unwrap_or(i64::MAX));
+        match Self::message_at(msg, value, caret) {
+            Data::Map(mut entries) => {
+                entries.insert("selected".to_owned(), selected);
                 Data::Map(entries)
             },
             other => other,
