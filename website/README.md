@@ -43,7 +43,12 @@ A component without a picture shows a pointer to the app instead.
 
 ## Patterns
 
-The home page's editorial Patterns section and `site/docs/patterns/` share
+Patterns are hidden from the site for now: nothing links to them, and
+`site/_redirects` sends `/patterns/` to the docs home. To bring them back,
+remove that redirect and restore the links in `site/index.html`,
+`site/docs/index.html` and `site/llms.txt`.
+
+`site/docs/patterns/` reads
 `site/docs/patterns/data.js`, generated from the real Luau pattern definitions
 and preview mods. The docs offer a searchable category grid and a side-by-side
 preview/code detail page, with deep links to each pattern.
