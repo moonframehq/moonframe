@@ -53,6 +53,7 @@ pub(crate) mod guard;
 mod history;
 mod icon;
 mod listeners;
+mod live_settings;
 mod machine;
 mod measuring;
 mod menu;
@@ -175,6 +176,8 @@ pub(crate) struct MoonframeApp {
     history: Option<Arc<moonframe_history::History>>,
     /// Dropping it stops the events.
     _watcher: Option<RecommendedWatcher>,
+    _settings_watcher: Option<RecommendedWatcher>,
+    quick_inspect: quick_inspect::Shortcut,
     _omarchy: Option<RecommendedWatcher>,
     /// The main window, the one this view draws.
     main_window: WindowId,
@@ -252,7 +255,6 @@ impl MoonframeApp {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         bind_menu_keys(workspace.menus(), cx);
-        quick_inspect::bind(&folders, cx);
         cx.set_menus(menus(workspace.menus()));
         menu_actions(cx);
         #[cfg(feature = "terminal")]
@@ -318,6 +320,7 @@ impl MoonframeApp {
             },
         };
         show_appearance(appearance);
+        let settings_watcher = live_settings::watching(&folders, cx);
         let mut app = Self {
             #[cfg(feature = "terminal")]
             terminals,
@@ -364,11 +367,14 @@ impl MoonframeApp {
             key_layers: HashMap::new(),
             history,
             _watcher: watcher,
+            _settings_watcher: settings_watcher,
+            quick_inspect: Default::default(),
             _omarchy: omarchy,
             _keys: crate::keys::intercept(cx),
             last_pane: 0,
         };
         app.load_measure();
+        app.load_inspect_shortcut(cx);
         app.apply_theme(cx);
         // What changed while the app was closed is a snapshot of its own.
         app.snapshot("launch", cx);

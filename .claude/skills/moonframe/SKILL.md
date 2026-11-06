@@ -268,10 +268,10 @@ starts (hide a dialog then), and `{ asker, picking = false, picked, element?,
 mod?, at?, report? }` when the user clicks an element (`picked = true`;
 `report` is the text above) or presses Escape. Only the mod that asked
 hears it; if another mod starts a pick meanwhile, the first hears
-`picked = false`. `mods/feedback` attaches the pick to a request this way, and its chip's Copy
-button puts `report` on the clipboard for the user's own agent. The app's
+`picked = false`. `mods/feedback` attaches the pick to a request this way, and the Copy button
+beside its chip puts `report` on the clipboard for the user's own agent. The app's
 quick inspect shortcut (`secondary-shift-x`; `inspect_shortcut` in
-`settings.toml` names another, `""` none, read at launch) starts the same
+`settings.toml` names another, `""` none, followed live) starts the same
 pick for `feedback` with the dialog closed, and a pick opens it.
 `app/` topics are the app's: a mod can't publish them, nor send another mod
 a message passing for `app/` or `provider/` topic news.

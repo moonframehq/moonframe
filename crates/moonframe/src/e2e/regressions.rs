@@ -28,13 +28,39 @@ fn the_inspect_shortcut_opens_the_dialog_on_a_pick(cx: &mut TestAppContext) {
     window.keys("cmd-shift-x");
     window.click("target");
     assert!(window.shows("feedback-chip"), "a pick opens the dialog");
-    // The chip's Copy button sits just left of its ×.
-    let chip = window.bounds("feedback-chip");
-    window.click_at(point(chip.right() - px(60.), chip.center().y));
+    // The Copy button is at the right end of the chip's row.
+    let row = window.bounds("feedback-attached");
+    window.click_at(point(row.right() - px(20.), row.center().y));
     let copied = window.cx.read_from_clipboard().and_then(|item| item.text());
     assert!(
         copied.is_some_and(|text| text.starts_with("Selected in Moonframe")),
         "Copy puts the report on the clipboard"
+    );
+}
+
+#[gpui_kit::test]
+fn the_inspect_shortcut_follows_the_settings_live(cx: &mut TestAppContext) {
+    let mut window = with_feedback(cx);
+    let app = window.app.clone();
+    app.update(window.cx, |app, cx| {
+        app.set_inspect_shortcut(Some("cmd-alt-p"), cx)
+    });
+    window.keys("cmd-shift-x");
+    assert!(
+        !app.read_with(window.cx, |app, _| app.inspector.picking),
+        "the old key"
+    );
+    window.keys("cmd-alt-p");
+    assert!(
+        app.read_with(window.cx, |app, _| app.inspector.picking),
+        "the new key"
+    );
+    window.keys("escape");
+    app.update(window.cx, |app, cx| app.set_inspect_shortcut(Some(""), cx));
+    window.keys("cmd-alt-p");
+    assert!(
+        !app.read_with(window.cx, |app, _| app.inspector.picking),
+        "turned off"
     );
 }
 

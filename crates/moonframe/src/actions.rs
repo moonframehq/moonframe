@@ -8,7 +8,6 @@ gpui_kit::actions!(moonframe, [
     Reload,
     ToggleTheme,
     Inspect,
-    QuickInspect,
     Dismiss,
     BrowseComponents,
     ShowThemes,
@@ -60,6 +59,14 @@ pub(crate) fn show_appearance(appearance: Appearance) {
 #[action(namespace = moonframe, no_json)]
 pub(crate) struct ShowComponent {
     pub(crate) name: String,
+}
+
+/// A key bound to the quick inspect shortcut: it picks only while it is
+/// still the key `settings.toml` names.
+#[derive(Clone, Debug, PartialEq, gpui_kit::Action)]
+#[action(namespace = moonframe, no_json)]
+pub(crate) struct QuickInspect {
+    pub(crate) keystroke: String,
 }
 
 pub(crate) fn bind_keys(cx: &mut App) {

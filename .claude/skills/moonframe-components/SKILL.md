@@ -434,10 +434,10 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | Prop | Meaning |
 | --- | --- |
 | `actions` | elements on the footer's left, such as an agent `dropdown` |
-| `attached` | the element attached to the request, `{ element, at, report }`, shown as a chip; with a `report`, a Copy button on the chip puts it on the clipboard |
+| `attached` | the element attached to the request, `{ element, at, report }`, shown as a chip; with a `report`, a Copy button beside the chip puts it on the clipboard |
 | `change` | sent on each edit, with `value` set to the text |
-| `copied` | show "Copied" with a check on the chip's button |
-| `copy` | msg the chip's Copy button sends, as well as copying, e.g. to set `copied` |
+| `copied` | show "Copied" with a check on the Copy button |
+| `copy` | msg the Copy button sends, as well as copying, e.g. to set `copied` |
 | `detach` | msg the chip's × sends |
 | `dismiss` | msg sent by Cancel, Escape or a backdrop click |
 | `error` | why the last send failed, shown above the buttons |
@@ -455,7 +455,7 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | `to` | mod its own messages go to, if not the drawing one |
 | `value` | the text; set it to "" after sending to clear the field |
 
-**Styles:** `.feedback` `.feedback-action` `.feedback-action:hover` `.feedback-body` `.feedback-chip` `.feedback-chip-at` `.feedback-chip-element` `.feedback-detail` `.feedback-done` `.feedback-error` `.feedback-failed` `.feedback-heading` `.feedback-history` `.feedback-item` `.feedback-item-head` `.feedback-item-head:hover` `.feedback-muted` `.feedback-note` `.feedback-reply` `.feedback-request` `.feedback-run` `.feedback-running` `.feedback-said` `.feedback-title` `.feedback-waiting`
+**Styles:** `.feedback` `.feedback-action` `.feedback-action:hover` `.feedback-attached` `.feedback-body` `.feedback-chip` `.feedback-chip-at` `.feedback-chip-element` `.feedback-detail` `.feedback-done` `.feedback-error` `.feedback-failed` `.feedback-heading` `.feedback-history` `.feedback-item` `.feedback-item-head` `.feedback-item-head:hover` `.feedback-muted` `.feedback-note` `.feedback-reply` `.feedback-request` `.feedback-run` `.feedback-running` `.feedback-said` `.feedback-title` `.feedback-waiting`
 
 ```lua
 local feedback = use "feedback"

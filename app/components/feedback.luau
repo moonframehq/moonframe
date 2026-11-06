@@ -35,12 +35,12 @@ type Props = {
 	-- what the user picks (it hears it on `app/inspect`).
 	inspect: boolean?,
 	-- The element attached, { element, at, report }, shown as a chip. With a
-	-- `report`, the chip's Copy button puts it on the clipboard, to paste in
+	-- `report`, a Copy button beside the chip puts it on the clipboard, to paste in
 	-- an agent of the user's own.
 	attached: { element: string, at: string?, report: string? }?,
 	-- Sent by the chip's ×.
 	detach: any,
-	-- Sent by the chip's Copy button, and whether it has been pressed.
+	-- Sent by the Copy button, and whether it has been pressed.
 	copy: any,
 	copied: boolean?,
 	to: string?,
@@ -205,10 +205,10 @@ return component {
 		["reply"] = "the reply the mod has from `follow_type`; Reply is greyed out while it is blank",
 		["actions"] = "elements on the footer's left, such as an agent `dropdown`",
 		["inspect"] = "show an Inspect button that starts Inspect Element for the mod (`command = \"inspect\"`); the pick comes back on the topic `app/inspect`",
-		["attached"] = "the element attached to the request, `{ element, at, report }`, shown as a chip; with a `report`, a Copy button on the chip puts it on the clipboard",
+		["attached"] = "the element attached to the request, `{ element, at, report }`, shown as a chip; with a `report`, a Copy button beside the chip puts it on the clipboard",
 		["detach"] = "msg the chip's × sends",
-		["copy"] = "msg the chip's Copy button sends, as well as copying, e.g. to set `copied`",
-		["copied"] = "show \"Copied\" with a check on the chip's button",
+		["copy"] = "msg the Copy button sends, as well as copying, e.g. to set `copied`",
+		["copied"] = "show \"Copied\" with a check on the Copy button",
 		["to"] = "mod its own messages go to, if not the drawing one",
 	},
 	styles = {
@@ -217,6 +217,7 @@ return component {
 		[".feedback-title"] = { weight = "bold", size = "large" },
 		[".feedback-note"] = { size = "small", color = "muted-foreground" },
 		[".feedback-error"] = { size = "small", color = "danger" },
+		[".feedback-attached"] = { gap = 8 },
 		[".feedback-chip"] = {
 			gap = 6,
 			padding = { 4, 6, 4, 10 },
@@ -348,33 +349,36 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 					props.note ~= nil and ui.text { props.note, class = "feedback-note", wrap = true },
 					props.error ~= nil and ui.text { props.error, class = "feedback-error", wrap = true },
 					props.attached ~= nil and ui.row {
-						class = "feedback-chip",
+						class = "feedback-attached",
 						align = "center",
-						self_align = "start",
-						ui.icon { name = "inspector", class = "feedback-running", size = "small" },
-						ui.text { props.attached.element, class = "feedback-chip-element", truncate = true },
-						props.attached.at ~= nil and ui.text {
-							short_at(props.attached.at),
-							class = "feedback-chip-at",
-							truncate = true,
-							tooltip = props.attached.at,
+						ui.row {
+							class = "feedback-chip",
+							align = "center",
+							grow = true,
+							ui.icon { name = "inspector", class = "feedback-running", size = "small" },
+							ui.text { props.attached.element, class = "feedback-chip-element", truncate = true },
+							props.attached.at ~= nil and ui.text {
+								short_at(props.attached.at),
+								class = "feedback-chip-at",
+								truncate = true,
+								tooltip = props.attached.at,
+							},
+							ui.row {
+								class = "feedback-action",
+								msg = props.detach,
+								to = props.to,
+								tooltip = "Don't attach it",
+								ui.icon "close",
+							},
 						},
 						props.attached.report ~= nil and ui.button {
 							if props.copied then "Copied" else "Copy",
 							icon = if props.copied then "check" else "copy",
-							variant = "ghost",
-							small = true,
+							variant = "outline",
 							copy = props.attached.report,
 							msg = props.copy,
 							to = props.to,
 							tooltip = "Copy the element, to paste in your own agent",
-						},
-						ui.row {
-							class = "feedback-action",
-							msg = props.detach,
-							to = props.to,
-							tooltip = "Don't attach it",
-							ui.icon "close",
 						},
 					},
 					ui.row(footer),

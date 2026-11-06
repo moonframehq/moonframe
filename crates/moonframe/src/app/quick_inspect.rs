@@ -1,6 +1,6 @@
 //! A shortcut straight to picking an element for the feedback dialog, which
 //! opens with the pick attached. `inspect_shortcut` in `settings.toml` names
-//! the key, read at launch, as GPUI keeps a binding for the app's life.
+//! the key.
 
 use {super::*, crate::actions::keystroke, gpui_kit::KeyBinding, moonframe_core::Chord};
 
@@ -22,25 +22,58 @@ fn shortcut(saved: Option<&str>) -> Option<Chord> {
         .ok()
 }
 
-/// Binds the key. It works outside Developer Mode too, like the dialog's
-/// own Inspect button.
-pub(super) fn bind(folders: &Folders, cx: &mut App) {
-    let saved = folders
-        .settings()
-        .iter()
-        .find_map(|path| settings::get(path, settings::INSPECT_SHORTCUT));
-    if let Some(chord) = shortcut(saved.as_deref()) {
-        // GPUI takes a key's name for the app's life; this is bound once.
-        let name: &'static str = Box::leak(keystroke(&chord).into_boxed_str());
-        cx.bind_keys([KeyBinding::new(name, QuickInspect, Some("MoonframeApp"))]);
-    }
+/// The key that picks now, and each key ever bound: GPUI keeps a binding
+/// for the app's life, so an old key stays bound and runs nothing.
+#[derive(Default)]
+pub(super) struct Shortcut {
+    current: Option<String>,
+    bound: std::collections::BTreeSet<String>,
 }
 
 impl MoonframeApp {
+    /// Follows `settings.toml`, at launch and as it changes.
+    pub(super) fn load_inspect_shortcut(&mut self, cx: &mut App) {
+        let saved = self
+            .folders
+            .settings()
+            .iter()
+            .find_map(|path| settings::get(path, settings::INSPECT_SHORTCUT));
+        self.set_inspect_shortcut(saved.as_deref(), cx);
+    }
+
+    /// Makes the key `saved` names the one that picks. It works outside
+    /// Developer Mode too, like the dialog's own Inspect button.
+    pub(crate) fn set_inspect_shortcut(&mut self, saved: Option<&str>, cx: &mut App) {
+        let current = shortcut(saved).map(|chord| keystroke(&chord));
+        if let Some(key) = &current
+            && self.quick_inspect.bound.insert(key.clone())
+        {
+            // GPUI takes a key's name for the app's life; each is bound once.
+            let name: &'static str = Box::leak(key.clone().into_boxed_str());
+            cx.bind_keys([KeyBinding::new(
+                name,
+                QuickInspect {
+                    keystroke: key.clone(),
+                },
+                Some("MoonframeApp"),
+            )]);
+        }
+        self.quick_inspect.current = current;
+    }
+
+    /// `key` was pressed: false if it is no longer the shortcut.
+    pub(crate) fn quick_inspect_key(&mut self, key: &str, cx: &mut Context<Self>) -> bool {
+        let current = self.quick_inspect.current.as_deref() == Some(key);
+        if current {
+            self.quick_inspect(cx);
+        }
+        current
+    }
+
     /// Starts picking for the dialog, or stops. An app without the feedback
     /// mod gets the inspector's own card, in Developer Mode only, as the
     /// View menu offers it.
-    pub(crate) fn quick_inspect(&mut self, cx: &mut Context<Self>) {
+    fn quick_inspect(&mut self, cx: &mut Context<Self>) {
         if self.inspector.picking {
             self.toggle_inspect(cx);
         } else if self.workspace.slot(FEEDBACK).is_some() {

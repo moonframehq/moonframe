@@ -265,7 +265,7 @@ The window reloads while an agent edits it, so you can watch it work.
   paste it into an agent of your own. ⇧⌘X (Ctrl-Shift-X elsewhere) goes
   straight to picking, and a click opens the box with that element
   attached; set `inspect_shortcut` in `settings.toml` to use another key,
-  or `""` for none. A coding agent in the background changes
+  or `""` for none. The window follows that file as it changes. A coding agent in the background changes
   that app's own files with every permission, checks them, then screenshots
   your window and looks at the result before it answers; the window reloads
   with the change. Each request becomes a conversation under **Feedback &

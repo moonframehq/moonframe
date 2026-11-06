@@ -114,7 +114,11 @@ impl Render for MoonframeApp {
                 this.run(Command::ToggleTheme, window, cx)
             }))
             .on_action(cx.listener(|this, _: &Inspect, _, cx| this.toggle_inspect(cx)))
-            .on_action(cx.listener(|this, _: &QuickInspect, _, cx| this.quick_inspect(cx)))
+            .on_action(cx.listener(|this, action: &QuickInspect, _, cx| {
+                if !this.quick_inspect_key(&action.keystroke, cx) {
+                    cx.propagate();
+                }
+            }))
             .on_action(cx.listener(|this, action: &MenuSend, window, cx| {
                 this.run_menu_item(&action.id, window, cx);
             }))
