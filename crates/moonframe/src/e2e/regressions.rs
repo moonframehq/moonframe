@@ -2,6 +2,13 @@
 
 use super::*;
 
+/// The default inspect shortcut, `secondary-shift-x`, as this platform binds it.
+const INSPECT: &str = if cfg!(target_os = "macos") {
+    "cmd-shift-x"
+} else {
+    "ctrl-shift-x"
+};
+
 /// A window whose shell mounts the real `mods/feedback`.
 fn with_feedback(cx: &mut TestAppContext) -> Window<'_> {
     let dir = folder(
@@ -25,7 +32,7 @@ return mod {
 fn the_inspect_shortcut_opens_the_dialog_on_a_pick(cx: &mut TestAppContext) {
     let mut window = with_feedback(cx);
     assert!(!window.shows("feedback-chip"));
-    window.keys("cmd-shift-x");
+    window.keys(INSPECT);
     window.click("target");
     assert!(window.shows("feedback-chip"), "a pick opens the dialog");
     // The Copy button is at the right end of the chip's row.
@@ -45,7 +52,7 @@ fn the_inspect_shortcut_follows_the_settings_live(cx: &mut TestAppContext) {
     app.update(window.cx, |app, cx| {
         app.set_inspect_shortcut(Some("cmd-alt-p"), cx)
     });
-    window.keys("cmd-shift-x");
+    window.keys(INSPECT);
     assert!(
         !app.read_with(window.cx, |app, _| app.inspector.picking),
         "the old key"
@@ -67,7 +74,7 @@ fn the_inspect_shortcut_follows_the_settings_live(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn escaping_the_inspect_shortcut_leaves_the_dialog_closed(cx: &mut TestAppContext) {
     let mut window = with_feedback(cx);
-    window.keys("cmd-shift-x");
+    window.keys(INSPECT);
     window.keys("escape");
     assert!(!window.shows("feedback-body"), "nothing was picked");
 }
