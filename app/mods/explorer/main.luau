@@ -145,10 +145,7 @@ return mod {
 			state.selected = msg.open
 			-- With the project it is in: the project follows the terminal,
 			-- and a tab keeps the file it opened.
-			return state, {
-				{ to = "editor", msg = { open = msg.open, root = msg.root } },
-				{ to = "inspector", msg = { select = msg.open } },
-			}
+			return state, { { to = "editor", msg = { open = msg.open, root = msg.root } } }
 		end
 	end,
 

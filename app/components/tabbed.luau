@@ -38,6 +38,8 @@ type State = {
 	menu: boolean,
 	-- The last `tabs/<id>/open` request handled, by its `n`.
 	opened: number?,
+	-- Last tabs whose shell exited in a row, each replaced by a new one.
+	respawned: number?,
 }
 
 type Props = {
@@ -54,6 +56,9 @@ type Props = {
 	show: string?,
 }
 
+-- A shell that dies as it starts must not be started again without end.
+local MOST_RESPAWNED = 3
+
 local function find(list: { any }, key: string, value: any): (any, number?)
 	for index, item in list do
 		if item[key] == value then
@@ -69,6 +74,14 @@ local function open(state: State, props: Props, kind: string)
 	state.next += 1
 	table.insert(state.tabs, { id = id, kind = kind, props = {} })
 	state.selected = id
+end
+
+-- A bar with a `start` is never left empty: a window with nothing in it, and
+-- no shell, is no place to begin.
+local function ensure_one(state: State, props: Props?)
+	if props and props.start and #state.tabs == 0 then
+		open(state, props, props.start)
+	end
 end
 
 -- A tab another mod asked for: the open one of that kind, path and root
@@ -129,13 +142,17 @@ end
 
 -- Keeps what a tab's content reported: a browser's page and title. A
 -- shell that exited closes its tab.
-local function keep_report(state: State, msg)
+local function keep_report(state: State, props: Props, msg)
 	local tab = find(state.tabs, "id", msg.tab_report)
 	if not tab then
 		return false
 	end
 	if msg.exited then
 		close(state, tab.id)
+		if #state.tabs == 0 and (state.respawned or 0) < MOST_RESPAWNED then
+			state.respawned = (state.respawned or 0) + 1
+			ensure_one(state, props)
+		end
 		return true
 	end
 	-- The whole report, as the browser takes it back: address, title,
@@ -161,7 +178,7 @@ return component {
 	when = "Several terminals, browsers or tools in one place, opened and closed by the user, remembered across launches. For a strip whose tabs the mod keeps itself use `tabs`.",
 	props = {
 		["id"] = "names this tab bar: its tabs are kept under it, and published on `tabs/<id>`",
-		["start"] = "kind of the first tab, as `app.kinds` names it (\"component:terminal\")",
+		["start"] = "kind of the first tab, as `app.kinds` names it (\"component:terminal\"), and of a new one whenever the last closes: the bar is never left empty",
 		["offer"] = "kinds the + menu offers; all of `app.kinds` when unset",
 		["variant"] = "the strip's look, as `tabs` takes it; by default the stylesheet's `looks.tabs`, else \"classic\"",
 		["show"] = "\"bar\" draws only the strip, its content drawn elsewhere from the `tabs/<id>` topic with `tab-view`; \"both\" (default) draws the content under it",
@@ -174,9 +191,8 @@ return component {
 	init = function(previous: State?, props: Props)
 		local state: State = previous or { tabs = {}, next = 1, menu = false }
 		state.menu = false
-		if not previous and props and props.start then
-			open(state, props, props.start)
-		end
+		state.respawned = nil
+		ensure_one(state, props)
 		-- Announced as it starts, so content drawn elsewhere has its tab.
 		return state, { report(state, props or {}) }
 	end,
@@ -193,9 +209,11 @@ return component {
 		end
 		if msg.select then
 			state.selected = msg.select
+			state.respawned = nil
 		elseif msg.pick then
 			open(state, props, msg.pick)
 			state.menu = false
+			state.respawned = nil
 		elseif msg.open then
 			-- A tab of this kind, from a mod rather than the menu: the one
 			-- already open if there is one, else a new one.
@@ -222,18 +240,21 @@ return component {
 				local neighbour = kept[math.min(index or 1, #kept)]
 				state.selected = neighbour and neighbour.id
 			end
+			ensure_one(state, props)
 		elseif msg.close then
 			close(state, msg.close)
+			state.respawned = nil
+			ensure_one(state, props)
 		elseif msg.tab_report then
 			-- What its own content reported: a browser's page and title.
-			keep_report(state, msg)
+			keep_report(state, props, msg)
 		elseif msg.topic == `tabs/{props.id or "main"}/open` then
 			if not open_asked(state, props, msg.value) then
 				return
 			end
 		elseif msg.topic == `tabs/{props.id or "main"}/report` and type(msg.value) == "table" then
 			-- The same, from content drawn elsewhere.
-			if not keep_report(state, msg.value) then
+			if not keep_report(state, props, msg.value) then
 				return
 			end
 		else

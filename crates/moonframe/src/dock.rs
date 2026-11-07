@@ -174,6 +174,7 @@ pub(crate) fn about_panel(
     name: &str,
     about: &moonframe_core::About,
     icon: Option<&std::path::Path>,
+    renderer: &str,
 ) -> bool {
     use {
         objc2::{AllocAnyThread as _, MainThreadMarker, rc::Retained, runtime::AnyObject},
@@ -191,14 +192,14 @@ pub(crate) fn about_panel(
         "ApplicationName",
         Retained::into_super(Retained::into_super(NSString::from_str(name))),
     )];
-    if let Some(version) = &about.version {
-        options.push((
-            "ApplicationVersion",
-            Retained::into_super(Retained::into_super(NSString::from_str(version))),
-        ));
-    }
+    // A binary outside a bundle has no Info.plist for macOS to read it from.
+    let version = shown_version(about);
+    options.push((
+        "ApplicationVersion",
+        Retained::into_super(Retained::into_super(NSString::from_str(&version))),
+    ));
     // In parentheses after the version: what the app runs on.
-    let built_on = format!("Moonframe {}", env!("CARGO_PKG_VERSION"));
+    let built_on = built_on(renderer);
     options.push((
         "Version",
         Retained::into_super(Retained::into_super(NSString::from_str(&built_on))),
@@ -244,8 +245,26 @@ pub(crate) fn about_panel(
 }
 
 #[cfg(not(target_os = "macos"))]
-pub(crate) fn about_panel(_: &str, _: &moonframe_core::About, _: Option<&std::path::Path>) -> bool {
+pub(crate) fn about_panel(
+    _: &str,
+    _: &moonframe_core::About,
+    _: Option<&std::path::Path>,
+    _: &str,
+) -> bool {
     false
+}
+
+/// The version an About panel shows: the shell's, else the app's own.
+pub(crate) fn shown_version(about: &moonframe_core::About) -> String {
+    about
+        .version
+        .clone()
+        .unwrap_or_else(|| crate::identity().version.clone())
+}
+
+/// What the app runs on, and what draws it: `Moonframe 0.2.0 · Rune`.
+pub(crate) fn built_on(renderer: &str) -> String {
+    format!("Moonframe {} · {renderer}", env!("CARGO_PKG_VERSION"))
 }
 
 /// Elsewhere the window system takes the icon from the app's desktop

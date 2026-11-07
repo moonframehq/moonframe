@@ -587,6 +587,39 @@ it uses the app's own runtime (`.tokio(handle)`, or the one
 [examples/host](examples/host) is a small one, and
 [docs/library.md](docs/library.md) has the rest.
 
+## What draws the window
+
+The Luau is the same whichever library draws it: mods, components and
+`style.luau` build one checked tree, and a Cargo feature of `moonframe-app`
+chooses the renderer.
+
+| Feature | Renderer | State |
+| --- | --- | --- |
+| `gpui` (default) | [GPUI](https://www.gpui.rs), in `crates/moonframe` | The whole app |
+| `rune` | [Rune](https://github.com/anomalyco/rune), in `crates/moonframe-rune` | Experimental |
+
+```sh
+cargo run -p moonframe-app --no-default-features --features rune
+# Every component with its live demo:
+MOONFRAME_RUNE_GALLERY=1 cargo run -p moonframe-app --no-default-features --features rune
+```
+
+A Rune build links no GPUI. It runs the mods and every provider kind, keeps
+state where the GPUI build does, reloads live, and has keys, the menu bar and
+terminals kept by herdr-core or tmux. It draws every element; a `ui.view` is
+Rust an app writes for one renderer. [docs/rune-coverage.md](docs/rune-coverage.md)
+lists how each component fares.
+
+An app on the library chooses the same way: `moonframe_rune::Moonframe` is the
+same builder, so `extern crate moonframe_rune as moonframe;` behind a feature
+is all its code needs, beside its own `ui.view`s.
+
+It is still behind in places: it has none of the `moonframe` commands or
+profiles, windows of their own, named themes or animations. `ui.video` is 8-bit; `ui.map` doesn't
+turn or route; text fields lack the writing modes; and a `ui.browser` needs a
+window on screen to show. CI packages it beside the GPUI build, as
+`rune-package-*` artifacts that a release does not publish.
+
 ## Commands
 
 | Command | Does |

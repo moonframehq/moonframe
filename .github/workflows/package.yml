@@ -161,3 +161,63 @@ jobs:
           path: dist/*
           if-no-files-found: error
           retention-days: 7
+
+  # The same app drawn with Rune, on every platform, beside the GPUI packages
+  # above. `rune-package-*` stays out of the release's `package-*` download, so
+  # what ships signed is unchanged until a release chooses to carry these.
+  rune:
+    name: Rune (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple Silicon only so far: the GPUI job's universal app takes a
+          # second target and the Rosetta check.
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '13.0'
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: scripts/install-linux-deps.sh
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup toolchain install
+          test "$(rustc -vV | sed -n 's/^host: //p')" = "$TARGET"
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.17.0
+          use-cache: false
+      - name: Build the optimized executable
+        run: cargo build --locked --release -p moonframe-app --no-default-features --features rune --target "$TARGET"
+      - name: Package the macOS app and disk image
+        if: runner.os == 'macOS'
+        run: scripts/release/package-macos.sh dist "target/$TARGET/release/moonframe"
+      - name: Package the tarball
+        if: runner.os == 'Linux'
+        run: scripts/release/package-archive.sh "$TARGET" "target/$TARGET/release/moonframe" dist
+      - name: Package the zip
+        if: runner.os == 'Windows'
+        run: scripts/release/package-archive.sh "$TARGET" "target/$TARGET/release/moonframe.exe" dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rune-package-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7

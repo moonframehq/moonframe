@@ -14,6 +14,7 @@ members = [
   "crates/moonframe-mux",
   "crates/moonframe-packages",
   "crates/moonframe-providers",
+  "crates/moonframe-rune",
   "crates/moonframe-shell",
   "crates/moonframe-speech",
   "crates/moonframe-store",
@@ -84,6 +85,7 @@ moonframe-history        = { path = "crates/moonframe-history" }
 moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }
 moonframe-packages       = { path = "crates/moonframe-packages" }
 moonframe-providers      = { path = "crates/moonframe-providers" }
+moonframe-rune           = { path = "crates/moonframe-rune" }
 moonframe-shell          = { path = "crates/moonframe-shell" }
 moonframe-speech         = { path = "crates/moonframe-speech" }
 moonframe-store          = { path = "crates/moonframe-store" }
@@ -97,7 +99,10 @@ objc2-user-notifications = { default-features = false, features = ["UNNotificati
 objc2-web-kit            = { default-features = false, features = ["WKWebView", "objc2-app-kit", "std"], version = "0.3" }
 portable-pty             = "0.9"
 raw-window-handle        = "0.6"
-rusqlite                 = { features = ["bundled"], version = "0.40" }
+# Pre-release: Rune asks apps to pin a revision of `dev`, which is never rewritten.
+rune     = { git = "https://github.com/anomalyco/rune", rev = "a8ca769b944598e179f33cc6843629b90e6ca831" }
+rune-kit = { features = ["markdown"], git = "https://github.com/anomalyco/rune", rev = "a8ca769b944598e179f33cc6843629b90e6ca831" }
+rusqlite = { features = ["bundled"], version = "0.40" }
 # Swapping a saved file into place atomically (moonframe-docs).
 rust-embed = { features = ["include-exclude"], version = "8.7" }
 # Tokens kept redacted in memory (moonframe-forge), as herdr-credentials reads them.

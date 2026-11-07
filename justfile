@@ -164,6 +164,20 @@ types dir="app":
 screenshot out="target/screenshot.png" pid="":
     scripts/screenshot.sh {{out}} {{pid}}
 
+# The starter drawn with Rune instead of GPUI, from the same Luau.
+rune *args:
+    cargo run --release -p moonframe-app --no-default-features --features rune -- {{args}}
+
+# Every component's live demo on Rune, in a window of its own.
+rune-gallery:
+    MOONFRAME_RUNE_GALLERY=1 cargo run --release -p moonframe-app --no-default-features --features rune
+
+# Lint the Rune build, prove it links no GPUI, and load every built-in module.
+rune-check:
+    cargo clippy --locked -p moonframe-app --no-default-features --features rune --all-targets -- -D warnings
+    test "$(cargo tree --locked -p moonframe-app --no-default-features --features rune -e normal --prefix none | awk '{print $1}' | grep -c '^gpui')" = 0
+    cargo run --locked -p moonframe-app --no-default-features --features rune -- --check --no-user
+
 # Capture one component's preview page to a PNG from a background instance
 # that never takes focus and is stopped afterwards (macOS).
 component-shot name out="" dir="app":

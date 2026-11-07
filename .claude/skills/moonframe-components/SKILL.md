@@ -5446,7 +5446,7 @@ tab_view { tab = state.tab, kind = kind_of(app.kinds, state.tab.kind) }
 | `id` | names this tab bar: its tabs are kept under it, and published on `tabs/<id>` |
 | `offer` | kinds the + menu offers; all of `app.kinds` when unset |
 | `show` | "bar" draws only the strip, its content drawn elsewhere from the `tabs/<id>` topic with `tab-view`; "both" (default) draws the content under it |
-| `start` | kind of the first tab, as `app.kinds` names it ("component:terminal") |
+| `start` | kind of the first tab, as `app.kinds` names it ("component:terminal"), and of a new one whenever the last closes: the bar is never left empty |
 | `variant` | the strip's look, as `tabs` takes it; by default the stylesheet's `looks.tabs`, else "classic" |
 
 ```lua
