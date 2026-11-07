@@ -9,3 +9,8 @@ name  = "switchyard"
 title = "Switchyard"
 # The projects provider and the file, change and code components.
 requires = ["../projects"]
+
+# Shipped by Moonframe's releases as an app of its own (docs/releasing.md).
+[release]
+cask        = "moonframe-switchyard"
+description = "Workspace for coding agents across repositories and worktrees"

@@ -27,8 +27,8 @@ sentences or reading time; click it for the next.
 
 Documents are plain `.md` files in
 `~/.local/share/moonframe/folio/documents` (the profile's folder under
-`$XDG_DATA_HOME`), started with a few samples the first time. A Python
-provider (`providers/library`) lists them, opens one, and writes your edits
+`$XDG_DATA_HOME`), started with a few samples the first time. A native provider
+(`crates/moonframe-documents`) lists them, opens one, and writes your edits
 once you stop typing. Each edit first goes to an atomic recovery journal,
 so restarting the provider recovers edits still waiting to be written.
 Edit the files elsewhere and the list follows.

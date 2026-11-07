@@ -15,6 +15,9 @@ struct ManifestFile {
     /// Build-time dependency hints, interpreted by scripts/bundle_sealed.py.
     #[serde(default, rename = "bundle")]
     _bundle: Option<toml::Table>,
+    /// That Moonframe's releases ship it, read by scripts/release/apps.py.
+    #[serde(default, rename = "release")]
+    _release: Option<toml::Table>,
 }
 
 /// An app package's `[app]`.

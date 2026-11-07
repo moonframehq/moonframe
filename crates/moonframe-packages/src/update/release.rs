@@ -104,13 +104,13 @@ pub fn check(source: &Source, beta: bool) -> Result<Found, String> {
     Ok(found(release, &source.version))
 }
 
-/// How many releases a page of GitHub's list holds, at most.
-const PER_PAGE: usize = 100;
+/// How many releases a page of GitHub's list holds, at most: few enough that
+/// a page of releases with many assets each stays under what `ask` reads.
+const PER_PAGE: usize = 30;
 
-/// How many pages of releases a beta check reads at most: a thousand
-/// releases, so a repository with years of nightlies still answers in a
-/// few requests.
-const PAGES: usize = 10;
+/// How many pages of releases a beta check reads at most: about a thousand
+/// releases, so a repository with years of nightlies still answers.
+const PAGES: usize = 34;
 
 /// `source`'s releases, every page of them (up to [`PAGES`]): GitHub lists
 /// them newest first by date, not by version, so a backport or nightly
