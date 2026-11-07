@@ -12,8 +12,10 @@ use {
 const SHELL: &str = include_str!("../../moonframe-core/fixtures/both-backends.luau");
 const FRAME: f64 = 1. / 60.;
 
+// keep-sorted start
 mod maps;
 mod terminals;
+// keep-sorted end
 
 use terminals::wait;
 

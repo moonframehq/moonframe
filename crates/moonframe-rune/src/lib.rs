@@ -508,13 +508,10 @@ fn poll(ui: &mut Ui, _: f64, tx: &mut Tx) -> bool {
         changed |= ui.map_tiles.take_ready(cache);
     }
     // A failed tile comes up for another try: the view asks for what shows.
+    let now = Instant::now();
+    changed |= ui.map_tiles.retry_due(now);
     if let Some(due) = ui.map_tiles.next_retry() {
-        let now = Instant::now();
-        if now >= due {
-            changed = true;
-        } else {
-            tx.wake_after(due - now);
-        }
+        tx.wake_after(due.saturating_duration_since(now));
     }
     ui.settle_maps(tx);
     ui.videos.retire();

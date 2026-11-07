@@ -182,18 +182,12 @@ impl Tiles {
     }
 
     /// Whether `url` may be asked for at `now`: a failed one is left a while,
-    /// then forgotten, so a network that comes back brings it in.
+    /// so a network that comes back brings it in without hammering a server.
     fn may_ask(&self, url: &str, now: Instant) -> bool {
-        let mut failed = self.failed.borrow_mut();
-        match failed.get(url) {
-            Some(until) if now < *until => false,
-            Some(_) => {
-                failed.remove(url);
-                self.asked.borrow_mut().remove(url);
-                true
-            },
-            None => true,
-        }
+        self.failed
+            .borrow()
+            .get(url)
+            .is_none_or(|until| now >= *until)
     }
 
     fn keep(&self, url: String, image: Image) {
@@ -232,7 +226,24 @@ impl Tiles {
         arrived
     }
 
-    /// When a failed tile is next due; the view asks for it from then on.
+    /// Forgets the failed tiles whose wait is over, shown or not, and says
+    /// whether there were any: the view then asks again for those it draws,
+    /// and one that left the screen wakes nothing more.
+    pub(crate) fn retry_due(&self, now: Instant) -> bool {
+        let mut asked = self.asked.borrow_mut();
+        let mut failed = self.failed.borrow_mut();
+        let before = failed.len();
+        failed.retain(|url, until| {
+            let waiting = now < *until;
+            if !waiting {
+                asked.remove(url);
+            }
+            waiting
+        });
+        failed.len() != before
+    }
+
+    /// When the next failed tile's wait ends.
     pub(crate) fn next_retry(&self) -> Option<Instant> {
         self.failed.borrow().values().min().copied()
     }
@@ -416,11 +427,23 @@ mod tests {
         tiles.asked.borrow_mut().insert("a".to_owned());
         tiles.fail("a".to_owned(), now);
         assert!(!tiles.may_ask("a", now), "not at once");
+        assert!(!tiles.retry_due(now), "nothing to do yet");
+        assert!(tiles.retry_due(now + RETRY), "the view is told once");
         assert!(tiles.may_ask("a", now + RETRY));
         assert!(
             !tiles.asked.borrow().contains("a"),
             "forgotten, so it goes out again"
         );
+    }
+
+    #[test]
+    fn a_failed_tile_that_left_the_screen_wakes_nothing_more() {
+        let tiles = Tiles::default();
+        let now = Instant::now();
+        tiles.fail("a".to_owned(), now);
+        assert!(tiles.retry_due(now + RETRY));
+        // No view asks for it again, and later polls find nothing to do.
+        assert!(!tiles.retry_due(now + RETRY + RETRY));
         assert!(tiles.next_retry().is_none());
     }
 
