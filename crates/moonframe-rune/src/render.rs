@@ -11,6 +11,7 @@ mod gallery;
 mod leaves;
 mod markdown;
 mod plots;
+mod pointer;
 mod shell;
 // keep-sorted end
 

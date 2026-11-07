@@ -835,3 +835,57 @@ fn a_row_that_hugs_keeps_its_own_width_in_a_column() {
     assert!(parent_of("short") < 200., "{}", parent_of("short"));
     assert!(parent_of("wide") > 600., "{}", parent_of("wide"));
 }
+
+/// A track that says the value a drag sets.
+fn slider_window(width: f32) -> (TempDir, Runtime<Ui>) {
+    let dir = folder(
+        r#"return mod {
+            init = function() return { value = 0 } end,
+            update = function(state, msg)
+                state.value = msg.value or state.value
+                return state
+            end,
+            view = function(state)
+                return ui.column {
+                    ui.row {
+                        height = 20,
+                        width = 200,
+                        shrink = false,
+                        pointer = { set = true },
+                        range = { min = 0, max = 100, step = 1, value = state.value },
+                    },
+                    ui.text { `value {state.value}` },
+                }
+            end,
+        }"#,
+    );
+    let mut window = Runtime::new(
+        Ui::open(dir.path().to_owned(), None),
+        view,
+        (width, 200.),
+        Env::new(true, 2.),
+    );
+    settle(&mut window);
+    (dir, window)
+}
+
+#[test]
+fn dragging_a_track_sets_its_value() {
+    let (_dir, mut window) = slider_window(400.);
+    assert!(shows(&window, "value 0"));
+    let track = rect_of(&window, |element| {
+        (element.rect[2] - 200.).abs() < 0.5 && (element.rect[3] - 20.).abs() < 0.5
+    });
+    let y = track[1] + 10.;
+    window.pointer_down(track[0] + 20., y);
+    settle(&mut window);
+    assert!(shows(&window, "value 10"), "a press sets it");
+    window.pointer_move(track[0] + 150., y);
+    settle(&mut window);
+    assert!(shows(&window, "value 75"), "a drag follows");
+    // Past the end of the track it stays at the end.
+    window.pointer_move(track[0] + 390., y);
+    window.pointer_up(track[0] + 390., y);
+    settle(&mut window);
+    assert!(shows(&window, "value 100"), "it stops at the end");
+}

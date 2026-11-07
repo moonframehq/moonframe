@@ -205,6 +205,10 @@ impl<'w> Painter<'w> {
         } else {
             element
         };
+        let element = match &stack.pointer {
+            Some(pointer) => self.pointered(element, pointer, place),
+            None => element,
+        };
         let element = self.clicked(element, stack.action.as_ref(), place);
         self.extras(element, &stack.extras, place)
     }
