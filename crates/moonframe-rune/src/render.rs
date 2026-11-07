@@ -3,6 +3,7 @@
 //! then the stylesheet's rules, then its own keys, and clicks go back to the
 //! workspace with the module that drew the control.
 
+// keep-sorted start
 mod containers;
 mod embeds;
 mod floating;
@@ -10,6 +11,7 @@ mod gallery;
 mod leaves;
 mod plots;
 mod shell;
+// keep-sorted end
 
 use {
     crate::{Ui, inspect::Crumb, style::Ink, theme::Palette},
@@ -65,6 +67,7 @@ pub(crate) fn window(ui: &Ui) -> El {
     ui.layers.borrow_mut().clear();
     ui.browsers.wanted.borrow_mut().clear();
     ui.terminals.shown.borrow_mut().clear();
+    ui.videos.frame_began();
     ui.crumbs.borrow_mut().clear();
     let painter = Painter {
         ui,

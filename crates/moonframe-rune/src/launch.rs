@@ -6,7 +6,7 @@
 
 use {
     crate::{Ui, persist},
-    moonframe_core::{AppLayer, Data, Roots, Workspace},
+    moonframe_core::{AppLayer, Appearance, Data, Roots, Workspace},
     moonframe_mux::Backends,
     moonframe_packages::{
         IDENTITY, Identity, packages,
@@ -241,6 +241,14 @@ impl Moonframe {
         ui.views = self.views;
         ui.terminals.backends = backends;
         ui.icon = folders.icon();
+        let files = folders.settings();
+        ui.settings = files.first().cloned();
+        let saved = files
+            .iter()
+            .find_map(|file| crate::settings::get(file, crate::settings::APPEARANCE));
+        if let Some(appearance) = saved.as_deref().and_then(Appearance::named) {
+            ui.show_appearance(appearance);
+        }
         crate::dock::set_name(title);
         if let Err(problem) = crate::dock::set_icon(ui.icon.as_deref()) {
             tracing::warn!("no Dock icon: {problem}");

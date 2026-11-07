@@ -12,6 +12,11 @@ use {
 const SHELL: &str = include_str!("../../moonframe-core/fixtures/both-backends.luau");
 const FRAME: f64 = 1. / 60.;
 
+mod maps;
+mod terminals;
+
+use terminals::wait;
+
 /// An app folder holding `main`, with the real components and stylesheet.
 fn folder(main: &str) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
@@ -107,64 +112,6 @@ fn an_element_left_out_says_so() {
     let dir = folder("return mod { view = function() return ui.browser { id = 'b' } end }");
     let window = open(dir.path());
     assert!(shows(&window, "ui.browser needs the GPUI backend"));
-}
-
-#[test]
-fn a_real_shell_echoes_what_is_typed() {
-    let dir = folder("return mod { view = function() return ui.terminal { id = 'shell' } end }");
-    let mut ui = Ui::open(dir.path().to_owned(), None);
-    ui.waker = Some(Arc::new(|| {}));
-    let mut window = Runtime::new(ui, view, (800., 400.), Env::new(true, 2.));
-    settle(&mut window);
-    window.update(|ui, _| {
-        ui.terminals
-            .dirty
-            .store(true, std::sync::atomic::Ordering::Release);
-    });
-    let tick = |window: &mut Runtime<Ui>| {
-        std::thread::sleep(Duration::from_millis(50));
-        window.update(|ui, tx| {
-            poll(ui, 0., tx);
-        });
-        window.frame(FRAME);
-    };
-    let terminal = rect_of(&window, |element| element.role == "terminal");
-    click_at(&mut window, terminal);
-    for _ in 0..40 {
-        tick(&mut window);
-    }
-    let line = "echo rune-$((6*7))";
-    for letter in line.chars() {
-        window.key(KeyEvent {
-            key: Key::Text(letter.to_string()),
-            mods: Mods::default(),
-        });
-        window.frame(FRAME);
-    }
-    window.key(KeyEvent {
-        key: Key::Enter,
-        mods: Mods::default(),
-    });
-    let answered = |window: &Runtime<Ui>| {
-        window.elements().iter().any(|element| {
-            element
-                .text
-                .as_deref()
-                .is_some_and(|text| text.trim() == "rune-42")
-        })
-    };
-    for _ in 0..100 {
-        tick(&mut window);
-        if answered(&window) {
-            return;
-        }
-    }
-    let texts: Vec<String> = window
-        .elements()
-        .iter()
-        .filter_map(|element| element.text.clone())
-        .collect();
-    panic!("the shell never answered: {texts:?}");
 }
 
 #[test]
@@ -413,111 +360,6 @@ return mod { view = function() return ui.column { grow = true, tabbed { id = "ma
     assert!(shown, "no terminal after picking it: {offered:?}");
 }
 
-/// A real shell in a window, ready for typing.
-fn shell_window(dir: &TempDir) -> Runtime<Ui> {
-    let mut ui = Ui::open(dir.path().to_owned(), None);
-    ui.waker = Some(Arc::new(|| {}));
-    let mut window = Runtime::new(ui, view, (800., 400.), Env::new(true, 2.));
-    settle(&mut window);
-    let terminal = rect_of(&window, |element| element.role == "terminal");
-    click_at(&mut window, terminal);
-    wait(&mut window, 40);
-    window
-}
-
-fn wait(window: &mut Runtime<Ui>, ticks: usize) {
-    for _ in 0..ticks {
-        std::thread::sleep(Duration::from_millis(50));
-        window.update(|ui, tx| {
-            poll(ui, 0., tx);
-        });
-        window.frame(FRAME);
-    }
-}
-
-fn type_line(window: &mut Runtime<Ui>, line: &str) {
-    for letter in line.chars() {
-        window.key(KeyEvent {
-            key: Key::Text(letter.to_string()),
-            mods: Mods::default(),
-        });
-        window.frame(FRAME);
-    }
-    window.key(KeyEvent {
-        key: Key::Enter,
-        mods: Mods::default(),
-    });
-    window.frame(FRAME);
-}
-
-/// Waits for a row reading `wanted`, trimmed, or containing it.
-fn wait_for(window: &mut Runtime<Ui>, wanted: &str) -> bool {
-    for _ in 0..120 {
-        wait(window, 1);
-        let found = window.elements().iter().any(|element| {
-            element
-                .text
-                .as_deref()
-                .is_some_and(|text| text.contains(wanted))
-        });
-        if found {
-            return true;
-        }
-    }
-    false
-}
-
-const TERMINAL: &str =
-    "return mod { view = function() return ui.terminal { id = 'shell', backend = 'pty' } end }";
-
-#[test]
-fn dragging_over_a_shells_output_selects_its_text() {
-    let dir = folder(TERMINAL);
-    let mut window = shell_window(&dir);
-    type_line(&mut window, "echo selected-$((6*7))");
-    assert!(wait_for(&mut window, "selected-42"));
-    let key = "shell/shell".to_owned();
-    let metrics = render::Metrics {
-        width: 8.,
-        height: 16.,
-    };
-    let screen = window.state.terminals.screen(&key).unwrap();
-    let row = (0..screen.rows)
-        .find(|row| {
-            let line: String = screen.row(*row).iter().map(|cell| cell.ch).collect();
-            line.trim() == "selected-42"
-        })
-        .expect("the answer's row");
-    let y = terminal::PADDING + (f32::from(row) + 0.5) * metrics.height;
-    let terminals = &window.state.terminals;
-    assert_eq!(
-        terminals.select(&key, (9., y), (Phase::Down, 2), metrics),
-        None
-    );
-    let chosen = terminals.select(&key, (9., y), (Phase::Up, 2), metrics);
-    assert_eq!(
-        chosen.as_deref(),
-        Some("selected-42"),
-        "a double click takes the word"
-    );
-}
-
-#[test]
-fn a_shell_that_exits_says_so_and_enter_starts_another() {
-    let dir = folder(TERMINAL);
-    let mut window = shell_window(&dir);
-    type_line(&mut window, "exit");
-    assert!(wait_for(&mut window, "press Enter to start another"));
-    window.key(KeyEvent {
-        key: Key::Enter,
-        mods: Mods::default(),
-    });
-    window.frame(FRAME);
-    wait(&mut window, 40);
-    type_line(&mut window, "echo again-$((6*7))");
-    assert!(wait_for(&mut window, "again-42"));
-}
-
 /// The component browser on the real app, on `first`.
 fn gallery(first: &str) -> Runtime<Ui> {
     let app = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
@@ -605,76 +447,6 @@ return mod {
 }
 
 #[test]
-fn the_shown_terminal_takes_keys_without_a_click() {
-    let dir = folder(TERMINAL);
-    let mut ui = Ui::open(dir.path().to_owned(), None);
-    ui.waker = Some(Arc::new(|| {}));
-    let mut window = Runtime::new(ui, view, (800., 400.), Env::new(true, 2.));
-    settle(&mut window);
-    wait(&mut window, 40);
-    for letter in "echo typed-$((6*7))".chars() {
-        let event = KeyEvent {
-            key: Key::Text(letter.to_string()),
-            mods: Mods::default(),
-        };
-        window.update(|ui, tx| {
-            assert!(ui.key(&event, tx), "{letter}");
-        });
-        window.frame(FRAME);
-    }
-    let enter = KeyEvent {
-        key: Key::Enter,
-        mods: Mods::default(),
-    };
-    window.update(|ui, tx| {
-        assert!(ui.key(&enter, tx));
-    });
-    assert!(wait_for(&mut window, "typed-42"));
-}
-
-#[test]
-fn a_control_character_reaches_the_shell() {
-    let dir = folder(TERMINAL);
-    let mut window = shell_window(&dir);
-    for letter in "sleep 30".chars() {
-        window.key(KeyEvent {
-            key: Key::Text(letter.to_string()),
-            mods: Mods::default(),
-        });
-        window.frame(FRAME);
-    }
-    window.key(KeyEvent {
-        key: Key::Enter,
-        mods: Mods::default(),
-    });
-    wait(&mut window, 10);
-    // What macOS can send for ⌃C.
-    window.key(KeyEvent {
-        key: Key::Text("\u{3}".to_owned()),
-        mods: Mods {
-            ctrl: true,
-            ..Mods::default()
-        },
-    });
-    window.frame(FRAME);
-    wait(&mut window, 10);
-    type_line(&mut window, "echo after-$((6*7))");
-    assert!(wait_for(&mut window, "after-42"), "⌃C stopped the sleep");
-}
-
-#[test]
-fn the_grid_fills_its_box_once_the_cell_is_measured() {
-    let dir = folder(TERMINAL);
-    let mut window = shell_window(&dir);
-    wait(&mut window, 10);
-    let rect = rect_of(&window, |element| element.role == "terminal");
-    let screen = window.state.terminals.screen("shell/shell").unwrap();
-    let cell = window.state.cell_width.get().expect("a measured cell");
-    let wanted = ((rect[2] - 2. * terminal::PADDING) / cell).floor() as u16;
-    assert_eq!(screen.cols, wanted, "cell {cell} in {rect:?}");
-}
-
-#[test]
 fn inspect_picks_what_is_under_the_click_and_tells_the_mod() {
     let main = r#"
 return mod {
@@ -718,57 +490,6 @@ return mod {
             .iter()
             .filter_map(|e| e.text.clone())
             .collect::<Vec<_>>()
-    );
-}
-
-/// What of a terminal's grid is fading or gliding this frame.
-fn ghosts(window: &Runtime<Ui>) -> Vec<String> {
-    window
-        .elements()
-        .iter()
-        .filter(|element| {
-            let in_grid = element
-                .key
-                .as_deref()
-                .is_some_and(|key| key.contains("-row") || key.contains("-cursor"));
-            in_grid && (element.exiting || element.moving || element.opacity < 1.)
-        })
-        .map(|element| format!("{:?} {:?}", element.key, element.text))
-        .collect()
-}
-
-#[test]
-fn a_terminal_changes_at_once_with_no_ghosts() {
-    let dir = folder(TERMINAL);
-    let mut window = shell_window(&dir);
-    type_line(&mut window, "echo one; echo two; echo three");
-    assert!(wait_for(&mut window, "three"));
-    let mut seen = Vec::new();
-    for line in ["printf abc", "clear", "echo after-clear"] {
-        for letter in line.chars() {
-            window.key(KeyEvent {
-                key: Key::Text(letter.to_string()),
-                mods: Mods::default(),
-            });
-            for _ in 0..3 {
-                wait(&mut window, 1);
-                seen.extend(ghosts(&window));
-            }
-        }
-        window.key(KeyEvent {
-            key: Key::Enter,
-            mods: Mods::default(),
-        });
-        for _ in 0..12 {
-            wait(&mut window, 1);
-            seen.extend(ghosts(&window));
-        }
-    }
-    assert!(
-        seen.is_empty(),
-        "{} ghosts, such as {:?}",
-        seen.len(),
-        seen.first()
     );
 }
 
@@ -862,15 +583,48 @@ fn a_mod_that_does_not_fit_leaves_the_row_rather_than_covering_its_neighbour() {
 }
 
 #[test]
-fn a_tab_in_a_cell_takes_one_cell_as_any_blank_does() {
-    // Alacritty leaves the tab it was sent in the cell it started from.
-    let cells: Vec<moonframe_terminal::Cell> = "a\t  b"
-        .chars()
-        .map(|ch| moonframe_terminal::Cell {
-            ch,
-            ..moonframe_terminal::Cell::default()
-        })
-        .collect();
-    let (line, _) = terminal::row_text(&cells, rune::Color::WHITE);
-    assert_eq!(line, "a   b");
+fn a_chosen_appearance_stands_against_the_system() {
+    let dir = folder("return mod { view = function() return ui.text { 'x' } end }");
+    let mut ui = Ui::open(dir.path().to_owned(), None);
+    let file = dir.path().join("settings.toml");
+    ui.settings = Some(file.clone());
+    let mut window = Runtime::new(ui, view, (400., 300.), Env::new(true, 2.));
+    settle(&mut window);
+    let dark = |window: &mut Runtime<Ui>| {
+        window.update(|ui, tx| {
+            poll(ui, 0., tx);
+        });
+        window.frame(FRAME);
+        window.state.dark
+    };
+    assert!(dark(&mut window), "the system is dark");
+    window.update(|ui, _| ui.set_appearance(Appearance::Light));
+    settle(&mut window);
+    assert!(
+        !dark(&mut window),
+        "light stands, though the system is dark"
+    );
+    assert!(!dark(&mut window), "and goes on standing");
+    assert_eq!(
+        settings::get(&file, settings::APPEARANCE).as_deref(),
+        Some("light"),
+        "and is kept"
+    );
+    window.update(|ui, _| ui.set_appearance(Appearance::System));
+    settle(&mut window);
+    assert!(dark(&mut window), "`system` follows it again");
+}
+
+#[test]
+fn toggling_the_theme_chooses_the_other_one() {
+    let dir = folder("return mod { view = function() return ui.text { 'x' } end }");
+    let mut window = open(dir.path());
+    window.update(|ui, tx| {
+        ui.act("shell", &Action::Command(Command::ToggleTheme), tx);
+    });
+    assert_eq!(window.state.appearance, Appearance::Light);
+    window.update(|ui, tx| {
+        poll(ui, 0., tx);
+    });
+    assert!(!window.state.dark, "and it stands");
 }

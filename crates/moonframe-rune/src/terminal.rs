@@ -532,6 +532,17 @@ impl Ui {
                 told.push((view.owner.clone(), msg));
             }
         }
+        // A shell its mod has heard of goes once nothing draws it: a tab's is
+        // replaced under a new id, and must not hold a slot for ever.
+        let shown = self.terminals.shown.borrow();
+        self.terminals
+            .views
+            .get_mut()
+            .retain(|key, view| !view.told || shown.contains(key));
+        let boxes = self.terminals.boxes.get_mut();
+        let views = self.terminals.views.get_mut();
+        boxes.retain(|key, _| views.contains_key(key));
+        drop(shown);
         for (owner, msg) in told {
             let exited = match msg {
                 moonframe_core::Data::Map(mut entries) => {

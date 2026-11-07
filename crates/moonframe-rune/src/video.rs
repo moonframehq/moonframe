@@ -8,12 +8,12 @@ use {
     rune::Pixels,
     std::{
         cell::RefCell,
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         sync::{
             Arc,
-            atomic::{AtomicU64, Ordering},
+            atomic::{AtomicBool, AtomicU64, Ordering},
         },
-        time::Duration,
+        time::{Duration, Instant},
     },
 };
 
@@ -21,10 +21,15 @@ use {
 const LOOK: Duration = Duration::from_millis(8);
 /// How long to wait before opening a ring that isn't there yet.
 const WAIT: Duration = Duration::from_millis(250);
+/// A ring silent this long is opened again: a producer that restarted made a
+/// new one under the same name, and this mapping would stay on the old.
+const REOPEN: Duration = Duration::from_millis(500);
 
 /// A ring being shown.
 struct Stream {
     pixels: Pixels,
+    /// Tells its thread to end, as it goes.
+    stop: Arc<AtomicBool>,
     #[cfg_attr(
         not(test),
         expect(dead_code, reason = "read by tests; the thread writes it")
@@ -32,9 +37,17 @@ struct Stream {
     shown: Arc<AtomicU64>,
 }
 
+impl Drop for Stream {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Release);
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct Videos {
     streams: RefCell<HashMap<String, Stream>>,
+    /// The rings this frame drew.
+    drawn: RefCell<HashSet<String>>,
 }
 
 /// The high byte of a 16-bit little-endian sample at `at`.
@@ -88,14 +101,14 @@ pub(crate) fn rgba(info: &FrameInfo, bytes: &[u8]) -> Vec<u8> {
     out
 }
 
-fn stream(source: &str, pixels: &Pixels, shown: &AtomicU64) {
-    loop {
+fn stream(source: &str, pixels: &Pixels, shown: &AtomicU64, stop: &AtomicBool) {
+    while !stop.load(Ordering::Acquire) {
         let Ok(reader) = Reader::open(source) else {
             std::thread::sleep(WAIT);
             continue;
         };
-        let mut last = 0;
-        loop {
+        let (mut last, mut heard) = (0, Instant::now());
+        while !stop.load(Ordering::Acquire) && heard.elapsed() < REOPEN {
             let newest = reader.latest();
             if newest != last {
                 let frame = reader.read(newest, |info, start, length| {
@@ -109,6 +122,7 @@ fn stream(source: &str, pixels: &Pixels, shown: &AtomicU64) {
                     pixels.set(info.width, info.height, picture);
                     shown.store(info.number, Ordering::Release);
                     last = newest;
+                    heard = Instant::now();
                 }
             }
             std::thread::sleep(LOOK);
@@ -117,6 +131,19 @@ fn stream(source: &str, pixels: &Pixels, shown: &AtomicU64) {
 }
 
 impl Videos {
+    /// A frame is being drawn: what it asks for is what stays.
+    pub(crate) fn frame_began(&self) {
+        self.drawn.borrow_mut().clear();
+    }
+
+    /// Stops reading the rings the last frame did not draw.
+    pub(crate) fn retire(&self) {
+        let drawn = self.drawn.borrow();
+        self.streams
+            .borrow_mut()
+            .retain(|source, _| drawn.contains(source));
+    }
+
     /// The number of the newest frame of `source` shown so far.
     #[cfg(test)]
     fn shown(&self, source: &str) -> u64 {
@@ -128,21 +155,25 @@ impl Videos {
 
     /// The pixels of the ring `source`, read from now on by a thread of its own.
     pub(crate) fn pixels(&self, source: &str) -> Pixels {
+        self.drawn.borrow_mut().insert(source.to_owned());
         let mut streams = self.streams.borrow_mut();
         if let Some(found) = streams.get(source) {
             return found.pixels.clone();
         }
         let pixels = Pixels::new();
         let shown = Arc::new(AtomicU64::new(0));
+        let stop = Arc::new(AtomicBool::new(false));
         let (name, reading, count) = (source.to_owned(), pixels.clone(), Arc::clone(&shown));
+        let told = Arc::clone(&stop);
         let started = std::thread::Builder::new()
             .name("rune-video".into())
-            .spawn(move || stream(&name, &reading, &count));
+            .spawn(move || stream(&name, &reading, &count, &told));
         if let Err(problem) = started {
             tracing::warn!("cannot read {source}: {problem}");
         }
         streams.insert(source.to_owned(), Stream {
             pixels: pixels.clone(),
+            stop,
             shown,
         });
         pixels
@@ -192,6 +223,49 @@ mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         panic!("the frame never arrived");
+    }
+
+    fn wait_for(done: impl Fn() -> bool) -> bool {
+        for _ in 0..300 {
+            if done() {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        false
+    }
+
+    #[test]
+    fn a_producer_that_restarts_is_read_again() {
+        let name = format!("rune-again-{}", std::process::id());
+        let mut first = moonframe_frames::Writer::create(&name, 2, 16).unwrap();
+        let videos = Videos::default();
+        let pixels = videos.pixels(&name);
+        first
+            .write(2, 2, Format::Rgba8, Pattern::from_raw(0), 0, &[9; 16])
+            .unwrap();
+        assert!(wait_for(|| pixels.size() == (2, 2)));
+        // The same name, a new ring: the old mapping would never hear of it.
+        let mut second = moonframe_frames::Writer::create(&name, 2, 16).unwrap();
+        second
+            .write(1, 1, Format::Rgba8, Pattern::from_raw(0), 0, &[9; 4])
+            .unwrap();
+        assert!(wait_for(|| pixels.size() == (1, 1)), "{:?}", pixels.size());
+    }
+
+    #[test]
+    fn a_video_nothing_draws_stops_being_read() {
+        let name = format!("rune-gone-{}", std::process::id());
+        let videos = Videos::default();
+        videos.pixels(&name);
+        let stop = Arc::clone(&videos.streams.borrow()[&name].stop);
+        videos.retire();
+        assert_eq!(videos.streams.borrow().len(), 1, "drawn this frame, kept");
+        videos.frame_began();
+        videos.retire();
+        assert!(videos.streams.borrow().is_empty());
+        assert!(stop.load(Ordering::Acquire), "its thread is told to end");
+        assert!(wait_for(|| Arc::strong_count(&stop) == 1), "and it does");
     }
 
     #[test]

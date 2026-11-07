@@ -6,11 +6,11 @@ use {
     crate::{
         Ui,
         browser::Wanted,
-        map::{self, Camera},
+        map::{self, Camera, Hearer},
         style::looked,
     },
     moonframe_core::{Browser, Map, Part, States, Token, Video, world},
-    rune::{Drag, El, LineCap, Shape, SurfaceFit, Tx, WheelEvent, canvas, el, text},
+    rune::{Drag, El, LineCap, Phase, Shape, SurfaceFit, Tx, WheelEvent, canvas, el, text},
 };
 
 const TILE: f64 = 256.;
@@ -84,6 +84,7 @@ impl<'w> Painter<'w> {
                 node.width.unwrap_or(FIRST_BOX.0),
                 node.height.unwrap_or(FIRST_BOX.1),
             ));
+        self.ui.map_tiles.supplied(&key, (node.center, node.zoom));
         let moved = self.ui.map_tiles.cameras.borrow().get(&key).copied();
         let camera = map::camera(node, moved, size);
         let mut element = el()
@@ -99,10 +100,11 @@ impl<'w> Painter<'w> {
                 .color(self.palette.token(Token::MutedForeground))
                 .pin(None, None, Some(6.), Some(4.)),
         );
-        let (laid, panned, zoomed, told) = (key.clone(), key.clone(), key.clone(), key);
+        let (laid, panned, zoomed) = (key.clone(), key.clone(), key);
         let owner = place.owner.to_owned();
         let to = node.to.clone().unwrap_or_else(|| owner.clone());
-        let moved_msg = node.moved.clone();
+        let hearer = node.moved.clone().map(|msg| Hearer { owner, to, msg });
+        let (dragged, wheeled) = (hearer.clone(), hearer);
         element = element
             .on_layout(move |ui: &mut Ui, rect: [f32; 4]| {
                 ui.map_tiles
@@ -112,14 +114,16 @@ impl<'w> Painter<'w> {
             })
             .on_drag(move |ui: &mut Ui, drag: &mut Drag, tx: &mut Tx| {
                 ui.pan_map(&panned, camera, drag);
-                if Ui::drag_ended(drag)
-                    && let Some(msg) = &moved_msg
-                {
-                    ui.map_moved(&told, &owner, &to, msg, tx);
+                if let Some(hearer) = &dragged {
+                    let last = matches!(drag.phase, Phase::Up);
+                    ui.map_moved_by_user(&panned, hearer.clone(), last, tx);
                 }
             })
-            .on_wheel(move |ui: &mut Ui, event: WheelEvent, _: &mut Tx| {
+            .on_wheel(move |ui: &mut Ui, event: WheelEvent, tx: &mut Tx| {
                 ui.zoom_map(&zoomed, camera, &event);
+                if let Some(hearer) = &wheeled {
+                    ui.map_moved_by_user(&zoomed, hearer.clone(), false, tx);
+                }
                 true
             });
         let element = match node.width {
@@ -229,15 +233,20 @@ impl<'w> Painter<'w> {
             ))
             .absolute(x - PIN / 2., y - PIN / 2.)
             .size(PIN, PIN);
-            let dot = match node.select.clone() {
+            // Its own `msg`, else the map's `select` with which pin it was.
+            let number = i64::try_from(index + 1).unwrap_or(i64::MAX);
+            let press = pin.msg.clone().or_else(|| {
+                let msg = node.select.as_ref()?;
+                Some(moonframe_core::Markdown::note(msg, [(
+                    "pin",
+                    number.into(),
+                )]))
+            });
+            let dot = match press {
                 Some(msg) => {
                     let owner = place.owner.to_owned();
                     let to = node.to.clone().unwrap_or_else(|| owner.clone());
-                    dot.on_press(move |ui: &mut Ui| {
-                        let number = i64::try_from(index + 1).unwrap_or(i64::MAX);
-                        let note = moonframe_core::Markdown::note(&msg, [("pin", number.into())]);
-                        ui.send(&owner, &to, note);
-                    })
+                    dot.on_press(move |ui: &mut Ui| ui.send(&owner, &to, msg.clone()))
                 },
                 None => dot,
             };

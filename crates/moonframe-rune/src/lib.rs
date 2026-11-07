@@ -11,6 +11,7 @@
 //!
 //! [`Node`]: moonframe_core::Node
 
+// keep-sorted start
 #[cfg_attr(not(any(target_os = "macos", windows)), path = "browser_left_out.rs")]
 mod browser;
 #[cfg(all(test, unix))]
@@ -31,6 +32,9 @@ mod natives;
 #[path = "../../moonframe/src/persist.rs"]
 mod persist;
 mod render;
+#[path = "../../moonframe/src/settings.rs"]
+#[allow(dead_code, reason = "shared with `moonframe`, which uses more of it")]
+mod settings;
 mod style;
 mod terminal;
 #[cfg(all(test, unix))]
@@ -39,6 +43,7 @@ mod theme;
 #[cfg_attr(not(unix), path = "video_left_out.rs")]
 mod video;
 mod watch;
+// keep-sorted end
 
 pub use {
     launch::{Moonframe, View},
@@ -63,7 +68,7 @@ use {
             Arc,
             mpsc::{Receiver, channel},
         },
-        time::Duration,
+        time::{Duration, Instant},
     },
 };
 
@@ -136,6 +141,10 @@ pub struct Ui {
     /// Decodes `ui.image`'s pictures; set once Rune has a waker.
     pub(crate) images: Option<ImageCache>,
     pub(crate) pictures: RefCell<HashMap<PathBuf, rune::Image>>,
+    /// What the user chose: `system` follows it, light and dark stand.
+    pub(crate) appearance: Appearance,
+    /// Where that choice is kept.
+    pub(crate) settings: Option<PathBuf>,
     /// Draw the component browser instead of the app (`MOONFRAME_RUNE_GALLERY`).
     pub(crate) gallery: bool,
     /// The native providers this build has, until they start.
@@ -182,6 +191,25 @@ impl Drop for Ui {
 }
 
 impl Ui {
+    /// Makes the window light, dark or follow the system, and keeps the
+    /// choice for the next run, as the GPUI app does.
+    pub(crate) fn set_appearance(&mut self, appearance: Appearance) {
+        self.show_appearance(appearance);
+        if let Some(path) = &self.settings
+            && let Err(problem) = settings::save(path, &[(settings::APPEARANCE, appearance.name())])
+        {
+            tracing::warn!("cannot save the appearance: {problem}");
+        }
+    }
+
+    /// `appearance`, as it was saved or just chosen.
+    pub(crate) fn show_appearance(&mut self, appearance: Appearance) {
+        self.appearance = appearance;
+        self.dark = appearance.is_dark(self.system_dark.get());
+        self.workspace.set_dark(self.dark);
+        self.workspace.set_appearance(appearance, BTreeMap::new());
+    }
+
     /// Does what a mod asked of the app; true when the view has to run.
     fn request(&mut self, from: &str, request: Request, tx: &mut Tx) -> bool {
         match request {
@@ -204,9 +232,8 @@ impl Ui {
                 self.pick(from, pick, tx);
                 false
             },
-            Request::Appearance(Appearance::Light | Appearance::Dark) => {
-                self.dark = request_is_dark(&request);
-                self.workspace.set_dark(self.dark);
+            Request::Appearance(appearance) => {
+                self.set_appearance(appearance);
                 true
             },
             other => {
@@ -255,10 +282,12 @@ impl Ui {
             Some(Command::Minimize) => tx.minimize(),
             Some(Command::Maximize) => tx.toggle_maximized(),
             Some(Command::Reload) => self.workspace.reload(),
-            Some(Command::ToggleTheme) => {
-                self.dark = !self.dark;
-                self.workspace.set_dark(self.dark);
-            },
+            // The other of light and dark, whatever the system is.
+            Some(Command::ToggleTheme) => self.set_appearance(if self.dark {
+                Appearance::Light
+            } else {
+                Appearance::Dark
+            }),
             Some(other) => tracing::debug!("not on the Rune backend yet: {other:?}"),
             None => {},
         }
@@ -347,10 +376,6 @@ impl Ui {
     }
 }
 
-fn request_is_dark(request: &Request) -> bool {
-    matches!(request, Request::Appearance(Appearance::Dark))
-}
-
 /// `AppSpec` wants a plain `fn`; `App::init` hands it the real one.
 fn unused_init() -> Ui {
     Ui::open(PathBuf::new(), None)
@@ -392,6 +417,8 @@ impl Ui {
             images: None,
             pictures: RefCell::default(),
             gallery,
+            appearance: Appearance::System,
+            settings: None,
             natives: natives::natives(),
             views: HashMap::new(),
             preview: std::env::var("MOONFRAME_RUNE_GALLERY")
@@ -468,9 +495,11 @@ fn poll(ui: &mut Ui, _: f64, tx: &mut Tx) -> bool {
     {
         std::thread::sleep(delay);
     }
-    if ui.system_dark.get() != ui.dark {
-        ui.dark = ui.system_dark.get();
-        ui.workspace.set_dark(ui.dark);
+    // Only `system` follows the system: a choice of light or dark stands.
+    let dark = ui.appearance.is_dark(ui.system_dark.get());
+    if dark != ui.dark {
+        ui.dark = dark;
+        ui.workspace.set_dark(dark);
         changed = true;
     }
     changed |= ui.reload_changed();
@@ -478,6 +507,17 @@ fn poll(ui: &mut Ui, _: f64, tx: &mut Tx) -> bool {
     if let Some(cache) = &ui.images {
         changed |= ui.map_tiles.take_ready(cache);
     }
+    // A failed tile comes up for another try: the view asks for what shows.
+    if let Some(due) = ui.map_tiles.next_retry() {
+        let now = Instant::now();
+        if now >= due {
+            changed = true;
+        } else {
+            tx.wake_after(due - now);
+        }
+    }
+    ui.settle_maps(tx);
+    ui.videos.retire();
     ui.sync_menus();
     if ui.app.is_some() && !ui.about_replaced {
         ui.about_replaced = menus::drop_system_about();

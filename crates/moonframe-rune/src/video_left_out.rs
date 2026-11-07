@@ -8,6 +8,10 @@ pub(crate) struct Videos {
 }
 
 impl Videos {
+    pub(crate) fn frame_began(&self) {}
+
+    pub(crate) fn retire(&self) {}
+
     pub(crate) fn pixels(&self, _: &str) -> Pixels {
         self.none
             .borrow_mut()
