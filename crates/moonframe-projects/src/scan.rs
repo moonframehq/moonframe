@@ -91,7 +91,7 @@ fn git_dir(dir: &str) -> String {
         let line = fs::read_to_string(&dot).unwrap_or_default();
         let target = line.lines().next().and_then(|l| l.strip_prefix("gitdir:"));
         if let Some(target) = target.map(str::trim).filter(|target| !target.is_empty()) {
-            return if target.starts_with('/') {
+            return if Path::new(target).is_absolute() {
                 target.to_owned()
             } else {
                 format!("{dir}/{target}")

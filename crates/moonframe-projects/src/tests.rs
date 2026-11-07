@@ -17,6 +17,17 @@ fn sh(dir: &Path, args: &[&str]) {
     assert!(done.status.success(), "git {args:?}: {done:?}");
 }
 
+/// `path` with links resolved, as git reports paths: macOS's temp folder is
+/// one, and Windows gets forward slashes and no `\\\\?\\` in front.
+fn real(path: &Path) -> PathBuf {
+    let full = path.canonicalize().unwrap().to_string_lossy().into_owned();
+    PathBuf::from(if cfg!(windows) {
+        full.trim_start_matches(r"\\?\").replace('\\', "/")
+    } else {
+        full
+    })
+}
+
 /// A repository with one commit, in a project folder of its own.
 struct Fixture {
     temp: TempDir,
@@ -26,14 +37,14 @@ struct Fixture {
 impl Fixture {
     fn new() -> Self {
         let temp = tempdir().unwrap();
-        // Links resolved, as git reports paths: macOS's temp folder is one.
-        let root = temp.path().canonicalize().unwrap();
+        let root = real(temp.path());
         let repo = root.join("code/app");
         fs::create_dir_all(&repo).unwrap();
         sh(&repo, &["init", "-q", "-b", "main"]);
         sh(&repo, &["config", "user.name", "Test"]);
         sh(&repo, &["config", "user.email", "test@example.com"]);
         sh(&repo, &["config", "commit.gpgsign", "false"]);
+        sh(&repo, &["config", "core.autocrlf", "false"]);
         fs::write(repo.join("a.txt"), "one\ntwo\n").unwrap();
         fs::write(repo.join(".gitignore"), "build\n").unwrap();
         sh(&repo, &["add", "-A"]);
@@ -48,13 +59,7 @@ impl Fixture {
     fn projects(&self) -> Projects {
         let root = self.repo.parent().unwrap();
         Projects::new(Config {
-            home: self
-                .temp
-                .path()
-                .canonicalize()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned(),
+            home: real(self.temp.path()).to_string_lossy().into_owned(),
             roots: vec![root.to_string_lossy().into_owned()],
             writers: vec!["writer".to_owned()],
             kept: self.temp.path().join("cache/kept.json"),
@@ -173,12 +178,7 @@ fn completion_and_inspector_listings_are_independent() {
 
 /// A repository outside the project folders.
 fn outside(fixture: &Fixture) -> String {
-    let elsewhere = fixture
-        .temp
-        .path()
-        .canonicalize()
-        .unwrap()
-        .join("elsewhere");
+    let elsewhere = real(fixture.temp.path()).join("elsewhere");
     fs::create_dir(&elsewhere).unwrap();
     sh(&elsewhere, &["init", "-q"]);
     fs::write(elsewhere.join("secret.txt"), "private").unwrap();
@@ -221,7 +221,7 @@ fn a_work_tree_just_added_can_be_opened() {
     let fixture = Fixture::new();
     let mut projects = fixture.projects();
     published(&mut projects);
-    let tree = fixture.temp.path().canonicalize().unwrap().join("tree");
+    let tree = real(fixture.temp.path()).join("tree");
     sh(&fixture.repo, &[
         "worktree",
         "add",

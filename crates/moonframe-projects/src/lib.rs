@@ -90,6 +90,16 @@ pub fn native() -> Box<dyn Native> {
     Box::new(Provider::default())
 }
 
+/// `path` with forward slashes, the form git reports and every path here
+/// is built and compared in.
+fn slashed(path: String) -> String {
+    if cfg!(windows) {
+        path.replace('\\', "/")
+    } else {
+        path
+    }
+}
+
 /// `path` with the home folder as `~`.
 pub(crate) fn tilde(path: &str, home: &str) -> String {
     match path.strip_prefix(home) {
@@ -102,10 +112,10 @@ pub(crate) fn tilde(path: &str, home: &str) -> String {
 
 /// `path` with a leading `~` as the home folder.
 fn expand(path: &str, home: &str) -> String {
-    match path.strip_prefix('~') {
+    slashed(match path.strip_prefix('~') {
         Some(rest) if rest.is_empty() || rest.starts_with('/') => format!("{home}{rest}"),
         _ => path.to_owned(),
-    }
+    })
 }
 
 /// The last part of a path, or `None` when it ends in a slash.
@@ -160,9 +170,11 @@ struct Config {
 
 impl Config {
     fn of(host: &Handle) -> Self {
-        let home = env::var("HOME")
-            .or_else(|_| env::var("USERPROFILE"))
-            .unwrap_or_default();
+        let home = slashed(
+            env::var("HOME")
+                .or_else(|_| env::var("USERPROFILE"))
+                .unwrap_or_default(),
+        );
         let wanted = env::var("MOONFRAME_PROJECTS").map_or_else(
             |_| {
                 [
