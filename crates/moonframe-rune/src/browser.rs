@@ -70,6 +70,13 @@ fn may_navigate(url: &str, local: bool) -> bool {
         || is_web_url(url)
 }
 
+/// Notes that a page began loading `url`: a local page that went to the web
+/// is a web page now, and must not reach back to the disk. On the page's own
+/// callback, as an idle window would read a report too late.
+fn started(local: &AtomicBool, url: &str) {
+    local.store(is_file_url(url), Ordering::Relaxed);
+}
+
 fn builder(
     url: String,
     sender: &Sender<Report>,
@@ -78,6 +85,7 @@ fn builder(
 ) -> WebViewBuilder<'static> {
     let (title, load) = (sender.clone(), sender.clone());
     let (woken, loaded) = (Arc::clone(&wake), wake);
+    let loading = Arc::clone(&local);
     WebViewBuilder::new()
         .with_url(url)
         .with_visible(false)
@@ -93,7 +101,10 @@ fn builder(
         })
         .with_on_page_load_handler(move |event, url| {
             let report = match event {
-                PageLoadEvent::Started => Report::Started(url),
+                PageLoadEvent::Started => {
+                    started(&loading, &url);
+                    Report::Started(url)
+                },
                 PageLoadEvent::Finished => Report::Finished(url),
             };
             if load.send(report).is_ok() {
@@ -279,7 +290,10 @@ impl Ui {
 
 #[cfg(test)]
 mod tests {
-    use super::may_navigate;
+    use {
+        super::{may_navigate, started},
+        std::sync::atomic::{AtomicBool, Ordering},
+    };
 
     #[test]
     fn a_web_page_cannot_reach_the_disk() {
@@ -293,6 +307,21 @@ mod tests {
     fn a_local_page_reaches_files_and_the_web() {
         assert!(may_navigate("file:///tmp/page.html", true));
         assert!(may_navigate("https://example.com/", true));
+    }
+
+    #[test]
+    fn a_local_page_that_goes_to_the_web_loses_the_disk() {
+        let local = AtomicBool::new(true);
+        started(&local, "file:///tmp/next.html");
+        assert!(
+            local.load(Ordering::Relaxed),
+            "links among files stay local"
+        );
+        started(&local, "https://example.com/");
+        assert!(!may_navigate(
+            "file:///etc/passwd",
+            local.load(Ordering::Relaxed)
+        ));
     }
 
     #[test]
