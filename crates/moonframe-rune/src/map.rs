@@ -13,7 +13,7 @@ use {
         collections::{HashMap, HashSet},
         hash::{DefaultHasher, Hash as _, Hasher as _},
         io::Read as _,
-        path::PathBuf,
+        path::{Path, PathBuf},
         sync::{
             Arc, Mutex,
             mpsc::{Sender, channel},
@@ -88,16 +88,41 @@ pub(crate) struct Tiles {
     pub(crate) boxes: RefCell<HashMap<String, (f32, f32)>>,
 }
 
-fn cached(url: &str) -> PathBuf {
+/// Where tiles are kept: the user's own cache, never the shared temporary
+/// folder, where another user could plant a link for a write to follow.
+fn tiles_folder() -> PathBuf {
+    moonframe_packages::paths::cache().join("rune-tiles")
+}
+
+fn cached(folder: &Path, url: &str) -> PathBuf {
     let mut hasher = DefaultHasher::new();
     url.hash(&mut hasher);
-    std::env::temp_dir()
-        .join("moonframe-rune-tiles")
-        .join(format!("{:016x}.tile", hasher.finish()))
+    folder.join(format!("{:016x}.tile", hasher.finish()))
+}
+
+/// Writes `bytes` as `file` through a file of its own made beside it, then
+/// renamed over it: a rename replaces a link at `file` rather than writing
+/// where it points.
+fn keep(file: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let folder = file.parent().unwrap_or(file);
+    std::fs::create_dir_all(folder)?;
+    let part = file.with_extension(format!("{}.part", std::process::id()));
+    let written = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&part)
+        .and_then(|mut out| std::io::Write::write_all(&mut out, bytes));
+    if let Err(problem) = written {
+        let _ = std::fs::remove_file(&part);
+        return Err(problem);
+    }
+    std::fs::rename(&part, file).inspect_err(|_| {
+        let _ = std::fs::remove_file(&part);
+    })
 }
 
 fn fetch(url: &str) -> Option<Vec<u8>> {
-    let file = cached(url);
+    let file = cached(&tiles_folder(), url);
     let fresh = std::fs::metadata(&file)
         .and_then(|found| found.modified())
         .ok()
@@ -114,10 +139,7 @@ fn fetch(url: &str) -> Option<Vec<u8>> {
         .take(MOST_BYTES)
         .read_to_end(&mut bytes)
         .ok()?;
-    if let Some(folder) = file.parent()
-        && std::fs::create_dir_all(folder).is_ok()
-        && let Err(problem) = std::fs::write(&file, &bytes)
-    {
+    if let Err(problem) = keep(&file, &bytes) {
         tracing::debug!("cannot keep a tile: {problem}");
     }
     Some(bytes)
@@ -472,5 +494,31 @@ mod tests {
         );
         tiles.supplied("map", (Some([5., 5.]), Some(4.)));
         assert!(tiles.cameras.borrow().is_empty());
+    }
+
+    #[test]
+    fn tiles_are_kept_in_the_users_own_cache() {
+        let folder = tiles_folder();
+        assert!(!folder.starts_with(std::env::temp_dir().join("moonframe-rune-tiles")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_tile_replaces_a_link_rather_than_writing_where_it_points() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("precious");
+        std::fs::write(&target, b"keep me").unwrap();
+        let tile = dir.path().join("tiles").join("0.tile");
+        std::fs::create_dir_all(tile.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(&target, &tile).unwrap();
+        keep(&tile, b"tile bytes").unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"keep me");
+        assert_eq!(std::fs::read(&tile).unwrap(), b"tile bytes");
+        assert!(
+            !std::fs::symlink_metadata(&tile)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
     }
 }
