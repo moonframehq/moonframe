@@ -17,6 +17,7 @@ type State = {
 	current: string?,
 	picked: string?,
 	folded: { [string]: boolean },
+	collapsed: { [string]: boolean },
 	greeter: any,
 	name: string,
 	doc: string?,
@@ -72,7 +73,8 @@ end
 
 local function files_tab(state: State, files: { any })
 	if #files == 0 then
-		return empty_state { icon = "list-tree", title = "No changes", message = "This session has not touched a file." }
+		local message = if state.current then "This session has not touched a file." else "Open a session to see its changes."
+		return empty_state { icon = "list-tree", title = "No changes", message = message }
 	end
 	local lines = {}
 	local open = files[1]
@@ -87,7 +89,7 @@ local function files_tab(state: State, files: { any })
 			change_tree { files = lines, selected = open.path, counts = true, plain = true, folded = state.folded, pick = "file" },
 		},
 		ui.column { class = "bench-diff", grow = true,
-			diff_view { path = open.path, status = open.status, hunks = parse_diff(open.diff), grow = true },
+			diff_view { path = open.path, status = open.status, hunks = parse_diff(open.diff), collapsed = state.collapsed[open.path], grow = true },
 		},
 	}
 end
@@ -141,6 +143,7 @@ return mod {
 			tab = "echo", closed = {}, folded = {}, name = "Kit", shell = false,
 		} :: any
 		state.adding = false
+		state.collapsed = state.collapsed or {}
 		return state
 	end,
 
@@ -179,6 +182,8 @@ return mod {
 			state.shell = true
 			state.tab = "terminal"
 			state.adding = false
+		elseif msg.toggle then
+			state.collapsed[msg.toggle] = not state.collapsed[msg.toggle]
 		elseif msg.fold then
 			state.folded[msg.fold] = not state.folded[msg.fold]
 		elseif msg.open_doc then

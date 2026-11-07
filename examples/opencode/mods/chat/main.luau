@@ -16,11 +16,11 @@ type State = {
 	current: string?,
 	list: { any },
 	extra: { [string]: { any } },
-	spent: { [string]: number },
 	open_tools: { [string]: boolean },
 	draft: string,
 	caret: number,
 	highlighted: number,
+	no_suggestions: boolean,
 	model: string,
 	effort: string,
 	dropdown: string?,
@@ -63,9 +63,11 @@ local function sample(app, id: string?): any
 end
 
 -- What a turn the user sent does: the canned answer, and any sends.
-local function answer(text: string): (string, { any })
+local function answer(state: State, text: string): (string, { any })
 	local name = string.match(text, "^[Hh]ello,?%s+(%S+)")
-	if name then
+	if name and not (state.greeter and state.greeter.on) then
+		return "The greeter service is off, so nobody answered. Turn it on in the **Hello** tab.", {}
+	elseif name then
 		name = string.gsub(name, "[%p]+$", "")
 		return `I asked the greeter service to say hello to **{name}**. Its answer is above the composer and in Echo.`,
 			{ { to = "hello", msg = { greet = name } } }
@@ -82,10 +84,10 @@ local function send(state: State, text: string)
 	local session = current_session(state)
 	local turns = state.extra[id] or {}
 	state.extra[id] = turns
-	local reply, sends = answer(words)
+	local reply, sends = answer(state, words)
 	table.insert(turns, { from = "user", text = words, attached = state.attached })
 	table.insert(turns, { from = "agent", text = reply })
-	state.spent[id] = (state.spent[id] or 0) + 600 + #words * 4
+	table.insert(sends, { to = "sidebar", msg = { spent = id, tokens = 600 + #words * 4 } })
 	state.draft = ""
 	state.attached = {}
 	if session and session.title == "New session" then
@@ -184,7 +186,10 @@ end
 
 local function composer(state: State, session: any, app)
 	local people: { any } = {}
-	if string.sub(state.draft, 1, 1) == "/" then
+	if state.no_suggestions then
+		-- Dismissed: none until the next edit, so Enter sends the draft.
+		people = {}
+	elseif string.sub(state.draft, 1, 1) == "/" then
 		people = COMMANDS
 	else
 		local data = sample(app, state.current)
@@ -260,19 +265,22 @@ return mod {
 
 	init = function(previous: State?): State
 		local state = previous or {
-			list = {}, extra = {}, spent = {}, open_tools = {}, draft = "", caret = 0, highlighted = 1,
+			list = {}, extra = {}, open_tools = {}, draft = "", caret = 0, highlighted = 1,
 			model = "opus", effort = "high", toast_hidden = -1, attached = {}, new_title = "",
 		} :: any
 		state.dropdown = nil
 		state.session_menu = false
 		state.renaming = false
 		state.listening = false
+		state.no_suggestions = false
 		return state
 	end,
 
 	update = function(state: State, msg)
 		if msg == "send-click" then
 			return send(state, state.draft)
+		elseif msg == "no-suggestions" then
+			state.no_suggestions = true
 		elseif msg == "close-dropdown" then
 			state.dropdown = nil
 		elseif msg == "session-menu" then
@@ -309,13 +317,17 @@ return mod {
 		elseif msg.msg == "draft" then
 			if msg.value ~= state.draft then
 				state.highlighted = 1
+				state.no_suggestions = false
 			end
 			state.draft = msg.value
 			state.caret = msg.caret or #msg.value
+		elseif msg.msg == "no-suggestions" then
+			state.no_suggestions = true
 		elseif msg.msg == "send" then
 			return send(state, msg.value)
 		elseif msg.msg == "dictated" then
 			state.draft = if state.draft == "" then msg.value else `{state.draft} {msg.value}`
+			state.caret = #state.draft
 		elseif msg.msg == "rename-title" then
 			state.new_title = msg.value
 		elseif msg.msg == "link" then
@@ -383,8 +395,6 @@ return mod {
 
 		local greeter = state.greeter
 		local on = greeter and greeter.on
-		local total = session.tokens + (state.spent[session.id] or 0)
-		local cost = session.cost + (state.spent[session.id] or 0) * 0.000008
 		local toast = greeter and greeter.answer and greeter.count ~= state.toast_hidden
 
 		return ui.column { grow = true, gap = "none",
@@ -411,8 +421,8 @@ return mod {
 					ui.text { if on then "Greeter on" else "Greeter off", size = "small", weight = "medium" },
 				},
 				ui.icon { "loader-circle", tone = "muted" },
-				ui.text { tokens(total) },
-				ui.text { string.format("$%.2f", cost), tone = "muted" },
+				ui.text { tokens(session.tokens) },
+				ui.text { string.format("$%.2f", session.cost), tone = "muted" },
 			},
 			-- The inner column keeps its height, or the scroll squeezes the turns.
 			ui.column { grow = true, scroll = true, follow = true, gap = "none",

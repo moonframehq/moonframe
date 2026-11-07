@@ -5,6 +5,9 @@
 
 local search_field = use "search-field"
 
+-- What the scripted agent charges, to keep the counters moving.
+local COST_PER_TOKEN = 0.000008
+
 type Session = { id: string, title: string, letter: string, project: string, unread: boolean, tokens: number, cost: number }
 
 type State = {
@@ -14,6 +17,7 @@ type State = {
 	deleted: { [string]: boolean },
 	read: { [string]: boolean },
 	unread: { [string]: boolean },
+	spent: { [string]: number },
 	current: string?,
 	page: string,
 	searching: boolean,
@@ -27,10 +31,11 @@ local function sessions(state: State): { Session }
 	local function add(session: Session)
 		if not state.deleted[session.id] then
 			local unread = state.unread[session.id] or (session.unread and not state.read[session.id])
+			local spent = state.spent[session.id] or 0
 			table.insert(list, {
 				id = session.id, letter = session.letter, project = session.project,
 				title = state.renamed[session.id] or session.title,
-				unread = unread == true, tokens = session.tokens, cost = session.cost,
+				unread = unread == true, tokens = session.tokens + spent, cost = session.cost + spent * COST_PER_TOKEN,
 			})
 		end
 	end
@@ -80,9 +85,10 @@ return mod {
 
 	init = function(previous: State?)
 		local state: State = previous or {
-			base = {}, created = {}, renamed = {}, deleted = {}, read = {}, unread = {},
+			base = {}, created = {}, renamed = {}, deleted = {}, read = {}, unread = {}, spent = {},
 			current = "s2", page = "chat", searching = false, query = "", next_id = 1,
 		}
+		state.spent = state.spent or {}
 		state.searching = false
 		state.query = ""
 		return state, publish(state)
@@ -122,6 +128,8 @@ return mod {
 			select(state, msg.select)
 		elseif msg.rename then
 			state.renamed[msg.rename] = msg.title
+		elseif msg.spent then
+			state.spent[msg.spent] = (state.spent[msg.spent] or 0) + msg.tokens
 		elseif msg.mark_unread then
 			state.unread[msg.mark_unread] = true
 			state.read[msg.mark_unread] = nil

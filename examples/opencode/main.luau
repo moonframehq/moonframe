@@ -80,7 +80,7 @@ return mod {
 				window = app.window,
 				leading = {
 					icon_button { icon = "menu", tooltip = "Playground", msg = "open", to = "playground" },
-					icon_button { icon = "panel-left", tooltip = "Toggle sidebar", msg = "toggle-left", active = false },
+					icon_button { icon = "panel-left", tooltip = "Toggle sidebar", msg = "toggle-left" },
 				},
 				actions = {
 					ui.row { class = "service-pill", align = "center", msg = "show-echo", tooltip = "Open Echo",
