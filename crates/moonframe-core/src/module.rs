@@ -8,6 +8,7 @@ use {
         component::Library,
         menus::Menus,
         node,
+        peaks::Peaks,
         read::{Cx, Fields, NO_NAMES, Read},
         vm::{self, Meter},
     },
@@ -207,6 +208,7 @@ impl Read for Send {
 pub(crate) struct Module {
     lua: Lua,
     meter: Meter,
+    peaks: Peaks,
     lens: Lens,
     definition: Definition,
     state: Value,
@@ -237,7 +239,8 @@ impl Module {
                 "menus and about: only the shell (main.luau) sets them",
             ));
         }
-        Self::start(lua, meter, definition, previous, restored, props)
+        let peaks = Peaks::new(name, vm::MEMORY, vm::INTERRUPTS);
+        Self::start(lua, meter, peaks, definition, previous, restored, props)
     }
 
     /// An instance of the component `component`, which keeps state: it has
@@ -274,17 +277,22 @@ impl Module {
             keys: Keys::default(),
             meta: Meta::default(),
         };
-        Self::start(lua, meter, definition, previous, restored, props)
+        let peaks = Peaks::new(name, vm::SMALL_MEMORY, vm::INTERRUPTS);
+        Self::start(lua, meter, peaks, definition, previous, restored, props)
     }
 
     fn start(
         lua: Lua,
         meter: Meter,
+        peaks: Peaks,
         definition: Definition,
         previous: Option<&Data>,
         restored: bool,
         props: Option<&Data>,
     ) -> Result<Self, Error> {
+        let read_peaks = || peaks.read(lua.used_memory(), meter.used());
+        // Loading ran its top level, on a count `init` starts over.
+        read_peaks();
         let previous = match previous {
             Some(previous) => previous.to_lua(&lua)?,
             None => Value::Nil,
@@ -300,6 +308,7 @@ impl Module {
                 meter.reset();
                 let (state, sends) = init
                     .call::<(Value, Value)>((previous, props.clone(), restored))
+                    .inspect(|_| read_peaks())
                     .map_err(|error| Error::from(error).context("init"))?;
                 let sends = Option::<Vec<Send>>::read(&sends, &Cx::root(&NO_NAMES).key("sends"))
                     .map_err(|error| error.context("init"))?;
@@ -312,6 +321,7 @@ impl Module {
             lens: Lens::new(&lua)?,
             lua,
             meter,
+            peaks,
             definition,
             state,
             props,
@@ -384,6 +394,7 @@ impl Module {
                 msg.to_lua(&self.lua)?,
                 self.props.clone(),
             ))
+            .inspect(|_| self.read_peaks())
             .map_err(|error| Error::from(error).context("update"))?;
         if !state.is_nil() {
             self.state = state;
@@ -417,6 +428,7 @@ impl Module {
         // A list's rows are built as it is read, and may read `app` too.
         let (node, problems) =
             node::read(&tree, sheet, windows).map_err(|error| error.context("view"))?;
+        self.read_peaks();
         Ok((
             node,
             problems
@@ -425,6 +437,11 @@ impl Module {
                 .collect(),
             self.lens.reads(),
         ))
+    }
+
+    /// Notes how much of its limits the call that just ended came to use.
+    fn read_peaks(&self) {
+        self.peaks.read(self.lua.used_memory(), self.meter.used());
     }
 
     /// The mod's own `styles`, read against the stylesheet's names.
@@ -442,3 +459,8 @@ impl Module {
         Data::read(&self.state)
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[path = "module/tests.rs"]
+mod tests;

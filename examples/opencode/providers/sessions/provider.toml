@@ -1,0 +1,6 @@
+# The sessions, their transcripts, changed files and linked documents, shared
+# as `app.sessions`. SAMPLE DATA from sessions.json; replace it, or this
+# provider, with your own source. A static provider: the file is published as
+# it is, and again when it changes.
+file = "sessions.json"
+kind = "static"

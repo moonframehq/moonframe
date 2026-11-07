@@ -1887,6 +1887,17 @@ it: the repository follows the terminal, so one that moved (or no `root`)
 is refused, never written to another. Signing and pushing may wait on the user's hardware key: show
 that something runs until the reply comes.
 
+Worktrees, one per branch in flight, take the same `root`, `id` and
+`writers`. `{ worktree_add = { branch = "feat/x", base = "main" }, root = ...,
+id = ... }` checks out `branch`, making it from `base` (or HEAD) when it is
+new, and the reply's `message` is the folder: the host picks it, beside the
+repository in `<repository>.worktrees/<branch>` (a `/` becomes `%2F`, and a very
+long name is cut and given a hash), never a mod. `{
+worktree_remove = <path from app.git.worktrees>, root = ..., id = ... }`
+removes a linked worktree. The branch stays, and it is refused with
+uncommitted changes, for the main checkout, or for the checkout in use; there
+is no way to force it, so show `error` to the user, who decides.
+
 | field | shape |
 |---|---|
 | `repository`, `branch`, `changed`, `ahead`, `behind` | as before; `branch` is `"HEAD"` when `detached` |
@@ -1898,6 +1909,7 @@ that something runs until the reply comes.
 | `branches` | 20 newest local `{ name, head, time, upstream?, ahead, behind, gone, current }` |
 | `remote` | `{ name, url, host, kind ("github" "gitlab" "other"), owner, repo, web_url? }` or nil |
 | `stashes` | count |
+| `log` | once a mod sends `{ log = 200 }` (at most 500; `false` stops it): `{ sha, short, parents, author, time, refs, subject }`, children before parents, of every branch, tag and HEAD. Draw it with `use "commit-graph"`; the `history` mod is a tab that does |
 | `diff` | `{ path, binary, lines, truncated, hunks = { { header, old_start, new_start, lines = { { kind ("add" "del" "ctx"), old?, new?, text } } } } }`, at most 1200 lines of 300 characters |
 
 `app.docs` (docs, native): `{ available, root }`, the root `app.files`

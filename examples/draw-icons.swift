@@ -585,3 +585,29 @@ do {
     }
     save(cx, "examples/msgvault/icon.png")
 }
+
+// opencode: a near-black window with a list of sessions, a chat bubble over
+// lines of an answer, and a card on the right.
+do {
+    let cx = body([0x3a3a40, 0x18181b, 0x09090b])
+    // The sessions: one raised, one unread.
+    fill(cx, CGRect(x: 172, y: 684, width: 170, height: 46), 14, color(0xffffff, 0.2))
+    for row in 0..<6 {
+        let y = 620 - CGFloat(row) * 66
+        fill(cx, CGRect(x: 186, y: y, width: 30, height: 30), 8, color(0xffffff, 0.5))
+        fill(cx, CGRect(x: 230, y: y + 6, width: row % 2 == 0 ? 94 : 72, height: 18), 9, color(0xffffff, 0.28))
+    }
+    fill(cx, CGRect(x: 310, y: 490, width: 18, height: 18), 9, color(0x4c5dff))
+    // The chat: a bubble, then lines of an answer.
+    fill(cx, CGRect(x: 366, y: 180, width: 276, height: 664), 30, color(0x27272a))
+    fill(cx, CGRect(x: 462, y: 712, width: 156, height: 76), 22, color(0xffffff, 0.22))
+    for row in 0..<5 {
+        fill(cx, CGRect(x: 392, y: 640 - CGFloat(row) * 52, width: row % 2 == 0 ? 224 : 176, height: 20), 10, color(0xffffff, 0.5))
+    }
+    fill(cx, CGRect(x: 392, y: 208, width: 224, height: 96), 22, color(0xffffff, 0.14))
+    // The workbench: a card with a green dot.
+    fill(cx, CGRect(x: 664, y: 180, width: 188, height: 664), 30, color(0x27272a))
+    fill(cx, CGRect(x: 690, y: 748, width: 26, height: 26), 13, color(0x4ade80))
+    fill(cx, CGRect(x: 690, y: 560, width: 136, height: 150), 20, color(0xffffff, 0.16))
+    save(cx, "examples/opencode/icon.png")
+}

@@ -1312,6 +1312,19 @@ declare ui: {
 	memo: <T>(key: string, deps: { any }, build: () -> T) -> T,
 }
 
+-- One commit of `app.git.log`.
+type GitCommit = {
+	sha: string,
+	short: string,
+	parents: { string },
+	author: string,
+	-- Seconds since 1970.
+	time: number,
+	-- Branches and tags pointing here.
+	refs: { string },
+	subject: string,
+}
+
 -- This machine's load, sampled by the host once a second.
 type System = {
 	-- Fractions from 0 to 1.
@@ -1521,6 +1534,9 @@ type Git = {
 	branches: { GitBranch },
 	remote: GitRemote?,
 	stashes: number,
+	-- Once a mod sends `provider:git` `{ log = 200 }`: recent commits of every
+	-- branch, tag and HEAD, children before parents.
+	log: { GitCommit }?,
 	-- The file asked for with `{ diff = path }`, until `{ diff = false }`.
 	diff: GitDiff?,
 }
