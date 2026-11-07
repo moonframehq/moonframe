@@ -91,6 +91,7 @@ impl<'w> Draw<'w> for Terminal {
         }
         painter.terminals.drawn(&key, &view);
         view.on_exit(self.exit.as_ref());
+        view.on_shell(self.shell.as_ref());
         let press_view = view.clone();
         let scroll_view = view.clone();
         let selection = theme.primary.opacity(SELECTION_ALPHA);

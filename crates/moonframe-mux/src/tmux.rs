@@ -110,6 +110,9 @@ impl Tmux {
             "-e",
             "COLORTERM=truecolor",
         ]);
+        for (variable, value) in &open.env {
+            start.arg("-e").arg(format!("{variable}={value}"));
+        }
         if let Some(cwd) = open.cwd.as_ref().filter(|cwd| cwd.is_dir()) {
             start.arg("-c").arg(cwd);
         } else if let Some(home) = std::env::var_os("HOME") {

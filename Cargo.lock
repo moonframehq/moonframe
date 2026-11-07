@@ -5470,6 +5470,7 @@ dependencies = [
  "libghostty-vt",
  "portable-pty",
  "sysinfo 0.40.1",
+ "tempfile",
  "tracing",
 ]
 

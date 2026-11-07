@@ -1,7 +1,9 @@
 -- The main area: the content of the tab selected in the title bar's tab
 -- strip (`tabbed { id = "main", show = "bar" }` in main.luau). It hears the
 -- strip on the `tabs/main` topic, draws that tab with `tab-view`, and sends
--- what the tab reports (a browser's page) back on `tabs/main/report`.
+-- what the tab reports (a browser's page) back on `tabs/main/report`. What a
+-- tab's shell does goes straight to the strip instead: a command line can
+-- hold a secret, and a topic is open to every mod and saved.
 -- A markdown file chosen in the explorer opens in a tab of its own (asked
 -- for on `tabs/main/open`), with the project it is in (`root`), so the tab
 -- keeps that file when the project moves; a link in one opens the file it
@@ -16,6 +18,9 @@ type State = {
 	-- Numbers the tabs it asks the strip for.
 	asked: number,
 }
+
+-- The strip `main.luau` draws, by its full name.
+local STRIP = "shell/tabbed#main"
 
 -- The kinds that open a shell.
 local TERMINALS = { ["component:terminal"] = true, ["component:ghostty-terminal"] = true }
@@ -87,7 +92,8 @@ return mod {
 		elseif msg.topic == "looks" then
 			state.looks = msg.value
 		elseif msg.tab_report then
-			return state, { { to = "topic:tabs/main/report", msg = msg } }
+			local to = if msg.event then STRIP else "topic:tabs/main/report"
+			return state, { { to = to, msg = msg } }
 		elseif type(msg.open) == "string" and is_markdown(msg.open) then
 			-- From the explorer.
 			local root = if type(msg.root) == "string" then msg.root else nil

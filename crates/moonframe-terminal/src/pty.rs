@@ -36,6 +36,9 @@ impl Backend for Pty {
         let mut command = CommandBuilder::new_default_prog();
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
+        for (name, value) in &open.env {
+            command.env(name, value);
+        }
         if let Some(cwd) = open.cwd.as_ref().filter(|cwd| cwd.is_dir()) {
             command.cwd(cwd);
         } else if let Some(home) = std::env::var_os("HOME") {
