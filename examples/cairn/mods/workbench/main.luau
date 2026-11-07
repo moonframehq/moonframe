@@ -120,7 +120,7 @@ local function echo_tab(state: State)
 end
 
 return mod {
-	subscribe = { "opencode/sessions", "opencode/greeter" },
+	subscribe = { "cairn/sessions", "cairn/greeter" },
 
 	styles = {
 		[".bench-head"] = { padding = { 7, 10, 7, 12 } },
@@ -161,9 +161,9 @@ return mod {
 		elseif msg.msg == "ask" then
 			state.name = msg.value
 			return ask(state)
-		elseif msg.topic == "opencode/greeter" then
+		elseif msg.topic == "cairn/greeter" then
 			state.greeter = msg.value
-		elseif msg.topic == "opencode/sessions" and msg.value then
+		elseif msg.topic == "cairn/sessions" and msg.value then
 			if state.current ~= msg.value.current then
 				state.current = msg.value.current
 				state.picked = nil

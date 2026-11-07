@@ -8,7 +8,7 @@ local function tokens(value: number): string
 end
 
 return mod {
-	subscribe = { "opencode/sessions" },
+	subscribe = { "cairn/sessions" },
 
 	styles = {
 		[".home"] = { padding = { 28, 28 }, gap = 18 },
@@ -23,7 +23,7 @@ return mod {
 	end,
 
 	update = function(state, msg)
-		if type(msg) == "table" and msg.topic == "opencode/sessions" and msg.value then
+		if type(msg) == "table" and msg.topic == "cairn/sessions" and msg.value then
 			state.list = msg.value.list
 		end
 	end,

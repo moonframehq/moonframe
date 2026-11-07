@@ -36,7 +36,7 @@ local function commands(list: { any }): { any }
 end
 
 return mod {
-	subscribe = { "opencode/sessions" },
+	subscribe = { "cairn/sessions" },
 
 	keys = { ["secondary-shift-d"] = "open" } :: any,
 
@@ -49,7 +49,7 @@ return mod {
 			state.open = not state.open
 		elseif msg == "close" then
 			state.open = false
-		elseif type(msg) == "table" and msg.topic == "opencode/sessions" and msg.value then
+		elseif type(msg) == "table" and msg.topic == "cairn/sessions" and msg.value then
 			state.list = msg.value.list
 		elseif type(msg) == "table" and msg.run then
 			state.open = false

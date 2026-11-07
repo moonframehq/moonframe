@@ -236,7 +236,7 @@ local function composer(state: State, session: any, app)
 end
 
 return mod {
-	subscribe = { "opencode/sessions", "opencode/greeter", "opencode/page" },
+	subscribe = { "cairn/sessions", "cairn/greeter", "cairn/page" },
 
 	styles = {
 		[".chat-head"] = { padding = { 10, 10, 10, 14 }, gap = 8 },
@@ -301,12 +301,12 @@ return mod {
 			return state, { { to = "app:pick", msg = { kind = "open", multiple = true, reply = { attached = true } } } }
 		elseif type(msg) ~= "table" then
 			return
-		elseif msg.topic == "opencode/sessions" and msg.value then
+		elseif msg.topic == "cairn/sessions" and msg.value then
 			state.list = msg.value.list
 			state.current = msg.value.current
-		elseif msg.topic == "opencode/greeter" then
+		elseif msg.topic == "cairn/greeter" then
 			state.greeter = msg.value
-		elseif msg.topic == "opencode/page" then
+		elseif msg.topic == "cairn/page" then
 			-- Home draws no mic button, so nothing else would stop it.
 			if msg.value ~= "chat" and state.listening then
 				state.listening = false

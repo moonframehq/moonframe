@@ -1,7 +1,7 @@
--- opencode's shell: a thin bar across the top, the sessions on the window's
+-- cairn's shell: a thin bar across the top, the sessions on the window's
 -- own colour, then two cards: the chat (or Home) and the workbench. The
--- sidebar says which page shows on `opencode/page`; the bar's pill reads the
--- greeter service on `opencode/greeter`, and opens its tab.
+-- sidebar says which page shows on `cairn/page`; the bar's pill reads the
+-- greeter service on `cairn/greeter`, and opens its tab.
 
 local title_bar = use "title-bar"
 local icon_button = use "icon-button"
@@ -41,7 +41,7 @@ return mod {
 
 	menus = MENUS,
 
-	subscribe = { "opencode/page", "opencode/greeter" },
+	subscribe = { "cairn/page", "cairn/greeter" },
 
 	styles = {
 		[".service-pill"] = { background = "#1c1c1c", radius = 999, padding = { 4, 12, 4, 10 }, gap = 6, color = "#d8d8d8" },
@@ -67,9 +67,9 @@ return mod {
 			return state, { { to = "workbench", msg = { tab = "echo" } } }
 		elseif type(msg) == "table" and msg.show_right then
 			state.right = true
-		elseif type(msg) == "table" and msg.topic == "opencode/page" then
+		elseif type(msg) == "table" and msg.topic == "cairn/page" then
 			state.page = msg.value or "chat"
-		elseif type(msg) == "table" and msg.topic == "opencode/greeter" and msg.value then
+		elseif type(msg) == "table" and msg.topic == "cairn/greeter" and msg.value then
 			state.generation = msg.value.generation
 		end
 	end,

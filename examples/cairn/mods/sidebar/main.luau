@@ -1,7 +1,7 @@
 -- The sessions: Home, search, New session, then a row per session. It owns
 -- the list: the sample sessions (from `provider/sessions`) with what the user
--- did to them on top, shared on `opencode/sessions` as { current, list }, and
--- which page shows on `opencode/page`.
+-- did to them on top, shared on `cairn/sessions` as { current, list }, and
+-- which page shows on `cairn/page`.
 
 local search_field = use "search-field"
 
@@ -50,8 +50,8 @@ end
 
 local function publish(state: State)
 	local sends: { any } = {
-		{ to = "topic:opencode/sessions", msg = { current = state.current, list = sessions(state) } },
-		{ to = "topic:opencode/page", msg = state.page },
+		{ to = "topic:cairn/sessions", msg = { current = state.current, list = sessions(state) } },
+		{ to = "topic:cairn/page", msg = state.page },
 	}
 	return sends
 end

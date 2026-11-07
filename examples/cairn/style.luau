@@ -1,4 +1,4 @@
--- opencode's look: near-black window, two dark cards with thin edges, grey
+-- cairn's look: near-black window, two dark cards with thin edges, grey
 -- text with white for what matters, and one blue for unread. It is a dark
 -- app, so each colour has one value.
 return style {

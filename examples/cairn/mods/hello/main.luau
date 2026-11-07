@@ -1,5 +1,5 @@
 -- The greeter service. It owns the answer, the count and the generation, and
--- publishes them on `opencode/greeter`; Echo asks it from the workbench, and
+-- publishes them on `cairn/greeter`; Echo asks it from the workbench, and
 -- the top bar, the chat's header and its toast all read what comes back.
 -- Restarting it starts a new generation, as a reloaded service would.
 
@@ -9,7 +9,7 @@ local switch = use "switch"
 type State = { on: boolean, generation: number, count: number, name: string, answer: string, words: number }
 
 local function publish(state: State)
-	return { { to = "topic:opencode/greeter", msg = {
+	return { { to = "topic:cairn/greeter", msg = {
 		on = state.on, generation = state.generation, count = state.count,
 		name = state.name, answer = state.answer, words = state.words,
 	} } }
