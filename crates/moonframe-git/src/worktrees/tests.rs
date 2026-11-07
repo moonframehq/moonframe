@@ -23,9 +23,12 @@ fn run(root: &Path, args: &[&str]) -> String {
 
 fn fixture() -> Fixture {
     let dir = tempfile::tempdir().unwrap();
-    let root = dir.path().canonicalize().unwrap().join("project");
-    std::fs::create_dir(&root).unwrap();
-    run(&root, &["init", "-q", "-b", "main"]);
+    let created = dir.path().join("project");
+    std::fs::create_dir(&created).unwrap();
+    run(&created, &["init", "-q", "-b", "main"]);
+    // As git names it, as the provider has it: not as the temporary folder
+    // was named, through a link on macOS, with other separators on Windows.
+    let root = PathBuf::from(run(&created, &["rev-parse", "--show-toplevel"]));
     for (key, value) in [
         ("user.name", "Moonframe Test"),
         ("user.email", "test@moonframe.invalid"),

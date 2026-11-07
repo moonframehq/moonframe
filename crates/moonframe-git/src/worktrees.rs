@@ -146,18 +146,27 @@ fn add(root: &Path, branch: &str, base: Option<&str>) -> Result<String, String> 
         &["worktree", "add", "--quiet", "-b", branch, &path, &start]
     };
     git(root, args, "add a worktree")?;
-    Ok(path)
+    // As git lists it, which is how `app.git.worktrees` and a later removal
+    // name it: on Windows that differs from the path given here.
+    let added = listed(&repo)?
+        .into_iter()
+        .find(|worktree| Path::new(&worktree.path) == folder);
+    Ok(added.map_or(path, |worktree| worktree.path))
 }
 
 fn remove(root: &Path, path: &str) -> Result<String, String> {
     let worktrees = listed(&Repo::at(root))?;
-    let Some(at) = worktrees.iter().position(|worktree| worktree.path == path) else {
+    let asked = Path::new(path);
+    let Some(at) = worktrees
+        .iter()
+        .position(|worktree| Path::new(&worktree.path) == asked)
+    else {
         return Err(format!("{path} is not a worktree of this repository"));
     };
     if at == 0 {
         return Err("the main checkout cannot be removed".to_owned());
     }
-    if Path::new(path) == root {
+    if asked == root {
         return Err("this is the checkout in use; switch to another first".to_owned());
     }
     git(root, &["worktree", "remove", path], "remove a worktree")?;
