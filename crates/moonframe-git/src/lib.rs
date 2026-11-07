@@ -435,9 +435,6 @@ impl Git {
             "worktrees": worktrees, "branches": self.branches,
             "remote": self.remote, "stashes": self.stashes,
         });
-        if let (Some(_), Value::Object(fields)) = (self.log_limit, &mut out) {
-            fields.insert("log".to_owned(), Value::from(self.log.clone()));
-        }
         if let (Some(path), Value::Object(fields)) = (&self.diff_path, &mut out) {
             // Only a file git reports as changed: a path a mod makes up
             // (`../..`, `/etc/hosts`) would otherwise publish a file outside
@@ -452,6 +449,17 @@ impl Git {
                 diff::parse(path, "")
             };
             fields.insert("diff".to_owned(), diff);
+        }
+        // Last, in the room the rest leaves: the host refuses a publish past
+        // its limit whole, and a diff is what the user is looking at.
+        if self.log_limit.is_some() {
+            let log = log::fit(
+                &self.log,
+                moonframe_providers::MAX_ENTRIES.saturating_sub(log::values(&out)),
+            );
+            if let Value::Object(fields) = &mut out {
+                fields.insert("log".to_owned(), log);
+            }
         }
         self.publish(host, out, force);
     }
@@ -640,8 +648,8 @@ fn base(repo: &Repo) -> String {
 }
 
 /// The repository to watch: `LAYOUTS_REPO`, else the project the user
-/// works in, else the one holding the app folder this provider is in (two
-/// folders up), as git.sh did.
+/// works in, else the one the app was started in, else the one holding the
+/// app folder this provider is in (two folders up), as git.sh did.
 fn repository(dir: &Path) -> Option<PathBuf> {
     if let Some(named) = std::env::var_os("LAYOUTS_REPO") {
         return toplevel(Path::new(&named));
@@ -649,6 +657,9 @@ fn repository(dir: &Path) -> Option<PathBuf> {
     moonframe_providers::project()
         .as_deref()
         .and_then(toplevel)
+        // Before any terminal has made a project: an app that opens its
+        // terminals from what git lists needs one to start from.
+        .or_else(|| moonframe_providers::launch_dir().and_then(toplevel))
         .or_else(|| toplevel(&dir.join("..").join("..")))
 }
 

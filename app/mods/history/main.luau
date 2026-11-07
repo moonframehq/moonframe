@@ -1,6 +1,7 @@
 -- A tab showing the repository's commits as a graph. Git reads them only
 -- while a bar shows this tab: the mod in its own place follows the bars and
--- asks, and each tab draws what comes back.
+-- asks, and each tab draws what comes back. A copy mounted in a panel of its
+-- own, which no bar speaks for, says so with `always = true` and asks itself.
 local commit_graph = use "commit-graph"
 local empty_state = use "empty-state"
 
@@ -32,8 +33,12 @@ return mod {
 
 	-- Never the saved state: git starts with no log asked for, and each bar's
 	-- topic comes again as this loads.
-	init = function(previous: State?, props: any): State
-		return { shown = {}, asking = false }
+	init = function(previous: State?, props: any): (State, { any }?)
+		local state: State = { shown = {}, asking = false }
+		if props and props.always then
+			return state, { { to = "provider:git", msg = { log = COMMITS } } }
+		end
+		return state
 	end,
 
 	update = function(state: State, msg: any, props: any): (State?, { any }?)
@@ -51,7 +56,7 @@ return mod {
 		return state, { { to = "provider:git", msg = { log = if asking then COMMITS else false } } }
 	end,
 
-	view = function(state: State, app)
+	view = function(state: State, app, props: any)
 		local log = app.git and app.git.log
 		if not log and app.git and app.git.repository then
 			-- This tab was only just shown, or git has only just started.
@@ -68,7 +73,7 @@ return mod {
 			grow = true,
 			scroll = true,
 			padding = "small",
-			commit_graph { commits = log },
+			commit_graph { commits = log, compact = props and props.compact },
 		}
 	end,
 }
