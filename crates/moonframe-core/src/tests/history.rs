@@ -164,3 +164,28 @@ fn history_reads_the_log_only_while_a_bar_shows_it() {
     select(&mut workspace, "bottom", "component:terminal", "zsh");
     assert_eq!(asked(&mut workspace), [Data::Bool(false)]);
 }
+
+/// No bar speaks for a copy in a panel of its own, as Hangar's: it asks.
+#[test]
+fn history_in_a_panel_of_its_own_asks_for_the_log() {
+    let panel = r#"
+return mod { view = function()
+    return ui.mount { "history", id = "graph", props = { always = true, compact = true } }
+end }
+"#;
+    let dir = app(&[
+        ("panel", panel),
+        (
+            "history",
+            include_str!("../../../../app/mods/history/main.luau"),
+        ),
+    ]);
+    write(dir.path(), "components/commit-graph.luau", GRAPH);
+    write(
+        dir.path(),
+        "components/empty-state.luau",
+        include_str!("../../../../app/components/empty-state.luau"),
+    );
+    let mut workspace = Workspace::open(dir.path(), false);
+    assert_eq!(asked(&mut workspace), [Data::Integer(200)]);
+}

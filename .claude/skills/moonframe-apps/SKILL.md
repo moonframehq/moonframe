@@ -284,6 +284,9 @@ counts, and memory a call took and gave back within itself does not.
 - **sessions**: repositories as sessions with a shell each and their changes.
 - **workbench**: terminal tabs, an editor with highlighting, files and
   changes.
+- **hangar**: parallel agents on one repository: a bay per worktree with what
+  its shell is doing, its changes and pull request, a terminal in the one you
+  pick, and the changes over a commit graph. Adds and removes worktrees.
 - **daybook**: a planner: a top bar with one search-or-create field, a
   sidebar, a day card (day strip, a summary of pills, tasks and events) and
   an inbox card; Upcoming, a month, notes; three looks the provider keeps.

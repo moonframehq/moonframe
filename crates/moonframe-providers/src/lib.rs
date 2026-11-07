@@ -73,7 +73,7 @@ pub use {
     tokio,
 };
 pub use {
-    json::{from_json, to_json},
+    json::{MAX_ENTRIES, from_json, to_json},
     manifest::{Capability, Kind, Manifest, PREBUILT, Publish, Restart, Start},
     mods::{Mods, owner},
     native::{Handle, Native, Natives},

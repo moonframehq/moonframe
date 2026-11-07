@@ -1,0 +1,7 @@
+[app]
+# Parallel agents on one repository: a worktree per branch with what its agent
+# is doing, a terminal in the one you pick, and the changes and history beside
+# it. `moonframe --profile hangar` opens it, in the repository it starts from.
+keep  = ["changes", "feedback", "history"]
+name  = "hangar"
+title = "Hangar"

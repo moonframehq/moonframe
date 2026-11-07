@@ -11,6 +11,10 @@ use {
 const MAX_LINES: usize = 1200;
 const MAX_TEXT: usize = 300;
 const MAX_BYTES: usize = 600_000;
+/// Values a diff may hold, leaving the rest of a publish its room however
+/// many hunks those lines are in; each line and each hunk is `ITEM_VALUES`.
+const MAX_VALUES: usize = 6500;
+const ITEM_VALUES: usize = 5;
 
 pub(crate) fn read(repo: &Repo, base: &str, path: &str) -> Value {
     let literal = format!(":(literal){path}");
@@ -60,6 +64,7 @@ pub(crate) fn parse(path: &str, text: &str) -> Value {
     let mut lines: Vec<Value> = Vec::new();
     let mut header: Option<(String, u64, u64)> = None;
     let (mut old, mut new, mut count, mut size) = (0u64, 0u64, 0usize, 0usize);
+    let mut values = 0usize;
     let (mut binary, mut truncated) = (false, false);
     let close = |header: &mut Option<(String, u64, u64)>,
                  lines: &mut Vec<Value>,
@@ -73,10 +78,11 @@ pub(crate) fn parse(path: &str, text: &str) -> Value {
     };
     for line in text.lines() {
         if let Some(rest) = line.strip_prefix("@@ -") {
-            if count >= MAX_LINES || size >= MAX_BYTES {
+            if count >= MAX_LINES || size >= MAX_BYTES || values >= MAX_VALUES {
                 truncated = true;
                 break;
             }
+            values += ITEM_VALUES;
             close(&mut header, &mut lines, &mut hunks);
             let start = |text: &str| {
                 text.split([',', ' '])
@@ -104,11 +110,12 @@ pub(crate) fn parse(path: &str, text: &str) -> Value {
             // "\ No newline at end of file"
             Some(_) => continue,
         };
-        if count >= MAX_LINES || size >= MAX_BYTES {
+        if count >= MAX_LINES || size >= MAX_BYTES || values >= MAX_VALUES {
             truncated = true;
             break;
         }
         count += 1;
+        values += ITEM_VALUES;
         let text: String = body.chars().take(MAX_TEXT).collect();
         size += text.len() + 40;
         lines.push(match kind {
