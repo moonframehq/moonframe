@@ -220,11 +220,13 @@ pub(crate) struct Module {
 
 impl Module {
     /// Runs `source` and its `init`. `previous` is the state the module had
-    /// before a reload, so an edit does not lose what the user was doing.
+    /// before a reload, so an edit does not lose what the user was doing,
+    /// or, when `restored`, what an earlier run saved.
     pub(crate) fn load(
         name: &str,
         source: &str,
         previous: Option<&Data>,
+        restored: bool,
         props: Option<&Data>,
         library: &Library,
     ) -> Result<Self, Error> {
@@ -238,7 +240,7 @@ impl Module {
             ));
         }
         let peaks = Peaks::new(name, vm::MEMORY, vm::INTERRUPTS);
-        Self::start(lua, meter, peaks, definition, previous, props)
+        Self::start(lua, meter, peaks, definition, previous, restored, props)
     }
 
     /// An instance of the component `component`, which keeps state: it has
@@ -247,6 +249,7 @@ impl Module {
         name: &str,
         component: &str,
         previous: Option<&Data>,
+        restored: bool,
         props: Option<&Data>,
         library: &Library,
     ) -> Result<Self, Error> {
@@ -275,7 +278,7 @@ impl Module {
             meta: Meta::default(),
         };
         let peaks = Peaks::new(name, vm::SMALL_MEMORY, vm::INTERRUPTS);
-        Self::start(lua, meter, peaks, definition, previous, props)
+        Self::start(lua, meter, peaks, definition, previous, restored, props)
     }
 
     fn start(
@@ -284,6 +287,7 @@ impl Module {
         peaks: Peaks,
         definition: Definition,
         previous: Option<&Data>,
+        restored: bool,
         props: Option<&Data>,
     ) -> Result<Self, Error> {
         let read_peaks = || peaks.read(lua.used_memory(), meter.used());
@@ -303,7 +307,7 @@ impl Module {
             Some(init) => {
                 meter.reset();
                 let (state, sends) = init
-                    .call::<(Value, Value)>((previous, props.clone()))
+                    .call::<(Value, Value)>((previous, props.clone(), restored))
                     .inspect(|_| read_peaks())
                     .map_err(|error| Error::from(error).context("init"))?;
                 let sends = Option::<Vec<Send>>::read(&sends, &Cx::root(&NO_NAMES).key("sends"))

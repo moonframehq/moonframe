@@ -969,7 +969,9 @@ draws only the strip, as the shell does in its title row. The bar publishes
 as `tab`; a mod subscribed to it draws that tab with `tab-view { tab, kind }`
 (`mods/editor` does, finding `kind` in `app.kinds`). What the content reports
 (`{ tab_report = id, url, title }`) goes back to the bar on
-`topic:tabs/<id>/report`.
+`topic:tabs/<id>/report`. A report with `event` is what a shell did and can
+name a command, so it goes to the bar itself (`to = "shell/tabbed#main"`),
+never on a topic, which every mod can read.
 
 **Looks.** The strip's look comes from its `variant` prop, else the
 stylesheet's `looks = { tabs = "..." }`, else `classic`. Built in: `pills`,
@@ -1080,6 +1082,9 @@ return mod {
 	-- Optional. `previous` is the state from before a reload, or saved from
 	-- the last run (nil the very first time). `props` is what an instance was
 	-- mounted with (nil for a mod in its own place); see "Instances".
+	-- A third argument, `restored`, is true when `previous` was saved by an
+	-- earlier run rather than kept across a reload: what only held while the
+	-- app ran (a shell's activity, say) is stale then.
 	init = function(previous, props)
 		return previous or { selected = nil }
 	end,

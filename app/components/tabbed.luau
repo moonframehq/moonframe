@@ -9,7 +9,8 @@
 -- as { count, selected, title, tab } where `tab` is the selected tab's record.
 -- With `show = "bar"` it draws only its strip (in a title bar, say) and a mod
 -- draws the content from that topic with `tab-view`; what the content reports
--- comes back on `tabs/<id>/report`. A report with `exited = true` (its
+-- comes back on `tabs/<id>/report`, or straight to the strip for what a shell
+-- does, which can name a command. A report with `exited = true` (its
 -- shell ended, Ctrl-D in a terminal) closes the tab. A terminal's tab is
 -- named after its shell's folder or title, and a long command ending in a
 -- tab not on show, or a program's notice, posts a notification. A tab not on
@@ -73,12 +74,22 @@ local function find(list: { any }, key: string, value: any): (any, number?)
 	return nil, nil
 end
 
+-- Puts the tab `id` on show. Every selection comes through here, however it
+-- came about, as showing a tab is what answers its dot.
+local function show_tab(state: State, id: string?)
+	state.selected = id
+	local shown = find(state.tabs, "id", id)
+	if shown then
+		shown.attention = nil
+	end
+end
+
 -- A new tab of `kind`, selected.
 local function open(state: State, props: Props, kind: string)
 	local id = `{props.id or "main"}-{state.next}`
 	state.next += 1
 	table.insert(state.tabs, { id = id, kind = kind, props = {} })
-	state.selected = id
+	show_tab(state, id)
 end
 
 -- A tab another mod asked for: the open one of that kind, path and root
@@ -92,7 +103,7 @@ local function open_asked(state: State, props: Props, asked: any)
 	if wanted.path ~= nil then
 		for _, tab in state.tabs do
 			if tab.kind == asked.kind and tab.props.path == wanted.path and tab.props.root == wanted.root then
-				state.selected = tab.id
+				show_tab(state, tab.id)
 				return true
 			end
 		end
@@ -105,7 +116,7 @@ local function open_asked(state: State, props: Props, asked: any)
 	-- `moonframe pane new` opens, to know its terminal.
 	if type(asked.id) == "string" and asked.id ~= "" and not find(state.tabs, "id", asked.id) then
 		tab.id = asked.id
-		state.selected = asked.id
+		show_tab(state, asked.id)
 	end
 	return true
 end
@@ -132,7 +143,7 @@ local function close(state: State, id: string)
 		table.remove(state.tabs, index)
 		if state.selected == id then
 			local neighbour = state.tabs[math.min(index, #state.tabs)]
-			state.selected = neighbour and neighbour.id
+			show_tab(state, neighbour and neighbour.id)
 		end
 	end
 end
@@ -283,13 +294,16 @@ return component {
 	-- Reports for its tabs, from content drawn elsewhere.
 	subscribe = { "tabs/*" },
 
-	init = function(previous: State?, props: Props)
+	init = function(previous: State?, props: Props, restored: boolean)
 		local state: State = previous or { tabs = {}, next = 1, menu = false }
 		state.menu = false
-		-- Nothing is known of the shells yet: they say again as they run.
-		for _, tab in state.tabs do
-			tab.running = nil
-			tab.attention = nil
+		-- Nothing is known of an earlier run's shells: they say again as they
+		-- run. A reload leaves them running, and they will not say it twice.
+		if restored then
+			for _, tab in state.tabs do
+				tab.running = nil
+				tab.attention = nil
+			end
 		end
 		if not previous and props and props.start then
 			open(state, props, props.start)
@@ -309,11 +323,7 @@ return component {
 			return
 		end
 		if msg.select then
-			state.selected = msg.select
-			local shown = find(state.tabs, "id", msg.select)
-			if shown then
-				shown.attention = nil
-			end
+			show_tab(state, msg.select)
 		elseif msg.pick then
 			open(state, props, msg.pick)
 			state.menu = false
@@ -322,7 +332,7 @@ return component {
 			-- already open if there is one, else a new one.
 			local tab = find(state.tabs, "kind", msg.open)
 			if tab then
-				state.selected = tab.id
+				show_tab(state, tab.id)
 			else
 				open(state, props, msg.open)
 			end
@@ -341,7 +351,7 @@ return component {
 			state.tabs = kept
 			if not find(kept, "id", state.selected) then
 				local neighbour = kept[math.min(index or 1, #kept)]
-				state.selected = neighbour and neighbour.id
+				show_tab(state, neighbour and neighbour.id)
 			end
 		elseif msg.close then
 			close(state, msg.close)
