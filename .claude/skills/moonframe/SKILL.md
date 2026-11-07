@@ -411,7 +411,10 @@ live shell. The host runs it, so it can't be written in Luau:
   shells already running under herdr-core or tmux get it once restarted. A
   tab from `tabbed` uses this itself: it takes its shell's folder or title
   as its name, and posts a notification for a notice, or for a command of
-  10 s or more ending in a tab not on show.
+  10 s or more ending in a tab not on show. A tab not on show has a spinner
+  while a command runs, and a dot once a program needs the user or a command
+  ended, until it is shown. An agent reaches that dot by printing a notice
+  (OSC 9 or 777).
 - **Engines:** `engine = "alacritty"` (default, pure Rust) or `"ghostty"`
   (libghostty-vt). Both are cargo features of the `moonframe` crate; the
   starter builds both, an app on the library opts into `ghostty`.

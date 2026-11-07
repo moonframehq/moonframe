@@ -507,7 +507,70 @@ fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
             )),
         "no notification"
     );
+    // A tab not on show tells what its shell does, until it is shown.
+    let hidden = |fields: Vec<(&str, Data)>| {
+        let mut report = vec![("tab_report".to_owned(), Data::from("main-1"))];
+        report.extend(
+            fields
+                .into_iter()
+                .map(|(name, value)| (name.to_owned(), value)),
+        );
+        Data::Map(report.into_iter().collect())
+    };
+    let event = |name: &str| ("event", Data::from(name));
+    workspace.send("editor", "editor", hidden(vec![event("started")]));
+    assert!(
+        strip_text().contains("\"running\": Bool(true)"),
+        "{}",
+        strip_text()
+    );
+    workspace.send(
+        "editor",
+        "editor",
+        hidden(vec![event("finished"), ("took_ms", Data::Integer(5))]),
+    );
+    assert!(!strip_text().contains("running"), "{}", strip_text());
+    assert!(strip_text().contains("\"done\""), "{}", strip_text());
+    workspace.take_requests();
+    workspace.send(
+        "editor",
+        "editor",
+        hidden(vec![
+            event("finished"),
+            ("command", Data::from("cargo test")),
+            ("status", Data::Integer(101)),
+            ("took_ms", Data::Integer(12_000)),
+        ]),
+    );
+    let long = workspace.take_requests();
+    assert!(
+        long.iter().any(|(_, request)| matches!(
+            request,
+            crate::Request::Notify(notice)
+                if notice.title == "Command failed" && notice.body == "cargo test"
+        )),
+        "no notification of the long command"
+    );
+    workspace.send(
+        "editor",
+        "editor",
+        hidden(vec![event("notice"), ("body", Data::from("Need you"))]),
+    );
+    assert!(strip_text().contains("\"blocked\""), "{}", strip_text());
+    workspace.send(
+        key,
+        key,
+        Data::Map([("select".to_owned(), Data::from("main-1"))].into()),
+    );
+    assert!(!strip_text().contains("\"blocked\""), "{}", strip_text());
+    workspace.send(
+        key,
+        key,
+        Data::Map([("select".to_owned(), Data::from("main-3"))].into()),
+    );
+
     // However long a program's text, it reaches the user, cut to fit.
+    workspace.take_requests();
     let long = "é".repeat(1024);
     workspace.send(
         "editor",

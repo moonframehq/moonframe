@@ -12,7 +12,9 @@
 -- comes back on `tabs/<id>/report`. A report with `exited = true` (its
 -- shell ended, Ctrl-D in a terminal) closes the tab. A terminal's tab is
 -- named after its shell's folder or title, and a long command ending in a
--- tab not on show, or a program's notice, posts a notification.
+-- tab not on show, or a program's notice, posts a notification. A tab not on
+-- show has a spinner while a command runs in it, and a dot once it needs the
+-- user or a command ended there, until it is shown.
 -- Another mod opens a tab by publishing on `tabs/<id>/open`
 -- { n, kind, props, title, id? }: a tab of that kind showing the same `path` is
 -- selected instead of opened twice. `n` numbers the requests, so one heard
@@ -28,6 +30,10 @@ type Tab = {
 	kind: string,
 	-- Set once the content reports one, such as a page's title.
 	title: string?,
+	-- A command runs in its shell, as far as the shell says.
+	running: boolean?,
+	-- What happened while it was not on show: "blocked" or "done".
+	attention: string?,
 	props: { [string]: any },
 }
 
@@ -167,16 +173,31 @@ end
 -- What a tab's shell reported: whether the tab changed, and a notification
 -- to post, if any.
 local function keep_shell_event(state: State, tab: Tab, msg): (boolean, any)
+	local hidden = tab.id ~= state.selected
 	local title
 	if msg.event == "folder" then
 		title = folder_name(msg.path)
 	elseif msg.event == "title" and msg.title ~= "" then
 		title = msg.title
+	elseif msg.event == "started" then
+		tab.running = true
+		return hidden, nil
 	elseif msg.event == "notice" then
-		return false, notification(tab, msg.title or tab.title or "Terminal", msg.body)
-	elseif msg.event == "finished" and tab.id ~= state.selected and msg.took_ms >= LONG_COMMAND_MS then
+		if hidden then
+			tab.attention = "blocked"
+		end
+		return hidden, notification(tab, msg.title or tab.title or "Terminal", msg.body)
+	elseif msg.event == "finished" then
+		tab.running = nil
+		if not hidden then
+			return false, nil
+		end
+		tab.attention = "done"
+		if msg.took_ms < LONG_COMMAND_MS then
+			return true, nil
+		end
 		local failed = msg.status ~= nil and msg.status ~= 0
-		return false, notification(tab, if failed then "Command failed" else "Command finished", msg.command or tab.title)
+		return true, notification(tab, if failed then "Command failed" else "Command finished", msg.command or tab.title)
 	end
 	title = title and clip(title, MAX_TAB_TITLE)
 	if title and title ~= tab.title then
@@ -216,6 +237,15 @@ local function keep_report(state: State, msg): (boolean, any)
 	return true, nil
 end
 
+-- What a tab's status dot says: nothing on the tab on show, which speaks for
+-- itself, so a quick command there does not flicker.
+local function status_of(state: State, tab: Tab): string?
+	if tab.id == state.selected then
+		return nil
+	end
+	return tab.attention or (if tab.running then "working" else nil)
+end
+
 -- What to do about a report: the bar announced again only if it changed, so
 -- a prompt in an unchanged folder costs nothing.
 local function report_effects(state: State, props: Props, changed: boolean, notice: any): { any }
@@ -250,6 +280,11 @@ return component {
 	init = function(previous: State?, props: Props)
 		local state: State = previous or { tabs = {}, next = 1, menu = false }
 		state.menu = false
+		-- Nothing is known of the shells yet: they say again as they run.
+		for _, tab in state.tabs do
+			tab.running = nil
+			tab.attention = nil
+		end
 		if not previous and props and props.start then
 			open(state, props, props.start)
 		end
@@ -269,6 +304,10 @@ return component {
 		end
 		if msg.select then
 			state.selected = msg.select
+			local shown = find(state.tabs, "id", msg.select)
+			if shown then
+				shown.attention = nil
+			end
 		elseif msg.pick then
 			open(state, props, msg.pick)
 			state.menu = false
@@ -343,6 +382,7 @@ return component {
 				id = tab.id,
 				label = tab.title or (kind and kind.title) or tab.kind,
 				icon = kind and kind.icon,
+				status = status_of(state, tab),
 				closable = true,
 			})
 		end
