@@ -223,8 +223,10 @@
   /* Experimental apps: a screenshot beside each app's facts, alternating sides. */
   .exp-row { display:grid; grid-template-columns:3fr 2fr; gap:48px; align-items:center; margin-top:56px }
   .exp-row.flip { grid-template-columns:2fr 3fr } .exp-row.flip .exp-text { order:-1 }
-  .exp-row > img { width:100%; height:auto; display:block; border-radius:10px; cursor:zoom-in; filter:drop-shadow(0 6px 10px #2a1a1026); transition:transform .25s cubic-bezier(.2,.8,.2,1), filter .25s }
-  .exp-row > img:hover { transform:translateY(-4px); filter:drop-shadow(0 18px 20px #2a1a1050) }
+  .exp-shot { display:block; width:100%; padding:0; border:0; background:none; border-radius:10px; cursor:zoom-in }
+  .exp-shot:focus-visible { outline:2px solid var(--acc); outline-offset:4px }
+  .exp-shot img { width:100%; height:auto; display:block; border-radius:10px; filter:drop-shadow(0 6px 10px #2a1a1026); transition:transform .25s cubic-bezier(.2,.8,.2,1), filter .25s }
+  .exp-shot:hover img { transform:translateY(-4px); filter:drop-shadow(0 18px 20px #2a1a1050) }
   .exp-text img { width:64px; height:64px; display:block; margin:0 0 8px -6px }
   .exp-text h3 { font:italic 600 30px var(--serif); margin:0 }
   .exp-text p { font:16px/1.5 var(--sans); color:var(--ink2); margin:8px 0 0 }
@@ -623,15 +625,15 @@ end,</pre></div>
     <h2>Real apps, <i>still being built.</i></h2>
     <p class="lead">Three apps in progress on Moonframe, rough edges included. Read how they're made, or follow along.</p>
     <div class="exp-row" data-id="moonmux">
-      <img src="img/moonmux.webp" width="2800" height="1762" loading="lazy" alt="The Moonmux window: spaces and agents on the left, a tab split into three terminal panes, and the Files panel on the right">
+      <button class="exp-shot" type="button" aria-label="View the Moonmux screenshot full size"><img src="img/moonmux.webp" width="2800" height="1762" loading="lazy" alt="The Moonmux window: spaces and agents on the left, a tab split into three terminal panes, and the Files panel on the right"></button>
       <div class="exp-text"><img src="img/moonmux-icon.png" width="64" height="64" loading="lazy" alt=""><h3>Moonmux</h3><p>A workspace for terminals and coding agents. Every shell and agent keeps running when the window closes.</p><ul><li>Spaces, split panes and an agents sidebar</li><li>Files and Changes panels</li><li>Terminals kept in herdr-core or tmux</li></ul><a class="exp-link" href="https://github.com/moonframehq/moonmux">github.com/moonframehq/moonmux ↗</a></div>
     </div>
     <div class="exp-row flip" data-id="moonmail">
-      <img src="img/moonmail.webp" width="3000" height="1880" loading="lazy" alt="The Moonmail window with demo mail: mailboxes on the left, a table of messages across the top, and the Correspondence list beside the reader below it">
+      <button class="exp-shot" type="button" aria-label="View the Moonmail screenshot full size"><img src="img/moonmail.webp" width="3000" height="1880" loading="lazy" alt="The Moonmail window with demo mail: mailboxes on the left, a table of messages across the top, and the Correspondence list beside the reader below it"></button>
       <div class="exp-text"><img src="img/moonmail-icon.png" width="64" height="64" loading="lazy" alt=""><h3>Moonmail</h3><p>A local-first mail client built around a separate Correspondence pane, with search, IMAP sync and SMTP sending.</p><ul><li>Correspondence beside the reader</li><li>Persistent, searchable local mail</li><li>Multi-provider sign-in, IMAP and SMTP</li></ul><span class="exp-link">Repository coming soon</span></div>
     </div>
     <div class="exp-row" data-id="moonmap">
-      <img src="img/moonmap.webp" width="1800" height="1126" loading="lazy" alt="The Moonmap window over San Francisco: a sidebar of places and recents on the left, and the map controls down the right edge">
+      <button class="exp-shot" type="button" aria-label="View the Moonmap screenshot full size"><img src="img/moonmap.webp" width="1800" height="1126" loading="lazy" alt="The Moonmap window over San Francisco: a sidebar of places and recents on the left, and the map controls down the right edge"></button>
       <div class="exp-text"><img src="img/moonmap-icon.png" width="64" height="64" loading="lazy" alt=""><h3>Moonmap</h3><p>A desktop map app with switchable tile providers, place sheets and directions.</p><ul><li>Switchable tile providers</li><li>Search with results pinned on the map</li><li>Place sheets and directions</li></ul><a class="exp-link" href="https://github.com/moonframehq/moonmap">github.com/moonframehq/moonmap ↗</a></div>
     </div>
   </section>
@@ -768,7 +770,7 @@ document.getElementById("plates").addEventListener("click", e => { const f = e.t
 [...document.querySelectorAll("#cstrip img")].forEach((img, i) => img.onclick = () => openPlate(i, SHOTS));
 const EXPERIMENTAL = [...document.querySelectorAll(".exp-row")].map(row => ({ lo:`img/${row.dataset.id}.webp`, full:`img/full/${row.dataset.id}.png`,
   caption:`<b>${row.querySelector("h3").textContent}</b> ${row.querySelector("p").textContent}` }));
-document.querySelectorAll(".exp-row > img").forEach((img, i) => img.onclick = () => openPlate(i, EXPERIMENTAL));
+document.querySelectorAll(".exp-shot").forEach((shot, i) => shot.onclick = () => openPlate(i, EXPERIMENTAL));
 lb.querySelector(".x").onclick = closePlate;
 cmd.onclick = async () => {
   try { await navigator.clipboard.writeText(cmd.firstElementChild.textContent); cmd.lastElementChild.textContent = "Copied"; }
