@@ -299,7 +299,7 @@ counts, and memory a call took and gave back within itself does not.
 - **lightbox**: a pretend film scanner: `video-viewer` and live instruments
   from a Python engine the app starts, surviving a crash mid-scan, with
   `app:awake`, `app:guard`, `app:dock` and the `caffeine` cup.
-- **projects**: a Python provider for repositories, their files and changes,
+- **projects**: a native provider (the `projects` feature) for repositories, their files and changes,
   and the `file-tree`, `change-tree`, `code` and `file-icon` components.
 
 `just check-examples` loads them all and type-checks them; `swift

@@ -5240,12 +5240,14 @@ dependencies = [
  "moonframe-chat",
  "moonframe-core",
  "moonframe-docs",
+ "moonframe-documents",
  "moonframe-forge",
  "moonframe-frames",
  "moonframe-git",
  "moonframe-history",
  "moonframe-mux",
  "moonframe-packages",
+ "moonframe-projects",
  "moonframe-providers",
  "moonframe-shell",
  "moonframe-speech",
@@ -5319,6 +5321,18 @@ dependencies = [
  "moonframe-core",
  "moonframe-providers",
  "rustix",
+ "tempfile",
+]
+
+[[package]]
+name = "moonframe-documents"
+version = "0.2.2"
+dependencies = [
+ "chrono",
+ "moonframe-core",
+ "moonframe-providers",
+ "serde_json",
+ "sha2 0.11.1",
  "tempfile",
 ]
 
@@ -5399,6 +5413,17 @@ dependencies = [
  "toml 1.1.8+spec-1.1.0",
  "tracing",
  "ureq",
+]
+
+[[package]]
+name = "moonframe-projects"
+version = "0.2.2"
+dependencies = [
+ "chrono",
+ "moonframe-core",
+ "moonframe-providers",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
