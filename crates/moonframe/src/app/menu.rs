@@ -95,12 +95,12 @@ impl MoonframeApp {
         if crate::dock::about_panel(&name, &about, icon.as_deref(), "GPUI") {
             return;
         }
-        let version = crate::dock::shown_version(&about);
-        let backend = crate::dock::backend_line("GPUI");
-        let mut text = format!("{name} {version} ({}), {backend}", crate::dock::built_on());
-        if let Some(description) = &about.description {
-            text = format!("{text}: {description}");
-        }
+        let text = format!(
+            "{name} {} ({}): {}",
+            crate::dock::shown_version(&about),
+            crate::dock::built_on(),
+            crate::dock::credits(&about, "GPUI").replace("\n\n", " · "),
+        );
         self.show_toast_text(text.into(), cx);
     }
 }
