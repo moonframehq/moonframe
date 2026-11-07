@@ -217,8 +217,15 @@ impl Native for Git {
         }
         match field("log") {
             Some(Data::Integer(count)) => {
-                self.log_limit = Some(usize::try_from(*count).unwrap_or(log::MAX_COMMITS));
-                self.read_log();
+                let limit = usize::try_from(*count)
+                    .unwrap_or(log::MAX_COMMITS)
+                    .clamp(1, log::MAX_COMMITS);
+                // Read at once only for a new request: a mod sending this
+                // each frame must not get past the pace of `look`.
+                if self.log_limit != Some(limit) {
+                    self.log_limit = Some(limit);
+                    self.read_log();
+                }
             },
             Some(Data::Bool(false)) => {
                 self.log_limit = None;

@@ -346,6 +346,39 @@ fn only_writers_may_commit() {
     assert_eq!(published(&seen)["changed"], 1, "nothing was committed");
 }
 
+/// A mod asking for the log each frame gets one read, not a `git log` a
+/// frame: only a new request skips the pace of the refs.
+#[test]
+fn asking_for_the_same_log_again_reads_nothing() {
+    let dir = repository();
+    let (events, seen) = events();
+    let folder = dir.path().join("providers").join("git");
+    std::fs::create_dir_all(&folder).unwrap();
+    let host = Handle::new("git", &folder, writers(&[]), events);
+    let mut git = Git::default();
+    git.start(&host).unwrap();
+    let ask = |git: &mut Git, count: i64| {
+        let message = BTreeMap::from([("log".to_owned(), Data::Integer(count))]);
+        git.receive(&host, "history", Data::Map(message));
+    };
+
+    ask(&mut git, 10);
+    assert_eq!(published(&seen)["log"][0]["subject"], "first");
+    // Made after the read: only a look at the refs may show it.
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["commit", "-q", "--allow-empty", "-m", "second"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    git.log.clear();
+    ask(&mut git, 10);
+    assert!(git.log.is_empty(), "the same request read the log again");
+    ask(&mut git, 20);
+    assert_eq!(git.log[0]["subject"], "second");
+}
+
 /// A diff only covers files git lists as changed, never a path from
 /// outside the repository.
 #[test]
