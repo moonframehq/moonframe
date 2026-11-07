@@ -26,6 +26,7 @@
 #[macro_use]
 mod tokens;
 
+// keep-sorted start
 mod component;
 mod data;
 mod error;
@@ -33,6 +34,7 @@ mod keys;
 mod menus;
 mod module;
 mod node;
+mod peaks;
 pub mod perf;
 mod persist;
 mod read;
@@ -42,6 +44,7 @@ mod style;
 mod vm;
 mod window;
 mod workspace;
+// keep-sorted end
 
 pub use {
     component::{Component, Demo, catalogue},
