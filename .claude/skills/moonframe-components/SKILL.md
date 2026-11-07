@@ -6151,6 +6151,7 @@ writing_stats { show = "words", text = "A short sentence is a door. It opens, yo
 | `cwd` | starting folder |
 | `exit` | message sent once as the shell exits, with `exited = true` added; without it Enter starts another shell |
 | `id` | keeps the shell across reloads; one per id |
+| `shell` | message sent as the shell reports something, with `event` added: `prompt`, `started`, `finished`, `folder`, `title` or `notice` |
 | `style` | style table for the box |
 
 ```lua
@@ -6173,6 +6174,7 @@ A whole mod using it, with state: `app/components/demos/ghostty-terminal.luau`.
 | `cwd` | starting folder |
 | `exit` | message sent once as the shell exits, with `exited = true` added; without it Enter starts another shell |
 | `id` | keeps the shell across reloads; one per id |
+| `shell` | message sent as the shell reports something, with `event` added: `prompt`, `started`, `finished`, `folder`, `title` or `notice` |
 | `style` | style table for the box |
 
 ```lua

@@ -1,0 +1,60 @@
+# Moonframe's shell integration for zsh, loaded because a terminal starts
+# with ZDOTDIR here. Puts ZDOTDIR back first, so the user's own files load as
+# they always do, and this file is the only thing that differs.
+if [[ -n "${MOONFRAME_ZDOTDIR+set}" ]]; then
+	ZDOTDIR=$MOONFRAME_ZDOTDIR
+	unset MOONFRAME_ZDOTDIR
+else
+	unset ZDOTDIR
+fi
+
+{
+	[[ -r "${ZDOTDIR:-$HOME}/.zshenv" ]] && source "${ZDOTDIR:-$HOME}/.zshenv"
+} always {
+	if [[ -o interactive ]]; then
+		typeset -g _moonframe_running=
+
+		# Sets REPLY to $1, percent-encoded, without starting a process.
+		_moonframe_url() {
+			emulate -L zsh
+			local LC_ALL=C text=$1 character hex
+			local -i at
+			REPLY=
+			for ((at = 1; at <= $#text; at++)); do
+				character=$text[at]
+				case $character in
+					[a-zA-Z0-9/._~-]) REPLY+=$character ;;
+					*)
+						printf -v hex '%02X' $(( #character & 255 ))
+						REPLY+="%$hex"
+						;;
+				esac
+			done
+		}
+
+		# First of the hooks, so $? is still the command's.
+		_moonframe_precmd() {
+			local code=$?
+			emulate -L zsh
+			if [[ -n $_moonframe_running ]]; then
+				_moonframe_running=
+				printf '\e]133;D;%s\e\\' $code
+			fi
+			local REPLY
+			_moonframe_url $PWD
+			printf '\e]7;file://%s%s\e\\' $HOST $REPLY
+			printf '\e]133;A\e\\'
+		}
+
+		_moonframe_preexec() {
+			emulate -L zsh
+			_moonframe_running=1
+			local REPLY
+			_moonframe_url ${1[1,1024]}
+			printf '\e]133;C;cmdline_url=%s\e\\' $REPLY
+		}
+
+		precmd_functions=(_moonframe_precmd $precmd_functions)
+		preexec_functions+=(_moonframe_preexec)
+	fi
+}

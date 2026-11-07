@@ -10,7 +10,9 @@
 -- With `show = "bar"` it draws only its strip (in a title bar, say) and a mod
 -- draws the content from that topic with `tab-view`; what the content reports
 -- comes back on `tabs/<id>/report`. A report with `exited = true` (its
--- shell ended, Ctrl-D in a terminal) closes the tab.
+-- shell ended, Ctrl-D in a terminal) closes the tab. A terminal's tab is
+-- named after its shell's folder or title, and a long command ending in a
+-- tab not on show, or a program's notice, posts a notification.
 -- Another mod opens a tab by publishing on `tabs/<id>/open`
 -- { n, kind, props, title, id? }: a tab of that kind showing the same `path` is
 -- selected instead of opened twice. `n` numbers the requests, so one heard
@@ -127,16 +129,77 @@ local function close(state: State, id: string)
 	end
 end
 
--- Keeps what a tab's content reported: a browser's page and title. A
--- shell that exited closes its tab.
-local function keep_report(state: State, msg)
+-- A command ending in a tab not on show is news from this long on.
+local LONG_COMMAND_MS = 10000
+
+-- What fits a tab, and what `app:notify` takes. A shell's text can be longer
+-- than either, whatever a program printed.
+local MAX_TAB_TITLE = 60
+local MAX_NOTICE_TITLE = 256
+local MAX_NOTICE_BODY = 2048
+
+-- `text` in `limit` bytes at most, cut between characters.
+local function clip(text: string, limit: number): string
+	if #text <= limit then
+		return text
+	end
+	local at = limit + 1
+	while at > 1 and bit32.band(string.byte(text, at), 0xC0) == 0x80 do
+		at -= 1
+	end
+	return string.sub(text, 1, at - 1)
+end
+
+-- A notification about a tab.
+local function notification(tab: Tab, title: string, body: string?)
+	return {
+		title = clip(title, MAX_NOTICE_TITLE),
+		body = body and clip(body, MAX_NOTICE_BODY),
+		id = tab.id,
+	}
+end
+
+-- The last part of a path, or the path when it is the root.
+local function folder_name(path: string): string
+	return string.match(path, "([^/]+)/*$") or path
+end
+
+-- What a tab's shell reported: whether the tab changed, and a notification
+-- to post, if any.
+local function keep_shell_event(state: State, tab: Tab, msg): (boolean, any)
+	local title
+	if msg.event == "folder" then
+		title = folder_name(msg.path)
+	elseif msg.event == "title" and msg.title ~= "" then
+		title = msg.title
+	elseif msg.event == "notice" then
+		return false, notification(tab, msg.title or tab.title or "Terminal", msg.body)
+	elseif msg.event == "finished" and tab.id ~= state.selected and msg.took_ms >= LONG_COMMAND_MS then
+		local failed = msg.status ~= nil and msg.status ~= 0
+		return false, notification(tab, if failed then "Command failed" else "Command finished", msg.command or tab.title)
+	end
+	title = title and clip(title, MAX_TAB_TITLE)
+	if title and title ~= tab.title then
+		tab.title = title
+		return true, nil
+	end
+	return false, nil
+end
+
+-- Keeps what a tab's content reported: a browser's page and title, what a
+-- shell does. A shell that exited closes its tab. Returns whether anything
+-- changed, and a notification to post, if any.
+local function keep_report(state: State, msg): (boolean, any)
 	local tab = find(state.tabs, "id", msg.tab_report)
 	if not tab then
-		return false
+		return false, nil
 	end
 	if msg.exited then
 		close(state, tab.id)
-		return true
+		return true, nil
+	end
+	if msg.event then
+		return keep_shell_event(state, tab, msg)
 	end
 	-- The whole report, as the browser takes it back: address, title,
 	-- loading and history.
@@ -150,7 +213,20 @@ local function keep_report(state: State, msg)
 	if msg.title and msg.title ~= "" then
 		tab.title = msg.title
 	end
-	return true
+	return true, nil
+end
+
+-- What to do about a report: the bar announced again only if it changed, so
+-- a prompt in an unchanged folder costs nothing.
+local function report_effects(state: State, props: Props, changed: boolean, notice: any): { any }
+	local effects = {}
+	if changed then
+		table.insert(effects, report(state, props))
+	end
+	if notice then
+		table.insert(effects, { to = "app:notify", msg = notice })
+	end
+	return effects
 end
 
 return component {
@@ -226,16 +302,24 @@ return component {
 			close(state, msg.close)
 		elseif msg.tab_report then
 			-- What its own content reported: a browser's page and title.
-			keep_report(state, msg)
+			local changed, notice = keep_report(state, msg)
+			local effects = report_effects(state, props, changed, notice)
+			if #effects == 0 then
+				return
+			end
+			return state, effects
 		elseif msg.topic == `tabs/{props.id or "main"}/open` then
 			if not open_asked(state, props, msg.value) then
 				return
 			end
 		elseif msg.topic == `tabs/{props.id or "main"}/report` and type(msg.value) == "table" then
 			-- The same, from content drawn elsewhere.
-			if not keep_report(state, msg.value) then
+			local changed, notice = keep_report(state, msg.value)
+			local effects = report_effects(state, props, changed, notice)
+			if #effects == 0 then
 				return
 			end
+			return state, effects
 		else
 			return
 		end

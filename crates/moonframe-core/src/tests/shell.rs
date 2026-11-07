@@ -461,6 +461,67 @@ fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
     let pick = Data::Map([("pick".to_owned(), Data::from("component:terminal"))].into());
     workspace.send(key, key, pick);
     assert_eq!(tabs(&workspace).len(), 3);
+    // Its tab is named after the folder its shell reports, then the title.
+    let shell = |fields: &[(&str, &str)]| {
+        let mut report = vec![("tab_report".to_owned(), Data::from("main-3"))];
+        report.extend(
+            fields
+                .iter()
+                .map(|(name, value)| ((*name).to_owned(), Data::from(*value))),
+        );
+        Data::Map(report.into_iter().collect())
+    };
+    let strip_text = || {
+        let strip = memory.0.borrow().0.get(&format!("mod:{key}")).cloned();
+        format!("{strip:?}")
+    };
+    workspace.send(
+        "editor",
+        "editor",
+        shell(&[("event", "folder"), ("path", "/Users/me/my-project/")]),
+    );
+    assert!(strip_text().contains("my-project"), "{}", strip_text());
+    assert!(!strip_text().contains("/Users/me"), "{}", strip_text());
+    workspace.send(
+        "editor",
+        "editor",
+        shell(&[("event", "title"), ("title", "vim notes.md")]),
+    );
+    assert!(strip_text().contains("vim notes.md"), "{}", strip_text());
+    // A prompt says nothing about the tab; a notice is for the user.
+    workspace.send("editor", "editor", shell(&[("event", "prompt")]));
+    assert!(strip_text().contains("vim notes.md"), "{}", strip_text());
+    workspace.take_requests();
+    workspace.send(
+        "editor",
+        "editor",
+        shell(&[("event", "notice"), ("body", "Waiting for you")]),
+    );
+    assert!(
+        workspace
+            .take_requests()
+            .iter()
+            .any(|(_, request)| matches!(
+                request,
+                crate::Request::Notify(notice) if notice.body == "Waiting for you"
+            )),
+        "no notification"
+    );
+    // However long a program's text, it reaches the user, cut to fit.
+    let long = "é".repeat(1024);
+    workspace.send(
+        "editor",
+        "editor",
+        shell(&[("event", "notice"), ("title", &long), ("body", &long)]),
+    );
+    let requests = workspace.take_requests();
+    let notice = requests.iter().find_map(|(_, request)| match request {
+        crate::Request::Notify(notice) => Some(notice),
+        _ => None,
+    });
+    let notice = notice.expect("a long notice was refused");
+    assert_eq!(notice.title, "é".repeat(128));
+    assert_eq!(notice.body, long);
     let exited = Data::Map(
         [
             ("tab_report".to_owned(), Data::from("main-3")),

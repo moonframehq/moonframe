@@ -34,6 +34,9 @@ pub struct Open {
     /// The folder a new one starts in; the home folder when `None`.
     pub cwd: Option<PathBuf>,
     pub size: Size,
+    /// Variables a new one starts with, on top of the backend's own; one
+    /// that is attached again keeps those it started with.
+    pub env: Vec<(String, String)>,
 }
 
 /// One terminal's program, attached.

@@ -250,9 +250,15 @@ impl Backend for HerdrCore {
                 } else {
                     terminal_name(&format!("{}/{}", self.app, open.key))
                 };
+                let mut env = BTreeMap::from([("COLORTERM", "truecolor")]);
+                env.extend(
+                    open.env
+                        .iter()
+                        .map(|(name, value)| (name.as_str(), value.as_str())),
+                );
                 let mut run = wire::Run {
                     cwd: cwd.as_deref(),
-                    env: BTreeMap::from([("COLORTERM", "truecolor")]),
+                    env,
                     labels: BTreeMap::from([(LABEL, open.key.as_str()), (APP, self.app.as_str())]),
                     name: name.as_deref(),
                     ..wire::Run::default()

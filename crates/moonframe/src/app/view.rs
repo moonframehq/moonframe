@@ -76,13 +76,16 @@ impl Render for MoonframeApp {
         if let Some(focus) = self.terminals.end_frame() {
             window.defer(cx, move |window, cx| focus.focus(window, cx));
         }
-        // Shells that exited tell their mods (a tab closes), once drawn.
+        // What shells reported, then those that exited (a tab closes), once
+        // drawn, each to the mod that asked.
         #[cfg(feature = "terminal")]
-        let exits = self.terminals.take_exits();
+        let mut messages = self.terminals.take_shell_events();
         #[cfg(feature = "terminal")]
-        if !exits.is_empty() {
+        messages.extend(self.terminals.take_exits());
+        #[cfg(feature = "terminal")]
+        if !messages.is_empty() {
             cx.defer_in(window, move |app, _, cx| {
-                for (owner, msg) in exits {
+                for (owner, msg) in messages {
                     app.deliver(&owner, msg, cx);
                 }
             });

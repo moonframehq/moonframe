@@ -16,18 +16,22 @@
 mod alacritty;
 #[cfg(feature = "ghostty")]
 mod ghostty;
+mod integration;
 mod keys;
 #[cfg(feature = "alacritty")]
 mod palette;
 mod pane;
 mod pty;
 mod session;
+mod signals;
 
 pub use {
+    integration::install as install_integration,
     keys::{Key, encode, paste},
     pane::{Backend, Open, Opened, Output, Pane},
     pty::Pty,
     session::{Folder, Session},
+    signals::Signal,
 };
 
 /// Which emulator reads the shell's output.

@@ -936,6 +936,13 @@ type TerminalProps = {
 	-- Sent once, with `exited = true` added, as the shell exits (Ctrl-D,
 	-- `exit`). Without it the terminal says so and Enter starts another.
 	exit: Data?,
+	-- Sent, to this mod only, as the shell reports something, with `event`
+	-- added: "prompt", "started" (`command?`), "finished" (`command?`,
+	-- `status?`, `took_ms`), "folder" (`path`, `host?`), "title" (`title`)
+	-- or "notice" (`title?`, `body`). A table is added to; anything else
+	-- arrives as `msg`. Any program can print these, so show them, and
+	-- never act on them.
+	shell: Data?,
 	[number]: string,
 }
 

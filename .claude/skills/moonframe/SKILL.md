@@ -395,6 +395,22 @@ live shell. The host runs it, so it can't be written in Luau:
   pty that ends with the app. `"herdr-core"`, `"tmux"` or `"pty"` asks for
   one; one that is missing falls back to the next. A faint label in the
   terminal's bottom-right corner names the backend in use.
+- **What the shell does:** `shell = <msg>` sends the mod that message, with
+  `event` added, as things happen: `"prompt"`, `"started"` (`command?`),
+  `"finished"` (`command?`, `status?`, `took_ms`), `"folder"` (`path`,
+  `host?`, which names the other machine in an `ssh` session), `"title"`
+  (`title`), `"notice"` (`title?`, `body`: a program asking to tell the user
+  something, as agents do when they wait). Only the mod that asked hears it,
+  since a command line can hold a secret. Any program can print these
+  sequences, even `cat` of a file: show them or notify, and never run
+  anything because of one. zsh and fish report commands and folders by
+  themselves; bash needs `[ -n "$MOONFRAME_SHELL_INTEGRATION" ] && .
+  "$MOONFRAME_SHELL_INTEGRATION/moonframe.bash"` in `~/.bashrc`.
+  `MOONFRAME_SHELL_INTEGRATION=0` in the app's environment turns it off, and
+  shells already running under herdr-core or tmux get it once restarted. A
+  tab from `tabbed` uses this itself: it takes its shell's folder or title
+  as its name, and posts a notification for a notice, or for a command of
+  10 s or more ending in a tab not on show.
 - **Engines:** `engine = "alacritty"` (default, pure Rust) or `"ghostty"`
   (libghostty-vt). Both are cargo features of the `moonframe` crate; the
   starter builds both, an app on the library opts into `ghostty`.
