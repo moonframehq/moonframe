@@ -452,7 +452,12 @@ pub(crate) fn row_text(cells: &[Cell], foreground: RuneColor) -> (String, Vec<Sp
             finish(&run, line.len(), &mut spans);
             run = Some((line.len(), *cell));
         }
-        line.push(cell.ch);
+        // A cell is one column, but text would take a tab to its next stop.
+        line.push(if cell.ch.is_control() {
+            ' '
+        } else {
+            cell.ch
+        });
     }
     finish(&run, line.len(), &mut spans);
     (line, spans)

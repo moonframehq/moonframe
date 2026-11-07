@@ -860,3 +860,17 @@ fn a_mod_that_does_not_fit_leaves_the_row_rather_than_covering_its_neighbour() {
     );
     assert!(x >= left + width, "the branch is over the first at {x}");
 }
+
+#[test]
+fn a_tab_in_a_cell_takes_one_cell_as_any_blank_does() {
+    // Alacritty leaves the tab it was sent in the cell it started from.
+    let cells: Vec<moonframe_terminal::Cell> = "a\t  b"
+        .chars()
+        .map(|ch| moonframe_terminal::Cell {
+            ch,
+            ..moonframe_terminal::Cell::default()
+        })
+        .collect();
+    let (line, _) = terminal::row_text(&cells, rune::Color::WHITE);
+    assert_eq!(line, "a   b");
+}
