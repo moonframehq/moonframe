@@ -113,6 +113,7 @@ impl Terminals {
                 .map(expand)
                 .or_else(|| moonframe_providers::launch_dir().map(ToOwned::to_owned)),
             size: Size::default(),
+            env: Vec::new(),
         };
         let session = if mine >= PER_MOD {
             Err(format!("`{owner}` already has {PER_MOD} terminals"))

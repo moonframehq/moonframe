@@ -12,22 +12,28 @@
 //! types cannot leave the thread that made them); the window only ever sees
 //! the latest snapshot, and writes keys straight to the shell.
 
+// keep-sorted start
 #[cfg(feature = "alacritty")]
 mod alacritty;
 #[cfg(feature = "ghostty")]
 mod ghostty;
+mod integration;
 mod keys;
 #[cfg(feature = "alacritty")]
 mod palette;
 mod pane;
 mod pty;
 mod session;
+mod signals;
+// keep-sorted end
 
 pub use {
+    integration::install as install_integration,
     keys::{Key, encode, paste},
     pane::{Backend, Open, Opened, Output, Pane},
     pty::Pty,
     session::{Folder, Session},
+    signals::Signal,
 };
 
 /// Which emulator reads the shell's output.
@@ -188,6 +194,10 @@ trait Emulator {
     /// device queries.
     fn replies(&mut self) -> Vec<u8>;
 }
+
+#[cfg(all(test, unix))]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod shell_tests;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

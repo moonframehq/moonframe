@@ -57,6 +57,7 @@ fn tmux_detach_reconnect_and_shell_exit_have_distinct_outcomes() {
             key: "test/end".into(),
             cwd: None,
             size: Size::default(),
+            env: Vec::new(),
         };
         let start = || {
             Session::start(

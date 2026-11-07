@@ -4,7 +4,9 @@
 -- with the strip elsewhere (`tabbed { show = "bar" }`, as in the title bar),
 -- a mod draws it from the `tabs/<id>` topic. What a kind reports (a browser's
 -- page) arrives at the drawing mod as `{ tab_report = <tab id>, url, title, ... }`;
--- publish it on `tabs/<id>/report` and the tab keeps it.
+-- publish it on `tabs/<id>/report` and the tab keeps it. A report with `event`
+-- is what a shell did, and can name a command: send that to the strip itself,
+-- never on a topic, which every mod can read.
 
 type Props = {
 	-- { id, kind, title?, props }, as `tabbed` keeps it.
@@ -65,6 +67,10 @@ tab_view { tab = state.tab, kind = kind_of(app.kinds, state.tab.kind) }]],
 		end
 		if kind and kind.report then
 			merged[kind.report] = { tab_report = tab.id }
+			-- A terminal reports what its shell does the same way.
+			if kind.report == "exit" then
+				merged.shell = merged.exit
+			end
 		end
 		merged.id = tab.id
 		return use(name :: any)(merged)

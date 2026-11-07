@@ -12,6 +12,9 @@ type Props = {
 	backend: string?,
 	-- Sent once as the shell exits (Ctrl-D), with `exited = true` added.
 	exit: any,
+	-- Sent as the shell reports something, with `event` and its fields
+	-- added: see `shell` on `ui.terminal`.
+	shell: any,
 	style: any,
 }
 
@@ -29,6 +32,7 @@ return component {
 		["cwd"] = "starting folder",
 		["backend"] = "`auto` (default), `herdr-core`, `tmux` or `pty`",
 		["exit"] = "message sent once as the shell exits, with `exited = true` added; without it Enter starts another shell",
+		["shell"] = "message sent as the shell reports something, with `event` added: `prompt`, `started`, `finished`, `folder`, `title` or `notice`",
 		["style"] = "style table for the box",
 	},
 	example = { id = "shell", cwd = "~" },
@@ -39,6 +43,7 @@ return component {
 			cwd = props.cwd,
 			backend = props.backend :: any,
 			exit = props.exit,
+			shell = props.shell,
 			engine = "alacritty",
 			style = props.style,
 		}

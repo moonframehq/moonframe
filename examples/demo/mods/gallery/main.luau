@@ -23,7 +23,7 @@ local function card(app: any): any
 		tooltip = if open then `Bring {app.title} forward` else `Open {app.title}`,
 		if app.picture
 			then ui.image { src = app.picture, width = WIDTH, height = 236, fit = "cover", class = "demo-picture" }
-			else ui.column { class = "demo-picture demo-blank", width = WIDTH, height = 236, align = "center", justify = "center", ui.icon { "app-window" } },
+			else ui.column { class = "demo-picture demo-blank", width = WIDTH, height = 236, align = "center", justify = "center", ui.icon { "monitor" } },
 		ui.column {
 			class = "demo-body",
 			gap = "small",

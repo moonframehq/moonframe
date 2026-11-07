@@ -69,6 +69,7 @@ fn apps_keep_their_tmux_terminals_apart() {
         key: "terminal/main".into(),
         cwd: None,
         size: Size::default(),
+        env: Vec::new(),
     };
     let sessions = |socket: &str| {
         Command::new("tmux")
@@ -126,6 +127,7 @@ fn a_tmux_terminal_outlives_its_view() {
         key: "test/outlives".into(),
         cwd: None,
         size: Size::default(),
+        env: Vec::new(),
     };
     let engine = [Engine::Alacritty, Engine::Ghostty]
         .into_iter()
@@ -177,6 +179,7 @@ fn a_herdr_core_terminal_outlives_its_view() {
         key: "test/outlives".into(),
         cwd: None,
         size: Size::default(),
+        env: Vec::new(),
     };
     let engine = [Engine::Alacritty, Engine::Ghostty]
         .into_iter()

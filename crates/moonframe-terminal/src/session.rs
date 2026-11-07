@@ -8,8 +8,9 @@
 //! publishes, so a burst of output costs one snapshot.
 
 use {
-    crate::{Ansi, Engine, Opened, Pane, Screen, Size},
+    crate::{Ansi, Engine, Opened, Pane, Screen, Signal, Size, signals::Scanner},
     std::{
+        collections::VecDeque,
         path::PathBuf,
         sync::{
             Arc, Mutex, Weak,
@@ -20,11 +21,16 @@ use {
     },
 };
 
+/// Signals kept for the window between frames. A hidden window draws none,
+/// so the oldest go first.
+const MAX_SIGNALS: usize = 64;
+
 pub struct Session {
     engine: Engine,
     commands: Sender<Command>,
     pane: Arc<dyn Pane>,
     screen: Arc<Mutex<Screen>>,
+    signals: Arc<Mutex<VecDeque<Signal>>>,
     size: Mutex<Size>,
 }
 
@@ -74,6 +80,7 @@ impl Session {
         let pane: Arc<dyn Pane> = Arc::from(pane);
         let (commands, received) = mpsc::channel();
         let screen = Arc::new(Mutex::new(Screen::default()));
+        let signals = Arc::new(Mutex::new(VecDeque::new()));
 
         let sender = commands.clone();
         let program = Arc::downgrade(&pane);
@@ -99,6 +106,7 @@ impl Session {
             // ends the program, its output, and so this thread too.
             answers: (!pane.answers_queries()).then(|| Arc::downgrade(&pane)),
             screen: screen.clone(),
+            signals: signals.clone(),
             wake,
         };
         thread::Builder::new()
@@ -111,6 +119,7 @@ impl Session {
             commands,
             pane,
             screen,
+            signals,
             size: Mutex::new(size),
         })
     }
@@ -130,6 +139,15 @@ impl Session {
     /// Whether the shell has exited, without copying the screen.
     pub fn exited(&self) -> bool {
         self.screen.lock().is_ok_and(|screen| screen.exited)
+    }
+
+    /// What the shell reported since the last call, oldest first. A wake
+    /// follows new ones, as it does a new screen.
+    pub fn take_signals(&self) -> Vec<Signal> {
+        self.signals
+            .lock()
+            .map(|mut signals| signals.drain(..).collect())
+            .unwrap_or_default()
     }
 
     /// Where to ask which folder its program is in, from any thread. It
@@ -233,6 +251,7 @@ struct Emulate {
     /// answers them itself.
     answers: Option<Weak<dyn Pane>>,
     screen: Arc<Mutex<Screen>>,
+    signals: Arc<Mutex<VecDeque<Signal>>>,
     wake: Arc<dyn Fn() + Send + Sync>,
 }
 
@@ -241,12 +260,17 @@ impl Emulate {
         let Some(mut emulator) = self.engine.emulator(self.size) else {
             return;
         };
+        let mut scanner = Scanner::default();
+        let mut found = Vec::new();
         let mut exited = false;
         let mut disconnected = false;
         while let Ok(first) = self.received.recv() {
             for command in std::iter::once(first).chain(self.received.try_iter()) {
                 match command {
-                    Command::Output(bytes) => emulator.feed(&bytes),
+                    Command::Output(bytes) => {
+                        scanner.feed(&bytes, &mut found);
+                        emulator.feed(&bytes);
+                    },
                     Command::Resize(size) => emulator.resize(size),
                     Command::Scroll(lines) => emulator.scroll(lines),
                     Command::Palette(palette) => emulator.set_palette(palette),
@@ -262,6 +286,7 @@ impl Emulate {
             {
                 pane.write(&replies);
             }
+            self.keep(&mut found);
             let mut screen = emulator.screen();
             screen.exited = exited;
             screen.disconnected = disconnected;
@@ -269,6 +294,29 @@ impl Emulate {
                 *shared = screen;
             }
             (self.wake)();
+        }
+    }
+
+    /// Moves `found` to the window's queue. A title or folder replaces one
+    /// still waiting right before it: a program can set them at any rate,
+    /// and only the last one means anything.
+    fn keep(&self, found: &mut Vec<Signal>) {
+        let Ok(mut signals) = self.signals.lock() else {
+            found.clear();
+            return;
+        };
+        for signal in found.drain(..) {
+            if matches!(
+                (signals.back(), &signal),
+                (Some(Signal::Title(_)), Signal::Title(_))
+                    | (Some(Signal::Folder { .. }), Signal::Folder { .. })
+            ) {
+                signals.pop_back();
+            }
+            if signals.len() == MAX_SIGNALS {
+                signals.pop_front();
+            }
+            signals.push_back(signal);
         }
     }
 }

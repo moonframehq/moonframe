@@ -634,6 +634,7 @@ window on screen to show. CI packages it beside the GPUI build, as
 | `just bundle-app NAME` | builds the profile NAME's app as a standalone release |
 | `just check-examples` | loads and type-checks the apps in `examples/` |
 | `just demo` | opens the gallery of every example app, to open and compare them |
+| `just app` | lists the example apps; `just app NAME` opens one, and `just pilot` opens Pilot |
 | `just patterns` | opens the independent pattern browser: categories, search, live previews and Luau source |
 | `just patterns-check` | validates the patterns, their types and the generated web/native catalogs |
 | `just install` | builds the app and installs it in `/Applications` |
