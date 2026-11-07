@@ -88,16 +88,15 @@ impl MoonframeApp {
     fn highlight(&self, cx: &Context<Self>) -> AnyElement {
         let accent = cx.theme().primary;
         let still = cx.reduce_motion();
-        let hovered = self
-            .inspector
-            .picking
-            .then(|| {
-                self.inspector
-                    .hovered
-                    .as_ref()
-                    .map(|target| target.placed.path.clone())
-            })
-            .flatten();
+        // Picking outlines what the pointer aims at, the card the row under it.
+        let hovered = if self.inspector.picking {
+            self.inspector
+                .hovered
+                .as_ref()
+                .map(|target| target.placed.path.clone())
+        } else {
+            self.inspector.previewed.clone()
+        };
         let selected = self
             .inspector
             .selected
@@ -219,9 +218,9 @@ impl MoonframeApp {
                         .flex_col()
                         .gap_1()
                         .child(row("mod", mono(pick.owner).into_any_element()))
-                        .child(row("file", mono(pick.at).into_any_element()))
-                        .child(row("inside", self.trail(selected, cx))),
+                        .child(row("file", mono(pick.at).into_any_element())),
                 )
+                .child(self.trail(selected, cx))
                 .child(
                     div()
                         .px_3()

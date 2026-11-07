@@ -96,6 +96,7 @@ impl MoonframeApp {
             self.inspector.leaf = None;
         } else {
             self.inspector.selected = picked;
+            self.reveal_selection();
         }
         cx.notify();
     }

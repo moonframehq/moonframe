@@ -248,10 +248,11 @@ The pointer finds the deepest element under it. While picking, **↑**
 targets the element around that one instead (a cell's row, the row's
 `ui.list`, the list's panel) and **↓** steps back in; Enter or a click picks
 the target. A level chosen with ↑ stays while the pointer moves over elements
-of the same kind, so moving down a list keeps picking rows. In the card, each
-element of "inside" (and those inside the selection, down to what was under
-the pointer) is a button that selects it instead. So a selection may be a
-row or panel the user chose on purpose, not just the leaf under the pointer.
+of the same kind, so moving down a list keeps picking rows. The card lists
+every element around the selection as an indented tree, with those inside it
+down to what was under the pointer: hovering a row outlines that element in
+the window, and clicking it selects it instead. So a selection may be a row
+or panel the user chose on purpose, not just the leaf under the pointer.
 
 When the user says "here", "this", "the selected element" or "add X there"
 without saying where, read that file first. The `file:line` is the `ui` call
