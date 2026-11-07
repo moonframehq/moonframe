@@ -582,10 +582,10 @@ impl moonframe::provider::host::Host for State {
         if !self.capabilities.contains(&Capability::System) {
             return Err("needs `capabilities = [\"system\"]` in provider.toml".to_owned());
         }
-        Ok(self
-            .system
-            .get_or_insert_with(SystemLoad::new)
-            .sample()
-            .to_string())
+        let system = match &mut self.system {
+            Some(system) => system,
+            empty => empty.insert(SystemLoad::new().map_err(|error| error.to_string())?),
+        };
+        Ok(system.sample().to_string())
     }
 }

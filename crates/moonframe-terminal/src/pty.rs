@@ -137,7 +137,7 @@ impl Pane for PtyPane {
     /// mostly starts where the shell is.
     fn cwd(&self) -> Option<PathBuf> {
         let pid = Pid::from_u32(self.pid?);
-        let mut system = System::new();
+        let mut system = System::new().ok()?;
         system.refresh_processes_specifics(
             ProcessesToUpdate::Some(&[pid]),
             false,

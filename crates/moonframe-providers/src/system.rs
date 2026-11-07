@@ -13,16 +13,17 @@ pub(crate) struct SystemLoad {
 }
 
 impl SystemLoad {
-    pub(crate) fn new() -> Self {
-        Self {
+    /// Fails where the system can't be measured at all.
+    pub(crate) fn new() -> Result<Self, sysinfo::Error> {
+        Ok(Self {
             system: System::new_with_specifics(
                 RefreshKind::nothing()
-                    .with_cpu(CpuRefreshKind::nothing().with_cpu_usage())
+                    .with_cpu(CpuRefreshKind::nothing().with_usage())
                     .with_memory(MemoryRefreshKind::nothing().with_ram()),
-            ),
-            networks: Networks::new_with_refreshed_list(),
+            )?,
+            networks: Networks::new_with_refreshed_list()?,
             last: Instant::now(),
-        }
+        })
     }
 
     /// The load since the last call; CPU and network rates need two calls,
