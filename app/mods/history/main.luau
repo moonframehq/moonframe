@@ -13,7 +13,7 @@ return mod {
 		return {}, { { to = "provider:git", msg = { log = COMMITS } } }
 	end,
 
-	view = function(state: any, app)
+	view = function(state: any, app, props: any)
 		local log = app.git and app.git.log
 		if not log or #log == 0 then
 			return empty_state {
@@ -26,7 +26,7 @@ return mod {
 			grow = true,
 			scroll = true,
 			padding = "small",
-			commit_graph { commits = log },
+			commit_graph { commits = log, compact = props and props.compact },
 		}
 	end,
 }
