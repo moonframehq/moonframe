@@ -36,24 +36,27 @@ moonframe app link examples/pilot   # from the repository: a profile running it 
 moonframe --profile pilot           # or `just demo` and pick it from the gallery
 ```
 
-It needs [Node](https://nodejs.org) and pi. It finds pi on your login shell's
-PATH or in mise's installs, and offers to install a private copy with npm when
-there is none. Connect a model under **Settings**: an API key goes straight
-into pi's `auth.json`; a browser sign-in is pi's own `/login`, run in the
-terminal tab, as pi only offers it in its terminal interface. Pilot notices
-the new credential by itself.
+It needs pi, and nothing else. It finds pi on your login shell's PATH, or in
+mise's installs and the usual places; set `PILOT_PI` to choose one, which comes
+first. A version manager's shim comes last: it picks a version by the folder it
+runs in, and would fail in a project whose settings it refuses. With no pi,
+Pilot says so and starts once you have one and reopen it. Connect a model
+under **Settings**: an API key goes straight into pi's `auth.json`; a browser
+sign-in is pi's own `/login`, run in the terminal tab, as pi only offers it in
+its terminal interface. Pilot notices the new credential by itself.
 
 ## How it fits together
 
-- `providers/pi` (Node, no dependencies) runs pi and publishes `app.pi`:
-  `lib/engine.mjs` is the model, `lib/live.mjs` follows one pi's events,
-  `lib/timeline.mjs` turns messages into what the window draws,
-  `lib/publish.mjs` keeps that under the host's limits, and `lib/commands.mjs`
+- `providers/pi` and `providers/repo` are native providers: Rust built into the
+  app, in [`crates/moonframe-pi`](../../crates/moonframe-pi), the `pi` feature.
+  `pi` runs pi and publishes `app.pi`: `engine.rs` is the model, `live.rs`
+  follows one pi's events, `timeline.rs` turns messages into what the window
+  draws, `snapshot.rs` keeps that under the host's limits, and `commands.rs`
   lists the messages it takes. What the app adds to pi (projects, pins,
   schedules, each run's before and after) is in
   `~/.local/share/moonframe/pilot/state.json`; a conversation is only ever in
   pi's session file.
-- `providers/repo` (Node) is the checkout of the thread on screen: `app.repo`.
+- `repo` is the checkout of the thread on screen: `app.repo`.
 - `mods/watch` is the only mod that hears the pi provider. A message re-runs
   the view of the mod it reaches, and pi publishes on every streamed word, so
   it passes on what really changed. Pages are instances for the same reason: a
@@ -61,14 +64,17 @@ the new credential by itself.
 
 ## Tests
 
-`tests/` runs the providers end to end with the real pi on your PATH and a
-mock model (`mock-llm.mjs`, a small OpenAI-compatible server), in folders of
-their own, so they need no account and touch none of your sessions:
+The tests are in `crates/moonframe-pi`. `cargo test -p moonframe-pi` runs the
+providers against a real repository and a fake pi the tests write. `just
+test-pilot` also runs them end to end with the real pi on your PATH (or
+`PILOT_PI`) and a mock model (`tests/support/mock_llm.rs`, a small
+OpenAI-compatible server), in folders of their own, so they need no account and
+touch none of your sessions.
 
 ```sh
-node --test examples/pilot/tests/*.test.mjs
+cargo run -p moonframe-pi --example pilot_seed -- DIR PORT --stay
 ```
 
-`node examples/pilot/tests/seed.mjs DIR` fills a folder with real threads to
-look at, for a window started with `PI_CODING_AGENT_DIR=DIR/agent` and
-`PILOT_DATA=DIR/data`.
+fills a folder with real threads to look at, for a window started with
+`PI_CODING_AGENT_DIR=DIR/agent` and `PILOT_DATA=DIR/data`, and goes on serving
+the mock model on PORT for it.

@@ -16,14 +16,18 @@ use {
         collections::BTreeMap,
         panic::{AssertUnwindSafe, catch_unwind},
         path::{Path, PathBuf},
-        sync::{Arc, mpsc::RecvTimeoutError},
+        sync::{Arc, atomic::Ordering, mpsc::RecvTimeoutError},
+        thread,
+        time::{Duration, Instant},
     },
 };
 
 /// A provider written in Rust and built into the app.
 ///
 /// Every call runs on the provider's own thread; a panic stops the provider
-/// and reports it, never the app.
+/// and reports it, never the app. Dropping it is its stop: it has a couple
+/// of seconds for that, as the app quits or it is replaced, for programs it
+/// started to leave.
 pub trait Native: Send {
     /// Called once, before anything else.
     fn start(&mut self, host: &Handle) -> Result<(), String>;
@@ -143,6 +147,13 @@ pub(crate) fn run(context: &Context, factory: Option<Factory>) {
             Err(format!("stopped: {what}"))
         })
     };
+    // Bounded: a slow one is given up on, as it would be at shutdown.
+    if let Some(left) = &context.replaces {
+        let started = Instant::now();
+        while !left.load(Ordering::Relaxed) && started.elapsed() < crate::NATIVE_GRACE {
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
     let mut provider = factory();
     if let Err(problem) = guarded(&mut || provider.start(&host)) {
         context.fail(format!("start: {problem}"));

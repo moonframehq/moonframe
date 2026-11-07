@@ -83,6 +83,11 @@ app name="" *args:
 # Open Pilot, the pi coding agent app: `just app pilot`.
 pilot: (app "pilot")
 
+# Pilot's providers end to end, on the real pi and a mock model: `cargo test`
+# leaves these out, as CI has no pi.
+test-pilot:
+    cargo test --locked -p moonframe-pi -- --include-ignored
+
 # Browse reusable patterns in their own app, alongside the app being built.
 patterns:
     python3 scripts/patterns-data.py

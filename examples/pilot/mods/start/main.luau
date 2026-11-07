@@ -1,6 +1,6 @@
 -- A new thread: what is missing to run pi, if anything, then the composer on
--- its project. The steps of getting started read as one page: install pi, add
--- a project, connect a model.
+-- its project. The steps of getting started read as one page: add a project,
+-- connect a model.
 
 local empty_state = use "empty-state"
 
@@ -34,13 +34,7 @@ return mod {
 			return ui.column { grow = true, justify = "center", empty_state { icon = "circle-alert", title = "Pilot can't start", message = pi.reason } }
 		end
 		local steps: { any } = {}
-		local runtime = pi.runtime
-		if runtime.status == "missing" then
-			table.insert(steps, step("download", "Install pi", runtime.error or "pi was not found on this machine. Pilot can install its own copy with npm.", ui.button { "Install pi", variant = "primary", msg = { install_pi = true }, to = "provider:pi" }))
-		elseif runtime.status == "installing" then
-			table.insert(steps, step("loader-circle", "Installing pi…", "This takes a minute.", nil))
-		end
-		if runtime.status == "ready" and #pi.models == 0 then
+		if #pi.models == 0 then
 			table.insert(steps, step("key-round", "Connect a model", "Add an API key or sign in with a provider.", ui.button { "Open settings", msg = { page = "settings" }, to = "shell" }))
 		end
 		return ui.column {

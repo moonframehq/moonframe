@@ -5247,6 +5247,7 @@ dependencies = [
  "moonframe-history",
  "moonframe-mux",
  "moonframe-packages",
+ "moonframe-pi",
  "moonframe-projects",
  "moonframe-providers",
  "moonframe-shell",
@@ -5413,6 +5414,23 @@ dependencies = [
  "toml 1.1.8+spec-1.1.0",
  "tracing",
  "ureq",
+]
+
+[[package]]
+name = "moonframe-pi"
+version = "0.2.2"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "libc",
+ "moonframe-core",
+ "moonframe-providers",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

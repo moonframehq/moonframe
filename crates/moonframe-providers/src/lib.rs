@@ -351,6 +351,9 @@ impl Wanted {
 /// Past what a process was given to leave, what [`Providers::shutdown`]
 /// allows for its thread to see it stop and for the last steps.
 const SHUTDOWN_SLACK: Duration = Duration::from_millis(200);
+/// How long a native provider has to leave once it is told to: one with
+/// programs of its own stops them as it is dropped.
+const NATIVE_GRACE: Duration = Duration::from_secs(2);
 
 /// A provider's thread, and how to reach and stop it.
 struct Running {
@@ -529,6 +532,7 @@ impl Providers {
             let leaving = match manifest.kind {
                 Kind::Process { .. } => Some(manifest.stop_grace + process::TERM_GRACE),
                 Kind::Wasm => Some(Duration::ZERO),
+                Kind::Native => Some(NATIVE_GRACE),
                 _ => None,
             }
             .map(|time| (time, left.clone()));
