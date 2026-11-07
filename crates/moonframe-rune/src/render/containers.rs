@@ -11,11 +11,13 @@ use {
         Sides, Space, Split, Stack, States, Style, Token,
     },
     rune::{Cursor, Drag, El, Phase, ScrollSpec, Tx, col, el, row, text},
-    std::{cell::Cell, rc::Rc},
+    std::{cell::Cell, collections::HashMap, rc::Rc},
 };
 
 /// The smallest a pane gets when a module gives a `max` and no `min`.
 const PANE_MIN: f32 = 80.;
+/// The room kept at the end of a row region for how many it hides.
+const HIDDEN_CHIP: f32 = 28.;
 /// Width of the strip a split's edge is dragged by.
 const HANDLE: f32 = 6.;
 /// A panel's title, as GPUI's `text_xs`.
@@ -35,30 +37,106 @@ fn stacked(direction: Direction) -> El {
 /// member is as tall as the row, so only the first line shows; the row needs
 /// a parent of definite height.
 ///
-/// `grow` here would share the parent evenly whatever the regions hold, so one
-/// that starts at the left is as wide as its mods and leaves the rest to a
-/// region after it. Only one aligned elsewhere needs the room to align in.
-fn row_region(element: El, justify: Justify, members: impl Iterator<Item = El>) -> El {
-    let element = match justify {
-        Justify::Start => element.shrink(),
-        Justify::Center | Justify::End | Justify::Between => element.grow(1.).min_w(0.),
-    };
+/// `grow` here would share the parent evenly whatever the regions hold, so
+/// each is as wide as its mods and regions side by side give way in proportion
+/// to that, every one keeping what still fits. The parent's `justify` places
+/// them: a region has no spare room of its own to align in.
+///
+/// A member that does not fit wraps below the row, where it is clipped away.
+/// Each says where it landed, so the region can count those and say so.
+fn row_region(element: El, key: &str, members: impl Iterator<Item = El>) -> El {
+    let region = key.to_owned();
     element
+        .shrink()
         .h_full()
         .flex_wrap()
         .items_center()
         .clip_rounded(0.)
-        .children(members.map(|member| {
+        .on_layout(move |ui: &mut Ui, rect: [f32; 4]| {
+            ui.row_regions.laid_out(&region, rect);
+        })
+        .children(members.enumerate().map(|(index, member)| {
+            let region = key.to_owned();
             row()
+                .key(format!("{key}-member{index}"))
                 .items_center()
                 .h_full()
                 .shrink()
                 .clip_rounded(0.)
+                .on_layout(move |ui: &mut Ui, rect: [f32; 4]| {
+                    ui.row_regions.member_laid_out(&region, index, rect);
+                })
                 .child(member)
         }))
 }
 
+/// What a row region knows of where its members landed.
+#[derive(Default)]
+struct RowRegion {
+    /// The bottom of the row, in the window's points.
+    bottom: f32,
+    /// The top and width of each member, by its place in the row.
+    members: HashMap<usize, (f32, f32)>,
+}
+
+/// Row regions by their path, as last laid out.
+#[derive(Default)]
+pub(crate) struct RowRegions(HashMap<String, RowRegion>);
+
+impl RowRegions {
+    fn laid_out(&mut self, key: &str, [_, y, _, height]: [f32; 4]) {
+        self.0.entry(key.to_owned()).or_default().bottom = y + height;
+    }
+
+    fn member_laid_out(&mut self, key: &str, index: usize, [_, y, width, _]: [f32; 4]) {
+        let region = self.0.entry(key.to_owned()).or_default();
+        region.members.insert(index, (y, width));
+    }
+
+    /// How many of its first `count` members wrapped below the row. One with
+    /// no width has nothing to show, so it is not missed.
+    fn hidden(&self, key: &str, count: usize) -> usize {
+        self.0.get(key).map_or(0, |region| {
+            region
+                .members
+                .iter()
+                .filter(|(index, (top, width))| {
+                    **index < count && *width > 0.5 && *top >= region.bottom - 0.5
+                })
+                .count()
+        })
+    }
+}
+
 impl<'w> Painter<'w> {
+    /// A region with `hidden` members says so at its end, in room of its own,
+    /// so the chip covers nothing that still shows.
+    fn with_hidden_chip(&self, element: El, hidden: usize, place: &Place<'w>) -> El {
+        if hidden == 0 {
+            return element;
+        }
+        let items = if hidden == 1 {
+            "item"
+        } else {
+            "items"
+        };
+        let chip = row()
+            .key(format!("{}-hidden", place.path))
+            .pin(None, Some(0.), Some(0.), Some(0.))
+            .w(HIDDEN_CHIP)
+            .items_center()
+            .justify_end()
+            .help(format!(
+                "{hidden} {items} hidden: widen the window to show them"
+            ))
+            .child(
+                text(format!("+{hidden}"))
+                    .font(place.ink.text_style())
+                    .color(self.palette.token(Token::MutedForeground)),
+            );
+        element.pr(HIDDEN_CHIP).child(chip)
+    }
+
     pub(super) fn stack(&self, stack: &'w Stack, place: &Place<'w>) -> El {
         let part = match stack.direction {
             Direction::Row => Part::Row,
@@ -294,10 +372,7 @@ impl<'w> Painter<'w> {
 
     pub(super) fn region(&self, region: &'w Region, place: &Place<'w>) -> El {
         let mods = self.ui.workspace.region(&region.name);
-        let children = mods
-            .into_iter()
-            .enumerate()
-            .map(|(index, name)| self.slot(name, &place.child(index)));
+        let mods = mods.into_iter().enumerate();
         let element = stacked(region.direction)
             .key(place.path.clone())
             .gap(region.gap.pixels())
@@ -309,8 +384,18 @@ impl<'w> Painter<'w> {
             Justify::Between => element.justify_between(),
         };
         match region.direction {
-            Direction::Row => row_region(element, region.justify, children),
-            Direction::Column => element.grow(1.).min_w(0.).children(children),
+            Direction::Row => {
+                let members: Vec<El> = mods
+                    .flat_map(|(index, name)| self.members(name, &place.child(index)))
+                    .collect();
+                let hidden = self.ui.row_regions.hidden(&place.path, members.len());
+                let element = row_region(element, &place.path, members.into_iter());
+                self.with_hidden_chip(element, hidden, place)
+            },
+            Direction::Column => element
+                .grow(1.)
+                .min_w(0.)
+                .children(mods.map(|(index, name)| self.slot(name, &place.child(index)))),
         }
     }
 

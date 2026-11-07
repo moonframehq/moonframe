@@ -288,14 +288,17 @@ return mod {
 				ui.text { "Usage unavailable", class = "status-text" },
 			})
 		end
-		return ui.popover {
+		-- Spread, so a narrow bar drops one widget at a time; the sheet opens
+		-- from the first.
+		widgets[1] = ui.popover {
 			open = state.open,
 			dismiss = "close",
 			side = "top",
 			align = "start",
 			width = SHEET_WIDTH,
 			content = sheet(usage, shown),
-			ui.row { gap = "large", align = "center", table.unpack(widgets) },
+			widgets[1],
 		}
+		return ui.row { spread = true, gap = "large", align = "center", table.unpack(widgets) }
 	end,
 }

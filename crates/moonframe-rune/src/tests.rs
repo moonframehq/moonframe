@@ -523,6 +523,7 @@ fn bar(width: f32) -> (TempDir, Runtime<Ui>) {
                         height = 30,
                         shrink = false,
                         gap = "large",
+                        justify = "between",
                         ui.region { name = "status", direction = "row", gap = "large" },
                         ui.region { name = "status-right", direction = "row", justify = "end" },
                     },
@@ -545,6 +546,14 @@ fn bar(width: f32) -> (TempDir, Runtime<Ui>) {
         );
         std::fs::write(folder.join("main.luau"), source).unwrap();
     }
+    // A mod with nothing to say right now: it wraps too, but hides nothing.
+    let quiet = dir.path().join("mods").join("zz-quiet");
+    std::fs::create_dir_all(&quiet).unwrap();
+    std::fs::write(
+        quiet.join("main.luau"),
+        r#"return mod { region = "status", view = function() return ui.row {} end }"#,
+    )
+    .unwrap();
     let mut window = Runtime::new(
         Ui::open(dir.path().to_owned(), None),
         view,
@@ -629,4 +638,126 @@ fn toggling_the_theme_chooses_the_other_one() {
         poll(ui, 0., tx);
     });
     assert!(!window.state.dark, "and it stands");
+}
+
+#[test]
+fn regions_short_of_room_each_keep_a_mod() {
+    let (_dir, window) = bar(320.);
+    let [left, top, width, _] = drawn(&window, "first widget of the left");
+    let [x, right_top, ..] = drawn(&window, "branch on the right");
+    assert_eq!(top, right_top, "the branch left the bar");
+    assert!(x >= left + width.min(1.), "the branch is at {x}");
+    assert!(x + 1. < 320., "the branch is past the window at {x}");
+}
+
+#[test]
+fn a_spread_mod_gives_up_one_widget_at_a_time() {
+    let dir = folder(
+        r#"return mod {
+            view = function()
+                return ui.column {
+                    grow = true,
+                    ui.row {
+                        height = 30,
+                        shrink = false,
+                        ui.region { name = "status", direction = "row", gap = "large" },
+                    },
+                }
+            end,
+        }"#,
+    );
+    let meters = dir.path().join("mods/meters");
+    std::fs::create_dir_all(&meters).unwrap();
+    let source = r#"return mod {
+        region = "status",
+        view = function()
+            return ui.row {
+                spread = true,
+                ui.row { shrink = false, ui.text { "the first meter of the bar" } },
+                ui.row { shrink = false, ui.text { "the second meter of the bar" } },
+            }
+        end,
+    }"#;
+    std::fs::write(meters.join("main.luau"), source).unwrap();
+    let mut window = Runtime::new(
+        Ui::open(dir.path().to_owned(), None),
+        view,
+        (260., 200.),
+        Env::new(true, 2.),
+    );
+    settle(&mut window);
+    let [_, first, ..] = drawn(&window, "the first meter of the bar");
+    let [_, second, ..] = drawn(&window, "the second meter of the bar");
+    assert!(first < 30., "the first left the bar at {first}");
+    assert!(second >= 30., "the second stayed on the bar at {second}");
+}
+
+/// Whether the bar's chip says `count` items are hidden.
+fn hidden_chip(window: &Runtime<Ui>) -> Option<[f32; 4]> {
+    window
+        .elements()
+        .iter()
+        .find(|element| {
+            element
+                .text
+                .as_deref()
+                .is_some_and(|text| text.starts_with('+'))
+        })
+        .map(|element| element.rect)
+}
+
+#[test]
+fn a_bar_with_room_says_nothing_of_hidden_items() {
+    let (_dir, window) = bar(1000.);
+    assert!(hidden_chip(&window).is_none());
+}
+
+#[test]
+fn a_bar_short_of_room_says_how_many_items_are_hidden() {
+    let (_dir, mut window) = bar(320.);
+    settle(&mut window);
+    assert!(
+        shows(&window, "+1"),
+        "{:?}",
+        window
+            .elements()
+            .iter()
+            .filter_map(|e| e.text.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn the_hidden_chip_covers_no_item_that_shows() {
+    let (_dir, mut window) = bar(320.);
+    settle(&mut window);
+    let chip = hidden_chip(&window).expect("a chip");
+    let shown = drawn(&window, "first widget of the left");
+    assert!(
+        shown[0] + shown[2] <= chip[0] + 0.5,
+        "{shown:?} runs under {chip:?}"
+    );
+}
+
+#[test]
+fn the_hidden_count_follows_the_window_both_ways() {
+    let (_dir, mut window) = bar(1000.);
+    assert!(hidden_chip(&window).is_none());
+    window.set_viewport((320., 200.), 2.);
+    settle(&mut window);
+    assert!(hidden_chip(&window).is_some(), "narrowed, nothing said");
+    window.set_viewport((1000., 200.), 2.);
+    settle(&mut window);
+    assert!(hidden_chip(&window).is_none(), "widened, chip stayed");
+}
+
+#[test]
+fn the_hidden_count_holds_still_once_laid_out() {
+    let (_dir, mut window) = bar(320.);
+    settle(&mut window);
+    let chip = hidden_chip(&window);
+    for _ in 0..10 {
+        window.frame(FRAME);
+        assert_eq!(hidden_chip(&window), chip, "the chip flickers");
+    }
 }

@@ -160,6 +160,7 @@ pub struct Ui {
     /// The component the browser shows.
     pub(crate) preview: Option<String>,
     pub(crate) terminals: terminal::Terminals,
+    pub(crate) row_regions: render::RowRegions,
     pub(crate) inspecting: inspect::Inspecting,
     /// What each element is, while picking, by its key.
     pub(crate) crumbs: RefCell<HashMap<String, inspect::Crumb>>,
@@ -431,6 +432,7 @@ impl Ui {
                 .ok()
                 .filter(|name| !name.is_empty() && name != "1"),
             terminals: terminal::Terminals::default(),
+            row_regions: render::RowRegions::default(),
             inspecting: inspect::Inspecting::default(),
             crumbs: RefCell::default(),
             browsers: browser::Browsers::default(),

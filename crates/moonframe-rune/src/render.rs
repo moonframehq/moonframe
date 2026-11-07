@@ -20,7 +20,7 @@ use {
     std::{cell::RefCell, sync::LazyLock},
 };
 
-pub(crate) use shell::Metrics;
+pub(crate) use {containers::RowRegions, shell::Metrics};
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
 
@@ -187,6 +187,28 @@ impl<'w> Painter<'w> {
     fn slot(&self, name: &'w str, place: &Place<'w>) -> El {
         let slot = self.ui.workspace.slot(name);
         self.mounted(name, slot, place)
+    }
+
+    /// What a mod adds to a row region: its view, or with `spread` each of
+    /// that view's children. One with a problem stays whole, to show it.
+    fn members(&self, name: &'w str, place: &Place<'w>) -> Vec<El> {
+        let slot = self.ui.workspace.slot(name);
+        match slot
+            .filter(|slot| slot.error().is_none())
+            .and_then(Slot::view)
+        {
+            Some(Node::Stack(stack)) if stack.spread && place.mounts < MAX_MOUNTS => {
+                let inner = Place {
+                    owner: name,
+                    path: format!("{}>{name}", place.path),
+                    mounts: place.mounts + 1,
+                    parent: Direction::Row,
+                    ..place.clone()
+                };
+                self.nodes(&stack.children, &inner)
+            },
+            _ => vec![self.slot(name, place)],
+        }
     }
 
     fn mounted(&self, owner: &'w str, slot: Option<&'w Slot>, place: &Place<'w>) -> El {
