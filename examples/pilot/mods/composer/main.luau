@@ -399,13 +399,20 @@ return mod {
 			table.insert(level_options, { id = name, label = name, checked = name == level })
 		end
 
-		local workspace_path = state.workspace or (pi and pi.workspaces[1] and pi.workspaces[1].path)
+		local first_workspace = pi and (pi.workspaces[1] or pi.chats)
+		local workspace_path = state.workspace or (first_workspace and first_workspace.path)
 		local workspace_options: { any } = {}
 		local workspace_entry: any = nil
 		for _, workspace in (pi and pi.workspaces) or {} do
 			table.insert(workspace_options, { id = workspace.path, label = workspace.name, detail = workspace.short, icon = "folder" })
 			if workspace.path == workspace_path then
 				workspace_entry = workspace
+			end
+		end
+		if pi then
+			table.insert(workspace_options, { id = pi.chats.path, label = pi.chats.name, detail = "Pilot's own empty folder", icon = "message-square" })
+			if pi.chats.path == workspace_path then
+				workspace_entry = pi.chats
 			end
 		end
 		table.insert(workspace_options, "separator")

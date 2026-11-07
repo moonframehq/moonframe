@@ -16,7 +16,7 @@ local WEEKDAYS = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 local latest: any = nil
 
 local function blank(): Draft
-	local first = latest and latest.workspaces[1]
+	local first = latest and (latest.workspaces[1] or latest.chats)
 	return { name = "", prompt = "", workspace = first and first.path, cadence = "daily", time = "09:00", weekday = 1, worktree = false }
 end
 
@@ -136,6 +136,12 @@ return mod {
 			table.insert(workspaces, { id = workspace.path, label = workspace.name, detail = workspace.short })
 			if draft and workspace.path == draft.workspace then
 				workspace_name = workspace.name
+			end
+		end
+		if pi then
+			table.insert(workspaces, { id = pi.chats.path, label = pi.chats.name, detail = "Pilot's own empty folder" })
+			if draft and pi.chats.path == draft.workspace then
+				workspace_name = pi.chats.name
 			end
 		end
 		local weekdays: { any } = {}

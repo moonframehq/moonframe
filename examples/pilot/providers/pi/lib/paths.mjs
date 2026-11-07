@@ -6,6 +6,8 @@ export const AGENT_DIR = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi
 export const DATA_DIR = process.env.PILOT_DATA || join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "moonframe", "pilot");
 export const WORKTREES_DIR = join(DATA_DIR, "worktrees");
 export const RUNTIME_DIR = join(DATA_DIR, "runtime");
+// Where a thread with no project runs: pi always needs a working directory.
+export const CHATS_DIR = join(DATA_DIR, "chats");
 
 // The folder pi keeps a working directory's sessions in, as pi names it.
 export function sessionDir(cwd) {

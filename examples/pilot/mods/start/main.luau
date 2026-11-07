@@ -40,9 +40,6 @@ return mod {
 		elseif runtime.status == "installing" then
 			table.insert(steps, step("loader-circle", "Installing pi…", "This takes a minute.", nil))
 		end
-		if #pi.workspaces == 0 then
-			table.insert(steps, step("folder-open", "Add a project", "A folder for pi to work in. Threads belong to a project.", ui.button { "Add project", variant = "primary", msg = "add-folder", to = "sidebar" }))
-		end
 		if runtime.status == "ready" and #pi.models == 0 then
 			table.insert(steps, step("key-round", "Connect a model", "Add an API key or sign in with a provider.", ui.button { "Open settings", msg = { page = "settings" }, to = "shell" }))
 		end

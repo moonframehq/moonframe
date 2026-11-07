@@ -6,6 +6,8 @@ pi, not another agent: each thread is a real `pi --mode rpc` process over pi's
 own session files, so threads, models, sign-ins and skills carry over to the
 pi CLI and back.
 
+- **Projects are optional:** a thread can work in a project folder, or under
+  **No project** in an empty folder of Pilot's own, for a question or a chat.
 - **Left:** New thread, the pages, and the threads by day or by project. A
   spinner while one runs, a dot when something is new, a warning when it needs
   you. Right-click to pin, rename, archive or delete.

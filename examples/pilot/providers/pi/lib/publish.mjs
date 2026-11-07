@@ -6,6 +6,13 @@ import { listExtensions, listProviders, listSkills } from "./resources.mjs";
 import { describe } from "./schedule.mjs";
 import { contextUse, timeline, totalCost } from "./timeline.mjs";
 
+const NO_PROJECT = "No project";
+
+function workspaceName(engine, path) {
+	if (path === engine.chats) return NO_PROJECT;
+	return engine.data.workspaces.find((item) => item.path === path)?.name ?? path.split("/").pop();
+}
+
 const MAX_THREADS = 120;
 const MAX_MODELS = 160;
 const MAX_COMMANDS = 80;
@@ -37,11 +44,10 @@ function threadRows(engine) {
 		const info = engine.summaries.get(meta.id);
 		const status = threadStatus(engine, meta);
 		if (!info && status === "idle" && meta.id !== engine.data.selected) continue;
-		const workspace = engine.data.workspaces.find((item) => item.path === meta.workspace);
 		rows.push({
 			id: meta.id,
 			title: engine.titleOf(meta.id),
-			workspace: workspace?.name ?? meta.workspace.split("/").pop(),
+			workspace: workspaceName(engine, meta.workspace),
 			path: meta.workspace,
 			branch: meta.worktree?.branch ?? null,
 			status,
@@ -101,16 +107,15 @@ function threadDetail(engine, id, now) {
 	const limit = engine.shown.get(id) ?? SHOWN_ITEMS;
 	const model = modelOf(engine, meta, live);
 	const branch = engine.branches.get(meta.cwd);
-	const workspace = engine.data.workspaces.find((item) => item.path === meta.workspace);
 	return {
 		id,
 		title: engine.titleOf(id),
-		workspace: workspace?.name ?? meta.workspace.split("/").pop(),
+		workspace: workspaceName(engine, meta.workspace),
 		path: meta.workspace,
 		cwd: meta.cwd,
 		branch: meta.worktree?.branch ?? branch?.branch ?? null,
 		worktree: meta.worktree != null,
-		git: branch?.git ?? true,
+		git: meta.workspace !== engine.chats && (branch?.git ?? true),
 		status: threadStatus(engine, meta),
 		updated: Math.round(engine.summaries.get(id)?.updated ?? meta.created ?? now),
 		ready: live?.state != null,
@@ -138,7 +143,7 @@ function schedules(engine) {
 		name,
 		prompt,
 		workspace,
-		workspace_name: workspace?.split("/").pop() ?? "",
+		workspace_name: workspace ? workspaceName(engine, workspace) : "",
 		cadence,
 		time,
 		weekday: weekday ?? 1,
@@ -214,6 +219,7 @@ export function snapshotOf(engine) {
 		threads_version: versioned(engine, threads),
 		runtime: { ...engine.pi, path: engine.pi.path && shortPath(engine.pi.path) },
 		prefs: engine.data.prefs,
+		chats: { path: engine.chats, name: NO_PROJECT, short: shortPath(engine.chats), git: false },
 		workspaces: engine.data.workspaces.map((workspace) => ({
 			...workspace,
 			short: shortPath(workspace.path),

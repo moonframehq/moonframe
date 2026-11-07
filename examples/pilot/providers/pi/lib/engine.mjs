@@ -4,11 +4,12 @@
 // shape, and commands.mjs for the messages it takes.
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename } from "node:path";
 import { addWorktree, changesBetween, currentBranch, repoRoot, snapshot } from "./git.mjs";
 import { LiveThread } from "./live.mjs";
+import { CHATS_DIR } from "./paths.mjs";
 import { PiProcess } from "./rpc.mjs";
 import { configStamp } from "./resources.mjs";
 import { adoptLoginEnvironment, findPi, installPi } from "./runtime.mjs";
@@ -24,6 +25,8 @@ export class Engine {
 	constructor(publish) {
 		this.notifyPublish = publish;
 		this.store = new Store();
+		mkdirSync(CHATS_DIR, { recursive: true });
+		this.chats = realpathSync(CHATS_DIR);
 		this.live = new Map();
 		this.entries = new Map();
 		this.summaries = new Map();
@@ -417,14 +420,14 @@ export class Engine {
 	// Asking pi -------------------------------------------------------
 
 	async createThread({ workspace, mode, prompt, title, images, select = true, model, thinking }) {
-		const given = workspace ?? this.data.workspaces[0]?.path;
-		if (!given) throw new Error("Add a project folder first.");
+		const given = workspace ?? this.data.workspaces[0]?.path ?? this.chats;
 		// pi names a session folder after the real path, links resolved.
 		const path = realpathSync(given);
 		const id = randomUUID();
 		let cwd = path;
 		let worktree = null;
-		if (mode === "worktree") {
+		// A choice left over from a project: chats are not a repository.
+		if (mode === "worktree" && path !== this.chats) {
 			worktree = await addWorktree(path, title || prompt || "thread");
 			cwd = worktree.path;
 			this.refreshBranch(cwd);
