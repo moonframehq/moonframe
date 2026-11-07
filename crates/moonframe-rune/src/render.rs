@@ -9,6 +9,7 @@ mod embeds;
 mod floating;
 mod gallery;
 mod leaves;
+mod markdown;
 mod plots;
 mod shell;
 // keep-sorted end

@@ -6,15 +6,31 @@ use {
     crate::{
         Ui, icons,
         keys::{chord_name, is_chord, pressed},
-        style::{looked, pixels, weight},
+        style::{Ink, looked, pixels, weight},
     },
     moonframe_core::{
-        Action, Badge, Button, Case, DEMO, Data, Direction, Extras, Fit, Icon, Image, Input, Item,
-        Look, Markdown, Part, States, Text, Token, Variant,
+        Action, Badge, Border, Button, Case, DEMO, Data, Direction, Extras, Fit, Icon, Image,
+        Input, Item, Look, Markdown, Part, Sides, States, Text, Token, Variant,
     },
-    rune::{El, ScrollSpec, SurfaceFit, Tx, col, edit_access, el, row, text, text_input},
-    rune_kit::{Markdown as RuneMarkdown, MarkdownStyle},
+    rune::{El, SurfaceFit, Tx, col, edit_access, el, row, text, text_input},
+    rune_kit::syntax::SyntaxTheme,
 };
+
+/// A text field's line height, in sizes of its text.
+const FIELD_LINE: f32 = 1.4;
+/// GPUI's `text_sm` and `text_xs`, in sizes of the app's text.
+const SM: f32 = 0.875;
+const XS: f32 = 0.75;
+
+/// A word in a rounded tint of its color.
+fn pill(said: &str, pen: Ink, color: rune::Color) -> El {
+    row()
+        .items_center()
+        .px(6.)
+        .radius(999.)
+        .fill(color.alpha(0.15))
+        .child(text(said.to_owned()).font(pen.text_style()).color(color))
+}
 
 impl<'w> Painter<'w> {
     /// What a click on `element` does.
@@ -61,7 +77,16 @@ impl<'w> Painter<'w> {
             _ => node.text.clone(),
         };
         let length = content.len();
+        // `syntax` colors one line of code, for `code-view` and `diff-view`.
+        let colored = node.syntax.as_deref().map(|language| {
+            let found = rune_kit::syntax::highlight(Some(language), &content);
+            SyntaxTheme::neutral(self.ui.dark).spans(&found, 0)
+        });
         let element = text(content).font(ink.text_style()).color(ink.color);
+        let element = match colored {
+            Some(spans) => element.spans(spans),
+            None => element,
+        };
         let element = if node.truncate {
             element.truncate()
         } else if let Some(lines) = node.lines {
@@ -76,6 +101,13 @@ impl<'w> Painter<'w> {
         } else {
             element
         };
+        // Padding and a hairline need a box: text alone has neither.
+        let boxed = look.base.border.is_some() || look.base.padding != Sides::default();
+        let element = if boxed {
+            col().min_w(0.).child(element)
+        } else {
+            element
+        };
         let element = looked(element, &look, None, self.palette);
         self.extras(element, &node.extras, place)
     }
@@ -86,37 +118,48 @@ impl<'w> Painter<'w> {
             ..States::default()
         };
         let look = self.look(Part::Button, &button.look, states, place);
+        let token = |token| self.palette.token(token);
         let (fill, ink) = match button.variant {
-            Variant::Primary => (Some(Token::Accent), Token::AccentForeground),
-            Variant::Danger => (Some(Token::Danger), Token::AccentForeground),
-            Variant::Normal => (Some(Token::Secondary), Token::Foreground),
+            Variant::Primary => (Some(token(Token::Accent)), Token::AccentForeground),
+            // A tint of its color, loud only in what it says.
+            Variant::Danger => (Some(token(Token::Danger).alpha(0.1)), Token::Danger),
+            Variant::Normal => (Some(token(Token::Background)), Token::Foreground),
             Variant::Ghost | Variant::Outline => (None, Token::Foreground),
         };
         let mut pen = place.ink;
-        pen.color = self.palette.token(ink);
+        pen.color = token(ink);
+        // A size of the button's own, unless the stylesheet sets one.
+        pen.size = pen.base * SM;
+        if button.disabled {
+            pen.color = token(Token::MutedForeground);
+        }
         let pen = pen.under(&look.base, self.palette);
-        let height = if button.small {
-            24.
-        } else {
-            32.
+        let (height, sides) = match (button.small, button.label.is_empty()) {
+            (true, true) => (21., 0.),
+            (true, false) => (28., 10.),
+            (false, true) => (28., 0.),
+            (false, false) => (28., 8.75),
         };
         let mut element = row()
             .key(place.path.clone())
             .items_center()
             .justify_center()
-            .gap(6.)
-            .h(height)
-            .px(if button.small {
-                8.
+            .gap(if button.small {
+                3.5
             } else {
-                12.
+                7.
             })
+            .h(height)
+            .px(sides)
             .radius(6.);
-        if let Some(fill) = fill {
-            element = element.fill(self.palette.token(fill));
+        if button.label.is_empty() {
+            element = element.w(height);
         }
-        if button.variant == Variant::Outline {
-            element = element.border(1., self.palette.token(Token::Border));
+        if let Some(fill) = fill {
+            element = element.fill(fill);
+        }
+        if matches!(button.variant, Variant::Normal | Variant::Outline) {
+            element = element.border(1., token(Token::Border));
         }
         if let Some(name) = &button.icon
             && let Some(found) = icons::icon(name)
@@ -146,26 +189,39 @@ impl<'w> Painter<'w> {
         };
         let look = self.look(Part::Item, &item.look, states, place);
         let pen = place.ink.under(&look.base, self.palette);
-        let mut element = row().key(place.path.clone()).items_center().gap(8.).child(
-            text(item.label.clone())
-                .font(pen.text_style())
-                .color(pen.color)
-                .truncate(),
-        );
+        let muted = self.palette.token(Token::MutedForeground);
+        let small = Ink {
+            size: pen.base * XS,
+            ..pen
+        };
+        let mut element = row()
+            .key(place.path.clone())
+            .items_center()
+            .gap(7.)
+            .px(7.)
+            .py(3.5)
+            .radius(6.)
+            .hover(self.palette.token(Token::ListHover))
+            .child(
+                text(item.label.clone())
+                    .font(pen.text_style())
+                    .color(pen.color)
+                    .grow(1.)
+                    .truncate(),
+            );
+        if item.selected {
+            element = element.fill(self.palette.token(Token::ListActive));
+        }
         if let Some(detail) = &item.detail {
             element = element.child(
                 text(detail.clone())
-                    .font(pen.text_style())
-                    .color(self.palette.token(Token::MutedForeground))
-                    .truncate(),
+                    .font(small.text_style())
+                    .color(muted)
+                    .shrink(),
             );
         }
         if let Some(badge) = &item.badge {
-            element = element.child(rune::spacer()).child(
-                text(badge.clone())
-                    .font(pen.text_style())
-                    .color(self.palette.token(Token::MutedForeground)),
-            );
+            element = element.child(pill(badge, small, muted));
         }
         let element = looked(element, &look, None, self.palette);
         let element = self.clicked(element, item.action.as_ref(), place);
@@ -174,16 +230,27 @@ impl<'w> Painter<'w> {
 
     pub(super) fn badge(&self, badge: &'w Badge, place: &Place<'w>) -> El {
         let look = self.look(Part::Badge, &badge.look, States::default(), place);
-        let mut pen = place.ink.under(&look.base, self.palette);
-        if let Some(tone) = badge.tone {
+        let mut ink = place.ink;
+        ink.size = ink.base * XS;
+        ink.color = self.palette.token(Token::MutedForeground);
+        let mut pen = ink.under(&look.base, self.palette);
+        if let Some(tone) = badge
+            .tone
+            .filter(|tone| *tone != moonframe_core::Tone::Normal)
+        {
             pen.color = self.palette.tone(tone);
         }
-        let element = row().key(place.path.clone()).items_center().child(
-            text(badge.text.clone())
-                .font(pen.text_style())
-                .color(pen.color),
-        );
+        let element = pill(&badge.text, pen, pen.color).key(place.path.clone());
         let element = looked(element, &look, None, self.palette);
+        // A tone beats the stylesheet's background, as on GPUI.
+        let element = if badge
+            .tone
+            .is_some_and(|tone| tone != moonframe_core::Tone::Normal)
+        {
+            element.fill(pen.color.alpha(0.15))
+        } else {
+            element
+        };
         self.extras(element, &badge.extras, place)
     }
 
@@ -225,7 +292,9 @@ impl<'w> Painter<'w> {
             let to = input.to.clone().unwrap_or_else(|| place.owner.to_owned());
             (place.owner.to_owned(), to, msg)
         });
-        let shown = text_input(&field.edit, pen.text_style());
+        let mut font = pen.text_style();
+        font.line_height = (pen.size * FIELD_LINE).round();
+        let shown = text_input(&field.edit, font);
         let shown_text = field.edit.text.clone();
         drop(fields);
         let element = if input.multiline {
@@ -240,8 +309,13 @@ impl<'w> Painter<'w> {
             .color(pen.color)
             .px(8.)
             .py(6.)
-            .radius(6.)
-            .border(1., self.palette.token(Token::Border));
+            .radius(6.);
+        // Unless a rule says otherwise, as a field inside a bar of its own does.
+        let element = if look.base.border == Some(Border::None) {
+            element
+        } else {
+            element.border(1., self.palette.token(Token::Border))
+        };
         let edit_key = key.clone();
         let element = element.on_edit(edit_access(move |ui: &mut Ui| {
             &mut ui
@@ -323,47 +397,6 @@ impl<'w> Painter<'w> {
     }
 
     /// A `ui.markdown`, through rune-kit's renderer.
-    pub(super) fn markdown(&self, markdown: &'w Markdown, place: &Place<'w>) -> El {
-        let look = self.look(Part::Markdown, &markdown.look, States::default(), place);
-        let document = RuneMarkdown::new(markdown.text.clone()).selectable(true);
-        let document = match markdown.link.clone() {
-            Some(msg) => {
-                let owner = place.owner.to_owned();
-                let to = markdown.to.clone().unwrap_or_else(|| owner.clone());
-                document.on_link(move |ui: &mut Ui, url: &str| {
-                    ui.send(&owner, &to, Markdown::message(&msg, url));
-                })
-            },
-            None => document,
-        };
-        let element = col()
-            .key(place.path.clone())
-            .child(document.render(&MarkdownStyle::neutral(self.palette.dark)));
-        let element = match (markdown.width, markdown.height) {
-            (Some(width), Some(height)) => element.size(width, height),
-            (Some(width), None) => element.w(width),
-            (None, Some(height)) => element.h(height),
-            (None, None) => element,
-        };
-        let element = match markdown.max_width {
-            Some(width) => element.max_w(width),
-            None => element,
-        };
-        let element = if markdown.grow {
-            element.grow(1.).min_h(0.).min_w(0.)
-        } else {
-            element
-        };
-        let element = if markdown.scroll {
-            element.min_h(0.).scroll(ScrollSpec {
-                stick_bottom: false,
-            })
-        } else {
-            element
-        };
-        looked(element, &look, None, self.palette)
-    }
-
     /// A `ui.image` from a file; a missing one leaves an empty box.
     pub(super) fn image(&self, image: &'w Image, place: &Place<'w>) -> El {
         let look = self.look(Part::Image, &image.look, States::default(), place);

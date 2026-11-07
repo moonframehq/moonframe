@@ -8,7 +8,7 @@ use {
     },
     moonframe_core::{
         Align, Border, Direction, Justify, List, ListWindow, Look, Panel, Part, Region, Resolved,
-        Sides, Space, Split, Stack, States, Style, Token,
+        Scroll, Sides, Space, Split, Stack, States, Style, Token,
     },
     rune::{Cursor, Drag, El, Phase, ScrollSpec, Tx, col, el, row, text},
     std::{cell::Cell, collections::HashMap, rc::Rc},
@@ -177,12 +177,31 @@ impl<'w> Painter<'w> {
         } else {
             element
         };
-        let element = element.children(self.nodes(&stack.children, &inner));
-        let element = looked(element, &look, stack.frame.border, self.palette);
         let column = stack.direction == Direction::Column;
+        // Across a column that scrolls sideways, rows keep the column's width
+        // rather than each its own, so what they fill lines up.
+        let sideways = column && matches!(stack.frame.scroll, Scroll::X | Scroll::Both);
+        let children = self.nodes(&stack.children, &inner);
+        let element = element.children(children.into_iter().map(|child| {
+            if sideways {
+                child.w_full()
+            } else {
+                child
+            }
+        }));
+        let element = looked(element, &look, stack.frame.border, self.palette);
         let element = framed(element, &stack.frame, column, self.palette);
         let element = if stack.drag {
             element.window_drag()
+        } else {
+            element
+        };
+        // Hugging only says something across a column.
+        let hugs = stack.frame.hug
+            && stack.frame.self_align.is_none()
+            && place.parent == Direction::Column;
+        let element = if hugs {
+            element.self_start()
         } else {
             element
         };
@@ -428,7 +447,7 @@ impl<'w> Painter<'w> {
         let rows = self
             .nodes(&list.rows, place)
             .into_iter()
-            .map(|built| built.h(list.row_height));
+            .map(|built| built.h(list.row_height).w_full());
         let element = col()
             .key(place.path.clone())
             .min_h(0.)

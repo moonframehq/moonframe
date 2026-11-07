@@ -8,6 +8,8 @@ use {
     rune::{Align, Color, El, Side as RuneSide, col, row},
 };
 
+/// Where a demo's dialog starts on its stage, clear of the demo's controls.
+const DEMO_TOP: f32 = 44.;
 /// Dims the window behind an overlay that asks for it.
 const BACKDROP: f32 = 0.4;
 
@@ -111,12 +113,16 @@ impl<'w> Painter<'w> {
             .key(format!("{}-layer", place.path))
             .pin(Some(0.), Some(0.), Some(0.), Some(0.))
             .padding(16.);
-        let layer = if overlay.backdrop {
+        // A demo's dialog shows on its stage: nothing behind it to dim, and
+        // its top in view however tall it is.
+        let demo = place.owner.starts_with(DEMO);
+        let layer = if overlay.backdrop && !demo {
             layer.fill(Color::BLACK.alpha(BACKDROP))
         } else {
             layer
         };
         let layer = match overlay.place {
+            Placement::Center if demo => layer.items_start().justify_center().pt(DEMO_TOP),
             Placement::Center => layer.items_center().justify_center(),
             Placement::Top => layer.items_start().justify_center(),
             // Sheets along an edge are as tall or as wide as the window.
@@ -137,7 +143,7 @@ impl<'w> Painter<'w> {
         let dismiss = dismissed(place.owner, overlay.to.as_deref(), overlay.dismiss.as_ref());
         // A demo's dialog is a preview: it stays on the stage, and the
         // browser's list beside it goes on answering.
-        if place.owner.starts_with(DEMO) {
+        if demo {
             let layer = layer
                 .child(click_outside(dismiss))
                 .child(content.on_press(|_: &mut Ui| {}));

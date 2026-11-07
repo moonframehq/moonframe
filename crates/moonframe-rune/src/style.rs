@@ -42,6 +42,9 @@ pub(crate) fn weight(weight: Weight) -> f32 {
     }
 }
 
+/// GPUI's default line height, the golden ratio, in sizes of the text.
+const LINE_HEIGHT: f32 = 1.618;
+
 impl Ink {
     /// This ink under what `style` sets.
     pub(crate) fn under(self, style: &Style, palette: Palette<'_>) -> Self {
@@ -57,8 +60,18 @@ impl Ink {
         }
     }
 
+    /// As GPUI sets text, so a layout has the same rhythm on both: its line
+    /// height, and no tracking, which Rune otherwise adds to system fonts.
     pub(crate) fn text_style(self) -> TextStyle {
-        let mut style = TextStyle::new(self.size, self.weight);
+        // GPUI's system font has no medium: it draws regular.
+        let weight = if self.weight < 600. {
+            400.
+        } else {
+            self.weight
+        };
+        let mut style = TextStyle::new(self.size, weight);
+        style.line_height = self.size * LINE_HEIGHT;
+        style.features = "'trak' 0";
         if self.mono {
             style.family = Family::SystemMono;
         }
@@ -241,16 +254,25 @@ pub(crate) fn framed(mut element: El, frame: &Frame, column: bool, palette: Pale
 /// only, so a row and a column of flexible gaps put it there.
 fn in_area(element: El, area: Area) -> El {
     let gap = |share: f32| el().grow(share.max(0.));
+    // Without a size it keeps its own, starting there.
     let span = |start: Option<f32>, size: Option<f32>| {
-        let (start, size) = (start.unwrap_or(0.), size.unwrap_or(1.));
-        (start, size, 1. - start - size)
+        let start = start.unwrap_or(0.);
+        (start, 1. - start - size.unwrap_or(0.))
     };
-    let (left, width, right) = span(area.left, area.width);
-    let (top, height, bottom) = span(area.top, area.height);
-    let across = row()
-        .grow(height.max(f32::EPSILON))
+    let sized = |host: El, size: Option<f32>| match size {
+        Some(size) => host.grow(size.max(f32::EPSILON)),
+        None => host,
+    };
+    let (left, right) = span(area.left, area.width);
+    let (top, bottom) = span(area.top, area.height);
+    let element = if area.height.is_some() {
+        element.grow(1.)
+    } else {
+        element
+    };
+    let across = sized(row(), area.height)
         .child(gap(left))
-        .child(col().grow(width.max(f32::EPSILON)).child(element.grow(1.)))
+        .child(sized(col(), area.width).child(element))
         .child(gap(right));
     col()
         .pin(Some(0.), Some(0.), Some(0.), Some(0.))

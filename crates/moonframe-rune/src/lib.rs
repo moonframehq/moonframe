@@ -153,6 +153,9 @@ pub struct Ui {
     pub(crate) settings: Option<PathBuf>,
     /// Draw the component browser instead of the app (`MOONFRAME_RUNE_GALLERY`).
     pub(crate) gallery: bool,
+    /// Draw only the chosen component's preview, for a screenshot
+    /// (`MOONFRAME_RUNE_PREVIEW_ONLY`), as GPUI's `--preview-only`.
+    pub(crate) preview_only: bool,
     /// The native providers this build has, until they start.
     pub(crate) natives: Natives,
     /// The app's own `ui.view`s, by name.
@@ -161,6 +164,10 @@ pub struct Ui {
     pub(crate) preview: Option<String>,
     pub(crate) terminals: terminal::Terminals,
     pub(crate) row_regions: render::RowRegions,
+    /// How many matches each searched document last told its mod of.
+    pub(crate) markdown_found: RefCell<HashMap<String, usize>>,
+    /// What documents have to tell their mods, which a view cannot send.
+    pub(crate) markdown_notes: RefCell<Vec<(String, String, Data)>>,
     pub(crate) inspecting: inspect::Inspecting,
     /// What each element is, while picking, by its key.
     pub(crate) crumbs: RefCell<HashMap<String, inspect::Crumb>>,
@@ -424,6 +431,7 @@ impl Ui {
             images: None,
             pictures: RefCell::default(),
             gallery,
+            preview_only: std::env::var_os("MOONFRAME_RUNE_PREVIEW_ONLY").is_some(),
             appearance: Appearance::System,
             settings: None,
             natives: natives::natives(),
@@ -433,6 +441,8 @@ impl Ui {
                 .filter(|name| !name.is_empty() && name != "1"),
             terminals: terminal::Terminals::default(),
             row_regions: render::RowRegions::default(),
+            markdown_found: RefCell::default(),
+            markdown_notes: RefCell::default(),
             inspecting: inspect::Inspecting::default(),
             crumbs: RefCell::default(),
             browsers: browser::Browsers::default(),
@@ -512,6 +522,10 @@ fn poll(ui: &mut Ui, _: f64, tx: &mut Tx) -> bool {
     }
     changed |= ui.reload_changed();
     changed |= ui.settle_browsers();
+    for (owner, to, note) in ui.markdown_notes.take() {
+        ui.send(&owner, &to, note);
+        changed = true;
+    }
     if let Some(cache) = &ui.images {
         changed |= ui.map_tiles.take_ready(cache);
     }

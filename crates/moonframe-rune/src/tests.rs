@@ -761,3 +761,77 @@ fn the_hidden_count_holds_still_once_laid_out() {
         assert_eq!(hidden_chip(&window), chip, "the chip flickers");
     }
 }
+
+#[test]
+fn a_component_with_no_demo_shows_its_example() {
+    let window = gallery("tab-view");
+    assert!(shows(&window, "A tab's content"));
+}
+
+#[test]
+fn a_static_example_sends_nothing_when_clicked() {
+    let mut window = gallery("tab-view");
+    let page = rect_of(&window, |element| {
+        element.key.as_deref() == Some("gallery-static")
+    });
+    click_at(&mut window, page);
+    assert!(shows(&window, "A tab's content"));
+}
+
+#[test]
+fn the_gallery_page_says_how_to_use_a_component() {
+    let window = gallery("tab-view");
+    assert!(shows(&window, "Tab view"));
+    assert!(shows(&window, "Use it in a mod"));
+}
+
+#[test]
+fn a_search_narrows_the_gallery() {
+    let mut window = gallery("tab-view");
+    window
+        .state
+        .fields
+        .get_mut()
+        .entry("gallery:search".to_owned())
+        .or_default()
+        .edit
+        .replace_text("no component has this name".to_owned());
+    window.state.preview = None;
+    window.invalidate();
+    settle(&mut window);
+    assert!(shows(
+        &window,
+        "No components match “no component has this name”."
+    ));
+}
+
+#[test]
+fn a_row_that_hugs_keeps_its_own_width_in_a_column() {
+    let dir = folder(
+        r#"return mod {
+            view = function()
+                return ui.column {
+                    ui.row { hug = true, ui.text "short" },
+                    ui.row { ui.text "wide" },
+                }
+            end,
+        }"#,
+    );
+    let mut window = Runtime::new(
+        Ui::open(dir.path().to_owned(), None),
+        view,
+        (800., 200.),
+        Env::new(true, 2.),
+    );
+    settle(&mut window);
+    let elements = window.elements();
+    let parent_of = |said: &str| {
+        let text = elements
+            .iter()
+            .find(|element| element.text.as_deref() == Some(said))
+            .unwrap();
+        elements[text.parent.unwrap()].rect[2]
+    };
+    assert!(parent_of("short") < 200., "{}", parent_of("short"));
+    assert!(parent_of("wide") > 600., "{}", parent_of("wide"));
+}

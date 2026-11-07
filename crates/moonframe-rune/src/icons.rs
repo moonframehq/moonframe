@@ -47,6 +47,43 @@ fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
     Some(&value[..value.find('"')?])
 }
 
+/// `shapes` with each `polygon` and `polyline` as the `path` it draws: Rune's
+/// icons have neither, and would leave them out.
+fn as_paths(shapes: &str) -> String {
+    let mut out = String::with_capacity(shapes.len());
+    let mut rest = shapes;
+    while let Some(at) = rest.find("<poly") {
+        let Some(end) = rest[at..].find('>').map(|end| at + end) else {
+            break;
+        };
+        let tag = &rest[at..end];
+        out.push_str(&rest[..at]);
+        let closed = tag.starts_with("<polygon");
+        let numbers: Vec<&str> = attribute(tag, "points")
+            .unwrap_or_default()
+            .split([' ', ','])
+            .filter(|number| !number.is_empty())
+            .collect();
+        let mut d = String::new();
+        let (points, _) = numbers.as_chunks::<2>();
+        for (index, [x, y]) in points.iter().enumerate() {
+            let verb = if index == 0 {
+                'M'
+            } else {
+                'L'
+            };
+            d.push_str(&format!("{verb}{x} {y} "));
+        }
+        if closed {
+            d.push('Z');
+        }
+        out.push_str(&format!("<path d=\"{}\"/", d.trim_end()));
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// The shapes inside `svg`, each carrying what the root set for them.
 fn body(svg: &str) -> Option<(f32, String)> {
     let start = svg.find("<svg")?;
@@ -60,7 +97,7 @@ fn body(svg: &str) -> Option<(f32, String)> {
         .iter()
         .filter_map(|name| Some(format!(" {name}=\"{}\"", attribute(root, name)?)))
         .collect();
-    let mut shapes = svg[end + 1..close].to_owned();
+    let mut shapes = as_paths(&svg[end + 1..close]);
     for shape in SHAPES {
         shapes = shapes.replace(&format!("<{shape} "), &format!("<{shape}{carried} "));
     }
@@ -96,6 +133,24 @@ mod tests {
             .filter(|name| source(&format!("{name}.svg")).is_none())
             .collect();
         assert!(missing.is_empty(), "no SVG for {missing:?}");
+    }
+
+    #[test]
+    fn polygons_and_polylines_become_paths() {
+        let shapes = as_paths(r#"<polygon points="1 2, 3 4 5 6"/><polyline points="7,8 9,10"/>"#);
+        assert_eq!(
+            shapes,
+            r#"<path d="M1 2 L3 4 L5 6 Z"/><path d="M7 8 L9 10"/>"#
+        );
+    }
+
+    #[test]
+    fn every_icon_draws_every_shape_it_has() {
+        for name in moonframe_core::ICONS {
+            let data = source(&format!("{name}.svg")).unwrap();
+            let (_, shapes) = body(std::str::from_utf8(&data).unwrap()).unwrap();
+            assert!(!shapes.contains("<poly"), "{name} keeps a shape Rune drops");
+        }
     }
 
     #[test]
