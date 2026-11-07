@@ -1,0 +1,8 @@
+# The git checkout and files of the thread on screen: status, diffs, the file
+# tree, reading and saving files, staging, committing and worktrees. A
+# process provider: it runs git and reads files with your access. See
+# main.mjs for what it publishes and the messages it takes.
+command    = ["bash", "run.sh"]
+kind       = "process"
+publish    = "latest"
+stop-grace = 1

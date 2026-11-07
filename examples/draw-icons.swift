@@ -182,6 +182,24 @@ do {
     save(cx, "examples/pipeline/icon.png")
 }
 
+// Pilot: a thread beside its sidebar, the last steps a change in green and red.
+do {
+    let cx = body([0x8b98e0, 0x4c5a9a, 0x2c3566])
+    card(cx, CGRect(x: 204, y: 224, width: 616, height: 576), 0x1e2547)
+    fill(cx, CGRect(x: 204, y: 224, width: 176, height: 576), 34, color(0xe7e5e0))
+    for index in 0..<4 {
+        fill(cx, CGRect(x: 232, y: 720 - CGFloat(index) * 66, width: index == 0 ? 120 : 92, height: 20), 10, color(0x4c5a9a, index == 0 ? 1 : 0.4))
+    }
+    fill(cx, CGRect(x: 420, y: 672, width: 360, height: 88), 30, color(0xe7e5e0))
+    fill(cx, CGRect(x: 448, y: 706, width: 220, height: 20), 10, color(0x4c5a9a, 0.6))
+    fill(cx, CGRect(x: 420, y: 590, width: 300, height: 20), 10, color(0x1e2547, 0.28))
+    fill(cx, CGRect(x: 420, y: 540, width: 240, height: 20), 10, color(0x1e2547, 0.28))
+    fill(cx, CGRect(x: 420, y: 412, width: 360, height: 44), 12, color(0xef4444, 0.75))
+    fill(cx, CGRect(x: 420, y: 358, width: 360, height: 44), 12, color(0x22c55e, 0.8))
+    fill(cx, CGRect(x: 420, y: 272, width: 170, height: 20), 10, color(0x1e2547, 0.28))
+    save(cx, "examples/pilot/icon.png")
+}
+
 // Ledger: bars over a dashed floor, the last week low.
 do {
     let cx = body([0x3b82f6, 0x2563eb, 0x1e40af])
