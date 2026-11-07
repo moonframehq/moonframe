@@ -48,6 +48,41 @@ demo user="~/.local/share/moonframe/demo":
     fi
     exec "$bin" --user "$user" --profile demo
 
+# List the example apps, or open one by name as a window of its own (`just app
+# pilot`), in the user folder the gallery uses. Anything after the name goes to
+# the app (`just app pilot --check`). MOONFRAME_USER names another folder.
+app name="" *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    list() {
+        for manifest in examples/*/moonframe.toml; do
+            title=$(sed -n 's/^title *= *"\(.*\)".*/\1/p' "$manifest" | head -1)
+            printf '  %-14s %s\n' "$(basename "$(dirname "$manifest")")" "$title"
+        done
+    }
+    name="{{name}}"
+    if [ -z "$name" ]; then
+        echo "Open one with: just app NAME"
+        list
+        exit
+    fi
+    if [ ! -f "examples/$name/moonframe.toml" ]; then
+        echo "No example app is called $name. These are:" >&2
+        list >&2
+        exit 1
+    fi
+    user="${MOONFRAME_USER:-$HOME/.local/share/moonframe/demo}"
+    cargo build --quiet --release -p moonframe-app
+    bin=target/release/moonframe
+    if ! grep -qs "url = \"$PWD/examples/$name\"" "$user/profiles/$name/packages.toml"; then
+        "$bin" --user "$user" app remove "$name" --force >/dev/null 2>&1 || true
+        "$bin" --user "$user" app link "examples/$name" --yes >/dev/null
+    fi
+    exec "$bin" --user "$user" --profile "$name" {{args}}
+
+# Open Pilot, the pi coding agent app: `just app pilot`.
+pilot: (app "pilot")
+
 # Browse reusable patterns in their own app, alongside the app being built.
 patterns:
     python3 scripts/patterns-data.py
