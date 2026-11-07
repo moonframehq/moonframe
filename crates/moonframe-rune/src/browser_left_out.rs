@@ -7,6 +7,10 @@ use {
     std::{cell::RefCell, collections::HashMap, rc::Rc},
 };
 
+#[expect(
+    dead_code,
+    reason = "what a view hands over, for a platform with web views"
+)]
 pub(crate) struct Wanted {
     pub(crate) owner: String,
     pub(crate) url: Option<String>,
