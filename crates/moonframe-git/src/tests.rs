@@ -506,6 +506,67 @@ fn only_writers_may_change_worktrees() {
     std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
 }
 
+/// A move to a worktree being removed waits: the provider must not end up
+/// watching a folder that is gone. Once the removal ends, the move goes on.
+#[test]
+fn a_move_waits_for_a_worktree_removal() {
+    if std::env::var_os("LAYOUTS_REPO").is_some() {
+        return;
+    }
+    let (here, there) = (repository(), repository());
+    let root = toplevel(here.path()).unwrap();
+    let mut git = Git {
+        root: Some(root.clone()),
+        ..Git::default()
+    };
+    let project = Some(there.path().to_path_buf());
+
+    git.removing.store(true, Ordering::Release);
+    assert!(!git.follow(project.clone()));
+    assert_eq!(git.root.as_ref(), Some(&root));
+    assert_eq!(git.followed, None, "the next look tries again");
+
+    git.removing.store(false, Ordering::Release);
+    assert!(git.follow(project));
+    assert_eq!(git.root, toplevel(there.path()));
+}
+
+/// A removal the provider ran leaves it free to move again.
+#[test]
+fn a_removal_ends_with_moves_allowed() {
+    let dir = repository();
+    let (events, seen) = events();
+    let folder = dir.path().join("providers").join("git");
+    std::fs::create_dir_all(&folder).unwrap();
+    let host = Handle::new("git", &folder, writers(&["status"]), events);
+    let mut git = Git::default();
+    git.start(&host).unwrap();
+    let root = published(&seen)["root"].as_str().unwrap().to_owned();
+    let outside = tempfile::tempdir().unwrap();
+    let side = outside.path().join("side");
+    let status = Command::new("git")
+        .args(["-C", &root, "worktree", "add", "-q", "-b", "side"])
+        .arg(&side)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let path = toplevel(&side).unwrap().to_string_lossy().into_owned();
+
+    let message = BTreeMap::from([
+        ("worktree_remove".to_owned(), Data::from(path.as_str())),
+        ("root".to_owned(), Data::from(root.as_str())),
+    ]);
+    git.receive(&host, "status", Data::Map(message));
+
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while git.busy.load(Ordering::Acquire) && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert!(!git.busy.load(Ordering::Acquire), "the removal ended");
+    assert!(!git.removing.load(Ordering::Acquire));
+    assert!(!side.exists());
+}
+
 /// A mod asking for the log each frame costs no more than the refs' own
 /// pace: past those reads, only a new request reads it.
 #[test]
