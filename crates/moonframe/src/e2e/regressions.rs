@@ -34,7 +34,15 @@ fn the_inspect_shortcut_opens_the_dialog_on_a_pick(cx: &mut TestAppContext) {
     assert!(!window.shows("feedback-chip"));
     window.keys(INSPECT);
     window.click("target");
-    assert!(window.shows("feedback-chip"), "a pick opens the dialog");
+    assert!(
+        !window.shows("feedback-chip"),
+        "the card chooses the level first"
+    );
+    window.keys("enter");
+    assert!(
+        window.shows("feedback-chip"),
+        "using the pick opens the dialog"
+    );
     // The Copy button is at the right end of the chip's row.
     let row = window.bounds("feedback-attached");
     window.click_at(point(row.right() - px(20.), row.center().y));
@@ -77,6 +85,27 @@ fn escaping_the_inspect_shortcut_leaves_the_dialog_closed(cx: &mut TestAppContex
     window.keys(INSPECT);
     window.keys("escape");
     assert!(!window.shows("feedback-body"), "nothing was picked");
+}
+
+#[gpui_kit::test]
+fn a_pick_for_a_mod_waits_on_its_card(cx: &mut TestAppContext) {
+    let mut window = with_feedback(cx);
+    let app = window.app.clone();
+    window.keys(INSPECT);
+    window.click("target");
+    assert!(
+        app.read_with(window.cx, |app, _| app.inspector.selected.is_some()),
+        "the card shows the pick"
+    );
+    window.keys("escape");
+    assert!(
+        !window.shows("feedback-body"),
+        "cancelled: nothing attached"
+    );
+    assert!(
+        app.read_with(window.cx, |app, _| app.inspector.asker.is_none()),
+        "the mod heard there was no pick"
+    );
 }
 
 #[gpui_kit::test]

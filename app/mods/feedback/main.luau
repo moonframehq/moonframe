@@ -7,8 +7,8 @@
 -- spins while an agent works, and shows a dot when one finished since the
 -- dialog was last open. Inspect in the dialog picks an element in the
 -- window to attach, or to copy for an agent of the user's own; the app's
--- quick inspect shortcut does the same with the dialog closed, and a pick
--- opens it. The mic beside it dictates the request instead (see
+-- quick inspect shortcut does the same with the dialog closed, and using
+-- the pick opens it. The mic beside it dictates the request instead (see
 -- providers/speech). The shell mounts it in its title bar.
 local feedback = use "feedback"
 local dropdown = use "dropdown"

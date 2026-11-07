@@ -19,7 +19,7 @@ impl MoonframeApp {
     }
 
     /// Starts picking for the mod `from`, which hears the pick (or that
-    /// there was none) on `app/inspect` instead of a card opening.
+    /// there was none) on `app/inspect` once the card's choice is confirmed.
     pub(super) fn inspect_for(&mut self, from: &str, cx: &mut Context<Self>) {
         // A preview starts nothing.
         if from.starts_with(moonframe_core::DEMO) {
@@ -89,21 +89,30 @@ impl MoonframeApp {
                 .as_ref()
                 .map(|picked| inspect::report(picked, &self.workspace)),
         );
-        if self.inspector.asker.is_some() {
-            // Picked for a mod: it shows the pick itself, so no card.
-            self.answer_asker(picked.as_ref());
-            self.inspector.selected = None;
-            self.inspector.leaf = None;
+        self.inspector.selected = picked;
+        if self.inspector.selected.is_some() {
+            self.reveal_selection();
         } else {
-            self.inspector.selected = picked;
+            // A mod waiting on the card hears that nothing was chosen.
+            self.answer_asker(None);
         }
+        cx.notify();
+    }
+
+    /// Hands the card's selection to the mod that asked for a pick, and
+    /// closes the card.
+    pub(crate) fn use_selection(&mut self, cx: &mut Context<Self>) {
+        let picked = self.inspector.selected.take();
+        self.inspector.leaf = None;
+        self.answer_asker(picked.as_ref());
         cx.notify();
     }
 
     /// Keys while picking: ↑ targets the node around the one under the
     /// pointer (a cell's row, a row's list), ↓ steps back in, Enter picks
-    /// the target. Only the main window shows the picker; other windows
-    /// keep their keys. Its own bindings wait until picking ends.
+    /// the target. Enter on the card of a pick a mod asked for hands it
+    /// over. Only the main window shows the picker; other windows keep
+    /// their keys. Its own bindings wait until picking ends.
     pub(crate) fn picking_keystroke(
         &mut self,
         keystroke: &Keystroke,
@@ -111,7 +120,8 @@ impl MoonframeApp {
         cx: &mut Context<Self>,
     ) -> bool {
         let modifiers = keystroke.modifiers;
-        if !self.inspector.picking
+        let confirming = self.inspector.asker.is_some() && self.inspector.selected.is_some();
+        if !(self.inspector.picking || confirming)
             || !self.is_main(window)
             || modifiers.control
             || modifiers.alt
@@ -119,6 +129,13 @@ impl MoonframeApp {
             || modifiers.function
         {
             return false;
+        }
+        if confirming {
+            if keystroke.key != "enter" {
+                return false;
+            }
+            self.use_selection(cx);
+            return true;
         }
         let pointer = window.mouse_position();
         match keystroke.key.as_str() {
