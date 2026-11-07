@@ -12,6 +12,7 @@
 //! types cannot leave the thread that made them); the window only ever sees
 //! the latest snapshot, and writes keys straight to the shell.
 
+// keep-sorted start
 #[cfg(feature = "alacritty")]
 mod alacritty;
 #[cfg(feature = "ghostty")]
@@ -24,6 +25,7 @@ mod pane;
 mod pty;
 mod session;
 mod signals;
+// keep-sorted end
 
 pub use {
     integration::install as install_integration,

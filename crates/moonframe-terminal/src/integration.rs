@@ -19,13 +19,15 @@ use std::{ffi::OsStr, fs, io, path::Path};
 const FOLDER: &str = "MOONFRAME_SHELL_INTEGRATION";
 
 /// Each script, by the path it has under the folder of [`install`].
-const SCRIPTS: [(&str, &str); 3] = [
-    ("bash/moonframe.bash", include_str!("shell/moonframe.bash")),
+const SCRIPTS: &[(&str, &str)] = &[
+    // keep-sorted start
     (
         "fish/fish/vendor_conf.d/moonframe.fish",
         include_str!("shell/moonframe.fish"),
     ),
+    ("bash/moonframe.bash", include_str!("shell/moonframe.bash")),
     ("zsh/.zshenv", include_str!("shell/zshenv")),
+    // keep-sorted end
 ];
 
 /// Writes the scripts under `folder`, and returns the environment a new
@@ -38,7 +40,7 @@ pub fn install(folder: &Path) -> io::Result<Vec<(String, String)>> {
     if read(FOLDER).as_deref() == Some("0") {
         return Ok(Vec::new());
     }
-    for (path, text) in SCRIPTS {
+    for &(path, text) in SCRIPTS {
         let path = folder.join(path);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;

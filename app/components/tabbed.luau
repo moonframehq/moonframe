@@ -9,7 +9,8 @@
 -- as { count, selected, title, tab } where `tab` is the selected tab's record.
 -- With `show = "bar"` it draws only its strip (in a title bar, say) and a mod
 -- draws the content from that topic with `tab-view`; what the content reports
--- comes back on `tabs/<id>/report`. A report with `exited = true` (its
+-- comes back on `tabs/<id>/report`, or straight to the strip for what a shell
+-- does, which can name a command. A report with `exited = true` (its
 -- shell ended, Ctrl-D in a terminal) closes the tab. A terminal's tab is
 -- named after its shell's folder or title, and a long command ending in a
 -- tab not on show, or a program's notice, posts a notification. A tab not on

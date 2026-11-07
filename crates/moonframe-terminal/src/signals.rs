@@ -9,11 +9,12 @@
 
 use std::time::{Duration, Instant};
 
-/// Longest sequence read; a longer one is skipped whole. It holds a
-/// percent-encoded command line of [`MAX_TEXT`] characters.
-const MAX_SEQUENCE: usize = 8 * 1024;
 /// Longest text passed on, in characters.
 const MAX_TEXT: usize = 1024;
+/// Longest sequence read; a longer one is skipped whole. It holds a command
+/// line of [`MAX_TEXT`] characters at its widest, after the mark that starts
+/// it: four bytes each, and three to percent-encode a byte.
+const MAX_SEQUENCE: usize = MAX_TEXT * 4 * 3 + 64;
 
 const ESC: u8 = 0x1b;
 const BEL: u8 = 0x07;

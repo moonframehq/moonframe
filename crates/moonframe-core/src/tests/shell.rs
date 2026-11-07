@@ -585,6 +585,20 @@ fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
     let notice = notice.expect("a long notice was refused");
     assert_eq!(notice.title, "é".repeat(128));
     assert_eq!(notice.body, long);
+    // A command line can hold a secret: what a shell does reaches the strip
+    // without going on a topic, which any mod hears and which is saved.
+    workspace.send(
+        "editor",
+        "editor",
+        shell(&[
+            ("event", "started"),
+            ("command", "login --password hunter2"),
+        ]),
+    );
+    let reports = memory.0.borrow().0.get("topic:tabs/main/report").cloned();
+    assert!(format!("{reports:?}").contains("Example"), "{reports:?}");
+    assert!(!format!("{reports:?}").contains("hunter2"), "{reports:?}");
+    assert!(!format!("{reports:?}").contains("Waiting"), "{reports:?}");
     let exited = Data::Map(
         [
             ("tab_report".to_owned(), Data::from("main-3")),

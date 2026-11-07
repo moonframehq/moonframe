@@ -969,7 +969,9 @@ draws only the strip, as the shell does in its title row. The bar publishes
 as `tab`; a mod subscribed to it draws that tab with `tab-view { tab, kind }`
 (`mods/editor` does, finding `kind` in `app.kinds`). What the content reports
 (`{ tab_report = id, url, title }`) goes back to the bar on
-`topic:tabs/<id>/report`.
+`topic:tabs/<id>/report`. A report with `event` is what a shell did and can
+name a command, so it goes to the bar itself (`to = "shell/tabbed#main"`),
+never on a topic, which every mod can read.
 
 **Looks.** The strip's look comes from its `variant` prop, else the
 stylesheet's `looks = { tabs = "..." }`, else `classic`. Built in: `pills`,

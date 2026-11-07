@@ -158,6 +158,17 @@ fn an_endless_sequence_is_skipped_and_costs_no_more_memory() {
 }
 
 #[test]
+fn the_widest_command_a_shell_sends_is_read_whole() {
+    let mut output = b"\x1b]133;C;cmdline_url=".to_vec();
+    output.extend("%F0%9F%98%80".repeat(MAX_TEXT).as_bytes());
+    output.push(BEL);
+    let [Signal::Started { command }] = &scan(&output)[..] else {
+        panic!("no start");
+    };
+    assert_eq!(command.as_deref(), Some("😀".repeat(MAX_TEXT).as_str()));
+}
+
+#[test]
 fn long_text_is_cut_on_a_character() {
     let mut output = b"\x1b]2;".to_vec();
     output.extend("é".repeat(MAX_TEXT + 10).as_bytes());
