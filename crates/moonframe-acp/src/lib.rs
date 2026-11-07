@@ -25,6 +25,9 @@
 //!   finished one; `{ answer = "<run>", option = "<option id>" | false }`
 //!   answers its permission question (false refuses). An option that
 //!   allows always is refused: a mod answers once at most.
+//! - `{ undo = "<run>" }` takes the app's folders back to before a finished
+//!   run the mod started, when the app keeps them ([`Keeper`]): a run's
+//!   `changed` says it left them different, `undone` that it was undone.
 //! - Anything else publishes again.
 //!
 //! In an installed app, agents work in the user's folder, whose files win
@@ -35,8 +38,10 @@
 
 mod agents;
 mod guard;
+mod keeper;
 mod run;
 
+pub use keeper::{Keeper, set_keeper};
 use {
     moonframe_core::Data,
     moonframe_providers::{Handle, Installed, Mods, Native, to_json},
@@ -100,6 +105,8 @@ pub struct Acp {
     commands: Vec<(String, Vec<String>)>,
     /// Where finished runs are saved; none in tests that keep nothing.
     store: Option<PathBuf>,
+    /// What keeps the app's folders, to come back to a run's start.
+    keeper: Option<Arc<dyn Keeper>>,
     /// The agents as last published, and whether any can run.
     agents: Value,
     last: Option<Value>,
@@ -178,6 +185,7 @@ impl Native for Acp {
             }
         }
         self.check_seal();
+        self.keep_finished();
         self.publish(host);
     }
 
@@ -202,6 +210,8 @@ impl Native for Acp {
             self.with_own_run(from, id, |run, _| {
                 run.answer(option);
             });
+        } else if let Some(id) = text("undo") {
+            self.undo_run(from, id);
         } else if let Some(id) = text("forget") {
             let mut state = lock(&self.state);
             let before = state.runs.len();
@@ -235,6 +245,56 @@ impl Drop for Acp {
 }
 
 impl Acp {
+    /// The app's keeper, which may come after this provider starts.
+    fn keeper(&self) -> Option<Arc<dyn Keeper>> {
+        self.keeper.clone().or_else(keeper::keeper)
+    }
+
+    /// Records what each run that finished changed, with its folders kept.
+    fn keep_finished(&self) {
+        let Some(keeper) = self.keeper() else {
+            return;
+        };
+        let finished: Vec<String> = lock(&self.state)
+            .runs
+            .iter_mut()
+            .filter_map(Run::take_unkept)
+            .collect();
+        for id in finished {
+            let changed = keeper.after(&id);
+            let mut state = lock(&self.state);
+            if let Some(run) = state.runs.iter_mut().find(|run| run.id == id) {
+                run.set_changed(changed);
+            }
+            state.dirty = true;
+            state.unsaved = true;
+        }
+    }
+
+    /// Takes the app back to before the mod `from`'s finished run `id`.
+    fn undo_run(&self, from: &str, id: &str) {
+        let Some(keeper) = self.keeper() else {
+            return;
+        };
+        let known = lock(&self.state)
+            .runs
+            .iter()
+            .any(|run| run.id == id && run.owner == from && run.undoable());
+        if !known {
+            return;
+        }
+        let undone = keeper.undo(id);
+        let mut state = lock(&self.state);
+        if let Some(run) = state.runs.iter_mut().find(|run| run.id == id) {
+            match undone {
+                Ok(()) => run.set_undone(),
+                Err(error) => run.warn(format!("Could not undo this run: {error}")),
+            }
+        }
+        state.dirty = true;
+        state.unsaved = true;
+    }
+
     /// Checks the bundle's signature after each run, on a thread of its own:
     /// a shell command can write there without a tool saying so.
     fn check_seal(&self) {
@@ -333,6 +393,10 @@ impl Acp {
         let now = now();
         let id = format!("{now}-{}", self.serial);
         let prompt = compose(instructions, words, &context, &nonce(&id));
+        // Before the agent can write anything.
+        if let Some(keeper) = self.keeper() {
+            keeper.before(&id);
+        }
 
         let mut command = Command::new(&program);
         command

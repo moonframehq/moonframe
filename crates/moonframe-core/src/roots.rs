@@ -191,6 +191,29 @@ impl Roots {
     }
 
     /// Every folder, lowest first.
+    /// These roots with the layer at `from` read from `to` instead: to load
+    /// a copy of a folder as it was, without touching the folder.
+    pub fn moved(&self, from: &Path, to: &Path) -> Self {
+        let resolved = |path: &Path| path.canonicalize().unwrap_or_else(|_| path.to_owned());
+        let from = resolved(from);
+        let mut moved = self.clone();
+        for layer in &mut moved.layers {
+            if resolved(&layer.path) == from {
+                to.clone_into(&mut layer.path);
+            }
+        }
+        moved
+    }
+
+    /// The layers that bring an app of their own, the ones a change to the
+    /// app lands in: never a package, which has its own updates.
+    pub fn app_layers(&self) -> impl Iterator<Item = &Path> {
+        self.layers
+            .iter()
+            .filter(|layer| matches!(layer.role, Role::App | Role::Toolbox(_)))
+            .map(|layer| layer.path.as_path())
+    }
+
     pub fn layers(&self) -> impl Iterator<Item = &Path> {
         self.layers.iter().map(|layer| layer.path.as_path())
     }

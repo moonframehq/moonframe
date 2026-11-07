@@ -40,6 +40,31 @@ impl Git {
         }
     }
 
+    /// Writes the commit `id`'s files to the folder `to`, through an index
+    /// of its own: the history's index and the kept folder stay as they are.
+    pub(crate) fn export(&self, id: &str, to: &Path) -> Result<()> {
+        let index = self
+            .dir
+            .join(format!("export-{}.index", std::process::id()));
+        let prefix = format!("--prefix={}/", to.display());
+        let run = |args: &[&str]| {
+            let output = self
+                .command(args)
+                .env("GIT_INDEX_FILE", &index)
+                .output()
+                .map_err(|error| Error(format!("cannot run git: {error}")))?;
+            if output.status.success() {
+                return Ok(());
+            }
+            let said = String::from_utf8_lossy(&output.stderr);
+            Err(Error(format!("git export: {}", said.trim())))
+        };
+        let done = run(&["read-tree", id]).and_then(|()| run(&["checkout-index", "-a", &prefix]));
+        // Only a leftover if it stays: the next export writes over it.
+        let _ = std::fs::remove_file(&index);
+        done
+    }
+
     /// [`Git::run`] for a question git answers by failing: `None` then.
     pub(crate) fn ask(&self, args: &[&str]) -> Option<String> {
         self.run(args).ok().filter(|answer| !answer.is_empty())

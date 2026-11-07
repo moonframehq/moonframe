@@ -15,6 +15,9 @@
 //!   from the cursor, as an editor's undo does; the reflog keeps the old
 //!   one for a while.
 //!
+//! - `refs/moonframe/marks/<name>` is a moment to come back to, whatever
+//!   followed it: the snapshot the folder was at when an agent's run began.
+//!
 //! Undo, redo and restore first take a snapshot of whatever changed since
 //! the last one, so nothing is lost, and refuse (as git does) when a file
 //! changes under them halfway through.
@@ -26,6 +29,7 @@
 mod git;
 #[cfg(feature = "herdr")]
 mod herdr;
+mod marks;
 mod store;
 #[cfg(test)]
 mod tests;
@@ -195,6 +199,30 @@ impl History {
         let Some(cursor) = self.cursor() else {
             return Ok(None);
         };
+        let Some(next) = self.after(&cursor)? else {
+            return Ok(None);
+        };
+        let redone = self.snapshot(&next)?;
+        self.move_to(&next, &format!("redo {}", redone.label))?;
+        Ok(Some(redone))
+    }
+
+    /// The snapshot [`History::undo`] would undo, if any.
+    pub fn undoable(&self) -> Option<Snapshot> {
+        let cursor = self.cursor()?;
+        self.git
+            .ask(&["rev-parse", "--verify", "-q", &format!("{cursor}^")])?;
+        self.snapshot(&cursor).ok()
+    }
+
+    /// The snapshot [`History::redo`] would redo, if any.
+    pub fn redoable(&self) -> Option<Snapshot> {
+        let next = self.after(&self.cursor()?).ok()??;
+        self.snapshot(&next).ok()
+    }
+
+    /// The snapshot after `cursor` on the way to the newest.
+    fn after(&self, cursor: &str) -> Result<Option<String>> {
         let range = format!("{cursor}..{BRANCH}");
         let later = self.git.run(&[
             "rev-list",
@@ -203,12 +231,7 @@ impl History {
             "--reverse",
             &range,
         ])?;
-        let Some(next) = later.lines().next() else {
-            return Ok(None);
-        };
-        let redone = self.snapshot(next)?;
-        self.move_to(next, &format!("redo {}", redone.label))?;
-        Ok(Some(redone))
+        Ok(later.lines().next().map(str::to_owned))
     }
 
     /// Takes the folder to the snapshot `id` (a full or short id).

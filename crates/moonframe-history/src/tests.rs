@@ -236,3 +236,69 @@ fn another_process_waits_for_an_operation_to_finish() {
         assert_eq!(taken.unwrap().unwrap().reason, "changed");
     });
 }
+
+#[test]
+fn a_mark_brings_a_run_back_however_many_snapshots_followed() {
+    let fixture = fixture();
+    fixture.history.capture("launch").unwrap();
+    fixture.write("main.luau", "-- before\n");
+    fixture.history.mark("1-1", "before run").unwrap();
+    assert!(!fixture.history.moved_from("1-1"));
+    for step in ["-- one\n", "-- two\n", "-- three\n"] {
+        fixture.write("main.luau", step);
+        fixture.history.capture("changed").unwrap();
+    }
+    assert!(fixture.history.moved_from("1-1"));
+    let marked = fixture.history.marked("1-1").unwrap();
+    fixture.history.restore(&marked).unwrap();
+    assert_eq!(fixture.read("main.luau").unwrap(), "-- before\n");
+}
+
+#[test]
+fn a_mark_needs_no_change_since_the_last_snapshot() {
+    let fixture = fixture();
+    fixture.history.capture("launch").unwrap();
+    fixture.history.mark("1-1", "before run").unwrap();
+    fixture.history.mark("2-1", "before run").unwrap();
+    assert_eq!(fixture.history.marks().unwrap(), ["2-1", "1-1"]);
+    assert_eq!(fixture.history.marked("1-1"), fixture.history.marked("2-1"));
+}
+
+#[test]
+fn a_name_that_could_not_be_a_ref_is_refused() {
+    let fixture = fixture();
+    for name in ["", "../heads/history", "a b", "-x", "a..b"] {
+        assert!(fixture.history.mark(name, "why").is_err(), "{name}");
+        assert_eq!(fixture.history.marked(name), None);
+    }
+}
+
+#[test]
+fn an_export_leaves_the_folder_and_the_next_snapshot_alone() {
+    let fixture = fixture();
+    let first = fixture.history.capture("launch").unwrap().unwrap();
+    fixture.write("main.luau", "-- now\n");
+    fixture.history.capture("changed").unwrap();
+    let out = tempfile::tempdir().unwrap();
+    let to = out.path().join("copy");
+    fixture.history.export(&first.id, &to).unwrap();
+    assert_eq!(
+        fs::read_to_string(to.join("main.luau")).unwrap(),
+        "-- shell\n"
+    );
+    assert_eq!(fixture.read("main.luau").unwrap(), "-- now\n");
+    assert_eq!(fixture.history.capture("changed").unwrap(), None);
+}
+
+#[test]
+fn undoable_and_redoable_name_what_undo_and_redo_would_do() {
+    let fixture = fixture();
+    fixture.history.capture("launch").unwrap();
+    assert_eq!(fixture.history.undoable(), None);
+    fixture.write("main.luau", "-- two\n");
+    let two = fixture.history.capture("changed").unwrap().unwrap();
+    assert_eq!(fixture.history.undoable().unwrap().id, two.id);
+    assert_eq!(fixture.history.redoable(), None);
+    fixture.history.undo().unwrap();
+    assert_eq!(fixture.history.redoable().unwrap().id, two.id);
+}

@@ -453,6 +453,7 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | `send` | sent by Send and ⌘↩, with `value` set to the text from ⌘↩ |
 | `text` | the text the mod has from `change`; Send is greyed out while it is blank |
 | `to` | mod its own messages go to, if not the drawing one |
+| `undo` | show Undo these changes under an open conversation whose runs changed the app (`changed`, not yet `undone`): it sends `{ undo_thread = id }`; send the provider `{ undo = run }` for each of its runs, newest first |
 | `value` | the text; set it to "" after sending to clear the field |
 
 **Styles:** `.feedback` `.feedback-action` `.feedback-action:hover` `.feedback-attached` `.feedback-body` `.feedback-chip` `.feedback-chip-at` `.feedback-chip-element` `.feedback-detail` `.feedback-done` `.feedback-error` `.feedback-failed` `.feedback-heading` `.feedback-history` `.feedback-item` `.feedback-item-head` `.feedback-item-head:hover` `.feedback-muted` `.feedback-note` `.feedback-reply` `.feedback-request` `.feedback-run` `.feedback-running` `.feedback-said` `.feedback-title` `.feedback-waiting`

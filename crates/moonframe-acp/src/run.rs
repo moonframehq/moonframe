@@ -141,6 +141,12 @@ pub(crate) struct Run {
     warning: Option<String>,
     /// Finished, and the bundle's signature was checked after it.
     checked: bool,
+    /// Finished, and what it changed was taken note of.
+    kept: bool,
+    /// It left the app's folders different from how it found them.
+    changed: bool,
+    /// The app was taken back to before it.
+    undone: bool,
     session: Option<String>,
     next: i64,
     pending: BTreeMap<i64, Pending>,
@@ -227,6 +233,9 @@ impl Run {
             installed: start.installed,
             warning: None,
             checked: false,
+            kept: false,
+            changed: false,
+            undone: false,
             session: None,
             next: 0,
             pending: BTreeMap::new(),
@@ -248,6 +257,28 @@ impl Run {
         }
         self.checked = true;
         Some(self.id.clone())
+    }
+
+    /// The run's id, once, when it finished with its changes not noted.
+    pub(crate) fn take_unkept(&mut self) -> Option<String> {
+        if !self.status.finished() || self.kept {
+            return None;
+        }
+        self.kept = true;
+        Some(self.id.clone())
+    }
+
+    pub(crate) fn set_changed(&mut self, changed: bool) {
+        self.changed = changed;
+    }
+
+    pub(crate) fn set_undone(&mut self) {
+        self.undone = true;
+    }
+
+    /// Finished with changes that have not been undone.
+    pub(crate) fn undoable(&self) -> bool {
+        self.status.finished() && self.changed && !self.undone
     }
 
     pub(crate) fn warn(&mut self, warning: String) {
@@ -750,6 +781,8 @@ impl Run {
             "plan": plan,
             "question": question,
             "warning": self.warning,
+            "changed": self.changed,
+            "undone": self.undone,
         })
     }
 
@@ -757,6 +790,7 @@ impl Run {
     pub(crate) fn saved(&self) -> Value {
         let mut value = self.to_json();
         value["question"] = Value::Null;
+        value["kept"] = json!(self.kept);
         value
     }
 
@@ -788,6 +822,10 @@ impl Run {
         run.error = text("error");
         run.warning = text("warning");
         run.checked = true;
+        // Stopped by the app quitting: what it left is noted at this launch.
+        run.kept = value.get("kept").and_then(Value::as_bool) != Some(false);
+        run.changed = value.get("changed").and_then(Value::as_bool) == Some(true);
+        run.undone = value.get("undone").and_then(Value::as_bool) == Some(true);
         run.stop_reason = text("stop_reason");
         run.message = text("message").unwrap_or_default();
         run.tool_count = value

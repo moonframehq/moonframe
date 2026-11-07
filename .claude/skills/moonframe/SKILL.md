@@ -37,7 +37,8 @@ bundle), then the user's folder, `~/.config/moonframe` (or
   replaced by each update. To change one built-in file, copy it to the same
   path there and edit the copy: it wins over the app's at once, and removing
   it brings the app's back. `moonframe doctor` names what in the folder breaks
-  the app, and `--fix` moves it to `.broken/`.
+  the app, `--fix` moves it to `.broken/`, and `--rollback` goes back to the
+  newest snapshot that loads, a linked app's source included.
 - The window watches both folders, so either kind of edit reloads live.
 - **Packages** go between the two: mods others publish as git repositories,
   installed with `moonframe mod install` (see "Sharing mods"). A package
@@ -998,10 +999,11 @@ Tabs open and close with the `.tabs-tab` rule's transition (see
    the user has in front, and they are usually working. Test behaviour
    with `just check`, unit tests and screenshots by PID; ask the user to try
    interactions themselves.
-6. Every change the window reloads for is kept as a snapshot of the user's
-   folder (or the profile's), whoever made it, so you need not commit as
-   you go. When the user asks to take a change back, use
-   `moonframe [--profile NAME] history undo` (`redo` to go forward again,
+6. Every change the window reloads for is kept as a snapshot, whoever made
+   it: of the user's folder (or the profile's), a linked app's source, and
+   `app/` in a checkout. So you need not commit as you go. When the user asks
+   to take a change back, use `moonframe [--profile NAME] history undo`
+   (`undo --run` for all of an agent's last run, `redo` to go forward again,
    `list` and `restore ID` for an older one, `show ID` for its patch); the
    window reloads with the files it writes back. Undo leaves
    `settings.toml`, databases and installed packages as they are. The user

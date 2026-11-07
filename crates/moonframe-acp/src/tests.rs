@@ -526,3 +526,52 @@ fn a_changed_bundle_no_longer_matches_its_signature() {
     // Not an app bundle: nothing to verify.
     assert!(!guard::broken(dir.path()));
 }
+
+/// Remembers what it was asked, in order; a run changes what `changed` says.
+#[derive(Default)]
+struct Notes {
+    calls: Mutex<Vec<String>>,
+}
+
+impl Keeper for Notes {
+    fn before(&self, run: &str) {
+        self.calls.lock().unwrap().push(format!("before {run}"));
+    }
+
+    fn after(&self, run: &str) -> bool {
+        self.calls.lock().unwrap().push(format!("after {run}"));
+        true
+    }
+
+    fn undo(&self, run: &str) -> Result<(), String> {
+        self.calls.lock().unwrap().push(format!("undo {run}"));
+        Ok(())
+    }
+}
+
+#[test]
+fn a_run_is_kept_from_before_it_starts_and_can_be_undone_once() {
+    let mut rig = rig_allowing(json!({ "feedback": "all" }));
+    let notes = Arc::new(Notes::default());
+    rig.acp.keeper = Some(notes.clone());
+    rig.send("feedback", json!({ "start": "Make it bold" }));
+    let id = rig.run()["id"].as_str().unwrap().to_owned();
+    assert_eq!(*notes.calls.lock().unwrap(), [format!("before {id}")]);
+
+    rig.wait_for("done");
+    rig.acp.tick(&rig.host);
+    assert_eq!(rig.run()["changed"], true);
+    assert_eq!(rig.run()["undone"], false);
+
+    // Only the mod that started it, and only once.
+    rig.send("other", json!({ "undo": id }));
+    assert_eq!(rig.run()["undone"], false);
+    rig.send("feedback", json!({ "undo": id }));
+    rig.send("feedback", json!({ "undo": id }));
+    assert_eq!(rig.run()["undone"], true);
+    assert_eq!(*notes.calls.lock().unwrap(), [
+        format!("before {id}"),
+        format!("after {id}"),
+        format!("undo {id}")
+    ]);
+}

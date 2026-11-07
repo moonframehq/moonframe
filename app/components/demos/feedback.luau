@@ -15,6 +15,7 @@ return mod {
 				agent_title = "Claude",
 				text = "The search field is still left of centre in my window",
 				status = "done",
+				changed = true,
 				started = 200,
 				finished = 262,
 				tool_count = 7,
@@ -26,6 +27,7 @@ return mod {
 				agent_title = "Claude",
 				text = "Put the search field in the centre of the top bar",
 				status = "done",
+				changed = true,
 				started = 0,
 				finished = 38,
 				tool_count = 6,
@@ -56,6 +58,12 @@ return mod {
 			state.text = msg.value
 		elseif type(msg) == "table" and msg.follow_type then
 			state.reply = msg.value or ""
+		elseif type(msg) == "table" and msg.undo_thread then
+			for _, run in state.runs do
+				if run.id == msg.undo_thread or run.thread == msg.undo_thread then
+					run.undone = run.changed
+				end
+			end
 		elseif msg == "send" or (type(msg) == "table" and (msg.msg == "send" or msg.follow)) then
 			state.count += 1
 			local follow = type(msg) == "table" and msg.follow or nil
@@ -97,6 +105,7 @@ return mod {
 				runs = state.runs,
 				expanded = state.expanded,
 				follow = true,
+				undo = true,
 				reply = state.reply,
 				-- In a mod, the Inspect button starts Inspect Element and the pick
 				-- comes back on the topic `app/inspect`; the gallery starts nothing.

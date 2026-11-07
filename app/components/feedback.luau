@@ -24,6 +24,9 @@ type Props = {
 	runs: { any }?,
 	-- The conversation shown open: its first run's id.
 	expanded: string?,
+	-- A button under an open conversation that changed the app: sends
+	-- `{ undo_thread = id }` with the first run's id.
+	undo: boolean?,
 	-- A box under an open conversation to reply in: sends `{ follow = id }`
 	-- with the first run's id (and `value` from ⌘↩), and `{ follow_type =
 	-- id, value }` on each edit; `reply` is the text the mod has.
@@ -129,6 +132,18 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 				table.insert(body, ui.text { turn.warning, class = "feedback-error", wrap = true })
 			end
 		end
+		local undoable, undone = false, false
+		for _, turn in turns do
+			undoable = undoable or (turn.changed and not turn.undone)
+			undone = undone or turn.undone
+		end
+		if props.undo and undoable and not going then
+			table.insert(body, ui.row {
+				ui.button { "Undo these changes", variant = "outline", msg = { undo_thread = first.id }, to = to },
+			})
+		elseif props.undo and undone then
+			table.insert(body, ui.text { "These changes were undone", class = "feedback-detail" })
+		end
 		local blank = string.match(props.reply or "", "^%s*$") ~= nil
 		if props.follow and not going then
 			table.insert(body, ui.row {
@@ -201,6 +216,7 @@ return component {
 		["send"] = "sent by Send and ⌘↩, with `value` set to the text from ⌘↩",
 		["runs"] = "runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it)",
 		["expanded"] = "id of the conversation shown open (its first run), each run with `agent-run`; one waiting on an answer is always open",
+		["undo"] = "show Undo these changes under an open conversation whose runs changed the app (`changed`, not yet `undone`): it sends `{ undo_thread = id }`; send the provider `{ undo = run }` for each of its runs, newest first",
 		["follow"] = "show a box to reply in under the open conversation: Reply sends `{ follow = id }` (⌘↩ with `value`), each edit `{ follow_type = id, value }`; start the follow-up with `thread = id`",
 		["reply"] = "the reply the mod has from `follow_type`; Reply is greyed out while it is blank",
 		["actions"] = "elements on the footer's left, such as an agent `dropdown`",

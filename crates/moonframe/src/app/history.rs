@@ -1,12 +1,12 @@
-//! Undo Last Change and Redo Change: the window's own folder taken back
-//! or forward one snapshot. Git runs off the UI thread; writing the files
+//! Undo Last Change and Redo Change: the app's folders taken back or
+//! forward one snapshot. Git runs off the UI thread; writing the files
 //! is what reloads the window, as any other change does.
 
 use super::*;
 
 impl MoonframeApp {
-    /// Takes a snapshot of the window's folder, saying `reason`, if
-    /// anything changed since the last one.
+    /// Takes a snapshot of each folder kept, saying `reason`, if anything
+    /// changed since the last one.
     pub(super) fn snapshot(&self, reason: &'static str, cx: &mut Context<Self>) {
         let Some(history) = self.history.clone() else {
             return;
@@ -14,7 +14,7 @@ impl MoonframeApp {
         cx.background_executor()
             .spawn(async move {
                 if let Err(error) = history.capture(reason) {
-                    tracing::warn!("no snapshot of {}: {error}", history.folder().display());
+                    tracing::warn!("no snapshot: {error}");
                 }
                 if reason == "launch"
                     && let Err(error) = history.tidy()
@@ -25,7 +25,7 @@ impl MoonframeApp {
             .detach();
     }
 
-    /// Undoes the last change to the window's folder (`back`), or redoes
+    /// Undoes the last change to the app's folders (`back`), or redoes
     /// the one undone last, and says which in a toast.
     pub(super) fn step_history(&mut self, back: bool, cx: &mut Context<Self>) {
         let Some(history) = self.history.clone() else {

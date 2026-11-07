@@ -284,6 +284,15 @@ return mod {
 				end
 			end
 			return state, sends
+		elseif msg.undo_thread then
+			-- Newest first, so the app ends up as the conversation found it.
+			local sends = {}
+			for _, run in state.runs do
+				if (run.id == msg.undo_thread or run.thread == msg.undo_thread) and run.changed and not run.undone then
+					table.insert(sends, { to = "provider:acp", msg = { undo = run.id } })
+				end
+			end
+			return state, sends
 		elseif msg.follow then
 			-- A follow-up in the conversation `msg.follow`, with what was said.
 			local text = msg.value or state.reply
@@ -448,6 +457,7 @@ return mod {
 				runs = runs,
 				expanded = state.expanded,
 				follow = true,
+				undo = true,
 				reply = state.reply,
 				actions = {
 					dictation { id = "prompt", text = "dictated", failed = "dictation-failed", listening = "listening" },

@@ -1833,6 +1833,10 @@ type AcpRun = {
 	-- A permission question waiting on the user; answer with
 	-- `{ answer = id, option = option.id }` (or `option = false`).
 	question: { title: string, options: { { id: string, name: string, kind: string } } }?,
+	-- It left the app's folders different; undo it with `{ undo = id }`.
+	changed: boolean,
+	-- The app was taken back to before it.
+	undone: boolean,
 }
 
 type Acp = {
