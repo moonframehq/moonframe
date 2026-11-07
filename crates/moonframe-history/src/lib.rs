@@ -26,6 +26,7 @@
 //! `settings.toml`, databases, installed packages (clones of their own),
 //! other profiles, and build output.
 
+mod export;
 mod git;
 #[cfg(feature = "herdr")]
 mod herdr;
@@ -37,7 +38,11 @@ mod tests;
 pub use store::store_in;
 use {
     git::Git,
-    std::{fmt, fs, path::Path},
+    std::{
+        fmt, fs,
+        path::Path,
+        time::{SystemTime, UNIX_EPOCH},
+    },
     store::Lock,
 };
 
@@ -59,6 +64,9 @@ target/
 *.db
 *.db-*
 ";
+/// Starts the last line of a snapshot's message: the time it was taken in
+/// microseconds, as git's own times are in whole seconds.
+const TAKEN: &str = "\n\nTaken: ";
 /// Files a snapshot's label names before it counts the rest.
 const NAMED: usize = 2;
 
@@ -89,6 +97,9 @@ pub struct Snapshot {
     pub id: String,
     /// Unix seconds.
     pub created: i64,
+    /// Unix microseconds: what puts snapshots of different folders in the
+    /// order they were taken, as many can share a second.
+    pub taken: i64,
     /// The files it changed, as "mods/clock/init.luau and 2 more".
     pub label: String,
     /// Why it was taken: "changed", "launch", "before undo".
@@ -250,8 +261,14 @@ impl History {
     /// What the snapshot `id` changed, as a patch.
     pub fn show(&self, id: &str) -> Result<String> {
         let target = self.resolve(id)?;
-        self.git
-            .run(&["show", "--no-color", "--format=%s%n%n%b", &target])
+        let snapshot = self.snapshot(&target)?;
+        let patch = self
+            .git
+            .run(&["show", "--no-color", "--format=", &target])?;
+        Ok(format!(
+            "{}\n\n{}\n\n{patch}",
+            snapshot.label, snapshot.reason
+        ))
     }
 
     /// Lets git pack and prune the repository when it has grown enough.
@@ -306,7 +323,7 @@ impl History {
                 .run(&["ls-tree", "-r", "--name-only", "-z", &tree])?,
         };
         let label = label(changed.split('\0').filter(|path| !path.is_empty()));
-        let message = format!("{label}\n\n{reason}");
+        let message = format!("{label}\n\n{reason}{TAKEN}{}", micros());
         let mut args = vec!["commit-tree", tree.as_str(), "-m", message.as_str()];
         if let Some(cursor) = &cursor {
             args.extend(["-p", cursor.as_str()]);
@@ -354,22 +371,34 @@ fn create(git: &Git) -> Result<()> {
     Ok(())
 }
 
-/// A snapshot from git's `%H %ct %s %b`, separated by `\x1f`.
+/// Now, in Unix microseconds.
+fn micros() -> i64 {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH);
+    now.map_or(0, |now| i64::try_from(now.as_micros()).unwrap_or(i64::MAX))
+}
+
+/// A snapshot from git's `%H %ct %s %b`, separated by `\x1f`. One from
+/// before snapshots said when they were taken counts from its second.
 fn parse(record: &str, cursor: Option<&str>) -> Option<Snapshot> {
     let mut fields = record.splitn(4, '\x1f');
     let id = fields.next()?.trim().to_owned();
     if id.is_empty() {
         return None;
     }
-    let created = fields.next()?.trim().parse().ok()?;
+    let created: i64 = fields.next()?.trim().parse().ok()?;
     let label = fields.next()?.trim().to_owned();
-    let reason = fields.next().unwrap_or_default().trim().to_owned();
+    let body = fields.next().unwrap_or_default().trim();
+    let stamped = body
+        .rsplit_once(TAKEN)
+        .and_then(|(reason, taken)| Some((reason, taken.parse().ok()?)));
+    let (reason, taken) = stamped.unwrap_or((body, created.saturating_mul(1_000_000)));
     Some(Snapshot {
         current: cursor == Some(id.as_str()),
         id,
         created,
+        taken,
         label,
-        reason,
+        reason: reason.to_owned(),
     })
 }
 

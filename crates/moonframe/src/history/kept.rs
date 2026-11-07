@@ -111,7 +111,7 @@ impl Kept {
             let snapshots = history.list(count)?;
             listed.extend(snapshots.into_iter().map(|one| (folder.to_owned(), one)));
         }
-        listed.sort_by_key(|(_, snapshot)| std::cmp::Reverse(snapshot.created));
+        listed.sort_by_key(|(_, snapshot)| std::cmp::Reverse(snapshot.taken));
         listed.truncate(count);
         Ok(listed)
     }
@@ -122,8 +122,8 @@ impl Kept {
         let last = self
             .0
             .iter()
-            .filter_map(|history| Some((history.undoable()?.created, history)))
-            .max_by_key(|(created, _)| *created);
+            .filter_map(|history| Some((history.undoable()?.taken, history)))
+            .max_by_key(|(taken, _)| *taken);
         last.map_or(Ok(None), |(_, history)| history.undo())
     }
 
@@ -133,8 +133,8 @@ impl Kept {
         let next = self
             .0
             .iter()
-            .filter_map(|history| Some((history.redoable()?.created, history)))
-            .min_by_key(|(created, _)| *created);
+            .filter_map(|history| Some((history.redoable()?.taken, history)))
+            .min_by_key(|(taken, _)| *taken);
         next.map_or(Ok(None), |(_, history)| history.redo())
     }
 
@@ -170,7 +170,7 @@ impl Kept {
     /// The newest run marked.
     pub(crate) fn last_run(&self) -> Option<String> {
         let marks = self.0.iter().filter_map(|history| history.marks().ok());
-        marks.flatten().max()
+        marks.flatten().max_by_key(|run| started(run))
     }
 
     /// Takes every folder back to before the run `run`, and says how many
@@ -185,6 +185,13 @@ impl Kept {
         }
         Ok(restored)
     }
+}
+
+/// What puts run ids in the order the runs started: the numbers they begin
+/// with, as numbers, so run 10 comes after run 9.
+fn started(run: &str) -> Vec<u128> {
+    let numbers = run.split('-').map(str::parse);
+    numbers.map_while(std::result::Result::ok).collect()
 }
 
 #[cfg(feature = "acp")]
@@ -290,6 +297,41 @@ mod tests {
             let text = fs::read_to_string(history.folder().join("main.luau")).unwrap();
             assert_eq!(text, "-- two\n");
         }
+    }
+
+    #[test]
+    fn the_latest_run_is_the_last_started_not_the_last_as_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let kept = kept(dir.path(), &["own"]);
+        kept.capture("launch").unwrap();
+        for run in ["7-10-ab", "7-9-cd", "6-99-ef"] {
+            kept.mark_run(run).unwrap();
+        }
+        assert_eq!(kept.last_run().as_deref(), Some("7-10-ab"));
+    }
+
+    #[test]
+    fn undo_takes_the_last_change_even_in_the_same_second() {
+        let dir = tempfile::tempdir().unwrap();
+        let kept = kept(dir.path(), &["own", "source"]);
+        kept.capture("launch").unwrap();
+        let [own, source] = kept.histories() else {
+            panic!("two folders");
+        };
+        let (mine, theirs) = (
+            own.folder().join("main.luau"),
+            source.folder().join("main.luau"),
+        );
+        // The window's own folder changes last, whatever the clock's second.
+        fs::write(&theirs, "-- two\n").unwrap();
+        source.capture("changed").unwrap();
+        fs::write(&mine, "-- two\n").unwrap();
+        own.capture("changed").unwrap();
+        kept.undo().unwrap();
+        assert_eq!(fs::read_to_string(&mine).unwrap(), "-- one\n");
+        assert_eq!(fs::read_to_string(&theirs).unwrap(), "-- two\n");
+        kept.redo().unwrap();
+        assert_eq!(fs::read_to_string(&mine).unwrap(), "-- two\n");
     }
 
     #[test]

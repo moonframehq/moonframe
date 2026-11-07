@@ -8,7 +8,8 @@ use std::sync::{Arc, OnceLock};
 pub trait Keeper: Send + Sync {
     /// Remembers the folders as they are, before the run writes anything.
     fn before(&self, run: &str);
-    /// Notes what the run left; whether it changed anything.
+    /// Notes what the run left, once its agent has exited; whether it
+    /// changed anything.
     fn after(&self, run: &str) -> bool;
     /// Takes the folders back to how [`Keeper::before`] found them.
     fn undo(&self, run: &str) -> Result<(), String>;

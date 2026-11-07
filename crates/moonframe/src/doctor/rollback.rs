@@ -53,8 +53,7 @@ fn find_and_restore(kept: &Kept, roots: &Roots) -> moonframe_history::Result<boo
     for history in kept.histories() {
         lines.push(line(history)?);
     }
-    for at in moments(&lines).into_iter().take(MOST_TRIED) {
-        let picks = picks(&lines, at);
+    for picks in moments(&lines).into_iter().take(MOST_TRIED) {
         if !loads(kept.histories(), &picks, roots)? {
             continue;
         }
@@ -83,27 +82,35 @@ fn line(history: &History) -> moonframe_history::Result<Vec<Snapshot>> {
         .collect())
 }
 
-/// The times any folder changed, newest first: the moments to try.
-fn moments(lines: &[Vec<Snapshot>]) -> Vec<i64> {
-    let mut moments: Vec<i64> = lines.iter().flatten().map(|one| one.created).collect();
-    moments.sort_unstable_by_key(|at| std::cmp::Reverse(*at));
-    moments.dedup();
-    moments
+/// Where each folder was at each moment, newest first: from now, each step
+/// takes whichever folder changed last back one snapshot. No snapshot is
+/// passed over, however many share a time, and a folder at its oldest stays
+/// there as the others go on.
+fn moments(lines: &[Vec<Snapshot>]) -> Vec<Vec<Option<&Snapshot>>> {
+    let mut steps = vec![0; lines.len()];
+    let mut moments = Vec::new();
+    loop {
+        let at = lines.iter().zip(&steps);
+        moments.push(at.map(|(line, step)| line.get(*step)).collect());
+        let older = lines
+            .iter()
+            .zip(&steps)
+            .enumerate()
+            .filter_map(|(folder, (line, step))| {
+                line.get(step + 1)?;
+                Some((line.get(*step)?.taken, folder))
+            });
+        let Some((_, folder)) = older.max() else {
+            return moments;
+        };
+        if let Some(step) = steps.get_mut(folder) {
+            *step += 1;
+        }
+    }
 }
 
-/// Each folder's snapshot at the time `at`: its newest by then, or its
-/// oldest if it was first kept later.
-fn picks(lines: &[Vec<Snapshot>], at: i64) -> Vec<Option<&Snapshot>> {
-    lines
-        .iter()
-        .map(|line| {
-            let by_then = line.iter().find(|snapshot| snapshot.created <= at);
-            by_then.or_else(|| line.last())
-        })
-        .collect()
-}
-
-/// Whether the app loads with each folder at its pick, read from a copy.
+/// Whether the app loads with each folder at its pick, read from a copy
+/// that holds what going back would leave in the folder, ignored files too.
 /// With every folder where it is now there is nothing new to try.
 fn loads(
     histories: &[History],
@@ -132,31 +139,50 @@ mod tests {
         std::{fs, path::Path},
     };
 
-    fn snapshot(id: &str, created: i64, current: bool) -> Snapshot {
+    fn snapshot(id: &str, taken: i64, current: bool) -> Snapshot {
         Snapshot {
             id: id.to_owned(),
-            created,
+            created: taken / 1_000_000,
+            taken,
             label: id.to_owned(),
             reason: "changed".to_owned(),
             current,
         }
     }
 
-    #[test]
-    fn a_moment_takes_each_folder_as_it_was_by_then() {
-        let own = vec![snapshot("c", 30, true), snapshot("a", 10, false)];
-        let source = vec![snapshot("d", 20, true)];
-        let lines = [own, source];
-        assert_eq!(moments(&lines), [30, 20, 10]);
-        let ids = |at| -> Vec<&str> {
-            picks(&lines, at)
-                .into_iter()
+    fn ids<'a>(moments: &[Vec<Option<&'a Snapshot>>]) -> Vec<Vec<&'a str>> {
+        let ids = |moment: &Vec<Option<&'a Snapshot>>| -> Vec<&'a str> {
+            moment
+                .iter()
                 .map(|pick| pick.unwrap().id.as_str())
                 .collect()
         };
-        assert_eq!(ids(25), ["a", "d"]);
-        // First kept after that moment: its oldest is the nearest there is.
-        assert_eq!(ids(10), ["a", "d"]);
+        moments.iter().map(ids).collect()
+    }
+
+    #[test]
+    fn each_moment_takes_back_whichever_folder_changed_last() {
+        let own = vec![snapshot("c", 30, true), snapshot("a", 10, false)];
+        let source = vec![snapshot("d", 20, true), snapshot("b", 5, false)];
+        let lines = [own, source];
+        assert_eq!(ids(&moments(&lines)), [["c", "d"], ["a", "d"], ["a", "b"]]);
+    }
+
+    #[test]
+    fn a_folder_kept_later_stays_at_its_oldest() {
+        let own = vec![snapshot("c", 30, true), snapshot("a", 10, false)];
+        let source = vec![snapshot("d", 20, true)];
+        assert_eq!(ids(&moments(&[own, source])), [["c", "d"], ["a", "d"]]);
+    }
+
+    #[test]
+    fn snapshots_of_one_time_are_each_a_moment() {
+        let line = vec![
+            snapshot("broken", 10, true),
+            snapshot("good", 10, false),
+            snapshot("older", 10, false),
+        ];
+        assert_eq!(ids(&moments(&[line])), [["broken"], ["good"], ["older"]]);
     }
 
     /// The real app, with `user` over it.
@@ -180,8 +206,7 @@ mod tests {
         let style = user.join("style.luau");
         fs::write(&style, "return {}\n").unwrap();
         history.capture("launch").unwrap();
-        // Git's times are in seconds, so a moment needs one of its own.
-        std::thread::sleep(std::time::Duration::from_millis(1100));
+        // In the same second, more often than not: each is a moment.
         fs::write(&style, "return {\n").unwrap();
         history.capture("changed").unwrap();
         let folders = window(&user);
@@ -189,5 +214,26 @@ mod tests {
         let kept = Kept::of(vec![history]);
         assert!(find_and_restore(&kept, &roots).unwrap());
         assert_eq!(fs::read_to_string(&style).unwrap(), "return {}\n");
+    }
+
+    #[test]
+    fn an_ignored_file_that_breaks_the_app_counts_in_every_moment() {
+        let dir = tempfile::tempdir().unwrap();
+        let user = dir.path().join("user");
+        fs::create_dir_all(user.join("mods/local")).unwrap();
+        fs::write(user.join(".gitignore"), "mods/local/\n").unwrap();
+        let history = History::open(&user, &dir.path().join("own.git")).unwrap();
+        let style = user.join("style.luau");
+        fs::write(&style, "return {}\n").unwrap();
+        history.capture("launch").unwrap();
+        fs::write(&style, "return { }\n").unwrap();
+        history.capture("changed").unwrap();
+        fs::write(user.join("mods/local/main.luau"), "return {\n").unwrap();
+        let folders = window(&user);
+        let roots = folders.roots();
+        let kept = Kept::of(vec![history]);
+        // Going back leaves the mod broken, so no snapshot would help.
+        assert!(!find_and_restore(&kept, &roots).unwrap());
+        assert_eq!(fs::read_to_string(&style).unwrap(), "return { }\n");
     }
 }

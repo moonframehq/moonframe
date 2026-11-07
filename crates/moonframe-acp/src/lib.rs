@@ -391,7 +391,7 @@ impl Acp {
         }
         self.serial += 1;
         let now = now();
-        let id = format!("{now}-{}", self.serial);
+        let id = run_id(self.serial);
         let prompt = compose(instructions, words, &context, &nonce(&id));
         // Before the agent can write anything.
         if let Some(keeper) = self.keeper() {
@@ -636,6 +636,17 @@ fn nonce(id: &str) -> String {
             .unwrap_or(0),
     );
     format!("{:016x}", hasher.finish())
+}
+
+/// A run's id: when it started, in microseconds, then a serial for runs of
+/// this provider, and a nonce. Windows of different profiles can share a
+/// folder's history, which keeps a run's start by this id, so no two
+/// processes may ever make the same one.
+fn run_id(serial: u64) -> String {
+    let started = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |time| time.as_micros());
+    format!("{started}-{serial}-{}", nonce(&serial.to_string()))
 }
 
 /// Where agents work: `[settings] cwd`, else the repository holding the

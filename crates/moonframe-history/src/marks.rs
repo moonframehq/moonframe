@@ -3,10 +3,7 @@
 //! nothing changed since the last one, so a run that began right after
 //! another still has a start of its own.
 
-use {
-    crate::{Error, History, Result},
-    std::path::Path,
-};
+use crate::{Error, History, Result};
 
 /// Where marks are kept, each named after what it marks.
 const MARKS: &str = "refs/moonframe/marks/";
@@ -32,8 +29,7 @@ impl History {
         self.git.ask(&["rev-parse", "--verify", "-q", &reference])
     }
 
-    /// Every mark's name, last in sort order first: names that start with
-    /// the time they were made come newest first.
+    /// Every mark's name, last in sort order first.
     pub fn marks(&self) -> Result<Vec<String>> {
         let listed = self.git.run(&[
             "for-each-ref",
@@ -52,13 +48,6 @@ impl History {
     pub fn moved_from(&self, name: &str) -> bool {
         self.marked(name)
             .is_some_and(|marked| self.cursor().as_deref() != Some(marked.as_str()))
-    }
-
-    /// Writes the files of the snapshot `id` to the new folder `to`, leaving
-    /// the kept folder alone: to look at one without going back to it.
-    pub fn export(&self, id: &str, to: &Path) -> Result<()> {
-        let target = self.resolve(id)?;
-        self.git.export(&target, to)
     }
 
     /// Whether `id` names a snapshot in this history.

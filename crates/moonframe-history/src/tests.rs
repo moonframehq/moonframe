@@ -302,3 +302,57 @@ fn undoable_and_redoable_name_what_undo_and_redo_would_do() {
     fixture.history.undo().unwrap();
     assert_eq!(fixture.history.redoable().unwrap().id, two.id);
 }
+
+#[test]
+fn an_export_holds_what_going_back_would_leave_in_place() {
+    let fixture = fixture();
+    fixture.write(".gitignore", "local/\nnotes.txt\n");
+    let first = fixture.history.capture("launch").unwrap().unwrap();
+    fs::create_dir_all(fixture.folder.join("local/mod")).unwrap();
+    fixture.write("local/mod/main.luau", "-- ignored\n");
+    fixture.write("mods/clock/notes.txt", "ignored\n");
+    fixture.write("added.luau", "-- since\n");
+    fixture.history.capture("changed").unwrap();
+
+    let out = tempfile::tempdir().unwrap();
+    let to = out.path().join("copy");
+    fixture.history.export(&first.id, &to).unwrap();
+    let read = |path: &str| fs::read_to_string(to.join(path)).unwrap();
+    assert_eq!(read("local/mod/main.luau"), "-- ignored\n");
+    assert_eq!(read("mods/clock/notes.txt"), "ignored\n");
+    // A file is never a link: a static provider would refuse one.
+    let file = fs::symlink_metadata(to.join("mods/clock/notes.txt")).unwrap();
+    assert!(file.is_file());
+    assert!(!to.join("added.luau").exists());
+}
+
+#[test]
+fn an_empty_snapshot_still_exports_a_folder() {
+    let fixture = fixture();
+    fs::remove_file(fixture.folder.join("main.luau")).unwrap();
+    let empty = fixture.history.capture("launch").unwrap().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    let to = out.path().join("copy");
+    fixture.history.export(&empty.id, &to).unwrap();
+    assert!(to.is_dir());
+}
+
+#[test]
+fn snapshots_of_one_second_keep_their_order_and_their_reason() {
+    let fixture = fixture();
+    let first = fixture.history.capture("launch").unwrap().unwrap();
+    fixture.write("main.luau", "-- two\n");
+    let second = fixture.history.capture("changed").unwrap().unwrap();
+    assert!(second.taken > first.taken);
+    assert_eq!(second.reason, "changed");
+    let shown = fixture.history.show(&second.id).unwrap();
+    assert!(shown.starts_with("main.luau\n\nchanged\n\n"), "{shown}");
+    assert!(!shown.contains("Taken:"), "{shown}");
+}
+
+#[test]
+fn a_snapshot_from_before_times_were_kept_counts_from_its_second() {
+    let parsed = parse("abc\x1f12\x1flabel\x1flaunch", None).unwrap();
+    assert_eq!(parsed.taken, 12_000_000);
+    assert_eq!(parsed.reason, "launch");
+}

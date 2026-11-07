@@ -190,7 +190,6 @@ impl Roots {
         Self { layers }
     }
 
-    /// Every folder, lowest first.
     /// These roots with the layer at `from` read from `to` instead: to load
     /// a copy of a folder as it was, without touching the folder.
     pub fn moved(&self, from: &Path, to: &Path) -> Self {
@@ -214,6 +213,7 @@ impl Roots {
             .map(|layer| layer.path.as_path())
     }
 
+    /// Every folder, lowest first.
     pub fn layers(&self) -> impl Iterator<Item = &Path> {
         self.layers.iter().map(|layer| layer.path.as_path())
     }
