@@ -1082,6 +1082,9 @@ return mod {
 	-- Optional. `previous` is the state from before a reload, or saved from
 	-- the last run (nil the very first time). `props` is what an instance was
 	-- mounted with (nil for a mod in its own place); see "Instances".
+	-- A third argument, `restored`, is true when `previous` was saved by an
+	-- earlier run rather than kept across a reload: what only held while the
+	-- app ran (a shell's activity, say) is stale then.
 	init = function(previous, props)
 		return previous or { selected = nil }
 	end,

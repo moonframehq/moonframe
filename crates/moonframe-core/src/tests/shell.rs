@@ -727,6 +727,33 @@ fn a_tab_out_of_sight_draws_what_its_shell_does_until_it_is_shown() {
 }
 
 #[test]
+fn a_tabs_status_outlives_a_reload_but_not_the_run() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
+    let memory = Memory::default();
+    let mut workspace = Workspace::open_with(root.as_path(), false, Some(Box::new(memory.clone())));
+    let key = "shell/tabbed#main";
+    for _ in 0..2 {
+        let pick = fields(&[("pick", Data::from("component:terminal"))]);
+        workspace.send(key, key, pick);
+    }
+    shell_says(&mut workspace, "main-1", "started");
+    shell_says(&mut workspace, "main-2", "notice");
+
+    // The shells go on through a reload, and will not say it again.
+    workspace.reload();
+    let status = |workspace: &Workspace, tab| drawn_status(workspace, tab);
+    assert_eq!(status(&workspace, "main-1").as_deref(), Some("working"));
+    assert_eq!(status(&workspace, "main-2").as_deref(), Some("blocked"));
+
+    // The next run knows nothing of them: no spinner that never ends.
+    workspace.flush();
+    drop(workspace);
+    let workspace = Workspace::open_with(root.as_path(), false, Some(Box::new(memory)));
+    assert_eq!(status(&workspace, "main-1"), None);
+    assert_eq!(status(&workspace, "main-2"), None);
+}
+
+#[test]
 fn every_way_of_showing_a_tab_answers_its_dot() {
     let key = "shell/tabbed#main";
     let terminal = "component:terminal";

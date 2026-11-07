@@ -288,13 +288,16 @@ return component {
 	-- Reports for its tabs, from content drawn elsewhere.
 	subscribe = { "tabs/*" },
 
-	init = function(previous: State?, props: Props)
+	init = function(previous: State?, props: Props, restored: boolean)
 		local state: State = previous or { tabs = {}, next = 1, menu = false }
 		state.menu = false
-		-- Nothing is known of the shells yet: they say again as they run.
-		for _, tab in state.tabs do
-			tab.running = nil
-			tab.attention = nil
+		-- Nothing is known of an earlier run's shells: they say again as they
+		-- run. A reload leaves them running, and they will not say it twice.
+		if restored then
+			for _, tab in state.tabs do
+				tab.running = nil
+				tab.attention = nil
+			end
 		end
 		if not previous and props and props.start then
 			open(state, props, props.start)
