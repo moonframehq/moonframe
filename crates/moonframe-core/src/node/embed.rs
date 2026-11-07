@@ -41,6 +41,11 @@ pub struct Terminal {
     /// exits (Ctrl-D, `exit`). Without it the terminal says the shell
     /// exited and Enter starts another.
     pub exit: Option<Data>,
+    /// Sent to the mod, with `event` and what happened added, each time
+    /// the shell reports something: a command's start and end, its folder,
+    /// its title, a notice. Only this mod hears it: a command line can hold
+    /// a secret.
+    pub shell: Option<Data>,
 }
 
 /// A web page the host shows in a native web view (WebKit on macOS,

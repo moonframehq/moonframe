@@ -4,7 +4,7 @@ use super::*;
 const WORK: u64 = 1_000_000;
 
 fn load(source: &str) -> Module {
-    Module::load("test", source, None, None, &Library::default()).unwrap()
+    Module::load("test", source, None, false, None, &Library::default()).unwrap()
 }
 
 #[test]

@@ -160,6 +160,7 @@ fn a_session_runs_a_shell() {
                 key: "test/main".into(),
                 cwd: None,
                 size: Size::default(),
+                env: Vec::new(),
             })
             .unwrap();
         let session = Session::start(opened, engine, Size::default(), Arc::new(|| {})).unwrap();
@@ -270,6 +271,7 @@ fn a_shell_says_which_folder_it_is_in_until_its_session_goes() {
             key: "test/folder".into(),
             cwd: Some(dir.clone()),
             size: Size::default(),
+            env: Vec::new(),
         })
         .unwrap();
     let session = Session::start(opened, engine, Size::default(), Arc::new(|| {})).unwrap();

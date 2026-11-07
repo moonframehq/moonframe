@@ -89,9 +89,9 @@ impl Slot {
         library: &Library,
     ) {
         self.source = path.map(Path::to_owned);
-        let (previous, lost) = self.previous();
+        let (previous, restored, lost) = self.previous();
         let props = (self.props != Data::Nil).then_some(&self.props);
-        let loaded = Module::load(name, source, previous.as_ref(), props, library);
+        let loaded = Module::load(name, source, previous.as_ref(), restored, props, library);
         self.loaded(loaded, lost);
     }
 
@@ -99,20 +99,25 @@ impl Slot {
     /// across reloads like a mod's.
     pub(super) fn load_component(&mut self, key: &str, component: &str, library: &Library) {
         self.source = library.path(component);
-        let (previous, lost) = self.previous();
+        let (previous, restored, lost) = self.previous();
         let props = (self.props != Data::Nil).then_some(&self.props);
-        let loaded = Module::load_component(key, component, previous.as_ref(), props, library);
+        let loaded =
+            Module::load_component(key, component, previous.as_ref(), restored, props, library);
         self.loaded(loaded, lost);
     }
 
     /// The state a load starts from: a reload keeps the running state, a
-    /// first load takes the saved one. With why the running state could not
-    /// be kept, when it could not.
-    fn previous(&mut self) -> (Option<Data>, Option<Error>) {
+    /// first load takes the saved one. With whether it is the saved one,
+    /// and why the running state could not be kept, when it could not.
+    fn previous(&mut self) -> (Option<Data>, bool, Option<Error>) {
         match self.module.as_ref().map(Module::state) {
-            Some(Ok(state)) => (Some(state), None),
-            Some(Err(error)) => (None, Some(lost_state(error))),
-            None => (self.restored.take(), None),
+            Some(Ok(state)) => (Some(state), false, None),
+            Some(Err(error)) => (None, false, Some(lost_state(error))),
+            None => {
+                let saved = self.restored.take();
+                let restored = saved.is_some();
+                (saved, restored, None)
+            },
         }
     }
 

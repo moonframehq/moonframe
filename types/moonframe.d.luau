@@ -936,6 +936,13 @@ type TerminalProps = {
 	-- Sent once, with `exited = true` added, as the shell exits (Ctrl-D,
 	-- `exit`). Without it the terminal says so and Enter starts another.
 	exit: Data?,
+	-- Sent, to this mod only, as the shell reports something, with `event`
+	-- added: "prompt", "started" (`command?`), "finished" (`command?`,
+	-- `status?`, `took_ms`), "folder" (`path`, `host?`), "title" (`title`)
+	-- or "notice" (`title?`, `body`). A table is added to; anything else
+	-- arrives as `msg`. Any program can print these, so show them, and
+	-- never act on them.
+	shell: Data?,
 	[number]: string,
 }
 
@@ -2109,8 +2116,9 @@ type TabKind = {
 
 type Mod<State> = {
 	-- `props` is what an instance was mounted with (`ui.mount { "name",
-	-- id = ..., props = ... }`), nil for a mod in its own place.
-	init: ((previous: State?, props: any?) -> State)?,
+	-- id = ..., props = ... }`), nil for a mod in its own place. `restored`
+	-- says `previous` was saved by an earlier run, not kept across a reload.
+	init: ((previous: State?, props: any?, restored: boolean) -> State)?,
 	-- Returns nothing to keep the state it changed in place, or the new
 	-- state and optionally a list of `Send`s. Its results are left untyped
 	-- so it may return nothing on some paths; the host checks them. A
@@ -2204,7 +2212,7 @@ type Component<Props> = {
 	-- With `update`, it keeps state: each `use` call with an `id` mounts an
 	-- instance, and `build` gets `(props, state, app)`.
 	build: (props: Props, state: any?, app: App?) -> Child,
-	init: ((previous: any?, props: Props) -> any)?,
+	init: ((previous: any?, props: Props, restored: boolean) -> any)?,
 	-- Sends `to = "parent"` reach the module that drew it.
 	update: ((state: any, msg: any, props: Props) -> ...any)?,
 	subscribe: { string }?,

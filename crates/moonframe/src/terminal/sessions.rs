@@ -6,6 +6,8 @@
 
 #[path = "selection.rs"]
 mod selection;
+#[path = "shell_events.rs"]
+mod shell_events;
 
 pub(crate) use selection::{Selection, Spot};
 
@@ -16,7 +18,7 @@ use {
     moonframe_mux::{Backends, Preference},
     moonframe_terminal::{Ansi, Engine, Key, Open, Session, encode, paste},
     std::{
-        cell::{Cell, RefCell},
+        cell::{Cell, OnceCell, RefCell},
         collections::{HashMap, HashSet},
         path::{Path, PathBuf},
         rc::Rc,
@@ -49,6 +51,8 @@ pub(crate) struct TerminalView {
     pub(crate) scrolled: Cell<f32>,
     /// What its element sends its mod as the shell exits, as last drawn.
     exit: RefCell<Option<Data>>,
+    /// What its element sends its mod as the shell reports something.
+    shell: RefCell<Option<Data>>,
     /// That message went out: the mod handles the exit, so the terminal
     /// goes once it is no longer drawn.
     told: Cell<bool>,
@@ -78,6 +82,7 @@ impl TerminalView {
             spawn,
             scrolled: Cell::new(0.),
             exit: RefCell::new(None),
+            shell: RefCell::new(None),
             told: Cell::new(false),
             elsewhere: Cell::new(false),
             selection: RefCell::new(None),
@@ -90,6 +95,13 @@ impl TerminalView {
     pub(crate) fn on_exit(&self, msg: Option<&Data>) {
         if self.exit.borrow().as_ref() != msg {
             *self.exit.borrow_mut() = msg.cloned();
+        }
+    }
+
+    /// Keeps what the element asks to be sent as the shell reports.
+    pub(crate) fn on_shell(&self, msg: Option<&Data>) {
+        if self.shell.borrow().as_ref() != msg {
+            *self.shell.borrow_mut() = msg.cloned();
         }
     }
 
@@ -137,6 +149,9 @@ pub(crate) struct Terminals {
     wake: Arc<dyn Fn() + Send + Sync>,
     /// The theme's 16 colors; xterm's when `None`.
     palette: Option<Ansi>,
+    /// What new shells start with so they report what they do; written
+    /// when the first one starts.
+    shell_env: OnceCell<Vec<(String, String)>>,
     /// The terminals the main window drew in its last frame, and in the
     /// one being drawn: one that appears (a new tab, or a tab selected
     /// again) takes the keyboard, ready to type in.
@@ -164,6 +179,7 @@ impl Terminals {
             backends,
             wake,
             palette: None,
+            shell_env: OnceCell::new(),
             last_drawn: HashSet::new(),
             drawn: HashSet::new(),
             appeared: None,
@@ -171,6 +187,17 @@ impl Terminals {
             refused: HashSet::new(),
             typed: HashMap::new(),
         }
+    }
+
+    /// The shell integration's environment; empty when it cannot be
+    /// written, and shells then run without it.
+    fn shell_env(&self) -> &[(String, String)] {
+        self.shell_env.get_or_init(|| {
+            let folder = moonframe_packages::paths::cache().join("shell");
+            moonframe_terminal::install_integration(&folder)
+                .inspect_err(|error| tracing::warn!("no shell integration: {error}"))
+                .unwrap_or_default()
+        })
     }
 
     /// Paints every terminal, and those started later, in `palette`.
@@ -285,6 +312,7 @@ impl Terminals {
                     .map(expand)
                     .or_else(|| moonframe_providers::launch_dir().map(Path::to_owned)),
                 size: moonframe_terminal::Size::default(),
+                env: self.shell_env().to_vec(),
             },
         };
         let refused = limit.is_some();
@@ -343,6 +371,29 @@ impl Terminals {
         self.appeared.take()
     }
 
+    /// What each shell reported, as `(mod, message)`, oldest first. Nothing
+    /// is kept for a terminal whose mod did not ask.
+    pub(crate) fn take_shell_events(&self) -> Vec<(String, Data)> {
+        let mut events = Vec::new();
+        for (key, view) in &self.views {
+            let Ok(session) = &view.session else {
+                continue;
+            };
+            let signals = session.take_signals();
+            if let Some(msg) = view.shell.borrow().as_ref() {
+                let owner = key
+                    .rsplit_once('/')
+                    .map_or(key.as_str(), |(owner, _)| owner);
+                events.extend(
+                    signals
+                        .into_iter()
+                        .map(|signal| (owner.to_owned(), shell_events::message(msg, signal))),
+                );
+            }
+        }
+        events
+    }
+
     /// The exit messages of shells that just exited, as `(mod, message)`
     /// with `exited = true` added, each sent once. A told one that the main
     /// window no longer draws (its tab closed) goes, so it holds no slot;
@@ -383,6 +434,7 @@ impl Terminals {
                 old.spawn.clone(),
             ));
             view.on_exit(old.exit.borrow().as_ref());
+            view.on_shell(old.shell.borrow().as_ref());
             view.elsewhere.set(old.elsewhere.get());
             self.views.insert(key.to_owned(), view);
         }

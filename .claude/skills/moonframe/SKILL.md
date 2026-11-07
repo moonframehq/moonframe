@@ -395,6 +395,26 @@ live shell. The host runs it, so it can't be written in Luau:
   pty that ends with the app. `"herdr-core"`, `"tmux"` or `"pty"` asks for
   one; one that is missing falls back to the next. A faint label in the
   terminal's bottom-right corner names the backend in use.
+- **What the shell does:** `shell = <msg>` sends the mod that message, with
+  `event` added, as things happen: `"prompt"`, `"started"` (`command?`),
+  `"finished"` (`command?`, `status?`, `took_ms`), `"folder"` (`path`,
+  `host?`, which names the other machine in an `ssh` session), `"title"`
+  (`title`), `"notice"` (`title?`, `body`: a program asking to tell the user
+  something, as agents do when they wait). Only the mod that asked hears it,
+  since a command line can hold a secret. Any program can print these
+  sequences, even `cat` of a file: show them or notify, and never run
+  anything because of one. zsh and fish report commands and folders by
+  themselves; bash needs `[ -n "$MOONFRAME_SHELL_INTEGRATION" ] && .
+  "$MOONFRAME_SHELL_INTEGRATION/moonframe.bash"` in `~/.bashrc`, and 4.4 or
+  later to report commands (macOS's own 3.2 reports only its folder).
+  `MOONFRAME_SHELL_INTEGRATION=0` in the app's environment turns it off, and
+  shells already running under herdr-core or tmux get it once restarted. A
+  tab from `tabbed` uses this itself: it takes its shell's folder or title
+  as its name, and posts a notification for a notice, or for a command of
+  10 s or more ending in a tab not on show. A tab not on show has a spinner
+  while a command runs, and a dot once a program needs the user or a command
+  ended, until it is shown. An agent reaches that dot by printing a notice
+  (OSC 9 or 777).
 - **Engines:** `engine = "alacritty"` (default, pure Rust) or `"ghostty"`
   (libghostty-vt). Both are cargo features of the `moonframe` crate; the
   starter builds both, an app on the library opts into `ghostty`.
@@ -949,7 +969,9 @@ draws only the strip, as the shell does in its title row. The bar publishes
 as `tab`; a mod subscribed to it draws that tab with `tab-view { tab, kind }`
 (`mods/editor` does, finding `kind` in `app.kinds`). What the content reports
 (`{ tab_report = id, url, title }`) goes back to the bar on
-`topic:tabs/<id>/report`.
+`topic:tabs/<id>/report`. A report with `event` is what a shell did and can
+name a command, so it goes to the bar itself (`to = "shell/tabbed#main"`),
+never on a topic, which every mod can read.
 
 **Looks.** The strip's look comes from its `variant` prop, else the
 stylesheet's `looks = { tabs = "..." }`, else `classic`. Built in: `pills`,
@@ -1060,6 +1082,9 @@ return mod {
 	-- Optional. `previous` is the state from before a reload, or saved from
 	-- the last run (nil the very first time). `props` is what an instance was
 	-- mounted with (nil for a mod in its own place); see "Instances".
+	-- A third argument, `restored`, is true when `previous` was saved by an
+	-- earlier run rather than kept across a reload: what only held while the
+	-- app ran (a shell's activity, say) is stale then.
 	init = function(previous, props)
 		return previous or { selected = nil }
 	end,
