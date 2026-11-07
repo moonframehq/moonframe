@@ -105,7 +105,7 @@ pub(crate) struct Inspector {
     /// Where the card's list of elements is scrolled.
     pub(crate) ladder: ScrollHandle,
     /// The mod that started this pick (`command = "inspect"`): it hears
-    /// the pick on `app/inspect`, and no card opens.
+    /// the pick on `app/inspect` once the card's choice is confirmed.
     pub(crate) asker: Option<String>,
     /// Where the highlight was last drawn, to animate it from there.
     pub(crate) highlight: Rc<RefCell<crate::overlay::Highlight>>,

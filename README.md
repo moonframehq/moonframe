@@ -263,8 +263,8 @@ The window reloads while an agent edits it, so you can watch it work.
   app) opens a box: write what should change, attach an element picked with
   Inspect if it helps, and send. Or press Copy on the picked element and
   paste it into an agent of your own. ⇧⌘X (Ctrl-Shift-X elsewhere) goes
-  straight to picking, and a click opens the box with that element
-  attached; set `inspect_shortcut` in `settings.toml` to use another key,
+  straight to picking: click an element, choose its level in the card,
+  and Enter opens the box with it attached; set `inspect_shortcut` in `settings.toml` to use another key,
   or `""` for none. The window follows that file as it changes. A coding agent in the background changes
   that app's own files with every permission, checks them, then screenshots
   your window and looks at the result before it answers; the window reloads

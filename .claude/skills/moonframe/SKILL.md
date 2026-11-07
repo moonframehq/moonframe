@@ -263,17 +263,19 @@ row means adding a child to that row; on a text, add a sibling. If the file
 is missing, nothing is selected: ask, or pick a sensible place and say which.
 
 **A mod can ask for a pick.** A button with `command = "inspect"` starts
-picking for the mod that drew it, without the card. That mod hears it on the
+picking for the mod that drew it. The card opens on the pick, so the user can
+choose a level, with **Use this element** (or Enter) in place of Copy for
+agent. That mod hears it on the
 topic `app/inspect` (subscribe to it): `{ asker, picking = true }` as it
 starts (hide a dialog then), and `{ asker, picking = false, picked, element?,
-mod?, at?, report? }` when the user clicks an element (`picked = true`;
+mod?, at?, report? }` when the user uses the element (`picked = true`;
 `report` is the text above) or presses Escape. Only the mod that asked
 hears it; if another mod starts a pick meanwhile, the first hears
 `picked = false`. `mods/feedback` attaches the pick to a request this way, and the Copy button
 beside its chip puts `report` on the clipboard for the user's own agent. The app's
 quick inspect shortcut (`secondary-shift-x`; `inspect_shortcut` in
 `settings.toml` names another, `""` none, followed live) starts the same
-pick for `feedback` with the dialog closed, and a pick opens it.
+pick for `feedback` with the dialog closed, and using the pick opens it.
 `app/` topics are the app's: a mod can't publish them, nor send another mod
 a message passing for `app/` or `provider/` topic news.
 
