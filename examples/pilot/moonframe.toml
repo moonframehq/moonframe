@@ -1,0 +1,9 @@
+[app]
+# A desktop app for the pi coding agent: threads down the side, each a real
+# pi session in its checkout or a worktree of its own, the conversation in
+# the middle, and changes, files and a terminal in a workbench beside it.
+# `moonframe --profile pilot` opens it.
+keep     = ["feedback"]
+name     = "pilot"
+requires = []
+title    = "Pilot"

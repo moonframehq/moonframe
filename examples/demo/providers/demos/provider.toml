@@ -13,6 +13,6 @@ kind     = "native"
 openers = ["gallery"]
 # Where the apps are, from this app's folder (default: the folder holding
 # it), and their screenshots, <name>.png (default: docs/screenshots/apps
-# in the repository); an app without one shows its icon.
+# in the repository); an app without one shows a placeholder.
 # apps = ".."
 # pictures = "../../docs/screenshots/apps"

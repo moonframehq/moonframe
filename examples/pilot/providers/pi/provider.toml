@@ -1,0 +1,13 @@
+# The pi coding agent: its threads, each a `pi --mode rpc` process over the
+# session files pi keeps itself, so what happens here carries over to the pi
+# CLI. A process provider: it runs pi and git with your access, and reads
+# and writes pi's settings and credentials under ~/.pi/agent. Needs Node; it
+# looks for it in your login shell's PATH. See lib/engine.mjs for what it
+# publishes and README.md for the messages it takes.
+command    = ["bash", "run.sh"]
+kind       = "process"
+publish    = "latest"
+restart    = "on-failure"
+start      = "always"
+stop-grace = 2
+urgent     = ["abort"]
