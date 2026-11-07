@@ -776,7 +776,12 @@ fn a_terminal_changes_at_once_with_no_ghosts() {
 fn about_says_the_version_and_what_draws_it() {
     let about = moonframe_core::About::default();
     assert_eq!(dock::shown_version(&about), identity().version);
-    assert!(dock::built_on("Rune").ends_with(" · Rune"));
+    assert_eq!(dock::credits(&about, "Rune"), "Backend: Rune");
+    let described = moonframe_core::About {
+        description: Some("Notes".to_owned()),
+        ..about.clone()
+    };
+    assert_eq!(dock::credits(&described, "GPUI"), "Notes\n\nBackend: GPUI");
     let named = moonframe_core::About {
         version: Some("1.2.3".to_owned()),
         ..about

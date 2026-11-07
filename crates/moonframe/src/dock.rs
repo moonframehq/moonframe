@@ -184,10 +184,6 @@ pub(crate) fn about_panel(
     let Some(main) = MainThreadMarker::new() else {
         return false;
     };
-    let credits: Vec<&str> = [&about.description, &about.website]
-        .into_iter()
-        .filter_map(|text| text.as_deref())
-        .collect();
     let mut options: Vec<(&str, Retained<AnyObject>)> = vec![(
         "ApplicationName",
         Retained::into_super(Retained::into_super(NSString::from_str(name))),
@@ -199,19 +195,18 @@ pub(crate) fn about_panel(
         Retained::into_super(Retained::into_super(NSString::from_str(&version))),
     ));
     // In parentheses after the version: what the app runs on.
-    let built_on = built_on(renderer);
+    let built_on = built_on();
     options.push((
         "Version",
         Retained::into_super(Retained::into_super(NSString::from_str(&built_on))),
     ));
-    if !credits.is_empty() {
-        let text = NSString::from_str(&credits.join("\n\n"));
-        let credits = NSAttributedString::from_nsstring(&text);
-        options.push((
-            "Credits",
-            Retained::into_super(Retained::into_super(credits)),
-        ));
-    }
+    let text = NSString::from_str(&credits(about, renderer));
+    options.push((
+        "Credits",
+        Retained::into_super(Retained::into_super(NSAttributedString::from_nsstring(
+            &text,
+        ))),
+    ));
     if let Some(copyright) = &about.copyright {
         options.push((
             "Copyright",
@@ -262,9 +257,26 @@ pub(crate) fn shown_version(about: &moonframe_core::About) -> String {
         .unwrap_or_else(|| crate::identity().version.clone())
 }
 
-/// What the app runs on, and what draws it: `Moonframe 0.2.0 · Rune`.
-pub(crate) fn built_on(renderer: &str) -> String {
-    format!("Moonframe {} · {renderer}", env!("CARGO_PKG_VERSION"))
+/// What the app runs on: `Moonframe 0.2.0`.
+pub(crate) fn built_on() -> String {
+    format!("Moonframe {}", env!("CARGO_PKG_VERSION"))
+}
+
+/// The text under the name in an About panel: what the shell says of the
+/// app, and what draws this build.
+pub(crate) fn credits(about: &moonframe_core::About, renderer: &str) -> String {
+    let backend = backend_line(renderer);
+    [about.description.as_deref(), about.website.as_deref()]
+        .into_iter()
+        .flatten()
+        .chain([backend.as_str()])
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+/// What draws the app, as its About says: a build is one or the other.
+pub(crate) fn backend_line(renderer: &str) -> String {
+    format!("Backend: {renderer}")
 }
 
 /// Elsewhere the window system takes the icon from the app's desktop

@@ -96,7 +96,8 @@ impl MoonframeApp {
             return;
         }
         let version = crate::dock::shown_version(&about);
-        let mut text = format!("{name} {version} ({})", crate::dock::built_on("GPUI"));
+        let backend = crate::dock::backend_line("GPUI");
+        let mut text = format!("{name} {version} ({}), {backend}", crate::dock::built_on());
         if let Some(description) = &about.description {
             text = format!("{text}: {description}");
         }
