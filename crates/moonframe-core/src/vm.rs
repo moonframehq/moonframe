@@ -15,7 +15,7 @@ use {
 const PRELUDE: &str = include_str!("prelude.luau");
 
 /// Luau's interrupt checks per call: one per loop iteration and call, roughly.
-const INTERRUPTS: u64 = 10_000_000;
+pub(crate) const INTERRUPTS: u64 = 10_000_000;
 /// The memory a mod's state may use.
 pub(crate) const MEMORY: usize = 64 * 1024 * 1024;
 
@@ -49,6 +49,11 @@ pub(crate) struct Meter(Rc<Cell<u64>>);
 impl Meter {
     pub(crate) fn reset(&self) {
         self.0.set(0);
+    }
+
+    /// The checks used since the last [`reset`](Self::reset).
+    pub(crate) fn used(&self) -> u64 {
+        self.0.get()
     }
 }
 

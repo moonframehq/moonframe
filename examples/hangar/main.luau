@@ -62,7 +62,7 @@ return mod {
 					id = "right",
 					divider = false,
 					ui.pane { ui.region "right" },
-					ui.pane { size = 340, min = 160, fixed = true, ui.mount { "history", id = "graph", props = { compact = true } } },
+					ui.pane { size = 340, min = 160, fixed = true, ui.mount { "history", id = "graph", props = { always = true, compact = true } } },
 				},
 			},
 		}

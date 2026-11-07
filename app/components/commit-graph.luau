@@ -29,8 +29,7 @@ local DOT = 2.5
 local MAX_LANES = 8
 -- Refs shown on a row, so its subject keeps the room.
 local MAX_REFS = 2
--- What one `ui.paths` takes: a longer history draws as several, one over the
--- other.
+-- The most lines the host takes in one `ui.paths`.
 local MAX_PATHS = 500
 local COLORS = { "#6366f1", "#14b8a6", "#f59e0b", "#ec4899", "#3b82f6", "#22c55e", "#ef4444", "#8b5cf6" }
 
@@ -147,19 +146,23 @@ local function shown_refs(refs: { string }): { string }
 	return shown
 end
 
--- `lines` drawn over one area, in as many `ui.paths` as they need.
-local function drawing_of(lines: { any }, width: number, height: number)
-	local layers: { any } = {}
+-- The lines as layers over one another, each as many as a `ui.paths` takes:
+-- a commit draws a dot and a line or more, so 250 commits fill one.
+local function layers_of(lines: { any }, width: number, height: number): { any }
+	local layers = {}
 	for first = 1, #lines, MAX_PATHS do
 		local last = math.min(first + MAX_PATHS - 1, #lines)
-		table.insert(layers, ui.row {
-			float = { top = 0, left = 0 },
-			width = width,
-			height = height,
-			ui.paths { paths = { table.unpack(lines, first, last) }, width = width, height = height },
-		})
+		table.insert(
+			layers,
+			ui.row {
+				float = { top = 0, left = 0 },
+				width = width,
+				height = height,
+				ui.paths { paths = table.move(lines, first, last, 1, {}), width = width, height = height },
+			}
+		)
 	end
-	return ui.row { width = width, height = height, table.unpack(layers) }
+	return layers
 end
 
 local function row_of(commit: Commit, props: Props, row_height: number)
@@ -245,11 +248,12 @@ return component {
 			table.insert(lines, dot_of(spot.lane, (row - 0.5) * row_height))
 			table.insert(rows, row_of(commit, props, row_height))
 		end
+		local width, height = widest * LANE, #commits * row_height
 		return ui.row {
 			align = "start",
 			gap = "none",
 			grow = true,
-			drawing_of(lines, widest * LANE, #commits * row_height),
+			ui.column { gap = "none", width = width, height = height, table.unpack(layers_of(lines, width, height)) },
 			ui.column { gap = "none", grow = true, table.unpack(rows) },
 		}
 	end,
