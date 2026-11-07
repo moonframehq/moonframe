@@ -22,7 +22,7 @@ type State = {
 	workspace: string?,
 	mode: string,
 	prefill_seq: number,
-	returned_seq: number?,
+	returned_id: string?,
 	compose_seq: number,
 }
 
@@ -308,8 +308,8 @@ return mod {
 			end
 			-- A failed send's words, beside anything typed since.
 			local back = thread.returned
-			if back and back.seq ~= state.returned_seq then
-				state.returned_seq = back.seq
+			if back and back.id ~= state.returned_id then
+				state.returned_id = back.id
 				state.text = if state.text == "" then back.text else `{state.text}\n\n{back.text}`
 			end
 		elseif msg.msg == "type" then

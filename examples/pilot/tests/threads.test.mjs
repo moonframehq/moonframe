@@ -57,15 +57,21 @@ test("a failed send's words wait for their own thread, and come back once", asyn
 	assert.equal(app.value.returned, null, "not offered to the open thread");
 
 	app.send({ select: failing });
-	const { seq } = await app.until((v) => v.selected === failing && v.returned?.text === "keep these words" && v.returned, "back on its thread");
-	app.send({ returned_taken: { thread: failing, seq: seq - 1 } });
+	const { id } = await app.until((v) => v.selected === failing && v.returned?.text === "keep these words" && v.returned, "back on its thread");
+	app.send({ returned_taken: { thread: failing, id: "an older one" } });
 	app.send({ select: other });
 	await app.until((v) => v.selected === other, "away again");
 	app.send({ select: failing });
-	await app.until((v) => v.selected === failing && v.returned?.seq === seq, "an old answer takes nothing");
+	await app.until((v) => v.selected === failing && v.returned?.id === id, "an old answer takes nothing");
 
-	app.send({ returned_taken: { thread: failing, seq } });
+	app.send({ returned_taken: { thread: failing, id } });
 	await app.until((v) => v.returned === null, "taken once");
+
+	// The mods keep the last id across launches, and a provider starts over.
+	app.send({ prompt: "keep these words", images: [join(app.project, "package.json")] });
+	const again = await app.until((v) => v.returned, "failed again");
+	assert.equal(again.text, "keep these words");
+	assert.notEqual(again.id, id, "same words, a new id");
 });
 
 test("a worktree outlives its first thread while a fork uses it", async () => {

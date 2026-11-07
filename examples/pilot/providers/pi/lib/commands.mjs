@@ -56,7 +56,8 @@ async function submit(engine, id, { text, paths, behavior }) {
 	} catch (error) {
 		// The composer emptied itself on sending: the words go back to this
 		// thread's, whichever is open by the time a slow failure comes.
-		if (text) engine.returned.set(id, { text, seq: ++engine.seq });
+		// Mods remember the last id across launches, so a count won't do.
+		if (text) engine.returned.set(id, { text, id: randomUUID() });
 		throw error;
 	}
 }
@@ -160,8 +161,8 @@ const HANDLERS = {
 		await submit(engine, id, { text: msg.prompt, paths: msg.images, behavior: msg.behavior });
 	},
 	returned_taken: (engine, msg) => {
-		const { thread, seq } = msg.returned_taken;
-		if (engine.returned.get(thread)?.seq === seq) engine.returned.delete(thread);
+		const { thread, id } = msg.returned_taken;
+		if (engine.returned.get(thread)?.id === id) engine.returned.delete(thread);
 	},
 	abort: async (engine, msg) => {
 		const live = engine.live.get(msg.thread ?? engine.data.selected);
