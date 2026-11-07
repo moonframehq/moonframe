@@ -554,8 +554,10 @@ fn poll(ui: &mut Ui, _: f64, tx: &mut Tx) -> bool {
     }
     changed |= ui.take_events();
     changed |= ui.terminal_changed();
-    ui.tell_exits();
+    // What a shell said before it ended reaches its tab before the tab
+    // closes for the exit, as on GPUI.
     changed |= ui.tell_shell_events();
+    ui.tell_exits();
     ui.settle_pick(tx);
     ui.tell_blurs();
     changed |= ui.refill_lists();
