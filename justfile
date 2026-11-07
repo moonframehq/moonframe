@@ -240,11 +240,10 @@ rune-app name="" *args:
     fi
     exec "$bin" --user "$user" --profile "$name" {{args}}
 
-# Lint the Rune build, prove it links no GPUI, and load every built-in module.
+# Lint and test the Rune build, prove it links no GPUI, and load every built-in
+# module and example app on it.
 rune-check:
-    cargo clippy --locked -p moonframe-app --no-default-features --features rune --all-targets -- -D warnings
-    test "$(cargo tree --locked -p moonframe-app --no-default-features --features rune -e normal --prefix none | awk '{print $1}' | grep -c '^gpui')" = 0
-    cargo run --locked -p moonframe-app --no-default-features --features rune -- --check --no-user
+    scripts/check-rune.sh
 
 # Capture one component's preview page to a PNG from a background instance
 # that never takes focus and is stopped afterwards (macOS).
@@ -315,4 +314,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check check-file-size check-sorted lint test test-sealed-bundles types providers providers-examples check-builtin components-check check-examples patterns-check
+ci: format-check check-file-size check-sorted lint test rune-check test-sealed-bundles types providers providers-examples check-builtin components-check check-examples patterns-check
