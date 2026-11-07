@@ -47,7 +47,9 @@ function threadRows(engine) {
 	for (const meta of Object.values(engine.data.threads)) {
 		const info = engine.summaries.get(meta.id);
 		const status = threadStatus(engine, meta);
-		if (!info && status === "idle" && meta.id !== engine.data.selected) continue;
+		// A thread with only `!` output has no file yet, so no summary.
+		const empty = !info && !engine.entries.get(meta.id)?.length;
+		if (empty && status === "idle" && meta.id !== engine.data.selected) continue;
 		rows.push({
 			id: meta.id,
 			title: engine.titleOf(meta.id),
@@ -150,6 +152,16 @@ function countValues(value) {
 
 const fits = (line, snapshot) => Buffer.byteLength(line) <= MAX_BYTES && countValues(snapshot) <= MAX_VALUES;
 
+// The last resort when nothing above was enough: every list and text cut
+// down, every key kept, since views read them. Tighter until it fits.
+function trimmed(value, limit, depth = 0) {
+	if (typeof value === "string") return value.length > limit * 100 ? `${value.slice(0, limit * 100)}…` : value;
+	if (typeof value !== "object" || value === null) return value;
+	if (depth > 12) return null;
+	if (Array.isArray(value)) return value.slice(0, limit).map((item) => trimmed(item, limit, depth + 1));
+	return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, trimmed(item, limit, depth + 1)]));
+}
+
 function shortened(item) {
 	const cut = {};
 	for (const [key, value] of Object.entries(item)) {
@@ -163,21 +175,26 @@ function shortened(item) {
 export function encode(snapshot) {
 	let line = JSON.stringify(snapshot);
 	const thread = snapshot.thread;
-	if (!thread) return line;
-	while (!fits(line, snapshot) && thread.items.length > 1) {
+	while (thread && !fits(line, snapshot) && thread.items.length > 1) {
 		const dropped = Math.ceil(thread.items.length / 4);
 		thread.items = thread.items.slice(dropped);
 		thread.earlier += dropped;
 		line = JSON.stringify(snapshot);
 	}
-	if (!fits(line, snapshot)) {
+	if (thread && !fits(line, snapshot)) {
 		thread.items = thread.items.map(shortened);
 		line = JSON.stringify(snapshot);
 	}
-	if (!fits(line, snapshot)) {
+	if (thread && !fits(line, snapshot)) {
 		thread.earlier += thread.items.length;
 		thread.items = [];
 		line = JSON.stringify(snapshot);
+	}
+	let view = snapshot;
+	for (const limit of [50, 10, 2]) {
+		if (fits(line, view)) break;
+		view = trimmed(view, limit);
+		line = JSON.stringify(view);
 	}
 	return line;
 }

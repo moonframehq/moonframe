@@ -447,7 +447,10 @@ return mod {
 			if file then
 				state.editing = true
 				state.edit = { path = file.path, version = file.version }
-				state.text = file.text or ""
+				-- After a conflict, the words the save didn't write.
+				if not file.conflict then
+					state.text = file.text or ""
+				end
 			end
 		elseif msg == "cancel-edit" then
 			state.editing = false

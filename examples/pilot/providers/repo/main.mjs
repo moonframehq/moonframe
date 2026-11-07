@@ -63,6 +63,16 @@ const SHEDS = [
 	(view) => ({ ...view, files: view.files.slice(0, 100), more_files: (view.more_files ?? 0) + Math.max(0, view.files.length - 100) }),
 ];
 
+// The last resort when nothing above was enough: every list and text cut
+// down, every key kept, since views read them. Tighter until it fits.
+function trimmed(value, limit, depth = 0) {
+	if (typeof value === "string") return value.length > limit * 100 ? `${value.slice(0, limit * 100)}…` : value;
+	if (typeof value !== "object" || value === null) return value;
+	if (depth > 12) return null;
+	if (Array.isArray(value)) return value.slice(0, limit).map((item) => trimmed(item, limit, depth + 1));
+	return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, trimmed(item, limit, depth + 1)]));
+}
+
 function encoded() {
 	let view = { available: true, ...state };
 	let line = JSON.stringify(view);
@@ -72,6 +82,11 @@ function encoded() {
 		// One long file is a few values: it only goes for its bytes.
 		if (index === 0 && !bytes) continue;
 		view = shed(view);
+		line = JSON.stringify(view);
+	}
+	for (const limit of [50, 10, 2]) {
+		if (!tooLarge(line) && countValues(view) <= MAX_VALUES) break;
+		view = trimmed(view, limit);
 		line = JSON.stringify(view);
 	}
 	return line;
@@ -249,6 +264,8 @@ function readTree() {
 }
 
 let refreshing = false;
+// A refresh clears its own failures, not those of what the user just did.
+let refreshFailed = false;
 async function refresh() {
 	if (!state.at || refreshing) return;
 	refreshing = true;
@@ -273,9 +290,11 @@ async function refresh() {
 		} else {
 			Object.assign(state, { files: [], diff: null, branch: null, head: null, worktrees: [] });
 		}
-		state.error = null;
+		if (refreshFailed) state.error = null;
+		refreshFailed = false;
 	} catch (error) {
 		state.error = error.message;
+		refreshFailed = true;
 	} finally {
 		refreshing = false;
 	}
@@ -315,7 +334,8 @@ function saveFile({ write: path, text, version }) {
 	const full = inside(path);
 	const current = readFileSync(full, "utf8");
 	if (version && versionOf(current) !== version) {
-		state.file = { ...state.file, conflict: true };
+		// What's on disk now, so a second save knowingly replaces it.
+		state.file = { path, text: current, version: versionOf(current), conflict: true };
 		return;
 	}
 	writeFileSync(full, text);
@@ -437,7 +457,13 @@ async function handle(msg) {
 		return run(
 			"commit",
 			async () => {
-				if (!state.files.some((file) => file.staged)) await git(["add", "-A", "--", "."]);
+				// A commit takes everything staged, and this list only shows
+				// the project: what's staged beyond it must not go in unseen.
+				const prefix = (await git(["rev-parse", "--show-prefix"])).trim();
+				const staged = (await git(["diff", "--cached", "--name-only", "-z"])).split("\0").filter(Boolean);
+				const outside = staged.filter((path) => !path.startsWith(prefix));
+				if (outside.length > 0) throw new Error(`Staged outside this project: ${outside.slice(0, 3).join(", ")}. Unstage it first.`);
+				if (staged.length === 0) await git(["add", "-A", "--", "."]);
 				await git(["commit", "-q", "-F", "-"], { input: msg.commit });
 			},
 			"Committed",

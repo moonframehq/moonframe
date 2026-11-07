@@ -47,10 +47,17 @@ async function builtin(engine, id, text) {
 }
 
 // What the composer's text means: a shell line, a command, or a prompt.
-async function submit(engine, id, { text, images, behavior }) {
-	if (text.startsWith("!")) return shell(engine, id, text);
-	if (text.startsWith("/") && (await builtin(engine, id, text))) return;
-	await engine.prompt(id, { text, images, behavior });
+async function submit(engine, id, { text, paths, behavior }) {
+	try {
+		const attached = images(paths);
+		if (text.startsWith("!")) return await shell(engine, id, text);
+		if (text.startsWith("/") && (await builtin(engine, id, text))) return;
+		await engine.prompt(id, { text, images: attached, behavior });
+	} catch (error) {
+		// The composer emptied itself on sending: give the words back.
+		engine.prefill = { text, seq: Date.now() };
+		throw error;
+	}
 }
 
 async function shell(engine, id, text) {
@@ -143,11 +150,12 @@ const HANDLERS = {
 	new_thread: async (engine, msg) => {
 		const options = msg.new_thread;
 		const model = options.model ?? engine.data.prefs.last_model;
-		await engine.createThread({ ...options, model, images: images(options.images), deliver: (id, fields) => submit(engine, id, fields) });
+		const paths = asList(options.images);
+		await engine.createThread({ ...options, model, images: paths, deliver: (id, { text }) => submit(engine, id, { text, paths }) });
 	},
 	prompt: async (engine, msg) => {
 		const id = msg.thread ?? engine.data.selected;
-		await submit(engine, id, { text: msg.prompt, images: images(msg.images), behavior: msg.behavior });
+		await submit(engine, id, { text: msg.prompt, paths: msg.images, behavior: msg.behavior });
 	},
 	abort: async (engine, msg) => {
 		const live = engine.live.get(msg.thread ?? engine.data.selected);

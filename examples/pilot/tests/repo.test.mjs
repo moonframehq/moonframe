@@ -140,6 +140,39 @@ test("a project below the repository's top uses paths from its own folder", asyn
 	await until((v) => v.files.some((file) => file.path === "outside.txt"), "the rest is still uncommitted");
 });
 
+test("a commit refuses what's staged beyond the project", async () => {
+	execFileSync("git", ["add", "outside.txt"], { cwd: project });
+	writeFileSync(join(project, "src/price.js"), "// changed again\n");
+	send({ at: join(project, "src") });
+	await until((v) => v.at.endsWith("src") && v.files.length > 0, "subfolder");
+	const before = execFileSync("git", ["rev-parse", "HEAD"], { cwd: project, encoding: "utf8" });
+	send({ commit: "Should not happen" });
+	await until((v) => /Staged outside this project: outside.txt/.test(v.error ?? ""), "refused");
+	assert.equal(execFileSync("git", ["rev-parse", "HEAD"], { cwd: project, encoding: "utf8" }), before);
+	send({ refresh: true });
+	await new Promise((done) => setTimeout(done, 300));
+	assert.match(value.error ?? "", /Staged outside/, "a refresh leaves it on screen");
+	execFileSync("git", ["reset", "-q", "HEAD", "--", "outside.txt"], { cwd: project });
+	send({ at: project });
+	await until((v) => v.at === project && v.files.length > 0, "back");
+});
+
+test("a conflicting save shows what's on disk, and can replace it", async () => {
+	writeFileSync(join(project, "shared.txt"), "first\n");
+	send({ read: "shared.txt" });
+	const { version } = await until((v) => v.file?.path === "shared.txt" && v.file, "opened");
+	writeFileSync(join(project, "shared.txt"), "someone else\n");
+	send({ write: "shared.txt", text: "mine\n", version });
+	const conflict = await until((v) => v.file?.conflict && v.file, "conflict");
+	assert.equal(conflict.text, "someone else\n");
+	assert.equal(readFileSync(join(project, "shared.txt"), "utf8"), "someone else\n");
+	send({ write: "shared.txt", text: "mine\n", version: conflict.version });
+	await until((v) => v.file?.saved, "saved");
+	assert.equal(readFileSync(join(project, "shared.txt"), "utf8"), "mine\n");
+	send({ close: true });
+	await until((v) => !v.file, "closed");
+});
+
 test("a search can be of another folder than the open one", async () => {
 	const other = mkdtempSync(join(tmpdir(), "pilot-other-"));
 	mkdirSync(join(other, "docs"));

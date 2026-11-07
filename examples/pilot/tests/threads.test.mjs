@@ -34,6 +34,23 @@ test("a new thread's !command runs in the shell, not as a prompt", async () => {
 	assert.equal(app.value.thread.items.filter((i) => i.k === "bash").length, 1, "the file takes over, without a copy");
 });
 
+test("a thread with only shell output stays listed after leaving it", async () => {
+	const first = app.value.selected;
+	app.send({ new_thread: { workspace: app.project, mode: "local", prompt: "!echo only a shell", images: {} } });
+	const shellOnly = await app.until((v) => v.selected !== first && v.thread?.items.some((i) => i.k === "bash") && v.selected, "ran");
+	app.send({ select: first });
+	await app.until((v) => v.selected === first, "left");
+	assert.ok(app.value.threads.some((row) => row.id === shellOnly), "still in the list");
+	app.send({ select: shellOnly });
+	await app.until((v) => v.selected === shellOnly && v.thread?.items.some((i) => i.k === "bash"), "and it comes back");
+});
+
+test("a send that fails puts the words back in the composer", async () => {
+	app.send({ prompt: "keep these words", images: [join(app.project, "package.json")] });
+	await app.until((v) => v.prefill?.text === "keep these words", "given back");
+	assert.equal(app.value.thread.items.some((i) => i.text === "keep these words"), false);
+});
+
 test("a worktree outlives its first thread while a fork uses it", async () => {
 	app.send({ new_thread: { workspace: app.project, mode: "worktree", prompt: "hello there", images: {} } });
 	const original = await app.until((v) => v.thread?.worktree && v.thread.status === "idle" && v.thread.items.some((i) => i.entry) && v.thread, "worktree thread");
@@ -80,4 +97,12 @@ test("what is published always fits the host", () => {
 
 	const wide = encode({ thread: { earlier: 0, items: Array.from({ length: 4000 }, (_, id) => ({ k: "note", id, text: "x" })) } });
 	assert.ok(hostTakes(wide), "many small items too");
+
+	const skills = Array.from({ length: 30_000 }, (_, id) => ({ id, name: `skill ${id}`, description: "d".repeat(200) }));
+	const crowded = JSON.parse(encode({ now: 1, skills, thread: null, workspaces: [], prefs: { group: "time" } }));
+	assert.ok(hostTakes(JSON.stringify(crowded)), "with no thread open too");
+	assert.deepEqual(Object.keys(crowded).sort(), ["now", "prefs", "skills", "thread", "workspaces"], "every key stays");
+
+	const dialog = encode({ thread: { earlier: 0, items: [], dialog: { prefill: "x".repeat(3_000_000) }, widgets: [] } });
+	assert.ok(hostTakes(dialog), "whatever part of the thread is long");
 });
