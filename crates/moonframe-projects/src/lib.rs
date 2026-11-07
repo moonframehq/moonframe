@@ -47,7 +47,9 @@
 //!
 //! The project folders are `MOONFRAME_PROJECTS` (colon-separated), else those
 //! of `~/code ~/dev ~/src ~/Projects ~/projects ~/work ~/.herdr/worktrees`
-//! that exist. Each is searched two levels deep.
+//! that exist. Each is searched two levels deep. Only what that finds, and
+//! the work trees of it, can be opened or get a work tree: a mod cannot point
+//! the provider at another folder to read it.
 
 mod git;
 mod jobs;
@@ -64,6 +66,7 @@ use {
     scan::{Found, Summaries},
     serde_json::{Map, Value, json},
     std::{
+        collections::BTreeSet,
         env,
         path::{Path, PathBuf},
         time::{Duration, Instant},
@@ -222,6 +225,8 @@ struct Projects {
     /// A composer's folder, independent of the inspector's open ones.
     completion: Option<String>,
     projects: Vec<Value>,
+    /// Every repository and work tree found, listed or not.
+    known: BTreeSet<String>,
     last_scan: u64,
     last: Option<String>,
     action: Option<Value>,
@@ -242,6 +247,7 @@ impl Projects {
             state,
             completion: None,
             projects: Vec::new(),
+            known: BTreeSet::new(),
             last_scan: 0,
             last: None,
             action: None,
@@ -339,7 +345,7 @@ impl Projects {
         }
         if let Some(path) = text_of(msg.get("select")) {
             let path = expand(&path, &self.config.home);
-            if self.state.select.as_ref() != Some(&path) {
+            if self.state.select.as_ref() != Some(&path) && self.knows(&path) {
                 self.state.select = Some(path);
                 self.completion = None;
                 self.state.open.clear();
@@ -391,7 +397,7 @@ impl Projects {
         if let Some(name) = text_of(msg.get("worktree")) {
             let repo = text_of(msg.get("repo")).unwrap_or_default();
             let repo = expand(&repo, &self.config.home);
-            if branch_name(&name) && Path::new(&repo).join(".git").exists() {
+            if branch_name(&name) && self.knows(&repo) && Path::new(&repo).join(".git").exists() {
                 let home = self.config.home.clone();
                 self.write(from, "worktree", id, move || {
                     jobs::add_worktree(&repo, &name, &home)
@@ -402,6 +408,15 @@ impl Projects {
             }
         }
         self.state.keep(&self.config.kept);
+    }
+
+    /// Whether `path` is a repository or work tree found, looking again if
+    /// not: it may be a work tree added a moment ago.
+    fn knows(&mut self, path: &str) -> bool {
+        if !self.known.contains(path) {
+            self.scan(scan::now());
+        }
+        self.known.contains(path)
     }
 
     fn ask_forge(&mut self, dir: &str, now: u64) {
@@ -421,10 +436,22 @@ impl Projects {
         self.rescan = false;
         let found = scan::find_projects(&self.config.roots);
         let mut projects = self.summaries.of(&found, &self.config.home);
+        self.known = projects
+            .iter()
+            .flat_map(|project| {
+                let trees = project["worktrees"].as_array().into_iter().flatten();
+                std::iter::once(&project["path"]).chain(trees.map(|tree| &tree["path"]))
+            })
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect();
         projects.sort_by_key(|project| std::cmp::Reverse(project["time"].as_u64().unwrap_or(0)));
         projects.truncate(MAX_PROJECTS);
         self.projects = projects;
         self.last_scan = now;
+        // What was kept may be gone, or may never have been one of these.
+        let known = &self.known;
+        self.state.select = self.state.select.take().filter(|path| known.contains(path));
         // Until an app picks one, the most recently active project is open.
         if self.state.select.is_none() {
             let first = self

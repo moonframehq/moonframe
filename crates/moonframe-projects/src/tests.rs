@@ -164,8 +164,77 @@ fn completion_and_inspector_listings_are_independent() {
         &json!({ "complete": "other", "cwd": format!("{root}/different") }),
     );
     assert_eq!(projects.completion.as_deref(), Some("src"));
-    projects.receive("any", &json!({ "select": format!("{root}/another") }));
+    let other = fixture.repo.parent().unwrap().join("other");
+    fs::create_dir(&other).unwrap();
+    sh(&other, &["init", "-q"]);
+    projects.receive("any", &json!({ "select": other.to_string_lossy() }));
     assert!(projects.completion.is_none());
+}
+
+/// A repository outside the project folders.
+fn outside(fixture: &Fixture) -> String {
+    let elsewhere = fixture
+        .temp
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join("elsewhere");
+    fs::create_dir(&elsewhere).unwrap();
+    sh(&elsewhere, &["init", "-q"]);
+    fs::write(elsewhere.join("secret.txt"), "private").unwrap();
+    elsewhere.to_string_lossy().into_owned()
+}
+
+#[test]
+fn a_mod_cannot_open_a_repository_outside_the_project_folders() {
+    let fixture = Fixture::new();
+    let elsewhere = outside(&fixture);
+    let mut projects = fixture.projects();
+    published(&mut projects);
+    projects.receive("any", &json!({ "select": elsewhere, "read": "secret.txt" }));
+    let out = published(&mut projects);
+    assert_eq!(out["current"]["path"], fixture.path());
+    assert_eq!(out["file"]["missing"], true);
+}
+
+#[test]
+fn a_kept_repository_outside_the_project_folders_is_not_reopened() {
+    let fixture = Fixture::new();
+    let elsewhere = outside(&fixture);
+    let mut projects = fixture.projects();
+    projects.state.select = Some(elsewhere);
+    assert_eq!(published(&mut projects)["current"]["path"], fixture.path());
+}
+
+#[test]
+fn a_work_tree_goes_only_on_a_repository_found() {
+    let fixture = Fixture::new();
+    let elsewhere = outside(&fixture);
+    let mut projects = fixture.projects();
+    published(&mut projects);
+    projects.receive("writer", &json!({ "worktree": "feat", "repo": elsewhere }));
+    assert_eq!(published(&mut projects)["action"]["ok"], false);
+}
+
+#[test]
+fn a_work_tree_just_added_can_be_opened() {
+    let fixture = Fixture::new();
+    let mut projects = fixture.projects();
+    published(&mut projects);
+    let tree = fixture.temp.path().canonicalize().unwrap().join("tree");
+    sh(&fixture.repo, &[
+        "worktree",
+        "add",
+        "-q",
+        "-b",
+        "side",
+        tree.to_str().unwrap(),
+    ]);
+    projects.receive("any", &json!({ "select": tree.to_string_lossy() }));
+    assert_eq!(
+        published(&mut projects)["current"]["path"],
+        tree.to_str().unwrap()
+    );
 }
 
 #[test]
