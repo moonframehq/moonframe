@@ -403,7 +403,6 @@ fn only_writers_may_change_worktrees() {
     std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
 }
 
-||||||| 55bfc5fc
 /// A mod asking for the log each frame costs no more than the refs' own
 /// pace: past those reads, only a new request reads it.
 #[test]
