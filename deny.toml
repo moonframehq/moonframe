@@ -63,7 +63,12 @@ allow-wildcard-paths = true
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 # herdr-gpui's crates (terminals in herdr-core, the git provider), and
 # libghostty-rs until a release pins a Ghostty that builds with Zig 0.17;
-# each pinned to a commit in Cargo.toml.
-allow-git        = ["https://github.com/penso/herdr-gpui", "https://github.com/uzaaft/libghostty-rs"]
-unknown-git      = "deny"
+# and Rune, which ships only as revisions of its `dev` branch; each pinned to a
+# commit in Cargo.toml.
+allow-git = [
+  "https://github.com/anomalyco/rune",
+  "https://github.com/penso/herdr-gpui",
+  "https://github.com/uzaaft/libghostty-rs",
+]
+unknown-git = "deny"
 unknown-registry = "deny"

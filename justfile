@@ -199,6 +199,52 @@ types dir="app":
 screenshot out="target/screenshot.png" pid="":
     scripts/screenshot.sh {{out}} {{pid}}
 
+# The starter drawn with Rune instead of GPUI, from the same Luau.
+rune *args:
+    cargo run --release -p moonframe-app --no-default-features --features rune -- {{args}}
+
+# Every component's live demo on Rune, in a window of its own.
+rune-gallery:
+    MOONFRAME_RUNE_GALLERY=1 cargo run --release -p moonframe-app --no-default-features --features rune
+
+# List the example apps, or open one on Rune as a window of its own (`just
+# rune-app cadence`), each a profile in the user folder the gallery uses.
+# Anything after the name goes to the app (`just rune-app cadence --check`).
+# MOONFRAME_USER names another folder.
+rune-app name="" *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    list() {
+        for manifest in examples/*/moonframe.toml; do
+            title=$(sed -n 's/^title *= *"\(.*\)".*/\1/p' "$manifest" | head -1)
+            printf '  %-14s %s\n' "$(basename "$(dirname "$manifest")")" "$title"
+        done
+    }
+    name="{{name}}"
+    if [ -z "$name" ]; then
+        echo "Open one with: just rune-app NAME"
+        list
+        exit
+    fi
+    if [ ! -f "examples/$name/moonframe.toml" ]; then
+        echo "No example app is called $name. These are:" >&2
+        list >&2
+        exit 1
+    fi
+    user="${MOONFRAME_USER:-$HOME/.local/share/moonframe/demo}"
+    cargo build --quiet --release -p moonframe-app --no-default-features --features rune
+    bin="${CARGO_TARGET_DIR:-target}/release/moonframe"
+    if ! grep -qs "url = \"$PWD/examples/$name\"" "$user/profiles/$name/packages.toml"; then
+        "$bin" --user "$user" app remove "$name" --force >/dev/null 2>&1 || true
+        "$bin" --user "$user" app link "examples/$name" --yes >/dev/null
+    fi
+    exec "$bin" --user "$user" --profile "$name" {{args}}
+
+# Lint and test the Rune build, prove it links no GPUI, and load every built-in
+# module and example app on it.
+rune-check:
+    scripts/check-rune.sh
+
 # Capture one component's preview page to a PNG from a background instance
 # that never takes focus and is stopped afterwards (macOS).
 component-shot name out="" dir="app":
@@ -268,4 +314,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check check-file-size check-sorted lint test test-sealed-bundles types providers providers-examples check-builtin components-check check-examples patterns-check
+ci: format-check check-file-size check-sorted lint test rune-check test-sealed-bundles types providers providers-examples check-builtin components-check check-examples patterns-check

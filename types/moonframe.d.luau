@@ -290,6 +290,9 @@ type StackProps = {
 	align: Align?,
 	justify: Justify?,
 	wrap: boolean?,
+	-- As a mod's whole view in a row region, each child is a member of it:
+	-- it fits or leaves the row by itself.
+	spread: boolean?,
 	-- Matches `:selected` rules, as on an item: tabs, segments, tiles.
 	selected: boolean?,
 	-- Extras: shown under the pointer; sent on a right-click; copied on a click.

@@ -236,6 +236,10 @@ jobs:
           cargo clippy --locked -p moonframe-mux --no-default-features --features herdr-core --all-targets -- -D warnings
       - name: Load every built-in module headlessly
         run: cargo run --locked -p moonframe-app -- --check --no-user app
+      # The Rune build is its own selection: linking no GPUI is what it is for,
+      # so its tests and every example run here too, without GPUI's features.
+      - name: Test the Rune build
+        run: scripts/check-rune.sh
       - name: Load every example app headlessly
         run: |
           cargo build --locked -p moonframe-app -p moonframe-host-example
