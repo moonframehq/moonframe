@@ -2,7 +2,7 @@
 import { StringDecoder } from "node:string_decoder";
 import { handle } from "./lib/commands.mjs";
 import { Engine } from "./lib/engine.mjs";
-import { snapshotOf } from "./lib/publish.mjs";
+import { encode, snapshotOf } from "./lib/publish.mjs";
 
 // About eleven a second: each publish redraws the conversation.
 const FRAME = 90;
@@ -12,7 +12,7 @@ let last = "";
 
 function publish() {
 	timer = null;
-	const line = JSON.stringify(snapshotOf(engine));
+	const line = encode(snapshotOf(engine));
 	if (line === last) return;
 	last = line;
 	process.stdout.write(`${line}\n`);

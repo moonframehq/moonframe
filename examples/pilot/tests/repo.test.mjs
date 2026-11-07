@@ -1,7 +1,7 @@
 // The repo provider against a real repository.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
@@ -93,4 +93,58 @@ test("finding a file by a few letters", async () => {
 test("a commit takes everything when nothing is staged", async () => {
 	send({ commit: "Tidy up" });
 	await until((v) => v.message === "Committed" && v.files.length === 0, "committed");
+});
+
+const MIB = 1024 * 1024;
+const countValues = (item) => (typeof item === "object" && item !== null ? Object.values(item).reduce((total, inner) => total + countValues(inner), 1) : 1);
+const hostTakes = (view) => Buffer.byteLength(JSON.stringify(view)) <= MIB && countValues(view) <= 10_000;
+
+test("a file that JSON makes too long is refused, not published", async () => {
+	writeFileSync(join(project, "quotes.txt"), '"\n'.repeat(400_000));
+	send({ read: "quotes.txt" });
+	await until((v) => v.file?.path === "quotes.txt", "opened");
+	assert.equal(value.file.tooLarge, true);
+	assert.ok(hostTakes(value));
+	send({ close: true });
+	await until((v) => !v.file, "closed");
+});
+
+test("many changes and a long diff stay under the host's value limit", async () => {
+	for (let index = 0; index < 400; index++) writeFileSync(join(project, `many-${index}.txt`), "x\n");
+	writeFileSync(join(project, "long.txt"), "line\n".repeat(3000));
+	send({ refresh: true });
+	await until((v) => v.more_files > 0, "listed");
+	send({ pick: "long.txt" });
+	await until((v) => v.diff?.path === "long.txt", "diff");
+	assert.ok(hostTakes(value), `${countValues(value)} values`);
+	send({ stage_all: true });
+	await until((v) => v.files.every((file) => file.staged), "staged");
+	send({ commit: "Lots of files" });
+	await until((v) => v.message === "Committed" && v.files.length === 0, "committed");
+});
+
+test("a project below the repository's top uses paths from its own folder", async () => {
+	writeFileSync(join(project, "src/price.js"), "// changed\n");
+	writeFileSync(join(project, "outside.txt"), "not in this project\n");
+	send({ at: join(project, "src") });
+	await until((v) => v.at.endsWith("src") && v.files.length > 0, "subfolder");
+	assert.deepEqual(value.files.map((file) => file.path), ["price.js"]);
+	assert.ok(value.diff?.hunks.length > 0, "its diff is found");
+	send({ stage: "price.js" });
+	await until((v) => v.files[0]?.staged, "staged");
+	send({ commit: "Only the subfolder" });
+	await until((v) => v.message === "Committed" && v.files.length === 0, "committed");
+	const committed = execFileSync("git", ["show", "--name-only", "--format=", "HEAD"], { cwd: project, encoding: "utf8" });
+	assert.equal(committed.trim(), "src/price.js");
+	send({ at: project });
+	await until((v) => v.files.some((file) => file.path === "outside.txt"), "the rest is still uncommitted");
+});
+
+test("a search can be of another folder than the open one", async () => {
+	const other = mkdtempSync(join(tmpdir(), "pilot-other-"));
+	mkdirSync(join(other, "docs"));
+	writeFileSync(join(other, "docs/only-here.md"), "hello");
+	send({ find: "onlyhere", root: other });
+	await until((v) => v.found.query === "onlyhere", "found");
+	assert.deepEqual(value.found.results, ["docs/only-here.md"]);
 });

@@ -13,7 +13,7 @@ import { CHATS_DIR } from "./paths.mjs";
 import { PiProcess } from "./rpc.mjs";
 import { configStamp } from "./resources.mjs";
 import { adoptLoginEnvironment, findPi, installPi } from "./runtime.mjs";
-import { nextRun } from "./schedule.mjs";
+import { nextRun, skipMissed } from "./schedule.mjs";
 import { activeBranch, parse, sessionsIn, summary } from "./sessions.mjs";
 import { Store } from "./store.mjs";
 
@@ -53,6 +53,7 @@ export class Engine {
 
 	async boot() {
 		adoptLoginEnvironment();
+		if (skipMissed(this.data.schedules, Date.now() / 1000)) this.store.save();
 		this.locatePi();
 		this.scan();
 		if (this.data.selected) this.loadEntries(this.data.selected);
@@ -419,7 +420,7 @@ export class Engine {
 
 	// Asking pi -------------------------------------------------------
 
-	async createThread({ workspace, mode, prompt, title, images, select = true, model, thinking }) {
+	async createThread({ workspace, mode, prompt, title, images, select = true, model, thinking, deliver = (id, fields) => this.prompt(id, fields) }) {
 		const given = workspace ?? this.data.workspaces[0]?.path ?? this.chats;
 		// pi names a session folder after the real path, links resolved.
 		const path = realpathSync(given);
@@ -445,7 +446,7 @@ export class Engine {
 		this.entries.set(id, []);
 		this.store.save();
 		if (select) this.select(id);
-		if (prompt) await this.prompt(id, { text: prompt, images });
+		if (prompt || images?.length) await deliver(id, { text: prompt ?? "", images });
 		return id;
 	}
 

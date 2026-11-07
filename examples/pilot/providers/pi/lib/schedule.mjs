@@ -28,6 +28,18 @@ export function nextRun(task, after) {
 	return after + DAY;
 }
 
+// At launch: what came due while the app was closed waits for its next time.
+export function skipMissed(tasks, now) {
+	let moved = false;
+	for (const task of tasks) {
+		if (task.next && task.next <= now) {
+			task.next = nextRun(task, now);
+			moved = true;
+		}
+	}
+	return moved;
+}
+
 const WEEKDAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
 
 export function describe(task) {

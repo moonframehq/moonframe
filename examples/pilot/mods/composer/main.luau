@@ -36,6 +36,7 @@ local LEVELS = { "off", "minimal", "low", "medium", "high" }
 
 -- What the view last drew, for `update`, which has no `app`.
 local suggestions: { any } = {}
+local draft_folder: string? = nil
 
 -- The `@word` or leading `/word` the caret is in.
 local function token_at(text: string, caret: number): { kind: string, query: string }?
@@ -107,16 +108,16 @@ local function send(state: State, value: string, behavior: string?, props: Props
 	state.text = ""
 	state.images = {}
 	state.token = nil
+	if text == "/new" then
+		return state, { { to = "shell", msg = { page = "new" } } }
+	elseif text == "/model" then
+		return state, { { to = "palette", msg = { open = "models" } } }
+	end
 	if props and props.draft then
 		return state, {
 			{ to = "provider:pi", msg = { new_thread = { workspace = state.workspace, mode = state.mode, prompt = text, images = images } } },
 			{ to = "shell", msg = { page = "threads" } },
 		}
-	end
-	if text == "/new" then
-		return state, { { to = "shell", msg = { page = "new" } } }
-	elseif text == "/model" then
-		return state, { { to = "palette", msg = { open = "models" } } }
 	end
 	return state, { { to = "provider:pi", msg = { prompt = text, images = images, behavior = behavior } } }
 end
@@ -311,7 +312,8 @@ return mod {
 			state.token = token
 			state.highlighted = 1
 			if token and token.kind == "file" then
-				return state, { { to = "provider:repo", msg = { find = token.query } } }
+				local root = if props and props.draft then draft_folder else nil
+				return state, { { to = "provider:repo", msg = { find = token.query, root = root } } }
 			end
 		elseif msg.msg == "enter" then
 			state.text = msg.value
@@ -401,6 +403,7 @@ return mod {
 
 		local first_workspace = pi and (pi.workspaces[1] or pi.chats)
 		local workspace_path = state.workspace or (first_workspace and first_workspace.path)
+		draft_folder = workspace_path
 		local workspace_options: { any } = {}
 		local workspace_entry: any = nil
 		for _, workspace in (pi and pi.workspaces) or {} do

@@ -1,7 +1,7 @@
 // The messages mods send `provider:pi`, each by its one distinguishing key.
 // Anything that fails comes back as a toast in `app.pi.events`.
 import { randomUUID } from "node:crypto";
-import { readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { extname } from "node:path";
 import { removeWorktree } from "./git.mjs";
 import { PiProcess } from "./rpc.mjs";
@@ -46,13 +46,24 @@ async function builtin(engine, id, text) {
 	}
 }
 
+// What the composer's text means: a shell line, a command, or a prompt.
+async function submit(engine, id, { text, images, behavior }) {
+	if (text.startsWith("!")) return shell(engine, id, text);
+	if (text.startsWith("/") && (await builtin(engine, id, text))) return;
+	await engine.prompt(id, { text, images, behavior });
+}
+
 async function shell(engine, id, text) {
 	const quiet = text.startsWith("!!");
 	const command = text.slice(quiet ? 2 : 1).trim();
 	const thread = await engine.ensureLive(id);
-	await thread.send("bash", { command, excludeFromContext: quiet }, 600_000);
+	const result = await thread.send("bash", { command, excludeFromContext: quiet }, 600_000);
 	await thread.refresh();
-	engine.loadEntries(id);
+	const meta = engine.data.threads[id];
+	if (meta.file && existsSync(meta.file)) engine.loadEntries(id);
+	// pi writes nothing until the model first answers, so before that the
+	// output is only here. Once the file exists it holds this too.
+	else engine.entries.get(id)?.push({ id: randomUUID(), message: { role: "bashExecution", command, exitCode: result?.exitCode, output: result?.output ?? "", excludeFromContext: quiet } });
 	engine.changed();
 }
 
@@ -66,7 +77,7 @@ async function fork(engine, { thread: id, entry, worktree }) {
 		if (done?.cancelled) return;
 		const state = await child.send("get_state");
 		const forked = randomUUID();
-		engine.data.threads[forked] = { id: forked, cwd: meta.cwd, workspace: meta.workspace, file: state.sessionFile, title: `Fork of ${engine.titleOf(id)}`, worktree: null };
+		engine.data.threads[forked] = { id: forked, cwd: meta.cwd, workspace: meta.workspace, file: state.sessionFile, title: `Fork of ${engine.titleOf(id)}`, worktree: meta.worktree ?? null };
 		if (worktree) await moveToWorktree(engine, engine.data.threads[forked]);
 		engine.store.save();
 		engine.scan();
@@ -111,7 +122,12 @@ async function deleteThread(engine, id) {
 	if (!meta) return;
 	engine.stopLive(id);
 	if (meta.file) rmSync(meta.file, { force: true });
-	if (meta.worktree) await removeWorktree(meta.workspace, meta.worktree.path).catch((error) => console.error(`pilot: ${error.message}`));
+	if (meta.worktree) {
+		// A fork can share the checkout: the last thread in it removes it.
+		const heir = Object.values(engine.data.threads).find((other) => other.id !== id && other.cwd === meta.cwd);
+		if (heir) heir.worktree ??= meta.worktree;
+		else await removeWorktree(meta.workspace, meta.worktree.path).catch((error) => console.error(`pilot: ${error.message}`));
+	}
 	delete engine.data.threads[id];
 	engine.summaries.delete(id);
 	engine.entries.delete(id);
@@ -127,14 +143,11 @@ const HANDLERS = {
 	new_thread: async (engine, msg) => {
 		const options = msg.new_thread;
 		const model = options.model ?? engine.data.prefs.last_model;
-		await engine.createThread({ ...options, model, images: images(options.images) });
+		await engine.createThread({ ...options, model, images: images(options.images), deliver: (id, fields) => submit(engine, id, fields) });
 	},
 	prompt: async (engine, msg) => {
 		const id = msg.thread ?? engine.data.selected;
-		const text = msg.prompt;
-		if (text.startsWith("!")) return shell(engine, id, text);
-		if (text.startsWith("/") && (await builtin(engine, id, text))) return;
-		await engine.prompt(id, { text, images: images(msg.images), behavior: msg.behavior });
+		await submit(engine, id, { text: msg.prompt, images: images(msg.images), behavior: msg.behavior });
 	},
 	abort: async (engine, msg) => {
 		const live = engine.live.get(msg.thread ?? engine.data.selected);

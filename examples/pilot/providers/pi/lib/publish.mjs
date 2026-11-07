@@ -18,6 +18,10 @@ const MAX_MODELS = 160;
 const MAX_COMMANDS = 80;
 const SHOWN_ITEMS = 160;
 const TEXT_BUDGET = 500_000;
+// The host ends a provider whose line passes 1 MiB or 10,000 values.
+const MAX_BYTES = 1_000_000;
+const MAX_VALUES = 9_000;
+const LONGEST_TEXT = 100_000;
 
 function threadStatus(engine, meta) {
 	const live = engine.live.get(meta.id);
@@ -83,7 +87,7 @@ function visibleItems(items, limit) {
 	let first = items.length;
 	while (first > 0 && items.length - first < limit) {
 		const item = items[first - 1];
-		text += (item.text?.length ?? 0) + (item.output?.length ?? 0) + (item.patch?.length ?? 0);
+		text += Buffer.byteLength(item.text ?? "") + Buffer.byteLength(item.output ?? "") + Buffer.byteLength(item.patch ?? "");
 		if (text > TEXT_BUDGET && first < items.length) break;
 		first--;
 	}
@@ -135,6 +139,47 @@ function threadDetail(engine, id, now) {
 		editor_text: live?.editorText ?? null,
 		...visibleItems(items, limit),
 	};
+}
+
+function countValues(value) {
+	if (typeof value !== "object" || value === null) return 1;
+	let total = 1;
+	for (const item of Object.values(value)) total += countValues(item);
+	return total;
+}
+
+const fits = (line, snapshot) => Buffer.byteLength(line) <= MAX_BYTES && countValues(snapshot) <= MAX_VALUES;
+
+function shortened(item) {
+	const cut = {};
+	for (const [key, value] of Object.entries(item)) {
+		cut[key] = typeof value === "string" && value.length > LONGEST_TEXT ? `${value.slice(0, LONGEST_TEXT)}\n… cut, too long to show` : value;
+	}
+	return cut;
+}
+
+// The line for a snapshot, one the host takes: what it can't hold of the
+// conversation goes, the oldest first, as older entries do when they scroll off.
+export function encode(snapshot) {
+	let line = JSON.stringify(snapshot);
+	const thread = snapshot.thread;
+	if (!thread) return line;
+	while (!fits(line, snapshot) && thread.items.length > 1) {
+		const dropped = Math.ceil(thread.items.length / 4);
+		thread.items = thread.items.slice(dropped);
+		thread.earlier += dropped;
+		line = JSON.stringify(snapshot);
+	}
+	if (!fits(line, snapshot)) {
+		thread.items = thread.items.map(shortened);
+		line = JSON.stringify(snapshot);
+	}
+	if (!fits(line, snapshot)) {
+		thread.earlier += thread.items.length;
+		thread.items = [];
+		line = JSON.stringify(snapshot);
+	}
+	return line;
 }
 
 function schedules(engine) {

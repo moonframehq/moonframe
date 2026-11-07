@@ -64,7 +64,7 @@ export async function changesBetween(cwd, from, to) {
 	const files = [];
 	let added = 0;
 	let deleted = 0;
-	const out = await git(cwd, ["diff", "--numstat", "--no-renames", from, to]);
+	const out = await git(cwd, ["diff", "--numstat", "--no-renames", "--relative", from, to]);
 	for (const line of out.split("\n")) {
 		const [plus, minus, path] = line.split("\t");
 		if (!path) continue;

@@ -26,6 +26,9 @@ type State = {
 	terminal: string?,
 	serial: number,
 	editing: boolean,
+	-- The file the edit is of: what's open can change while it's going on.
+	edit: { path: string, version: string? }?,
+	blocked: boolean,
 	text: string,
 	split: boolean,
 	removing: string?,
@@ -200,8 +203,8 @@ local function tree_rows(repo: any, path: string, depth: number, rows: { any })
 			class = "tree-entry",
 			selected = repo.file ~= nil and repo.file.path == full,
 			align = "center",
-			msg = if entry.dir then { open_dir = full } else { read = full },
-			to = "provider:repo",
+			msg = if entry.dir then { open_dir = full } else { open_file = full },
+			to = if entry.dir then "provider:repo" else nil,
 			ui.row { width = depth * 14, shrink = false },
 			if entry.dir then ui.icon { (if open then "chevron-down" else "chevron-right") :: any, class = "tree-chevron" } else ui.row { width = 14, shrink = false },
 			file_icon { name = entry.name, dir = entry.dir, open = open },
@@ -229,6 +232,7 @@ local function file_body(state: State, repo: any): any
 			ui.text { file.path, truncate = true, class = "file-path" },
 			ui.spacer(),
 			file.conflict and ui.text { "Changed on disk", tone = "warning", size = "small", wrap = false },
+			state.blocked and ui.text { "Save or cancel this edit first", tone = "warning", size = "small", wrap = false },
 			file.text and not state.editing and ui.button { "Edit", small = true, variant = "ghost", msg = "edit" },
 			state.editing and ui.button { "Cancel", small = true, variant = "ghost", msg = "cancel-edit" },
 			state.editing and ui.button { "Save", small = true, variant = "primary", msg = "save-file" },
@@ -401,11 +405,14 @@ return mod {
 			terminals = {},
 			serial = 0,
 			editing = false,
+			blocked = false,
 			text = "",
 			split = false,
 		}
 		state.compare_open = false
 		state.editing = false
+		state.edit = nil
+		state.blocked = false
 		state.at = nil
 		state.range = nil
 		state.removing = nil
@@ -436,15 +443,23 @@ return mod {
 				return state, { { to = "provider:repo", msg = { commit = text } } }
 			end
 		elseif msg == "edit" then
-			state.editing = true
-			state.text = (latest_repo and latest_repo.file and latest_repo.file.text) or ""
+			local file = latest_repo and latest_repo.file
+			if file then
+				state.editing = true
+				state.edit = { path = file.path, version = file.version }
+				state.text = file.text or ""
+			end
 		elseif msg == "cancel-edit" then
 			state.editing = false
+			state.edit = nil
+			state.blocked = false
 		elseif msg == "save-file" or (type(msg) == "table" and msg.msg == "save-file") then
-			local file = latest_repo and latest_repo.file
+			local edit = state.edit
 			state.editing = false
-			if file then
-				return state, { { to = "provider:repo", msg = { write = file.path, text = state.text, version = file.version } } }
+			state.edit = nil
+			state.blocked = false
+			if edit then
+				return state, { { to = "provider:repo", msg = { write = edit.path, text = state.text, version = edit.version } } }
 			end
 		elseif type(msg) ~= "table" then
 			return
@@ -459,6 +474,8 @@ return mod {
 				state.tab = state.tabs[thread.id] or state.tab
 				state.range = nil
 				state.editing = false
+				state.edit = nil
+				state.blocked = false
 			end
 			if thread.cwd and thread.cwd ~= state.at then
 				state.at = thread.cwd
@@ -507,7 +524,10 @@ return mod {
 			return state, sends
 		elseif msg.open_file then
 			show_tab(state, "files")
-			state.editing = false
+			if state.edit and state.edit.path ~= msg.open_file then
+				state.blocked = true
+				return state, { { to = "shell", msg = "show-workbench" } }
+			end
 			local sends: { any } = { { to = "shell", msg = "show-workbench" }, { to = "provider:repo", msg = { read = msg.open_file } } }
 			-- Open the folders down to it.
 			local dir = ""

@@ -7,7 +7,7 @@
 // { pick = path } (the diff shown), { stage = path }, { unstage = path },
 // { discard = path }, { commit = message }, { open_dir = path },
 // { read = path }, { write = path, text, version }, { close = true },
-// { find = query }, { remove_worktree = path }, { refresh = true }.
+// { find = query, root? }, { remove_worktree = path }, { refresh = true }.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
@@ -20,6 +20,9 @@ const MAX_DIFF_LINES = 1500;
 const MAX_LINE = 400;
 const MAX_FILE = 1024 * 1024;
 const MAX_FOUND = 40;
+// The host ends a provider whose line passes 1 MiB or 10,000 values.
+const MAX_BYTES = 1_000_000;
+const MAX_VALUES = 9_000;
 
 const state = {
 	at: null,
@@ -43,8 +46,39 @@ const state = {
 let listing = null;
 let last = "";
 
+function countValues(value) {
+	if (typeof value !== "object" || value === null) return 1;
+	let total = 1;
+	for (const item of Object.values(value)) total += countValues(item);
+	return total;
+}
+
+const tooLarge = (line) => Buffer.byteLength(line) > MAX_BYTES;
+
+// What to give up, in order, until the line is one the host takes.
+const SHEDS = [
+	(view) => (view.file?.text ? { ...view, file: { path: view.file.path, tooLarge: true } } : view),
+	(view) => (view.diff ? { ...view, diff: { ...view.diff, hunks: [], truncated: true } } : view),
+	(view) => ({ ...view, tree: { "": view.tree[""] ?? [] }, open: [""] }),
+	(view) => ({ ...view, files: view.files.slice(0, 100), more_files: (view.more_files ?? 0) + Math.max(0, view.files.length - 100) }),
+];
+
+function encoded() {
+	let view = { available: true, ...state };
+	let line = JSON.stringify(view);
+	for (const [index, shed] of SHEDS.entries()) {
+		const bytes = tooLarge(line);
+		if (!bytes && countValues(view) <= MAX_VALUES) break;
+		// One long file is a few values: it only goes for its bytes.
+		if (index === 0 && !bytes) continue;
+		view = shed(view);
+		line = JSON.stringify(view);
+	}
+	return line;
+}
+
 function publish() {
-	const line = JSON.stringify({ available: true, ...state });
+	const line = encoded();
 	if (line === last) return;
 	last = line;
 	process.stdout.write(`${line}\n`);
@@ -80,7 +114,7 @@ async function baseBranch() {
 }
 
 // Staged and unstaged per file, from porcelain v1.
-function parseStatus(text) {
+function parseStatus(text, prefix) {
 	const found = new Map();
 	const parts = text.split("\0");
 	for (let i = 0; i < parts.length; i++) {
@@ -88,8 +122,11 @@ function parseStatus(text) {
 		if (part.length < 4) continue;
 		const x = part[0];
 		const y = part[1];
-		const path = part.slice(3);
 		if (x === "R" || x === "C") i++;
+		// Status gives paths from the repository's top; everything else here
+		// works from the project folder, which may be below it.
+		if (!part.startsWith(prefix, 3)) continue;
+		const path = part.slice(3 + prefix.length);
 		found.set(path, {
 			path,
 			status: x === "?" ? "?" : x === "U" || y === "U" ? "U" : x !== " " ? x : y,
@@ -116,19 +153,20 @@ function addCounts(files, numstat) {
 
 async function readStatus() {
 	if (state.compare.mode === "uncommitted") {
-		const files = parseStatus(await git(["status", "--porcelain=v1", "-z", "--untracked-files=all"]));
-		addCounts(files, await git(["diff", "--numstat", "--no-renames", "HEAD"]).catch(() => ""));
+		const prefix = (await git(["rev-parse", "--show-prefix"])).trim();
+		const files = parseStatus(await git(["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", "."]), prefix);
+		addCounts(files, await git(["diff", "--numstat", "--no-renames", "--relative", "HEAD"]).catch(() => ""));
 		return [...files.values()];
 	}
 	const [from, to] = range();
-	const args = ["diff", "--no-renames", "--name-status", from];
+	const args = ["diff", "--no-renames", "--relative", "--name-status", from];
 	if (to) args.push(to);
 	const files = new Map();
 	for (const line of (await git(args)).split("\n")) {
 		const [status, path] = line.split("\t");
 		if (path) files.set(path, { path, status: status[0], staged: false, unstaged: false, added: 0, deleted: 0 });
 	}
-	addCounts(files, await git(["diff", "--numstat", "--no-renames", from, ...(to ? [to] : [])]));
+	addCounts(files, await git(["diff", "--numstat", "--no-renames", "--relative", from, ...(to ? [to] : [])]));
 	return [...files.values()];
 }
 
@@ -174,7 +212,7 @@ async function readDiff(path) {
 		);
 		return { path, status: "A", ...parseDiff(out) };
 	}
-	const text = await git(["diff", "--no-renames", ...range(), "--", path]);
+	const text = await git(["diff", "--no-renames", "--relative", ...range(), "--", path]);
 	return { path, status: file.status, binary: /^Binary files /m.test(text), ...parseDiff(text) };
 }
 
@@ -191,8 +229,8 @@ async function readWorktrees() {
 	return list;
 }
 
-function listDir(path) {
-	const dir = join(state.at, path);
+function listDir(path, root = state.at) {
+	const dir = join(root, path);
 	try {
 		return readdirSync(dir, { withFileTypes: true })
 			.filter((entry) => entry.name !== ".git" && entry.name !== ".DS_Store")
@@ -285,14 +323,15 @@ function saveFile({ write: path, text, version }) {
 	state.message = `Saved ${path}`;
 }
 
-async function allFiles() {
-	if (listing?.at === state.at && Date.now() - listing.time < 15_000) return listing.files;
+async function allFiles(root) {
+	if (listing?.at === root && Date.now() - listing.time < 15_000) return listing.files;
 	let files = [];
-	if (state.git) {
-		files = (await git(["ls-files", "-co", "--exclude-standard"])).split("\n").filter(Boolean);
+	const tracked = await git(["ls-files", "-co", "--exclude-standard"], { cwd: root }).catch(() => null);
+	if (tracked !== null) {
+		files = tracked.split("\n").filter(Boolean);
 	} else {
 		const walk = (dir, depth) => {
-			for (const entry of listDir(dir)) {
+			for (const entry of listDir(dir, root)) {
 				const path = dir ? `${dir}/${entry.name}` : entry.name;
 				if (entry.dir && depth < 4 && !entry.name.startsWith(".") && entry.name !== "node_modules") walk(path, depth + 1);
 				else if (!entry.dir) files.push(path);
@@ -300,7 +339,7 @@ async function allFiles() {
 		};
 		walk("", 0);
 	}
-	listing = { at: state.at, time: Date.now(), files };
+	listing = { at: root, time: Date.now(), files };
 	return files;
 }
 
@@ -322,8 +361,8 @@ function score(path, query) {
 	return total + (lower.includes(query, name) ? -100 : 0) + path.length / 100;
 }
 
-async function find(query) {
-	const files = await allFiles();
+async function find(query, root) {
+	const files = await allFiles(root);
 	const wanted = query.toLowerCase();
 	const scored = [];
 	for (const path of files) {
@@ -367,6 +406,13 @@ async function handle(msg) {
 		publish();
 		return refresh();
 	}
+	// A draft searches the project it was given, whatever is open here.
+	if (msg.find !== undefined) {
+		const root = msg.root ?? state.at;
+		if (!root) return;
+		await find(msg.find, root).catch((error) => (state.error = error.message));
+		return publish();
+	}
 	if (!state.at) return;
 	if (msg.compare) {
 		state.compare = { mode: msg.compare, from: msg.from ?? null, to: msg.to ?? null };
@@ -380,7 +426,7 @@ async function handle(msg) {
 	}
 	if (msg.stage) return run("stage", () => git(["add", "--", msg.stage]));
 	if (msg.unstage) return run("unstage", () => git(["reset", "-q", "HEAD", "--", msg.unstage]));
-	if (msg.stage_all) return run("stage", () => git(["add", "-A"]));
+	if (msg.stage_all) return run("stage", () => git(["add", "-A", "--", "."]));
 	if (msg.discard) {
 		const file = state.files.find((item) => item.path === msg.discard);
 		return run("discard", () =>
@@ -391,7 +437,7 @@ async function handle(msg) {
 		return run(
 			"commit",
 			async () => {
-				if (!state.files.some((file) => file.staged)) await git(["add", "-A"]);
+				if (!state.files.some((file) => file.staged)) await git(["add", "-A", "--", "."]);
 				await git(["commit", "-q", "-F", "-"], { input: msg.commit });
 			},
 			"Committed",
@@ -422,10 +468,6 @@ async function handle(msg) {
 	}
 	if (msg.close) {
 		state.file = null;
-		return publish();
-	}
-	if (msg.find !== undefined) {
-		await find(msg.find).catch((error) => (state.error = error.message));
 		return publish();
 	}
 	if (msg.remove_worktree) return run("worktree", () => git(["worktree", "remove", "--force", msg.remove_worktree]));

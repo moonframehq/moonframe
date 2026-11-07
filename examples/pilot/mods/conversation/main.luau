@@ -75,8 +75,8 @@ local function user_item(item: any, thread: any, hit: boolean): any
 			justify = "end",
 			gap = "small",
 			ui.row { class = "faint-button", copy = item.text, tooltip = "Copy", ui.icon { "copy" } },
-			ui.row { class = "faint-button", msg = { fork = { thread = thread.id, entry = item.entry } }, to = "provider:pi", tooltip = "Fork from here", ui.icon { "git-branch" } },
-			thread.git and ui.row { class = "faint-button", msg = { fork = { thread = thread.id, entry = item.entry, worktree = true } }, to = "provider:pi", tooltip = "Fork into a new worktree", ui.icon { "folder-git-2" } },
+			item.entry and ui.row { class = "faint-button", msg = { fork = { thread = thread.id, entry = item.entry } }, to = "provider:pi", tooltip = "Fork from here", ui.icon { "git-branch" } },
+			item.entry and thread.git and ui.row { class = "faint-button", msg = { fork = { thread = thread.id, entry = item.entry, worktree = true } }, to = "provider:pi", tooltip = "Fork into a new worktree", ui.icon { "folder-git-2" } },
 		},
 	}
 end
