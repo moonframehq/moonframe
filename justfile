@@ -249,6 +249,11 @@ audit:
     actionlint
     cargo deny check advisories bans licenses sources
 
+# Build this Mac's apps with a [release] table, unsigned, as package.yml does.
+package-apps out="target/dist":
+    cargo build --locked --release -p moonframe-app
+    scripts/release/package-apps.sh {{out}} target/release/moonframe
+
 # Build this Mac's release packages, unsigned, as .github/workflows/package.yml
 # does: the app and its disk image in target/dist.
 package-macos out="target/dist":

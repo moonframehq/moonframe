@@ -7,3 +7,8 @@ name  = "trellis"
 title = "Trellis"
 # The projects provider (repositories, work trees, changes, commits).
 requires = ["../projects"]
+
+# Shipped by Moonframe's releases as an app of its own (docs/releasing.md).
+[release]
+cask        = "moonframe-trellis"
+description = "Terminal multiplexer organised around projects and work trees"

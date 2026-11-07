@@ -44,8 +44,11 @@ The workflow then:
    published disk image (only for a notarized disk image and a version
    without a pre-release suffix).
 
-Only the `sign-macos`, `sign-windows`, `attest` and `publish` jobs enter
-the `release` environment. Only the `homebrew` job enters the `homebrew`
+7. once Moonframe is out, does the same for the apps (see
+   [Apps](#apps)): their own release, `apps-v<version>`, and their casks.
+
+Only the signing, attesting and publishing jobs enter the `release`
+environment. Only the `homebrew` and `homebrew-apps` jobs enter the `homebrew`
 environment, which holds `HOMEBREW_TAP_SSH_KEY`: the private half of a
 deploy key with write access to moonframehq/homebrew-tap and nothing else. Protect it (Settings → Environments) so it only accepts
 `main`, and add yourself as a required reviewer if releases should wait for
@@ -64,6 +67,50 @@ an approval.
 
 The Linux and Windows folders hold the executable with the built-in app
 beside it in `app/`, where the executable looks for it.
+
+## Apps
+
+An app in `examples/` ships on its own, so nobody needs Moonframe or a checkout
+to run it, when its `moonframe.toml` has a `[release]` table:
+
+```toml
+[release]
+cask        = "moonframe-folio"
+description = "Quiet markdown writing app with focus and typewriter modes"
+```
+
+Only real apps ship, not ones on sample data or a scripted agent. A released
+app must run with nothing else installed, so `scripts/release/apps.py` refuses
+one with a process provider that needs anything but a shell: `--check` passes
+without a provider's runtime. git and any agent an app drives are the user's.
+
+A bundle is the release's executable and the app's files, so
+`scripts/release/package-apps.sh` makes them all in seconds from what
+`package.yml` built, and loads each headlessly with a user folder (without one,
+a bundle's check loads the built-in app, whatever the bundle holds). Every app
+has Moonframe's version and is released with it.
+
+The apps have a release of their own, `apps-v<version>`, never marked latest:
+Check for Updates takes a release's assets for the running app's, so
+Moonframe's must hold only Moonframe. It holds, for each app:
+
+| File | For |
+| --- | --- |
+| `<Title>-<v>-universal-apple-darwin.zip` | macOS 13+, Apple Silicon and Intel |
+| `<Title>-<v>-{x86_64,aarch64}-unknown-linux-gnu.tar.gz` | Linux: a prefix, with `bin/moonframe-<name>` |
+
+and `SHA256SUMS` and the Sigstore bundles, as above. There are no Windows
+builds yet: nothing lays a profile's bundle out for Windows. These jobs run
+after Moonframe is published, and `continue-on-error` keeps a broken app from
+failing the packages; on a pull request a broken app does fail.
+
+`brew install moonframehq/tap/moonframe-folio` installs an app. Its cask comes
+from `homebrew/Casks/app.rb`, by `scripts/release/render-app-casks.py`. The
+`moonframe-` prefix is because `lantern`, `ledger` and others are taken in
+Homebrew. It links no command, as every bundle's executable has one name, and
+apps have no Check for Updates yet, so `brew upgrade` updates them.
+
+`just package-apps` builds this Mac's locally.
 
 ## Verifying a download
 

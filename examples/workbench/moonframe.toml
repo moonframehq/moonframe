@@ -6,3 +6,8 @@ name  = "workbench"
 title = "Workbench"
 # The projects provider and the file, change and code components.
 requires = ["../projects"]
+
+# Shipped by Moonframe's releases as an app of its own (docs/releasing.md).
+[release]
+cask        = "moonframe-workbench"
+description = "Agent terminal, editor and project files side by side"
