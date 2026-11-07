@@ -327,6 +327,18 @@ cx.spawn(async move |this, cx| {
 .detach();
 ```
 
+Construct timers and other futures that need a runtime inside an `async`
+block, so their constructors run on Tokio too:
+
+```rust
+moonframe::on_runtime(async {
+    moonframe::tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+}).await?;
+```
+
+Passing `on_runtime(tokio::time::sleep(...))` directly from GPUI panics:
+`sleep` needs a reactor when it is called, before the future is awaited.
+
 The runtime is the app's own when it gives one, so providers and views
 share its clients and pools. GPUI holds the main thread, so `run` blocks
 there; keep the runtime on other threads:
