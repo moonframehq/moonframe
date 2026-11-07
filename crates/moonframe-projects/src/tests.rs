@@ -28,6 +28,12 @@ fn real(path: &Path) -> PathBuf {
     })
 }
 
+/// `rel` under `base` with a forward slash, as the provider joins paths:
+/// `Path::join` puts a backslash there on Windows.
+fn under(base: &Path, rel: &str) -> PathBuf {
+    PathBuf::from(format!("{}/{rel}", base.to_string_lossy()))
+}
+
 /// A repository with one commit, in a project folder of its own.
 struct Fixture {
     temp: TempDir,
@@ -38,7 +44,7 @@ impl Fixture {
     fn new() -> Self {
         let temp = tempdir().unwrap();
         let root = real(temp.path());
-        let repo = root.join("code/app");
+        let repo = under(&root, "code/app");
         fs::create_dir_all(&repo).unwrap();
         sh(&repo, &["init", "-q", "-b", "main"]);
         sh(&repo, &["config", "user.name", "Test"]);
@@ -169,7 +175,7 @@ fn completion_and_inspector_listings_are_independent() {
         &json!({ "complete": "other", "cwd": format!("{root}/different") }),
     );
     assert_eq!(projects.completion.as_deref(), Some("src"));
-    let other = fixture.repo.parent().unwrap().join("other");
+    let other = under(fixture.repo.parent().unwrap(), "other");
     fs::create_dir(&other).unwrap();
     sh(&other, &["init", "-q"]);
     projects.receive("any", &json!({ "select": other.to_string_lossy() }));
@@ -178,7 +184,7 @@ fn completion_and_inspector_listings_are_independent() {
 
 /// A repository outside the project folders.
 fn outside(fixture: &Fixture) -> String {
-    let elsewhere = real(fixture.temp.path()).join("elsewhere");
+    let elsewhere = under(&real(fixture.temp.path()), "elsewhere");
     fs::create_dir(&elsewhere).unwrap();
     sh(&elsewhere, &["init", "-q"]);
     fs::write(elsewhere.join("secret.txt"), "private").unwrap();
@@ -221,7 +227,7 @@ fn a_work_tree_just_added_can_be_opened() {
     let fixture = Fixture::new();
     let mut projects = fixture.projects();
     published(&mut projects);
-    let tree = real(fixture.temp.path()).join("tree");
+    let tree = under(&real(fixture.temp.path()), "tree");
     sh(&fixture.repo, &[
         "worktree",
         "add",
