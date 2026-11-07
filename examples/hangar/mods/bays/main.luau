@@ -209,7 +209,12 @@ return mod {
 			end
 			return
 		elseif msg.draft then
-			state.draft = msg.draft
+			state.draft = msg.value
+			return state
+		elseif msg.cancel then
+			state.adding = false
+			state.draft = ""
+			state.problem = nil
 			return state
 		elseif msg.submit then
 			if string.find(state.draft, "%S") and not state.busy then
@@ -259,9 +264,9 @@ return mod {
 				id = "branch",
 				value = state.draft,
 				placeholder = "Branch for the new bay",
-				change = "draft",
+				change = { draft = true },
 				submit = { submit = true },
-				keys = { escape = "add" },
+				keys = { escape = { cancel = true } },
 			} or nil,
 			state.problem and ui.text { state.problem, class = "bays-problem" } or nil,
 			ui.column { grow = true, gap = "none", scroll = true, table.unpack(rows) },

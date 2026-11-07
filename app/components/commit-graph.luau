@@ -29,6 +29,9 @@ local DOT = 2.5
 local MAX_LANES = 8
 -- Refs shown on a row, so its subject keeps the room.
 local MAX_REFS = 2
+-- What one `ui.paths` takes: a longer history draws as several, one over the
+-- other.
+local MAX_PATHS = 500
 local COLORS = { "#6366f1", "#14b8a6", "#f59e0b", "#ec4899", "#3b82f6", "#22c55e", "#ef4444", "#8b5cf6" }
 
 local function color_of(lane: number): string
@@ -144,6 +147,21 @@ local function shown_refs(refs: { string }): { string }
 	return shown
 end
 
+-- `lines` drawn over one area, in as many `ui.paths` as they need.
+local function drawing_of(lines: { any }, width: number, height: number)
+	local layers: { any } = {}
+	for first = 1, #lines, MAX_PATHS do
+		local last = math.min(first + MAX_PATHS - 1, #lines)
+		table.insert(layers, ui.row {
+			float = { top = 0, left = 0 },
+			width = width,
+			height = height,
+			ui.paths { paths = { table.unpack(lines, first, last) }, width = width, height = height },
+		})
+	end
+	return ui.row { width = width, height = height, table.unpack(layers) }
+end
+
 local function row_of(commit: Commit, props: Props, row_height: number)
 	local cells: { any } = {}
 	local refs = shown_refs(commit.refs or {})
@@ -231,7 +249,7 @@ return component {
 			align = "start",
 			gap = "none",
 			grow = true,
-			ui.paths { paths = lines, width = widest * LANE, height = #commits * row_height },
+			drawing_of(lines, widest * LANE, #commits * row_height),
 			ui.column { gap = "none", grow = true, table.unpack(rows) },
 		}
 	end,

@@ -9,7 +9,8 @@ use {
 
 /// Longer lines from a provider are refused.
 pub(crate) const MAX_JSON: usize = 1024 * 1024;
-const MAX_ENTRIES: usize = 10_000;
+/// The most values one publish holds, counting every list, table and field.
+pub const MAX_ENTRIES: usize = 10_000;
 const MAX_DEPTH: usize = 16;
 
 pub(crate) fn data(text: &str) -> Result<Data, Error> {

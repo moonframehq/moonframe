@@ -32,11 +32,13 @@
 //! or `error` instead of `message` when it failed; `reply` is the action's
 //! name when the mod gave no `id`.
 
+// keep-sorted start
 mod diff;
 mod log;
 mod refs;
 mod status;
 mod worktrees;
+// keep-sorted end
 
 /// A remote URL's host, owner and repository, as `app.git.remote` gives
 /// them; the forge providers read their repository with it.
@@ -421,9 +423,6 @@ impl Git {
             "worktrees": worktrees, "branches": self.branches,
             "remote": self.remote, "stashes": self.stashes,
         });
-        if let (Some(_), Value::Object(fields)) = (self.log_limit, &mut out) {
-            fields.insert("log".to_owned(), Value::from(self.log.clone()));
-        }
         if let (Some(path), Value::Object(fields)) = (&self.diff_path, &mut out) {
             // Only a file git reports as changed: a path a mod makes up
             // (`../..`, `/etc/hosts`) would otherwise publish a file outside
@@ -438,6 +437,17 @@ impl Git {
                 diff::parse(path, "")
             };
             fields.insert("diff".to_owned(), diff);
+        }
+        // Last, in the room the rest leaves: the host refuses a publish past
+        // its limit whole, and a diff is what the user is looking at.
+        if self.log_limit.is_some() {
+            let log = log::fit(
+                &self.log,
+                moonframe_providers::MAX_ENTRIES.saturating_sub(log::values(&out)),
+            );
+            if let Value::Object(fields) = &mut out {
+                fields.insert("log".to_owned(), log);
+            }
         }
         self.publish(host, out, force);
     }

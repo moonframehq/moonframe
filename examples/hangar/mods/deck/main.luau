@@ -21,6 +21,8 @@ type State = {
 	-- A command runs there, and what happened while it was out of sight.
 	running: { [string]: boolean },
 	attention: { [string]: string },
+	-- The bay on show whose shell exited, still showing what it printed.
+	ended: string?,
 }
 
 local function activity_of(state: State): { [string]: string }
@@ -57,6 +59,12 @@ local function clip(text: string, limit: number): string
 	return string.sub(text, 1, at - 1)
 end
 
+-- Which bay a notification is about. Never the command: its line can hold a
+-- token, and notifications outlive the terminal in the system's own list.
+local function folder_of(path: string): string
+	return string.match(path, "([^/\\]+)$") or path
+end
+
 local function notify(title: string, body: string?): any
 	return { to = "app:notify", msg = { title = clip(title, MAX_TITLE), body = body and clip(body, MAX_BODY) } }
 end
@@ -83,12 +91,28 @@ return mod {
 	end,
 
 	update = function(state: State, msg: any)
-		if type(msg) ~= "table" then
+		if msg == "restart" then
+			-- A new id, as the old one's terminal stays until it is no
+			-- longer drawn, which also gives back its slot.
+			local path = state.ended
+			if path then
+				state.terminals[path] = `bay-{state.next_terminal}`
+				state.next_terminal += 1
+				state.ended = nil
+				return state
+			end
+			return
+		elseif type(msg) ~= "table" then
 			return
 		end
 		if msg.topic == "hangar/bay" then
 			state.bay = msg.value or nil
 			local bay = state.bay
+			-- Out of sight an ended terminal goes, and coming back starts
+			-- a shell by itself.
+			if state.ended ~= (bay and bay.path) then
+				state.ended = nil
+			end
 			if bay then
 				state.attention[bay.path] = nil
 				if not state.terminals[bay.path] then
@@ -105,6 +129,9 @@ return mod {
 		local hidden = not state.bay or state.bay.path ~= path
 		if msg.exited then
 			state.running[path] = nil
+			if not hidden then
+				state.ended = path
+			end
 			return state, announce(state)
 		elseif msg.event == "started" then
 			state.running[path] = true
@@ -118,7 +145,7 @@ return mod {
 			local long = msg.took_ms >= LONG_COMMAND_MS
 			local failed = msg.status ~= nil and msg.status ~= 0
 			local title = if failed then "Command failed" else "Command finished"
-			return state, announce(state, if long then notify(title, msg.command) else nil)
+			return state, announce(state, if long then notify(title, folder_of(path)) else nil)
 		elseif msg.event == "notice" then
 			if hidden then
 				state.attention[path] = "blocked"
@@ -149,6 +176,7 @@ return mod {
 				status_dot { status = if state.running[bay.path] then "working" else "idle", spin = true },
 				ui.text { bay.branch, class = "deck-branch" },
 				ui.row { grow = true, ui.text { bay.path, class = "deck-path", truncate = true } },
+				state.ended == bay.path and ui.button { "New shell", small = true, msg = "restart" } or nil,
 			},
 			ui.terminal {
 				id = state.terminals[bay.path],

@@ -1,7 +1,7 @@
 use {
     super::*,
     moonframe_providers::Event,
-    std::{process::Command, sync::Mutex},
+    std::{io::Write, process::Command, sync::Mutex},
 };
 
 #[test]
@@ -107,6 +107,109 @@ fn a_diff_becomes_numbered_hunks() {
     assert_eq!(lines[1], json!({ "kind": "del", "old": 4, "text": "old" }));
     assert_eq!(lines[2], json!({ "kind": "add", "new": 4, "text": "new" }));
     assert_eq!(lines[3], json!({ "kind": "add", "new": 5, "text": "more" }));
+}
+
+/// Hunks cost values of their own, so lines alone do not bound a diff: with
+/// `diff.context = 0` every changed line can be a hunk.
+#[test]
+fn a_diff_of_many_small_hunks_stays_in_its_share_of_a_publish() {
+    let mut text = String::from("diff --git a/x b/x\n--- a/x\n+++ b/x\n");
+    for line in 1..=1200 {
+        text.push_str(&format!("@@ -{line} +{line} @@\n+new\n"));
+    }
+    let diff = diff::parse("x", &text);
+    assert_eq!(diff["truncated"], true);
+    assert!(log::values(&diff) < moonframe_providers::MAX_ENTRIES * 7 / 10);
+}
+
+/// The largest log and the largest diff are each allowed and together past
+/// what the host takes: a publish refused whole would leave `app.git` stale.
+#[test]
+fn a_full_log_gives_way_to_a_full_diff() {
+    let dir = repository();
+    let mut import = Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["fast-import", "--quiet"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stream = String::new();
+    for n in 0..500 {
+        stream.push_str(&format!(
+            "commit refs/heads/main\ncommitter T <t@moonframe.invalid> {} +0000\n\
+             data 1\nc\n{}\n",
+            1_700_000_000 + n,
+            if n == 0 {
+                "from refs/heads/main^0\n"
+            } else {
+                ""
+            },
+        ));
+    }
+    import
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(stream.as_bytes())
+        .unwrap();
+    assert!(import.wait().unwrap().success());
+    // A change every seventh line: one long hunk, mostly context, the
+    // costliest lines there are.
+    let lines = |word: &str| {
+        (0..2000)
+            .map(|n| {
+                if n % 7 == 0 {
+                    format!("{word}\n")
+                } else {
+                    "same\n".to_owned()
+                }
+            })
+            .collect::<String>()
+    };
+    let run = |args: &[&str]| {
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(dir.path())
+            .args(args)
+            .status()
+            .unwrap();
+        assert!(status.success(), "git {args:?}");
+    };
+    run(&["reset", "-q", "--hard"]);
+    std::fs::write(dir.path().join("big.txt"), lines("old")).unwrap();
+    run(&["add", "-A"]);
+    run(&["commit", "-q", "-m", "big"]);
+    std::fs::write(dir.path().join("big.txt"), lines("new")).unwrap();
+
+    let (events, seen) = events();
+    let folder = dir.path().join("providers").join("git");
+    std::fs::create_dir_all(&folder).unwrap();
+    let host = Handle::new("git", &folder, writers(&[]), events);
+    let mut git = Git::default();
+    git.start(&host).unwrap();
+    let ask = |git: &mut Git, field: &str, value: Data| {
+        let message = BTreeMap::from([(field.to_owned(), value)]);
+        git.receive(&host, "history", Data::Map(message));
+    };
+    ask(&mut git, "log", Data::Integer(500));
+    assert_eq!(
+        published(&seen)["log"].as_array().unwrap().len(),
+        log::MAX_COMMITS
+    );
+    ask(&mut git, "diff", Data::from("big.txt"));
+
+    let out = published(&seen);
+    assert_eq!(out["diff"]["path"], "big.txt");
+    assert_eq!(out["diff"]["lines"], 1200);
+    assert_eq!(out["log"][0]["subject"], "big");
+    assert!(out["log"].as_array().unwrap().len() < log::MAX_COMMITS);
+    let failed = seen
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|event| matches!(event, Event::Failed { .. }));
+    assert!(!failed, "the host refused a publish");
 }
 
 /// provider.toml's settings with these `writers`.

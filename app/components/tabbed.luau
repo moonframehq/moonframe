@@ -30,6 +30,8 @@ type Tab = {
 	kind: string,
 	-- Set once the content reports one, such as a page's title.
 	title: string?,
+	-- The folder its shell is in, as far as the shell says.
+	folder: string?,
 	-- A command runs in its shell, as far as the shell says.
 	running: boolean?,
 	-- What happened while it was not on show: "blocked" or "done".
@@ -177,6 +179,7 @@ local function keep_shell_event(state: State, tab: Tab, msg): (boolean, any)
 	local title
 	if msg.event == "folder" then
 		title = folder_name(msg.path)
+		tab.folder = title
 	elseif msg.event == "title" and msg.title ~= "" then
 		title = msg.title
 	elseif msg.event == "started" then
@@ -197,7 +200,10 @@ local function keep_shell_event(state: State, tab: Tab, msg): (boolean, any)
 			return true, nil
 		end
 		local failed = msg.status ~= nil and msg.status ~= 0
-		return true, notification(tab, if failed then "Command failed" else "Command finished", msg.command or tab.title)
+		-- The folder, not the command or a title a shell may have set to
+		-- it: a command line can hold a token, and notifications outlive
+		-- the terminal in the system's own list.
+		return true, notification(tab, if failed then "Command failed" else "Command finished", tab.folder)
 	end
 	title = title and clip(title, MAX_TAB_TITLE)
 	if title and title ~= tab.title then
