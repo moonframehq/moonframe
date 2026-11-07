@@ -80,6 +80,11 @@ impl<'w> Painter<'w> {
     pub(super) fn markdown(&self, markdown: &'w Markdown, place: &Place<'w>) -> El {
         let look = self.look(Part::Markdown, &markdown.look, States::default(), place);
         let ink = place.ink.under(&look.base, self.palette);
+        // Said, not silently dropped: a document's headings and where it is.
+        if markdown.outline.is_some() || markdown.section.is_some() || markdown.reveal.is_some() {
+            let mut left_out = self.ui.left_out.borrow_mut();
+            left_out.insert("ui.markdown outline".to_owned());
+        }
         let source = titled_alerts(&markdown.text);
         let query = markdown.find.as_deref().filter(|query| !query.is_empty());
         let found = query.map_or_else(Vec::new, |query| find(&source, query, Case::Insensitive));

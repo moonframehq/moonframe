@@ -53,6 +53,15 @@ impl<'w> Painter<'w> {
     /// `element` with `pointer`'s listeners and cursor. `carry`, `accept`,
     /// `drop` and `gestures` are not on this backend yet.
     pub(super) fn pointered(&self, element: El, pointer: &Pointer, place: &Place<'w>) -> El {
+        let lacking = pointer.carry.is_some()
+            || pointer.accept.is_some()
+            || pointer.drop.is_some()
+            || pointer.hover
+            || !pointer.gestures.is_empty();
+        if lacking {
+            let mut left_out = self.ui.left_out.borrow_mut();
+            left_out.insert("pointer carry, drop, hover or gestures".to_owned());
+        }
         let element = match pointer.cursor {
             Some(cursor) => element.cursor(shape(cursor)),
             None => element,

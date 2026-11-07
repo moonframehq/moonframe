@@ -555,6 +555,7 @@ fn poll(ui: &mut Ui, _: f64, tx: &mut Tx) -> bool {
     changed |= ui.take_events();
     changed |= ui.terminal_changed();
     ui.tell_exits();
+    changed |= ui.tell_shell_events();
     ui.settle_pick(tx);
     ui.tell_blurs();
     changed |= ui.refill_lists();

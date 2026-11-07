@@ -7,6 +7,8 @@
 
 #[path = "../../moonframe/src/terminal/selection.rs"]
 mod selection;
+#[path = "../../moonframe/src/terminal/shell_events.rs"]
+mod shell_events;
 
 pub(crate) use selection::{Selection, Spot};
 
@@ -51,6 +53,8 @@ pub(crate) struct View {
     pub(crate) selection: Option<Selection>,
     /// What the element sends as the shell exits, once.
     pub(crate) exit: Option<moonframe_core::Data>,
+    /// What it sends as the shell reports something: a command, its folder.
+    pub(crate) shell: Option<moonframe_core::Data>,
     pub(crate) owner: String,
     pub(crate) told: bool,
 }
@@ -69,6 +73,8 @@ pub(crate) struct Terminals {
     boxes: RefCell<HashMap<String, (f32, f32)>>,
     /// The stylesheet's terminal font, kept as Rune keeps its families.
     family: RefCell<Option<(String, &'static str)>>,
+    /// The shell integration's environment, written on first use.
+    shell_env: std::cell::OnceCell<Vec<(String, String)>>,
 }
 
 impl Default for Terminals {
@@ -81,7 +87,25 @@ impl Default for Terminals {
             shown: RefCell::default(),
             boxes: RefCell::default(),
             family: RefCell::default(),
+            shell_env: std::cell::OnceCell::new(),
         }
+    }
+}
+
+impl Terminals {
+    /// The shell integration's environment, as GPUI's shells get it; empty
+    /// when it cannot be written, and shells then run without it. Tests
+    /// leave the user's cache alone.
+    fn shell_env(&self) -> &[(String, String)] {
+        self.shell_env.get_or_init(|| {
+            if cfg!(test) {
+                return Vec::new();
+            }
+            let folder = moonframe_packages::paths::cache().join("shell");
+            moonframe_terminal::install_integration(&folder)
+                .inspect_err(|error| tracing::warn!("no shell integration: {error}"))
+                .unwrap_or_default()
+        })
     }
 }
 
@@ -113,7 +137,7 @@ impl Terminals {
                 .map(expand)
                 .or_else(|| moonframe_providers::launch_dir().map(ToOwned::to_owned)),
             size: Size::default(),
-            env: Vec::new(),
+            env: self.shell_env().to_vec(),
         };
         let session = if mine >= PER_MOD {
             Err(format!("`{owner}` already has {PER_MOD} terminals"))
@@ -129,6 +153,7 @@ impl Terminals {
             engine,
             selection: None,
             exit: None,
+            shell: None,
             owner: owner.to_owned(),
             told: false,
         });
@@ -521,6 +546,30 @@ pub(crate) fn grid(
 
 impl Ui {
     /// Tells mods of shells that exited: each once, if it asked to hear.
+    /// Tells each mod what its shells reported, oldest first: nothing is kept
+    /// for a terminal whose mod did not ask.
+    pub(crate) fn tell_shell_events(&mut self) -> bool {
+        let mut told = Vec::new();
+        for view in self.terminals.views.get_mut().values() {
+            let Ok(session) = &view.session else {
+                continue;
+            };
+            let signals = session.take_signals();
+            if let Some(msg) = &view.shell {
+                told.extend(
+                    signals
+                        .into_iter()
+                        .map(|signal| (view.owner.clone(), shell_events::message(msg, signal))),
+                );
+            }
+        }
+        let any = !told.is_empty();
+        for (owner, msg) in told {
+            self.workspace.send(&owner, &owner, msg);
+        }
+        any
+    }
+
     pub(crate) fn tell_exits(&mut self) {
         let mut told = Vec::new();
         for view in self.terminals.views.get_mut().values_mut() {

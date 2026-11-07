@@ -71,6 +71,7 @@ impl<'w> Painter<'w> {
         self.ui.terminals.shown.borrow_mut().push(key.clone());
         if let Some(view) = self.ui.terminals.views.borrow_mut().get_mut(&key) {
             view.exit.clone_from(&node.exit);
+            view.shell.clone_from(&node.shell);
         }
         let foreground = look
             .base
