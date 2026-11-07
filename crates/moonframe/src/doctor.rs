@@ -2,6 +2,9 @@
 //! app from loading, and with `--fix` moves them aside, so the app's own
 //! come back. A file there wins over the one at the same path in the app,
 //! so taking it away is always a way back. The window reloads as they go.
+//! With `--rollback` it goes back in the history instead.
+
+mod rollback;
 
 use {
     crate::paths::Folders,
@@ -20,11 +23,14 @@ moonframe doctor: find the files in your folder that break the app
 A file in your folder (or a profile's) replaces the one at the same path
 in the app. Doctor loads the app and names the ones with a problem.
 
-Usage: moonframe [--profile NAME] doctor [--fix]
+Usage: moonframe [--profile NAME] doctor [--fix | --rollback]
 
 Options:
   --fix         move them to .broken/ in your folder, so the app's own come
-                back; a running window reloads without them";
+                back; a running window reloads without them
+  --rollback    go back to the newest snapshot that loads, in every folder
+                `moonframe history` keeps, a linked app's source included;
+                `moonframe history redo` goes forward again";
 
 /// Where broken files are moved to in the user's folder.
 const ASIDE: &str = ".broken";
@@ -33,6 +39,7 @@ pub(crate) fn run(folders: &Folders, words: &[String]) -> ExitCode {
     let fix = match words {
         [] => false,
         [word] if word == "--fix" => true,
+        [word] if word == "--rollback" => return rollback::run(folders),
         [word] if word == "help" || word == "--help" || word == "-h" => {
             println!("{USAGE}");
             return ExitCode::SUCCESS;
@@ -61,6 +68,7 @@ pub(crate) fn run(folders: &Folders, words: &[String]) -> ExitCode {
             return ExitCode::SUCCESS;
         }
         println!("none of these come from a file in {}", own.display());
+        println!("`moonframe doctor --rollback` goes back to the newest snapshot that loads");
         return ExitCode::FAILURE;
     }
     let mut files: Vec<PathBuf> = Vec::new();
@@ -77,6 +85,7 @@ pub(crate) fn run(folders: &Folders, words: &[String]) -> ExitCode {
             println!("broken: {}", own.join(file).display());
         }
         println!("`moonframe doctor --fix` moves them aside");
+        println!("`moonframe doctor --rollback` goes back to the newest snapshot that loads");
         return ExitCode::FAILURE;
     }
     let stamp = SystemTime::now()

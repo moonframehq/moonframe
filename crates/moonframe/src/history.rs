@@ -1,24 +1,28 @@
-//! Undo for the window's own folder (the user's, or the profile's): a
-//! snapshot each time its files change, and `moonframe history` to list,
-//! undo, redo, or restore them from a terminal, as an agent would.
-//! moonframe-history keeps them; this finds where.
+//! Undo for the folders a change to the app lands in: a snapshot each time
+//! their files change, and `moonframe history` to list, undo, redo, or
+//! restore them from a terminal, as an agent would. moonframe-history keeps
+//! them; [`Kept`] finds which folders and lays them on one timeline.
 
+mod kept;
+
+pub(crate) use kept::{Kept, open};
 use {
     crate::paths::{self, Folders},
-    moonframe_history::{History, Snapshot},
+    moonframe_history::Snapshot,
     std::{
+        path::Path,
         process::ExitCode,
-        sync::Arc,
         time::{SystemTime, UNIX_EPOCH},
     },
 };
 
 pub(crate) const USAGE: &str = "\
-moonframe history: undo changes to your folder (or a profile's)
+moonframe history: undo changes to your app
 
 Every change the window reloads for is kept as a snapshot, whoever made
-it: you, an editor, or an agent. Undo writes the files back and the
-window reloads with them.
+it: you, an editor, or an agent. That covers your folder (or a profile's),
+the source of a linked app, and app/ when running from a checkout. Undo
+writes the files back and the window reloads with them.
 
 Usage: moonframe [--profile NAME] history [COMMAND]
 
@@ -26,6 +30,9 @@ Commands:
   list [N]      the last N snapshots (default 20), newest first; * marks
                 the one the folder is at
   undo          go back one snapshot
+  undo --run [ID]
+                go back to before the agent's run ID (default: the last),
+                however many files it changed
   redo          go forward one again, after an undo
   restore ID    go to the snapshot ID (as `list` shows it)
   show ID       what the snapshot ID changed, as a patch
@@ -33,20 +40,6 @@ Commands:
 
 settings.toml, databases, installed packages and other profiles are left
 out: undo never changes them.";
-
-/// The history of the window's own folder, if it has one and git runs.
-pub(crate) fn open(folders: &Folders) -> Option<Arc<History>> {
-    if !cfg!(feature = "studio") {
-        return None;
-    }
-    let own = folders.own()?;
-    let state = paths::state(folders.profile.as_deref());
-    let store = moonframe_history::store_in(state.parent()?, &own);
-    History::open(&own, &store)
-        .inspect_err(|error| tracing::warn!("no undo for {}: {error}", own.display()))
-        .ok()
-        .map(Arc::new)
-}
 
 /// `moonframe history <words>`.
 pub(crate) fn run(folders: &Folders, words: &[String]) -> ExitCode {
@@ -68,6 +61,8 @@ pub(crate) fn run(folders: &Folders, words: &[String]) -> ExitCode {
             Ok(count) => list(&history, count),
             Err(_) => return usage(&format!("not a count: {count}")),
         },
+        ["undo", "--run"] => undo_run(&history, None),
+        ["undo", "--run", id] => undo_run(&history, Some(id)),
         ["undo"] => history.undo().map(|undone| match undone {
             Some(undone) => println!("Undid {} ({})", undone.label, undone.short()),
             None => println!("Nothing to undo"),
@@ -80,9 +75,13 @@ pub(crate) fn run(folders: &Folders, words: &[String]) -> ExitCode {
             .restore(id)
             .map(|at| println!("Restored {} ({})", at.label, at.short())),
         ["show", id] => history.show(id).map(|patch| println!("{patch}")),
-        ["snapshot"] => history.capture("by hand").map(|taken| match taken {
-            Some(taken) => println!("Took {} ({})", taken.label, taken.short()),
-            None => println!("Nothing changed"),
+        ["snapshot"] => history.capture("by hand").map(|taken| {
+            for snapshot in &taken {
+                println!("Took {} ({})", snapshot.label, snapshot.short());
+            }
+            if taken.is_empty() {
+                println!("Nothing changed");
+            }
         }),
         [word, ..] => return usage(&format!("unknown history command: {word}")),
     };
@@ -100,7 +99,21 @@ fn usage(problem: &str) -> ExitCode {
     ExitCode::from(2)
 }
 
-fn list(history: &History, count: usize) -> moonframe_history::Result<()> {
+fn undo_run(history: &Kept, id: Option<&str>) -> moonframe_history::Result<()> {
+    let Some(run) = id.map(str::to_owned).or_else(|| history.last_run()) else {
+        println!("No agent's run to undo");
+        return Ok(());
+    };
+    let restored = history.undo_run(&run)?;
+    if restored == 0 {
+        println!("No run {run} to undo");
+    } else {
+        println!("Went back to before run {run}");
+    }
+    Ok(())
+}
+
+fn list(history: &Kept, count: usize) -> moonframe_history::Result<()> {
     let listed = history.list(count)?;
     if listed.is_empty() {
         println!("No snapshots yet of {}", history.folder().display());
@@ -108,10 +121,24 @@ fn list(history: &History, count: usize) -> moonframe_history::Result<()> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_secs().cast_signed());
-    for snapshot in &listed {
-        println!("{}", line(snapshot, now));
+    let several = history.several();
+    for (folder, snapshot) in &listed {
+        let line = line(snapshot, now);
+        if several {
+            println!("{line}  [{}]", short_folder(folder));
+        } else {
+            println!("{line}");
+        }
     }
     Ok(())
+}
+
+/// The folder's last part, enough to tell a timeline's folders apart.
+fn short_folder(folder: &Path) -> String {
+    folder.file_name().map_or_else(
+        || folder.display().to_string(),
+        |name| name.to_string_lossy().into_owned(),
+    )
 }
 
 /// `* 1a2b3c4d  5m ago  changed  mods/clock/init.luau`.

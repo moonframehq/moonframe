@@ -14,7 +14,11 @@ use {
         io::{BufRead, BufReader, Read, Write},
         path::PathBuf,
         process::Child,
-        sync::mpsc::{Sender, channel},
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+            mpsc::{Sender, channel},
+        },
         thread,
         time::{Duration, Instant},
     },
@@ -141,6 +145,15 @@ pub(crate) struct Run {
     warning: Option<String>,
     /// Finished, and the bundle's signature was checked after it.
     checked: bool,
+    /// No agent of this run is left to write: it has none, or it exited.
+    /// A finished run's agent gets a moment to exit, so this comes after.
+    exited: Arc<AtomicBool>,
+    /// Finished, and what it changed was taken note of.
+    kept: bool,
+    /// It left the app's folders different from how it found them.
+    changed: bool,
+    /// The app was taken back to before it.
+    undone: bool,
     session: Option<String>,
     next: i64,
     pending: BTreeMap<i64, Pending>,
@@ -227,6 +240,10 @@ impl Run {
             installed: start.installed,
             warning: None,
             checked: false,
+            exited: Arc::new(AtomicBool::new(true)),
+            kept: false,
+            changed: false,
+            undone: false,
             session: None,
             next: 0,
             pending: BTreeMap::new(),
@@ -248,6 +265,31 @@ impl Run {
         }
         self.checked = true;
         Some(self.id.clone())
+    }
+
+    /// The run's id, once, when it finished with its changes not noted and
+    /// its agent can write no more: only then is what it left final, and
+    /// `changed`, which allows an undo, comes from this.
+    pub(crate) fn take_unkept(&mut self) -> Option<String> {
+        let stopped = self.status.finished() && self.exited.load(Ordering::Acquire);
+        if !stopped || self.kept {
+            return None;
+        }
+        self.kept = true;
+        Some(self.id.clone())
+    }
+
+    pub(crate) fn set_changed(&mut self, changed: bool) {
+        self.changed = changed;
+    }
+
+    pub(crate) fn set_undone(&mut self) {
+        self.undone = true;
+    }
+
+    /// Finished with changes that have not been undone.
+    pub(crate) fn undoable(&self) -> bool {
+        self.status.finished() && self.changed && !self.undone
     }
 
     pub(crate) fn warn(&mut self, warning: String) {
@@ -297,6 +339,7 @@ impl Run {
             return Err(format!("cannot start the agent's threads: {error}"));
         }
         self.outbox = Some(outbox);
+        self.exited.store(false, Ordering::Release);
         self.child = Some(child);
         self.request_rpc(
             "initialize",
@@ -641,21 +684,25 @@ impl Run {
             // Given a moment to read what it was last sent (a cancel) and
             // exit with its input closed, then killed; on a thread of its
             // own, so an agent slow to die never holds the provider's lock.
+            let exited = Arc::clone(&self.exited);
             let reaped = thread::Builder::new()
                 .name("acp-reap".to_owned())
                 .spawn(move || {
                     let deadline = Instant::now() + GRACE;
                     while Instant::now() < deadline {
                         if matches!(child.try_wait(), Ok(Some(_))) {
+                            exited.store(true, Ordering::Release);
                             return;
                         }
                         thread::sleep(Duration::from_millis(50));
                     }
                     let _ = child.kill();
                     let _ = child.wait();
+                    exited.store(true, Ordering::Release);
                 });
             if let Err(error) = reaped {
                 tracing::warn!(provider = "acp", "cannot reap the agent: {error}");
+                self.exited.store(true, Ordering::Release);
             }
         }
         if let Some(host) = &self.host {
@@ -750,6 +797,8 @@ impl Run {
             "plan": plan,
             "question": question,
             "warning": self.warning,
+            "changed": self.changed,
+            "undone": self.undone,
         })
     }
 
@@ -757,6 +806,7 @@ impl Run {
     pub(crate) fn saved(&self) -> Value {
         let mut value = self.to_json();
         value["question"] = Value::Null;
+        value["kept"] = json!(self.kept);
         value
     }
 
@@ -788,6 +838,10 @@ impl Run {
         run.error = text("error");
         run.warning = text("warning");
         run.checked = true;
+        // Stopped by the app quitting: what it left is noted at this launch.
+        run.kept = value.get("kept").and_then(Value::as_bool) != Some(false);
+        run.changed = value.get("changed").and_then(Value::as_bool) == Some(true);
+        run.undone = value.get("undone").and_then(Value::as_bool) == Some(true);
         run.stop_reason = text("stop_reason");
         run.message = text("message").unwrap_or_default();
         run.tool_count = value
