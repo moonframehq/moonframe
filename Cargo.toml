@@ -108,7 +108,7 @@ rustix             = { default-features = false, features = ["fs", "std"], versi
 secrecy            = "0.10"
 serde              = { features = ["derive"], version = "1" }
 serde_json         = "1"
-sysinfo            = { default-features = false, features = ["network", "system"], version = "0.39" }
+sysinfo            = { default-features = false, features = ["network", "system"], version = "0.40" }
 tempfile           = "3"
 thiserror          = "2"
 toml               = "1"
