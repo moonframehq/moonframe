@@ -96,8 +96,10 @@ impl<'w> Painter<'w> {
             height: style.line_height,
         };
         self.ui.terminals.refit(&key, metrics);
+        // Keyed by the terminal, not its place: two tabs draw theirs in the
+        // same box, and one taking over has to be laid out, and so fitted.
         let element = el()
-            .key(place.path.clone())
+            .key(format!("terminal:{key}"))
             .role("terminal")
             .grow(1.)
             .min_w(0.)

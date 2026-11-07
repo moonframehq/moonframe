@@ -333,3 +333,35 @@ return mod {
         "the slot is free"
     );
 }
+
+#[test]
+fn a_terminal_opened_in_a_tab_fills_its_box_too() {
+    // Two tabs draw their terminals in the same place: the box does not move
+    // as one takes over from the other, so nothing lays out afresh.
+    let main = r#"
+return mod {
+	init = function(previous) return previous or { id = "one" } end,
+	update = function(state, msg) if msg == "other" then state.id = "two" end end,
+	view = function(state)
+		return ui.column { grow = true,
+			ui.button { "Other", msg = "other" },
+			ui.terminal { id = state.id, backend = "pty" },
+		}
+	end,
+}
+"#;
+    let dir = folder(main);
+    let mut ui = Ui::open(dir.path().to_owned(), None);
+    ui.waker = Some(Arc::new(|| {}));
+    let mut window = Runtime::new(ui, view, (800., 600.), Env::new(true, 2.));
+    settle(&mut window);
+    wait(&mut window, 20);
+    let button = rect_of(&window, |element| element.text.as_deref() == Some("Other"));
+    click_at(&mut window, button);
+    wait(&mut window, 20);
+    let rect = rect_of(&window, |element| element.role == "terminal");
+    let screen = window.state.terminals.screen("shell/two").unwrap();
+    let height = window.state.workspace.stylesheet().mono.size.unwrap_or(13.) * 1.3;
+    let wanted = ((rect[3] - 2. * terminal::PADDING) / height).floor() as u16;
+    assert_eq!(screen.rows, wanted, "{rect:?}");
+}
