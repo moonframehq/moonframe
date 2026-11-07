@@ -1,6 +1,6 @@
 //! The `git` native provider: the git state of the app's repository as
-//! `app.git`, and the writes a mod asks for (commit, push), each answered
-//! to the mod that asked.
+//! `app.git`, and the writes a mod asks for (commit, push, worktrees), each
+//! answered to the mod that asked.
 //!
 //! The repository is `LAYOUTS_REPO` when set; else the project the user
 //! works in (the repository of the terminal they last used), followed as
@@ -18,24 +18,29 @@
 //!   until `{ diff = false }`;
 //! - `{ commit = "<message>", root, id = ... }` stages everything and
 //!   commits;
-//! - `{ push = true, root, id = ... }` pushes the branch to `origin`.
+//! - `{ push = true, root, id = ... }` pushes the branch to `origin`;
+//! - `{ worktree_add = { branch, base? }, root, id = ... }` adds a worktree;
+//! - `{ worktree_remove = "<path>", root, id = ... }` removes one.
 //!
 //! A write names the repository it is for (`root`, as `app.git.root` gave
 //! it) and is refused when the provider no longer watches that one: the
 //! repository follows the terminal's project, so a sheet drawn for one must
 //! never commit to another.
 //!
-//! Only the mods named in provider.toml's `writers` setting may commit or
-//! push; any other gets a refusal as its answer. Reading is open to all.
+//! Only the mods named in provider.toml's `writers` setting may write; any
+//! other gets a refusal as its answer. Reading is open to all.
 //!
 //! An action answers its mod with `{ reply = id, action, ok, message }`,
 //! or `error` instead of `message` when it failed; `reply` is the action's
 //! name when the mod gave no `id`.
 
+// keep-sorted start
 mod diff;
 mod log;
 mod refs;
 mod status;
+mod worktrees;
+// keep-sorted end
 
 /// A remote URL's host, owner and repository, as `app.git.remote` gives
 /// them; the forge providers read their repository with it.
@@ -58,6 +63,7 @@ use {
         thread,
         time::{Duration, Instant},
     },
+    worktrees::Change,
 };
 
 /// How long a read may take; writes get herdr-vcs's own, longer deadline.
@@ -176,6 +182,8 @@ pub struct Git {
     last: Option<Value>,
     /// An action is running: one at a time.
     busy: Arc<AtomicBool>,
+    /// That action removes a worktree: [`Git::follow`] waits for it.
+    removing: Arc<AtomicBool>,
     /// An action finished: look again at the next tick.
     stale: Arc<AtomicBool>,
 }
@@ -241,9 +249,27 @@ impl Native for Git {
             _ => None,
         };
         if let Some(Data::String(text)) = field("commit") {
-            self.act(host, from, field("id"), root, Action::Commit(text.clone()));
+            self.act(
+                host,
+                from,
+                field("id"),
+                root,
+                Job::Vcs(Action::Commit(text.clone())),
+            );
         } else if let Some(Data::Bool(true)) = field("push") {
-            self.act(host, from, field("id"), root, Action::Push);
+            self.act(host, from, field("id"), root, Job::Vcs(Action::Push));
+        } else if let Some(asked) = field("worktree_add") {
+            let job = Change::add(asked).map(Job::Worktree);
+            self.act_or_refuse(host, from, field("id"), root, job, "worktree_add");
+        } else if let Some(Data::String(path)) = field("worktree_remove") {
+            let path = path.clone();
+            self.act(
+                host,
+                from,
+                field("id"),
+                root,
+                Job::Worktree(Change::Remove { path }),
+            );
         }
         // Worktrees, branches, remote and stashes are some 60 git commands
         // with many worktrees: a mod sending a message each frame gets them
@@ -275,8 +301,15 @@ impl Git {
     /// `LAYOUTS_REPO` names the repository; returns whether it moved.
     /// Everything read of the old one goes; an action running there
     /// finishes there.
+    ///
+    /// A worktree being removed may be the very project moved to: the move
+    /// waits, `followed` left as it was so the next look tries again, and it
+    /// is never made to a checkout that is gone by then.
     fn follow(&mut self, project: Option<PathBuf>) -> bool {
         if std::env::var_os("LAYOUTS_REPO").is_some() {
+            return false;
+        }
+        if self.removing.load(Ordering::Acquire) {
             return false;
         }
         if project.is_none() || project == self.followed {
@@ -295,6 +328,7 @@ impl Git {
             writers: std::mem::take(&mut self.writers),
             log_limit: self.log_limit,
             busy: self.busy.clone(),
+            removing: self.removing.clone(),
             stale: self.stale.clone(),
             ..Self::default()
         };
@@ -429,40 +463,27 @@ impl Git {
         }
     }
 
-    /// Runs `action` on a thread of its own and answers `from` when it ends,
-    /// if `asked` names the repository it watches.
-    fn act(
+    /// [`act`](Self::act), or the reason `job` could not even be read.
+    fn act_or_refuse(
         &self,
         host: &Handle,
         from: &str,
         id: Option<&Data>,
         asked: Option<&str>,
-        action: Action,
+        job: Result<Job, String>,
+        name: &'static str,
     ) {
-        let name = match action {
-            Action::Commit(_) => "commit",
-            Action::Push => "push",
-            Action::CreatePullRequest => "pull_request",
-        };
-        let reply = id.cloned().unwrap_or_else(|| Data::from(name));
-        let answer = {
-            let (host, from, reply) = (host.clone(), from.to_owned(), reply.clone());
-            move |result: Result<String, String>| {
-                let (key, text) = match &result {
-                    Ok(message) => ("message", message.clone()),
-                    Err(error) => ("error", error.clone()),
-                };
-                host.send(
-                    &from,
-                    Data::Map(BTreeMap::from([
-                        ("reply".to_owned(), reply.clone()),
-                        ("action".to_owned(), Data::from(name)),
-                        ("ok".to_owned(), Data::Bool(result.is_ok())),
-                        (key.to_owned(), Data::String(text)),
-                    ])),
-                );
-            }
-        };
+        match job {
+            Ok(job) => self.act(host, from, id, asked, job),
+            Err(problem) => answerer(host, from, id, name)(Err(problem)),
+        }
+    }
+
+    /// Runs `job` on a thread of its own and answers `from` when it ends,
+    /// if `asked` names the repository it watches.
+    fn act(&self, host: &Handle, from: &str, id: Option<&Data>, asked: Option<&str>, job: Job) {
+        let name = job.name();
+        let answer = answerer(host, from, id, name);
         // A write changes the user's history and remote; a mod from
         // elsewhere must not do it unasked.
         if !self.writers.allows(from) {
@@ -490,17 +511,81 @@ impl Git {
             repo_key: None,
             branch: self.status.branch.clone(),
         };
-        let (busy, stale) = (self.busy.clone(), self.stale.clone());
+        // Set here, on the thread `follow` runs on: no move can slip in
+        // between the checks above and the removal starting.
+        self.removing.store(job.removes(), Ordering::Release);
+        let (busy, removing, stale) =
+            (self.busy.clone(), self.removing.clone(), self.stale.clone());
         let spawned = thread::Builder::new()
             .name(format!("git-{name}"))
             .spawn(move || {
-                answer(run(input, action));
+                answer(job.run(input, &root));
+                removing.store(false, Ordering::Release);
                 busy.store(false, Ordering::Release);
                 stale.store(true, Ordering::Release);
             });
         if spawned.is_err() {
+            self.removing.store(false, Ordering::Release);
             self.busy.store(false, Ordering::Release);
         }
+    }
+}
+
+/// A write a mod asks for.
+enum Job {
+    // keep-sorted start
+    Vcs(Action),
+    Worktree(Change),
+    // keep-sorted end
+}
+
+impl Job {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Vcs(Action::Commit(_)) => "commit",
+            Self::Vcs(Action::Push) => "push",
+            Self::Vcs(Action::CreatePullRequest) => "pull_request",
+            Self::Worktree(Change::Add { .. }) => "worktree_add",
+            Self::Worktree(Change::Remove { .. }) => "worktree_remove",
+        }
+    }
+
+    fn removes(&self) -> bool {
+        matches!(self, Self::Worktree(Change::Remove { .. }))
+    }
+
+    fn run(self, input: Input, root: &Path) -> Result<String, String> {
+        match self {
+            Self::Vcs(action) => run(input, action),
+            Self::Worktree(change) => change.apply(root, &in_use),
+        }
+    }
+}
+
+/// What answers `from` once a write named `name` ends: `id`, or the name
+/// when it gave none, comes back as `reply`.
+fn answerer(
+    host: &Handle,
+    from: &str,
+    id: Option<&Data>,
+    name: &'static str,
+) -> impl FnOnce(Result<String, String>) + Send + use<> {
+    let reply = id.cloned().unwrap_or_else(|| Data::from(name));
+    let (host, from) = (host.clone(), from.to_owned());
+    move |result: Result<String, String>| {
+        let (key, text) = match &result {
+            Ok(message) => ("message", message.clone()),
+            Err(error) => ("error", error.clone()),
+        };
+        host.send(
+            &from,
+            Data::Map(BTreeMap::from([
+                ("reply".to_owned(), reply),
+                ("action".to_owned(), Data::from(name)),
+                ("ok".to_owned(), Data::Bool(result.is_ok())),
+                (key.to_owned(), Data::String(text)),
+            ])),
+        );
     }
 }
 
@@ -565,6 +650,11 @@ fn repository(dir: &Path) -> Option<PathBuf> {
         .as_deref()
         .and_then(toplevel)
         .or_else(|| toplevel(&dir.join("..").join("..")))
+}
+
+/// The checkout the user works in now, as git names it.
+fn in_use() -> Option<PathBuf> {
+    moonframe_providers::project().as_deref().and_then(toplevel)
 }
 
 /// The repository holding `start`, as git names it.
