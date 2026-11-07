@@ -43,9 +43,12 @@ unwrap_used = "deny"
 # ACP wire types for moonframe-acp; its own transport, so no async runtime.
 acp                = { default-features = false, package = "agent-client-protocol-schema", version = "1.12" }
 alacritty_terminal = "0.26"
-block2             = "0.6"
-futures            = "0.3"
-gpui-kit           = "=0.8.1"
+# Colored command-line output, plain when piped or under NO_COLOR.
+anstream = "1"
+anstyle  = "1"
+block2   = "0.6"
+futures  = "0.3"
+gpui-kit = "=0.8.1"
 # The parser `gpui-kit` renders with, read here for headings and footnotes.
 latex-rust = { default-features = false, features = ["std"], version = "3.0" }
 markdown   = "1.0"
