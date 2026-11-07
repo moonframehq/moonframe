@@ -25,8 +25,10 @@ fn shortened(value: &Value, limit: usize) -> String {
 }
 
 fn path_in(cwd: &str, path: &Value) -> String {
+    // Not by `is_absolute`: Windows calls `/code/a` relative, and a
+    // relative path never starts with the working directory anyway.
     let path = display(path);
-    if path.is_empty() || !Path::new(&path).is_absolute() {
+    if path.is_empty() {
         return path;
     }
     Path::new(&path).strip_prefix(cwd).map_or_else(
