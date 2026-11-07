@@ -614,8 +614,8 @@ fn base(repo: &Repo) -> String {
 }
 
 /// The repository to watch: `LAYOUTS_REPO`, else the project the user
-/// works in, else the one holding the app folder this provider is in (two
-/// folders up), as git.sh did.
+/// works in, else the one the app was started in, else the one holding the
+/// app folder this provider is in (two folders up), as git.sh did.
 fn repository(dir: &Path) -> Option<PathBuf> {
     if let Some(named) = std::env::var_os("LAYOUTS_REPO") {
         return toplevel(Path::new(&named));
@@ -623,6 +623,9 @@ fn repository(dir: &Path) -> Option<PathBuf> {
     moonframe_providers::project()
         .as_deref()
         .and_then(toplevel)
+        // Before any terminal has made a project: an app that opens its
+        // terminals from what git lists needs one to start from.
+        .or_else(|| moonframe_providers::launch_dir().and_then(toplevel))
         .or_else(|| toplevel(&dir.join("..").join("..")))
 }
 
