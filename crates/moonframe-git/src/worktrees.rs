@@ -4,7 +4,8 @@
 //! A mod names a branch, never a folder: the host puts each worktree beside
 //! the repository, in `<repository>.worktrees/`. Removing one never deletes
 //! its branch, and git refuses one with uncommitted changes or a lock, with
-//! no way for a mod to force it: the work there is the user's.
+//! no way for a mod to force it: the work there is the user's. Nor does it
+//! take the checkout the user works in, even one they moved to just now.
 
 use {
     crate::{
@@ -28,6 +29,7 @@ const LIMIT: usize = 1 << 20;
 /// A worktree a mod asks to add or remove.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Change {
+    // keep-sorted start
     /// A worktree on `branch`; made from `base`, or HEAD, if it is new.
     Add {
         branch: String,
@@ -36,6 +38,7 @@ pub(crate) enum Change {
     Remove {
         path: String,
     },
+    // keep-sorted end
 }
 
 impl Change {
@@ -55,10 +58,16 @@ impl Change {
         })
     }
 
-    pub(crate) fn apply(&self, root: &Path) -> Result<String, String> {
+    /// Runs the change in `root`. `in_use` names the checkout the user works
+    /// in now, which may have moved since `root` was read.
+    pub(crate) fn apply(
+        &self,
+        root: &Path,
+        in_use: &dyn Fn() -> Option<PathBuf>,
+    ) -> Result<String, String> {
         match self {
             Self::Add { branch, base } => add(root, branch, base.as_deref()),
-            Self::Remove { path } => remove(root, path),
+            Self::Remove { path } => remove(root, path, in_use),
         }
     }
 }
@@ -112,20 +121,22 @@ fn commit_of(repo: &Repo, base: &str) -> Result<String, String> {
 }
 
 /// Where a worktree of `branch` goes: `<repository>.worktrees/<branch>`
-/// beside the main checkout, with a branch's `/` as `-`.
+/// beside the main checkout, one folder deep. A branch's `/` is `%2F` and its
+/// `%` is `%25`, so no two branches share a folder: `feat/login` is not
+/// `feat-login`, and neither sits inside another worktree.
 fn folder_for(main: &Path, branch: &str) -> Result<PathBuf, String> {
     let (Some(parent), Some(name)) = (main.parent(), main.file_name()) else {
         return Err(format!("no folder beside {}", main.display()));
     };
     let mut worktrees = name.to_owned();
     worktrees.push(".worktrees");
-    Ok(parent.join(worktrees).join(branch.replace('/', "-")))
+    let folder = branch.replace('%', "%25").replace('/', "%2F");
+    Ok(parent.join(worktrees).join(folder))
 }
 
 fn add(root: &Path, branch: &str, base: Option<&str>) -> Result<String, String> {
     let repo = Repo::at(root);
     checked_branch(&repo, branch)?;
-    let start = commit_of(&repo, base.unwrap_or("HEAD"))?;
     let worktrees = listed(&repo)?;
     let main = worktrees.first().ok_or("no main checkout")?;
     let folder = folder_for(Path::new(&main.path), branch)?;
@@ -140,12 +151,16 @@ fn add(root: &Path, branch: &str, base: Option<&str>) -> Result<String, String> 
             "find a branch",
         )
         .is_some();
-    let args: &[&str] = if exists {
-        &["worktree", "add", "--quiet", &path, branch]
+    if exists {
+        let args = ["worktree", "add", "--quiet", &path, branch];
+        git(root, &args, "add a worktree")?;
     } else {
-        &["worktree", "add", "--quiet", "-b", branch, &path, &start]
-    };
-    git(root, args, "add a worktree")?;
+        // Only a new branch starts somewhere: one that exists needs no
+        // commit here, and HEAD may have none yet.
+        let start = commit_of(&repo, base.unwrap_or("HEAD"))?;
+        let args = ["worktree", "add", "--quiet", "-b", branch, &path, &start];
+        git(root, &args, "add a worktree")?;
+    }
     // As git lists it, which is how `app.git.worktrees` and a later removal
     // name it: on Windows that differs from the path given here.
     let added = listed(&repo)?
@@ -154,7 +169,7 @@ fn add(root: &Path, branch: &str, base: Option<&str>) -> Result<String, String> 
     Ok(added.map_or(path, |worktree| worktree.path))
 }
 
-fn remove(root: &Path, path: &str) -> Result<String, String> {
+fn remove(root: &Path, path: &str, in_use: &dyn Fn() -> Option<PathBuf>) -> Result<String, String> {
     let worktrees = listed(&Repo::at(root))?;
     let asked = Path::new(path);
     let Some(at) = worktrees
@@ -166,7 +181,9 @@ fn remove(root: &Path, path: &str) -> Result<String, String> {
     if at == 0 {
         return Err("the main checkout cannot be removed".to_owned());
     }
-    if asked == root {
+    // Asked last, right before git: the user may have moved here since this
+    // began, which `root`, read then, cannot show.
+    if asked == root || in_use().as_deref() == Some(asked) {
         return Err("this is the checkout in use; switch to another first".to_owned());
     }
     git(root, &["worktree", "remove", path], "remove a worktree")?;

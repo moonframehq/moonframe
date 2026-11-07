@@ -1866,7 +1866,8 @@ Worktrees, one per branch in flight, take the same `root`, `id` and
 `writers`. `{ worktree_add = { branch = "feat/x", base = "main" }, root = ...,
 id = ... }` checks out `branch`, making it from `base` (or HEAD) when it is
 new, and the reply's `message` is the folder: the host picks it, beside the
-repository in `<repository>.worktrees/<branch>`, never a mod. `{
+repository in `<repository>.worktrees/<branch>` (a `/` becomes `%2F`), never a
+mod. `{
 worktree_remove = <path from app.git.worktrees>, root = ..., id = ... }`
 removes a linked worktree. The branch stays, and it is refused with
 uncommitted changes, for the main checkout, or for the checkout in use; there

@@ -48,14 +48,14 @@ fn add(fixture: &Fixture, branch: &str, base: Option<&str>) -> Result<String, St
         branch: branch.to_owned(),
         base: base.map(str::to_owned),
     }
-    .apply(&fixture.root)
+    .apply(&fixture.root, &|| None)
 }
 
 fn remove(fixture: &Fixture, path: &str) -> Result<String, String> {
     Change::Remove {
         path: path.to_owned(),
     }
-    .apply(&fixture.root)
+    .apply(&fixture.root, &|| None)
 }
 
 fn branches(root: &Path) -> String {
@@ -69,10 +69,40 @@ fn a_new_branch_gets_a_folder_beside_the_repository() {
     let expected = fixture
         .root
         .with_file_name("project.worktrees")
-        .join("feat-login");
+        .join("feat%2Flogin");
     assert_eq!(Path::new(&path), expected);
     assert!(expected.join("a.txt").is_file());
     assert_eq!(run(&expected, &["branch", "--show-current"]), "feat/login");
+}
+
+#[test]
+fn branches_that_look_alike_get_folders_of_their_own() {
+    let fixture = fixture();
+    let names = ["feat/login", "feat-login", "feat%2Flogin"];
+    let paths: Vec<String> = names
+        .iter()
+        .map(|name| add(&fixture, name, None).unwrap())
+        .collect();
+    for (path, name) in paths.iter().zip(names) {
+        assert_eq!(run(Path::new(path), &["branch", "--show-current"]), name);
+    }
+    let unique: std::collections::BTreeSet<_> = paths.iter().collect();
+    assert_eq!(unique.len(), paths.len());
+
+    // Nothing of a removed `feat/login` stays in the way of a `feat`.
+    remove(&fixture, &paths[0]).unwrap();
+    run(&fixture.root, &["branch", "-D", "feat/login"]);
+    add(&fixture, "feat", None).unwrap();
+}
+
+#[test]
+fn a_branch_that_exists_needs_no_commit_on_head() {
+    let fixture = fixture();
+    run(&fixture.root, &["checkout", "-q", "--orphan", "fresh"]);
+    let path = add(&fixture, "main", None).unwrap();
+    assert!(Path::new(&path).join("a.txt").is_file());
+    let refused = add(&fixture, "new", None).unwrap_err();
+    assert!(refused.contains("no commit"), "{refused}");
 }
 
 #[test]
@@ -165,7 +195,21 @@ fn only_a_linked_worktree_elsewhere_can_be_removed() {
     let refused = Change::Remove {
         path: linked.clone(),
     }
-    .apply(Path::new(&linked))
+    .apply(Path::new(&linked), &|| None)
+    .unwrap_err();
+    assert!(refused.contains("in use"), "{refused}");
+    assert!(Path::new(&linked).is_dir());
+}
+
+/// `root` was read when the removal began; the user moved there after.
+#[test]
+fn a_checkout_the_user_just_moved_to_stays() {
+    let fixture = fixture();
+    let linked = add(&fixture, "moved-to", None).unwrap();
+    let refused = Change::Remove {
+        path: linked.clone(),
+    }
+    .apply(&fixture.root, &|| Some(PathBuf::from(&linked)))
     .unwrap_err();
     assert!(refused.contains("in use"), "{refused}");
     assert!(Path::new(&linked).is_dir());
