@@ -25,6 +25,9 @@ use {
 const TIMEOUT: Duration = Duration::from_secs(120);
 /// Output kept from one command.
 const LIMIT: usize = 1 << 20;
+/// The longest folder named after a branch as it is, in bytes. A filesystem
+/// allows 255, and a path on Windows 260 in all.
+const FOLDER_LIMIT: usize = 100;
 
 /// A worktree a mod asks to add or remove.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -123,7 +126,8 @@ fn commit_of(repo: &Repo, base: &str) -> Result<String, String> {
 /// Where a worktree of `branch` goes: `<repository>.worktrees/<branch>`
 /// beside the main checkout, one folder deep. A branch's `/` is `%2F` and its
 /// `%` is `%25`, so no two branches share a folder: `feat/login` is not
-/// `feat-login`, and neither sits inside another worktree.
+/// `feat-login`, and neither sits inside another worktree. [`bounded`] keeps
+/// a long one within what a filesystem takes.
 fn folder_for(main: &Path, branch: &str) -> Result<PathBuf, String> {
     let (Some(parent), Some(name)) = (main.parent(), main.file_name()) else {
         return Err(format!("no folder beside {}", main.display()));
@@ -131,7 +135,30 @@ fn folder_for(main: &Path, branch: &str) -> Result<PathBuf, String> {
     let mut worktrees = name.to_owned();
     worktrees.push(".worktrees");
     let folder = branch.replace('%', "%25").replace('/', "%2F");
-    Ok(parent.join(worktrees).join(folder))
+    Ok(parent.join(worktrees).join(bounded(folder)))
+}
+
+/// `folder`, or past [`FOLDER_LIMIT`] its start and a hash of the whole of
+/// it. That is always longer than the limit, so it is never the name of a
+/// shorter branch; two long ones sharing a hash meet the check for a folder
+/// already there, and are refused.
+fn bounded(folder: String) -> String {
+    if folder.len() <= FOLDER_LIMIT {
+        return folder;
+    }
+    let mut end = FOLDER_LIMIT;
+    while !folder.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}-{:016x}", &folder[..end], fnv1a(folder.as_bytes()))
+}
+
+/// FNV-1a: the same from one build to the next, as a folder already on disk
+/// needs, which std's hashers don't promise.
+fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
+    })
 }
 
 fn add(root: &Path, branch: &str, base: Option<&str>) -> Result<String, String> {

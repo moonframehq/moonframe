@@ -96,6 +96,43 @@ fn branches_that_look_alike_get_folders_of_their_own() {
 }
 
 #[test]
+fn a_long_branch_gets_a_folder_a_filesystem_takes() {
+    let main = Path::new("/work/project");
+    let name = |branch: &str| {
+        let folder = folder_for(main, branch).unwrap();
+        folder.file_name().unwrap().to_string_lossy().into_owned()
+    };
+    let segment = "a".repeat(62);
+    let long = [segment.as_str(); 4].join("/");
+    assert!(name(&long).len() <= 255, "{}", name(&long));
+
+    // Long names differing only past the cut stay apart, in any script.
+    let other = format!("{}b", &long[..long.len() - 1]);
+    assert_ne!(name(&long), name(&other));
+    let wide = "é".repeat(120);
+    assert!(name(&wide).len() <= 255);
+    assert!(name(&wide).starts_with("éé"));
+
+    // One at the limit keeps its name, and no cut name is ever that short.
+    let exact = "a".repeat(FOLDER_LIMIT);
+    assert_eq!(name(&exact), exact);
+    assert!(name(&format!("{exact}a")).len() > FOLDER_LIMIT);
+}
+
+// On Windows git cannot write the ref itself: its path is over 260.
+#[cfg(unix)]
+#[test]
+fn a_long_branch_can_be_added_and_removed() {
+    let fixture = fixture();
+    let segment = "a".repeat(62);
+    let branch = [segment.as_str(); 4].join("/");
+    let path = add(&fixture, &branch, None).unwrap();
+    assert_eq!(run(Path::new(&path), &["branch", "--show-current"]), branch);
+    remove(&fixture, &path).unwrap();
+    assert!(!Path::new(&path).exists());
+}
+
+#[test]
 fn a_branch_that_exists_needs_no_commit_on_head() {
     let fixture = fixture();
     run(&fixture.root, &["checkout", "-q", "--orphan", "fresh"]);
