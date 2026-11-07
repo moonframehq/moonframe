@@ -293,7 +293,8 @@ impl Moonframe {
             moonframe_providers::set_profile(profile);
         }
         if given.check {
-            return checked(folders.roots());
+            let roots = folders.roots();
+            return on_a_view_stack(move || checked(roots));
         }
         if let Some(own) = folders.own()
             && let Err(error) = fs::create_dir_all(&own)
@@ -349,6 +350,19 @@ impl Moonframe {
 }
 
 /// Loads every module and reports, as `moonframe --check` does.
+/// Runs `run` with the stack views are read on: 8 MiB, the main thread's on
+/// macOS and Linux. Windows gives its main thread 1 MiB, which a debug
+/// build's frames reading a deep view (an example app, in CI) outgrow.
+fn on_a_view_stack(run: impl FnOnce() -> ExitCode + Send + 'static) -> ExitCode {
+    std::thread::Builder::new()
+        .name("check".to_owned())
+        .stack_size(8 * 1024 * 1024)
+        .spawn(run)
+        .ok()
+        .and_then(|thread| thread.join().ok())
+        .unwrap_or(ExitCode::FAILURE)
+}
+
 fn checked(roots: Roots) -> ExitCode {
     let workspace = Workspace::open_with_capabilities(roots, false, None, crate::compiled());
     let problems = workspace.problems();
