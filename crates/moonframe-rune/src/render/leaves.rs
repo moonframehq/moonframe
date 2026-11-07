@@ -292,6 +292,14 @@ impl<'w> Painter<'w> {
             let to = input.to.clone().unwrap_or_else(|| place.owner.to_owned());
             (place.owner.to_owned(), to, msg)
         });
+        let hearing = |msg: &Option<Data>| {
+            msg.clone().map(|msg| {
+                let to = input.to.clone().unwrap_or_else(|| place.owner.to_owned());
+                (place.owner.to_owned(), to, msg)
+            })
+        };
+        field.select = hearing(&input.select);
+        field.change = hearing(&input.change);
         let mut font = pen.text_style();
         font.line_height = (pen.size * FIELD_LINE).round();
         let shown = text_input(&field.edit, font);

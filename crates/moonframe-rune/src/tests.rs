@@ -13,6 +13,7 @@ const SHELL: &str = include_str!("../../moonframe-core/fixtures/both-backends.lu
 const FRAME: f64 = 1. / 60.;
 
 // keep-sorted start
+mod fields;
 mod maps;
 mod terminals;
 // keep-sorted end

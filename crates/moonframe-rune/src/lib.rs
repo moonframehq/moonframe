@@ -25,6 +25,7 @@ mod dock;
 #[path = "../../moonframe/src/embed.rs"]
 #[allow(dead_code, reason = "shared with `moonframe`, which uses more of it")]
 mod embed;
+mod fields;
 mod icons;
 mod inspect;
 mod keys;
@@ -116,6 +117,11 @@ pub(crate) struct Field {
     pub(crate) had_focus: bool,
     /// Who hears `blur`, and what they are sent: sender, mod and message.
     pub(crate) blur: Option<(String, String, Data)>,
+    /// Who hears `select` and `change`, as last drawn.
+    pub(crate) select: Option<fields::Hearing>,
+    pub(crate) change: Option<fields::Hearing>,
+    /// The selection and caret `select` last saw.
+    pub(crate) selection: ((usize, usize), usize),
 }
 
 /// A `ui.list` on screen: where it is scrolled, written as Rune lays it out.
@@ -248,6 +254,10 @@ impl Ui {
             },
             Request::Appearance(appearance) => {
                 self.set_appearance(appearance);
+                true
+            },
+            Request::Edit(edit) => {
+                self.apply_edit(from, &edit);
                 true
             },
             other => {
@@ -522,6 +532,7 @@ fn poll(ui: &mut Ui, _: f64, tx: &mut Tx) -> bool {
     }
     changed |= ui.reload_changed();
     changed |= ui.settle_browsers();
+    changed |= ui.tell_selections();
     for (owner, to, note) in ui.markdown_notes.take() {
         ui.send(&owner, &to, note);
         changed = true;
