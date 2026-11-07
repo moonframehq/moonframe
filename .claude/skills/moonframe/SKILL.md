@@ -405,7 +405,8 @@ live shell. The host runs it, so it can't be written in Luau:
   sequences, even `cat` of a file: show them or notify, and never run
   anything because of one. zsh and fish report commands and folders by
   themselves; bash needs `[ -n "$MOONFRAME_SHELL_INTEGRATION" ] && .
-  "$MOONFRAME_SHELL_INTEGRATION/moonframe.bash"` in `~/.bashrc`.
+  "$MOONFRAME_SHELL_INTEGRATION/moonframe.bash"` in `~/.bashrc`, and 4.4 or
+  later to report commands (macOS's own 3.2 reports only its folder).
   `MOONFRAME_SHELL_INTEGRATION=0` in the app's environment turns it off, and
   shells already running under herdr-core or tmux get it once restarted. A
   tab from `tabbed` uses this itself: it takes its shell's folder or title

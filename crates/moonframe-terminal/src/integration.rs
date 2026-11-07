@@ -6,7 +6,8 @@
 //! - **zsh**: `ZDOTDIR` leads to a `.zshenv` that puts it back, then loads
 //!   the user's files as usual.
 //! - **fish**: a `vendor_conf.d` script, found through `XDG_DATA_DIRS`.
-//! - **bash**: cannot be reached this way; one line in `~/.bashrc` does it.
+//! - **bash**: cannot be reached this way; one line in `~/.bashrc` does it,
+//!   and it takes bash 4.4 or later to report commands.
 //!
 //! `MOONFRAME_SHELL_INTEGRATION=0` in the app's environment turns it off.
 //!

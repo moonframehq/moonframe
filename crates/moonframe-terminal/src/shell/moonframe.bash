@@ -14,5 +14,7 @@ _moonframe_prompt() {
 }
 
 PROMPT_COMMAND="_moonframe_prompt${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
-# Printed as a command starts (bash 4.4). It cannot name the command.
+# Printed as a command starts. Bash before 4.4, such as macOS's own 3.2, has no
+# PS0, so it reports its folder and prompt but no commands. It cannot name the
+# command either way.
 PS0+=$'\e]133;C\e\\'

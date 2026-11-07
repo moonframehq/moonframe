@@ -193,6 +193,10 @@ trait Emulator {
     fn replies(&mut self) -> Vec<u8>;
 }
 
+#[cfg(all(test, unix))]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod shell_tests;
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod snapshot_tests;
