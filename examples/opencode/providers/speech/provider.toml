@@ -1,0 +1,66 @@
+# The built-in `speech` provider, here so that the chat mod may listen for the
+# composer's mic button.
+
+# Dictation: a mod asks it to listen, the user talks, and the words go back
+# to that mod alone. Shared as `app.speech`: the engines, which is ready,
+# and whether it is listening (see crates/moonframe-speech, the `speech`
+# feature). `use "dictation"` is the button that drives it.
+# A native provider: Rust built into the app, using the microphone with the
+# permission the system asks you for.
+interval = 0.1
+kind     = "native"
+
+[settings]
+# The mods that may listen, with the components they draw; any other is
+# refused. Each listens only from a click of its mic button.
+recorders = ["chat"]
+# The engines a mod that names none may use, best first. Only what is listed
+# here is picked by itself, so your voice leaves this machine only if you add
+# a remote engine. To change it, copy this folder to
+# ~/.config/moonframe/providers/speech and edit the copy.
+prefer = ["apple", "whisper"]
+# The longest take, in seconds (at most 600).
+max_seconds = 120
+
+# On-device recognition, macOS only, in the installed app. It needs Dictation
+# on in System Settings > Keyboard, and never goes to Apple's servers.
+# `language` is a locale such as "fr-FR"; without it, the system's.
+[settings.engines.apple]
+kind  = "apple"
+title = "Apple (on device)"
+
+# A local program, on any system: run without a shell, with {file} replaced
+# by a 16 kHz mono WAV, and what it prints is the text. This is whisper.cpp
+# (`brew install whisper-cpp`, with a model from huggingface.co/ggerganov/whisper.cpp).
+# `timeout` is in seconds (120).
+[settings.engines.whisper]
+command = [
+  "whisper-cli",
+  "-m",
+  "~/.local/share/whisper/ggml-base.bin",
+  "-f",
+  "{file}",
+  "-nt",
+  "-np",
+]
+kind = "command"
+title = "Whisper (local)"
+
+# Remote services, with OpenAI's audio/transcriptions request. `url` is https,
+# or http on this machine for a server of your own; `key_env` names the
+# variable holding the key, read from the app's environment, then your login
+# shell's; leave it out for a server without one. `language` is a code such
+# as "fr". Add one to `prefer` to use it by default.
+[settings.engines.groq]
+key_env = "GROQ_API_KEY"
+kind    = "remote"
+model   = "whisper-large-v3-turbo"
+title   = "Groq"
+url     = "https://api.groq.com/openai/v1"
+
+[settings.engines.openai]
+key_env = "OPENAI_API_KEY"
+kind    = "remote"
+model   = "gpt-4o-mini-transcribe"
+title   = "OpenAI"
+url     = "https://api.openai.com/v1"

@@ -1,0 +1,7 @@
+[app]
+# A demo agent workspace in the dark: sessions on the left, a chat in the
+# middle, changes and two little mods on the right. The sessions are sample
+# data and the agent is scripted. `moonframe --profile opencode` opens it.
+name     = "opencode"
+requires = []
+title    = "opencode"
