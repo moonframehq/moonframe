@@ -32,6 +32,8 @@ export class Engine {
 		this.summaries = new Map();
 		this.branches = new Map();
 		this.expanded = new Map();
+		// Words of failed sends, by thread, until its composer has them back.
+		this.returned = new Map();
 		this.shown = new Map();
 		this.events = [];
 		this.seq = 0;

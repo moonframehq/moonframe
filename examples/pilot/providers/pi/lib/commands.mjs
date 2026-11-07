@@ -54,8 +54,9 @@ async function submit(engine, id, { text, paths, behavior }) {
 		if (text.startsWith("/") && (await builtin(engine, id, text))) return;
 		await engine.prompt(id, { text, images: attached, behavior });
 	} catch (error) {
-		// The composer emptied itself on sending: give the words back.
-		engine.prefill = { text, seq: Date.now() };
+		// The composer emptied itself on sending: the words go back to this
+		// thread's, whichever is open by the time a slow failure comes.
+		if (text) engine.returned.set(id, { text, seq: ++engine.seq });
 		throw error;
 	}
 }
@@ -136,6 +137,7 @@ async function deleteThread(engine, id) {
 		else await removeWorktree(meta.workspace, meta.worktree.path).catch((error) => console.error(`pilot: ${error.message}`));
 	}
 	delete engine.data.threads[id];
+	engine.returned.delete(id);
 	engine.summaries.delete(id);
 	engine.entries.delete(id);
 	if (engine.data.selected === id) engine.data.selected = null;
@@ -156,6 +158,10 @@ const HANDLERS = {
 	prompt: async (engine, msg) => {
 		const id = msg.thread ?? engine.data.selected;
 		await submit(engine, id, { text: msg.prompt, paths: msg.images, behavior: msg.behavior });
+	},
+	returned_taken: (engine, msg) => {
+		const { thread, seq } = msg.returned_taken;
+		if (engine.returned.get(thread)?.seq === seq) engine.returned.delete(thread);
 	},
 	abort: async (engine, msg) => {
 		const live = engine.live.get(msg.thread ?? engine.data.selected);

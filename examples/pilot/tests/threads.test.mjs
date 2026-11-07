@@ -45,10 +45,27 @@ test("a thread with only shell output stays listed after leaving it", async () =
 	await app.until((v) => v.selected === shellOnly && v.thread?.items.some((i) => i.k === "bash"), "and it comes back");
 });
 
-test("a send that fails puts the words back in the composer", async () => {
-	app.send({ prompt: "keep these words", images: [join(app.project, "package.json")] });
-	await app.until((v) => v.prefill?.text === "keep these words", "given back");
-	assert.equal(app.value.thread.items.some((i) => i.text === "keep these words"), false);
+test("a failed send's words wait for their own thread, and come back once", async () => {
+	const other = app.value.selected;
+	app.send({ new_thread: { workspace: app.project, mode: "local", prompt: "hello there", images: {} } });
+	const failing = await app.until((v) => v.selected !== other && v.thread?.status === "idle" && v.thread.items.some((i) => i.entry) && v.selected, "a second thread");
+	app.send({ select: other });
+	await app.until((v) => v.selected === other, "moved away");
+
+	app.send({ thread: failing, prompt: "keep these words", images: [join(app.project, "package.json")] });
+	await app.until((v) => v.events.some((event) => /is not one/.test(event.body ?? "")), "refused");
+	assert.equal(app.value.returned, null, "not offered to the open thread");
+
+	app.send({ select: failing });
+	const { seq } = await app.until((v) => v.selected === failing && v.returned?.text === "keep these words" && v.returned, "back on its thread");
+	app.send({ returned_taken: { thread: failing, seq: seq - 1 } });
+	app.send({ select: other });
+	await app.until((v) => v.selected === other, "away again");
+	app.send({ select: failing });
+	await app.until((v) => v.selected === failing && v.returned?.seq === seq, "an old answer takes nothing");
+
+	app.send({ returned_taken: { thread: failing, seq } });
+	await app.until((v) => v.returned === null, "taken once");
 });
 
 test("a worktree outlives its first thread while a fork uses it", async () => {

@@ -292,6 +292,7 @@ export function snapshotOf(engine) {
 		selected,
 		thread,
 		prefill: engine.prefill ?? null,
+		returned: engine.returned.get(selected) ?? null,
 		models: engine.catalogue.models.slice(0, MAX_MODELS).map(({ provider, id, name, reasoning }) => ({
 			provider,
 			id,

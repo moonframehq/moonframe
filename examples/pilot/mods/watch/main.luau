@@ -3,7 +3,7 @@
 -- mod draws nothing and passes on only what changed: the thread on screen
 -- (the topic `pilot/thread`), new events (to the shell) and the Dock's badge.
 
-type State = { seen: number, thread: string?, cwd: string?, prefill: number, editor: number, badge: string }
+type State = { seen: number, thread: string?, cwd: string?, prefill: number, editor: number, returned: number?, badge: string }
 
 return mod {
 	subscribe = { "provider/pi" },
@@ -41,7 +41,9 @@ return mod {
 		local written = thread and thread.editor_text
 		local new_prefill = prefill ~= nil and prefill.seq ~= state.prefill
 		local new_written = written ~= nil and written.seq ~= state.editor
-		if pi.selected ~= state.thread or cwd ~= state.cwd or new_prefill or new_written then
+		local returned = pi.returned
+		local new_returned = returned ~= nil and returned.seq ~= state.returned
+		if pi.selected ~= state.thread or cwd ~= state.cwd or new_prefill or new_written or new_returned then
 			state.thread = pi.selected
 			state.cwd = cwd
 			local text: string? = nil
@@ -53,7 +55,13 @@ return mod {
 				state.editor = written.seq
 				text = written.text
 			end
-			table.insert(sends, { to = "topic:pilot/thread", msg = { id = pi.selected, cwd = cwd, text = text, seq = state.prefill + state.editor } })
+			local back: any = nil
+			if new_returned then
+				state.returned = returned.seq
+				back = returned
+				table.insert(sends, { to = "provider:pi", msg = { returned_taken = { thread = pi.selected, seq = returned.seq } } })
+			end
+			table.insert(sends, { to = "topic:pilot/thread", msg = { id = pi.selected, cwd = cwd, text = text, seq = state.prefill + state.editor, returned = back } })
 		end
 
 		local waiting = 0
