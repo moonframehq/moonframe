@@ -8,6 +8,7 @@ use {
         component::Library,
         menus::Menus,
         node,
+        peaks::Peaks,
         read::{Cx, Fields, NO_NAMES, Read},
         vm::{self, Meter},
     },
@@ -207,6 +208,7 @@ impl Read for Send {
 pub(crate) struct Module {
     lua: Lua,
     meter: Meter,
+    peaks: Peaks,
     lens: Lens,
     definition: Definition,
     state: Value,
@@ -235,7 +237,8 @@ impl Module {
                 "menus and about: only the shell (main.luau) sets them",
             ));
         }
-        Self::start(lua, meter, definition, previous, props)
+        let peaks = Peaks::new(name, vm::MEMORY, vm::INTERRUPTS);
+        Self::start(lua, meter, peaks, definition, previous, props)
     }
 
     /// An instance of the component `component`, which keeps state: it has
@@ -271,12 +274,14 @@ impl Module {
             keys: Keys::default(),
             meta: Meta::default(),
         };
-        Self::start(lua, meter, definition, previous, props)
+        let peaks = Peaks::new(name, vm::SMALL_MEMORY, vm::INTERRUPTS);
+        Self::start(lua, meter, peaks, definition, previous, props)
     }
 
     fn start(
         lua: Lua,
         meter: Meter,
+        peaks: Peaks,
         definition: Definition,
         previous: Option<&Data>,
         props: Option<&Data>,
@@ -308,6 +313,7 @@ impl Module {
             lens: Lens::new(&lua)?,
             lua,
             meter,
+            peaks,
             definition,
             state,
             props,
@@ -380,6 +386,7 @@ impl Module {
                 msg.to_lua(&self.lua)?,
                 self.props.clone(),
             ))
+            .inspect(|_| self.read_peaks())
             .map_err(|error| Error::from(error).context("update"))?;
         if !state.is_nil() {
             self.state = state;
@@ -413,6 +420,7 @@ impl Module {
         // A list's rows are built as it is read, and may read `app` too.
         let (node, problems) =
             node::read(&tree, sheet, windows).map_err(|error| error.context("view"))?;
+        self.read_peaks();
         Ok((
             node,
             problems
@@ -421,6 +429,11 @@ impl Module {
                 .collect(),
             self.lens.reads(),
         ))
+    }
+
+    /// Notes how much of its limits the call that just ended came to use.
+    fn read_peaks(&self) {
+        self.peaks.read(self.lua.used_memory(), self.meter.used());
     }
 
     /// The mod's own `styles`, read against the stylesheet's names.

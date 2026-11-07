@@ -270,6 +270,13 @@ Anything over 8 ms
 and over 16 ms at `warn`; fast ones stay at `debug`. Measure in a release build
 (`target/release/moonframe`): debug is several times slower.
 
+The same log shows how close each module comes to its limits. At `debug`, a
+line each time a module's Luau memory grows by a quarter past 1 MiB, or a call
+uses over a tenth of its instruction budget; at `warn`, once, at 75% of either.
+A mod has 64 MiB, and a component instance 8 MiB. Readings are taken as a call
+ends: garbage not yet collected counts, and memory a call took and gave back
+within itself does not.
+
 ## Examples
 
 `examples/` has its apps and a package two of them share; read them first:
