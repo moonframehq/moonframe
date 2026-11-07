@@ -29,6 +29,35 @@ fn stacked(direction: Direction) -> El {
     }
 }
 
+/// A row of mods, such as a status bar, never spills onto its neighbours, as
+/// on GPUI: a member that does not fit wraps onto a line of its own below,
+/// which is clipped away, and a first member wider than the row is cut. Each
+/// member is as tall as the row, so only the first line shows; the row needs
+/// a parent of definite height.
+///
+/// `grow` here would share the parent evenly whatever the regions hold, so one
+/// that starts at the left is as wide as its mods and leaves the rest to a
+/// region after it. Only one aligned elsewhere needs the room to align in.
+fn row_region(element: El, justify: Justify, members: impl Iterator<Item = El>) -> El {
+    let element = match justify {
+        Justify::Start => element.shrink(),
+        Justify::Center | Justify::End | Justify::Between => element.grow(1.).min_w(0.),
+    };
+    element
+        .h_full()
+        .flex_wrap()
+        .items_center()
+        .clip_rounded(0.)
+        .children(members.map(|member| {
+            row()
+                .items_center()
+                .h_full()
+                .shrink()
+                .clip_rounded(0.)
+                .child(member)
+        }))
+}
+
 impl<'w> Painter<'w> {
     pub(super) fn stack(&self, stack: &'w Stack, place: &Place<'w>) -> El {
         let part = match stack.direction {
@@ -265,16 +294,13 @@ impl<'w> Painter<'w> {
 
     pub(super) fn region(&self, region: &'w Region, place: &Place<'w>) -> El {
         let mods = self.ui.workspace.region(&region.name);
-        let children: Vec<El> = mods
+        let children = mods
             .into_iter()
             .enumerate()
-            .map(|(index, name)| self.slot(name, &place.child(index)))
-            .collect();
+            .map(|(index, name)| self.slot(name, &place.child(index)));
         let element = stacked(region.direction)
             .key(place.path.clone())
-            .grow(1.)
             .gap(region.gap.pixels())
-            .min_w(0.)
             .min_h(0.);
         let element = match region.justify {
             Justify::Start => element.justify_start(),
@@ -282,11 +308,9 @@ impl<'w> Painter<'w> {
             Justify::End => element.justify_end(),
             Justify::Between => element.justify_between(),
         };
-        let element = element.children(children);
         match region.direction {
-            // A row of mods, such as a status bar, is as tall as its parent.
-            Direction::Row => element.h_full().items_center(),
-            Direction::Column => element,
+            Direction::Row => row_region(element, region.justify, children),
+            Direction::Column => element.grow(1.).min_w(0.).children(children),
         }
     }
 

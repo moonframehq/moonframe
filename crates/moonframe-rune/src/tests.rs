@@ -783,3 +783,75 @@ fn about_says_the_version_and_what_draws_it() {
     };
     assert_eq!(dock::shown_version(&named), "1.2.3");
 }
+
+/// A bar of two regions, as the starter's status bar, in a window `width` wide.
+fn bar(width: f32) -> (TempDir, Runtime<Ui>) {
+    let dir = folder(
+        r#"return mod {
+            view = function()
+                return ui.column {
+                    grow = true,
+                    ui.row {
+                        height = 30,
+                        shrink = false,
+                        gap = "large",
+                        ui.region { name = "status", direction = "row", gap = "large" },
+                        ui.region { name = "status-right", direction = "row", justify = "end" },
+                    },
+                }
+            end,
+        }"#,
+    );
+    for (name, region, label) in [
+        ("first", "status", "first widget of the left"),
+        ("second", "status", "second widget of the left"),
+        ("branch", "status-right", "branch on the right"),
+    ] {
+        let folder = dir.path().join("mods").join(name);
+        std::fs::create_dir_all(&folder).unwrap();
+        let source = format!(
+            r#"return mod {{
+                region = "{region}",
+                view = function() return ui.row {{ shrink = false, ui.text {{ "{label}" }} }} end,
+            }}"#
+        );
+        std::fs::write(folder.join("main.luau"), source).unwrap();
+    }
+    let mut window = Runtime::new(
+        Ui::open(dir.path().to_owned(), None),
+        view,
+        (width, 200.),
+        Env::new(true, 2.),
+    );
+    settle(&mut window);
+    (dir, window)
+}
+
+fn drawn(window: &Runtime<Ui>, label: &str) -> [f32; 4] {
+    rect_of(window, |element| element.text.as_deref() == Some(label))
+}
+
+#[test]
+fn a_row_region_with_room_keeps_every_mod_and_pushes_the_next_right() {
+    let (_dir, window) = bar(900.);
+    let [_, top, ..] = drawn(&window, "first widget of the left");
+    let [second, same_line, ..] = drawn(&window, "second widget of the left");
+    let [x, _, w, _] = drawn(&window, "branch on the right");
+    assert_eq!(top, same_line);
+    assert!(second > 0.);
+    assert!((x + w - 900.).abs() < 1., "ends at {}", x + w);
+}
+
+#[test]
+fn a_mod_that_does_not_fit_leaves_the_row_rather_than_covering_its_neighbour() {
+    let (_dir, window) = bar(320.);
+    let [_, top, ..] = drawn(&window, "first widget of the left");
+    let [_, below, ..] = drawn(&window, "second widget of the left");
+    let [x, ..] = drawn(&window, "branch on the right");
+    let [left, _, width, _] = drawn(&window, "first widget of the left");
+    assert!(
+        below >= top + 30.,
+        "the second stayed on the bar at {below}"
+    );
+    assert!(x >= left + width, "the branch is over the first at {x}");
+}
