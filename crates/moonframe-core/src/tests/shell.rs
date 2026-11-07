@@ -507,7 +507,70 @@ fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
             )),
         "no notification"
     );
+    // A tab not on show tells what its shell does, until it is shown.
+    let hidden = |fields: Vec<(&str, Data)>| {
+        let mut report = vec![("tab_report".to_owned(), Data::from("main-1"))];
+        report.extend(
+            fields
+                .into_iter()
+                .map(|(name, value)| (name.to_owned(), value)),
+        );
+        Data::Map(report.into_iter().collect())
+    };
+    let event = |name: &str| ("event", Data::from(name));
+    workspace.send("editor", "editor", hidden(vec![event("started")]));
+    assert!(
+        strip_text().contains("\"running\": Bool(true)"),
+        "{}",
+        strip_text()
+    );
+    workspace.send(
+        "editor",
+        "editor",
+        hidden(vec![event("finished"), ("took_ms", Data::Integer(5))]),
+    );
+    assert!(!strip_text().contains("running"), "{}", strip_text());
+    assert!(strip_text().contains("\"done\""), "{}", strip_text());
+    workspace.take_requests();
+    workspace.send(
+        "editor",
+        "editor",
+        hidden(vec![
+            event("finished"),
+            ("command", Data::from("cargo test")),
+            ("status", Data::Integer(101)),
+            ("took_ms", Data::Integer(12_000)),
+        ]),
+    );
+    let long = workspace.take_requests();
+    assert!(
+        long.iter().any(|(_, request)| matches!(
+            request,
+            crate::Request::Notify(notice)
+                if notice.title == "Command failed" && notice.body == "cargo test"
+        )),
+        "no notification of the long command"
+    );
+    workspace.send(
+        "editor",
+        "editor",
+        hidden(vec![event("notice"), ("body", Data::from("Need you"))]),
+    );
+    assert!(strip_text().contains("\"blocked\""), "{}", strip_text());
+    workspace.send(
+        key,
+        key,
+        Data::Map([("select".to_owned(), Data::from("main-1"))].into()),
+    );
+    assert!(!strip_text().contains("\"blocked\""), "{}", strip_text());
+    workspace.send(
+        key,
+        key,
+        Data::Map([("select".to_owned(), Data::from("main-3"))].into()),
+    );
+
     // However long a program's text, it reaches the user, cut to fit.
+    workspace.take_requests();
     let long = "é".repeat(1024);
     workspace.send(
         "editor",
@@ -559,4 +622,154 @@ fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
         workspace.slot("explorer#main-4").is_some(),
         "the selected explorer tab is drawn again"
     );
+}
+
+/// What the strip draws for `tab`: "working" for its spinner, else the name
+/// of its dot.
+fn drawn_status(workspace: &Workspace, tab: &str) -> Option<String> {
+    let strip = workspace.slot("shell/tabbed#main").unwrap().view().unwrap();
+    let mut found = Vec::new();
+    stacks(strip, &mut found);
+    let cell = found
+        .iter()
+        .find(|stack| stack.key.as_deref() == Some(tab))
+        .unwrap_or_else(|| panic!("no tab {tab} in the strip"));
+    cell.children.iter().find_map(|child| match child {
+        Node::Icon(icon) if icon.look.class.iter().any(|class| class == "tabs-spinner") => {
+            assert!(icon.spin, "{tab}'s spinner stands still");
+            Some("working".to_owned())
+        },
+        Node::Stack(row) => row
+            .look
+            .class
+            .iter()
+            .find_map(|class| class.strip_prefix("tabs-dot-"))
+            .map(str::to_owned),
+        _ => None,
+    })
+}
+
+/// A message of these fields.
+fn fields(fields: &[(&str, Data)]) -> Data {
+    Data::Map(
+        fields
+            .iter()
+            .map(|(name, value)| ((*name).to_owned(), value.clone()))
+            .collect(),
+    )
+}
+
+/// What `tab`'s shell reports, as it reaches the strip from the main area.
+fn shell_says(workspace: &mut Workspace, tab: &str, event: &str) {
+    let report = fields(&[
+        ("tab_report", Data::from(tab)),
+        ("event", Data::from(event)),
+        ("took_ms", Data::Integer(5)),
+    ]);
+    workspace.send("editor", "editor", report);
+}
+
+#[test]
+fn a_tab_out_of_sight_draws_what_its_shell_does_until_it_is_shown() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
+    let mut workspace =
+        Workspace::open_with(root.as_path(), false, Some(Box::new(Memory::default())));
+    let key = "shell/tabbed#main";
+    for _ in 0..2 {
+        let pick = fields(&[("pick", Data::from("component:terminal"))]);
+        workspace.send(key, key, pick);
+    }
+    let shown = "main-3";
+
+    // Out of sight, a running command is a spinner and its end a dot.
+    shell_says(&mut workspace, "main-1", "started");
+    assert_eq!(
+        drawn_status(&workspace, "main-1").as_deref(),
+        Some("working")
+    );
+    shell_says(&mut workspace, "main-1", "finished");
+    assert_eq!(drawn_status(&workspace, "main-1").as_deref(), Some("done"));
+    shell_says(&mut workspace, "main-2", "notice");
+    assert_eq!(
+        drawn_status(&workspace, "main-2").as_deref(),
+        Some("blocked")
+    );
+
+    // The tab on show draws none of them.
+    for event in ["started", "notice", "finished"] {
+        shell_says(&mut workspace, shown, event);
+        assert_eq!(drawn_status(&workspace, shown), None, "{event}");
+    }
+
+    // Showing a tab answers its dot, for good, and leaves the others'.
+    workspace.send(key, key, fields(&[("select", Data::from("main-1"))]));
+    assert_eq!(drawn_status(&workspace, "main-1"), None);
+    assert_eq!(
+        drawn_status(&workspace, "main-2").as_deref(),
+        Some("blocked")
+    );
+    workspace.send(key, key, fields(&[("select", Data::from(shown))]));
+    assert_eq!(drawn_status(&workspace, "main-1"), None);
+}
+
+#[test]
+fn every_way_of_showing_a_tab_answers_its_dot() {
+    let key = "shell/tabbed#main";
+    let terminal = "component:terminal";
+    let browser = "component:browser";
+    let asked = |n: i64| {
+        let props = fields(&[("path", Data::from("/work"))]);
+        let value = fields(&[
+            ("n", Data::Integer(n)),
+            ("kind", Data::from(terminal)),
+            ("props", props),
+        ]);
+        fields(&[("topic", Data::from("tabs/main/open")), ("value", value)])
+    };
+    let ways = [
+        ("select", fields(&[("select", Data::from("main-2"))])),
+        ("open a kind", fields(&[("open", Data::from(terminal))])),
+        ("asked to open", asked(2)),
+        (
+            "neighbour closed",
+            fields(&[("close", Data::from("main-3"))]),
+        ),
+        (
+            "kind closed",
+            fields(&[("close_kind", Data::from(browser))]),
+        ),
+        (
+            "neighbour's shell exited",
+            fields(&[
+                ("tab_report", Data::from("main-3")),
+                ("exited", Data::Bool(true)),
+            ]),
+        ),
+    ];
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
+    for (way, message) in ways {
+        let mut workspace =
+            Workspace::open_with(root.as_path(), false, Some(Box::new(Memory::default())));
+        // A terminal at /work, the only one, with a dot, beside a browser on show.
+        workspace.send(key, key, asked(1));
+        workspace.send(key, key, fields(&[("close", Data::from("main-1"))]));
+        workspace.send(key, key, fields(&[("pick", Data::from(browser))]));
+        shell_says(&mut workspace, "main-2", "finished");
+        assert_eq!(
+            drawn_status(&workspace, "main-2").as_deref(),
+            Some("done"),
+            "{way}"
+        );
+
+        workspace.send(key, key, message);
+        assert_eq!(drawn_status(&workspace, "main-2"), None, "{way}: on show");
+
+        // It stays answered once the tab is out of sight again.
+        workspace.send(key, key, fields(&[("pick", Data::from(browser))]));
+        assert_eq!(
+            drawn_status(&workspace, "main-2"),
+            None,
+            "{way}: it came back"
+        );
+    }
 }
