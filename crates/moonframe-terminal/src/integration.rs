@@ -83,7 +83,8 @@ pub(crate) fn environment(
     variables
 }
 
-#[cfg(test)]
+// These shells and their paths are Unix's.
+#[cfg(all(test, unix))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 #[path = "integration/tests.rs"]
 mod tests;
