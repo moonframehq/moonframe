@@ -303,7 +303,11 @@ impl Moonframe {
         let title: &'static str = Box::leak(folders.title().into_boxed_str());
         let namespace = paths::namespace(folders.profile.as_deref());
         let backends = Arc::new(Backends::for_app(&namespace));
-        let store = persist::open(&backends, folders.profile.as_deref());
+        // `--no-user` is a fresh run: it neither reads nor writes saved state.
+        let store = folders
+            .user
+            .as_ref()
+            .and_then(|_| persist::open(&backends, folders.profile.as_deref()));
         let mut ui = Ui::open(folders.roots(), store);
         ui.natives = self.natives;
         ui.views = self.views;

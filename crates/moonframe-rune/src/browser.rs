@@ -57,6 +57,19 @@ pub(crate) struct Browsers {
     pub(crate) wanted: RefCell<HashMap<String, Wanted>>,
 }
 
+/// Whether a page may go to `url`, as on GPUI. `is_web_url` passes `file`
+/// addresses too, so those are for `local` pages alone: a web page must not
+/// read the disk. The blank and inline documents are ones pages make.
+fn may_navigate(url: &str, local: bool) -> bool {
+    if is_file_url(url) {
+        return local && is_web_url(url);
+    }
+    url == "about:blank"
+        || url.starts_with("about:srcdoc")
+        || url.starts_with("blob:")
+        || is_web_url(url)
+}
+
 fn builder(
     url: String,
     sender: &Sender<Report>,
@@ -70,9 +83,7 @@ fn builder(
         .with_visible(false)
         .with_focused(false)
         .with_bounds(Rect::default())
-        .with_navigation_handler(move |url| {
-            is_web_url(&url) || (local.load(Ordering::Relaxed) && is_file_url(&url))
-        })
+        .with_navigation_handler(move |url| may_navigate(&url, local.load(Ordering::Relaxed)))
         .with_new_window_req_handler(|_, _| NewWindowResponse::Deny)
         .with_download_started_handler(|_, _| false)
         .with_document_title_changed_handler(move |text| {
@@ -263,5 +274,39 @@ impl Ui {
         tx: &mut Tx,
     ) {
         self.browsers.command(&format!("{owner}/{id}"), command, tx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::may_navigate;
+
+    #[test]
+    fn a_web_page_cannot_reach_the_disk() {
+        assert!(may_navigate("https://example.com/", false));
+        assert!(!may_navigate("file:///etc/passwd", false));
+        assert!(!may_navigate("FILE:///etc/passwd", false));
+        assert!(!may_navigate("file://localhost/etc/passwd", false));
+    }
+
+    #[test]
+    fn a_local_page_reaches_files_and_the_web() {
+        assert!(may_navigate("file:///tmp/page.html", true));
+        assert!(may_navigate("https://example.com/", true));
+    }
+
+    #[test]
+    fn pages_keep_the_documents_they_make() {
+        for url in ["about:blank", "about:srcdoc", "blob:https://example.com/1"] {
+            assert!(may_navigate(url, false), "{url}");
+        }
+    }
+
+    #[test]
+    fn neither_goes_anywhere_else() {
+        for local in [false, true] {
+            assert!(!may_navigate("javascript:alert(1)", local));
+            assert!(!may_navigate("ftp://example.com/", local));
+        }
     }
 }
