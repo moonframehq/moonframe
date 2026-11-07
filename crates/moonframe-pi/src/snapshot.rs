@@ -465,12 +465,20 @@ fn versioned(engine: &mut Engine, rows: &[Value]) -> u64 {
 
 /// What to publish, or `None` while pi is still being looked for.
 pub(crate) fn snapshot_of(engine: &mut Engine, runtime: &Runtime) -> Option<Value> {
-    let (path, version) = match &engine.pi {
+    // With no pi the shape stays: views read `prefs` and the lists before
+    // they get to `available`.
+    let (runtime_view, reason) = match &engine.pi {
         PiStatus::Looking => return None,
-        PiStatus::Missing { reason } => {
-            return Some(json!({ "available": false, "reason": reason }));
+        PiStatus::Missing { reason } => (
+            json!({ "status": "missing", "path": null, "version": null, "error": null }),
+            Some(reason.clone()),
+        ),
+        PiStatus::Ready { path, version } => {
+            let short = engine.config.short_path(&path.to_string_lossy());
+            let view =
+                json!({ "status": "ready", "path": short, "version": version, "error": null });
+            (view, None)
         },
-        PiStatus::Ready { path, version } => (path.to_string_lossy().into_owned(), version.clone()),
     };
     let now_float = now_seconds();
     let now = now_float.floor();
@@ -515,16 +523,12 @@ pub(crate) fn snapshot_of(engine: &mut Engine, runtime: &Runtime) -> Option<Valu
         .collect();
     let returned = selected.as_ref().and_then(|id| engine.returned.get(id));
     Some(json!({
-        "available": true,
+        "available": reason.is_none(),
+        "reason": reason,
         "now": rounded(now),
         "day_start": start_of_day(),
         "threads_version": threads_version,
-        "runtime": {
-            "status": "ready",
-            "path": config.short_path(&path),
-            "version": version,
-            "error": null,
-        },
+        "runtime": runtime_view,
         "prefs": engine.data().prefs,
         "chats": {
             "path": engine.chats,

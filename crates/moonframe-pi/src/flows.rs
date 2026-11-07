@@ -513,8 +513,8 @@ impl Core {
         let Some(rpc) = cell.get() else {
             return;
         };
-        // Stopped on purpose: it is out of the list already.
-        let Some(live) = same_live(&mut engine, id, rpc) else {
+        // Stopped on purpose: it is out of the list already, or all are going.
+        let Some(live) = same_live(&mut engine, id, rpc).filter(|_| !self.stopping()) else {
             return;
         };
         let was_running = live.running;

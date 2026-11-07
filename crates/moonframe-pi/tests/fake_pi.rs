@@ -259,7 +259,10 @@ fn with_no_pi_the_app_says_so() {
     let value = app.value();
     let reason = value["reason"].as_str().unwrap();
     assert!(reason.starts_with("pi was not found."), "{reason}");
-    assert!(value.get("threads").is_none(), "{value}");
+    // Views read these before they get to `available`.
+    assert_eq!(value["prefs"]["group"], "time");
+    assert_eq!(value["threads"], json!([]));
+    assert_eq!(value["runtime"]["status"], "missing");
 }
 
 #[test]
