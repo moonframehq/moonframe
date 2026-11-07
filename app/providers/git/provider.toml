@@ -7,13 +7,16 @@
 # `app.git.root` gave it (refused once it moved); it answers the mod that
 # asked with
 # `{ reply = id, action, ok, message | error }`.
+# They add a worktree (`{ worktree_add = { branch, base? }, root, id }`, whose
+# reply's `message` is its folder) or remove one (`{ worktree_remove = path,
+# root, id }`): never its branch, and never one with uncommitted changes.
 # A native provider: Rust built into the app (crates/moonframe-git, the
 # `git` feature), running git through herdr-vcs with your own access.
 interval = 1.0
 kind     = "native"
 
 [settings]
-# The mods that may commit and push; any other is refused. The status
+# The mods that may commit, push and change worktrees; any other is refused. The status
 # bar's sheet acts only when the user clicks. Add your own mod here to let
 # it write.
 writers = ["status"]

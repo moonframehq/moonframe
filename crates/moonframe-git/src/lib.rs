@@ -35,6 +35,7 @@
 mod diff;
 mod refs;
 mod status;
+mod worktrees;
 
 /// A remote URL's host, owner and repository, as `app.git.remote` gives
 /// them; the forge providers read their repository with it.
@@ -57,6 +58,7 @@ use {
         thread,
         time::{Duration, Instant},
     },
+    worktrees::Change,
 };
 
 /// How long a read may take; writes get herdr-vcs's own, longer deadline.
@@ -216,9 +218,27 @@ impl Native for Git {
             _ => None,
         };
         if let Some(Data::String(text)) = field("commit") {
-            self.act(host, from, field("id"), root, Action::Commit(text.clone()));
+            self.act(
+                host,
+                from,
+                field("id"),
+                root,
+                Job::Vcs(Action::Commit(text.clone())),
+            );
         } else if let Some(Data::Bool(true)) = field("push") {
-            self.act(host, from, field("id"), root, Action::Push);
+            self.act(host, from, field("id"), root, Job::Vcs(Action::Push));
+        } else if let Some(asked) = field("worktree_add") {
+            let job = Change::add(asked).map(Job::Worktree);
+            self.act_or_refuse(host, from, field("id"), root, job, "worktree_add");
+        } else if let Some(Data::String(path)) = field("worktree_remove") {
+            let path = path.clone();
+            self.act(
+                host,
+                from,
+                field("id"),
+                root,
+                Job::Worktree(Change::Remove { path }),
+            );
         }
         // Worktrees, branches, remote and stashes are some 60 git commands
         // with many worktrees: a mod sending a message each frame gets them
@@ -388,40 +408,27 @@ impl Git {
         }
     }
 
-    /// Runs `action` on a thread of its own and answers `from` when it ends,
-    /// if `asked` names the repository it watches.
-    fn act(
+    /// [`act`](Self::act), or the reason `job` could not even be read.
+    fn act_or_refuse(
         &self,
         host: &Handle,
         from: &str,
         id: Option<&Data>,
         asked: Option<&str>,
-        action: Action,
+        job: Result<Job, String>,
+        name: &'static str,
     ) {
-        let name = match action {
-            Action::Commit(_) => "commit",
-            Action::Push => "push",
-            Action::CreatePullRequest => "pull_request",
-        };
-        let reply = id.cloned().unwrap_or_else(|| Data::from(name));
-        let answer = {
-            let (host, from, reply) = (host.clone(), from.to_owned(), reply.clone());
-            move |result: Result<String, String>| {
-                let (key, text) = match &result {
-                    Ok(message) => ("message", message.clone()),
-                    Err(error) => ("error", error.clone()),
-                };
-                host.send(
-                    &from,
-                    Data::Map(BTreeMap::from([
-                        ("reply".to_owned(), reply.clone()),
-                        ("action".to_owned(), Data::from(name)),
-                        ("ok".to_owned(), Data::Bool(result.is_ok())),
-                        (key.to_owned(), Data::String(text)),
-                    ])),
-                );
-            }
-        };
+        match job {
+            Ok(job) => self.act(host, from, id, asked, job),
+            Err(problem) => answerer(host, from, id, name)(Err(problem)),
+        }
+    }
+
+    /// Runs `job` on a thread of its own and answers `from` when it ends,
+    /// if `asked` names the repository it watches.
+    fn act(&self, host: &Handle, from: &str, id: Option<&Data>, asked: Option<&str>, job: Job) {
+        let name = job.name();
+        let answer = answerer(host, from, id, name);
         // A write changes the user's history and remote; a mod from
         // elsewhere must not do it unasked.
         if !self.writers.allows(from) {
@@ -453,13 +460,65 @@ impl Git {
         let spawned = thread::Builder::new()
             .name(format!("git-{name}"))
             .spawn(move || {
-                answer(run(input, action));
+                answer(job.run(input, &root));
                 busy.store(false, Ordering::Release);
                 stale.store(true, Ordering::Release);
             });
         if spawned.is_err() {
             self.busy.store(false, Ordering::Release);
         }
+    }
+}
+
+/// A write a mod asks for.
+enum Job {
+    Vcs(Action),
+    Worktree(Change),
+}
+
+impl Job {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Vcs(Action::Commit(_)) => "commit",
+            Self::Vcs(Action::Push) => "push",
+            Self::Vcs(Action::CreatePullRequest) => "pull_request",
+            Self::Worktree(Change::Add { .. }) => "worktree_add",
+            Self::Worktree(Change::Remove { .. }) => "worktree_remove",
+        }
+    }
+
+    fn run(self, input: Input, root: &Path) -> Result<String, String> {
+        match self {
+            Self::Vcs(action) => run(input, action),
+            Self::Worktree(change) => change.apply(root),
+        }
+    }
+}
+
+/// What answers `from` once a write named `name` ends: `id`, or the name
+/// when it gave none, comes back as `reply`.
+fn answerer(
+    host: &Handle,
+    from: &str,
+    id: Option<&Data>,
+    name: &'static str,
+) -> impl FnOnce(Result<String, String>) + Send + use<> {
+    let reply = id.cloned().unwrap_or_else(|| Data::from(name));
+    let (host, from) = (host.clone(), from.to_owned());
+    move |result: Result<String, String>| {
+        let (key, text) = match &result {
+            Ok(message) => ("message", message.clone()),
+            Err(error) => ("error", error.clone()),
+        };
+        host.send(
+            &from,
+            Data::Map(BTreeMap::from([
+                ("reply".to_owned(), reply),
+                ("action".to_owned(), Data::from(name)),
+                ("ok".to_owned(), Data::Bool(result.is_ok())),
+                (key.to_owned(), Data::String(text)),
+            ])),
+        );
     }
 }
 

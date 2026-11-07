@@ -346,6 +346,63 @@ fn only_writers_may_commit() {
     assert_eq!(published(&seen)["changed"], 1, "nothing was committed");
 }
 
+/// Worktrees are writes: a mod outside `writers` is refused, and one inside
+/// hears where the worktree went.
+#[test]
+fn only_writers_may_change_worktrees() {
+    let dir = repository();
+    let (events, seen) = events();
+    let folder = dir.path().join("providers").join("git");
+    std::fs::create_dir_all(&folder).unwrap();
+    let host = Handle::new("git", &folder, writers(&["status"]), events);
+    let mut git = Git::default();
+    git.start(&host).unwrap();
+    let root = published(&seen)["root"].as_str().unwrap().to_owned();
+    let ask = |git: &mut Git, from: &str| {
+        let branch = Data::Map(BTreeMap::from([("branch".to_owned(), Data::from("side"))]));
+        let message = BTreeMap::from([
+            ("worktree_add".to_owned(), branch),
+            ("root".to_owned(), Data::from(root.as_str())),
+        ]);
+        git.receive(&host, from, Data::Map(message));
+    };
+    let reply_to = |name: &str| {
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while Instant::now() < deadline {
+            let reply = seen.lock().unwrap().iter().find_map(|event| match event {
+                Event::Sent { to, msg, .. } if to == name => {
+                    Some(moonframe_providers::to_json(msg))
+                },
+                _ => None,
+            });
+            if let Some(reply) = reply {
+                return reply;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        panic!("no reply to {name}");
+    };
+
+    ask(&mut git, "stranger");
+    let refused = reply_to("stranger");
+    assert_eq!(refused["ok"], false);
+    assert!(
+        refused["error"]
+            .as_str()
+            .unwrap()
+            .contains("may not worktree_add"),
+        "{refused}"
+    );
+
+    ask(&mut git, "status");
+    let added = reply_to("status");
+    assert_eq!(added["ok"], true, "{added}");
+    assert_eq!(added["action"], "worktree_add");
+    let path = PathBuf::from(added["message"].as_str().unwrap());
+    assert!(path.join("a.txt").is_file());
+    std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+}
+
 /// A diff only covers files git lists as changed, never a path from
 /// outside the repository.
 #[test]
