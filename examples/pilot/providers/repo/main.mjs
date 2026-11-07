@@ -99,9 +99,13 @@ function publish() {
 	process.stdout.write(`${line}\n`);
 }
 
+// This polls, so it must not take the index lock to tidy up, or a commit that
+// comes at that moment fails, here or the agent's own in the same checkout.
+const GIT_ENV = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
+
 function git(args, { cwd = state.at, input } = {}) {
 	return new Promise((done, fail) => {
-		const child = execFile("git", args, { cwd, maxBuffer: 64 * 1024 * 1024, timeout: 60_000 }, (error, stdout, stderr) =>
+		const child = execFile("git", args, { cwd, env: GIT_ENV, maxBuffer: 64 * 1024 * 1024, timeout: 60_000 }, (error, stdout, stderr) =>
 			error ? fail(new Error(stderr.trim() || error.message)) : done(stdout),
 		);
 		if (input !== undefined) child.stdin.end(input);

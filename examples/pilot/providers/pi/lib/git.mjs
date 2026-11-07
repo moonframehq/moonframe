@@ -11,7 +11,7 @@ export function git(cwd, args, env = {}) {
 		execFile(
 			"git",
 			args,
-			{ cwd, env: { ...process.env, ...env }, maxBuffer: 32 * 1024 * 1024, timeout: 60_000 },
+			{ cwd, env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", ...env }, maxBuffer: 32 * 1024 * 1024, timeout: 60_000 },
 			(error, stdout, stderr) => (error ? reject(new Error(stderr.trim() || error.message)) : resolve(stdout)),
 		);
 	});
