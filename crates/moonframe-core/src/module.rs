@@ -286,6 +286,9 @@ impl Module {
         previous: Option<&Data>,
         props: Option<&Data>,
     ) -> Result<Self, Error> {
+        let read_peaks = || peaks.read(lua.used_memory(), meter.used());
+        // Loading ran its top level, on a count `init` starts over.
+        read_peaks();
         let previous = match previous {
             Some(previous) => previous.to_lua(&lua)?,
             None => Value::Nil,
@@ -301,6 +304,7 @@ impl Module {
                 meter.reset();
                 let (state, sends) = init
                     .call::<(Value, Value)>((previous, props.clone()))
+                    .inspect(|_| read_peaks())
                     .map_err(|error| Error::from(error).context("init"))?;
                 let sends = Option::<Vec<Send>>::read(&sends, &Cx::root(&NO_NAMES).key("sends"))
                     .map_err(|error| error.context("init"))?;
@@ -451,3 +455,8 @@ impl Module {
         Data::read(&self.state)
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[path = "module/tests.rs"]
+mod tests;

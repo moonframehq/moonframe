@@ -274,8 +274,8 @@ The same log shows how close each module comes to its limits. At `debug`, a
 line each time a module's Luau memory grows by a quarter past 1 MiB, or a call
 uses over a tenth of its instruction budget; at `warn`, once, at 75% of either.
 A mod has 64 MiB, and a component instance 8 MiB. Readings are taken as a call
-ends: garbage not yet collected counts, and memory a call took and gave back
-within itself does not.
+ends, loading a module and its `init` included: garbage not yet collected
+counts, and memory a call took and gave back within itself does not.
 
 ## Examples
 

@@ -1,7 +1,7 @@
 //! How close each module's Luau state comes to its limits, for the perf log
 //! (`moonframe::perf`), so a limit is changed on what mods really use.
 //!
-//! Read as each call ends: garbage not yet collected counts, and memory a
+//! Read as each call ends, and as a module's source and `init` end: garbage not yet collected counts, and memory a
 //! call took and gave back within itself does not. Luau gives no hook for
 //! the moment in between, so a peak is what was seen, not the exact most.
 
@@ -110,6 +110,12 @@ impl Peaks {
             ),
             Report::Quiet => {},
         }
+    }
+
+    /// The highest memory and instruction checks seen so far.
+    #[cfg(test)]
+    pub(crate) fn seen(&self) -> (u64, u64) {
+        (self.memory.seen.get(), self.checks.seen.get())
     }
 }
 
