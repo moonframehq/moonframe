@@ -33,6 +33,7 @@
 //! name when the mod gave no `id`.
 
 mod diff;
+mod log;
 mod refs;
 mod status;
 
@@ -153,6 +154,9 @@ pub struct Git {
     status: Status,
     head: Value,
     worktrees: Vec<refs::Worktree>,
+    /// How many commits a mod asked to see, and those read.
+    log_limit: Option<usize>,
+    log: Vec<Value>,
     branches: Vec<Value>,
     remote: Value,
     stashes: u64,
@@ -211,6 +215,17 @@ impl Native for Git {
             Some(Data::Bool(false) | Data::Nil) => self.diff_path = None,
             _ => {},
         }
+        match field("log") {
+            Some(Data::Integer(count)) => {
+                self.log_limit = Some(usize::try_from(*count).unwrap_or(log::MAX_COMMITS));
+                self.read_log();
+            },
+            Some(Data::Bool(false)) => {
+                self.log_limit = None;
+                self.log.clear();
+            },
+            _ => {},
+        }
         let root = match field("root") {
             Some(Data::String(root)) => Some(root.as_str()),
             _ => None,
@@ -235,6 +250,13 @@ impl Native for Git {
 }
 
 impl Git {
+    /// Reads the commits a mod asked for; nothing if none did.
+    fn read_log(&mut self) {
+        if let (Some(limit), Some(root)) = (self.log_limit, &self.root) {
+            self.log = log::commits(&Repo::at(root), limit);
+        }
+    }
+
     /// Moves to `project`, the project the user works in now, unless
     /// `LAYOUTS_REPO` names the repository; returns whether it moved.
     /// Everything read of the old one goes; an action running there
@@ -257,6 +279,7 @@ impl Git {
             root: Some(root),
             followed: project,
             writers: std::mem::take(&mut self.writers),
+            log_limit: self.log_limit,
             busy: self.busy.clone(),
             stale: self.stale.clone(),
             ..Self::default()
@@ -341,6 +364,7 @@ impl Git {
             self.branches = refs::branches(&repo);
             self.remote = refs::remote(&repo, &self.status.branch);
             self.stashes = refs::stashes(&repo);
+            self.read_log();
         }
         if !changed {
             return;
@@ -363,6 +387,9 @@ impl Git {
             "worktrees": worktrees, "branches": self.branches,
             "remote": self.remote, "stashes": self.stashes,
         });
+        if let (Some(_), Value::Object(fields)) = (self.log_limit, &mut out) {
+            fields.insert("log".to_owned(), Value::from(self.log.clone()));
+        }
         if let (Some(path), Value::Object(fields)) = (&self.diff_path, &mut out) {
             // Only a file git reports as changed: a path a mod makes up
             // (`../..`, `/etc/hosts`) would otherwise publish a file outside

@@ -299,6 +299,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`vertical-bar`](#vertical-bar) | Data | A fraction in a row with no room for a horizontal bar: a host's CPU or memory beside its name in a sidebar, a queue's depth in a tab. For a bar with room to spread use `meter`; for a history use `sparkline`. |
 | [`waveform`](#waveform) | Data | Setting exposure or light against a picture's levels, from values an engine measured and published (a few hundred columns). For the spread of tones with no position use `histogram`; for hue and saturation use `vectorscope`. |
 | [`week-calendar`](#week-calendar) | Data | Meetings, bookings or shifts placed in time: a day or week of hours where events span their length and overlapping ones share the column, or a month of them. For picking a day without events use `month-grid` or `day-strip`; for events in order without hours use `timeline`; for a day's list use `task-row`. |
+| [`commit-graph`](#commit-graph) | Developer | A repository's history with its branches. For a file's changes use `diff-view`, for a timeline of events `timeline`. |
 | [`banner`](#banner) | Feedback | A message across the whole window or pane that stays until dealt with: the current worktree's branch, a failed provider, an update ready. For a transient message use a toast (`ui.overlay` at `bottom-end`); for a status inside a row use `status-dot` or `ui.badge`; for an empty pane use `empty-state`. |
 | [`empty-state`](#empty-state) | Feedback | A list, panel or page with nothing to show yet, optionally with one action to fix that. For loading use `loading-row`; for failures use `notice`. |
 | [`error-state`](#error-state) | Feedback | In place of content that failed to load (a list, a pane, a provider's data). For an in-page warning that isn't a failed load use `notice`; for a lost daemon or SSH connection use `reconnecting`; for nothing to show use `empty-state`; for a transient failure use `toast`. |
@@ -2927,6 +2928,29 @@ week_calendar {
 ```
 
 A whole mod using it, with state: `app/components/demos/week-calendar.luau`.
+
+### Developer
+
+#### `commit-graph`
+
+**Commit graph.** Commits as a graph: a line per branch, a dot on each commit, merges and forks joining the lines, with each commit's subject, refs, author and short id.
+
+**When:** A repository's history with its branches. For a file's changes use `diff-view`, for a timeline of events `timeline`.
+
+| Prop | Meaning |
+| --- | --- |
+| `commits` | `{ sha, parents, short?, subject?, author?, refs? }`, children before parents, as `app.git.log` gives them |
+| `row_height` | pixels per commit; 26 by default |
+| `select` | message sent with `sha` added as a commit is clicked; a string arrives as `{ select = <it>, sha = ... }` |
+| `selected` | the sha shown as selected |
+
+**Styles:** `.commit-graph-meta` `.commit-graph-ref` `.commit-graph-row` `.commit-graph-selected` `.commit-graph-sha`
+
+```lua
+local commit_graph = use "commit-graph"
+
+commit_graph { commits = { { author = "Ada", parents = { "e", "d" }, refs = { "main", "origin/main" }, sha = "f", short = "a41f09c", subject = "Merge pull request #12 from worktree-actions" }, { author = "Ada", parents = { "b" }, refs = { "worktree-actions" }, sha = "d", short = "9be2d11", subject = "Let mods add and remove worktrees" }, { author = "Grace", parents = { "c" }, sha = "e", short = "71cc0de", subject = "Log how close each module comes to its limits" }, { author = "Grace", parents = { "b" }, sha = "c", short = "0d4a7f2", subject = "Name terminal tabs after their folder" }, { author = "Ada", parents = { "a" }, refs = { "v0.2.2" }, sha = "b", short = "e93b120", subject = "Release 0.2.2" }, { author = "Ada", parents = {  }, sha = "a", short = "3fa8c55", subject = "Start the app" } } }
+```
 
 ### Feedback
 
