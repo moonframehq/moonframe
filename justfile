@@ -172,6 +172,39 @@ rune *args:
 rune-gallery:
     MOONFRAME_RUNE_GALLERY=1 cargo run --release -p moonframe-app --no-default-features --features rune
 
+# List the example apps, or open one on Rune as a window of its own (`just
+# rune-app cadence`), each a profile in the user folder the gallery uses.
+# Anything after the name goes to the app (`just rune-app cadence --check`).
+# MOONFRAME_USER names another folder.
+rune-app name="" *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    list() {
+        for manifest in examples/*/moonframe.toml; do
+            title=$(sed -n 's/^title *= *"\(.*\)".*/\1/p' "$manifest" | head -1)
+            printf '  %-14s %s\n' "$(basename "$(dirname "$manifest")")" "$title"
+        done
+    }
+    name="{{name}}"
+    if [ -z "$name" ]; then
+        echo "Open one with: just rune-app NAME"
+        list
+        exit
+    fi
+    if [ ! -f "examples/$name/moonframe.toml" ]; then
+        echo "No example app is called $name. These are:" >&2
+        list >&2
+        exit 1
+    fi
+    user="${MOONFRAME_USER:-$HOME/.local/share/moonframe/demo}"
+    cargo build --quiet --release -p moonframe-app --no-default-features --features rune
+    bin="${CARGO_TARGET_DIR:-target}/release/moonframe"
+    if ! grep -qs "url = \"$PWD/examples/$name\"" "$user/profiles/$name/packages.toml"; then
+        "$bin" --user "$user" app remove "$name" --force >/dev/null 2>&1 || true
+        "$bin" --user "$user" app link "examples/$name" --yes >/dev/null
+    fi
+    exec "$bin" --user "$user" --profile "$name" {{args}}
+
 # Lint the Rune build, prove it links no GPUI, and load every built-in module.
 rune-check:
     cargo clippy --locked -p moonframe-app --no-default-features --features rune --all-targets -- -D warnings

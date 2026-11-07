@@ -601,9 +601,9 @@ chooses the renderer.
 | `rune` | [Rune](https://github.com/anomalyco/rune), in `crates/moonframe-rune` | Experimental |
 
 ```sh
-cargo run -p moonframe-app --no-default-features --features rune
-# Every component with its live demo:
-MOONFRAME_RUNE_GALLERY=1 cargo run -p moonframe-app --no-default-features --features rune
+just rune               # the starter
+just rune-gallery       # every component with its live demo
+just rune-app           # the example apps; `just rune-app NAME` opens one
 ```
 
 A Rune build links no GPUI. It runs the mods and every provider kind, keeps

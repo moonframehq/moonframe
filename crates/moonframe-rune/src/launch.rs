@@ -5,7 +5,7 @@
 //! `bundle`), which `moonframe` keeps.
 
 use {
-    crate::{Ui, persist},
+    crate::{Ui, persist, profiles},
     moonframe_core::{AppLayer, Appearance, Data, Roots, Workspace},
     moonframe_mux::Backends,
     moonframe_packages::{
@@ -30,6 +30,49 @@ pub type View = Rc<dyn Fn(&Data) -> El>;
 
 /// What the window opens at when the shell names no size.
 const SIZE: (f32, f32) = (1200., 800.);
+
+/// What the command line asks of Moonframe; the rest of it is Rune's.
+#[derive(Debug, Default, PartialEq)]
+struct Given {
+    /// `--user DIR`, or `None` inside for `--no-user`.
+    user: Option<Option<PathBuf>>,
+    profile: Option<String>,
+    /// The words after `app`.
+    apps: Option<Vec<String>>,
+    check: bool,
+    rest: Vec<String>,
+}
+
+impl Given {
+    fn read(arguments: impl IntoIterator<Item = String>) -> Result<Self, String> {
+        let mut given = Self::default();
+        let mut arguments = arguments.into_iter();
+        while let Some(argument) = arguments.next() {
+            match argument.as_str() {
+                "--user" => {
+                    let folder = arguments.next().ok_or("--user needs a folder")?;
+                    given.user = Some(Some(PathBuf::from(folder)));
+                },
+                "--no-user" => given.user = Some(None),
+                "--profile" => {
+                    let profile = arguments.next().ok_or("--profile needs a name")?;
+                    if !packages::valid_name(&profile) {
+                        return Err(format!(
+                            "`{profile}` is not a profile name: use a-z, 0-9, - and _"
+                        ));
+                    }
+                    given.profile = Some(profile);
+                },
+                "--check" => given.check = true,
+                "app" | "apps" if given.rest.is_empty() => {
+                    given.apps = Some(arguments.by_ref().collect());
+                },
+                _ => given.rest.push(argument),
+            }
+        }
+        Ok(given)
+    }
+}
 
 /// Where the host's own app folder comes from.
 #[derive(Clone)]
@@ -219,13 +262,37 @@ impl Moonframe {
         if let Some(resources) = paths::resources() {
             moonframe_providers::set_payload(&resources.join("payload"));
         }
+        let given = match Given::read(std::env::args().skip(1)) {
+            Ok(given) => given,
+            Err(problem) => {
+                eprintln!("{name}: {problem}");
+                return ExitCode::from(2);
+            },
+        };
         let mut folders = self.folders();
-        let given: Vec<String> = std::env::args().skip(1).collect();
-        if given.iter().any(|argument| argument == "--no-user") {
-            folders.user = None;
+        if let Some(user) = given.user {
+            folders.user = user;
         }
+        folders.profile = given.profile.or(folders.profile);
         paths::set_user_folder(folders.user.clone());
-        if given.iter().any(|argument| argument == "--check") {
+        if let Some(words) = &given.apps {
+            let Some(user) = &folders.user else {
+                eprintln!("{name} app: profiles go in the user's folder; drop --no-user");
+                return ExitCode::from(2);
+            };
+            return profiles::run(user, words);
+        }
+        if let (Some(profile), Some(user), None) =
+            (&folders.profile, &folders.user, &folders.bundled)
+            && !paths::profile(user, profile).is_dir()
+        {
+            eprintln!("{name}: no profile `{profile}`; `{name} app link DIR` adds one");
+            return ExitCode::from(2);
+        }
+        if let Some(profile) = &folders.profile {
+            moonframe_providers::set_profile(profile);
+        }
+        if given.check {
             return checked(folders.roots());
         }
         if let Some(own) = folders.own()
@@ -234,7 +301,8 @@ impl Moonframe {
             tracing::warn!("cannot create {}: {error}", own.display());
         }
         let title: &'static str = Box::leak(folders.title().into_boxed_str());
-        let backends = Arc::new(Backends::for_app(&name));
+        let namespace = paths::namespace(folders.profile.as_deref());
+        let backends = Arc::new(Backends::for_app(&namespace));
         let store = persist::open(&backends, folders.profile.as_deref());
         let mut ui = Ui::open(folders.roots(), store);
         ui.natives = self.natives;
@@ -264,7 +332,8 @@ impl Moonframe {
         let ready = app.handle();
         let parent: Rc<RefCell<Option<WindowHandle>>> = Rc::default();
         ui.browsers.parent = Rc::clone(&parent);
-        app.init(move || ui)
+        app.args(given.rest)
+            .init(move || ui)
             .on_ready(move |window| {
                 *parent.borrow_mut() = Some(window.clone());
                 // An idle window polls no more: what waited for it has to hear.
@@ -288,4 +357,34 @@ fn checked(roots: Roots) -> ExitCode {
         eprintln!("{name}: {error}");
     }
     ExitCode::FAILURE
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    fn read(words: &[&str]) -> Result<Given, String> {
+        Given::read(words.iter().map(|word| (*word).to_owned()))
+    }
+
+    #[test]
+    fn moonframes_flags_stay_and_runes_go_on_to_it() {
+        let given = read(&["--user", "/u", "--profile", "notes", "--snap", "a.png"]).unwrap();
+        assert_eq!(given.user, Some(Some(PathBuf::from("/u"))));
+        assert_eq!(given.profile.as_deref(), Some("notes"));
+        assert_eq!(given.rest, ["--snap", "a.png"]);
+    }
+
+    #[test]
+    fn the_app_command_takes_all_that_follows() {
+        let given = read(&["--user", "/u", "app", "link", "examples/demo", "--yes"]).unwrap();
+        assert_eq!(given.apps.unwrap(), ["link", "examples/demo", "--yes"]);
+    }
+
+    #[test]
+    fn a_profile_name_is_checked_before_a_path_is_made_of_it() {
+        assert!(read(&["--profile", "../up"]).is_err());
+        assert!(read(&["--user"]).is_err());
+    }
 }

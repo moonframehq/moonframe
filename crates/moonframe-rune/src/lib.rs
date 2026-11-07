@@ -12,6 +12,9 @@
 //! [`Node`]: moonframe_core::Node
 
 // keep-sorted start
+#[path = "../../moonframe/src/agent_files.rs"]
+#[allow(dead_code, reason = "shared with `moonframe`, which uses more of it")]
+mod agent_files;
 #[cfg_attr(not(any(target_os = "macos", windows)), path = "browser_left_out.rs")]
 mod browser;
 #[cfg(all(test, unix))]
@@ -31,6 +34,9 @@ mod menus;
 mod natives;
 #[path = "../../moonframe/src/persist.rs"]
 mod persist;
+#[path = "../../moonframe/src/profiles.rs"]
+#[allow(dead_code, reason = "shared with `moonframe`, which uses more of it")]
+mod profiles;
 mod render;
 #[path = "../../moonframe/src/settings.rs"]
 #[allow(dead_code, reason = "shared with `moonframe`, which uses more of it")]
@@ -56,7 +62,7 @@ use {
         APP, Action, Appearance, Command, Error, ListWindow, PROVIDER, Persist, Pick, PickKind,
         Platform, Request, Roots, Titlebar, WindowState, Workspace,
     },
-    moonframe_packages::{identity, paths},
+    moonframe_packages::{identity, packages, paths},
     moonframe_providers::{Event, Natives, Providers},
     rune::{AppHandle, Cx, El, FileDialogOptions, ImageCache, TextEdit, Tx, Waker},
     std::{
