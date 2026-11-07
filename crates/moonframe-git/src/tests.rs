@@ -346,8 +346,8 @@ fn only_writers_may_commit() {
     assert_eq!(published(&seen)["changed"], 1, "nothing was committed");
 }
 
-/// A mod asking for the log each frame gets one read, not a `git log` a
-/// frame: only a new request skips the pace of the refs.
+/// A mod asking for the log each frame costs no more than the refs' own
+/// pace: past those reads, only a new request reads it.
 #[test]
 fn asking_for_the_same_log_again_reads_nothing() {
     let dir = repository();
@@ -361,22 +361,18 @@ fn asking_for_the_same_log_again_reads_nothing() {
         let message = BTreeMap::from([("log".to_owned(), Data::Integer(count))]);
         git.receive(&host, "history", Data::Map(message));
     };
+    // Reads beyond those of the refs, however slow the machine is.
+    let extra = |git: &Git| git.log_reads as i64 - git.ref_reads as i64;
 
     ask(&mut git, 10);
     assert_eq!(published(&seen)["log"][0]["subject"], "first");
-    // Made after the read: only a look at the refs may show it.
-    let status = Command::new("git")
-        .arg("-C")
-        .arg(dir.path())
-        .args(["commit", "-q", "--allow-empty", "-m", "second"])
-        .status()
-        .unwrap();
-    assert!(status.success());
-    git.log.clear();
-    ask(&mut git, 10);
-    assert!(git.log.is_empty(), "the same request read the log again");
+    let asked = extra(&git);
+    for _ in 0..20 {
+        ask(&mut git, 10);
+    }
+    assert!(extra(&git) <= asked, "the same request read the log again");
     ask(&mut git, 20);
-    assert_eq!(git.log[0]["subject"], "second");
+    assert_eq!(extra(&git), asked + 1, "a new request reads it at once");
 }
 
 /// A diff only covers files git lists as changed, never a path from

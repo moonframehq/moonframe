@@ -157,6 +157,9 @@ pub struct Git {
     /// How many commits a mod asked to see, and those read.
     log_limit: Option<usize>,
     log: Vec<Value>,
+    /// How many times the log was read.
+    #[cfg(test)]
+    log_reads: usize,
     branches: Vec<Value>,
     remote: Value,
     stashes: u64,
@@ -261,6 +264,10 @@ impl Git {
     fn read_log(&mut self) {
         if let (Some(limit), Some(root)) = (self.log_limit, &self.root) {
             self.log = log::commits(&Repo::at(root), limit);
+            #[cfg(test)]
+            {
+                self.log_reads += 1;
+            }
         }
     }
 
