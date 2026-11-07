@@ -33,6 +33,7 @@ impl<'w> Painter<'w> {
                 url: node.url.clone(),
                 navigate: node.navigate.clone(),
                 loading: node.loading.clone(),
+                zoom: node.zoom,
             });
         if !self.ui.browsers.can_show() {
             return self.not_here_named("ui.browser", place);

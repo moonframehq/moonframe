@@ -16,6 +16,7 @@ pub(crate) struct Wanted {
     pub(crate) url: Option<String>,
     pub(crate) navigate: Option<Data>,
     pub(crate) loading: Option<Data>,
+    pub(crate) zoom: f32,
 }
 
 #[derive(Default)]
@@ -37,6 +38,10 @@ impl Browsers {
 }
 
 impl Ui {
+    pub(crate) fn visit(&self, _: &str, _: &str, _: &str) -> bool {
+        false
+    }
+
     pub(crate) fn settle_browsers(&mut self) -> bool {
         false
     }

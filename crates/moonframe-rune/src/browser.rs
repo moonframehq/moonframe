@@ -6,10 +6,10 @@
 
 use {
     crate::Ui,
-    moonframe_core::{BrowserCommand, Data, Markdown, is_file_url, is_web_url},
+    moonframe_core::{BrowserCommand, Data, Markdown, is_file_url, is_web_url, typed_address},
     rune::{Tx, Waker, WindowHandle},
     std::{
-        cell::RefCell,
+        cell::{Cell, RefCell},
         collections::HashMap,
         rc::Rc,
         sync::{
@@ -37,10 +37,15 @@ pub(crate) struct Wanted {
     pub(crate) url: Option<String>,
     pub(crate) navigate: Option<Data>,
     pub(crate) loading: Option<Data>,
+    pub(crate) zoom: f32,
 }
 
 struct Page {
     view: WebView,
+    owner: String,
+    zoom: f32,
+    /// The last settle that had it drawn, so the longest gone goes first.
+    seen: u64,
     asked: Option<String>,
     url: Option<String>,
     local: Arc<AtomicBool>,
@@ -54,7 +59,40 @@ struct Page {
 pub(crate) struct Browsers {
     pub(crate) parent: Rc<RefCell<Option<WindowHandle>>>,
     pages: RefCell<HashMap<String, Page>>,
+    settles: Cell<u64>,
     pub(crate) wanted: RefCell<HashMap<String, Wanted>>,
+}
+
+/// Pages one mod can have, and the whole app, as on GPUI: each runs web
+/// content processes, so a mod drawing ids in a loop must not start them
+/// without end.
+const PER_MOD: usize = 4;
+const TOTAL: usize = 16;
+
+/// What a page is to the limits: its key, its mod, whether a view drew it
+/// now, and the last settle that did.
+type Held<'a> = (&'a str, &'a str, bool, u64);
+
+/// The key of the page that must go for `owner` to open one: the longest
+/// gone of those no view draws, its own when it is at its limit. `Ok(None)`
+/// when there is room; `Err` says why there is none to give up.
+fn to_reclaim(held: &[Held<'_>], owner: &str) -> Result<Option<String>, String> {
+    let mine = held.iter().filter(|page| page.1 == owner).count();
+    let over_mine = mine >= PER_MOD;
+    if !over_mine && held.len() < TOTAL {
+        return Ok(None);
+    }
+    held.iter()
+        .filter(|page| !page.2 && (!over_mine || page.1 == owner))
+        .min_by_key(|page| page.3)
+        .map(|page| Some(page.0.to_owned()))
+        .ok_or_else(|| {
+            if over_mine {
+                format!("`{owner}` already has {PER_MOD} browsers")
+            } else {
+                format!("the app already has {TOTAL} browsers")
+            }
+        })
 }
 
 /// Whether a page may go to `url`, as on GPUI. `is_web_url` passes `file`
@@ -150,8 +188,17 @@ impl Browsers {
         let wanted = self.wanted.borrow();
         let mut pages = self.pages.borrow_mut();
         let mut built = false;
+        let settle = self.settles.get() + 1;
+        self.settles.set(settle);
         for (key, want) in wanted.iter() {
             if let Some(page) = pages.get_mut(key) {
+                page.seen = settle;
+                if (page.zoom - want.zoom).abs() > f32::EPSILON {
+                    page.zoom = want.zoom;
+                    if let Err(problem) = page.view.zoom(f64::from(want.zoom)) {
+                        tracing::warn!("cannot zoom a page: {problem}");
+                    }
+                }
                 if page.asked != want.url {
                     page.asked.clone_from(&want.url);
                     if let Some(url) = &want.url {
@@ -163,6 +210,27 @@ impl Browsers {
                 }
                 continue;
             }
+            let held: Vec<Held<'_>> = pages
+                .iter()
+                .map(|(key, page)| {
+                    (
+                        key.as_str(),
+                        page.owner.as_str(),
+                        wanted.contains_key(key),
+                        page.seen,
+                    )
+                })
+                .collect();
+            match to_reclaim(&held, &want.owner) {
+                Ok(None) => {},
+                Ok(Some(gone)) => {
+                    pages.remove(&gone);
+                },
+                Err(problem) => {
+                    tracing::warn!("cannot open a page: {problem}");
+                    continue;
+                },
+            }
             let (sender, reports) = channel();
             let local = Arc::new(AtomicBool::new(
                 want.url.as_deref().is_some_and(is_file_url),
@@ -172,8 +240,14 @@ impl Browsers {
             match parent.with_raw_handle(|handle| page.build_as_child(&handle)) {
                 Ok(Ok(view)) => {
                     built = true;
+                    if let Err(problem) = view.zoom(f64::from(want.zoom)) {
+                        tracing::warn!("cannot zoom a page: {problem}");
+                    }
                     pages.insert(key.clone(), Page {
                         view,
+                        owner: want.owner.clone(),
+                        zoom: want.zoom,
+                        seen: settle,
                         asked: want.url.clone(),
                         url: want.url.clone(),
                         local,
@@ -276,6 +350,24 @@ impl Ui {
         built || told
     }
 
+    /// Goes where `text`, typed in the address field of the `ui.browser`
+    /// `id` of `owner`, says, even to the address it shows. Returns whether
+    /// the text named somewhere to go.
+    pub(crate) fn visit(&self, owner: &str, id: &str, text: &str) -> bool {
+        let Some(url) = typed_address(text) else {
+            return false;
+        };
+        let pages = self.browsers.pages.borrow();
+        let Some(page) = pages.get(&format!("{owner}/{id}")) else {
+            return false;
+        };
+        page.local.store(is_file_url(&url), Ordering::Relaxed);
+        if let Err(problem) = page.view.load_url(&url) {
+            tracing::warn!("cannot load {url}: {problem}");
+        }
+        true
+    }
+
     /// A toolbar's command for the `ui.browser` `id` of `owner`.
     pub(crate) fn browser_command(
         &self,
@@ -291,9 +383,57 @@ impl Ui {
 #[cfg(test)]
 mod tests {
     use {
-        super::{may_navigate, started},
+        super::{Held, PER_MOD, TOTAL, may_navigate, started, to_reclaim},
         std::sync::atomic::{AtomicBool, Ordering},
     };
+
+    /// `count` pages of `owner`, named from `first`, gone longest first.
+    fn pages<'a>(names: &'a [String], owner: &'a str, drawn: bool) -> Vec<Held<'a>> {
+        names
+            .iter()
+            .zip(0..)
+            .map(|(name, seen)| (name.as_str(), owner, drawn, seen))
+            .collect()
+    }
+
+    fn names(count: usize) -> Vec<String> {
+        (0..count).map(|index| format!("page{index}")).collect()
+    }
+
+    #[test]
+    fn a_mod_under_its_limit_gives_nothing_up() {
+        let names = names(PER_MOD - 1);
+        assert_eq!(to_reclaim(&pages(&names, "a", false), "a"), Ok(None));
+    }
+
+    #[test]
+    fn a_mod_at_its_limit_gives_up_the_page_gone_longest() {
+        let names = names(PER_MOD);
+        let held = pages(&names, "a", false);
+        assert_eq!(to_reclaim(&held, "a"), Ok(Some("page0".to_owned())));
+    }
+
+    #[test]
+    fn a_page_on_show_is_never_given_up() {
+        let names = names(PER_MOD);
+        let held = pages(&names, "a", true);
+        assert!(to_reclaim(&held, "a").is_err());
+    }
+
+    #[test]
+    fn a_mod_at_its_limit_takes_nothing_from_another() {
+        let (mine, theirs) = (names(PER_MOD), vec!["other".to_owned()]);
+        let mut held = pages(&mine, "a", true);
+        held.extend(pages(&theirs, "b", false));
+        assert!(to_reclaim(&held, "a").is_err());
+    }
+
+    #[test]
+    fn the_app_at_its_limit_gives_up_any_mods_hidden_page() {
+        let names = names(TOTAL);
+        let held = pages(&names, "b", false);
+        assert_eq!(to_reclaim(&held, "a"), Ok(Some("page0".to_owned())));
+    }
 
     #[test]
     fn a_web_page_cannot_reach_the_disk() {

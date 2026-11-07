@@ -340,12 +340,24 @@ impl<'w> Painter<'w> {
             },
             None => element,
         };
-        let element = match input.submit.clone() {
-            Some(msg) => element.on_submit(move |ui: &mut Ui, _: &mut Tx| {
+        // A field with `browser` is that page's address bar: Enter goes where
+        // it says, and what names nowhere goes to `submit`, if any.
+        let (browser, submit) = (input.browser.clone(), input.submit.clone());
+        let element = if browser.is_some() || submit.is_some() {
+            element.on_submit(move |ui: &mut Ui, _: &mut Tx| {
                 let value = ui.field_text(&key);
-                ui.send(&owner, &to, Input::message(&msg, &value));
-            }),
-            None => element,
+                if browser
+                    .as_deref()
+                    .is_some_and(|id| ui.visit(&to, id, &value))
+                {
+                    return;
+                }
+                if let Some(msg) = &submit {
+                    ui.send(&owner, &to, Input::message(msg, &value));
+                }
+            })
+        } else {
+            element
         };
         let element = if input.keys.is_empty() && input.capture.is_none() {
             element
