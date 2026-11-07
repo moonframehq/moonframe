@@ -104,6 +104,17 @@ impl Rig {
         }
     }
 
+    /// Ticks until the newest run's changes are noted, which waits for its
+    /// agent to exit.
+    fn wait_for_changed(&mut self) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while self.run()["changed"] != true {
+            assert!(Instant::now() < deadline, "still {}", self.run());
+            std::thread::sleep(Duration::from_millis(20));
+            self.acp.tick(&self.host);
+        }
+    }
+
     /// What the provider sent to mods.
     fn replies(&self) -> Vec<(String, Value)> {
         self.events
@@ -525,4 +536,87 @@ fn a_changed_bundle_no_longer_matches_its_signature() {
     assert!(guard::broken(&bundle));
     // Not an app bundle: nothing to verify.
     assert!(!guard::broken(dir.path()));
+}
+
+/// Remembers what it was asked, in order; a run changes what `changed` says.
+#[derive(Default)]
+struct Notes {
+    calls: Mutex<Vec<String>>,
+}
+
+impl Keeper for Notes {
+    fn before(&self, run: &str) {
+        self.calls.lock().unwrap().push(format!("before {run}"));
+    }
+
+    fn after(&self, run: &str) -> bool {
+        self.calls.lock().unwrap().push(format!("after {run}"));
+        true
+    }
+
+    fn undo(&self, run: &str) -> Result<(), String> {
+        self.calls.lock().unwrap().push(format!("undo {run}"));
+        Ok(())
+    }
+}
+
+#[test]
+fn a_run_is_kept_from_before_it_starts_and_can_be_undone_once() {
+    let mut rig = rig_allowing(json!({ "feedback": "all" }));
+    let notes = Arc::new(Notes::default());
+    rig.acp.keeper = Some(notes.clone());
+    rig.send("feedback", json!({ "start": "Make it bold" }));
+    let id = rig.run()["id"].as_str().unwrap().to_owned();
+    assert_eq!(*notes.calls.lock().unwrap(), [format!("before {id}")]);
+
+    rig.wait_for("done");
+    rig.wait_for_changed();
+    assert_eq!(rig.run()["undone"], false);
+
+    // Only the mod that started it, and only once.
+    rig.send("other", json!({ "undo": id }));
+    assert_eq!(rig.run()["undone"], false);
+    rig.send("feedback", json!({ "undo": id }));
+    rig.send("feedback", json!({ "undo": id }));
+    assert_eq!(rig.run()["undone"], true);
+    assert_eq!(*notes.calls.lock().unwrap(), [
+        format!("before {id}"),
+        format!("after {id}"),
+        format!("undo {id}")
+    ]);
+}
+
+#[test]
+fn a_cancelled_run_is_not_noted_or_undone_until_its_agent_exits() {
+    let mut rig = rig();
+    let notes = Arc::new(Notes::default());
+    rig.acp.keeper = Some(notes.clone());
+    rig.send("feedback", json!({ "start": "Make it bold" }));
+    let id = rig.wait_for("waiting")["id"].as_str().unwrap().to_owned();
+    rig.send("feedback", json!({ "cancel": id }));
+    assert_eq!(rig.run()["status"], "cancelled");
+
+    // The stand-in agent sleeps on past its closed input until it is killed.
+    rig.acp.tick(&rig.host);
+    rig.send("feedback", json!({ "undo": id }));
+    assert_eq!(*notes.calls.lock().unwrap(), [format!("before {id}")]);
+    assert_eq!(rig.run()["changed"], false);
+
+    rig.wait_for_changed();
+    rig.send("feedback", json!({ "undo": id }));
+    assert_eq!(*notes.calls.lock().unwrap(), [
+        format!("before {id}"),
+        format!("after {id}"),
+        format!("undo {id}")
+    ]);
+}
+
+#[test]
+fn run_ids_never_repeat_and_can_name_a_mark() {
+    let (one, other) = (run_id(1), run_id(1));
+    assert_ne!(one, other);
+    assert!(
+        one.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'),
+        "{one}"
+    );
 }

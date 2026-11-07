@@ -7,8 +7,8 @@
 -- spins while an agent works, and shows a dot when one finished since the
 -- dialog was last open. Inspect in the dialog picks an element in the
 -- window to attach, or to copy for an agent of the user's own; the app's
--- quick inspect shortcut does the same with the dialog closed, and a pick
--- opens it. The mic beside it dictates the request instead (see
+-- quick inspect shortcut does the same with the dialog closed, and using
+-- the pick opens it. The mic beside it dictates the request instead (see
 -- providers/speech). The shell mounts it in its title bar.
 local feedback = use "feedback"
 local dropdown = use "dropdown"
@@ -284,6 +284,15 @@ return mod {
 				end
 			end
 			return state, sends
+		elseif msg.undo_thread then
+			-- Newest first, so the app ends up as the conversation found it.
+			local sends = {}
+			for _, run in state.runs do
+				if (run.id == msg.undo_thread or run.thread == msg.undo_thread) and run.changed and not run.undone then
+					table.insert(sends, { to = "provider:acp", msg = { undo = run.id } })
+				end
+			end
+			return state, sends
 		elseif msg.follow then
 			-- A follow-up in the conversation `msg.follow`, with what was said.
 			local text = msg.value or state.reply
@@ -448,6 +457,7 @@ return mod {
 				runs = runs,
 				expanded = state.expanded,
 				follow = true,
+				undo = true,
 				reply = state.reply,
 				actions = {
 					dictation { id = "prompt", text = "dictated", failed = "dictation-failed", listening = "listening" },

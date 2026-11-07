@@ -108,8 +108,10 @@ Moonframe as a library.
   the same path, so to change a built-in one, copy it there: the window
   reloads with the copy, and removing it brings the app's back. The installed
   app itself stays signed: agents are kept out of it and work on such copies.
-  `moonframe doctor` names what in your folder breaks the app, and
-  `--fix` moves it aside.
+  `moonframe doctor` names what in your folder breaks the app, `--fix` moves
+  it aside, and `--rollback` goes back to the newest snapshot that loads. An
+  agent's whole run can be undone from Send feedback, or with
+  `moonframe history undo --run`.
 - **A skill for agents** in `.claude/skills/moonframe` that teaches them to
   build with all of the above. The app offers to copy its skills to
   `~/.config/moonframe/.claude/skills` (only if you agree, and again when an
@@ -263,8 +265,8 @@ The window reloads while an agent edits it, so you can watch it work.
   app) opens a box: write what should change, attach an element picked with
   Inspect if it helps, and send. Or press Copy on the picked element and
   paste it into an agent of your own. ⇧⌘X (Ctrl-Shift-X elsewhere) goes
-  straight to picking, and a click opens the box with that element
-  attached; set `inspect_shortcut` in `settings.toml` to use another key,
+  straight to picking: click an element, choose its level in the card,
+  and Enter opens the box with it attached; set `inspect_shortcut` in `settings.toml` to use another key,
   or `""` for none. The window follows that file as it changes. A coding agent in the background changes
   that app's own files with every permission, checks them, then screenshots
   your window and looks at the result before it answers; the window reloads

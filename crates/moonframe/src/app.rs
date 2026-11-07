@@ -173,7 +173,7 @@ pub(crate) struct MoonframeApp {
     defaults: Defaults,
     /// Snapshots of the window's own folder, for Undo Last Change; `None`
     /// without a user's folder or git.
-    history: Option<Arc<moonframe_history::History>>,
+    history: Option<Arc<crate::history::Kept>>,
     /// Dropping it stops the events.
     _watcher: Option<RecommendedWatcher>,
     _settings_watcher: Option<RecommendedWatcher>,
@@ -243,6 +243,11 @@ impl MoonframeApp {
         .detach();
         let watcher = watching(&workspace, &folders, cx);
         let history = crate::history::open(&folders);
+        // An agent's run is marked before it starts, to come back to.
+        #[cfg(feature = "acp")]
+        if let Some(history) = &history {
+            moonframe_acp::set_keeper(history.clone());
+        }
         // Projects are kept only with the user's folder: `--no-user` runs
         // start fresh and keep nothing, as their state.
         let kept =

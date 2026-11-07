@@ -230,6 +230,7 @@ fn main() -> std::process::ExitCode {
 | `.native_async(name, make)` | a native provider written with `async fn`, on tokio (below) |
 | `.tokio(handle)` | the tokio runtime async providers and `on_runtime` use (below) |
 | `.view(name, make)` | a view (below) |
+| `.assets(source)` | the app's own `AssetSource`, for its views: its paths win over Moonframe's, and the rest fall through |
 | `.log(filter)` | the log filter when `RUST_LOG` is unset |
 | `.run()` | the command line: the window, `--check`, `--release`, `--profile`, `mod`, `app`, `init`, `bundle`; see `--help` |
 
@@ -326,6 +327,18 @@ cx.spawn(async move |this, cx| {
 })
 .detach();
 ```
+
+Construct timers and other futures that need a runtime inside an `async`
+block, so their constructors run on Tokio too:
+
+```rust
+moonframe::on_runtime(async {
+    moonframe::tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+}).await?;
+```
+
+Passing `on_runtime(tokio::time::sleep(...))` directly from GPUI panics:
+`sleep` needs a reactor when it is called, before the future is awaited.
 
 The runtime is the app's own when it gives one, so providers and views
 share its clients and pools. GPUI holds the main thread, so `run` blocks

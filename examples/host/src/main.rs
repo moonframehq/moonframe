@@ -206,9 +206,11 @@ impl Render for Counter {
                             .label(format!("+{} in a second", self.step))
                             .on_click(cx.listener(|_, _, _, cx| {
                                 cx.spawn(async move |this, cx| {
-                                    let slept = moonframe::on_runtime(
-                                        moonframe::tokio::time::sleep(Duration::from_secs(1)),
-                                    )
+                                    // Construct the timer on tokio too: `sleep`
+                                    // needs its reactor before it is awaited.
+                                    let slept = moonframe::on_runtime(async {
+                                        moonframe::tokio::time::sleep(Duration::from_secs(1)).await;
+                                    })
                                     .await;
                                     if slept.is_ok() {
                                         let _ = this.update(cx, |this, cx| this.add(cx));

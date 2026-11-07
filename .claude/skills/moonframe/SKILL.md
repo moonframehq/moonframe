@@ -37,7 +37,8 @@ bundle), then the user's folder, `~/.config/moonframe` (or
   replaced by each update. To change one built-in file, copy it to the same
   path there and edit the copy: it wins over the app's at once, and removing
   it brings the app's back. `moonframe doctor` names what in the folder breaks
-  the app, and `--fix` moves it to `.broken/`.
+  the app, `--fix` moves it to `.broken/`, and `--rollback` goes back to the
+  newest snapshot that loads, a linked app's source included.
 - The window watches both folders, so either kind of edit reloads live.
 - **Packages** go between the two: mods others publish as git repositories,
   installed with `moonframe mod install` (see "Sharing mods"). A package
@@ -248,10 +249,11 @@ The pointer finds the deepest element under it. While picking, **↑**
 targets the element around that one instead (a cell's row, the row's
 `ui.list`, the list's panel) and **↓** steps back in; Enter or a click picks
 the target. A level chosen with ↑ stays while the pointer moves over elements
-of the same kind, so moving down a list keeps picking rows. In the card, each
-element of "inside" (and those inside the selection, down to what was under
-the pointer) is a button that selects it instead. So a selection may be a
-row or panel the user chose on purpose, not just the leaf under the pointer.
+of the same kind, so moving down a list keeps picking rows. The card lists
+every element around the selection as an indented tree, with those inside it
+down to what was under the pointer: hovering a row outlines that element in
+the window, and clicking it selects it instead. So a selection may be a row
+or panel the user chose on purpose, not just the leaf under the pointer.
 
 When the user says "here", "this", "the selected element" or "add X there"
 without saying where, read that file first. The `file:line` is the `ui` call
@@ -262,17 +264,19 @@ row means adding a child to that row; on a text, add a sibling. If the file
 is missing, nothing is selected: ask, or pick a sensible place and say which.
 
 **A mod can ask for a pick.** A button with `command = "inspect"` starts
-picking for the mod that drew it, without the card. That mod hears it on the
+picking for the mod that drew it. The card opens on the pick, so the user can
+choose a level, with **Use this element** (or Enter) in place of Copy for
+agent. That mod hears it on the
 topic `app/inspect` (subscribe to it): `{ asker, picking = true }` as it
 starts (hide a dialog then), and `{ asker, picking = false, picked, element?,
-mod?, at?, report? }` when the user clicks an element (`picked = true`;
+mod?, at?, report? }` when the user uses the element (`picked = true`;
 `report` is the text above) or presses Escape. Only the mod that asked
 hears it; if another mod starts a pick meanwhile, the first hears
 `picked = false`. `mods/feedback` attaches the pick to a request this way, and the Copy button
 beside its chip puts `report` on the clipboard for the user's own agent. The app's
 quick inspect shortcut (`secondary-shift-x`; `inspect_shortcut` in
 `settings.toml` names another, `""` none, followed live) starts the same
-pick for `feedback` with the dialog closed, and a pick opens it.
+pick for `feedback` with the dialog closed, and using the pick opens it.
 `app/` topics are the app's: a mod can't publish them, nor send another mod
 a message passing for `app/` or `provider/` topic news.
 
@@ -998,10 +1002,11 @@ Tabs open and close with the `.tabs-tab` rule's transition (see
    the user has in front, and they are usually working. Test behaviour
    with `just check`, unit tests and screenshots by PID; ask the user to try
    interactions themselves.
-6. Every change the window reloads for is kept as a snapshot of the user's
-   folder (or the profile's), whoever made it, so you need not commit as
-   you go. When the user asks to take a change back, use
-   `moonframe [--profile NAME] history undo` (`redo` to go forward again,
+6. Every change the window reloads for is kept as a snapshot, whoever made
+   it: of the user's folder (or the profile's), a linked app's source, and
+   `app/` in a checkout. So you need not commit as you go. When the user asks
+   to take a change back, use `moonframe [--profile NAME] history undo`
+   (`undo --run` for all of an agent's last run, `redo` to go forward again,
    `list` and `restore ID` for an older one, `show ID` for its patch); the
    window reloads with the files it writes back. Undo leaves
    `settings.toml`, databases and installed packages as they are. The user

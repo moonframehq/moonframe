@@ -5,9 +5,11 @@
 
 use {
     crate::{
-        agent_files::{self, write},
+        agent_files::{self, Outcome, write},
         packages,
     },
+    anstream::{print, println},
+    anstyle::{AnsiColor, Style},
     std::{
         fs,
         path::{Path, PathBuf},
@@ -48,6 +50,12 @@ const CLOCK_TOML: &str = include_str!("../../../examples/host/app/providers/cloc
 const TOOLCHAIN: &str = include_str!("../../../rust-toolchain.toml");
 
 const REPOSITORY: &str = "https://github.com/moonframehq/moonframe";
+
+const CHANGED: Style = AnsiColor::Yellow.on_default();
+const COMMAND: Style = AnsiColor::Cyan.on_default();
+const CREATED: Style = AnsiColor::Green.on_default();
+const HEADING: Style = Style::new().bold();
+const QUIET: Style = Style::new().dimmed();
 
 struct Options {
     dir: PathBuf,
@@ -139,12 +147,12 @@ fn init(options: &Options) -> Result<(), String> {
     let mut keep = |relative: &str, text: &str| -> Result<(), String> {
         let path = dir.join(relative);
         if path.exists() {
-            println!("kept      {relative}");
+            println!("{}", listed(QUIET, "kept", relative));
             return Ok(());
         }
         write(&path, text)?;
         wrote.push(relative.to_owned());
-        println!("wrote     {relative}");
+        println!("{}", listed(CREATED, "wrote", relative));
         Ok(())
     };
     if !existing {
@@ -157,42 +165,98 @@ fn init(options: &Options) -> Result<(), String> {
     keep("app/style.luau", STYLE_LUAU)?;
     keep("app/providers/clock/provider.toml", CLOCK_TOML)?;
     for (relative, outcome) in agent_files::refresh(&dir, agent_files::LIBRARY)? {
-        println!("{:<9} {relative}", outcome.verb());
+        let style = match outcome {
+            Outcome::Current => QUIET,
+            Outcome::Updated => CHANGED,
+            Outcome::Wrote => CREATED,
+        };
+        println!("{}", listed(style, outcome.verb(), relative));
     }
 
     println!();
     if existing {
         println!(
-            "Add to {}:\n\n  [dependencies]\n  {dependency}\n\n  # In the workspace's root \
-             Cargo.toml: GPUI and Luau are unusably slow unoptimised.\n  \
-             [profile.dev.package.\"*\"]\n  opt-level = 2\n",
-            dir.join("Cargo.toml").display()
+            "{}\n\n{}\n",
+            paint(
+                HEADING,
+                &format!("Add to {}:", dir.join("Cargo.toml").display())
+            ),
+            paint(
+                COMMAND,
+                &format!(
+                    "  [dependencies]\n  {dependency}\n\n  # In the workspace's root Cargo.toml: \
+                     GPUI and Luau are unusably slow unoptimised.\n  \
+                     [profile.dev.package.\"*\"]\n  opt-level = 2"
+                )
+            )
         );
         println!(
-            "Then run the app from `main` (src/main.rs in a new crate shows the rest: a \
-             native provider and a view):\n\n  fn main() -> std::process::ExitCode {{\n      \
-             moonframe::Moonframe::new({name:?})\n          .title({title:?})\n          \
-             .version(env!(\"CARGO_PKG_VERSION\"))\n          \
-             // .updates(\"owner/repo\") // Check for Updates from its GitHub releases\n          \
-             .app_dir(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/app\"))\n          \
-             .run()\n  }}\n"
+            "{}\n\n{}\n",
+            paint(
+                HEADING,
+                "Then run the app from `main` (src/main.rs in a new crate shows the rest: a \
+                 native provider and a view):"
+            ),
+            paint(
+                COMMAND,
+                &format!(
+                    "  fn main() -> std::process::ExitCode {{\n      \
+                 moonframe::Moonframe::new({name:?})\n          .title({title:?})\n          \
+                 .version(env!(\"CARGO_PKG_VERSION\"))\n          \
+                 // .updates(\"owner/repo\") // Check for Updates from its GitHub releases\n          \
+                 .app_dir(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/app\"))\n          \
+                 .run()\n  }}"
+                )
+            )
         );
         if wrote.iter().any(|path| path.ends_with("provider.toml")) {
             println!(
-                "app/providers/clock/provider.toml runs a native provider named `clock`: \
-                 register one (`.native(\"clock\", ...)`) or delete the folder.\n"
+                "{} runs a native provider named `clock`: register one (`.native(\"clock\", \
+                 ...)`) or delete the folder.\n",
+                paint(HEADING, "app/providers/clock/provider.toml")
             );
         }
-    } else {
-        println!("Run it:  cd {} && cargo run", dir.display());
     }
-    println!("Check it after each edit:  cargo run -- --check");
-    println!("Bundle it:  cargo run --release -- bundle");
-    println!(
-        "Release it:  cargo run --release -- bundle --dist dist, then attach dist/* to a \
-         GitHub release; with `.updates(\"owner/repo\")` the app finds it (docs/updates.md)"
-    );
+    print!("{}", next_steps((!existing).then_some(dir.as_path())));
     Ok(())
+}
+
+/// `text` in `style`; `anstream` drops the color where it cannot show.
+fn paint(style: Style, text: &str) -> String {
+    format!("{style}{text}{style:#}")
+}
+
+/// One file's line of the listing.
+fn listed(style: Style, verb: &str, relative: &str) -> String {
+    format!("{} {relative}", paint(style, &format!("{verb:<9}")))
+}
+
+/// What to do with the app now; `new_crate` is its folder if init made one.
+fn next_steps(new_crate: Option<&Path>) -> String {
+    let step = |label: &str, command: &str| {
+        format!(
+            "  {} {}\n",
+            paint(HEADING, &format!("{label:<10}")),
+            paint(COMMAND, command)
+        )
+    };
+    let mut text = format!("{}\n", paint(HEADING, "Next steps"));
+    if let Some(dir) = new_crate {
+        text += &step("Run it", &format!("cd {} && cargo run", dir.display()));
+    }
+    text += &step("Check it", "cargo run -- --check");
+    text += &step("Bundle it", "cargo run --release -- bundle");
+    text += &step("Release it", "cargo run --release -- bundle --dist dist");
+    text += &format!(
+        "  {:<10} {}\n",
+        "",
+        paint(
+            QUIET,
+            "then attach dist/* to a GitHub release; with `.updates(\"owner/repo\")` the app \
+             finds it (docs/updates.md)"
+        )
+    );
+    text
 }
 
 /// `my-notes` as `My Notes`.
@@ -270,6 +334,32 @@ impl Template<'_> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+
+    fn plain(text: &str) -> String {
+        anstream::adapter::strip_str(text).to_string()
+    }
+
+    #[test]
+    fn listed_files_stay_aligned_under_their_color() {
+        let line = listed(CREATED, "wrote", "app/main.luau");
+        assert_eq!(plain(&line), "wrote     app/main.luau");
+        assert_ne!(line, plain(&line));
+    }
+
+    #[test]
+    fn next_steps_run_a_new_crate_from_its_folder() {
+        let new = plain(&next_steps(Some(Path::new("/tmp/notes"))));
+        assert!(
+            new.contains("Run it     cd /tmp/notes && cargo run"),
+            "{new}"
+        );
+        let existing = plain(&next_steps(None));
+        assert!(!existing.contains("Run it"), "{existing}");
+        assert!(
+            existing.contains("Check it   cargo run -- --check"),
+            "{existing}"
+        );
+    }
 
     #[test]
     fn a_new_crate_is_the_example_renamed() {

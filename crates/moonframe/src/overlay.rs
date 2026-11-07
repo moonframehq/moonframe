@@ -88,16 +88,15 @@ impl MoonframeApp {
     fn highlight(&self, cx: &Context<Self>) -> AnyElement {
         let accent = cx.theme().primary;
         let still = cx.reduce_motion();
-        let hovered = self
-            .inspector
-            .picking
-            .then(|| {
-                self.inspector
-                    .hovered
-                    .as_ref()
-                    .map(|target| target.placed.path.clone())
-            })
-            .flatten();
+        // Picking outlines what the pointer aims at, the card the row under it.
+        let hovered = if self.inspector.picking {
+            self.inspector
+                .hovered
+                .as_ref()
+                .map(|target| target.placed.path.clone())
+        } else {
+            self.inspector.previewed.clone()
+        };
         let selected = self
             .inspector
             .selected
@@ -131,6 +130,8 @@ impl MoonframeApp {
     fn card(&self, selected: &inspect::Placed, cx: &Context<Self>) -> AnyElement {
         let theme = cx.theme();
         let pick = inspect::pick(selected, &self.workspace);
+        // Picked for a mod: the card chooses the level, then hands it over.
+        let asked = self.inspector.asker.is_some();
         let mono = |text: String| {
             div()
                 .font_family("Menlo")
@@ -219,9 +220,9 @@ impl MoonframeApp {
                         .flex_col()
                         .gap_1()
                         .child(row("mod", mono(pick.owner).into_any_element()))
-                        .child(row("file", mono(pick.at).into_any_element()))
-                        .child(row("inside", self.trail(selected, cx))),
+                        .child(row("file", mono(pick.at).into_any_element())),
                 )
+                .child(self.trail(selected, cx))
                 .child(
                     div()
                         .px_3()
@@ -229,7 +230,11 @@ impl MoonframeApp {
                         .pb_3()
                         .text_xs()
                         .text_color(theme.muted_foreground)
-                        .child("Saved for agents, who read it when you say \"here\" or \"the selected element\"."),
+                        .child(if asked {
+                            "Choose the element above, then use it or press Enter."
+                        } else {
+                            "Saved for agents, who read it when you say \"here\" or \"the selected element\"."
+                        }),
                 )
                 .child(
                     div()
@@ -252,16 +257,22 @@ impl MoonframeApp {
                             Button::new("inspect-clear")
                                 .small()
                                 .ghost()
-                                .label("Clear")
+                                .label(if asked { "Cancel" } else { "Clear" })
                                 .on_click(cx.listener(|this, _, _, cx| this.select(None, cx))),
                         )
-                        .child(
+                        .child(if asked {
+                            Button::new("inspect-use")
+                                .small()
+                                .primary()
+                                .label("Use this element")
+                                .on_click(cx.listener(|this, _, _, cx| this.use_selection(cx)))
+                        } else {
                             Button::new("inspect-copy")
                                 .small()
                                 .primary()
                                 .label("Copy for agent")
-                                .on_click(cx.listener(|this, _, _, cx| this.copy_selection(cx))),
-                        ),
+                                .on_click(cx.listener(|this, _, _, cx| this.copy_selection(cx)))
+                        }),
                 ),
         )
         .with_priority(PRIORITY + 1)

@@ -89,6 +89,9 @@ pub(crate) struct Inspector {
     /// Picking: the pointer highlights, a click selects.
     pub(crate) picking: bool,
     sink: Sink,
+    /// The last whole frame's record: `sink` is empty while a frame is
+    /// built, and the card names the sizes of what it lists then.
+    drawn: RefCell<Vec<Placed>>,
     /// What the pointer, and ↑ and ↓, aim at while picking.
     aim: aim::Aim,
     pub(crate) hovered: Option<Target>,
@@ -96,8 +99,13 @@ pub(crate) struct Inspector {
     /// The deepest node the selection's card offers in its trail: what
     /// was under the pointer, when ↑ picked a node around it.
     pub(crate) leaf: Option<Placed>,
+    /// The element path of the card's row under the pointer, which the
+    /// window outlines to show where that row is.
+    pub(crate) previewed: Option<String>,
+    /// Where the card's list of elements is scrolled.
+    pub(crate) ladder: ScrollHandle,
     /// The mod that started this pick (`command = "inspect"`): it hears
-    /// the pick on `app/inspect`, and no card opens.
+    /// the pick on `app/inspect` once the card's choice is confirmed.
     pub(crate) asker: Option<String>,
     /// Where the highlight was last drawn, to animate it from there.
     pub(crate) highlight: Rc<RefCell<crate::overlay::Highlight>>,
@@ -109,7 +117,11 @@ impl Inspector {
     /// Where this frame's nodes record themselves, when anything needs them.
     pub(crate) fn sink(&self) -> Option<Sink> {
         (self.picking || self.selected.is_some()).then(|| {
-            self.sink.borrow_mut().clear();
+            // Asked more than once a frame: only the first finds a record.
+            let mut sink = self.sink.borrow_mut();
+            if !sink.is_empty() {
+                *self.drawn.borrow_mut() = std::mem::take(&mut *sink);
+            }
             self.sink.clone()
         })
     }

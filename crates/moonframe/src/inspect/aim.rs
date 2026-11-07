@@ -172,6 +172,7 @@ impl Inspector {
     /// Stops hovering, and forgets the level ↑ chose.
     pub(crate) fn unhover(&mut self) {
         self.hovered = None;
+        self.previewed = None;
         self.aim = Aim::default();
     }
 
@@ -192,6 +193,16 @@ impl Inspector {
             .or(inside)
             .unwrap_or(picked)
             .clone()
+    }
+
+    /// The size of the node at `path` in the last whole frame, for a frame
+    /// being built; none for one not drawn then.
+    pub(crate) fn drawn_size(&self, path: &str) -> Option<Size<Pixels>> {
+        self.drawn
+            .borrow()
+            .iter()
+            .find(|placed| placed.path == path)
+            .map(|placed| placed.bounds.size)
     }
 
     /// The node drawn at `path` in the last frame.
@@ -389,6 +400,26 @@ mod tests {
         assert!(aim.step(&recorded, at(-5., -5.), false).is_some());
         let mut empty = Aim::default();
         assert!(empty.step(&recorded, at(-5., -5.), true).is_none());
+    }
+
+    #[test]
+    fn a_frame_being_built_still_knows_the_last_frames_sizes() {
+        let recorded = mail();
+        let mut inspector = Inspector {
+            selected: recorded.first().cloned(),
+            ..Inspector::default()
+        };
+        *inspector.sink.borrow_mut() = recorded;
+        // A frame asks for the sink twice, the second time finding it empty.
+        assert!(inspector.sink().is_some());
+        assert!(
+            inspector
+                .sink()
+                .is_some_and(|sink| sink.borrow().is_empty())
+        );
+        assert_eq!(inspector.drawn_size("mail"), Some(size(px(900.), px(600.))));
+        assert_eq!(inspector.drawn_size("gone"), None);
+        inspector.selected = None;
     }
 
     #[test]

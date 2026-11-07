@@ -35,7 +35,7 @@ Usage: moonframe [OPTIONS] [DIR]
        moonframe [--user DIR] [--profile NAME] history [COMMAND]
                                          undo and redo changes to your folder;
                                          see `history help`
-       moonframe [--user DIR] [--profile NAME] doctor [--fix]
+       moonframe [--user DIR] [--profile NAME] doctor [--fix | --rollback]
                                          find what in your folder breaks the app,
                                          and move it aside; see `doctor help`
        moonframe init [DIR] [--name NAME] [--path CHECKOUT]
@@ -577,7 +577,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     let component = args.component.filter(|_| !crate::release());
     let (natives, views) = (launch.natives, launch.views);
     gpui_kit::application()
-        .with_assets(crate::assets::Assets)
+        .with_assets(crate::assets::Assets::new(launch.assets))
         .run(move |cx| {
             crate::app::list_fonts_ahead(cx);
             gpui_kit::init(cx);

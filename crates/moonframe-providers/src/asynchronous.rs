@@ -116,6 +116,18 @@ pub fn runtime() -> Runtime {
 /// })
 /// ```
 ///
+/// Construct runtime-dependent futures inside an `async` block: functions
+/// such as `tokio::time::sleep` need a reactor when called, before polling.
+/// Passing `on_runtime(tokio::time::sleep(...))` from GPUI would panic.
+///
+/// ```
+/// # futures::executor::block_on(async {
+/// moonframe_providers::on_runtime(async {
+///     tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+/// }).await.unwrap();
+/// # });
+/// ```
+///
 /// It fails only when the future panicked or the runtime shut down.
 pub async fn on_runtime<F>(future: F) -> Result<F::Output, tokio::task::JoinError>
 where
