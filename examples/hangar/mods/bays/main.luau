@@ -26,6 +26,9 @@ type State = {
 	-- The repository as git last named it: a write says which it is for.
 	root: string?,
 	worktrees: { Worktree },
+	-- Each path's row key, and the number of the next.
+	keys: { [string]: string },
+	next_key: number,
 	-- What each bay is doing, from the deck.
 	activity: { [string]: string },
 	adding: boolean,
@@ -91,11 +94,15 @@ local function write(state: State, id: string, fields: { [string]: any }): { any
 	return { { to = "provider:git", msg = msg } }
 end
 
--- A key from a path, which holds what keys cannot: the end of it is what
--- tells worktrees apart.
-local function key_of(path: string): string
-	local safe = string.gsub(path, "[^%w_-]", "-")
-	return string.sub(safe, -64)
+-- Gives each worktree a row key of its own, for good. A path cannot be one:
+-- a key is 64 plain characters, and two rows with one key are an error.
+local function number_rows(state: State)
+	for _, worktree in state.worktrees do
+		if not state.keys[worktree.path] then
+			state.keys[worktree.path] = `bay-{state.next_key}`
+			state.next_key += 1
+		end
+	end
 end
 
 local function row_of(worktree: Worktree, state: State, app: any)
@@ -103,7 +110,7 @@ local function row_of(worktree: Worktree, state: State, app: any)
 	local name = string.match(worktree.path, "([^/\\]+)$") or worktree.path
 	local confirming = state.removing == worktree.path
 	return ui.column {
-		key = key_of(worktree.path),
+		key = state.keys[worktree.path],
 		class = "bay",
 		selected = worktree.path == state.selected,
 		msg = { pick = worktree.path },
@@ -159,6 +166,8 @@ return mod {
 		local state: State = {
 			selected = previous and previous.selected,
 			worktrees = {},
+			keys = {},
+			next_key = 1,
 			activity = {},
 			adding = false,
 			draft = "",
@@ -184,6 +193,7 @@ return mod {
 		if msg.topic == "provider/git" and type(msg.value) == "table" then
 			state.root = msg.value.root
 			state.worktrees = usable(msg.value.worktrees or {})
+			number_rows(state)
 			-- A bay just added is not listed until now, and stays chosen.
 			if not (state.awaited and not find(state.worktrees, state.awaited)) then
 				state.awaited = nil
