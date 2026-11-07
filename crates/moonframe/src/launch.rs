@@ -6,7 +6,7 @@ use {
         Identity,
         hosted::{HostView, Registry, ViewInit},
     },
-    gpui_kit::{Context, Window},
+    gpui_kit::{AssetSource, Context, Window},
     moonframe_providers::{Native, Natives},
     std::{
         io,
@@ -25,6 +25,7 @@ use {
 pub struct Moonframe {
     pub(crate) identity: Identity,
     pub(crate) app: Option<AppSource>,
+    pub(crate) assets: Option<Arc<dyn AssetSource>>,
     pub(crate) project: Option<PathBuf>,
     pub(crate) keep: Vec<String>,
     pub(crate) natives: Natives,
@@ -64,6 +65,7 @@ impl Moonframe {
             keep: Vec::new(),
             natives: crate::natives::natives(),
             views: Registry::default(),
+            assets: None,
             #[cfg(feature = "tokio")]
             runtime: None,
         }
@@ -220,6 +222,13 @@ impl Moonframe {
         make: impl Fn(&ViewInit, &mut Window, &mut Context<T>) -> T + 'static,
     ) -> Self {
         self.views.insert(name, make);
+        self
+    }
+
+    /// The app's own assets, for its views: GPUI asks them first, so a path
+    /// they hold wins over Moonframe's, and the rest fall through to it.
+    pub fn assets(mut self, assets: impl AssetSource) -> Self {
+        self.assets = Some(Arc::new(assets));
         self
     }
 

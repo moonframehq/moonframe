@@ -464,6 +464,35 @@ fn a_removal_ends_with_moves_allowed() {
     assert!(!side.exists());
 }
 
+/// A mod asking for the log each frame costs no more than the refs' own
+/// pace: past those reads, only a new request reads it.
+#[test]
+fn asking_for_the_same_log_again_reads_nothing() {
+    let dir = repository();
+    let (events, seen) = events();
+    let folder = dir.path().join("providers").join("git");
+    std::fs::create_dir_all(&folder).unwrap();
+    let host = Handle::new("git", &folder, writers(&[]), events);
+    let mut git = Git::default();
+    git.start(&host).unwrap();
+    let ask = |git: &mut Git, count: i64| {
+        let message = BTreeMap::from([("log".to_owned(), Data::Integer(count))]);
+        git.receive(&host, "history", Data::Map(message));
+    };
+    // Reads beyond those of the refs, however slow the machine is.
+    let extra = |git: &Git| git.log_reads as i64 - git.ref_reads as i64;
+
+    ask(&mut git, 10);
+    assert_eq!(published(&seen)["log"][0]["subject"], "first");
+    let asked = extra(&git);
+    for _ in 0..20 {
+        ask(&mut git, 10);
+    }
+    assert!(extra(&git) <= asked, "the same request read the log again");
+    ask(&mut git, 20);
+    assert_eq!(extra(&git), asked + 1, "a new request reads it at once");
+}
+
 /// A diff only covers files git lists as changed, never a path from
 /// outside the repository.
 #[test]

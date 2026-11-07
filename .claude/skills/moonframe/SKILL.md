@@ -1884,6 +1884,7 @@ is no way to force it, so show `error` to the user, who decides.
 | `branches` | 20 newest local `{ name, head, time, upstream?, ahead, behind, gone, current }` |
 | `remote` | `{ name, url, host, kind ("github" "gitlab" "other"), owner, repo, web_url? }` or nil |
 | `stashes` | count |
+| `log` | once a mod sends `{ log = 200 }` (at most 500; `false` stops it): `{ sha, short, parents, author, time, refs, subject }`, children before parents, of every branch, tag and HEAD. Draw it with `use "commit-graph"`; the `history` mod is a tab that does |
 | `diff` | `{ path, binary, lines, truncated, hunks = { { header, old_start, new_start, lines = { { kind ("add" "del" "ctx"), old?, new?, text } } } } }`, at most 1200 lines of 300 characters |
 
 `app.docs` (docs, native): `{ available, root }`, the root `app.files`
