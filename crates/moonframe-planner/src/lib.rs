@@ -28,8 +28,9 @@
 //! "classic" | "sepia" | "light"`.
 //!
 //! The file is `$XDG_DATA_HOME/moonframe/<profile>/planner.json` (by default
-//! under `~/.local/share`), started with sample items the first time. Day
-//! and month names are English.
+//! under `~/.local/share`). A new planner starts empty, or with sample items
+//! when `DAYBOOK_SAMPLE` is set; a file that holds no planner is kept as
+//! `planner.json.broken` first. Day and month names are English.
 
 // keep-sorted start
 mod dates;
@@ -154,7 +155,8 @@ struct Planner {
 
 impl Planner {
     fn open(file: PathBuf, today: chrono::NaiveDate) -> Self {
-        let store = store::load(&file, today);
+        let sample = env::var_os("DAYBOOK_SAMPLE").is_some_and(|value| !value.is_empty());
+        let store = store::load(&file, today, sample);
         Self {
             file,
             store,

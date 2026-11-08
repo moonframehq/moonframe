@@ -172,16 +172,25 @@ return mod {
 				nav_buttons { back = { shift = -1 }, forward = { shift = 1 }, to = "provider:planner", small = true },
 			}))
 			table.insert(body, day_strip { days = planner.days, selected = planner.selected })
-			table.insert(body, ui.row {
-				class = "agenda-summary",
-				align = "center",
-				wrap = true,
-				ui.text { `{planner.greeting}, you have`, weight = "medium" },
-				pill { label = plural(events, "event", "events"), icon = "calendar", tone = "danger", size = "normal" },
-				pill { label = plural(habits, "daily habit", "daily habits"), icon = "activity", size = "normal" },
-				ui.text { "and", weight = "medium" },
-				pill { label = `{important} important`, icon = "triangle-alert", tone = "warning", size = "normal" },
-			})
+			-- An empty day, as a new planner's first one is, says so rather
+			-- than counting nothing three times.
+			local summary = if events + habits + important == 0
+				then ui.row {
+					class = "agenda-summary",
+					align = "center",
+					ui.text { `{planner.greeting}, nothing planned.`, weight = "medium" },
+				}
+				else ui.row {
+					class = "agenda-summary",
+					align = "center",
+					wrap = true,
+					ui.text { `{planner.greeting}, you have`, weight = "medium" },
+					pill { label = plural(events, "event", "events"), icon = "calendar", tone = "danger", size = "normal" },
+					pill { label = plural(habits, "daily habit", "daily habits"), icon = "activity", size = "normal" },
+					ui.text { "and", weight = "medium" },
+					pill { label = `{important} important`, icon = "triangle-alert", tone = "warning", size = "normal" },
+				}
+			table.insert(body, summary)
 			table.insert(body, ui.column { grow = true, scroll = true, list(day, "Nothing on this day. Type above to add a task.") })
 		elseif state.view == "calendar" then
 			local day = {}
