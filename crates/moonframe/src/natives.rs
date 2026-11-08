@@ -30,6 +30,7 @@ pub(crate) fn natives() -> Natives {
         ("library", library),
         ("pi", pi),
         ("planner", planner),
+        ("procs", procs),
         ("projects", projects),
         ("repo", repo),
         ("shell", shell),
@@ -94,6 +95,11 @@ fn pi() -> Box<dyn Native> {
 #[cfg(feature = "planner")]
 fn planner() -> Box<dyn Native> {
     moonframe_planner::native()
+}
+
+#[cfg(feature = "procs")]
+fn procs() -> Box<dyn Native> {
+    moonframe_procs::native()
 }
 
 #[cfg(feature = "projects")]
@@ -176,6 +182,11 @@ fn planner() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(not(feature = "procs"))]
+fn procs() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 #[cfg(not(feature = "projects"))]
 fn projects() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -208,6 +219,7 @@ fn usage() -> Box<dyn Native> {
         feature = "git",
         feature = "pi",
         feature = "planner",
+        feature = "procs",
         feature = "projects",
         feature = "transcripts",
         feature = "shell",
@@ -263,8 +275,8 @@ mod tests {
     fn every_built_in_native_is_registered() {
         let natives = natives();
         for name in [
-            "acp", "chat", "docs", "git", "github", "gitlab", "library", "pi", "projects", "repo",
-            "shell", "usage",
+            "acp", "chat", "docs", "git", "github", "gitlab", "library", "pi", "procs", "projects",
+            "repo", "shell", "usage",
         ] {
             assert!(natives.contains_key(name), "{name}");
         }

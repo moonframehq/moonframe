@@ -1,7 +1,7 @@
 # What runs on this machine, for Lantern's process monitor: processes
 # grouped by name with their CPU and memory, the CPU split and load, and
-# memory in use. Shared as `app.procs`. A process provider: it runs `ps`,
-# `iostat`, `vm_stat` and `sysctl` with your access (macOS). Needs python3.
-# See procs.py for what it publishes.
-command = ["python3", "procs.py"]
-kind    = "process"
+# memory in use. Shared as `app.procs`. It runs `ps`, `iostat`, `vm_stat`
+# and `sysctl` with your access (macOS). A native provider: Rust built into
+# the app (crates/moonframe-procs, the `procs` feature), so the app needs
+# nothing else installed. See its lib.rs for what it publishes.
+kind = "native"

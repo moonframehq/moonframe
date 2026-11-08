@@ -5249,6 +5249,7 @@ dependencies = [
  "moonframe-packages",
  "moonframe-pi",
  "moonframe-planner",
+ "moonframe-procs",
  "moonframe-projects",
  "moonframe-providers",
  "moonframe-shell",
@@ -5444,6 +5445,15 @@ dependencies = [
  "moonframe-providers",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "moonframe-procs"
+version = "0.2.2"
+dependencies = [
+ "moonframe-core",
+ "moonframe-providers",
+ "serde_json",
 ]
 
 [[package]]

@@ -34,6 +34,7 @@ fn compiled() -> std::collections::BTreeMap<String, bool> {
         "math",
         "pi",
         "planner",
+        "procs",
         "projects",
         "prose",
         "restart",

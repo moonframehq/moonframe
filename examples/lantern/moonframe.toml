@@ -7,3 +7,8 @@ name  = "lantern"
 title = "Lantern"
 # The projects provider and the file-tree component.
 requires = ["../projects"]
+
+# Shipped by Moonframe's releases as an app of its own (docs/releasing.md).
+[release]
+cask        = "moonframe-lantern"
+description = "Halloween terminal workspace with project pages and a process monitor"

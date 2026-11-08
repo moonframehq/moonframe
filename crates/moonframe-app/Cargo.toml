@@ -45,6 +45,7 @@ default = [
   "math",
   "pi",
   "planner",
+  "procs",
   "projects",
   "prose",
   "restart",
@@ -83,6 +84,7 @@ markdown      = ["moonframe/markdown"]
 math          = ["moonframe/math"]
 pi            = ["moonframe/pi"]
 planner       = ["moonframe/planner"]
+procs         = ["moonframe/procs"]
 projects      = ["moonframe/projects"]
 prose         = ["moonframe/prose"]
 restart       = ["moonframe/restart"]
