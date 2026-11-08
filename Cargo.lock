@@ -5254,6 +5254,7 @@ dependencies = [
  "moonframe-speech",
  "moonframe-store",
  "moonframe-terminal",
+ "moonframe-transcripts",
  "moonframe-usage",
  "notify",
  "objc2 0.6.5",
@@ -5515,6 +5516,16 @@ dependencies = [
  "sysinfo 0.40.1",
  "tempfile",
  "tracing",
+]
+
+[[package]]
+name = "moonframe-transcripts"
+version = "0.2.2"
+dependencies = [
+ "moonframe-core",
+ "moonframe-providers",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

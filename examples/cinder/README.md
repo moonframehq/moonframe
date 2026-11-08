@@ -24,7 +24,8 @@ grid (`components/cinder-sprite.luau`).
 
 ## Where the sessions come from
 
-`providers/history` (a Python process provider) reads the coding-agent CLI's
+`providers/history` (a native provider, `crates/moonframe-transcripts`) reads
+the coding-agent CLI's
 transcripts in `~/.claude/projects` (a folder per project, a JSONL file per
 session), **read-only**: the 60 most recent sessions, titled by the CLI's
 own title, a summary, or the first thing typed, and grouped by the

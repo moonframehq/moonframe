@@ -52,6 +52,7 @@ default = [
   "speech",
   "studio",
   "tokio",
+  "transcripts",
   "updates",
   "usage",
   "video",
@@ -91,6 +92,7 @@ studio        = ["moonframe/studio"]
 syntax        = ["moonframe/syntax"]
 terminal      = ["moonframe/terminal"]
 tokio         = ["moonframe/tokio"]
+transcripts   = ["moonframe/transcripts"]
 updates       = ["moonframe/updates"]
 usage         = ["moonframe/usage"]
 video         = ["moonframe/video"]
