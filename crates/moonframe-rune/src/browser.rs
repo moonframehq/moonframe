@@ -6,7 +6,9 @@
 
 use {
     crate::Ui,
-    moonframe_core::{BrowserCommand, Data, Markdown, is_file_url, is_web_url, typed_address},
+    moonframe_core::{
+        BrowserCommand, Data, Markdown, is_file_url, is_remote_url, is_web_url, typed_address,
+    },
     rune::{Tx, Waker, WindowHandle},
     std::{
         cell::{Cell, RefCell},
@@ -320,8 +322,10 @@ impl Browsers {
             BrowserCommand::Forward => page.view.evaluate_script("history.forward()"),
             BrowserCommand::Reload => page.view.reload(),
             BrowserCommand::Stop => page.view.evaluate_script("window.stop()"),
+            // Only web addresses reach the system, as on GPUI: a `file` one
+            // would open whatever program the file is.
             BrowserCommand::Open => {
-                if let Some(url) = &page.url
+                if let Some(url) = page.url.as_deref().filter(|url| is_remote_url(url))
                     && let Err(problem) = tx.open_url(url)
                 {
                     tracing::warn!("cannot open {url}: {problem:?}");

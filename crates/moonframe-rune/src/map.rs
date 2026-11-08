@@ -192,7 +192,9 @@ impl Tiles {
             let mut work = self.work.borrow_mut();
             let sender = work.get_or_insert_with(|| self.start(wake));
             if sender.send(url.to_owned()).is_err() {
-                tracing::warn!("no worker for {url}");
+                // The address without its query, where a tile server's key goes.
+                let shown = url.split(['?', '#']).next().unwrap_or_default();
+                tracing::warn!("no worker for {shown}");
             }
         }
         None

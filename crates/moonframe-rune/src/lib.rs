@@ -33,6 +33,7 @@ mod launch;
 mod map;
 mod menus;
 mod natives;
+mod opens;
 #[path = "../../moonframe/src/persist.rs"]
 mod persist;
 #[path = "../../moonframe/src/profiles.rs"]
@@ -174,6 +175,8 @@ pub struct Ui {
     pub(crate) markdown_found: RefCell<HashMap<String, usize>>,
     /// What documents have to tell their mods, which a view cannot send.
     pub(crate) markdown_notes: RefCell<Vec<(String, String, Data)>>,
+    /// When `app:open` last opened pages, to keep it to a burst.
+    pub(crate) opens: opens::Opens,
     /// What a drag inside the app carries, and the rows that take it.
     pub(crate) carrying: RefCell<Option<render::Carrying>>,
     pub(crate) carry_targets: RefCell<Vec<render::Target>>,
@@ -249,7 +252,9 @@ impl Ui {
                 true
             },
             Request::Open(url) => {
-                if let Err(problem) = tx.open_url(&url) {
+                if !self.opens.may_open(Instant::now()) {
+                    tracing::warn!("{from}: `app:open` asked too often; a page was not opened");
+                } else if let Err(problem) = tx.open_url(&url) {
                     self.workspace
                         .refuse(from, Error::new(format!("{problem:?}")));
                 }
@@ -460,6 +465,7 @@ impl Ui {
             row_regions: render::RowRegions::default(),
             markdown_found: RefCell::default(),
             markdown_notes: RefCell::default(),
+            opens: opens::Opens::default(),
             documents: RefCell::default(),
             carrying: RefCell::default(),
             carry_targets: RefCell::default(),
