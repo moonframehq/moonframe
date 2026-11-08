@@ -31,11 +31,13 @@
 //! under `~/.local/share`), started with sample items the first time. Day
 //! and month names are English.
 
+// keep-sorted start
 mod dates;
 mod messages;
 mod store;
 mod values;
 mod view;
+// keep-sorted end
 
 use {
     chrono::Local,
