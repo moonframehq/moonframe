@@ -7,11 +7,13 @@ mod outline;
 
 use {
     super::{Painter, Place},
-    crate::{Ui, style::Ink},
-    moonframe_core::{Data, Markdown, Part, Reveal, States, Token},
+    crate::{Ui, icons, style::Ink},
+    moonframe_core::{Data, IconName, Markdown, Part, Reveal, States, Token},
     outline::Outline,
-    rune::{El, ScrollSpec, col},
-    rune_kit::{Case, Highlight, Markdown as RuneMarkdown, MarkdownStyle, markdown::find},
+    rune::{El, ScrollSpec, col, el, row, text},
+    rune_kit::{
+        Case, CodeFrame, Highlight, Markdown as RuneMarkdown, MarkdownStyle, markdown::find,
+    },
     std::rc::Rc,
 };
 
@@ -21,14 +23,19 @@ const HEADINGS: [f32; 3] = [1.75, 1.25, 1.1];
 const TASK_BOX: f32 = 14.;
 /// How line height relates to size, as `Ink` sets text.
 const LINE: f32 = 1.618;
-/// GitHub's alerts, as the marker in a quote and the title it shows.
-const ALERTS: [(&str, &str); 5] = [
-    ("[!NOTE]", "Note"),
-    ("[!TIP]", "Tip"),
-    ("[!IMPORTANT]", "Important"),
-    ("[!WARNING]", "Warning"),
-    ("[!CAUTION]", "Caution"),
+/// GitHub's alerts: the marker in a quote, the title it shows, its color and
+/// its icon, as GPUI draws them.
+const ALERTS: [(&str, &str, Token, &str); 5] = [
+    ("[!NOTE]", "Note", Token::Accent, "info"),
+    ("[!TIP]", "Tip", Token::Success, "sparkles"),
+    ("[!IMPORTANT]", "Important", Token::Accent, "message-square"),
+    ("[!WARNING]", "Warning", Token::Warning, "triangle-alert"),
+    ("[!CAUTION]", "Caution", Token::Danger, "octagon-alert"),
 ];
+/// The language an alert's fence goes under, followed by its kind's index.
+const ALERT_FENCE: &str = "moonframe-alert-";
+/// An alert's bar, along its left side.
+const ALERT_BAR: f32 = 3.;
 
 /// What a document's mod asked to hear of its structure, as last drawn.
 #[derive(Default)]
@@ -49,11 +56,68 @@ fn block_key(path: &str, index: usize) -> String {
     format!("{path}-b{index}")
 }
 
-/// `text` with each alert's marker as its bold title, on a line of its own.
-fn titled_alerts(text: &str) -> String {
-    let mut out = text.to_owned();
-    for (marker, title) in ALERTS {
-        out = out.replace(&format!("> {marker}\n"), &format!("> **{title}**\n>\n"));
+/// `text` with each footnote mark, `[^id]`, as a link to its note, and each
+/// note's `[^id]:` as its label; with where each note is in what it returns.
+/// Fenced code is left as it is.
+fn linked_footnotes(text: &str) -> (String, Vec<(String, usize)>) {
+    let mut out = String::with_capacity(text.len());
+    let mut notes = Vec::new();
+    let mut fenced = false;
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            fenced = !fenced;
+        }
+        if fenced || !line.contains("[^") {
+            out.push_str(line);
+            continue;
+        }
+        let mut rest = line;
+        let mut first = true;
+        while let Some(at) = rest.find("[^") {
+            let Some(end) = rest[at..].find(']').map(|end| at + end) else {
+                break;
+            };
+            let id = &rest[at + 2..end];
+            out.push_str(&rest[..at]);
+            let defines = first && at == 0 && rest[end + 1..].starts_with(':');
+            if defines {
+                notes.push((id.to_owned(), out.len()));
+                out.push_str(&format!("**[{id}]**"));
+                rest = &rest[end + 2..];
+            } else {
+                out.push_str(&format!("[[{id}]](#fn-{id})"));
+                rest = &rest[end + 1..];
+            }
+            first = false;
+        }
+        out.push_str(rest);
+    }
+    (out, notes)
+}
+
+/// `text` with each alert, a quote that starts with a marker, as a fence of
+/// its own, which the document's code frame draws as GPUI draws an alert.
+fn fenced_alerts(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut lines = text.split_inclusive('\n').peekable();
+    while let Some(line) = lines.next() {
+        let kind = ALERTS
+            .iter()
+            .position(|(marker, ..)| line.trim_end() == format!("> {marker}"));
+        let Some(kind) = kind else {
+            out.push_str(line);
+            continue;
+        };
+        out.push_str(&format!("~~~~{ALERT_FENCE}{kind}\n"));
+        while let Some(quoted) = lines.next_if(|next| next.starts_with('>')) {
+            let body = quoted.strip_prefix("> ").unwrap_or(&quoted[1..]);
+            out.push_str(body);
+            if !body.ends_with('\n') {
+                out.push('\n');
+            }
+        }
+        out.push_str("~~~~\n");
     }
     out
 }
@@ -61,8 +125,11 @@ fn titled_alerts(text: &str) -> String {
 impl<'w> Painter<'w> {
     fn markdown_style(&self, ink: Ink) -> MarkdownStyle {
         let token = |token| self.palette.token(token);
+        // Links in the text's own ink, underlined, as on GPUI.
         let style = MarkdownStyle::neutral(self.palette.dark)
             .body_font(ink.text_style())
+            .link(ink.color)
+            .link_underline(ink.color)
             .task_checkbox(
                 TASK_BOX,
                 3.,
@@ -184,6 +251,58 @@ impl<'w> Painter<'w> {
         }
     }
 
+    /// What draws an alert's fence: its color down the side, its icon and
+    /// title, and its text as markdown. Other fences keep their card.
+    fn alert_frame(
+        &self,
+        style: &MarkdownStyle,
+        ink: Ink,
+    ) -> impl Fn(El, &CodeFrame<'_>) -> El + use<> {
+        let kinds: Vec<(&'static str, rune::Color, Option<&'static rune::Icon>)> = ALERTS
+            .iter()
+            .map(|(_, title, token, icon)| {
+                let icon = IconName::new(icon).as_ref().and_then(icons::icon);
+                (*title, self.palette.token(*token), icon)
+            })
+            .collect();
+        let style = style.clone();
+        let title_ink = Ink {
+            weight: 600.,
+            ..ink
+        };
+        let muted = self.palette.token(Token::Muted);
+        move |card: El, frame: &CodeFrame<'_>| {
+            let kind = frame
+                .language
+                .and_then(|language| language.strip_prefix(ALERT_FENCE))
+                .and_then(|index| index.parse::<usize>().ok())
+                .and_then(|index| kinds.get(index));
+            let Some((title, color, icon)) = kind else {
+                return card;
+            };
+            let heading = row()
+                .gap(8.)
+                .items_center()
+                .children(icon.map(|icon| rune::icon(icon, title_ink.size).color(*color)))
+                .child(text(*title).font(title_ink.text_style()).color(*color));
+            col()
+                .w_full()
+                .gap(4.)
+                .py(8.)
+                .pl(12. + ALERT_BAR)
+                .pr(12.)
+                .radius(6.)
+                .fill(muted)
+                .child(
+                    el().pin(Some(0.), Some(0.), None, Some(0.))
+                        .w(ALERT_BAR)
+                        .fill(*color),
+                )
+                .child(heading)
+                .child(RuneMarkdown::new(frame.source.to_owned()).render(&style))
+        }
+    }
+
     /// Tells the mod how many matches there are, when that changed.
     fn note_found(&self, markdown: &Markdown, count: usize, place: &Place<'w>) {
         let Some(msg) = &markdown.found else {
@@ -203,7 +322,7 @@ impl<'w> Painter<'w> {
     pub(super) fn markdown(&self, markdown: &'w Markdown, place: &Place<'w>) -> El {
         let look = self.look(Part::Markdown, &markdown.look, States::default(), place);
         let ink = place.ink.under(&look.base, self.palette);
-        let source = titled_alerts(&markdown.text);
+        let (source, notes) = linked_footnotes(&fenced_alerts(&markdown.text));
         let query = markdown.find.as_deref().filter(|query| !query.is_empty());
         let found = query.map_or_else(Vec::new, |query| find(&source, query, Case::Insensitive));
         self.note_found(markdown, found.len(), place);
@@ -229,13 +348,19 @@ impl<'w> Painter<'w> {
             .highlights(marks)
             .block_keys(keys)
             .on_link(move |ui: &mut Ui, url: &str| {
-                let heading = url
-                    .strip_prefix('#')
-                    .and_then(|fragment| outline.anchor(fragment));
-                match (heading, &link) {
-                    (Some(heading), _) => {
+                // A note's mark scrolls to the note; a `#heading`, to it.
+                let fragment = url.strip_prefix('#');
+                let note = fragment
+                    .and_then(|fragment| fragment.strip_prefix("fn-"))
+                    .and_then(|id| notes.iter().find(|(note, _)| note == id))
+                    .map(|(_, at)| *at);
+                let heading = fragment
+                    .and_then(|fragment| outline.anchor(fragment))
+                    .map(|heading| heading.at);
+                match (note.or(heading), &link) {
+                    (Some(at), _) => {
                         if let Some(document) = ui.documents.get_mut().get_mut(&path) {
-                            document.pending = Some(outline.block_at(heading.at));
+                            document.pending = Some(outline.block_at(at));
                         }
                     },
                     (None, Some(msg)) => ui.send(&owner, &to, Markdown::message(msg, url)),
@@ -245,6 +370,7 @@ impl<'w> Painter<'w> {
         let style = self
             .markdown_style(ink)
             .highlight_bg(self.palette.token(Token::Warning).alpha(0.35));
+        let document = document.code_frame(self.alert_frame(&style, ink));
         // Each move of the text inside a scroll runs the view again, so the
         // section a reader is in follows them.
         let rendered = document
@@ -286,20 +412,38 @@ impl<'w> Painter<'w> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
-    use super::titled_alerts;
+    use super::{fenced_alerts, linked_footnotes};
 
     #[test]
-    fn an_alert_shows_its_title_on_a_line_of_its_own() {
+    fn a_footnote_mark_links_to_its_note() {
+        let (text, notes) = linked_footnotes("Mixed.[^why]\n\n[^why]: Because.\n");
+        assert_eq!(text, "Mixed.[[why]](#fn-why)\n\n**[why]** Because.\n");
+        assert_eq!(notes, vec![(
+            "why".to_owned(),
+            text.find("**[why]**").unwrap()
+        )]);
+    }
+
+    #[test]
+    fn a_footnote_in_fenced_code_stays_as_it_is() {
+        let code = "```\nlet a = b[^c];\n```\n";
+        assert_eq!(linked_footnotes(code).0, code);
+    }
+
+    #[test]
+    fn an_alert_becomes_a_fence_of_its_own() {
+        let text = "Before.\n\n> [!TIP]\n> Mind it.\n> Twice.\n\nAfter.\n";
         assert_eq!(
-            titled_alerts("> [!TIP]\n> Mind it.\n"),
-            "> **Tip**\n>\n> Mind it.\n"
+            fenced_alerts(text),
+            "Before.\n\n~~~~moonframe-alert-1\nMind it.\nTwice.\n~~~~\n\nAfter.\n"
         );
     }
 
     #[test]
     fn a_quote_that_is_no_alert_stays_as_it_is() {
         let quote = "> [!FOO]\n> Mind it.\n";
-        assert_eq!(titled_alerts(quote), quote);
+        assert_eq!(fenced_alerts(quote), quote);
     }
 }
