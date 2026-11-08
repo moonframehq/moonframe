@@ -270,13 +270,16 @@ fn refuse_binaries(folder: &Path) -> Result<(), String> {
 /// linked folder's ignored build output does not count; elsewhere, every
 /// one. A link is listed, not followed.
 fn files(folder: &Path) -> Vec<PathBuf> {
-    let listed = git(folder, &[
-        "ls-files",
-        "-z",
-        "--cached",
-        "--others",
-        "--exclude-standard",
-    ]);
+    let listed = git(
+        folder,
+        &[
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ],
+    );
     if let Ok(listed) = listed
         && folder.join(".git").exists()
     {

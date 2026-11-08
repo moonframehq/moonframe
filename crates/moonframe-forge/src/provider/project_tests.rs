@@ -60,12 +60,15 @@ fn a_packaged_app_follows_projects_and_rejects_old_repository_data() {
     assert_eq!(forge.root.as_ref().unwrap().canonicalize().unwrap(), second);
     assert!(forge.data.is_null());
     assert_eq!(forge.target().unwrap().path, "owner/two");
-    forge.take_in(&handle, Done::Fetched {
-        target: old,
-        epoch: forge.epoch,
-        result: Ok(json!({ "current_pr": { "number": 1 } })),
-        credential: None,
-    });
+    forge.take_in(
+        &handle,
+        Done::Fetched {
+            target: old,
+            epoch: forge.epoch,
+            result: Ok(json!({ "current_pr": { "number": 1 } })),
+            credential: None,
+        },
+    );
     assert!(forge.data.is_null());
     assert!(forge.due(Instant::now()));
     forge.look_project(&handle, None);

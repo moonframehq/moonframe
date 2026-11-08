@@ -598,10 +598,13 @@ mod tests {
     #[test]
     fn a_claimed_request_is_not_taken_again() {
         let dir = tempfile::tempdir().unwrap();
-        let path = leave(dir.path(), &Request {
-            created: now(),
-            ..Request::default()
-        })
+        let path = leave(
+            dir.path(),
+            &Request {
+                created: now(),
+                ..Request::default()
+            },
+        )
         .unwrap();
         // Another window claimed it first.
         fs::rename(&path, path.with_extension("claimed-1")).unwrap();

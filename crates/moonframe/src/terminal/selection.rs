@@ -364,14 +364,18 @@ mod tests {
             (spot(1, 1), spot(1, 0), "a界", vec![(1, 0..3)]),
             (spot(0, 0), spot(0, 1), "界", vec![(0, 0..2)]),
             (spot(0, 1), spot(0, 0), "界", vec![(0, 0..2)]),
-            (spot(0, 1), spot(1, 1), "界x\na界", vec![
-                (0, 0..3),
-                (1, 0..3),
-            ]),
-            (spot(1, 1), spot(0, 1), "界x\na界", vec![
-                (0, 0..3),
-                (1, 0..3),
-            ]),
+            (
+                spot(0, 1),
+                spot(1, 1),
+                "界x\na界",
+                vec![(0, 0..3), (1, 0..3)],
+            ),
+            (
+                spot(1, 1),
+                spot(0, 1),
+                "界x\na界",
+                vec![(0, 0..3), (1, 0..3)],
+            ),
         ] {
             let mut selection = Selection::press(&screen, from, 1);
             selection.extend(&screen, to);

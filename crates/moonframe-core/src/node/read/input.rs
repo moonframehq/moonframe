@@ -3,30 +3,34 @@
 use {super::*, crate::read::Document};
 
 impl Build for Input {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "id",
-        "value",
-        "placeholder",
-        "to",
-        "change",
-        "select",
-        "submit",
-        "blur",
-        "keys",
-        "capture",
-        "multiline",
-        "rows",
-        "max_rows",
-        "disabled",
-        "focus",
-        "mono",
-        "width",
-        "grow",
-        "browser",
-        "prose",
-        "dim",
-        "typewriter",
-    ]];
+    const KEYS: &'static [&'static [&'static str]] = &[
+        TYPE,
+        LOOK,
+        &[
+            "id",
+            "value",
+            "placeholder",
+            "to",
+            "change",
+            "select",
+            "submit",
+            "blur",
+            "keys",
+            "capture",
+            "multiline",
+            "rows",
+            "max_rows",
+            "disabled",
+            "focus",
+            "mono",
+            "width",
+            "grow",
+            "browser",
+            "prose",
+            "dim",
+            "typewriter",
+        ],
+    ];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         let multiline = fields.get("multiline")?.unwrap_or(false);
@@ -143,26 +147,30 @@ impl Build for Input {
 }
 
 impl Build for Markdown {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "text",
-        "link",
-        "to",
-        "grow",
-        "scroll",
-        "width",
-        "height",
-        "max_width",
-        "lines",
-        "images",
-        "image",
-        "outline",
-        "section",
-        "reveal",
-        "find",
-        "find_index",
-        "found",
-        "stream",
-    ]];
+    const KEYS: &'static [&'static [&'static str]] = &[
+        TYPE,
+        LOOK,
+        &[
+            "text",
+            "link",
+            "to",
+            "grow",
+            "scroll",
+            "width",
+            "height",
+            "max_width",
+            "lines",
+            "images",
+            "image",
+            "outline",
+            "section",
+            "reveal",
+            "find",
+            "find_index",
+            "found",
+            "stream",
+        ],
+    ];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         let link = fields.get::<Data>("link")?;

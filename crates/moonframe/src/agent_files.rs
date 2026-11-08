@@ -89,19 +89,19 @@ mod tests {
     fn writes_then_refreshes() {
         let dir = tempfile::tempdir().unwrap();
         let files = [("a/b.md", "one")];
-        assert_eq!(refresh(dir.path(), &files).unwrap(), [(
-            "a/b.md",
-            Outcome::Wrote
-        )]);
-        assert_eq!(refresh(dir.path(), &files).unwrap(), [(
-            "a/b.md",
-            Outcome::Current
-        )]);
+        assert_eq!(
+            refresh(dir.path(), &files).unwrap(),
+            [("a/b.md", Outcome::Wrote)]
+        );
+        assert_eq!(
+            refresh(dir.path(), &files).unwrap(),
+            [("a/b.md", Outcome::Current)]
+        );
         fs::write(dir.path().join("a/b.md"), "old").unwrap();
-        assert_eq!(refresh(dir.path(), &files).unwrap(), [(
-            "a/b.md",
-            Outcome::Updated
-        )]);
+        assert_eq!(
+            refresh(dir.path(), &files).unwrap(),
+            [("a/b.md", Outcome::Updated)]
+        );
         assert_eq!(
             fs::read_to_string(dir.path().join("a/b.md")).unwrap(),
             "one"

@@ -223,10 +223,14 @@ fn wheel_and_drop_messages_say_what_happened() {
     };
     let wheel = fields(
         pointer
-            .wheel_message(&travel(0.5, -3.0), 0.1, Held {
-                secondary: true,
-                ..Held::default()
-            })
+            .wheel_message(
+                &travel(0.5, -3.0),
+                0.1,
+                Held {
+                    secondary: true,
+                    ..Held::default()
+                },
+            )
             .unwrap(),
     );
     assert_eq!(wheel["zoom"], Data::Number(0.1));

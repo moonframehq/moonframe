@@ -83,9 +83,11 @@ impl Pointer {
 /// = "x" }`: `min` and `max` needed.
 impl Read for Range {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
-        let fields = Fields::read(value, cx, &[&[
-            "min", "max", "step", "value", "speed", "axis",
-        ]])?;
+        let fields = Fields::read(
+            value,
+            cx,
+            &[&["min", "max", "step", "value", "speed", "axis"]],
+        )?;
         let min = fields
             .number("min", LIMIT)?
             .ok_or_else(|| cx.key("min").fail("a range needs `min` and `max`"))?;

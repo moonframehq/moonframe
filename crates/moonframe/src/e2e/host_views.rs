@@ -137,7 +137,13 @@ impl Hosting<'_> {
 #[gpui_kit::test]
 fn a_host_view_drawing_by_itself_leaves_the_app_as_it_was(cx: &mut TestAppContext) {
     let mut hosting = with_counter(cx);
-    for _ in 0..3 {
+    for step in 0..4 {
+        if step == 2 {
+            // Replayed frames keep the places the last drawn one noted.
+            hosting.send("wide");
+            hosting.window.cx.simulate_resize(size(px(900.), px(500.)));
+            hosting.window.cx.run_until_parked();
+        }
         let (app, view) = (hosting.app_frames(), hosting.frames.get());
         hosting
             .counter

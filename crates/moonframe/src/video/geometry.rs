@@ -231,11 +231,15 @@ mod tests {
 
     #[test]
     fn a_zoomed_picture_puts_its_center_in_the_middle() {
-        let placed = place([100., 100.], [1000., 1000.], &VideoView {
-            zoom: Some(1.),
-            center: [0.25, 0.75],
-            ..view()
-        });
+        let placed = place(
+            [100., 100.],
+            [1000., 1000.],
+            &VideoView {
+                zoom: Some(1.),
+                center: [0.25, 0.75],
+                ..view()
+            },
+        );
         assert_eq!(placed.scale, 1.);
         assert_eq!(placed.offset, [50. - 250., 50. - 750.]);
     }

@@ -6,10 +6,15 @@ use super::*;
 const MAX_GUIDES: usize = 256;
 
 impl Build for Video {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ATTACHED, &[
-        "id", "source", "width", "height", "zoom", "center", "filter", "color", "extended",
-        "black", "white", "gain", "gamma", "guides", "probe", "stats", "probed",
-    ]];
+    const KEYS: &'static [&'static [&'static str]] = &[
+        TYPE,
+        LOOK,
+        ATTACHED,
+        &[
+            "id", "source", "width", "height", "zoom", "center", "filter", "color", "extended",
+            "black", "white", "gain", "gamma", "guides", "probe", "stats", "probed",
+        ],
+    ];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         let pair = |key: &str| -> Result<Option<[f32; 2]>, Error> {

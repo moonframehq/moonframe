@@ -84,11 +84,14 @@ fn shown(workspace: &Workspace, name: &str) -> String {
 #[test]
 fn sources_name_a_repository_and_a_ref() {
     let parse = |text: &str| Source::parse(text).unwrap();
-    assert_eq!(parse("github.com/penso/my-super-mod"), Source {
-        id: "github.com/penso/my-super-mod".into(),
-        url: "https://github.com/penso/my-super-mod".into(),
-        reference: None,
-    });
+    assert_eq!(
+        parse("github.com/penso/my-super-mod"),
+        Source {
+            id: "github.com/penso/my-super-mod".into(),
+            url: "https://github.com/penso/my-super-mod".into(),
+            reference: None,
+        }
+    );
     assert_eq!(
         parse("penso/my-super-mod@v1.2").url,
         "https://github.com/penso/my-super-mod"
@@ -152,17 +155,22 @@ fn an_installed_mod_is_laid_between_the_app_and_the_user() {
     let (builtin, user) = (dir.path().join("app"), dir.path().join("user"));
     write(&builtin, "main.luau", SHELL);
     write(&builtin, "mods/clock/main.luau", &counter("built-in clock"));
-    let remote = repo(dir.path(), "My.Clock", &[(
-        "main.luau",
-        &counter("package"),
-    )]);
-    let package = repo(dir.path(), "extras", &[
-        ("mods/clock/main.luau", &counter("package clock")),
-        (
-            "components/pill.luau",
-            "return component { build = function() return ui.text 'pill' end }",
-        ),
-    ]);
+    let remote = repo(
+        dir.path(),
+        "My.Clock",
+        &[("main.luau", &counter("package"))],
+    );
+    let package = repo(
+        dir.path(),
+        "extras",
+        &[
+            ("mods/clock/main.luau", &counter("package clock")),
+            (
+                "components/pill.luau",
+                "return component { build = function() return ui.text 'pill' end }",
+            ),
+        ],
+    );
 
     let (id, contents) = install(&user, remote.to_str().unwrap(), &yes).unwrap();
     assert_eq!(id, "local/My.Clock");
@@ -234,19 +242,23 @@ fn a_ref_pins_a_package_and_update_follows_it() {
 fn providers_that_run_as_the_user_need_approval() {
     let dir = tempfile::tempdir().unwrap();
     let user = dir.path().join("user");
-    let remote = repo(dir.path(), "weather", &[
-        ("mods/weather/main.luau", &counter("sunny")),
-        (
-            "providers/forecast/provider.toml",
-            "kind = \"process\"\ncommand = [\"sh\", \"fetch.sh\"]\n",
-        ),
-        // Runs nothing, so it is not among those to approve.
-        (
-            "providers/sample/provider.toml",
-            "kind = \"static\"\nfile = \"sample.json\"\n",
-        ),
-        ("providers/sample/sample.json", "{\"sunny\": true}"),
-    ]);
+    let remote = repo(
+        dir.path(),
+        "weather",
+        &[
+            ("mods/weather/main.luau", &counter("sunny")),
+            (
+                "providers/forecast/provider.toml",
+                "kind = \"process\"\ncommand = [\"sh\", \"fetch.sh\"]\n",
+            ),
+            // Runs nothing, so it is not among those to approve.
+            (
+                "providers/sample/provider.toml",
+                "kind = \"static\"\nfile = \"sample.json\"\n",
+            ),
+            ("providers/sample/sample.json", "{\"sunny\": true}"),
+        ],
+    );
     let problem = install(&user, remote.to_str().unwrap(), &no).unwrap_err();
     assert_eq!(problem, "declined");
     assert!(!user.join("packages/local/weather").exists());
@@ -261,9 +273,10 @@ fn providers_that_run_as_the_user_need_approval() {
         .trusted()
         .map(|(name, how)| format!("{name}: {how}"))
         .collect();
-    assert_eq!(trusted, [
-        r#"forecast: runs ["sh" "fetch.sh"] with your access"#
-    ]);
+    assert_eq!(
+        trusted,
+        [r#"forecast: runs ["sh" "fetch.sh"] with your access"#]
+    );
 
     // An update that is declined stays where it was.
     commit(
@@ -353,11 +366,15 @@ fn a_package_ships_source_only() {
     let dir = tempfile::tempdir().unwrap();
     let user = dir.path().join("user");
     let provider = "kind = \"wasm\"\n";
-    let remote = repo(dir.path(), "meter", &[
-        ("mods/meter/main.luau", &counter("load")),
-        ("providers/load/provider.toml", provider),
-        ("providers/load/provider.wasm", "\0asm"),
-    ]);
+    let remote = repo(
+        dir.path(),
+        "meter",
+        &[
+            ("mods/meter/main.luau", &counter("load")),
+            ("providers/load/provider.toml", provider),
+            ("providers/load/provider.wasm", "\0asm"),
+        ],
+    );
     let problem = install(&user, remote.to_str().unwrap(), &yes).unwrap_err();
     assert!(
         problem.contains("providers/load/provider.wasm"),
@@ -427,10 +444,11 @@ fn a_package_ships_source_only() {
 fn a_linked_folder_skips_what_git_ignores() {
     let dir = tempfile::tempdir().unwrap();
     let user = dir.path().join("user");
-    let folder = repo(dir.path(), "dev", &[
-        ("main.luau", &counter("dev")),
-        (".gitignore", "target/\n"),
-    ]);
+    let folder = repo(
+        dir.path(),
+        "dev",
+        &[("main.luau", &counter("dev")), (".gitignore", "target/\n")],
+    );
     write(&folder, "target/debug/dev", "\u{7f}ELF\0");
     link(&user, folder.to_str().unwrap(), &yes).unwrap();
     remove(&user, "dev").unwrap();
@@ -456,11 +474,15 @@ fn an_app_package_brings_its_shell_into_a_profile_only() {
     write(&builtin, "main.luau", SHELL);
     write(&builtin, "mods/explorer/main.luau", &counter("explorer"));
     write(&builtin, "mods/terminal/main.luau", &counter("terminal"));
-    let pi = repo(dir.path(), "pi-app", &[
-        (MANIFEST, "[app]\nname = \"pi\"\nkeep = [\"terminal\"]\n"),
-        ("main.luau", SHELL),
-        ("mods/sessions/main.luau", &counter("sessions")),
-    ]);
+    let pi = repo(
+        dir.path(),
+        "pi-app",
+        &[
+            (MANIFEST, "[app]\nname = \"pi\"\nkeep = [\"terminal\"]\n"),
+            ("main.luau", SHELL),
+            ("mods/sessions/main.luau", &counter("sessions")),
+        ],
+    );
     let source = pi.display().to_string();
 
     let profile = user.join("profiles/pi");
@@ -491,9 +513,10 @@ fn an_app_package_brings_its_shell_into_a_profile_only() {
         "pi-app"
     );
     let workspace = Workspace::open(roots, false);
-    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
-        "sessions", "terminal"
-    ]);
+    assert_eq!(
+        workspace.mod_names().collect::<Vec<_>>(),
+        ["sessions", "terminal"]
+    );
     assert_eq!(shown(&workspace, "sessions"), "sessions");
 
     // Over the starter app, an app would only bring mods its shell has no
@@ -506,17 +529,25 @@ fn an_app_package_brings_its_shell_into_a_profile_only() {
 #[test]
 fn an_app_without_a_shell_or_a_name_is_refused() {
     let dir = tempfile::tempdir().unwrap();
-    let headless = repo(dir.path(), "headless", &[
-        (MANIFEST, "[app]\nname = \"headless\"\n"),
-        ("mods/a/main.luau", &counter("a")),
-    ]);
+    let headless = repo(
+        dir.path(),
+        "headless",
+        &[
+            (MANIFEST, "[app]\nname = \"headless\"\n"),
+            ("mods/a/main.luau", &counter("a")),
+        ],
+    );
     let problem =
         install(&dir.path().join("p"), &headless.display().to_string(), &yes).unwrap_err();
     assert!(problem.contains("main.luau"), "{problem}");
-    let badly_named = repo(dir.path(), "badly", &[
-        (MANIFEST, "[app]\nname = \"Not OK\"\n"),
-        ("main.luau", SHELL),
-    ]);
+    let badly_named = repo(
+        dir.path(),
+        "badly",
+        &[
+            (MANIFEST, "[app]\nname = \"Not OK\"\n"),
+            ("main.luau", SHELL),
+        ],
+    );
     let problem = install(
         &dir.path().join("q"),
         &badly_named.display().to_string(),
@@ -585,13 +616,17 @@ fn an_app_updated_from_github_names_its_repository_and_version() {
 fn a_native_provider_in_a_package_needs_approval() {
     let dir = tempfile::tempdir().unwrap();
     let user = dir.path().join("user");
-    let remote = repo(dir.path(), "writer", &[
-        ("mods/writer/main.luau", &counter("w")),
-        (
-            "providers/git/provider.toml",
-            "kind = \"native\"\n[settings]\nwriters = [\"writer\"]\n",
-        ),
-    ]);
+    let remote = repo(
+        dir.path(),
+        "writer",
+        &[
+            ("mods/writer/main.luau", &counter("w")),
+            (
+                "providers/git/provider.toml",
+                "kind = \"native\"\n[settings]\nwriters = [\"writer\"]\n",
+            ),
+        ],
+    );
     assert_eq!(
         install(&user, remote.to_str().unwrap(), &no).unwrap_err(),
         "declined"
@@ -616,10 +651,14 @@ fn a_native_provider_in_a_package_needs_approval() {
 fn a_mod_that_shadows_a_git_writer_is_named() {
     let dir = tempfile::tempdir().unwrap();
     let user = dir.path().join("user");
-    let remote = repo(dir.path(), "bar", &[
-        ("mods/status/main.luau", &counter("s")),
-        ("mods/other/main.luau", &counter("o")),
-    ]);
+    let remote = repo(
+        dir.path(),
+        "bar",
+        &[
+            ("mods/status/main.luau", &counter("s")),
+            ("mods/other/main.luau", &counter("o")),
+        ],
+    );
     let (_, contents) = install(&user, remote.to_str().unwrap(), &yes).unwrap();
     let builtin = writers(&user);
     assert!(builtin.contains(&"status".to_owned()), "{builtin:?}");
@@ -636,15 +675,20 @@ fn a_mod_that_shadows_a_git_writer_is_named() {
     for name in ["other", "status"] {
         assert!(widened.contains(&name.to_owned()), "{widened:?}");
     }
-    assert_eq!(contents.writers(&widened).collect::<Vec<_>>(), [
-        "other", "status"
-    ]);
+    assert_eq!(
+        contents.writers(&widened).collect::<Vec<_>>(),
+        ["other", "status"]
+    );
 
     // A package installed earlier that widened `writers` counts too.
-    let widening = repo(dir.path(), "widen", &[(
-        "providers/git/provider.toml",
-        "kind = \"native\"\n[settings]\nwriters = [\"later\"]\n",
-    )]);
+    let widening = repo(
+        dir.path(),
+        "widen",
+        &[(
+            "providers/git/provider.toml",
+            "kind = \"native\"\n[settings]\nwriters = [\"later\"]\n",
+        )],
+    );
     install(&user, widening.to_str().unwrap(), &yes).unwrap();
     assert!(writers(&user).contains(&"later".to_owned()));
 }
@@ -657,16 +701,21 @@ fn a_mod_that_shadows_a_git_writer_is_named() {
 fn a_mod_that_shadows_any_providers_writer_is_named() {
     let dir = tempfile::tempdir().unwrap();
     let user = dir.path().join("user");
-    let remote = repo(dir.path(), "baz", &[
-        ("mods/usage/main.luau", &counter("u")),
-        ("mods/editor/main.luau", &counter("e")),
-        ("mods/feedback/main.luau", &counter("f")),
-    ]);
+    let remote = repo(
+        dir.path(),
+        "baz",
+        &[
+            ("mods/usage/main.luau", &counter("u")),
+            ("mods/editor/main.luau", &counter("e")),
+            ("mods/feedback/main.luau", &counter("f")),
+        ],
+    );
     let (_, contents) = install(&user, remote.to_str().unwrap(), &yes).unwrap();
     let all = writers(&user);
-    assert_eq!(contents.writers(&all).collect::<Vec<_>>(), [
-        "editor", "feedback", "usage"
-    ]);
+    assert_eq!(
+        contents.writers(&all).collect::<Vec<_>>(),
+        ["editor", "feedback", "usage"]
+    );
 
     let usage = user.join("providers/usage");
     fs::create_dir_all(&usage).unwrap();
@@ -695,14 +744,18 @@ fn a_mod_that_shadows_any_providers_writer_is_named() {
 fn an_app_update_asks_about_providers_it_ships_beside_it() {
     let dir = tempfile::tempdir().unwrap();
     let profile = dir.path().join("user/profiles/pi");
-    let remote = repo(dir.path(), "pi-app", &[
-        (
-            MANIFEST,
-            "[app]\nname = \"pi\"\nrequires = [\"./shared\"]\n",
-        ),
-        ("main.luau", SHELL),
-        ("shared/mods/helper/main.luau", &counter("helper")),
-    ]);
+    let remote = repo(
+        dir.path(),
+        "pi-app",
+        &[
+            (
+                MANIFEST,
+                "[app]\nname = \"pi\"\nrequires = [\"./shared\"]\n",
+            ),
+            ("main.luau", SHELL),
+            ("shared/mods/helper/main.luau", &counter("helper")),
+        ],
+    );
     let (_, contents) = install(&profile, remote.to_str().unwrap(), &yes).unwrap();
     assert_eq!(contents.parts().count(), 2, "{contents:?}");
 
@@ -739,14 +792,18 @@ fn an_app_update_asks_about_providers_it_ships_beside_it() {
 fn an_app_update_asks_about_links_it_no_longer_requires() {
     let dir = tempfile::tempdir().unwrap();
     let profile = dir.path().join("user/profiles/pi");
-    let remote = repo(dir.path(), "pi-app", &[
-        (
-            MANIFEST,
-            "[app]\nname = \"pi\"\nrequires = [\"./shared\"]\n",
-        ),
-        ("main.luau", SHELL),
-        ("shared/mods/helper/main.luau", &counter("helper")),
-    ]);
+    let remote = repo(
+        dir.path(),
+        "pi-app",
+        &[
+            (
+                MANIFEST,
+                "[app]\nname = \"pi\"\nrequires = [\"./shared\"]\n",
+            ),
+            ("main.luau", SHELL),
+            ("shared/mods/helper/main.luau", &counter("helper")),
+        ],
+    );
     install(&profile, remote.to_str().unwrap(), &yes).unwrap();
     let folder = profile.join("packages/local/pi-app");
     let shared = folder.join("shared").canonicalize().unwrap();
@@ -783,10 +840,14 @@ fn an_app_update_asks_about_links_it_no_longer_requires() {
 #[test]
 fn an_app_requires_only_what_ships_in_its_repository() {
     let dir = tempfile::tempdir().unwrap();
-    let mono = repo(dir.path(), "mono", &[
-        ("examples/pi/main.luau", SHELL),
-        ("examples/projects/main.luau", &counter("projects")),
-    ]);
+    let mono = repo(
+        dir.path(),
+        "mono",
+        &[
+            ("examples/pi/main.luau", SHELL),
+            ("examples/projects/main.luau", &counter("projects")),
+        ],
+    );
     let app = mono.join("examples/pi");
     let projects = mono.join("examples/projects").canonicalize().unwrap();
     assert_eq!(beside(Some(&app), "../projects").unwrap(), Some(projects));
@@ -810,10 +871,14 @@ fn an_app_requires_only_what_ships_in_its_repository() {
 
     // An app whose requirement leaves its repository does not install.
     let user = dir.path().join("user/profiles/x");
-    let remote = repo(dir.path(), "x-app", &[
-        (MANIFEST, "[app]\nname = \"x\"\nrequires = [\"../..\"]\n"),
-        ("main.luau", SHELL),
-    ]);
+    let remote = repo(
+        dir.path(),
+        "x-app",
+        &[
+            (MANIFEST, "[app]\nname = \"x\"\nrequires = [\"../..\"]\n"),
+            ("main.luau", SHELL),
+        ],
+    );
     let problem = install(&user, remote.to_str().unwrap(), &yes).unwrap_err();
     assert!(problem.contains("leaves the app's repository"), "{problem}");
 }

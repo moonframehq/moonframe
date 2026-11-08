@@ -130,12 +130,15 @@ fn a_reading_publishes_its_tightest_window_and_details() {
         title: "By surface".into(),
         shares: vec![("Claude Code".into(), 75.)],
     }]);
-    let usage = Usage::showing(Host::Local, vec![Reading {
-        provider: claude(),
-        report: Some(report),
-        error: Some("rate limited".into()),
-        access: None,
-    }]);
+    let usage = Usage::showing(
+        Host::Local,
+        vec![Reading {
+            provider: claude(),
+            report: Some(report),
+            error: Some("rate limited".into()),
+            access: None,
+        }],
+    );
     let out = publish::usage(&usage, &UsageConfig::default(), Some(&Host::Local));
     assert_eq!(out["host"], "local");
     assert_eq!(out["headline"], json!(["claude"]));
@@ -164,12 +167,15 @@ fn balance_fractions_keep_spending_and_credit_labels_without_claiming_left() {
         Balance::new("Uncapped", 12., usd.clone()),
         Balance::new("Zero budget", 12., usd).out_of(0.),
     ]);
-    let usage = Usage::showing(Host::Local, vec![Reading {
-        provider,
-        report: Some(report),
-        error: None,
-        access: None,
-    }]);
+    let usage = Usage::showing(
+        Host::Local,
+        vec![Reading {
+            provider,
+            report: Some(report),
+            error: None,
+            access: None,
+        }],
+    );
     let out = publish::usage(&usage, &UsageConfig::default(), Some(&Host::Local));
     let balances = out["providers"][0]["balances"].as_array().unwrap();
     assert_eq!(balances[0]["label"], "Billing cycle spend");

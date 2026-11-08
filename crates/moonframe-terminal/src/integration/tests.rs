@@ -45,9 +45,9 @@ fn other_shells_only_hear_where_the_scripts_are() {
     let folder = PathBuf::from("/cache/shell");
     for shell in ["/bin/bash", "/bin/dash", ""] {
         let variables = environment(shell, &folder, |_| None);
-        assert_eq!(variables, [(
-            FOLDER.to_owned(),
-            "/cache/shell/bash".to_owned()
-        )]);
+        assert_eq!(
+            variables,
+            [(FOLDER.to_owned(), "/cache/shell/bash".to_owned())]
+        );
     }
 }

@@ -3,23 +3,26 @@ use {
     moonframe_core::{AppMenu, Appearance, Chord, MenuEntry},
 };
 
-gpui_kit::actions!(moonframe, [
-    Quit,
-    Reload,
-    ToggleTheme,
-    Inspect,
-    Dismiss,
-    BrowseComponents,
-    ShowThemes,
-    AboutApp,
-    BuildApp,
-    CheckForUpdates,
-    ToggleBetaReleases,
-    ToggleSlowAnimations,
-    ToggleDeveloperMode,
-    UndoChange,
-    RedoChange
-]);
+gpui_kit::actions!(
+    moonframe,
+    [
+        Quit,
+        Reload,
+        ToggleTheme,
+        Inspect,
+        Dismiss,
+        BrowseComponents,
+        ShowThemes,
+        AboutApp,
+        BuildApp,
+        CheckForUpdates,
+        ToggleBetaReleases,
+        ToggleSlowAnimations,
+        ToggleDeveloperMode,
+        UndoChange,
+        RedoChange
+    ]
+);
 
 /// Runs a shell menu item, found by its id (menu title and label).
 #[derive(Clone, Debug, PartialEq, gpui_kit::Action)]
@@ -148,9 +151,12 @@ pub(crate) fn menus(shell: &[AppMenu]) -> Vec<Menu> {
     for menu in shell {
         let items = menu.items.iter().map(|entry| match entry {
             MenuEntry::Separator => MenuItem::separator(),
-            MenuEntry::Item(item) => MenuItem::action(item.label.clone(), MenuSend {
-                id: item.id(&menu.title),
-            }),
+            MenuEntry::Item(item) => MenuItem::action(
+                item.label.clone(),
+                MenuSend {
+                    id: item.id(&menu.title),
+                },
+            ),
         });
         if menu.title == "View" {
             view_items.extend(items);

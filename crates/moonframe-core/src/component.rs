@@ -291,22 +291,26 @@ fn describe(
         vm::SMALL_MEMORY,
     )?;
     let table = library.load(&lua, name)?;
-    let fields = Fields::read(&Value::Table(table.clone()), &Cx::root(&NO_NAMES), &[&[
-        "title",
-        "description",
-        "category",
-        "when",
-        "props",
-        "styles",
-        "icon",
-        "usage",
-        "example",
-        "build",
-        "init",
-        "update",
-        "tab",
-        "subscribe",
-    ]])?;
+    let fields = Fields::read(
+        &Value::Table(table.clone()),
+        &Cx::root(&NO_NAMES),
+        &[&[
+            "title",
+            "description",
+            "category",
+            "when",
+            "props",
+            "styles",
+            "icon",
+            "usage",
+            "example",
+            "build",
+            "init",
+            "update",
+            "tab",
+            "subscribe",
+        ]],
+    )?;
     let styles = fields.raw("styles").cloned().unwrap_or(Value::Nil);
     let example = fields.raw("example").cloned().unwrap_or(Value::Nil);
     let about = About {

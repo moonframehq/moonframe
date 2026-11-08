@@ -256,11 +256,14 @@ impl Terminals {
             tracing::warn!("terminal {oldest}: never drawn; its command is dropped");
             self.typed.remove(&oldest);
         }
-        self.typed.insert(id.to_owned(), Typed {
-            bytes,
-            cwd,
-            asked: Instant::now(),
-        });
+        self.typed.insert(
+            id.to_owned(),
+            Typed {
+                bytes,
+                cwd,
+                asked: Instant::now(),
+            },
+        );
     }
 
     /// The command line waiting for a terminal `key` that starts in `cwd`.

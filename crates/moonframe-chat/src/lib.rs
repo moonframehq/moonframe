@@ -350,22 +350,25 @@ impl Chats {
         let id = format!("{}-{}", now_ms(), self.serial);
         {
             let mut state = lock(&self.state);
-            state.chats.insert(0, Chat {
-                id: id.clone(),
-                owner: owner.to_owned(),
-                agent: agent.clone(),
-                cwd: cwd.display().to_string(),
-                created: now_ms(),
-                pid: None,
-                endpoint: None,
-                session: load.clone(),
-                phase: Phase::Starting,
-                transcript: None,
-                cursor: None,
-                #[cfg(unix)]
-                writer: None,
-                closing: false,
-            });
+            state.chats.insert(
+                0,
+                Chat {
+                    id: id.clone(),
+                    owner: owner.to_owned(),
+                    agent: agent.clone(),
+                    cwd: cwd.display().to_string(),
+                    created: now_ms(),
+                    pid: None,
+                    endpoint: None,
+                    session: load.clone(),
+                    phase: Phase::Starting,
+                    transcript: None,
+                    cursor: None,
+                    #[cfg(unix)]
+                    writer: None,
+                    closing: false,
+                },
+            );
             trim(&mut state);
             state.focus = Some(id.clone());
             state.unsaved = true;
@@ -498,12 +501,15 @@ impl Chats {
             return Err("the chat's program did not take it".to_owned());
         }
         let owner = owner.to_owned();
-        state.pending.insert(command_id, Pending {
-            chat: id.to_owned(),
-            owner,
-            reply,
-            action,
-        });
+        state.pending.insert(
+            command_id,
+            Pending {
+                chat: id.to_owned(),
+                owner,
+                reply,
+                action,
+            },
+        );
         // Answered when the program acknowledges it.
         Ok(None)
     }

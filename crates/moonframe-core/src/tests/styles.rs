@@ -19,18 +19,27 @@ fn stylesheets_layer_type_class_and_inline_rules() {
     );
     let sheet = workspace.stylesheet();
     assert_eq!((sheet.radius, sheet.font_size), (Some(6.0), Some(13.0)));
-    assert_eq!(sheet.mono, crate::MonoFont {
-        family: Some("Fira Code".into()),
-        size: Some(12.0),
-        weight: Some(500.0),
-        line_height: Some(1.2),
-        fallbacks: Some(vec!["Symbols Nerd Font Mono".into()]),
-        ligatures: Some(false),
-    });
-    assert_eq!(sheet.overrides, [(Token::Accent, Shade {
-        light: 0x4f46e5ff,
-        dark: 0x818cf8ff
-    })]);
+    assert_eq!(
+        sheet.mono,
+        crate::MonoFont {
+            family: Some("Fira Code".into()),
+            size: Some(12.0),
+            weight: Some(500.0),
+            line_height: Some(1.2),
+            fallbacks: Some(vec!["Symbols Nerd Font Mono".into()]),
+            ligatures: Some(false),
+        }
+    );
+    assert_eq!(
+        sheet.overrides,
+        [(
+            Token::Accent,
+            Shade {
+                light: 0x4f46e5ff,
+                dark: 0x818cf8ff
+            }
+        )]
+    );
 
     let panel = styled_panel(&workspace);
     let style = sheet

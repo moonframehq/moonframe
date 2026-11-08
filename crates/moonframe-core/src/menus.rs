@@ -74,13 +74,11 @@ pub struct About {
 
 impl Read for About {
     fn read(value: &mlua::Value, cx: &Cx) -> Result<Self, Error> {
-        let fields = Fields::read(value, cx, &[&[
-            "name",
-            "version",
-            "description",
-            "website",
-            "copyright",
-        ]])?;
+        let fields = Fields::read(
+            value,
+            cx,
+            &[&["name", "version", "description", "website", "copyright"]],
+        )?;
         Ok(Self {
             name: fields.get("name")?,
             version: fields.get("version")?,

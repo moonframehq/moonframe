@@ -89,11 +89,10 @@ pub fn worktree_branches(list: &str) -> Vec<String> {
 fn remote(root: &Path, branch: &str) -> Option<(String, String)> {
     let tracked = (branch != "HEAD" && !branch.is_empty())
         .then(|| {
-            text(root, &[
-                "config",
-                "--get",
-                &format!("branch.{branch}.remote"),
-            ])
+            text(
+                root,
+                &["config", "--get", &format!("branch.{branch}.remote")],
+            )
         })
         .flatten()
         .filter(|name| !name.is_empty() && name != ".");

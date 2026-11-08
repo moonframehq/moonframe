@@ -83,10 +83,13 @@ fn parse_alert(node: &Node, cx: &MarkdownParseContext<'_>) -> Option<MarkdownNod
     let source = cx.node_source(node)?;
     let (kind, body) = parts::alert(source)?;
     Some(
-        MarkdownNode::new(ALERT, Alert {
-            kind,
-            body: body.clone().into(),
-        })
+        MarkdownNode::new(
+            ALERT,
+            Alert {
+                kind,
+                body: body.clone().into(),
+            },
+        )
         .text(body)
         .markdown(source.to_owned()),
     )
@@ -146,10 +149,13 @@ fn parse_picture(node: &Node, cx: &MarkdownParseContext<'_>) -> Option<MarkdownN
         return None;
     };
     Some(
-        MarkdownNode::new(PICTURE, Picture {
-            src: image.url.clone(),
-            alt: image.alt.clone(),
-        })
+        MarkdownNode::new(
+            PICTURE,
+            Picture {
+                src: image.url.clone(),
+                alt: image.alt.clone(),
+            },
+        )
         .text(image.alt.clone())
         .markdown(cx.node_source(node)?.to_owned()),
     )
@@ -203,10 +209,13 @@ fn draw_picture(
                 return;
             };
             if let Some(msg) = &shared.image {
-                let msg = Markdown::note(msg, [
-                    ("src", Data::String(src.clone())),
-                    ("alt", Data::String(alt.clone())),
-                ]);
+                let msg = Markdown::note(
+                    msg,
+                    [
+                        ("src", Data::String(src.clone())),
+                        ("alt", Data::String(alt.clone())),
+                    ],
+                );
                 send(
                     &shared.app,
                     &shared.owner,

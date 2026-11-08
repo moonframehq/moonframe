@@ -17,10 +17,13 @@ fn lines(bytes: &[u8]) -> Vec<String> {
 #[test]
 fn colours_become_marks_and_each_line_stands_alone() {
     let got = lines(b"\x1b[33mabc \x1b[1;32mdef\nghi\x1b[0m plain\n");
-    assert_eq!(got, [
-        "\u{1}yellow;\u{2}abc \u{1}green;b\u{2}def",
-        "\u{1}green;b\u{2}ghi\u{1};\u{2} plain",
-    ]);
+    assert_eq!(
+        got,
+        [
+            "\u{1}yellow;\u{2}abc \u{1}green;b\u{2}def",
+            "\u{1}green;b\u{2}ghi\u{1};\u{2} plain",
+        ]
+    );
 }
 
 #[test]

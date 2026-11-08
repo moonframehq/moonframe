@@ -37,23 +37,29 @@ fn cursor_reconnect_becomes_live_without_a_snapshot() {
     assert!(
         matches!(read_frame::<_, ClientMessage>(&mut server).unwrap(), Some(ClientMessage::Hello { since: Some(since), .. }) if since == cursor)
     );
-    write_frame(&mut server, &ServerMessage::Welcome {
-        agent: "test".into(),
-        pane: None,
-        version: VERSION,
-    })
+    write_frame(
+        &mut server,
+        &ServerMessage::Welcome {
+            agent: "test".into(),
+            pane: None,
+            version: VERSION,
+        },
+    )
     .unwrap();
-    write_frame(&mut server, &ServerMessage::Change {
-        cursor: Cursor { seq: 1, ..cursor },
-        change: Change::Push {
-            entry: Entry {
-                id: EntryId(1),
-                kind: EntryKind::Agent {
-                    text: "replayed".into(),
+    write_frame(
+        &mut server,
+        &ServerMessage::Change {
+            cursor: Cursor { seq: 1, ..cursor },
+            change: Change::Push {
+                entry: Entry {
+                    id: EntryId(1),
+                    kind: EntryKind::Agent {
+                        text: "replayed".into(),
+                    },
                 },
             },
         },
-    })
+    )
     .unwrap();
     server.shutdown(std::net::Shutdown::Write).unwrap();
     assert!(!client.join().unwrap());
@@ -95,12 +101,15 @@ fn commands_a_chat_never_answered_are_answered_when_it_goes() {
     let host = Handle::new("chat", std::path::Path::new("."), Data::Nil, events);
     let mut state = State::default();
     for (chat, reply) in [("a", "first"), ("b", "other")] {
-        state.pending.insert(CommandId::random(), crate::Pending {
-            chat: chat.into(),
-            owner: "chat".into(),
-            reply: json!(reply),
-            action: "prompt",
-        });
+        state.pending.insert(
+            CommandId::random(),
+            crate::Pending {
+                chat: chat.into(),
+                owner: "chat".into(),
+                reply: json!(reply),
+                action: "prompt",
+            },
+        );
     }
     state.settle(&host, "a", "the chat disconnected before answering");
     assert_eq!(

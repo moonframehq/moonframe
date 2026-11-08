@@ -144,21 +144,25 @@ impl Definition {
         if !matches!(value, Value::Table(_)) {
             return Err(cx.fail("main.luau must return mod { ... }"));
         }
-        let fields = Fields::read(value, cx, &[&[
-            "init",
-            "update",
-            "view",
-            "region",
-            "order",
-            "title",
-            "styles",
-            "window",
-            "subscribe",
-            "tab",
-            "menus",
-            "about",
-            "keys",
-        ]])?;
+        let fields = Fields::read(
+            value,
+            cx,
+            &[&[
+                "init",
+                "update",
+                "view",
+                "region",
+                "order",
+                "title",
+                "styles",
+                "window",
+                "subscribe",
+                "tab",
+                "menus",
+                "about",
+                "keys",
+            ]],
+        )?;
         Ok(Self {
             init: fields.get("init")?,
             update: fields.get("update")?,

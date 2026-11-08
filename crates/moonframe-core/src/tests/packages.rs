@@ -29,9 +29,10 @@ fn the_users_folder_goes_over_the_apps() {
         "{:?}",
         workspace.problems()
     );
-    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
-        "counter", "extra", "styled"
-    ]);
+    assert_eq!(
+        workspace.mod_names().collect::<Vec<_>>(),
+        ["counter", "extra", "styled"]
+    );
     let Some(Node::Text(text)) = workspace.slot("counter").unwrap().view() else {
         panic!("the user's counter did not replace the app's");
     };
@@ -44,10 +45,16 @@ fn the_users_folder_goes_over_the_apps() {
         (sheet.mono.size, sheet.mono.family.as_deref()),
         (Some(15.0), Some("Fira Code"))
     );
-    assert_eq!(sheet.overrides, [(Token::Accent, Shade {
-        light: 0xff0000ff,
-        dark: 0xff0000ff
-    })]);
+    assert_eq!(
+        sheet.overrides,
+        [(
+            Token::Accent,
+            Shade {
+                light: 0xff0000ff,
+                dark: 0xff0000ff
+            }
+        )]
+    );
     let style = sheet
         .resolve(
             Part::Panel,
@@ -126,9 +133,10 @@ fn an_app_package_brings_its_shell_and_keeps_only_the_builtin_mods_it_names() {
         "{:?}",
         workspace.problems()
     );
-    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
-        "changes", "sessions", "terminal"
-    ]);
+    assert_eq!(
+        workspace.mod_names().collect::<Vec<_>>(),
+        ["changes", "sessions", "terminal"]
+    );
     assert_eq!(workspace.stylesheet().radius, Some(9.0));
 
     // The profile's own shell wins over the app's.
@@ -153,9 +161,10 @@ fn an_app_package_brings_its_shell_and_keeps_only_the_builtin_mods_it_names() {
         Some(builtin.path().join("main.luau"))
     );
     let workspace = Workspace::open(roots, false);
-    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
-        "explorer", "terminal"
-    ]);
+    assert_eq!(
+        workspace.mod_names().collect::<Vec<_>>(),
+        ["explorer", "terminal"]
+    );
 }
 
 #[test]
@@ -194,9 +203,10 @@ fn a_hosted_app_stands_on_the_toolbox_under_its_packages_and_the_user() {
         workspace.problems()
     );
     // The toolbox's explorer stays out; its terminal is kept.
-    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
-        "notes", "sessions", "terminal"
-    ]);
+    assert_eq!(
+        workspace.mod_names().collect::<Vec<_>>(),
+        ["notes", "sessions", "terminal"]
+    );
     assert_eq!(workspace.stylesheet().radius, Some(7.0));
 }
 
@@ -243,8 +253,9 @@ fn packages_lie_between_the_app_and_the_user_and_never_replace_the_shell() {
         "{:?}",
         workspace.problems()
     );
-    assert_eq!(workspace.mod_names().collect::<Vec<_>>(), [
-        "extra", "my-clock"
-    ]);
+    assert_eq!(
+        workspace.mod_names().collect::<Vec<_>>(),
+        ["extra", "my-clock"]
+    );
     assert_eq!(workspace.stylesheet().radius, Some(7.0));
 }

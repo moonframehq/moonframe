@@ -441,9 +441,12 @@ mod tests {
         );
         let release: GithubRelease =
             serde_json::from_str(r#"{"tag_name": "0.1.0", "html_url": "u"}"#).expect("a release");
-        assert_eq!(found(release, "0.1.0"), Found::UpToDate {
-            latest: "0.1.0".to_owned()
-        });
+        assert_eq!(
+            found(release, "0.1.0"),
+            Found::UpToDate {
+                latest: "0.1.0".to_owned()
+            }
+        );
     }
 
     #[test]

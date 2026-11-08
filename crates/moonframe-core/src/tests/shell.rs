@@ -26,11 +26,14 @@ fn the_shell_asks_for_its_window_and_views_see_it() {
         "{:?}",
         workspace.problems()
     );
-    assert_eq!(workspace.chrome(), Chrome {
-        titlebar: Titlebar::Hidden,
-        traffic_lights: Some((12.0, 16.0)),
-        size: None,
-    });
+    assert_eq!(
+        workspace.chrome(),
+        Chrome {
+            titlebar: Titlebar::Hidden,
+            traffic_lights: Some((12.0, 16.0)),
+            size: None,
+        }
+    );
     let row = |workspace: &Workspace| {
         let Some(Node::Stack(row)) = workspace.shell().view() else {
             panic!("no row");
@@ -57,11 +60,14 @@ fn the_shell_asks_for_its_window_and_views_see_it() {
             other => panic!("expected a button, got {other:?}"),
         })
         .collect();
-    assert_eq!(commands, [
-        Some(Action::Command(Command::CloseWindow)),
-        Some(Action::Command(Command::Minimize)),
-        Some(Action::Command(Command::Maximize)),
-    ]);
+    assert_eq!(
+        commands,
+        [
+            Some(Action::Command(Command::CloseWindow)),
+            Some(Action::Command(Command::Minimize)),
+            Some(Action::Command(Command::Maximize)),
+        ]
+    );
 
     for (window, expected) in [
         (r#"{ titlebar = "none" }"#, "unknown `none`"),
@@ -417,10 +423,10 @@ fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
             .collect()
     };
     // It starts with a terminal, and its kinds include the browser and the explorer.
-    assert_eq!(tabs(&workspace), [(
-        "main-1".to_owned(),
-        "component:terminal".to_owned()
-    )]);
+    assert_eq!(
+        tabs(&workspace),
+        [("main-1".to_owned(), "component:terminal".to_owned())]
+    );
     assert!(workspace.slot(key).is_some(), "{:?}", workspace.problems());
 
     // + then a pick opens a browser tab, selected, drawn as the browser component.

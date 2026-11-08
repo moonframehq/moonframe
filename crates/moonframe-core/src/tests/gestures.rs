@@ -59,10 +59,13 @@ fn each_gesture_says_what_happened_and_where() {
     let swipe = fields(gestures.swipe_message(&AT, Swipe::Back, Held::default()));
     assert_eq!(swipe["direction"], Data::from("back"));
 
-    let tap = fields(gestures.smart_zoom_message(&AT, Held {
-        shift: true,
-        ..Held::default()
-    }));
+    let tap = fields(gestures.smart_zoom_message(
+        &AT,
+        Held {
+            shift: true,
+            ..Held::default()
+        },
+    ));
     assert_eq!(tap["width"], Data::Integer(200));
     assert_eq!(tap["shift"], Data::Bool(true));
 

@@ -71,10 +71,10 @@ fn update_runs_an_app_command_without_a_click() {
     let (_dir, mut workspace) = workspace();
     ask(&mut workspace, "app:command", Data::from("minimize"));
     assert_eq!(error(&workspace), "");
-    assert_eq!(workspace.take_requests(), [(
-        "asker".to_owned(),
-        Request::Command(Command::Minimize)
-    )]);
+    assert_eq!(
+        workspace.take_requests(),
+        [("asker".to_owned(), Request::Command(Command::Minimize))]
+    );
     assert!(workspace.take_requests().is_empty(), "taken once");
 }
 
@@ -106,10 +106,10 @@ fn a_control_can_ask_the_app_too() {
         msg: Data::from("show-themes"),
     };
     assert_eq!(workspace.dispatch("asker", &send), None);
-    assert_eq!(workspace.take_requests(), [(
-        "asker".to_owned(),
-        Request::Command(Command::ShowThemes)
-    )]);
+    assert_eq!(
+        workspace.take_requests(),
+        [("asker".to_owned(), Request::Command(Command::ShowThemes))]
+    );
 }
 
 #[test]
@@ -135,10 +135,10 @@ fn update_sets_the_appearance() {
         ("dark", Appearance::Dark),
     ] {
         ask(&mut workspace, "app:appearance", Data::from(name));
-        assert_eq!(workspace.take_requests(), [(
-            "asker".to_owned(),
-            Request::Appearance(appearance)
-        )]);
+        assert_eq!(
+            workspace.take_requests(),
+            [("asker".to_owned(), Request::Appearance(appearance))]
+        );
     }
     ask(&mut workspace, "app:appearance", Data::from("sepia"));
     assert!(
@@ -183,22 +183,28 @@ fn update_picks_the_light_and_dark_themes() {
         .into(),
     );
     ask(&mut workspace, "app:theme", both);
-    assert_eq!(workspace.take_requests(), [(
-        "asker".to_owned(),
-        Request::Theme {
-            light: Some("Rose Pine Dawn".to_owned()),
-            dark: Some("Rose Pine".to_owned()),
-        }
-    )]);
+    assert_eq!(
+        workspace.take_requests(),
+        [(
+            "asker".to_owned(),
+            Request::Theme {
+                light: Some("Rose Pine Dawn".to_owned()),
+                dark: Some("Rose Pine".to_owned()),
+            }
+        )]
+    );
     let dark = Data::Map([("dark".to_owned(), Data::from("Nord"))].into());
     ask(&mut workspace, "app:theme", dark);
-    assert_eq!(workspace.take_requests(), [(
-        "asker".to_owned(),
-        Request::Theme {
-            light: None,
-            dark: Some("Nord".to_owned()),
-        }
-    )]);
+    assert_eq!(
+        workspace.take_requests(),
+        [(
+            "asker".to_owned(),
+            Request::Theme {
+                light: None,
+                dark: Some("Nord".to_owned()),
+            }
+        )]
+    );
     for wrong in [
         Data::from("Nord"),
         Data::Map(BTreeMap::new()),
@@ -227,13 +233,16 @@ fn update_plays_a_sound_file_or_the_chime() {
     let (_dir, mut workspace) = workspace();
     ask(&mut workspace, "app:sound", Data::from("default"));
     ask(&mut workspace, "app:sound", Data::from("sounds/Done.WAV"));
-    assert_eq!(workspace.take_requests(), [
-        ("asker".to_owned(), Request::Sound(Sound::Chime)),
-        (
-            "asker".to_owned(),
-            Request::Sound(Sound::File("sounds/Done.WAV".to_owned()))
-        ),
-    ]);
+    assert_eq!(
+        workspace.take_requests(),
+        [
+            ("asker".to_owned(), Request::Sound(Sound::Chime)),
+            (
+                "asker".to_owned(),
+                Request::Sound(Sound::File("sounds/Done.WAV".to_owned()))
+            ),
+        ]
+    );
     for (wrong, problem) in [
         ("https://example.com/a.wav", "is an address"),
         ("notes.txt", "is not a sound file"),
@@ -252,13 +261,16 @@ fn update_changes_the_app_icon_or_puts_it_back() {
     let (_dir, mut workspace) = workspace();
     ask(&mut workspace, "app:icon", Data::from("icons/Busy.PNG"));
     ask(&mut workspace, "app:icon", Data::from("default"));
-    assert_eq!(workspace.take_requests(), [
-        (
-            "asker".to_owned(),
-            Request::Icon(AppIcon::File("icons/Busy.PNG".to_owned()))
-        ),
-        ("asker".to_owned(), Request::Icon(AppIcon::Default)),
-    ]);
+    assert_eq!(
+        workspace.take_requests(),
+        [
+            (
+                "asker".to_owned(),
+                Request::Icon(AppIcon::File("icons/Busy.PNG".to_owned()))
+            ),
+            ("asker".to_owned(), Request::Icon(AppIcon::Default)),
+        ]
+    );
     for (wrong, problem) in [
         ("https://example.com/a.png", "is an address"),
         ("notes.txt", "is not an image file"),
@@ -293,24 +305,27 @@ fn update_posts_a_notification() {
         ]),
     );
     ask(&mut workspace, "app:notify", map(&[("title", "Hi")]));
-    assert_eq!(workspace.take_requests(), [
-        (
-            "asker".to_owned(),
-            Request::Notify(Notification {
-                title: "Agent done".to_owned(),
-                body: "claude finished".to_owned(),
-                id: Some("pane-3".to_owned()),
-            })
-        ),
-        (
-            "asker".to_owned(),
-            Request::Notify(Notification {
-                title: "Hi".to_owned(),
-                body: String::new(),
-                id: None,
-            })
-        ),
-    ]);
+    assert_eq!(
+        workspace.take_requests(),
+        [
+            (
+                "asker".to_owned(),
+                Request::Notify(Notification {
+                    title: "Agent done".to_owned(),
+                    body: "claude finished".to_owned(),
+                    id: Some("pane-3".to_owned()),
+                })
+            ),
+            (
+                "asker".to_owned(),
+                Request::Notify(Notification {
+                    title: "Hi".to_owned(),
+                    body: String::new(),
+                    id: None,
+                })
+            ),
+        ]
+    );
     let long = "x".repeat(MAX_TITLE + 1);
     for (wrong, problem) in [
         (map(&[("body", "no title")]), "needs a `title`"),

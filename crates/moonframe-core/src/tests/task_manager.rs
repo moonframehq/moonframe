@@ -98,10 +98,14 @@ return mod {
     let first = list(&workspace);
     assert_eq!(first.count, 1000 + 2); // tasks, heading and Add
     assert!(first.rows.len() < 1000);
-    workspace.set_list_window("tasks", "tasks", crate::ListWindow {
-        start: 990,
-        len: 30,
-    });
+    workspace.set_list_window(
+        "tasks",
+        "tasks",
+        crate::ListWindow {
+            start: 990,
+            len: 30,
+        },
+    );
     let last = list(&workspace);
     assert_eq!(last.start, 990);
     assert_eq!(last.rows.len(), last.count - last.start);
@@ -175,11 +179,14 @@ fn gantt_resize_handles_keep_their_paths_across_the_label_threshold() {
     };
     let before = handle(&workspace);
     for days in [-1, -2, 1] {
-        send(&mut workspace, &[
-            ("resize", Data::from("brief")),
-            ("phase", Data::from("move")),
-            ("value", Data::Integer(days)),
-        ]);
+        send(
+            &mut workspace,
+            &[
+                ("resize", Data::from("brief")),
+                ("phase", Data::from("move")),
+                ("value", Data::Integer(days)),
+            ],
+        );
         assert_eq!(handle(&workspace), before);
     }
 }
@@ -204,45 +211,63 @@ fn carried_rows(workspace: &Workspace, field: &str, group: Option<&str>) -> Vec<
 #[test]
 fn table_demo_dropping_after_the_predecessor_is_a_no_op() {
     let (_dir, mut workspace) = demo("table", &["table", "switch"]);
-    send(&mut workspace, &[
-        ("move", Data::Bool(true)),
-        ("group", Data::from("todo")),
-        ("phase", Data::from("drop")),
-        ("carry", map(&[("row", Data::from("web112"))])),
-    ]);
+    send(
+        &mut workspace,
+        &[
+            ("move", Data::Bool(true)),
+            ("group", Data::from("todo")),
+            ("phase", Data::from("drop")),
+            ("carry", map(&[("row", Data::from("web112"))])),
+        ],
+    );
     let before = carried_rows(&workspace, "row", Some("todo"));
     assert_eq!(before, ["web121", "web124", "web112"]);
-    send(&mut workspace, &[
-        ("move", Data::from("web121")),
-        ("group", Data::from("todo")),
-        ("phase", Data::from("drop")),
-        ("y", Data::Number(0.75)),
-        ("carry", map(&[("row", Data::from("web124"))])),
-    ]);
+    send(
+        &mut workspace,
+        &[
+            ("move", Data::from("web121")),
+            ("group", Data::from("todo")),
+            ("phase", Data::from("drop")),
+            ("y", Data::Number(0.75)),
+            ("carry", map(&[("row", Data::from("web124"))])),
+        ],
+    );
     assert_eq!(carried_rows(&workspace, "row", Some("todo")), before);
 }
 
 #[test]
 fn kanban_demo_drops_on_empty_column_space_append_after_hovering_a_card() {
     let (_dir, mut workspace) = demo("kanban-column", &["kanban-column", "board-card", "avatar"]);
-    send(&mut workspace, &[
-        ("over_card", Data::from("web121")),
-        ("phase", Data::from("over")),
-        ("y", Data::Number(0.25)),
-    ]);
-    send(&mut workspace, &[
-        ("over_column", Data::from("todo")),
-        ("phase", Data::from("over")),
-    ]);
-    send(&mut workspace, &[
-        ("over_card", Data::from("web121")),
-        ("phase", Data::from("leave")),
-    ]);
-    send(&mut workspace, &[
-        ("over_column", Data::from("todo")),
-        ("phase", Data::from("drop")),
-        ("carry", map(&[("card", Data::from("web112"))])),
-    ]);
+    send(
+        &mut workspace,
+        &[
+            ("over_card", Data::from("web121")),
+            ("phase", Data::from("over")),
+            ("y", Data::Number(0.25)),
+        ],
+    );
+    send(
+        &mut workspace,
+        &[
+            ("over_column", Data::from("todo")),
+            ("phase", Data::from("over")),
+        ],
+    );
+    send(
+        &mut workspace,
+        &[
+            ("over_card", Data::from("web121")),
+            ("phase", Data::from("leave")),
+        ],
+    );
+    send(
+        &mut workspace,
+        &[
+            ("over_column", Data::from("todo")),
+            ("phase", Data::from("drop")),
+            ("carry", map(&[("card", Data::from("web112"))])),
+        ],
+    );
     let ids = carried_rows(&workspace, "card", None);
     assert_eq!(&ids[..4], ["web121", "web124", "web130", "web112"]);
 }
@@ -298,11 +323,14 @@ fn kanban_hover_preserves_card_paths_and_in_flow_layout() {
     };
     let before = cards(&workspace);
     for (target, y) in [("web121", 0.01), ("web124", 0.75), ("web130", 0.99)] {
-        send(&mut workspace, &[
-            ("over_card", Data::from(target)),
-            ("phase", Data::from("over")),
-            ("y", Data::Number(y)),
-        ]);
+        send(
+            &mut workspace,
+            &[
+                ("over_card", Data::from(target)),
+                ("phase", Data::from("over")),
+                ("y", Data::Number(y)),
+            ],
+        );
         assert_eq!(cards(&workspace), before);
         let mut markers = 0;
         walk(tree(&workspace), &mut vec![], &mut |node, _| {
@@ -323,15 +351,19 @@ fn kanban_hover_preserves_card_paths_and_in_flow_layout() {
         });
         assert_eq!(markers, 1);
     }
-    send(&mut workspace, &[
-        ("over_card", Data::from("web121")),
-        ("phase", Data::from("drop")),
-        ("y", Data::Number(0.01)),
-        ("carry", map(&[("card", Data::from("web112"))])),
-    ]);
-    assert_eq!(&carried_rows(&workspace, "card", None)[..4], [
-        "web112", "web121", "web124", "web130"
-    ]);
+    send(
+        &mut workspace,
+        &[
+            ("over_card", Data::from("web121")),
+            ("phase", Data::from("drop")),
+            ("y", Data::Number(0.01)),
+            ("carry", map(&[("card", Data::from("web112"))])),
+        ],
+    );
+    assert_eq!(
+        &carried_rows(&workspace, "card", None)[..4],
+        ["web112", "web121", "web124", "web130"]
+    );
 }
 
 #[test]
@@ -385,10 +417,13 @@ fn leaving_an_old_calendar_or_table_target_keeps_the_new_indicator() {
 fn long_editor_text_remains_available_in_a_scrollable_preview() {
     let (_dir, mut workspace) = demo("text-editor", &["text-editor", "segmented"]);
     let text = "A paragraph of the description.\n\n".repeat(100);
-    send(&mut workspace, &[
-        ("msg", Data::from("type")),
-        ("value", Data::from(text.as_str())),
-    ]);
+    send(
+        &mut workspace,
+        &[
+            ("msg", Data::from("type")),
+            ("value", Data::from(text.as_str())),
+        ],
+    );
     send(&mut workspace, &[("view", Data::from("preview"))]);
     let mut preview = None;
     walk(tree(&workspace), &mut vec![], &mut |node, _| {

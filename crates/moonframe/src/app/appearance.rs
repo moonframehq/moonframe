@@ -38,16 +38,19 @@ impl MoonframeApp {
         }
         self.apply_theme(cx);
         if let Some(path) = &self.settings
-            && let Err(problem) = settings::save(path, &[
-                (
-                    settings::LIGHT_THEME,
-                    kept_name(self.light_scheme, self.pending_omarchy[0]),
-                ),
-                (
-                    settings::DARK_THEME,
-                    kept_name(self.dark_scheme, self.pending_omarchy[1]),
-                ),
-            ])
+            && let Err(problem) = settings::save(
+                path,
+                &[
+                    (
+                        settings::LIGHT_THEME,
+                        kept_name(self.light_scheme, self.pending_omarchy[0]),
+                    ),
+                    (
+                        settings::DARK_THEME,
+                        kept_name(self.dark_scheme, self.pending_omarchy[1]),
+                    ),
+                ],
+            )
         {
             tracing::warn!("cannot save the themes: {problem}");
         }
@@ -76,10 +79,13 @@ mod tests {
     fn saving_another_choice_keeps_a_pending_omarchy_slot() -> Result<(), String> {
         let home = tempfile::tempdir().map_err(|error| error.to_string())?;
         let path = home.path().join("settings.toml");
-        settings::save(&path, &[
-            (settings::LIGHT_THEME, kept_name(None, true)),
-            (settings::DARK_THEME, kept_name(None, false)),
-        ])?;
+        settings::save(
+            &path,
+            &[
+                (settings::LIGHT_THEME, kept_name(None, true)),
+                (settings::DARK_THEME, kept_name(None, false)),
+            ],
+        )?;
         assert_eq!(
             settings::get(&path, settings::LIGHT_THEME).as_deref(),
             Some(themes::omarchy::NAME)

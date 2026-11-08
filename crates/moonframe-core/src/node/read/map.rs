@@ -12,10 +12,14 @@ const MOST_STOPS: usize = 25;
 const LONGEST_KEY: usize = 512;
 
 impl Build for Map {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "provider", "key", "center", "zoom", "pins", "routes", "move", "select", "routed", "to",
-        "width", "height", "grow", "glide", "bearing",
-    ]];
+    const KEYS: &'static [&'static [&'static str]] = &[
+        TYPE,
+        LOOK,
+        &[
+            "provider", "key", "center", "zoom", "pins", "routes", "move", "select", "routed",
+            "to", "width", "height", "grow", "glide", "bearing",
+        ],
+    ];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         let provider = fields
@@ -96,9 +100,13 @@ fn place(lat: f64, lon: f64, cx: &Cx) -> Result<[f64; 2], Error> {
 /// `{ lat, lon, label, icon, color, shape, selected, pulse, msg }`.
 impl Read for Pin {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
-        let fields = Fields::read(value, cx, &[&[
-            "lat", "lon", "label", "icon", "color", "shape", "selected", "pulse", "msg",
-        ]])?;
+        let fields = Fields::read(
+            value,
+            cx,
+            &[&[
+                "lat", "lon", "label", "icon", "color", "shape", "selected", "pulse", "msg",
+            ]],
+        )?;
         let [lat, lon] = place(fields.need("lat")?, fields.need("lon")?, cx)?;
         let label: Option<String> = fields.get("label")?;
         if label
@@ -127,9 +135,11 @@ impl Read for Pin {
 /// mode }` to route along streets; and `color`, `stroke`, `dashed`.
 impl Read for Route {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
-        let fields = Fields::read(value, cx, &[&[
-            "points", "via", "mode", "color", "stroke", "dashed",
-        ]])?;
+        let fields = Fields::read(
+            value,
+            cx,
+            &[&["points", "via", "mode", "color", "stroke", "dashed"]],
+        )?;
         let (points, via) = match (fields.raw("points"), fields.raw("via")) {
             (Some(_), None) => (places(&fields, "points", MOST_CORNERS)?, Vec::new()),
             (None, Some(_)) => (Vec::new(), places(&fields, "via", MOST_STOPS)?),

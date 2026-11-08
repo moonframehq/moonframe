@@ -31,10 +31,11 @@ pub struct Code {
 
 /// Asks `host` for a device code.
 pub fn start(agent: &ureq::Agent, kind: Kind, host: &str, client: &str) -> Result<Code, Failure> {
-    let answer = http::form(agent, &kind.device_url(host), &[
-        ("client_id", client),
-        ("scope", kind.scopes()),
-    ])?;
+    let answer = http::form(
+        agent,
+        &kind.device_url(host),
+        &[("client_id", client), ("scope", kind.scopes())],
+    )?;
     if let Some(error) = answer.get("error").and_then(Value::as_str) {
         return Err(Failure::Status(400, start_error(kind, error, &answer)));
     }
@@ -94,11 +95,15 @@ pub enum Poll {
 
 /// Asks once whether the user entered `code`.
 pub fn poll(agent: &ureq::Agent, kind: Kind, host: &str, client: &str, code: &mut Code) -> Poll {
-    let answer = match http::form(agent, &kind.token_url(host), &[
-        ("client_id", client),
-        ("device_code", code.device.expose_secret()),
-        ("grant_type", GRANT),
-    ]) {
+    let answer = match http::form(
+        agent,
+        &kind.token_url(host),
+        &[
+            ("client_id", client),
+            ("device_code", code.device.expose_secret()),
+            ("grant_type", GRANT),
+        ],
+    ) {
         Ok(answer) => answer,
         // A blip: keep waiting, the code is still good.
         Err(Failure::Network(_)) => return Poll::Wait(code.interval),
@@ -135,11 +140,15 @@ pub fn refresh(
     let Some(refresh) = &credential.refresh else {
         return Err(Failure::Unauthorized);
     };
-    let answer = http::form(agent, &kind.token_url(host), &[
-        ("client_id", client),
-        ("grant_type", "refresh_token"),
-        ("refresh_token", refresh.expose_secret()),
-    ])?;
+    let answer = http::form(
+        agent,
+        &kind.token_url(host),
+        &[
+            ("client_id", client),
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh.expose_secret()),
+        ],
+    )?;
     refreshed(&answer, credential.source)
 }
 

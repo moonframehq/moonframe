@@ -227,13 +227,16 @@ impl Tweens {
                 self.elements
                     .retain(|_, tween| now.saturating_duration_since(tween.seen) < FORGET);
             }
-            self.elements.insert(path.to_owned(), Tween {
-                state: state.map(str::to_owned),
-                from: target,
-                to: target,
-                moving: None,
-                seen: now,
-            });
+            self.elements.insert(
+                path.to_owned(),
+                Tween {
+                    state: state.map(str::to_owned),
+                    from: target,
+                    to: target,
+                    moving: None,
+                    seen: now,
+                },
+            );
             return (target, false);
         };
         tween.seen = now;
@@ -515,10 +518,13 @@ mod tests {
     #[test]
     fn a_frame_hands_over_what_the_last_one_drew() {
         let mut motion = Motion::default();
-        motion.drew("strip".to_owned(), Drawn {
-            keys: vec!["a".to_owned()],
-            kept: Vec::new(),
-        });
+        motion.drew(
+            "strip".to_owned(),
+            Drawn {
+                keys: vec!["a".to_owned()],
+                kept: Vec::new(),
+            },
+        );
         let last = motion.begin_frame();
         assert_eq!(last.containers["strip"].keys, ["a"]);
         assert!(motion.begin_frame().containers.is_empty());

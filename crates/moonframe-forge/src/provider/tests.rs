@@ -42,14 +42,17 @@ fn authentication_is_initialized_without_a_checkout() {
     let mut forge = Forge::new(Kind::GitHub);
     forge.look(&host);
     assert_eq!(forge.loaded.as_deref(), Some("github.com"));
-    forge.take_in(&host, Done::Loaded {
-        host: "github.com".into(),
-        epoch: forge.epoch,
-        credential: None,
-        cli: true,
-        error: None,
-        retry: false,
-    });
+    forge.take_in(
+        &host,
+        Done::Loaded {
+            host: "github.com".into(),
+            epoch: forge.epoch,
+            credential: None,
+            cli: true,
+            error: None,
+            retry: false,
+        },
+    );
     let data = forge.snapshot();
     assert_eq!(data["reason"], "not a git repository");
     assert_eq!(data["auth"]["status"], "signed_out");
@@ -86,17 +89,23 @@ fn expiry_completes_the_attempt_even_if_the_worker_never_answers() {
     // A new attempt is not cancelled by late events from the expired one.
     forge.status = Status::Pending;
     forge.waiting = Some(asker(forge.attempt));
-    forge.take_in(&host, Done::Refused {
-        asker: asker(0),
-        error: "old failure".into(),
-    });
-    forge.take_in(&host, Done::Code {
-        attempt: 0,
-        user: "OLD".into(),
-        url: "https://github.com/login/device".into(),
-        complete_url: None,
-        expires: 200,
-    });
+    forge.take_in(
+        &host,
+        Done::Refused {
+            asker: asker(0),
+            error: "old failure".into(),
+        },
+    );
+    forge.take_in(
+        &host,
+        Done::Code {
+            attempt: 0,
+            user: "OLD".into(),
+            url: "https://github.com/login/device".into(),
+            complete_url: None,
+            expires: 200,
+        },
+    );
     assert_eq!(forge.status, Status::Pending);
     assert!(forge.waiting.is_some());
     assert!(forge.code.is_none());
@@ -112,12 +121,15 @@ fn a_branch_change_discards_the_old_fetch_and_preserves_the_refresh() {
     forge.checkout.branches = vec!["after".into()];
     let due = Instant::now();
     forge.next = Some(due);
-    forge.take_in(&host, Done::Fetched {
-        target: old,
-        epoch: forge.epoch,
-        result: Ok(json!({ "current_pr": { "number": 1 } })),
-        credential: None,
-    });
+    forge.take_in(
+        &host,
+        Done::Fetched {
+            target: old,
+            epoch: forge.epoch,
+            result: Ok(json!({ "current_pr": { "number": 1 } })),
+            credential: None,
+        },
+    );
     assert!(forge.data.is_null());
     assert!(!forge.fetching);
     assert_eq!(forge.next, Some(due));
@@ -129,12 +141,15 @@ fn a_refresh_during_a_fetch_still_runs_after_it() {
     let mut forge = signed_in();
     let due = Instant::now();
     forge.next = Some(due);
-    forge.take_in(&host, Done::Fetched {
-        target: forge.target().unwrap(),
-        epoch: forge.epoch,
-        result: Ok(json!({ "viewer": { "login": "user" } })),
-        credential: None,
-    });
+    forge.take_in(
+        &host,
+        Done::Fetched {
+            target: forge.target().unwrap(),
+            epoch: forge.epoch,
+            result: Ok(json!({ "viewer": { "login": "user" } })),
+            credential: None,
+        },
+    );
     assert_eq!(forge.login.as_deref(), Some("user"));
     assert_eq!(forge.next, Some(due));
 }
@@ -144,12 +159,15 @@ fn an_old_accounts_failure_cannot_sign_out_the_new_account() {
     let (host, _) = handle();
     let mut forge = signed_in();
     forge.epoch = 1;
-    forge.take_in(&host, Done::Fetched {
-        target: forge.target().unwrap(),
-        epoch: 0,
-        result: Err(Failure::Unauthorized),
-        credential: None,
-    });
+    forge.take_in(
+        &host,
+        Done::Fetched {
+            target: forge.target().unwrap(),
+            epoch: 0,
+            result: Err(Failure::Unauthorized),
+            credential: None,
+        },
+    );
     assert_eq!(forge.status, Status::SignedIn);
     assert!(forge.credential.is_some());
 }
@@ -172,12 +190,15 @@ fn a_refresh_request_waits_out_a_rate_limit() {
     let mut forge = signed_in();
     let target = forge.target().unwrap();
     forge.fetching = true;
-    forge.take_in(&host, Done::Fetched {
-        target,
-        epoch: forge.epoch,
-        result: Err(Failure::RateLimited),
-        credential: None,
-    });
+    forge.take_in(
+        &host,
+        Done::Fetched {
+            target,
+            epoch: forge.epoch,
+            result: Err(Failure::RateLimited),
+            credential: None,
+        },
+    );
     // What a mod's refresh does.
     forge.next = Some(Instant::now());
     assert!(!forge.due(Instant::now()));
@@ -223,12 +244,15 @@ fn a_sign_out_during_the_check_is_not_undone() {
         "sign_out",
     );
     // The check finishes after the sign-out.
-    forge.take_in(&host, Done::SignedIn {
-        host: "github.com".into(),
-        credential: Credential::new(SecretString::from("late-token"), Source::Saved),
-        login: "late".into(),
-        asker: waiting,
-    });
+    forge.take_in(
+        &host,
+        Done::SignedIn {
+            host: "github.com".into(),
+            credential: Credential::new(SecretString::from("late-token"), Source::Saved),
+            login: "late".into(),
+            asker: waiting,
+        },
+    );
     assert_eq!(forge.status, Status::SignedOut);
     assert!(forge.credential.is_none());
     assert!(
@@ -249,12 +273,15 @@ fn a_finished_check_saves_the_sign_in() {
         ..asker(forge.attempt)
     };
     forge.waiting = Some(waiting.clone());
-    forge.take_in(&host, Done::SignedIn {
-        host: "github.com".into(),
-        credential: Credential::new(SecretString::from("good-token"), Source::Saved),
-        login: "penso".into(),
-        asker: waiting,
-    });
+    forge.take_in(
+        &host,
+        Done::SignedIn {
+            host: "github.com".into(),
+            credential: Credential::new(SecretString::from("good-token"), Source::Saved),
+            login: "penso".into(),
+            asker: waiting,
+        },
+    );
     assert_eq!(forge.status, Status::SignedIn);
     assert!(matches!(
         saved.load("github.com"),
@@ -271,16 +298,19 @@ fn a_renewed_token_outlives_a_branch_change() {
     forge.fetching = true;
     forge.checkout.branch = "after".into();
     forge.checkout.branches = vec!["after".into()];
-    forge.take_in(&host, Done::Fetched {
-        target: old,
-        epoch: forge.epoch,
-        result: Ok(json!({ "viewer": { "login": "penso" } })),
-        // No context to save into here: the token is still applied.
-        credential: Some(Credential::new(
-            SecretString::from("renewed-token"),
-            Source::Saved,
-        )),
-    });
+    forge.take_in(
+        &host,
+        Done::Fetched {
+            target: old,
+            epoch: forge.epoch,
+            result: Ok(json!({ "viewer": { "login": "penso" } })),
+            // No context to save into here: the token is still applied.
+            credential: Some(Credential::new(
+                SecretString::from("renewed-token"),
+                Source::Saved,
+            )),
+        },
+    );
     let kept = forge.credential.as_ref().unwrap();
     assert_eq!(kept.token.expose_secret(), "renewed-token");
     // The old branch's data is not shown.
@@ -300,12 +330,15 @@ fn branch_changes_preserve_account_backoff() {
         forge.checkout.branch = "after".into();
         forge.checkout.branches = vec!["after".into()];
         forge.next = Some(Instant::now());
-        forge.take_in(&host, Done::Fetched {
-            target,
-            epoch: forge.epoch,
-            result: Err(failure),
-            credential: None,
-        });
+        forge.take_in(
+            &host,
+            Done::Fetched {
+                target,
+                epoch: forge.epoch,
+                result: Err(failure),
+                credential: None,
+            },
+        );
         // Explicit refreshes and further branch changes must still wait.
         forge.next = Some(Instant::now());
         assert!(!forge.due(Instant::now()));
@@ -322,12 +355,15 @@ fn an_old_accounts_rate_limit_does_not_block_the_new_account() {
     let old_epoch = forge.epoch;
     forge.epoch += 1;
     forge.next = Some(Instant::now());
-    forge.take_in(&host, Done::Fetched {
-        target: forge.target().unwrap(),
-        epoch: old_epoch,
-        result: Err(Failure::RateLimited),
-        credential: None,
-    });
+    forge.take_in(
+        &host,
+        Done::Fetched {
+            target: forge.target().unwrap(),
+            epoch: old_epoch,
+            result: Err(Failure::RateLimited),
+            credential: None,
+        },
+    );
     assert!(forge.due(Instant::now()));
     assert!(forge.blocked_until.is_none());
 }
@@ -364,14 +400,17 @@ fn an_old_load_cannot_restore_a_signed_out_account_after_a_host_round_trip() {
     assert!(!forge.cli);
     assert!(forge.error.is_none());
     assert_eq!(forge.status, Status::Checking);
-    forge.take_in(&host, Done::Loaded {
-        host: forge.host.clone(),
-        epoch: forge.epoch,
-        credential: None,
-        cli: false,
-        error: None,
-        retry: false,
-    });
+    forge.take_in(
+        &host,
+        Done::Loaded {
+            host: forge.host.clone(),
+            epoch: forge.epoch,
+            credential: None,
+            cli: false,
+            error: None,
+            retry: false,
+        },
+    );
     assert_eq!(forge.status, Status::SignedOut);
 }
 
@@ -416,18 +455,24 @@ fn an_obsolete_cli_probe_cannot_replace_the_current_one() {
     let old_epoch = forge.epoch;
     forge.epoch += 1;
     forge.cli_probe = Some(forge.epoch);
-    forge.take_in(&host, Done::Cli {
-        host: forge.host.clone(),
-        epoch: old_epoch,
-        available: true,
-    });
+    forge.take_in(
+        &host,
+        Done::Cli {
+            host: forge.host.clone(),
+            epoch: old_epoch,
+            available: true,
+        },
+    );
     assert!(!forge.cli);
     assert_eq!(forge.cli_probe, Some(forge.epoch));
-    forge.take_in(&host, Done::Cli {
-        host: forge.host.clone(),
-        epoch: forge.epoch,
-        available: true,
-    });
+    forge.take_in(
+        &host,
+        Done::Cli {
+            host: forge.host.clone(),
+            epoch: forge.epoch,
+            available: true,
+        },
+    );
     assert!(forge.cli);
     assert!(forge.cli_probe.is_none());
 }

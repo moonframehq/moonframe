@@ -176,14 +176,18 @@ const MOD_WINDOW_HEIGHT: std::ops::RangeInclusive<f32> = 160.0..=3000.0;
 
 impl Read for ModWindowSize {
     fn read(value: &mlua::Value, cx: &Cx) -> Result<Self, Error> {
-        let fields = Fields::read(value, cx, &[&[
-            "size",
-            "min_size",
-            "display",
-            "fullscreen",
-            "titlebar",
-            "traffic_lights",
-        ]])?;
+        let fields = Fields::read(
+            value,
+            cx,
+            &[&[
+                "size",
+                "min_size",
+                "display",
+                "fullscreen",
+                "titlebar",
+                "traffic_lights",
+            ]],
+        )?;
         let pair = |key: &str| -> Result<Option<(f32, f32)>, Error> {
             let Some(value) = fields.raw(key) else {
                 return Ok(None);

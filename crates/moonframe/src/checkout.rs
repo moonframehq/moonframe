@@ -17,11 +17,10 @@ impl Checkout {
     /// The checkout `dir` is in; all empty outside git.
     pub(crate) fn of(dir: &Path) -> Self {
         let own = git(dir, &["rev-parse", "--absolute-git-dir"]);
-        let common = git(dir, &[
-            "rev-parse",
-            "--path-format=absolute",
-            "--git-common-dir",
-        ]);
+        let common = git(
+            dir,
+            &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        );
         // A linked worktree has a git folder of its own beside the common one.
         let worktree = match (own, common, git(dir, &["rev-parse", "--show-toplevel"])) {
             (Some(own), Some(common), Some(top)) if own != common => Path::new(&top)

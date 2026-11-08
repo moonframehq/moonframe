@@ -203,12 +203,11 @@ fn access_only_accounts_still_offer_allow() {
 
 #[test]
 fn long_reports_keep_all_details_inside_a_bounded_scroll_area() {
-    let report = Report::new(claude(), Account::default(), vec![Window::new(
-        Kind::Weekly,
-        40.,
-        None,
-        None,
-    )])
+    let report = Report::new(
+        claude(),
+        Account::default(),
+        vec![Window::new(Kind::Weekly, 40., None, None)],
+    )
     .with_sections([Section::Facts {
         title: "Details".into(),
         facts: (0..30)

@@ -303,11 +303,14 @@ impl Docs {
         {
             self.open.remove(&oldest);
         }
-        self.open.insert(key, Watch {
-            root: root.to_owned(),
-            version: version.to_owned(),
-            used: self.uses,
-        });
+        self.open.insert(
+            key,
+            Watch {
+                root: root.to_owned(),
+                version: version.to_owned(),
+                used: self.uses,
+            },
+        );
     }
 
     /// Anyone may read a project, but home holds the user's keys and

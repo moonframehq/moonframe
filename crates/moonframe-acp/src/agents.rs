@@ -18,21 +18,19 @@ pub(crate) const AGENTS: &[Agent] = &[
         name: "claude",
         title: "Claude",
         login: "run `claude` and use /login",
-        candidates: &[&["claude-agent-acp"], &[
-            "npx",
-            "-y",
-            "@agentclientprotocol/claude-agent-acp",
-        ]],
+        candidates: &[
+            &["claude-agent-acp"],
+            &["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
+        ],
     },
     Agent {
         name: "codex",
         title: "Codex",
         login: "run `codex login`",
-        candidates: &[&["codex-acp"], &[
-            "npx",
-            "-y",
-            "@agentclientprotocol/codex-acp",
-        ]],
+        candidates: &[
+            &["codex-acp"],
+            &["npx", "-y", "@agentclientprotocol/codex-acp"],
+        ],
     },
     Agent {
         name: "copilot",

@@ -116,9 +116,13 @@ fn kind_of(table: &Table) -> Option<Element> {
 
 impl Build for Pane {
     const CHILDREN: bool = true;
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "size", "min", "max", "fixed", "visible", "lazy", "gap", "padding", "surface", "scroll",
-    ]];
+    const KEYS: &'static [&'static [&'static str]] = &[
+        TYPE,
+        LOOK,
+        &[
+            "size", "min", "max", "fixed", "visible", "lazy", "gap", "padding", "surface", "scroll",
+        ],
+    ];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let size = fields.number("size", PIXELS)?;
@@ -156,18 +160,22 @@ impl Build for Region {
 
 impl Build for Popover {
     const CHILDREN: bool = true;
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "open",
-        "dismiss",
-        "to",
-        "side",
-        "align",
-        "gap",
-        "width",
-        "keys",
-        "anchor_clicks",
-        "content",
-    ]];
+    const KEYS: &'static [&'static [&'static str]] = &[
+        TYPE,
+        LOOK,
+        &[
+            "open",
+            "dismiss",
+            "to",
+            "side",
+            "align",
+            "gap",
+            "width",
+            "keys",
+            "anchor_clicks",
+            "content",
+        ],
+    ];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let content = content(fields)?;
@@ -189,9 +197,13 @@ impl Build for Popover {
 }
 
 impl Build for Overlay {
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "open", "dismiss", "to", "place", "backdrop", "width", "height", "keys", "content",
-    ]];
+    const KEYS: &'static [&'static [&'static str]] = &[
+        TYPE,
+        LOOK,
+        &[
+            "open", "dismiss", "to", "place", "backdrop", "width", "height", "keys", "content",
+        ],
+    ];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let content = content(fields)?;

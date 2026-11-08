@@ -298,11 +298,14 @@ impl Workspace {
                     props: instance.props.clone(),
                     ..Slot::default()
                 };
-                self.instances.insert(key.clone(), Mounted {
-                    slot,
-                    of: instance.of.clone(),
-                    owner: owner.clone(),
-                });
+                self.instances.insert(
+                    key.clone(),
+                    Mounted {
+                        slot,
+                        of: instance.of.clone(),
+                        owner: owner.clone(),
+                    },
+                );
                 self.load_instance(&key);
             }
             let Some(mounted) = self.instances.get_mut(&key) else {
