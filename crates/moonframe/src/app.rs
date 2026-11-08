@@ -55,6 +55,7 @@ mod icon;
 mod listeners;
 mod live_settings;
 mod machine;
+mod main_window;
 mod measuring;
 mod menu;
 mod omarchy;
@@ -69,7 +70,7 @@ mod watch;
 mod windows;
 pub(crate) use fonts::list_ahead as list_fonts_ahead;
 
-pub(crate) use listeners::display_number;
+pub(crate) use {listeners::display_number, main_window::MainWindow};
 // keep-sorted end
 
 use {

@@ -1,6 +1,6 @@
 //! A `ui.view`: a box styled by the `view` rule, which the app's own view
-//! fills (see `crate::hosted`). Previews, and windows that draw no views,
-//! show its name instead.
+//! fills (see `crate::hosted`), drawn over it in the main window. Previews,
+//! and windows that draw no views, show its name instead.
 
 use {
     super::{Cx, Draw, Painter, Place, problem, styling::*},
@@ -38,7 +38,7 @@ impl<'w> Draw<'w> for View {
             },
         };
         match views.show(place.owner, &self.id, &self.name, &self.props) {
-            Shown::View(view) => frame.child(view).into_any_element(),
+            Shown::View(view) => frame.child(painter.host(view)).into_any_element(),
             Shown::Pending => frame.into_any_element(),
             Shown::Missing(why) => problem(why, cx),
         }

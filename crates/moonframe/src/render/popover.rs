@@ -20,9 +20,13 @@ const POPOVER_SLIDE: f32 = 8.;
 
 impl<'w> Draw<'w> for Popover {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
-        let anchor = painter.children(&self.anchor, place, Direction::Row, cx);
         // Above the click-outside layer, the anchor takes its own clicks.
         let lifted = self.open && self.anchor_clicks && self.dismiss.is_some();
+        let anchor = if lifted {
+            painter.lifted(|painter| painter.children(&self.anchor, place, Direction::Row, cx))
+        } else {
+            painter.children(&self.anchor, place, Direction::Row, cx)
+        };
         let anchor: Vec<AnyElement> = if lifted {
             let priority = painter.layer + POPOVER_CONTENT;
             anchor
@@ -72,9 +76,10 @@ impl<'w> Draw<'w> for Popover {
         } else {
             self.side
         };
-        let content = self
-            .content
-            .draw(painter, &content_place.child(0, Direction::Column), cx);
+        let content = painter.lifted(|painter| {
+            self.content
+                .draw(painter, &content_place.child(0, Direction::Column), cx)
+        });
         let theme = cx.theme();
         let kind = transition.map(|transition| transition.kind);
         let moving = shown.moving();
