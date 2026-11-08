@@ -169,6 +169,8 @@ pub(crate) struct Run {
     pending: BTreeMap<i64, Pending>,
     outbox: Option<Sender<Vec<u8>>>,
     child: Option<Child>,
+    /// The agent's process id, which leads its process group.
+    pid: Option<u32>,
     log: VecDeque<String>,
     host: Option<Handle>,
 }
@@ -262,6 +264,7 @@ impl Run {
             pending: BTreeMap::new(),
             outbox: None,
             child: None,
+            pid: None,
             log: VecDeque::new(),
             host,
         }
@@ -353,6 +356,7 @@ impl Run {
         }
         self.outbox = Some(outbox);
         self.exited.store(false, Ordering::Release);
+        self.pid = Some(child.id());
         self.child = Some(child);
         self.request_rpc(
             "initialize",
@@ -688,11 +692,24 @@ impl Run {
         self.finish(Status::Cancelled, now);
     }
 
-    /// Stops the agent as the app quits.
+    /// Stops the agent as the app quits: its group is asked at once, as no
+    /// thread outlives the app to ask later.
     pub(crate) fn stop(&mut self, now: u64) {
         if !self.status.finished() {
+            if let Some(pid) = self.pid.filter(|_| self.child.is_some()) {
+                crate::tree::signal(pid, false);
+            }
             self.finish(Status::Stopped, now);
         }
+    }
+
+    /// The agent still running, if any: its process id and whether it has
+    /// exited since.
+    pub(crate) fn agent(&self) -> Option<(u32, Arc<AtomicBool>)> {
+        let running = self.child.is_some() || !self.exited.load(Ordering::Acquire);
+        self.pid
+            .filter(|_| running)
+            .map(|pid| (pid, Arc::clone(&self.exited)))
     }
 
     pub(crate) fn fail(&mut self, why: String, now: u64) {
@@ -711,7 +728,7 @@ impl Run {
             // Given a moment to read what it was last sent (a cancel) and
             // exit with its input closed, then killed; on a thread of its
             // own, so an agent slow to die never holds the provider's lock.
-            let exited = Arc::clone(&self.exited);
+            let (exited, pid) = (Arc::clone(&self.exited), self.pid);
             let reaped = thread::Builder::new()
                 .name("acp-reap".to_owned())
                 .spawn(move || {
@@ -722,6 +739,9 @@ impl Run {
                             return;
                         }
                         thread::sleep(Duration::from_millis(50));
+                    }
+                    if let Some(pid) = pid {
+                        crate::tree::signal(pid, true);
                     }
                     let _ = child.kill();
                     let _ = child.wait();
