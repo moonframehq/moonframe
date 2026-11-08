@@ -36,14 +36,21 @@ use {
     moonframe_providers::{Handle, Native, to_json},
     serde_json::{Map, Value, json},
     std::{
-        sync::mpsc::{self, Receiver, RecvTimeoutError, Sender},
-        thread,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+            mpsc::{self, Receiver, RecvTimeoutError, Sender},
+        },
+        thread::{self, JoinHandle},
         time::{Duration, Instant},
     },
 };
 
 const POLL: Duration = Duration::from_secs(2);
 const MAX_FILES: usize = 300;
+/// How long dropping the provider waits for its worker to leave: within
+/// what the host gives a native provider, so the next one starts after.
+const LEAVING: Duration = Duration::from_millis(1500);
 
 pub(crate) fn native() -> Box<dyn Native> {
     Box::new(Provider::default())
@@ -52,13 +59,17 @@ pub(crate) fn native() -> Box<dyn Native> {
 #[derive(Default)]
 struct Provider {
     inbox: Option<Sender<Value>>,
+    /// Set as the provider goes: its worker publishes nothing after.
+    stopped: Arc<AtomicBool>,
+    worker: Option<JoinHandle<()>>,
 }
 
 impl Native for Provider {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         let (inbox, messages) = mpsc::channel();
         let host = host.clone();
-        thread::spawn(move || serve(&host, &messages));
+        let stopped = Arc::clone(&self.stopped);
+        self.worker = Some(thread::spawn(move || serve(&host, &messages, stopped)));
         self.inbox = Some(inbox);
         Ok(())
     }
@@ -73,12 +84,32 @@ impl Native for Provider {
     }
 }
 
-fn serve(host: &Handle, messages: &Receiver<Value>) {
-    let mut repo = Repo::new(host.clone());
+impl Drop for Provider {
+    /// Stops the worker and waits a moment for it: a replacement must not
+    /// have an old git command's answer published over its own. A worker
+    /// stuck in git past that publishes nothing once it comes back.
+    fn drop(&mut self) {
+        self.stopped.store(true, Ordering::SeqCst);
+        self.inbox = None;
+        if let Some(worker) = self.worker.take() {
+            let started = Instant::now();
+            while !worker.is_finished() && started.elapsed() < LEAVING {
+                thread::sleep(Duration::from_millis(5));
+            }
+        }
+    }
+}
+
+fn serve(host: &Handle, messages: &Receiver<Value>, stopped: Arc<AtomicBool>) {
+    let mut repo = Repo::new(host.clone(), stopped);
     repo.publish();
     let mut looked = Instant::now();
     loop {
-        match messages.recv_timeout(POLL.saturating_sub(looked.elapsed())) {
+        let message = messages.recv_timeout(POLL.saturating_sub(looked.elapsed()));
+        if repo.stopped.load(Ordering::SeqCst) {
+            return;
+        }
+        match message {
             Ok(message) => {
                 let handled = guarded(|| {
                     repo.handle(&message);
@@ -124,6 +155,7 @@ impl Compare {
 /// The state behind `app.repo`.
 struct Repo {
     host: Handle,
+    stopped: Arc<AtomicBool>,
     runtime: Runtime,
     at: Option<String>,
     is_git: bool,
@@ -160,9 +192,10 @@ fn filled<'a>(message: &'a Value, key: &str) -> Option<&'a str> {
 }
 
 impl Repo {
-    fn new(host: Handle) -> Self {
+    fn new(host: Handle, stopped: Arc<AtomicBool>) -> Self {
         Self {
             host,
+            stopped,
             runtime: Runtime::new(&Config::from_env()),
             at: None,
             is_git: false,
@@ -198,6 +231,9 @@ impl Repo {
     }
 
     fn publish(&mut self) {
+        if self.stopped.load(Ordering::SeqCst) {
+            return;
+        }
         let (line, value) = view::encoded(self.view());
         if line != self.last {
             self.host.publish_json(&value);

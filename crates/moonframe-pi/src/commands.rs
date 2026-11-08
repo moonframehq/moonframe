@@ -192,14 +192,16 @@ fn shell(core: &Arc<Core>, id: &str, text: &str) -> Result<(), String> {
 /// A pi for one job, answering nothing but what is asked of it.
 fn helper(core: &Arc<Core>, args: &[String], cwd: &str) -> Result<Arc<Rpc>, String> {
     let path = pi_path(&core.lock().pi).ok_or("pi was not found.")?;
-    Rpc::spawn(Start {
+    let rpc = Rpc::spawn(Start {
         program: &path,
         args,
         cwd,
         runtime: &core.runtime(),
         on_event: Box::new(|_| {}),
         on_exit: Box::new(|_, _| {}),
-    })
+    })?;
+    core.keep_helper(&rpc)?;
+    Ok(rpc)
 }
 
 /// A fork is a new session from an earlier prompt; a pi of its own makes it,
@@ -362,7 +364,8 @@ fn delete_thread(core: &Arc<Core>, id: &str) -> Result<(), String> {
 }
 
 /// Tells a thread's running pi of a change, if it has one, then asks where
-/// it stands. Off the loop: pi may take a moment to answer.
+/// it stands. Written here, on the loop, so a prompt sent after the change
+/// reaches pi after it; answered off the loop, as pi may take a moment.
 fn tell_live(
     core: &Arc<Core>,
     live: LiveRef,
@@ -370,8 +373,9 @@ fn tell_live(
     fields: Value,
     then: impl FnOnce(&Arc<Core>, &LiveRef) -> Result<(), String> + Send + 'static,
 ) {
+    let asked = live.rpc.ask(kind, fields);
     core.work(move |core| {
-        live.rpc.send(kind, fields)?;
+        live.rpc.answer_within(asked, crate::rpc::COMMAND_TIMEOUT)?;
         core.refresh(&live.id, &live.rpc)?;
         then(core, &live)
     });

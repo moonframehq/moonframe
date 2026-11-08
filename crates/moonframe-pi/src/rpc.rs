@@ -201,19 +201,21 @@ impl Rpc {
         }
     }
 
-    /// Sends a command, and waits for its answer for up to `timeout`.
-    pub(crate) fn send_within(
-        &self,
-        kind: &str,
-        fields: Value,
-        timeout: Duration,
-    ) -> Result<Value, String> {
-        if self.exited() {
-            return Err("pi is not running".to_owned());
-        }
-        self.touch();
+    /// Sends a command now, not waiting: pi takes commands in the order
+    /// they are written, so a change written here goes ahead of whatever is
+    /// written after, whichever thread waits for the answers.
+    pub(crate) fn ask(&self, kind: &str, fields: Value) -> Asked {
         let id = format!("c{}", self.next_id.fetch_add(1, Ordering::Relaxed));
         let (answer, waiting) = mpsc::channel();
+        let asked = Asked {
+            kind: kind.to_owned(),
+            id: id.clone(),
+            waiting,
+        };
+        if self.exited() {
+            return asked;
+        }
+        self.touch();
         lock(&self.pending).insert(id.clone(), answer);
         let mut record = Map::new();
         record.insert("id".to_owned(), json!(id));
@@ -222,9 +224,31 @@ impl Rpc {
             record.extend(fields);
         }
         self.write(&Value::Object(record));
-        let answered = waiting.recv_timeout(timeout);
-        lock(&self.pending).remove(&id);
-        answered.unwrap_or_else(|_| Err(format!("pi did not answer {kind}")))
+        asked
+    }
+
+    /// Sends a command, and waits for its answer for up to `timeout`.
+    pub(crate) fn send_within(
+        &self,
+        kind: &str,
+        fields: Value,
+        timeout: Duration,
+    ) -> Result<Value, String> {
+        let asked = self.ask(kind, fields);
+        self.answer_within(asked, timeout)
+    }
+
+    /// Waits for the answer to `asked` for up to `timeout`.
+    pub(crate) fn answer_within(&self, asked: Asked, timeout: Duration) -> Result<Value, String> {
+        let answered = asked.waiting.recv_timeout(timeout);
+        lock(&self.pending).remove(&asked.id);
+        answered.unwrap_or_else(|_| {
+            Err(if self.exited() {
+                "pi is not running".to_owned()
+            } else {
+                format!("pi did not answer {}", asked.kind)
+            })
+        })
     }
 
     /// [`Rpc::send_within`], in the usual time.
@@ -246,6 +270,13 @@ impl Rpc {
             }
         });
     }
+}
+
+/// A command written, its answer still to come: [`Rpc::answer_within`].
+pub(crate) struct Asked {
+    kind: String,
+    id: String,
+    waiting: mpsc::Receiver<Answer>,
 }
 
 fn write_lines(mut stdin: ChildStdin, lines: &mpsc::Receiver<String>) {

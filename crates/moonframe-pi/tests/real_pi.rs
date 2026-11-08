@@ -1,6 +1,7 @@
 //! The pi provider end to end: the real pi and a mock model, in folders of
 //! their own, so they need no account and touch none of your sessions. They
-//! need pi, so `just test` skips them: `just test-pilot` runs them. The
+//! need pi, so `just test` skips them: `just test-pilot` runs them, as CI
+//! does on Linux with a pinned pi (see ci.yml). The
 //! scenarios of each test follow on from each other, as a session would.
 #![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]

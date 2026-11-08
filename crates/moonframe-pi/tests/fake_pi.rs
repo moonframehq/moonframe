@@ -38,7 +38,9 @@ answer() {
 }
 while IFS= read -r line; do
     id=$(printf '%s' "$line" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+    printf '%s' "$line" | grep -o '"type":"[a-z_]*"' | head -1 >> "$FAKE_DIR/types"
     case "$line" in
+    *'"type":"fork"'*) echo $$ > "$FAKE_DIR/fork-pid" ;;
     *'"type":"get_state"'*)
         ok "$id" "{\"sessionFile\":\"$FAKE_DIR/none.jsonl\",\"thinkingLevel\":\"low\",\"model\":{\"provider\":\"fake\",\"id\":\"f\",\"name\":\"Fake\"}}" ;;
     *'"type":"get_available_models"'*) ok "$id" '{"models":[{"provider":"fake","id":"f","name":"Fake"}]}' ;;
@@ -62,7 +64,7 @@ while IFS= read -r line; do
     *) ok "$id" '{}' ;;
     esac
 done
-touch "$FAKE_DIR/stdin-closed"
+touch "$FAKE_DIR/stdin-closed" "$FAKE_DIR/closed-$$"
 "#;
 
 struct Fake {
@@ -207,6 +209,49 @@ fn closing_stops_each_pi_by_closing_its_stdin() {
         asked.elapsed()
     );
     wait_for(&fake.root.join("stdin-closed"), "pi was not told");
+}
+
+#[test]
+fn a_model_chosen_before_a_prompt_reaches_pi_first() {
+    let (fake, config) = fake(FAKE_PI);
+    let mut app = started(config);
+    app.send(&json!({ "new_thread": { "mode": "local", "images": {} } }));
+    app.when("a thread", |v| v["thread"]["ready"] == true);
+    for round in 1..=10 {
+        app.send(&json!({ "set_model": { "provider": "fake", "id": "f" } }));
+        app.send(&json!({ "prompt": format!("hello {round}"), "images": {} }));
+        app.when("answered", |v| {
+            let events = v["events"].as_array().unwrap();
+            events.iter().filter(|e| e["kind"] == "finished").count() == round
+        });
+    }
+    let types = fs::read_to_string(fake.root.join("types")).unwrap();
+    let mut chosen = false;
+    for kind in types.lines() {
+        if kind.contains("set_model") {
+            chosen = true;
+        } else if kind.contains("\"prompt\"") {
+            assert!(chosen, "a prompt went ahead of its model:\n{types}");
+            chosen = false;
+        }
+    }
+}
+
+#[test]
+fn closing_stops_a_fork_s_helper_too() {
+    let (fake, config) = fake(FAKE_PI);
+    let mut app = started(config);
+    app.send(&json!({ "new_thread": { "mode": "local", "prompt": "hello", "images": {} } }));
+    app.when("answered", |v| {
+        v["thread"]["status"] == "idle" && v["thread"]["ready"] == true
+    });
+    let thread = app.value()["thread"]["id"].clone();
+    app.send(&json!({ "fork": { "thread": thread, "entry": "e1" } }));
+    wait_for(&fake.root.join("fork-pid"), "the fork's pi was not asked");
+    let pid = fs::read_to_string(fake.root.join("fork-pid")).unwrap();
+    app.stop();
+    let closed = fake.root.join(format!("closed-{}", pid.trim()));
+    wait_for(&closed, "the fork's pi was left running");
 }
 
 #[test]

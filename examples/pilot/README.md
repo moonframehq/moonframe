@@ -69,7 +69,7 @@ providers against a real repository and a fake pi the tests write. `just
 test-pilot` also runs them end to end with the real pi on your PATH (or
 `PILOT_PI`) and a mock model (`tests/support/mock_llm.rs`, a small
 OpenAI-compatible server), in folders of their own, so they need no account and
-touch none of your sessions.
+touch none of your sessions. CI runs them on Linux with a pinned pi.
 
 ```sh
 cargo run -p moonframe-pi --example pilot_seed -- DIR PORT --stay

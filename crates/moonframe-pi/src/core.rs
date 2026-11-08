@@ -18,7 +18,7 @@ use {
         collections::HashMap,
         panic::{AssertUnwindSafe, catch_unwind},
         sync::{
-            Arc, Condvar, Mutex, MutexGuard, PoisonError, RwLock,
+            Arc, Condvar, Mutex, MutexGuard, PoisonError, RwLock, Weak,
             atomic::{AtomicBool, Ordering},
             mpsc::{Receiver, RecvTimeoutError},
         },
@@ -80,6 +80,9 @@ pub(crate) struct Core {
     notify: Arc<Notify>,
     runtime: RwLock<Arc<Runtime>>,
     stopping: AtomicBool,
+    /// The pis started for one job, such as a fork: in no thread, but
+    /// stopped with the rest as the provider goes.
+    helpers: Mutex<Vec<Weak<Rpc>>>,
     /// When sessions were last looked at.
     pub(crate) scanned: Mutex<Option<Instant>>,
 }
@@ -102,6 +105,7 @@ impl Core {
             notify,
             runtime: RwLock::new(runtime),
             stopping: AtomicBool::new(false),
+            helpers: Mutex::default(),
             scanned: Mutex::new(None),
         }))
     }
@@ -151,6 +155,20 @@ impl Core {
         });
     }
 
+    /// Keeps `rpc` to be stopped with the rest, or stops it now if the
+    /// provider is already going.
+    pub(crate) fn keep_helper(&self, rpc: &Arc<Rpc>) -> Result<(), String> {
+        let mut helpers = lock(&self.helpers);
+        helpers.retain(|kept| kept.upgrade().is_some_and(|kept| !kept.exited()));
+        helpers.push(Arc::downgrade(rpc));
+        drop(helpers);
+        if self.stopping() {
+            rpc.stop();
+            return Err("Pilot is closing.".to_owned());
+        }
+        Ok(())
+    }
+
     /// Stops the run of `thread`, or of the selected one, now.
     pub(crate) fn abort(self: &Arc<Self>, thread: Option<String>) {
         let rpc = {
@@ -172,7 +190,11 @@ impl Core {
             engine.store.flush_pending();
             let probe = engine.probe.take();
             let live = engine.live.values().map(|live| Arc::clone(&live.rpc));
-            live.chain(probe).collect()
+            let helpers = lock(&self.helpers)
+                .iter()
+                .filter_map(Weak::upgrade)
+                .collect::<Vec<_>>();
+            live.chain(probe).chain(helpers).collect()
         };
         for rpc in &rpcs {
             rpc.stop();

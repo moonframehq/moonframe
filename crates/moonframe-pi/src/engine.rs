@@ -151,6 +151,11 @@ impl Engine {
             for session in list {
                 let id = session.id.clone();
                 let threads = &mut self.store.data.threads;
+                // Read before a deletion that has since finished: the
+                // thread is gone, and its file before it.
+                if !threads.contains_key(&id) && !Path::new(&session.file).exists() {
+                    continue;
+                }
                 let meta = threads.entry(id.clone()).or_insert_with(|| Meta {
                     id: id.clone(),
                     cwd: cwd.clone(),
@@ -380,8 +385,44 @@ pub(crate) fn paths_of(value: &Value) -> Vec<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_session_deleted_while_it_was_read_is_not_adopted() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let config = Config {
+            agent_dir: root.join("agent"),
+            data_dir: root.join("data"),
+            home: root.to_owned(),
+            pi: None,
+            login_shell: false,
+            env: Vec::new(),
+        };
+        let mut engine = Engine::new(Arc::new(config), Arc::default()).unwrap();
+        let kept = root.join("kept.jsonl");
+        std::fs::write(&kept, "").unwrap();
+        let session = |id: &str, file: &Path| Summary {
+            id: id.to_owned(),
+            file: file.to_string_lossy().into_owned(),
+            updated: 0.0,
+            name: None,
+            prompt: None,
+            preview: String::new(),
+            messages: 0,
+            model: None,
+            thinking: None,
+        };
+        let found = vec![("/w".to_owned(), vec![
+            session("gone", &root.join("gone.jsonl")),
+            session("kept", &kept),
+        ])];
+        engine.merge_sessions(found);
+        assert!(engine.thread("gone").is_none());
+        assert!(engine.thread("kept").is_some());
+    }
 
     #[test]
     fn a_title_is_the_first_line() {
