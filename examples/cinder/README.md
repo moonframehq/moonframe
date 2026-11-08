@@ -7,8 +7,7 @@ grid (`components/cinder-sprite.luau`).
 - **Title bar:** the traffic lights, the sidebar toggle, back and forward
   through the sessions you opened, and a chat / code switch; the session's
   title; What's new, a terminal, a preview page and a menu on the right.
-- **Sidebar:** New, Search (filters the sessions as you type), the places
-  (not in this example), the sessions you started here with an agent, then
+- **Sidebar:** New, Search (filters the sessions as you type), the sessions you started here with an agent, then
   your CLI sessions grouped by repository, and the agent new sessions get. A
   group folds from its heading. Each CLI session shows a green pull-request
   mark when it opened one, and a laptop (on this computer) or a cloud (its

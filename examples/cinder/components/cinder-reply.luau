@@ -1,59 +1,18 @@
--- One agent turn as Cinder shows it: prose with bullet lists and fenced
--- code, and tool calls folded into one line each group until clicked.
+-- One agent turn as Cinder shows it: its prose as markdown, and tool calls
+-- folded into one line each group until clicked.
 -- The same look for a CLI session's transcript (from the history provider)
 -- and a live agent's reply (from the acp provider's `parts`).
 
 type Tool = { name: string, detail: string, status: string? }
 type Part = { kind: string, text: string?, tools: { Tool }? }
 
--- Inline marks the view can't draw: bold markers go, backticks stay.
-local function plain(text: string): string
-	return (string.gsub(text, "%*%*", ""))
-end
-
--- Prose and fenced code: paragraphs, bullet lists, code in a mono box.
+-- Prose as the agent wrote it: markdown, drawn by the host (lists, inline
+-- and fenced code, emphasis, tables).
 local function render_text(text: string): { any }
-	local out = {}
-	local segments = string.split(text, "```")
-	for index, segment in segments do
-		if index % 2 == 0 then
-			-- Code: drop the language on the fence's line.
-			local body = string.gsub(segment, "^[%w_+-]*\n", "")
-			body = string.gsub(body, "\n$", "")
-			table.insert(out, ui.column {
-				class = "cinder-reply-code",
-				scroll = "x",
-				ui.text { body, wrap = false, class = "cinder-reply-code-text" },
-			})
-		else
-			for _, para in string.split(segment, "\n\n") do
-				local trimmed = string.match(para, "^%s*(.-)%s*$") or ""
-				if trimmed ~= "" then
-					local bullets = {}
-					local prose = {}
-					for _, line in string.split(trimmed, "\n") do
-						local item = string.match(line, "^%s*[-*] (.*)$") or string.match(line, "^%s*%d+%. (.*)$")
-						if item then
-							table.insert(bullets, ui.row {
-								gap = "normal",
-								ui.text { "•", class = "cinder-reply-bullet" },
-								ui.row { grow = true, ui.text { plain(item), class = "cinder-reply-prose" } },
-							})
-						else
-							table.insert(prose, line)
-						end
-					end
-					if #prose > 0 then
-						table.insert(out, ui.text { plain(table.concat(prose, "\n")), class = "cinder-reply-prose" })
-					end
-					if #bullets > 0 then
-						table.insert(out, ui.column { gap = "small", table.unpack(bullets) })
-					end
-				end
-			end
-		end
+	if string.match(text, "^%s*$") then
+		return {}
 	end
-	return out
+	return { ui.markdown { text = text } }
 end
 
 local TOOL_STATUS = {
@@ -100,7 +59,7 @@ return component {
 	title = "Cinder Reply",
 	category = "Data",
 	icon = "message-square",
-	description = "An agent's turn: prose, bullet lists and code blocks, with tool calls folded into a line per group.",
+	description = "An agent's turn: its prose as markdown, with tool calls folded into a line per group.",
 	when = "Showing what a coding agent said in a transcript, in Cinder's look. For a run's status, plan and permission question use `agent-run`; for chat bubbles use `chat`.",
 	props = {
 		parts = "list of `{ kind = \"text\", text }` or `{ kind = \"tools\", tools = { { name, detail, status? } } }`, in order",
@@ -109,10 +68,6 @@ return component {
 	},
 	styles = {
 		[".cinder-reply"] = { gap = 12 },
-		[".cinder-reply-prose"] = { color = "foreground" },
-		[".cinder-reply-bullet"] = { color = "muted-foreground" },
-		[".cinder-reply-code"] = { background = "#111111", border = true, border_color = "border", radius = 10, padding = { 10, 12 } },
-		[".cinder-reply-code-text"] = { size = "small", font = "mono", color = "#d8d8d8" },
 		[".cinder-reply-tools-head"] = { padding = { 4, 8 }, gap = 8, radius = 8, color = "muted-foreground" },
 		[".cinder-reply-tools-head:hover"] = { background = "list-hover", color = "foreground" },
 		[".cinder-reply-tools-summary"] = { color = "muted-foreground", font = "mono", size = "small" },

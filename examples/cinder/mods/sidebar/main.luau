@@ -1,4 +1,4 @@
--- The sidebar: New, Search and the places, then the sessions: those started
+-- The sidebar: New and Search, then the sessions: those started
 -- here with an agent, then the CLI sessions grouped by repository (code
 -- mode; chat mode has none yet), and the agent new sessions get. Groups
 -- fold from their heading; Search turns its row into a field that filters
@@ -16,13 +16,6 @@ type State = {
 	query: string,
 	mode: string,
 	open: string,
-}
-
-local PLACES = {
-	{ id = "projects", label = "Projects", icon = "layers", beta = true },
-	{ id = "artifacts", label = "Artifacts", icon = "copy", beta = false },
-	{ id = "customize", label = "Customize", icon = "palette", beta = false },
-	{ id = "more", label = "More", icon = "ellipsis", beta = false },
 }
 
 -- A session started here: its first run, and how its newest is going.
@@ -103,7 +96,6 @@ return mod {
 		[".em-new"] = { background = "em-raised" },
 		[".em-new:hover"] = { background = "#4e4e4f" },
 		[".em-row-icon"] = { color = "#d4d4d5" },
-		[".em-beta"] = { border = true, border_color = "#5a5a5b", radius = 10, padding = { 1, 7 }, color = "muted-foreground", size = "small" },
 		[".em-list"] = { padding = { 0, 8, 12, 8 } },
 		[".em-group"] = { height = 34, padding = { 0, 10 }, gap = 6, margin = { top = 18 }, radius = 6, color = "muted-foreground" },
 		[".em-group:hover"] = { color = "foreground" },
@@ -155,7 +147,7 @@ return mod {
 		local history = app.history
 		local code = state.mode == "code"
 
-		-- New, Search, the places.
+		-- New and Search.
 		local nav = {}
 		table.insert(nav, ui.row {
 			class = "em-row em-new",
@@ -191,16 +183,6 @@ return mod {
 				tooltip = "⌘K",
 				ui.icon { name = "search", class = "em-row-icon" },
 				ui.text "Search",
-			})
-		end
-		for _, place in PLACES do
-			table.insert(nav, ui.row {
-				class = "em-row",
-				align = "center",
-				tooltip = "Not in this example",
-				ui.icon { name = place.icon :: any, class = "em-row-icon" },
-				ui.text { place.label },
-				place.beta and ui.text { "Beta", class = "em-beta" },
 			})
 		end
 
