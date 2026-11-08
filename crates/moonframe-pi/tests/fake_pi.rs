@@ -246,8 +246,18 @@ fn closing_stops_a_fork_s_helper_too() {
         v["thread"]["status"] == "idle" && v["thread"]["ready"] == true
     });
     let thread = app.value()["thread"]["id"].clone();
-    app.send(&json!({ "fork": { "thread": thread, "entry": "e1" } }));
-    wait_for(&fake.root.join("fork-pid"), "the fork's pi was not asked");
+    // The thread's session file is noted a moment after it settles, and a
+    // fork is refused until then: ask again until the fork's pi is.
+    let asked = fake.root.join("fork-pid");
+    let started = Instant::now();
+    while !asked.exists() {
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "the fork's pi was not asked"
+        );
+        app.send(&json!({ "fork": { "thread": thread, "entry": "e1" } }));
+        thread::sleep(Duration::from_millis(200));
+    }
     let pid = fs::read_to_string(fake.root.join("fork-pid")).unwrap();
     app.stop();
     let closed = fake.root.join(format!("closed-{}", pid.trim()));
