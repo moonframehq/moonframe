@@ -1,7 +1,8 @@
 -- A process monitor pane: a search, processes grouped by name with heat
 -- bars behind CPU and memory (click a group's arrow for its members, a
 -- heading to sort), the CPU over the last two minutes, and memory in use.
--- Live from Lantern's `procs` provider (`ps`, `iostat`, `vm_stat`).
+-- Live from Lantern's `procs` provider (`ps`, `iostat` and `vm_stat` on
+-- macOS; the system's own counters on Linux and Windows).
 
 local progress = use "progress"
 
@@ -208,11 +209,15 @@ return mod {
 				align = "center",
 				ui.row { gap = "small", align = "center", ui.row { class = "mon-user", width = 7, height = 7 }, ui.text { `user {procs.user}%`, class = "mon-note" } },
 				ui.row { gap = "small", align = "center", ui.row { class = "mon-system", width = 7, height = 7 }, ui.text { `system {procs.system}%`, class = "mon-note" } },
-				ui.text {
-					string.format("load %.2f · %.2f · %.2f", load[1], load[2], load[3]),
-					class = "mon-note",
-					truncate = true,
-				},
+				-- Windows keeps no load average, and the provider sends zeros:
+				-- shown, they would read as an idle machine.
+				if load[1] == 0 and load[2] == 0 and load[3] == 0
+					then nil
+					else ui.text {
+						string.format("load %.2f · %.2f · %.2f", load[1], load[2], load[3]),
+						class = "mon-note",
+						truncate = true,
+					},
 			},
 			ui.row { height = 4 },
 			ui.row {

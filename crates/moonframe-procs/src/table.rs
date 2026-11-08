@@ -2,10 +2,29 @@
 //! (a query, a sort, open groups), and the processes grouped by name.
 
 use {
-    crate::read::{Proc, Reading},
     serde_json::{Map, Value, json},
     std::collections::{BTreeMap, BTreeSet, VecDeque},
 };
+
+/// One process the system lists.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Proc {
+    pub(crate) pid: i64,
+    /// % of one core.
+    pub(crate) cpu: f64,
+    /// Resident memory, bytes.
+    pub(crate) mem: i64,
+    pub(crate) name: String,
+}
+
+/// One CPU reading: the split, in whole percents, and the load averages.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Reading {
+    pub(crate) user: i64,
+    pub(crate) system: i64,
+    pub(crate) idle: i64,
+    pub(crate) load: [f64; 3],
+}
 
 /// Groups listed.
 const MAX_GROUPS: usize = 80;
@@ -129,7 +148,7 @@ impl Monitor {
         }
     }
 
-    /// A new `iostat` reading.
+    /// A new CPU reading.
     pub(crate) fn read(&mut self, reading: Reading) {
         let busy = 100 - reading.idle;
         self.cpu = busy;

@@ -3,29 +3,10 @@
 //! with the patterns procs.py used.
 
 use {
+    crate::table::{Proc, Reading},
     serde_json::{Value, json},
     std::collections::HashMap,
 };
-
-/// One process `ps` lists.
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Proc {
-    pub(crate) pid: i64,
-    /// % of one core.
-    pub(crate) cpu: f64,
-    /// Resident memory, bytes.
-    pub(crate) mem: i64,
-    pub(crate) name: String,
-}
-
-/// One `iostat -n0` line: the CPU split and the load averages.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct Reading {
-    pub(crate) user: i64,
-    pub(crate) system: i64,
-    pub(crate) idle: i64,
-    pub(crate) load: [f64; 3],
-}
 
 /// The ASCII digits `text` starts with, and what follows.
 fn digits(text: &str) -> (&str, &str) {
