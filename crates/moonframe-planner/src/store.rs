@@ -9,8 +9,14 @@ use {
     std::{fs, io, path::Path},
 };
 
-/// What a new planner starts with: a day of tasks and events around today,
-/// an inbox, tags, folders and a few notes.
+/// What a new planner starts with: nothing yet.
+pub(crate) fn empty() -> Map<String, Value> {
+    let store = json!({ "tags": [], "folders": [], "items": [], "next": 1 });
+    store.as_object().cloned().unwrap_or_default()
+}
+
+/// A planner to look at instead (`DAYBOOK_SAMPLE`): a day of tasks and
+/// events around today, an inbox, tags, folders and a few notes.
 pub(crate) fn sample(today: NaiveDate) -> Map<String, Value> {
     let today_text = day(today, None, 0);
     let near = |offset| day(today, Some(&today_text), offset);
@@ -73,16 +79,27 @@ pub(crate) fn sample(today: NaiveDate) -> Map<String, Value> {
     store.as_object().cloned().unwrap_or_default()
 }
 
-/// The file's planner, or the sample, written over a file that is missing
-/// or holds no planner.
-pub(crate) fn load(file: &Path, today: NaiveDate) -> Map<String, Value> {
-    let read = fs::read_to_string(file)
-        .ok()
-        .and_then(|text| serde_json::from_str::<Value>(&text).ok());
+/// The file's planner. A new one starts empty, or as the sample when
+/// `sample` is asked for. A file that holds no planner is kept beside it as
+/// `planner.json.broken` first, so what it held is never written over.
+pub(crate) fn load(file: &Path, today: NaiveDate, sample_wanted: bool) -> Map<String, Value> {
+    let text = fs::read_to_string(file).ok();
+    let read = text
+        .as_deref()
+        .and_then(|text| serde_json::from_str::<Value>(text).ok());
     match read {
         Some(Value::Object(store)) if store.get("items").is_some_and(Value::is_array) => store,
         _ => {
-            let store = sample(today);
+            if text.is_some() {
+                let mut kept = file.as_os_str().to_owned();
+                kept.push(".broken");
+                let _ = fs::rename(file, kept);
+            }
+            let store = if sample_wanted {
+                sample(today)
+            } else {
+                empty()
+            };
             // As before, a planner that cannot be written still runs.
             let _ = save(file, &store);
             store

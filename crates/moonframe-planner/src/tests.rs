@@ -152,16 +152,44 @@ fn saves_the_python_format_byte_for_byte() {
     let python = "{\n   \"folders\" : [],\n   \"items\" : [\n      {\n         \"done\" : true,\n         \"id\" : \"i1\",\n         \"kind\" : \"task\",\n         \"tags\" : [],\n         \"time\" : \"07:30\",\n         \"title\" : \"Caf\u{e9} \u{2b50} \\\"q\\\"\\n\"\n      }\n   ],\n   \"look\" : {},\n   \"next\" : 2,\n   \"tags\" : [\n      {\n         \"color\" : \"#3b6fd8\",\n         \"name\" : \"Work\"\n      }\n   ]\n}\n";
     assert_eq!(fs::read_to_string(&planner.file).unwrap(), python);
     assert!(!Path::new(&format!("{}.tmp", planner.file.display())).exists());
-    let reread = store::load(&planner.file, date("2026-10-31"));
+    let reread = store::load(&planner.file, date("2026-10-31"), false);
     assert_eq!(reread, planner.store);
 }
 
 #[test]
-fn a_missing_or_broken_file_starts_with_the_sample() {
+fn a_new_planner_starts_empty() {
+    let temp = tempdir().unwrap();
+    let file = temp.path().join("planner.json");
+    let fresh = store::load(&file, date("2026-10-31"), false);
+    assert_eq!(fresh, store::empty());
+    assert_eq!(fresh["items"], json!([]));
+    assert_eq!(fresh["next"], 1);
+    assert!(file.is_file(), "it was written");
+    assert_eq!(store::load(&file, date("2026-11-01"), false), fresh);
+}
+
+#[test]
+fn a_broken_file_is_kept_before_a_new_planner_starts() {
+    let temp = tempdir().unwrap();
+    let file = temp.path().join("planner.json");
+    let kept = temp.path().join("planner.json.broken");
+    for broken in ["not json", "[]", "{\"items\": {}}"] {
+        fs::write(&file, broken).unwrap();
+        assert_eq!(
+            store::load(&file, date("2026-10-31"), false),
+            store::empty(),
+            "{broken}"
+        );
+        assert_eq!(fs::read_to_string(&kept).unwrap(), broken);
+    }
+}
+
+#[test]
+fn the_sample_is_there_when_asked_for() {
     let temp = tempdir().unwrap();
     let file = temp.path().join("planner.json");
     let today = date("2026-10-31");
-    let fresh = store::load(&file, today);
+    let fresh = store::load(&file, today, true);
     let items = fresh["items"].as_array().unwrap();
     assert_eq!(fresh["next"], json!(items.len() + 1));
     let ids: std::collections::BTreeSet<_> = items.iter().map(|i| i["id"].to_string()).collect();
@@ -176,11 +204,11 @@ fn a_missing_or_broken_file_starts_with_the_sample() {
             .iter()
             .any(|i| i["title"] == "Climbing" && i["date"] == "2026-11-04")
     );
-    assert_eq!(store::load(&file, today), fresh, "it was written");
-    for broken in ["not json", "[]", "{\"items\": {}}"] {
-        fs::write(&file, broken).unwrap();
-        assert_eq!(store::load(&file, today), store::sample(today), "{broken}");
-    }
+    assert_eq!(
+        store::load(&file, today, false),
+        fresh,
+        "it was written, and is kept"
+    );
 }
 
 #[test]
@@ -490,8 +518,8 @@ fn the_provider_publishes_and_keeps_what_mods_send() {
     let first = published(&seen);
     assert_eq!(first.len(), 1);
     assert_eq!(first[0]["available"], true);
-    assert!(file.is_file(), "the sample is written at the first start");
-    let sample = first[0]["items"].as_array().unwrap().len();
+    assert!(file.is_file(), "the planner is written at the first start");
+    assert_eq!(first[0]["items"], json!([]), "a new planner is empty");
 
     // As the inbox mod sends it, and an empty Luau table as the host does.
     planner.receive(
@@ -504,7 +532,7 @@ fn the_provider_publishes_and_keeps_what_mods_send() {
     let after = published(&seen);
     assert_eq!(after.len(), 2, "nothing new, nothing published");
     let items = after[1]["items"].as_array().unwrap();
-    assert_eq!(items.len(), sample + 1);
+    assert_eq!(items.len(), 1);
     let added = items
         .iter()
         .find(|item| item["title"] == "From the inbox")
@@ -520,7 +548,7 @@ fn the_provider_publishes_and_keeps_what_mods_send() {
     again.start(&handle).unwrap();
     let reread = &published(&seen)[0];
     assert_eq!(reread["look"], "light");
-    assert_eq!(reread["items"].as_array().unwrap().len(), sample + 1);
+    assert_eq!(reread["items"].as_array().unwrap().len(), 1);
 }
 
 #[test]
