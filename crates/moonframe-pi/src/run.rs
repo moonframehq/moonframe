@@ -186,14 +186,23 @@ fn run_within(
             },
         }
     };
-    if too_much() {
+    // Decided once the readers are done: a program can leave before what
+    // it said has all been read, and so before it is found to be too much.
+    let flags: Vec<Arc<AtomicBool>> = [&stdout, &stderr]
+        .into_iter()
+        .flatten()
+        .map(|output| Arc::clone(&output.over))
+        .collect();
+    let taken = |output: Option<Collected>| output.map(Collected::take).unwrap_or_default();
+    let (stdout, stderr) = (taken(stdout), taken(stderr));
+    let over = flags.iter().any(|flag| flag.load(Ordering::SeqCst));
+    if over {
         failure = Some(format!("more than {} MiB of output", limit / 1024 / 1024));
     }
-    let taken = |output: Option<Collected>| output.map(Collected::take).unwrap_or_default();
     Ran {
-        ok,
-        stdout: taken(stdout),
-        stderr: String::from_utf8_lossy(&taken(stderr)).into_owned(),
+        ok: ok && !over,
+        stdout,
+        stderr: String::from_utf8_lossy(&stderr).into_owned(),
         failure,
     }
 }
