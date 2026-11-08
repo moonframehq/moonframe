@@ -1,7 +1,8 @@
 -- A process monitor pane: a search, processes grouped by name with heat
 -- bars behind CPU and memory (click a group's arrow for its members, a
 -- heading to sort), the CPU over the last two minutes, and memory in use.
--- Live from Lantern's `procs` provider (`ps`, `iostat`, `vm_stat`).
+-- Live from Lantern's `procs` provider (`ps`, `iostat` and `vm_stat` on
+-- macOS; the system's own counters on Linux and Windows).
 
 local progress = use "progress"
 

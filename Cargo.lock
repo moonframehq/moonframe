@@ -5454,6 +5454,7 @@ dependencies = [
  "moonframe-core",
  "moonframe-providers",
  "serde_json",
+ "sysinfo 0.40.1",
 ]
 
 [[package]]
