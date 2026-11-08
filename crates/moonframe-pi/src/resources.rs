@@ -29,7 +29,7 @@ type Offered = (
     &'static str,
 );
 
-const PROVIDERS: [Offered; 10] = [
+const PROVIDERS: &[Offered] = &[
     (
         "anthropic",
         "Anthropic",
@@ -105,7 +105,7 @@ const PROVIDERS: [Offered; 10] = [
     ),
 ];
 
-const BUILTIN_EXTENSIONS: [(&str, &str, &str); 4] = [
+const BUILTIN_EXTENSIONS: &[(&str, &str, &str)] = &[
     (
         "builtin:mcp",
         "MCP",

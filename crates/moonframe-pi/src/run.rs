@@ -20,6 +20,9 @@ use {
 /// started can hold the pipe for ever.
 const DRAIN: Duration = Duration::from_secs(1);
 const SLOWEST_POLL: Duration = Duration::from_millis(20);
+/// The most output kept from a program, as the Node providers allowed git:
+/// past it the program is stopped, rather than held in memory whole.
+const MAX_OUTPUT: usize = 64 * 1024 * 1024;
 
 /// How a program went.
 pub(crate) struct Ran {
@@ -51,24 +54,36 @@ impl Ran {
 struct Collected {
     bytes: Arc<Mutex<Vec<u8>>>,
     ended: mpsc::Receiver<()>,
+    /// It said more than [`MAX_OUTPUT`].
+    over: Arc<AtomicBool>,
 }
 
 impl Collected {
-    fn new(mut stream: impl Read + Send + 'static) -> Self {
+    fn new(mut stream: impl Read + Send + 'static, limit: usize) -> Self {
         let bytes = Arc::new(Mutex::new(Vec::new()));
+        let over = Arc::new(AtomicBool::new(false));
         let (done, ended) = mpsc::channel();
-        let shared = Arc::clone(&bytes);
+        let (shared, full) = (Arc::clone(&bytes), Arc::clone(&over));
         thread::spawn(move || {
             let mut chunk = [0; 16 * 1024];
             while let Ok(count) = stream.read(&mut chunk) {
                 if count == 0 {
                     break;
                 }
-                lock(&shared).extend_from_slice(&chunk[..count]);
+                let mut kept = lock(&shared);
+                if kept.len() + count > limit {
+                    full.store(true, Ordering::SeqCst);
+                    break;
+                }
+                kept.extend_from_slice(&chunk[..count]);
             }
             let _ = done.send(());
         });
-        Self { bytes, ended }
+        Self { bytes, ended, over }
+    }
+
+    fn over(&self) -> bool {
+        self.over.load(Ordering::SeqCst)
     }
 
     /// What arrived, waiting a moment for the rest.
@@ -86,10 +101,21 @@ pub(crate) fn run(command: Command, input: Option<&str>, timeout: Duration) -> R
 /// [`run`], stopped early once `stop` is set: the provider is going, and
 /// nothing may outlive it.
 pub(crate) fn run_until(
+    command: Command,
+    input: Option<&str>,
+    timeout: Duration,
+    stop: &AtomicBool,
+) -> Ran {
+    run_within(command, input, timeout, stop, MAX_OUTPUT)
+}
+
+/// [`run_until`], keeping at most `limit` bytes of each output.
+fn run_within(
     mut command: Command,
     input: Option<&str>,
     timeout: Duration,
     stop: &AtomicBool,
+    limit: usize,
 ) -> Ran {
     command
         .stdin(if input.is_some() {
@@ -116,24 +142,35 @@ pub(crate) fn run_until(
             let _ = stdin.write_all(input.as_bytes());
         });
     }
-    let stdout = child.stdout.take().map(Collected::new);
-    let stderr = child.stderr.take().map(Collected::new);
+    let stdout = child.stdout.take().map(|out| Collected::new(out, limit));
+    let stderr = child.stderr.take().map(|err| Collected::new(err, limit));
+    let too_much = || {
+        [&stdout, &stderr]
+            .into_iter()
+            .flatten()
+            .any(Collected::over)
+    };
     let until = Instant::now() + timeout;
     let mut poll = Duration::from_millis(1);
     let mut failure = None;
     let ok = loop {
         match child.try_wait() {
             Ok(Some(status)) => {
+                if too_much() {
+                    break false;
+                }
                 if !status.success() {
                     failure = Some(status.to_string());
                 }
                 break status.success();
             },
-            Ok(None) if Instant::now() >= until || stop.load(Ordering::SeqCst) => {
+            Ok(None) if Instant::now() >= until || stop.load(Ordering::SeqCst) || too_much() => {
                 let _ = child.kill();
                 let _ = child.wait();
                 failure = Some(if stop.load(Ordering::SeqCst) {
                     "stopped".to_owned()
+                } else if too_much() {
+                    String::new()
                 } else {
                     format!("no answer after {}s", timeout.as_secs())
                 });
@@ -149,6 +186,9 @@ pub(crate) fn run_until(
             },
         }
     };
+    if too_much() {
+        failure = Some(format!("more than {} MiB of output", limit / 1024 / 1024));
+    }
     let taken = |output: Option<Collected>| output.map(Collected::take).unwrap_or_default();
     Ran {
         ok,
@@ -186,6 +226,17 @@ mod tests {
         let ran = run(shell("echo said; sleep 30 &"), None, Duration::from_secs(5));
         assert!(started.elapsed() < Duration::from_secs(4));
         assert_eq!(ran.output(), Ok("said\n".to_owned()));
+    }
+
+    #[test]
+    fn output_past_the_limit_stops_the_program() {
+        let started = Instant::now();
+        let never = AtomicBool::new(false);
+        let ran = run_within(shell("yes"), None, Duration::from_secs(30), &never, 1 << 20);
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert!(!ran.ok);
+        assert!(ran.stdout.len() <= 1 << 20);
+        assert_eq!(ran.failure.as_deref(), Some("more than 1 MiB of output"));
     }
 
     #[test]

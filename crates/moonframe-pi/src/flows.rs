@@ -152,7 +152,17 @@ impl Core {
                 return;
             },
         };
-        self.lock().probe = Some(Arc::clone(&probe));
+        {
+            // Checked as it is kept, under the lock shutdown takes to
+            // collect what to stop: one or the other sees it.
+            let mut engine = self.lock();
+            if self.stopping() {
+                drop(engine);
+                probe.stop();
+                return;
+            }
+            engine.probe = Some(Arc::clone(&probe));
+        }
         self.work(move |core| {
             let asked = probe
                 .send("get_available_models", json!({}))

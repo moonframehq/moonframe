@@ -20,7 +20,7 @@ use {
         sync::{
             Arc, Condvar, Mutex, MutexGuard, PoisonError, RwLock, Weak,
             atomic::{AtomicBool, Ordering},
-            mpsc::{Receiver, RecvTimeoutError},
+            mpsc::{self, Receiver, RecvTimeoutError, Sender},
         },
         thread,
         time::{Duration, Instant},
@@ -34,6 +34,10 @@ const WAKE: Duration = Duration::from_millis(100);
 const TICK: Duration = Duration::from_secs(1);
 /// How long leaving waits for pis to go: closing stdin, then the signal.
 const LEAVING: Duration = Duration::from_millis(1700);
+/// How long a thread's queue of work waits for more before it goes.
+const QUEUE_IDLE: Duration = Duration::from_secs(5);
+
+type Job = Box<dyn FnOnce(&Arc<Core>) -> Result<(), String> + Send>;
 
 /// Wakes the publisher.
 #[derive(Default)]
@@ -83,6 +87,9 @@ pub(crate) struct Core {
     /// The pis started for one job, such as a fork: in no thread, but
     /// stopped with the rest as the provider goes.
     helpers: Mutex<Vec<Weak<Rpc>>>,
+    /// Work that must reach a thread's pi in the order it was asked for,
+    /// such as prompts, a queue per thread.
+    queues: Mutex<HashMap<String, Sender<Job>>>,
     /// When sessions were last looked at.
     pub(crate) scanned: Mutex<Option<Instant>>,
 }
@@ -106,6 +113,7 @@ impl Core {
             runtime: RwLock::new(runtime),
             stopping: AtomicBool::new(false),
             helpers: Mutex::default(),
+            queues: Mutex::default(),
             scanned: Mutex::new(None),
         }))
     }
@@ -172,6 +180,56 @@ impl Core {
             return Err("Pilot is closing.".to_owned());
         }
         Ok(())
+    }
+
+    /// [`Core::work`], after whatever was queued for `key` before it: two
+    /// prompts to one thread reach its pi in the order they were sent.
+    pub(crate) fn work_in_order(
+        self: &Arc<Self>,
+        key: &str,
+        work: impl FnOnce(&Arc<Self>) -> Result<(), String> + Send + 'static,
+    ) {
+        let mut queues = lock(&self.queues);
+        let mut job: Job = Box::new(work);
+        if let Some(queue) = queues.get(key) {
+            match queue.send(job) {
+                Ok(()) => return,
+                Err(mpsc::SendError(back)) => job = back,
+            }
+        }
+        let (queue, jobs) = mpsc::channel();
+        let _ = queue.send(job);
+        queues.insert(key.to_owned(), queue);
+        drop(queues);
+        let (core, key) = (Arc::clone(self), key.to_owned());
+        thread::spawn(move || core.serve_queue(&key, &jobs));
+    }
+
+    fn serve_queue(self: &Arc<Self>, key: &str, jobs: &Receiver<Job>) {
+        let run = |job: Job| {
+            if let Err(problem) = guarded(|| job(self)) {
+                self.fail(&problem, None);
+            }
+            self.changed();
+        };
+        loop {
+            match jobs.recv_timeout(QUEUE_IDLE) {
+                Ok(job) => run(job),
+                Err(RecvTimeoutError::Timeout) => {
+                    // Under the lock work is queued under: nothing slips in
+                    // between the last look and the queue going.
+                    let mut queues = lock(&self.queues);
+                    if let Ok(job) = jobs.try_recv() {
+                        drop(queues);
+                        run(job);
+                    } else {
+                        queues.remove(key);
+                        return;
+                    }
+                },
+                Err(RecvTimeoutError::Disconnected) => return,
+            }
+        }
     }
 
     /// Stops the run of `thread`, or of the selected one, now.
@@ -290,5 +348,37 @@ pub(crate) fn publish(core: &Core, host: &Handle) {
             host.publish_json(&value);
             last = line;
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn work_for_one_key_runs_in_the_order_it_was_asked_for() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let core = Core::new(Config {
+            agent_dir: root.join("agent"),
+            data_dir: root.join("data"),
+            home: root.to_owned(),
+            pi: None,
+            login_shell: false,
+            env: Vec::new(),
+        })
+        .unwrap();
+        let (done, order) = mpsc::channel();
+        let (first, second) = (done.clone(), done);
+        core.work_in_order("t", move |_| {
+            thread::sleep(Duration::from_millis(100));
+            first.send(1).map_err(|error| error.to_string())
+        });
+        core.work_in_order("t", move |_| {
+            second.send(2).map_err(|error| error.to_string())
+        });
+        let got: Vec<i32> = order.iter().take(2).collect();
+        assert_eq!(got, [1, 2]);
     }
 }

@@ -449,7 +449,10 @@ fn prompt(core: &Arc<Core>, message: &Map<String, Value>) -> Result<(), String> 
         .get("behavior")
         .and_then(Value::as_str)
         .map(str::to_owned);
-    core.work(move |core| submit(core, &id, &text, &paths, behavior.as_deref()));
+    let thread = id.clone();
+    core.work_in_order(&thread, move |core| {
+        submit(core, &id, &text, &paths, behavior.as_deref())
+    });
     Ok(())
 }
 
