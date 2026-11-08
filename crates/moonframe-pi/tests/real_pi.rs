@@ -257,10 +257,11 @@ fn renaming_reaches_pi(rig: &mut Rig) {
     let id = rig.app.value()["selected"].clone();
     rig.app
         .send(&json!({ "rename": { "id": id, "title": "A better name" } }));
+    // As long as any other wait: renaming a thread whose pi isn't running
+    // starts one and loads its session first, which a CI runner can take
+    // longer than 8 seconds to do.
     rig.app
-        .until_within("renamed", Duration::from_secs(8), |v| {
-            (v["thread"]["title"] == "A better name").then_some(())
-        });
+        .when("renamed", |v| v["thread"]["title"] == "A better name");
 }
 
 fn connected(value: &Value, id: &str) -> bool {

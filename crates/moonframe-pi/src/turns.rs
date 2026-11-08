@@ -140,7 +140,7 @@ impl Core {
                         .is_some_and(|prompt| !prompt.is_empty())
                     && info.messages <= 1
             });
-            if !auto || !fresh {
+            if !auto || !fresh || engine.renamed.contains(id) {
                 return Ok(());
             }
             let words = engine.first_prompt(id).cloned().unwrap_or(Value::Null);
@@ -185,15 +185,21 @@ impl Core {
             return Ok(());
         };
         let clean = clean_title(out.trim().lines().next().unwrap_or_default());
-        if clean.is_empty() || !self.same_rpc(id, rpc) {
+        if clean.is_empty() {
             return Ok(());
         }
-        rpc.send("set_session_name", json!({ "name": clean }))
+        // Checked and written under the lock a rename notes itself under,
+        // so a name the user gave meanwhile is never replaced: theirs is
+        // either seen here, or written to pi after this.
+        let asked = {
+            let mut engine = self.lock();
+            if engine.renamed.contains(id) || same_live(&mut engine, id, rpc).is_none() {
+                return Ok(());
+            }
+            rpc.ask("set_session_name", json!({ "name": clean }))
+        };
+        rpc.answer_within(asked, crate::rpc::COMMAND_TIMEOUT)
             .map(|_| ())
-    }
-
-    fn same_rpc(&self, id: &str, rpc: &Arc<Rpc>) -> bool {
-        same_live(&mut self.lock(), id, rpc).is_some()
     }
 }
 
