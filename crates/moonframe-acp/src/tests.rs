@@ -667,3 +667,7 @@ fn run_ids_never_repeat_and_can_name_a_mark() {
         "{one}"
     );
 }
+
+#[cfg(unix)]
+mod quit;
+mod replies;

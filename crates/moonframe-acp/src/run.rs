@@ -22,14 +22,18 @@ use {
         thread,
         time::{Duration, Instant},
     },
+    transcript::Transcript,
 };
+
+mod json;
+mod transcript;
 
 /// The longest line read from an agent.
 const MAX_LINE: usize = 16 << 20;
 /// What is kept of the agent's latest message, in characters.
 const MAX_MESSAGE: usize = 16_000;
-/// Tool calls kept per run, newest last.
-const MAX_TOOLS: usize = 40;
+/// Tool calls kept per run, newest last: the transcript shows them.
+const MAX_TOOLS: usize = 200;
 /// Lines of the agent's stderr kept, to explain a failure.
 const MAX_LOG: usize = 20;
 /// How long a finished agent has to exit before it is killed.
@@ -134,6 +138,12 @@ pub(crate) struct Run {
     fresh: bool,
     tools: VecDeque<Tool>,
     tool_count: usize,
+    /// Everything the agent said and the tools it called, in order.
+    transcript: Transcript,
+    /// Who the agent says it is (`initialize`'s `agentInfo`).
+    agent_info: Option<Value>,
+    /// The model its session says it uses, by name.
+    model: Option<String>,
     plan: Vec<(String, String)>,
     question: Option<Question>,
     /// Which permission questions are answered without asking.
@@ -159,6 +169,8 @@ pub(crate) struct Run {
     pending: BTreeMap<i64, Pending>,
     outbox: Option<Sender<Vec<u8>>>,
     child: Option<Child>,
+    /// The agent's process id, which leads its process group.
+    pid: Option<u32>,
     log: VecDeque<String>,
     host: Option<Handle>,
 }
@@ -233,6 +245,9 @@ impl Run {
             fresh: false,
             tools: VecDeque::new(),
             tool_count: 0,
+            transcript: Transcript::default(),
+            agent_info: None,
+            model: None,
             plan: Vec::new(),
             question: None,
             allow: start.allow,
@@ -249,6 +264,7 @@ impl Run {
             pending: BTreeMap::new(),
             outbox: None,
             child: None,
+            pid: None,
             log: VecDeque::new(),
             host,
         }
@@ -340,6 +356,7 @@ impl Run {
         }
         self.outbox = Some(outbox);
         self.exited.store(false, Ordering::Release);
+        self.pid = Some(child.id());
         self.child = Some(child);
         self.request_rpc(
             "initialize",
@@ -426,12 +443,18 @@ impl Run {
             },
         };
         match pending {
-            Pending::Initialize => self.request_rpc(
-                "session/new",
-                &json!({ "cwd": self.cwd, "mcpServers": [] }),
-                Pending::NewSession,
-            ),
+            Pending::Initialize => {
+                self.agent_info = agent_info(&value);
+                self.request_rpc(
+                    "session/new",
+                    &json!({ "cwd": self.cwd, "mcpServers": [] }),
+                    Pending::NewSession,
+                );
+            },
             Pending::NewSession => {
+                if let Some(model) = model_name(&value) {
+                    self.model = Some(model);
+                }
                 let Ok(response) = serde_json::from_value::<wire::NewSessionResponse>(value) else {
                     return self.fail("the agent's session was invalid".to_owned(), now);
                 };
@@ -478,6 +501,7 @@ impl Run {
                         self.fresh = false;
                     }
                     self.message.push_str(&text.text);
+                    self.transcript.text(&text.text);
                     if self.message.len() > MAX_MESSAGE {
                         let cut = self.message.len() - MAX_MESSAGE;
                         let cut = (cut..self.message.len())
@@ -493,6 +517,7 @@ impl Run {
                 if self.tools.len() == MAX_TOOLS {
                     self.tools.pop_front();
                 }
+                self.transcript.tool(&call.tool_call_id.0);
                 self.tools.push_back(Tool {
                     id: call.tool_call_id.0.to_string(),
                     title: call.title,
@@ -518,6 +543,12 @@ impl Run {
                     if let Some(kind) = update.fields.kind {
                         tool.kind = enum_name(&kind);
                     }
+                }
+            },
+            wire::SessionUpdate::ConfigOptionUpdate(update) => {
+                let options = json!({ "configOptions": update.config_options });
+                if let Some(model) = model_name(&options) {
+                    self.model = Some(model);
                 }
             },
             wire::SessionUpdate::Plan(plan) => {
@@ -661,11 +692,24 @@ impl Run {
         self.finish(Status::Cancelled, now);
     }
 
-    /// Stops the agent as the app quits.
+    /// Stops the agent as the app quits: its group is asked at once, as no
+    /// thread outlives the app to ask later.
     pub(crate) fn stop(&mut self, now: u64) {
         if !self.status.finished() {
+            if let Some(pid) = self.pid.filter(|_| self.child.is_some()) {
+                crate::tree::signal(pid, false);
+            }
             self.finish(Status::Stopped, now);
         }
+    }
+
+    /// The agent still running, if any: its process id and whether it has
+    /// exited since.
+    pub(crate) fn agent(&self) -> Option<(u32, Arc<AtomicBool>)> {
+        let running = self.child.is_some() || !self.exited.load(Ordering::Acquire);
+        self.pid
+            .filter(|_| running)
+            .map(|pid| (pid, Arc::clone(&self.exited)))
     }
 
     pub(crate) fn fail(&mut self, why: String, now: u64) {
@@ -684,7 +728,7 @@ impl Run {
             // Given a moment to read what it was last sent (a cancel) and
             // exit with its input closed, then killed; on a thread of its
             // own, so an agent slow to die never holds the provider's lock.
-            let exited = Arc::clone(&self.exited);
+            let (exited, pid) = (Arc::clone(&self.exited), self.pid);
             let reaped = thread::Builder::new()
                 .name("acp-reap".to_owned())
                 .spawn(move || {
@@ -695,6 +739,9 @@ impl Run {
                             return;
                         }
                         thread::sleep(Duration::from_millis(50));
+                    }
+                    if let Some(pid) = pid {
+                        crate::tree::signal(pid, true);
                     }
                     let _ = child.kill();
                     let _ = child.wait();
@@ -752,142 +799,69 @@ impl Run {
             let _ = outbox.send(line);
         }
     }
+}
 
-    /// The run as `app.acp` shows it.
-    pub(crate) fn to_json(&self) -> Value {
-        let tools: Vec<Value> = self
-            .tools
+/// Who the agent says it is, from its `initialize` answer.
+fn agent_info(value: &Value) -> Option<Value> {
+    let info = value.get("agentInfo")?;
+    let text = |key: &str| {
+        info.get(key)
+            .and_then(Value::as_str)
+            .filter(|text| !text.is_empty())
+    };
+    let name = text("name")?;
+    Some(json!({ "name": name, "title": text("title"), "version": text("version") }))
+}
+
+/// The model a session says it uses, by its name: the select option of the
+/// `model` category in `configOptions`, else the unstable `models` state.
+fn model_name(value: &Value) -> Option<String> {
+    let named = |current: &str, choices: &[&Value]| {
+        choices
             .iter()
-            .rev()
-            .take(12)
-            .rev()
-            .map(|tool| {
-                json!({ "id": tool.id, "title": tool.title, "kind": tool.kind, "status": tool.status })
+            .find(|choice| {
+                choice
+                    .get("value")
+                    .or_else(|| choice.get("modelId"))
+                    .and_then(Value::as_str)
+                    == Some(current)
             })
-            .collect();
-        let plan: Vec<Value> = self
-            .plan
-            .iter()
-            .take(30)
-            .map(|(content, status)| json!({ "content": content, "status": status }))
-            .collect();
-        let question = self.question.as_ref().map(|question| {
-            let options: Vec<Value> = question
-                .options
-                .iter()
-                .map(|(id, name, kind)| json!({ "id": id, "name": name, "kind": kind }))
-                .collect();
-            json!({ "title": question.title, "options": options })
-        });
-        json!({
-            "id": self.id,
-            "owner": self.owner,
-            "agent": self.agent.name,
-            "agent_title": self.agent.title,
-            "text": self.text,
-            "thread": self.thread,
-            // Where it works; none for a run saved before this was kept.
-            "cwd": (!self.cwd.as_os_str().is_empty()).then_some(&self.cwd),
-            "status": self.status.name(),
-            "started": self.started,
-            "finished": self.finished,
-            "error": self.error,
-            "stop_reason": self.stop_reason,
-            "message": if self.message.is_empty() { Value::Null } else { json!(self.message) },
-            "tools": tools,
-            "tool_count": self.tool_count,
-            "plan": plan,
-            "question": question,
-            "warning": self.warning,
-            "changed": self.changed,
-            "undone": self.undone,
-        })
-    }
-
-    /// A finished run as saved, to show again at the next launch.
-    pub(crate) fn saved(&self) -> Value {
-        let mut value = self.to_json();
-        value["question"] = Value::Null;
-        value["kept"] = json!(self.kept);
-        value
-    }
-
-    /// A saved run back; one that was running when the app quit is stopped.
-    pub(crate) fn restore(value: &Value) -> Option<Self> {
-        let text = |key: &str| value.get(key).and_then(Value::as_str).map(str::to_owned);
-        let agent = crate::agents::find(&text("agent")?)?;
-        let mut run = Self::new(
-            Start {
-                id: text("id")?,
-                owner: text("owner")?,
-                request: Value::Null,
-                agent,
-                text: text("text").unwrap_or_default(),
-                thread: text("thread"),
-                prompt: String::new(),
-                allow: Allow::Ask,
-                cwd: text("cwd").map(PathBuf::from).unwrap_or_default(),
-                installed: None,
-                now: value.get("started").and_then(Value::as_u64).unwrap_or(0),
-            },
-            None,
-        );
-        run.status = Status::parse(&text("status").unwrap_or_default());
-        run.finished = value
-            .get("finished")
-            .and_then(Value::as_u64)
-            .or(Some(run.started));
-        run.error = text("error");
-        run.warning = text("warning");
-        run.checked = true;
-        // Stopped by the app quitting: what it left is noted at this launch.
-        run.kept = value.get("kept").and_then(Value::as_bool) != Some(false);
-        run.changed = value.get("changed").and_then(Value::as_bool) == Some(true);
-        run.undone = value.get("undone").and_then(Value::as_bool) == Some(true);
-        run.stop_reason = text("stop_reason");
-        run.message = text("message").unwrap_or_default();
-        run.tool_count = value
-            .get("tool_count")
-            .and_then(Value::as_u64)
-            .and_then(|count| usize::try_from(count).ok())
-            .unwrap_or(0);
-        for tool in value
-            .get("tools")
+            .and_then(|choice| choice.get("name").and_then(Value::as_str))
+            .unwrap_or(current)
+            .to_owned()
+    };
+    let options = value.get("configOptions").and_then(Value::as_array);
+    for option in options.into_iter().flatten() {
+        if option.get("category").and_then(Value::as_str) != Some("model") {
+            continue;
+        }
+        let Some(current) = option.get("currentValue").and_then(Value::as_str) else {
+            continue;
+        };
+        // Choices, or groups of them.
+        let mut choices = Vec::new();
+        for choice in option
+            .get("options")
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
         {
-            let field = |key: &str| {
-                tool.get(key)
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_owned()
-            };
-            run.tools.push_back(Tool {
-                id: field("id"),
-                title: field("title"),
-                kind: field("kind"),
-                status: field("status"),
-                paths: Vec::new(),
-            });
+            match choice.get("options").and_then(Value::as_array) {
+                Some(group) => choices.extend(group),
+                None => choices.push(choice),
+            }
         }
-        for entry in value
-            .get("plan")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            let field = |key: &str| {
-                entry
-                    .get(key)
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_owned()
-            };
-            run.plan.push((field("content"), field("status")));
-        }
-        Some(run)
+        return Some(named(current, &choices));
     }
+    let models = value.get("models")?;
+    let current = models.get("currentModelId").and_then(Value::as_str)?;
+    let choices: Vec<&Value> = models
+        .get("availableModels")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .collect();
+    Some(named(current, &choices))
 }
 
 /// The files a tool call's fields name.
@@ -934,4 +908,28 @@ fn read_lines(output: impl Read, deliver: &impl Fn(Inbound)) {
         }
     };
     deliver(Inbound::Closed(problem));
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, serde_json::json};
+
+    #[test]
+    fn the_model_is_named_from_either_way_an_agent_says_it() {
+        // An unstable `models` state, as some adapters send.
+        let models = json!({ "models": {
+            "currentModelId": "default",
+            "availableModels": [{ "modelId": "default", "name": "Default (Opus)" }],
+        } });
+        assert_eq!(model_name(&models).as_deref(), Some("Default (Opus)"));
+        // A grouped select, whose value has no name: the value.
+        let grouped = json!({ "configOptions": [
+            { "id": "mode", "category": "mode", "type": "select", "currentValue": "ask", "options": [] },
+            { "id": "model", "category": "model", "type": "select", "currentValue": "x",
+              "options": [{ "group": "g", "name": "G", "options": [{ "value": "y", "name": "Y" }] }] },
+        ] });
+        assert_eq!(model_name(&grouped).as_deref(), Some("x"));
+        assert_eq!(model_name(&json!({})), None);
+        assert!(agent_info(&json!({ "agentInfo": { "name": "" } })).is_none());
+    }
 }

@@ -4,6 +4,6 @@
 # A native provider: Rust built into the app (crates/moonframe-transcripts, the
 # `transcripts` feature), so the app needs nothing else installed. It reads
 # those files with your access, read-only, and never writes anything. With
-# no such folder, or CINDER_SAMPLE=1 in the environment, it shares sample
-# sessions instead.
+# no such folder it lists none; CINDER_SAMPLE=1 in the environment shares
+# sample sessions instead, for screenshots.
 kind = "native"

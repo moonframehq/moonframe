@@ -5,7 +5,8 @@
 -- it.
 --
 -- The shell owns where you are: the mode, the session open ("" for a new
--- one) and the history behind back and forward. It shares them with the
+-- one, "run:<id>" for one with an agent started here, else a CLI session's
+-- id) and the history behind back and forward. It shares them with the
 -- sidebar and the canvas on the `cinder/nav` topic, and tells the history
 -- provider which transcript to read.
 
@@ -61,11 +62,16 @@ local MORE: { any } = {
 
 local HOME = "https://github.com/moonframehq/moonframe"
 
+-- A session with an agent started in Cinder, not a CLI session.
+local function agent_session(open: string): boolean
+	return string.sub(open, 1, 4) == "run:"
+end
+
 -- What the sidebar and the canvas hear, and what the provider reads.
 local function share(state: State): { any }
 	return {
 		{ to = "topic:cinder/nav", msg = { mode = state.mode, open = state.open } },
-		{ to = "provider:history", msg = if state.open ~= "" then { open = state.open } else { close = true } },
+		{ to = "provider:history", msg = if state.open ~= "" and not agent_session(state.open) then { open = state.open } else { close = true } },
 	}
 end
 
@@ -81,8 +87,17 @@ local function go(state: State, open: string)
 	state.open = open
 end
 
--- The session's title and folder, from what the provider shares.
-local function find(history: any, id: string): (string?, string?, boolean)
+-- The session's title and folder, from what the providers share.
+local function find(history: any, acp: any, id: string): (string?, string?, boolean)
+	if agent_session(id) then
+		local first = string.sub(id, 5)
+		for _, run in (acp and acp.runs) or {} do
+			if run.id == first then
+				return run.text, run.cwd, false
+			end
+		end
+		return nil, nil, false
+	end
 	if not history or id == "" then
 		return nil, nil, false
 	end
@@ -135,8 +150,8 @@ return mod {
 	window = { titlebar = "hidden", traffic_lights = { x = 17, y = 16 }, size = { width = 1500, height = 905 } },
 
 	about = {
-		version = "0.1",
-		description = "Your coding-agent sessions by repository, their transcripts, and a scripted demo agent.",
+		version = "0.2",
+		description = "Your coding-agent sessions by repository, their transcripts, and a real coding agent in the folder you pick.",
 		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
@@ -238,7 +253,7 @@ return mod {
 	view = function(state: State, app)
 		local window = app.window
 		local lights = window.platform == "macos" and window.titlebar == "hidden" and not window.fullscreen
-		local title, folder, gone = find(app.history, state.open)
+		local title, folder, gone = find(app.history, app.acp, state.open)
 		if state.open ~= "" and not title then
 			title = "Session"
 		end
@@ -278,14 +293,13 @@ return mod {
 					class = "em-whatsnew",
 					release_notes {
 						name = "Cinder",
-						version = "0.1",
-						badge = "Demo",
-						date = "October 31, 2026",
-						summary = "Your coding-agent sessions, by repository, in one window.",
+						version = "0.2",
+						date = "November 7, 2026",
+						summary = "Your coding-agent sessions, by repository, and a real agent, in one window.",
 						highlights = {
 							{ icon = "history", title = "Your CLI sessions", detail = "Read from ~/.claude/projects, newest first, grouped by repository. Nothing is written." },
 							{ icon = "message-square", title = "Transcripts", detail = "Open one to read it; tool calls fold into a line." },
-							{ icon = "sparkles", title = "A scripted demo agent", detail = "New sessions answer from a script: no model is called." },
+							{ icon = "bot", title = "A real coding agent", detail = "New sessions run Claude (or another agent you have) in the folder you pick, over the Agent Client Protocol. It asks before each edit." },
 						},
 					},
 				},

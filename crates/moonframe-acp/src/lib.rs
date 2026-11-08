@@ -5,7 +5,9 @@
 //! A mod starts a run with a request; the provider starts the agent's ACP
 //! command in the app's folder, opens a session and sends the prompt, then
 //! publishes the run as it goes: its status, the agent's latest message,
-//! its tool calls and plan, and a permission question waiting on the user.
+//! its tool calls and plan, everything it said in order (`parts`), the
+//! agent's own name and model when it gives them, and a permission
+//! question waiting on the user.
 //! Each run is one prompt; the agent exits when it ends. Finished runs are
 //! saved and shown again at the next launch.
 //!
@@ -42,6 +44,7 @@ mod agents;
 mod guard;
 mod keeper;
 mod run;
+mod tree;
 
 pub use keeper::{Keeper, set_keeper};
 use {
@@ -55,8 +58,8 @@ use {
         hash::{BuildHasher, Hasher},
         path::{Path, PathBuf},
         process::{Command, Stdio},
-        sync::{Arc, Mutex, MutexGuard, PoisonError},
-        time::{Duration, SystemTime, UNIX_EPOCH},
+        sync::{Arc, Mutex, MutexGuard, PoisonError, atomic::Ordering},
+        time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     },
 };
 
@@ -67,6 +70,9 @@ const MAX_RUNS: usize = 30;
 /// How long an agent may take to start its session: `npx` may be
 /// downloading the adapter first.
 const START_TIMEOUT: Duration = Duration::from_secs(300);
+/// How long agents have to leave as the app quits before they are killed:
+/// within the two seconds the host gives a native provider.
+const QUIT_WAIT: Duration = Duration::from_millis(1500);
 /// The longest request, instructions and context a mod may send.
 const MAX_TEXT: usize = 64 << 10;
 
@@ -238,15 +244,30 @@ impl Native for Acp {
 
 impl Drop for Acp {
     /// The app quits or the provider restarts: no agent outlives it.
+    /// Each agent's group is asked to stop, given a moment within the
+    /// host's grace, then killed: a thread left to do it later would die
+    /// with the app, and its agent live on.
     fn drop(&mut self) {
         let now = now();
         let mut state = lock(&self.state);
+        let leaving: Vec<_> = state.runs.iter().filter_map(Run::agent).collect();
         for run in &mut state.runs {
             run.stop(now);
         }
         state.unsaved = true;
         drop(state);
         self.save();
+        let deadline = Instant::now() + QUIT_WAIT;
+        while Instant::now() < deadline
+            && !leaving
+                .iter()
+                .all(|(_, exited)| exited.load(Ordering::Acquire))
+        {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        for (pid, _) in &leaving {
+            tree::signal(*pid, true);
+        }
     }
 }
 
@@ -416,6 +437,7 @@ impl Acp {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        tree::own_group(&mut command);
         let child = command
             .spawn()
             .map_err(|error| format!("cannot start {}: {error}", agent.title))?;
