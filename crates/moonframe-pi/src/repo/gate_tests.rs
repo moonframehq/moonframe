@@ -41,6 +41,11 @@ fn git(dir: &Path, args: &[&str]) -> String {
 fn checkout() -> (tempfile::TempDir, Repo) {
     let dir = tempfile::tempdir().unwrap();
     git(dir.path(), &["init", "-q"]);
+    // The checkout's own identity, which the provider's commit uses too: a
+    // machine with none, as CI's, would refuse it.
+    git(dir.path(), &["config", "user.name", "t"]);
+    git(dir.path(), &["config", "user.email", "t@t"]);
+    git(dir.path(), &["config", "commit.gpgsign", "false"]);
     for name in ["a", "b"] {
         std::fs::write(dir.path().join(name), name).unwrap();
         git(dir.path(), &["add", "-A"]);
@@ -69,7 +74,12 @@ fn a_mod_not_listed_cannot_commit_and_a_writer_can() {
     assert_eq!(commits(dir.path()), 2, "the intruder committed");
     assert!(repo.error.as_deref().unwrap().contains("intruder"));
     repo.handle("workbench", &json!({ "commit": "meant" }));
-    assert_eq!(commits(dir.path()), 3);
+    assert_eq!(
+        commits(dir.path()),
+        3,
+        "the writer's commit: {:?}",
+        repo.error
+    );
 }
 
 #[test]
