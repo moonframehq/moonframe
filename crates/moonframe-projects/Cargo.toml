@@ -1,0 +1,20 @@
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-projects"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[dependencies]
+chrono.workspace              = true
+moonframe-core.workspace      = true
+moonframe-providers.workspace = true
+serde_json.workspace          = true
+
+[dev-dependencies]
+tempfile.workspace = true

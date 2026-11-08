@@ -34,6 +34,7 @@ default = [
   "displays",
   "dock",
   "docs",
+  "documents",
   "forge",
   "ghostty",
   "git",
@@ -42,6 +43,7 @@ default = [
   "map",
   "markdown",
   "math",
+  "projects",
   "prose",
   "restart",
   "shell",
@@ -66,6 +68,7 @@ crash         = ["moonframe/crash"]
 displays      = ["moonframe/displays"]
 dock          = ["moonframe/dock"]
 docs          = ["moonframe/docs"]
+documents     = ["moonframe/documents"]
 forge         = ["moonframe/forge"]
 ghostty       = ["moonframe/ghostty"]
 git           = ["moonframe/git"]
@@ -75,6 +78,7 @@ map           = ["moonframe/map"]
 map-benchmark = ["moonframe/map-benchmark"]
 markdown      = ["moonframe/markdown"]
 math          = ["moonframe/math"]
+projects      = ["moonframe/projects"]
 prose         = ["moonframe/prose"]
 restart       = ["moonframe/restart"]
 sealed        = ["moonframe/sealed"]

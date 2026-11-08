@@ -385,6 +385,14 @@ description, website, copyright }`); the menu bar carries the app's title.
 About panel and Send feedback button. The dashboards and chats run on sample
 data or a scripted agent, labelled as such.
 
+The real ones also ship on their own, with nothing else to install: Folio,
+Sessions, Switchyard, Trellis and Workbench. Each release's `apps-v<version>`
+has them for macOS and Linux, and on a Mac:
+
+```sh
+brew install moonframehq/tap/moonframe-folio
+```
+
 `just demo` opens them all in one gallery (the screenshot at the top): a
 picture of each, and a click opens it as a window of its own, or brings it
 forward; **Open all** opens every one to compare them. Their profiles go in
