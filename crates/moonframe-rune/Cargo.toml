@@ -19,31 +19,37 @@ sealed = ["moonframe-packages/sealed"]
 ghostty = ["moonframe-terminal/ghostty"]
 
 [dependencies]
-markdown.workspace           = true
-moonframe-acp.workspace      = true
-moonframe-chat.workspace     = true
-moonframe-core.workspace     = true
-moonframe-docs.workspace     = true
-moonframe-forge.workspace    = true
-moonframe-git.workspace      = true
-moonframe-mux                = { features = ["herdr-core", "terminal"], workspace = true }
-moonframe-packages           = { default-features = false, path = "../moonframe-packages" }
-moonframe-providers          = { features = ["tokio", "wasm"], workspace = true }
-moonframe-shell.workspace    = true
-moonframe-speech.workspace   = true
-moonframe-store.workspace    = true
-moonframe-terminal           = { features = ["alacritty"], workspace = true }
-moonframe-usage.workspace    = true
-notify.workspace             = true
-rune.workspace               = true
-rune-kit.workspace           = true
-rust-embed.workspace         = true
-serde_json.workspace         = true
-tempfile.workspace           = true
-toml.workspace               = true
-tracing.workspace            = true
-tracing-subscriber.workspace = true
-ureq.workspace               = true
+markdown.workspace              = true
+moonframe-acp.workspace         = true
+moonframe-chat.workspace        = true
+moonframe-core.workspace        = true
+moonframe-docs.workspace        = true
+moonframe-documents.workspace   = true
+moonframe-forge.workspace       = true
+moonframe-git.workspace         = true
+moonframe-mux                   = { features = ["herdr-core", "terminal"], workspace = true }
+moonframe-packages              = { default-features = false, path = "../moonframe-packages" }
+moonframe-pi.workspace          = true
+moonframe-planner.workspace     = true
+moonframe-procs.workspace       = true
+moonframe-projects.workspace    = true
+moonframe-providers             = { features = ["tokio", "wasm"], workspace = true }
+moonframe-shell.workspace       = true
+moonframe-speech.workspace      = true
+moonframe-store.workspace       = true
+moonframe-terminal              = { features = ["alacritty"], workspace = true }
+moonframe-transcripts.workspace = true
+moonframe-usage.workspace       = true
+notify.workspace                = true
+rune.workspace                  = true
+rune-kit.workspace              = true
+rust-embed.workspace            = true
+serde_json.workspace            = true
+tempfile.workspace              = true
+toml.workspace                  = true
+tracing.workspace               = true
+tracing-subscriber.workspace    = true
+ureq.workspace                  = true
 
 # Web views live where wry has a child view to offer; a ring is POSIX shared
 # memory. Elsewhere `ui.browser` and `ui.video` show their markers.
