@@ -101,6 +101,9 @@ math = ["dep:latex-rust", "markdown"]
 # pi coding agent and the checkout they work in, for Pilot. Off by default;
 # the starter turns it on.
 pi = ["dep:moonframe-pi"]
+# The `planner` native provider (`app.planner`): Daybook's tasks, events and
+# notes in a JSON file. Off by default; the starter turns it on.
+planner = ["dep:moonframe-planner"]
 # The `projects` native provider (`app.projects`): every repository under
 # the project folders, for apps working across many. Off by default; the
 # starter turns it on.
@@ -184,6 +187,7 @@ moonframe-history.workspace   = true
 moonframe-mux                 = { optional = true, workspace = true }
 moonframe-packages            = { default-features = false, path = "../moonframe-packages" }
 moonframe-pi                  = { optional = true, workspace = true }
+moonframe-planner             = { optional = true, workspace = true }
 moonframe-projects            = { optional = true, workspace = true }
 moonframe-providers.workspace = true
 moonframe-shell               = { optional = true, workspace = true }
