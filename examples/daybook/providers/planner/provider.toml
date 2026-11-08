@@ -1,5 +1,7 @@
 # Daybook's tasks, events and notes, and today's date, shared as
-# `app.planner`. A process provider: it keeps them in a JSON file under
-# ~/.local/share/moonframe with your access. Needs python3.
-command = ["python3", "planner.py"]
-kind    = "process"
+# `app.planner`. A native provider: Rust built into the app
+# (crates/moonframe-planner, the `planner` feature), which documents what it
+# publishes. It keeps them in a JSON file under ~/.local/share/moonframe
+# with your access, so the app needs nothing else installed.
+interval = 1
+kind     = "native"

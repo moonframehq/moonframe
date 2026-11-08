@@ -26,8 +26,11 @@ pub(crate) fn natives() -> Natives {
         ("git", git),
         ("github", github),
         ("gitlab", gitlab),
+        ("history", history),
         ("library", library),
         ("pi", pi),
+        ("planner", planner),
+        ("procs", procs),
         ("projects", projects),
         ("repo", repo),
         ("shell", shell),
@@ -74,6 +77,11 @@ fn gitlab() -> Box<dyn Native> {
     moonframe_forge::gitlab()
 }
 
+#[cfg(feature = "transcripts")]
+fn history() -> Box<dyn Native> {
+    moonframe_transcripts::native()
+}
+
 #[cfg(feature = "documents")]
 fn library() -> Box<dyn Native> {
     moonframe_documents::native()
@@ -82,6 +90,16 @@ fn library() -> Box<dyn Native> {
 #[cfg(feature = "pi")]
 fn pi() -> Box<dyn Native> {
     moonframe_pi::pi()
+}
+
+#[cfg(feature = "planner")]
+fn planner() -> Box<dyn Native> {
+    moonframe_planner::native()
+}
+
+#[cfg(feature = "procs")]
+fn procs() -> Box<dyn Native> {
+    moonframe_procs::native()
 }
 
 #[cfg(feature = "projects")]
@@ -144,6 +162,11 @@ fn gitlab() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(not(feature = "transcripts"))]
+fn history() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 #[cfg(not(feature = "documents"))]
 fn library() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -151,6 +174,16 @@ fn library() -> Box<dyn Native> {
 
 #[cfg(not(feature = "pi"))]
 fn pi() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "planner"))]
+fn planner() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "procs"))]
+fn procs() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
@@ -185,7 +218,10 @@ fn usage() -> Box<dyn Native> {
         feature = "forge",
         feature = "git",
         feature = "pi",
+        feature = "planner",
+        feature = "procs",
         feature = "projects",
+        feature = "transcripts",
         feature = "shell",
         feature = "speech",
         feature = "usage"
@@ -239,8 +275,8 @@ mod tests {
     fn every_built_in_native_is_registered() {
         let natives = natives();
         for name in [
-            "acp", "chat", "docs", "git", "github", "gitlab", "library", "pi", "projects", "repo",
-            "shell", "usage",
+            "acp", "chat", "docs", "git", "github", "gitlab", "library", "pi", "procs", "projects",
+            "repo", "shell", "usage",
         ] {
             assert!(natives.contains_key(name), "{name}");
         }

@@ -5,3 +5,8 @@ keep     = ["feedback"]
 name     = "daybook"
 requires = []
 title    = "Daybook"
+
+# Shipped by Moonframe's releases as an app of its own (docs/releasing.md).
+[release]
+cask        = "moonframe-daybook"
+description = "Planner for daily tasks and events, with an inbox, a month view and notes"

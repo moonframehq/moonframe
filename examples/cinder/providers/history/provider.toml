@@ -1,8 +1,9 @@
 # Cinder's sessions, shared as `app.history`: the coding-agent CLI sessions
 # found in ~/.claude/projects (one folder per project, a JSONL transcript per
 # session), grouped by repository, and the transcript of the one opened.
-# A process provider: it reads those files with your access, read-only, and
-# never writes anything. Needs python3. With no such folder, or
-# CINDER_SAMPLE=1 in the environment, it shares sample sessions instead.
-command = ["python3", "history.py"]
-kind    = "process"
+# A native provider: Rust built into the app (crates/moonframe-transcripts, the
+# `transcripts` feature), so the app needs nothing else installed. It reads
+# those files with your access, read-only, and never writes anything. With
+# no such folder, or CINDER_SAMPLE=1 in the environment, it shares sample
+# sessions instead.
+kind = "native"

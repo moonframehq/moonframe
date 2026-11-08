@@ -15,6 +15,8 @@ members = [
   "crates/moonframe-mux",
   "crates/moonframe-packages",
   "crates/moonframe-pi",
+  "crates/moonframe-planner",
+  "crates/moonframe-procs",
   "crates/moonframe-projects",
   "crates/moonframe-providers",
   "crates/moonframe-rune",
@@ -22,6 +24,7 @@ members = [
   "crates/moonframe-speech",
   "crates/moonframe-store",
   "crates/moonframe-terminal",
+  "crates/moonframe-transcripts",
   "crates/moonframe-usage",
   "examples/host",
 ]
@@ -96,6 +99,8 @@ moonframe-history        = { path = "crates/moonframe-history" }
 moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }
 moonframe-packages       = { path = "crates/moonframe-packages" }
 moonframe-pi             = { path = "crates/moonframe-pi" }
+moonframe-planner        = { path = "crates/moonframe-planner" }
+moonframe-procs          = { path = "crates/moonframe-procs" }
 moonframe-projects       = { path = "crates/moonframe-projects" }
 moonframe-providers      = { path = "crates/moonframe-providers" }
 moonframe-rune           = { path = "crates/moonframe-rune" }
@@ -103,6 +108,7 @@ moonframe-shell          = { path = "crates/moonframe-shell" }
 moonframe-speech         = { path = "crates/moonframe-speech" }
 moonframe-store          = { path = "crates/moonframe-store" }
 moonframe-terminal       = { default-features = false, path = "crates/moonframe-terminal" }
+moonframe-transcripts    = { path = "crates/moonframe-transcripts" }
 moonframe-usage          = { path = "crates/moonframe-usage" }
 notify                   = "8"
 objc2                    = "0.6"
