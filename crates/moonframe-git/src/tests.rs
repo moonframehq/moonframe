@@ -213,7 +213,7 @@ fn a_full_log_gives_way_to_a_full_diff() {
 }
 
 /// provider.toml's settings with these `writers`.
-fn writers(names: &[&str]) -> Data {
+pub(crate) fn writers(names: &[&str]) -> Data {
     Data::Map(BTreeMap::from([(
         "writers".to_owned(),
         Data::List(names.iter().map(|name| Data::from(*name)).collect()),
@@ -222,7 +222,7 @@ fn writers(names: &[&str]) -> Data {
 
 /// A repository of the test's own, with an identity and no signing or
 /// hooks, so a commit never waits on the user's key or config.
-fn repository() -> tempfile::TempDir {
+pub(crate) fn repository() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let git = |args: &[&str]| {
         let status = Command::new("git")
@@ -248,7 +248,7 @@ fn repository() -> tempfile::TempDir {
     dir
 }
 
-fn events() -> (moonframe_providers::Events, Arc<Mutex<Vec<Event>>>) {
+pub(crate) fn events() -> (moonframe_providers::Events, Arc<Mutex<Vec<Event>>>) {
     let seen = Arc::new(Mutex::new(Vec::new()));
     let sink = seen.clone();
     (
@@ -257,7 +257,7 @@ fn events() -> (moonframe_providers::Events, Arc<Mutex<Vec<Event>>>) {
     )
 }
 
-fn published(seen: &Mutex<Vec<Event>>) -> Value {
+pub(crate) fn published(seen: &Mutex<Vec<Event>>) -> Value {
     seen.lock()
         .unwrap()
         .iter()
