@@ -10,6 +10,13 @@
 //! Views are made and updated after the frame that drew them, since
 //! drawing has no `&mut App`: the first frame shows the empty space, the
 //! next the view.
+//!
+//! The main window draws them over the app rather than inside it ([`layers`]),
+//! so that one drawing again by itself does not draw the window around it.
+
+mod layers;
+
+pub(crate) use layers::Layers;
 
 use {
     futures::channel::mpsc::UnboundedSender,
@@ -23,6 +30,11 @@ use {
 const MAX_VIEWS: usize = 512;
 
 /// A view of the host app's, drawn where its Luau puts a `ui.view`.
+///
+/// It fills the box the `view` rule styles: its root element is laid out at
+/// that box's size, so give it `size_full()`. In the main window, notifying
+/// it, or a view drawn inside it notifying itself, draws it again and nothing
+/// else of the window.
 pub trait HostView: Render + Sized {
     /// The mod gave other `props`. The view was made with the first ones
     /// ([`ViewInit::props`]); it draws again after this.
@@ -151,6 +163,8 @@ pub(crate) struct Views {
     placed: BTreeMap<String, Placed>,
     requests: Vec<Request>,
     sender: UnboundedSender<(String, Data)>,
+    /// Where the main window draws them.
+    layers: Rc<Layers>,
 }
 
 /// What a `ui.view` shows this frame.
@@ -169,7 +183,13 @@ impl Views {
             placed: BTreeMap::new(),
             requests: Vec::new(),
             sender,
+            layers: Rc::default(),
         }
+    }
+
+    /// Where the main window draws them.
+    pub(crate) fn layers(&self) -> &Rc<Layers> {
+        &self.layers
     }
 
     /// The view `name` the mod `owner` draws as `id`, with `props`; makes

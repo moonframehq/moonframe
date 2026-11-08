@@ -54,7 +54,8 @@ fn rig_with(agent: &str, allow: Value) -> Rig {
     std::fs::write(&script, agent).unwrap();
     let sent = dir.path().join("sent.jsonl");
     let settings = json!({
-        "starters": ["feedback"],
+        "starters": ["feedback", "chat"],
+        "folders": ["chat"],
         "allow": allow,
         "cwd": dir.path(),
         "store": dir.path().join("runs.json"),
@@ -291,6 +292,52 @@ fn only_starters_start_runs() {
             .as_array()
             .unwrap()
             .is_empty()
+    );
+}
+
+#[test]
+fn only_mods_allowed_folders_choose_where_a_run_works() {
+    let mut rig = rig_allowing(json!({ "chat": "all" }));
+    let project = tempfile::tempdir().unwrap();
+    let folder = project.path().canonicalize().unwrap();
+    rig.send("feedback", json!({ "start": "Hi", "id": 1, "cwd": folder }));
+    rig.send(
+        "chat",
+        json!({ "start": "Hi", "id": 2, "cwd": "relative/folder" }),
+    );
+    rig.send(
+        "chat",
+        json!({ "start": "Hi", "id": 3, "cwd": folder.join("gone") }),
+    );
+    let replies = rig.replies();
+    assert!(replies[0].1["error"].as_str().unwrap().contains("folders"));
+    assert!(replies[1].1["error"].as_str().unwrap().contains("absolute"));
+    assert!(
+        replies[2].1["error"]
+            .as_str()
+            .unwrap()
+            .contains("not a folder")
+    );
+    assert!(
+        rig.acp.last.as_ref().unwrap()["runs"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+
+    rig.send("chat", json!({ "start": "Hi", "id": 4, "cwd": folder }));
+    let run = rig.wait_for("done");
+    assert_eq!(run["cwd"], json!(folder));
+    // The agent's session opens there, not in the provider's folder.
+    assert_eq!(rig.sent()[1]["params"]["cwd"], json!(folder));
+    // And it is still said after a restart.
+    rig.acp.tick(&rig.host);
+    drop(std::mem::take(&mut rig.acp));
+    let mut again = Acp::default();
+    again.start(&rig.host).unwrap();
+    assert_eq!(
+        again.last.as_ref().unwrap()["runs"][0]["cwd"],
+        json!(folder)
     );
 }
 
@@ -620,3 +667,7 @@ fn run_ids_never_repeat_and_can_name_a_mark() {
         "{one}"
     );
 }
+
+#[cfg(unix)]
+mod quit;
+mod replies;

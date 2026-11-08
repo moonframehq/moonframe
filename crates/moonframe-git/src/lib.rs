@@ -20,7 +20,9 @@
 //!   commits;
 //! - `{ push = true, root, id = ... }` pushes the branch to `origin`;
 //! - `{ worktree_add = { branch, base? }, root, id = ... }` adds a worktree;
-//! - `{ worktree_remove = "<path>", root, id = ... }` removes one.
+//! - `{ worktree_remove = "<path>", root, id = ... }` removes one;
+//! - `{ open = "<folder>", id = ... }` watches the repository holding that
+//!   folder from now on (see [`open`]).
 //!
 //! A write names the repository it is for (`root`, as `app.git.root` gave
 //! it) and is refused when the provider no longer watches that one: the
@@ -37,6 +39,7 @@
 // keep-sorted start
 mod diff;
 mod log;
+mod open;
 mod refs;
 mod status;
 mod worktrees;
@@ -244,6 +247,9 @@ impl Native for Git {
             },
             _ => {},
         }
+        if let Some(Data::String(folder)) = field("open") {
+            self.open(host, from, field("id"), folder);
+        }
         let root = match field("root") {
             Some(Data::String(root)) => Some(root.as_str()),
             _ => None,
@@ -322,9 +328,17 @@ impl Git {
         if self.root.as_ref() == Some(&root) {
             return false;
         }
+        self.move_to(root, project);
+        true
+    }
+
+    /// Watches `root` from now on, `followed` being the project last moved
+    /// to. Everything read of the old one goes; an action running there
+    /// finishes there.
+    fn move_to(&mut self, root: PathBuf, followed: Option<PathBuf>) {
         *self = Self {
             root: Some(root),
-            followed: project,
+            followed,
             writers: std::mem::take(&mut self.writers),
             log_limit: self.log_limit,
             busy: self.busy.clone(),
@@ -332,7 +346,34 @@ impl Git {
             stale: self.stale.clone(),
             ..Self::default()
         };
-        true
+    }
+
+    /// Opens the repository holding `folder` for the mod `from` and answers
+    /// it with that repository's root, or why not. The project followed
+    /// stays as it was, so the next look does not move straight back.
+    fn open(&mut self, host: &Handle, from: &str, id: Option<&Data>, folder: &str) {
+        let answer = answerer(host, from, id, "open");
+        if !self.writers.allows(from) {
+            answer(Err(format!(
+                "`{from}` may not open a repository: only the mods in providers/git's `writers` may"
+            )));
+            return;
+        }
+        // An action running in the old repository finishes first.
+        if self.busy.load(Ordering::Acquire) {
+            answer(Err(herdr_vcs::git::Error::Busy.to_string()));
+            return;
+        }
+        match open::repository(folder) {
+            Ok(root) => {
+                if self.root.as_ref() != Some(&root) {
+                    let followed = self.followed.take();
+                    self.move_to(root.clone(), followed);
+                }
+                answer(Ok(root.to_string_lossy().into_owned()));
+            },
+            Err(problem) => answer(Err(problem)),
+        }
     }
 
     /// Looks at the repository and publishes what changed; `force` reads

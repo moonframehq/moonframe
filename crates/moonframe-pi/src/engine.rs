@@ -67,6 +67,8 @@ pub(crate) struct Engine {
     pub(crate) live: BTreeMap<String, Live>,
     pub(crate) entries: HashMap<String, Vec<Entry>>,
     pub(crate) summaries: HashMap<String, Summary>,
+    /// Threads the user named, which a generated title must not rename.
+    pub(crate) renamed: HashSet<String>,
     pub(crate) branches: HashMap<String, Branch>,
     pub(crate) expanded: HashMap<String, HashSet<String>>,
     /// Words of failed sends, by thread, until its composer has them back.
@@ -100,6 +102,7 @@ impl Engine {
             live: BTreeMap::new(),
             entries: HashMap::new(),
             summaries: HashMap::new(),
+            renamed: HashSet::new(),
             branches: HashMap::new(),
             expanded: HashMap::new(),
             returned: HashMap::new(),

@@ -1,5 +1,6 @@
 # The built-in git provider, here so that the bays mod may add and remove
-# worktrees. Everything else is as the app ships it.
+# worktrees and the repositories mod may open the repository the user picks.
+# Everything else is as the app ships it.
 
 # The git state of the repository of the terminal last used (else the one
 # the app runs from), shared as `app.git`:
@@ -14,13 +15,14 @@
 # They add a worktree (`{ worktree_add = { branch, base? }, root, id }`, whose
 # reply's `message` is its folder) or remove one (`{ worktree_remove = path,
 # root, id }`): never its branch, and never one with uncommitted changes.
+# They open another repository (`{ open = folder, id }`, whose reply's
+# `message` is its top folder), refused unless it is in a git repository.
 # A native provider: Rust built into the app (crates/moonframe-git, the
 # `git` feature), running git through herdr-vcs with your own access.
 interval = 1.0
 kind     = "native"
 
 [settings]
-# The mods that may commit, push and change worktrees; any other is refused. The status
-# bar's sheet acts only when the user clicks. Add your own mod here to let
-# it write.
-writers = ["bays"]
+# The mods that may commit, push, change worktrees and open a repository; any
+# other is refused. Add your own mod here to let it write.
+writers = ["bays", "repositories"]

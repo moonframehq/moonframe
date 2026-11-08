@@ -1,0 +1,24 @@
+# The built-in `acp` provider, here so that the chat may start coding agents
+# (Claude by default, over the Agent Client Protocol) in each session's
+# folder. Shared as `app.acp`: the agents found here, and each run's status,
+# the agent's latest message, its tool calls, and a permission question
+# waiting on you. Finished runs are kept across launches (the newest 30),
+# and the sidebar lists them as sessions.
+# A native provider: Rust built into the app (crates/moonframe-acp). The
+# agents run with your access, in the folder you started the session in.
+interval = 0.25
+kind     = "native"
+
+[settings]
+# The agent the chat starts until you pick another in its composer.
+agent = "claude"
+# The mods that may start agents, and name the folder each run works in.
+folders  = ["chat"]
+starters = ["chat"]
+# Questions for tools that only look (read, search, think) are allowed once;
+# every edit or command waits for your answer in the chat. "all" would let
+# the agent change files and run commands without asking: to choose that,
+# copy this folder to ~/.config/moonframe/providers/acp and edit the copy.
+allow = { chat = "read" }
+# Commands replacing an agent's own ACP command, e.g.
+# commands = { claude = ["claude-agent-acp"] }

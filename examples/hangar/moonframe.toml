@@ -1,7 +1,13 @@
 [app]
 # Parallel agents on one repository: a worktree per branch with what its agent
 # is doing, a terminal in the one you pick, and the changes and history beside
-# it. `moonframe --profile hangar` opens it, in the repository it starts from.
+# it. `moonframe --profile hangar` opens it, in the repository it starts from;
+# started elsewhere (from the Finder) it reopens the last one, or asks for one.
 keep  = ["changes", "feedback", "history"]
 name  = "hangar"
 title = "Hangar"
+
+# Shipped by Moonframe's releases as an app of its own (docs/releasing.md).
+[release]
+cask        = "moonframe-hangar"
+description = "Parallel coding agents on one repository, each in a worktree of its own"

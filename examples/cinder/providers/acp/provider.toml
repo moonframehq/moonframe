@@ -1,12 +1,22 @@
-# Send feedback: the built-in `acp` provider, here so that the agent the
-# `?` starts (the built-in mods/feedback, kept in moonframe.toml) is told
-# to change this app's folder.
+# Cinder's agent: the built-in `acp` provider (crates/moonframe-acp, the
+# `acp` feature), shared as `app.acp`. The composer (mods/canvas) sends a
+# new session's prompt to a coding agent over the Agent Client Protocol, in
+# the folder you pick under it, and shows the reply as it streams, its tool
+# calls and its permission questions. Send feedback (the built-in
+# mods/feedback, kept in moonframe.toml) starts agents here too, told to
+# change this app's folder.
 interval = 0.25
 kind     = "native"
 
 [settings]
+# The agent a start without `agent` gets; the composer lets you pick any
+# agent installed here.
 agent    = "claude"
-starters = ["feedback"]
-# Questions for tools that only look are allowed once; the rest ask you
-# (see the app's providers/acp for "all").
-allow = { feedback = "read" }
+starters = ["canvas", "feedback"]
+# The mods whose runs work in a folder they name (the one you pick in the
+# composer) rather than this app's.
+folders = ["canvas"]
+# Questions for tools that only look are allowed once; every edit, command
+# and anything else waits for your answer in the session. A mod can't ask
+# for more: only this file sets it (see the app's providers/acp for "all").
+allow = { canvas = "read", feedback = "read" }

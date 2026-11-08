@@ -3,6 +3,10 @@
 -- The side panes fold from the View menu.
 
 local MENUS: { { title: string, items: { any } } } = {
+	{ title = "File", items = {
+		{ label = "Open Repository…", msg = "open", to = "repositories", shortcut = "secondary-o" },
+		{ label = "Switch Repository…", msg = "switch", to = "repositories", shortcut = "secondary-shift-o" },
+	} },
 	{ title = "Bay", items = {
 		{ label = "New Bay…", msg = "add", to = "bays", shortcut = "secondary-n" },
 		{ label = "Next Bay", msg = { step = 1 }, to = "bays", shortcut = "secondary-]" },
@@ -45,7 +49,13 @@ return mod {
 		return state
 	end,
 
-	view = function(state)
+	view = function(state, app)
+		local feedback = ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" }
+		-- No repository (started from the Finder, in `/`): the repositories
+		-- mod fills the window with a way to open one.
+		if app.git and not app.git.repository then
+			return ui.column { grow = true, gap = "none", ui.mount "repositories", feedback }
+		end
 		local body = ui.hsplit {
 			id = "body",
 			divider = false,
@@ -70,7 +80,9 @@ return mod {
 			grow = true,
 			gap = "none",
 			body,
-			ui.row { class = "feedback-corner", float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" },
+			-- File > Switch Repository's dialog, closed otherwise.
+			ui.mount "repositories",
+			feedback,
 		}
 	end,
 }

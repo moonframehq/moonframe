@@ -385,9 +385,9 @@ description, website, copyright }`); the menu bar carries the app's title.
 About panel and Send feedback button. The dashboards and chats run on sample
 data or a scripted agent, labelled as such.
 
-The real ones also ship on their own, with nothing else to install: Folio,
-Pilot (which runs the pi you have), Sessions, Switchyard, Trellis and
-Workbench. Each release's `apps-v<version>` has them for macOS and Linux, and
+The real ones also ship on their own, with nothing else to install: Cairn
+(which runs the coding agent you have), Folio, Pilot (which runs the pi you
+have), Sessions, Switchyard, Trellis and Workbench. Each release's `apps-v<version>` has them for macOS and Linux, and
 on a Mac:
 
 ```sh
@@ -559,7 +559,7 @@ feedback, shows at once.
   </tr>
 </table>
 
-Sessions, Workbench, Stage, Trellis and Lantern require the `projects`
+Sessions, Workbench, Stage, Trellis, Lantern and Cairn require the `projects`
 package beside them (`examples/projects`). To run one by hand, link it in
 place and open its profile:
 

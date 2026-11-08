@@ -1898,6 +1898,15 @@ removes a linked worktree. The branch stays, and it is refused with
 uncommitted changes, for the main checkout, or for the checkout in use; there
 is no way to force it, so show `error` to the user, who decides.
 
+An app started outside any repository (a bundle opened from the Finder runs
+in `/`) has `app.git.repository = false` until a mod opens one: `{ open =
+"<absolute folder>", id = ... }`, from a mod in `writers`, watches the
+repository holding that folder from then on (and still follows the terminal
+after). The reply's `message` is its top folder; a folder outside any git
+repository is refused with the reason. Pick the folder with `app:pick`
+(`kind = "folder"`) and keep the recent ones in the mod's state;
+`examples/hangar/mods/repositories` does both.
+
 | field | shape |
 |---|---|
 | `repository`, `branch`, `changed`, `ahead`, `behind` | as before; `branch` is `"HEAD"` when `detached` |
@@ -2074,8 +2083,9 @@ replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
 runs are kept (30) across launches.
 
 Messages: `{ start = "<words>", id?, agent?, instructions?, context?,
-}` (permission questions wait on the user, except those the
-user's `[settings] allow` covers for the mod), `{ cancel = run }`, `{ forget = run }`
+thread?, cwd? }` (permission questions wait on the user, except those the
+user's `[settings] allow` covers for the mod; `cwd`, an absolute folder the
+run works in instead, only from mods in `[settings] folders`), `{ cancel = run }`, `{ forget = run }`
 (finished ones), `{ answer = run, option = "<id>" | false }`.
 
 | field | shape |
@@ -2084,7 +2094,7 @@ user's `[settings] allow` covers for the mod), `{ cancel = run }`, `{ forget = r
 | `agent`, `workdir`, `running` | the default agent, where agents work, how many runs go |
 | `app` | the app folder the provider is in, from `workdir` (`app`, `examples/ledger`); nil when outside it |
 | `pid` | this app's process, for an agent to screenshot the window (`just screenshot OUT PID`) |
-| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
+| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `parts` everything said in order, `{ kind = "text", text }` or `{ kind = "tools", tools = { { id, title, kind, status } } }`; `agent_info` `{ name, title?, version? }` as the agent names itself; `model` the model its session says it uses, by name; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
 
 `app.chat` (chat, native, crates/moonframe-chat): conversations with
 coding agents, each run by herdr-gpui's `herdr-acp` program with no view
@@ -2243,6 +2253,67 @@ nothing.
 The shell in `app/main.luau` and the mods in `app/mods/` are working
 examples of each pattern. Read them before larger changes.
 
+## Fast views
+
+What makes a window cost little per frame, measured on a host app that
+embeds a terminal beside a Luau sidebar (Sheprd). Read with `ui.memo` and
+lazy panes under "Patterns", and the perf log in the moonframe-apps skill.
+
+**Split data by how often it changes.** A provider's publish runs every
+view that reads it. One provider carrying a CPU meter, the theme and the
+app's state reran every view each second; three providers (`app.load`,
+`app.theme`, `app.state`) rerun only the status bar on a tick. Publish
+only when the value changed (compare with the last one you published),
+and from a native provider push on change rather than poll on `interval`.
+
+**Select with `selected`, not `state`.** `state = "..."` is for
+transitions (`.drawer:open`) and makes its element draw again on every
+frame. A list row that is the current one takes `selected = true`, and
+its look goes in `style.luau` as a `:selected` rule:
+
+```lua
+-- style.luau
+[".row"] = { radius = 6, padding = { top = 8, x = 12 } },
+[".row:selected"] = { background = "muted", border = "all", border_color = "muted-foreground" },
+-- the mod
+ui.row { class = "row", selected = item.current, msg = { pick = item.id }, ... }
+```
+
+That also puts the look in one place for every mod that draws such a row.
+
+**Kept views.** In a window with a map, plain runs of three or more
+nodes around it are replayed instead of rebuilt while only the map moves.
+A run is not plain, and draws on every frame, when it has `key`,
+`state`, `scroll`, `scroll_to`, `drag`, a `pointer` (press, hover, wheel,
+drop, carry), a spinning icon, or an image viewer. `msg`, `tooltip`,
+classes and hover rules keep it plain. Windows that place host views
+(below) replay the whole app instead, so this matters only there.
+
+**One section, one mod.** Give each section of a pane its own mod with
+one root element (`class = "app-worktrees"`, `class = "app-agents"`),
+mounted by the shell, so Inspect picks it and an agent changes it alone.
+What sections share goes in `components/` (`use`) or `style.luau` rules,
+not copied between mods.
+
+**Keys a node does not take are dropped, with a warning on every run.**
+`float` belongs on a row or column, not on `ui.text`; wrap the text.
+`--check` does not run views with real data, so read the log
+(`unknown key ...`) after a change.
+
+**Host views are drawn over the app.** A `ui.view` is laid out in a layer
+over its placeholder, so a host view drawing again (a terminal printing)
+costs what it costs in its own app: the Luau layout is replayed whole.
+For that:
+- **Root:** the view's root fills its box (`size_full()`), since it is
+  laid out at the slot's size.
+- **What goes over it:** use `float`/`area`, a popover, or an overlay.
+  Something that overlaps it through a negative margin or overflow sits
+  under it.
+- **Drawn in place, at full cost:** a host view inside a popover or
+  overlay, or in a keyed child moving in or out, draws inside the app and
+  redraws it all on each of its frames. Keep a busy host view out of
+  them.
+
 ## Extending the host
 
 **In an app built on the library** (a crate whose `main` calls
@@ -2254,7 +2325,10 @@ crate, never in Moonframe:
   `.view("editor", Editor::new)`, placed with `ui.view { name = "editor",
   id = "main", props = {...} }`. It is made on first draw, kept by mod and
   `id`, gets `set_props` when `props` change, and sends the mod's `update`
-  messages with its `Messenger` (`ViewInit::messenger`). To await a tokio
+  messages with its `Messenger` (`ViewInit::messenger`). It is drawn in a
+  layer over the app (see "Fast views"): fill the box it is given, and
+  notify only the view that changed, never the whole app, so each of its
+  frames redraws it alone. To await a tokio
   future from it, wrap it in `moonframe::on_runtime(future)` inside
   `cx.spawn`.
 - data or actions: a `moonframe::Native` provider, `.native("index",

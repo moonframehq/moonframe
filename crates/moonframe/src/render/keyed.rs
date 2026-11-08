@@ -101,7 +101,9 @@ impl<'w> Painter<'w, '_> {
                 node: same.unwrap_or_else(|| Rc::new(node.clone())),
                 transition,
             });
-            let element = node.draw(self, &child, cx);
+            let element = self.moving(shown.moving().is_some(), |painter| {
+                node.draw(painter, &child, cx)
+            });
             elements.push(self.sized(element, shown, transition.kind, stack, &child, false));
         }
         // What went since the last frame, drawn where it was until it is
@@ -122,7 +124,7 @@ impl<'w> Painter<'w, '_> {
                 self.motion.forget(&child.path);
                 continue;
             }
-            let element = kept.node.draw(self, &child, cx);
+            let element = self.moving(true, |painter| kept.node.draw(painter, &child, cx));
             let element = self.sized(element, shown, kept.transition.kind, stack, &child, true);
             elements.insert(kept.index.min(elements.len()), element);
             drawn.kept.push(Kept {

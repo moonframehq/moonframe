@@ -1,8 +1,14 @@
 [app]
-# A desktop agent app in code mode: your coding-agent CLI sessions grouped by
-# repository (read-only), their transcripts, and a scripted demo agent for new
-# sessions. `moonframe --profile cinder` opens it.
+# A desktop agent app in code mode: a coding agent (Claude, or another one
+# installed here, over the Agent Client Protocol) working in the folder you
+# pick, beside your coding-agent CLI sessions grouped by repository
+# (read-only) and their transcripts. `moonframe --profile cinder` opens it.
 keep     = ["feedback"]
 name     = "cinder"
 requires = []
 title    = "Cinder"
+
+# Shipped by Moonframe's releases as an app of its own (docs/releasing.md).
+[release]
+cask        = "moonframe-cinder"
+description = "Coding agent app: run Claude in a folder, browse your CLI sessions"

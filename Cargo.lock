@@ -5562,6 +5562,7 @@ name = "moonframe-acp"
 version = "0.2.2"
 dependencies = [
  "agent-client-protocol-schema",
+ "libc",
  "moonframe-core",
  "moonframe-providers",
  "serde",
@@ -5737,6 +5738,7 @@ dependencies = [
  "moonframe-core",
  "moonframe-providers",
  "serde_json",
+ "sysinfo 0.40.1",
 ]
 
 [[package]]

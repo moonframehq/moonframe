@@ -7,12 +7,14 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 mod both_backends;
+mod host_views;
 mod regressions;
 
 use {
     crate::{
         app::{MoonframeApp, Parts},
         backends::Backends,
+        hosted::Registry,
     },
     gpui_kit::{
         AppContext as _, Bounds, Entity, Modifiers, Pixels, Point, ScrollDelta, ScrollEvent,
@@ -58,6 +60,11 @@ fn open<'a>(cx: &'a mut TestAppContext, main: &str) -> Window<'a> {
 }
 
 fn open_in(cx: &mut TestAppContext, dir: TempDir) -> Window<'_> {
+    open_with(cx, dir, Registry::default())
+}
+
+/// A window on the app in `dir`, whose host app registers `views`.
+fn open_with(cx: &mut TestAppContext, dir: TempDir, views: Registry) -> Window<'_> {
     cx.update(|cx| {
         gpui_kit::init(cx);
         crate::actions::bind_keys(cx);
@@ -82,13 +89,14 @@ fn open_in(cx: &mut TestAppContext, dir: TempDir) -> Window<'_> {
                 backends,
                 Parts {
                     natives: Natives::default(),
-                    views: Default::default(),
+                    views,
                 },
                 window,
                 cx,
             )
         });
         app = Some(view.clone());
+        let view = cx.new(|_| crate::app::MainWindow::new(view));
         Root::new(view, window, cx)
     });
     let mut window = Window {
