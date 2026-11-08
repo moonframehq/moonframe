@@ -1898,6 +1898,15 @@ removes a linked worktree. The branch stays, and it is refused with
 uncommitted changes, for the main checkout, or for the checkout in use; there
 is no way to force it, so show `error` to the user, who decides.
 
+An app started outside any repository (a bundle opened from the Finder runs
+in `/`) has `app.git.repository = false` until a mod opens one: `{ open =
+"<absolute folder>", id = ... }`, from a mod in `writers`, watches the
+repository holding that folder from then on (and still follows the terminal
+after). The reply's `message` is its top folder; a folder outside any git
+repository is refused with the reason. Pick the folder with `app:pick`
+(`kind = "folder"`) and keep the recent ones in the mod's state;
+`examples/hangar/mods/repositories` does both.
+
 | field | shape |
 |---|---|
 | `repository`, `branch`, `changed`, `ahead`, `behind` | as before; `branch` is `"HEAD"` when `detached` |
