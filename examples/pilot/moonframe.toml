@@ -7,3 +7,7 @@ keep     = ["feedback"]
 name     = "pilot"
 requires = []
 title    = "Pilot"
+
+[release]
+cask        = "moonframe-pilot"
+description = "Desktop app for the pi coding agent"

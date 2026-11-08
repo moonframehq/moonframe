@@ -14,6 +14,7 @@ members = [
   "crates/moonframe-history",
   "crates/moonframe-mux",
   "crates/moonframe-packages",
+  "crates/moonframe-pi",
   "crates/moonframe-projects",
   "crates/moonframe-providers",
   "crates/moonframe-shell",
@@ -47,6 +48,8 @@ acp                = { default-features = false, package = "agent-client-protoco
 alacritty_terminal = "0.26"
 # Dates a document list shows, in local time (moonframe-documents).
 chrono = { default-features = false, features = ["clock"], version = "0.4" }
+# Pictures sent to the pi agent (moonframe-pi).
+base64 = "0.22"
 # Colored command-line output, plain when piped or under NO_COLOR.
 anstream = "1"
 anstyle  = "1"
@@ -91,6 +94,7 @@ moonframe-git            = { path = "crates/moonframe-git" }
 moonframe-history        = { path = "crates/moonframe-history" }
 moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }
 moonframe-packages       = { path = "crates/moonframe-packages" }
+moonframe-pi             = { path = "crates/moonframe-pi" }
 moonframe-projects       = { path = "crates/moonframe-projects" }
 moonframe-providers      = { path = "crates/moonframe-providers" }
 moonframe-shell          = { path = "crates/moonframe-shell" }
@@ -122,7 +126,9 @@ toml               = "1"
 tracing            = "0.1"
 tracing-subscriber = { default-features = false, features = ["ansi", "env-filter", "fmt", "std"], version = "0.3" }
 # Check for Updates: GitHub's releases API and the download (moonframe).
-ureq          = "3.5"
+ureq = "3.5"
+# The ids of pi threads, which pi takes as session ids (moonframe-pi).
+uuid          = { features = ["v4"], version = "1" }
 wasmtime      = "50"
 wasmtime-wasi = "50"
 # The native web views behind `ui.browser` (WebKit, WebView2): a fork of

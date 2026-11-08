@@ -386,8 +386,9 @@ About panel and Send feedback button. The dashboards and chats run on sample
 data or a scripted agent, labelled as such.
 
 The real ones also ship on their own, with nothing else to install: Folio,
-Sessions, Switchyard, Trellis and Workbench. Each release's `apps-v<version>`
-has them for macOS and Linux, and on a Mac:
+Pilot (which runs the pi you have), Sessions, Switchyard, Trellis and
+Workbench. Each release's `apps-v<version>` has them for macOS and Linux, and
+on a Mac:
 
 ```sh
 brew install moonframehq/tap/moonframe-folio
