@@ -101,6 +101,9 @@ math = ["dep:latex-rust", "markdown"]
 # pi coding agent and the checkout they work in, for Pilot. Off by default;
 # the starter turns it on.
 pi = ["dep:moonframe-pi"]
+# The `procs` native provider (`app.procs`): what runs on this machine,
+# for Lantern's process monitor. Off by default; the starter turns it on.
+procs = ["dep:moonframe-procs"]
 # The `projects` native provider (`app.projects`): every repository under
 # the project folders, for apps working across many. Off by default; the
 # starter turns it on.
@@ -180,6 +183,7 @@ moonframe-history.workspace   = true
 moonframe-mux                 = { optional = true, workspace = true }
 moonframe-packages            = { default-features = false, path = "../moonframe-packages" }
 moonframe-pi                  = { optional = true, workspace = true }
+moonframe-procs               = { optional = true, workspace = true }
 moonframe-projects            = { optional = true, workspace = true }
 moonframe-providers.workspace = true
 moonframe-shell               = { optional = true, workspace = true }

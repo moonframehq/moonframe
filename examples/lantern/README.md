@@ -15,9 +15,10 @@ projects, and a jack-o'-lantern under string lights.
   pane gives it the focus, drawn as an ember frame; the menu splits it
   right or down. The rail on the right switches what the focused pane
   shows.
-- **Processes**: live from the app's own `procs` provider (`ps`, `iostat`,
-  `vm_stat`, `sysctl`; macOS): groups by name with heat bars, the CPU over
-  the last two minutes, memory and pressure.
+- **Processes**: live from the app's own `procs` provider, native Rust
+  built into the app (`crates/moonframe-procs`), which runs `ps`, `iostat`,
+  `vm_stat` and `sysctl` (macOS): groups by name with heat bars, the CPU
+  over the last two minutes, memory and pressure.
 - **Changes**: from the built-in `git` provider, for the repository the app
   runs from: its worktrees, untracked and modified files, one diff open.
 - **The Hallows palette** is in `style.luau`; the starter has it as the

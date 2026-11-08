@@ -15,6 +15,7 @@ members = [
   "crates/moonframe-mux",
   "crates/moonframe-packages",
   "crates/moonframe-pi",
+  "crates/moonframe-procs",
   "crates/moonframe-projects",
   "crates/moonframe-providers",
   "crates/moonframe-shell",
@@ -95,6 +96,7 @@ moonframe-history        = { path = "crates/moonframe-history" }
 moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }
 moonframe-packages       = { path = "crates/moonframe-packages" }
 moonframe-pi             = { path = "crates/moonframe-pi" }
+moonframe-procs          = { path = "crates/moonframe-procs" }
 moonframe-projects       = { path = "crates/moonframe-projects" }
 moonframe-providers      = { path = "crates/moonframe-providers" }
 moonframe-shell          = { path = "crates/moonframe-shell" }

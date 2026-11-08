@@ -44,6 +44,7 @@ default = [
   "markdown",
   "math",
   "pi",
+  "procs",
   "projects",
   "prose",
   "restart",
@@ -80,6 +81,7 @@ map-benchmark = ["moonframe/map-benchmark"]
 markdown      = ["moonframe/markdown"]
 math          = ["moonframe/math"]
 pi            = ["moonframe/pi"]
+procs         = ["moonframe/procs"]
 projects      = ["moonframe/projects"]
 prose         = ["moonframe/prose"]
 restart       = ["moonframe/restart"]
