@@ -283,6 +283,10 @@ impl<'w> Painter<'w> {
             field
                 .edit
                 .replace_text(input.value.clone().unwrap_or_default());
+            // A page to write in opens at its start, as on GPUI.
+            if input.writing() {
+                field.edit.set_caret(0);
+            }
         }
         if input.focus && !field.asked_focus {
             field.edit.focused = true;
@@ -302,7 +306,21 @@ impl<'w> Painter<'w> {
         field.change = hearing(&input.change);
         let mut font = pen.text_style();
         font.line_height = (pen.size * FIELD_LINE).round();
+        let painted = super::prose::spans(input, &field.edit.text, field.edit.focus, pen.color);
+        // Keeping the caret's line in the middle needs a field that scrolls
+        // its text under the caret, which Rune's does not yet.
+        if input.typewriter {
+            self.ui
+                .left_out
+                .borrow_mut()
+                .insert("typewriter".to_owned());
+        }
         let shown = text_input(&field.edit, font);
+        let shown = if painted.is_empty() {
+            shown
+        } else {
+            shown.spans(painted)
+        };
         let shown_text = field.edit.text.clone();
         drop(fields);
         let element = if input.multiline {

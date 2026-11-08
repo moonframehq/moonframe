@@ -13,6 +13,7 @@ mod leaves;
 mod markdown;
 mod plots;
 mod pointer;
+mod prose;
 mod shell;
 // keep-sorted end
 
