@@ -241,6 +241,7 @@ fn host() -> (Handle, Arc<Mutex<Vec<Value>>>) {
 }
 
 /// Waits for the `count`th publication.
+#[cfg(unix)]
 fn nth(seen: &Mutex<Vec<Value>>, count: usize) -> Value {
     let started = Instant::now();
     loop {
@@ -318,6 +319,7 @@ fn it_publishes_each_reading_after_the_first_and_each_message() {
     );
 }
 
+#[cfg(unix)]
 fn json_data(value: Value) -> Data {
     moonframe_providers::from_json(&value).unwrap()
 }
