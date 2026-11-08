@@ -270,6 +270,24 @@ Anything over 8 ms
 and over 16 ms at `warn`; fast ones stay at `debug`. Measure in a release build
 (`target/release/moonframe`): debug is several times slower.
 
+To compare two builds (before and after a change, or an app against the
+host app it embeds):
+- **Frame times:** `ZED_MEASUREMENTS=1` prints GPUI's own time for each
+  frame (draw and present), the same line in any GPUI app.
+- **Rounds:** run each build through the same scripted workload (idle,
+  then the busy part: output, state changing, switching), alternating
+  them over five or more rounds, and compare medians. Load from other
+  processes moves single runs by a third.
+- **CPU:** take it from the process (`ps -o time=` or `ps -M` per thread
+  before and after a phase); frame time alone includes waiting on the GPU.
+- **Same window:** open both at the same size (`window = { size = {
+  width = 1200, height = 780 } }` in the shell). A bigger window draws more.
+- **Unlocked screen:** GPUI draws nothing while the screen is locked, so a
+  run that shows no frames is void, not fast.
+- **Finding the cost:** `sample <pid> 6` during the busy phase shows where
+  the main thread goes. A host view's frames should not show
+  `MoonframeApp` rendering (see "Fast views" in the moonframe skill).
+
 The same log shows how close each module comes to its limits. At `debug`, a
 line each time a module's Luau memory grows by a quarter past 1 MiB, or a call
 uses over a tenth of its instruction budget; at `warn`, once, at 75% of either.
