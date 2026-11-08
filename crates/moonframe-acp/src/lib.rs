@@ -18,7 +18,9 @@
 //!   instructions. Permission questions wait on the user, unless the user
 //!   set the mod's entry in provider.toml's `[settings] allow`: `"read"`
 //!   answers those of tools that only look, `"all"` every one; always
-//!   "allow once", never "always". A mod can't ask for more. Answered at once with
+//!   "allow once", never "always". A mod can't ask for more. `cwd`, an
+//!   absolute folder, is where the run works instead of the provider's,
+//!   only for mods in `[settings] folders`. Answered at once with
 //!   `{ reply = id, action = "start", ok, run | error }`, and when it ends
 //!   with `{ reply = id, action = "finished", ok, run, status, message | error }`.
 //! - `{ cancel = "<run>" }` stops it; `{ forget = "<run>" }` drops a
@@ -87,6 +89,9 @@ pub struct Acp {
     state: Arc<Mutex<State>>,
     /// The mods that may start runs (`[settings] starters`).
     starters: Mods,
+    /// The mods that may name the folder a run works in (`[settings]
+    /// folders`); the rest work in `cwd`.
+    folders: Mods,
     /// The permission questions each mod's runs answer themselves
     /// (`[settings] allow`), by mod; the rest ask.
     allow: Vec<(String, Allow)>,
@@ -117,6 +122,7 @@ impl Native for Acp {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         let settings = to_json(host.settings());
         self.starters = Mods::from_settings(host.settings(), "starters");
+        self.folders = Mods::from_settings(host.settings(), "folders");
         self.allow = settings
             .get("allow")
             .and_then(Value::as_object)
@@ -365,6 +371,10 @@ impl Acp {
             .and_then(Value::as_str)
             .unwrap_or(&self.default_agent);
         let agent = agents::find(name).ok_or_else(|| format!("no agent named `{name}`"))?;
+        let cwd = match message.get("cwd").and_then(Value::as_str) {
+            Some(folder) => self.run_folder(from, folder)?,
+            None => self.cwd.clone(),
+        };
         let (program, args) = match self.locate(agent) {
             agents::Found::Installed(program, args) | agents::Found::Fetched(program, args) => {
                 (program, args)
@@ -401,7 +411,7 @@ impl Acp {
         let mut command = Command::new(&program);
         command
             .args(&args)
-            .current_dir(&self.cwd)
+            .current_dir(&cwd)
             .env("PATH", &self.path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -427,7 +437,7 @@ impl Acp {
                     .iter()
                     .find(|(name, _)| name == moonframe_providers::owner(from))
                     .map_or(Allow::Ask, |(_, allow)| *allow),
-                cwd: self.cwd.clone(),
+                cwd,
                 installed: self.installed.clone(),
                 now,
             },
@@ -470,6 +480,25 @@ impl Acp {
         prune(&mut state.runs);
         state.dirty = true;
         Ok(id)
+    }
+
+    /// The folder a run of `from` asked to work in: an absolute folder that
+    /// exists, from a mod the user let name one.
+    fn run_folder(&self, from: &str, folder: &str) -> Result<PathBuf, String> {
+        if !self.folders.allows(from) {
+            return Err(format!(
+                "`{from}` may not choose where agents work: only the mods in providers/acp's \
+                 `folders` may"
+            ));
+        }
+        let path = Path::new(folder);
+        if !path.is_absolute() {
+            return Err(format!("{folder} is not an absolute folder"));
+        }
+        path.canonicalize()
+            .ok()
+            .filter(|path| path.is_dir())
+            .ok_or_else(|| format!("{folder} is not a folder here"))
     }
 
     fn with_own_run(&self, from: &str, id: &str, act: impl FnOnce(&mut Run, u64)) {

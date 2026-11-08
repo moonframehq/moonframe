@@ -30,3 +30,6 @@ allow = { feedback = "read" }
 # commands = { claude = ["claude-agent-acp"] }
 # Where agents work, instead of the app's repository:
 # cwd = "~/code/my-app"
+# The mods that may name another folder for each run (`cwd` in `start`),
+# such as a chat over the user's projects:
+# folders = ["chat"]

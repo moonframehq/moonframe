@@ -786,6 +786,8 @@ impl Run {
             "agent_title": self.agent.title,
             "text": self.text,
             "thread": self.thread,
+            // Where it works; none for a run saved before this was kept.
+            "cwd": (!self.cwd.as_os_str().is_empty()).then_some(&self.cwd),
             "status": self.status.name(),
             "started": self.started,
             "finished": self.finished,
@@ -824,7 +826,7 @@ impl Run {
                 thread: text("thread"),
                 prompt: String::new(),
                 allow: Allow::Ask,
-                cwd: PathBuf::new(),
+                cwd: text("cwd").map(PathBuf::from).unwrap_or_default(),
                 installed: None,
                 now: value.get("started").and_then(Value::as_u64).unwrap_or(0),
             },

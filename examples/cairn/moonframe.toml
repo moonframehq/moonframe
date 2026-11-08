@@ -1,7 +1,14 @@
 [app]
-# A demo agent workspace in the dark: sessions on the left, a chat in the
-# middle, changes and two little mods on the right. The sessions are sample
-# data and the agent is scripted. `moonframe --profile cairn` opens it.
-name     = "cairn"
-requires = []
-title    = "Cairn"
+# An agent workspace in the dark: sessions with a coding agent (Claude,
+# Codex, Gemini, OpenCode or Copilot, over ACP) on the left, the chat in the
+# middle, and the session folder's git changes and a terminal on the right.
+# `moonframe --profile cairn` opens it.
+name  = "cairn"
+title = "Cairn"
+# The projects provider (the session folder's changes) and the code view.
+requires = ["../projects"]
+
+# Shipped by Moonframe's releases as an app of its own (docs/releasing.md).
+[release]
+cask        = "moonframe-cairn"
+description = "Chat with a coding agent in your folders, with changes and a terminal"

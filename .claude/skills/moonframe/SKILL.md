@@ -2074,8 +2074,9 @@ replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
 runs are kept (30) across launches.
 
 Messages: `{ start = "<words>", id?, agent?, instructions?, context?,
-}` (permission questions wait on the user, except those the
-user's `[settings] allow` covers for the mod), `{ cancel = run }`, `{ forget = run }`
+thread?, cwd? }` (permission questions wait on the user, except those the
+user's `[settings] allow` covers for the mod; `cwd`, an absolute folder the
+run works in instead, only from mods in `[settings] folders`), `{ cancel = run }`, `{ forget = run }`
 (finished ones), `{ answer = run, option = "<id>" | false }`.
 
 | field | shape |
@@ -2084,7 +2085,7 @@ user's `[settings] allow` covers for the mod), `{ cancel = run }`, `{ forget = r
 | `agent`, `workdir`, `running` | the default agent, where agents work, how many runs go |
 | `app` | the app folder the provider is in, from `workdir` (`app`, `examples/ledger`); nil when outside it |
 | `pid` | this app's process, for an agent to screenshot the window (`just screenshot OUT PID`) |
-| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
+| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
 
 `app.chat` (chat, native, crates/moonframe-chat): conversations with
 coding agents, each run by herdr-gpui's `herdr-acp` program with no view
