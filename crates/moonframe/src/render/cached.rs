@@ -392,11 +392,12 @@ impl<'w> Painter<'w, '_> {
         };
         let live_frame = self.cached.as_ref().is_some_and(|cached| cached.live_frame);
         let kept = &entry.kept;
-        let same = kept
-            .source
-            .borrow()
-            .as_ref()
-            .is_some_and(|source| source.in_drag == self.in_drag && source.node == *node);
+        // In a live frame nothing the mods drew has changed, as any change
+        // notifies the app and makes the frame whole: comparing the trees
+        // would cost more than the rest of drawing the kept view.
+        let same = kept.source.borrow().as_ref().is_some_and(|source| {
+            source.in_drag == self.in_drag && (live_frame || source.node == *node)
+        });
         let app = cx.entity().downgrade();
         let shape = kept.style.borrow().clone();
         if let (true, true, false, Some(bounds), Some(shape)) =
