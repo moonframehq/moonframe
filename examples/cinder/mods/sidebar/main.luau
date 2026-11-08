@@ -1,13 +1,14 @@
--- The sidebar: New, Search and the places, then the sessions grouped by
--- repository (code mode) or the recent chats (chat mode), and who is
--- signed in. Groups fold from their heading; Search turns its row into a
--- field that filters the sessions as you type.
+-- The sidebar: New and Search, then the sessions: those started
+-- here with an agent, then the CLI sessions grouped by repository (code
+-- mode; chat mode has none yet), and the agent new sessions get. Groups
+-- fold from their heading; Search turns its row into a field that filters
+-- the sessions as you type.
 --
--- Sessions come from the history provider (`app.history`): your coding-agent
--- CLI sessions, read-only, or samples when there are none. Each row says
--- whether the session opened a pull request, ran on this computer, or ran
--- in a folder that is gone. The chats are sample data: Cinder has no chat
--- history to read.
+-- Sessions started here come from the acp provider (`app.acp`, the runs
+-- the canvas started, each follow-up under its first); the others from the
+-- history provider (`app.history`): your coding-agent CLI sessions,
+-- read-only. Each CLI row says whether the session opened a pull request,
+-- ran on this computer, or ran in a folder that is gone.
 
 type State = {
 	folded: { [string]: boolean },
@@ -17,23 +18,64 @@ type State = {
 	open: string,
 }
 
-local PLACES = {
-	{ id = "projects", label = "Projects", icon = "layers", beta = true },
-	{ id = "artifacts", label = "Artifacts", icon = "copy", beta = false },
-	{ id = "customize", label = "Customize", icon = "palette", beta = false },
-	{ id = "more", label = "More", icon = "ellipsis", beta = false },
+-- A session started here: its first run, and how its newest is going.
+type Started = { id: string, title: string, status: string }
+
+local STATUS_ICONS = {
+	starting = { icon = "loader-circle", spin = true, tip = "Starting" },
+	running = { icon = "loader-circle", spin = true, tip = "Working" },
+	waiting = { icon = "circle-alert", class = "em-asks", tip = "Needs your answer" },
+	failed = { icon = "circle-x", tip = "Failed" },
 }
 
--- Sample chats for chat mode.
-local CHATS = {
-	"Plan a three-day trip to Lisbon",
-	"Explain CRDTs like I'm new to them",
-	"Rewrite this cover letter, warmer",
-	"Sourdough starter smells like acetone",
-	"Compare two standing desks",
-	"Name ideas for a ceramics studio",
-	"What is a monad, practically?",
-}
+-- The sessions started here, newest first.
+local function started(acp: any): { Started }
+	local list: { Started } = {}
+	local index: { [string]: Started } = {}
+	-- Runs come newest first, so a session's newest run is met first.
+	local newest: { [string]: string } = {}
+	for _, run in (acp and acp.runs) or {} do
+		if run.owner == "canvas" then
+			local first = run.thread or run.id
+			if not newest[first] then
+				newest[first] = run.status
+			end
+			if not run.thread then
+				local entry = { id = run.id, title = run.text, status = "" }
+				index[run.id] = entry
+				table.insert(list, entry)
+			end
+		end
+	end
+	for id, entry in index do
+		entry.status = newest[id] or ""
+	end
+	return list
+end
+
+-- The agent a new session gets by default, and whether it can run.
+local function agent_line(acp: any): string
+	if acp == nil then
+		return "Looking for agents…"
+	end
+	local usable = 0
+	local default = nil
+	for _, agent in acp.agents or {} do
+		if agent.installed or agent.fetched then
+			usable += 1
+			if agent.name == acp.agent then
+				default = agent
+			end
+		end
+	end
+	if usable == 0 then
+		return "No coding agent installed"
+	end
+	if default then
+		return if default.installed then default.title else `{default.title} (via npx)`
+	end
+	return `{usable} agent{if usable == 1 then "" else "s"} installed`
+end
 
 local function matches(title: string, query: string): boolean
 	if query == "" then
@@ -54,7 +96,6 @@ return mod {
 		[".em-new"] = { background = "em-raised" },
 		[".em-new:hover"] = { background = "#4e4e4f" },
 		[".em-row-icon"] = { color = "#d4d4d5" },
-		[".em-beta"] = { border = true, border_color = "#5a5a5b", radius = 10, padding = { 1, 7 }, color = "muted-foreground", size = "small" },
 		[".em-list"] = { padding = { 0, 8, 12, 8 } },
 		[".em-group"] = { height = 34, padding = { 0, 10 }, gap = 6, margin = { top = 18 }, radius = 6, color = "muted-foreground" },
 		[".em-group:hover"] = { color = "foreground" },
@@ -68,8 +109,8 @@ return mod {
 		[".em-pr"] = { color = "success" },
 		[".em-empty"] = { padding = { 10, 10 }, color = "muted-foreground", size = "small" },
 		[".em-sample"] = { padding = { 2, 10, 6, 10 }, color = "em-faint", size = "small" },
+		[".em-asks"] = { color = "#f2a65a" },
 		[".em-foot"] = { height = 52, padding = { 0, 14, 0, 18 }, gap = 8 },
-		[".em-avatar"] = { background = "#3a3a3b", radius = 10, color = "#d4d4d5", size = "small" },
 		[".em-plan"] = { color = "muted-foreground", size = "small" },
 		[".em-search"] = { background = "list-active" },
 	},
@@ -106,7 +147,7 @@ return mod {
 		local history = app.history
 		local code = state.mode == "code"
 
-		-- New, Search, the places.
+		-- New and Search.
 		local nav = {}
 		table.insert(nav, ui.row {
 			class = "em-row em-new",
@@ -144,44 +185,53 @@ return mod {
 				ui.text "Search",
 			})
 		end
-		for _, place in PLACES do
-			table.insert(nav, ui.row {
-				class = "em-row",
-				align = "center",
-				tooltip = "Not in this example",
-				ui.icon { name = place.icon :: any, class = "em-row-icon" },
-				ui.text { place.label },
-				place.beta and ui.text { "Beta", class = "em-beta" },
-			})
-		end
 
 		-- The sessions by repository, or the chats.
 		local rows = {}
+		local first = true
 		if not code then
-			table.insert(rows, ui.row {
-				class = "em-group em-group-first",
-				align = "center",
-				ui.text { "Recents", class = "em-group-name" },
-			})
-			local shown = 0
-			for _, chat in CHATS do
-				if matches(chat, state.query) then
-					shown += 1
-					table.insert(rows, ui.row {
-						class = "em-session",
-						align = "center",
-						tooltip = "Sample chat",
-						ui.row { grow = true, ui.text { chat, truncate = true } },
-					})
+			table.insert(rows, ui.text { "Chats are not in Cinder yet. Code mode runs an agent in a folder.", class = "em-empty", wrap = true })
+		else
+			-- The sessions started here.
+			local mine = {}
+			for _, session in started(app.acp) do
+				if matches(session.title, state.query) then
+					table.insert(mine, session)
 				end
 			end
-			if shown == 0 then
-				table.insert(rows, ui.text { "No chat matches.", class = "em-empty" })
+			if #mine > 0 then
+				local folded = state.folded["cinder:started"] == true and state.query == ""
+				table.insert(rows, ui.row {
+					class = "em-group em-group-first",
+					align = "center",
+					self_align = "start",
+					msg = { fold = "cinder:started" },
+					ui.text { "Started in Cinder", class = "em-group-name" },
+					ui.icon { name = if folded then "chevron-right" else "chevron-down", size = "small", class = "em-caret" },
+				})
+				first = false
+				if not folded then
+					for _, session in mine do
+						local look = STATUS_ICONS[session.status]
+						table.insert(rows, ui.row {
+							class = "em-session",
+							align = "center",
+							selected = "run:" .. session.id == state.open,
+							msg = { open = "run:" .. session.id },
+							to = "shell",
+							tooltip = session.title,
+							ui.row { grow = true, ui.text { session.title, truncate = true } },
+							if look
+								then ui.icon { name = look.icon :: any, class = look.class or "em-status", spin = look.spin, tooltip = look.tip }
+								else ui.icon { name = "bot", class = "em-status", tooltip = "An agent session" },
+						})
+					end
+				end
 			end
-		elseif not history then
+		end
+		if code and not history then
 			table.insert(rows, ui.text { "Looking for sessions…", class = "em-empty" })
-		else
-			local first = true
+		elseif code then
 			for _, group in history.groups or {} do
 				local sessions = {}
 				for _, session in group.sessions do
@@ -226,7 +276,7 @@ return mod {
 				table.insert(rows, ui.text { if state.query ~= "" then "No session matches." else "No sessions yet.", class = "em-empty" })
 			end
 			if history.source == "sample" then
-				table.insert(rows, ui.text { "Sample sessions: no CLI sessions found.", class = "em-sample" })
+				table.insert(rows, ui.text { "Sample sessions (CINDER_SAMPLE is set).", class = "em-sample" })
 			end
 		end
 
@@ -244,17 +294,8 @@ return mod {
 				class = "em-foot",
 				align = "center",
 				shrink = false,
-				ui.row { class = "em-avatar", width = 20, height = 20, align = "center", justify = "center", ui.text "A" },
-				ui.row {
-					align = "center",
-					gap = "small",
-					tooltip = "Sample account",
-					ui.text { "Alex", weight = "medium" },
-					ui.text { "· Ultra", class = "em-plan" },
-					ui.icon { name = "chevron-down", size = "small", class = "em-plan" },
-				},
-				ui.spacer(),
-				ui.row { class = "em-tool", tooltip = "Report a bug", ui.icon "bug" },
+				ui.icon { name = "bot", class = "em-plan" },
+				ui.text { agent_line(app.acp), class = "em-plan", truncate = true },
 			},
 		}
 	end,

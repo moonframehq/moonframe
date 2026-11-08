@@ -5,7 +5,9 @@
 //! A mod starts a run with a request; the provider starts the agent's ACP
 //! command in the app's folder, opens a session and sends the prompt, then
 //! publishes the run as it goes: its status, the agent's latest message,
-//! its tool calls and plan, and a permission question waiting on the user.
+//! its tool calls and plan, everything it said in order (`parts`), the
+//! agent's own name and model when it gives them, and a permission
+//! question waiting on the user.
 //! Each run is one prompt; the agent exits when it ends. Finished runs are
 //! saved and shown again at the next launch.
 //!
@@ -18,7 +20,9 @@
 //!   instructions. Permission questions wait on the user, unless the user
 //!   set the mod's entry in provider.toml's `[settings] allow`: `"read"`
 //!   answers those of tools that only look, `"all"` every one; always
-//!   "allow once", never "always". A mod can't ask for more. Answered at once with
+//!   "allow once", never "always". A mod can't ask for more. `cwd`, an
+//!   absolute folder, is where the run works instead of the provider's,
+//!   only for mods in `[settings] folders`. Answered at once with
 //!   `{ reply = id, action = "start", ok, run | error }`, and when it ends
 //!   with `{ reply = id, action = "finished", ok, run, status, message | error }`.
 //! - `{ cancel = "<run>" }` stops it; `{ forget = "<run>" }` drops a
@@ -40,6 +44,7 @@ mod agents;
 mod guard;
 mod keeper;
 mod run;
+mod tree;
 
 pub use keeper::{Keeper, set_keeper};
 use {
@@ -53,8 +58,8 @@ use {
         hash::{BuildHasher, Hasher},
         path::{Path, PathBuf},
         process::{Command, Stdio},
-        sync::{Arc, Mutex, MutexGuard, PoisonError},
-        time::{Duration, SystemTime, UNIX_EPOCH},
+        sync::{Arc, Mutex, MutexGuard, PoisonError, atomic::Ordering},
+        time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     },
 };
 
@@ -65,6 +70,9 @@ const MAX_RUNS: usize = 30;
 /// How long an agent may take to start its session: `npx` may be
 /// downloading the adapter first.
 const START_TIMEOUT: Duration = Duration::from_secs(300);
+/// How long agents have to leave as the app quits before they are killed:
+/// within the two seconds the host gives a native provider.
+const QUIT_WAIT: Duration = Duration::from_millis(1500);
 /// The longest request, instructions and context a mod may send.
 const MAX_TEXT: usize = 64 << 10;
 
@@ -87,6 +95,9 @@ pub struct Acp {
     state: Arc<Mutex<State>>,
     /// The mods that may start runs (`[settings] starters`).
     starters: Mods,
+    /// The mods that may name the folder a run works in (`[settings]
+    /// folders`); the rest work in `cwd`.
+    folders: Mods,
     /// The permission questions each mod's runs answer themselves
     /// (`[settings] allow`), by mod; the rest ask.
     allow: Vec<(String, Allow)>,
@@ -117,6 +128,7 @@ impl Native for Acp {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         let settings = to_json(host.settings());
         self.starters = Mods::from_settings(host.settings(), "starters");
+        self.folders = Mods::from_settings(host.settings(), "folders");
         self.allow = settings
             .get("allow")
             .and_then(Value::as_object)
@@ -232,15 +244,30 @@ impl Native for Acp {
 
 impl Drop for Acp {
     /// The app quits or the provider restarts: no agent outlives it.
+    /// Each agent's group is asked to stop, given a moment within the
+    /// host's grace, then killed: a thread left to do it later would die
+    /// with the app, and its agent live on.
     fn drop(&mut self) {
         let now = now();
         let mut state = lock(&self.state);
+        let leaving: Vec<_> = state.runs.iter().filter_map(Run::agent).collect();
         for run in &mut state.runs {
             run.stop(now);
         }
         state.unsaved = true;
         drop(state);
         self.save();
+        let deadline = Instant::now() + QUIT_WAIT;
+        while Instant::now() < deadline
+            && !leaving
+                .iter()
+                .all(|(_, exited)| exited.load(Ordering::Acquire))
+        {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        for (pid, _) in &leaving {
+            tree::signal(*pid, true);
+        }
     }
 }
 
@@ -365,6 +392,10 @@ impl Acp {
             .and_then(Value::as_str)
             .unwrap_or(&self.default_agent);
         let agent = agents::find(name).ok_or_else(|| format!("no agent named `{name}`"))?;
+        let cwd = match message.get("cwd").and_then(Value::as_str) {
+            Some(folder) => self.run_folder(from, folder)?,
+            None => self.cwd.clone(),
+        };
         let (program, args) = match self.locate(agent) {
             agents::Found::Installed(program, args) | agents::Found::Fetched(program, args) => {
                 (program, args)
@@ -401,11 +432,12 @@ impl Acp {
         let mut command = Command::new(&program);
         command
             .args(&args)
-            .current_dir(&self.cwd)
+            .current_dir(&cwd)
             .env("PATH", &self.path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        tree::own_group(&mut command);
         let child = command
             .spawn()
             .map_err(|error| format!("cannot start {}: {error}", agent.title))?;
@@ -427,7 +459,7 @@ impl Acp {
                     .iter()
                     .find(|(name, _)| name == moonframe_providers::owner(from))
                     .map_or(Allow::Ask, |(_, allow)| *allow),
-                cwd: self.cwd.clone(),
+                cwd,
                 installed: self.installed.clone(),
                 now,
             },
@@ -470,6 +502,25 @@ impl Acp {
         prune(&mut state.runs);
         state.dirty = true;
         Ok(id)
+    }
+
+    /// The folder a run of `from` asked to work in: an absolute folder that
+    /// exists, from a mod the user let name one.
+    fn run_folder(&self, from: &str, folder: &str) -> Result<PathBuf, String> {
+        if !self.folders.allows(from) {
+            return Err(format!(
+                "`{from}` may not choose where agents work: only the mods in providers/acp's \
+                 `folders` may"
+            ));
+        }
+        let path = Path::new(folder);
+        if !path.is_absolute() {
+            return Err(format!("{folder} is not an absolute folder"));
+        }
+        path.canonicalize()
+            .ok()
+            .filter(|path| path.is_dir())
+            .ok_or_else(|| format!("{folder} is not a folder here"))
     }
 
     fn with_own_run(&self, from: &str, id: &str, act: impl FnOnce(&mut Run, u64)) {

@@ -18,8 +18,10 @@
 //! Messages: `{ open = id }` opens a transcript, `{ close = true }` drops
 //! it, `{ refresh = true }` looks again.
 //!
-//! With no such folder, or `CINDER_SAMPLE` set in the environment, it shares
-//! sample sessions instead. Reading a large transcript takes a while, so
+//! With `CINDER_SAMPLE` set in the environment it shares sample sessions
+//! instead, for screenshots; with no such folder it shares none, since
+//! Cinder runs a real agent and made-up sessions beside it would pass for
+//! the user's. Reading a large transcript takes a while, so
 //! `Native::receive` only posts: one thread reads, looks again every 30
 //! seconds, and publishes.
 
@@ -38,7 +40,6 @@ use {
     sessions::Sessions,
     std::{
         env,
-        path::Path,
         sync::{
             Arc,
             atomic::{AtomicBool, Ordering},
@@ -71,6 +72,11 @@ struct Provider {
     looks_in: Option<(String, bool)>,
 }
 
+/// Whether to share sample sessions: only when `CINDER_SAMPLE` asks.
+fn samples(asked: Option<&std::ffi::OsStr>) -> bool {
+    asked.is_some_and(|value| !value.is_empty())
+}
+
 /// Where the CLI keeps its sessions, with forward slashes.
 fn root() -> String {
     let home = env::var("HOME")
@@ -84,8 +90,7 @@ fn root() -> String {
 impl Native for Provider {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
         let root = root();
-        let sample = env::var_os("CINDER_SAMPLE").is_some_and(|value| !value.is_empty())
-            || !Path::new(&root).is_dir();
+        let sample = samples(env::var_os("CINDER_SAMPLE").as_deref());
         #[cfg(test)]
         let (root, sample) = self.looks_in.clone().unwrap_or((root, sample));
         let sessions = Sessions::new(root, sample, Arc::clone(&self.stopped));
