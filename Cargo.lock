@@ -5280,6 +5280,7 @@ name = "moonframe-acp"
 version = "0.2.2"
 dependencies = [
  "agent-client-protocol-schema",
+ "libc",
  "moonframe-core",
  "moonframe-providers",
  "serde",
