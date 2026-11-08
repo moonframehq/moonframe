@@ -61,6 +61,8 @@ jobs:
         run: |
           rustup toolchain install
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - name: Let rust-objcopy strip the release build
+        run: scripts/release/link-rust-llvm.sh
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
           version: 0.17.0
@@ -206,6 +208,9 @@ jobs:
         with:
           version: 0.17.0
           use-cache: false
+      - name: Let rust-objcopy strip the release build
+        if: runner.os == 'macOS'
+        run: scripts/release/link-rust-llvm.sh
       - name: Build the optimized executable
         run: cargo build --locked --release -p moonframe-app --no-default-features --features rune --target "$TARGET"
       - name: Package the macOS app and disk image

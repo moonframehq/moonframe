@@ -308,6 +308,7 @@ package-apps out="target/dist":
 # Build this Mac's release packages, unsigned, as .github/workflows/package.yml
 # does: the app and its disk image in target/dist.
 package-macos out="target/dist":
+    scripts/release/link-rust-llvm.sh
     cargo build --locked --release -p moonframe-app
     scripts/release/package-macos.sh {{out}} target/release/moonframe
 
