@@ -229,13 +229,10 @@ bright_magenta = "#bb9af7"
         assert_eq!(scheme.cursor, 0xc0caf5);
         assert_eq!(scheme.selection, Some(0x292e42));
         assert!(scheme.dark());
-        assert_eq!(
-            scheme.ansi,
-            [
-                0x1a1b26, 0xf7768e, 0x9ece6a, 0xe0af68, 0x7aa2f7, 0xad8ee6, 0x449dab, 0xa9b1d6,
-                0x414868, 0xff7a93, 0xb9f27c, 0xff9e64, 0x7da6ff, 0xbb9af7, 0x0db9d7, 0xc0caf5,
-            ]
-        );
+        assert_eq!(scheme.ansi, [
+            0x1a1b26, 0xf7768e, 0x9ece6a, 0xe0af68, 0x7aa2f7, 0xad8ee6, 0x449dab, 0xa9b1d6,
+            0x414868, 0xff7a93, 0xb9f27c, 0xff9e64, 0x7da6ff, 0xbb9af7, 0x0db9d7, 0xc0caf5,
+        ]);
     }
 
     #[test]

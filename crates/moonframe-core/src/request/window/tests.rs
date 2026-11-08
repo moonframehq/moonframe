@@ -103,17 +103,14 @@ fn update_opens_raises_and_closes_a_mods_window() {
         send: None,
         place: None,
     };
-    assert_eq!(
-        workspace.take_requests(),
-        [
-            ("asker".to_owned(), Request::Window(open.clone())),
-            ("asker".to_owned(), Request::Window(open)),
-            (
-                "asker".to_owned(),
-                Request::Window(WindowRequest::Close("settings".to_owned()))
-            ),
-        ]
-    );
+    assert_eq!(workspace.take_requests(), [
+        ("asker".to_owned(), Request::Window(open.clone())),
+        ("asker".to_owned(), Request::Window(open)),
+        (
+            "asker".to_owned(),
+            Request::Window(WindowRequest::Close("settings".to_owned()))
+        ),
+    ]);
 }
 
 #[test]
@@ -128,20 +125,17 @@ fn a_window_can_ask_for_a_screen_and_to_fill_it() {
         ]),
     );
     assert_eq!(error(&workspace), "");
-    assert_eq!(
-        workspace.take_requests(),
-        [(
-            "asker".to_owned(),
-            Request::Window(WindowRequest::Open {
-                name: "settings".to_owned(),
-                send: None,
-                place: Some(WindowPlace {
-                    display: Some(Display::External),
-                    fullscreen: true,
-                }),
-            })
-        )]
-    );
+    assert_eq!(workspace.take_requests(), [(
+        "asker".to_owned(),
+        Request::Window(WindowRequest::Open {
+            name: "settings".to_owned(),
+            send: None,
+            place: Some(WindowPlace {
+                display: Some(Display::External),
+                fullscreen: true,
+            }),
+        })
+    )]);
     ask(
         &mut workspace,
         map(&[
@@ -165,17 +159,14 @@ fn what_a_window_opens_with_reaches_its_mod_first() {
     // Delivered by the time the app takes the request, so its window's
     // first frame shows the page.
     assert_eq!(page(&workspace), "machines");
-    assert_eq!(
-        workspace.take_requests(),
-        [(
-            "asker".to_owned(),
-            Request::Window(WindowRequest::Open {
-                name: "settings".to_owned(),
-                send: Some(send),
-                place: None,
-            })
-        )]
-    );
+    assert_eq!(workspace.take_requests(), [(
+        "asker".to_owned(),
+        Request::Window(WindowRequest::Open {
+            name: "settings".to_owned(),
+            send: Some(send),
+            place: None,
+        })
+    )]);
 }
 
 #[test]

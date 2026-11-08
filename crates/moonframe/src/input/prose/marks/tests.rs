@@ -12,10 +12,10 @@ fn marked(text: &str) -> Vec<(&str, Mark)> {
 
 #[test]
 fn headings_are_bold_with_their_hashes_faded() {
-    assert_eq!(
-        marked("## Draft"),
-        [("## Draft", Mark::Heading), ("##", Mark::Markup)]
-    );
+    assert_eq!(marked("## Draft"), [
+        ("## Draft", Mark::Heading),
+        ("##", Mark::Markup)
+    ]);
     // Seven hashes, or none followed by a space, are text.
     assert!(marked("####### no").is_empty());
     assert!(marked("#hashtag").is_empty());
@@ -23,44 +23,36 @@ fn headings_are_bold_with_their_hashes_faded() {
 
 #[test]
 fn inline_spans_mark_their_text_and_fade_their_markup() {
-    assert_eq!(
-        marked("a **bold** b"),
-        [
-            ("**", Mark::Markup),
-            ("bold", Mark::Strong),
-            ("**", Mark::Markup)
-        ]
-    );
-    assert_eq!(
-        marked("an *aside* here"),
-        [
-            ("*", Mark::Markup),
-            ("aside", Mark::Emphasis),
-            ("*", Mark::Markup)
-        ]
-    );
-    assert_eq!(
-        marked("see [the site](https://ia.net)"),
-        [
-            ("[", Mark::Markup),
-            ("the site", Mark::Link),
-            ("](https://ia.net)", Mark::Markup)
-        ]
-    );
-    assert_eq!(
-        marked("run `ls`"),
-        [("`", Mark::Markup), ("ls", Mark::Code), ("`", Mark::Markup)]
-    );
+    assert_eq!(marked("a **bold** b"), [
+        ("**", Mark::Markup),
+        ("bold", Mark::Strong),
+        ("**", Mark::Markup)
+    ]);
+    assert_eq!(marked("an *aside* here"), [
+        ("*", Mark::Markup),
+        ("aside", Mark::Emphasis),
+        ("*", Mark::Markup)
+    ]);
+    assert_eq!(marked("see [the site](https://ia.net)"), [
+        ("[", Mark::Markup),
+        ("the site", Mark::Link),
+        ("](https://ia.net)", Mark::Markup)
+    ]);
+    assert_eq!(marked("run `ls`"), [
+        ("`", Mark::Markup),
+        ("ls", Mark::Code),
+        ("`", Mark::Markup)
+    ]);
     // Words with underscores and sums with stars are not emphasis.
     assert!(marked("snake_case_name and 2 * 3 * 4").is_empty());
 }
 
 #[test]
 fn blocks_fade_their_leading_markup() {
-    assert_eq!(
-        marked("> said"),
-        [(">", Mark::Markup), (" said", Mark::Quote)]
-    );
+    assert_eq!(marked("> said"), [
+        (">", Mark::Markup),
+        (" said", Mark::Quote)
+    ]);
     assert_eq!(marked("- [x] done"), [("- [x] ", Mark::Markup)]);
     assert_eq!(marked("12. twelfth"), [("12. ", Mark::Markup)]);
     assert_eq!(marked("* * *"), [("* * *", Mark::Markup)]);
@@ -70,14 +62,11 @@ fn blocks_fade_their_leading_markup() {
 fn fenced_code_is_left_unstyled_inside() {
     let text = "```\n**not bold**\n```\nafter *this*";
     assert_eq!(fences(text).first(), Some(&(0..20)));
-    assert_eq!(
-        marked(text)[..3],
-        [
-            ("```", Mark::Markup),
-            ("**not bold**", Mark::Code),
-            ("```", Mark::Markup)
-        ]
-    );
+    assert_eq!(marked(text)[..3], [
+        ("```", Mark::Markup),
+        ("**not bold**", Mark::Code),
+        ("```", Mark::Markup)
+    ]);
     assert_eq!(marked(text)[4], ("this", Mark::Emphasis));
     // An unclosed fence runs to the end.
     assert_eq!(fences("a\n```\nb").first(), Some(&(2..7)));

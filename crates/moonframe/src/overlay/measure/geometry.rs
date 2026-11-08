@@ -270,10 +270,12 @@ mod tests {
         let spans = gaps(rect(16., 52., 260., 72.), &others, window);
         // Right to the card beside it, left to the panel, down to the card
         // under it, up to the header.
-        assert_eq!(
-            lengths(&spans),
-            vec![(true, 16.), (true, 16.), (false, 16.), (false, 14.)]
-        );
+        assert_eq!(lengths(&spans), vec![
+            (true, 16.),
+            (true, 16.),
+            (false, 16.),
+            (false, 14.)
+        ]);
     }
 
     #[test]
@@ -292,10 +294,12 @@ mod tests {
     fn padding_is_the_space_around_what_it_holds() {
         let card = rect(16., 52., 260., 72.);
         let others = vec![card, rect(28., 64., 120., 20.), rect(28., 88., 100., 24.)];
-        assert_eq!(
-            lengths(&padding(card, &others)),
-            vec![(false, 12.), (true, 128.), (false, 12.), (true, 12.)]
-        );
+        assert_eq!(lengths(&padding(card, &others)), vec![
+            (false, 12.),
+            (true, 128.),
+            (false, 12.),
+            (true, 12.)
+        ]);
         assert!(padding(card, &[card]).is_empty());
     }
 
@@ -317,13 +321,10 @@ mod tests {
     fn guides_show_where_edges_line_up() {
         let a = rect(16., 52., 260., 72.);
         let guides = aligned(a, rect(292., 52., 112., 160.));
-        assert_eq!(
-            guides,
-            vec![Guide {
-                vertical: false,
-                at: px(52.)
-            }]
-        );
+        assert_eq!(guides, vec![Guide {
+            vertical: false,
+            at: px(52.)
+        }]);
         assert!(aligned(a, rect(300., 300., 7., 7.)).is_empty());
     }
 }

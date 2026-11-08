@@ -92,12 +92,10 @@ fn closing_feedback_cancels_a_microphone_still_opening() {
     assert!(sent(&mut workspace, "cancel"));
     // The start acknowledgment can arrive after the dialog has closed.
     reply(&mut workspace, "start", true, &[]);
-    reply(
-        &mut workspace,
-        "transcript",
-        false,
-        &[("cancelled", Data::Bool(true))],
-    );
+    reply(&mut workspace, "transcript", false, &[(
+        "cancelled",
+        Data::Bool(true),
+    )]);
     assert!(
         workspace.problems().is_empty(),
         "{:?}",
@@ -122,12 +120,10 @@ fn a_failed_start_clears_the_parents_listening_state() {
     workspace.send("feedback", "feedback", "open".into());
     button(&mut workspace, "start".into());
     assert!(sent(&mut workspace, "start"));
-    reply(
-        &mut workspace,
-        "start",
-        false,
-        &[("error", "No microphone".into())],
-    );
+    reply(&mut workspace, "start", false, &[(
+        "error",
+        "No microphone".into(),
+    )]);
     workspace.send("feedback", "feedback", "close".into());
     assert!(!sent(&mut workspace, "cancel"));
 }
@@ -155,12 +151,10 @@ fn reload_cancels_pending_recording_and_transcribing_takes() {
             reply(&mut workspace, "start", true, &[]);
             assert!(sent(&mut workspace, "cancel"));
         }
-        reply(
-            &mut workspace,
-            "transcript",
-            false,
-            &[("cancelled", Data::Bool(true))],
-        );
+        reply(&mut workspace, "transcript", false, &[(
+            "cancelled",
+            Data::Bool(true),
+        )]);
         speech(&mut workspace, "idle");
         workspace.send("feedback", "feedback", "open".into());
         button(&mut workspace, "start".into());

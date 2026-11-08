@@ -127,10 +127,11 @@ mod sealed_tests {
         };
         let roots = folders.roots();
         assert_eq!(roots.file("main.luau"), Some(app.join("main.luau")));
-        assert_eq!(
-            roots.layers().collect::<Vec<_>>(),
-            [base.as_path(), package.as_path(), app.as_path()]
-        );
+        assert_eq!(roots.layers().collect::<Vec<_>>(), [
+            base.as_path(),
+            package.as_path(),
+            app.as_path()
+        ]);
         folders.user = Some(user);
         assert_eq!(folders.roots(), roots);
         assert!(folders.settings().contains(&own.join("settings.toml")));

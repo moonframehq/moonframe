@@ -557,14 +557,11 @@ mod tests {
 
         // The newest two from OpenStreetMap; the third waits, and what is
         // behind it does not wait with it.
-        assert_eq!(
-            taken,
-            [
-                tile(MapProvider::OpenStreetMap, 2),
-                tile(MapProvider::OpenStreetMap, 1),
-                voyager,
-            ]
-        );
+        assert_eq!(taken, [
+            tile(MapProvider::OpenStreetMap, 2),
+            tile(MapProvider::OpenStreetMap, 1),
+            voyager,
+        ]);
         assert_eq!(shared.queue.len(), 1);
     }
 }

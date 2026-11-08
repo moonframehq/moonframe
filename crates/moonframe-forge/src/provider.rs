@@ -700,13 +700,10 @@ impl Forge {
 /// Answers `asker` with `{ reply, action, ok }` and `fields`.
 fn reply(host: &Handle, asker: &Asker, ok: bool, fields: Value) {
     let mut answer = vec![
-        (
-            "reply".to_owned(),
-            match &asker.id {
-                Data::Nil => Data::from(asker.action),
-                id => id.clone(),
-            },
-        ),
+        ("reply".to_owned(), match &asker.id {
+            Data::Nil => Data::from(asker.action),
+            id => id.clone(),
+        }),
         ("action".to_owned(), Data::from(asker.action)),
         ("ok".to_owned(), Data::from(ok)),
     ];

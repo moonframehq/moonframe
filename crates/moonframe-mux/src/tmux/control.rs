@@ -261,15 +261,12 @@ mod tests {
         let input = "%begin 1 2 1\n%end 1 2 1\n%begin 1 3 1\n%end 1 3 1\n\
             %begin 1 4 1\n0 0 0 0\n%end 1 4 1\n\
             %begin 1 5 1\n%end 1 5 1\n%output %2 x\n";
-        let bytes = read(
-            input,
-            &[
-                Expect::Nothing,
-                Expect::Capture,
-                Expect::Cursor,
-                Expect::Nothing,
-            ],
-        );
+        let bytes = read(input, &[
+            Expect::Nothing,
+            Expect::Capture,
+            Expect::Cursor,
+            Expect::Nothing,
+        ]);
         assert_eq!(bytes, b"\x1b[0m\x1b[1;1Hx");
     }
 }

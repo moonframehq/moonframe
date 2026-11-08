@@ -33,10 +33,9 @@ fn a_map_reads_its_provider_place_pins_and_routes() {
             .unwrap();
     assert!(here.pins[0].pulse);
     assert!(!map.glide && map_of("glide = true").unwrap().glide);
-    assert_eq!(
-        map.routes[0].points,
-        vec![[37.787, -122.404], [37.79, -122.39]]
-    );
+    assert_eq!(map.routes[0].points, vec![[37.787, -122.404], [
+        37.79, -122.39
+    ]]);
     assert!(map.routes[0].dashed && map.routes[0].color.is_some());
     assert!(map.moved.is_some() && map.select.is_some() && map.grow);
     // OpenStreetMap is the default, and needs no key.

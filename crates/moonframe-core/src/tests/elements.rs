@@ -140,14 +140,11 @@ fn images_name_a_file_and_refuse_urls() {
         .iter()
         .map(|image| image.resolve(&folder, Some(&home), std::slice::from_ref(&real)))
         .collect();
-    assert_eq!(
-        resolved,
-        [
-            Some(real.join("app/mods/pics/logo.png")),
-            Some(real.join("home/Pictures/me.png")),
-            None,
-        ]
-    );
+    assert_eq!(resolved, [
+        Some(real.join("app/mods/pics/logo.png")),
+        Some(real.join("home/Pictures/me.png")),
+        None,
+    ]);
 
     for (view, expected) in [
         (
@@ -341,14 +338,11 @@ fn inputs_read_their_text_messages_and_keys() {
     assert_eq!(input.look.class, ["search"]);
     // Sorted by name, so the order is the same on every render.
     let keys: Vec<_> = input.keys.iter().map(|(chord, _)| chord.clone()).collect();
-    assert_eq!(
-        keys,
-        [
-            KeyChord::parse("secondary-k").unwrap(),
-            KeyChord::parse("shift-tab").unwrap(),
-            KeyChord::parse("up").unwrap(),
-        ]
-    );
+    assert_eq!(keys, [
+        KeyChord::parse("secondary-k").unwrap(),
+        KeyChord::parse("shift-tab").unwrap(),
+        KeyChord::parse("up").unwrap(),
+    ]);
     assert!(keys[0].secondary && keys[0].key == "k");
     assert!(keys[1].shift && keys[1].key == "tab" && !keys[1].ctrl);
 

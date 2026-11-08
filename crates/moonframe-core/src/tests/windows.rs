@@ -184,14 +184,11 @@ fn a_mods_title_bar_uses_its_own_controls_and_traffic_light_inset() {
         let row = title_bar(&workspace);
         let mut found = Vec::new();
         commands(&Node::Stack(row), &mut found);
-        assert_eq!(
-            found,
-            [
-                Action::Command(Command::Minimize),
-                Action::Command(Command::Maximize),
-                Action::Command(Command::CloseWindow),
-            ]
-        );
+        assert_eq!(found, [
+            Action::Command(Command::Minimize),
+            Action::Command(Command::Maximize),
+            Action::Command(Command::CloseWindow),
+        ]);
     }
     for (fullscreen, inset) in [(false, 76.), (true, 10.)] {
         workspace.set_mod_window(

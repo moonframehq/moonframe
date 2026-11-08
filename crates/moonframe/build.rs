@@ -16,10 +16,11 @@ fn main() {
     let manifest = Path::new(&manifest);
     let checkout = Checkout::of(manifest);
     let dir = git(manifest, &["rev-parse", "--absolute-git-dir"]);
-    let common = git(
-        manifest,
-        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
-    );
+    let common = git(manifest, &[
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-common-dir",
+    ]);
     // Switching branches moves HEAD; committing moves the branch's ref,
     // which is a file under refs/heads (Cargo watches a folder whole) or a
     // line in packed-refs.

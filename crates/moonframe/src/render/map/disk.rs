@@ -139,11 +139,8 @@ mod tests {
         // Over it: the oldest go until four fifths of the cap is left.
         prune_to(dir.path(), 500);
         let kept: Vec<bool> = files.iter().map(|file| file.is_file()).collect();
-        assert_eq!(
-            kept,
-            [
-                false, false, false, false, false, false, true, true, true, true
-            ]
-        );
+        assert_eq!(kept, [
+            false, false, false, false, false, false, true, true, true, true
+        ]);
     }
 }

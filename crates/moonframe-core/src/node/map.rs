@@ -254,10 +254,10 @@ impl Map {
             let (x, y) = (x * cos + y * sin, y * cos - x * sin);
             bounds = Some(match bounds {
                 None => ([x, y], [x, y]),
-                Some((low, high)) => (
-                    [low[0].min(x), low[1].min(y)],
-                    [high[0].max(x), high[1].max(y)],
-                ),
+                Some((low, high)) => ([low[0].min(x), low[1].min(y)], [
+                    high[0].max(x),
+                    high[1].max(y),
+                ]),
             });
         }
         let most = f64::from(self.provider.source().max_zoom).min(16.0);

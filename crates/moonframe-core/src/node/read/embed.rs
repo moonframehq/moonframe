@@ -4,11 +4,9 @@
 use super::*;
 
 impl Build for Terminal {
-    const KEYS: &'static [&'static [&'static str]] = &[
-        TYPE,
-        LOOK,
-        &["id", "cwd", "engine", "backend", "exit", "shell"],
-    ];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
+        "id", "cwd", "engine", "backend", "exit", "shell",
+    ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {

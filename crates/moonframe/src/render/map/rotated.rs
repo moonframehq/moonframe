@@ -90,13 +90,10 @@ pub(super) fn layer(map: &Map, frame: Frame, scale: f32, key: &str) -> (Div, boo
             };
             let mut choices = Vec::new();
             match tiles::tile(&tile, api_key) {
-                Some(file) => choices.push((
-                    file,
-                    Choice {
-                        coarser: 0,
-                        part: (0, 0),
-                    },
-                )),
+                Some(file) => choices.push((file, Choice {
+                    coarser: 0,
+                    part: (0, 0),
+                })),
                 None => missing = true,
             }
             for coarser in 1..=STAND_IN.min(cover.z) {
@@ -262,15 +259,12 @@ fn paint(
                     }
                 },
                 None => {
-                    painted.insert(
-                        key.to_owned(),
-                        Painted {
-                            window: id,
-                            shown,
-                            picture,
-                            old: VecDeque::new(),
-                        },
-                    );
+                    painted.insert(key.to_owned(), Painted {
+                        window: id,
+                        shown,
+                        picture,
+                        old: VecDeque::new(),
+                    });
                 },
             });
         }

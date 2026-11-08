@@ -36,33 +36,24 @@ fn transitions_take_css_words_or_a_table() {
             .transition
             .unwrap()
     };
-    assert_eq!(
-        transition(None),
-        Transition {
-            kind: TransitionKind::Slide,
-            duration: Duration::from_millis(220),
-            curve: Curve::EASE_OUT,
-            delay: Duration::ZERO,
-        }
-    );
-    assert_eq!(
-        transition(Some("fading")),
-        Transition {
-            kind: TransitionKind::Fade,
-            duration: Duration::from_millis(300),
-            curve: Curve::CubicBezier(0.2, 0.0, 0.0, 1.0),
-            delay: Duration::ZERO,
-        }
-    );
-    assert_eq!(
-        transition(Some("table")),
-        Transition {
-            kind: TransitionKind::SlideFade,
-            duration: Duration::from_millis(150),
-            curve: Curve::Linear,
-            delay: Duration::ZERO,
-        }
-    );
+    assert_eq!(transition(None), Transition {
+        kind: TransitionKind::Slide,
+        duration: Duration::from_millis(220),
+        curve: Curve::EASE_OUT,
+        delay: Duration::ZERO,
+    });
+    assert_eq!(transition(Some("fading")), Transition {
+        kind: TransitionKind::Fade,
+        duration: Duration::from_millis(300),
+        curve: Curve::CubicBezier(0.2, 0.0, 0.0, 1.0),
+        delay: Duration::ZERO,
+    });
+    assert_eq!(transition(Some("table")), Transition {
+        kind: TransitionKind::SlideFade,
+        duration: Duration::from_millis(150),
+        curve: Curve::Linear,
+        delay: Duration::ZERO,
+    });
     assert_eq!(transition(Some("rising")).kind, TransitionKind::Rise);
     // A second duration is the delay, as in CSS.
     assert_eq!(transition(Some("late")).delay, Duration::from_millis(40));
@@ -278,15 +269,12 @@ fn a_component_is_animated_by_a_transition_or_what_the_stylesheet_moves() {
         .iter()
         .map(|component| (component.name.as_str(), component.animated()))
         .collect();
-    assert_eq!(
-        animated,
-        [
-            ("a-moving", true),
-            ("b-sheet", true),
-            ("c-still", false),
-            ("d-off", false),
-        ]
-    );
+    assert_eq!(animated, [
+        ("a-moving", true),
+        ("b-sheet", true),
+        ("c-still", false),
+        ("d-off", false),
+    ]);
 }
 
 #[test]

@@ -579,14 +579,11 @@ fn a_run_is_kept_from_before_it_starts_and_can_be_undone_once() {
     rig.send("feedback", json!({ "undo": id }));
     rig.send("feedback", json!({ "undo": id }));
     assert_eq!(rig.run()["undone"], true);
-    assert_eq!(
-        *notes.calls.lock().unwrap(),
-        [
-            format!("before {id}"),
-            format!("after {id}"),
-            format!("undo {id}")
-        ]
-    );
+    assert_eq!(*notes.calls.lock().unwrap(), [
+        format!("before {id}"),
+        format!("after {id}"),
+        format!("undo {id}")
+    ]);
 }
 
 #[test]
@@ -607,14 +604,11 @@ fn a_cancelled_run_is_not_noted_or_undone_until_its_agent_exits() {
 
     rig.wait_for_changed();
     rig.send("feedback", json!({ "undo": id }));
-    assert_eq!(
-        *notes.calls.lock().unwrap(),
-        [
-            format!("before {id}"),
-            format!("after {id}"),
-            format!("undo {id}")
-        ]
-    );
+    assert_eq!(*notes.calls.lock().unwrap(), [
+        format!("before {id}"),
+        format!("after {id}"),
+        format!("undo {id}")
+    ]);
 }
 
 #[test]

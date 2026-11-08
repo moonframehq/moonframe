@@ -566,16 +566,13 @@ impl Providers {
                 });
             match spawned {
                 Ok(_) => {
-                    self.running.insert(
-                        name,
-                        Running {
-                            messages: sender,
-                            stop,
-                            fingerprint: Some(fingerprint),
-                            follows_project,
-                            leaving,
-                        },
-                    );
+                    self.running.insert(name, Running {
+                        messages: sender,
+                        stop,
+                        fingerprint: Some(fingerprint),
+                        follows_project,
+                        leaving,
+                    });
                 },
                 Err(error) => (self.events)(Event::Failed {
                     provider: name,

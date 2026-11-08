@@ -25,10 +25,13 @@ u UU N... 100644 100644 100644 100644 e f g both.rs\0\
         .iter()
         .map(|file| file["status"].clone())
         .collect();
-    assert_eq!(
-        kinds,
-        [json!("M"), json!("A"), json!("R"), json!("U"), json!("?")]
-    );
+    assert_eq!(kinds, [
+        json!("M"),
+        json!("A"),
+        json!("R"),
+        json!("U"),
+        json!("?")
+    ]);
     assert_eq!(status.files[0]["path"], "src/a file.rs");
     assert_eq!(status.files[0]["staged"], false);
     assert_eq!(status.files[0]["unstaged"], true);

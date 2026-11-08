@@ -115,25 +115,19 @@ impl Kind {
     /// token for `host`.
     pub fn cli(self, host: &str) -> (&'static str, Vec<String>) {
         match self {
-            Self::GitHub => (
-                "gh",
-                vec![
-                    "auth".into(),
-                    "token".into(),
-                    "--hostname".into(),
-                    host.into(),
-                ],
-            ),
-            Self::GitLab => (
-                "glab",
-                vec![
-                    "config".into(),
-                    "get".into(),
-                    "token".into(),
-                    "--host".into(),
-                    host.into(),
-                ],
-            ),
+            Self::GitHub => ("gh", vec![
+                "auth".into(),
+                "token".into(),
+                "--hostname".into(),
+                host.into(),
+            ]),
+            Self::GitLab => ("glab", vec![
+                "config".into(),
+                "get".into(),
+                "token".into(),
+                "--host".into(),
+                host.into(),
+            ]),
         }
     }
 }

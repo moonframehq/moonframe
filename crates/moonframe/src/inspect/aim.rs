@@ -345,16 +345,13 @@ mod tests {
             .into_iter()
             .map(|placed| placed.path)
             .collect();
-        assert_eq!(
-            paths,
-            [
-                "mail/1/10/0/0",
-                "mail/1/10/0",
-                "mail/1/10",
-                "mail/1",
-                "mail"
-            ]
-        );
+        assert_eq!(paths, [
+            "mail/1/10/0/0",
+            "mail/1/10/0",
+            "mail/1/10",
+            "mail/1",
+            "mail"
+        ]);
     }
 
     #[test]

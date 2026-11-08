@@ -113,15 +113,12 @@ fn a_bad_agent_name_or_folder_is_refused() {
 #[test]
 fn messages_become_herdr_commands() {
     let prompt = command("prompt", &json!({ "prompt": "hi", "files": ["/a/b.png"] })).unwrap();
-    assert_eq!(
-        prompt,
-        Command::Prompt {
-            text: "hi".to_owned(),
-            attachments: vec![Attachment {
-                path: "/a/b.png".to_owned()
-            }],
-        }
-    );
+    assert_eq!(prompt, Command::Prompt {
+        text: "hi".to_owned(),
+        attachments: vec![Attachment {
+            path: "/a/b.png".to_owned()
+        }],
+    });
     assert!(command("prompt", &json!({ "prompt": "  " })).is_err());
     assert_eq!(
         command("setting", &json!({ "setting": "model", "value": "opus" })).unwrap(),

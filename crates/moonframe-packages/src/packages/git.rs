@@ -47,15 +47,12 @@ pub(super) fn resolve(dir: &Path, reference: Option<&str>) -> Result<String, Str
         None => "origin/HEAD".to_owned(),
         Some(reference) => {
             let branch = format!("origin/{reference}");
-            if git(
-                dir,
-                &[
-                    "rev-parse",
-                    "--verify",
-                    "--quiet",
-                    &format!("{branch}^{{commit}}"),
-                ],
-            )
+            if git(dir, &[
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                &format!("{branch}^{{commit}}"),
+            ])
             .is_ok()
             {
                 branch
@@ -64,15 +61,12 @@ pub(super) fn resolve(dir: &Path, reference: Option<&str>) -> Result<String, Str
             }
         },
     };
-    git(
-        dir,
-        &[
-            "rev-parse",
-            "--verify",
-            "--quiet",
-            &format!("{target}^{{commit}}"),
-        ],
-    )
+    git(dir, &[
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        &format!("{target}^{{commit}}"),
+    ])
     .map_err(|_| format!("no branch, tag, or commit {target}"))
 }
 

@@ -282,24 +282,21 @@ impl Inputs {
                 _ => None,
             };
             prune(&mut registry.fields, frame, window, cx);
-            registry.fields.insert(
-                key.to_owned(),
-                Field {
-                    selection: (editor.selection(cx), editor.caret(cx)),
-                    editor,
-                    mounted: mounted.downgrade(),
-                    wiring: wiring.clone(),
-                    applied: carried.and_then(|(_, applied)| applied),
-                    placeholder: None,
-                    rows: None,
-                    focus: false,
-                    seen: frame,
-                    window: window.window_handle().window_id(),
-                    _events: events,
-                    _selection: selection,
-                    _caret: caret,
-                },
-            );
+            registry.fields.insert(key.to_owned(), Field {
+                selection: (editor.selection(cx), editor.caret(cx)),
+                editor,
+                mounted: mounted.downgrade(),
+                wiring: wiring.clone(),
+                applied: carried.and_then(|(_, applied)| applied),
+                placeholder: None,
+                rows: None,
+                focus: false,
+                seen: frame,
+                window: window.window_handle().window_id(),
+                _events: events,
+                _selection: selection,
+                _caret: caret,
+            });
         }
         let field = registry.fields.get_mut(key)?;
         // Gone for a frame or more: it appears again, as if new.
@@ -504,18 +501,15 @@ impl MoonframeApp {
             }
             field.selection = selection.clone();
             field.wiring.select.as_ref().map(|msg| {
-                (
-                    field.wiring.owner.clone(),
-                    Action::Send {
-                        to: field.wiring.to.clone(),
-                        msg: Input::selection_message(
-                            msg,
-                            &field.editor.value(cx),
-                            selection.1,
-                            selection.0.len(),
-                        ),
-                    },
-                )
+                (field.wiring.owner.clone(), Action::Send {
+                    to: field.wiring.to.clone(),
+                    msg: Input::selection_message(
+                        msg,
+                        &field.editor.value(cx),
+                        selection.1,
+                        selection.0.len(),
+                    ),
+                })
             })
         };
         if let Some((owner, action)) = send {

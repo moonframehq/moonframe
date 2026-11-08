@@ -213,10 +213,11 @@ fn a_broken_child_is_marked_in_place_and_the_rest_still_draws() {
     let Some(Node::Stack(row)) = workspace.slot("news").unwrap().view() else {
         panic!("the row still draws");
     };
-    assert!(matches!(
-        &row.children[..],
-        [Node::Text(_), Node::Problem(_), Node::Text(_)]
-    ));
+    assert!(matches!(&row.children[..], [
+        Node::Text(_),
+        Node::Problem(_),
+        Node::Text(_)
+    ]));
     // It still counts as a problem for `just check`.
     assert!(workspace.problems().iter().any(|(name, _)| *name == "news"));
     // A near miss gets its suggestion.

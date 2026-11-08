@@ -299,13 +299,10 @@ impl Page {
             },
         };
         if let (Some(loading), Some(msg)) = (loading, &state.loading) {
-            sends.push(with(
-                msg,
-                [
-                    ("loading", Data::Bool(loading)),
-                    ("url", Data::String(state.url.clone())),
-                ],
-            ));
+            sends.push(with(msg, [
+                ("loading", Data::Bool(loading)),
+                ("url", Data::String(state.url.clone())),
+            ]));
         }
         let now = Report {
             url: state.url.clone(),
@@ -320,19 +317,16 @@ impl Page {
         if state.sent.as_ref() != Some(&now)
             && let Some(msg) = &state.navigate
         {
-            let mut msg = with(
-                msg,
-                [
-                    ("url", Data::String(now.url.clone())),
-                    ("title", Data::String(now.title.clone())),
-                    ("loading", Data::Bool(now.loading)),
-                ],
-            );
+            let mut msg = with(msg, [
+                ("url", Data::String(now.url.clone())),
+                ("title", Data::String(now.title.clone())),
+                ("loading", Data::Bool(now.loading)),
+            ]);
             if let Some((back, forward)) = now.history {
-                msg = with(
-                    &msg,
-                    [("back", Data::Bool(back)), ("forward", Data::Bool(forward))],
-                );
+                msg = with(&msg, [
+                    ("back", Data::Bool(back)),
+                    ("forward", Data::Bool(forward)),
+                ]);
             }
             sends.push(msg);
             state.sent = Some(now);

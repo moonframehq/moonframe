@@ -192,14 +192,10 @@ return mod {
     assert_eq!((scrolled.start, scrolled.rows.len()), (5000, 30));
     assert_eq!(text_of(&scrolled.rows[0]), "row 5001");
     // Past the end, it stops at the last row.
-    workspace.set_list_window(
-        "long",
-        "rows",
-        crate::ListWindow {
-            start: 99_990,
-            len: 30,
-        },
-    );
+    workspace.set_list_window("long", "rows", crate::ListWindow {
+        start: 99_990,
+        len: 30,
+    });
     assert_eq!(list(&workspace).rows.len(), 10);
 }
 

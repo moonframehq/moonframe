@@ -230,14 +230,10 @@ pub(super) fn run(
                 let mut fields = report(&counts, frame.as_ref(), live, reported.elapsed());
                 if let Some(info) = &frame {
                     let picture = [info.width as f32, info.height as f32];
-                    let fit = geometry::place(
-                        renderer.size(),
-                        picture,
-                        &VideoView {
-                            zoom: None,
-                            ..view.clone()
-                        },
-                    )
+                    let fit = geometry::place(renderer.size(), picture, &VideoView {
+                        zoom: None,
+                        ..view.clone()
+                    })
                     .scale;
                     fields.insert("fit".to_owned(), Data::Number(f64::from(fit)));
                     fields.insert(

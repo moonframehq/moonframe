@@ -26,14 +26,10 @@ fn holds(requests: &[(String, Request)]) {
 #[test]
 fn a_restored_lightbox_scan_reacquires_and_releases_its_holds() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let roots = crate::Roots::bundled(
-        root.join("app"),
-        vec![],
-        crate::AppLayer {
-            path: root.join("examples/lightbox"),
-            keep: vec![],
-        },
-    );
+    let roots = crate::Roots::bundled(root.join("app"), vec![], crate::AppLayer {
+        path: root.join("examples/lightbox"),
+        keep: vec![],
+    });
     let memory = Memory::default();
     let mut workspace = Workspace::open_with(roots.clone(), false, Some(Box::new(memory.clone())));
     assert!(workspace.take_requests().is_empty());

@@ -129,11 +129,9 @@ impl Read for Offsets {
         if let Value::String(_) = value {
             return pinned(&String::read(value, cx)?, 0.0, cx);
         }
-        let fields = Fields::read(
-            value,
-            cx,
-            &[&["top", "right", "bottom", "left", "at", "inset"]],
-        )?;
+        let fields = Fields::read(value, cx, &[&[
+            "top", "right", "bottom", "left", "at", "inset",
+        ]])?;
         if let Some(at) = fields.get::<String>("at")? {
             let edges = ["top", "right", "bottom", "left"];
             if let Some(edge) = edges.iter().find(|edge| fields.raw(edge).is_some()) {

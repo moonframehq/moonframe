@@ -4,14 +4,9 @@
 use super::*;
 
 impl Build for Text {
-    const KEYS: &'static [&'static [&'static str]] = &[
-        TYPE,
-        LOOK,
-        ATTACHED,
-        &[
-            "text", "tone", "size", "weight", "truncate", "lines", "wrap", "strike", "syntax",
-        ],
-    ];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ATTACHED, &[
+        "text", "tone", "size", "weight", "truncate", "lines", "wrap", "strike", "syntax",
+    ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
@@ -33,13 +28,9 @@ impl Build for Text {
 }
 
 impl Build for Button {
-    const KEYS: &'static [&'static [&'static str]] = &[
-        TYPE,
-        LOOK,
-        ACTION,
-        EXTRAS,
-        &["label", "icon", "variant", "small", "disabled"],
-    ];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ACTION, EXTRAS, &[
+        "label", "icon", "variant", "small", "disabled",
+    ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         let icon = fields.get("icon")?;
@@ -61,13 +52,9 @@ impl Build for Button {
 }
 
 impl Build for Item {
-    const KEYS: &'static [&'static [&'static str]] = &[
-        TYPE,
-        LOOK,
-        ACTION,
-        EXTRAS,
-        &["label", "detail", "badge", "selected"],
-    ];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ACTION, EXTRAS, &[
+        "label", "detail", "badge", "selected",
+    ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
         Ok(Self {
@@ -115,14 +102,9 @@ impl Build for Icon {
 const MOST_POINTS: usize = 2000;
 
 impl Build for Line {
-    const KEYS: &'static [&'static [&'static str]] = &[
-        TYPE,
-        LOOK,
-        &[
-            "points", "min", "max", "baseline", "area", "dots", "stroke", "dashed", "width",
-            "height",
-        ],
-    ];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
+        "points", "min", "max", "baseline", "area", "dots", "stroke", "dashed", "width", "height",
+    ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree) -> Result<Self, Error> {
         let points: Vec<f32> = fields.need("points")?;
@@ -180,11 +162,9 @@ impl Build for Paths {
 /// arrow }`: the points in pixels, flat.
 impl Read for Polyline {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
-        let fields = Fields::read(
-            value,
-            cx,
-            &[&["points", "color", "stroke", "dashed", "radius", "arrow"]],
-        )?;
+        let fields = Fields::read(value, cx, &[&[
+            "points", "color", "stroke", "dashed", "radius", "arrow",
+        ]])?;
         let flat: Vec<f32> = fields.need("points")?;
         let points = cx.key("points");
         if !flat.len().is_multiple_of(2) || flat.len() < 4 {
@@ -228,14 +208,9 @@ impl Build for Hatch {
 }
 
 impl Build for Image {
-    const KEYS: &'static [&'static [&'static str]] = &[
-        TYPE,
-        LOOK,
-        ATTACHED,
-        &[
-            "src", "width", "height", "fit", "zoom", "center", "measure", "overlay",
-        ],
-    ];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, ATTACHED, &[
+        "src", "width", "height", "fit", "zoom", "center", "measure", "overlay",
+    ]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let center = fields

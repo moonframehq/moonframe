@@ -36,14 +36,12 @@ impl<'w> Draw<'w> for List {
         let shown = first..(first + showing).min(self.count);
         let built = self.start..self.start + self.rows.len();
         if shown.start < built.start || shown.end > built.end {
-            painter.list_requests.push((
-                place.owner.to_owned(),
-                self.id.clone(),
-                ListWindow {
+            painter
+                .list_requests
+                .push((place.owner.to_owned(), self.id.clone(), ListWindow {
                     start: first.saturating_sub(OVERSCAN),
                     len: showing + 2 * OVERSCAN,
-                },
-            ));
+                }));
         }
         let rows: Vec<AnyElement> = self
             .rows

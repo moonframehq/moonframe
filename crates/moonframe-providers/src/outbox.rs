@@ -93,14 +93,11 @@ impl Outbox {
                 .iter()
                 .position(|waiting| !waiting.urgent)
                 .unwrap_or(queue.waiting.len());
-            queue.waiting.insert(
-                place,
-                Waiting {
-                    line,
-                    latest,
-                    urgent,
-                },
-            );
+            queue.waiting.insert(place, Waiting {
+                line,
+                latest,
+                urgent,
+            });
         } else if queue.waiting.len() >= CAPACITY {
             queue.dropped += 1;
             return;

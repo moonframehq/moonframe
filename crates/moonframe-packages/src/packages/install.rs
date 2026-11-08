@@ -40,16 +40,13 @@ pub fn install(user: &Path, source: &str, approve: Approve) -> Result<(String, C
     let _ = fs::remove_dir_all(&incoming);
     fs::create_dir_all(&packages).map_err(|error| format!("{}: {error}", packages.display()))?;
     let installed = (|| {
-        git(
-            &packages,
-            &[
-                "clone",
-                "--quiet",
-                "--",
-                &source.url,
-                &incoming.display().to_string(),
-            ],
-        )?;
+        git(&packages, &[
+            "clone",
+            "--quiet",
+            "--",
+            &source.url,
+            &incoming.display().to_string(),
+        ])?;
         if let Some(reference) = &source.reference {
             checkout(&incoming, Some(reference))?;
         }
@@ -68,15 +65,12 @@ pub fn install(user: &Path, source: &str, approve: Approve) -> Result<(String, C
             return Err(problem);
         },
     };
-    list.package.insert(
-        source.id.clone(),
-        Entry {
-            url: source.url,
-            reference: source.reference,
-            link: false,
-            enabled: true,
-        },
-    );
+    list.package.insert(source.id.clone(), Entry {
+        url: source.url,
+        reference: source.reference,
+        link: false,
+        enabled: true,
+    });
     // Unlisted, the folder would only block the next install.
     if let Err(problem) = list.write(user) {
         let _ = fs::remove_dir_all(&target);
@@ -110,15 +104,12 @@ pub fn link(user: &Path, folder: &str, approve: Approve) -> Result<(String, Cont
     }
     let contents = Contents::read(&folder, name)?;
     approve(&contents)?;
-    list.package.insert(
-        id.clone(),
-        Entry {
-            url,
-            reference: None,
-            link: true,
-            enabled: true,
-        },
-    );
+    list.package.insert(id.clone(), Entry {
+        url,
+        reference: None,
+        link: true,
+        enabled: true,
+    });
     list.write(user)?;
     Ok((id, contents))
 }
@@ -189,10 +180,9 @@ fn update_one(
     let incoming = folder.with_file_name(format!(".incoming-{}", std::process::id()));
     let _ = fs::remove_dir_all(&incoming);
     let shown = incoming.display().to_string();
-    git(
-        folder,
-        &["worktree", "add", "--quiet", "--detach", &shown, &after],
-    )?;
+    git(folder, &[
+        "worktree", "add", "--quiet", "--detach", &shown, &after,
+    ])?;
     let approved = Contents::read(&incoming, name)
         .and_then(|mut contents| {
             contents.add_links(&incoming, links)?;

@@ -117,21 +117,18 @@ mod tests {
     };
 
     fn commit(dir: &Path) {
-        git(
-            dir,
-            &[
-                "-c",
-                "user.name=Test",
-                "-c",
-                "user.email=test@example.com",
-                "-c",
-                "commit.gpgsign=false",
-                "commit",
-                "--allow-empty",
-                "--message",
-                "first",
-            ],
-        );
+        git(dir, &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--allow-empty",
+            "--message",
+            "first",
+        ]);
     }
 
     #[test]
@@ -183,16 +180,13 @@ mod tests {
         assert_eq!(label(None), None);
 
         let linked = root.path().join("selected");
-        git(
-            &repo,
-            &[
-                "worktree",
-                "add",
-                "-b",
-                "selected-feature",
-                &linked.to_string_lossy(),
-            ],
-        );
+        git(&repo, &[
+            "worktree",
+            "add",
+            "-b",
+            "selected-feature",
+            &linked.to_string_lossy(),
+        ]);
         let app = linked.join("app");
         std::fs::create_dir_all(&app)?;
         let hash = git(&linked, &["rev-parse", "--short", "HEAD"]).unwrap_or_default();
@@ -210,10 +204,11 @@ mod tests {
     fn an_embedded_app_uses_its_explicit_project_not_the_executable() -> std::io::Result<()> {
         // This project is unrelated to the checkout containing the test binary.
         let repo = tempfile::tempdir()?;
-        git(
-            repo.path(),
-            &["init", "--initial-branch", "embedded-feature"],
-        );
+        git(repo.path(), &[
+            "init",
+            "--initial-branch",
+            "embedded-feature",
+        ]);
         commit(repo.path());
         let source = AppSource::Embedded(Arc::new(|_| panic!("must not materialize files")));
         let label = |selected: Option<&Path>, project_dir: Option<&Path>| {

@@ -183,13 +183,10 @@ impl Harness {
         let released = Mutex::new(released);
         let blocked = AtomicBool::new(false);
         let mut harness = Self::start_with(&good(1), move |event| {
-            if matches!(
-                event,
-                Event::Published {
-                    data: Data::Integer(1),
-                    ..
-                }
-            ) && !blocked.swap(true, Ordering::Relaxed)
+            if matches!(event, Event::Published {
+                data: Data::Integer(1),
+                ..
+            }) && !blocked.swap(true, Ordering::Relaxed)
             {
                 entered.send(()).unwrap();
                 released

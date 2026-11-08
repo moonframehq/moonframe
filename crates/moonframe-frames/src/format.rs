@@ -93,12 +93,10 @@ impl Pattern {
 
     /// The channel (0 red, 1 green, 2 blue) the sensor reads at `x`, `y`.
     pub fn channel(self, x: u32, y: u32) -> usize {
-        let cell = [
-            [[0, 1], [1, 2]],
-            [[2, 1], [1, 0]],
-            [[1, 0], [2, 1]],
-            [[1, 2], [0, 1]],
-        ][self.raw() as usize];
+        let cell = [[[0, 1], [1, 2]], [[2, 1], [1, 0]], [[1, 0], [2, 1]], [
+            [1, 2],
+            [0, 1],
+        ]][self.raw() as usize];
         cell[(y % 2) as usize][(x % 2) as usize]
     }
 }

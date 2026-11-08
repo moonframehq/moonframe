@@ -379,12 +379,9 @@ mod tests {
             ("lines", Data::from("> ")),
         ]))
         .unwrap();
-        assert_eq!(
-            ok.change,
-            EditChange::Lines {
-                prefix: "> ".to_owned()
-            }
-        );
+        assert_eq!(ok.change, EditChange::Lines {
+            prefix: "> ".to_owned()
+        });
         let both = read(map(&[
             ("field", Data::from("notes")),
             ("lines", Data::from("> ")),
