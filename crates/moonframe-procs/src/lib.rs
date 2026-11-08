@@ -24,8 +24,11 @@
 //! `ps` and the memory tools run on a worker thread, so a message never
 //! waits for them.
 
+// keep-sorted start
+mod lines;
 mod read;
 mod table;
+// keep-sorted end
 
 use {
     moonframe_core::Data,
@@ -201,7 +204,7 @@ impl Drop for Provider {
 /// Sends each of `iostat`'s readings until it ends, skipping the first,
 /// which averages since boot.
 fn read_iostat(mut stdout: ChildStdout, readings: &Sender<Work>) {
-    let mut pending = Vec::new();
+    let mut lines = lines::Lines::new(MAX_LINE);
     let mut chunk = [0; 4096];
     let mut first = true;
     loop {
@@ -209,9 +212,7 @@ fn read_iostat(mut stdout: ChildStdout, readings: &Sender<Work>) {
             Ok(0) | Err(_) => return,
             Ok(got) => got,
         };
-        pending.extend_from_slice(&chunk[..got]);
-        while let Some(end) = pending.iter().position(|&byte| byte == b'\n') {
-            let line: Vec<u8> = pending.drain(..=end).collect();
+        for line in lines.feed(&chunk[..got]) {
             let Some(reading) = read::iostat(&String::from_utf8_lossy(&line)) else {
                 continue;
             };
@@ -221,9 +222,6 @@ fn read_iostat(mut stdout: ChildStdout, readings: &Sender<Work>) {
             if readings.send(Work::Reading(reading)).is_err() {
                 return;
             }
-        }
-        if pending.len() > MAX_LINE {
-            pending.clear();
         }
     }
 }
