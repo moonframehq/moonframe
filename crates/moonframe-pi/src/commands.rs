@@ -353,6 +353,7 @@ fn delete_thread(core: &Arc<Core>, id: &str) -> Result<(), String> {
     engine.data_mut().threads.remove(id);
     engine.returned.remove(id);
     engine.summaries.remove(id);
+    engine.renamed.remove(id);
     engine.entries.remove(id);
     if engine.selected() == Some(id) {
         engine.data_mut().selected = None;
@@ -583,6 +584,9 @@ fn run_one(core: &Arc<Core>, name: &str, message: &Map<String, Value>) -> Result
         "set_thinking" => set_thinking(core, message),
         "rename" => {
             let (id, title) = (display(&value["id"]), value["title"].clone());
+            // Noted here, on the loop, before the name is sent: a title
+            // being generated for the thread then never replaces it.
+            core.lock().renamed.insert(id.clone());
             core.work(move |core| {
                 let live = core.ensure_live(&id)?;
                 live.rpc
