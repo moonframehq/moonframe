@@ -120,6 +120,13 @@ fn an_element_left_out_says_so() {
 }
 
 #[test]
+fn views_read_what_draws_them() {
+    let dir = folder("return mod { view = function(_, app) return ui.text(app.renderer) end }");
+    let window = open(dir.path());
+    assert!(shows(&window, "rune"));
+}
+
+#[test]
 fn the_stylesheets_colors_go_over_the_theme() {
     let dir = folder(
         "return mod { view = function() return ui.column { class = 'x', grow = true } end }",

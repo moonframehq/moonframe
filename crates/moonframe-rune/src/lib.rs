@@ -428,6 +428,7 @@ fn compiled() -> BTreeMap<String, bool> {
 impl Ui {
     fn open(roots: impl Into<Roots>, store: Option<Box<dyn Persist>>) -> Self {
         let mut workspace = Workspace::open_with_capabilities(roots, true, store, compiled());
+        workspace.set_host("renderer", Data::from("rune"));
         // Rune's default window has macOS's buttons over its content, and a
         // native frame elsewhere: a view has to leave them room only there.
         let gallery = std::env::var_os("MOONFRAME_RUNE_GALLERY").is_some();

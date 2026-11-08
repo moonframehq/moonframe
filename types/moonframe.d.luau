@@ -1928,9 +1928,14 @@ type MountProps = {
 	[number]: string,
 }
 
+-- What draws this build.
+type Renderer = "gpui" | "rune"
+
 -- What every `view` gets as `app`.
 type App = {
 	dark: boolean,
+	-- Absent where nothing draws, as in `--check`.
+	renderer: Renderer?,
 	appearance: Appearance,
 	window: WindowState,
 	-- Every screen, the primary one first.

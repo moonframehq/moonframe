@@ -604,8 +604,9 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
                 .as_ref()
                 .and_then(|_| crate::persist::open(&backends, folders.profile.as_deref()));
             // The shell says what window it wants, so it loads first.
-            let workspace =
+            let mut workspace =
                 crate::capabilities::open(folders.roots(), cx.theme().is_dark(), persist);
+            workspace.set_host("renderer", moonframe_core::Data::from("gpui"));
             let chrome = workspace.chrome();
             // The shell's size if it asks, kept within the screen.
             let (width, height) = chrome.size.unwrap_or((1280., 820.));
