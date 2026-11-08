@@ -56,7 +56,10 @@ impl App {
             }
             changed.notify_all();
         });
-        let host = Handle::new(name, Path::new("."), Data::Nil, events);
+        // What it receives comes from `test`, a writer, as an app's
+        // provider.toml names the mods that may change a checkout.
+        let settings = from_json(&json!({ "writers": ["test"] })).unwrap_or(Data::Nil);
+        let host = Handle::new(name, Path::new("."), settings, events);
         provider.start(&host).unwrap();
         Self {
             provider: Some(provider),
