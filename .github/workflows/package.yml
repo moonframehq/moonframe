@@ -17,6 +17,8 @@ on:
       - .github/workflows/package.yml
       - .github/workflows/release.yml
       - assets/macos/**
+      - examples/*/moonframe.toml
+      - homebrew/**
       - scripts/bundle-app.sh
       - scripts/install-linux-deps.sh
       - scripts/release/**
@@ -218,6 +220,86 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rune-package-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  # The apps with a [release] table, each a bundle of the executable above:
+  # no Rust is built for them here but their Wasm providers. A pull request
+  # must get them right, but a broken app never holds up Moonframe's release.
+  apps-macos:
+    name: Apps (macOS)
+    needs: macos
+    continue-on-error: ${{ github.event_name != 'pull_request' }}
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - name: Require Rosetta for the x86_64 check
+        run: arch -x86_64 /usr/bin/true || sudo softwareupdate --install-rosetta --agree-to-license
+      # No token or run-id: artifacts can only come from this workflow run.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-macos
+          path: packages
+      - name: Package the apps
+        run: |
+          tar -xf packages/Moonframe.app.tar -C packages Moonframe.app/Contents/MacOS/moonframe
+          scripts/release/package-apps.sh dist packages/Moonframe.app/Contents/MacOS/moonframe
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apps-macos
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  apps-linux:
+    name: Apps (${{ matrix.target }})
+    needs: linux
+    continue-on-error: ${{ github.event_name != 'pull_request' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Install Linux dependencies
+        run: scripts/install-linux-deps.sh
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      # No token or run-id: artifacts can only come from this workflow run.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-${{ matrix.target }}
+          path: packages
+      - name: Package the apps
+        run: |
+          version=$(scripts/release/version.sh)
+          tar -xzf "packages/Moonframe-$version-$TARGET.tar.gz" -C packages
+          scripts/release/package-apps.sh dist "packages/Moonframe-$version-$TARGET/moonframe"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apps-${{ matrix.target }}
           path: dist/*
           if-no-files-found: error
           retention-days: 7

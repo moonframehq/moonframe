@@ -547,9 +547,9 @@ fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
         long.iter().any(|(_, request)| matches!(
             request,
             crate::Request::Notify(notice)
-                if notice.title == "Command failed" && notice.body == "cargo test"
+                if notice.title == "Command failed" && !notice.body.contains("cargo test")
         )),
-        "no notification of the long command"
+        "no notification of the long command, or one holding its command line: {long:?}"
     );
     workspace.send(
         "editor",

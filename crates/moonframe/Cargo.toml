@@ -61,6 +61,9 @@ dock = []
 # The `docs` native provider: reads and saves the project's text files
 # for the markdown editor.
 docs = ["dep:moonframe-docs"]
+# The `library` native provider (`app.library`): a folder of markdown
+# documents, for a writing app. Off by default; the starter turns it on.
+documents = ["dep:moonframe-documents"]
 # The `github` and `gitlab` native providers: pull requests, checks and
 # sign-in over the forges' own APIs.
 forge   = ["dep:moonframe-forge"]
@@ -93,8 +96,16 @@ video = ["dep:core-graphics-types", "dep:metal", "dep:moonframe-frames"]
 markdown = ["dep:markdown", "syntax"]
 # LaTeX in a `ui.markdown`, drawn by latex-rust, which carries its math font.
 # Off by default, as few apps need one; the starter turns it on.
-math  = ["dep:latex-rust", "markdown"]
-prose = []
+math = ["dep:latex-rust", "markdown"]
+# The `pi` and `repo` native providers (`app.pi`, `app.repo`): threads of the
+# pi coding agent and the checkout they work in, for Pilot. Off by default;
+# the starter turns it on.
+pi = ["dep:moonframe-pi"]
+# The `projects` native provider (`app.projects`): every repository under
+# the project folders, for apps working across many. Off by default; the
+# starter turns it on.
+projects = ["dep:moonframe-projects"]
+prose    = []
 # `app:restart`, and `restart = "on-failure"` for process providers. Off by
 # default; the starter turns it on.
 restart = ["moonframe-providers/restart"]
@@ -162,11 +173,14 @@ moonframe-acp                 = { optional = true, workspace = true }
 moonframe-chat                = { optional = true, workspace = true }
 moonframe-core.workspace      = true
 moonframe-docs                = { optional = true, workspace = true }
+moonframe-documents           = { optional = true, workspace = true }
 moonframe-forge               = { optional = true, workspace = true }
 moonframe-git                 = { optional = true, workspace = true }
 moonframe-history.workspace   = true
 moonframe-mux                 = { optional = true, workspace = true }
 moonframe-packages            = { default-features = false, path = "../moonframe-packages" }
+moonframe-pi                  = { optional = true, workspace = true }
+moonframe-projects            = { optional = true, workspace = true }
 moonframe-providers.workspace = true
 moonframe-shell               = { optional = true, workspace = true }
 moonframe-speech              = { optional = true, workspace = true }

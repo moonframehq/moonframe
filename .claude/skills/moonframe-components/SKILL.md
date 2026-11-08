@@ -2940,6 +2940,7 @@ A whole mod using it, with state: `app/components/demos/week-calendar.luau`.
 | Prop | Meaning |
 | --- | --- |
 | `commits` | `{ sha, parents, short?, subject?, author?, refs? }`, children before parents, as `app.git.log` gives them |
+| `compact` | only the graph, refs and subject, for a narrow panel |
 | `row_height` | pixels per commit; 26 by default |
 | `select` | message sent with `sha` added as a commit is clicked; a string arrives as `{ select = <it>, sha = ... }` |
 | `selected` | the sha shown as selected |

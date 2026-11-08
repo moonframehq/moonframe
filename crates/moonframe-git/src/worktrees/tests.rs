@@ -202,7 +202,9 @@ fn work_in_a_worktree_is_never_thrown_away() {
     let path = add(&fixture, "busy", None).unwrap();
     let file = Path::new(&path).join("new.txt");
     std::fs::write(&file, "unsaved\n").unwrap();
-    assert!(remove(&fixture, &path).is_err());
+    let refused = remove(&fixture, &path).unwrap_err();
+    assert!(refused.contains("uncommitted work"), "{refused}");
+    assert!(!refused.contains("--force"), "{refused}");
     assert!(file.is_file());
 }
 

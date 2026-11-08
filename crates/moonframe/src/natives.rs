@@ -26,6 +26,10 @@ pub(crate) fn natives() -> Natives {
         ("git", git),
         ("github", github),
         ("gitlab", gitlab),
+        ("library", library),
+        ("pi", pi),
+        ("projects", projects),
+        ("repo", repo),
         ("shell", shell),
         ("speech", speech),
         ("usage", usage),
@@ -68,6 +72,26 @@ fn github() -> Box<dyn Native> {
 #[cfg(feature = "forge")]
 fn gitlab() -> Box<dyn Native> {
     moonframe_forge::gitlab()
+}
+
+#[cfg(feature = "documents")]
+fn library() -> Box<dyn Native> {
+    moonframe_documents::native()
+}
+
+#[cfg(feature = "pi")]
+fn pi() -> Box<dyn Native> {
+    moonframe_pi::pi()
+}
+
+#[cfg(feature = "projects")]
+fn projects() -> Box<dyn Native> {
+    moonframe_projects::native()
+}
+
+#[cfg(feature = "pi")]
+fn repo() -> Box<dyn Native> {
+    moonframe_pi::repo()
 }
 
 #[cfg(feature = "shell")]
@@ -120,6 +144,26 @@ fn gitlab() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(not(feature = "documents"))]
+fn library() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "pi"))]
+fn pi() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "projects"))]
+fn projects() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
+#[cfg(not(feature = "pi"))]
+fn repo() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 #[cfg(not(feature = "speech"))]
 fn speech() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -137,8 +181,11 @@ fn usage() -> Box<dyn Native> {
         feature = "acp",
         feature = "chat",
         feature = "docs",
+        feature = "documents",
         feature = "forge",
         feature = "git",
+        feature = "pi",
+        feature = "projects",
         feature = "shell",
         feature = "speech",
         feature = "usage"
@@ -192,7 +239,8 @@ mod tests {
     fn every_built_in_native_is_registered() {
         let natives = natives();
         for name in [
-            "acp", "chat", "docs", "git", "github", "gitlab", "shell", "usage",
+            "acp", "chat", "docs", "git", "github", "gitlab", "library", "pi", "projects", "repo",
+            "shell", "usage",
         ] {
             assert!(natives.contains_key(name), "{name}");
         }

@@ -213,7 +213,14 @@ fn remove(root: &Path, path: &str, in_use: &dyn Fn() -> Option<PathBuf>) -> Resu
     if asked == root || in_use().as_deref() == Some(asked) {
         return Err("this is the checkout in use; switch to another first".to_owned());
     }
-    git(root, &["worktree", "remove", path], "remove a worktree")?;
+    git(root, &["worktree", "remove", path], "remove a worktree").map_err(|error| {
+        // Git's own words offer `--force`, which a mod does not have.
+        if error.contains("modified or untracked") {
+            format!("{path} has uncommitted work: commit or stash it first")
+        } else {
+            error
+        }
+    })?;
     let branch = &worktrees[at].branch;
     Ok(if branch.is_empty() {
         format!("removed {path}")

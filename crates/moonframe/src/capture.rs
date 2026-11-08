@@ -6,11 +6,19 @@ use {
     std::{
         path::PathBuf,
         sync::atomic::{AtomicBool, Ordering},
-        time::Duration,
+        time::{Duration, Instant},
     },
 };
 
 static SCHEDULED: AtomicBool = AtomicBool::new(false);
+
+/// How often the window is drawn while waiting to capture it.
+const STEP: Duration = Duration::from_millis(250);
+
+fn draw(window: &mut Window, cx: &mut App) {
+    window.refresh();
+    window.draw(cx).clear(cx);
+}
 
 pub(super) fn schedule(window: &Window, cx: &App) {
     let Some(path) = std::env::var_os("MOONFRAME_CAPTURE").map(PathBuf::from) else {
@@ -25,12 +33,18 @@ pub(super) fn schedule(window: &Window, cx: &App) {
         .ok()
         .and_then(|ms| ms.parse().ok())
         .map_or(Duration::from_millis(750), Duration::from_millis);
-    // A background window may stop receiving frame callbacks when occluded.
-    // A timer still completes after its initial layout and theme settle.
+    // A window behind others or on a locked screen gets no frame callbacks,
+    // so nothing it was told since would show, and terminals, which start as
+    // they are drawn, would not start. A timer still runs: draw from it.
     window
         .spawn(cx, async move |cx| {
-            cx.background_executor().timer(delay).await;
+            let end = Instant::now() + delay;
+            while Instant::now() < end {
+                cx.background_executor().timer(STEP).await;
+                let _ = cx.update(draw);
+            }
             let _ = cx.update(|window, cx| {
+                draw(window, cx);
                 match window.render_to_image() {
                     Ok(image) => {
                         if let Err(error) = image.save(&path) {

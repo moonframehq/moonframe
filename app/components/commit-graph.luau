@@ -18,6 +18,8 @@ type Props = {
 	select: any,
 	selected: string?,
 	row_height: number?,
+	-- Only the graph, refs and subject, for a narrow panel.
+	compact: boolean?,
 }
 
 local LANE = 14
@@ -174,8 +176,10 @@ local function row_of(commit: Commit, props: Props, row_height: number)
 		table.insert(cells, ui.text { name, class = "commit-graph-ref", truncate = true })
 	end
 	table.insert(cells, ui.row { grow = true, ui.text { commit.subject or "", truncate = true } })
-	table.insert(cells, ui.text { commit.author or "", class = "commit-graph-meta", truncate = true })
-	table.insert(cells, ui.text { commit.short or "", class = "commit-graph-meta commit-graph-sha" })
+	if not props.compact then
+		table.insert(cells, ui.text { commit.author or "", class = "commit-graph-meta", truncate = true })
+		table.insert(cells, ui.text { commit.short or "", class = "commit-graph-meta commit-graph-sha" })
+	end
 	local message: any = nil
 	if props.select ~= nil then
 		message = if type(props.select) == "table" then table.clone(props.select) else { select = props.select }
@@ -212,6 +216,7 @@ return component {
 		["select"] = "message sent with `sha` added as a commit is clicked; a string arrives as `{ select = <it>, sha = ... }`",
 		["selected"] = "the sha shown as selected",
 		["row_height"] = "pixels per commit; 26 by default",
+		["compact"] = "only the graph, refs and subject, for a narrow panel",
 	},
 	example = { commits = EXAMPLE },
 

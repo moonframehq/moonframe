@@ -6,3 +6,8 @@ keep     = ["feedback"]
 name     = "folio"
 requires = []
 title    = "Folio"
+
+# Shipped by Moonframe's releases as an app of its own (docs/releasing.md).
+[release]
+cask        = "moonframe-folio"
+description = "Quiet markdown writing app with focus and typewriter modes"

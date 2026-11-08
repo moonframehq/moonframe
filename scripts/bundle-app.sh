@@ -134,7 +134,8 @@ stage() {
     scripts/stage-app.sh "$1/app" >/dev/null
     if [ -n "$app" ]; then
         scripts/stage-app.sh "$1/bundle/app" "$app" >/dev/null
-        for package in "${packages[@]}"; do
+        # Spelt so, as macOS's Bash 3.2 calls an empty array unbound.
+        for package in ${packages[@]+"${packages[@]}"}; do
             staged="$1/bundle/packages/$(basename "$package")"
             # Two packages of one name would land in one folder, the second
             # quietly over the first.

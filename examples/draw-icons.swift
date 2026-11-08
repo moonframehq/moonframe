@@ -604,7 +604,7 @@ do {
     save(cx, "examples/msgvault/icon.png")
 }
 
-// opencode: a near-black window with a list of sessions, a chat bubble over
+// cairn: a near-black window with a list of sessions, a chat bubble over
 // lines of an answer, and a card on the right.
 do {
     let cx = body([0x3a3a40, 0x18181b, 0x09090b])
@@ -627,5 +627,5 @@ do {
     fill(cx, CGRect(x: 664, y: 180, width: 188, height: 664), 30, color(0x27272a))
     fill(cx, CGRect(x: 690, y: 748, width: 26, height: 26), 13, color(0x4ade80))
     fill(cx, CGRect(x: 690, y: 560, width: 136, height: 150), 20, color(0xffffff, 0.16))
-    save(cx, "examples/opencode/icon.png")
+    save(cx, "examples/cairn/icon.png")
 }

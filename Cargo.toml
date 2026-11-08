@@ -7,12 +7,15 @@ members = [
   "crates/moonframe-chat",
   "crates/moonframe-core",
   "crates/moonframe-docs",
+  "crates/moonframe-documents",
   "crates/moonframe-forge",
   "crates/moonframe-frames",
   "crates/moonframe-git",
   "crates/moonframe-history",
   "crates/moonframe-mux",
   "crates/moonframe-packages",
+  "crates/moonframe-pi",
+  "crates/moonframe-projects",
   "crates/moonframe-providers",
   "crates/moonframe-rune",
   "crates/moonframe-shell",
@@ -44,6 +47,10 @@ unwrap_used = "deny"
 # ACP wire types for moonframe-acp; its own transport, so no async runtime.
 acp                = { default-features = false, package = "agent-client-protocol-schema", version = "1.12" }
 alacritty_terminal = "0.26"
+# Dates a document list shows, in local time (moonframe-documents).
+chrono = { default-features = false, features = ["clock"], version = "0.4" }
+# Pictures sent to the pi agent (moonframe-pi).
+base64 = "0.22"
 # Colored command-line output, plain when piped or under NO_COLOR.
 anstream = "1"
 anstyle  = "1"
@@ -81,12 +88,15 @@ moonframe-acp            = { path = "crates/moonframe-acp" }
 moonframe-chat           = { path = "crates/moonframe-chat" }
 moonframe-core           = { path = "crates/moonframe-core" }
 moonframe-docs           = { path = "crates/moonframe-docs" }
+moonframe-documents      = { path = "crates/moonframe-documents" }
 moonframe-forge          = { path = "crates/moonframe-forge" }
 moonframe-frames         = { path = "crates/moonframe-frames" }
 moonframe-git            = { path = "crates/moonframe-git" }
 moonframe-history        = { path = "crates/moonframe-history" }
 moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }
 moonframe-packages       = { path = "crates/moonframe-packages" }
+moonframe-pi             = { path = "crates/moonframe-pi" }
+moonframe-projects       = { path = "crates/moonframe-projects" }
 moonframe-providers      = { path = "crates/moonframe-providers" }
 moonframe-rune           = { path = "crates/moonframe-rune" }
 moonframe-shell          = { path = "crates/moonframe-shell" }
@@ -113,14 +123,17 @@ rustix             = { default-features = false, features = ["fs", "std"], versi
 secrecy            = "0.10"
 serde              = { features = ["derive"], version = "1" }
 serde_json         = "1"
-sysinfo            = { default-features = false, features = ["network", "system"], version = "0.39" }
+sha2               = "0.11"
+sysinfo            = { default-features = false, features = ["network", "system"], version = "0.40" }
 tempfile           = "3"
 thiserror          = "2"
 toml               = "1"
 tracing            = "0.1"
 tracing-subscriber = { default-features = false, features = ["ansi", "env-filter", "fmt", "std"], version = "0.3" }
 # Check for Updates: GitHub's releases API and the download (moonframe).
-ureq          = "3.5"
+ureq = "3.5"
+# The ids of pi threads, which pi takes as session ids (moonframe-pi).
+uuid          = { features = ["v4"], version = "1" }
 wasmtime      = "50"
 wasmtime-wasi = "50"
 # The native web views behind `ui.browser` (WebKit, WebView2): a fork of

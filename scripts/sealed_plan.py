@@ -9,7 +9,7 @@ import tomllib
 from sealed_luau import references
 
 NATIVES = {"acp": "acp", "chat": "chat", "docs": "docs", "git": "git",
-           "github": "forge", "gitlab": "forge", "shell": "shell", "speech": "speech", "usage": "usage"}
+           "github": "forge", "gitlab": "forge", "library": "documents", "pi": "pi", "projects": "projects", "repo": "pi", "shell": "shell", "speech": "speech", "usage": "usage"}
 FEATURES = set(NATIVES.values()) | {
     # keep-sorted start
     "alacritty",

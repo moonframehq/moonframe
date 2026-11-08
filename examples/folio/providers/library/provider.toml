@@ -1,5 +1,10 @@
 # Folio's documents, shared as `app.library`: markdown files in a folder
 # under ~/.local/share/moonframe, read and written with your access. A
-# process provider; needs python3.
-command = ["python3", "library.py"]
-kind    = "process"
+# native provider: Rust built into the app (crates/moonframe-documents, the
+# `documents` feature), so the app needs nothing else installed.
+interval = 0.25
+kind     = "native"
+
+[settings]
+# What a new library starts with, newest first, from the samples folder.
+samples = ["Welcome to Folio", "Morning pages", "On short sentences", "Notes for the talk"]

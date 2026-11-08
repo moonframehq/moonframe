@@ -40,6 +40,30 @@ pub(crate) fn commits(repo: &Repo, limit: usize) -> Vec<Value> {
         .unwrap_or_default()
 }
 
+/// How many values `value` is to the host, which counts each one.
+pub(crate) fn values(value: &Value) -> usize {
+    1 + match value {
+        Value::Array(items) => items.iter().map(values).sum(),
+        Value::Object(fields) => fields.values().map(values).sum(),
+        _ => 0,
+    }
+}
+
+/// The newest commits of `log` that fit in `room` values, as a list.
+pub(crate) fn fit(log: &[Value], room: usize) -> Value {
+    let mut left = room.saturating_sub(1);
+    let mut kept = Vec::new();
+    for commit in log {
+        let cost = values(commit);
+        if cost > left {
+            break;
+        }
+        left -= cost;
+        kept.push(commit.clone());
+    }
+    Value::Array(kept)
+}
+
 fn parse(text: &str) -> Vec<Value> {
     let fields: Vec<&str> = text.split('\0').collect();
     let (records, _) = fields.as_chunks::<FIELDS>();
@@ -110,6 +134,20 @@ mod tests {
         assert_eq!(commits[0]["time"], 1700);
         assert_eq!(commits[0]["refs"], json!([]));
         assert_eq!(commits[0]["subject"], "Real\x1fsubject");
+    }
+
+    #[test]
+    fn a_log_keeps_the_newest_commits_that_fit() {
+        let log: Vec<Value> = (0..10)
+            .map(|n| json!({ "sha": n, "subject": "s" }))
+            .collect();
+        let cost = values(&log[0]);
+        let room = 1 + 3 * cost + 1;
+        let kept = fit(&log, room);
+        assert_eq!(kept, json!(log[..3]));
+        assert!(values(&kept) <= room);
+        assert_eq!(fit(&log, 0), json!([]));
+        assert_eq!(fit(&log, 10_000), json!(log));
     }
 
     #[test]

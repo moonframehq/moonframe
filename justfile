@@ -83,6 +83,11 @@ app name="" *args:
 # Open Pilot, the pi coding agent app: `just app pilot`.
 pilot: (app "pilot")
 
+# Pilot's providers end to end, on the real pi and a mock model: `cargo test`
+# leaves these out, as CI has no pi.
+test-pilot:
+    cargo test --locked -p moonframe-pi -- --include-ignored
+
 # Browse reusable patterns in their own app, alongside the app being built.
 patterns:
     python3 scripts/patterns-data.py
@@ -294,6 +299,11 @@ audit:
     zizmor .github/
     actionlint
     cargo deny check advisories bans licenses sources
+
+# Build this Mac's apps with a [release] table, unsigned, as package.yml does.
+package-apps out="target/dist":
+    cargo build --locked --release -p moonframe-app
+    scripts/release/package-apps.sh {{out}} target/release/moonframe
 
 # Build this Mac's release packages, unsigned, as .github/workflows/package.yml
 # does: the app and its disk image in target/dist.
