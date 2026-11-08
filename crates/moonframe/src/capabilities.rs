@@ -45,6 +45,7 @@ fn compiled() -> std::collections::BTreeMap<String, bool> {
         "syntax",
         "terminal",
         "tokio",
+        "transcripts",
         "updates",
         "usage",
         "video",
