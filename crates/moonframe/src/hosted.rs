@@ -10,10 +10,17 @@
 //! Views are made and updated after the frame that drew them, since
 //! drawing has no `&mut App`: the first frame shows the empty space, the
 //! next the view.
+//!
+//! A view that draws again by itself (`cx.notify()` on its own entity, as a
+//! terminal printing does) is a live view (see `crate::render::cached`):
+//! the window replays what it keeps around it rather than building every
+//! element again. New `props` are a change of the mod's, and draw it all.
 
 use {
     futures::channel::mpsc::UnboundedSender,
-    gpui_kit::{AnyView, App, AppContext as _, Context, Entity, Render, Window},
+    gpui_kit::{
+        AnyView, App, AppContext as _, Context, Entity, EntityId, Render, Subscription, Window,
+    },
     moonframe_core::Data,
     std::{collections::BTreeMap, rc::Rc},
 };
@@ -23,6 +30,12 @@ use {
 const MAX_VIEWS: usize = 512;
 
 /// A view of the host app's, drawn where its Luau puts a `ui.view`.
+///
+/// Notifying it draws it again while the window replays what it keeps
+/// around it. A view drawn inside it notifying itself does not reach it:
+/// one that only shows others notifies itself when they do
+/// (`cx.observe(&inner, |_, _, cx| cx.notify())`), or each of its frames
+/// draws the whole window.
 pub trait HostView: Render + Sized {
     /// The mod gave other `props`. The view was made with the first ones
     /// ([`ViewInit::props`]); it draws again after this.
@@ -81,15 +94,24 @@ impl Messenger {
     }
 }
 
+/// Told the id of a view each time it is notified.
+pub(crate) type Notified = Rc<dyn Fn(EntityId)>;
+
 /// A made view, whatever its type.
 trait Live {
     fn view(&self) -> AnyView;
     fn set_props(&self, props: &Data, cx: &mut App);
+    /// Calls `notified` each time the view is notified.
+    fn watch(&self, notified: Notified, cx: &mut App) -> Subscription;
 }
 
 impl<T: HostView> Live for Entity<T> {
     fn view(&self) -> AnyView {
         self.clone().into()
+    }
+
+    fn watch(&self, notified: Notified, cx: &mut App) -> Subscription {
+        cx.observe(self, move |view, _| notified(view.entity_id()))
     }
 
     fn set_props(&self, props: &Data, cx: &mut App) {
@@ -128,6 +150,7 @@ struct Placed {
     name: String,
     props: Data,
     live: Box<dyn Live>,
+    _watch: Subscription,
 }
 
 /// What the frame found a view needs, done after it.
@@ -215,15 +238,17 @@ impl Views {
         std::mem::take(&mut self.requests)
     }
 
-    /// Makes and updates views as `requests` say; true when one was made,
-    /// so the window draws again to show it.
+    /// Makes and updates views as `requests` say; true when one was made or
+    /// given new props, so the window draws all of it again. A made view
+    /// tells `notified` each time it draws again by itself.
     pub(crate) fn apply(
         &mut self,
         requests: Vec<Request>,
+        notified: &Notified,
         window: &mut Window,
         cx: &mut App,
     ) -> bool {
-        let mut made = false;
+        let mut changed = false;
         for request in requests {
             match request {
                 Request::Make {
@@ -254,8 +279,14 @@ impl Views {
                         props: props.clone(),
                     };
                     let live = factory(init, window, cx);
-                    self.placed.insert(key, Placed { name, props, live });
-                    made = true;
+                    let watch = live.watch(notified.clone(), cx);
+                    self.placed.insert(key, Placed {
+                        name,
+                        props,
+                        live,
+                        _watch: watch,
+                    });
+                    changed = true;
                 },
                 Request::Props { key, props } => {
                     if let Some(placed) = self.placed.get_mut(&key)
@@ -263,11 +294,12 @@ impl Views {
                     {
                         placed.live.set_props(&props, cx);
                         placed.props = props;
+                        changed = true;
                     }
                 },
             }
         }
-        made
+        changed
     }
 }
 

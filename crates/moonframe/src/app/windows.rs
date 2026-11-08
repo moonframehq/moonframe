@@ -205,9 +205,12 @@ impl MoonframeApp {
         }
         // In the window that drew them, which a view may want at its start.
         let this = cx.entity().downgrade();
+        let notified = self.cached.notified();
         window.defer(cx, move |window, cx| {
             let _ = this.update(cx, |this, cx| {
-                if this.views.apply(requests, window, cx) {
+                // The app notified, the next frame is a whole one: new props
+                // are the mod's change, not the view drawing by itself.
+                if this.views.apply(requests, &notified, window, cx) {
                     cx.notify();
                 }
             });

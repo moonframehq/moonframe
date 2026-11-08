@@ -151,6 +151,12 @@ impl Render for MoonframeApp {
 }
 
 impl MoonframeApp {
+    /// Whether the last frame was a live one (see `crate::render::cached`).
+    #[cfg(all(test, unix, feature = "markdown"))]
+    pub(crate) fn drew_live(&self) -> bool {
+        self.cached.live_frame()
+    }
+
     /// A kept view again, for GPUI drawing it without a frame having asked.
     pub(crate) fn redraw_kept(
         &mut self,

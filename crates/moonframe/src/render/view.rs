@@ -38,7 +38,10 @@ impl<'w> Draw<'w> for View {
             },
         };
         match views.show(place.owner, &self.id, &self.name, &self.props) {
-            Shown::View(view) => frame.child(view).into_any_element(),
+            Shown::View(view) => {
+                painter.host_view(view.entity_id());
+                frame.child(view).into_any_element()
+            },
             Shown::Pending => frame.into_any_element(),
             Shown::Missing(why) => problem(why, cx),
         }
