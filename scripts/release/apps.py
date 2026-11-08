@@ -31,7 +31,7 @@ def folders(app, data):
     """The app's folder and the local packages it requires."""
     yield app
     for wanted in data["app"].get("requires", []):
-        if wanted.startswith("../"):
+        if wanted.startswith(("./", "../")):
             yield (app / wanted).resolve()
 
 
@@ -68,6 +68,10 @@ def apps():
         found.append({"name": name, "title": title, "cask": cask, "description": description})
     if len({app["cask"] for app in found}) != len(found):
         raise SystemExit("two released apps share a cask")
+    # Bundles and archives are named by title, spaces as dashes, on file
+    # systems that may ignore case: one would replace the other.
+    if len({app["title"].replace(" ", "-").casefold() for app in found}) != len(found):
+        raise SystemExit("two released apps' titles name one bundle")
     return found
 
 
