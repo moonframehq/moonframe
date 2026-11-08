@@ -11,16 +11,16 @@
 //! drawing has no `&mut App`: the first frame shows the empty space, the
 //! next the view.
 //!
-//! A view that draws again by itself (`cx.notify()` on its own entity, as a
-//! terminal printing does) is a live view (see `crate::render::cached`):
-//! the window replays what it keeps around it rather than building every
-//! element again. New `props` are a change of the mod's, and draw it all.
+//! The main window draws them over the app rather than inside it ([`layers`]),
+//! so that one drawing again by itself does not draw the window around it.
+
+mod layers;
+
+pub(crate) use layers::Layers;
 
 use {
     futures::channel::mpsc::UnboundedSender,
-    gpui_kit::{
-        AnyView, App, AppContext as _, Context, Entity, EntityId, Render, Subscription, Window,
-    },
+    gpui_kit::{AnyView, App, AppContext as _, Context, Entity, Render, Window},
     moonframe_core::Data,
     std::{collections::BTreeMap, rc::Rc},
 };
@@ -31,11 +31,10 @@ const MAX_VIEWS: usize = 512;
 
 /// A view of the host app's, drawn where its Luau puts a `ui.view`.
 ///
-/// Notifying it draws it again while the window replays what it keeps
-/// around it. A view drawn inside it notifying itself does not reach it:
-/// one that only shows others notifies itself when they do
-/// (`cx.observe(&inner, |_, _, cx| cx.notify())`), or each of its frames
-/// draws the whole window.
+/// It fills the box the `view` rule styles: its root element is laid out at
+/// that box's size, so give it `size_full()`. In the main window, notifying
+/// it, or a view drawn inside it notifying itself, draws it again and nothing
+/// else of the window.
 pub trait HostView: Render + Sized {
     /// The mod gave other `props`. The view was made with the first ones
     /// ([`ViewInit::props`]); it draws again after this.
@@ -94,24 +93,15 @@ impl Messenger {
     }
 }
 
-/// Told the id of a view each time it is notified.
-pub(crate) type Notified = Rc<dyn Fn(EntityId)>;
-
 /// A made view, whatever its type.
 trait Live {
     fn view(&self) -> AnyView;
     fn set_props(&self, props: &Data, cx: &mut App);
-    /// Calls `notified` each time the view is notified.
-    fn watch(&self, notified: Notified, cx: &mut App) -> Subscription;
 }
 
 impl<T: HostView> Live for Entity<T> {
     fn view(&self) -> AnyView {
         self.clone().into()
-    }
-
-    fn watch(&self, notified: Notified, cx: &mut App) -> Subscription {
-        cx.observe(self, move |view, _| notified(view.entity_id()))
     }
 
     fn set_props(&self, props: &Data, cx: &mut App) {
@@ -150,7 +140,6 @@ struct Placed {
     name: String,
     props: Data,
     live: Box<dyn Live>,
-    _watch: Subscription,
 }
 
 /// What the frame found a view needs, done after it.
@@ -174,6 +163,8 @@ pub(crate) struct Views {
     placed: BTreeMap<String, Placed>,
     requests: Vec<Request>,
     sender: UnboundedSender<(String, Data)>,
+    /// Where the main window draws them.
+    layers: Rc<Layers>,
 }
 
 /// What a `ui.view` shows this frame.
@@ -192,7 +183,13 @@ impl Views {
             placed: BTreeMap::new(),
             requests: Vec::new(),
             sender,
+            layers: Rc::default(),
         }
+    }
+
+    /// Where the main window draws them.
+    pub(crate) fn layers(&self) -> &Rc<Layers> {
+        &self.layers
     }
 
     /// The view `name` the mod `owner` draws as `id`, with `props`; makes
@@ -238,17 +235,15 @@ impl Views {
         std::mem::take(&mut self.requests)
     }
 
-    /// Makes and updates views as `requests` say; true when one was made or
-    /// given new props, so the window draws all of it again. A made view
-    /// tells `notified` each time it draws again by itself.
+    /// Makes and updates views as `requests` say; true when one was made,
+    /// so the window draws again to show it.
     pub(crate) fn apply(
         &mut self,
         requests: Vec<Request>,
-        notified: &Notified,
         window: &mut Window,
         cx: &mut App,
     ) -> bool {
-        let mut changed = false;
+        let mut made = false;
         for request in requests {
             match request {
                 Request::Make {
@@ -279,14 +274,8 @@ impl Views {
                         props: props.clone(),
                     };
                     let live = factory(init, window, cx);
-                    let watch = live.watch(notified.clone(), cx);
-                    self.placed.insert(key, Placed {
-                        name,
-                        props,
-                        live,
-                        _watch: watch,
-                    });
-                    changed = true;
+                    self.placed.insert(key, Placed { name, props, live });
+                    made = true;
                 },
                 Request::Props { key, props } => {
                     if let Some(placed) = self.placed.get_mut(&key)
@@ -294,12 +283,11 @@ impl Views {
                     {
                         placed.live.set_props(&props, cx);
                         placed.props = props;
-                        changed = true;
                     }
                 },
             }
         }
-        changed
+        made
     }
 }
 

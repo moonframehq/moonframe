@@ -2,33 +2,32 @@
 //! moving by itself pays for itself and not for what surrounds it.
 //!
 //! An element that moves on its own, a map, draws in a view of its own: a
-//! *live* one. A view of the host app's (`ui.view`, see [`crate::hosted`])
-//! is a view already, and once it has drawn again by notifying itself, as a
-//! terminal printing does, it is a live one too. While a window shows one,
-//! each run of plain nodes around it (see [`nodes`]) also draws in a view,
-//! and the frame is then one of two kinds:
+//! *live* one. While a window shows one, each run of plain nodes around it
+//! (see [`nodes`]) also draws in a view, and the frame is then one of two
+//! kinds:
 //!
 //! - A whole frame draws everything, as a window without a live view always
 //!   does, and notes how big each kept view came out.
-//! - A live frame is one nothing but live views asked for. GPUI replays the
+//! - A live frame is one nothing but a live view asked for. GPUI replays the
 //!   kept views as they were painted, which needs them laid out without
 //!   reading their content: each takes its own style at the size it measured.
 //!
-//! A frame nobody asked for is a live one too while the window shows a live
-//! host view: a view drawn inside it that notifies itself marks the host and
-//! the app for drawing without telling either, as each frame of a terminal
-//! inside an app's view does.
-//!
 //! Anything else that happens makes the next frame a whole one: the app being
-//! notified (a host view's new props are the mod's doing, and notify it),
-//! a kept view notified (a hover, an image arriving), the window changing
-//! size. What GPUI draws again by itself, as a refresh does, is drawn
+//! notified, a kept view notified (a hover, an image arriving), the window
+//! changing size. What GPUI draws again by itself, as a refresh does, is drawn
 //! from the node the view keeps, and a view that does not land where it was
 //! is never pinned again.
+//!
+//! A host view (`ui.view`) needs none of this: the main window draws those
+//! over the app (see `crate::hosted::layers`), and replays the app whole
+//! while one draws by itself. Doing so, it draws the app as a cached view,
+//! and GPUI then draws everything inside one again whenever it draws it: in
+//! such a window nothing is kept here, and a map drawing by itself draws the
+//! whole app.
 
 use {
     super::{Cx, Draw, Painter, Place},
-    crate::{app::MoonframeApp, hosted::Notified},
+    crate::app::MoonframeApp,
     gpui_kit::*,
     moonframe_core::{Direction, Look, Node, Scroll, Stack},
     std::{
@@ -51,30 +50,6 @@ struct Asked {
     live: Cell<bool>,
     /// Something else does: the next frame is a whole one.
     whole: Cell<bool>,
-    /// The host views it shows.
-    hosts: RefCell<Hosts>,
-}
-
-/// The host views of a window. Those of other windows, or gone from this
-/// one, ask for nothing here.
-#[derive(Default)]
-struct Hosts {
-    /// Those the last frame showed: one notified is a live view asking.
-    shown: HashSet<EntityId>,
-    /// Those of them that have drawn again by themselves: the live ones.
-    /// One that never does keeps nothing around it.
-    live: HashSet<EntityId>,
-}
-
-impl Asked {
-    /// The host view `view` was notified.
-    fn host_notified(&self, view: EntityId) {
-        let mut hosts = self.hosts.borrow_mut();
-        if hosts.shown.contains(&view) {
-            hosts.live.insert(view);
-            self.live.set(true);
-        }
-    }
 }
 
 /// The kept views of a window.
@@ -113,53 +88,24 @@ impl Cached {
         }
     }
 
-    /// What to tell when a host view is notified.
-    pub(crate) fn notified(&self) -> Notified {
-        let asked = self.asked.clone();
-        Rc::new(move |view| asked.host_notified(view))
-    }
-
     /// Decides what kind of frame this is.
     pub(crate) fn begin(&mut self, viewport: Size<Pixels>, inspecting: bool) {
         let live = self.asked.live.take();
         let whole = self.asked.whole.take();
-        let mut hosts = self.asked.hosts.borrow_mut();
-        // Nobody asked, so a view inside a host view did (see the module
-        // docs), when one the last frame showed draws by itself.
-        let inner = !live && !whole && !hosts.live.is_empty();
-        // No view is notified while the frame draws: those it shows are
-        // noted again as it does.
-        hosts.shown.clear();
-        drop(hosts);
         let same_size = self.viewport.replace(viewport) == Some(viewport);
         self.keeping = self.had_live && !inspecting;
-        self.live_frame = (live || inner) && !whole && same_size && self.keeping;
+        self.live_frame = live && !whole && same_size && self.keeping;
         self.has_live = false;
         self.drawn.clear();
-    }
-
-    /// Whether the frame drawn last was a live one.
-    #[cfg(all(test, unix, feature = "markdown"))]
-    pub(crate) fn live_frame(&self) -> bool {
-        self.live_frame
     }
 
     /// The frame is built: what a whole frame did not draw is gone.
     pub(crate) fn finish(&mut self) {
         self.had_live = self.has_live;
-        let hosts = &mut *self.asked.hosts.borrow_mut();
-        hosts.live.retain(|view| hosts.shown.contains(view));
         if !self.live_frame {
             let drawn = &self.drawn;
             self.entries.retain(|path, _| drawn.contains(path));
         }
-    }
-
-    /// The frame shows the host view `view`.
-    fn show_host(&mut self, view: EntityId) {
-        let mut hosts = self.asked.hosts.borrow_mut();
-        hosts.shown.insert(view);
-        self.has_live |= hosts.live.contains(&view);
     }
 
     /// The view of `path`, taking a spare one the first time.
@@ -509,14 +455,6 @@ impl<'w> Painter<'w, '_> {
         Some(entry.view.entity_id())
     }
 
-    /// Notes that the frame shows the host view `view`, which asks for
-    /// frames by notifying itself: live once it has.
-    pub(super) fn host_view(&mut self, view: EntityId) {
-        if let Some(cached) = self.cached.as_mut() {
-            cached.show_host(view);
-        }
-    }
-
     /// `element`, what the element at `place` drew, in its live view.
     #[cfg_attr(not(feature = "map"), expect(dead_code))]
     pub(super) fn in_live_view(&mut self, element: AnyElement, place: &Place) -> AnyElement {
@@ -585,7 +523,7 @@ fn rooted(node: &Node) -> bool {
 mod tests {
     use {
         super::{Cached, nodes, pinned},
-        gpui_kit::{EntityId, Position, Size, StyleRefinement, px, size},
+        gpui_kit::{Position, Size, StyleRefinement, px, size},
         moonframe_core::{
             Align, Data, Direction, Fit, Frame, Image, Justify, Look, Node, Scroll, Stack,
         },
@@ -692,92 +630,6 @@ mod tests {
         cached.begin(window(), false);
         assert!(!cached.keeping);
         assert!(!cached.live_frame);
-    }
-
-    /// A window that has drawn the host view `view`.
-    fn showing(view: EntityId) -> Cached {
-        let mut cached = Cached::default();
-        cached.begin(window(), false);
-        cached.show_host(view);
-        cached.finish();
-        cached
-    }
-
-    /// The next frame of `cached`, still showing the host view `view`.
-    fn next_frame(cached: &mut Cached, view: EntityId) {
-        cached.begin(window(), false);
-        cached.show_host(view);
-        cached.finish();
-    }
-
-    #[test]
-    fn a_host_view_drawing_by_itself_makes_live_frames() {
-        let view = EntityId::from(7);
-        let mut cached = showing(view);
-        // Until it draws by itself, it keeps nothing around it.
-        cached.begin(window(), false);
-        assert!(!cached.keeping);
-        cached.show_host(view);
-        cached.finish();
-        (cached.notified())(view);
-        next_frame(&mut cached, view);
-        (cached.notified())(view);
-        cached.begin(window(), false);
-        assert!(cached.keeping);
-        assert!(cached.live_frame);
-    }
-
-    #[test]
-    fn new_props_make_the_frame_whole() {
-        // The app is notified as the view is (`Views::apply`).
-        let view = EntityId::from(7);
-        let mut cached = showing(view);
-        (cached.notified())(view);
-        next_frame(&mut cached, view);
-        (cached.notified())(view);
-        cached.asked.whole.set(true);
-        cached.begin(window(), false);
-        assert!(cached.keeping);
-        assert!(!cached.live_frame);
-    }
-
-    #[test]
-    fn a_frame_nobody_asked_for_is_live_beside_a_live_host_view() {
-        // A terminal drawn inside the host's view notifies only itself.
-        let view = EntityId::from(7);
-        let mut cached = showing(view);
-        (cached.notified())(view);
-        next_frame(&mut cached, view);
-        cached.begin(window(), false);
-        assert!(cached.live_frame);
-    }
-
-    #[test]
-    fn a_frame_nobody_asked_for_is_whole_beside_a_host_view_that_never_drew_by_itself() {
-        let view = EntityId::from(7);
-        let mut cached = showing(view);
-        next_frame(&mut cached, view);
-        cached.begin(window(), false);
-        assert!(!cached.live_frame);
-    }
-
-    #[test]
-    fn a_host_view_the_window_no_longer_shows_asks_for_nothing() {
-        let (view, other) = (EntityId::from(7), EntityId::from(8));
-        let mut cached = showing(view);
-        (cached.notified())(view);
-        next_frame(&mut cached, view);
-        // Another window's view, then this one's once it has gone.
-        (cached.notified())(other);
-        assert!(!cached.asked.live.get());
-        cached.begin(window(), false);
-        cached.finish();
-        (cached.notified())(view);
-        cached.begin(window(), false);
-        assert!(!cached.live_frame);
-        assert!(!cached.keeping);
-        cached.finish();
-        assert!(cached.asked.hosts.borrow().live.is_empty());
     }
 
     #[test]

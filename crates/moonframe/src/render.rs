@@ -16,6 +16,7 @@ mod gallery;
 pub(crate) mod images;
 mod input;
 mod keyed;
+mod layered;
 mod list;
 #[cfg_attr(not(feature = "map"), path = "render/map_left_out.rs")]
 mod map;
@@ -299,6 +300,8 @@ pub(crate) struct Painter<'w, 'm> {
     in_kept: bool,
     /// The live views that asked for another frame.
     live_again: Vec<EntityId>,
+    /// Where host views go, in a window that draws them in layers.
+    layering: Option<layered::Layering>,
 }
 
 /// A list's rows a mod should build, which the app asks the workspace for
@@ -345,6 +348,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             root: None,
             in_kept: false,
             live_again: Vec::new(),
+            layering: None,
         }
     }
 
@@ -487,12 +491,15 @@ impl<'w, 'm> Painter<'w, 'm> {
                 .min_w_0()
                 .child(view)
                 .child(
-                    div()
-                        .absolute()
-                        .top(px(4.))
-                        .right(px(4.))
-                        .max_w(px(PROBLEM_WIDTH))
-                        .child(problem(format!("{name}: {error}"), cx)),
+                    self.over_layers(
+                        div()
+                            .absolute()
+                            .top(px(4.))
+                            .right(px(4.))
+                            .max_w(px(PROBLEM_WIDTH))
+                            .child(problem(format!("{name}: {error}"), cx))
+                            .into_any_element(),
+                    ),
                 )
                 .into_any_element(),
             (error, None) => problem(
@@ -675,7 +682,7 @@ impl<'w> Draw<'w> for Node {
             std::cmp::Ordering::Greater => return div().into_any_element(),
         }
         let Some(sink) = painter.sink.clone() else {
-            return draw_node(self, painter, place, cx);
+            return painter.draw_lifted(self, place, cx);
         };
         let crumb = Crumb::node(self, &place.path, place.crumb.clone());
         let place = Place {
@@ -683,7 +690,7 @@ impl<'w> Draw<'w> for Node {
             ..place.clone()
         };
         let outer = painter.outer.replace(crumb.clone());
-        let child = draw_node(self, painter, &place, cx);
+        let child = painter.draw_lifted(self, &place, cx);
         painter.outer = outer;
         let styled = painter.radii.borrow_mut().remove(&place.path);
         Tracked {

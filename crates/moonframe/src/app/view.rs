@@ -21,7 +21,11 @@ impl Render for MoonframeApp {
         }
         self.cached.prepare(cx);
         let inspecting = self.inspector.sink().is_some();
-        self.cached.begin(window.viewport_size(), inspecting);
+        let layers = self.views.layers().clone();
+        layers.begin();
+        // Drawn as a cached view, everything in it is drawn again with it.
+        self.cached
+            .begin(window.viewport_size(), inspecting || layers.replayed());
         self.inputs.begin_frame();
         let last_keyed = self.motion.begin_frame();
         #[cfg(feature = "terminal")]
@@ -37,6 +41,7 @@ impl Render for MoonframeApp {
         )
         .with_browsers(&mut self.browsers)
         .with_views(&mut self.views)
+        .layering()
         .with_keyed(&last_keyed)
         .with_cached(&mut self.cached)
         .in_window(window.window_handle().window_id());
@@ -105,32 +110,10 @@ impl Render for MoonframeApp {
             toast(message.clone(), notice, cx)
         });
         let theme = cx.theme();
+        // Its keys and actions are the window's view's (`MainWindow`), which
+        // the host views drawn over it are inside too.
         div()
             .id("moonframe-app")
-            .key_context(if crate::release() {
-                "MoonframeApp"
-            } else {
-                "MoonframeApp developer"
-            })
-            .track_focus(&self.focus)
-            .on_action(cx.listener(|this, _: &ToggleTheme, window, cx| {
-                this.run(Command::ToggleTheme, window, cx)
-            }))
-            .on_action(cx.listener(|this, _: &Inspect, _, cx| this.toggle_inspect(cx)))
-            .on_action(cx.listener(|this, action: &QuickInspect, _, cx| {
-                if !this.quick_inspect_key(&action.keystroke, cx) {
-                    cx.propagate();
-                }
-            }))
-            .on_action(cx.listener(|this, action: &MenuSend, window, cx| {
-                this.run_menu_item(&action.id, window, cx);
-            }))
-            .on_action(cx.listener(|this, action: &MenuKey, window, cx| {
-                if !this.run_menu_key(&action.keystroke, window, cx) {
-                    cx.propagate();
-                }
-            }))
-            .on_action(cx.listener(|this, _: &Dismiss, _, cx| this.dismiss(cx)))
             .size_full()
             .flex()
             .flex_col()
@@ -151,12 +134,6 @@ impl Render for MoonframeApp {
 }
 
 impl MoonframeApp {
-    /// Whether the last frame was a live one (see `crate::render::cached`).
-    #[cfg(all(test, unix, feature = "markdown"))]
-    pub(crate) fn drew_live(&self) -> bool {
-        self.cached.live_frame()
-    }
-
     /// A kept view again, for GPUI drawing it without a frame having asked.
     pub(crate) fn redraw_kept(
         &mut self,

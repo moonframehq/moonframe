@@ -641,6 +641,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
                     }
                     app
                 });
+                let view = cx.new(|_| crate::app::MainWindow::new(view));
                 cx.new(|cx| Root::new(view, window, cx))
             });
             if let Err(error) = opened {

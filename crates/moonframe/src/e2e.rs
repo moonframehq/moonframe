@@ -95,6 +95,7 @@ fn open_with(cx: &mut TestAppContext, dir: TempDir, views: Registry) -> Window<'
             )
         });
         app = Some(view.clone());
+        let view = cx.new(|_| crate::app::MainWindow::new(view));
         Root::new(view, window, cx)
     });
     let mut window = Window {
