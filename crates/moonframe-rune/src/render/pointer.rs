@@ -6,7 +6,7 @@ use {
     super::{Painter, Place},
     crate::Ui,
     moonframe_core::{Cursor, Held, Pointer, PointerPhase, Travel},
-    rune::{Cursor as RuneCursor, Drag, El, Phase, Tx, WheelEvent},
+    rune::{Cursor as RuneCursor, Drag, El, Phase, PointerEvent, Tx, WheelEvent},
 };
 
 /// Moves shorter than this, in points, are not sent: a trackpad reports
@@ -53,15 +53,17 @@ impl<'w> Painter<'w> {
     /// `element` with `pointer`'s listeners and cursor. `carry`, `accept`,
     /// `drop` and `gestures` are not on this backend yet.
     pub(super) fn pointered(&self, element: El, pointer: &Pointer, place: &Place<'w>) -> El {
-        let lacking = pointer.carry.is_some()
-            || pointer.accept.is_some()
-            || pointer.drop.is_some()
-            || pointer.hover
-            || !pointer.gestures.is_empty();
-        if lacking {
+        // Trackpad rotation, smart zoom and swipes: Rune hears none of them.
+        if !pointer.gestures.is_empty() {
             let mut left_out = self.ui.left_out.borrow_mut();
-            left_out.insert("pointer carry, drop, hover or gestures".to_owned());
+            left_out.insert("trackpad gestures".to_owned());
         }
+        let size = rune::memo::layout_size(&place.path).unwrap_or([0., 0.]);
+        let element = if pointer.carry.is_some() || pointer.accept.is_some() {
+            self.carried(element, pointer, place)
+        } else {
+            element
+        };
         let element = match pointer.cursor {
             Some(cursor) => element.cursor(shape(cursor)),
             None => element,
@@ -92,6 +94,87 @@ impl<'w> Painter<'w> {
                     ui.send(&owner, &to, msg);
                 }
             })
+        } else {
+            element
+        };
+        let element = if pointer.hover {
+            let (moving, owner, to) = (pointer.clone(), owner.clone(), to.clone());
+            let (leaving, gone_owner, gone_to) = (pointer.clone(), owner.clone(), to.clone());
+            element
+                .on_pointer_move_local(move |ui: &mut Ui, at: PointerEvent, _: &mut Tx| {
+                    if ui.carrying.get_mut().is_some() {
+                        return;
+                    }
+                    let travel = Travel {
+                        x: if size[0] > 0. {
+                            at.x / size[0]
+                        } else {
+                            0.
+                        },
+                        y: if size[1] > 0. {
+                            at.y / size[1]
+                        } else {
+                            0.
+                        },
+                        dx: 0.,
+                        dy: 0.,
+                        width: size[0],
+                        height: size[1],
+                    };
+                    let held = Held::default();
+                    if let Some(msg) =
+                        moving.press_message(PointerPhase::Hover, &travel, "", 0, held)
+                    {
+                        ui.send(&owner, &to, msg);
+                    }
+                })
+                .on_hover_change(move |ui: &mut Ui, inside: bool, _: &mut Tx| {
+                    if inside {
+                        return;
+                    }
+                    let travel = Travel {
+                        x: 0.,
+                        y: 0.,
+                        dx: 0.,
+                        dy: 0.,
+                        width: size[0],
+                        height: size[1],
+                    };
+                    let held = Held::default();
+                    if let Some(msg) =
+                        leaving.press_message(PointerPhase::Leave, &travel, "", 0, held)
+                    {
+                        ui.send(&gone_owner, &gone_to, msg);
+                    }
+                })
+        } else {
+            element
+        };
+        let element = if pointer.drop.is_some() {
+            let (dropping, owner, to) = (pointer.clone(), owner.clone(), to.clone());
+            element.on_drop_files(
+                move |ui: &mut Ui, files: &[std::path::PathBuf], tx: &mut Tx| {
+                    let point = tx.drop_point();
+                    let fraction = |at: f32, size: f32| {
+                        if size > 0. {
+                            at / size
+                        } else {
+                            0.
+                        }
+                    };
+                    let travel = Travel {
+                        x: point.map_or(0., |point| fraction(point.x, size[0])),
+                        y: point.map_or(0., |point| fraction(point.y, size[1])),
+                        dx: 0.,
+                        dy: 0.,
+                        width: size[0],
+                        height: size[1],
+                    };
+                    if let Some(msg) = dropping.drop_message(files, &travel) {
+                        ui.send(&owner, &to, msg);
+                    }
+                },
+            )
         } else {
             element
         };

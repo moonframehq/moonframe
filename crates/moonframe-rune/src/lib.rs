@@ -174,6 +174,9 @@ pub struct Ui {
     pub(crate) markdown_found: RefCell<HashMap<String, usize>>,
     /// What documents have to tell their mods, which a view cannot send.
     pub(crate) markdown_notes: RefCell<Vec<(String, String, Data)>>,
+    /// What a drag inside the app carries, and the rows that take it.
+    pub(crate) carrying: RefCell<Option<render::Carrying>>,
+    pub(crate) carry_targets: RefCell<Vec<render::Target>>,
     /// Each document that follows its structure, by its place.
     pub(crate) documents: RefCell<HashMap<String, render::Document>>,
     /// Documents to scroll, each to a place in its text, next frame.
@@ -458,6 +461,8 @@ impl Ui {
             markdown_found: RefCell::default(),
             markdown_notes: RefCell::default(),
             documents: RefCell::default(),
+            carrying: RefCell::default(),
+            carry_targets: RefCell::default(),
             markdown_reveals: RefCell::default(),
             inspecting: inspect::Inspecting::default(),
             crumbs: RefCell::default(),

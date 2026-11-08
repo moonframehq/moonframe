@@ -4,6 +4,7 @@
 //! workspace with the module that drew the control.
 
 // keep-sorted start
+mod carry;
 mod containers;
 mod embeds;
 mod floating;
@@ -22,7 +23,12 @@ use {
     std::{cell::RefCell, sync::LazyLock},
 };
 
-pub(crate) use {containers::RowRegions, markdown::Document, shell::Metrics};
+pub(crate) use {
+    carry::{Carrying, Target},
+    containers::RowRegions,
+    markdown::Document,
+    shell::Metrics,
+};
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
 
@@ -68,6 +74,8 @@ impl Place<'_> {
 pub(crate) fn window(ui: &Ui) -> El {
     ui.layers.borrow_mut().clear();
     ui.browsers.wanted.borrow_mut().clear();
+    // Where things are carried to, found again as this view draws them.
+    ui.carry_targets.borrow_mut().clear();
     ui.terminals.shown.borrow_mut().clear();
     ui.videos.frame_began();
     ui.crumbs.borrow_mut().clear();
