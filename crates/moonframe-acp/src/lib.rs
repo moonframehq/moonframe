@@ -5,7 +5,9 @@
 //! A mod starts a run with a request; the provider starts the agent's ACP
 //! command in the app's folder, opens a session and sends the prompt, then
 //! publishes the run as it goes: its status, the agent's latest message,
-//! its tool calls and plan, and a permission question waiting on the user.
+//! its tool calls and plan, everything it said in order (`parts`), the
+//! agent's own name and model when it gives them, and a permission
+//! question waiting on the user.
 //! Each run is one prompt; the agent exits when it ends. Finished runs are
 //! saved and shown again at the next launch.
 //!

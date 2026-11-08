@@ -2085,7 +2085,7 @@ run works in instead, only from mods in `[settings] folders`), `{ cancel = run }
 | `agent`, `workdir`, `running` | the default agent, where agents work, how many runs go |
 | `app` | the app folder the provider is in, from `workdir` (`app`, `examples/ledger`); nil when outside it |
 | `pid` | this app's process, for an agent to screenshot the window (`just screenshot OUT PID`) |
-| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
+| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `parts` everything said in order, `{ kind = "text", text }` or `{ kind = "tools", tools = { { id, title, kind, status } } }`; `agent_info` `{ name, title?, version? }` as the agent names itself; `model` the model its session says it uses, by name; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
 
 `app.chat` (chat, native, crates/moonframe-chat): conversations with
 coding agents, each run by herdr-gpui's `herdr-acp` program with no view

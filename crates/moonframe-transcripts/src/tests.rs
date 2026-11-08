@@ -9,6 +9,7 @@ use {
     serde_json::json,
     std::{
         fs::{self, File},
+        path::Path,
         sync::Mutex,
         time::{Duration, SystemTime},
     },
@@ -518,11 +519,27 @@ fn the_provider_answers_mods_from_its_thread_and_stops_when_dropped() {
 }
 
 #[test]
-fn with_no_sessions_folder_the_provider_shares_samples() {
+fn samples_only_when_asked() {
     let (handle, seen) = host();
     let mut provider = Provider::default();
     provider.looks_in = Some(("/nowhere".to_owned(), true));
     provider.start(&handle).unwrap();
     let view = wait_for(&seen, 0, |value| value["source"] == "sample");
     assert_eq!(view["total"], sample::TOTAL);
+
+    assert!(samples(Some(std::ffi::OsStr::new("1"))));
+    assert!(!samples(Some(std::ffi::OsStr::new(""))));
+    assert!(!samples(None));
+}
+
+#[test]
+fn with_no_sessions_folder_the_provider_shares_none() {
+    let (handle, seen) = host();
+    let mut provider = Provider::default();
+    provider.looks_in = Some(("/nowhere".to_owned(), samples(None)));
+    provider.start(&handle).unwrap();
+    let view = wait_for(&seen, 0, |value| value.get("source").is_some());
+    assert_eq!(view["source"], "cli");
+    assert_eq!(view["total"], 0);
+    assert_eq!(view["groups"], json!([]));
 }
