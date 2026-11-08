@@ -132,6 +132,11 @@ impl Core {
         self.stopping.load(Ordering::SeqCst)
     }
 
+    /// Set as the provider goes: a program run to its end watches it.
+    pub(crate) fn stop_flag(&self) -> &AtomicBool {
+        &self.stopping
+    }
+
     /// Reports a failure as a toast in `app.pi.events`.
     pub(crate) fn fail(&self, problem: &str, thread: Option<&str>) {
         tracing::warn!("pilot: {problem}");

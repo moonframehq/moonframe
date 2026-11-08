@@ -6,7 +6,11 @@ use {
     std::{
         io::{Read, Write},
         process::{Command, Stdio},
-        sync::{Arc, Mutex, mpsc},
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, Ordering},
+            mpsc,
+        },
         thread,
         time::{Duration, Instant},
     },
@@ -75,7 +79,18 @@ impl Collected {
 }
 
 /// Runs `command`, with `input` on its stdin, for at most `timeout`.
-pub(crate) fn run(mut command: Command, input: Option<&str>, timeout: Duration) -> Ran {
+pub(crate) fn run(command: Command, input: Option<&str>, timeout: Duration) -> Ran {
+    run_until(command, input, timeout, &AtomicBool::new(false))
+}
+
+/// [`run`], stopped early once `stop` is set: the provider is going, and
+/// nothing may outlive it.
+pub(crate) fn run_until(
+    mut command: Command,
+    input: Option<&str>,
+    timeout: Duration,
+    stop: &AtomicBool,
+) -> Ran {
     command
         .stdin(if input.is_some() {
             Stdio::piped()
@@ -114,10 +129,14 @@ pub(crate) fn run(mut command: Command, input: Option<&str>, timeout: Duration) 
                 }
                 break status.success();
             },
-            Ok(None) if Instant::now() >= until => {
+            Ok(None) if Instant::now() >= until || stop.load(Ordering::SeqCst) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                failure = Some(format!("no answer after {}s", timeout.as_secs()));
+                failure = Some(if stop.load(Ordering::SeqCst) {
+                    "stopped".to_owned()
+                } else {
+                    format!("no answer after {}s", timeout.as_secs())
+                });
                 break false;
             },
             Ok(None) => {
@@ -167,6 +186,20 @@ mod tests {
         let ran = run(shell("echo said; sleep 30 &"), None, Duration::from_secs(5));
         assert!(started.elapsed() < Duration::from_secs(4));
         assert_eq!(ran.output(), Ok("said\n".to_owned()));
+    }
+
+    #[test]
+    fn a_program_is_stopped_when_told() {
+        let stop = Arc::new(AtomicBool::new(false));
+        let later = Arc::clone(&stop);
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+            later.store(true, Ordering::SeqCst);
+        });
+        let started = Instant::now();
+        let ran = run_until(shell("exec sleep 30"), None, Duration::from_secs(30), &stop);
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert_eq!(ran.failure.as_deref(), Some("stopped"));
     }
 
     #[test]

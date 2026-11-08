@@ -8,7 +8,7 @@ use {
         flows::{pi_path, same_live},
         git,
         rpc::Rpc,
-        run::run,
+        run::run_until,
         value::{as_list, display, first_chars},
     },
     serde_json::{Value, json},
@@ -178,8 +178,10 @@ impl Core {
             &model,
             &prompt,
         ]);
-        // `pi -p` reads piped stdin as part of the prompt, to its end.
-        let Ok(out) = run(command, None, TITLE_TIMEOUT).output() else {
+        // `pi -p` reads piped stdin as part of the prompt, to its end. It
+        // is in no thread, so it watches the provider leaving itself.
+        let ran = run_until(command, None, TITLE_TIMEOUT, self.stop_flag());
+        let Ok(out) = ran.output() else {
             return Ok(());
         };
         let clean = clean_title(out.trim().lines().next().unwrap_or_default());
