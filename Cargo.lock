@@ -5709,6 +5709,7 @@ version = "0.2.2"
 dependencies = [
  "block2 0.6.2",
  "lb-wry",
+ "markdown",
  "moonframe-acp",
  "moonframe-chat",
  "moonframe-core",

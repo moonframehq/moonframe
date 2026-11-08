@@ -1,12 +1,18 @@
 //! `ui.markdown`: Rune's document on the app's type scale, with GitHub's
 //! alerts, a `lines` limit, and search.
 
+#[allow(dead_code, reason = "shared with GPUI, which reads all of it")]
+#[path = "../../../moonframe/src/render/markdown/outline.rs"]
+mod outline;
+
 use {
     super::{Painter, Place},
     crate::{Ui, style::Ink},
-    moonframe_core::{Data, Markdown, Part, States, Token},
+    moonframe_core::{Data, Markdown, Part, Reveal, States, Token},
+    outline::Outline,
     rune::{El, ScrollSpec, col},
     rune_kit::{Case, Highlight, Markdown as RuneMarkdown, MarkdownStyle, markdown::find},
+    std::rc::Rc,
 };
 
 /// Heading sizes, levels 1 to 3, in sizes of the body.
@@ -23,6 +29,25 @@ const ALERTS: [(&str, &str); 5] = [
     ("[!WARNING]", "Warning"),
     ("[!CAUTION]", "Caution"),
 ];
+
+/// What a document's mod asked to hear of its structure, as last drawn.
+#[derive(Default)]
+pub(crate) struct Document {
+    /// The text the outline is of.
+    text: String,
+    outline: Rc<Outline>,
+    /// The headings the mod was last told of.
+    told: Option<Vec<(u8, String, usize)>>,
+    section: Option<usize>,
+    reveal: Option<Reveal>,
+    /// A block to scroll to the top of the document once it is laid out.
+    pub(crate) pending: Option<usize>,
+}
+
+/// The key of a document's top-level block `index`.
+fn block_key(path: &str, index: usize) -> String {
+    format!("{path}-b{index}")
+}
 
 /// `text` with each alert's marker as its bold title, on a line of its own.
 fn titled_alerts(text: &str) -> String {
@@ -61,6 +86,104 @@ impl<'w> Painter<'w> {
             })
     }
 
+    /// A document's outline, parsed once for each text it shows.
+    fn outline(&self, path: &str, source: &str) -> Rc<Outline> {
+        let mut documents = self.ui.documents.borrow_mut();
+        let document = documents.entry(path.to_owned()).or_default();
+        if document.text != source {
+            document.text = source.to_owned();
+            document.outline = Rc::new(Outline::parse(source));
+        }
+        Rc::clone(&document.outline)
+    }
+
+    /// Queues `msg` for the document's mod: a view cannot send.
+    fn tell(&self, markdown: &Markdown, msg: Data, place: &Place<'w>) {
+        let owner = place.owner.to_owned();
+        let to = markdown.to.clone().unwrap_or_else(|| owner.clone());
+        self.ui.markdown_notes.borrow_mut().push((owner, to, msg));
+    }
+
+    /// The heading a reader of the document at `path` has scrolled to: the
+    /// one over the first block still showing at its top.
+    fn section_at(path: &str, outline: &Outline) -> Option<usize> {
+        let top = rune::memo::window_layout(path)?[1];
+        let showing = (0..outline.blocks().len()).find(|index| {
+            rune::memo::window_layout(&block_key(path, *index))
+                .is_some_and(|[_, y, _, height]| y + height > top + 1.)
+        })?;
+        outline.section(showing)
+    }
+
+    /// `outline`, `section` and `reveal`: its headings when they change, the
+    /// one a reader has scrolled to, and a scroll to a place asked for.
+    fn follow(&self, markdown: &Markdown, outline: &Outline, place: &Place<'w>) {
+        let path = place.path.as_str();
+        let headings: Vec<(u8, String, usize)> = outline
+            .headings
+            .iter()
+            .map(|heading| (heading.level, heading.text.clone(), heading.at))
+            .collect();
+        let section = markdown
+            .section
+            .as_ref()
+            .and_then(|_| Self::section_at(path, outline));
+        let (told, moved, reveal) = {
+            let mut documents = self.ui.documents.borrow_mut();
+            let Some(document) = documents.get_mut(path) else {
+                return;
+            };
+            let told = markdown.outline.is_some() && document.told.as_ref() != Some(&headings);
+            if told {
+                document.told = Some(headings);
+            }
+            let moved =
+                markdown.section.is_some() && section.is_some() && section != document.section;
+            if moved {
+                document.section = section;
+            }
+            let reveal = (markdown.reveal != document.reveal)
+                .then_some(markdown.reveal)
+                .flatten();
+            document.reveal = markdown.reveal;
+            (told, moved, reveal)
+        };
+        if let (true, Some(msg)) = (told, &markdown.outline) {
+            let list = outline
+                .headings
+                .iter()
+                .map(|heading| heading.data())
+                .collect();
+            self.tell(
+                markdown,
+                Markdown::note(msg, [("headings", Data::List(list))]),
+                place,
+            );
+        }
+        if let (true, Some(msg), Some(index)) = (moved, &markdown.section, section) {
+            let heading = Data::Integer(i64::try_from(index + 1).unwrap_or(i64::MAX));
+            self.tell(markdown, Markdown::note(msg, [("heading", heading)]), place);
+        }
+        let mut documents = self.ui.documents.borrow_mut();
+        let Some(document) = documents.get_mut(path) else {
+            return;
+        };
+        if let Some(reveal) = reveal {
+            document.pending = Some(outline.block_at(reveal.at));
+        }
+        // Its block at the top, as on GPUI: where it is in the text, from
+        // the last layout; until there is one, it waits.
+        if let Some(block) = document.pending {
+            let top = rune::memo::window_layout(&format!("{path}-text"));
+            let at = rune::memo::window_layout(&block_key(path, block));
+            if let (Some([_, top, ..]), Some([_, at, ..])) = (top, at) {
+                document.pending = None;
+                let mut reveals = self.ui.markdown_reveals.borrow_mut();
+                reveals.push((path.to_owned(), at - top));
+            }
+        }
+    }
+
     /// Tells the mod how many matches there are, when that changed.
     fn note_found(&self, markdown: &Markdown, count: usize, place: &Place<'w>) {
         let Some(msg) = &markdown.found else {
@@ -80,11 +203,6 @@ impl<'w> Painter<'w> {
     pub(super) fn markdown(&self, markdown: &'w Markdown, place: &Place<'w>) -> El {
         let look = self.look(Part::Markdown, &markdown.look, States::default(), place);
         let ink = place.ink.under(&look.base, self.palette);
-        // Said, not silently dropped: a document's headings and where it is.
-        if markdown.outline.is_some() || markdown.section.is_some() || markdown.reveal.is_some() {
-            let mut left_out = self.ui.left_out.borrow_mut();
-            left_out.insert("ui.markdown outline".to_owned());
-        }
         let source = titled_alerts(&markdown.text);
         let query = markdown.find.as_deref().filter(|query| !query.is_empty());
         let found = query.map_or_else(Vec::new, |query| find(&source, query, Case::Insensitive));
@@ -93,18 +211,47 @@ impl<'w> Painter<'w> {
             let current = markdown.find_index == Some(index + 1);
             (range, Highlight::new().current_match(current))
         });
-        let mut document = RuneMarkdown::new(source).selectable(true).highlights(marks);
-        if let Some(msg) = markdown.link.clone() {
-            let owner = place.owner.to_owned();
-            let to = markdown.to.clone().unwrap_or_else(|| owner.clone());
-            document = document.on_link(move |ui: &mut Ui, url: &str| {
-                ui.send(&owner, &to, Markdown::message(&msg, url));
+        let outline = self.outline(&place.path, &source);
+        self.follow(markdown, &outline, place);
+        let path = place.path.clone();
+        let keys: Vec<(usize, String)> = outline
+            .blocks()
+            .iter()
+            .enumerate()
+            .map(|(index, at)| (*at, block_key(&path, index)))
+            .collect();
+        // A `#heading` link scrolls there; the rest goes to the mod.
+        let link = markdown.link.clone();
+        let owner = place.owner.to_owned();
+        let to = markdown.to.clone().unwrap_or_else(|| owner.clone());
+        let document = RuneMarkdown::new(source)
+            .selectable(true)
+            .highlights(marks)
+            .block_keys(keys)
+            .on_link(move |ui: &mut Ui, url: &str| {
+                let heading = url
+                    .strip_prefix('#')
+                    .and_then(|fragment| outline.anchor(fragment));
+                match (heading, &link) {
+                    (Some(heading), _) => {
+                        if let Some(document) = ui.documents.get_mut().get_mut(&path) {
+                            document.pending = Some(outline.block_at(heading.at));
+                        }
+                    },
+                    (None, Some(msg)) => ui.send(&owner, &to, Markdown::message(msg, url)),
+                    (None, None) => {},
+                }
             });
-        }
         let style = self
             .markdown_style(ink)
             .highlight_bg(self.palette.token(Token::Warning).alpha(0.35));
-        let element = col().key(place.path.clone()).child(document.render(&style));
+        // Each move of the text inside a scroll runs the view again, so the
+        // section a reader is in follows them.
+        let rendered = document
+            .render(&style)
+            .key(format!("{}-text", place.path))
+            .on_layout(|_: &mut Ui, _: [f32; 4]| {});
+        let element = col().key(place.path.clone()).child(rendered);
         let element = match (markdown.width, markdown.height) {
             (Some(width), Some(height)) => element.size(width, height),
             (Some(width), None) => element.w(width),

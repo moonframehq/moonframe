@@ -15,6 +15,7 @@ const FRAME: f64 = 1. / 60.;
 // keep-sorted start
 mod fields;
 mod maps;
+mod markdown;
 mod terminals;
 // keep-sorted end
 

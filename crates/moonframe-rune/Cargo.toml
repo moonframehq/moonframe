@@ -19,6 +19,7 @@ sealed = ["moonframe-packages/sealed"]
 ghostty = ["moonframe-terminal/ghostty"]
 
 [dependencies]
+markdown.workspace           = true
 moonframe-acp.workspace      = true
 moonframe-chat.workspace     = true
 moonframe-core.workspace     = true

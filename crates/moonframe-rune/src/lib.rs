@@ -174,6 +174,10 @@ pub struct Ui {
     pub(crate) markdown_found: RefCell<HashMap<String, usize>>,
     /// What documents have to tell their mods, which a view cannot send.
     pub(crate) markdown_notes: RefCell<Vec<(String, String, Data)>>,
+    /// Each document that follows its structure, by its place.
+    pub(crate) documents: RefCell<HashMap<String, render::Document>>,
+    /// Documents to scroll, each to a place in its text, next frame.
+    pub(crate) markdown_reveals: RefCell<Vec<(String, f32)>>,
     pub(crate) inspecting: inspect::Inspecting,
     /// What each element is, while picking, by its key.
     pub(crate) crumbs: RefCell<HashMap<String, inspect::Crumb>>,
@@ -453,6 +457,8 @@ impl Ui {
             row_regions: render::RowRegions::default(),
             markdown_found: RefCell::default(),
             markdown_notes: RefCell::default(),
+            documents: RefCell::default(),
+            markdown_reveals: RefCell::default(),
             inspecting: inspect::Inspecting::default(),
             crumbs: RefCell::default(),
             browsers: browser::Browsers::default(),
@@ -533,6 +539,10 @@ fn poll(ui: &mut Ui, _: f64, tx: &mut Tx) -> bool {
     changed |= ui.reload_changed();
     changed |= ui.settle_browsers();
     changed |= ui.tell_selections();
+    for (document, y) in ui.markdown_reveals.take() {
+        tx.scroll_to(document, 0., y);
+        changed = true;
+    }
     for (owner, to, note) in ui.markdown_notes.take() {
         ui.send(&owner, &to, note);
         changed = true;

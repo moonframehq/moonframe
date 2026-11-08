@@ -87,6 +87,15 @@ impl Outline {
             .find(|heading| heading.slug == fragment)
     }
 
+    /// Bytes into the source of each top-level block, in order.
+    #[allow(
+        dead_code,
+        reason = "Rune keys its blocks by them; GPUI asks `block_at`"
+    )]
+    pub(super) fn blocks(&self) -> &[usize] {
+        &self.blocks
+    }
+
     /// Which top-level block the byte `at` of the source is in.
     pub(super) fn block_at(&self, at: usize) -> usize {
         self.blocks

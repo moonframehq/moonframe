@@ -22,7 +22,7 @@ use {
     std::{cell::RefCell, sync::LazyLock},
 };
 
-pub(crate) use {containers::RowRegions, shell::Metrics};
+pub(crate) use {containers::RowRegions, markdown::Document, shell::Metrics};
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
 
