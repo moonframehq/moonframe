@@ -2,7 +2,7 @@
 //! row shows: its branch, changes, work trees and last commit.
 
 use {
-    crate::{MAX_WORKTREES, git::git, last_name, tilde},
+    crate::{git::git, last_name, tilde},
     serde_json::{Value, json},
     std::{
         collections::{BTreeSet, HashMap},
@@ -101,7 +101,8 @@ fn git_dir(dir: &str) -> String {
     dot
 }
 
-/// The repository's work trees, the main one first, as git lists them.
+/// The repository's work trees, the main one first, as git lists them: all
+/// of them, as each may be opened; the listing shows only the first few.
 fn worktrees(list: &str) -> Vec<Value> {
     let mut trees = Vec::new();
     for block in list.split("\n\n") {
@@ -109,9 +110,6 @@ fn worktrees(list: &str) -> Vec<Value> {
         let Some(path) = field("worktree ").filter(|_| !block.lines().any(|l| l == "bare")) else {
             continue;
         };
-        if trees.len() >= MAX_WORKTREES {
-            break;
-        }
         let branch = field("branch refs/heads/").unwrap_or("HEAD");
         trees.push(json!({ "path": path, "branch": branch, "primary": trees.is_empty() }));
     }

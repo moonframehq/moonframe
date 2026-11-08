@@ -384,3 +384,46 @@ fn messages_read_loosely_as_lua_sends_them() {
     assert_eq!(last_name("/a/b"), Some("b"));
     assert_eq!(last_name("/a/"), None);
 }
+
+#[test]
+fn home_leaves_no_repository_open() {
+    let fixture = Fixture::new();
+    let mut projects = fixture.projects();
+    assert_eq!(published(&mut projects)["current"]["path"], fixture.path());
+    projects.receive("any", &json!({ "select": "~" }));
+    let out = published(&mut projects);
+    assert!(out["current"].is_null(), "{}", out["current"]);
+    projects.receive("writer", &json!({ "commit": "x" }));
+    assert_eq!(published(&mut projects)["action"]["ok"], false);
+    // A scan keeps Home rather than opening a project again.
+    projects.scan(scan::now());
+    assert!(published(&mut projects)["current"].is_null());
+}
+
+#[test]
+fn a_work_tree_past_those_listed_can_be_opened() {
+    let fixture = Fixture::new();
+    let root = real(fixture.temp.path());
+    let mut last = PathBuf::new();
+    for n in 0..=MAX_WORKTREES {
+        last = under(&root, &format!("tree{n:02}"));
+        let branch = format!("b{n}");
+        sh(&fixture.repo, &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            &branch,
+            last.to_str().unwrap(),
+        ]);
+    }
+    let mut projects = fixture.projects();
+    let out = published(&mut projects);
+    let listed = out["projects"][0]["worktrees"].as_array().unwrap().len();
+    assert_eq!(listed, MAX_WORKTREES);
+    projects.receive("any", &json!({ "select": last.to_string_lossy() }));
+    assert_eq!(
+        published(&mut projects)["current"]["path"],
+        last.to_str().unwrap()
+    );
+}

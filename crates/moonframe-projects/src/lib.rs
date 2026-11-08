@@ -328,10 +328,18 @@ impl Projects {
         }
     }
 
-    /// The open project, when it is one.
+    /// The open project, when it is one the scan found: the home folder
+    /// may be selected, but opens no repository, even if it is one.
     fn open_tree(&self) -> Option<String> {
         let dir = self.state.select.clone()?;
-        Path::new(&dir).join(".git").exists().then_some(dir)
+        let found = self.known.contains(&dir) && Path::new(&dir).join(".git").exists();
+        found.then_some(dir)
+    }
+
+    /// Whether `path` may be selected: a repository or work tree found, or
+    /// the home folder, which an app's Home picks to have none open.
+    fn selectable(&mut self, path: &str) -> bool {
+        path == self.config.home || self.knows(path)
     }
 
     fn write_or_refuse(
@@ -357,7 +365,7 @@ impl Projects {
         }
         if let Some(path) = text_of(msg.get("select")) {
             let path = expand(&path, &self.config.home);
-            if self.state.select.as_ref() != Some(&path) && self.knows(&path) {
+            if self.state.select.as_ref() != Some(&path) && self.selectable(&path) {
                 self.state.select = Some(path);
                 self.completion = None;
                 self.state.open.clear();
@@ -459,11 +467,17 @@ impl Projects {
             .collect();
         projects.sort_by_key(|project| std::cmp::Reverse(project["time"].as_u64().unwrap_or(0)));
         projects.truncate(MAX_PROJECTS);
+        for project in &mut projects {
+            if let Some(trees) = project["worktrees"].as_array_mut() {
+                trees.truncate(MAX_WORKTREES);
+            }
+        }
         self.projects = projects;
         self.last_scan = now;
         // What was kept may be gone, or may never have been one of these.
-        let known = &self.known;
-        self.state.select = self.state.select.take().filter(|path| known.contains(path));
+        let (known, home) = (&self.known, &self.config.home);
+        let kept = self.state.select.take();
+        self.state.select = kept.filter(|path| known.contains(path) || path == home);
         // Until an app picks one, the most recently active project is open.
         if self.state.select.is_none() {
             let first = self
