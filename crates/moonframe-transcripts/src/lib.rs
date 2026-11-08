@@ -23,11 +23,13 @@
 //! `Native::receive` only posts: one thread reads, looks again every 30
 //! seconds, and publishes.
 
+// keep-sorted start
 mod meta;
 mod sample;
 mod sessions;
 mod text;
 mod transcript;
+// keep-sorted end
 
 use {
     moonframe_core::Data,
