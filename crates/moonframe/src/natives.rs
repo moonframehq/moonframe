@@ -28,6 +28,7 @@ pub(crate) fn natives() -> Natives {
         ("gitlab", gitlab),
         ("library", library),
         ("pi", pi),
+        ("planner", planner),
         ("projects", projects),
         ("repo", repo),
         ("shell", shell),
@@ -82,6 +83,11 @@ fn library() -> Box<dyn Native> {
 #[cfg(feature = "pi")]
 fn pi() -> Box<dyn Native> {
     moonframe_pi::pi()
+}
+
+#[cfg(feature = "planner")]
+fn planner() -> Box<dyn Native> {
+    moonframe_planner::native()
 }
 
 #[cfg(feature = "projects")]
@@ -154,6 +160,11 @@ fn pi() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(not(feature = "planner"))]
+fn planner() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 #[cfg(not(feature = "projects"))]
 fn projects() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -185,6 +196,7 @@ fn usage() -> Box<dyn Native> {
         feature = "forge",
         feature = "git",
         feature = "pi",
+        feature = "planner",
         feature = "projects",
         feature = "shell",
         feature = "speech",

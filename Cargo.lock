@@ -5248,6 +5248,7 @@ dependencies = [
  "moonframe-mux",
  "moonframe-packages",
  "moonframe-pi",
+ "moonframe-planner",
  "moonframe-projects",
  "moonframe-providers",
  "moonframe-shell",
@@ -5431,6 +5432,17 @@ dependencies = [
  "tempfile",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "moonframe-planner"
+version = "0.2.2"
+dependencies = [
+ "chrono",
+ "moonframe-core",
+ "moonframe-providers",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
