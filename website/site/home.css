@@ -100,7 +100,7 @@ h1 i { color:var(--acc-hi) }
 .film .play i { width:30px; height:30px; border-radius:50%; background:var(--acc-hi); display:grid; place-items:center }
 .film .play i::before { content:""; border-left:10px solid #fff; border-top:6px solid transparent; border-bottom:6px solid transparent; margin-left:3px }
 .film .play span { font:500 13px var(--mono); color:#cbb89a }
-.chapters { list-style:none; padding:0; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); border-top:2px solid var(--ink); margin-top:28px }
+.chapters { list-style:none; padding:0; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); border-top:2px solid var(--ink); margin-top:28px }
 .chapters button { all:unset; box-sizing:border-box; width:100%; cursor:pointer; display:flex; gap:12px; align-items:baseline; padding:12px 14px 12px 0; border-bottom:1px solid var(--rule); font:16px/1.35 var(--serif); color:var(--ink2) }
 .chapters button:hover, .chapters button:focus-visible { color:var(--acc) }
 .chapters button:focus-visible { outline:2px solid var(--acc); outline-offset:2px }
@@ -145,6 +145,8 @@ kbd { font:12px var(--mono); border:1px solid var(--rule); border-bottom-width:2
 .mockfig img { width:100%; filter:drop-shadow(0 18px 24px #2a1a1038) }
 .mockfig h3 { font-size:34px; font-weight:500; line-height:1.1; margin-bottom:12px }
 .mockfig p { color:var(--ink2); font-size:17px }
+.devfig { grid-template-columns:1fr 0.62fr; margin-top:80px }
+.devfig img { max-height:620px; width:auto; max-width:100%; justify-self:center }
 
 /* Components */
 .comp-head { display:flex; justify-content:space-between; align-items:flex-end; gap:40px }

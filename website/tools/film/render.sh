@@ -21,7 +21,7 @@ mkdir -p "$work/frames/img" "$work/out" "$site"
 # The screenshots the frames embed, scaled down so each frame renders quickly.
 shots="$repo/docs/screenshots"
 scale() { ffmpeg -loglevel error -y -i "$1" -vf "scale='min($3,iw)':-2" "$2"; }
-for name in window dark components; do
+for name in window dark components devtools; do
 	scale "$shots/$name.png" "$work/frames/img/$name.png" 1800
 done
 for shot in "$shots"/apps/*.png; do
