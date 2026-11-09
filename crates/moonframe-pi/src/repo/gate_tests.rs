@@ -41,6 +41,14 @@ fn git(dir: &Path, args: &[&str]) -> String {
 fn checkout() -> (tempfile::TempDir, Repo) {
     let dir = tempfile::tempdir().unwrap();
     git(dir.path(), &["init", "-q"]);
+    // The provider commits with whatever git finds, and CI has no identity.
+    for (key, value) in [
+        ("user.name", "t"),
+        ("user.email", "t@t"),
+        ("commit.gpgsign", "false"),
+    ] {
+        git(dir.path(), &["config", key, value]);
+    }
     for name in ["a", "b"] {
         std::fs::write(dir.path().join(name), name).unwrap();
         git(dir.path(), &["add", "-A"]);
