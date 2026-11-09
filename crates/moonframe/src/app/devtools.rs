@@ -7,9 +7,11 @@
 //! the file ships in the signed app; the window then reloads as for any
 //! change.
 
+mod files;
+
 use {
     super::*,
-    moonframe_core::{DEVTOOLS, Devtools, DevtoolsPlace, FEEDBACK, MAX_SOURCE, with_fields},
+    moonframe_core::{DEVTOOLS, Devtools, DevtoolsPlace, FEEDBACK, with_fields},
     std::collections::BTreeMap,
 };
 
@@ -183,7 +185,7 @@ impl MoonframeApp {
             Devtools::Select(path) => self.select_path(&path, cx),
             Devtools::Read { path, reply } => {
                 let answer = match self.source_file(&path) {
-                    Ok(file) => read_source(&file),
+                    Ok(file) => files::read(&file, &self.source_roots()),
                     Err(problem) => Err(problem),
                 };
                 let fields = match answer {
@@ -198,7 +200,7 @@ impl MoonframeApp {
             Devtools::Save { path, text, reply } => {
                 let fields = match self
                     .source_file(&path)
-                    .and_then(|file| save_source(&file, &text))
+                    .and_then(|file| files::save(&file, &text, &self.source_roots()))
                 {
                     Ok(written) => BTreeMap::from([
                         ("path".to_owned(), Data::from(path)),
@@ -253,19 +255,27 @@ impl MoonframeApp {
         if !file.is_absolute() || !luau || climbs {
             return Err("only a Luau file of the app's folders, by its whole path".to_owned());
         }
-        // Resolved, so a link inside the app's folders cannot lead out.
-        let resolved = file
-            .canonicalize()
-            .map_err(|error| format!("cannot read it: {error}"))?;
-        if !self.workspace.roots().layers().any(|layer| {
-            layer
-                .canonicalize()
-                .is_ok_and(|layer| resolved.starts_with(layer))
-        }) {
+        // By name here; `files` checks what the folder really is.
+        if !self
+            .workspace
+            .roots()
+            .layers()
+            .any(|layer| file.starts_with(layer))
+        {
             return Err("that file is not in the app's folders".to_owned());
         }
-        // The path as asked: the pick and the user's copy are named by it.
         Ok(file)
+    }
+
+    /// The folders a source file may be read from and saved to: the app's,
+    /// and the user's copies of a signed app's files.
+    fn source_roots(&self) -> Vec<PathBuf> {
+        self.workspace
+            .roots()
+            .layers()
+            .map(Path::to_path_buf)
+            .chain(moonframe_providers::installed().map(|installed| installed.folder.clone()))
+            .collect()
     }
 
     /// Whether the `devtools` mod loaded is the app's own (the built-in
@@ -371,72 +381,4 @@ fn failed(path: &str, problem: String) -> BTreeMap<String, Data> {
         ("ok".to_owned(), Data::Bool(false)),
         ("error".to_owned(), Data::from(problem)),
     ])
-}
-
-/// The text of `file`: the user's copy of it when there is one, as that is
-/// what the app runs.
-fn read_source(file: &Path) -> Result<String, String> {
-    let file = user_copy(file)
-        .filter(|copy| copy.is_file())
-        .unwrap_or_else(|| file.to_path_buf());
-    let size = std::fs::metadata(&file)
-        .map_err(|error| error.to_string())?
-        .len();
-    if size > MAX_SOURCE as u64 {
-        return Err(format!("it is over {MAX_SOURCE} bytes"));
-    }
-    std::fs::read_to_string(&file).map_err(|error| error.to_string())
-}
-
-/// Writes `text` to `file`, or to the user's copy of it when it ships in
-/// the signed app, which that copy then replaces. A temporary file and a
-/// rename, so the window never reloads half a file.
-fn save_source(file: &Path, text: &str) -> Result<PathBuf, String> {
-    let target = user_copy(file).unwrap_or_else(|| file.to_path_buf());
-    let folder = target
-        .parent()
-        .ok_or_else(|| "that file has no folder".to_owned())?;
-    std::fs::create_dir_all(folder).map_err(|error| error.to_string())?;
-    let name = target
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let temporary = folder.join(format!(".{name}.devtools"));
-    std::fs::write(&temporary, text)
-        .and_then(|()| std::fs::rename(&temporary, &target))
-        .map_err(|error| {
-            let _ = std::fs::remove_file(&temporary);
-            error.to_string()
-        })?;
-    tracing::info!("devtools saved {}", target.display());
-    Ok(target)
-}
-
-/// Where the user's copy of `file` goes when it ships in the signed app.
-fn user_copy(file: &Path) -> Option<PathBuf> {
-    let folder = &moonframe_providers::installed()?.folder;
-    Some(folder.join(paths::overlay(file)?))
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use super::{read_source, save_source};
-
-    #[test]
-    fn a_save_replaces_the_whole_file_and_reads_back() {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join("mods/a/main.luau");
-        let written = save_source(&file, "return mod {}").unwrap();
-        assert_eq!(written, file);
-        assert_eq!(read_source(&file).unwrap(), "return mod {}");
-        save_source(&file, "return mod { title = \"A\" }").unwrap();
-        assert_eq!(read_source(&file).unwrap(), "return mod { title = \"A\" }");
-        // No temporary file is left beside it.
-        let names: Vec<_> = std::fs::read_dir(file.parent().unwrap())
-            .unwrap()
-            .map(|entry| entry.unwrap().file_name())
-            .collect();
-        assert_eq!(names.len(), 1);
-    }
 }
