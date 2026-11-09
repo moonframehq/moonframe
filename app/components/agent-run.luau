@@ -202,7 +202,14 @@ return component {
 					class = "agent-run-tool",
 					align = "center",
 					ui.icon { name = look.icon :: any, class = look.tone, size = "small", spin = look.spin },
-					ui.text { tool.title, class = "agent-run-tool-title", truncate = true, tooltip = tool.title },
+					-- One line: a command's title can hold a whole script,
+					-- whose other lines would spill over the rows under it.
+					ui.text {
+						string.match(tool.title, "^%s*([^\n]*)") or tool.title,
+						class = "agent-run-tool-title",
+						truncate = true,
+						tooltip = tool.title,
+					},
 				}
 			)
 		end

@@ -84,7 +84,12 @@ impl Layer {
     fn brings_mod(&self, name: &str) -> bool {
         match &self.role {
             Role::App | Role::Package => true,
-            Role::Toolbox(keep) => keep.iter().any(|kept| kept == name),
+            // An app that keeps the feedback mod (the sparkle that asks an
+            // agent for a change) gets the Developer tools with it; any
+            // other app adds them with `keep = ["devtools"]`.
+            Role::Toolbox(keep) => keep
+                .iter()
+                .any(|kept| kept == name || (name == crate::DEVTOOLS && kept == crate::FEEDBACK)),
             Role::Style => false,
         }
     }

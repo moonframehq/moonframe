@@ -156,6 +156,17 @@ pub(crate) fn pick(placed: &Placed, workspace: &Workspace) -> Pick {
 
 /// The innermost mod that drew `placed`, and the innermost line within it.
 fn origin(placed: &Placed, workspace: &Workspace) -> (String, String) {
+    let (owner, source, line) = source_of(placed, workspace);
+    let at = location(source.as_deref(), line);
+    (owner, at)
+}
+
+/// The innermost mod that drew `placed`, its file, and the innermost line
+/// within it that built the element.
+pub(crate) fn source_of(
+    placed: &Placed,
+    workspace: &Workspace,
+) -> (String, Option<std::path::PathBuf>, Option<u32>) {
     let trail = placed.crumb.trail();
     let owner = trail
         .iter()
@@ -167,8 +178,11 @@ fn origin(placed: &Placed, workspace: &Workspace) -> (String, String) {
         .rev()
         .take_while(|crumb| crumb.owner.is_none())
         .find_map(|crumb| crumb.line);
-    let source = workspace.slot(owner).and_then(|slot| slot.source());
-    (owner.to_owned(), location(source, line))
+    let source = workspace
+        .slot(owner)
+        .and_then(|slot| slot.source())
+        .map(Path::to_path_buf);
+    (owner.to_owned(), source, line)
 }
 
 /// A pick, written for an agent to act on.

@@ -26,9 +26,12 @@ impl Build for Input {
         "prose",
         "dim",
         "typewriter",
+        "code",
+        "line",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
+        let code = code_language(fields)?;
         let multiline = fields.get("multiline")?.unwrap_or(false);
         let prose = fields.get("prose")?.unwrap_or(false);
         let dim = fields.get::<Dim>("dim")?;
@@ -37,6 +40,7 @@ impl Build for Input {
             ("prose", prose),
             ("dim", dim.is_some()),
             ("typewriter", typewriter),
+            ("code", code.is_some()),
         ] {
             if set && !multiline {
                 return Err(fields
@@ -138,8 +142,53 @@ impl Build for Input {
             prose,
             dim,
             typewriter,
+            line: caret_line(fields, code.is_some())?,
+            code,
         })
     }
+}
+
+/// `line`, a whole number from 1, for a code editor only.
+fn caret_line(fields: &Fields, code: bool) -> Result<Option<u32>, Error> {
+    let Some(line) = fields.get::<f32>("line")? else {
+        return Ok(None);
+    };
+    if !code {
+        return Err(fields.cx().key("line").fail("`line` goes with `code`"));
+    }
+    if line.fract() != 0.0 || !(1.0..=u32::MAX as f32).contains(&line) {
+        return Err(fields.cx().key("line").fail("a line number, from 1"));
+    }
+    Ok(Some(line as u32))
+}
+
+/// Longest language name `code` takes.
+const MAX_LANGUAGE: usize = 32;
+
+/// `code`'s language, lowercase: a name, never a path. Luau is colored as
+/// Lua, which it extends.
+fn code_language(fields: &Fields) -> Result<Option<String>, Error> {
+    let Some(name) = fields.get::<String>("code")? else {
+        return Ok(None);
+    };
+    let name = name.to_ascii_lowercase();
+    let plain = !name.is_empty()
+        && name.len() <= MAX_LANGUAGE
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'+'));
+    if !plain {
+        return Err(fields.cx().key("code").fail(format!(
+            "a language's name, such as \"luau\" or \"rust\" (at most {MAX_LANGUAGE} letters)"
+        )));
+    }
+    if fields.get("prose")?.unwrap_or(false) {
+        return Err(fields
+            .cx()
+            .key("code")
+            .fail("`code` and `prose` are two kinds of field: choose one"));
+    }
+    Ok(Some(name))
 }
 
 impl Build for Markdown {

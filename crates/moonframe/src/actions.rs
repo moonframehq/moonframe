@@ -17,6 +17,7 @@ gpui_kit::actions!(moonframe, [
     ToggleBetaReleases,
     ToggleSlowAnimations,
     ToggleDeveloperMode,
+    ToggleDevtools,
     UndoChange,
     RedoChange
 ]);
@@ -76,6 +77,11 @@ pub(crate) fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("cmd-r", Reload, Some("MoonframeApp && developer")),
         KeyBinding::new("cmd-alt-i", Inspect, Some("MoonframeApp && developer")),
+        KeyBinding::new(
+            "cmd-alt-j",
+            ToggleDevtools,
+            Some("MoonframeApp && developer"),
+        ),
         KeyBinding::new("cmd-alt-z", UndoChange, Some("MoonframeApp && developer")),
         KeyBinding::new(
             "cmd-alt-shift-z",
@@ -187,6 +193,7 @@ pub(crate) fn menus(shell: &[AppMenu]) -> Vec<Menu> {
         MenuItem::action("Undo Last Change", UndoChange),
         MenuItem::action("Redo Change", RedoChange),
         MenuItem::action("Inspect Element", Inspect),
+        MenuItem::action("Developer Tools", ToggleDevtools),
         MenuItem::action("Slow Animations", ToggleSlowAnimations).checked(crate::motion::is_slow()),
     ]);
     bar.push(Menu::new("View").items(view_items));

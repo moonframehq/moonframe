@@ -23,6 +23,7 @@ impl Render for MoonframeApp {
         let inspecting = self.inspector.sink().is_some();
         self.cached.begin(window.viewport_size(), inspecting);
         self.inputs.begin_frame();
+        let docked = self.devtools_docked();
         let last_keyed = self.motion.begin_frame();
         #[cfg(feature = "terminal")]
         self.terminals.begin_frame();
@@ -41,8 +42,10 @@ impl Render for MoonframeApp {
         .with_cached(&mut self.cached)
         .in_window(window.window_handle().window_id());
         let body = painter.shell(cx);
+        let tools = docked.then(|| painter.window(moonframe_core::DEVTOOLS, cx));
         let mut frame = painter.finish();
         self.cached.finish();
+        let body = self.with_dock(body, tools, cx);
         let animating = frame.animating;
         if animating {
             window.request_animation_frame();

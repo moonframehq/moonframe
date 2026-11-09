@@ -25,6 +25,13 @@ impl MoonframeApp {
         if from.starts_with(moonframe_core::DEMO) {
             return;
         }
+        // The Developer tools hear every pick while they are open.
+        if from == moonframe_core::DEVTOOLS {
+            if !self.inspector.picking {
+                self.toggle_inspect(cx);
+            }
+            return;
+        }
         // A pick another mod started ends for it first, unanswered.
         if self
             .inspector
@@ -89,6 +96,11 @@ impl MoonframeApp {
                 .as_ref()
                 .map(|picked| inspect::report(picked, &self.workspace)),
         );
+        if let Some(picked) = &picked
+            && self.inspector.asker.is_none()
+        {
+            self.tell_devtools(picked);
+        }
         self.inspector.selected = picked;
         if self.inspector.selected.is_some() {
             self.reveal_selection();
