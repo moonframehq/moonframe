@@ -42,13 +42,13 @@ impl MoonframeApp {
         if !omarchy::load() {
             return;
         }
-        for (slot, pending) in [&mut self.light_scheme, &mut self.dark_scheme]
+        for (slot, pending) in [&mut self.look.light_scheme, &mut self.look.dark_scheme]
             .into_iter()
-            .zip(&mut self.pending_omarchy)
+            .zip(&mut self.look.pending_omarchy)
         {
             refresh(slot, pending, omarchy::current());
         }
-        self.preview = None;
+        self.look.preview = None;
         self.apply_theme(cx);
         cx.notify();
     }

@@ -210,6 +210,12 @@ return mod {
 }
 ```
 
+**New Window** (⌘N, Ctrl-N elsewhere) sits under About: another main
+window with its own copy of the layout and the same providers, whose
+replies reach the window that asked; `command = "new-window"` places it in
+a shell menu (File, say). Only the first window keeps mod state across
+launches; another starts from each mod's `init` and saves nothing.
+
 An item sends `msg` to `to` (the shell without it) or runs a `command`;
 `shortcut` is a key as `keys` name them (`secondary` is ⌘ on macOS, Ctrl
 elsewhere). The receiving mod handles the message in `update` like a click.

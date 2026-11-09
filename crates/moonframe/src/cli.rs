@@ -360,7 +360,7 @@ fn catalogue(roots: Roots) -> ExitCode {
 /// gpui-component's `Root` then draws the resize edges and shadow). The
 /// layout moves the window from its `drag = true` stacks, so AppKit must
 /// not take the title bar's clicks for itself.
-fn framed(chrome: Chrome) -> WindowOptions {
+pub(crate) fn framed(chrome: Chrome) -> WindowOptions {
     let hidden = chrome.titlebar == Titlebar::Hidden;
     WindowOptions {
         titlebar: Some(TitlebarOptions {
@@ -619,6 +619,18 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
             let workspace =
                 crate::capabilities::open(folders.roots(), cx.theme().is_dark(), persist);
             let chrome = workspace.chrome();
+            // What every main window shares: the providers first.
+            crate::app::Hub::install(
+                &workspace,
+                natives,
+                crate::app::Launch {
+                    folders: folders.clone(),
+                    backends: backends.clone(),
+                    views: views.clone(),
+                    chrome,
+                },
+                cx,
+            );
             let placement = placement.filter(|_| chrome.remember);
             // The shell's size if it asks, kept within the screen.
             let (width, height) = chrome.size.unwrap_or((1280., 820.));
@@ -660,7 +672,7 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
                         chrome,
                         folders.clone(),
                         backends,
-                        crate::app::Parts { natives, views },
+                        views,
                         window,
                         cx,
                     );

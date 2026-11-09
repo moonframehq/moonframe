@@ -56,29 +56,13 @@ impl MoonframeApp {
     }
 
     /// Starts the provider `name` again, for the mod `from`.
-    pub(super) fn restart_provider(&mut self, from: &str, name: &str) {
+    pub(super) fn restart_provider(&mut self, from: &str, name: &str, cx: &mut Context<Self>) {
         if !self.built_with(from, cfg!(feature = "restart"), "restart") {
             return;
         }
-        if let Err(problem) = self.providers.restart(name) {
+        if let Err(problem) = self.hub.update(cx, |hub, _| hub.restart(name)) {
             self.workspace
                 .refuse(from, Error::new(format!("`app:restart`: {problem}")));
         }
-    }
-
-    /// Shares the last launch's crash, if it left a report.
-    pub(super) fn tell_last_crash(cx: &mut Context<Self>) {
-        if !cfg!(feature = "crash") {
-            return;
-        }
-        let Some(crash) = crate::crash::last(&crate::crash_dir()) else {
-            return;
-        };
-        tracing::warn!("the last run crashed: {crash:?}");
-        // After the app exists: this runs as it is being made.
-        cx.spawn(async move |this, cx| {
-            let _ = this.update(cx, |app, cx| app.published("crash", crash, cx));
-        })
-        .detach();
     }
 }

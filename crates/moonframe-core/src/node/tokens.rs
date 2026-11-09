@@ -207,6 +207,9 @@ tokens! {
         /// Asks the app's GitHub repository for a newer release, as the
         /// app menu's Check for Updates does.
         CheckForUpdates = "check-for-updates",
+        /// Opens another main window of the app, with its own copy of the
+        /// layout and the same providers.
+        NewWindow = "new-window",
     }
 }
 

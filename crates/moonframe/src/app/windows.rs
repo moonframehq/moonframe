@@ -19,6 +19,23 @@ impl MoonframeApp {
         }
     }
 
+    /// Whether the window `id` is this app's: its main window, a mod's it
+    /// opened, its components browser or theme picker, or one it drew in.
+    pub(crate) fn owns(&self, id: WindowId) -> bool {
+        id == self.main_window
+            || self.key_layers.contains_key(&id)
+            || (self.mod_windows.values())
+                .chain(&self.gallery)
+                .chain(&self.themes)
+                .any(|handle| handle.window_id() == id)
+    }
+
+    /// The main window, the one this app draws.
+    #[cfg(all(test, unix, feature = "markdown"))]
+    pub(crate) fn main_window_id(&self) -> WindowId {
+        self.main_window
+    }
+
     /// Whether `window` is the main window, not a mod's, the components
     /// browser or the theme picker.
     pub(crate) fn is_main(&self, window: &Window) -> bool {

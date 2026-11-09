@@ -185,6 +185,7 @@ mod tests {
         Message {
             from: "ui".into(),
             data,
+            origin: None,
         }
     }
 
@@ -208,6 +209,7 @@ mod tests {
         let message = Message {
             from: "herdr".into(),
             data: Data::from("install"),
+            origin: None,
         };
         assert_eq!(line(&message), r#"{"from":"herdr","message":"install"}"#);
     }

@@ -58,7 +58,7 @@ impl Project {
             while moves.next().await.is_some() {
                 while moves.try_recv().is_ok() {}
                 if this
-                    .update(cx, |app, _| app.providers.tell_project())
+                    .update(cx, |app, cx| app.hub.read(cx).tell_project())
                     .is_err()
                 {
                     break;

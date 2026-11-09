@@ -35,28 +35,20 @@ pub(crate) struct CloseGuard {
     waiting: Option<(Closing, Instant)>,
 }
 
-/// Reaches the app from the `Quit` action, which is the application's and
-/// has no window.
-struct QuitGuard(WeakEntity<MoonframeApp>);
-
-impl Global for QuitGuard {}
-
-/// Quits, unless a mod holds it back.
+/// Quits, unless a mod in one of the main windows holds it back.
 pub(crate) fn quit(cx: &mut App) {
-    let app = cx
-        .try_global::<QuitGuard>()
-        .and_then(|guard| guard.0.upgrade());
-    let held = app.is_some_and(|app| app.update(cx, |app, cx| app.held(Closing::Quit, cx)));
+    let held = hub::every(cx)
+        .into_iter()
+        .any(|app| app.update(cx, |app, cx| app.held(Closing::Quit, cx)));
     if !held {
         cx.quit();
     }
 }
 
 impl MoonframeApp {
-    /// Lets the main window's close button and the `Quit` action ask.
+    /// Lets the main window's close button ask.
     pub(super) fn watch_closing(window: &mut Window, cx: &mut Context<Self>) {
         let app = cx.entity().downgrade();
-        cx.set_global(QuitGuard(app.clone()));
         window.on_window_should_close(cx, move |_, cx| {
             !app.update(cx, |app, cx| app.held(Closing::Window, cx))
                 .unwrap_or(false)
@@ -121,7 +113,8 @@ impl MoonframeApp {
             Guard::Stop => self.close_guard = None,
             Guard::Release => match self.close_guard.take().and_then(|guard| guard.waiting) {
                 Some((Closing::Window, _)) => window.remove_window(),
-                Some((Closing::Quit, _)) => cx.quit(),
+                // Unless a mod in another window holds it back too.
+                Some((Closing::Quit, _)) => cx.defer(quit),
                 None => {},
             },
         }
