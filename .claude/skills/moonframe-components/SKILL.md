@@ -162,7 +162,9 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   traffic_lights = { x, y } } }` draws the layout under the title bar (at
   startup only); `app.window` tells views the `platform`, `titlebar`,
   `maximized`, `fullscreen` and `active`, so a title bar knows whether to
-  draw window buttons or leave room for traffic lights.
+  draw window buttons or leave room for traffic lights. The main window
+  reopens where and as large as it last was, kept within the screen;
+  `window = { remember = false }` opens it at its `size`, centered, instead.
 - **A mod's own window** takes `titlebar = "hidden"` and `traffic_lights`
   in its `window` too, beside `size` and `min_size`, with `drag = true` on
   what moves it. While open, the mod and its instances read that window's

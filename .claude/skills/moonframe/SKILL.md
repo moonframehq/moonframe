@@ -1568,6 +1568,13 @@ return mod {
 
 - `size = { width = 1500, height = 960 }`: the size the window opens at
   (kept within the screen), for apps whose layout needs room.
+- The window reopens where it last was: its place, size, screen, and
+  whether it was maximized or fullscreen are kept per app (and profile) in
+  the app's state folder (`window.json` beside `state.sqlite`). A screen
+  that is gone, or a frame too far off it to reach, opens at `size`,
+  centered, instead; a frame too large for its screen shrinks to fit.
+  `remember = false` opens at `size`, centered, every launch. `--no-user`
+  runs keep nothing, as for state.
 - `titlebar = "hidden"`: on macOS the layout runs under a transparent title
   bar and the traffic lights stay, at `traffic_lights` (the first button's
   offset from the top left; the system's place when unset). On Windows the

@@ -15,11 +15,23 @@ use super::*;
 /// The app, and the host views it shows.
 pub(crate) struct MainWindow {
     app: Entity<MoonframeApp>,
+    /// Keep the window's place for the next launch, while it is open.
+    _placement: Option<[Subscription; 2]>,
 }
 
 impl MainWindow {
-    pub(crate) fn new(app: Entity<MoonframeApp>) -> Self {
-        Self { app }
+    /// The window showing `app`, saving its place to `placement` as it
+    /// changes when that is given.
+    pub(crate) fn new(
+        app: Entity<MoonframeApp>,
+        placement: Option<PathBuf>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        Self {
+            app,
+            _placement: placement.map(|path| crate::placement::remember(path, window, cx)),
+        }
     }
 
     /// Runs `f` on the app, from one of the window's actions.
