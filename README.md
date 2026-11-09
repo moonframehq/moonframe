@@ -386,9 +386,10 @@ About panel and Send feedback button. The dashboards and chats run on sample
 data or a scripted agent, labelled as such.
 
 The real ones also ship on their own, with nothing else to install: Cairn
-(which runs the coding agent you have), Folio, Pilot (which runs the pi you
-have), Sessions, Switchyard, Trellis and Workbench. Each release's `apps-v<version>` has them for macOS and Linux, and
-on a Mac:
+and Cinder (which run the coding agent you have), Daybook, Folio, Hangar,
+Lantern, Pilot (which runs the pi you have), Sessions, Switchyard, Trellis
+and Workbench. Each release's `apps-v<version>` has them for macOS and
+Linux, and on a Mac:
 
 ```sh
 brew install moonframehq/tap/moonframe-folio
@@ -458,7 +459,7 @@ feedback, shows at once.
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/cinder.png" alt="Cinder">
       <br>
-      <sub><b>Cinder</b> (<code>cinder</code>): a desktop agent app in code mode: your coding-agent CLI sessions grouped by repository (read-only), their transcripts, and a scripted demo agent for new sessions.</sub>
+      <sub><b>Cinder</b> (<code>cinder</code>): a desktop agent app in code mode: your coding-agent CLI sessions grouped by repository (read-only), their transcripts, and new sessions with the coding agent you have.</sub>
     </td>
   </tr>
   <tr>
@@ -559,7 +560,7 @@ feedback, shows at once.
   </tr>
 </table>
 
-Sessions, Workbench, Stage, Trellis, Lantern and Cairn require the `projects`
+Sessions, Workbench, Stage, Switchyard, Trellis, Lantern and Cairn require the `projects`
 package beside them (`examples/projects`). To run one by hand, link it in
 place and open its profile:
 
