@@ -165,7 +165,7 @@ impl MoonframeApp {
         request: Devtools,
         cx: &mut Context<Self>,
     ) {
-        if from != DEVTOOLS {
+        if from != DEVTOOLS || !self.devtools_trusted() {
             self.workspace.refuse(
                 from,
                 Error::new(format!(
@@ -253,15 +253,32 @@ impl MoonframeApp {
         if !file.is_absolute() || !luau || climbs {
             return Err("only a Luau file of the app's folders, by its whole path".to_owned());
         }
-        if !self
-            .workspace
-            .roots()
-            .layers()
-            .any(|layer| file.starts_with(layer))
-        {
+        // Resolved, so a link inside the app's folders cannot lead out.
+        let resolved = file
+            .canonicalize()
+            .map_err(|error| format!("cannot read it: {error}"))?;
+        if !self.workspace.roots().layers().any(|layer| {
+            layer
+                .canonicalize()
+                .is_ok_and(|layer| resolved.starts_with(layer))
+        }) {
             return Err("that file is not in the app's folders".to_owned());
         }
+        // The path as asked: the pick and the user's copy are named by it.
         Ok(file)
+    }
+
+    /// Whether the `devtools` mod loaded is the app's own (the built-in
+    /// one, the app's, or the user's), not one an installed package
+    /// brought: only that one may read and save the app's files.
+    fn devtools_trusted(&self) -> bool {
+        let Some(source) = self.workspace.slot(DEVTOOLS).and_then(|slot| slot.source()) else {
+            return false;
+        };
+        self.workspace
+            .roots()
+            .app_layers()
+            .any(|layer| source.starts_with(layer))
     }
 
     /// The dock beside `body`, the shell, when `tools` is drawn: a strip
