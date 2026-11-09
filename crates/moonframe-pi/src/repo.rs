@@ -12,6 +12,13 @@
 //! `{ write = path, text, version }`, `{ close = true }`, `{ find = query,
 //! root? }`, `{ remove_worktree = path }`, `{ refresh = true }`.
 //!
+//! Only the mods named in `[settings] writers` (or the comma-separated
+//! `MOONFRAME_REPO_WRITERS`) may point it at a checkout or change one: `at`,
+//! `stage`, `unstage`, `stage_all`, `discard`, `commit`, `write` and
+//! `remove_worktree`. Any mod may look: compare, pick, read, open folders and
+//! search the checkout it is at. A compared revision must name a commit, and
+//! a worktree removed must be one git lists.
+//!
 //! Git can wait a long time (a signing key waiting for a tap), so
 //! `Native::receive` only posts: one thread takes messages in order and
 //! looks at the checkout every couple of seconds, publishing as it goes.
@@ -58,7 +65,7 @@ pub(crate) fn native() -> Box<dyn Native> {
 
 #[derive(Default)]
 struct Provider {
-    inbox: Option<Sender<Value>>,
+    inbox: Option<Sender<(String, Value)>>,
     /// Set as the provider goes: its worker publishes nothing after.
     stopped: Arc<AtomicBool>,
     worker: Option<JoinHandle<()>>,
@@ -77,9 +84,9 @@ impl Native for Provider {
     /// The worker keeps its own time.
     fn tick(&mut self, _host: &Handle) {}
 
-    fn receive(&mut self, _host: &Handle, _from: &str, message: Data) {
+    fn receive(&mut self, _host: &Handle, from: &str, message: Data) {
         if let Some(inbox) = &self.inbox {
-            let _ = inbox.send(to_json(&message));
+            let _ = inbox.send((from.to_owned(), to_json(&message)));
         }
     }
 }
@@ -100,7 +107,7 @@ impl Drop for Provider {
     }
 }
 
-fn serve(host: &Handle, messages: &Receiver<Value>, stopped: Arc<AtomicBool>) {
+fn serve(host: &Handle, messages: &Receiver<(String, Value)>, stopped: Arc<AtomicBool>) {
     let mut repo = Repo::new(host.clone(), stopped);
     repo.publish();
     let mut looked = Instant::now();
@@ -110,9 +117,9 @@ fn serve(host: &Handle, messages: &Receiver<Value>, stopped: Arc<AtomicBool>) {
             return;
         }
         match message {
-            Ok(message) => {
+            Ok((from, message)) => {
                 let handled = guarded(|| {
-                    repo.handle(&message);
+                    repo.handle(&from, &message);
                     Ok(())
                 });
                 if let Err(problem) = handled {
@@ -140,6 +147,8 @@ struct Compare {
     mode: String,
     from: Option<String>,
     to: Option<String>,
+    /// `from` and `to` as the commits they name, which is all git is given.
+    commits: Option<(String, String)>,
 }
 
 impl Compare {
@@ -148,6 +157,7 @@ impl Compare {
             mode: "uncommitted".to_owned(),
             from: None,
             to: None,
+            commits: None,
         }
     }
 }
@@ -155,6 +165,8 @@ impl Compare {
 /// The state behind `app.repo`.
 struct Repo {
     host: Handle,
+    /// The mods that may point it somewhere and change what is there.
+    writers: Vec<String>,
     stopped: Arc<AtomicBool>,
     runtime: Runtime,
     at: Option<String>,
@@ -186,6 +198,41 @@ fn nothing_found() -> Value {
     json!({ "query": "", "results": [] })
 }
 
+/// What a message asks that only a writer may: its key, if any.
+fn change(message: &Value) -> Option<&'static str> {
+    const CHANGES: [&str; 8] = [
+        "at",
+        "stage",
+        "unstage",
+        "stage_all",
+        "discard",
+        "commit",
+        "write",
+        "remove_worktree",
+    ];
+    CHANGES.into_iter().find(|key| message.get(key).is_some())
+}
+
+/// The mods `[settings] writers` names, or `MOONFRAME_REPO_WRITERS`.
+fn writers(settings: &Value) -> Vec<String> {
+    match std::env::var("MOONFRAME_REPO_WRITERS") {
+        Ok(listed) => listed
+            .split(',')
+            .map(str::trim)
+            .filter(|writer| !writer.is_empty())
+            .map(str::to_owned)
+            .collect(),
+        Err(_) => settings
+            .get("writers")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect(),
+    }
+}
+
 /// A message's text, if it has any: an empty one asks for nothing.
 fn filled<'a>(message: &'a Value, key: &str) -> Option<&'a str> {
     message[key].as_str().filter(|text| !text.is_empty())
@@ -193,8 +240,10 @@ fn filled<'a>(message: &'a Value, key: &str) -> Option<&'a str> {
 
 impl Repo {
     fn new(host: Handle, stopped: Arc<AtomicBool>) -> Self {
+        let writers = writers(&to_json(host.settings()));
         Self {
             host,
+            writers,
             stopped,
             runtime: Runtime::new(&Config::from_env()),
             at: None,
@@ -355,6 +404,34 @@ impl Repo {
             .map(|_| ())
     }
 
+    /// The commit `revision` names, for git to be given in its place: never
+    /// what reads as an option, nor what names no commit.
+    fn commit_of(&self, revision: &str) -> Result<String, String> {
+        let refused = || format!("`{revision}` names no commit");
+        if revision.is_empty() || revision.starts_with('-') {
+            return Err(refused());
+        }
+        let named = format!("{revision}^{{commit}}");
+        let args = [
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            "--end-of-options",
+            named.as_str(),
+        ];
+        let commit = self.git(&args).map_err(|_| refused())?;
+        Some(commit.trim().to_owned())
+            .filter(|commit| !commit.is_empty())
+            .ok_or_else(refused)
+    }
+
+    /// Whether `path` is a worktree git lists for the checkout.
+    fn listed_worktree(&self, path: &str) -> bool {
+        self.worktrees
+            .iter()
+            .any(|worktree| worktree["path"] == path)
+    }
+
     fn go_to(&mut self, at: String) {
         if self.at.as_deref() == Some(at.as_str()) {
             return;
@@ -373,8 +450,18 @@ impl Repo {
         self.refresh();
     }
 
-    fn handle(&mut self, message: &Value) {
+    fn handle(&mut self, from: &str, message: &Value) {
         if !message.is_object() {
+            return;
+        }
+        let writer = self.writers.iter().any(|writer| writer == from);
+        if let Some(key) = change(message)
+            && !writer
+        {
+            self.error = Some(format!(
+                "`{from}` may not {key} here: only the mods in [settings] writers may"
+            ));
+            self.publish();
             return;
         }
         if let Some(at) = message.get("at") {
@@ -383,8 +470,13 @@ impl Repo {
         }
         // A draft searches the project it was given, whatever is open here.
         if let Some(query) = message.get("find") {
+            // Another mod searches the checkout or one of its worktrees, as
+            // a draft for another thread does; only a writer looks elsewhere.
             let root = message["root"]
                 .as_str()
+                .filter(|root| {
+                    writer || self.at.as_deref() == Some(*root) || self.listed_worktree(root)
+                })
                 .map(str::to_owned)
                 .or_else(|| self.at.clone());
             if let Some(root) = root {
@@ -398,10 +490,26 @@ impl Repo {
         }
         if let Some(mode) = filled(message, "compare") {
             let text = |key: &str| message[key].as_str().map(str::to_owned);
+            let (from, to) = (text("from"), text("to"));
+            let commits = match (mode, from.as_deref(), to.as_deref()) {
+                ("range", Some(from), Some(to)) if !from.is_empty() && !to.is_empty() => match self
+                    .commit_of(from)
+                    .and_then(|from| Ok((from, self.commit_of(to)?)))
+                {
+                    Ok(commits) => Some(commits),
+                    Err(problem) => {
+                        self.error = Some(problem);
+                        self.publish();
+                        return;
+                    },
+                },
+                _ => None,
+            };
             self.compare = Compare {
                 mode: mode.to_owned(),
-                from: text("from"),
-                to: text("to"),
+                from,
+                to,
+                commits,
             };
             self.picked = text("pick");
             self.refresh();
@@ -465,6 +573,11 @@ impl Repo {
             self.file = Value::Null;
             self.publish();
         } else if let Some(path) = filled(message, "remove_worktree") {
+            if !self.listed_worktree(path) {
+                self.error = Some(format!("`{path}` is no worktree of this checkout"));
+                self.publish();
+                return;
+            }
             self.act("worktree", None, |repo| {
                 repo.git(&["worktree", "remove", "--force", path])
                     .map(|_| ())
@@ -483,3 +596,7 @@ impl Repo {
         self.publish();
     }
 }
+
+#[cfg(test)]
+#[path = "repo/gate_tests.rs"]
+mod gate_tests;

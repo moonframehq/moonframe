@@ -68,9 +68,7 @@ impl Repo {
     pub(super) fn range(&self) -> Vec<String> {
         let compare = &self.compare;
         if compare.mode == "range"
-            && let (Some(from), Some(to)) = (&compare.from, &compare.to)
-            && !from.is_empty()
-            && !to.is_empty()
+            && let Some((from, to)) = &compare.commits
         {
             return vec![from.clone(), to.clone()];
         }
