@@ -69,10 +69,10 @@ impl MoonframeApp {
         changed |= self.reload_theme(settings::DARK_THEME, true);
         if let Some(name) = self.saved_setting(settings::APPEARANCE) {
             match Appearance::named(&name) {
-                Some(appearance) if appearance != self.appearance => {
-                    self.appearance = appearance;
+                Some(appearance) if appearance != self.look.appearance => {
+                    self.look.appearance = appearance;
                     show_appearance(appearance);
-                    cx.set_menus(menus(self.workspace.menus()));
+                    crate::host_menus::install(self.workspace.menus(), cx);
                     changed = true;
                 },
                 Some(_) => {},
@@ -80,7 +80,7 @@ impl MoonframeApp {
             }
         }
         if changed {
-            self.preview = None;
+            self.look.preview = None;
             self.apply_theme(cx);
         }
         cx.notify();
@@ -100,9 +100,9 @@ impl MoonframeApp {
             return false;
         };
         let current = if dark {
-            self.dark_scheme
+            self.look.dark_scheme
         } else {
-            self.light_scheme
+            self.look.light_scheme
         };
         if name == themes::omarchy::NAME || name == name_of(current) {
             return false;
@@ -110,11 +110,11 @@ impl MoonframeApp {
         match themes::fits(&name, dark) {
             Ok(scheme) => {
                 let slot = usize::from(dark);
-                self.pending_omarchy[slot] = false;
+                self.look.pending_omarchy[slot] = false;
                 if dark {
-                    self.dark_scheme = scheme;
+                    self.look.dark_scheme = scheme;
                 } else {
-                    self.light_scheme = scheme;
+                    self.look.light_scheme = scheme;
                 }
                 true
             },

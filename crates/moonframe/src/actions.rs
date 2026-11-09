@@ -17,8 +17,10 @@ gpui_kit::actions!(moonframe, [
     ToggleBetaReleases,
     ToggleSlowAnimations,
     ToggleDeveloperMode,
+    ToggleDevtools,
     UndoChange,
-    RedoChange
+    RedoChange,
+    NewWindow
 ]);
 
 /// Runs a shell menu item, found by its id (menu title and label).
@@ -76,6 +78,11 @@ pub(crate) fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("cmd-r", Reload, Some("MoonframeApp && developer")),
         KeyBinding::new("cmd-alt-i", Inspect, Some("MoonframeApp && developer")),
+        KeyBinding::new(
+            "cmd-alt-j",
+            ToggleDevtools,
+            Some("MoonframeApp && developer"),
+        ),
         KeyBinding::new("cmd-alt-z", UndoChange, Some("MoonframeApp && developer")),
         KeyBinding::new(
             "cmd-alt-shift-z",
@@ -90,6 +97,17 @@ pub(crate) fn bind_keys(cx: &mut App) {
     ]);
     cx.bind_keys([
         KeyBinding::new("cmd-q", Quit, None),
+        // ⌘N, Ctrl-N elsewhere; a shell menu item with the same
+        // shortcut, bound later, wins.
+        KeyBinding::new(
+            if cfg!(target_os = "macos") {
+                "cmd-n"
+            } else {
+                "ctrl-n"
+            },
+            NewWindow,
+            Some("MoonframeApp"),
+        ),
         KeyBinding::new("cmd-shift-l", ToggleTheme, Some("MoonframeApp")),
         KeyBinding::new("cmd-k cmd-t", ShowThemes, Some("MoonframeApp")),
         // Escape in a terminal is the shell's (vim needs it).
@@ -112,7 +130,11 @@ pub(crate) fn bind_keys(cx: &mut App) {
 /// changes to the app's files, or Slow Animations.
 pub(crate) fn menus(shell: &[AppMenu]) -> Vec<Menu> {
     let title = crate::title();
-    let mut app_items = vec![MenuItem::action(format!("About {title}"), AboutApp)];
+    let mut app_items = vec![
+        MenuItem::action(format!("About {title}"), AboutApp),
+        MenuItem::separator(),
+        MenuItem::action("New Window", NewWindow),
+    ];
     // An app that names the GitHub repository it is released from.
     #[cfg(feature = "updates")]
     if crate::update::source().is_some() {
@@ -146,12 +168,7 @@ pub(crate) fn menus(shell: &[AppMenu]) -> Vec<Menu> {
     // Window and Help go last, after View, as macOS orders them.
     let mut last = Vec::new();
     for menu in shell {
-        let items = menu.items.iter().map(|entry| match entry {
-            MenuEntry::Separator => MenuItem::separator(),
-            MenuEntry::Item(item) => MenuItem::action(item.label.clone(), MenuSend {
-                id: item.id(&menu.title),
-            }),
-        });
+        let items = shell_items(menu);
         if menu.title == "View" {
             view_items.extend(items);
             view_items.push(MenuItem::separator());
@@ -187,11 +204,56 @@ pub(crate) fn menus(shell: &[AppMenu]) -> Vec<Menu> {
         MenuItem::action("Undo Last Change", UndoChange),
         MenuItem::action("Redo Change", RedoChange),
         MenuItem::action("Inspect Element", Inspect),
+        MenuItem::action("Developer Tools", ToggleDevtools),
         MenuItem::action("Slow Animations", ToggleSlowAnimations).checked(crate::motion::is_slow()),
     ]);
     bar.push(Menu::new("View").items(view_items));
     bar.extend(last);
     bar
+}
+
+/// A shell menu's items, each sending its id when chosen.
+fn shell_items(menu: &AppMenu) -> Vec<MenuItem> {
+    menu.items
+        .iter()
+        .map(|entry| match entry {
+            MenuEntry::Separator => MenuItem::separator(),
+            MenuEntry::Item(item) => MenuItem::action(item.label.clone(), MenuSend {
+                id: item.id(&menu.title),
+            }),
+        })
+        .collect()
+}
+
+/// A shell menu as a menu of its own in a host's bar.
+pub(crate) fn shell_menu(menu: &AppMenu) -> Menu {
+    Menu::new(menu.title.clone()).items(shell_items(menu))
+}
+
+/// Developer Mode and, while it is on, the tools for changing the app as it
+/// runs: for a host's bar, which has no View menu of Moonframe's to hold
+/// them. None in a build without them.
+pub(crate) fn developer_menu() -> Option<Menu> {
+    let mut items = Vec::new();
+    if cfg!(feature = "studio") {
+        items.push(
+            MenuItem::action("Developer Mode", ToggleDeveloperMode).checked(!crate::release()),
+        );
+    }
+    if !crate::release() {
+        items.extend([
+            MenuItem::separator(),
+            MenuItem::action("Components…", BrowseComponents),
+            MenuItem::action("Reload Modules", Reload),
+            MenuItem::action("Undo Last Change", UndoChange),
+            MenuItem::action("Redo Change", RedoChange),
+            MenuItem::action("Inspect Element", Inspect),
+            MenuItem::action("Developer Tools", ToggleDevtools),
+            MenuItem::action("Slow Animations", ToggleSlowAnimations)
+                .checked(crate::motion::is_slow()),
+        ]);
+    }
+    (!items.is_empty()).then(|| Menu::new("Developer").items(items))
 }
 
 /// Binds each shell menu item's `shortcut`, once per key: GPUI keeps

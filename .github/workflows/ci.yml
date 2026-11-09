@@ -56,6 +56,7 @@ jobs:
       workflows: ${{ steps.classify.outputs.workflows }}
       build: ${{ steps.classify.outputs.build }}
       site: ${{ steps.classify.outputs.site }}
+      guide: ${{ steps.classify.outputs.guide }}
     steps:
       - id: classify
         env:
@@ -68,7 +69,7 @@ jobs:
           set -euo pipefail
           all() {
             echo "$1: running every job"
-            printf 'workflows=true\nbuild=true\nsite=true\n' >> "$GITHUB_OUTPUT"
+            printf 'workflows=true\nbuild=true\nsite=true\nguide=true\n' >> "$GITHUB_OUTPUT"
             exit 0
           }
           case $EVENT in
@@ -95,9 +96,16 @@ jobs:
           workflows=false
           build=false
           site=false
+          guide=false
           while IFS= read -r file; do
             [[ -n $file ]] || continue
             [[ $file != .github/* ]] || workflows=true
+            # The WASM guide page is generated from its Markdown by a tool
+            # in website/tools; a change to any of them, or to this workflow,
+            # checks it is still current.
+            case $file in
+              website/* | docs/wasm-providers.md | .github/workflows/ci.yml) guide=true ;;
+            esac
             case $file in
               # Built by nothing here, wherever its scripts or TOML are: the
               # site job checks their size, sort markers and formatting.
@@ -117,7 +125,7 @@ jobs:
               *) build=true ;;
             esac
           done <<<"$files"
-          printf 'workflows=%s\nbuild=%s\nsite=%s\n' "$workflows" "$build" "$site" | tee -a "$GITHUB_OUTPUT"
+          printf 'workflows=%s\nbuild=%s\nsite=%s\nguide=%s\n' "$workflows" "$build" "$site" "$guide" | tee -a "$GITHUB_OUTPUT"
 
   # Audits the workflows themselves: template injection, over-broad
   # permissions, unpinned actions, persisted credentials, cache poisoning.
@@ -234,7 +242,7 @@ jobs:
           PI_VERSION: 1.5.0
           PI_SHA256: df870ba0e344cb7b3358d8d8f19397b8b8d225a8669784736ad68a5c2169d53b
         run: |
-          curl -fsSL -o "$RUNNER_TEMP/pi.tar.gz" \
+          curl -fsSL --retry 5 --retry-delay 15 -o "$RUNNER_TEMP/pi.tar.gz" \
             "https://github.com/earendil-works/pi/releases/download/v$PI_VERSION/pi-linux-x64.tar.gz"
           echo "$PI_SHA256  $RUNNER_TEMP/pi.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/pi.tar.gz" -C "$RUNNER_TEMP"
@@ -301,11 +309,37 @@ jobs:
       - name: Check TOML formatting
         run: taplo fmt --check
 
+  # docs.moonframe.dev's WASM guide is generated from docs/wasm-providers.md
+  # by website/tools/wasm-guide.py: fail when the committed page is not what
+  # the tool renders now. Its own job, as it runs whether or not `build` is.
+  wasm-guide:
+    name: WASM guide is current
+    needs: [changes, zizmor]
+    if: >-
+      !cancelled() && needs.changes.outputs.guide == 'true' &&
+      (needs.zizmor.result == 'success' || needs.zizmor.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The tool's one dependency, pinned as in its script header, by hash.
+      - name: Install Markdown
+        run: |
+          python3 -m venv "$RUNNER_TEMP/guide"
+          printf 'Markdown==3.8.2 --hash=sha256:5c83764dbd4e00bdd94d85a19b8d55ccca20fe35b2e678a1422b380324dd5f24\n' > "$RUNNER_TEMP/guide.txt"
+          "$RUNNER_TEMP/guide/bin/pip" install --quiet --disable-pip-version-check --no-deps --only-binary :all: --require-hashes -r "$RUNNER_TEMP/guide.txt"
+      - name: Check the WASM guide page matches its Markdown
+        run: '"$RUNNER_TEMP/guide/bin/python" website/tools/wasm-guide.py --check'
+
   # One stable context for branch protection: every job above passed, or
   # was skipped because Changes found nothing for it to check.
   ci-passed:
     name: CI passed
-    needs: [changes, zizmor, lint, checks, site]
+    needs: [changes, zizmor, lint, checks, site, wasm-guide]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

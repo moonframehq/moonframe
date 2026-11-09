@@ -237,3 +237,8 @@ objc2-web-kit                      = { optional = true, workspace = true }
 # there shows its address and opens it in the system browser.
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 wry = { optional = true, workspace = true }
+
+# The Developer tools read and save relative to a folder opened and checked
+# once, so no link swapped in after the check leads them out of the app.
+[target.'cfg(any(target_os = "macos", target_os = "linux"))'.dependencies]
+rustix.workspace = true

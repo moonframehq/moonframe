@@ -364,7 +364,11 @@ impl Ui {
                     let problem = Error::new(format!("provider failed: {problem}"));
                     self.workspace.clear_host(&provider, Some(problem));
                 },
-                Event::Sent { provider, to, msg } => {
+                // Rune has one main window: a reply goes there, whichever
+                // window's message it answers.
+                Event::Sent {
+                    provider, to, msg, ..
+                } => {
                     self.workspace
                         .send(&format!("{PROVIDER}{provider}"), &to, msg);
                 },

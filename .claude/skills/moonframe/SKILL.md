@@ -255,6 +255,15 @@ down to what was under the pointer: hovering a row outlines that element in
 the window, and clicking it selects it instead. So a selection may be a row
 or panel the user chose on purpose, not just the leaf under the pointer.
 
+**View > Developer Tools** (⌥⌘J, Developer Mode) shows the pick in a dock
+on the right of the window (drawn around the shell, so no layout makes room
+for it) or in a window of its own (drag the dock's grip out): the element and
+its trail, its mod's Luau in a code editor (⌘S saves and the window reloads),
+the mod's state, and agent sessions (the feedback mod's runs) that stay open.
+It is `mods/devtools`; only it may send `app:devtools`. Every app has it,
+profiles and library hosts alike, whatever their `keep`; the Agent tab
+shows when the app also keeps `feedback`.
+
 When the user says "here", "this", "the selected element" or "add X there"
 without saying where, read that file first. The `file:line` is the `ui` call
 that built the element. For an element a component built, it is the line in
@@ -685,7 +694,8 @@ end,
 - `app:command`, `msg` a command's name: runs it as a control's `command`
   does, with the same commands (`quit` `reload` `toggle-theme`
   `show-themes` `minimize` `maximize` `close-window` `check-for-updates`
-  `inspect`) and nothing else. It runs once the update that asked is done.
+  `new-window` `inspect`) and nothing else. It runs once the update that
+  asked is done; `reload` and `new-window` asked from `init` are ignored.
 - `app:appearance`, `msg` `"system"`, `"light"` or `"dark"`: whether the
   window follows the system's light or dark (and switches live as it
   does) or stays one. It is kept across launches for the app and profile
@@ -1220,7 +1230,7 @@ Text-like elements take their main value positionally:
 - border: `true`, `all`, `top`, `bottom`, `left`, `right`, `none`
 - direction: `row` `column`
 - variant (button): `normal` `primary` `ghost` `outline` `danger`
-- command: `quit` `reload` `toggle-theme` (light to dark or back, keeping the themes) `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `inspect` (Inspect Element for the mod: see "Here")
+- command: `quit` `reload` `toggle-theme` (light to dark or back, keeping the themes) `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `new-window` (another main window: its own copy of the layout, the same providers; only the first keeps mod state across launches) `inspect` (Inspect Element for the mod: see "Here")
 - place (overlay): `center` `top` `bottom` `left` `right` `top-start`
   `top-end` `bottom-start` `bottom-end`
 - browser commands (with `browser = "<id>"`): `browser-back`
@@ -1559,6 +1569,13 @@ return mod {
 
 - `size = { width = 1500, height = 960 }`: the size the window opens at
   (kept within the screen), for apps whose layout needs room.
+- The window reopens where it last was: its place, size, screen, and
+  whether it was maximized or fullscreen are kept per app (and profile) in
+  the app's state folder (`window.json` beside `state.sqlite`). A screen
+  that is gone, or a frame too far off it to reach, opens at `size`,
+  centered, instead; a frame too large for its screen shrinks to fit.
+  `remember = false` opens at `size`, centered, every launch. `--no-user`
+  runs keep nothing, as for state.
 - `titlebar = "hidden"`: on macOS the layout runs under a transparent title
   bar and the traffic lights stay, at `traffic_lights` (the first button's
   offset from the top left; the system's place when unset). On Windows the

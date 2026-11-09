@@ -91,7 +91,7 @@ ship only their selected components.
 | `markdown` | Rich `ui.markdown` rendering (headings, lists, tables, links and code). |
 | `prose` | The writing editor for `ui.input` with `prose`, `dim` or `typewriter`. Ordinary single-line and multiline inputs remain available without it. |
 | `sealed` | Staged app resources instead of the full embedded toolbox. |
-| `studio` | Development commands and the component gallery. |
+| `studio` | Developer Mode: Inspect Element, the Developer tools (with `syntax` to color their code editor), Reload Modules and the component gallery. Without it the app is always in release mode. |
 | `updates` | Release checks, downloads and in-place app updates. Omitting it hides the updater menu and disables automatic checks. |
 | `acp`, `chat`, `docs`, `forge`, `git`, `shell`, `usage` | The respective built-in native providers. |
 | `speech` | The `speech` native provider: dictation from the microphone (`use "dictation"`), through Apple's on-device recognizer, a local program or a remote service. Opt-in. |
@@ -225,7 +225,7 @@ fn main() -> std::process::ExitCode {
 | `.app_dir(path)` | its app folder while it runs from source; edits reload live |
 | `.embedded_app::<E>()` | its app folder compiled in (`#[derive(moonframe::rust_embed::RustEmbed)]`, `#[crate_path = "moonframe::rust_embed"]`), for a lone executable |
 | `.project_dir(path)` | the source checkout for an embedded app's debug branch bar; pass `env!("CARGO_MANIFEST_DIR")` from the host crate, including when Cargo builds into an external target folder |
-| `.keep(mods)` | the starter's mods it shows (from `app/mods` here), as a profile's `keep` |
+| `.keep(mods)` | the starter's mods it shows (from `app/mods` here), as a profile's `keep`; the Developer tools come whatever it names, and `feedback` adds their Agent tab |
 | `.native(name, make)` | a native provider (below) |
 | `.native_async(name, make)` | a native provider written with `async fn`, on tokio (below) |
 | `.tokio(handle)` | the tokio runtime async providers and `on_runtime` use (below) |
@@ -403,6 +403,21 @@ impl Render for Editor { /* ... */ }
 `get`, `as_str`, `as_i64`, `as_f64`, `as_bool`, and `From` for strings,
 numbers, booleans and lists.
 
+### More than one window
+
+`moonframe::open_main_window(cx)` opens another main window of the app, a
+little below and right of the front one (only the first window reopens
+where it last was): its own copy of the Luau layout
+and of each view (made again from `.view`), sharing the app's providers. A
+host with its own menus calls it from its File > New Window; Moonframe's own
+bar has **New Window** in the app menu (⌘N, Ctrl-N elsewhere), and a shell
+can run `command = "new-window"`. A provider's data reaches every window;
+its reply to a mod reaches that mod in the window that asked. Only the
+first window keeps its mods' state across launches and its terminals in
+herdr-core or tmux: another starts from each mod's `init`, saves nothing,
+and its terminals are local shells that end with it. The app quits when its
+last window closes.
+
 ## Check, run, ship
 
 ```sh
@@ -421,11 +436,10 @@ finds and installs those releases itself.
 
 **Developer Mode**, in the app menu beside About, switches the tools for
 changing the app as it runs (View's Components…, Inspect Element ⌥⌘I,
-Reload Modules ⌘R) on and off, at once and without a rebuild, and is kept
-for the app (and each profile) in `$XDG_STATE_HOME/<name>/developer`. Until
-the user picks, it is on in a debug build (`cargo run`) and off in a release
-one (`cargo run --release`, an install, a bundle), as the app's users see
-it. `--dev` and `--release` set it for one run. Its keys are bound in the
+Developer Tools ⌥⌘J, Reload Modules ⌘R) on and off, at once and without a rebuild, and is kept
+for the app (and each profile) in `$XDG_STATE_HOME/<name>/developer`. It is
+on until the user turns it off, in every build, a bundle included; an app
+that must never show the tools builds without the `studio` feature. `--dev` and `--release` set it for one run. Its keys are bound in the
 `developer` key context, so with it off ⌘R is the app's own again.
 
 ## Moving an existing GPUI app over

@@ -47,6 +47,9 @@ type State = {
 	-- conversation a follow-up being started goes in.
 	reply: string,
 	following: string?,
+	-- The last request came from the Developer tools (`quiet`): a failure
+	-- shows there, not by opening the dialog.
+	quiet: boolean?,
 	-- From `app.acp`: our runs (newest first), the app folder agents
 	-- change, and this window's process, to screenshot.
 	runs: { any },
@@ -309,6 +312,7 @@ return mod {
 			state.reply = ""
 			state.error = nil
 			state.following = msg.follow
+			state.quiet = msg.quiet
 			return state,
 				{
 					{
@@ -334,10 +338,13 @@ return mod {
 			if state.attached then
 				context.inspect_element_selection = state.attached.report
 			end
+			-- The dialog stays open on the new run, which opens under the
+			-- field as it starts, so the user follows it and replies there.
 			state.text = ""
-			state.open = false
 			state.error = nil
 			state.attached = nil
+			state.copied = false
+			state.quiet = msg.quiet
 			local sends: { any } = {
 				{
 					to = "provider:acp",
@@ -358,11 +365,13 @@ return mod {
 		elseif msg.reply == "feedback" and msg.action == "start" then
 			local following = state.following
 			state.following = nil
+			local quiet = state.quiet
+			state.quiet = nil
 			if msg.ok then
 				state.expanded = following or msg.run
 			else
-				-- Back in the dialog, with why.
-				state.open = true
+				-- In the dialog, with why; the Developer tools show it themselves.
+				state.open = state.open or not quiet
 				state.error = msg.error
 			end
 		end

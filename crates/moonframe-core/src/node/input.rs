@@ -57,6 +57,12 @@ pub struct Input {
     /// Keep the line being written in the middle of the field, as a
     /// typewriter keeps its line, scrolling the text instead of the caret.
     pub typewriter: bool,
+    /// A code editor for this language (`"luau"`, `"rust"`): colored as
+    /// it is typed, with line numbers and indenting by the language.
+    pub code: Option<String>,
+    /// A code editor's caret goes to this line (from 1), scrolled into
+    /// view, when it changes or the field takes a new `value`.
+    pub line: Option<u32>,
 }
 
 /// What a writing field keeps in full while the rest of its text fades.

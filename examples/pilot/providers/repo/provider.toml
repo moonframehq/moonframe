@@ -5,3 +5,8 @@
 # what it publishes and the messages it takes.
 kind    = "native"
 publish = "latest"
+
+[settings]
+# The mods that may point it at a checkout and change one (stage, discard,
+# commit, write, remove a worktree): the workbench. Others only look.
+writers = ["workbench"]

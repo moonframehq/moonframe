@@ -34,6 +34,11 @@ pub(crate) fn intercept(cx: &mut Context<MoonframeApp>) -> Subscription {
         }
         let taken = app
             .update(cx, |app, cx| {
+                // Each main window's app hears every keystroke: only the
+                // one whose windows it was typed in takes it.
+                if !app.owns(window.window_handle().window_id()) {
+                    return false;
+                }
                 match app.layer_keystroke(&event.keystroke, window, cx) {
                     Taken::Sent => true,
                     Taken::Blocked => app.input_keystroke(&event.keystroke, window, cx),

@@ -84,7 +84,9 @@ impl Layer {
     fn brings_mod(&self, name: &str) -> bool {
         match &self.role {
             Role::App | Role::Package => true,
-            Role::Toolbox(keep) => keep.iter().any(|kept| kept == name),
+            // Every app gets the Developer tools: they show only in
+            // Developer Mode, and are how its Luau is changed as it runs.
+            Role::Toolbox(keep) => name == crate::DEVTOOLS || keep.iter().any(|kept| kept == name),
             Role::Style => false,
         }
     }

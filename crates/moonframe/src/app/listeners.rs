@@ -1,5 +1,5 @@
 //! The tasks the view starts to hear what runs elsewhere: terminals,
-//! the app's views, providers, and the app quitting.
+//! the app's views, and the app quitting. Providers are the hub's.
 
 use super::*;
 
@@ -42,63 +42,6 @@ pub(super) fn deliver_from_views(
     sender
 }
 
-/// Starts the providers, sharing what each publishes as `app.<name>`.
-pub(super) fn start_providers(
-    workspace: &Workspace,
-    natives: Natives,
-    cx: &mut Context<MoonframeApp>,
-) -> Providers {
-    let (sender, mut events) = futures::channel::mpsc::unbounded();
-    // Only those the first views read or the mods hear, and those that
-    // always start: the rest wait until something wants them.
-    let providers = Providers::start_wanting(
-        workspace.roots().clone(),
-        paths::builds(),
-        Arc::new(move |event| {
-            let _ = sender.unbounded_send(event);
-        }),
-        natives,
-        workspace.wanted_providers(),
-    );
-    cx.spawn(async move |this, cx| {
-        while let Some(event) = events.next().await {
-            let handled = this.update(cx, |this, cx| {
-                match event {
-                    Event::Published { provider, data } => this.published(&provider, data, cx),
-                    // The newest there is by now, not what was first sent.
-                    Event::Newest { provider, newest } => {
-                        if let Some(data) = newest.take() {
-                            this.published(&provider, data, cx);
-                        }
-                    },
-                    Event::Link { provider, link } => {
-                        this.links.insert(provider, link.data());
-                        let links = Data::Map(this.links.clone());
-                        this.published("links", links, cx);
-                    },
-                    Event::Failed { provider, problem } => {
-                        tracing::warn!("provider {provider}: {problem}");
-                        let problem = Error::new(format!("provider failed: {problem}"));
-                        this.workspace.clear_host(&provider, Some(problem));
-                        cx.notify();
-                    },
-                    // A native provider's answer to the mod that asked.
-                    Event::Sent { provider, to, msg } => {
-                        let from = format!("{}{provider}", moonframe_core::PROVIDER);
-                        this.workspace.send(&from, &to, msg);
-                        this.flush(&from, cx);
-                    },
-                }
-            });
-            if handled.is_err() {
-                break;
-            }
-        }
-    })
-    .detach();
-    providers
-}
-
 /// Logs each module's problem, so a terminal shows what the window does.
 pub(super) fn report(workspace: &Workspace) {
     for (name, error) in workspace.problems() {
@@ -106,14 +49,13 @@ pub(super) fn report(workspace: &Workspace) {
     }
 }
 
-/// Saves the state that changed since the last save, waiting for it, and
-/// lets processes leave, as the app quits: the workspace saves as it goes,
+/// Saves the state that changed since the last save, waiting for it, as
+/// the app quits (the hub lets providers leave): the workspace saves as it goes,
 /// but writes are queued. This runs before GPUI's timeout on quitting
 /// starts, which is too short for a process given a `stop-grace`.
 pub(super) fn flush_on_quit(cx: &mut Context<MoonframeApp>) {
     cx.on_app_quit(|app, _| {
         app.workspace.flush();
-        app.providers.shutdown();
         async {}
     })
     .detach();

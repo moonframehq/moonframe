@@ -308,3 +308,47 @@ jobs:
           path: dist/*
           if-no-files-found: error
           retention-days: 7
+
+  # Each app a folder, TITLE, holding TITLE.exe (the executable above) with
+  # the app's files beside it, zipped. Authenticode signing is the release's.
+  apps-windows:
+    name: Apps (${{ matrix.target }})
+    needs: windows
+    continue-on-error: ${{ github.event_name != 'pull_request' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      # No token or run-id: artifacts can only come from this workflow run.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-${{ matrix.target }}
+          path: packages
+      # Python unpacks the zip, as package-archive.sh packed it.
+      - name: Package the apps
+        run: |
+          version=$(scripts/release/version.sh)
+          python -c 'import shutil, sys; shutil.unpack_archive(sys.argv[1], sys.argv[2])' \
+            "packages/Moonframe-$version-$TARGET.zip" packages
+          scripts/release/package-apps.sh dist "packages/Moonframe-$version-$TARGET/moonframe.exe"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apps-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7

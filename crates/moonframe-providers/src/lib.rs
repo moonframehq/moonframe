@@ -102,6 +102,9 @@ use {
 pub(crate) struct Message {
     pub(crate) from: String,
     pub(crate) data: Data,
+    /// Which of the app's windows sent it (see [`Providers::send_for`]);
+    /// providers never see it, but a native's reply carries it back.
+    pub(crate) origin: Option<u64>,
 }
 
 /// What a provider reports to the app.
@@ -122,6 +125,11 @@ pub enum Event {
         provider: String,
         to: String,
         msg: Data,
+        /// The window whose message the provider was answering when it
+        /// sent this (see [`Providers::send_for`]); `None` for one sent
+        /// by itself, or from another of its threads, which is for every
+        /// window.
+        origin: Option<u64>,
     },
 }
 
@@ -637,6 +645,30 @@ impl Providers {
     /// Hands `message`, from the mod `from`, to the provider `name`,
     /// starting it first if it is not running yet.
     pub fn send(&mut self, name: &str, from: &str, message: Data) -> Result<(), Error> {
+        self.send_message(name, from, None, message)
+    }
+
+    /// The same, from the mod `from` in the app's window `origin`: what a
+    /// native provider sends while it handles it carries `origin` back
+    /// ([`Event::Sent`]), so the reply reaches that window's mod and not
+    /// the same mod in another window.
+    pub fn send_for(
+        &mut self,
+        name: &str,
+        from: &str,
+        origin: u64,
+        message: Data,
+    ) -> Result<(), Error> {
+        self.send_message(name, from, Some(origin), message)
+    }
+
+    fn send_message(
+        &mut self,
+        name: &str,
+        from: &str,
+        origin: Option<u64>,
+        message: Data,
+    ) -> Result<(), Error> {
         if !self.running.contains_key(name) && self.found.contains_key(name) {
             self.want(Some(BTreeSet::from([name.to_owned()])));
         }
@@ -649,6 +681,7 @@ impl Providers {
             .send(Message {
                 from: from.to_owned(),
                 data: message,
+                origin,
             })
             .map_err(|_| Error::new(format!("provider `{name}` has stopped")))
     }
@@ -674,6 +707,7 @@ impl Providers {
             let _ = running.messages.send(Message {
                 from: String::new(),
                 data: message.clone(),
+                origin: None,
             });
         }
     }

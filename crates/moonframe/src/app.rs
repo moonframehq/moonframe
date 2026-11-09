@@ -31,7 +31,7 @@ use {
         Action, AppIcon, Appearance, Chrome, Command, Data, Error, Platform, Request, Roots, SHELL,
         Sound, Stylesheet, Titlebar, Token, WindowRequest, WindowState, Workspace,
     },
-    moonframe_providers::{Event, Natives, Providers},
+    moonframe_providers::{Natives, Providers},
     notify::{RecommendedWatcher, RecursiveMode, Watcher as _},
     std::{
         collections::HashMap,
@@ -47,10 +47,12 @@ use {crate::terminal::Terminals, listeners::wake_on_output};
 
 // keep-sorted start
 mod appearance;
+mod devtools;
 mod dialogs;
 mod fonts;
 pub(crate) mod guard;
 mod history;
+mod hub;
 mod icon;
 mod listeners;
 mod live_settings;
@@ -70,12 +72,20 @@ mod watch;
 mod windows;
 pub(crate) use fonts::list_ahead as list_fonts_ahead;
 
-pub(crate) use {listeners::display_number, main_window::MainWindow};
+#[cfg(all(test, unix, feature = "markdown"))]
+pub(crate) use hub::every as main_windows;
+pub use hub::open_main_window;
+pub(crate) use {
+    hub::{Hub, Launch},
+    listeners::display_number,
+    main_window::MainWindow,
+};
 // keep-sorted end
 
 use {
-    listeners::{deliver_from_views, flush_on_quit, report, start_providers},
-    menu::{hear_notification_clicks, is_dark, menu_actions, name_of, stock_preview},
+    appearance::Look,
+    listeners::{deliver_from_views, flush_on_quit, report},
+    menu::{is_dark, name_of, stock_preview},
     watch::watching,
 };
 
@@ -87,13 +97,6 @@ const TOAST: Duration = Duration::from_millis(1600);
 const NOTICE: Duration = Duration::from_secs(5);
 /// gpui-component's stock 16px reads large in a dense tool window.
 const DEFAULT_FONT_SIZE: Pixels = px(14.);
-
-/// What the app adds to Moonframe in Rust: its native providers, and the
-/// views its Luau places with `ui.view`.
-pub(crate) struct Parts {
-    pub(crate) natives: Natives,
-    pub(crate) views: Registry,
-}
 
 pub(crate) struct MoonframeApp {
     pub(crate) workspace: Workspace,
@@ -121,17 +124,10 @@ pub(crate) struct MoonframeApp {
     /// The component the browser shows, and its window while it is open.
     chosen: String,
     gallery: Option<WindowHandle<component::Root>>,
-    /// The theme light windows show and the one dark windows show
-    /// (`None`: the stock look), picked in View > Themes or by a mod; the
-    /// one the picker shows while the pointer is over another; and the
-    /// picker's window while it is open.
-    light_scheme: Option<&'static Scheme>,
-    dark_scheme: Option<&'static Scheme>,
-    /// Light/dark choices waiting for Omarchy's first readable palette.
-    pending_omarchy: [bool; 2],
-    preview: Option<Option<&'static Scheme>>,
-    /// Light, dark, or as the system is; and whether the system is dark.
-    appearance: Appearance,
+    /// The themes and appearance picked, the same in every main window;
+    /// whether the system is dark; and the picker's window while it is
+    /// open.
+    look: Look,
     system_dark: bool,
     themes: Option<WindowHandle<component::Root>>,
     /// Mods open in windows of their own (`window = "<mod>"`), by name.
@@ -165,8 +161,10 @@ pub(crate) struct MoonframeApp {
     /// Where each animated pane is in its transition.
     motion: Motion,
     cached: Cached,
-    /// The app's providers, which publish data as `app.<name>`.
-    pub(crate) providers: Providers,
+    /// What the app's main windows share, the providers among it; and
+    /// this window's number there, where provider replies for it go.
+    pub(crate) hub: Entity<Hub>,
+    id: u64,
     /// The repository of the terminal last used, which providers follow.
     #[cfg(feature = "terminal")]
     pub(crate) project: crate::project::Project,
@@ -179,14 +177,13 @@ pub(crate) struct MoonframeApp {
     _watcher: Option<RecommendedWatcher>,
     _settings_watcher: Option<RecommendedWatcher>,
     quick_inspect: quick_inspect::Shortcut,
+    devtools: devtools::Tools,
     _omarchy: Option<RecommendedWatcher>,
     /// The main window, the one this view draws.
     main_window: WindowId,
     /// The mod holding back closing and quitting, if one is.
     close_guard: Option<guard::CloseGuard>,
     awake: crate::awake::Awake,
-    /// How each process or socket provider's link stands: `app.links`.
-    links: std::collections::BTreeMap<String, Data>,
     /// The open popovers and overlays each window's last frame drew, which
     /// take their `keys` before anything else in that window only.
     pub(crate) key_layers: HashMap<WindowId, Vec<KeyLayer>>,
@@ -208,16 +205,26 @@ struct Defaults {
 
 impl MoonframeApp {
     /// The window's view of `workspace`, in a window opened with `chrome`;
-    /// `folders` are the ones it was opened from.
+    /// `folders` are the ones it was opened from, and `views` the host
+    /// views the app registered. It joins the app's [`Hub`], installed
+    /// first.
     pub(crate) fn new(
         mut workspace: Workspace,
         chrome: Chrome,
         folders: Folders,
         backends: Arc<Backends>,
-        parts: Parts,
+        views: Registry,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        #[allow(clippy::expect_used)]
+        let hub = hub::hub_of(cx).expect("the hub is installed before a main window opens");
+        let joined = Hub::join(
+            &hub,
+            window.window_handle().window_id(),
+            cx.weak_entity(),
+            cx,
+        );
         let theme = cx.theme();
         let defaults = Defaults {
             font_size: DEFAULT_FONT_SIZE,
@@ -228,6 +235,10 @@ impl MoonframeApp {
         };
         workspace.set_dark(theme.is_dark());
         workspace.set_window(window_state(chrome.titlebar, window, cx));
+        // What the providers shared before this window opened.
+        for (key, data) in joined.latest {
+            workspace.set_host(&key, data);
+        }
         report(&workspace);
         cx.observe_window_bounds(window, |this, window, cx| this.sync_window(window, cx))
             .detach();
@@ -236,96 +247,43 @@ impl MoonframeApp {
         // The system's appearance, which `system` follows as it changes.
         cx.observe_window_appearance(window, |this, window, cx| {
             this.system_dark = is_dark(window.appearance());
-            if this.appearance == Appearance::System {
+            if this.look.appearance == Appearance::System {
                 this.apply_theme(cx);
                 cx.notify();
             }
         })
         .detach();
         let watcher = watching(&workspace, &folders, cx);
-        let history = crate::history::open(&folders);
-        // An agent's run is marked before it starts, to come back to.
-        #[cfg(feature = "acp")]
-        if let Some(history) = &history {
-            moonframe_acp::set_keeper(history.clone());
-        }
-        // Projects are kept only with the user's folder: `--no-user` runs
-        // start fresh and keep nothing, as their state.
-        let kept =
-            (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref()));
-        crate::project::restore(kept.as_deref());
-        let providers = start_providers(&workspace, parts.natives, cx);
         let messages = deliver_from_views(cx);
-        crate::video::deliver_to(messages.clone());
-        let views = Views::new(parts.views, messages);
+        crate::video::deliver_to(window.window_handle().window_id(), messages.clone());
+        let views = Views::new(views, messages);
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         bind_menu_keys(workspace.menus(), cx);
-        cx.set_menus(menus(workspace.menus()));
-        menu_actions(cx);
+        crate::host_menus::install(workspace.menus(), cx);
+        // Another window's terminals are local shells that end with it:
+        // the first one's keep theirs, by the same names.
         #[cfg(feature = "terminal")]
-        let terminals = Terminals::new(backends, wake_on_output(cx));
+        let terminals = Terminals::new(backends, wake_on_output(cx), joined.first);
         #[cfg(not(feature = "terminal"))]
-        let _ = backends;
+        let _ = (backends, joined.first);
         #[cfg(feature = "terminal")]
-        let project = crate::project::Project::start(kept, cx);
+        let project = crate::project::Project::start(
+            (folders.user.as_ref()).map(|_| crate::project::kept_file(folders.profile.as_deref())),
+            cx,
+        );
         flush_on_quit(cx);
         Self::watch_closing(window, cx);
         Self::watch_displays(cx);
-        Self::tell_last_crash(cx);
         let settings = folders.settings().into_iter().next();
-        let saved = |key: &str| {
-            folders
-                .settings()
-                .iter()
-                .find_map(|path| settings::get(path, key))
-        };
         // Watch before reading, so a swap during startup cannot be missed.
         let omarchy = omarchy::watching(cx);
         themes::omarchy::load();
-        let pending_omarchy = if omarchy.is_some() && themes::omarchy::current().is_none() {
-            omarchy::pending(saved)
-        } else {
-            [false; 2]
-        };
-        // Omarchy's theme is the default, for those who never picked one.
-        let default = saved(settings::THEME).map_or_else(themes::omarchy::current, |_| None);
-        // The one theme kept before light and dark had one each.
-        let scheme = saved(settings::THEME).and_then(|name| {
-            let scheme = themes::find(&name);
-            if scheme.is_none() && name != themes::DEFAULT {
-                tracing::warn!("no theme called {name:?}; using {}", themes::DEFAULT);
-            }
-            scheme
-        });
-        let slot = |key, dark: bool| match saved(key) {
-            Some(name) if name == themes::omarchy::NAME && omarchy.is_some() => {
-                themes::omarchy::current()
-            },
-            Some(name) => themes::fits(&name, dark)
-                .inspect_err(|problem| {
-                    tracing::warn!("{key}: {problem}; using {}", themes::DEFAULT);
-                })
-                .unwrap_or(None),
-            None => scheme.filter(|scheme| scheme.dark() == dark).or(default),
-        };
-        let (light_scheme, dark_scheme) = (
-            slot(settings::LIGHT_THEME, false),
-            slot(settings::DARK_THEME, true),
-        );
-        // Before the appearance was kept, a theme picked set it.
-        let appearance = match saved(settings::APPEARANCE) {
-            Some(name) => Appearance::named(&name).unwrap_or_else(|| {
-                tracing::warn!("no appearance called {name:?}; following the system");
-                Appearance::System
-            }),
-            None => match scheme {
-                Some(scheme) if scheme.dark() => Appearance::Dark,
-                Some(_) => Appearance::Light,
-                None => Appearance::System,
-            },
-        };
-        show_appearance(appearance);
+        // Another window looks as those open do, saved or not.
+        let look = joined
+            .look
+            .unwrap_or_else(|| Look::saved(&folders, omarchy.is_some()));
+        show_appearance(look.appearance);
         let settings_watcher = live_settings::watching(&folders, cx);
         let mut app = Self {
             #[cfg(feature = "terminal")]
@@ -341,11 +299,7 @@ impl MoonframeApp {
             problem_state: problems::Problems::default(),
             chosen: String::new(),
             gallery: None,
-            light_scheme,
-            dark_scheme,
-            pending_omarchy,
-            preview: None,
-            appearance,
+            look,
             system_dark: is_dark(window.appearance()),
             themes: None,
             mod_windows: HashMap::new(),
@@ -362,19 +316,20 @@ impl MoonframeApp {
             focus,
             motion: Motion::default(),
             cached: Cached::default(),
-            providers,
+            hub: joined.hub,
+            id: joined.id,
             #[cfg(feature = "terminal")]
             project,
             defaults,
             main_window: window.window_handle().window_id(),
             close_guard: None,
             awake: Default::default(),
-            links: Default::default(),
             key_layers: HashMap::new(),
-            history,
+            history: joined.history,
             _watcher: watcher,
             _settings_watcher: settings_watcher,
             quick_inspect: Default::default(),
+            devtools: Default::default(),
             _omarchy: omarchy,
             _keys: crate::keys::intercept(cx),
             last_pane: 0,
@@ -382,40 +337,8 @@ impl MoonframeApp {
         app.load_measure();
         app.load_inspect_shortcut(cx);
         app.apply_theme(cx);
-        // What changed while the app was closed is a snapshot of its own.
-        app.snapshot("launch", cx);
-        hear_notification_clicks(cx);
         // What the mods' `init` sent providers as they started.
         app.forward("start", cx);
-        app.take_panes(cx);
-        // An installed app looks for updates by itself, once a day, also
-        // while it stays open, whatever Developer Mode says; runs from
-        // source and runs without the user's folder (checks, screenshots)
-        // never do.
-        #[cfg(feature = "updates")]
-        if crate::update::checks_by_itself()
-            && crate::update::source().is_some()
-            && app.folders.user.is_some()
-        {
-            let profile = app.folders.profile.clone();
-            cx.spawn(async move |this, cx| {
-                loop {
-                    if crate::update::due(profile.as_deref())
-                        && this
-                            .update(cx, |app, cx| app.check_for_updates(false, cx))
-                            .is_err()
-                    {
-                        break;
-                    }
-                    cx.background_executor().timer(crate::update::POLL).await;
-                    // The window is gone: so is the app.
-                    if this.update(cx, |_, _| ()).is_err() {
-                        break;
-                    }
-                }
-            })
-            .detach();
-        }
         app
     }
 
@@ -428,7 +351,7 @@ impl MoonframeApp {
         let dark = self.dark();
         // A theme shows in the appearance it is made for; in the other the
         // stock look does, and the theme stays picked.
-        let scheme = themes::shown(self.preview, self.scheme(dark), dark);
+        let scheme = themes::shown(self.look.preview, self.scheme(dark), dark);
         let config = scheme.map(|scheme| Rc::new(scheme.config()));
         let was_dark = cx.theme().is_dark();
         let mode = if dark {
@@ -521,28 +444,29 @@ impl MoonframeApp {
             ("theme".to_owned(), Data::from(self.theme_name())),
             (
                 "light_theme".to_owned(),
-                Data::from(name_of(self.light_scheme)),
+                Data::from(name_of(self.look.light_scheme)),
             ),
             (
                 "dark_theme".to_owned(),
-                Data::from(name_of(self.dark_scheme)),
+                Data::from(name_of(self.look.dark_scheme)),
             ),
             (
                 "themes".to_owned(),
                 themes::listing(stock(false), stock(true)),
             ),
         ]);
-        self.workspace.set_appearance(self.appearance, fields);
+        self.workspace.set_appearance(self.look.appearance, fields);
     }
 
     /// Makes the window light, dark, or follow the system, keeping the
     /// themes picked, and saves the choice for the next run.
     pub(crate) fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
-        self.appearance = appearance;
-        self.preview = None;
+        self.look.appearance = appearance;
+        self.look.preview = None;
         self.apply_theme(cx);
+        self.share_look(cx);
         show_appearance(appearance);
-        cx.set_menus(menus(self.workspace.menus()));
+        crate::host_menus::install(self.workspace.menus(), cx);
         if let Some(path) = &self.settings
             && let Err(problem) = settings::save(path, &[(settings::APPEARANCE, appearance.name())])
         {
@@ -555,15 +479,17 @@ impl MoonframeApp {
     /// theme, which may tell the desktop so only after it has changed.
     pub(crate) fn dark(&self) -> bool {
         let omarchy = themes::omarchy::current().map(Scheme::dark);
-        self.appearance.is_dark(omarchy.unwrap_or(self.system_dark))
+        self.look
+            .appearance
+            .is_dark(omarchy.unwrap_or(self.system_dark))
     }
 
     /// The theme picked for dark windows, or for light ones.
     fn scheme(&self, dark: bool) -> Option<&'static Scheme> {
         if dark {
-            self.dark_scheme
+            self.look.dark_scheme
         } else {
-            self.light_scheme
+            self.look.light_scheme
         }
     }
 
@@ -576,11 +502,12 @@ impl MoonframeApp {
     /// when `None`.
     pub(crate) fn preview_theme(&mut self, name: Option<&str>, cx: &mut Context<Self>) {
         let preview = name.map(themes::find);
-        if preview == self.preview {
+        if preview == self.look.preview {
             return;
         }
-        self.preview = preview;
+        self.look.preview = preview;
         self.apply_theme(cx);
+        self.share_look(cx);
         cx.notify();
     }
 
@@ -678,8 +605,8 @@ impl MoonframeApp {
 
     fn run(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
         match command {
-            Command::Quit if self.held(guard::Closing::Quit, cx) => {},
-            Command::Quit => cx.quit(),
+            // Unless a mod in any window holds it back.
+            Command::Quit => cx.defer(guard::quit),
             Command::Reload => self.reload(cx),
             // The other of light and dark, whatever the system is.
             Command::ToggleTheme => self.set_appearance(
@@ -697,11 +624,16 @@ impl MoonframeApp {
             Command::ShowThemes => self.show_themes(cx),
             Command::Inspect => self.inspect_for(SHELL, cx),
             Command::CheckForUpdates => self.check_for_updates(true, cx),
+            Command::NewWindow => cx.defer(open_main_window),
         }
     }
 
     /// Shares the window's state with the views as `app.window`.
     fn sync_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if window.is_window_active() {
+            let id = self.id;
+            self.hub.update(cx, |hub, _| hub.raise(id));
+        }
         self.workspace
             .set_window(window_state(self.chrome.titlebar, window, cx));
         cx.notify();
@@ -714,23 +646,26 @@ impl MoonframeApp {
     fn forward(&mut self, from: &str, cx: &mut Context<Self>) {
         // What the views read and the mods hear now may want a provider
         // that hasn't started; one a message is for starts as it is sent.
-        self.providers.want(self.workspace.wanted_providers());
-        for (provider, sender, message) in self.workspace.take_outbox() {
-            if let Err(problem) = self.providers.send(&provider, &sender, message) {
-                tracing::warn!("{from}: {problem}");
-            }
-        }
+        let wanted = self.workspace.wanted_providers();
+        let outbox = self.workspace.take_outbox();
+        let id = self.id;
+        self.hub
+            .update(cx, |hub, _| hub.send(id, wanted, outbox, from));
         let mut requests = self.workspace.take_requests();
-        // A reload runs every `init` again: one that asks for a reload
-        // would loop, so what `init` asks as the app starts or reloads
-        // reloads nothing.
+        // A reload runs every `init` again, as a new window does: one that
+        // asks for either would loop, so what `init` asks as the app (or a
+        // window) starts or reloads reloads nothing and opens no window.
         if matches!(from, "start" | "reload" | "packages") {
             requests.retain(|(asker, request)| {
-                let reload = *request == Request::Command(Command::Reload);
-                if reload {
-                    tracing::warn!("{asker}: a reload asked for as the app loads is ignored");
+                let looping = match request {
+                    Request::Command(Command::Reload) => Some("a reload"),
+                    Request::Command(Command::NewWindow) => Some("a new window"),
+                    _ => None,
+                };
+                if let Some(what) = looping {
+                    tracing::warn!("{asker}: {what} asked for as the app loads is ignored");
                 }
-                !reload
+                looping.is_none()
             });
         }
         if !requests.is_empty() {
@@ -870,7 +805,8 @@ impl MoonframeApp {
             Request::Guard(request) => self.guard_request(from, request, window, cx),
             Request::Awake(request) => self.awake_request(from, request, cx),
             Request::Dock(dock) => self.dock_request(from, &dock),
-            Request::Restart(name) => self.restart_provider(from, &name),
+            Request::Restart(name) => self.restart_provider(from, &name, cx),
+            Request::Devtools(request) => self.devtools_request(from, request, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);
@@ -917,7 +853,7 @@ impl MoonframeApp {
             self.show_toast("The window's title bar changes when the app restarts", cx);
         }
         bind_menu_keys(self.workspace.menus(), cx);
-        cx.set_menus(menus(self.workspace.menus()));
+        crate::host_menus::install(self.workspace.menus(), cx);
         self.apply_theme(cx);
         report(&self.workspace);
         cx.notify();
@@ -937,7 +873,7 @@ impl MoonframeApp {
         self.forward("packages", cx);
         self.rewatch(cx);
         bind_menu_keys(self.workspace.menus(), cx);
-        cx.set_menus(menus(self.workspace.menus()));
+        crate::host_menus::install(self.workspace.menus(), cx);
         self.apply_theme(cx);
         report(&self.workspace);
         self.reload_providers(Some(roots), cx);
@@ -945,21 +881,27 @@ impl MoonframeApp {
     }
 
     /// Restarts the providers whose folders changed, rebuilding wasm ones,
-    /// and stops sharing the data of providers that are gone; from `roots`
-    /// instead, if given.
+    /// and stops sharing the data of providers that are gone, in every
+    /// window; from `roots` instead, if given.
     fn reload_providers(&mut self, roots: Option<Roots>, cx: &mut Context<Self>) {
-        let before: Vec<String> = self.providers.names().map(str::to_owned).collect();
-        match roots {
-            Some(roots) => self.providers.set_roots(roots),
-            None => self.providers.reload(),
-        }
-        for gone in before
-            .iter()
-            .filter(|name| !self.providers.names().any(|now| now == name.as_str()))
-        {
-            self.workspace.clear_host(gone, None);
+        let gone = self.hub.update(cx, |hub, _| hub.reload_providers(roots));
+        for name in &gone {
+            self.workspace.clear_host(name, None);
         }
         cx.notify();
+        let me = self.id;
+        cx.defer(move |cx| {
+            for app in hub::every(cx) {
+                app.update(cx, |app, cx| {
+                    if app.id != me {
+                        for name in &gone {
+                            app.workspace.clear_host(name, None);
+                        }
+                        cx.notify();
+                    }
+                });
+            }
+        });
     }
 }
 

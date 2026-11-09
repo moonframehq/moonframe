@@ -101,7 +101,9 @@ Moonframe as a library.
   and survives a reload.
 - **An inspector.** <b>View &gt; Inspect Element</b> picks anything in the
   window, like a browser's developer tools, and tells an agent which file
-  and line drew it.
+  and line drew it. <b>View &gt; Developer Tools</b> docks beside the window
+  (or opens in its own): edit the picked element's Luau and save to see it
+  at once, read its mod's state, or ask an agent in a session that stays open.
 - **Your folder over the app.** `~/.config/moonframe` holds your own mods,
   providers and stylesheet, laid over the built-in app; updates never touch
   it, and mods install from git into it. A file there wins over the app's at
@@ -368,9 +370,9 @@ into each.
 `just bundle-app NAME` builds a profile's app as a standalone release:
 `target/bundle/<Title>.app` on macOS, or a prefix with a `.desktop` file
 on Linux, with the app's title, id and icon. A bundle starts with
-Developer Mode off: no Components…, Inspect Element or Reload. **Developer
-Mode** in the app menu turns them on live, for anyone who wants to change
-their app, and the choice is kept; `--release` and `--dev` set it for one
+Developer Mode on, as every build does: Components…, Inspect Element, the
+Developer tools and Reload. **Developer Mode** in the app menu turns them
+off live, and the choice is kept; `--release` and `--dev` set it for one
 run. Outside a release,
 **Build App Bundle** in the app menu builds the window's own app the same
 way and shows it in Finder.
@@ -386,9 +388,10 @@ About panel and Send feedback button. The dashboards and chats run on sample
 data or a scripted agent, labelled as such.
 
 The real ones also ship on their own, with nothing else to install: Cairn
-(which runs the coding agent you have), Folio, Pilot (which runs the pi you
-have), Sessions, Switchyard, Trellis and Workbench. Each release's `apps-v<version>` has them for macOS and Linux, and
-on a Mac:
+and Cinder (which run the coding agent you have), Daybook, Folio, Hangar,
+Lantern, Pilot (which runs the pi you have), Sessions, Switchyard, Trellis
+and Workbench. Each release's `apps-v<version>` has them for macOS and
+Linux, and on a Mac:
 
 ```sh
 brew install moonframehq/tap/moonframe-folio
@@ -458,7 +461,7 @@ feedback, shows at once.
     <td width="50%" valign="top">
       <img src="docs/screenshots/apps/cinder.png" alt="Cinder">
       <br>
-      <sub><b>Cinder</b> (<code>cinder</code>): a desktop agent app in code mode: your coding-agent CLI sessions grouped by repository (read-only), their transcripts, and a scripted demo agent for new sessions.</sub>
+      <sub><b>Cinder</b> (<code>cinder</code>): a desktop agent app in code mode: your coding-agent CLI sessions grouped by repository (read-only), their transcripts, and new sessions with the coding agent you have.</sub>
     </td>
   </tr>
   <tr>
@@ -559,7 +562,7 @@ feedback, shows at once.
   </tr>
 </table>
 
-Sessions, Workbench, Stage, Trellis, Lantern and Cairn require the `projects`
+Sessions, Workbench, Stage, Switchyard, Trellis, Lantern and Cairn require the `projects`
 package beside them (`examples/projects`). To run one by hand, link it in
 place and open its profile:
 

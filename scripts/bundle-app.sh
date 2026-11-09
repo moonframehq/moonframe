@@ -4,7 +4,9 @@
 # prebuilt, no sources), and the icon. On macOS it is NAME.app, with an
 # Info.plist, signed ad hoc so it runs on this Mac; on Linux a folder laid
 # out like a prefix (bin/, share/moonframe/, share/applications/ with a
-# .desktop file, share/icons/) to copy under /usr/local or ~/.local.
+# .desktop file, share/icons/) to copy under /usr/local or ~/.local; on
+# Windows (Git Bash) one folder, TITLE, with TITLE.exe and the app's files
+# beside it (app/, bundle/), where the executable looks for them.
 #
 # With no PROFILE it is Moonframe.app, the starter: the user's mods,
 # providers and stylesheet live in ~/.config/moonframe, never here.
@@ -28,9 +30,10 @@
 # one) instead of building for this Mac.
 #
 # DIST=DIR also writes what a GitHub release of the app carries to DIR: the
-# bundle as TITLE-VERSION-TARGET.zip (macOS; TARGET is universal-apple-darwin
-# for a universal binary) or .tar.gz (Linux), and its line in DIR/SHA256SUMS,
-# so Check for Updates finds the build for each platform and verifies it.
+# bundle as TITLE-VERSION-TARGET.zip (macOS, TARGET universal-apple-darwin
+# for a universal binary; Windows) or .tar.gz (Linux), and its line in
+# DIR/SHA256SUMS, so Check for Updates finds the build for each platform
+# and verifies it.
 set -euo pipefail
 
 out=${1:-target/bundle}
@@ -41,6 +44,10 @@ id=dev.moonframe.app
 icon=assets/icon.png
 version=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
 binary=${MOONFRAME_BINARY:-}
+windows=false
+case $(uname -s) in
+    MINGW* | MSYS* | CYGWIN*) windows=true ;;
+esac
 
 if [ "${3:-}" = --sealed ]; then
     exec python3 scripts/bundle_sealed.py --profile "${profile:?--sealed needs a profile}" --out "$out"
@@ -49,6 +56,7 @@ fi
 if [ -z "$binary" ]; then
     cargo build --quiet --release --locked -p moonframe-app
     binary="target/release/$exe"
+    [ "$windows" = false ] || binary="$binary.exe"
 fi
 
 app=
@@ -62,15 +70,24 @@ app_paths() {
         "$binary" ${MOONFRAME_USER:+--user "$MOONFRAME_USER"} app paths "$profile"
     fi
 }
+# The executable prints Windows paths there, whose backslashes a glob
+# would read as escapes: Git Bash's own spelling instead.
+posix() {
+    if [ "$windows" = true ]; then
+        cygpath -u "$1"
+    else
+        printf '%s\n' "$1"
+    fi
+}
 if [ -n "$profile" ]; then
     while IFS=$'\t' read -r kind value; do
         case $kind in
             name) id="$id.$value" ;;
             title) title=$value ;;
-            app) app=$value ;;
-            icon) icon=$value ;;
+            app) app=$(posix "$value") ;;
+            icon) icon=$(posix "$value") ;;
             version) version=$value ;;
-            package) packages+=("$value") ;;
+            package) packages+=("$(posix "$value")") ;;
         esac
     done < <(app_paths)
     [ -n "$app" ] || { echo "no app in the profile $profile" >&2; exit 1; }
@@ -80,6 +97,15 @@ if [ -n "$profile" ]; then
             exit 1
             ;;
     esac
+    # Nor can these on Windows.
+    if [ "$windows" = true ]; then
+        case $title in
+            *'"'* | *'*'* | *'?'* | *'|'* | *. | *' ')
+                echo "the app's title \`$title\` cannot name a bundle on Windows" >&2
+                exit 1
+                ;;
+        esac
+    fi
 fi
 
 # Archives the bundle $1 into $DIST for a release, with its checksum.
@@ -99,6 +125,16 @@ dist() {
         rm -f "$DIST/$archive"
         ditto -c -k --sequesterRsrc --keepParent "$bundle" "$DIST/$archive"
         sum=$(shasum -a 256 "$DIST/$archive" | cut -d' ' -f1)
+    elif [ "$windows" = true ]; then
+        archive="$name-$version-$(uname -m)-pc-windows-msvc.zip"
+        archive=${archive// /-}
+        rm -f "$DIST/$archive"
+        # Git Bash has Python but no zip; one top-level folder, as
+        # Moonframe's own zip.
+        "$(command -v python3 || command -v python)" -c \
+            'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2], sys.argv[3])' \
+            "$DIST/${archive%.zip}" "$(dirname "$bundle")" "$name"
+        sum=$(sha256sum "$DIST/$archive" | cut -d' ' -f1)
     else
         archive="$name-$version-$(uname -m)-unknown-linux-gnu.tar.gz"
         archive=${archive// /-}
@@ -149,6 +185,23 @@ stage() {
         find "$1/bundle" -name .git -prune -exec rm -rf {} +
     fi
 }
+
+if [ "$windows" = true ]; then
+    # Windows: one folder to unpack anywhere. The executable takes the app's
+    # title, and finds its files in its own folder, as Moonframe's own zip.
+    bundle="$out/$title"
+    rm -rf "$bundle"
+    mkdir -p "$bundle"
+    cp "$binary" "$bundle/$title.exe"
+    stage "$bundle"
+    cp LICENSE "$bundle/LICENSE"
+    if [ -n "${MOONFRAME_STAGED_RESOURCES:-}" ]; then
+        "$bundle/$title.exe" --no-user --check
+    fi
+    dist "$bundle"
+    echo "$bundle"
+    exit 0
+fi
 
 if [ "$(uname)" != Darwin ]; then
     # Linux: a prefix. Each app's binary has a name of its own, and finds

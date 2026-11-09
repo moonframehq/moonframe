@@ -19,7 +19,7 @@ type Edge = "none" | "all" | "top" | "bottom" | "left" | "right"
 type Border = boolean | Edge
 type Direction = "row" | "column"
 type Variant = "normal" | "primary" | "ghost" | "outline" | "danger"
-type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | "check-for-updates" | BrowserCommand
+type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | "check-for-updates" | "new-window" | BrowserCommand
 -- Run on the `ui.browser` the control's `browser` key names.
 type BrowserCommand = "browser-back" | "browser-forward" | "browser-reload" | "browser-stop" | "browser-open"
 
@@ -1040,6 +1040,12 @@ type InputProps = {
 	dim: ("sentence" | "paragraph")?,
 	-- Keep the caret's line in the middle of the field (needs `multiline`).
 	typewriter: boolean?,
+	-- A code editor for this language (needs `multiline`): `"luau"`,
+	-- `"rust"`, ...; colored as typed, with line numbers.
+	code: string?,
+	-- A code editor's caret goes to this line (from 1), scrolled into view,
+	-- when it changes or the field takes a new `value`.
+	line: number?,
 }
 
 type RegionProps = {
@@ -2033,6 +2039,19 @@ type EditMsg = {
 -- for any mod's window; never the shell's.
 type WindowMsg = string | { open: string, send: Data? } | { close: string }
 
+-- What the Developer tools (mods/devtools, and only it) ask with
+-- `{ to = "app:devtools", msg = ... }`: where they show; a Luau file of the
+-- app's folders to read (answered with `text`) or save (with `ok`, or
+-- `error`); a mod's state (with `state`, `problem`); or another element of
+-- the selection's trail to select. Answers come back as `reply` with fields
+-- added; picks arrive on `app/selection`, the place on `app/devtools`.
+type DevtoolsMsg =
+	{ place: "dock" | "window" | "closed" }
+	| { read: string, reply: Data? }
+	| { save: string, text: string, reply: Data? }
+	| { state: string, reply: Data? }
+	| { select: string }
+
 -- A message `update` sends on. `to` is a mod, `"parent"`, `"shell"`,
 -- `"provider:<name>"`, `"topic:<name>"`, or the app itself:
 -- `"app:command"` (`msg` a `Command`), `"app:appearance"` (`msg` an
@@ -2041,8 +2060,8 @@ type WindowMsg = string | { open: string, send: Data? } | { close: string }
 -- `"app:icon"` (`msg` `"default"` or an image file's path: the app's icon
 -- in the Dock, changed at once until the app quits; macOS only),
 -- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
--- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`)
--- and `"app:open"` (`msg` a web address, opened in the system's browser).
+-- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
+-- `"app:devtools"` (`msg` a `DevtoolsMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
 type Send = {
 	to: string,
 	msg: Data,
@@ -2056,6 +2075,9 @@ type Window = {
 	traffic_lights: { x: number?, y: number? }?,
 	-- The size the window opens at, before the user resizes it.
 	size: { width: number?, height: number? }?,
+	-- Reopen where and as large as the window last was (the default), kept
+	-- within the screen; false opens it at `size`, centered, every launch.
+	remember: boolean?,
 }
 
 -- A mod's own window (`window` on a mod other than main.luau), when a

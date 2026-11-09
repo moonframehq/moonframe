@@ -52,6 +52,13 @@ where the user's edits to this app go. Built-in providers (`git`, `files`,
 `agents`, `system`, `github`, `gitlab`) and every component in the catalogue
 are there to use.
 
+**Developer tools.** Every app has them, whatever its `keep`, and so does
+every library host built with the `studio` feature: in Developer Mode,
+View > Developer Tools (⌥⌘J) docks Pick, the picked element's Luau source
+to edit and save, its mod's state and, when the app keeps `feedback` (the
+sparkle that asks an agent for a change), agent sessions beside the app.
+With Developer Mode off they don't show.
+
 ## Commands
 
 ```sh
@@ -203,6 +210,12 @@ return mod {
 }
 ```
 
+**New Window** (⌘N, Ctrl-N elsewhere) sits under About: another main
+window with its own copy of the layout and the same providers, whose
+replies reach the window that asked; `command = "new-window"` places it in
+a shell menu (File, say). Only the first window keeps mod state across
+launches; another starts from each mod's `init` and saves nothing.
+
 An item sends `msg` to `to` (the shell without it) or runs a `command`;
 `shortcut` is a key as `keys` name them (`secondary` is ⌘ on macOS, Ctrl
 elsewhere). The receiving mod handles the message in `update` like a click.
@@ -233,8 +246,8 @@ which also has a release workflow to copy.
 
 - **Developer Mode** (app menu, beside About) switches View's Components…,
   Inspect Element and Reload Modules, and their keys, on and off live; the
-  choice is kept per app and profile. Until the user picks, it is off in a
-  bundle and in a library app's release build. `--release` and `--dev` set
+  choice is kept per app and profile. It is on until the user turns it
+  off, in every build, bundles included. `--release` and `--dev` set
   it for one run.
 - **Carrying more than Luau:** `PAYLOAD=DIR just bundle-app NAME` puts a
   folder into the bundle as it is (a Python, native libraries, an engine),
@@ -246,7 +259,9 @@ which also has a release workflow to copy.
   `target/bundle/<Title>.app` on macOS (id `dev.moonframe.app.NAME`, its
   icon, its packages staged inside, Wasm providers prebuilt), or on Linux a
   prefix with `bin/moonframe-NAME`, `share/moonframe-NAME/` and a `.desktop`
-  file and icon. `MOONFRAME_USER=DIR` finds the profile in another user
+  file and icon, or on Windows (in Git Bash) a `<Title>` folder holding
+  `<Title>.exe` with `app/` and `bundle/` beside it, zipped by `DIST=DIR`.
+  `MOONFRAME_USER=DIR` finds the profile in another user
   folder. What its users change goes in `~/.config/moonframe/profiles/NAME`.
 - **Build App Bundle** in the app menu (outside a release, when the app
   runs from its checkout) does the same for the window's own app, the

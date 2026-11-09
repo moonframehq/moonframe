@@ -40,7 +40,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
-| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow`, `browser`, `prose`, `dim`, `typewriter` |
+| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there) |
 
 ### Overlays
 
@@ -147,7 +147,9 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   traffic_lights = { x, y } } }` draws the layout under the title bar (at
   startup only); `app.window` tells views the `platform`, `titlebar`,
   `maximized`, `fullscreen` and `active`, so a title bar knows whether to
-  draw window buttons or leave room for traffic lights.
+  draw window buttons or leave room for traffic lights. The main window
+  reopens where and as large as it last was, kept within the screen;
+  `window = { remember = false }` opens it at its `size`, centered, instead.
 - **A mod's own window** takes `titlebar = "hidden"` and `traffic_lights`
   in its `window` too, beside `size` and `min_size`, with `drag = true` on
   what moves it. While open, the mod and its instances read that window's

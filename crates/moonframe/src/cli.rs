@@ -360,7 +360,7 @@ fn catalogue(roots: Roots) -> ExitCode {
 /// gpui-component's `Root` then draws the resize edges and shadow). The
 /// layout moves the window from its `drag = true` stacks, so AppKit must
 /// not take the title bar's clicks for itself.
-fn framed(chrome: Chrome) -> WindowOptions {
+pub(crate) fn framed(chrome: Chrome) -> WindowOptions {
     let hidden = chrome.titlebar == Titlebar::Hidden;
     WindowOptions {
         titlebar: Some(TitlebarOptions {
@@ -378,14 +378,24 @@ fn framed(chrome: Chrome) -> WindowOptions {
 }
 
 /// What `Moonframe::run` does.
-pub(crate) fn main(launch: Moonframe) -> ExitCode {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(&launch.log)),
-        )
-        .with_writer(std::io::stderr)
-        .init();
+pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
+    {
+        use tracing_subscriber::{
+            Layer as _, layer::SubscriberExt as _, util::SubscriberInitExt as _,
+        };
+        // `RUST_LOG` (else the app's filter) says what reaches stderr; the
+        // app's own layers see every event and filter for themselves.
+        let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(&launch.log));
+        tracing_subscriber::registry()
+            .with(std::mem::take(&mut launch.log_layers))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::stderr)
+                    .with_filter(filter),
+            )
+            .init();
+    }
     // The app's tokio runtime, else the one `run` is called in
     // (`#[tokio::main]`), for async providers and views.
     #[cfg(feature = "tokio")]
@@ -524,14 +534,11 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     {
         tracing::warn!("cannot create {}: {error}", own.display());
     }
-    // The developer tools (Components, Inspect Element, Reload Modules)
-    // are for whoever builds the app: an app on the library shows them in
-    // a debug build (`cargo run`), not in a release one (`cargo run
-    // --release`, an install, a bundle). The starter always shows them
-    // outside a bundle, as building apps is what it is for.
-    let hosted_release = folders.host.is_some() && (paths::in_bundle() || !cfg!(debug_assertions));
-    // The user's own choice (Developer Mode in the app menu) wins over
-    // those defaults; `--release` and `--dev` over both, for this run.
+    // Developer Mode (Components, Inspect Element, the Developer tools,
+    // Reload Modules) is on until the user turns it off in the app menu,
+    // in every build: changing the app as it runs is what Moonframe is
+    // for. `--release` and `--dev` override the choice for this run. An
+    // app that must never show the tools leaves out the `studio` feature.
     let developer_file =
         paths::state(folders.profile.as_deref()).with_file_name(match &folders.profile {
             Some(profile) => format!("developer-{profile}"),
@@ -540,9 +547,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     let chosen = crate::developer_choice(&developer_file).map(|on| !on);
     let _ = crate::DEVELOPER_FILE.set(developer_file);
     crate::RELEASE.store(
-        args.release
-            .or(chosen)
-            .unwrap_or(folders.bundled.is_some() || hosted_release),
+        args.release.or(chosen).unwrap_or_default(),
         Ordering::Relaxed,
     );
     let _ = crate::TITLE.set(folders.title());
@@ -576,13 +581,20 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     }
     let component = args.component.filter(|_| !crate::release());
     let (natives, views) = (launch.natives, launch.views);
+    // Where the main window was, read before the window opens; only with
+    // the user's folder, as the rest of what the app keeps.
+    let placement = folders.user.as_ref().map(|_| {
+        let path = crate::placement::file(folders.profile.as_deref());
+        let saved = crate::placement::load(&path);
+        (path, saved)
+    });
     gpui_kit::application()
         .with_assets(crate::assets::Assets::new(launch.assets))
         .run(move |cx| {
             crate::app::list_fonts_ahead(cx);
             gpui_kit::init(cx);
             crate::actions::bind_keys(cx);
-            cx.set_menus(crate::actions::menus(&[]));
+            crate::host_menus::install(&[], cx);
             cx.on_action(|_: &crate::actions::Quit, cx| crate::app::guard::quit(cx));
             cx.on_window_closed(|cx, id| {
                 crate::video::window_closed(id);
@@ -608,6 +620,19 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
                 crate::capabilities::open(folders.roots(), cx.theme().is_dark(), persist);
             workspace.set_host("renderer", moonframe_core::Data::from("gpui"));
             let chrome = workspace.chrome();
+            // What every main window shares: the providers first.
+            crate::app::Hub::install(
+                &workspace,
+                natives,
+                crate::app::Launch {
+                    folders: folders.clone(),
+                    backends: backends.clone(),
+                    views: views.clone(),
+                    chrome,
+                },
+                cx,
+            );
+            let placement = placement.filter(|_| chrome.remember);
             // The shell's size if it asks, kept within the screen.
             let (width, height) = chrome.size.unwrap_or((1280., 820.));
             let screen = cx.primary_display().map(|display| display.bounds().size);
@@ -618,9 +643,24 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
                 ),
                 None => (width, height),
             };
-            let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
+            // Where the window last was, if it still fits a screen; else
+            // the shell's size, centered.
+            let (window_bounds, display_id) = placement
+                .as_ref()
+                .and_then(|(_, saved)| crate::placement::reopen(saved.as_ref()?, cx))
+                .map_or_else(
+                    || {
+                        let size = size(px(width), px(height));
+                        (
+                            WindowBounds::Windowed(Bounds::centered(None, size, cx)),
+                            None,
+                        )
+                    },
+                    |(bounds, display)| (bounds, Some(display)),
+                );
             let options = WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                window_bounds: Some(window_bounds),
+                display_id,
                 window_min_size: Some(size(px(640.), px(400.))),
                 app_id: Some(crate::app_id()),
                 focus: !background,
@@ -633,7 +673,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
                         chrome,
                         folders.clone(),
                         backends,
-                        crate::app::Parts { natives, views },
+                        views,
                         window,
                         cx,
                     );
@@ -642,7 +682,8 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
                     }
                     app
                 });
-                let view = cx.new(|_| crate::app::MainWindow::new(view));
+                let kept = placement.map(|(path, _)| path);
+                let view = cx.new(|cx| crate::app::MainWindow::new(view, kept, window, cx));
                 cx.new(|cx| Root::new(view, window, cx))
             });
             if let Err(error) = opened {

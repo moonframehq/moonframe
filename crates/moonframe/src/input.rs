@@ -25,17 +25,21 @@ use {
 };
 
 #[cfg(feature = "prose")]
-use gpui_kit::base::input::{Editor as ProseElement, EditorState};
+use gpui_kit::base::input::Editor as ProseElement;
+use gpui_kit::{base::input::EditorState, component::input::Editor as CodeElement};
 
 /// Fields the app keeps at once. Past this the ones drawn longest ago go,
 /// so a mod drawing inputs from data can't grow the set without end.
 const MAX_FIELDS: usize = 256;
 
-/// The engine behind one field: one line, several, or a writing field.
+/// The engine behind one field: one line, several, a code editor, or a
+/// writing field.
 #[derive(Clone)]
 pub(crate) enum Editor {
     Line(Entity<InputState>),
     Lines(Entity<TextareaState>),
+    /// A code editor, with the language it colors (as the field names it).
+    Code(Entity<EditorState>, String),
     #[cfg(feature = "prose")]
     Prose(Entity<EditorState>, Rc<prose::Writing>),
 }
@@ -46,6 +50,7 @@ macro_rules! on_state {
         match $editor {
             Editor::Line($state) => $body,
             Editor::Lines($state) => $body,
+            Editor::Code($state, _) => $body,
             #[cfg(feature = "prose")]
             Editor::Prose($state, _) => $body,
         }
@@ -59,6 +64,16 @@ impl Editor {
             let writing = Rc::new(prose::Writing::default());
             return Self::Prose(prose::editor(&writing, window, cx), writing);
         }
+        if let Some(language) = &input.code {
+            let colored = highlighted(language);
+            let state = cx.new(|cx| {
+                EditorState::new(window, cx)
+                    .language(colored)
+                    .folding(false)
+                    .soft_wrap(false)
+            });
+            return Self::Code(state, language.clone());
+        }
         if input.multiline {
             Self::Lines(cx.new(|cx| TextareaState::new(window, cx)))
         } else {
@@ -68,13 +83,14 @@ impl Editor {
 
     /// Whether `input` asks for an engine of another kind than this one.
     fn other_kind(&self, input: &Input) -> bool {
-        let (multiline, writing) = match self {
-            Self::Line(_) => (false, false),
-            Self::Lines(_) => (true, false),
+        let (multiline, writing, code) = match self {
+            Self::Line(_) => (false, false, None),
+            Self::Lines(_) => (true, false, None),
+            Self::Code(_, language) => (true, false, Some(language)),
             #[cfg(feature = "prose")]
-            Self::Prose(..) => (true, true),
+            Self::Prose(..) => (true, true, None),
         };
-        multiline != input.multiline || writing != input.writing()
+        multiline != input.multiline || writing != input.writing() || code != input.code.as_ref()
     }
 
     pub(crate) fn focus_handle(&self, cx: &App) -> FocusHandle {
@@ -139,9 +155,24 @@ impl Editor {
         match self {
             Self::Line(state) => LineElement::new(state).into_any_element(),
             Self::Lines(state) => Textarea::new(state).into_any_element(),
+            // Its own look: a code font, line numbers, the theme's colors.
+            Self::Code(state, _) => CodeElement::new(state)
+                .appearance(false)
+                .bordered(false)
+                .h(relative(1.))
+                .into_any_element(),
             #[cfg(feature = "prose")]
             Self::Prose(state, _) => ProseElement::new(state).into_any_element(),
         }
+    }
+}
+
+/// The highlighter's name for `language`: Luau is colored as Lua, which it
+/// extends.
+fn highlighted(language: &str) -> String {
+    match language {
+        "luau" => "lua".to_owned(),
+        other => other.to_owned(),
     }
 }
 
@@ -204,6 +235,8 @@ struct Field {
     applied: Option<String>,
     placeholder: Option<String>,
     rows: Option<u32>,
+    /// The code editor's last `line`, to move the caret as it changes.
+    line: Option<u32>,
     /// The mod's `focus` when last drawn, so it takes focus as it turns true.
     focus: bool,
     /// The frame it was last drawn in.
@@ -290,6 +323,7 @@ impl Inputs {
                 applied: carried.and_then(|(_, applied)| applied),
                 placeholder: None,
                 rows: None,
+                line: None,
                 focus: false,
                 seen: frame,
                 window: window.window_handle().window_id(),
@@ -308,14 +342,23 @@ impl Inputs {
         field.window = window.window_handle().window_id();
         field.wiring = wiring;
         let editor = field.editor.clone();
+        let mut renewed = false;
         if input.value != field.applied {
             if let Some(value) = &input.value
                 && editor.value(cx).as_ref() != value
             {
                 editor.set_value(value, window, cx);
+                renewed = true;
             }
             field.applied = input.value.clone();
         }
+        if let (Editor::Code(state, _), Some(line)) = (&editor, input.line)
+            && (renewed || field.line != input.line)
+        {
+            let at = base::input::Position::new(line - 1, 0);
+            state.update(cx, |state, cx| state.set_cursor_position(at, window, cx));
+        }
+        field.line = input.line;
         if input.placeholder != field.placeholder {
             editor.set_placeholder(input.placeholder.as_deref().unwrap_or(""), window, cx);
             field.placeholder = input.placeholder.clone();

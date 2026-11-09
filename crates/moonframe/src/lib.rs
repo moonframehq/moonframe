@@ -51,6 +51,7 @@ mod embed;
 mod gallery;
 pub mod gestures;
 mod history;
+mod host_menus;
 mod hosted;
 mod init;
 mod input;
@@ -67,6 +68,7 @@ mod persist;
 #[cfg(not(any(feature = "terminal", feature = "herdr-core")))]
 #[path = "persist/sqlite.rs"]
 mod persist;
+mod placement;
 mod profiles;
 mod project;
 mod render;
@@ -83,9 +85,11 @@ mod video;
 #[cfg(feature = "tokio")]
 pub use moonframe_providers::{AsyncNative, on_runtime, runtime, tokio};
 pub use {
+    app::open_main_window,
     gpui_kit,
+    host_menus::refresh_menus,
     hosted::{HostView, Messenger, ViewInit},
-    launch::Moonframe,
+    launch::{LogLayer, Moonframe},
     moonframe_core::{self, Data},
     moonframe_providers::{Handle, Native},
     rust_embed,

@@ -170,10 +170,19 @@ pub(crate) struct Terminals {
     /// command line `moonframe pane new` asked for. The app sets it, never
     /// Luau, so a mod still picks where a terminal starts but not what runs.
     typed: HashMap<String, Typed>,
+    /// Whether shells may outlive the window, kept by herdr-core or tmux
+    /// under their names: in the first main window only, as another's
+    /// would take over the first's shells of the same names.
+    kept: bool,
 }
 
 impl Terminals {
-    pub(crate) fn new(backends: Arc<Backends>, wake: Arc<dyn Fn() + Send + Sync>) -> Self {
+    /// `kept`: whether shells may outlive the window (see the field).
+    pub(crate) fn new(
+        backends: Arc<Backends>,
+        wake: Arc<dyn Fn() + Send + Sync>,
+        kept: bool,
+    ) -> Self {
         Self {
             views: HashMap::new(),
             backends,
@@ -186,6 +195,7 @@ impl Terminals {
             in_main_frame: false,
             refused: HashSet::new(),
             typed: HashMap::new(),
+            kept,
         }
     }
 
@@ -303,7 +313,11 @@ impl Terminals {
         };
         let spawn = Spawn {
             engine,
-            preference,
+            preference: if self.kept {
+                preference
+            } else {
+                Preference::Pty
+            },
             open: Open {
                 key: key.to_owned(),
                 // Unnamed, the folder the app was started from; the

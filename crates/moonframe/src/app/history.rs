@@ -8,21 +8,9 @@ impl MoonframeApp {
     /// Takes a snapshot of each folder kept, saying `reason`, if anything
     /// changed since the last one.
     pub(super) fn snapshot(&self, reason: &'static str, cx: &mut Context<Self>) {
-        let Some(history) = self.history.clone() else {
-            return;
-        };
-        cx.background_executor()
-            .spawn(async move {
-                if let Err(error) = history.capture(reason) {
-                    tracing::warn!("no snapshot: {error}");
-                }
-                if reason == "launch"
-                    && let Err(error) = history.tidy()
-                {
-                    tracing::warn!("cannot tidy the history: {error}");
-                }
-            })
-            .detach();
+        if let Some(history) = self.history.clone() {
+            hub::capture(history, reason, cx);
+        }
     }
 
     /// Undoes the last change to the app's folders (`back`), or redoes

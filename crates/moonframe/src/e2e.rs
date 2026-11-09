@@ -9,10 +9,11 @@
 mod both_backends;
 mod host_views;
 mod regressions;
+mod windows;
 
 use {
     crate::{
-        app::{MoonframeApp, Parts},
+        app::{Hub, Launch, MoonframeApp},
         backends::Backends,
         hosted::Registry,
     },
@@ -79,24 +80,25 @@ fn open_with(cx: &mut TestAppContext, dir: TempDir, views: Registry) -> Window<'
         bundled: None,
     };
     let backends = Arc::new(Backends::for_app("e2e"));
+    cx.update(|cx| {
+        Hub::install(
+            &workspace,
+            Natives::default(),
+            Launch {
+                folders: folders.clone(),
+                backends: backends.clone(),
+                views: views.clone(),
+                chrome,
+            },
+            cx,
+        );
+    });
     let mut app = None;
     let (_, cx) = cx.add_window_view(|window, cx| {
-        let view = cx.new(|cx| {
-            MoonframeApp::new(
-                workspace,
-                chrome,
-                folders,
-                backends,
-                Parts {
-                    natives: Natives::default(),
-                    views,
-                },
-                window,
-                cx,
-            )
-        });
+        let view =
+            cx.new(|cx| MoonframeApp::new(workspace, chrome, folders, backends, views, window, cx));
         app = Some(view.clone());
-        let view = cx.new(|_| crate::app::MainWindow::new(view));
+        let view = cx.new(|cx| crate::app::MainWindow::new(view, None, window, cx));
         Root::new(view, window, cx)
     });
     let mut window = Window {
