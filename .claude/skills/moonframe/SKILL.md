@@ -260,8 +260,9 @@ on the right of the window (drawn around the shell, so no layout makes room
 for it) or in a window of its own (drag the dock's grip out): the element and
 its trail, its mod's Luau in a code editor (⌘S saves and the window reloads),
 the mod's state, and agent sessions (the feedback mod's runs) that stay open.
-It is `mods/devtools`; only it may send `app:devtools`. An app running as
-a profile has it when its `keep` names `feedback` or `devtools`.
+It is `mods/devtools`; only it may send `app:devtools`. Every app has it,
+profiles and library hosts alike, whatever their `keep`; the Agent tab
+shows when the app also keeps `feedback`.
 
 When the user says "here", "this", "the selected element" or "add X there"
 without saying where, read that file first. The `file:line` is the `ui` call

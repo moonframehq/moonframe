@@ -250,7 +250,7 @@ fn packages_lie_between_the_app_and_the_user_and_never_replace_the_shell() {
 }
 
 #[test]
-fn the_developer_tools_come_with_the_feedback_mod_or_on_their_own() {
+fn every_app_gets_the_developer_tools() {
     const PANEL: &str = r#"return mod { view = function() return ui.text "x" end }"#;
     let builtin = app(&[
         ("devtools", PANEL),
@@ -272,6 +272,6 @@ fn the_developer_tools_come_with_the_feedback_mod_or_on_their_own() {
     };
     assert!(brings(&["feedback"]));
     assert!(brings(&["devtools"]));
-    assert!(!brings(&["terminal"]));
-    assert!(!brings(&[]));
+    assert!(brings(&["terminal"]));
+    assert!(brings(&[]));
 }
