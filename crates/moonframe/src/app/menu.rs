@@ -172,7 +172,7 @@ pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
                 app.close_devtools(cx);
             }
             app.rewatch(cx);
-            cx.set_menus(menus(app.workspace.menus()));
+            crate::host_menus::install(app.workspace.menus(), cx);
             app.show_toast(
                 if developer {
                     "Developer Mode: Components… (⇧⌘K), Inspect Element (⌥⌘I), Developer Tools (⌥⌘J) and Reload Modules (⌘R)"
@@ -189,7 +189,7 @@ pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
         crate::motion::set_slow(!crate::motion::is_slow());
         // The menu shows the switch checked while it is on.
         let _ = app.update(cx, |app, cx| {
-            cx.set_menus(menus(app.workspace.menus()));
+            crate::host_menus::install(app.workspace.menus(), cx);
         });
         cx.refresh_windows();
     });

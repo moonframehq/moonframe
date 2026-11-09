@@ -51,6 +51,7 @@ mod embed;
 mod gallery;
 pub mod gestures;
 mod history;
+mod host_menus;
 mod hosted;
 mod init;
 mod input;
@@ -84,6 +85,7 @@ mod video;
 pub use moonframe_providers::{AsyncNative, on_runtime, runtime, tokio};
 pub use {
     gpui_kit,
+    host_menus::refresh_menus,
     hosted::{HostView, Messenger, ViewInit},
     launch::Moonframe,
     moonframe_core::{self, Data},
