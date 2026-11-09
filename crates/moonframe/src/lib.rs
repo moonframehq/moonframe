@@ -68,6 +68,7 @@ mod persist;
 #[cfg(not(any(feature = "terminal", feature = "herdr-core")))]
 #[path = "persist/sqlite.rs"]
 mod persist;
+mod placement;
 mod profiles;
 mod project;
 mod render;

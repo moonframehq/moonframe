@@ -68,7 +68,7 @@ impl Platform {
 
 /// What the shell asks of the window. The host opens the window with it,
 /// so a change takes effect when the app next starts.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Chrome {
     pub titlebar: Titlebar,
     /// Where macOS puts its traffic lights under a hidden title bar: the
@@ -77,6 +77,20 @@ pub struct Chrome {
     /// The size the window opens at, `(width, height)`, before the user
     /// resizes it; the host's default when unset.
     pub size: Option<(f32, f32)>,
+    /// Whether the window opens where and as large as it last was, rather
+    /// than at `size` in the middle of the screen (`remember = false`).
+    pub remember: bool,
+}
+
+impl Default for Chrome {
+    fn default() -> Self {
+        Self {
+            titlebar: Titlebar::default(),
+            traffic_lights: None,
+            size: None,
+            remember: true,
+        }
+    }
 }
 
 /// The sizes a shell may ask the window to open at.
@@ -88,7 +102,12 @@ const TRAFFIC_LIGHTS: std::ops::RangeInclusive<f32> = 0.0..=200.0;
 
 impl Read for Chrome {
     fn read(value: &mlua::Value, cx: &Cx) -> Result<Self, Error> {
-        let fields = Fields::read(value, cx, &[&["titlebar", "traffic_lights", "size"]])?;
+        let fields = Fields::read(value, cx, &[&[
+            "titlebar",
+            "traffic_lights",
+            "size",
+            "remember",
+        ]])?;
         let size = match fields.raw("size") {
             None => None,
             Some(value) => {
@@ -104,6 +123,7 @@ impl Read for Chrome {
             titlebar: fields.get("titlebar")?.unwrap_or_default(),
             traffic_lights: traffic_lights(&fields, cx)?,
             size,
+            remember: fields.get("remember")?.unwrap_or(true),
         })
     }
 }

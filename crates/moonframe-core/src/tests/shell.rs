@@ -30,6 +30,7 @@ fn the_shell_asks_for_its_window_and_views_see_it() {
         titlebar: Titlebar::Hidden,
         traffic_lights: Some((12.0, 16.0)),
         size: None,
+        remember: true,
     });
     let row = |workspace: &Workspace| {
         let Some(Node::Stack(row)) = workspace.shell().view() else {
@@ -67,6 +68,7 @@ fn the_shell_asks_for_its_window_and_views_see_it() {
         (r#"{ titlebar = "none" }"#, "unknown `none`"),
         (r#"{ traffic_lights = { x = 500 } }"#, "traffic_lights.x"),
         (r#"{ frameless = true }"#, "unknown key `frameless`"),
+        (r#"{ remember = "yes" }"#, "remember"),
     ] {
         let source =
             format!("return mod {{ window = {window}, view = function() return ui.text 'x' end }}");
@@ -813,4 +815,24 @@ fn every_way_of_showing_a_tab_answers_its_dot() {
             "{way}: it came back"
         );
     }
+}
+
+#[test]
+fn the_shell_can_ask_the_window_to_forget_its_place() {
+    let dir = app(&[]);
+    // Remembered unless the shell says otherwise.
+    assert!(Workspace::open(dir.path(), false).chrome().remember);
+    let shell = r#"return mod {
+      window = { remember = false, size = { width = 900, height = 600 } },
+      view = function() return ui.text "x" end,
+    }"#;
+    write(dir.path(), "main.luau", shell);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    assert!(!workspace.chrome().remember);
+    assert_eq!(workspace.chrome().size, Some((900.0, 600.0)));
 }
