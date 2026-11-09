@@ -403,6 +403,20 @@ impl Render for Editor { /* ... */ }
 `get`, `as_str`, `as_i64`, `as_f64`, `as_bool`, and `From` for strings,
 numbers, booleans and lists.
 
+### More than one window
+
+`moonframe::open_main_window(cx)` opens another main window of the app, a
+little below and right of the front one: its own copy of the Luau layout
+and of each view (made again from `.view`), sharing the app's providers. A
+host with its own menus calls it from its File > New Window; Moonframe's own
+bar has **New Window** in the app menu (⌘N, Ctrl-N elsewhere), and a shell
+can run `command = "new-window"`. A provider's data reaches every window;
+its reply to a mod reaches that mod in the window that asked. Only the
+first window keeps its mods' state across launches and its terminals in
+herdr-core or tmux: another starts from each mod's `init`, saves nothing,
+and its terminals are local shells that end with it. The app quits when its
+last window closes.
+
 ## Check, run, ship
 
 ```sh

@@ -84,6 +84,7 @@ mod video;
 #[cfg(feature = "tokio")]
 pub use moonframe_providers::{AsyncNative, on_runtime, runtime, tokio};
 pub use {
+    app::open_main_window,
     gpui_kit,
     host_menus::refresh_menus,
     hosted::{HostView, Messenger, ViewInit},

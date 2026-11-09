@@ -19,7 +19,8 @@ gpui_kit::actions!(moonframe, [
     ToggleDeveloperMode,
     ToggleDevtools,
     UndoChange,
-    RedoChange
+    RedoChange,
+    NewWindow
 ]);
 
 /// Runs a shell menu item, found by its id (menu title and label).
@@ -96,6 +97,17 @@ pub(crate) fn bind_keys(cx: &mut App) {
     ]);
     cx.bind_keys([
         KeyBinding::new("cmd-q", Quit, None),
+        // ⌘N, Ctrl-N elsewhere; a shell menu item with the same
+        // shortcut, bound later, wins.
+        KeyBinding::new(
+            if cfg!(target_os = "macos") {
+                "cmd-n"
+            } else {
+                "ctrl-n"
+            },
+            NewWindow,
+            Some("MoonframeApp"),
+        ),
         KeyBinding::new("cmd-shift-l", ToggleTheme, Some("MoonframeApp")),
         KeyBinding::new("cmd-k cmd-t", ShowThemes, Some("MoonframeApp")),
         // Escape in a terminal is the shell's (vim needs it).
@@ -118,7 +130,11 @@ pub(crate) fn bind_keys(cx: &mut App) {
 /// changes to the app's files, or Slow Animations.
 pub(crate) fn menus(shell: &[AppMenu]) -> Vec<Menu> {
     let title = crate::title();
-    let mut app_items = vec![MenuItem::action(format!("About {title}"), AboutApp)];
+    let mut app_items = vec![
+        MenuItem::action(format!("About {title}"), AboutApp),
+        MenuItem::separator(),
+        MenuItem::action("New Window", NewWindow),
+    ];
     // An app that names the GitHub repository it is released from.
     #[cfg(feature = "updates")]
     if crate::update::source().is_some() {

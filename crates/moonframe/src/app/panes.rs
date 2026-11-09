@@ -1,37 +1,13 @@
-//! The tabs `moonframe pane new` asks for (see `crate::panes`).
+//! The tabs `moonframe pane new` asks for (see `crate::panes`), which the
+//! hub takes and opens in the front main window.
 
 use super::*;
 
 impl MoonframeApp {
-    /// Opens the tabs `moonframe pane new` asks for, also those left for
-    /// this window before it opened. Runs without the user's folder
-    /// (checks, screenshots) take none.
-    pub(super) fn take_panes(&self, cx: &mut Context<Self>) {
-        let Some(user) = &self.folders.user else {
-            return;
-        };
-        let inbox = crate::panes::inbox(user, self.folders.profile.as_deref());
-        cx.spawn(async move |this, cx| {
-            loop {
-                let requests = crate::panes::take(&inbox);
-                let open = this.update(cx, |app, cx| {
-                    for request in requests {
-                        app.open_pane(request, cx);
-                    }
-                });
-                if open.is_err() {
-                    break;
-                }
-                cx.background_executor().timer(crate::panes::POLL).await;
-            }
-        })
-        .detach();
-    }
-
     /// Opens the tab `request` asks for in the main tab bar: a terminal in
     /// its folder (the window's own user folder by default), with the
     /// agent's command typed into it.
-    fn open_pane(&mut self, request: crate::panes::Request, cx: &mut Context<Self>) {
+    pub(super) fn open_pane(&mut self, request: crate::panes::Request, cx: &mut Context<Self>) {
         if !cfg!(feature = "terminal") {
             self.show_toast("Terminal support was left out of this build", cx);
             return;

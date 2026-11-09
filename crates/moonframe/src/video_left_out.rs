@@ -7,7 +7,7 @@ use {
     moonframe_core::Data,
 };
 
-pub(crate) fn deliver_to(_: UnboundedSender<(String, Data)>) {}
+pub(crate) fn deliver_to(_: WindowId, _: UnboundedSender<(String, Data)>) {}
 
 pub(crate) fn sweep() -> impl IntoElement {
     div()

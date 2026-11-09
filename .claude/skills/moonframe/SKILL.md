@@ -694,7 +694,8 @@ end,
 - `app:command`, `msg` a command's name: runs it as a control's `command`
   does, with the same commands (`quit` `reload` `toggle-theme`
   `show-themes` `minimize` `maximize` `close-window` `check-for-updates`
-  `inspect`) and nothing else. It runs once the update that asked is done.
+  `new-window` `inspect`) and nothing else. It runs once the update that
+  asked is done; `reload` and `new-window` asked from `init` are ignored.
 - `app:appearance`, `msg` `"system"`, `"light"` or `"dark"`: whether the
   window follows the system's light or dark (and switches live as it
   does) or stays one. It is kept across launches for the app and profile
@@ -1229,7 +1230,7 @@ Text-like elements take their main value positionally:
 - border: `true`, `all`, `top`, `bottom`, `left`, `right`, `none`
 - direction: `row` `column`
 - variant (button): `normal` `primary` `ghost` `outline` `danger`
-- command: `quit` `reload` `toggle-theme` (light to dark or back, keeping the themes) `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `inspect` (Inspect Element for the mod: see "Here")
+- command: `quit` `reload` `toggle-theme` (light to dark or back, keeping the themes) `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `new-window` (another main window: its own copy of the layout, the same providers; only the first keeps mod state across launches) `inspect` (Inspect Element for the mod: see "Here")
 - place (overlay): `center` `top` `bottom` `left` `right` `top-start`
   `top-end` `bottom-start` `bottom-end`
 - browser commands (with `browser = "<id>"`): `browser-back`

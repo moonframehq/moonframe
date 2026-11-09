@@ -17,12 +17,7 @@ use {
     futures::channel::mpsc::UnboundedSender,
     gpui_kit::*,
     moonframe_core::{Data, Video},
-    std::{
-        cell::RefCell,
-        collections::HashMap,
-        sync::{Arc, OnceLock},
-        thread,
-    },
+    std::{cell::RefCell, collections::HashMap, sync::Arc, thread},
     stream::Shared,
     surface::Surface,
 };
@@ -30,12 +25,30 @@ use {
 /// The most videos the app keeps.
 const MAX_VIDEOS: usize = 32;
 
-/// Where videos send the mod that drew them messages.
-static MESSAGES: OnceLock<UnboundedSender<(String, Data)>> = OnceLock::new();
+thread_local! {
+    /// Where videos in each main window send the mod that drew them
+    /// messages: that window's app.
+    static MESSAGES: RefCell<Vec<(WindowId, UnboundedSender<(String, Data)>)>> =
+        const { RefCell::new(Vec::new()) };
+}
 
-/// Sets where videos send messages, once, as the app starts.
-pub(crate) fn deliver_to(sender: UnboundedSender<(String, Data)>) {
-    let _ = MESSAGES.set(sender);
+/// Sets where videos in the main window `window` send messages, as it
+/// opens.
+pub(crate) fn deliver_to(window: WindowId, sender: UnboundedSender<(String, Data)>) {
+    MESSAGES.with_borrow_mut(|senders| senders.push((window, sender)));
+}
+
+/// Where a video in `window` sends messages: that main window's app, else
+/// (a mod's window) the app that opened last and is still open.
+fn messages_for(window: WindowId) -> Option<UnboundedSender<(String, Data)>> {
+    MESSAGES.with_borrow_mut(|senders| {
+        senders.retain(|(_, sender)| !sender.is_closed());
+        senders
+            .iter()
+            .find(|(id, _)| *id == window)
+            .or_else(|| senders.last())
+            .map(|(_, sender)| sender.clone())
+    })
 }
 
 /// A video on the screen.
@@ -102,7 +115,7 @@ fn start(owner: &str, video: &Video, id: WindowId, window: &Window) -> Result<Li
     let surface = Surface::new(window, &device)?;
     let renderer = render::Renderer::new(device, surface.layer())?;
     let shared = Shared::new(video);
-    let messages = MESSAGES.get().ok_or("videos aren't ready")?.clone();
+    let messages = messages_for(id).ok_or("videos aren't ready")?;
     let (thread_shared, owner) = (shared.clone(), owner.to_owned());
     thread::Builder::new()
         .name(format!("video-{}", video.id))

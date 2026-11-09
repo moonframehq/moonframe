@@ -1,5 +1,5 @@
-//! The shell's menu items: run by their keys or ids, and the app-wide
-//! menu actions.
+//! The shell's menu items, run by their keys or ids (the app-wide menu
+//! actions are the hub's).
 
 use super::*;
 
@@ -105,96 +105,6 @@ impl MoonframeApp {
     }
 }
 
-/// The menu actions that need no particular window, handled app-wide, so
-/// they work from the menu bar or their shortcut whichever window has focus,
-/// or none (the app in the background, or every window minimized).
-pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
-    let app = cx.entity().downgrade();
-    // The app's own registry, not the view's of the same name.
-    let cx: &mut App = cx;
-    let on = app.clone();
-    cx.on_action(move |_: &Reload, cx| {
-        let _ = on.update(cx, |app, cx| app.reload(cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &BrowseComponents, cx| {
-        let _ = on.update(cx, |app, cx| app.show_component("", cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |action: &ShowComponent, cx| {
-        let _ = on.update(cx, |app, cx| app.show_component(&action.name, cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &ShowThemes, cx| {
-        let _ = on.update(cx, |app, cx| app.show_themes(cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |action: &SetAppearance, cx| {
-        let _ = on.update(cx, |app, cx| app.set_appearance(action.appearance, cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &AboutApp, cx| {
-        let _ = on.update(cx, |app, cx| app.show_about(cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &BuildApp, cx| {
-        let _ = on.update(cx, |app, cx| app.build_app(cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &CheckForUpdates, cx| {
-        let _ = on.update(cx, |app, cx| app.check_for_updates(true, cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &ToggleBetaReleases, cx| {
-        let _ = on.update(cx, |app, cx| app.toggle_beta_releases(cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &UndoChange, cx| {
-        let _ = on.update(cx, |app, cx| app.step_history(true, cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &RedoChange, cx| {
-        let _ = on.update(cx, |app, cx| app.step_history(false, cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &ToggleDevtools, cx| {
-        let _ = on.update(cx, |app, cx| app.toggle_devtools(cx));
-    });
-    let on = app.clone();
-    cx.on_action(move |_: &ToggleDeveloperMode, cx| {
-        let developer = crate::release();
-        crate::set_developer(developer);
-        let _ = on.update(cx, |app, cx| {
-            if !developer && app.inspector.picking {
-                app.toggle_inspect(cx);
-            }
-            if !developer {
-                app.close_devtools(cx);
-            }
-            app.rewatch(cx);
-            crate::host_menus::install(app.workspace.menus(), cx);
-            app.show_toast(
-                if developer {
-                    "Developer Mode: Components… (⇧⌘K), Inspect Element (⌥⌘I), Developer Tools (⌥⌘J) and Reload Modules (⌘R)"
-                } else {
-                    "Developer Mode is off"
-                },
-                cx,
-            );
-            cx.notify();
-        });
-        cx.refresh_windows();
-    });
-    cx.on_action(move |_: &ToggleSlowAnimations, cx| {
-        crate::motion::set_slow(!crate::motion::is_slow());
-        // The menu shows the switch checked while it is on.
-        let _ = app.update(cx, |app, cx| {
-            crate::host_menus::install(app.workspace.menus(), cx);
-        });
-        cx.refresh_windows();
-    });
-}
-
 /// A theme's name; the stock look's for `None`.
 pub(super) fn name_of(scheme: Option<&Scheme>) -> &'static str {
     scheme.map_or(themes::DEFAULT, |scheme| scheme.name)
@@ -226,25 +136,6 @@ pub(super) fn stock_preview(
         }
     }
     preview
-}
-
-/// Hears the clicks on the notifications mods posted: each brings the
-/// app and its window forward and tells the mod that posted it, on
-/// `app/notification`: `{ id, clicked = true }`.
-pub(super) fn hear_notification_clicks(cx: &mut Context<MoonframeApp>) {
-    let (sender, mut clicks) = futures::channel::mpsc::unbounded::<(String, Option<String>)>();
-    crate::alerts::listen(move |from, id| {
-        let _ = sender.unbounded_send((from, id));
-    });
-    cx.spawn(async move |this, cx| {
-        while let Some((from, id)) = clicks.next().await {
-            let heard = this.update(cx, |app, cx| app.notification_clicked(&from, id, cx));
-            if heard.is_err() {
-                break;
-            }
-        }
-    })
-    .detach();
 }
 
 /// Whether the system's appearance is a dark one.
