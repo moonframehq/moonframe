@@ -89,6 +89,7 @@ tokens! {
         Image = "image",
         Line = "line",
         Paths = "paths",
+        RevisionTimeline = "revision-timeline",
         Hatch = "hatch",
         /// A `ui.map`'s box; its `color` strokes routes without their own.
         Map = "map",

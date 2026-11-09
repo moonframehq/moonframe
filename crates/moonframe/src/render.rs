@@ -26,6 +26,7 @@ mod place;
 mod plot;
 mod pointer;
 mod popover;
+mod revision_timeline;
 mod styling;
 #[cfg_attr(not(feature = "syntax"), path = "render/syntax_left_out.rs")]
 mod syntax;
@@ -723,6 +724,7 @@ fn draw_node<'w>(
         Node::Image(image) => image.draw(painter, place, cx),
         Node::Line(line) => line.draw(painter, place, cx),
         Node::Paths(paths) => paths.draw(painter, place, cx),
+        Node::RevisionTimeline(timeline) => timeline.draw(painter, place, cx),
         Node::Hatch(hatch) => hatch.draw(painter, place, cx),
         Node::Map(map) => map.draw(painter, place, cx),
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),

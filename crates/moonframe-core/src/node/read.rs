@@ -10,6 +10,7 @@ mod input;
 mod layout;
 mod map;
 mod pointer;
+mod revision_timeline;
 mod video;
 // keep-sorted end
 
@@ -125,6 +126,7 @@ impl Tree<'_> {
             Element::Image => Node::Image(self.build(kind, table, &cx)?),
             Element::Line => Node::Line(self.build(kind, table, &cx)?),
             Element::Paths => Node::Paths(self.build(kind, table, &cx)?),
+            Element::RevisionTimeline => Node::RevisionTimeline(self.build(kind, table, &cx)?),
             Element::Hatch => Node::Hatch(self.build(kind, table, &cx)?),
             Element::Map => Node::Map(self.build(kind, table, &cx)?),
             Element::Terminal => Node::Terminal(self.build(kind, table, &cx)?),

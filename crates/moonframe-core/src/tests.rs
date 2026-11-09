@@ -25,6 +25,7 @@ mod overlays;
 mod packages;
 mod paint;
 mod pointer;
+mod revision_timeline;
 mod shell;
 mod state;
 mod styles;

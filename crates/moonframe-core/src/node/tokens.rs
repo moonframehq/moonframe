@@ -18,6 +18,7 @@ tokens! {
         Image = "image",
         Line = "line",
         Paths = "paths",
+        RevisionTimeline = "revision_timeline",
         Hatch = "hatch",
         Map = "map",
         Terminal = "terminal",
