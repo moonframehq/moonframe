@@ -524,14 +524,11 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     {
         tracing::warn!("cannot create {}: {error}", own.display());
     }
-    // The developer tools (Components, Inspect Element, Reload Modules)
-    // are for whoever builds the app: an app on the library shows them in
-    // a debug build (`cargo run`), not in a release one (`cargo run
-    // --release`, an install, a bundle). The starter always shows them
-    // outside a bundle, as building apps is what it is for.
-    let hosted_release = folders.host.is_some() && (paths::in_bundle() || !cfg!(debug_assertions));
-    // The user's own choice (Developer Mode in the app menu) wins over
-    // those defaults; `--release` and `--dev` over both, for this run.
+    // Developer Mode (Components, Inspect Element, the Developer tools,
+    // Reload Modules) is on until the user turns it off in the app menu,
+    // in every build: changing the app as it runs is what Moonframe is
+    // for. `--release` and `--dev` override the choice for this run. An
+    // app that must never show the tools leaves out the `studio` feature.
     let developer_file =
         paths::state(folders.profile.as_deref()).with_file_name(match &folders.profile {
             Some(profile) => format!("developer-{profile}"),
@@ -540,9 +537,7 @@ pub(crate) fn main(launch: Moonframe) -> ExitCode {
     let chosen = crate::developer_choice(&developer_file).map(|on| !on);
     let _ = crate::DEVELOPER_FILE.set(developer_file);
     crate::RELEASE.store(
-        args.release
-            .or(chosen)
-            .unwrap_or(folders.bundled.is_some() || hosted_release),
+        args.release.or(chosen).unwrap_or_default(),
         Ordering::Relaxed,
     );
     let _ = crate::TITLE.set(folders.title());

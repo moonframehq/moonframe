@@ -241,8 +241,8 @@ which also has a release workflow to copy.
 
 - **Developer Mode** (app menu, beside About) switches View's Components…,
   Inspect Element and Reload Modules, and their keys, on and off live; the
-  choice is kept per app and profile. Until the user picks, it is off in a
-  bundle and in a library app's release build. `--release` and `--dev` set
+  choice is kept per app and profile. It is on until the user turns it
+  off, in every build, bundles included. `--release` and `--dev` set
   it for one run.
 - **Carrying more than Luau:** `PAYLOAD=DIR just bundle-app NAME` puts a
   folder into the bundle as it is (a Python, native libraries, an engine),

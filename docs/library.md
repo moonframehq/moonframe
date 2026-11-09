@@ -422,10 +422,9 @@ finds and installs those releases itself.
 **Developer Mode**, in the app menu beside About, switches the tools for
 changing the app as it runs (View's Components…, Inspect Element ⌥⌘I,
 Developer Tools ⌥⌘J, Reload Modules ⌘R) on and off, at once and without a rebuild, and is kept
-for the app (and each profile) in `$XDG_STATE_HOME/<name>/developer`. Until
-the user picks, it is on in a debug build (`cargo run`) and off in a release
-one (`cargo run --release`, an install, a bundle), as the app's users see
-it. `--dev` and `--release` set it for one run. Its keys are bound in the
+for the app (and each profile) in `$XDG_STATE_HOME/<name>/developer`. It is
+on until the user turns it off, in every build, a bundle included; an app
+that must never show the tools builds without the `studio` feature. `--dev` and `--release` set it for one run. Its keys are bound in the
 `developer` key context, so with it off ⌘R is the app's own again.
 
 ## Moving an existing GPUI app over
