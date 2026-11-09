@@ -91,7 +91,7 @@ ship only their selected components.
 | `markdown` | Rich `ui.markdown` rendering (headings, lists, tables, links and code). |
 | `prose` | The writing editor for `ui.input` with `prose`, `dim` or `typewriter`. Ordinary single-line and multiline inputs remain available without it. |
 | `sealed` | Staged app resources instead of the full embedded toolbox. |
-| `studio` | Development commands and the component gallery. |
+| `studio` | Developer Mode: Inspect Element, the Developer tools (with `syntax` to color their code editor), Reload Modules and the component gallery. Without it the app is always in release mode. |
 | `updates` | Release checks, downloads and in-place app updates. Omitting it hides the updater menu and disables automatic checks. |
 | `acp`, `chat`, `docs`, `forge`, `git`, `shell`, `usage` | The respective built-in native providers. |
 | `speech` | The `speech` native provider: dictation from the microphone (`use "dictation"`), through Apple's on-device recognizer, a local program or a remote service. Opt-in. |
@@ -225,7 +225,7 @@ fn main() -> std::process::ExitCode {
 | `.app_dir(path)` | its app folder while it runs from source; edits reload live |
 | `.embedded_app::<E>()` | its app folder compiled in (`#[derive(moonframe::rust_embed::RustEmbed)]`, `#[crate_path = "moonframe::rust_embed"]`), for a lone executable |
 | `.project_dir(path)` | the source checkout for an embedded app's debug branch bar; pass `env!("CARGO_MANIFEST_DIR")` from the host crate, including when Cargo builds into an external target folder |
-| `.keep(mods)` | the starter's mods it shows (from `app/mods` here), as a profile's `keep`; `feedback` brings the Developer tools with it, `devtools` brings them alone |
+| `.keep(mods)` | the starter's mods it shows (from `app/mods` here), as a profile's `keep`; the Developer tools come whatever it names, and `feedback` adds their Agent tab |
 | `.native(name, make)` | a native provider (below) |
 | `.native_async(name, make)` | a native provider written with `async fn`, on tokio (below) |
 | `.tokio(handle)` | the tokio runtime async providers and `on_runtime` use (below) |

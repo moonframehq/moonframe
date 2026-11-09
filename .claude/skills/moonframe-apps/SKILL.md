@@ -52,13 +52,12 @@ where the user's edits to this app go. Built-in providers (`git`, `files`,
 `agents`, `system`, `github`, `gitlab`) and every component in the catalogue
 are there to use.
 
-**Developer tools.** Keeping `feedback` (the sparkle that asks an agent for
-a change) brings the Developer tools with it: in Developer Mode, View >
-Developer Tools (⌥⌘J) docks Pick, the picked element's Luau source to edit
-and save, its mod's state and agent sessions beside the app. An app without
-the sparkle adds just the tools with `keep = ["devtools"]` (no Agent tab
-then). A library host gets the same with `.keep(["feedback"])`. Release
-builds leave them out.
+**Developer tools.** Every app has them, whatever its `keep`, and so does
+every library host built with the `studio` feature: in Developer Mode,
+View > Developer Tools (⌥⌘J) docks Pick, the picked element's Luau source
+to edit and save, its mod's state and, when the app keeps `feedback` (the
+sparkle that asks an agent for a change), agent sessions beside the app.
+With Developer Mode off they don't show.
 
 ## Commands
 
