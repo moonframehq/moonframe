@@ -581,6 +581,13 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
     }
     let component = args.component.filter(|_| !crate::release());
     let (natives, views) = (launch.natives, launch.views);
+    // Where the main window was, read before the window opens; only with
+    // the user's folder, as the rest of what the app keeps.
+    let placement = folders.user.as_ref().map(|_| {
+        let path = crate::placement::file(folders.profile.as_deref());
+        let saved = crate::placement::load(&path);
+        (path, saved)
+    });
     gpui_kit::application()
         .with_assets(crate::assets::Assets::new(launch.assets))
         .run(move |cx| {
@@ -624,6 +631,7 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
                 },
                 cx,
             );
+            let placement = placement.filter(|_| chrome.remember);
             // The shell's size if it asks, kept within the screen.
             let (width, height) = chrome.size.unwrap_or((1280., 820.));
             let screen = cx.primary_display().map(|display| display.bounds().size);
@@ -634,9 +642,24 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
                 ),
                 None => (width, height),
             };
-            let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
+            // Where the window last was, if it still fits a screen; else
+            // the shell's size, centered.
+            let (window_bounds, display_id) = placement
+                .as_ref()
+                .and_then(|(_, saved)| crate::placement::reopen(saved.as_ref()?, cx))
+                .map_or_else(
+                    || {
+                        let size = size(px(width), px(height));
+                        (
+                            WindowBounds::Windowed(Bounds::centered(None, size, cx)),
+                            None,
+                        )
+                    },
+                    |(bounds, display)| (bounds, Some(display)),
+                );
             let options = WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                window_bounds: Some(window_bounds),
+                display_id,
                 window_min_size: Some(size(px(640.), px(400.))),
                 app_id: Some(crate::app_id()),
                 focus: !background,
@@ -658,7 +681,8 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
                     }
                     app
                 });
-                let view = cx.new(|_| crate::app::MainWindow::new(view));
+                let kept = placement.map(|(path, _)| path);
+                let view = cx.new(|cx| crate::app::MainWindow::new(view, kept, window, cx));
                 cx.new(|cx| Root::new(view, window, cx))
             });
             if let Err(error) = opened {

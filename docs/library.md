@@ -406,7 +406,8 @@ numbers, booleans and lists.
 ### More than one window
 
 `moonframe::open_main_window(cx)` opens another main window of the app, a
-little below and right of the front one: its own copy of the Luau layout
+little below and right of the front one (only the first window reopens
+where it last was): its own copy of the Luau layout
 and of each view (made again from `.view`), sharing the app's providers. A
 host with its own menus calls it from its File > New Window; Moonframe's own
 bar has **New Window** in the app menu (⌘N, Ctrl-N elsewhere), and a shell

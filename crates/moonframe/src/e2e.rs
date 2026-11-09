@@ -97,7 +97,7 @@ fn open_with(cx: &mut TestAppContext, dir: TempDir, views: Registry) -> Window<'
         let view =
             cx.new(|cx| MoonframeApp::new(workspace, chrome, folders, backends, views, window, cx));
         app = Some(view.clone());
-        let view = cx.new(|_| crate::app::MainWindow::new(view));
+        let view = cx.new(|cx| crate::app::MainWindow::new(view, None, window, cx));
         Root::new(view, window, cx)
     });
     let mut window = Window {

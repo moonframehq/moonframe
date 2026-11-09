@@ -2067,6 +2067,9 @@ type Window = {
 	traffic_lights: { x: number?, y: number? }?,
 	-- The size the window opens at, before the user resizes it.
 	size: { width: number?, height: number? }?,
+	-- Reopen where and as large as the window last was (the default), kept
+	-- within the screen; false opens it at `size`, centered, every launch.
+	remember: boolean?,
 }
 
 -- A mod's own window (`window` on a mod other than main.luau), when a

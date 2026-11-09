@@ -406,7 +406,9 @@ pub fn open_main_window(cx: &mut App) {
                 cx,
             )
         });
-        let view = cx.new(|_| MainWindow::new(app));
+        // It cascades rather than reopening where it was: only the first
+        // window's place is kept.
+        let view = cx.new(|cx| MainWindow::new(app, None, window, cx));
         cx.new(|cx| Root::new(view, window, cx))
     });
     match opened {
