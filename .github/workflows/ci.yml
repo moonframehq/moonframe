@@ -101,9 +101,10 @@ jobs:
             [[ -n $file ]] || continue
             [[ $file != .github/* ]] || workflows=true
             # The WASM guide page is generated from its Markdown by a tool
-            # in website/tools; a change to any of them must keep it current.
+            # in website/tools; a change to any of them, or to this workflow,
+            # checks it is still current.
             case $file in
-              website/* | docs/wasm-providers.md) guide=true ;;
+              website/* | docs/wasm-providers.md | .github/workflows/ci.yml) guide=true ;;
             esac
             case $file in
               # Built by nothing here, wherever its scripts or TOML are: the
