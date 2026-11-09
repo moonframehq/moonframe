@@ -29,7 +29,8 @@ if [ -x "$dir/luau-lsp" ]; then
 fi
 download="target/tools/download"
 mkdir -p "$download"
-curl --fail --location --silent --show-error \
+# GitHub release downloads sometimes answer 5xx for a while: retry them.
+curl --fail --location --silent --show-error --retry 5 --retry-delay 15 \
     --output "$download/$asset" \
     "https://github.com/JohnnyMorganz/luau-lsp/releases/download/$version/$asset"
 echo "$sha256  $download/$asset" | shasum -a 256 --check --status \
