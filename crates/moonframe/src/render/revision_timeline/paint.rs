@@ -97,10 +97,12 @@ pub(super) fn ruler(
             continue;
         }
         // Both detail lines must clear the longest neighbouring tick.
-        let label_width = if is_detail {
+        let label_width = if is_detail && model.preview {
+            rail_width(model, ticks, selected, available)
+        } else if is_detail {
             ticks
                 .iter()
-                .filter(|near| model.preview || (near.y - tick.y).abs() < 26.0)
+                .filter(|near| (near.y - tick.y).abs() < 26.0)
                 .map(|near| tick_width(model, near, selected))
                 .fold(width, f32::max)
         } else {
@@ -175,6 +177,20 @@ pub(super) fn ruler(
             cx,
         );
     }
+}
+
+/// The longest painted tick: shared by preview placement and rail hit testing.
+pub(super) fn rail_width(
+    model: &RevisionTimeline,
+    ticks: &[Tick],
+    selected: Option<usize>,
+    available: f32,
+) -> f32 {
+    ticks
+        .iter()
+        .map(|tick| tick_width(model, tick, selected))
+        .fold(0.0, f32::max)
+        .min((available - 16.0).max(0.0))
 }
 
 fn major(model: &RevisionTimeline, index: usize) -> bool {

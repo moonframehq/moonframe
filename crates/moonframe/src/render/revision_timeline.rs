@@ -167,15 +167,16 @@ impl TimelineView {
         let Some(entry) = self.model.entries.get(index) else {
             return;
         };
+        // Keyboard navigation also reveals an unchanged selection after scrolling away.
+        self.reveal = true;
+        cx.notify();
         if self.selected.as_ref() == Some(&entry.id) {
             return;
         }
         self.selected = Some(entry.id.clone());
-        self.reveal = true;
         if let Some(message) = self.model.selection_message(index) {
             self.sender.send(message, window, cx);
         }
-        cx.notify();
     }
 
     fn over_rail(&self, point: Point<Pixels>) -> bool {
@@ -188,8 +189,16 @@ impl TimelineView {
         } else {
             bounds.right() - point.x
         };
+        // The card begins 12px past the longest painted tick, itself inset 8px.
+        // Use its actual anchor so the preview never becomes a selection target.
         f32::from(distance)
-            <= 20.0 + self.model.metrics.tick_width * (self.model.metrics.magnification + 2.0)
+            < 20.0
+                + paint::rail_width(
+                    &self.model,
+                    &self.painted.borrow(),
+                    self.selected_index(),
+                    f32::from(bounds.size.width),
+                )
     }
 
     fn point(&mut self, point: Point<Pixels>, cx: &mut Context<Self>) {

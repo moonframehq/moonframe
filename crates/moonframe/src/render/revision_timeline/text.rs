@@ -30,12 +30,13 @@ pub(super) fn label(
     if room <= 0.0 {
         return;
     }
-    let line = window.text_system().shape_line(
-        text.to_owned().into(),
-        px(11.0),
-        &[run(text, color, cx)],
-        None,
-    );
+    // Labels stay on one line even when supplied from multiline chat text.
+    // Keep the original record intact for grouping and selection messages.
+    let text = text.replace(['\r', '\n'], " ");
+    let runs = [run(&text, color, cx)];
+    let line = window
+        .text_system()
+        .shape_line(text.into(), px(11.0), &runs, None);
     let width = line.width.min(px(room));
     let x = if left {
         anchor
