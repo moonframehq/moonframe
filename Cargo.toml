@@ -36,7 +36,7 @@ license      = "MIT"
 publish      = false
 repository   = "https://github.com/moonframehq/moonframe"
 rust-version = "1.99"
-version      = "0.2.3"
+version      = "0.3.0"
 
 [workspace.lints.rust]
 unsafe_code           = "deny"
