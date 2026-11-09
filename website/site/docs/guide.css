@@ -1,0 +1,10 @@
+/* A guide generated from Markdown (website/tools/wasm-guide.py), over docs.css. */
+
+main { min-width:0 }
+main a { text-decoration:underline; text-underline-offset:3px }
+main a:hover { color:var(--acc) }
+main ul, main ol { padding-left:24px; margin:14px 0 22px; color:var(--ink2) }
+main li { margin:8px 0 }
+pre code { font:inherit; background:none; padding:0 }
+td code { overflow-wrap:anywhere }
+.toc { max-height:calc(100vh - 58px); overflow:auto }
