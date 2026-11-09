@@ -11,7 +11,6 @@ local tabs = use "tabs"
 local key_values = use "key-values"
 local breadcrumbs = use "breadcrumbs"
 local empty_state = use "empty-state"
-local code_view = use "code-view"
 local chat_message = use "chat-message"
 local agent_run = use "agent-run"
 local composer = use "composer"
@@ -40,6 +39,9 @@ type Source = {
 
 type State = {
 	place: string,
+	-- Room for the sessions beside the open one: a window, or a dock
+	-- dragged wide enough. The app says.
+	wide: boolean,
 	tab: string,
 	-- The pick, from `app/selection`.
 	pick: any?,
@@ -299,6 +301,22 @@ local function element(state: State): any
 	}
 end
 
+-- The row over the Source and State editors: what is shown, and an action
+-- or a status on the right. One height, so both tabs line up.
+local function file_head(icon: any, path: string, tooltip: string?, badge: any, right: any): any
+	return ui.row {
+		align = "center",
+		gap = "small",
+		height = 24,
+		shrink = false,
+		ui.icon { name = icon, size = "small", class = "devtools-muted" },
+		ui.text { path, class = "devtools-path", truncate = true, tooltip = tooltip },
+		badge,
+		ui.spacer(),
+		right,
+	}
+end
+
 local function source(state: State): any
 	local file = state.source
 	if file == nil then
@@ -312,15 +330,7 @@ local function source(state: State): any
 	return ui.column {
 		gap = "small",
 		grow = true,
-		ui.row {
-			align = "center",
-			gap = "small",
-			ui.icon { name = "file-text", size = "small", class = "devtools-muted" },
-			ui.text { short(file.path), class = "devtools-path", truncate = true, tooltip = file.path },
-			line and ui.badge { `line {line}` },
-			ui.spacer(),
-			status,
-		},
+		file_head("file-text", short(file.path), file.path, line and ui.badge { `line {line}` }, status),
 		-- Drawn while it reads, so the text read is a new value it takes.
 		ui.input {
 			id = "devtools-source",
@@ -354,16 +364,25 @@ local function inspected(state: State): any
 	return ui.column {
 		gap = "small",
 		grow = true,
-		ui.row {
-			align = "center",
-			gap = "small",
-			ui.text { `mods/{seen.mod}`, class = "devtools-path" },
-			ui.spacer(),
-			ui.button { "Refresh", icon = "refresh-cw", small = true, variant = "ghost", msg = "refresh-state" },
-		},
+		file_head(
+			"database",
+			`mods/{seen.mod}`,
+			nil,
+			nil,
+			ui.button { "Refresh", icon = "refresh-cw", small = true, variant = "ghost", msg = "refresh-state" }
+		),
 		seen.problem and ui.text { seen.problem, class = "devtools-error", wrap = true },
 		seen.error and ui.text { seen.error, class = "devtools-error", wrap = true },
-		seen.state ~= nil and code_view { text = pretty(seen.state), language = "lua", grow = true, id = "devtools-state" },
+		-- The same editor as Source, read only, so the two tabs look alike.
+		seen.state ~= nil and ui.input {
+			id = "devtools-state",
+			value = pretty(seen.state),
+			multiline = true,
+			code = "luau",
+			disabled = true,
+			grow = true,
+			class = "devtools-editor",
+		},
 	}
 end
 
@@ -526,8 +545,8 @@ local function fresh(state: State, threads: { { any } }, list: boolean): any
 	}
 end
 
--- The Agent tab. Narrow: the list of sessions, and a session opens over
--- it with a way back. Wide: the list beside the session.
+-- The Agent tab. Wide: the list of sessions on the left, beside the open
+-- one. Narrow: the list, and a session opens over it with a way back.
 local function session(state: State, acp: any, wide: boolean): any
 	if not state.agent then
 		return empty_state {
@@ -553,7 +572,7 @@ local function session(state: State, acp: any, wide: boolean): any
 		grow = true,
 		ui.column {
 			class = "devtools-sessions",
-			width = 260,
+			width = if state.place == "window" then 260 else 180,
 			gap = "small",
 			ui.row {
 				align = "center",
@@ -575,7 +594,7 @@ local function body(state: State, app: any, wide: boolean): any
 	if state.pick == nil and state.tab ~= "agent" then
 		return unpicked()
 	elseif state.tab == "agent" then
-		return session(state, app.acp, wide)
+		return session(state, app.acp, wide or state.wide)
 	elseif state.tab == "source" then
 		return source(state)
 	elseif state.tab == "state" then
@@ -592,6 +611,7 @@ return mod {
 	init = function(previous: State?): State
 		local state: State = previous or {
 			place = "closed",
+			wide = false,
 			tab = "element",
 			torn = false,
 			agent = true,
@@ -641,6 +661,7 @@ return mod {
 			return state, load(state)
 		elseif msg.topic == "app/devtools" then
 			state.place = msg.value and msg.value.place or "closed"
+			state.wide = msg.value ~= nil and msg.value.wide == true
 			state.agent = not (msg.value and msg.value.agent == false)
 			state.torn = false
 			return state
