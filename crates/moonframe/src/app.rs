@@ -263,7 +263,7 @@ impl MoonframeApp {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         bind_menu_keys(workspace.menus(), cx);
-        cx.set_menus(menus(workspace.menus()));
+        crate::host_menus::install(workspace.menus(), cx);
         menu_actions(cx);
         #[cfg(feature = "terminal")]
         let terminals = Terminals::new(backends, wake_on_output(cx));
@@ -545,7 +545,7 @@ impl MoonframeApp {
         self.preview = None;
         self.apply_theme(cx);
         show_appearance(appearance);
-        cx.set_menus(menus(self.workspace.menus()));
+        crate::host_menus::install(self.workspace.menus(), cx);
         if let Some(path) = &self.settings
             && let Err(problem) = settings::save(path, &[(settings::APPEARANCE, appearance.name())])
         {
@@ -921,7 +921,7 @@ impl MoonframeApp {
             self.show_toast("The window's title bar changes when the app restarts", cx);
         }
         bind_menu_keys(self.workspace.menus(), cx);
-        cx.set_menus(menus(self.workspace.menus()));
+        crate::host_menus::install(self.workspace.menus(), cx);
         self.apply_theme(cx);
         report(&self.workspace);
         cx.notify();
@@ -941,7 +941,7 @@ impl MoonframeApp {
         self.forward("packages", cx);
         self.rewatch(cx);
         bind_menu_keys(self.workspace.menus(), cx);
-        cx.set_menus(menus(self.workspace.menus()));
+        crate::host_menus::install(self.workspace.menus(), cx);
         self.apply_theme(cx);
         report(&self.workspace);
         self.reload_providers(Some(roots), cx);

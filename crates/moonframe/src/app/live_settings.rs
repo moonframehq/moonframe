@@ -72,7 +72,7 @@ impl MoonframeApp {
                 Some(appearance) if appearance != self.appearance => {
                     self.appearance = appearance;
                     show_appearance(appearance);
-                    cx.set_menus(menus(self.workspace.menus()));
+                    crate::host_menus::install(self.workspace.menus(), cx);
                     changed = true;
                 },
                 Some(_) => {},

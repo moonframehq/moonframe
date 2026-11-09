@@ -232,6 +232,16 @@ impl Moonframe {
         self
     }
 
+    /// The menu bar, built by the app from its own state each time the bar
+    /// is set: an app with commands of its own keeps its menus, and
+    /// Moonframe adds the app's shell menus and its Developer menu before
+    /// Window and Help. Call [`refresh_menus`](crate::refresh_menus) when
+    /// what they show changes. Called on the thread that runs the app.
+    pub fn menus(self, build: impl Fn(&gpui_kit::App) -> Vec<gpui_kit::Menu> + 'static) -> Self {
+        crate::host_menus::set(std::rc::Rc::new(build));
+        self
+    }
+
     /// The log filter used when `RUST_LOG` is not set.
     pub fn log(mut self, filter: &str) -> Self {
         filter.clone_into(&mut self.log);
