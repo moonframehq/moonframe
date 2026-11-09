@@ -242,7 +242,7 @@ jobs:
           PI_VERSION: 1.5.0
           PI_SHA256: df870ba0e344cb7b3358d8d8f19397b8b8d225a8669784736ad68a5c2169d53b
         run: |
-          curl -fsSL -o "$RUNNER_TEMP/pi.tar.gz" \
+          curl -fsSL --retry 5 --retry-delay 15 -o "$RUNNER_TEMP/pi.tar.gz" \
             "https://github.com/earendil-works/pi/releases/download/v$PI_VERSION/pi-linux-x64.tar.gz"
           echo "$PI_SHA256  $RUNNER_TEMP/pi.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/pi.tar.gz" -C "$RUNNER_TEMP"
