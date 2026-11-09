@@ -621,13 +621,27 @@ fn a_native_provider_publishes_and_answers_the_mod_that_asked() {
     }
 
     providers.send("echo", "editor", Data::from("hi")).unwrap();
-    let Event::Sent { provider, to, msg } = next() else {
+    let Event::Sent {
+        provider,
+        to,
+        msg,
+        origin,
+    } = next()
+    else {
         panic!("no answer: {seen:?}");
     };
     assert_eq!(
-        (provider.as_str(), to.as_str(), msg),
-        ("echo", "editor", Data::from("hi"))
+        (provider.as_str(), to.as_str(), msg, origin),
+        ("echo", "editor", Data::from("hi"), None)
     );
+    // An answer goes back to the window that asked.
+    providers
+        .send_for("echo", "editor", 7, Data::from("again"))
+        .unwrap();
+    let Event::Sent { origin, msg, .. } = next() else {
+        panic!("no answer: {seen:?}");
+    };
+    assert_eq!((origin, msg), (Some(7), Data::from("again")));
 
     // A panic stops that provider with a reason; the test, like the app, goes on.
     providers

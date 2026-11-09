@@ -13,6 +13,7 @@ use {
     crate::{Context, Event, json},
     moonframe_core::{Data, Error},
     std::{
+        cell::Cell,
         collections::BTreeMap,
         panic::{AssertUnwindSafe, catch_unwind},
         path::{Path, PathBuf},
@@ -21,6 +22,12 @@ use {
         time::{Duration, Instant},
     },
 };
+
+thread_local! {
+    /// The window whose message the provider on this thread is handling,
+    /// which what it sends meanwhile answers.
+    static ANSWERING: Cell<Option<u64>> = const { Cell::new(None) };
+}
 
 /// A provider written in Rust and built into the app.
 ///
@@ -109,6 +116,7 @@ impl Handle {
             provider: self.name.clone(),
             to: to.to_owned(),
             msg,
+            origin: ANSWERING.get(),
         });
     }
 
@@ -168,12 +176,15 @@ pub(crate) fn run(context: &Context, factory: Option<Factory>) {
             Ok(message) => {
                 // `guarded` takes an `FnMut`; the message is moved in once.
                 let mut data = Some(message.data);
-                guarded(&mut || {
+                ANSWERING.set(message.origin);
+                let result = guarded(&mut || {
                     if let Some(data) = data.take() {
                         provider.receive(&host, &message.from, data);
                     }
                     Ok(())
-                })
+                });
+                ANSWERING.set(None);
+                result
             },
             Err(RecvTimeoutError::Timeout) => guarded(&mut || {
                 provider.tick(&host);
