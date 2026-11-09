@@ -139,6 +139,12 @@ impl Editor {
     }
 
     fn set_disabled(&self, disabled: bool, cx: &mut App) {
+        // A disabled code editor stays readable, not dimmed: its text can
+        // be selected and copied, never changed.
+        if let Self::Code(state, _) = self {
+            state.update(cx, |state, cx| state.set_readonly(disabled, cx));
+            return;
+        }
         on_state!(self, |state| state
             .update(cx, |state, cx| state.set_disabled(disabled, cx)))
     }

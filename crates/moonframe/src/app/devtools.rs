@@ -19,6 +19,8 @@ use {
 const WIDTH: f32 = 460.;
 const MIN_WIDTH: f32 = 320.;
 const MAX_WIDTH: f32 = 960.;
+/// The narrowest dock that lists the agent sessions beside the open one.
+const WIDE: f32 = 440.;
 /// Width of the strip between the content and the dock that resizes it.
 const HANDLE: f32 = 6.;
 
@@ -77,20 +79,37 @@ impl MoonframeApp {
         if place == DevtoolsPlace::Window {
             self.show_mod_window(DEVTOOLS, None, cx);
         }
-        // Agent sessions are the feedback mod's runs: without it, no Agent tab.
-        let agent = self.workspace.slot(FEEDBACK).is_some();
-        let fields = BTreeMap::from([
-            ("agent".to_owned(), Data::Bool(agent)),
-            ("place".to_owned(), Data::from(place.name())),
-        ]);
-        self.workspace
-            .app_topic("devtools", DEVTOOLS, Data::Map(fields));
+        self.tell_place();
         if place != DevtoolsPlace::Closed
             && let Some(selected) = self.inspector.selected.clone()
         {
             self.tell_devtools(&selected);
         }
         cx.notify();
+    }
+
+    /// Whether the tools have room for the agent sessions beside the open
+    /// one: in a window, or a dock at least [`WIDE`].
+    fn devtools_wide(&self) -> bool {
+        match self.devtools.place {
+            DevtoolsPlace::Window => true,
+            DevtoolsPlace::Dock => self.devtools.width >= WIDE,
+            DevtoolsPlace::Closed => false,
+        }
+    }
+
+    /// Tells the mod, on `app/devtools`, where the tools show, whether
+    /// they are wide, and whether the app has agents.
+    fn tell_place(&mut self) {
+        // Agent sessions are the feedback mod's runs: without it, no Agent tab.
+        let agent = self.workspace.slot(FEEDBACK).is_some();
+        let fields = BTreeMap::from([
+            ("agent".to_owned(), Data::Bool(agent)),
+            ("place".to_owned(), Data::from(self.devtools.place.name())),
+            ("wide".to_owned(), Data::Bool(self.devtools_wide())),
+        ]);
+        self.workspace
+            .app_topic("devtools", DEVTOOLS, Data::Map(fields));
     }
 
     /// The tools' window was closed by the user: they are closed.
@@ -337,7 +356,11 @@ impl MoonframeApp {
                     .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _, cx| {
                         if let Some((from, width)) = this.devtools.resizing {
                             let moved = f32::from(from - event.position.x);
+                            let was = this.devtools_wide();
                             this.devtools.width = (width + moved).clamp(MIN_WIDTH, MAX_WIDTH);
+                            if this.devtools_wide() != was {
+                                this.tell_place();
+                            }
                             cx.notify();
                         }
                     }))

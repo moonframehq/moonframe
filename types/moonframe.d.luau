@@ -1038,7 +1038,8 @@ type InputProps = {
 	-- Keep the caret's line in the middle of the field (needs `multiline`).
 	typewriter: boolean?,
 	-- A code editor for this language (needs `multiline`): `"luau"`,
-	-- `"rust"`, ...; colored as typed, with line numbers.
+	-- `"rust"`, ...; colored as typed, with line numbers. With `disabled`
+	-- it is read only, not dimmed: its text can be selected and copied.
 	code: string?,
 	-- A code editor's caret goes to this line (from 1), scrolled into view,
 	-- when it changes or the field takes a new `value`.
