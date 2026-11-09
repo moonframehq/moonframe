@@ -87,7 +87,7 @@ pub use {
     gpui_kit,
     host_menus::refresh_menus,
     hosted::{HostView, Messenger, ViewInit},
-    launch::Moonframe,
+    launch::{LogLayer, Moonframe},
     moonframe_core::{self, Data},
     moonframe_providers::{Handle, Native},
     rust_embed,

@@ -31,10 +31,16 @@ pub struct Moonframe {
     pub(crate) natives: Natives,
     pub(crate) views: Registry,
     pub(crate) log: String,
+    /// The app's own log layers, from [`Moonframe::log_layer`].
+    pub(crate) log_layers: Vec<LogLayer>,
     /// The app's own tokio runtime, from [`Moonframe::tokio`].
     #[cfg(feature = "tokio")]
     pub(crate) runtime: Option<moonframe_providers::tokio::runtime::Handle>,
 }
+
+/// A layer an app adds to the log; see [`Moonframe::log_layer`].
+pub type LogLayer =
+    Box<dyn tracing_subscriber::Layer<tracing_subscriber::Registry> + Send + Sync + 'static>;
 
 /// Where the host's own app folder comes from.
 #[derive(Clone)]
@@ -63,6 +69,7 @@ impl Moonframe {
             app: None,
             project: None,
             keep: Vec::new(),
+            log_layers: Vec::new(),
             natives: crate::natives::natives(),
             views: Registry::default(),
             assets: None,
@@ -239,6 +246,14 @@ impl Moonframe {
     /// what they show changes. Called on the thread that runs the app.
     pub fn menus(self, build: impl Fn(&gpui_kit::App) -> Vec<gpui_kit::Menu> + 'static) -> Self {
         crate::host_menus::set(std::rc::Rc::new(build));
+        self
+    }
+
+    /// Adds a layer of the app's own to the log, beside Moonframe's output
+    /// to stderr: an app that keeps its own log file or crash reports sees
+    /// every event, whatever `RUST_LOG` lets through to stderr.
+    pub fn log_layer(mut self, layer: LogLayer) -> Self {
+        self.log_layers.push(layer);
         self
     }
 
