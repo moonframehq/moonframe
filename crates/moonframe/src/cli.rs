@@ -378,14 +378,24 @@ fn framed(chrome: Chrome) -> WindowOptions {
 }
 
 /// What `Moonframe::run` does.
-pub(crate) fn main(launch: Moonframe) -> ExitCode {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(&launch.log)),
-        )
-        .with_writer(std::io::stderr)
-        .init();
+pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
+    {
+        use tracing_subscriber::{
+            Layer as _, layer::SubscriberExt as _, util::SubscriberInitExt as _,
+        };
+        // `RUST_LOG` (else the app's filter) says what reaches stderr; the
+        // app's own layers see every event and filter for themselves.
+        let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(&launch.log));
+        tracing_subscriber::registry()
+            .with(std::mem::take(&mut launch.log_layers))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::stderr)
+                    .with_filter(filter),
+            )
+            .init();
+    }
     // The app's tokio runtime, else the one `run` is called in
     // (`#[tokio::main]`), for async providers and views.
     #[cfg(feature = "tokio")]
