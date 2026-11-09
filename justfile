@@ -93,6 +93,10 @@ patterns:
     python3 scripts/patterns-data.py
     cargo run --quiet --release -p moonframe-app --bin moonframe-patterns --no-default-features --features patterns -- --dev
 
+# Fail when docs.moonframe.dev's WASM guide is behind docs/wasm-providers.md.
+wasm-guide-check:
+    uv run -q website/tools/wasm-guide.py --check
+
 # Validate patterns and their generated website/native catalogs.
 patterns-check:
     python3 scripts/patterns-data.py --check
@@ -278,4 +282,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check check-file-size check-sorted lint test test-sealed-bundles types providers providers-examples check-builtin components-check check-examples patterns-check
+ci: format-check check-file-size check-sorted lint test test-sealed-bundles types providers providers-examples check-builtin components-check check-examples patterns-check wasm-guide-check
