@@ -5219,7 +5219,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "anstream",
  "anstyle",
@@ -5278,7 +5278,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-acp"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "agent-client-protocol-schema",
  "libc",
@@ -5292,14 +5292,14 @@ dependencies = [
 
 [[package]]
 name = "moonframe-app"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "moonframe",
 ]
 
 [[package]]
 name = "moonframe-chat"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "herdr-chat-protocol",
  "moonframe-core",
@@ -5312,7 +5312,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-core"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "mlua",
  "tempfile",
@@ -5322,7 +5322,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-docs"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5332,7 +5332,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-documents"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "moonframe-core",
@@ -5344,7 +5344,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-forge"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "herdr-credentials",
  "herdr-vcs",
@@ -5362,14 +5362,14 @@ dependencies = [
 
 [[package]]
 name = "moonframe-frames"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "moonframe-git"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "herdr-github",
  "herdr-vcs",
@@ -5381,7 +5381,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-history"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "herdr-client",
  "herdr-vcs",
@@ -5391,14 +5391,14 @@ dependencies = [
 
 [[package]]
 name = "moonframe-host-example"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "moonframe",
 ]
 
 [[package]]
 name = "moonframe-mux"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "herdr-core-client",
  "moonframe-terminal",
@@ -5409,7 +5409,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-packages"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5423,7 +5423,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-pi"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -5440,7 +5440,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-planner"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "moonframe-core",
@@ -5451,7 +5451,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-procs"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5461,7 +5461,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-projects"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "moonframe-core",
@@ -5472,7 +5472,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-providers"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "futures",
  "libc",
@@ -5491,7 +5491,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-shell"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5503,7 +5503,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-speech"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "block2 0.6.2",
  "cpal",
@@ -5521,7 +5521,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-store"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "moonframe-core",
  "rusqlite",
@@ -5533,7 +5533,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-terminal"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "alacritty_terminal 0.26.0",
  "libghostty-vt",
@@ -5545,7 +5545,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-transcripts"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5555,7 +5555,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-usage"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "herdr-usage",
  "moonframe-core",
