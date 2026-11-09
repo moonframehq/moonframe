@@ -101,7 +101,9 @@ Moonframe as a library.
   and survives a reload.
 - **An inspector.** <b>View &gt; Inspect Element</b> picks anything in the
   window, like a browser's developer tools, and tells an agent which file
-  and line drew it.
+  and line drew it. <b>View &gt; Developer Tools</b> docks beside the window
+  (or opens in its own): edit the picked element's Luau and save to see it
+  at once, read its mod's state, or ask an agent in a session that stays open.
 - **Your folder over the app.** `~/.config/moonframe` holds your own mods,
   providers and stylesheet, laid over the built-in app; updates never touch
   it, and mods install from git into it. A file there wins over the app's at

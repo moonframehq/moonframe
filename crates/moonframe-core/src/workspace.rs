@@ -33,6 +33,13 @@ use {
     },
 };
 
+/// The mod the Developer tools are: docked beside the window or in a
+/// window of its own, with the source and state of what is picked.
+pub const DEVTOOLS: &str = "devtools";
+/// The mod that asks agents for a change (the sparkle), whose runs are the
+/// Developer tools' agent sessions.
+pub const FEEDBACK: &str = "feedback";
+
 /// The name messages use for the shell.
 pub const SHELL: &str = "shell";
 

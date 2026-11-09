@@ -47,6 +47,7 @@ use {crate::terminal::Terminals, listeners::wake_on_output};
 
 // keep-sorted start
 mod appearance;
+mod devtools;
 mod dialogs;
 mod fonts;
 pub(crate) mod guard;
@@ -179,6 +180,7 @@ pub(crate) struct MoonframeApp {
     _watcher: Option<RecommendedWatcher>,
     _settings_watcher: Option<RecommendedWatcher>,
     quick_inspect: quick_inspect::Shortcut,
+    devtools: devtools::Tools,
     _omarchy: Option<RecommendedWatcher>,
     /// The main window, the one this view draws.
     main_window: WindowId,
@@ -375,6 +377,7 @@ impl MoonframeApp {
             _watcher: watcher,
             _settings_watcher: settings_watcher,
             quick_inspect: Default::default(),
+            devtools: Default::default(),
             _omarchy: omarchy,
             _keys: crate::keys::intercept(cx),
             last_pane: 0,
@@ -871,6 +874,7 @@ impl MoonframeApp {
             Request::Awake(request) => self.awake_request(from, request, cx),
             Request::Dock(dock) => self.dock_request(from, &dock),
             Request::Restart(name) => self.restart_provider(from, &name),
+            Request::Devtools(request) => self.devtools_request(from, request, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);

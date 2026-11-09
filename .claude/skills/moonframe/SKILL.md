@@ -255,6 +255,14 @@ down to what was under the pointer: hovering a row outlines that element in
 the window, and clicking it selects it instead. So a selection may be a row
 or panel the user chose on purpose, not just the leaf under the pointer.
 
+**View > Developer Tools** (⌥⌘J, Developer Mode) shows the pick in a dock
+on the right of the window (drawn around the shell, so no layout makes room
+for it) or in a window of its own (drag the dock's grip out): the element and
+its trail, its mod's Luau in a code editor (⌘S saves and the window reloads),
+the mod's state, and agent sessions (the feedback mod's runs) that stay open.
+It is `mods/devtools`; only it may send `app:devtools`. An app running as
+a profile has it when its `keep` names `feedback` or `devtools`.
+
 When the user says "here", "this", "the selected element" or "add X there"
 without saying where, read that file first. The `file:line` is the `ui` call
 that built the element. For an element a component built, it is the line in

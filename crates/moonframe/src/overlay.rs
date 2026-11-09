@@ -78,7 +78,10 @@ impl MoonframeApp {
             if let Some(hovered) = &inspector.hovered {
                 layers.push(label(hovered, viewport, theme));
             }
-        } else if let Some(selected) = &inspector.selected {
+        } else if let Some(selected) = &inspector.selected
+            // The Developer tools show the pick instead, unless a mod asked.
+            && (inspector.asker.is_some() || !self.devtools_open())
+        {
             layers.push(self.card(selected, cx));
         }
         layers
@@ -253,6 +256,20 @@ impl MoonframeApp {
                                 .label("Pick another")
                                 .on_click(cx.listener(|this, _, _, cx| this.toggle_inspect(cx))),
                         )
+                        .when(!asked && !crate::release(), |row| {
+                            row.child(
+                                Button::new("inspect-devtools")
+                                    .small()
+                                    .ghost()
+                                    .label("Developer tools")
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.place_devtools(
+                                            moonframe_core::DevtoolsPlace::Dock,
+                                            cx,
+                                        )
+                                    })),
+                            )
+                        })
                         .child(
                             Button::new("inspect-clear")
                                 .small()

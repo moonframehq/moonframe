@@ -248,3 +248,30 @@ fn packages_lie_between_the_app_and_the_user_and_never_replace_the_shell() {
     ]);
     assert_eq!(workspace.stylesheet().radius, Some(7.0));
 }
+
+#[test]
+fn the_developer_tools_come_with_the_feedback_mod_or_on_their_own() {
+    const PANEL: &str = r#"return mod { view = function() return ui.text "x" end }"#;
+    let builtin = app(&[
+        ("devtools", PANEL),
+        ("feedback", PANEL),
+        ("terminal", PANEL),
+    ]);
+    let brings = |keep: &[&str]| {
+        let app = tempfile::tempdir().unwrap();
+        let roots = crate::Roots::hosted(
+            builtin.path().to_owned(),
+            crate::AppLayer {
+                path: app.path().to_owned(),
+                keep: keep.iter().map(|name| (*name).to_owned()).collect(),
+            },
+            [],
+            None,
+        );
+        !roots.mod_candidates("devtools").is_empty()
+    };
+    assert!(brings(&["feedback"]));
+    assert!(brings(&["devtools"]));
+    assert!(!brings(&["terminal"]));
+    assert!(!brings(&[]));
+}

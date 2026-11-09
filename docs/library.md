@@ -225,7 +225,7 @@ fn main() -> std::process::ExitCode {
 | `.app_dir(path)` | its app folder while it runs from source; edits reload live |
 | `.embedded_app::<E>()` | its app folder compiled in (`#[derive(moonframe::rust_embed::RustEmbed)]`, `#[crate_path = "moonframe::rust_embed"]`), for a lone executable |
 | `.project_dir(path)` | the source checkout for an embedded app's debug branch bar; pass `env!("CARGO_MANIFEST_DIR")` from the host crate, including when Cargo builds into an external target folder |
-| `.keep(mods)` | the starter's mods it shows (from `app/mods` here), as a profile's `keep` |
+| `.keep(mods)` | the starter's mods it shows (from `app/mods` here), as a profile's `keep`; `feedback` brings the Developer tools with it, `devtools` brings them alone |
 | `.native(name, make)` | a native provider (below) |
 | `.native_async(name, make)` | a native provider written with `async fn`, on tokio (below) |
 | `.tokio(handle)` | the tokio runtime async providers and `on_runtime` use (below) |
@@ -421,7 +421,7 @@ finds and installs those releases itself.
 
 **Developer Mode**, in the app menu beside About, switches the tools for
 changing the app as it runs (View's Components…, Inspect Element ⌥⌘I,
-Reload Modules ⌘R) on and off, at once and without a rebuild, and is kept
+Developer Tools ⌥⌘J, Reload Modules ⌘R) on and off, at once and without a rebuild, and is kept
 for the app (and each profile) in `$XDG_STATE_HOME/<name>/developer`. Until
 the user picks, it is on in a debug build (`cargo run`) and off in a release
 one (`cargo run --release`, an install, a bundle), as the app's users see

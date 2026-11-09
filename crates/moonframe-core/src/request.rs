@@ -8,6 +8,7 @@
 use crate::{Command, Data, Error};
 
 mod awake;
+mod devtools;
 mod dock;
 mod edit;
 mod guard;
@@ -17,6 +18,7 @@ mod window;
 
 pub use {
     awake::Awake,
+    devtools::{Devtools, DevtoolsPlace, MAX_SOURCE},
     dock::Dock,
     edit::{Edit, EditChange, Splice},
     guard::Guard,
@@ -74,6 +76,9 @@ pub enum Request {
     /// the app switcher, until the app quits or a mod asks again; or the
     /// app's own icon back.
     Icon(AppIcon),
+    /// `app:devtools`: where the Developer tools show, and a mod's source
+    /// and state for them.
+    Devtools(Devtools),
     /// `app:open`: opens a web address (`https://` or `http://`) in the
     /// system's browser: a pull request, a sign-in page.
     Open(String),
@@ -154,6 +159,7 @@ impl Request {
             "restart" => restart(msg).map(Self::Restart),
             "open" => open(msg).map(Self::Open),
             "icon" => icon::icon(msg).map(Self::Icon),
+            "devtools" => devtools::devtools(msg).map(Self::Devtools),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -182,6 +188,7 @@ pub const NAMES: &[&str] = &[
     "restart",
     "open",
     "icon",
+    "devtools",
 ];
 
 /// Longest address `app:open` opens.

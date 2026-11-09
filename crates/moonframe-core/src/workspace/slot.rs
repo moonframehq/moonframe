@@ -37,6 +37,12 @@ impl Slot {
         self.source.as_deref()
     }
 
+    /// Its state as data, for the Developer tools; none before it loads,
+    /// and an error when the state holds what data cannot (a function).
+    pub fn state(&self) -> Option<Result<Data, Error>> {
+        self.module.as_ref().map(Module::state)
+    }
+
     /// Loads the first of `paths` (highest layer first) that works. A module
     /// that never loaded falls back to the same file in a lower layer, the
     /// app's own, so a broken copy in the user's folder shows the built-in

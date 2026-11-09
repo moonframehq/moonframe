@@ -127,7 +127,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 				table.insert(body, ui.text { turn.text, class = "feedback-said", wrap = true })
 			end
 			local latest = turn == run
-			table.insert(body, agent_run { run = turn, lines = if latest then 10 else 4, tools = if latest then 6 else 3 })
+			table.insert(body, agent_run { run = turn, lines = if latest then 14 else 4, tools = if latest then 8 else 3 })
 			if turn.warning then
 				table.insert(body, ui.text { turn.warning, class = "feedback-error", wrap = true })
 			end
@@ -342,7 +342,7 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 			open = props.open,
 			dismiss = props.dismiss,
 			backdrop = true,
-			width = 600,
+			width = 760,
 			to = props.to,
 			keys = { escape = props.dismiss },
 			class = "feedback",
@@ -356,7 +356,10 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 						value = props.value,
 						placeholder = props.placeholder or PLACEHOLDER,
 						multiline = true,
-						rows = 6,
+						-- Smaller once there are runs below, which get the room;
+						-- it grows as the request does.
+						rows = if #rows > 0 then 3 else 6,
+						max_rows = 10,
 						focus = props.open,
 						change = props.change,
 						submit = not blank and props.send or nil,
@@ -402,7 +405,7 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 				#rows > 0 and ui.column {
 					class = "feedback-history",
 					ui.text { "Feedback & fixes", class = "feedback-heading" },
-					ui.column { gap = "none", max_height = 360, scroll = true, table.unpack(rows) },
+					ui.column { gap = "none", max_height = 520, scroll = true, follow = true, table.unpack(rows) },
 				},
 			},
 		}

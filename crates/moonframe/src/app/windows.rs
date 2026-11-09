@@ -11,8 +11,12 @@ impl MoonframeApp {
         state: Option<WindowState>,
         cx: &mut Context<Self>,
     ) {
+        let closed = state.is_none();
         self.workspace.set_mod_window(name, state);
         self.flush("window", cx);
+        if closed && name == moonframe_core::DEVTOOLS {
+            self.devtools_window_closed(cx);
+        }
     }
 
     /// Whether `window` is the main window, not a mod's, the components

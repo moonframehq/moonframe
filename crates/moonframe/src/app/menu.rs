@@ -157,6 +157,10 @@ pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
         let _ = on.update(cx, |app, cx| app.step_history(false, cx));
     });
     let on = app.clone();
+    cx.on_action(move |_: &ToggleDevtools, cx| {
+        let _ = on.update(cx, |app, cx| app.toggle_devtools(cx));
+    });
+    let on = app.clone();
     cx.on_action(move |_: &ToggleDeveloperMode, cx| {
         let developer = crate::release();
         crate::set_developer(developer);
@@ -164,11 +168,14 @@ pub(super) fn menu_actions(cx: &mut Context<MoonframeApp>) {
             if !developer && app.inspector.picking {
                 app.toggle_inspect(cx);
             }
+            if !developer {
+                app.close_devtools(cx);
+            }
             app.rewatch(cx);
             cx.set_menus(menus(app.workspace.menus()));
             app.show_toast(
                 if developer {
-                    "Developer Mode: Components… (⇧⌘K), Inspect Element (⌥⌘I) and Reload Modules (⌘R)"
+                    "Developer Mode: Components… (⇧⌘K), Inspect Element (⌥⌘I), Developer Tools (⌥⌘J) and Reload Modules (⌘R)"
                 } else {
                     "Developer Mode is off"
                 },
