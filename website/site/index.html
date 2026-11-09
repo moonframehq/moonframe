@@ -203,7 +203,8 @@
   .lb-cap { margin-top:28px; display:flex; gap:16px; align-items:center; font-size:14px; color:#bbb }
   .lb-cap b { color:#fff; font:italic 500 20px var(--serif) } .lb-cap code { background:#ffffff14; color:#ddd }
   .lb .lb-cmd { position:static; width:auto; height:auto; border-radius:4px; margin-top:12px; display:flex; gap:12px; align-items:center; padding:8px 10px 8px 14px; font:13px var(--mono); color:#ddd; background:#ffffff14 }
-  .lb .lb-cmd[hidden] { display:none }
+  .lb .lb-cmd[hidden], .lb-how[hidden] { display:none }
+  .lb-how { margin-top:12px; font:12px var(--sans); color:#bbb; text-align:center } .lb-how b { color:#eee; font-weight:600 } .lb-how + .lb-cmd { margin-top:6px }
   .lb-cmd code { background:none; color:inherit; padding:0; user-select:all }
   .lb-cmd span { font:600 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:#f2b33d }
   .lb-pct { font:12px var(--mono); color:#f2b33d; min-width:120px }
@@ -315,7 +316,7 @@
     .gs-brew { flex-direction:column; align-items:stretch } .gs-agent .copy { max-width:none } .gs-apps .copy { margin-top:0 } .gs-cards, .gs-pair { grid-template-columns:1fr } .gs-pair { grid-column:1 / -1 }
     .steps li { grid-template-columns:32px minmax(0, 1fr); gap:10px 12px } .steps .copy { grid-column:2 }
     footer { grid-template-columns:1fr 1fr }
-    .lb { padding:56px 10px 20px } .lb .prev, .lb .next { top:auto; bottom:14px } .lb-cap { flex-direction:column; text-align:center; gap:6px } .lb .lb-cmd { max-width:100%; text-align:left } .lb-cmd code { white-space:normal; word-break:break-all }
+    .lb { padding:56px 10px 20px } .lb .prev, .lb .next { top:auto; bottom:14px } .lb-cap { flex-direction:column; text-align:center; gap:6px } .lb .lb-cmd { max-width:100%; text-align:left } .lb-cmd code { white-space:normal; overflow-wrap:anywhere }
   }
 </style>
 <body>
@@ -666,6 +667,7 @@ end,</pre></div>
   <button class="x" aria-label="Close">✕</button><button class="prev" aria-label="Previous">‹</button><button class="next" aria-label="Next">›</button>
   <div class="lb-frame"><img class="lo" id="lb-lo" alt=""><img class="hi" id="lb-hi" alt=""><div class="lb-bar" id="lb-bar"><i></i></div></div>
   <div class="lb-cap"><span id="lb-cap"></span><span class="lb-pct" id="lb-pct"></span></div>
+  <p class="lb-how" id="lb-how" hidden></p>
   <button class="lb-cmd" id="lb-cmd" title="Copy the command" hidden><code></code><span>Copy</span></button>
 </div>
 
@@ -746,7 +748,7 @@ document.getElementById("plates").innerHTML = APPS.map(([id, title, d], i) =>
 // Plates open full size. The thumbnail shows at once, blurred; the full PNG
 // streams in behind it with a progress bar, then fades over it.
 const lb = document.getElementById("lb"), lo = document.getElementById("lb-lo"), hi = document.getElementById("lb-hi"),
-      bar = document.getElementById("lb-bar"), pct = document.getElementById("lb-pct"), cap = document.getElementById("lb-cap"), cmd = document.getElementById("lb-cmd");
+      bar = document.getElementById("lb-bar"), pct = document.getElementById("lb-pct"), cap = document.getElementById("lb-cap"), cmd = document.getElementById("lb-cmd"), how = document.getElementById("lb-how");
 let lbIndex = -1, lbToken = 0;
 const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.round(n / 1024) + " KB";
 // One download per image, shared by everyone who asks for it (the viewer and
@@ -779,7 +781,9 @@ const PLATES = APPS.map(([id, title, d]) => ({ lo:`img/${id}.webp`, full:`img/fu
   // A released app installs on its own. The others run from a clone: link the
   // example in place, then open its profile. The link refuses a profile that
   // already exists, so the open runs either way.
-  cmd: RELEASED[id] ? brew(id) : `moonframe app link examples/${id} --yes; moonframe --profile ${id}` }));
+  cmd: RELEASED[id] ? brew(id) : `moonframe app link examples/${id} --yes; moonframe --profile ${id}`,
+  how: RELEASED[id] ? `<b>Install ${title}</b> on a Mac; Linux and Windows builds are in the <a href="https://github.com/moonframehq/moonframe/releases?q=apps-v&amp;expanded=true" style="color:#f2b33d">apps release</a>.`
+    : `<b>Run ${title}</b> from a clone of the repository, with Moonframe installed.` }));
 const SHOTS = [["week-calendar","Week calendar","Day, week and month, with events"],["palette","Command palette","Spotlight, classic, compact or cards"],
   ["table","Table","Sortable, filterable, paged"],["notification-drawer","Notification drawer","Behind a bell, with a badge"]]
   .map(([id, title, d]) => ({ lo:`img/c-${id}.webp`, full:`img/full/c-${id}.png`, caption:`<b>${title}</b> ${d}.` }));
@@ -790,6 +794,7 @@ async function openPlate(i, set = lbSet) {
   lb.classList.add("on"); document.body.style.overflow = "hidden";
   lo.src = item.lo; lo.style.opacity = 1; lo.style.filter = ""; hi.classList.remove("ready"); hi.removeAttribute("src");
   cap.innerHTML = `${item.caption} · ${lbIndex + 1} of ${set.length}`;
+  how.hidden = !item.how; how.innerHTML = item.how || "";
   cmd.hidden = !item.cmd; cmd.firstElementChild.textContent = item.cmd || ""; cmd.lastElementChild.textContent = "Copy";
   bar.style.opacity = 1; bar.classList.remove("indet"); bar.firstElementChild.style.width = "0"; pct.textContent = "Loading full size…";
   const src = await loadFull(item.full, (got, total) => {
