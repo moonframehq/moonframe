@@ -51,6 +51,25 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 ### Controls
 
+`ui.revision_timeline { entries = { { id = "r1", day = "Today", label = "10:30" } }, selected = "r1", select = "pick" }`
+is a native, right-aligned Time Machine ruler. Nearby ticks smoothly magnify like the Dock.
+Entries are ordered top to bottom; adjacent equal `day`s form groups. Clicking selects a revision;
+after focusing it, Up/Down choose revisions, Shift-Up/Down jump days, and Home/End reach either end.
+The wheel scrolls long histories. `select` receives `revision` (stable id), `index` (one-based),
+`day` and `label`. Also takes `id`, `to`, `width` (240), `height` (420), `grow`, `disabled`,
+`class`, `style`, `state`. Up to 10000 unique ids. Style with `revision-timeline` (`color` is
+the selected tick); respects `animation_speed`, including 0. Use `revision-timeline` for a gallery demo.
+
+The same element supports compact chat rails: `side = "left"`, `dates = false`,
+`labels = "hover"`, `preview = true`. Entries need only `id` and `label`; optional `day`
+groups revisions, and `summary` adds up to three lines to the preview card.
+`labels` is `all` (day groups and active label), `active` (hover or selection), `hover`, or `none`.
+`width` includes room for labels/cards; `tick_width` (default 12, 1–128 px) controls the rail itself.
+Also configurable: `tick_height` (2, 0.5–16 px), `spacing` (9, 4–64 px),
+`magnification` (4.5, 1–10; 1 disables it), `radius` (4.5, 1–20 neighbours), and
+`spread` (1.8, 0–5; 0 keeps centers fixed). `side` defaults to `right`, `dates` to true,
+and `preview` to false. Preview cards are noninteractive and stay inside the component's box.
+
 | Element | Use it for | Keys |
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
@@ -376,6 +395,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`pagination`](#pagination) | Navigation | Under a table or list too long to show at once (an audit log, orders, invoices), when the user steps through it by page. For a list that scrolls use `ui.list`; for steps of an onboarding flow use `pager`; for history use `nav-buttons`. |
 | [`pill-tabs`](#pill-tabs) | Navigation | Switching the few views of one list from a sidebar or header (Inbox, All, Last 7 Days), where the current view deserves its name and the rest only an icon. For settings choices use `segmented`; for documents or sessions use `tabs`; for the app's main views use `activity-bar`. |
 | [`rail`](#rail) | Navigation | The sidebar folded to a narrow strip, one tile per workspace or agent with its status. For switching the app's views use `activity-bar`; for the full width version use `sidebar`. |
+| [`revision-timeline`](#revision-timeline) | Navigation | Choosing a snapshot, revision or chat turn beside its content. Configure one ruler for Time Machine-style dates or a compact chat rail. For an activity feed use `timeline`; for a calendar date use `date-picker`. |
 | [`settings-nav`](#settings-nav) | Navigation | Choosing the page of a settings or preferences window; pair it with `settings-page`, which uses it. For an app's main sidebar use `sidebar`; for a flat list use `list`; for tabs across the top use `tabs`. |
 | [`side-nav`](#side-nav) | Navigation | An app's main navigation that the user folds to icons and back (mail folders, views, projects, threads), with an account header and counts. For workspace tiles with status use `rail` beside a `sidebar`; for foldable groups of arbitrary rows use `sidebar`; for a VS Code strip beside a panel use `activity-bar`. |
 | [`sidebar`](#sidebar) | Navigation | The whole left column of an app: workspaces, agents, settings categories. One group alone is `sidebar-section`; the narrow collapsed form is `rail`; a VS Code style icon strip beside it is `activity-bar`; nested rows are `tree`. |
@@ -5286,6 +5306,44 @@ rail { selected = state.selected,
 ```
 
 A whole mod using it, with state: `app/components/demos/rail.luau`.
+
+#### `revision-timeline`
+
+**Revision Timeline.** A configurable native ruler: dated revisions or compact chat navigation, with Dock magnification and optional preview cards.
+
+**When:** Choosing a snapshot, revision or chat turn beside its content. Configure one ruler for Time Machine-style dates or a compact chat rail. For an activity feed use `timeline`; for a calendar date use `date-picker`.
+
+| Prop | Meaning |
+| --- | --- |
+| `class` | extra stylesheet classes; revision-timeline's color sets the selected tick |
+| `dates` | show day labels and longer day markers, default true; dates can also be omitted from entries |
+| `disabled` | show the ruler without accepting selection |
+| `entries` | ordered { id, label, day?, summary? } records, top to bottom; day and summary are optional; up to 10000 unique ids |
+| `grow` | fill the available height |
+| `height` | height in pixels, default 420; long histories scroll |
+| `id` | stable identity when the ruler moves in a view |
+| `labels` | 'all' (default): day groups plus active label; 'active': hover/selection; 'hover': only while hovered; 'none': ticks alone |
+| `magnification` | ordinary tick's peak width multiplier, 1–10, default 4.5; 1 disables magnification |
+| `preview` | show the active label/summary in a noninteractive card, default false; use labels='hover' for chat-style previews |
+| `radius` | lens radius in neighbouring entries, 1–20, default 4.5 |
+| `select` | message sent with revision (id), index (one-based), day and label; defaults to 'select' |
+| `selected` | stable id of the selected revision |
+| `side` | tick anchor: 'left' or 'right' (default); labels extend inward |
+| `spacing` | minimum resting slot height in pixels, 4–64, default 9; controls how many entries fit |
+| `spread` | vertical expansion strength, 0–5, default 1.8; 0 keeps tick centers fixed |
+| `style` | inline host styles, including color and background |
+| `tick_height` | ordinary tick thickness in pixels, 0.5–16, default 2; clamped to its slot |
+| `tick_width` | ordinary tick width in pixels, 1–128, default 12; day and selected markers are longer |
+| `to` | recipient mod; defaults to the drawing mod |
+| `width` | whole box width in pixels, default 240; includes space reserved for labels / preview cards |
+
+```lua
+local revision_timeline = use "revision-timeline"
+
+revision_timeline { entries = { { day = "6 Nov 2026", id = "r1", label = "09:20 · First draft" }, { day = "Yesterday", id = "r2", label = "14:32 · Layout" }, { day = "Today", id = "r3", label = "10:48 · Typography" }, { day = "Today", id = "r4", label = "16:05 · Current revision" } }, selected = "r3" }
+```
+
+A whole mod using it, with state: `app/components/demos/revision-timeline.luau`.
 
 #### `settings-nav`
 

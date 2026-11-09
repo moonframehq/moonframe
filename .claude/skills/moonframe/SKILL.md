@@ -1167,6 +1167,7 @@ Text-like elements take their main value positionally:
 | `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
+| `ui.revision_timeline { entries = { { id = "r1", day = "Today", label = "10:30" } }, select = "pick" }` | `entries`, `selected`, `select`, `to`, `id`, `width`, `height`, `grow`, `disabled`, `class`, `style`, `state` | native right-aligned revision ruler, with Dock-like pointer magnification; clicks and keyboard navigation choose revisions or days; `select` adds `revision`, `index`, `day`, `label` |
 | `ui.badge "..."` | `text`, `tone`, extras | pill |
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
@@ -1332,7 +1333,7 @@ Picking a font for the user:
 
 **Selectors.**
 - An element type: `row` `column` `panel` `panel-header` `pane` `text`
-  `button` `item` `badge` `icon` `image` `line` `hatch` `terminal` `browser` `input` `markdown` `markdown-code` `markdown-quote` `divider` `popover` `tooltip`
+  `button` `item` `badge` `icon` `image` `line` `hatch` `revision-timeline` `terminal` `browser` `input` `markdown` `markdown-code` `markdown-quote` `divider` `popover` `tooltip`
   `overlay` `overlay-backdrop`. `panel-header` is a panel's title bar;
   `tooltip` is every tooltip's box; `overlay-backdrop` is what dims the
   window behind an overlay with `backdrop = true` (its `background` and
@@ -2332,6 +2333,24 @@ For that:
   them.
 
 ## Extending the host
+
+**Revision selection.** `use "revision-timeline"` (or `ui.revision_timeline`)
+draws a native Time Machine-style ruler, with Dock-like magnification in Rust.
+Pass ordered `entries = { { id, day, label } }`, a stable `selected` id and
+`select = "pick"`; the message adds `revision`, one-based `index`, `day` and
+`label`. Adjacent equal days group together. Up/Down select revisions,
+Shift-Up/Down jump days, Home/End reach the ends; the wheel scrolls long
+histories. Takes `width`, `height`, `grow`, `disabled`, `id`, `to` and look
+keys. Style the `revision-timeline` selector; its `color` sets the selected
+tick. Animation follows `animation_speed` (0 disables it).
+
+For a compact chat rail, use the same element with `side = "left"`,
+`tick_width = 6`, `magnification = 4`, `radius = 3`, `spread = 0`,
+`dates = false`, `labels = "hover"`, `preview = true`. Entries may omit
+`day` and add `summary` for a three-line preview. `width` includes label/card
+space; `tick_width`, `tick_height` and `spacing` size the rail independently.
+`labels` can be `all`, `active`, `hover` or `none`; `magnification = 1`
+turns off the lens. The gallery demo has both configurations and live controls.
 
 **In an app built on the library** (a crate whose `main` calls
 `moonframe::Moonframe::new(...)`, with its own `app/` folder; see

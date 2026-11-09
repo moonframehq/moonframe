@@ -36,6 +36,25 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 ### Controls
 
+`ui.revision_timeline { entries = { { id = "r1", day = "Today", label = "10:30" } }, selected = "r1", select = "pick" }`
+is a native, right-aligned Time Machine ruler. Nearby ticks smoothly magnify like the Dock.
+Entries are ordered top to bottom; adjacent equal `day`s form groups. Clicking selects a revision;
+after focusing it, Up/Down choose revisions, Shift-Up/Down jump days, and Home/End reach either end.
+The wheel scrolls long histories. `select` receives `revision` (stable id), `index` (one-based),
+`day` and `label`. Also takes `id`, `to`, `width` (240), `height` (420), `grow`, `disabled`,
+`class`, `style`, `state`. Up to 10000 unique ids. Style with `revision-timeline` (`color` is
+the selected tick); respects `animation_speed`, including 0. Use `revision-timeline` for a gallery demo.
+
+The same element supports compact chat rails: `side = "left"`, `dates = false`,
+`labels = "hover"`, `preview = true`. Entries need only `id` and `label`; optional `day`
+groups revisions, and `summary` adds up to three lines to the preview card.
+`labels` is `all` (day groups and active label), `active` (hover or selection), `hover`, or `none`.
+`width` includes room for labels/cards; `tick_width` (default 12, 1–128 px) controls the rail itself.
+Also configurable: `tick_height` (2, 0.5–16 px), `spacing` (9, 4–64 px),
+`magnification` (4.5, 1–10; 1 disables it), `radius` (4.5, 1–20 neighbours), and
+`spread` (1.8, 0–5; 0 keeps centers fixed). `side` defaults to `right`, `dates` to true,
+and `preview` to false. Preview cards are noninteractive and stay inside the component's box.
+
 | Element | Use it for | Keys |
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |

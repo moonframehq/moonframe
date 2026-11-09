@@ -8,6 +8,7 @@
 
 mod host_views;
 mod regressions;
+mod revision_timeline;
 mod windows;
 
 use {
