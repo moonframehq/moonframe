@@ -246,7 +246,9 @@ which also has a release workflow to copy.
   `target/bundle/<Title>.app` on macOS (id `dev.moonframe.app.NAME`, its
   icon, its packages staged inside, Wasm providers prebuilt), or on Linux a
   prefix with `bin/moonframe-NAME`, `share/moonframe-NAME/` and a `.desktop`
-  file and icon. `MOONFRAME_USER=DIR` finds the profile in another user
+  file and icon, or on Windows (in Git Bash) a `<Title>` folder holding
+  `<Title>.exe` with `app/` and `bundle/` beside it, zipped by `DIST=DIR`.
+  `MOONFRAME_USER=DIR` finds the profile in another user
   folder. What its users change goes in `~/.config/moonframe/profiles/NAME`.
 - **Build App Bundle** in the app menu (outside a release, when the app
   runs from its checkout) does the same for the window's own app, the

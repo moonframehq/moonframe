@@ -564,14 +564,106 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # As sign-windows does for Moonframe: signs each app's tested executable
+  # inside Azure, checks every signature, and zips each folder up again.
+  # Nothing is built or run, and there is no checkout.
+  sign-apps-windows:
+    name: Sign the apps for Windows
+    needs: [validate, publish]
+    if: >-
+      !cancelled() && needs.publish.result == 'success' &&
+      needs.validate.outputs.windows_signed == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # exchanged for an Azure token by azure/login (OIDC)
+    steps:
+      # No token or run-id: artifacts can only come from this workflow run.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: apps-x86_64-pc-windows-msvc
+          path: unsigned
+      # Each zip in a folder of its own name, so it zips up again to the
+      # same name, around the one folder it held.
+      - name: Unpack the zips
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zips = @(Get-ChildItem -LiteralPath unsigned -Filter '*-x86_64-pc-windows-msvc.zip')
+          if ($zips.Count -eq 0) { throw 'no Windows app in apps-x86_64-pc-windows-msvc' }
+          foreach ($zip in $zips) {
+            Expand-Archive -LiteralPath $zip.FullName -DestinationPath "work/$($zip.BaseName)"
+            $folders = @(Get-ChildItem -LiteralPath "work/$($zip.BaseName)" -Directory)
+            if ($folders.Count -ne 1 -or
+                -not (Test-Path -LiteralPath "$($folders[0].FullName)/$($folders[0].Name).exe")) {
+              throw "$($zip.Name) does not hold one folder with its executable"
+            }
+          }
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\work
+          files-folder-filter: exe,dll
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: Moonframe app
+          exclude-environment-credential: true
+          exclude-azure-cli-credential: false
+          cache-dependencies: false
+      - name: Verify every signature, then zip each folder again
+        shell: pwsh
+        env:
+          SUBJECT: ${{ vars.WINDOWS_SIGNING_SUBJECT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(Get-ChildItem -LiteralPath work -Recurse -File -Include *.exe, *.dll)
+          if ($files.Count -eq 0) { throw 'nothing to verify' }
+          foreach ($file in $files) {
+            $s = Get-AuthenticodeSignature -LiteralPath $file.FullName
+            if ($s.Status -ne 'Valid' -or -not $s.TimeStamperCertificate -or
+                $s.SignerCertificate.Subject -ne $env:SUBJECT) {
+              throw "bad signature on $($file.FullName): $($s.Status)"
+            }
+            "signed: $($file.Name) ($($s.SignerCertificate.Subject))"
+          }
+          New-Item -ItemType Directory signed | Out-Null
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          foreach ($archive in Get-ChildItem -LiteralPath work -Directory) {
+            $folder = @(Get-ChildItem -LiteralPath $archive.FullName -Directory)[0]
+            # Same layout as bundle-app.sh: one top-level folder.
+            [IO.Compression.ZipFile]::CreateFromDirectory(
+              $folder.FullName, "$PWD/signed/$($archive.Name).zip",
+              [IO.Compression.CompressionLevel]::Optimal, $true)
+          }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signed-apps-windows
+          path: signed/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
   attest-apps:
     name: Checksums, signatures, and attestations of the apps
-    needs: [validate, publish, sign-apps]
-    # sign-apps is skipped while macOS signing is not set up.
+    needs: [validate, publish, sign-apps, sign-apps-windows]
+    # sign-apps and sign-apps-windows are skipped while their signing is not
+    # set up.
     if: >-
       !cancelled() && needs.publish.result == 'success' &&
       (needs.sign-apps.result == 'success' ||
-       (needs.validate.outputs.macos_signed == 'false' && needs.sign-apps.result == 'skipped'))
+       (needs.validate.outputs.macos_signed == 'false' && needs.sign-apps.result == 'skipped')) &&
+      (needs.sign-apps-windows.result == 'success' ||
+       (needs.validate.outputs.windows_signed == 'false' && needs.sign-apps-windows.result == 'skipped'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: release
@@ -589,18 +681,31 @@ jobs:
         if: needs.validate.outputs.macos_signed == 'true'
         with:
           name: signed-apps
-          path: signed
+          path: signed/macos
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.validate.outputs.windows_signed == 'true'
+        with:
+          name: signed-apps-windows
+          path: signed/windows
+      # Each platform's zips by their target: signed ones in place of
+      # unsigned, and neither platform's replacing the other's.
       - name: Collect the release files
         env:
           MACOS_SIGNED: ${{ needs.validate.outputs.macos_signed }}
+          WINDOWS_SIGNED: ${{ needs.validate.outputs.windows_signed }}
         run: |
           set -euo pipefail
           mkdir dist
           mv packages/*.tar.gz dist/
           if [[ "$MACOS_SIGNED" == true ]]; then
-            mv signed/*.zip dist/
+            mv signed/macos/*-universal-apple-darwin.zip dist/
           else
-            mv packages/*.zip dist/
+            mv packages/*-universal-apple-darwin.zip dist/
+          fi
+          if [[ "$WINDOWS_SIGNED" == true ]]; then
+            mv signed/windows/*-x86_64-pc-windows-msvc.zip dist/
+          else
+            mv packages/*-x86_64-pc-windows-msvc.zip dist/
           fi
           (cd dist && sha256sum -- * > SHA256SUMS)
           cat dist/SHA256SUMS
