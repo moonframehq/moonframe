@@ -116,7 +116,9 @@ objc2-user-notifications = { default-features = false, features = ["UNNotificati
 objc2-web-kit            = { default-features = false, features = ["WKWebView", "objc2-app-kit", "std"], version = "0.3" }
 portable-pty             = "0.9"
 raw-window-handle        = "0.6"
-rusqlite                 = { features = ["bundled"], version = "0.40" }
+# Either release: this workspace's lockfile keeps 0.40, while a host app
+# that is on 0.41 (one `sqlite3` per build) resolves to it.
+rusqlite                 = { features = ["bundled"], version = ">=0.40, <0.42" }
 # Swapping a saved file into place atomically (moonframe-docs).
 rust-embed = { features = ["include-exclude"], version = "8.7" }
 # Tokens kept redacted in memory (moonframe-forge), as herdr-credentials reads them.
