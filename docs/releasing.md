@@ -98,11 +98,15 @@ Moonframe's must hold only Moonframe. It holds, for each app:
 | --- | --- |
 | `<Title>-<v>-universal-apple-darwin.zip` | macOS 13+, Apple Silicon and Intel |
 | `<Title>-<v>-{x86_64,aarch64}-unknown-linux-gnu.tar.gz` | Linux: a prefix, with `bin/moonframe-<name>` |
+| `<Title>-<v>-x86_64-pc-windows-msvc.zip` | Windows: run `<Title>.exe` from the unpacked `<Title>` folder |
 
-and `SHA256SUMS` and the Sigstore bundles, as above. There are no Windows
-builds yet: nothing lays a profile's bundle out for Windows. These jobs run
-after Moonframe is published, and `continue-on-error` keeps a broken app from
-failing the packages; on a pull request a broken app does fail.
+and `SHA256SUMS` and the Sigstore bundles, as above. The Windows folder is
+Moonframe's Windows executable, renamed, with the built-in app in `app/` and
+the app and its packages in `bundle/` beside it, where it looks for them. It
+is signed with Authenticode as Moonframe's own (`sign-apps-windows`), when
+that signing is set up. These jobs run after Moonframe is published, and
+`continue-on-error` keeps a broken app from failing the packages; on a pull
+request a broken app does fail.
 
 `brew install moonframehq/tap/moonframe-folio` installs an app. Its cask comes
 from `homebrew/Casks/app.rb`, by `scripts/release/render-app-casks.py`. The
@@ -161,7 +165,8 @@ Without it, the zip's `moonframe.exe` is unsigned and SmartScreen warns on
 first launch. It is signed with Azure Artifact Signing, under the publisher
 `Fabien Penso`, by the account and certificate profile every one of the
 author's apps shares. There is no key, certificate or secret to store: the
-`sign-windows` job exchanges the `release` environment's GitHub OIDC token
+`sign-windows` job (and `sign-apps-windows`, for the apps' executables)
+exchanges the `release` environment's GitHub OIDC token
 for an Azure token as the `moonframe-signing` app registration, whose
 federated credential trusts only
 `repo:moonframehq@351295873/moonframe@1441198486:environment:release` (GitHub
