@@ -4,8 +4,12 @@ The project's website: static HTML, no build step.
 
 ```text
 site/                 what Netlify publishes (netlify.toml at the repo root)
-  index.html          moonframe.dev
+  index.html          moonframe.dev: markup only
+  home.css, home.js   its styles and script (the plates, viewer, install pickers, hero demo)
+  film.js             the tour film's player
   docs/index.html     docs.moonframe.dev (served by a host rewrite in site/_redirects)
+  docs/docs.css, docs/docs.js   the docs' styles and script, shared with the guides
+  docs/guide.css      extra styles for a guide generated from Markdown
   llms.txt            for coding agents: how to start a Moonframe app in the user's project
   components-browser.js, data/components.js   the Components browser on the home page
   img/                thumbnails (WebP, transparent corners) and img/full/ PNGs for the viewer

@@ -19,7 +19,7 @@ const W = 1920, H = 1080, FPS = 30, DUR = 60.0;
 const SCHEDULE = process.argv[2] === "--schedule";
 const ONLY = SCHEDULE ? [] : process.argv.slice(2).map(Number);
 
-// ---------- palette (website/site/index.html) ----------
+// ---------- palette (website/site/home.css) ----------
 const C = {
   paper: "#f6eedc", paper2: "#eee2c8", ink: "#2a1a10", ink2: "#4a3426", dim: "#6e5a4a",
   teal: "#2e6462", acc: "#a33a14", accHi: "#d9541f", sunY: "#f0b33c", sunO: "#e8662c",
