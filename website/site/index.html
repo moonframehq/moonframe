@@ -247,6 +247,12 @@
   .gs-brew b { font:500 22px var(--serif) } .gs-brew p { font-size:14px; color:var(--dim) }
   .gs-brew .copy { width:auto; flex-shrink:0 }
   .gs-agent { margin-top:14px; border-style:dashed } .gs-agent .copy { flex-shrink:1; max-width:58% }
+  .gs-apps { margin-top:14px; align-items:flex-start } .gs-apps > div { min-width:0 } .gs-apps .copy { margin-top:6px }
+  .gs-pick { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 10px }
+  .gs-pick button { font:13px var(--sans); color:var(--ink2); background:none; border:1px solid var(--rule); border-radius:999px; padding:4px 11px; cursor:pointer }
+  .gs-pick button:hover { border-color:var(--ink2) }
+  .gs-pick button[aria-pressed="true"] { background:var(--ink); border-color:var(--ink); color:var(--paper) }
+  .gs-apps .gs-what { color:var(--ink2); font-size:15px } .gs-apps .gs-what i { color:var(--dim) } .gs-apps .gs-else { margin-top:8px } .gs-apps a { color:var(--acc) }
   .gs-or { text-align:center; font:italic 18px var(--serif); color:var(--dim); margin:26px 0 0 }
   .gs-cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; margin-top:22px }
   .gs-card { text-align:left; border:1px solid #2a1a1033; background:#fffaf0; border-radius:6px; padding:20px 22px; cursor:pointer; font:inherit; color:inherit; position:relative; transition:border-color .15s, box-shadow .15s }
@@ -306,7 +312,7 @@
     .cols { columns:1 }
     .installbar { flex-direction:column; align-items:flex-start } .installbar pre { white-space:pre-wrap; word-break:break-all; font-size:13px }
     .pull { font-size:28px; padding:40px 0 }
-    .gs-brew { flex-direction:column; align-items:stretch } .gs-agent .copy { max-width:none } .gs-cards, .gs-pair { grid-template-columns:1fr } .gs-pair { grid-column:1 / -1 }
+    .gs-brew { flex-direction:column; align-items:stretch } .gs-agent .copy { max-width:none } .gs-apps .copy { margin-top:0 } .gs-cards, .gs-pair { grid-template-columns:1fr } .gs-pair { grid-column:1 / -1 }
     .steps li { grid-template-columns:32px minmax(0, 1fr); gap:10px 12px } .steps .copy { grid-column:2 }
     footer { grid-template-columns:1fr 1fr }
     .lb { padding:56px 10px 20px } .lb .prev, .lb .next { top:auto; bottom:14px } .lb-cap { flex-direction:column; text-align:center; gap:6px } .lb .lb-cmd { max-width:100%; text-align:left } .lb-cmd code { white-space:normal; word-break:break-all }
@@ -481,6 +487,14 @@ just install   # into /Applications</pre></div>
     <div class="gs-brew">
       <div><b>The app, in one line</b><p>Moonframe.app in /Applications and the <code>moonframe</code> command. macOS 13 or later; Linux and Windows on the <a href="https://github.com/moonframehq/moonframe/releases">releases page</a>.</p></div>
       <button class="copy" title="Copy the command"><code>brew install moonframehq/tap/moonframe</code><span>Copy</span></button>
+    </div>
+
+    <div class="gs-brew gs-apps" id="install-apps">
+      <div><b>Or just one app</b><p>Eleven Moonframe apps install on their own, each an app of its own, with no checkout and nothing else to set up. Pick one:</p>
+        <div class="gs-pick" id="app-pick" role="group" aria-label="App to install"></div>
+        <p class="gs-what" id="app-what"></p>
+        <p class="gs-else">On Linux and Windows, each release's <a href="https://github.com/moonframehq/moonframe/releases?q=apps-v&amp;expanded=true">apps release</a> has a tarball or zip per app: unpack it anywhere and run the app inside.</p></div>
+      <button class="copy" title="Copy the command"><code id="app-cmd">brew install moonframehq/tap/moonframe-folio</code><span>Copy</span></button>
     </div>
 
     <div class="gs-brew gs-agent" id="agents">
@@ -688,6 +702,36 @@ const APPS = [
   ["folio","Folio","a quiet place to write, with focus mode"],
   ["orbit","Orbit","a task workspace with connected boards, lists, calendars and timelines"],
 ];
+// The apps that ship on their own (a [release] table in their moonframe.toml),
+// each a Homebrew cask moonframe-<id> and an asset of the apps-v release.
+const RELEASED = {
+  cairn:["Cairn","chat with a coding agent in your folders","Needs Claude Code, Codex or Gemini, signed in."],
+  cinder:["Cinder","run a coding agent in a folder, beside your CLI sessions","Needs Claude Code, Codex or Gemini, signed in."],
+  daybook:["Daybook","a planner for tasks and events, starting empty",""],
+  folio:["Folio","a quiet place to write markdown",""],
+  hangar:["Hangar","parallel coding agents on one repository, each in its own worktree","Needs git."],
+  lantern:["Lantern","a terminal workspace with a process monitor",""],
+  pilot:["Pilot","a desktop app for the pi coding agent","Needs pi installed."],
+  sessions:["Sessions","coding sessions across your repositories",""],
+  switchyard:["Switchyard","coding agents across repositories and worktrees",""],
+  trellis:["Trellis","a terminal multiplexer around work trees",""],
+  workbench:["Workbench","a terminal, an editor and files, side by side",""],
+};
+const brew = id => `brew install moonframehq/tap/moonframe-${id}`;
+{
+  const pick = document.getElementById("app-pick"), what = document.getElementById("app-what"), code = document.getElementById("app-cmd");
+  const choose = id => {
+    const [title, d, needs] = RELEASED[id];
+    for (const b of pick.children) b.setAttribute("aria-pressed", b.dataset.id === id);
+    what.innerHTML = `<b style="font:inherit;font-weight:600">${title}</b>: ${d}.${needs ? ` <i>${needs}</i>` : ""}`;
+    code.textContent = brew(id);
+    code.nextElementSibling.textContent = "Copy";
+  };
+  pick.innerHTML = Object.entries(RELEASED).map(([id, [title]]) =>
+    `<button type="button" data-id="${id}" aria-pressed="false">${title}</button>`).join("");
+  pick.onclick = e => { const b = e.target.closest("button"); if (b) choose(b.dataset.id); };
+  choose("folio");
+}
 function roman(n) {
   let label = "";
   for (const [value, glyph] of [[1000,"M"],[900,"CM"],[500,"D"],[400,"CD"],[100,"C"],[90,"XC"],[50,"L"],[40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]]) {
@@ -732,9 +776,10 @@ function loadFull(url, onProgress) {
 // A set of images the viewer steps through: { lo, full, caption }.
 const PLATES = APPS.map(([id, title, d]) => ({ lo:`img/${id}.webp`, full:`img/full/${id}.png`,
   caption:`<b>${title}</b> ${d[0].toUpperCase() + d.slice(1)}.`,
-  // Run from a clone: link the example in place, then open its profile. The
-  // link refuses a profile that already exists, so the open runs either way.
-  cmd:`moonframe app link examples/${id} --yes; moonframe --profile ${id}` }));
+  // A released app installs on its own. The others run from a clone: link the
+  // example in place, then open its profile. The link refuses a profile that
+  // already exists, so the open runs either way.
+  cmd: RELEASED[id] ? brew(id) : `moonframe app link examples/${id} --yes; moonframe --profile ${id}` }));
 const SHOTS = [["week-calendar","Week calendar","Day, week and month, with events"],["palette","Command palette","Spotlight, classic, compact or cards"],
   ["table","Table","Sortable, filterable, paged"],["notification-drawer","Notification drawer","Behind a bell, with a badge"]]
   .map(([id, title, d]) => ({ lo:`img/c-${id}.webp`, full:`img/full/c-${id}.png`, caption:`<b>${title}</b> ${d}.` }));
