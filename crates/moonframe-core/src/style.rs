@@ -38,7 +38,7 @@ use {
     std::{collections::BTreeMap, time::Duration},
 };
 
-pub(crate) use read::{Edges, valid_name};
+pub(crate) use read::{Edges, SHEET_KEYS, STYLE_KEYS, valid_name};
 
 tokens! {
     /// A color the theme defines, so it follows light and dark mode.
@@ -572,6 +572,22 @@ impl Rules {
         })
     }
 
+    /// Whether a rule styles the class `name`, in any state.
+    pub(crate) fn styles_class(&self, name: &str) -> bool {
+        self.0
+            .keys()
+            .any(|selector| matches!(&selector.base, Base::Class(class) if class == name))
+    }
+
+    /// Whether a rule styles the named state `name`.
+    pub(crate) fn styles_state(&self, name: &str) -> bool {
+        self.0.keys().any(|selector| match &selector.state {
+            Some(Pseudo::Named(state)) => state == name,
+            Some(Pseudo::Known(state)) => state.name() == name,
+            None => false,
+        })
+    }
+
     /// Takes every rule `over` has, each laid over the same selector's here.
     pub(crate) fn layer(&mut self, over: &Rules) {
         for (selector, style) in &over.0 {
@@ -625,7 +641,7 @@ pub struct Stylesheet {
     /// "cards" }`. Views see it as `app.looks`; a component's own prop wins.
     pub looks: BTreeMap<String, String>,
     names: Names,
-    rules: Rules,
+    pub(crate) rules: Rules,
     /// Every component's `styles`, under each mod's and the stylesheet's.
     pub(crate) components: Rules,
 }

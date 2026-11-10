@@ -241,18 +241,18 @@ fn check_entry_validates_the_manifest_capabilities_and_policy() {
         "kind = \"wasm\"\ncapabilities = [\"hub.entities\"]\n",
     )
     .unwrap();
-    let missing = crate::check_entry(entry, &policy, None, &["hub.entities"]);
+    let missing = crate::check_entry(entry, &policy, &with(&["hub.entities"]));
     assert!(missing[0].message.contains("provider.wasm"), "{missing:?}");
     fs::write(entry.join("provider").join(crate::PREBUILT), b"\0asm").unwrap();
-    let ok = crate::check_entry(entry, &policy, None, &["hub.entities"]);
+    let ok = crate::check_entry(entry, &policy, &with(&["hub.entities"]));
     assert!(ok.is_empty(), "{ok:?}");
-    let unknown = crate::check_entry(entry, &policy, None, &[]);
+    let unknown = crate::check_entry(entry, &policy, &with(&[]));
     assert_eq!(unknown.len(), 1, "{unknown:?}");
     assert_eq!(unknown[0].file, manifest);
     assert!(unknown[0].message.contains("hub.entities"));
 
     fs::write(&manifest, "kind = \"process\"\ncommand = [\"true\"]\n").unwrap();
-    let refused = crate::check_entry(entry, &policy, None, &[]);
+    let refused = crate::check_entry(entry, &policy, &with(&[]));
     assert!(
         refused[0]
             .message
@@ -262,5 +262,42 @@ fn check_entry_validates_the_manifest_capabilities_and_policy() {
         allow_process: true,
         ..RootPolicy::default()
     };
-    assert!(crate::check_entry(entry, &allowed, None, &[]).is_empty());
+    assert!(crate::check_entry(entry, &allowed, &with(&[])).is_empty());
+}
+
+fn with(capabilities: &[&str]) -> moonframe_core::entries::CheckOptions {
+    moonframe_core::entries::CheckOptions {
+        capabilities: capabilities.iter().map(|name| (*name).to_owned()).collect(),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn check_entry_draws_with_the_shipped_sample() {
+    let dir = tempfile::tempdir().unwrap();
+    let entry = dir.path();
+    fs::write(
+        entry.join("main.luau"),
+        r#"return mod { view = function(_, app)
+    local data = app["user:fuubar"]
+    if not data then return ui.text "waiting" end
+    return ui.column { ui.row { padding = 8, ui.text(data.title) } }
+end }"#,
+    )
+    .unwrap();
+    let options = moonframe_core::entries::CheckOptions {
+        name: Some("user:fuubar".to_owned()),
+        ..Default::default()
+    };
+    let policy = RootPolicy::default();
+    assert!(crate::check_entry(entry, &policy, &options).is_empty());
+    fs::create_dir_all(entry.join("provider")).unwrap();
+    fs::write(entry.join("provider/sample.json"), r#"{"title": "hi"}"#).unwrap();
+    let found = crate::check_entry(entry, &policy, &options);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].line, Some(4));
+    assert!(found[0].message.contains("padding"));
+    fs::write(entry.join("provider/sample.json"), "{ not json").unwrap();
+    let found = crate::check_entry(entry, &policy, &options);
+    assert!(found[0].file.ends_with("sample.json"), "{found:?}");
 }

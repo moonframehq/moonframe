@@ -72,6 +72,8 @@ mod placement;
 mod profiles;
 mod project;
 mod render;
+#[cfg(feature = "capture")]
+mod render_entry;
 mod settings;
 mod terminal;
 mod theme_picker;
@@ -86,6 +88,8 @@ mod video;
 pub use moonframe_providers::AsyncHostCapability;
 #[cfg(feature = "tokio")]
 pub use moonframe_providers::{AsyncNative, on_runtime, runtime, tokio};
+#[cfg(feature = "capture")]
+pub use render_entry::{ElementBounds, RenderedEntry, render_entry};
 pub use {
     app::open_main_window,
     gpui_kit,
@@ -93,11 +97,12 @@ pub use {
     hosted::{HostView, Messenger, ViewInit},
     launch::{EmbeddedEntries, LogLayer, Moonframe},
     moonframe_core::{
-        self, Data,
+        self, Data, SCHEMA_VERSION, Schema, ViewDiagnostic, ViewLevel,
         entries::{
-            BuildPolicy, Diagnostic, Entries, Entry, EntryFiles, EntryKind, EntryState,
-            EntryStatus, RootPolicy, Severity,
+            BuildPolicy, CheckOptions, Diagnostic, Entries, Entry, EntryFiles, EntryKind,
+            EntryState, EntryStatus, RootPolicy, Severity, ViewSnapshot,
         },
+        schema,
     },
     moonframe_providers::{
         Caller, Capabilities, Handle, HostCallLimits, HostCapability, Native, check_entry,

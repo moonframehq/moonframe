@@ -457,20 +457,22 @@ let app = if cfg!(debug_assertions) {
 <p>On the runtime handle, <code>use moonframe::EmbeddedEntries</code> and call
 <code>entries.add_entry_embedded::&lt;Notes&gt;("builtin", "notes")</code>; one added before
 <code>run</code> waits until the app knows its cache folder.</p>
-<p><strong>Checking an entry.</strong> <code>moonframe::check_entry(path, &amp;policy, app_roots,
-&amp;["mshub.entities"])</code> returns a <code>Vec&lt;Diagnostic&gt;</code> (<code>severity</code>, <code>file</code>,
-<code>message</code>) for a host CLI's <code>&lt;app&gt; miniapp check</code>: it compiles and loads
-<code>main.luau</code>, draws its first view headlessly, loads each component and
-<code>style.luau</code>, reads <code>provider/provider.toml</code> with its capabilities checked
-against the names given, and applies <code>policy</code> (prebuilt-only, process,
-socket). With <code>app_roots</code> as <code>None</code>, a <code>use</code> of a component the entry does not
-bring is only a warning. The Luau-only part is
-<code>moonframe_core::entries::check(path, &amp;policy)</code> (or <code>check_in</code> with the app's
-<code>Roots</code>). Static type-checking stays with <code>luau-lsp analyze</code>, as <code>just types</code>
-runs it.</p>
+<p><strong>Checking an entry.</strong> <code>moonframe::check_entry(path, &amp;policy, &amp;options)</code>
+returns a <code>Vec&lt;Diagnostic&gt;</code> (<code>severity</code>, <code>file</code>, <code>line</code>, <code>message</code>) for a host
+CLI's <code>&lt;app&gt; miniapp check</code>. It loads <code>main.luau</code>, components and
+<code>style.luau</code>, draws the view with no data and then with each case
+<code>CheckOptions</code> gives (fake <code>app</code> tables, starting states, messages), reads
+<code>provider/provider.toml</code> with its capabilities checked against
+<code>options.capabilities</code>, and applies <code>policy</code>. An entry that ships a
+<code>sample.json</code> (beside <code>main.luau</code> or in <code>provider/</code>) is drawn with it as its
+provider's data, so a branch that only draws once data arrives is checked:
+ship one. See <a href="library.md#checking-what-miniapps-draw">checking what miniapps draw</a>
+for every option, live diagnostics, snapshots and headless renders.</p>
 <p><code>EntryStatus</code> contains <code>name</code>, <code>kind</code> (<code>Mod</code>/<code>Provider</code>), <code>state</code>
-(<code>Ok</code>/<code>Building</code>/<code>Stale</code>/<code>Failed</code>), optional <code>error</code>, and <code>revision</code> (an opaque
-fingerprint of the attempted revision, not a monotonic counter). The callback
+(<code>Ok</code>/<code>Building</code>/<code>Stale</code>/<code>Failed</code>), optional <code>error</code>, <code>revision</code> (an opaque
+fingerprint of the attempted revision, not a monotonic counter), and
+<code>view_errors</code>: what the entry's views drew wrong, as <code>ViewDiagnostic</code>s, sent
+when they change and empty once the view draws cleanly. The callback
 runs on the loading thread; keep it short. Wasm build/instantiate progress and
 errors use this callback. It does not publish a topic. On-demand providers
 report once wanted. Headless integrations use <code>Capabilities::capability</code>,

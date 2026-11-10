@@ -24,8 +24,9 @@ alacritty = ["moonframe-terminal/alacritty", "terminal"]
 awake = ["dep:keepawake"]
 # Native web views for `ui.browser` (WebKit on macOS, WebView2 on Windows).
 browser = ["dep:objc2-web-kit", "dep:wry"]
-# Developer-only export of this app's own rendered frame, without desktop capture.
-capture = ["dep:gpui-capture", "dep:gpui-platform-capture"]
+# Developer-only export of this app's own rendered frame, without desktop capture,
+# and `render_entry`: one miniapp entry drawn headless to PNG.
+capture = ["dep:gpui-apple-capture", "dep:gpui-capture", "dep:gpui-platform-capture", "dep:image"]
 # The `chat` native provider (`app.chat`): agent chats run by herdr-acp,
 # attached over herdr's chat protocol.
 chat = ["dep:moonframe-chat"]
@@ -222,8 +223,10 @@ tempfile.workspace    = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics-types = { optional = true, workspace = true }
-metal               = { optional = true, workspace = true }
-moonframe-frames    = { optional = true, workspace = true }
+# `render_entry`'s text, shaped off the main thread, unlike the platform's.
+gpui-apple-capture = { features = ["font-kit"], optional = true, package = "gpui-pre-apple", version = "=0.3.10" }
+metal              = { optional = true, workspace = true }
+moonframe-frames   = { optional = true, workspace = true }
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
 block2.workspace           = true
 objc2.workspace            = true

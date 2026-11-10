@@ -86,6 +86,7 @@ fn open_with(cx: &mut TestAppContext, dir: TempDir, views: Registry) -> Window<'
             &workspace,
             Natives::default(),
             Launch {
+                view_diagnostics: None,
                 entries: Default::default(),
                 providers: Default::default(),
                 folders: folders.clone(),

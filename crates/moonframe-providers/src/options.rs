@@ -19,24 +19,60 @@ pub struct ProviderOptions {
 }
 
 /// Checks a miniapp entry at `path` as a host would load it under
-/// `policy`: its Luau ([`moonframe_core::entries::check_in`], over `app`
-/// when given), and its `provider/provider.toml`, whose capabilities must be
-/// among `capabilities`, the names the host registers.
+/// `policy`, drawing its view as [`moonframe_core::entries::check_in`] does
+/// with `options`, and reading its `provider/provider.toml`, whose
+/// capabilities must be among `options.capabilities`.
+///
+/// A `sample.json` beside `main.luau` (or in `provider/`) is what its
+/// provider publishes, for the check to draw with: added as one more `app`
+/// case, under the entry's name. With `options.luau_lsp`, the Luau is also
+/// type-checked.
 pub fn check_entry(
     path: &Path,
     policy: &RootPolicy,
-    app: Option<&moonframe_core::Roots>,
-    capabilities: &[&str],
+    options: &moonframe_core::entries::CheckOptions,
 ) -> Vec<moonframe_core::entries::Diagnostic> {
-    use moonframe_core::entries::{Diagnostic, check_in};
-    let mut found = check_in(path, policy, app);
+    use moonframe_core::entries::{Diagnostic, check_in, typecheck};
+    let mut options = options.clone();
+    let mut found = Vec::new();
+    let name = options
+        .name
+        .clone()
+        .unwrap_or_else(|| "check:entry".to_owned());
+    for sample in [path.join("sample.json"), path.join("provider/sample.json")] {
+        if !sample.is_file() {
+            continue;
+        }
+        let read = std::fs::read_to_string(&sample)
+            .map_err(|error| error.to_string())
+            .and_then(|text| serde_json::from_str(&text).map_err(|error| error.to_string()))
+            .and_then(|json| crate::from_json(&json).map_err(|error| error.to_string()));
+        match read {
+            Ok(data) => options
+                .app
+                .push(moonframe_core::Data::map([(name.clone(), data)])),
+            Err(error) => found.push(Diagnostic::error(sample, error)),
+        }
+        break;
+    }
+    found.extend(check_in(path, policy, &options));
     let dir = path.join("provider");
     let manifest = dir.join("provider.toml");
     if manifest.is_file() {
-        let checked = Manifest::load_declared("check:entry", &dir, capabilities)
+        let capabilities: Vec<&str> = options.capabilities.iter().map(String::as_str).collect();
+        let checked = Manifest::load_declared("check:entry", &dir, &capabilities)
             .and_then(|loaded| check_policy(&loaded, &dir, policy));
         if let Err(error) = checked {
             found.push(Diagnostic::error(manifest, error.to_string()));
+        }
+    }
+    if let Some(lsp) = &options.luau_lsp {
+        match typecheck(path, lsp) {
+            Ok(typed) => found.extend(typed),
+            Err(error) => found.push(Diagnostic::warning(
+                path,
+                format!("could not type-check: {error}"),
+            )),
         }
     }
     found
@@ -82,6 +118,7 @@ impl crate::Context {
                 state,
                 error,
                 revision: self.revision,
+                view_errors: Vec::new(),
             });
         }
     }

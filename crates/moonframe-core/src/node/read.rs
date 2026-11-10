@@ -11,6 +11,7 @@ mod layout;
 mod map;
 mod pointer;
 mod revision_timeline;
+mod strict;
 mod video;
 // keep-sorted end
 
@@ -65,10 +66,15 @@ const ATTACHED: &[&str] = &["tooltip", "context", "copy", "to"];
 ///
 /// `windows` says which rows of each `ui.list` to build, by its `id`; a
 /// list not in it builds its first rows.
+///
+/// With `strict`, the problems also hold [`ViewLevel::Strict`] notes: each
+/// class and state no rule of `sheet` styles. Deprecated keys are always
+/// noted, as [`ViewLevel::Deprecated`]; neither marks the view.
 pub(crate) fn read(
     value: &Value,
     sheet: &Stylesheet,
     windows: &BTreeMap<String, ListWindow>,
+    strict: bool,
 ) -> Result<(Node, Vec<Error>), Error> {
     let mut tree = Tree {
         nodes: 0,
@@ -76,9 +82,57 @@ pub(crate) fn read(
         halted: false,
         windows,
         lists: BTreeSet::new(),
+        strict: strict.then(|| (sheet, Vec::new())),
     };
     let node = tree.node(value, &Cx::root(sheet.names()))?;
+    tree.unstyled();
     Ok((node, tree.problems))
+}
+
+/// Each element type `ui` builds, by name, with the key groups its reader
+/// takes and whether it takes children: what [`crate::schema`] describes,
+/// so the schema cannot drift from the reader.
+pub(crate) fn element_keys() -> Vec<(&'static str, &'static [&'static [&'static str]], bool)> {
+    fn of<T: Build>() -> (&'static [&'static [&'static str]], bool) {
+        (T::KEYS, T::CHILDREN)
+    }
+    Element::NAMES
+        .iter()
+        .filter_map(|name| Element::parse(name))
+        .map(|kind| {
+            let (keys, children) = match kind {
+                Element::Row | Element::Column => of::<Stack>(),
+                Element::Panel => of::<Panel>(),
+                Element::Hsplit | Element::Vsplit => of::<Split>(),
+                Element::Pane => of::<Pane>(),
+                Element::Text => of::<Text>(),
+                Element::Button => of::<Button>(),
+                Element::Item => of::<Item>(),
+                Element::Badge => of::<Badge>(),
+                Element::Icon => of::<Icon>(),
+                Element::Image => of::<Image>(),
+                Element::Line => of::<Line>(),
+                Element::Paths => of::<Paths>(),
+                Element::RevisionTimeline => of::<RevisionTimeline>(),
+                Element::Hatch => of::<Hatch>(),
+                Element::Map => of::<Map>(),
+                Element::Terminal => of::<Terminal>(),
+                Element::Browser => of::<Browser>(),
+                Element::Video => of::<Video>(),
+                Element::View => of::<View>(),
+                Element::Input => of::<Input>(),
+                Element::Markdown => of::<Markdown>(),
+                Element::Divider | Element::Spacer => of::<Bare>(),
+                Element::Region => of::<Region>(),
+                Element::Mount => of::<Mount>(),
+                Element::Instance => of::<Instance>(),
+                Element::Popover => of::<Popover>(),
+                Element::Overlay => of::<Overlay>(),
+                Element::List => of::<List>(),
+            };
+            (kind.name(), keys, children)
+        })
+        .collect()
 }
 
 /// An element type: the keys it takes, and how it reads them.
@@ -101,6 +155,8 @@ struct Tree<'w> {
     windows: &'w BTreeMap<String, ListWindow>,
     /// The ids of the lists read so far, which must differ.
     lists: BTreeSet<String>,
+    /// In a strict read, the stylesheet, and each class and state used.
+    strict: Option<(&'w Stylesheet, Vec<strict::Used>)>,
 }
 
 impl Tree<'_> {
@@ -112,7 +168,7 @@ impl Tree<'_> {
             _ => return Err(cx.fail("expected an element from `ui`, or a string")),
         };
         let kind = kind(table, cx)?;
-        let cx = cx.key(kind.name());
+        let cx = cx.element(kind.name());
         Ok(match kind {
             Element::Row | Element::Column => Node::Stack(self.build(kind, table, &cx)?),
             Element::Panel => Node::Panel(self.build(kind, table, &cx)?),
@@ -153,10 +209,20 @@ impl Tree<'_> {
 
     fn build<T: Build>(&mut self, kind: Element, table: &Table, cx: &Cx) -> Result<T, Error> {
         let fields = Fields::table(table, cx, T::KEYS)?;
+        let line = fields.line();
+        let stamp = |error: Error| {
+            error.with(|detail| {
+                if detail.line.is_none() {
+                    detail.line = line;
+                }
+            })
+        };
         if !T::CHILDREN && !fields.items().is_empty() {
-            return Err(cx.fail("takes no children"));
+            return Err(stamp(cx.fail("takes no children")));
         }
-        T::build(kind, &fields, self)
+        self.deprecated(kind, &fields);
+        self.used(&fields);
+        T::build(kind, &fields, self).map_err(stamp)
     }
 
     fn children(&mut self, fields: &Fields) -> Result<Vec<Node>, Error> {
@@ -197,7 +263,8 @@ impl Tree<'_> {
     fn child(&mut self, value: &Value, cx: &Cx) -> Result<Node, Error> {
         match self.node(value, cx) {
             Err(error) if !self.halted => {
-                let problem = Node::Problem(error.to_string());
+                let error = error.with(crate::diagnostic::suggest);
+                let problem = Node::Problem(error.explained());
                 self.problems.push(error);
                 Ok(problem)
             },

@@ -83,6 +83,20 @@ impl Moonframe {
         self.entries.clone()
     }
 
+    /// Hears each element problem any mod's view draws (the shell's, the
+    /// app's mods', entries' and their instances'): an unknown key, a wrong
+    /// token, an icon that does not exist. Each is told once per module and
+    /// source revision, until its view draws cleanly again; the same is
+    /// logged at warn level, and an entry's go in its
+    /// [`EntryStatus::view_errors`]. Called on the UI thread; keep it short.
+    pub fn on_view_diagnostic(
+        mut self,
+        callback: impl Fn(moonframe_core::ViewDiagnostic) + Send + Sync + 'static,
+    ) -> Self {
+        self.view_diagnostics = Some(Arc::new(callback));
+        self
+    }
+
     /// Called on the loading thread (UI for mods, workers for providers).
     /// Keep callbacks short; enqueue work back to the embedder if needed.
     pub fn on_entry_status(

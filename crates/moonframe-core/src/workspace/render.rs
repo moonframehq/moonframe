@@ -186,6 +186,7 @@ impl Workspace {
         }
         let app = self.app.clone();
         let style = self.style_generation;
+        self.shell.strict = self.strict;
         let mut ran =
             usize::from(
                 self.shell
@@ -193,6 +194,7 @@ impl Workspace {
             );
         let demos = self.demos.iter_mut().filter(|_| self.demos_shown);
         for (name, slot) in self.mods.iter_mut().chain(demos) {
+            slot.strict = self.strict;
             ran += usize::from(slot.render(
                 &app,
                 &self.versions,
@@ -203,6 +205,8 @@ impl Workspace {
         }
         self.views_run += ran;
         self.render_instances(&app);
+        self.report_views();
+        self.publish_views();
     }
 
     /// Has the list `id` drawn by `owner` build the rows in `window`, as the
@@ -309,6 +313,7 @@ impl Workspace {
                 continue;
             };
             mounted.slot.set_props(&instance.props);
+            mounted.slot.strict = self.strict;
             if mounted.slot.render(
                 app,
                 &self.versions,

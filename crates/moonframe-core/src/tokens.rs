@@ -39,8 +39,13 @@ macro_rules! tokens {
                     return Err(cx.fail(format!("expected one of {names}")));
                 };
                 let name = name.to_string_lossy();
-                Self::parse(&name)
-                    .ok_or_else(|| cx.fail(format!("unknown `{name}`; expected one of {names}")))
+                Self::parse(&name).ok_or_else(|| {
+                    cx.fail(format!("unknown `{name}`; expected one of {names}"))
+                        .with(|detail| {
+                            detail.suggestion =
+                                $crate::diagnostic::did_you_mean(&name, Self::NAMES);
+                        })
+                })
             }
         }
     };

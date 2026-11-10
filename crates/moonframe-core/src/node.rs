@@ -19,16 +19,17 @@ mod map;
 mod pointer;
 mod read;
 mod revision_timeline;
+mod snapshot;
 mod tokens;
 mod video;
 // keep-sorted end
 
 pub use {
     embed::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*,
-    revision_timeline::*, tokens::*, video::*,
+    revision_timeline::*, snapshot::*, tokens::*, video::*,
 };
 
-pub(crate) use read::read;
+pub(crate) use read::{element_keys, read};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {

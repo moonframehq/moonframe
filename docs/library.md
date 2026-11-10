@@ -11,6 +11,9 @@ For sandboxed, end-user miniapps outside `app_dir`, see
 [host capabilities and runtime entries](wasm-providers.md#host-defined-capabilities-and-external-miniapps):
 `Moonframe::capability`, `root`, `entry`, `entry_embedded`, `entry_handle`,
 `on_entry_status`, `check_entry`, and the serde guest SDK. Native providers remain code compiled into the host.
+[Checking what miniapps draw](#checking-what-miniapps-draw) covers live
+element diagnostics, checks with data, snapshots, headless renders and the
+element schema.
 
 ```sh
 moonframe init ~/code/notes                 # a new crate: Cargo.toml, src/main.rs, app/
@@ -461,3 +464,106 @@ The way in is to make Moonframe the host from day one, with one big view:
    as native providers.
 
 The app's crates must use the library's GPUI version.
+
+## Checking what miniapps draw
+
+When a view gives an element something it does not take
+(`ui.row { padding = 8 }`, `ui.button { selected = true }`, an icon that does
+not exist), the window draws a warning sign in that element's place and the
+rest still draws. The same problem reaches the host as data, so an agent
+writing a miniapp can see that its page is broken.
+
+**Live diagnostics.** Each refused element becomes a `ViewDiagnostic`:
+
+| Field | Example |
+| --- | --- |
+| `module` | `user:fuubar`, `shell`, `files` |
+| `path` | `column[1].row` (the element, as errors name it) |
+| `element` | `row` |
+| `key`, `value` | `padding`, `8` |
+| `line` | the line of the mod's file that built the element |
+| `message` | `expected one of none, small, normal, large` (without the path) |
+| `suggestion` | `padding takes none\|small\|normal\|large on an element; pixels belong in styles`, `ui.button has no selected; use variant`, close icon names, `did you mean label?` |
+| `level` | `Broken` (warning sign), `Deprecated` (still draws), `Strict` (only in strict checks) |
+
+Each is told once per module and source revision. A module's set clears when
+its source changes or its view draws without problems, so one that comes back
+is told again. They are delivered three ways:
+
+- `Moonframe::on_view_diagnostic(|d| ...)`, for every mod: the shell, the
+  app's mods, entries and their instances. It runs on the UI thread, so keep
+  it short.
+- `EntryStatus::view_errors` through `on_entry_status`, for entries. A status
+  is sent when the set changes, not on every frame, and is empty once fixed.
+- The log, once each, at warn level (`view: user:fuubar:5: column[1].row.padding: ...`).
+
+The warning sign's tooltip shows the same message and suggestion.
+
+**Checks with data.** `moonframe::check_entry(path, &policy, &CheckOptions)`
+(and `moonframe_core::entries::check_in` for the Luau alone) draws the view in
+every case the options give. It returns each element diagnostic, Luau errors
+with `file:line`, and instruction-budget overruns (`ran out of instructions`):
+
+```rust
+use moonframe::{CheckOptions, Data, RootPolicy, check_entry};
+
+let found = check_entry(path, &RootPolicy::default(), &CheckOptions {
+    name: Some("user:fuubar".into()),        // what app["user:fuubar"] holds
+    roots: None,                             // Some(app roots): resolve the app's components
+    app: vec![Data::map([("user:fuubar", sample)])], // fake `app` tables, each drawn
+    state: vec![],                           // starting states, each drawn
+    messages: vec![Data::from("open")],      // sent to `update`, drawn after each
+    sizes: vec![],                           // for render_entry; views read no size
+    strict: false,                           // see below
+    capabilities: vec!["mshub.entities".into()],
+    luau_lsp: None,                          // Some(binary): also type-check statically
+});
+for diagnostic in &found {
+    eprintln!("{diagnostic}"); // main.luau:10: error: column[1].row.padding: ... [app case 1]
+}
+```
+
+The view is drawn with no data first, then with each `app` case. If the
+entry has `sample.json` (or `provider/sample.json`), it is one more case,
+under the entry's name. Ship one with every miniapp whose view depends on its
+provider's data. With `strict`, classes and states that no rule styles, and
+deprecated keys, are errors too.
+
+**Static type-check.** With `luau_lsp` set (the binary
+`scripts/setup-luau-lsp.sh` downloads), the entry's Luau is checked against
+`types/moonframe.d.luau` in strict mode, with line numbers. It catches wrong
+token values and wrong types where they are literals (`padding = 8`,
+`tone = "loud"`). It does not catch unknown keys, which the drawing check
+does. `moonframe_core::entries::typecheck(path, lsp)` runs it alone.
+
+**Snapshots.** `entries.snapshot_view("user:fuubar")` on the `Entries` handle
+(from any thread) returns the entry's view as the window last drew it, as a
+`ViewSnapshot`:
+
+- `tree`: plain data with `kind`, `path`, `line`, `class`, `text`, the sizes
+  the view asked for, and `children`.
+- `diagnostics`.
+- `state`.
+- `reads`: the `app` keys the view read.
+- `error`.
+- `draws`: a counter.
+
+It is cut at 256 KiB (`truncated`). Laid-out sizes come from a headless render.
+
+**Headless render.** With the `capture` feature,
+`moonframe::render_entry(path, &policy, &options, (width, height))` draws the
+entry alone in an offscreen window, with the first `app` case (or its
+`sample.json`), from the first state and after its messages. It returns PNG bytes for an agent or a
+vision model, the snapshot, and each element's laid-out bounds.
+
+**The element schema.** `moonframe::schema()` returns as data (`to_data`,
+`to_json`) the element kinds, their keys with types and allowed tokens, icon
+names, style properties and token sets. It is built from the reader's own key
+lists, so it cannot drift. Put it in an agent's prompt, or validate against it.
+
+**Deprecations.** `schema().version` (`SCHEMA_VERSION`) is raised when an
+element key is removed or renamed. Before that, the key keeps working for at
+least one version with a `Deprecated` diagnostic naming its replacement. Once
+removed, it is an unknown key whose suggestion still names the replacement.
+Unknown keys are never tolerated silently: an element that has one draws a
+warning sign and is reported.

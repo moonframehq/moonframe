@@ -10,6 +10,7 @@ use {
 };
 
 // keep-sorted start
+mod check_data;
 mod checks;
 mod components;
 mod dictation;
@@ -35,6 +36,7 @@ mod switchyard;
 mod task_manager;
 mod topics;
 mod video;
+mod view_diagnostics;
 mod views;
 mod windows;
 // keep-sorted end

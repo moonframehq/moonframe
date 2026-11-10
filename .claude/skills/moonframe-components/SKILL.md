@@ -49,6 +49,14 @@ its `use` (and only its), and its `style.luau` (`style { rules = { ... } }`)
 styles only what it draws. `entry_embedded::<E>(namespace, id)` ships one in
 the binary; `moonframe::check_entry` reports its problems.
 
+An element given a key it does not take, a wrong token or an unknown icon
+draws a warning sign in its place and is reported to the host as a
+`ViewDiagnostic` (path, key, value, line, suggestion). `padding` and `gap`
+take `none`, `small`, `normal` or `large` on an element; pixels go in
+`style`. Check a miniapp with data (ship a `sample.json` with what its
+provider publishes) so branches that only draw with data are checked too.
+`moonframe::schema()` lists every element and its keys as data.
+
 Prefer sandboxed Wasm for end-user providers. The host registers namespaced
 JSON capabilities with `capability` / `capability_async`; a guest declares them
 in `provider.toml` and calls `moonframe_provider::host_call` from the Rust SDK.
