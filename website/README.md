@@ -96,7 +96,24 @@ add a scene, what to check, and the chapter times to move with it.
 ## Hosting
 
 One Netlify site serves both domains. `netlify.toml` publishes `website/site`
-and skips deploys when nothing under `website/` changed. In Netlify, add
-`moonframe.dev` as the primary domain and `docs.moonframe.dev` as a domain
+and skips Netlify's automatic builds. In Netlify, add `moonframe.dev` as the
+primary domain and `docs.moonframe.dev` as a domain
 alias; `_redirects` routes the docs host to `/docs/` and sends
 `moonframe.dev/docs/*` and `www` to their canonical addresses.
+
+The [`Deploy website` workflow](../.github/workflows/site.yml) runs on pushes
+to `main` that change `website/site/`, `netlify.toml`, or the workflow itself.
+It uploads the committed static files without a build step:
+
+```sh
+netlify deploy --prod --dir=website/site --no-build
+```
+
+In the GitHub repository's **Settings → Environments → website**, restrict
+deployment branches to `main` and add environment secrets
+`NETLIFY_AUTH_TOKEN` (a Netlify personal access token) and
+`NETLIFY_SITE_ID` (the Moonframe project's ID from Netlify project settings).
+The deploy job uses this environment. Production uploads are serialized.
+Regenerate and commit any generated pages
+or assets before pushing; changes to source tools or mockups alone do not
+trigger deployment.

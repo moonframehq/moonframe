@@ -2,8 +2,9 @@
 [build]
 command = ""
 publish = "website/site"
-# Skip a deploy when nothing under website/ changed.
-ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- website/ netlify.toml"
+# GitHub Actions uploads the static site; skip Netlify's automatic builds.
+# Netlify treats exit 0 as "ignore this build"; CLI deploys bypass this check.
+ignore = "exit 0"
 
 [[headers]]
 for = "/img/*"
