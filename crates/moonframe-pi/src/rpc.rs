@@ -336,7 +336,16 @@ mod tests {
     fn script(dir: &Path, body: &str) -> std::path::PathBuf {
         use std::os::unix::fs::PermissionsExt;
         let path = dir.join("pi");
-        fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+        // A sibling test can fork while a Rust file write is open, keeping
+        // that descriptor alive until exec and causing Linux ETXTBSY here.
+        // Only the single-threaded shell opens the executable for writing.
+        let status = std::process::Command::new("/bin/sh")
+            .args(["-c", "printf '%s' \"$1\" > \"$2\"", "write-test-executable"])
+            .arg(format!("#!/bin/sh\n{body}\n"))
+            .arg(&path)
+            .status()
+            .unwrap();
+        assert!(status.success(), "writing {}: {status}", path.display());
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
         path
     }

@@ -57,24 +57,27 @@ base64 = "0.22"
 anstream = "1"
 anstyle  = "1"
 block2   = "0.6"
+fluent   = "0.17"
 futures  = "0.3"
 gpui-kit = "=0.8.1"
 # The parser `gpui-kit` renders with, read here for headings and footnotes.
 latex-rust = { default-features = false, features = ["std"], version = "3.0" }
 markdown   = "1.0"
 tokio      = { default-features = false, version = "1.54" }
-# Crates of herdr-gpui (to be renamed), pinned to one commit. To work on
-# them beside this app, patch them to a local checkout:
+# Crates of Sheprd, pinned to one commit; older integration names are
+# Cargo aliases. To work on them beside this app, patch them to a local checkout:
 #   [patch."https://github.com/penso/herdr-gpui"]
-#   herdr-core-client = { path = "../herdr-gpui/crates/herdr-core-client" }
+#   sheprd-core-client = { path = "../herdr-gpui/crates/sheprd-core-client" }
 core-graphics-types = "0.2"
-herdr-chat-protocol = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-client        = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-core-client   = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-credentials   = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-github        = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-usage         = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-chat-protocol = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-chat-protocol", rev = "178a50c78482cc04a51163f26051bba334afcd91" }
+herdr-client        = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-client", rev = "178a50c78482cc04a51163f26051bba334afcd91" }
+herdr-core-client   = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-core-client", rev = "178a50c78482cc04a51163f26051bba334afcd91" }
+herdr-credentials   = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-credentials", rev = "178a50c78482cc04a51163f26051bba334afcd91" }
+herdr-github        = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-github", rev = "178a50c78482cc04a51163f26051bba334afcd91" }
+herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-vcs", rev = "178a50c78482cc04a51163f26051bba334afcd91" }
+# Usage needs the SQLite fix in rusqlite 0.41. Its English messages are
+# snapshotted from this revision by scripts/update-usage-messages.py.
+sheprd-usage = { git = "https://github.com/penso/herdr-gpui", rev = "178a50c78482cc04a51163f26051bba334afcd91" }
 # What GPUI's `RenderImage` is built from, for a turned `ui.map`'s picture.
 image = { default-features = false, version = "0.25" }
 # `ui.image` zooms by the picture's own size, read from its header.
@@ -116,9 +119,8 @@ objc2-user-notifications = { default-features = false, features = ["UNNotificati
 objc2-web-kit            = { default-features = false, features = ["WKWebView", "objc2-app-kit", "std"], version = "0.3" }
 portable-pty             = "0.9"
 raw-window-handle        = "0.6"
-# Either release: this workspace's lockfile keeps 0.40, while a host app
-# that is on 0.41 (one `sqlite3` per build) resolves to it.
-rusqlite                 = { features = ["bundled"], version = ">=0.40, <0.42" }
+# SQLite 3.54 fixes RUSTSEC-2026-0459; one sqlite3 is linked per build.
+rusqlite = { features = ["bundled"], version = "0.41" }
 # Swapping a saved file into place atomically (moonframe-docs).
 rust-embed = { features = ["include-exclude"], version = "8.7" }
 # Tokens kept redacted in memory (moonframe-forge), as herdr-credentials reads them.

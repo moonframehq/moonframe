@@ -107,7 +107,7 @@ fn configured_provider_without_numbers_can_open_its_error_and_refresh() {
         Reading {
             provider,
             report: None,
-            error: Some("Not signed in".into()),
+            error: Some(Error::NotSignedIn.into()),
             access: None,
         },
         &config,
@@ -116,7 +116,7 @@ fn configured_provider_without_numbers_can_open_its_error_and_refresh() {
     let (_dir, mut workspace) = app(&data);
     open(&mut workspace);
     let popover = sheet(&workspace);
-    assert!(has_text(&popover.content, "Not signed in"));
+    assert!(has_text(&popover.content, &Error::NotSignedIn.to_string()));
     refresh_is_reachable(popover);
 }
 
@@ -137,7 +137,7 @@ fn a_host_failure_without_providers_can_open_and_retry() {
 fn balance_only_accounts_show_the_balance_in_the_status_bar() {
     let provider = registry::find("openrouter").unwrap();
     let report = Report::new(provider, Account::default(), vec![]).with_balances([Balance::new(
-        "Credits",
+        Text::service("Credits"),
         60.,
         Unit::Currency("USD".into()),
     )
@@ -180,8 +180,8 @@ fn access_only_accounts_still_offer_allow() {
         Reading {
             provider,
             report: None,
-            error: Some("Keychain access needed".into()),
-            access: Some(herdr_usage::Access::Needed),
+            error: Some(Error::KeychainAccess.into()),
+            access: Some(sheprd_usage::Access::Needed),
         },
         &config,
     );
@@ -210,9 +210,9 @@ fn long_reports_keep_all_details_inside_a_bounded_scroll_area() {
         None,
     )])
     .with_sections([Section::Facts {
-        title: "Details".into(),
+        title: Text::service("Details"),
         facts: (0..30)
-            .map(|i| (format!("Detail {i}"), "value".into()))
+            .map(|i| (Text::service(format!("Detail {i}")), Text::service("value")))
             .collect(),
     }]);
     let data = published(

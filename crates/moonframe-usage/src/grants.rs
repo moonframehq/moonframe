@@ -6,9 +6,9 @@
 //! the background.
 
 use {
-    herdr_usage::{Provider, registry},
     serde::{Deserialize, Serialize},
     serde_json::Value,
+    sheprd_usage::{Provider, registry},
     std::{
         collections::{BTreeSet, HashSet},
         fs,

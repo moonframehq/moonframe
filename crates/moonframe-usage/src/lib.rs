@@ -1,9 +1,9 @@
 //! The `usage` native provider: the plan usage of the AI services signed in
 //! on this machine (Claude, Codex, Copilot, Cursor, Gemini, OpenRouter and
-//! the rest herdr-usage knows), shared as `app.usage`, for a status bar
+//! the rest sheprd-usage knows), shared as `app.usage`, for a status bar
 //! meter and a usage sheet.
 //!
-//! herdr-usage does the reading: it finds each agent's own sign-in, asks
+//! sheprd-usage does the reading: it finds each agent's own sign-in, asks
 //! its service on a thread of its own, keeps the last good numbers when a
 //! refresh fails, and spaces reads out (every 10 minutes, longer when
 //! rate limited). This crate drives it from the provider's ticks and
@@ -30,16 +30,17 @@
 
 mod grants;
 mod publish;
+mod words;
 
 #[cfg(test)]
 mod tests;
 
 use {
     grants::Grants,
-    herdr_usage::{Host, Usage, UsageConfig, registry},
     moonframe_core::Data,
     moonframe_providers::{Handle, Mods, Native},
     serde_json::{Map, Value},
+    sheprd_usage::{Host, Usage, UsageConfig, registry},
     std::time::Instant,
 };
 
@@ -168,7 +169,7 @@ impl Native for UsageProvider {
     }
 }
 
-/// herdr-usage's config from `[settings]`, refusing what it does not
+/// sheprd-usage's config from `[settings]`, refusing what it does not
 /// know so a typo says so instead of showing nothing.
 fn config(settings: &Value) -> Result<UsageConfig, String> {
     let entries = settings.as_object().into_iter().flatten();
@@ -193,7 +194,7 @@ fn config(settings: &Value) -> Result<UsageConfig, String> {
     Ok(config)
 }
 
-/// `local`, `ssh:<target>` or `wsl:<distro>`. herdr-client checks the
+/// `local`, `ssh:<target>` or `wsl:<distro>`. sheprd-client checks the
 /// target again before running anything; this refuses early what could
 /// read as an option to `ssh` or `wsl.exe`, so the mod hears why.
 pub(crate) fn parse_host(name: &str) -> Result<Host, String> {
