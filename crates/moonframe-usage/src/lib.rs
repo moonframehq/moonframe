@@ -30,6 +30,7 @@
 
 mod grants;
 mod publish;
+mod text;
 
 #[cfg(test)]
 mod tests;
