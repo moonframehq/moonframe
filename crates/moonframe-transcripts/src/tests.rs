@@ -20,6 +20,10 @@ use {
 struct Fixture {
     temp: TempDir,
     root: String,
+    /// What `ago` counts back from: one instant for the whole test, so two
+    /// files written `ago` the same have the same mtime even when the clock
+    /// crosses a second between them.
+    now: SystemTime,
 }
 
 impl Fixture {
@@ -30,7 +34,11 @@ impl Fixture {
             temp.path().to_string_lossy().replace('\\', "/")
         );
         fs::create_dir_all(&root).unwrap();
-        Self { temp, root }
+        Self {
+            temp,
+            root,
+            now: SystemTime::now(),
+        }
     }
 
     /// A folder that exists, as a session's `cwd`.
@@ -59,7 +67,7 @@ impl Fixture {
         fs::create_dir_all(format!("{}/{dir}", self.root)).unwrap();
         let path = format!("{}/{dir}/{id}.jsonl", self.root);
         fs::write(&path, bytes).unwrap();
-        let when = SystemTime::now() - Duration::from_secs(ago);
+        let when = self.now - Duration::from_secs(ago);
         File::options()
             .write(true)
             .open(&path)
