@@ -38,6 +38,8 @@ const CASCADE: Pixels = px(28.);
 /// What opening another main window takes, from the first.
 #[derive(Clone)]
 pub(crate) struct Launch {
+    pub(crate) entries: moonframe_core::entries::Entries,
+    pub(crate) providers: moonframe_providers::ProviderOptions,
     pub(crate) folders: Folders,
     pub(crate) backends: Arc<Backends>,
     pub(crate) views: Registry,
@@ -93,6 +95,10 @@ enum Delivery {
 }
 
 impl Hub {
+    pub(super) fn entry_roots(&self, roots: Roots) -> Roots {
+        self.launch.entries.apply(roots)
+    }
+
     /// Makes the app's hub: starts the providers `workspace` wants first
     /// (with the native ones the app has) and what runs once for the app.
     pub(crate) fn install(
@@ -105,7 +111,7 @@ impl Hub {
             let (sender, mut events) = futures::channel::mpsc::unbounded();
             // Only those the first views read or the mods hear, and those
             // that always start: the rest wait until something wants them.
-            let providers = Providers::start_wanting(
+            let providers = Providers::start_configured(
                 workspace.roots().clone(),
                 paths::builds(),
                 Arc::new(move |event| {
@@ -113,6 +119,7 @@ impl Hub {
                 }),
                 natives,
                 workspace.wanted_providers(),
+                launch.providers.clone(),
             );
             cx.spawn(async move |hub, cx| {
                 while let Some(event) = events.next().await {
@@ -151,6 +158,7 @@ impl Hub {
             }
         });
         cx.set_global(Installed(hub.clone()));
+        entries::listen(hub.read(cx).launch.entries.clone(), cx);
         cx.on_window_closed(|cx, id| {
             if let Some(hub) = hub_of(cx) {
                 hub.update(cx, |hub, _| {
@@ -386,7 +394,14 @@ pub fn open_main_window(cx: &mut App) {
         return;
     };
     let launch = hub.read(cx).launch.clone();
-    let workspace = crate::capabilities::open(launch.folders.roots(), cx.theme().is_dark(), None);
+    let mut workspace = crate::capabilities::open(
+        launch.entries.apply(launch.folders.roots()),
+        cx.theme().is_dark(),
+        None,
+    );
+    if let Some(report) = &launch.providers.on_entry_status {
+        workspace.on_entry_status(report.clone());
+    }
     let bounds = cascaded(launch.chrome, cx);
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),

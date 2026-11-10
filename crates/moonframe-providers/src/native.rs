@@ -168,6 +168,7 @@ pub(crate) fn run(context: &Context, factory: Option<Factory>) {
         return;
     }
     tracing::info!(provider = %context.name, "running");
+    context.status(moonframe_core::entries::EntryState::Ok, None);
     loop {
         if context.stopped() {
             return;

@@ -56,6 +56,7 @@ const MAX_SENDS: usize = 1024;
 const MAX_SENDS_PER_UPDATE: usize = 256;
 
 pub struct Workspace {
+    entry_statuses: Option<crate::entries::EntryStatuses>,
     roots: Roots,
     /// The components mods can `use`.
     library: Library,
@@ -223,6 +224,8 @@ pub const DEMO: &str = "demo:";
 /// the last good view instead of blanking the window.
 #[derive(Default)]
 pub struct Slot {
+    /// The last working module until the new module's first view succeeds.
+    rollback: Option<Module>,
     module: Option<Module>,
     /// The file it was last loaded from.
     source: Option<PathBuf>,
@@ -278,6 +281,7 @@ impl Workspace {
         capabilities: BTreeMap<String, bool>,
     ) -> Self {
         let mut workspace = Self {
+            entry_statuses: None,
             roots: roots.into(),
             library: Library::default(),
             components: Vec::new(),

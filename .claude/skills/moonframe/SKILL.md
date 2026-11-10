@@ -670,7 +670,7 @@ return mod {
   value at once, so it starts in step; instances too, when mounted.
 - `provider/<name>` carries a provider's data each time it publishes, for a
   mod that must react (not only redraw); views still read `app.<name>`.
-- Names are 1 to 128 of `a-z A-Z 0-9 - _ . /`; `provider/` is the
+- Names are 1 to 128 of `a-z A-Z 0-9 - _ . / :`; `provider/` is the
   providers', and `app/` the app's own (`app/inspect`, `app/notification`). Previews (the Components window) hear nothing.
 - Use a topic when several modules share a value; use `to = "<mod>"` when
   one module tells another.
@@ -1804,18 +1804,43 @@ terminal log. There are four kinds:
     provider's in-memory state on each edit would get in the way.
   - It runs sandboxed: no files, network or environment, a 64 MB memory cap,
     and an instruction budget per call.
-  - It reaches the machine only through `capabilities`. Today that is
-    `"system"`, which gives `host::system_load()`. Use this kind by default.
+  - It reaches the machine only through declared `capabilities`: built-in
+    `"system"` (`host::system_load()`) and namespaced APIs the embedding host
+    registers with `Moonframe::capability` (or `capability_async`, on `.tokio`).
+    Both WIT worlds import `host-call(capability, method, args)`; use the serde
+    helper `moonframe_provider::host_call` from `crates/moonframe-provider`.
+    Unknown manifest names fail; undeclared calls never reach the host.
+    Defaults: 1 MiB arguments/results, 5 s host-call timeout, independent of
+    Wasm fuel; configurable through `host_call_limits`. Use Wasm by default.
   - Only the running component is sandboxed. Building it runs Cargo and the
     crate's proc macros with the user's access. So never add a provider's
     source from an untrusted source without reading it, and keep its
     dependencies minimal. Something from elsewhere should come as
     `provider.wasm` alone.
     The host refuses to build a folder with a `build.rs` or a `.cargo/`.
-  - `app/providers/system` is the example. For a complete walkthrough,
+  - `app/providers/system` and `examples/capability-provider` are examples. For a complete walkthrough,
     read [Building WebAssembly (WASM) providers](https://docs.moonframe.dev/wasm-providers/)
     ([Markdown for agents](https://raw.githubusercontent.com/moonframehq/moonframe/main/docs/wasm-providers.md)):
     crate setup, the WIT interface, JSON messages, a Luau view, checks and packaging.
+  - **External miniapps on the library:** `.root(namespace, path, RootPolicy)`
+    registers policy without scanning. Select each filtered miniapp with
+    `.entry(namespace, id, path)` at launch, or clone `.entry_handle()` before
+    `.run()` and call `add_root` / `remove_root`, `add_entry` / `remove_entry`
+    from host threads. An entry contains `main.luau` and/or
+    `provider/provider.toml`. Mount `ui.mount "mshub:notes"`, read
+    `app["mshub:notes"]`, send `provider:mshub:notes`, subscribe to
+    `provider/mshub:notes`. Namespace and id use 1–48 of `a-z 0-9 - _`;
+    routing namespaces `app provider topic demo component shell parent` are
+    reserved. State keys include the namespace, also for mounted instances.
+    `kind = "native"` binds only to a compiled `.native("mshub:notes", ...)`.
+  - `RootPolicy::default()` is `PrebuiltOnly` (requires `provider.wasm`, refuses
+    `Cargo.toml`) with process/socket disabled. Use `BuildPolicy::Cargo` for
+    reviewed source; hooks remain refused. Entries reload live, including in
+    release bundles. A failed mod parse/init/first view or Wasm build/instantiate
+    keeps the last working revision. `.on_entry_status` reports name, kind,
+    ok/building/stale/failed, error and an opaque attempted-revision fingerprint.
+    Stateful entries save on clean stop and restore across rebuilds and launches
+    by namespaced identity; `--no-user` disables durable storage.
 - **`kind = "static"`, `file = "sample.json"`:** a JSON file in the
   folder, published as it is: no code runs, so it needs no approval when
   installed. It is published again when the file changes and on any

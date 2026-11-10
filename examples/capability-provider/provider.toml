@@ -1,0 +1,2 @@
+capabilities = ["example.echo"]
+kind         = "wasm"

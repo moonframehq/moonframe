@@ -29,6 +29,7 @@ mod tokens;
 // keep-sorted start
 mod component;
 mod data;
+pub mod entries;
 mod error;
 mod keys;
 mod menus;

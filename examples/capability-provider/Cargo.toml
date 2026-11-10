@@ -1,0 +1,14 @@
+[package]
+edition = "2024"
+name    = "capability-example"
+publish = false
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+moonframe-provider = { path = "../../crates/moonframe-provider" }
+serde_json         = "1"
+
+[workspace]

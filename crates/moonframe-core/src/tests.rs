@@ -14,6 +14,7 @@ mod checks;
 mod components;
 mod dictation;
 mod elements;
+mod entries;
 mod gestures;
 mod history;
 mod lightbox;

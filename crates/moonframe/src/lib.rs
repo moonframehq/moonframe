@@ -83,6 +83,8 @@ mod video;
 mod video;
 
 #[cfg(feature = "tokio")]
+pub use moonframe_providers::AsyncHostCapability;
+#[cfg(feature = "tokio")]
 pub use moonframe_providers::{AsyncNative, on_runtime, runtime, tokio};
 pub use {
     app::open_main_window,
@@ -90,8 +92,11 @@ pub use {
     host_menus::refresh_menus,
     hosted::{HostView, Messenger, ViewInit},
     launch::{LogLayer, Moonframe},
-    moonframe_core::{self, Data},
-    moonframe_providers::{Handle, Native},
+    moonframe_core::{
+        self, Data,
+        entries::{BuildPolicy, Entries, Entry, EntryKind, EntryState, EntryStatus, RootPolicy},
+    },
+    moonframe_providers::{Caller, Capabilities, Handle, HostCallLimits, HostCapability, Native},
     rust_embed,
 };
 
