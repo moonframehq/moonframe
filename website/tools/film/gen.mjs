@@ -15,7 +15,7 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.
 const WORK = process.env.FILM_WORK || path.join(REPO, "target/film");
 const OUT = path.join(WORK, "frames");
 fs.mkdirSync(OUT, { recursive: true });
-const W = 1920, H = 1080, FPS = 30, DUR = 60.0;
+const W = 1920, H = 1080, FPS = 30, DUR = 64.4;
 const SCHEDULE = process.argv[2] === "--schedule";
 const ONLY = SCHEDULE ? [] : process.argv.slice(2).map(Number);
 
@@ -102,11 +102,12 @@ function caption(t, a, b, n, eyebrow, head, sub, { x = 110, y = 128, width = 170
 const S = {
   intro: [0, 4.2], live: [4.0, 13.4], ask: [13.2, 21.6], inspect: [21.4, 27.0], comps: [26.8, 32.4],
   term: [32.2, 38.6], agents: [38.4, 43.8], sandbox: [43.6, 48.4], apps: [48.2, 55.4], outro: [55.2, 60],
+  devtools: [70, 74.6],
 };
 // The order the film plays them in. Each starts 0.2s before the previous one
 // ends, so they cross-fade; PLACE maps film time back onto a scene's clock.
 // The chapter times in website/site/index.html and film/chapters.vtt follow it.
-const ORDER = ["intro", "ask", "inspect", "agents", "live", "comps", "term", "sandbox", "apps", "outro"];
+const ORDER = ["intro", "ask", "inspect", "devtools", "agents", "live", "comps", "term", "sandbox", "apps", "outro"];
 const PLACE = {};
 {
   let at = 0;
@@ -417,6 +418,34 @@ function inspect(t) {
   return s;
 }
 
+// ---------- the Developer tools ----------
+// The pick from the inspector, opened beside the window: the dock's Source tab
+// at the line that drew the status bar (docs/screenshots/devtools.png).
+const DOCK_W = 920, DOCK_H = 1490;
+function devtools(t) {
+  const [a, b] = S.devtools;
+  const o = fadeIO(t, a, b, 0.5);
+  let s = caption(t, a, b, NUM.devtools, "Developer tools  ⌥⌘J", "Edit it where it's drawn.", "The pick's Luau opens beside the window, at the line that drew it, with the mod's state and your agent sessions.");
+  const sc = 1160 / WIN_W, ix = 110, iy = 260, iw = WIN_W * sc, ih = WIN_H * sc;
+  let r = img("window.png", ix, iy, iw, ih, { rx: 14 });
+  // The status bar, still picked from the inspector's last region.
+  const [, box] = REGIONS[REGIONS.length - 1];
+  const bx = box[0] * sc + ix, by = box[1] * sc + iy, bw = box[2] * sc, bh = box[3] * sc;
+  r += rect(bx, by, bw, bh, { rx: 6, fill: "#3b82f6", op: 0.16 }) + rect(bx, by, bw, bh, { rx: 6, stroke: "#3b82f6", sw: 3 });
+  s += g(r, { op: o });
+  // The dock slides in from the right.
+  const k = eOut(prog(t, a + 0.3, a + 1.0));
+  const dh = 760, dw = DOCK_W * (dh / DOCK_H), dx = 1330, dy = 250;
+  s += g(img("devtools.png", dx, dy, dw, dh, { rx: 14, slice: false }), { op: k * o, tx: (1 - k) * 120 });
+  // What its tabs hold, one after another.
+  const notes = [[a + 1.6, "Source, at the picked line"], [a + 2.2, "The mod's live state"], [a + 2.8, "Agent sessions that stay open"]];
+  notes.forEach(([at, label], i) => {
+    const q = eOut(prog(t, at, at + 0.4)) * o;
+    s += pill(dx - 30 - tw(label, 21, 0.52) - 74, 560 + i * 66, label, { size: 21, op: q, dot: C.sunO });
+  });
+  return s;
+}
+
 // ---------- 5. components ----------
 const COMPONENTS = fs.readdirSync(path.join(REPO, "app/components")).filter((f) => f.endsWith(".luau")).map((f) => f.slice(0, -5)).sort();
 function comps(t) {
@@ -630,13 +659,13 @@ function frame(n) {
   const t = n / FPS;
   uid = 0;
   let body = "";
-  const draw = { intro, live, ask, inspect, comps, term, agents, sandbox, apps, outro };
+  const draw = { intro, live, ask, inspect, devtools, comps, term, agents, sandbox, apps, outro };
   for (const k of ORDER) {
     const p = PLACE[k];
     if (t >= p.start && t < p.end) body += draw[k](t - p.shift);
   }
   // progress hairline
-  const bar = rect(0, H - 6, W * (t / DUR), 6, { fill: C.sunO, op: t < 4 || t > 55.2 ? 0 : 0.8 });
+  const bar = rect(0, H - 6, W * (t / DUR), 6, { fill: C.sunO, op: t < 4 || t > PLACE.outro.start ? 0 : 0.8 });
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feGaussianBlur stdDeviation="18"/><feOffset dy="16"/></filter>

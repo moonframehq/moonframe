@@ -72,8 +72,8 @@
 
   <section id="tour">
     <p class="kicker">The tour</p>
-    <h2>Moonframe in <i>sixty seconds.</i></h2>
-    <p class="lead">An app that changes when you ask it to, the inspector, coding agents, the live Luau underneath, components, terminals, the sandbox, and the apps built on it.</p>
+    <h2>Moonframe in <i>a minute.</i></h2>
+    <p class="lead">An app that changes when you ask it to, the inspector, the Developer tools, coding agents, the live Luau underneath, components, terminals, the sandbox, and the apps built on it.</p>
     <figure class="film">
       <div class="screen">
         <video class="full" controls playsinline preload="none" poster="film/film-poster.webp" aria-label="A one-minute tour of Moonframe">
@@ -83,18 +83,19 @@
         <video class="preview" muted loop playsinline preload="none" poster="film/loop-poster.webp" aria-hidden="true" hidden>
           <source src="film/loop.mp4" type="video/mp4">
         </video>
-        <button class="play" type="button" hidden><i></i>Watch the tour<span>1:00</span></button>
+        <button class="play" type="button" hidden><i></i>Watch the tour<span>1:04</span></button>
         <button class="hold" type="button" aria-pressed="false" hidden>Pause preview</button>
       </div>
       <ol class="chapters">
         <li><button type="button" data-t="4.3"><time>0:04</time>Send feedback</button></li>
         <li><button type="button" data-t="12.4"><time>0:12</time>Inspect Element</button></li>
-        <li><button type="button" data-t="17.8"><time>0:18</time>Coding agents</button></li>
-        <li><button type="button" data-t="23.0"><time>0:23</time>Under the hood</button></li>
-        <li><button type="button" data-t="32.2"><time>0:32</time>Components</button></li>
-        <li><button type="button" data-t="37.6"><time>0:38</time>Batteries included</button></li>
-        <li><button type="button" data-t="43.8"><time>0:44</time>The sandbox</button></li>
-        <li><button type="button" data-t="48.4"><time>0:48</time>Whole apps</button></li>
+        <li><button type="button" data-t="17.8"><time>0:18</time>Developer tools</button></li>
+        <li><button type="button" data-t="22.2"><time>0:22</time>Coding agents</button></li>
+        <li><button type="button" data-t="27.4"><time>0:27</time>Under the hood</button></li>
+        <li><button type="button" data-t="36.6"><time>0:37</time>Components</button></li>
+        <li><button type="button" data-t="42.0"><time>0:42</time>Batteries included</button></li>
+        <li><button type="button" data-t="48.2"><time>0:48</time>The sandbox</button></li>
+        <li><button type="button" data-t="52.8"><time>0:53</time>Whole apps</button></li>
       </ol>
       <figcaption class="cap"><b>Fig. 2</b> A stylised tour, drawn from the app's own screenshots and code, not a screen recording. The agent's steps are illustrative.</figcaption>
     </figure>
@@ -140,6 +141,10 @@ just install   # into /Applications</pre></div>
     <div class="mockfig">
       <img src="img/mockups.webp" alt="Mockups tab">
       <div><p class="kicker">Mockups</p><h3>See it before it's made.</h3><p>Ask for "three takes on the status bar" and they're drawn live, side by side, in a tab of your window. <b>Pick</b> one; nothing real changes until then.</p></div>
+    </div>
+    <div class="mockfig devfig">
+      <div><p class="kicker">Developer tools</p><h3>Edit it where it's drawn.</h3><p><kbd>⌥⌘J</kbd> docks the pick beside the window: the element and what holds it, its mod's Luau in a code editor at the line that drew it, the mod's live state, and your agent sessions. <b>⌘S</b> saves, and the window reloads in place. On in every build until you turn Developer Mode off.</p></div>
+      <img src="img/devtools.webp" alt="The Developer tools docked beside the window, on the Source tab at the picked line" loading="lazy">
     </div>
   </section>
 
