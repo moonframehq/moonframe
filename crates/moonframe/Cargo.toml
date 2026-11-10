@@ -124,8 +124,10 @@ transcripts = ["dep:moonframe-transcripts"]
 # Socket providers (`kind = "socket"`): a program that runs on its own. Off
 # by default; the starter turns it on.
 socket = ["moonframe-providers/socket"]
-# Development commands and the component gallery.
-studio = []
+# Developer Mode: development commands, the component gallery and the
+# Developer tools, whose code editor colors Luau with the Lua grammar alone
+# (`syntax` brings every language).
+studio = ["gpui-kit/tree-sitter-lua"]
 # Highlighting of code: the languages most documents show.
 syntax = [
   # keep-sorted start

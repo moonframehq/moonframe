@@ -111,11 +111,20 @@ pub enum Restart {
 }
 
 /// What a wasm provider may ask the host for.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Capability {
     /// This machine's CPU, memory, and network load.
     System,
+    Host(String),
+}
+
+impl Capability {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::System => "system",
+            Self::Host(name) => name,
+        }
+    }
 }
 
 /// The file as written, checked into a [`Manifest`].
@@ -140,18 +149,23 @@ struct File {
     #[serde(default)]
     restart: Restart,
     #[serde(default)]
-    capabilities: Vec<Capability>,
+    capabilities: Vec<String>,
     #[serde(default)]
     settings: toml::Table,
 }
 
 impl Manifest {
     pub fn load(name: &str, dir: &Path) -> Result<Self, Error> {
+        Self::load_with(name, dir, &crate::Capabilities::default())
+    }
+
+    pub fn load_with(
+        name: &str,
+        dir: &Path,
+        registry: &crate::Capabilities,
+    ) -> Result<Self, Error> {
         let problem = Error::new;
-        if !name
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"-_".contains(&byte))
-        {
+        if !moonframe_core::entries::module_name(name) {
             return Err(problem(
                 "use a-z, 0-9, - and _ in provider names".to_owned(),
             ));
@@ -160,6 +174,11 @@ impl Manifest {
         let text = fs::read_to_string(&path)
             .map_err(|error| problem(format!("cannot read {}: {error}", path.display())))?;
         let file: File = toml::from_str(&text).map_err(|error| problem(error.to_string()))?;
+        for capability in &file.capabilities {
+            if !registry.contains(capability) {
+                return Err(problem(format!("unknown capability `{capability}`")));
+            }
+        }
         let kind = match (file.kind.as_str(), file.command.is_empty()) {
             ("wasm", true) => Kind::Wasm,
             ("wasm", false) => {
@@ -294,7 +313,17 @@ impl Manifest {
             kind,
             start: file.start,
             interval: Duration::from_secs_f64(interval),
-            capabilities: file.capabilities,
+            capabilities: file
+                .capabilities
+                .into_iter()
+                .map(|name| {
+                    if name == "system" {
+                        Capability::System
+                    } else {
+                        Capability::Host(name)
+                    }
+                })
+                .collect(),
             settings,
             publish: file.publish,
             urgent: file.urgent,

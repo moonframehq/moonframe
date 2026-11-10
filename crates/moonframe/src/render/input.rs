@@ -36,10 +36,12 @@ impl<'w> Draw<'w> for Input {
                 cx,
             );
         }
+        // A disabled code editor is read only, not faded: `:disabled` rules
+        // are for fields that can't be used.
         let at = |focus| States {
             selected: false,
             focus,
-            disabled: self.disabled,
+            disabled: self.disabled && self.code.is_none(),
         };
         let colors = |part| painter.look(part, &Default::default(), false, place).base;
         let theme = cx.theme();

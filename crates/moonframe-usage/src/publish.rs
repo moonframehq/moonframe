@@ -15,6 +15,7 @@
 //! ```
 
 use {
+    crate::text::{self, english},
     herdr_usage::{
         Access, Host, Reading, Usage, UsageConfig,
         details::{ClaudeAccount, OpenaiDaily},
@@ -59,7 +60,7 @@ pub(crate) fn usage(usage: &Usage, config: &UsageConfig, host: Option<&Host>) ->
         "age": entry
             .and_then(|entry| entry.updated)
             .map(|at| now.duration_since(at).map_or(0, |since| since.as_secs() / 60)),
-        "error": entry.and_then(|entry| entry.error.clone()),
+        "error": entry.and_then(|entry| entry.error.as_ref()).map(ToString::to_string),
         "providers": providers,
         "headline": headline,
     })
@@ -75,9 +76,9 @@ fn provider(reading: &Reading, now: SystemTime) -> Value {
         "icon": icon(meta.id, meta.icon),
         "dashboard": meta.dashboard,
         "status_page": meta.status_page,
-        "email": report.and_then(|report| report.account.email.clone()),
-        "plan": report.and_then(|report| report.account.plan.clone()),
-        "error": reading.error,
+        "email": report.and_then(|report| report.account.email.as_ref()).map(english),
+        "plan": report.and_then(|report| report.account.plan.as_ref()).map(english),
+        "error": reading.error.as_ref().map(ToString::to_string),
         "access": reading.access.map(|access| match access {
             Access::Needed => "needed",
             Access::Denied => "denied",
@@ -130,7 +131,7 @@ pub(crate) fn icon(id: &str, path: Option<&str>) -> Option<&'static str> {
 pub(crate) fn window(limit: &Window, now: SystemTime) -> Value {
     let pace = limit.pace(now);
     json!({
-        "title": limit.kind.title(),
+        "title": text::title(&limit.kind),
         "kind": match limit.kind {
             Kind::Session => "session",
             Kind::Daily => "daily",
@@ -141,7 +142,7 @@ pub(crate) fn window(limit: &Window, now: SystemTime) -> Value {
         "used": fraction(limit.used),
         "left": fraction(100. - limit.used),
         "severity": severity(limit.used),
-        "label": limit.label(now),
+        "label": text::label(limit, now),
         "resets_at": limit.resets_at.map(unix),
         "resets_in": limit.resets_in(now).map(countdown),
         // Where an even spend would have left the bar of what is left:
@@ -154,7 +155,7 @@ pub(crate) fn window(limit: &Window, now: SystemTime) -> Value {
 fn balance(balance: &Balance) -> Value {
     let (unit, currency) = match &balance.unit {
         Unit::Currency(code) => (code.as_str(), true),
-        Unit::Count(name) => (name.as_str(), false),
+        Unit::Count(count) => (count.name(), false),
     };
     // Upstream amounts can be spent OR remaining; preserve their label's
     // meaning rather than claiming that every ratio is credit left.
@@ -163,7 +164,7 @@ fn balance(balance: &Balance) -> Value {
         .filter(|total| *total > 0.)
         .map(|total| (balance.amount / total).clamp(0., 1.));
     json!({
-        "label": balance.label,
+        "label": english(&balance.label),
         "amount": balance.amount,
         "total": balance.total,
         "unit": unit,
@@ -178,18 +179,18 @@ fn section(section: &Section, now: SystemTime) -> Value {
         Section::Limit(limit) => json!({ "kind": "limit", "window": window(limit, now) }),
         Section::Facts { title, facts } => json!({
             "kind": "facts",
-            "title": title,
+            "title": english(title),
             "facts": facts
                 .iter()
-                .map(|(label, value)| json!({ "label": label, "value": value }))
+                .map(|(label, value)| json!({ "label": english(label), "value": english(value) }))
                 .collect::<Vec<_>>(),
         }),
         Section::Shares { title, shares } => json!({
             "kind": "shares",
-            "title": title,
+            "title": english(title),
             "shares": shares
                 .iter()
-                .map(|(label, share)| json!({ "label": label, "share": fraction(*share) }))
+                .map(|(label, share)| json!({ "label": english(label), "share": fraction(*share) }))
                 .collect::<Vec<_>>(),
         }),
     }

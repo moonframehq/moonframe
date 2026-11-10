@@ -308,7 +308,7 @@ Packages ship source only, so everything they run can be read first.
 | Code | Runs | Can reach |
 |---|---|---|
 | Mods (Luau) | in the host's Luau sandbox, with memory and instruction caps | only the elements and providers the host offers |
-| WASM providers (`kind = "wasm"`) | on [wasmtime](https://wasmtime.dev), with 64 MiB and a fresh instruction budget per call | only the host calls listed under `capabilities` in `provider.toml` (today `system`, the machine's load) |
+| WASM providers (`kind = "wasm"`) | on [wasmtime](https://wasmtime.dev), with 64 MiB and a fresh instruction budget per call | only declared capabilities: built-in `system` and namespaced APIs registered by the embedding host |
 | Process and native providers | as your user | anything you can: git, forges, coding agents, your files |
 
 Write a provider as a WASM component if it only shapes data or if it comes
@@ -330,6 +330,15 @@ default (see [docs/library.md](docs/library.md)).
 **Build one:** [Building WebAssembly (WASM) providers](https://docs.moonframe.dev/wasm-providers/)
 walks through a complete Rust component, Luau messages, live reload and
 packaging, for people and coding agents. [Markdown source](docs/wasm-providers.md).
+
+**Embedding miniapps:** register `.capability("mshub.entities", handler)` and
+`.root("mshub", path, RootPolicy::default())`, then select entries with
+`.entry(...)` or the runtime `entry_handle()`. An entry's `main.luau` mounts as
+`ui.mount "mshub:notes"`; its `provider/provider.toml` publishes as
+`app["mshub:notes"]`. Roots default to prebuilt Wasm with process/socket kinds
+disabled. `on_entry_status` reports builds and stale revisions; failed Wasm
+builds keep the old worker running. Stateful entry providers survive clean
+restarts. See [the miniapp API and guest SDK](docs/wasm-providers.md#host-defined-capabilities-and-external-miniapps).
 
 ## Whole apps as profiles
 

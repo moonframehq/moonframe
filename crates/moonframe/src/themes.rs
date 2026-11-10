@@ -12,8 +12,9 @@ pub(crate) mod omarchy;
 
 use {
     gpui_kit::{
-        SharedString,
-        component::{ThemeConfig, ThemeConfigColors, ThemeMode},
+        Hsla, SharedString,
+        component::{ThemeConfig, ThemeConfigColors, ThemeMode, highlighter::HighlightTheme},
+        rgb,
     },
     moonframe_core::Data,
     std::{collections::BTreeMap, sync::LazyLock},
@@ -393,8 +394,30 @@ impl Scheme {
                 ThemeMode::Light
             },
             colors,
+            highlight: Some(self.highlight()),
             ..ThemeConfig::default()
         }
+    }
+
+    /// The code editor's colors: gpui-kit's own syntax colors for a light
+    /// or a dark theme, on this scheme's background. Without them the
+    /// editor keeps the highlight theme set before, the stock light one,
+    /// and draws white in a dark window.
+    fn highlight(&self) -> gpui_kit::component::highlighter::HighlightThemeStyle {
+        let stock = if self.dark() {
+            HighlightTheme::default_dark()
+        } else {
+            HighlightTheme::default_light()
+        };
+        let mut style = stock.style.clone();
+        let hsla = |value: u32| -> Hsla { rgb(value).into() };
+        style.editor_background = Some(hsla(self.background));
+        style.editor_foreground = Some(hsla(self.foreground));
+        style.editor_active_line = Some(hsla(mix(self.background, self.foreground, 6)));
+        style.editor_line_number = Some(hsla(mix(self.background, self.foreground, 45)));
+        style.editor_active_line_number = Some(hsla(self.foreground));
+        style.editor_gutter_background = Some(hsla(self.background));
+        style
     }
 }
 

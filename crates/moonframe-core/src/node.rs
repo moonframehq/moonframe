@@ -18,13 +18,14 @@ mod layout;
 mod map;
 mod pointer;
 mod read;
+mod revision_timeline;
 mod tokens;
 mod video;
 // keep-sorted end
 
 pub use {
-    embed::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*, tokens::*,
-    video::*,
+    embed::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*,
+    revision_timeline::*, tokens::*, video::*,
 };
 
 pub(crate) use read::read;
@@ -42,6 +43,7 @@ pub enum Node {
     Image(Image),
     Line(Line),
     Paths(Paths),
+    RevisionTimeline(RevisionTimeline),
     Hatch(Hatch),
     /// A street map from a tile provider, with pins and routes.
     Map(Map),

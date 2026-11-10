@@ -256,6 +256,11 @@ fn describe(node: &Node) -> String {
         Node::Image(image) => format!("image{} {}", classes(&image.look), quote(&image.src)),
         Node::Line(line) => format!("line{} ({} points)", classes(&line.look), line.points.len()),
         Node::Paths(paths) => format!("paths{} ({})", classes(&paths.look), paths.paths.len()),
+        Node::RevisionTimeline(timeline) => format!(
+            "revision_timeline{} ({})",
+            classes(&timeline.look),
+            timeline.entries.len()
+        ),
         Node::Hatch(hatch) => format!("hatch{}", classes(&hatch.look)),
         Node::Map(map) => format!("map{} {}", classes(&map.look), map.provider.name()),
         Node::Terminal(terminal) => format!(
@@ -339,6 +344,7 @@ fn line(node: &Node) -> Option<u32> {
         Node::Image(image) => image.look.line,
         Node::Line(line) => line.look.line,
         Node::Paths(paths) => paths.look.line,
+        Node::RevisionTimeline(timeline) => timeline.look.line,
         Node::Hatch(hatch) => hatch.look.line,
         Node::Map(map) => map.look.line,
         Node::Terminal(terminal) => terminal.look.line,

@@ -18,6 +18,29 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.divider()` | a line across the parent's axis | |
 | `ui.spacer()` | take the free space, to push what follows to the far end | |
 
+### Namespaced mods and providers
+
+Embedding apps can select miniapps outside `app_dir` with `Moonframe::root`
+and `entry`, or `entry_handle().add_entry(namespace, id, path)` at runtime.
+Roots set policy without scanning. An entry holds `main.luau` and/or
+`provider/provider.toml`: mount `ui.mount "mshub:notes"` (or give it an `id`
+for independent instance state), read `app["mshub:notes"]`, send to
+`"provider:mshub:notes"`, and subscribe to `"provider/mshub:notes"`.
+Saved mod/instance state includes the namespace. Namespace and id each use
+1–48 of `a-z 0-9 - _`; `app provider topic demo component shell parent` are
+reserved namespaces. `remove_entry` / `remove_root` unload them without
+erasing saved state.
+
+Prefer sandboxed Wasm for end-user providers. The host registers namespaced
+JSON capabilities with `capability` / `capability_async`; a guest declares them
+in `provider.toml` and calls `moonframe_provider::host_call` from the Rust SDK.
+`RootPolicy::default()` accepts only prebuilt Wasm (no Cargo crate) and disables
+process/socket kinds. Native providers are compiled into the host and bind by
+the full entry name. Entry files reload live, failed replacement mods or Wasm
+builds retain the old revision, and `on_entry_status` reports progress/errors.
+Stateful entry providers survive clean restarts. See `docs/wasm-providers.md`
+for the API, limits, caller identity and build policies.
+
 ### Content
 
 | Element | Use it for | Keys |
@@ -36,11 +59,30 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 
 ### Controls
 
+`ui.revision_timeline { entries = { { id = "r1", day = "Today", label = "10:30" } }, selected = "r1", select = "pick" }`
+is a native, right-aligned Time Machine ruler. Nearby ticks smoothly magnify like the Dock.
+Entries are ordered top to bottom; adjacent equal `day`s form groups. Clicking selects a revision;
+after focusing it, Up/Down choose revisions, Shift-Up/Down jump days, and Home/End reach either end.
+The wheel scrolls long histories. `select` receives `revision` (stable id), `index` (one-based),
+`day` and `label`. Also takes `id`, `to`, `width` (240), `height` (420), `grow`, `disabled`,
+`class`, `style`, `state`. Up to 10000 unique ids. Style with `revision-timeline` (`color` is
+the selected tick); respects `animation_speed`, including 0. Use `revision-timeline` for a gallery demo.
+
+The same element supports compact chat rails: `side = "left"`, `dates = false`,
+`labels = "hover"`, `preview = true`. Entries need only `id` and `label`; optional `day`
+groups revisions, and `summary` adds up to three lines to the preview card.
+`labels` is `all` (day groups and active label), `active` (hover or selection), `hover`, or `none`.
+`width` includes room for labels/cards; `tick_width` (default 12, 1–128 px) controls the rail itself.
+Also configurable: `tick_height` (2, 0.5–16 px), `spacing` (9, 4–64 px),
+`magnification` (4.5, 1–10; 1 disables it), `radius` (4.5, 1–20 neighbours), and
+`spread` (1.8, 0–5; 0 keeps centers fixed). `side` defaults to `right`, `dates` to true,
+and `preview` to false. Preview cards are noninteractive and stay inside the component's box.
+
 | Element | Use it for | Keys |
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
-| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there) |
+| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers; read only with `disabled`, not dimmed) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there) |
 
 ### Overlays
 

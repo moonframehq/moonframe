@@ -130,7 +130,7 @@ impl Slot {
     fn loaded(&mut self, loaded: Result<Module, Error>, lost: Option<Error>) {
         match loaded {
             Ok(module) => {
-                self.module = Some(module);
+                self.rollback = self.module.replace(module);
                 self.fresh = true;
                 self.dirty = true;
                 self.load_error = None;
@@ -190,6 +190,7 @@ impl Slot {
             .and_then(|rules| Ok((rules, module.view(app, sheet, &self.lists)?)))
         {
             Ok((rules, (view, broken, reads))) => {
+                self.rollback = None;
                 self.rules = rules;
                 self.view = Some(view);
                 self.broken = broken;
@@ -201,6 +202,11 @@ impl Slot {
                 });
             },
             Err(error) => {
+                if let Some(previous) = self.rollback.take() {
+                    self.module = Some(previous);
+                    self.load_error = Some(error.clone());
+                    self.fresh = false;
+                }
                 self.view_error = Some(error);
                 // Tried again on the next render, whatever changes.
                 self.drawn = None;

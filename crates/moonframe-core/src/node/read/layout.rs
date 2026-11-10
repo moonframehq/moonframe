@@ -292,7 +292,7 @@ impl Build for Mount {
         let name: String = fields.need("mod")?;
         // A mod's name is its folder's, never a path: an instance loads
         // `mods/<name>/main.luau`.
-        if !crate::style::valid_name(&name) {
+        if !crate::entries::module_name(&name) {
             return Err(fields
                 .cx()
                 .key("mod")

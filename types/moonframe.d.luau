@@ -837,6 +837,35 @@ type LineProps = {
 	height: number?,
 }
 
+-- Time Machine-style vertical ruler, with native Dock-like magnification.
+type RevisionTimelineProps = {
+	id: string?,
+	entries: { { id: string, day: string?, label: string, summary: string? } },
+	selected: string?,
+	-- Sent with one-based index, revision (id), day and label added.
+	select: any?,
+	to: string?,
+	width: number?,
+	height: number?,
+	grow: boolean?,
+	disabled: boolean?,
+	tick_width: number?,
+	tick_height: number?,
+	spacing: number?,
+	-- Ordinary tick's peak width multiplier; 1 disables magnification.
+	magnification: number?,
+	-- Number of neighbours affected on either side; spread controls vertical expansion.
+	radius: number?,
+	spread: number?,
+	side: ("left" | "right")?,
+	labels: ("all" | "active" | "hover" | "none")?,
+	dates: boolean?,
+	preview: boolean?,
+	class: Class?,
+	style: Style?,
+	state: string?,
+}
+
 -- Lines through points the view places itself, in pixels from the box's
 -- top-left corner: arrows between dependent bars on a timeline, the
 -- connectors of a diagram. Each line is stroked in its `color`, else the
@@ -1041,7 +1070,8 @@ type InputProps = {
 	-- Keep the caret's line in the middle of the field (needs `multiline`).
 	typewriter: boolean?,
 	-- A code editor for this language (needs `multiline`): `"luau"`,
-	-- `"rust"`, ...; colored as typed, with line numbers.
+	-- `"rust"`, ...; colored as typed, with line numbers. With `disabled`
+	-- it is read only, not dimmed: its text can be selected and copied.
 	code: string?,
 	-- A code editor's caret goes to this line (from 1), scrolled into view,
 	-- when it changes or the field takes a new `value`.
@@ -1300,6 +1330,7 @@ declare ui: {
 	image: (props: string | ImageProps) -> Element,
 	line: (props: LineProps) -> Element,
 	paths: (props: PathsProps) -> Element,
+	revision_timeline: (props: RevisionTimelineProps) -> Element,
 	hatch: (props: HatchProps) -> Element,
 	map: (props: MapProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,

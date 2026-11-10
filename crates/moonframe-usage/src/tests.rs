@@ -5,7 +5,7 @@ mod ui;
 use {
     super::*,
     herdr_usage::{
-        Reading,
+        Error, Reading, Text,
         model::{Account, Balance, Kind, Report, Section, Unit, WEEK, Window},
     },
     serde_json::json,
@@ -78,7 +78,7 @@ fn a_window_reads_as_fractions_and_countdowns() {
 #[test]
 fn a_window_without_a_reset_has_no_pace() {
     let out = publish::window(
-        &Window::new(Kind::Named("Opus".into()), 85., None, None),
+        &Window::new(Kind::Named(Text::service("Opus")), 85., None, None),
         SystemTime::now(),
     );
     assert_eq!(out["severity"], "critical");
@@ -112,8 +112,8 @@ fn a_reading_publishes_its_tightest_window_and_details() {
     let report = Report::new(
         claude(),
         Account {
-            email: Some("me@example.com".into()),
-            plan: Some("Max".into()),
+            email: Some(Text::service("me@example.com")),
+            plan: Some(Text::service("Max")),
         },
         vec![
             Window::new(
@@ -125,15 +125,20 @@ fn a_reading_publishes_its_tightest_window_and_details() {
             Window::new(Kind::Session, 10., None, None),
         ],
     )
-    .with_balances([Balance::new("Extra usage", 5., Unit::Currency("USD".into())).out_of(20.)])
+    .with_balances([Balance::new(
+        Text::service("Extra usage"),
+        5.,
+        Unit::Currency("USD".into()),
+    )
+    .out_of(20.)])
     .with_sections([Section::Shares {
-        title: "By surface".into(),
-        shares: vec![("Claude Code".into(), 75.)],
+        title: Text::service("By surface"),
+        shares: vec![(Text::service("Claude Code"), 75.)],
     }]);
     let usage = Usage::showing(Host::Local, vec![Reading {
         provider: claude(),
         report: Some(report),
-        error: Some("rate limited".into()),
+        error: Some(Error::RateLimited.into()),
         access: None,
     }]);
     let out = publish::usage(&usage, &UsageConfig::default(), Some(&Host::Local));
@@ -159,10 +164,10 @@ fn balance_fractions_keep_spending_and_credit_labels_without_claiming_left() {
     let provider = registry::find("deepinfra").unwrap();
     let usd = Unit::Currency("USD".into());
     let report = Report::new(provider, Account::default(), vec![]).with_balances([
-        Balance::new("Billing cycle spend", 12., usd.clone()).out_of(50.),
-        Balance::new("Credits left", 38., usd.clone()).out_of(50.),
-        Balance::new("Uncapped", 12., usd.clone()),
-        Balance::new("Zero budget", 12., usd).out_of(0.),
+        Balance::new(Text::service("Billing cycle spend"), 12., usd.clone()).out_of(50.),
+        Balance::new(Text::service("Credits left"), 38., usd.clone()).out_of(50.),
+        Balance::new(Text::service("Uncapped"), 12., usd.clone()),
+        Balance::new(Text::service("Zero budget"), 12., usd).out_of(0.),
     ]);
     let usage = Usage::showing(Host::Local, vec![Reading {
         provider,
@@ -241,4 +246,18 @@ fn the_shipped_settings_load() {
         .unwrap();
     let settings = serde_json::to_value(&manifest["settings"]).unwrap();
     config(&settings).unwrap();
+}
+
+#[test]
+fn messages_a_provider_names_are_written_in_english() {
+    assert_eq!(text::english(&Text::message("usage-report-usage")), "Usage");
+    let credits = Text::message("usage-alibabatokenplan-credits-of")
+        .arg("used", 12)
+        .arg("total", Text::service("50"));
+    assert_eq!(text::english(&credits), "12 / 50 credits");
+    assert_eq!(
+        text::english(&Text::message("usage-no-such")),
+        "usage-no-such"
+    );
+    assert_eq!(text::english(&Text::service("Opus")), "Opus");
 }

@@ -287,6 +287,7 @@ impl<'w> Painter<'w> {
             Node::Panel(panel) => self.panel(panel, place),
             Node::Split(split) => self.split(split, place),
             Node::List(list) => self.list(list, place),
+            Node::RevisionTimeline(_) => self.not_here_named("ui.revision_timeline", place),
             Node::Region(region) => self.region(region, place),
             Node::Mount(name) => self.slot(name, place),
             Node::Instance(instance) => match self.ui.workspace.instance(place.owner, instance) {

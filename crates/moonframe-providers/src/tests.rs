@@ -56,7 +56,7 @@ fn manifests_are_checked() {
         (
             "f",
             "kind = 'process'\ncommand = ['x']\ncapabilities = ['network']",
-            "unknown variant",
+            "unknown capability",
         ),
         (
             "g",

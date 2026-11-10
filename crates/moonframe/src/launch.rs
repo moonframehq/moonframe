@@ -1,6 +1,8 @@
 //! [`Moonframe`]: how an app built on this library says who it is and what
 //! it adds, then runs.
 
+mod entries;
+
 use {
     crate::{
         Identity,
@@ -23,6 +25,9 @@ use {
 /// [keeps](Self::keep) them), the packages the user installed, the app's
 /// own folder, and the user's `~/.config/<name>` on top.
 pub struct Moonframe {
+    pub(crate) entries: moonframe_core::entries::Entries,
+    pub(crate) providers: moonframe_providers::ProviderOptions,
+    pub(crate) errors: Vec<String>,
     pub(crate) identity: Identity,
     pub(crate) app: Option<AppSource>,
     pub(crate) assets: Option<Arc<dyn AssetSource>>,
@@ -64,6 +69,9 @@ impl Moonframe {
         identity.hosted = true;
         identity.updates = None;
         Self {
+            entries: Default::default(),
+            providers: Default::default(),
+            errors: Vec::new(),
             log: format!("error,moonframe=info,{}=info", name.replace('-', "_")),
             identity,
             app: None,
@@ -266,6 +274,12 @@ impl Moonframe {
     /// Reads the command line and runs: the window, or `--check`, `mod`,
     /// `app`, `init` and `bundle`. Returns once the app quits.
     pub fn run(self) -> ExitCode {
+        if !self.errors.is_empty() {
+            for error in &self.errors {
+                eprintln!("{error}");
+            }
+            return ExitCode::FAILURE;
+        }
         crate::cli::main(self)
     }
 }

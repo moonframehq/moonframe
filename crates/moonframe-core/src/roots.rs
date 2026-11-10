@@ -27,6 +27,7 @@ use std::{
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Roots {
     layers: Vec<Layer>,
+    entries: BTreeMap<String, crate::entries::Entry>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -105,12 +106,16 @@ impl Roots {
             )
             .chain([Layer::new(app.path, Role::App)])
             .collect();
-        Self { layers }
+        Self {
+            layers,
+            entries: BTreeMap::new(),
+        }
     }
 
     /// App folders, `layers` lowest first.
     pub fn new(layers: impl IntoIterator<Item = PathBuf>) -> Self {
         Self {
+            entries: BTreeMap::new(),
             layers: layers
                 .into_iter()
                 .map(|path| Layer::new(path, Role::App))
@@ -133,7 +138,10 @@ impl Roots {
             )
             .chain(user.map(|path| Layer::new(path, Role::App)))
             .collect();
-        Self { layers }
+        Self {
+            layers,
+            entries: BTreeMap::new(),
+        }
     }
 
     /// A profile: `builtin`, the profile's `packages`, its `app` package
@@ -163,7 +171,10 @@ impl Roots {
             .chain(global.map(|path| Layer::new(path, Role::Style)))
             .chain([Layer::new(profile, Role::App)])
             .collect();
-        Self { layers }
+        Self {
+            layers,
+            entries: BTreeMap::new(),
+        }
     }
 
     /// An app built on the library: `toolbox` (the built-in app, which
@@ -189,7 +200,10 @@ impl Roots {
         )
         .chain(user.map(|path| Layer::new(path, Role::App)))
         .collect();
-        Self { layers }
+        Self {
+            layers,
+            entries: BTreeMap::new(),
+        }
     }
 
     /// These roots with the layer at `from` read from `to` instead: to load
@@ -240,6 +254,9 @@ impl Roots {
     /// Every layer's `main.luau` for the mod `name`, highest first: under
     /// `mods/<name>/`, or the root of a single-mod package of that name.
     pub fn mod_candidates(&self, name: &str) -> Vec<PathBuf> {
+        if let Some(entry) = self.entries.get(name) {
+            return vec![entry.mod_file()];
+        }
         // Only a mod name, never a path out of the `mods` folders.
         if !crate::style::valid_name(name) {
             return Vec::new();
@@ -306,7 +323,25 @@ impl Roots {
                 }
             }
         }
+        for (name, entry) in &self.entries {
+            let path = match dir {
+                "mods" => entry.path.clone(),
+                "providers" => entry.provider_dir(),
+                _ => continue,
+            };
+            if path.join(marker).is_file() {
+                found.insert(name.clone(), path);
+            }
+        }
         found
+    }
+
+    pub fn set_entries(&mut self, entries: BTreeMap<String, crate::entries::Entry>) {
+        self.entries = entries;
+    }
+
+    pub fn external_entries(&self) -> &BTreeMap<String, crate::entries::Entry> {
+        &self.entries
     }
 
     /// Each file `dir/<name>.<extension>`, by name; a higher layer's file

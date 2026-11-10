@@ -19,6 +19,13 @@ interface host {
     // fractions from 0 to 1 except bytes and bytes per second. Only for
     // providers whose provider.toml grants `capabilities = ["system"]`.
     system-load: func() -> result<string, string>;
+
+    // Calls a host-registered capability declared in provider.toml. JSON in
+    // and out; undeclared/unknown names, size limits (default 1 MiB), and
+    // timeout (default 5 seconds) return errors to the guest. Host time does
+    // not consume Wasm fuel. Identity comes from the loader, not from args.
+    host-call: func(capability: string, method: string, args: string)
+        -> result<string, string>;
 }
 
 world provider {
@@ -40,8 +47,9 @@ world provider {
 world stateful-provider {
     include provider;
 
-    // Called as this build stops, to hand its state to the next one: any
-    // text, usually JSON. None keeps nothing.
+    // Called as this build stops, to hand its state to the next one: up to
+    // 1 MiB of text, usually JSON. Namespaced entries also keep it across
+    // clean app restarts, keyed by name. None keeps nothing new.
     export save: func() -> option<string>;
 
     // Called on a new build after `start` and before the first `tick`, with

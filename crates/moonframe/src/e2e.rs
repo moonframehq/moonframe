@@ -9,6 +9,7 @@
 mod both_backends;
 mod host_views;
 mod regressions;
+mod revision_timeline;
 mod windows;
 
 use {
@@ -85,6 +86,8 @@ fn open_with(cx: &mut TestAppContext, dir: TempDir, views: Registry) -> Window<'
             &workspace,
             Natives::default(),
             Launch {
+                entries: Default::default(),
+                providers: Default::default(),
                 folders: folders.clone(),
                 backends: backends.clone(),
                 views: views.clone(),

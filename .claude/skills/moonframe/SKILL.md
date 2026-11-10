@@ -670,7 +670,7 @@ return mod {
   value at once, so it starts in step; instances too, when mounted.
 - `provider/<name>` carries a provider's data each time it publishes, for a
   mod that must react (not only redraw); views still read `app.<name>`.
-- Names are 1 to 128 of `a-z A-Z 0-9 - _ . /`; `provider/` is the
+- Names are 1 to 128 of `a-z A-Z 0-9 - _ . / :`; `provider/` is the
   providers', and `app/` the app's own (`app/inspect`, `app/notification`). Previews (the Components window) hear nothing.
 - Use a topic when several modules share a value; use `to = "<mod>"` when
   one module tells another.
@@ -1167,6 +1167,7 @@ Text-like elements take their main value positionally:
 | `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
+| `ui.revision_timeline { entries = { { id = "r1", day = "Today", label = "10:30" } }, select = "pick" }` | `entries`, `selected`, `select`, `to`, `id`, `width`, `height`, `grow`, `disabled`, `class`, `style`, `state` | native right-aligned revision ruler, with Dock-like pointer magnification; clicks and keyboard navigation choose revisions or days; `select` adds `revision`, `index`, `day`, `label` |
 | `ui.badge "..."` | `text`, `tone`, extras | pill |
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
@@ -1332,7 +1333,7 @@ Picking a font for the user:
 
 **Selectors.**
 - An element type: `row` `column` `panel` `panel-header` `pane` `text`
-  `button` `item` `badge` `icon` `image` `line` `hatch` `terminal` `browser` `input` `markdown` `markdown-code` `markdown-quote` `divider` `popover` `tooltip`
+  `button` `item` `badge` `icon` `image` `line` `hatch` `revision-timeline` `terminal` `browser` `input` `markdown` `markdown-code` `markdown-quote` `divider` `popover` `tooltip`
   `overlay` `overlay-backdrop`. `panel-header` is a panel's title bar;
   `tooltip` is every tooltip's box; `overlay-backdrop` is what dims the
   window behind an overlay with `backdrop = true` (its `background` and
@@ -1803,18 +1804,43 @@ terminal log. There are four kinds:
     provider's in-memory state on each edit would get in the way.
   - It runs sandboxed: no files, network or environment, a 64 MB memory cap,
     and an instruction budget per call.
-  - It reaches the machine only through `capabilities`. Today that is
-    `"system"`, which gives `host::system_load()`. Use this kind by default.
+  - It reaches the machine only through declared `capabilities`: built-in
+    `"system"` (`host::system_load()`) and namespaced APIs the embedding host
+    registers with `Moonframe::capability` (or `capability_async`, on `.tokio`).
+    Both WIT worlds import `host-call(capability, method, args)`; use the serde
+    helper `moonframe_provider::host_call` from `crates/moonframe-provider`.
+    Unknown manifest names fail; undeclared calls never reach the host.
+    Defaults: 1 MiB arguments/results, 5 s host-call timeout, independent of
+    Wasm fuel; configurable through `host_call_limits`. Use Wasm by default.
   - Only the running component is sandboxed. Building it runs Cargo and the
     crate's proc macros with the user's access. So never add a provider's
     source from an untrusted source without reading it, and keep its
     dependencies minimal. Something from elsewhere should come as
     `provider.wasm` alone.
     The host refuses to build a folder with a `build.rs` or a `.cargo/`.
-  - `app/providers/system` is the example. For a complete walkthrough,
+  - `app/providers/system` and `examples/capability-provider` are examples. For a complete walkthrough,
     read [Building WebAssembly (WASM) providers](https://docs.moonframe.dev/wasm-providers/)
     ([Markdown for agents](https://raw.githubusercontent.com/moonframehq/moonframe/main/docs/wasm-providers.md)):
     crate setup, the WIT interface, JSON messages, a Luau view, checks and packaging.
+  - **External miniapps on the library:** `.root(namespace, path, RootPolicy)`
+    registers policy without scanning. Select each filtered miniapp with
+    `.entry(namespace, id, path)` at launch, or clone `.entry_handle()` before
+    `.run()` and call `add_root` / `remove_root`, `add_entry` / `remove_entry`
+    from host threads. An entry contains `main.luau` and/or
+    `provider/provider.toml`. Mount `ui.mount "mshub:notes"`, read
+    `app["mshub:notes"]`, send `provider:mshub:notes`, subscribe to
+    `provider/mshub:notes`. Namespace and id use 1–48 of `a-z 0-9 - _`;
+    routing namespaces `app provider topic demo component shell parent` are
+    reserved. State keys include the namespace, also for mounted instances.
+    `kind = "native"` binds only to a compiled `.native("mshub:notes", ...)`.
+  - `RootPolicy::default()` is `PrebuiltOnly` (requires `provider.wasm`, refuses
+    `Cargo.toml`) with process/socket disabled. Use `BuildPolicy::Cargo` for
+    reviewed source; hooks remain refused. Entries reload live, including in
+    release bundles. A failed mod parse/init/first view or Wasm build/instantiate
+    keeps the last working revision. `.on_entry_status` reports name, kind,
+    ok/building/stale/failed, error and an opaque attempted-revision fingerprint.
+    Stateful entries save on clean stop and restore across rebuilds and launches
+    by namespaced identity; `--no-user` disables durable storage.
 - **`kind = "static"`, `file = "sample.json"`:** a JSON file in the
   folder, published as it is: no code runs, so it needs no approval when
   installed. It is published again when the file changes and on any
@@ -2332,6 +2358,24 @@ For that:
   them.
 
 ## Extending the host
+
+**Revision selection.** `use "revision-timeline"` (or `ui.revision_timeline`)
+draws a native Time Machine-style ruler, with Dock-like magnification in Rust.
+Pass ordered `entries = { { id, day, label } }`, a stable `selected` id and
+`select = "pick"`; the message adds `revision`, one-based `index`, `day` and
+`label`. Adjacent equal days group together. Up/Down select revisions,
+Shift-Up/Down jump days, Home/End reach the ends; the wheel scrolls long
+histories. Takes `width`, `height`, `grow`, `disabled`, `id`, `to` and look
+keys. Style the `revision-timeline` selector; its `color` sets the selected
+tick. Animation follows `animation_speed` (0 disables it).
+
+For a compact chat rail, use the same element with `side = "left"`,
+`tick_width = 6`, `magnification = 4`, `radius = 3`, `spread = 0`,
+`dates = false`, `labels = "hover"`, `preview = true`. Entries may omit
+`day` and add `summary` for a three-line preview. `width` includes label/card
+space; `tick_width`, `tick_height` and `spacing` size the rail independently.
+`labels` can be `all`, `active`, `hover` or `none`; `magnification = 1`
+turns off the lens. The gallery demo has both configurations and live controls.
 
 **In an app built on the library** (a crate whose `main` calls
 `moonframe::Moonframe::new(...)`, with its own `app/` folder; see

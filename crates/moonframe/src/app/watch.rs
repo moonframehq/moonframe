@@ -24,7 +24,11 @@ pub(super) fn watching(
 ) -> Option<RecommendedWatcher> {
     // The watcher reports from a thread of its own, which the deterministic
     // scheduler of `e2e` refuses.
-    if cfg!(test) || (paths::in_bundle() && crate::release()) {
+    if cfg!(test)
+        || (paths::in_bundle()
+            && crate::release()
+            && workspace.roots().external_entries().is_empty())
+    {
         return None;
     }
     watch(workspace, folders, cx)
@@ -49,6 +53,14 @@ fn watch(
     let layers: Vec<PathBuf> = workspace
         .roots()
         .layers()
+        .filter(|_| !(paths::in_bundle() && crate::release()))
+        .chain(
+            workspace
+                .roots()
+                .external_entries()
+                .values()
+                .map(|entry| entry.path.as_path()),
+        )
         .filter(|layer| layer.is_dir())
         .map(Path::to_owned)
         .collect();
@@ -67,6 +79,13 @@ fn watch(
                 .unwrap_or_else(|_| layer.clone())
                 .join("providers")
         })
+        .chain(
+            workspace
+                .roots()
+                .external_entries()
+                .values()
+                .map(|entry| resolved(&entry.provider_dir())),
+        )
         .collect();
     let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
         let Ok(event) = event else {

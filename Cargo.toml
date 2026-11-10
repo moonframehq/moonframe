@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["app/providers"]
+exclude = ["app/providers", "crates/moonframe-provider"]
 members = [
   "crates/moonframe",
   "crates/moonframe-acp",
@@ -36,7 +36,7 @@ license      = "MIT"
 publish      = false
 repository   = "https://github.com/moonframehq/moonframe"
 rust-version = "1.99"
-version      = "0.3.0"
+version      = "0.3.1"
 
 [workspace.lints.rust]
 unsafe_code           = "deny"
@@ -64,18 +64,19 @@ gpui-kit = "=0.8.1"
 latex-rust = { default-features = false, features = ["std"], version = "3.0" }
 markdown   = "1.0"
 tokio      = { default-features = false, version = "1.54" }
-# Crates of herdr-gpui (to be renamed), pinned to one commit. To work on
-# them beside this app, patch them to a local checkout:
+# Crates of herdr-gpui, now named sheprd-* there but kept under their herdr-*
+# names here, pinned to one commit. To work on them beside this app, patch
+# them to a local checkout:
 #   [patch."https://github.com/penso/herdr-gpui"]
-#   herdr-core-client = { path = "../herdr-gpui/crates/herdr-core-client" }
+#   sheprd-core-client = { path = "../herdr-gpui/crates/sheprd-core-client" }
 core-graphics-types = "0.2"
-herdr-chat-protocol = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-client        = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-core-client   = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-credentials   = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-github        = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-usage         = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
-herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", rev = "9133cb18b143c9b3f12777fe69e3058eb4ecc8bf" }
+herdr-chat-protocol = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-chat-protocol", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
+herdr-core-client   = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-core-client", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
+herdr-credentials   = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-credentials", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
+herdr-github        = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-github", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
+herdr-i18n          = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-i18n", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
+herdr-usage         = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-usage", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
+herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-vcs", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
 # What GPUI's `RenderImage` is built from, for a turned `ui.map`'s picture.
 image = { default-features = false, version = "0.25" }
 # `ui.image` zooms by the picture's own size, read from its header.
@@ -121,7 +122,7 @@ raw-window-handle        = "0.6"
 # Pre-release: Rune asks apps to pin a revision of `dev`, which is never rewritten.
 rune     = { git = "https://github.com/anomalyco/rune", rev = "a8ca769b944598e179f33cc6843629b90e6ca831" }
 rune-kit = { features = ["markdown"], git = "https://github.com/anomalyco/rune", rev = "a8ca769b944598e179f33cc6843629b90e6ca831" }
-rusqlite = { features = ["bundled"], version = "0.40" }
+rusqlite = { features = ["bundled"], version = "0.41" }
 # Swapping a saved file into place atomically (moonframe-docs).
 rust-embed = { features = ["include-exclude"], version = "8.7" }
 # Tokens kept redacted in memory (moonframe-forge), as herdr-credentials reads them.

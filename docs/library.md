@@ -7,6 +7,11 @@ fork this repository.
 
 ## Start one
 
+For sandboxed, end-user miniapps outside `app_dir`, see
+[host capabilities and runtime entries](wasm-providers.md#host-defined-capabilities-and-external-miniapps):
+`Moonframe::capability`, `root`, `entry`, `entry_handle`, `on_entry_status`,
+and the serde guest SDK. Native providers remain code compiled into the host.
+
 ```sh
 moonframe init ~/code/notes                 # a new crate: Cargo.toml, src/main.rs, app/
 moonframe init ~/code/herdr --name herdr    # an existing crate: app/ and docs only
@@ -91,7 +96,7 @@ ship only their selected components.
 | `markdown` | Rich `ui.markdown` rendering (headings, lists, tables, links and code). |
 | `prose` | The writing editor for `ui.input` with `prose`, `dim` or `typewriter`. Ordinary single-line and multiline inputs remain available without it. |
 | `sealed` | Staged app resources instead of the full embedded toolbox. |
-| `studio` | Developer Mode: Inspect Element, the Developer tools (with `syntax` to color their code editor), Reload Modules and the component gallery. Without it the app is always in release mode. |
+| `studio` | Developer Mode: Inspect Element, the Developer tools (their code editor colors Luau), Reload Modules and the component gallery. Without it the app is always in release mode. |
 | `updates` | Release checks, downloads and in-place app updates. Omitting it hides the updater menu and disables automatic checks. |
 | `acp`, `chat`, `docs`, `forge`, `git`, `shell`, `usage` | The respective built-in native providers. |
 | `speech` | The `speech` native provider: dictation from the microphone (`use "dictation"`), through Apple's on-device recognizer, a local program or a remote service. Opt-in. |

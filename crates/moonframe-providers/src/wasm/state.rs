@@ -62,7 +62,14 @@ impl Handoff {
         context: &Context,
         store: &mut Store<State>,
     ) -> Result<(), String> {
-        let Some(state) = context.kept.get(&context.dir) else {
+        let Some(state) = context.kept.get(&context.state_key).or_else(|| {
+            context.state_file.as_ref().and_then(|file| {
+                let size = std::fs::metadata(file).ok()?.len();
+                (size <= 1024 * 1024)
+                    .then(|| std::fs::read_to_string(file).ok())
+                    .flatten()
+            })
+        }) else {
             return Ok(());
         };
         refuel(store)?;
@@ -86,7 +93,23 @@ impl Handoff {
     pub(super) fn save(&self, context: &Context, store: &mut Store<State>) {
         let saved = refuel(store).and_then(|()| self.save.call(&mut *store, ()).map_err(text));
         match saved {
-            Ok((Some(state),)) => context.kept.keep(&context.dir, state),
+            Ok((Some(state),)) if state.len() <= 1024 * 1024 => {
+                if let Some(file) = &context.state_file {
+                    let saved = (|| -> std::io::Result<()> {
+                        if let Some(parent) = file.parent() {
+                            std::fs::create_dir_all(parent)?;
+                        }
+                        let temp = file.with_extension(format!("{}.tmp", std::process::id()));
+                        std::fs::write(&temp, &state)?;
+                        std::fs::rename(temp, file)
+                    })();
+                    if let Err(error) = saved {
+                        tracing::warn!(provider = %context.name, "cannot save state: {error}");
+                    }
+                }
+                context.kept.keep(&context.state_key, state);
+            },
+            Ok((Some(_),)) => tracing::warn!(provider = %context.name, "saved state exceeds 1 MiB"),
             Ok((None,)) => {},
             Err(problem) => {
                 tracing::warn!(provider = %context.name, "state not saved: {problem}");
@@ -98,7 +121,7 @@ impl Handoff {
 /// Waits for every older build of this folder, including ones hidden by a
 /// failed replacement. Cancellation must leave the saved state untouched.
 pub(super) fn wait_for_old_build(context: &Context) -> bool {
-    let until = Instant::now() + LEAVE_MAX;
+    let until = Instant::now() + LEAVE_MAX + context.capabilities.limits.timeout;
     while context
         .wasm_build
         .as_ref()

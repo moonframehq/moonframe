@@ -5,7 +5,6 @@ use {
     super::*,
     crate::{
         component::Demo,
-        style,
         vm::{self, Meter},
     },
     mlua::{Table, Value},
@@ -61,6 +60,46 @@ impl Workspace {
             self.load_instance(&key);
         }
         self.settle();
+        self.report_entries();
+    }
+
+    /// Reports external mod revisions after load and first view validation.
+    pub fn on_entry_status(&mut self, callback: crate::entries::EntryStatuses) {
+        self.entry_statuses = Some(callback);
+        self.report_entries();
+    }
+
+    fn report_entries(&self) {
+        use {
+            crate::entries::{EntryKind, EntryState, EntryStatus},
+            std::hash::{Hash, Hasher},
+        };
+        let Some(report) = &self.entry_statuses else {
+            return;
+        };
+        for (name, entry) in self.roots.external_entries() {
+            let Some(slot) = self.mods.get(name) else {
+                continue;
+            };
+            let error = slot.error().map(ToString::to_string);
+            let mut hash = std::collections::hash_map::DefaultHasher::new();
+            fs::read(entry.mod_file())
+                .unwrap_or_default()
+                .hash(&mut hash);
+            report(EntryStatus {
+                name: name.clone(),
+                kind: EntryKind::Mod,
+                state: if error.is_none() {
+                    EntryState::Ok
+                } else if slot.module.is_some() {
+                    EntryState::Stale
+                } else {
+                    EntryState::Failed
+                },
+                error,
+                revision: hash.finish(),
+            });
+        }
     }
 
     /// Loads (or reloads) the instance at `key` from its mod or component.
@@ -214,5 +253,5 @@ fn merge(into: &Table, key: Value, value: Value, depth: usize) -> mlua::Result<(
 }
 
 fn valid_name(name: &str) -> bool {
-    name != SHELL && style::valid_name(name)
+    name != SHELL && crate::entries::module_name(name)
 }

@@ -19,8 +19,9 @@ not rebuild or restart the Moonframe executable to add one.
 | Use the host app's Rust libraries or asynchronous services directly | `native` |
 
 WASM providers cannot read your files, use the network, inherit your
-environment, or spawn processes. Today the only machine-data capability
-is `system` (CPU, memory and network counters). There are no `http`, `fs`
+environment, or spawn processes. The built-in machine-data capability
+is `system` (CPU, memory and network counters). Embedding apps can register
+namespaced capabilities such as `mshub.entities`. There are no built-in `http`, `fs`
 or `exec` capabilities. Process and native providers run with the user's
 access instead. See the [library guide](https://github.com/moonframehq/moonframe/blob/main/docs/library.md)
 for native providers.
@@ -104,7 +105,7 @@ Manifest fields for a WASM provider are:
 | `kind` | Must be `"wasm"`; no `command` or `file` field. |
 | `interval` | Seconds to wait for a message before calling `tick`; defaults to `1.0`, allowed range `0.1`–`3600.0`. |
 | `start` | `"on-demand"` (default), or `"always"` to start with the app. |
-| `capabilities` | An empty list by default; currently only `"system"` is supported. |
+| `capabilities` | An empty list by default; `"system"` and names registered by the embedding host. Unknown names are manifest errors. |
 | `[settings]` | Your configuration, converted to JSON and passed to `start`. |
 
 Unknown manifest fields are errors. Keep provider-specific configuration
@@ -227,8 +228,9 @@ results for views or `provider/counter` subscribers to consume.
 
 The `STATE` value survives calls, but resets when a new build replaces the
 provider, unless it [keeps its state](#keep-state-across-a-new-build). It is
-never saved between app launches. Use a mod's persisted state for UI choices
-that should survive quitting.
+saved across launches for namespaced entries using `stateful-provider` (below).
+Ordinary app-folder providers keep their existing reload-only behavior. Use a
+mod's persisted state for UI choices that should survive quitting.
 
 ## Keep state across a new build
 
@@ -263,7 +265,11 @@ fn restore(state: String) -> Result<(), String> {
 | `save()` | This build stops, because a new one replaces it | `Some(text)` hands it to the next build; `None` keeps nothing. |
 | `restore(state)` | On a new build, after `start` and before the first tick | `Ok(())`, or `Err(message)` to start fresh. |
 
-The state is any text, usually JSON, and stays in memory for this launch.
+The state is any text, usually JSON, up to 1 MiB. Ordinary app-folder providers
+keep it in memory for this launch. External entries also save it atomically on
+clean shutdown under the app's state directory, keyed by namespace and id;
+moving the entry's folder does not change its identity. `--no-user` keeps no
+durable state. Headless hosts set `ProviderOptions::state_dir` explicitly.
 `start` still runs first, so settings stay current: restore only what the
 user built up. Plain `provider` components keep working and start over.
 `examples/research/providers/research` is a working example, including how to
@@ -272,10 +278,119 @@ let a changed setting win over the saved state.
 - **Your state changed shape.** Read what you can in `restore`, with defaults
   for what is new. Return `Err` if nothing fits: the provider starts fresh
   and the reason goes to the terminal log. The saved state is then gone.
-- **A build fails.** A compile error, a panic in `restore`, or a panic on the
-  first tick loses nothing: the state waits for the build that fixes it.
+- **A build fails.** A build or instantiation error leaves the previous worker
+  answering messages and publishing data, with `stale` status. Once the new
+  component instantiates, the old one saves and stops. A panic in `restore`
+  or the first tick retains the saved state for the next attempt.
 - **A running provider panics.** It has nothing left to save, so the next
   build starts fresh. Only state from a clean stop is handed on.
+
+## Host-defined capabilities and external miniapps
+
+An embedding app can expose a narrow JSON API to Wasm:
+
+```rust
+use moonframe::{Caller, HostCapability, Moonframe, RootPolicy};
+
+struct Entities;
+impl HostCapability for Entities {
+    fn call(&self, caller: &Caller, method: &str, args: &str) -> Result<String, String> {
+        // Authorize using this loader-supplied identity, never an id in args.
+        if caller.provider != "mshub:notes" || method != "echo" {
+            return Err("not allowed".into());
+        }
+        Ok(args.to_owned())
+    }
+}
+
+let app = Moonframe::new("mshub")
+    .app_dir("app")
+    .capability("mshub.entities", Entities)
+    .root("mshub", "/path/to/miniapps", RootPolicy::default())
+    .entry("mshub", "notes", "/path/to/miniapps/notes")
+    .on_entry_status(|status| eprintln!("{}: {:?}", status.name, status.state));
+let entries = app.entry_handle(); // Clone into host threads before app.run().
+// After the host's own platform/enabled filtering:
+entries.add_entry("mshub", "tasks", "/path/to/tasks")?;
+entries.remove_entry("mshub", "tasks");
+```
+
+Roots register a namespace, path and policy; **they do not scan**. Use the
+`Entries` handle's `add_root` / `remove_root` and `add_entry` / `remove_entry`
+to control exactly what loads at runtime. Each entry may have `main.luau`,
+`provider/provider.toml`, or both. Entry paths are chosen by the trusted host
+and may lie outside the root directory. Guests cannot change this registry.
+
+The name is exactly `<namespace>:<id>`:
+
+- `ui.mount "mshub:notes"`, or `ui.mount { "mshub:notes", id = "second" }`;
+- `app["mshub:notes"]`, `to = "provider:mshub:notes"`;
+- `subscribe = { "provider/mshub:notes" }`;
+- persisted mod/instance keys include `mshub:notes` (for example
+  `mod:mshub:notes#second`). Removing an entry does not erase its saved state.
+
+Namespace and id each use 1–48 lowercase ASCII letters, digits, `-`, `_`.
+Namespaces `app`, `provider`, `topic`, `demo`, `component`, `shell` and `parent`
+are reserved because those prefixes route messages elsewhere. `:` is supported
+in topics and persistence keys. Entry edits are watched like app-folder edits,
+including in release bundles; invalid mod parse/init/first-view edits keep the
+previous working code. Native code is compiled into the host: register
+`.native("mshub:notes", factory)` and put `kind = "native"` in that entry's
+provider manifest. There is no runtime native-library loading.
+
+`RootPolicy::default()` uses `BuildPolicy::PrebuiltOnly` and disables process
+and socket providers. Prebuilt-only entries require `provider.wasm` and reject
+`Cargo.toml`, even when both are present. For reviewed development sources use
+`RootPolicy { build: BuildPolicy::Cargo, ..Default::default() }`; Cargo still
+refuses local `build.rs` and `.cargo/` hooks. `allow_process` and `allow_socket`
+are explicit opt-ins. Ordinary app layers retain their existing behavior.
+
+`EntryStatus` contains `name`, `kind` (`Mod`/`Provider`), `state`
+(`Ok`/`Building`/`Stale`/`Failed`), optional `error`, and `revision` (an opaque
+fingerprint of the attempted revision, not a monotonic counter). The callback
+runs on the loading thread; keep it short. Wasm build/instantiate progress and
+errors use this callback. It does not publish a topic. On-demand providers
+report once wanted. Headless integrations use `Capabilities::capability`,
+`Manifest::load_with` / `check_with`, and `Providers::start_configured` with
+`ProviderOptions` for capabilities, status and durable state.
+
+In the guest's `provider.toml`:
+
+```toml
+kind = "wasm"
+capabilities = ["mshub.entities"]
+```
+
+Both WIT worlds import `host-call(capability, method, args) -> result<string,
+string>`. `system-load` is unchanged, including for old prebuilt components.
+Undeclared calls return `Err` without invoking the host. Capability names must
+be namespaced with dots; unprefixed names and `moonframe.*` are reserved.
+`Caller` includes the registered provider name, provider folder, root path,
+optional namespace, and all declared capability names.
+
+The standalone Rust guest SDK is `crates/moonframe-provider` (add it as a path
+or git dependency). Implement `moonframe_provider::bindings::Guest` and export
+with `moonframe_provider::bindings::export!(MyProvider with_types_in
+moonframe_provider::bindings)`. Enable its `stateful` feature for save/restore.
+Its typed helper serializes arguments and deserializes the JSON answer:
+
+```rust
+let answer: serde_json::Value = moonframe_provider::host_call(
+    "mshub.entities", "echo", &serde_json::json!({ "id": 42 }),
+)?;
+```
+
+`examples/capability-provider` is a complete guest using `example.echo`;
+register that name in its host. For asynchronous services implement
+`AsyncHostCapability` and use `.capability_async(...)`; it uses the existing
+`.tokio(handle)` runtime. Configure `.host_call_limits(HostCallLimits { ... })`
+as needed: defaults are 1 MiB each for arguments/results, 5 seconds per call,
+and 32 outstanding host calls. Host work consumes no Wasm fuel. Timeout, panic,
+invalid JSON and size errors return strings to the guest. Async timeouts drop
+the future; synchronous Rust cannot be forcibly cancelled, so a timed-out call
+may finish later. Until it finishes that instance cannot start another host
+call, and it still counts toward the outstanding-call limit. Host APIs should
+account for this when implementing writes.
 
 ## Draw it and send messages
 
