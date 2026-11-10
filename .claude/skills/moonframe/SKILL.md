@@ -2320,8 +2320,12 @@ not copied between mods.
 
 **Host views are drawn over the app.** A `ui.view` is laid out in a layer
 over its placeholder, so a host view drawing again (a terminal printing)
-costs what it costs in its own app: the Luau layout is replayed whole.
+can replay the Luau layout whole instead of rebuilding it. Measure the
+complete frame to compare its cost with the host app's own window.
 For that:
+- **Notifications:** a busy host view notifies its own entity when output
+  changes. Do not forward every such notification to the Moonframe root;
+  invalidate the surrounding layout only when its own inputs change.
 - **Root:** the view's root fills its box (`size_full()`), since it is
   laid out at the slot's size.
 - **What goes over it:** use `float`/`area`, a popover, or an overlay.

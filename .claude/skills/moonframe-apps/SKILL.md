@@ -285,10 +285,12 @@ Anything over 8 ms
 and over 16 ms at `warn`; fast ones stay at `debug`. Measure in a release build
 (`target/release/moonframe`): debug is several times slower.
 
-To compare two builds (before and after a change, or an app against the
-host app it embeds):
+To compare two release builds (before and after a change, or a Moonframe
+window against the host app's hand-written GPUI window):
 - **Frame times:** `ZED_MEASUREMENTS=1` prints GPUI's own time for each
-  frame (draw and present), the same line in any GPUI app.
+  frame (draw and present), the same line in either app. For diagnosis, add
+  `RUST_LOG=moonframe::perf=debug` to see which messages, publishes and views
+  ran; Moonframe's layout timings alone are not the whole GPUI frame.
 - **Rounds:** run each build through the same scripted workload (idle,
   then the busy part: output, state changing, switching), alternating
   them over five or more rounds, and compare medians. Load from other
@@ -302,6 +304,23 @@ host app it embeds):
 - **Finding the cost:** `sample <pid> 6` during the busy phase shows where
   the main thread goes. A host view's frames should not show
   `MoonframeApp` rendering (see "Fast views" in the moonframe skill).
+  Let a busy host view notify itself on output, rather than notifying the
+  Moonframe root: that lets the surrounding Luau layout be replayed.
+
+For Sheprd's comparison, run `just bench-moonframe /path/to/herdr` in the
+Sheprd checkout that has the recipe (`docs/moonframe.md`), not in Moonframe.
+It builds both release binaries and runs them in turn on private daemons
+with 14 linked worktrees: idle, terminal output, agent state changes and
+workspace focus. Its default is three rounds; pass `5` as the second
+argument for five. It opens real windows for several minutes.
+`scripts/bench_frames.py --help` describes other binaries, workloads and
+per-round JSON output.
+
+Keep the command, script and build revisions, machine, OS, date, window
+size, round count and raw output with the results. Publish medians for each
+workload and name both apps: one hand-written GPUI app is not GPUI in
+general. A public performance claim needs a reproducible run, whichever
+app wins; retain the per-round results so variation is visible.
 
 The same log shows how close each module comes to its limits. At `debug`, a
 line each time a module's Luau memory grows by a quarter past 1 MiB, or a call
