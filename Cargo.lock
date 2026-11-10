@@ -5559,7 +5559,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anstream",
  "anstyle",
@@ -5618,7 +5618,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-acp"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "agent-client-protocol-schema",
  "libc",
@@ -5632,7 +5632,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-app"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe",
  "moonframe-rune",
@@ -5640,7 +5640,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-chat"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5653,7 +5653,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "mlua",
  "tempfile",
@@ -5663,7 +5663,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-docs"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5673,7 +5673,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-documents"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "chrono",
  "moonframe-core",
@@ -5685,7 +5685,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-forge"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-core",
  "moonframe-git",
@@ -5703,14 +5703,14 @@ dependencies = [
 
 [[package]]
 name = "moonframe-frames"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "moonframe-git"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5722,7 +5722,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-history"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "sheprd-usage",
  "sheprd-vcs",
@@ -5732,14 +5732,14 @@ dependencies = [
 
 [[package]]
 name = "moonframe-host-example"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe",
 ]
 
 [[package]]
 name = "moonframe-mux"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-terminal",
  "serde_json",
@@ -5750,7 +5750,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-packages"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5764,7 +5764,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-pi"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -5781,7 +5781,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-planner"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "chrono",
  "moonframe-core",
@@ -5792,7 +5792,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-procs"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5802,7 +5802,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-projects"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "chrono",
  "moonframe-core",
@@ -5813,7 +5813,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-providers"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "futures",
  "libc",
@@ -5832,7 +5832,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-rune"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "block2 0.6.2",
  "lb-wry",
@@ -5875,7 +5875,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-shell"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5887,7 +5887,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-speech"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "block2 0.6.2",
  "cpal",
@@ -5905,7 +5905,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-store"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-core",
  "rusqlite",
@@ -5917,7 +5917,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-terminal"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "alacritty_terminal",
  "libghostty-vt",
@@ -5929,7 +5929,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-transcripts"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
@@ -5939,7 +5939,7 @@ dependencies = [
 
 [[package]]
 name = "moonframe-usage"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "moonframe-core",
  "moonframe-providers",
