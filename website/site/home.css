@@ -204,7 +204,7 @@ kbd { font:12px var(--mono); border:1px solid var(--rule); border-bottom-width:2
 .renderer-shots { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap:28px; margin-top:36px }
 .renderer-shot { display:block; cursor:zoom-in }
 .renderer-shot:focus-visible { outline:2px solid var(--acc); outline-offset:5px }
-.renderer-shot img { display:block; width:100%; height:auto; border-radius:8px; box-shadow:0 16px 32px -18px #2a1a1066 }
+.renderer-shot img { display:block; width:100%; height:auto; aspect-ratio:1480 / 1040; object-fit:cover; object-position:top; border-radius:8px; box-shadow:0 16px 32px -18px #2a1a1066 }
 .renderer-shots code { display:inline-block; margin-top:6px }
 .renderer-notes { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap:32px; margin-top:32px }
 .renderer-notes h3 { font:600 13px var(--sans); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px }
