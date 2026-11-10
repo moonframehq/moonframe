@@ -26,12 +26,6 @@ ignore = [
   { id = "RUSTSEC-2026-0391", reason = "zstd only via wasmtime's compilation cache, which is never enabled" },
   { id = "RUSTSEC-2026-0398", reason = "zstd only via wasmtime's compilation cache, which is never enabled" },
   { id = "RUSTSEC-2026-0403", reason = "zstd only via wasmtime's compilation cache, which is never enabled" },
-  # Bundled SQLite before 3.54 can leak page-cache bytes when it opens a
-  # database with a -wal file of another page size, both written by a less
-  # trusted party. The databases opened are the user's own (state, usage).
-  # rusqlite 0.41 fixes it, but herdr-usage pins 0.40 and the herdr-gpui
-  # crates must move together (now sheprd-*). Drop this when they move.
-  { id = "RUSTSEC-2026-0459", reason = "bundled SQLite only opens the user's own databases; fix waits on the herdr-gpui crates moving to rusqlite 0.41" },
 ]
 # Security vulnerabilities always fail. "Unmaintained" is scoped to crates
 # this workspace depends on directly: GPUI's own tree carries discontinued

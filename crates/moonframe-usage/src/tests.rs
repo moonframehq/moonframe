@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 mod ui;
+mod words;
 
 use {
     super::*,

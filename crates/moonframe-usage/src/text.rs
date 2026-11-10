@@ -2,8 +2,9 @@
 //! shows (section titles, fact and balance labels, model windows) by Fluent
 //! message ID and leaves the writing to the app; `locales/en-US` holds those
 //! messages, copied from herdr-gpui's `crates/sheprd-gpui/locales/en-US/
-//! usage-*.ftl` at the rev the workspace pins. Copy them again when that
-//! rev moves; a message missing here shows as its ID.
+//! usage-*.ftl` at the rev the workspace pins. Run
+//! `scripts/update-usage-messages.py <checkout>` when that rev moves;
+//! a message missing here shows as its ID.
 
 use {
     herdr_i18n::{Catalog, FluentArgs, FluentValue},
