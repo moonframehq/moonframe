@@ -171,6 +171,8 @@ impl Scratch {
             );
             let dir =
                 std::env::temp_dir().join(format!("moonframe-typecheck-{:016x}", random.finish()));
+            // Only Unix sets the folder's mode.
+            #[cfg_attr(not(unix), allow(unused_mut))]
             let mut builder = fs::DirBuilder::new();
             #[cfg(unix)]
             std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
