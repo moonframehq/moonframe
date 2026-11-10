@@ -24,6 +24,7 @@ impl Workspace {
             rules.layer(&component.rules);
         }
         self.stylesheet.components = rules;
+        self.load_scopes();
         self.load_demos();
         match self.roots.file("main.luau") {
             Some(_) => {
@@ -40,13 +41,15 @@ impl Workspace {
                 let restored = self.restore(name);
                 self.mods.entry(name.clone()).or_default().restored = restored;
             }
+            let (library, scoped) = self.scoped(name);
             let Some(slot) = self.mods.get_mut(name) else {
                 continue;
             };
+            slot.scoped = scoped;
             if valid_name(name) {
                 // Highest layer first, so the folder found above leads.
                 let candidates = self.roots.mod_candidates(name);
-                slot.load_layered(name, &candidates, &self.library);
+                slot.load_layered(name, &candidates, &library);
             } else {
                 slot.load_error = Some(Error::new(format!(
                     "`{name}` is not a mod name: use a-z, 0-9, - and _, and not `{SHELL}`"
@@ -63,62 +66,25 @@ impl Workspace {
         self.report_entries();
     }
 
-    /// Reports external mod revisions after load and first view validation.
-    pub fn on_entry_status(&mut self, callback: crate::entries::EntryStatuses) {
-        self.entry_statuses = Some(callback);
-        self.report_entries();
-    }
-
-    fn report_entries(&self) {
-        use {
-            crate::entries::{EntryKind, EntryState, EntryStatus},
-            std::hash::{Hash, Hasher},
-        };
-        let Some(report) = &self.entry_statuses else {
-            return;
-        };
-        for (name, entry) in self.roots.external_entries() {
-            let Some(slot) = self.mods.get(name) else {
-                continue;
-            };
-            let error = slot.error().map(ToString::to_string);
-            let mut hash = std::collections::hash_map::DefaultHasher::new();
-            fs::read(entry.mod_file())
-                .unwrap_or_default()
-                .hash(&mut hash);
-            report(EntryStatus {
-                name: name.clone(),
-                kind: EntryKind::Mod,
-                state: if error.is_none() {
-                    EntryState::Ok
-                } else if slot.module.is_some() {
-                    EntryState::Stale
-                } else {
-                    EntryState::Failed
-                },
-                error,
-                revision: hash.finish(),
-            });
-        }
-    }
-
     /// Loads (or reloads) the instance at `key` from its mod or component.
     pub(super) fn load_instance(&mut self, key: &str) {
+        let (library, scoped) = self.scoped(key);
         let Some(mounted) = self.instances.get_mut(key) else {
             return;
         };
+        mounted.slot.scoped = scoped;
         match &mounted.of {
             InstanceOf::Mod(name) => {
                 let candidates = self.roots.mod_candidates(name);
                 if candidates.is_empty() {
                     mounted.slot.load_error = Some(Error::new(format!("no mod named `{name}`")));
                 } else {
-                    mounted.slot.load_layered(key, &candidates, &self.library);
+                    mounted.slot.load_layered(key, &candidates, &library);
                 }
             },
             InstanceOf::Component(name) => {
                 let name = name.clone();
-                mounted.slot.load_component(key, &name, &self.library);
+                mounted.slot.load_component(key, &name, &library);
             },
         }
     }

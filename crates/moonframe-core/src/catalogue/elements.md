@@ -29,7 +29,10 @@ for independent instance state), read `app["mshub:notes"]`, send to
 Saved mod/instance state includes the namespace. Namespace and id each use
 1–48 of `a-z 0-9 - _`; `app provider topic demo component shell parent` are
 reserved namespaces. `remove_entry` / `remove_root` unload them without
-erasing saved state.
+erasing saved state. An entry's own `components/<name>.luau` come first for
+its `use` (and only its), and its `style.luau` (`style { rules = { ... } }`)
+styles only what it draws. `entry_embedded::<E>(namespace, id)` ships one in
+the binary; `moonframe::check_entry` reports its problems.
 
 Prefer sandboxed Wasm for end-user providers. The host registers namespaced
 JSON capabilities with `capability` / `capability_async`; a guest declares them

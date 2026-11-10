@@ -3,6 +3,8 @@
 
 mod entries;
 
+pub use entries::EmbeddedEntries;
+
 use {
     crate::{
         Identity,

@@ -222,3 +222,45 @@ fn a_bad_manifest_after_failed_start_reports_failed_not_stale() {
     assert!(status.error.is_some());
     providers.shutdown();
 }
+
+#[test]
+fn check_entry_validates_the_manifest_capabilities_and_policy() {
+    let dir = tempfile::tempdir().unwrap();
+    let entry = dir.path();
+    fs::write(
+        entry.join("main.luau"),
+        "return mod { view = function() return ui.text 'ok' end }",
+    )
+    .unwrap();
+    fs::create_dir_all(entry.join("provider")).unwrap();
+    let manifest = entry.join("provider/provider.toml");
+    let policy = RootPolicy::default();
+
+    fs::write(
+        &manifest,
+        "kind = \"wasm\"\ncapabilities = [\"hub.entities\"]\n",
+    )
+    .unwrap();
+    let missing = crate::check_entry(entry, &policy, None, &["hub.entities"]);
+    assert!(missing[0].message.contains("provider.wasm"), "{missing:?}");
+    fs::write(entry.join("provider").join(crate::PREBUILT), b"\0asm").unwrap();
+    let ok = crate::check_entry(entry, &policy, None, &["hub.entities"]);
+    assert!(ok.is_empty(), "{ok:?}");
+    let unknown = crate::check_entry(entry, &policy, None, &[]);
+    assert_eq!(unknown.len(), 1, "{unknown:?}");
+    assert_eq!(unknown[0].file, manifest);
+    assert!(unknown[0].message.contains("hub.entities"));
+
+    fs::write(&manifest, "kind = \"process\"\ncommand = [\"true\"]\n").unwrap();
+    let refused = crate::check_entry(entry, &policy, None, &[]);
+    assert!(
+        refused[0]
+            .message
+            .contains("process providers are disabled")
+    );
+    let allowed = RootPolicy {
+        allow_process: true,
+        ..RootPolicy::default()
+    };
+    assert!(crate::check_entry(entry, &allowed, None, &[]).is_empty());
+}

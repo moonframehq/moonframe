@@ -419,6 +419,55 @@ and socket providers. Prebuilt-only entries require <code>provider.wasm</code> a
 <code>RootPolicy { build: BuildPolicy::Cargo, ..Default::default() }</code>; Cargo still
 refuses local <code>build.rs</code> and <code>.cargo/</code> hooks. <code>allow_process</code> and <code>allow_socket</code>
 are explicit opt-ins. Ordinary app layers retain their existing behavior.</p>
+<p>An entry may also bring <code>components/&lt;name&gt;.luau</code> and <code>style.luau</code>:</p>
+<pre><code class="language-text">notes/
+  main.luau            the mod, mounted as ui.mount &quot;mshub:notes&quot;
+  style.luau           optional: return style { rules = { ... } }
+  components/
+    card.luau          use &quot;card&quot; finds this before the app's `card`
+  provider/
+    provider.toml
+</code></pre>
+<p>The entry's <code>use</code> looks in its own <code>components/</code> first, then in the app's;
+other mods never see an entry's components, and they stay out of the
+Components window. Its <code>style.luau</code> takes only <code>rules</code>, which apply to what
+the entry draws (under its mod's own <code>styles</code>, over the app's stylesheet) and
+may name the app's colors; colors, fonts and the other stylesheet keys belong
+to the app and are refused. Both reload live with the entry; a broken
+<code>style.luau</code> keeps its last good rules and reports through <code>on_entry_status</code>.</p>
+<p><strong>Built-in miniapps.</strong> A miniapp shipped inside the host binary needs no files
+on disk: embed its folder with <code>rust-embed</code> and select it with
+<code>entry_embedded</code>. It is written to
+<code>~/.cache/&lt;app&gt;/entries/&lt;namespace&gt;/&lt;id&gt;/&lt;hash&gt;</code> as the app starts (once per
+content), so <code>main.luau</code>, <code>components/</code> and a <code>kind = "native"</code> provider work
+in a release bundle. In debug, point <code>entry</code> at the source folder instead, for
+live reload, as with <code>embedded_app</code> and <code>app_dir</code>:</p>
+<pre><code class="language-rust">#[derive(moonframe::rust_embed::RustEmbed)]
+#[crate_path = &quot;moonframe::rust_embed&quot;]
+#[folder = &quot;miniapps/notes&quot;]
+struct Notes;
+
+let app = Moonframe::new(&quot;mshub&quot;).root(&quot;builtin&quot;, &quot;miniapps&quot;, RootPolicy::default());
+let app = if cfg!(debug_assertions) {
+    app.entry(&quot;builtin&quot;, &quot;notes&quot;, concat!(env!(&quot;CARGO_MANIFEST_DIR&quot;), &quot;/miniapps/notes&quot;))
+} else {
+    app.entry_embedded::&lt;Notes&gt;(&quot;builtin&quot;, &quot;notes&quot;)
+};
+</code></pre>
+<p>On the runtime handle, <code>use moonframe::EmbeddedEntries</code> and call
+<code>entries.add_entry_embedded::&lt;Notes&gt;("builtin", "notes")</code>; one added before
+<code>run</code> waits until the app knows its cache folder.</p>
+<p><strong>Checking an entry.</strong> <code>moonframe::check_entry(path, &amp;policy, app_roots,
+&amp;["mshub.entities"])</code> returns a <code>Vec&lt;Diagnostic&gt;</code> (<code>severity</code>, <code>file</code>,
+<code>message</code>) for a host CLI's <code>&lt;app&gt; miniapp check</code>: it compiles and loads
+<code>main.luau</code>, draws its first view headlessly, loads each component and
+<code>style.luau</code>, reads <code>provider/provider.toml</code> with its capabilities checked
+against the names given, and applies <code>policy</code> (prebuilt-only, process,
+socket). With <code>app_roots</code> as <code>None</code>, a <code>use</code> of a component the entry does not
+bring is only a warning. The Luau-only part is
+<code>moonframe_core::entries::check(path, &amp;policy)</code> (or <code>check_in</code> with the app's
+<code>Roots</code>). Static type-checking stays with <code>luau-lsp analyze</code>, as <code>just types</code>
+runs it.</p>
 <p><code>EntryStatus</code> contains <code>name</code>, <code>kind</code> (<code>Mod</code>/<code>Provider</code>), <code>state</code>
 (<code>Ok</code>/<code>Building</code>/<code>Stale</code>/<code>Failed</code>), optional <code>error</code>, and <code>revision</code> (an opaque
 fingerprint of the attempted revision, not a monotonic counter). The callback

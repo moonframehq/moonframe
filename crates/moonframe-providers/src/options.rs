@@ -18,6 +18,30 @@ pub struct ProviderOptions {
     pub state_dir: Option<PathBuf>,
 }
 
+/// Checks a miniapp entry at `path` as a host would load it under
+/// `policy`: its Luau ([`moonframe_core::entries::check_in`], over `app`
+/// when given), and its `provider/provider.toml`, whose capabilities must be
+/// among `capabilities`, the names the host registers.
+pub fn check_entry(
+    path: &Path,
+    policy: &RootPolicy,
+    app: Option<&moonframe_core::Roots>,
+    capabilities: &[&str],
+) -> Vec<moonframe_core::entries::Diagnostic> {
+    use moonframe_core::entries::{Diagnostic, check_in};
+    let mut found = check_in(path, policy, app);
+    let dir = path.join("provider");
+    let manifest = dir.join("provider.toml");
+    if manifest.is_file() {
+        let checked = Manifest::load_declared("check:entry", &dir, capabilities)
+            .and_then(|loaded| check_policy(&loaded, &dir, policy));
+        if let Err(error) = checked {
+            found.push(Diagnostic::error(manifest, error.to_string()));
+        }
+    }
+    found
+}
+
 pub(crate) fn check_policy(
     manifest: &Manifest,
     dir: &Path,

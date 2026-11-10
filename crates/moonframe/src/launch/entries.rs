@@ -2,7 +2,7 @@
 
 use {
     super::Moonframe,
-    moonframe_core::entries::{Entries, EntryStatus, RootPolicy},
+    moonframe_core::entries::{Entries, EntryFiles, EntryStatus, RootPolicy},
     moonframe_providers::{HostCallLimits, HostCapability},
     std::{path::PathBuf, sync::Arc},
 };
@@ -48,6 +48,36 @@ impl Moonframe {
         self
     }
 
+    /// A miniapp compiled into the binary (its `main.luau`, `style.luau`,
+    /// `components/` and `provider/`), so a release bundle needs no files
+    /// on disk: written to `~/.cache/<name>/entries/<namespace>/<id>/<hash>`
+    /// as the app starts. In debug, point [`entry`](Self::entry) at the
+    /// source folder instead, so edits reload live:
+    ///
+    /// ```ignore
+    /// #[derive(moonframe::rust_embed::RustEmbed)]
+    /// #[crate_path = "moonframe::rust_embed"]
+    /// #[folder = "miniapps/clock"]
+    /// struct Clock;
+    ///
+    /// let app = moonframe::Moonframe::new("hub").root("builtin", dir, policy);
+    /// let app = if cfg!(debug_assertions) {
+    ///     app.entry("builtin", "clock", concat!(env!("CARGO_MANIFEST_DIR"), "/miniapps/clock"))
+    /// } else {
+    ///     app.entry_embedded::<Clock>("builtin", "clock")
+    /// };
+    /// ```
+    pub fn entry_embedded<E: rust_embed::RustEmbed + 'static>(
+        mut self,
+        namespace: &str,
+        id: &str,
+    ) -> Self {
+        if let Err(error) = self.entries.add_entry_embedded::<E>(namespace, id) {
+            self.errors.push(error);
+        }
+        self
+    }
+
     /// Clone before `run` and use from any host thread. Guests never get it.
     pub fn entry_handle(&self) -> Entries {
         self.entries.clone()
@@ -61,5 +91,62 @@ impl Moonframe {
     ) -> Self {
         self.providers.on_entry_status = Some(Arc::new(callback));
         self
+    }
+}
+
+/// [`Moonframe::entry_embedded`] on the [`Entries`] handle, from any host
+/// thread. Before the app runs, the files wait until it knows its cache.
+pub trait EmbeddedEntries {
+    fn add_entry_embedded<E: rust_embed::RustEmbed + 'static>(
+        &self,
+        namespace: &str,
+        id: &str,
+    ) -> Result<(), String>;
+}
+
+impl EmbeddedEntries for Entries {
+    fn add_entry_embedded<E: rust_embed::RustEmbed + 'static>(
+        &self,
+        namespace: &str,
+        id: &str,
+    ) -> Result<(), String> {
+        let files: EntryFiles = Arc::new(|folder| crate::embed::materialize_into::<E>(folder));
+        self.add_entry_files(namespace, id, files)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use {super::*, moonframe_core::entries::RootPolicy};
+
+    #[derive(rust_embed::RustEmbed)]
+    #[folder = "tests/fixtures/miniapp"]
+    struct Miniapp;
+
+    #[test]
+    fn an_embedded_entry_is_written_once_the_cache_is_known() {
+        let root = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        let entries = Entries::default();
+        entries
+            .add_root("builtin", root.path(), RootPolicy::default())
+            .unwrap();
+        entries
+            .add_entry_embedded::<Miniapp>("builtin", "clock")
+            .unwrap();
+        assert!(entries.snapshot().is_empty());
+        assert!(entries.set_files_dir(cache.path()).is_empty());
+        let entry = entries.snapshot().remove("builtin:clock").unwrap();
+        assert!(entry.path.starts_with(cache.path().join("builtin/clock")));
+        assert!(entry.mod_file().is_file());
+        assert!(entry.style_file().is_file());
+        assert!(entry.components().contains_key("badge"));
+        assert!(entry.provider_dir().join("provider.toml").is_file());
+        // The same files again: the same folder.
+        entries
+            .add_entry_embedded::<Miniapp>("builtin", "clock")
+            .unwrap();
+        assert_eq!(entries.snapshot()["builtin:clock"].path, entry.path);
     }
 }

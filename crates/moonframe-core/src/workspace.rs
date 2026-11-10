@@ -13,9 +13,12 @@
 mod load;
 mod messages;
 mod render;
+mod scope;
 mod slot;
 mod windows;
 // keep-sorted end
+
+pub(crate) use scope::read_style;
 
 use {
     crate::{
@@ -60,6 +63,8 @@ pub struct Workspace {
     roots: Roots,
     /// The components mods can `use`.
     library: Library,
+    /// Each miniapp entry's own components and stylesheet, by mod name.
+    scopes: BTreeMap<String, scope::Scope>,
     /// The same, loaded on their own for the window's list.
     components: Vec<Component>,
     shell: Slot,
@@ -230,8 +235,11 @@ pub struct Slot {
     /// The file it was last loaded from.
     source: Option<PathBuf>,
     view: Option<Node>,
-    /// The mod's own `styles`, which apply only to what it draws.
+    /// The mod's own `styles`, which apply only to what it draws, over
+    /// `scoped`.
     rules: Rules,
+    /// Its miniapp entry's `style.luau` rules, when it belongs to one.
+    scoped: Rules,
     load_error: Option<Error>,
     update_error: Option<Error>,
     view_error: Option<Error>,
@@ -284,6 +292,7 @@ impl Workspace {
             entry_statuses: None,
             roots: roots.into(),
             library: Library::default(),
+            scopes: BTreeMap::new(),
             components: Vec::new(),
             shell: Slot::default(),
             mods: BTreeMap::new(),

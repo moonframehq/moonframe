@@ -164,6 +164,18 @@ impl Manifest {
         dir: &Path,
         registry: &crate::Capabilities,
     ) -> Result<Self, Error> {
+        Self::load_known(name, dir, &|capability| registry.contains(capability))
+    }
+
+    /// Reads it, knowing only the names of the host's capabilities, as a
+    /// check run outside the host does.
+    pub fn load_declared(name: &str, dir: &Path, capabilities: &[&str]) -> Result<Self, Error> {
+        Self::load_known(name, dir, &|capability| {
+            capability == "system" || capabilities.contains(&capability)
+        })
+    }
+
+    fn load_known(name: &str, dir: &Path, known: &dyn Fn(&str) -> bool) -> Result<Self, Error> {
         let problem = Error::new;
         if !moonframe_core::entries::module_name(name) {
             return Err(problem(
@@ -175,7 +187,7 @@ impl Manifest {
             .map_err(|error| problem(format!("cannot read {}: {error}", path.display())))?;
         let file: File = toml::from_str(&text).map_err(|error| problem(error.to_string()))?;
         for capability in &file.capabilities {
-            if !registry.contains(capability) {
+            if !known(capability) {
                 return Err(problem(format!("unknown capability `{capability}`")));
             }
         }
