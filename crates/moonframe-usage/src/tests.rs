@@ -5,15 +5,15 @@ mod words;
 
 use {
     super::*,
-    serde_json::json,
-    sheprd_usage::{
+    herdr_usage::{
         Error, Reading, Text,
         model::{Account, Balance, Kind, Report, Section, Unit, WEEK, Window},
     },
+    serde_json::json,
     std::time::{Duration, SystemTime},
 };
 
-fn claude() -> sheprd_usage::Provider {
+fn claude() -> herdr_usage::Provider {
     registry::find("claude").unwrap()
 }
 
@@ -247,4 +247,18 @@ fn the_shipped_settings_load() {
         .unwrap();
     let settings = serde_json::to_value(&manifest["settings"]).unwrap();
     config(&settings).unwrap();
+}
+
+#[test]
+fn messages_a_provider_names_are_written_in_english() {
+    assert_eq!(text::english(&Text::message("usage-report-usage")), "Usage");
+    let credits = Text::message("usage-alibabatokenplan-credits-of")
+        .arg("used", 12)
+        .arg("total", Text::service("50"));
+    assert_eq!(text::english(&credits), "12 / 50 credits");
+    assert_eq!(
+        text::english(&Text::message("usage-no-such")),
+        "usage-no-such"
+    );
+    assert_eq!(text::english(&Text::service("Opus")), "Opus");
 }

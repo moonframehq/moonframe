@@ -116,7 +116,10 @@ fn configured_provider_without_numbers_can_open_its_error_and_refresh() {
     let (_dir, mut workspace) = app(&data);
     open(&mut workspace);
     let popover = sheet(&workspace);
-    assert!(has_text(&popover.content, &Error::NotSignedIn.to_string()));
+    assert!(has_text(
+        &popover.content,
+        "No sign-in found on this host. Set it up under [usage.providers] in the config."
+    ));
     refresh_is_reachable(popover);
 }
 
@@ -181,7 +184,7 @@ fn access_only_accounts_still_offer_allow() {
             provider,
             report: None,
             error: Some(Error::KeychainAccess.into()),
-            access: Some(sheprd_usage::Access::Needed),
+            access: Some(herdr_usage::Access::Needed),
         },
         &config,
     );

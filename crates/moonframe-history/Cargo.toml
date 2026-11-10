@@ -15,11 +15,11 @@ workspace = true
 # When the folder sits in a git checkout and Herdr is about, a restore
 # first takes a Herdr checkpoint of that checkout, so Herdr UI's
 # checkpoints can bring it back too.
-herdr = ["dep:herdr-vcs", "dep:sheprd-usage"]
+herdr = ["dep:herdr-usage", "dep:herdr-vcs"]
 
 [dependencies]
+herdr-usage       = { optional = true, workspace = true }
 herdr-vcs         = { optional = true, workspace = true }
-sheprd-usage      = { optional = true, workspace = true }
 tracing.workspace = true
 
 [dev-dependencies]

@@ -1,4 +1,4 @@
-//! `app.usage`, from what sheprd-usage last read. Shares are fractions
+//! `app.usage`, from what herdr-usage last read. Shares are fractions
 //! (0 to 1), as Moonframe's meters take them; times are Unix seconds, with
 //! the countdowns already written out so a view needs no clock.
 //!
@@ -15,14 +15,14 @@
 //! ```
 
 use {
-    crate::words::words,
-    moonframe_core::IconName,
-    serde_json::{Value, json},
-    sheprd_usage::{
+    crate::text::{self, english},
+    herdr_usage::{
         Access, Host, Reading, Usage, UsageConfig,
         details::{ClaudeAccount, OpenaiDaily},
         model::{Balance, Kind, Report, Section, Severity, Unit, Window, countdown},
     },
+    moonframe_core::IconName,
+    serde_json::{Value, json},
     std::time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -76,8 +76,8 @@ fn provider(reading: &Reading, now: SystemTime) -> Value {
         "icon": icon(meta.id, meta.icon),
         "dashboard": meta.dashboard,
         "status_page": meta.status_page,
-        "email": report.and_then(|report| report.account.email.as_ref()).map(words),
-        "plan": report.and_then(|report| report.account.plan.as_ref()).map(words),
+        "email": report.and_then(|report| report.account.email.as_ref()).map(english),
+        "plan": report.and_then(|report| report.account.plan.as_ref()).map(english),
         "error": reading.error.as_ref().map(ToString::to_string),
         "access": reading.access.map(|access| match access {
             Access::Needed => "needed",
@@ -131,10 +131,7 @@ pub(crate) fn icon(id: &str, path: Option<&str>) -> Option<&'static str> {
 pub(crate) fn window(limit: &Window, now: SystemTime) -> Value {
     let pace = limit.pace(now);
     json!({
-        "title": match &limit.kind {
-            Kind::Named(name) => words(name),
-            kind => kind.title(),
-        },
+        "title": text::title(&limit.kind),
         "kind": match limit.kind {
             Kind::Session => "session",
             Kind::Daily => "daily",
@@ -145,10 +142,7 @@ pub(crate) fn window(limit: &Window, now: SystemTime) -> Value {
         "used": fraction(limit.used),
         "left": fraction(100. - limit.used),
         "severity": severity(limit.used),
-        "label": match &limit.kind {
-            Kind::Named(name) => format!("{}% used {}", limit.percent(), words(name)),
-            _ => limit.label(now),
-        },
+        "label": text::label(limit, now),
         "resets_at": limit.resets_at.map(unix),
         "resets_in": limit.resets_in(now).map(countdown),
         // Where an even spend would have left the bar of what is left:
@@ -161,7 +155,7 @@ pub(crate) fn window(limit: &Window, now: SystemTime) -> Value {
 fn balance(balance: &Balance) -> Value {
     let (unit, currency) = match &balance.unit {
         Unit::Currency(code) => (code.as_str(), true),
-        Unit::Count(name) => (name.name(), false),
+        Unit::Count(count) => (count.name(), false),
     };
     // Upstream amounts can be spent OR remaining; preserve their label's
     // meaning rather than claiming that every ratio is credit left.
@@ -170,7 +164,7 @@ fn balance(balance: &Balance) -> Value {
         .filter(|total| *total > 0.)
         .map(|total| (balance.amount / total).clamp(0., 1.));
     json!({
-        "label": words(&balance.label),
+        "label": english(&balance.label),
         "amount": balance.amount,
         "total": balance.total,
         "unit": unit,
@@ -185,18 +179,18 @@ fn section(section: &Section, now: SystemTime) -> Value {
         Section::Limit(limit) => json!({ "kind": "limit", "window": window(limit, now) }),
         Section::Facts { title, facts } => json!({
             "kind": "facts",
-            "title": words(title),
+            "title": english(title),
             "facts": facts
                 .iter()
-                .map(|(label, value)| json!({ "label": words(label), "value": words(value) }))
+                .map(|(label, value)| json!({ "label": english(label), "value": english(value) }))
                 .collect::<Vec<_>>(),
         }),
         Section::Shares { title, shares } => json!({
             "kind": "shares",
-            "title": words(title),
+            "title": english(title),
             "shares": shares
                 .iter()
-                .map(|(label, share)| json!({ "label": words(label), "share": fraction(*share) }))
+                .map(|(label, share)| json!({ "label": english(label), "share": fraction(*share) }))
                 .collect::<Vec<_>>(),
         }),
     }

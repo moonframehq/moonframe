@@ -198,7 +198,7 @@ impl Workspace {
             && name.len() <= MAX_TOPIC
             && name
                 .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'));
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/' | ':'));
         if !plain || name.starts_with(PROVIDER_TOPIC) || name.starts_with(APP_TOPIC) {
             return Err(Error::new(format!(
                 "`topic:{name}`: a topic is 1 to {MAX_TOPIC} of a-z, A-Z, 0-9, - _ . /; provider/ topics are the providers' and app/ ones the app's"

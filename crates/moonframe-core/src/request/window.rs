@@ -34,7 +34,7 @@ pub(super) fn window(msg: &Data) -> Result<WindowRequest, Error> {
         Data::String(name) if name == SHELL => {
             Err(fail("the shell is the main window, not a mod's"))
         },
-        Data::String(name) if crate::style::valid_name(name) => Ok(name.clone()),
+        Data::String(name) if crate::entries::module_name(name) => Ok(name.clone()),
         Data::String(name) => Err(fail(&format!(
             "`{name}` is not a mod's name (a-z, 0-9, - and _)"
         ))),

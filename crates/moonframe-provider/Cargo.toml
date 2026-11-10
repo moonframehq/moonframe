@@ -1,0 +1,18 @@
+[package]
+edition      = "2024"
+license      = "MIT"
+name         = "moonframe-provider"
+publish      = false
+rust-version = "1.99"
+version      = "0.3.1"
+
+[features]
+stateful = []
+
+[dependencies]
+serde       = "1"
+serde_json  = "1"
+wit-bindgen = "0.63"
+
+# Standalone: providers do not inherit the native host workspace's hooks.
+[workspace]

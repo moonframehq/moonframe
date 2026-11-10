@@ -11,16 +11,17 @@ version.workspace      = true
 workspace = true
 
 [dependencies]
-fluent.workspace              = true
+# English for the messages herdr-usage names by ID (locales/en-US).
+herdr-i18n.workspace          = true
+herdr-usage.workspace         = true
 moonframe-core.workspace      = true
 moonframe-providers.workspace = true
 serde.workspace               = true
 serde_json.workspace          = true
-sheprd-usage.workspace        = true
 tracing.workspace             = true
 
 [dev-dependencies]
 # `Usage::showing`, to publish readings without asking any service.
-sheprd-usage       = { features = ["test-support"], workspace = true }
+herdr-usage        = { features = ["test-support"], workspace = true }
 tempfile.workspace = true
 toml.workspace     = true

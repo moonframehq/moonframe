@@ -44,6 +44,8 @@
 
 #[cfg(feature = "tokio")]
 mod asynchronous;
+#[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+mod capability;
 mod fingerprint;
 mod fixed;
 mod installed;
@@ -53,9 +55,11 @@ pub mod lines;
 mod manifest;
 mod mods;
 pub mod native;
+mod options;
 mod outbox;
 mod process;
 pub mod program;
+mod running;
 #[cfg(all(unix, feature = "socket"))]
 mod socket;
 mod stream;
@@ -73,16 +77,22 @@ pub use {
     tokio,
 };
 pub use {
+    capability::{Caller, Capabilities, HostCallLimits, HostCapability},
     json::{MAX_ENTRIES, from_json, to_json},
     manifest::{Capability, Kind, Manifest, PREBUILT, Publish, Restart, Start},
     mods::{Mods, owner},
     native::{Handle, Native, Natives},
+    options::ProviderOptions,
 };
+
+#[cfg(feature = "tokio")]
+pub use capability::AsyncHostCapability;
 
 use {
     fingerprint::Fingerprint,
     kept::Kept,
     moonframe_core::{Data, Error, Roots},
+    running::Running,
     std::{
         collections::{BTreeMap, BTreeSet},
         path::{Path, PathBuf},
@@ -334,6 +344,7 @@ pub struct Providers {
     wanted: Wanted,
     /// State wasm providers hand to their next build.
     kept: Kept,
+    options: ProviderOptions,
 }
 
 /// Which providers something wants running.
@@ -363,29 +374,22 @@ const SHUTDOWN_SLACK: Duration = Duration::from_millis(200);
 /// programs of its own stops them as it is dropped.
 const NATIVE_GRACE: Duration = Duration::from_secs(2);
 
-/// A provider's thread, and how to reach and stop it.
-struct Running {
-    messages: mpsc::Sender<Message>,
-    stop: Arc<AtomicBool>,
-    /// Its folder when it started: a reload restarts it only if this
-    /// changed. `None` once asked to restart, whatever the folder holds.
-    fingerprint: Option<Fingerprint>,
-    /// A process or native provider, which hears when the project changes.
-    follows_project: bool,
-    /// A process or wasm provider, and how long it may take to leave; set
-    /// once it has. A wasm provider's next build waits for this, as it may
-    /// have state to hand on, but quitting does not.
-    leaving: Option<(Duration, Arc<AtomicBool>)>,
-}
-
-impl Drop for Running {
-    fn drop(&mut self) {
-        self.stop.store(true, Ordering::Relaxed);
-    }
-}
-
 /// What a provider's thread gets.
 pub(crate) struct Context {
+    ready: Arc<AtomicBool>,
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+    pub(crate) capabilities: Capabilities,
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+    pub(crate) caller: Caller,
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+    pub(crate) policy: Option<moonframe_core::entries::RootPolicy>,
+    pub(crate) statuses: Option<moonframe_core::entries::EntryStatuses>,
+    pub(crate) revision: u64,
+    fallback: Arc<Mutex<Option<Box<Running>>>>,
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+    pub(crate) state_key: PathBuf,
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+    pub(crate) state_file: Option<PathBuf>,
     pub(crate) name: String,
     pub(crate) dir: PathBuf,
     pub(crate) manifest: Manifest,
@@ -411,10 +415,26 @@ impl Context {
     }
 
     pub(crate) fn publish(&self, data: Data) {
+        self.ready.store(true, Ordering::Release);
         self.publisher.publish(data);
     }
 
     pub(crate) fn fail(&self, problem: impl Into<String>) {
+        self.ready.store(false, Ordering::Release);
+        let problem = problem.into();
+        let stale = self.has_fallback();
+        self.status(
+            if stale {
+                moonframe_core::entries::EntryState::Stale
+            } else {
+                moonframe_core::entries::EntryState::Failed
+            },
+            Some(problem.clone()),
+        );
+        if stale {
+            tracing::warn!(provider = %self.name, "keeping last good revision: {problem}");
+            return;
+        }
         (self.events)(Event::Failed {
             provider: self.name.clone(),
             problem: Error::new(problem),
@@ -449,6 +469,24 @@ impl Providers {
         natives: Natives,
         wanted: Option<BTreeSet<String>>,
     ) -> Self {
+        Self::start_configured(
+            roots,
+            build_dir,
+            events,
+            natives,
+            wanted,
+            ProviderOptions::default(),
+        )
+    }
+
+    pub fn start_configured(
+        roots: Roots,
+        build_dir: impl Into<PathBuf>,
+        events: Events,
+        natives: Natives,
+        wanted: Option<BTreeSet<String>>,
+        options: ProviderOptions,
+    ) -> Self {
         let build_dir = build_dir.into();
         let mut providers = Self {
             roots,
@@ -459,6 +497,7 @@ impl Providers {
             found: BTreeMap::new(),
             wanted: wanted.map_or(Wanted::All, Wanted::Names),
             kept: Kept::default(),
+            options,
         };
         providers.reload();
         providers
@@ -487,7 +526,7 @@ impl Providers {
     /// Starts providers that appeared or whose folders changed, and stops
     /// those that went. The others keep running, and keep their state.
     pub fn reload(&mut self) {
-        self.found = discover(&self.roots);
+        self.found = discover_with(&self.roots, &self.options.capabilities);
         self.sync();
     }
 
@@ -500,7 +539,9 @@ impl Providers {
             .found
             .iter()
             .filter(|(name, (_, manifest))| {
-                self.wanted.covers(name)
+                self.running.contains_key(*name)
+                    || (self.roots.external_entries().contains_key(*name) && manifest.is_err())
+                    || self.wanted.covers(name)
                     || manifest
                         .as_ref()
                         .is_ok_and(|manifest| manifest.start == Start::Always)
@@ -508,23 +549,42 @@ impl Providers {
             .map(|(name, (dir, manifest))| (name.clone(), dir.clone(), manifest.clone()))
             .collect();
         for (name, dir, manifest) in found {
+            let entry = self.roots.external_entries().get(&name).cloned();
+            let policy = entry.as_ref().map(|entry| entry.policy.clone());
+            // Changing root permissions is explicit revocation, not a bad
+            // source edit: do not keep code running under the old policy.
+            if self.running.get(&name).is_some_and(|running| {
+                running.entry.as_ref().map(|entry| &entry.policy) != policy.as_ref()
+            }) {
+                self.running.remove(&name);
+            }
             let fingerprint = Fingerprint::of(&dir);
-            if self
-                .running
-                .get(&name)
-                .is_some_and(|running| running.fingerprint == Some(fingerprint))
-            {
+            if self.running.get(&name).is_some_and(|running| {
+                running.fingerprint == Some(fingerprint) && running.entry == entry
+            }) {
                 continue;
             }
-            // Stops the old one, if any. Its process may take a while to
-            // leave, and the new one must not start beside it.
-            let replaces = self
-                .running
-                .remove(&name)
-                .and_then(|running| running.leaving.as_ref().map(|(_, left)| left.clone()));
             let manifest = match manifest {
                 Ok(manifest) => manifest,
                 Err(problem) => {
+                    tracing::warn!(provider = %name, "manifest: {problem}");
+                    let stale = self.running.get(&name).is_some_and(Running::healthy);
+                    if let Some(report) = &self.options.on_entry_status {
+                        report(moonframe_core::entries::EntryStatus {
+                            name: name.clone(),
+                            kind: moonframe_core::entries::EntryKind::Provider,
+                            state: if stale {
+                                moonframe_core::entries::EntryState::Stale
+                            } else {
+                                moonframe_core::entries::EntryState::Failed
+                            },
+                            error: Some(problem.to_string()),
+                            revision: fingerprint.revision(),
+                        });
+                    }
+                    if stale {
+                        continue;
+                    }
                     (self.events)(Event::Failed {
                         provider: name,
                         problem,
@@ -532,25 +592,97 @@ impl Providers {
                     continue;
                 },
             };
+            let previous = Running::live(self.running.remove(&name));
+            let replaces = previous
+                .as_ref()
+                .and_then(|running| running.leaving.as_ref().map(|(_, left)| left.clone()));
+            let fallback = Arc::new(Mutex::new(if manifest.kind == Kind::Wasm {
+                previous.map(Box::new)
+            } else {
+                drop(previous);
+                None
+            }));
             tracing::info!(provider = %name, dir = %dir.display(), "starting");
             let follows_project = matches!(manifest.kind, Kind::Process { .. } | Kind::Native);
             let (sender, messages) = mpsc::channel();
             let stop = Arc::new(AtomicBool::new(false));
+            let ready = Arc::new(AtomicBool::new(false));
             let left = Arc::new(AtomicBool::new(false));
             let leaving = match manifest.kind {
                 Kind::Process { .. } => Some(manifest.stop_grace + process::TERM_GRACE),
-                Kind::Wasm => Some(Duration::ZERO),
+                Kind::Wasm => {
+                    Some(Duration::from_secs(10) + self.options.capabilities.limits.timeout)
+                },
                 Kind::Native => Some(NATIVE_GRACE),
                 _ => None,
             }
             .map(|time| (time, left.clone()));
             let publisher = Publisher::new(name.clone(), self.events.clone(), manifest.publish);
             let context = Context {
+                ready: ready.clone(),
+                capabilities: self.options.capabilities.clone(),
+                caller: Caller {
+                    provider: name.clone(),
+                    folder: dir.clone(),
+                    root: self
+                        .roots
+                        .external_entries()
+                        .get(&name)
+                        .map(|e| e.root.clone())
+                        .or_else(|| {
+                            self.roots
+                                .layers()
+                                .find(|root| dir.starts_with(root))
+                                .map(Path::to_owned)
+                        })
+                        .unwrap_or_else(|| dir.clone()),
+                    namespace: self
+                        .roots
+                        .external_entries()
+                        .get(&name)
+                        .map(|e| e.namespace.clone()),
+                    capabilities: manifest
+                        .capabilities
+                        .iter()
+                        .map(|cap| cap.name().to_owned())
+                        .collect(),
+                },
+                policy: policy.clone(),
+                statuses: self.options.on_entry_status.clone(),
+                revision: fingerprint.revision(),
+                fallback: fallback.clone(),
+                state_key: if self.roots.external_entries().contains_key(&name) {
+                    PathBuf::from(format!("entry:{name}"))
+                } else {
+                    dir.clone()
+                },
+                state_file: self.roots.external_entries().get(&name).and_then(|e| {
+                    self.options.state_dir.as_ref().map(|root| {
+                        root.join(&e.namespace)
+                            .join(name.split_once(':').map_or(name.as_str(), |(_, id)| id))
+                            .with_extension("json")
+                    })
+                }),
                 name: name.clone(),
-                wasm_build: matches!(manifest.kind, Kind::Wasm).then(|| self.kept.begin(&dir)),
+                wasm_build: matches!(manifest.kind, Kind::Wasm).then(|| {
+                    self.kept
+                        .begin(if self.roots.external_entries().contains_key(&name) {
+                            Path::new(&name)
+                        } else {
+                            &dir
+                        })
+                }),
                 dir,
                 manifest,
-                build_dir: self.build_dir.clone(),
+                build_dir: self.roots.external_entries().get(&name).map_or_else(
+                    || self.build_dir.clone(),
+                    |entry| {
+                        self.build_dir
+                            .join("entries")
+                            .join(&entry.namespace)
+                            .join(name.split_once(':').map_or(name.as_str(), |(_, id)| id))
+                    },
+                ),
                 messages,
                 stop: stop.clone(),
                 events: self.events.clone(),
@@ -574,13 +706,17 @@ impl Providers {
                         Kind::Native => native::run(&context, native),
                         Kind::Static { .. } => fixed::run(&context),
                     }
+                    context.ready.store(false, Ordering::Release);
                     left.store(true, Ordering::Relaxed);
                 });
             match spawned {
                 Ok(_) => {
                     self.running.insert(name, Running {
+                        fallback,
+                        entry,
                         messages: sender,
                         stop,
+                        ready,
                         fingerprint: Some(fingerprint),
                         follows_project,
                         leaving,
@@ -611,11 +747,10 @@ impl Providers {
     /// would outlive it. All leave at once, so the wait is the longest
     /// one's. A socket provider's program is not the app's, and stays.
     pub fn shutdown(&mut self) {
-        let leaving: Vec<(Duration, Arc<AtomicBool>)> = self
-            .running
-            .values()
-            .filter_map(|running| running.leaving.clone())
-            .collect();
+        let mut leaving = Vec::new();
+        for running in self.running.values() {
+            running.collect_leaving(&mut leaving);
+        }
         self.running.clear();
         let started = Instant::now();
         for (time, left) in leaving {
@@ -630,7 +765,7 @@ impl Providers {
     /// (a build that needed a tool installed), or for a process that went
     /// and stays gone, once the user has dealt with what stopped it.
     pub fn restart(&mut self, name: &str) -> Result<(), Error> {
-        self.found = discover(&self.roots);
+        self.found = discover_with(&self.roots, &self.options.capabilities);
         if !self.found.contains_key(name) {
             return Err(Error::new(format!("no provider named `{name}`")));
         }
@@ -677,7 +812,6 @@ impl Providers {
             .get(name)
             .ok_or_else(|| Error::new(format!("no provider named `{name}`")))?;
         running
-            .messages
             .send(Message {
                 from: from.to_owned(),
                 data: message,
@@ -715,7 +849,11 @@ impl Providers {
 
 /// Reads every manifest without starting anything: what `--check` reports.
 pub fn check(roots: &Roots) -> Vec<(String, Error)> {
-    discover(roots)
+    check_with(roots, &Capabilities::default())
+}
+
+pub fn check_with(roots: &Roots, capabilities: &Capabilities) -> Vec<(String, Error)> {
+    discover_with(roots, capabilities)
         .into_iter()
         .filter_map(|(name, (_, manifest))| manifest.err().map(|problem| (name, problem)))
         .collect()
@@ -729,16 +867,31 @@ pub fn names(roots: &Roots) -> Vec<String> {
 /// Each provider folder (one with a provider.toml) and its manifest, by
 /// name; a higher layer's folder replaces a lower one's.
 fn discover(roots: &Roots) -> BTreeMap<String, (PathBuf, Result<Manifest, Error>)> {
+    discover_with(roots, &Capabilities::default())
+}
+
+fn discover_with(
+    roots: &Roots,
+    capabilities: &Capabilities,
+) -> BTreeMap<String, (PathBuf, Result<Manifest, Error>)> {
     roots
         .folders("providers", "provider.toml")
         .into_iter()
         .map(|(name, dir)| {
-            let manifest = Manifest::load(&name, &dir);
+            let manifest = Manifest::load_with(&name, &dir, capabilities).and_then(|manifest| {
+                if let Some(entry) = roots.external_entries().get(&name) {
+                    options::check_policy(&manifest, &dir, &entry.policy)?;
+                }
+                Ok(manifest)
+            });
             (name, (dir, manifest))
         })
         .collect()
 }
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod entry_tests;
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod link_tests;

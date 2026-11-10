@@ -16,7 +16,7 @@ fn report_messages_publish_words_instead_of_ids() {
     .with_balances([Balance::new(
         Text::message("usage-venice-credits"),
         3.,
-        Unit::Count(sheprd_usage::model::Count::Credits),
+        Unit::Count(herdr_usage::model::Count::Credits),
     )])
     .with_sections([
         Section::Facts {
@@ -63,15 +63,15 @@ fn plural_messages_use_numeric_arguments() {
         let text = Text::message("usage-venice-credit-count")
             .arg("credits", count)
             .arg("count", count.to_string());
-        assert_eq!(crate::words::words(&text), expected);
+        assert_eq!(text::english(&text), expected);
     }
 }
 
 #[test]
 fn messages_track_the_pinned_usage_dependency() {
     let manifest: toml::Table = include_str!("../../../../Cargo.toml").parse().unwrap();
-    let rev = manifest["workspace"]["dependencies"]["sheprd-usage"]["rev"]
+    let rev = manifest["workspace"]["dependencies"]["herdr-usage"]["rev"]
         .as_str()
         .unwrap();
-    assert!(include_str!("../../messages/en-US.ftl").contains(&format!("at {rev}\n")));
+    assert_eq!(include_str!("../../locales/REVISION").trim(), rev);
 }

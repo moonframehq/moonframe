@@ -689,6 +689,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
+name = "basic-toml"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba62675e8242a4c4e806d12f11d136e626e6c8361d6b829310732241652a178a"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bincode"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2441,6 +2450,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "find-crate"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59a98bbaacea1c0eb6a0876280051b892eb73594fd90cf3b20e9c817029c57d2"
+dependencies = [
+ "toml 0.5.11",
+]
+
+[[package]]
 name = "find-msvc-tools"
 version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2503,7 +2521,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01203cb8918f5711e73891b347816d932046f95f54207710bda99beaeb423bf4"
 dependencies = [
- "fluent-langneg",
+ "fluent-langneg 0.13.1",
  "fluent-syntax",
  "intl-memoizer",
  "intl_pluralrules",
@@ -2520,6 +2538,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7eebbe59450baee8282d71676f3bfed5689aeab00b27545e83e5f14b1195e8b0"
 dependencies = [
  "unic-langid",
+]
+
+[[package]]
+name = "fluent-langneg"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d5439a5e4ef14dc761bfe1d6ecbc4ba6fd698814ee65e7e623fa85aa9348dcc"
+dependencies = [
+ "icu_locid",
 ]
 
 [[package]]
@@ -3967,6 +3994,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "i18n-config"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e06b90c8a0d252e203c94344b21e35a30f3a3a85dc7db5af8f8df9f3e0c63ef"
+dependencies = [
+ "basic-toml",
+ "log",
+ "serde",
+ "serde_derive",
+ "thiserror 1.0.69",
+ "unic-langid",
+]
+
+[[package]]
+name = "i18n-embed"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a217bbb075dcaefb292efa78897fc0678245ca67f265d12c351e42268fcb0305"
+dependencies = [
+ "arc-swap",
+ "fluent",
+ "fluent-langneg 0.13.1",
+ "fluent-syntax",
+ "i18n-embed-impl",
+ "intl-memoizer",
+ "log",
+ "parking_lot",
+ "rust-embed",
+ "thiserror 1.0.69",
+ "unic-langid",
+]
+
+[[package]]
+name = "i18n-embed-impl"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f2cc0e0523d1fe6fc2c6f66e5038624ea8091b3e7748b5e8e0c84b1698db6c2"
+dependencies = [
+ "find-crate",
+ "i18n-config",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3978,7 +4051,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.57.0",
 ]
 
 [[package]]
@@ -4011,10 +4084,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25d29b57c17c6528d0dc4c2141cfa2d08200465acb537a3909c8b9b8a4a984c0"
 dependencies = [
  "displaydoc",
- "litemap",
- "tinystr",
- "writeable",
+ "litemap 0.8.3",
+ "tinystr 0.8.5",
+ "writeable 0.6.4",
  "zerovec",
+]
+
+[[package]]
+name = "icu_locid"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13acbb8371917fc971be86fc8057c41a64b521c184808a698c02acc242dbf637"
+dependencies = [
+ "displaydoc",
+ "litemap 0.7.5",
+ "tinystr 0.7.6",
+ "writeable 0.5.5",
 ]
 
 [[package]]
@@ -4066,7 +4151,7 @@ checksum = "413099315636c588ee8f011190b329b971a09a8fae9d157e01dcae8379468514"
 dependencies = [
  "displaydoc",
  "icu_locale_core",
- "writeable",
+ "writeable 0.6.4",
  "yoke",
  "zerofrom",
  "zerotrie",
@@ -4803,6 +4888,12 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "litemap"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23fb14cb19457329c82206317a5663005a4d404783dc74f4252769b0d5f42856"
+
+[[package]]
+name = "litemap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
@@ -5524,11 +5615,11 @@ dependencies = [
 name = "moonframe-usage"
 version = "0.3.1"
 dependencies = [
- "fluent",
  "moonframe-core",
  "moonframe-providers",
  "serde",
  "serde_json",
+ "sheprd-i18n",
  "sheprd-usage",
  "tempfile",
  "toml 1.1.8+spec-1.1.0",
@@ -8327,7 +8418,7 @@ dependencies = [
 [[package]]
 name = "sheprd-backend"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "serde",
  "sheprd-protocol",
@@ -8337,7 +8428,7 @@ dependencies = [
 [[package]]
 name = "sheprd-chat-protocol"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "serde",
  "serde_json",
@@ -8348,7 +8439,7 @@ dependencies = [
 [[package]]
 name = "sheprd-client"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "base64 0.23.1",
  "crossbeam-channel",
@@ -8368,7 +8459,7 @@ dependencies = [
 [[package]]
 name = "sheprd-core-client"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "crossbeam-channel",
  "rustix",
@@ -8386,7 +8477,7 @@ dependencies = [
 [[package]]
 name = "sheprd-credentials"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "futures-lite",
  "oo7",
@@ -8402,7 +8493,7 @@ dependencies = [
 [[package]]
 name = "sheprd-github"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "chrono",
  "getrandom 0.4.3",
@@ -8420,9 +8511,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "sheprd-i18n"
+version = "0.1.0"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
+dependencies = [
+ "fluent",
+ "fluent-langneg 0.14.2",
+ "i18n-embed",
+ "serde",
+ "sys-locale",
+ "thiserror 2.0.21",
+ "unic-langid",
+]
+
+[[package]]
 name = "sheprd-protocol"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "base64 0.23.1",
  "bincode",
@@ -8434,7 +8539,7 @@ dependencies = [
 [[package]]
 name = "sheprd-session"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "serde",
  "serde_json",
@@ -8445,7 +8550,7 @@ dependencies = [
 [[package]]
 name = "sheprd-terminal"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "alacritty_terminal",
  "base64 0.23.1",
@@ -8458,7 +8563,7 @@ dependencies = [
 [[package]]
 name = "sheprd-updater"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "chrono",
  "ed25519-dalek",
@@ -8479,7 +8584,7 @@ dependencies = [
 [[package]]
 name = "sheprd-usage"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "aes 0.9.3",
  "cbc 0.2.1",
@@ -8504,7 +8609,7 @@ dependencies = [
 [[package]]
 name = "sheprd-vcs"
 version = "0.1.0"
-source = "git+https://github.com/penso/herdr-gpui?rev=178a50c78482cc04a51163f26051bba334afcd91#178a50c78482cc04a51163f26051bba334afcd91"
+source = "git+https://github.com/penso/herdr-gpui?rev=7947567ddc1ede4e6940a2a8d388ba2182249445#7947567ddc1ede4e6940a2a8d388ba2182249445"
 dependencies = [
  "secrecy",
  "serde_json",
@@ -9216,6 +9321,15 @@ dependencies = [
 
 [[package]]
 name = "tinystr"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9117f5d4db391c1cf6927e7bea3db74b9a1c1add8f7eda9ffd5364f40f57b82f"
+dependencies = [
+ "displaydoc",
+]
+
+[[package]]
+name = "tinystr"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "abc840c238154d58f9e86b2792261edfde565a17696e1cda1a449de27979801a"
@@ -9279,6 +9393,15 @@ dependencies = [
  "libc",
  "pin-project-lite",
  "tokio",
+]
+
+[[package]]
+name = "toml"
+version = "0.5.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4f7f0dd8d50a853a531c426359045b1998f04219d88799810762cd4ad314234"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -9723,6 +9846,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a28ba52c9b05311f4f6e62d5d9d46f094bd6e84cb8df7b3ef952748d752a7d05"
 dependencies = [
  "unic-langid-impl",
+ "unic-langid-macros",
 ]
 
 [[package]]
@@ -9731,7 +9855,32 @@ version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dce1bf08044d4b7a94028c93786f8566047edc11110595914de93362559bc658"
 dependencies = [
- "tinystr",
+ "serde",
+ "tinystr 0.8.5",
+]
+
+[[package]]
+name = "unic-langid-macros"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5957eb82e346d7add14182a3315a7e298f04e1ba4baac36f7f0dbfedba5fc25"
+dependencies = [
+ "proc-macro-hack",
+ "tinystr 0.8.5",
+ "unic-langid-impl",
+ "unic-langid-macros-impl",
+]
+
+[[package]]
+name = "unic-langid-macros-impl"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1249a628de3ad34b821ecb1001355bca3940bcb2f88558f1a8bd82e977f75b5"
+dependencies = [
+ "proc-macro-hack",
+ "quote",
+ "syn 2.0.119",
+ "unic-langid-impl",
 ]
 
 [[package]]
@@ -10982,7 +11131,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -11749,6 +11898,12 @@ dependencies = [
  "thiserror 1.0.69",
  "wast 35.0.2",
 ]
+
+[[package]]
+name = "writeable"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e9df38ee2d2c3c5948ea468a8406ff0db0b29ae1ffde1bcf20ef305bcc95c51"
 
 [[package]]
 name = "writeable"

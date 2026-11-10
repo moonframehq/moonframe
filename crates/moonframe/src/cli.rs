@@ -283,13 +283,25 @@ pub(crate) fn problems(roots: Roots) -> Vec<(String, String)> {
 }
 
 fn problems_in(workspace: &Workspace, roots: &Roots) -> Vec<(String, String)> {
+    problems_with(
+        workspace,
+        roots,
+        &moonframe_providers::Capabilities::default(),
+    )
+}
+
+fn problems_with(
+    workspace: &Workspace,
+    roots: &Roots,
+    capabilities: &moonframe_providers::Capabilities,
+) -> Vec<(String, String)> {
     let mut problems: Vec<(String, String)> = workspace
         .problems()
         .into_iter()
         .map(|(name, error)| (name.to_owned(), error.to_string()))
         .collect();
     problems.extend(
-        moonframe_providers::check(roots)
+        moonframe_providers::check_with(roots, capabilities)
             .into_iter()
             .map(|(name, error)| (format!("provider {name}"), error.to_string())),
     );
@@ -297,9 +309,9 @@ fn problems_in(workspace: &Workspace, roots: &Roots) -> Vec<(String, String)> {
 }
 
 /// Loads every module headlessly: what an agent runs after an edit.
-fn check(roots: Roots) -> ExitCode {
+fn check(roots: Roots, capabilities: moonframe_providers::Capabilities) -> ExitCode {
     let workspace = crate::capabilities::open(roots.clone(), false, None);
-    let problems = problems_in(&workspace, &roots);
+    let problems = problems_with(&workspace, &roots, &capabilities);
     if problems.is_empty() {
         let mods = workspace.mod_names().collect::<Vec<_>>();
         let providers = moonframe_providers::names(&roots);
@@ -517,8 +529,8 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
         return on_a_view_stack(move || crate::doctor::run(&folders, &words));
     }
     if args.check {
-        let roots = folders.roots();
-        return on_a_view_stack(move || check(roots));
+        let roots = launch.entries.apply(folders.roots());
+        return on_a_view_stack(move || check(roots, launch.providers.capabilities));
     }
     if cfg!(feature = "studio") && args.catalogue {
         let roots = folders.roots();
@@ -616,14 +628,26 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
                 .as_ref()
                 .and_then(|_| crate::persist::open(&backends, folders.profile.as_deref()));
             // The shell says what window it wants, so it loads first.
-            let workspace =
-                crate::capabilities::open(folders.roots(), cx.theme().is_dark(), persist);
+            let mut workspace = crate::capabilities::open(
+                launch.entries.apply(folders.roots()),
+                cx.theme().is_dark(),
+                persist,
+            );
+            if let Some(report) = &launch.providers.on_entry_status {
+                workspace.on_entry_status(report.clone());
+            }
+            let mut provider_options = launch.providers.clone();
+            provider_options.state_dir = folders.user.as_ref().map(|_| {
+                paths::state(folders.profile.as_deref()).with_file_name("entry-providers")
+            });
             let chrome = workspace.chrome();
             // What every main window shares: the providers first.
             crate::app::Hub::install(
                 &workspace,
                 natives,
                 crate::app::Launch {
+                    entries: launch.entries.clone(),
+                    providers: provider_options,
                     folders: folders.clone(),
                     backends: backends.clone(),
                     views: views.clone(),

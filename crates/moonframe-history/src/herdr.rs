@@ -47,5 +47,5 @@ fn checkout(folder: &Path) -> Option<Checkout> {
     };
     let key = ask(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
     let branch = ask(&["symbolic-ref", "--short", "-q", "HEAD"])?;
-    Checkout::new(sheprd_usage::Host::Local, &key, Some(&branch))
+    Checkout::new(herdr_usage::Host::Local, &key, Some(&branch))
 }
