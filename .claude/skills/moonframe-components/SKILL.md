@@ -33,6 +33,29 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.divider()` | a line across the parent's axis | |
 | `ui.spacer()` | take the free space, to push what follows to the far end | |
 
+### Namespaced mods and providers
+
+Embedding apps can select miniapps outside `app_dir` with `Moonframe::root`
+and `entry`, or `entry_handle().add_entry(namespace, id, path)` at runtime.
+Roots set policy without scanning. An entry holds `main.luau` and/or
+`provider/provider.toml`: mount `ui.mount "mshub:notes"` (or give it an `id`
+for independent instance state), read `app["mshub:notes"]`, send to
+`"provider:mshub:notes"`, and subscribe to `"provider/mshub:notes"`.
+Saved mod/instance state includes the namespace. Namespace and id each use
+1–48 of `a-z 0-9 - _`; `app provider topic demo component shell parent` are
+reserved namespaces. `remove_entry` / `remove_root` unload them without
+erasing saved state.
+
+Prefer sandboxed Wasm for end-user providers. The host registers namespaced
+JSON capabilities with `capability` / `capability_async`; a guest declares them
+in `provider.toml` and calls `moonframe_provider::host_call` from the Rust SDK.
+`RootPolicy::default()` accepts only prebuilt Wasm (no Cargo crate) and disables
+process/socket kinds. Native providers are compiled into the host and bind by
+the full entry name. Entry files reload live, failed replacement mods or Wasm
+builds retain the old revision, and `on_entry_status` reports progress/errors.
+Stateful entry providers survive clean restarts. See `docs/wasm-providers.md`
+for the API, limits, caller identity and build policies.
+
 ### Content
 
 | Element | Use it for | Keys |

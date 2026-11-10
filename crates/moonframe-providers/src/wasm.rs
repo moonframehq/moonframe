@@ -21,6 +21,10 @@ use {
 
 mod state;
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod host_tests;
+
 wasmtime::component::bindgen!({ path: "../../wit/provider.wit", world: "provider" });
 
 const TARGET: &str = "wasm32-wasip2";
@@ -38,12 +42,15 @@ const FUEL: u64 = 2_000_000_000;
 const BUILD_LINES: usize = 20;
 
 pub(crate) fn run(context: &Context) {
-    if let Err(problem) = serve(context) {
+    if let Err(problem) = serve(context)
+        && !context.stopped()
+    {
         context.fail(problem);
     }
 }
 
 fn serve(context: &Context) -> Result<(), String> {
+    context.status(moonframe_core::entries::EntryState::Building, None);
     let wasm = component(context)?;
     if context.stopped() {
         return Ok(());
@@ -63,6 +70,10 @@ fn serve(context: &Context) -> Result<(), String> {
     let instance = linker.instantiate(&mut store, &component).map_err(text)?;
     let provider = Provider::new(&mut store, &instance).map_err(text)?;
     let handoff = Handoff::find(&instance, &mut store)?;
+    if context.stopped() {
+        return Ok(());
+    }
+    context.activate();
     if !state::wait_for_old_build(context) {
         return Ok(());
     }
@@ -80,9 +91,22 @@ fn serve(context: &Context) -> Result<(), String> {
     }
     refuel(&mut store)?;
     let mut published = provider.call_tick(&mut store).map_err(text)?;
+    if let Some(text) = &published {
+        json::data(text).map_err(|e| e.to_string())?;
+    }
+    context.status(moonframe_core::entries::EntryState::Ok, None);
     if handoff.is_some() {
         // Only now: a build that fails this early leaves it for the next.
-        context.kept.forget(&context.dir);
+        context.kept.forget(&context.state_key);
+        if let Some(file) = &context.state_file {
+            match fs::remove_file(file) {
+                Ok(()) => {},
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
+                Err(error) => {
+                    tracing::warn!(provider = %context.name, "cannot retire restored state: {error}")
+                },
+            }
+        }
     }
     // After a trap the instance cannot be called, so only these ends save.
     let hand_on = |store: &mut Store<State>| {
@@ -90,7 +114,12 @@ fn serve(context: &Context) -> Result<(), String> {
             handoff.save(context, store);
         }
     };
+    let mut tick_at = std::time::Instant::now() + context.manifest.interval;
     loop {
+        if context.stopped() {
+            hand_on(&mut store);
+            return Ok(());
+        }
         if let Some(text) = published.take() {
             match json::data(&text) {
                 Ok(data) => context.publish(data),
@@ -100,12 +129,18 @@ fn serve(context: &Context) -> Result<(), String> {
                 },
             }
         }
-        let call = match context.messages.recv_timeout(context.manifest.interval) {
+        let wait = tick_at
+            .saturating_duration_since(std::time::Instant::now())
+            .min(std::time::Duration::from_millis(100));
+        let call = match context.messages.recv_timeout(wait) {
             Ok(message) => {
                 refuel(&mut store)?;
                 provider.call_receive(&mut store, &json::json(&message.data).to_string())
             },
             Err(RecvTimeoutError::Timeout) => {
+                if std::time::Instant::now() < tick_at {
+                    continue;
+                }
                 refuel(&mut store)?;
                 provider.call_tick(&mut store)
             },
@@ -121,6 +156,8 @@ fn serve(context: &Context) -> Result<(), String> {
             return Ok(());
         }
         published = call.map_err(text)?;
+        // Preserve the existing idle interval: messages postpone the tick.
+        tick_at = std::time::Instant::now() + context.manifest.interval;
     }
 }
 
@@ -129,6 +166,10 @@ fn serve(context: &Context) -> Result<(), String> {
 /// A failed build is the provider's problem, never a quiet fallback to an
 /// older `provider.wasm`, so an edit's compile error always shows.
 fn component(context: &Context) -> Result<PathBuf, String> {
+    if let Some(policy) = &context.policy {
+        crate::options::check_policy(&context.manifest, &context.dir, policy)
+            .map_err(|e| e.to_string())?;
+    }
     let prebuilt = context.dir.join(PREBUILT);
     let source = context.dir.join("Cargo.toml").is_file();
     match (source, cargo()) {
@@ -493,6 +534,10 @@ struct State {
     name: String,
     capabilities: Vec<Capability>,
     system: Option<SystemLoad>,
+    host: crate::Capabilities,
+    caller: crate::Caller,
+    host_busy: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl State {
@@ -506,6 +551,10 @@ impl State {
             name: context.name.clone(),
             capabilities: context.manifest.capabilities.clone(),
             system: None,
+            host: context.capabilities.clone(),
+            caller: context.caller.clone(),
+            host_busy: Default::default(),
+            stop: context.stop.clone(),
         }
     }
 }
@@ -574,6 +623,19 @@ impl WasiView for State {
 }
 
 impl moonframe::provider::host::Host for State {
+    fn host_call(
+        &mut self,
+        capability: String,
+        method: String,
+        args: String,
+    ) -> Result<String, String> {
+        if self.stop.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err("provider is stopping".into());
+        }
+        self.host
+            .call(&self.caller, &self.host_busy, &capability, &method, &args)
+    }
+
     fn log(&mut self, message: String) {
         tracing::info!(provider = %self.name, "{}", moonframe_core::printable(&message));
     }

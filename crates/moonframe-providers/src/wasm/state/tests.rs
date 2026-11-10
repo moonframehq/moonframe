@@ -97,6 +97,7 @@ struct Harness {
     dir: tempfile::TempDir,
     providers: Providers,
     received: mpsc::Receiver<Event>,
+    statuses: mpsc::Receiver<moonframe_core::entries::EntryStatus>,
 }
 
 impl Harness {
@@ -116,18 +117,28 @@ impl Harness {
         fs::write(folder.join("provider.wasm"), wasm).unwrap();
         let (sender, received) = mpsc::channel();
         let sender = Arc::new(Mutex::new(sender));
-        let providers = Providers::start(
+        let (status, statuses) = mpsc::channel();
+        let providers = Providers::start_configured(
             dir.path().into(),
             dir.path().join("build"),
             Arc::new(move |event| {
                 before_event(&event);
                 let _ = sender.lock().unwrap().send(event);
             }),
+            Default::default(),
+            None,
+            crate::ProviderOptions {
+                on_entry_status: Some(Arc::new(move |s| {
+                    let _ = status.send(s);
+                })),
+                ..Default::default()
+            },
         );
         Self {
             dir,
             providers,
             received,
+            statuses,
         }
     }
 
@@ -157,9 +168,14 @@ impl Harness {
     }
 
     fn failed(&self) -> String {
-        match self.next() {
-            Event::Failed { problem, .. } => problem.to_string(),
-            other => panic!("{other:?}"),
+        loop {
+            let status = self.statuses.recv_timeout(Duration::from_secs(20)).unwrap();
+            if let Some(error) = status.error {
+                if status.state == moonframe_core::entries::EntryState::Failed {
+                    assert!(matches!(self.next(), Event::Failed { .. }));
+                }
+                return error;
+            }
         }
     }
 
@@ -279,8 +295,9 @@ fn a_build_that_cannot_load_leaves_the_state_for_the_next() {
     assert_eq!(harness.add(3), 3);
     harness.install("not a component");
     harness.failed();
+    assert_eq!(harness.add(1), 4); // The last good revision is still answering.
     harness.install(&good(2));
-    assert_eq!(harness.count(), 3);
+    assert_eq!(harness.count(), 4);
 }
 
 #[test]
@@ -323,4 +340,113 @@ fn exports_of_the_wrong_type_are_a_problem() {
     let harness = Harness::start(&component(1, COPY, PUBLISH, WRONG_EXPORTS));
     let problem = harness.failed();
     assert!(problem.contains("provider.wit"), "{problem}");
+}
+
+#[test]
+fn old_components_importing_only_the_original_host_interface_still_load() {
+    let legacy = good(1).replacen(
+        "(component",
+        r#"(component
+      (import "moonframe:provider/host" (instance
+        (export "log" (func (param "message" string)))
+        (export "system-load" (func (result (result string (error string)))))))"#,
+        1,
+    );
+    let harness = Harness::start(&legacy);
+    assert_eq!(harness.count(), 0);
+}
+
+#[test]
+fn shutdown_waits_for_the_last_good_worker_under_a_failed_candidate() {
+    let mut harness = Harness::start(&good(1));
+    assert_eq!(harness.count(), 0);
+    harness.add(2);
+    harness.install("not a component");
+    harness.failed();
+    harness.providers.shutdown();
+    let folder = harness.dir.path().join("providers/count");
+    assert_eq!(harness.providers.kept.get(&folder), Some("2".into()));
+}
+
+#[test]
+fn failed_build_and_failed_instantiation_keep_the_old_worker_answering() {
+    let mut harness = Harness::start(&good(1));
+    assert_eq!(harness.count(), 0);
+    let dir = harness.file().parent().unwrap().to_owned();
+    fs::write(
+        dir.join("Cargo.toml"),
+        "[package]\nname = 'broken'\nversion = '0.1.0'",
+    )
+    .unwrap();
+    fs::write(dir.join("build.rs"), "fn main() {}").unwrap();
+    harness.providers.reload();
+    assert!(harness.failed().contains("build.rs"));
+    assert_eq!(harness.add(1), 1);
+    fs::remove_file(dir.join("Cargo.toml")).unwrap();
+    fs::remove_file(dir.join("build.rs")).unwrap();
+    let missing_import = good(2).replacen(
+        "(component",
+        r#"(component (import "not-provided" (func))"#,
+        1,
+    );
+    harness.install(&missing_import);
+    assert!(harness.failed().contains("not-provided"));
+    assert_eq!(harness.add(1), 2);
+    harness.install(&good(3));
+    assert_eq!(harness.count(), 2);
+}
+
+#[test]
+fn namespaced_state_survives_shutdown_restart_and_path_changes() {
+    use moonframe_core::entries::{Entries, RootPolicy};
+    let root = tempfile::tempdir().unwrap();
+    let entries = Entries::default();
+    entries
+        .add_root("user", root.path(), RootPolicy::default())
+        .unwrap();
+    let (send, recv) = mpsc::channel();
+    let events: crate::Events = Arc::new(move |event| {
+        let _ = send.send(event);
+    });
+    let options = crate::ProviderOptions {
+        state_dir: Some(root.path().join("state")),
+        ..Default::default()
+    };
+    let count = || match recv.recv_timeout(Duration::from_secs(20)).unwrap() {
+        Event::Published {
+            data: Data::Integer(n),
+            ..
+        } => n,
+        other => panic!("{other:?}"),
+    };
+    for (path, expected) in [("first", 0), ("moved", 2)] {
+        let dir = root.path().join(path).join("provider");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("provider.toml"), "kind = 'wasm'\ninterval = 60").unwrap();
+        fs::write(dir.join("provider.wasm"), good(1)).unwrap();
+        entries
+            .add_entry("user", "count", dir.parent().unwrap())
+            .unwrap();
+        let mut providers = Providers::start_configured(
+            entries.apply(root.path().into()),
+            root.path().join("build"),
+            events.clone(),
+            Default::default(),
+            None,
+            options.clone(),
+        );
+        assert_eq!(count(), expected);
+        for n in 1..=2 {
+            providers.send("user:count", "user:mod", Data::Nil).unwrap();
+            assert_eq!(count(), expected + n);
+        }
+        fs::write(dir.join("provider.wasm"), good(2)).unwrap();
+        providers.reload();
+        assert_eq!(count(), expected + 2);
+        providers.shutdown();
+        assert_eq!(
+            fs::read_to_string(root.path().join("state/user/count.json")).unwrap(),
+            (expected + 2).to_string()
+        );
+    }
 }

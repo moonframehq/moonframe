@@ -59,6 +59,13 @@ impl Native for Echo {
 /// Two main windows on the shell, sharing the provider `echo`: the one
 /// opened first, then the other.
 fn two_windows(cx: &mut TestAppContext) -> (tempfile::TempDir, [Entity<MoonframeApp>; 2]) {
+    windows_with_entries(cx, Default::default())
+}
+
+fn windows_with_entries(
+    cx: &mut TestAppContext,
+    entries: moonframe_core::entries::Entries,
+) -> (tempfile::TempDir, [Entity<MoonframeApp>; 2]) {
     cx.executor().allow_parking();
     let dir = folder(SHELL);
     let provider = dir.path().join("providers/echo");
@@ -84,6 +91,8 @@ fn two_windows(cx: &mut TestAppContext) -> (tempfile::TempDir, [Entity<Moonframe
             &workspace,
             Natives::from([("echo".to_owned(), echo)]),
             Launch {
+                entries,
+                providers: Default::default(),
                 folders,
                 backends: Arc::new(Backends::for_app("e2e")),
                 views: Registry::default(),
@@ -186,5 +195,39 @@ fn a_second_window_hears_providers_after_the_first_closes(cx: &mut TestAppContex
     tell(cx, &second, "ask");
     wait_until(cx, "the reply", |cx| {
         shown(cx, &second).contains("reply=ask")
+    });
+}
+
+#[gpui_kit::test]
+fn runtime_entry_handle_updates_every_open_window(cx: &mut TestAppContext) {
+    use moonframe_core::entries::{Entries, RootPolicy};
+    let entries = Entries::default();
+    let external = tempfile::tempdir().unwrap();
+    std::fs::write(
+        external.path().join("main.luau"),
+        "return mod { view = function() return ui.text 'external entry' end }",
+    )
+    .unwrap();
+    entries
+        .add_root("user", external.path(), RootPolicy::default())
+        .unwrap();
+    let (_dir, apps) = windows_with_entries(cx, entries.clone());
+    let present = |cx: &mut TestAppContext, yes: bool| {
+        apps.iter().all(|app| {
+            app.read_with(cx, |app, _| {
+                app.workspace.slot("user:notes").is_some() == yes
+            })
+        })
+    };
+    assert!(present(cx, false));
+    let handle = entries.clone();
+    let path = external.path().to_owned();
+    std::thread::spawn(move || handle.add_entry("user", "notes", path).unwrap())
+        .join()
+        .unwrap();
+    wait_until(cx, "entry in both windows", |cx| present(cx, true));
+    entries.remove_entry("user", "notes");
+    wait_until(cx, "entry removed from both windows", |cx| {
+        present(cx, false)
     });
 }

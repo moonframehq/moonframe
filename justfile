@@ -183,6 +183,9 @@ providers dir="app":
 # Build and lint the example apps' wasm providers.
 providers-examples:
     just providers "examples/*"
+    cargo clippy --quiet --release --target wasm32-wasip2 --manifest-path examples/capability-provider/Cargo.toml --target-dir target/providers -- -D warnings
+    cargo build --quiet --release --target wasm32-wasip2 --manifest-path examples/capability-provider/Cargo.toml --target-dir target/providers
+    cargo check --quiet --target wasm32-wasip2 --manifest-path crates/moonframe-provider/Cargo.toml --features stateful --target-dir target/providers
 
 # Download the pinned luau-lsp that `just types` uses (into target/tools).
 setup-luau:

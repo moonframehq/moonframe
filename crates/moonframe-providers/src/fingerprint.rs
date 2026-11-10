@@ -19,6 +19,10 @@ const SKIPPED: &[&str] = &["target", ".git"];
 pub(crate) struct Fingerprint(u64);
 
 impl Fingerprint {
+    pub(crate) fn revision(self) -> u64 {
+        self.0
+    }
+
     pub(crate) fn of(dir: &Path) -> Self {
         let mut hasher = DefaultHasher::new();
         dir.hash(&mut hasher);

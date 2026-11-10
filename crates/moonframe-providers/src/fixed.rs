@@ -19,7 +19,10 @@ pub(crate) fn run(context: &Context) {
             .map_err(|error| format!("cannot read {file}: {error}"))
             .and_then(|text| json::data(&text).map_err(|problem| format!("{file}: {problem}")));
         match read {
-            Ok(data) => context.publish(data),
+            Ok(data) => {
+                context.status(moonframe_core::entries::EntryState::Ok, None);
+                context.publish(data);
+            },
             Err(problem) => {
                 context.fail(problem);
                 return;

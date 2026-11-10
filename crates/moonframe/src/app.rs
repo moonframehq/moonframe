@@ -49,6 +49,7 @@ use {crate::terminal::Terminals, listeners::wake_on_output};
 mod appearance;
 mod devtools;
 mod dialogs;
+mod entries;
 mod fonts;
 pub(crate) mod guard;
 mod history;
@@ -863,7 +864,7 @@ impl MoonframeApp {
     /// and providers that stay keep running, and the new folders are
     /// watched. False if the layers are the same.
     fn reload_packages(&mut self, cx: &mut Context<Self>) -> bool {
-        let roots = self.folders.roots();
+        let roots = self.hub.read(cx).entry_roots(self.folders.roots());
         if &roots == self.workspace.roots() {
             return false;
         }
