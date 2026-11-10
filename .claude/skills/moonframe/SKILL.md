@@ -1841,6 +1841,18 @@ terminal log. There are four kinds:
     ok/building/stale/failed, error and an opaque attempted-revision fingerprint.
     Stateful entries save on clean stop and restore across rebuilds and launches
     by namespaced identity; `--no-user` disables durable storage.
+  - An entry may bring `components/<name>.luau` (its `use` finds them before
+    the app's; nobody else sees them) and `style.luau` returning
+    `style { rules = { ... } }`, scoped to what the entry draws; other
+    stylesheet keys are refused. Both reload live; errors go to
+    `on_entry_status`.
+  - Built-in miniapps: `.entry_embedded::<E: RustEmbed>(namespace, id)` (or
+    `EmbeddedEntries::add_entry_embedded` on the handle) writes the folder to
+    the cache at start, so release bundles need no files; in debug use
+    `.entry(...)` on the source folder for live reload.
+  - `moonframe::check_entry(path, &policy, app_roots, &capability_names)`
+    returns `Diagnostic`s (Luau load + first view, components, style,
+    provider.toml, policy) for a host's `<app> miniapp check`.
 - **`kind = "static"`, `file = "sample.json"`:** a JSON file in the
   folder, published as it is: no code runs, so it needs no approval when
   installed. It is published again when the file changes and on any

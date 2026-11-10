@@ -1,5 +1,13 @@
 //! Host-selected miniapps outside the app's normal layers.
 
+mod check;
+mod files;
+
+pub use {
+    check::{Diagnostic, Severity, check, check_in},
+    files::EntryFiles,
+};
+
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -41,6 +49,8 @@ struct Registry {
     roots: BTreeMap<String, (PathBuf, RootPolicy)>,
     entries: BTreeMap<String, Entry>,
     changed: Option<Arc<dyn Fn() + Send + Sync>>,
+    /// Embedded entries, written once the host knows its cache folder.
+    files: files::Pending,
 }
 
 impl Entries {
@@ -87,6 +97,7 @@ impl Entries {
             registry
                 .entries
                 .retain(|_, entry| entry.namespace != namespace);
+            registry.files.forget_root(namespace);
             registry.changed.clone()
         };
         if let Some(changed) = changed {
@@ -116,6 +127,7 @@ impl Entries {
                 .get(namespace)
                 .cloned()
                 .ok_or_else(|| format!("no entry root `{namespace}`"))?;
+            registry.files.forget(namespace, id);
             let name = format!("{namespace}:{id}");
             registry.entries.insert(name.clone(), Entry {
                 name,
@@ -139,6 +151,7 @@ impl Entries {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             registry.entries.remove(&format!("{namespace}:{id}"));
+            registry.files.forget(namespace, id);
             registry.changed.clone()
         };
         if let Some(changed) = changed {
@@ -227,7 +240,30 @@ impl Entry {
         self.path.join("main.luau")
     }
 
+    /// `style.luau`, whose `rules` apply only to what this entry draws.
+    pub fn style_file(&self) -> PathBuf {
+        self.path.join("style.luau")
+    }
+
+    /// `components/<name>.luau`, which this entry's `use` finds before the
+    /// app's components of the same name.
+    pub fn components(&self) -> BTreeMap<String, PathBuf> {
+        components(&self.path)
+    }
+
     pub fn root(&self) -> &Path {
         &self.root
     }
+}
+
+/// Each `components/<name>.luau` under an entry's folder, by name.
+pub(crate) fn components(folder: &Path) -> BTreeMap<String, PathBuf> {
+    let Ok(read) = std::fs::read_dir(folder.join("components")) else {
+        return BTreeMap::new();
+    };
+    read.flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file() && path.extension().is_some_and(|ext| ext == "luau"))
+        .filter_map(|path| Some((path.file_stem()?.to_str()?.to_owned(), path.clone())))
+        .collect()
 }

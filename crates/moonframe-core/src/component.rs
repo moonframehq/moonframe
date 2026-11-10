@@ -25,7 +25,7 @@ use {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Library(Rc<BTreeMap<String, Source>>);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Source {
     path: PathBuf,
     text: Result<String, Error>,
@@ -37,28 +37,39 @@ const LOADED: &str = "moonframe.components";
 
 impl Library {
     pub(crate) fn read(files: BTreeMap<String, PathBuf>) -> Self {
-        Self(Rc::new(
-            files
-                .into_iter()
-                .map(|(name, path)| {
-                    // The name goes into the demo's and usage's Luau as
-                    // `use "name"`, so it keeps to a mod name's letters.
-                    let text = if style::valid_name(&name) {
-                        std::fs::read_to_string(&path).map_err(|error| {
-                            Error::new(format!("cannot read {}: {error}", path.display()))
-                        })
-                    } else {
-                        Err(Error::new(format!(
-                            "{}: a component's file name is a-z, 0-9, - and _",
-                            path.display()
-                        )))
-                    };
-                    (name, Source { path, text })
-                })
-                .collect(),
-        ))
+        Self(Rc::new(sources(files).collect()))
     }
 
+    /// These components with `files` over them: a miniapp's own, which its
+    /// `use` finds before the app's of the same name.
+    pub(crate) fn with(&self, files: BTreeMap<String, PathBuf>) -> Self {
+        if files.is_empty() {
+            return self.clone();
+        }
+        let mut all = (*self.0).clone();
+        all.extend(sources(files));
+        Self(Rc::new(all))
+    }
+}
+
+fn sources(files: BTreeMap<String, PathBuf>) -> impl Iterator<Item = (String, Source)> {
+    files.into_iter().map(|(name, path)| {
+        // The name goes into the demo's and usage's Luau as
+        // `use "name"`, so it keeps to a mod name's letters.
+        let text = if style::valid_name(&name) {
+            std::fs::read_to_string(&path)
+                .map_err(|error| Error::new(format!("cannot read {}: {error}", path.display())))
+        } else {
+            Err(Error::new(format!(
+                "{}: a component's file name is a-z, 0-9, - and _",
+                path.display()
+            )))
+        };
+        (name, Source { path, text })
+    })
+}
+
+impl Library {
     /// `use(name)` for a module's state: the component's `build`. For a
     /// component that keeps state (it has `update`), a function that mounts
     /// an instance of it instead: `tabbed { id = "main", ... }` becomes an

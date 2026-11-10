@@ -349,7 +349,9 @@ packaging, for people and coding agents. [Markdown source](docs/wasm-providers.m
 `app["mshub:notes"]`. Roots default to prebuilt Wasm with process/socket kinds
 disabled. `on_entry_status` reports builds and stale revisions; failed Wasm
 builds keep the old worker running. Stateful entry providers survive clean
-restarts. See [the miniapp API and guest SDK](docs/wasm-providers.md#host-defined-capabilities-and-external-miniapps).
+restarts. Entries may bring their own `components/` and a `style.luau`
+scoped to them, ship inside the binary with `entry_embedded`, and be checked
+with `moonframe::check_entry`. See [the miniapp API and guest SDK](docs/wasm-providers.md#host-defined-capabilities-and-external-miniapps).
 
 ## Whole apps as profiles
 

@@ -15,6 +15,7 @@ mod components;
 mod dictation;
 mod elements;
 mod entries;
+mod entry_scopes;
 mod gestures;
 mod history;
 mod lightbox;

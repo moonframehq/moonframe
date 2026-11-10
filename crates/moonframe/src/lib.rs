@@ -91,12 +91,17 @@ pub use {
     gpui_kit,
     host_menus::refresh_menus,
     hosted::{HostView, Messenger, ViewInit},
-    launch::{LogLayer, Moonframe},
+    launch::{EmbeddedEntries, LogLayer, Moonframe},
     moonframe_core::{
         self, Data,
-        entries::{BuildPolicy, Entries, Entry, EntryKind, EntryState, EntryStatus, RootPolicy},
+        entries::{
+            BuildPolicy, Diagnostic, Entries, Entry, EntryFiles, EntryKind, EntryState,
+            EntryStatus, RootPolicy, Severity,
+        },
     },
-    moonframe_providers::{Caller, Capabilities, Handle, HostCallLimits, HostCapability, Native},
+    moonframe_providers::{
+        Caller, Capabilities, Handle, HostCallLimits, HostCapability, Native, check_entry,
+    },
     rust_embed,
 };
 

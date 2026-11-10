@@ -82,7 +82,7 @@ pub use {
     manifest::{Capability, Kind, Manifest, PREBUILT, Publish, Restart, Start},
     mods::{Mods, owner},
     native::{Handle, Native, Natives},
-    options::ProviderOptions,
+    options::{ProviderOptions, check_entry},
 };
 
 #[cfg(feature = "tokio")]

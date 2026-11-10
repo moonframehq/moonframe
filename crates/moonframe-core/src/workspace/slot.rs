@@ -191,7 +191,8 @@ impl Slot {
         {
             Ok((rules, (view, broken, reads))) => {
                 self.rollback = None;
-                self.rules = rules;
+                self.rules = self.scoped.clone();
+                self.rules.layer(&rules);
                 self.view = Some(view);
                 self.broken = broken;
                 self.view_error = None;

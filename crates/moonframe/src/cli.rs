@@ -427,6 +427,14 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
         return ExitCode::from(2);
     }
     let _ = crate::IDENTITY.set(launch.identity.clone());
+    // Embedded miniapps wait for the cache, which the identity names.
+    let unwritten = launch.entries.set_files_dir(paths::cache().join("entries"));
+    if !unwritten.is_empty() {
+        for error in unwritten {
+            eprintln!("{error}");
+        }
+        return ExitCode::FAILURE;
+    }
     if let Ok(dir) = std::env::current_dir() {
         // Terminals start here, and the explorer shows its project.
         moonframe_providers::set_launch_dir(&dir);

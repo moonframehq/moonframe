@@ -9,8 +9,8 @@ fork this repository.
 
 For sandboxed, end-user miniapps outside `app_dir`, see
 [host capabilities and runtime entries](wasm-providers.md#host-defined-capabilities-and-external-miniapps):
-`Moonframe::capability`, `root`, `entry`, `entry_handle`, `on_entry_status`,
-and the serde guest SDK. Native providers remain code compiled into the host.
+`Moonframe::capability`, `root`, `entry`, `entry_embedded`, `entry_handle`,
+`on_entry_status`, `check_entry`, and the serde guest SDK. Native providers remain code compiled into the host.
 
 ```sh
 moonframe init ~/code/notes                 # a new crate: Cargo.toml, src/main.rs, app/

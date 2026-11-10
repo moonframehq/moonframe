@@ -112,6 +112,12 @@ const DONE: &str = ".moonframe-embedded";
 /// Writes `E`'s files under `cache/<label>/<hash>`, unless they are there
 /// already, and returns that folder.
 pub(crate) fn materialize<E: RustEmbed>(cache: &Path, label: &str) -> io::Result<PathBuf> {
+    materialize_into::<E>(&cache.join(label))
+}
+
+/// Writes `E`'s files under `parent/<hash>`, unless they are there
+/// already, and returns that folder.
+pub(crate) fn materialize_into<E: RustEmbed>(parent: &Path) -> io::Result<PathBuf> {
     let mut names: Vec<String> = E::iter().map(|name| name.into_owned()).collect();
     names.sort();
     let mut hasher = Fnv::default();
@@ -121,15 +127,13 @@ pub(crate) fn materialize<E: RustEmbed>(cache: &Path, label: &str) -> io::Result
             hasher.write(&file.metadata.sha256_hash());
         }
     }
-    let folder = cache.join(label).join(hasher.hex());
+    let folder = parent.join(hasher.hex());
     if folder.join(DONE).is_file() {
         return Ok(folder);
     }
     // Written beside the folder, then moved into place: another process
     // starting at once finds the whole folder or none.
-    let partial = cache
-        .join(label)
-        .join(format!(".{}-{}", hasher.hex(), std::process::id()));
+    let partial = parent.join(format!(".{}-{}", hasher.hex(), std::process::id()));
     if partial.exists() {
         fs::remove_dir_all(&partial)?;
     }

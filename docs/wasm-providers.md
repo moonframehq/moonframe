@@ -345,6 +345,64 @@ and socket providers. Prebuilt-only entries require `provider.wasm` and reject
 refuses local `build.rs` and `.cargo/` hooks. `allow_process` and `allow_socket`
 are explicit opt-ins. Ordinary app layers retain their existing behavior.
 
+An entry may also bring `components/<name>.luau` and `style.luau`:
+
+```text
+notes/
+  main.luau            the mod, mounted as ui.mount "mshub:notes"
+  style.luau           optional: return style { rules = { ... } }
+  components/
+    card.luau          use "card" finds this before the app's `card`
+  provider/
+    provider.toml
+```
+
+The entry's `use` looks in its own `components/` first, then in the app's;
+other mods never see an entry's components, and they stay out of the
+Components window. Its `style.luau` takes only `rules`, which apply to what
+the entry draws (under its mod's own `styles`, over the app's stylesheet) and
+may name the app's colors; colors, fonts and the other stylesheet keys belong
+to the app and are refused. Both reload live with the entry; a broken
+`style.luau` keeps its last good rules and reports through `on_entry_status`.
+
+**Built-in miniapps.** A miniapp shipped inside the host binary needs no files
+on disk: embed its folder with `rust-embed` and select it with
+`entry_embedded`. It is written to
+`~/.cache/<app>/entries/<namespace>/<id>/<hash>` as the app starts (once per
+content), so `main.luau`, `components/` and a `kind = "native"` provider work
+in a release bundle. In debug, point `entry` at the source folder instead, for
+live reload, as with `embedded_app` and `app_dir`:
+
+```rust
+#[derive(moonframe::rust_embed::RustEmbed)]
+#[crate_path = "moonframe::rust_embed"]
+#[folder = "miniapps/notes"]
+struct Notes;
+
+let app = Moonframe::new("mshub").root("builtin", "miniapps", RootPolicy::default());
+let app = if cfg!(debug_assertions) {
+    app.entry("builtin", "notes", concat!(env!("CARGO_MANIFEST_DIR"), "/miniapps/notes"))
+} else {
+    app.entry_embedded::<Notes>("builtin", "notes")
+};
+```
+
+On the runtime handle, `use moonframe::EmbeddedEntries` and call
+`entries.add_entry_embedded::<Notes>("builtin", "notes")`; one added before
+`run` waits until the app knows its cache folder.
+
+**Checking an entry.** `moonframe::check_entry(path, &policy, app_roots,
+&["mshub.entities"])` returns a `Vec<Diagnostic>` (`severity`, `file`,
+`message`) for a host CLI's `<app> miniapp check`: it compiles and loads
+`main.luau`, draws its first view headlessly, loads each component and
+`style.luau`, reads `provider/provider.toml` with its capabilities checked
+against the names given, and applies `policy` (prebuilt-only, process,
+socket). With `app_roots` as `None`, a `use` of a component the entry does not
+bring is only a warning. The Luau-only part is
+`moonframe_core::entries::check(path, &policy)` (or `check_in` with the app's
+`Roots`). Static type-checking stays with `luau-lsp analyze`, as `just types`
+runs it.
+
 `EntryStatus` contains `name`, `kind` (`Mod`/`Provider`), `state`
 (`Ok`/`Building`/`Stale`/`Failed`), optional `error`, and `revision` (an opaque
 fingerprint of the attempted revision, not a monotonic counter). The callback
