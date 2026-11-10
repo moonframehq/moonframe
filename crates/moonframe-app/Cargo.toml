@@ -38,6 +38,7 @@ default = [
   "forge",
   "ghostty",
   "git",
+  "gpui",
   "guard",
   "herdr-core",
   "map",
@@ -62,20 +63,25 @@ default = [
   # keep-sorted end
 ]
 # keep-sorted start
-acp           = ["moonframe/acp"]
-alacritty     = ["moonframe/alacritty"]
-awake         = ["moonframe/awake"]
-browser       = ["moonframe/browser"]
-capture       = ["moonframe/capture"]
-chat          = ["moonframe/chat"]
-crash         = ["moonframe/crash"]
-displays      = ["moonframe/displays"]
-dock          = ["moonframe/dock"]
-docs          = ["moonframe/docs"]
-documents     = ["moonframe/documents"]
-forge         = ["moonframe/forge"]
-ghostty       = ["moonframe/ghostty"]
-git           = ["moonframe/git"]
+acp       = ["moonframe/acp"]
+alacritty = ["moonframe/alacritty"]
+awake     = ["moonframe/awake"]
+browser   = ["moonframe/browser"]
+capture   = ["moonframe/capture"]
+chat      = ["moonframe/chat"]
+crash     = ["moonframe/crash"]
+displays  = ["moonframe/displays"]
+dock      = ["moonframe/dock"]
+docs      = ["moonframe/docs"]
+documents = ["moonframe/documents"]
+forge     = ["moonframe/forge"]
+ghostty   = ["moonframe/ghostty"]
+git       = ["moonframe/git"]
+# What draws the window: the same Luau on either, and a build names one. `gpui`
+# is the whole app, which any capability above brings in by itself. `rune` is
+# moonframe-rune, a smaller renderer (see the README), and wins if both are on:
+#   cargo run -p moonframe-app --no-default-features --features rune
+gpui          = ["moonframe"]
 guard         = ["moonframe/guard"]
 herdr-core    = ["moonframe/herdr-core"]
 map           = ["moonframe/map"]
@@ -88,6 +94,7 @@ procs         = ["moonframe/procs"]
 projects      = ["moonframe/projects"]
 prose         = ["moonframe/prose"]
 restart       = ["moonframe/restart"]
+rune          = ["dep:moonframe-rune", "moonframe-rune/ghostty"]
 sealed        = ["moonframe/sealed"]
 shell         = ["moonframe/shell"]
 socket        = ["moonframe/socket"]
@@ -110,4 +117,5 @@ pattern-capture = ["moonframe/capture", "patterns"]
 
 [dependencies]
 # Keep this explicit: other workspace hosts use the library's defaults.
-moonframe = { default-features = false, path = "../moonframe" }
+moonframe      = { default-features = false, optional = true, path = "../moonframe" }
+moonframe-rune = { optional = true, workspace = true }

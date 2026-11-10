@@ -174,6 +174,7 @@ pub(crate) fn about_panel(
     name: &str,
     about: &moonframe_core::About,
     icon: Option<&std::path::Path>,
+    renderer: &str,
 ) -> bool {
     use {
         objc2::{AllocAnyThread as _, MainThreadMarker, rc::Retained, runtime::AnyObject},
@@ -183,34 +184,29 @@ pub(crate) fn about_panel(
     let Some(main) = MainThreadMarker::new() else {
         return false;
     };
-    let credits: Vec<&str> = [&about.description, &about.website]
-        .into_iter()
-        .filter_map(|text| text.as_deref())
-        .collect();
     let mut options: Vec<(&str, Retained<AnyObject>)> = vec![(
         "ApplicationName",
         Retained::into_super(Retained::into_super(NSString::from_str(name))),
     )];
-    if let Some(version) = &about.version {
-        options.push((
-            "ApplicationVersion",
-            Retained::into_super(Retained::into_super(NSString::from_str(version))),
-        ));
-    }
+    // A binary outside a bundle has no Info.plist for macOS to read it from.
+    let version = shown_version(about);
+    options.push((
+        "ApplicationVersion",
+        Retained::into_super(Retained::into_super(NSString::from_str(&version))),
+    ));
     // In parentheses after the version: what the app runs on.
-    let built_on = format!("Moonframe {}", env!("CARGO_PKG_VERSION"));
+    let built_on = built_on();
     options.push((
         "Version",
         Retained::into_super(Retained::into_super(NSString::from_str(&built_on))),
     ));
-    if !credits.is_empty() {
-        let text = NSString::from_str(&credits.join("\n\n"));
-        let credits = NSAttributedString::from_nsstring(&text);
-        options.push((
-            "Credits",
-            Retained::into_super(Retained::into_super(credits)),
-        ));
-    }
+    let text = NSString::from_str(&credits(about, renderer));
+    options.push((
+        "Credits",
+        Retained::into_super(Retained::into_super(NSAttributedString::from_nsstring(
+            &text,
+        ))),
+    ));
     if let Some(copyright) = &about.copyright {
         options.push((
             "Copyright",
@@ -244,8 +240,43 @@ pub(crate) fn about_panel(
 }
 
 #[cfg(not(target_os = "macos"))]
-pub(crate) fn about_panel(_: &str, _: &moonframe_core::About, _: Option<&std::path::Path>) -> bool {
+pub(crate) fn about_panel(
+    _: &str,
+    _: &moonframe_core::About,
+    _: Option<&std::path::Path>,
+    _: &str,
+) -> bool {
     false
+}
+
+/// The version an About panel shows: the shell's, else the app's own.
+pub(crate) fn shown_version(about: &moonframe_core::About) -> String {
+    about
+        .version
+        .clone()
+        .unwrap_or_else(|| crate::identity().version.clone())
+}
+
+/// What the app runs on: `Moonframe 0.2.0`.
+pub(crate) fn built_on() -> String {
+    format!("Moonframe {}", env!("CARGO_PKG_VERSION"))
+}
+
+/// The text under the name in an About panel: what the shell says of the
+/// app, and what draws this build.
+pub(crate) fn credits(about: &moonframe_core::About, renderer: &str) -> String {
+    let backend = backend_line(renderer);
+    [about.description.as_deref(), about.website.as_deref()]
+        .into_iter()
+        .flatten()
+        .chain([backend.as_str()])
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+/// What draws the app, as its About says: a build is one or the other.
+pub(crate) fn backend_line(renderer: &str) -> String {
+    format!("Backend: {renderer}")
 }
 
 /// Elsewhere the window system takes the icon from the app's desktop

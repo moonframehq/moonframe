@@ -6,6 +6,7 @@
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+mod both_backends;
 mod host_views;
 mod regressions;
 mod revision_timeline;

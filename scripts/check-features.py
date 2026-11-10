@@ -17,13 +17,16 @@ def cargo(*args, capture=False):
     ).stdout
 
 
-def selection(feature):
-    return ["--no-default-features", *(["--features", feature] if feature else [])]
+def selection(feature, minimal=None):
+    """Only `feature`; with none, `minimal`, as the starter has to name a renderer."""
+    chosen = feature or minimal
+    return ["--no-default-features", *(["--features", chosen] if chosen else [])]
 
 
 def dependencies(package, feature):
+    minimal = "gpui" if package == "moonframe-app" else None
     output = cargo(
-        "tree", "--locked", "-p", package, *selection(feature),
+        "tree", "--locked", "-p", package, *selection(feature, minimal),
         "--edges", "normal,build", "--prefix", "none", "--format", "{p}",
         capture=True,
     )
@@ -40,7 +43,8 @@ def main():
     manifests = {package["name"]: package["features"] for package in metadata["packages"]}
     library, starter = manifests["moonframe"], manifests["moonframe-app"]
     features = set(library) - {"default"}
-    starter_only = {"pattern-capture", "patterns"}
+    # `gpui` and `rune` choose the renderer; `moonframe` is `gpui`'s dependency.
+    starter_only = {"gpui", "moonframe", "pattern-capture", "patterns", "rune"}
     assert features == set(starter) - {"default"} - starter_only, "starter must forward every capability"
     for name in features:
         assert starter[name] == [f"moonframe/{name}"], name
@@ -48,7 +52,7 @@ def main():
     # need a street map, LaTeX, live video or what long runs ask of the machine.
     opt_in = {"awake", "crash", "displays", "dock", "documents", "ghostty", "guard", "map", "math", "pi", "planner", "procs", "projects", "restart",
               "socket", "speech", "transcripts", "video"}
-    assert set(starter["default"]) == set(library["default"]) | opt_in
+    assert set(starter["default"]) == set(library["default"]) | opt_in | {"gpui"}
 
     optional = {
         # keep-sorted start
@@ -99,7 +103,7 @@ def main():
             print(f"lint: {feature or 'minimal'}", flush=True)
             cargo("clippy", "--quiet", "--locked", "-p", "moonframe-app", "-p", "moonframe",
                   *(["--release"] if args.release else []),
-                  "--all-targets", *selection(feature), "--", "-D", "warnings")
+                  "--all-targets", *selection(feature, "moonframe-app/gpui"), "--", "-D", "warnings")
 
 
 if __name__ == "__main__":

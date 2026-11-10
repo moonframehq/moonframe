@@ -70,6 +70,10 @@ pub struct Stack {
     pub justify: Justify,
     /// Move children that do not fit onto another line.
     pub wrap: bool,
+    /// As a mod's whole view in a row region, its children are members of
+    /// that region: each one fits or leaves the row by itself, and this
+    /// stack's own look is not drawn. Anywhere else it is a plain stack.
+    pub spread: bool,
     /// Matches `:selected` rules, as a selected item does: a tab, a
     /// segment, a row.
     pub selected: bool,

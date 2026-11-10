@@ -640,6 +640,88 @@ fn the_apps_tab_bar_opens_kinds_keeps_its_tabs_and_publishes_them() {
     );
 }
 
+/// The kind of each main tab, as saved.
+fn saved_tabs(memory: &Memory) -> Vec<String> {
+    let saved = memory.0.borrow().0.get("mod:shell/tabbed#main").cloned();
+    let Some(Data::Map(state)) = saved else {
+        panic!("no saved tabs");
+    };
+    let tabs = match state.get("tabs").cloned() {
+        Some(Data::List(tabs)) => tabs,
+        // An empty Luau table has no shape to tell it from a map.
+        Some(Data::Map(empty)) if empty.is_empty() => Vec::new(),
+        other => panic!("no tabs: {other:?}"),
+    };
+    tabs.into_iter()
+        .filter_map(|tab| match tab.get("kind") {
+            Some(Data::String(kind)) => Some(kind.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A workspace on the real app, relaunched from a save with no main tabs.
+fn opened_with_no_tabs() -> (Workspace, Memory) {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
+    let memory = Memory::default();
+    let empty = Data::map([("tabs", Data::List(Vec::new())), ("next", Data::Integer(7))]);
+    memory
+        .0
+        .borrow_mut()
+        .0
+        .insert("mod:shell/tabbed#main".to_owned(), empty);
+    let workspace = Workspace::open_with(root.as_path(), false, Some(Box::new(memory.clone())));
+    (workspace, memory)
+}
+
+#[test]
+fn a_launch_with_no_tabs_saved_opens_a_terminal() {
+    let (workspace, memory) = opened_with_no_tabs();
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    assert_eq!(saved_tabs(&memory), ["component:terminal"]);
+    let topic = workspace.topic("tabs/main").cloned();
+    assert!(
+        matches!(&topic, Some(Data::Map(fields)) if fields.get("count") == Some(&Data::Integer(1))),
+        "{topic:?}"
+    );
+}
+
+#[test]
+fn closing_the_last_tab_opens_a_new_terminal() {
+    let (mut workspace, memory) = opened_with_no_tabs();
+    let key = "shell/tabbed#main";
+    let close = Data::map([("close", Data::from("main-7"))]);
+    workspace.send(key, key, close);
+    assert_eq!(saved_tabs(&memory), ["component:terminal"]);
+}
+
+#[test]
+fn a_shell_that_keeps_exiting_is_not_started_without_end() {
+    let (mut workspace, memory) = opened_with_no_tabs();
+    let key = "shell/tabbed#main";
+    let exited =
+        |id: String| Data::map([("tab_report", Data::from(id)), ("exited", Data::from(true))]);
+    // It opened as main-7; each exit replaces it, up to the limit.
+    for id in 7..10 {
+        workspace.send(key, key, exited(format!("main-{id}")));
+        assert_eq!(
+            saved_tabs(&memory),
+            ["component:terminal"],
+            "after main-{id}"
+        );
+    }
+    workspace.send(key, key, exited("main-10".to_owned()));
+    assert!(saved_tabs(&memory).is_empty(), "the bar gives up");
+    // Choosing one starts over.
+    let pick = Data::map([("pick", Data::from("component:terminal"))]);
+    workspace.send(key, key, pick);
+    assert_eq!(saved_tabs(&memory), ["component:terminal"]);
+}
+
 /// What the strip draws for `tab`: "working" for its spinner, else the name
 /// of its dot.
 fn drawn_status(workspace: &Workspace, tab: &str) -> Option<String> {

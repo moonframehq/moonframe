@@ -1,0 +1,67 @@
+[package]
+description            = "The Moonframe window drawn with Rune instead of GPUI"
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-rune"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[features]
+# As `moonframe/sealed`, for the code the two crates share.
+sealed = ["moonframe-packages/sealed"]
+# Ghostty's emulator for `engine = "ghostty"`, which needs Zig to build (see
+# mise.toml). Without it those terminals run on Alacritty's.
+ghostty = ["moonframe-terminal/ghostty"]
+
+[dependencies]
+markdown.workspace              = true
+moonframe-acp.workspace         = true
+moonframe-chat.workspace        = true
+moonframe-core.workspace        = true
+moonframe-docs.workspace        = true
+moonframe-documents.workspace   = true
+moonframe-forge.workspace       = true
+moonframe-git.workspace         = true
+moonframe-mux                   = { features = ["herdr-core", "terminal"], workspace = true }
+moonframe-packages              = { default-features = false, path = "../moonframe-packages" }
+moonframe-pi.workspace          = true
+moonframe-planner.workspace     = true
+moonframe-procs.workspace       = true
+moonframe-projects.workspace    = true
+moonframe-providers             = { features = ["tokio", "wasm"], workspace = true }
+moonframe-shell.workspace       = true
+moonframe-speech.workspace      = true
+moonframe-store.workspace       = true
+moonframe-terminal              = { features = ["alacritty"], workspace = true }
+moonframe-transcripts.workspace = true
+moonframe-usage.workspace       = true
+notify.workspace                = true
+rune.workspace                  = true
+rune-kit.workspace              = true
+rust-embed.workspace            = true
+serde_json.workspace            = true
+tempfile.workspace              = true
+toml.workspace                  = true
+tracing.workspace               = true
+tracing-subscriber.workspace    = true
+ureq.workspace                  = true
+
+# Web views live where wry has a child view to offer; a ring is POSIX shared
+# memory. Elsewhere `ui.browser` and `ui.video` show their markers.
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+wry.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+moonframe-frames.workspace = true
+
+# The About panel and Dock icon, in `dock.rs`, shared with `moonframe`.
+[target.'cfg(target_os = "macos")'.dependencies]
+block2.workspace           = true
+objc2.workspace            = true
+objc2-app-kit              = { features = ["NSBezierPath", "NSColor", "NSDockTile", "NSImageView", "NSMenu", "NSMenuItem", "NSView", "block2"], workspace = true }
+objc2-foundation.workspace = true

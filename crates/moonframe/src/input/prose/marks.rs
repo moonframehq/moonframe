@@ -333,5 +333,7 @@ pub(super) fn paint(
     runs
 }
 
+// Named in full, so Rune, which shares this file, finds them too.
 #[cfg(test)]
+#[path = "marks/tests.rs"]
 mod tests;

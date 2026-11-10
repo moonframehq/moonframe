@@ -91,16 +91,16 @@ impl MoonframeApp {
     pub(crate) fn show_about(&mut self, cx: &mut Context<Self>) {
         let about = self.workspace.about();
         let name = about.name.clone().unwrap_or_else(crate::title);
-        if crate::dock::about_panel(&name, &about, self.folders.icon().as_deref()) {
+        let icon = self.folders.icon();
+        if crate::dock::about_panel(&name, &about, icon.as_deref(), "GPUI") {
             return;
         }
-        let mut text = name;
-        if let Some(version) = &about.version {
-            text = format!("{text} {version}");
-        }
-        if let Some(description) = &about.description {
-            text = format!("{text}: {description}");
-        }
+        let text = format!(
+            "{name} {} ({}): {}",
+            crate::dock::shown_version(&about),
+            crate::dock::built_on(),
+            crate::dock::credits(&about, "GPUI").replace("\n\n", " · "),
+        );
         self.show_toast_text(text.into(), cx);
     }
 }

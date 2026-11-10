@@ -633,6 +633,7 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
                 cx.theme().is_dark(),
                 persist,
             );
+            workspace.set_host("renderer", moonframe_core::Data::from("gpui"));
             if let Some(report) = &launch.providers.on_entry_status {
                 workspace.on_entry_status(report.clone());
             }

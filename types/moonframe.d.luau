@@ -290,6 +290,9 @@ type StackProps = {
 	align: Align?,
 	justify: Justify?,
 	wrap: boolean?,
+	-- As a mod's whole view in a row region, each child is a member of it:
+	-- it fits or leaves the row by itself.
+	spread: boolean?,
 	-- Matches `:selected` rules, as on an item: tabs, segments, tiles.
 	selected: boolean?,
 	-- Extras: shown under the pointer; sent on a right-click; copied on a click.
@@ -1962,9 +1965,14 @@ type MountProps = {
 	[number]: string,
 }
 
+-- What draws this build.
+type Renderer = "gpui" | "rune"
+
 -- What every `view` gets as `app`.
 type App = {
 	dark: boolean,
+	-- Absent where nothing draws, as in `--check`.
+	renderer: Renderer?,
 	appearance: Appearance,
 	window: WindowState,
 	-- Every screen, the primary one first.

@@ -28,6 +28,7 @@ fn column() -> Stack {
         align: Align::Stretch,
         justify: Justify::Start,
         wrap: false,
+        spread: false,
         selected: false,
         scroll_to: None,
         action: None,

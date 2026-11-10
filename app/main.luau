@@ -170,6 +170,7 @@ return mod {
 				padding = "small",
 				gap = "large",
 				align = "center",
+				justify = "between",
 				surface = "sidebar",
 				border = "top",
 				-- Mods on the left, and mods pushed to the right edge.

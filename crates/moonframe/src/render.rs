@@ -522,6 +522,36 @@ impl<'w, 'm> Painter<'w, 'm> {
             .collect()
     }
 
+    /// A row region's members: each mod's view, or with `spread` each of that
+    /// view's children. One with a problem stays whole, to show it.
+    fn row_region(&mut self, name: &str, place: &Place<'w>, cx: Cx) -> Vec<AnyElement> {
+        let mut members = Vec::new();
+        for member in self.workspace.region(name) {
+            let spread = self
+                .workspace
+                .slot(member)
+                .filter(|slot| slot.error().is_none())
+                .and_then(|slot| slot.view())
+                .and_then(|view| match view {
+                    Node::Stack(stack) if stack.spread => Some(stack),
+                    _ => None,
+                })
+                .filter(|_| !self.mounted.contains(&member) && self.mounted.len() < MAX_MOUNTS);
+            let Some(stack) = spread else {
+                members.push(self.slot(member, Some(place), cx));
+                continue;
+            };
+            self.mounted.push(member);
+            let mut root = place.mounted(member);
+            if self.sink.is_some() {
+                root.crumb = Some(Crumb::module(member, self.outer.clone()));
+            }
+            members.extend(self.children(&stack.children, &root, Direction::Row, cx));
+            self.mounted.pop();
+        }
+        members
+    }
+
     fn children(
         &mut self,
         nodes: &'w [Node],

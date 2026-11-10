@@ -3,6 +3,8 @@
 local about = use "about"
 local switch = use "switch"
 
+local BACKENDS = { gpui = "GPUI", rune = "Rune" }
+
 local OPENED = {
 	["open-website"] = "Opening moonframe.dev…",
 	["open-notes"] = "Opening the 1.4.0 release notes…",
@@ -26,7 +28,8 @@ return mod {
 		end
 	end,
 
-	view = function(state)
+	view = function(state, app)
+		local backend = BACKENDS[app.renderer] or "Unknown"
 		return ui.column {
 			gap = "normal",
 			ui.row {
@@ -49,13 +52,14 @@ return mod {
 					{ "Built", "2026-10-28 14:02" },
 					{ "Channel", "beta" },
 					{ "Platform", "macOS 26 · arm64" },
+					{ "Backend", backend },
 				},
 				links = {
 					{ label = "Website", icon = "globe", msg = "open-website" },
 					{ label = "Release notes", icon = "file-text", msg = "open-notes" },
 					{ label = "Report an issue", icon = "bug", msg = "report" },
 				},
-				copy = "Moonframe 1.4.0 (beta 2) 6731aec macOS 26 arm64",
+				copy = `Moonframe 1.4.0 (beta 2) 6731aec macOS 26 arm64 {backend}`,
 				copyright = "© 2026 Fabien Penso",
 			},
 		}

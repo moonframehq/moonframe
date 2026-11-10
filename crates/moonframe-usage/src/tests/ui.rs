@@ -42,10 +42,15 @@ fn sheet(workspace: &Workspace) -> &Popover {
         "{:?}",
         workspace.problems()
     );
-    match workspace.slot("usage").unwrap().view().unwrap() {
-        Node::Popover(popover) => popover,
-        other => panic!("usage is inaccessible: {other:?}"),
-    }
+    // The bar's widgets spread, so the sheet hangs from the first of them.
+    let view = workspace.slot("usage").unwrap().view().unwrap();
+    nodes(view)
+        .into_iter()
+        .find_map(|node| match node {
+            Node::Popover(popover) => Some(popover),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("usage is inaccessible: {view:?}"))
 }
 
 fn nodes(node: &Node) -> Vec<&Node> {
