@@ -11,6 +11,8 @@ version.workspace      = true
 workspace = true
 
 [dependencies]
+# English for the messages herdr-usage names by ID (locales/en-US).
+herdr-i18n.workspace          = true
 herdr-usage.workspace         = true
 moonframe-core.workspace      = true
 moonframe-providers.workspace = true
