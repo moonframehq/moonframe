@@ -38,7 +38,7 @@
     <div class="head">
       <p class="kicker">The native desktop app factory</p>
       <h1>Malleable<br><i>software.</i></h1>
-      <p class="deck">Ask for a change and watch the running app reshape itself. Moonframe makes native desktop apps in Rust, drawn on the GPU by GPUI, with every panel, toolbar and status bar a Luau file you or an agent can change while the app runs. Start from its own app, or build whole new ones and ship each as a standalone release. No rebuild, no restart, and your terminals keep running.</p>
+      <p class="deck">Ask for a change and watch the running app reshape itself. Moonframe makes native desktop apps in Rust, drawn by GPUI by default or the <a href="#renderers">experimental Rune renderer</a>. Every panel, toolbar and status bar is a Luau file you or an agent can change while the app runs. Start from its own app, or build whole new ones and ship each as a standalone release. No rebuild, no restart, and your terminals keep running.</p>
       <div class="start"><a class="btn" href="#get-started">Get started</a><a class="btn o" href="https://github.com/moonframehq/moonframe">★ Star on GitHub</a><a class="btn o discord" href="https://discord.gg/pGrNdJU6k4"><span class="icon" aria-hidden="true"></span>Join the Discord</a></div>
     </div>
 
@@ -166,7 +166,7 @@ just install   # into /Applications</pre></div>
 
   <section id="apps">
     <div class="plates-head">
-      <div><p class="kicker">The plates</p><h2>Every one of these runs <i>on the same engine.</i></h2>
+      <div><p class="kicker">The plates</p><h2>Every one of these is <i>built on Moonframe.</i></h2>
         <p class="lead">Whole apps install beside the starter as profiles, each with its own shell, mods, menus, icon and theme, and bundle into a standalone release.</p></div>
       <div class="big-num" id="app-count"></div>
     </div>
@@ -174,11 +174,34 @@ just install   # into /Applications</pre></div>
     <div class="installbar"><span><b>Install one from git.</b> Packages ship source only, so everything they run can be read first.</span><pre>moonframe app install github.com/owner/some-app</pre></div>
   </section>
 
+  <section id="renderers">
+    <p class="kicker">Two renderers · the same Luau</p>
+    <h2>GPUI by default. <i>Rune, experimentally.</i></h2>
+    <p class="lead">Your mods, components and stylesheet build one checked tree. <a href="https://www.gpui.rs">GPUI</a> draws it in the apps we ship. The experimental <a href="https://github.com/anomalyco/rune">Rune</a> backend draws that same Luau in a separate build that links no GPUI.</p>
+    <div class="renderer-shots">
+      <figure>
+        <a class="renderer-shot" href="img/full/rune-emberline.png" data-command="just rune-app emberline"><img src="img/rune-emberline.webp" width="2960" height="2080" loading="lazy" alt="Emberline's dark CRM dashboard on Rune, with pipeline figures, revenue bars and lead statuses"></a>
+        <figcaption class="cap"><b>Emberline on Rune.</b> Leads and revenue, with sample data. <code>just rune-app emberline</code></figcaption>
+      </figure>
+      <figure>
+        <a class="renderer-shot" href="img/full/rune-audience.png" data-command="just rune-app audience"><img src="img/rune-audience.webp" width="3200" height="2360" loading="lazy" alt="Inkwell's light newsletter dashboard on Rune, with subscriber growth and audience sources"></a>
+        <figcaption class="cap"><b>Inkwell on Rune.</b> Newsletter analytics, with sample data. <code>just rune-app audience</code></figcaption>
+      </figure>
+    </div>
+    <p class="cap">Captured with Rune's own headless renderer from the unmodified example apps. <a href="https://github.com/moonframehq/moonframe/blob/main/website/tools/rune-shots.md">Capture commands →</a></p>
+    <div class="renderer-notes">
+      <div><h3>Try it from source</h3><p>From a checkout with <code>mise install</code> complete. The renderer is chosen at build time; installed apps and published releases use GPUI.</p><pre>just rune           # the starter on Rune
+just rune-gallery   # live component demos
+just rune-app       # list example apps</pre></div>
+      <div><h3>Experimental means in progress</h3><p>Rune has live reload, providers, saved state, profiles and terminals. Layouts can differ; named themes, animations, separate mod windows and much of the CLI are still missing. <a href="https://github.com/moonframehq/moonframe#what-draws-the-window">Backend guide →</a> · <a href="https://github.com/moonframehq/moonframe/blob/main/docs/rune-coverage.md">Component coverage →</a></p></div>
+    </div>
+  </section>
+
   <section>
-    <p class="kicker">What you get</p>
+    <p class="kicker">What you get · the default GPUI build</p>
     <h2>Rust underneath, <i>nothing hidden on top.</i></h2>
     <div class="cols">
-      <div><h3>Rust and GPUI</h3><p>A native window drawn on the GPU. Rust checks every element tree Luau returns and owns everything that touches the machine.</p></div>
+      <div><h3>Rust, with GPUI or Rune</h3><p>Rust checks every element tree Luau returns and owns everything that touches the machine. GPUI is the default renderer; <a href="#renderers">Rune is experimental</a>.</p></div>
       <div><h3>Laid out in Luau</h3><p>A shell places regions and mods fill them. Each mod is one file with its own state, <code>init</code>, <code>update</code> and <code>view</code>, like an Elm program.</p></div>
       <div><h3>A stylesheet</h3><p>Colors, corners, shadows, spacing, fonts and animations, by type and class, with hover states and transitions.</p></div>
       <div><h3>Themes</h3><p>Bundled color schemes reach the window, its controls and the terminals.</p></div>

@@ -45,6 +45,14 @@ uv run --with pillow website/tools/component-shots.py NAME ...
 
 A component without a picture shows a pointer to the app instead.
 
+## Renderer screenshots
+
+The home page's **GPUI by default. Rune, experimentally.** section uses
+`img/rune-*.webp` and full-size `img/full/rune-*.png`. These are captures
+from Rune's own headless renderer, explicitly labelled as such. See
+[tools/rune-shots.md](tools/rune-shots.md) for the source revisions,
+sample-data apps and reproduction commands.
+
 ## Patterns
 
 Patterns are hidden from the site for now: nothing links to them, and

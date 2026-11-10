@@ -153,6 +153,11 @@ document.getElementById("plates").addEventListener("click", e => { const f = e.t
 const EXPERIMENTAL = [...document.querySelectorAll(".exp-row")].map(row => ({ lo:`img/${row.dataset.id}.webp`, full:`img/full/${row.dataset.id}.png`,
   caption:`<b>${row.querySelector("h3").textContent}</b> ${row.querySelector("p").textContent}` }));
 document.querySelectorAll(".exp-shot").forEach((shot, i) => shot.onclick = () => openPlate(i, EXPERIMENTAL));
+const rendererShots = [...document.querySelectorAll(".renderer-shot")];
+const RENDERERS = rendererShots.map(shot => ({ lo:shot.querySelector("img").getAttribute("src"), full:shot.getAttribute("href"),
+  caption:shot.closest("figure").querySelector("figcaption").innerHTML, cmd:shot.dataset.command,
+  how:"Run from a Moonframe checkout. Rune is experimental; these apps use sample data." }));
+rendererShots.forEach((shot, i) => shot.onclick = e => { e.preventDefault(); openPlate(i, RENDERERS); });
 lb.querySelector(".x").onclick = closePlate;
 cmd.onclick = async () => {
   try { await navigator.clipboard.writeText(cmd.firstElementChild.textContent); cmd.lastElementChild.textContent = "Copied"; }

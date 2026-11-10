@@ -44,11 +44,12 @@
   <main>
     <p class="crumb">Start · Introduction</p>
     <h1>Introduction</h1>
-    <p class="lead">Moonframe is a factory for native desktop apps whose whole window is written in Luau. Rust and GPUI draw it, check it, and keep it safe; every panel, split, toolbar and status bar is a Luau file that reloads as you save, with its state kept.</p>
+    <p class="lead">Moonframe is a factory for native desktop apps whose whole window is written in Luau. Rust checks its element trees; GPUI draws them by default, with Rune as an experimental alternative. Both use the same Luau: every panel, split, toolbar and status bar is a file that reloads as you save, with its state kept.</p>
 <pre><span class="p">$</span> git clone https://github.com/moonframehq/moonframe my-app
 <span class="p">$</span> cd my-app
 <span class="p">$</span> mise install   <span class="c"># Rust, and Zig for the Ghostty terminal</span>
 <span class="p">$</span> just run       <span class="c"># opens the window on app/</span></pre>
+    <p><b>GPUI is the default in installed apps and published releases.</b> To try Rune from source, use <code>just rune</code>, <code>just rune-gallery</code> or <code>just rune-app NAME</code>. Rune supports profiles, providers and live reload, but layouts can differ and features such as named themes, animations and separate mod windows are still missing. <a href="https://moonframe.dev/#renderers">See the Rune screenshots</a> and <a href="https://github.com/moonframehq/moonframe#what-draws-the-window">backend guide</a>.</p>
     <div class="cards">
       <a href="https://github.com/moonframehq/moonframe#quick-start"><b>Quick start →</b><span>Clone, run, edit a file, watch it change.</span></a>
       <a href="#a-mod-is-one-file"><b>Your first mod →</b><span>State, init, update, view.</span></a>

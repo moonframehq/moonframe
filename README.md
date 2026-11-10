@@ -12,6 +12,7 @@
 <p align="center">
   <a href="#install"><b>Install</b></a> ·
   <a href="#quick-start"><b>Quick start</b></a> ·
+  <a href="#what-draws-the-window">GPUI &amp; Rune</a> ·
   <a href="#make-it-yours">Make it yours</a> ·
   <a href="#building-blocks">Building blocks</a> ·
   <a href="#working-with-an-agent">Working with an agent</a> ·
@@ -24,9 +25,11 @@
 </p>
 
 A factory for native desktop apps you reshape while they run. Each app's
-whole window is written in [Luau](https://luau.org): Rust and
-[GPUI](https://www.gpui.rs) draw it, check it, and keep it safe, and every
-panel, split, toolbar and status bar is a Luau file that reloads as you save,
+whole window is written in [Luau](https://luau.org). Rust checks the trees
+it returns; [GPUI](https://www.gpui.rs) draws them by default, with
+[Rune](https://github.com/anomalyco/rune) as an **experimental alternative**.
+Both renderers use the same Luau. Every panel, split, toolbar and status bar
+is a Luau file that reloads as you save,
 with its state kept. Ask an agent for a change, or make it by hand, and the
 running app reshapes itself, even from inside the app: its **Send feedback**
 button hands what you write to a coding agent, which changes the app in front
@@ -68,6 +71,10 @@ Moonframe as a library.
 </p>
 
 ## What you get
+
+The features below describe the default GPUI build. See
+[What draws the window](#what-draws-the-window) for Rune's current coverage
+and how to try it.
 
 - **A window laid out in Luau.** A shell (`app/main.luau`) places regions,
   and mods fill them. Each mod is one file with its own state, `init`,
@@ -151,6 +158,10 @@ cd my-app
 mise install        # Rust, and Zig for the Ghostty terminal
 just run            # opens the window on app/
 ```
+
+To try the experimental Rune renderer from the same checkout, run
+`just rune`, or `just rune-app emberline` for an example app. See
+[GPUI and Rune](#what-draws-the-window) for screenshots and current limits.
 
 Now edit `app/mods/explorer/main.luau` or `app/style.luau` and save: the
 window changes as you type. `just check` loads everything without a window
@@ -616,29 +627,57 @@ The Luau is the same whichever library draws it: mods, components and
 `style.luau` build one checked tree, and a Cargo feature of `moonframe-app`
 chooses the renderer.
 
+**GPUI is the default in installed apps and published releases. Rune is
+experimental and available from source.** Choosing a renderer is a build
+choice, not a setting in the running app.
+
 | Feature | Renderer | State |
 | --- | --- | --- |
 | `gpui` (default) | [GPUI](https://www.gpui.rs), in `crates/moonframe` | The whole app |
 | `rune` | [Rune](https://github.com/anomalyco/rune), in `crates/moonframe-rune` | Experimental |
 
 ```sh
+just run                # GPUI (default)
 just rune               # the starter
 just rune-gallery       # every component with its live demo
 just rune-app           # the example apps; `just rune-app NAME` opens one
 ```
 
+### Rendered with Rune
+
+These are captures from Rune's own headless renderer, using the unmodified
+example apps and their sample data. Click either image for the full size;
+[capture commands](website/tools/rune-shots.md) are included.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="website/site/img/full/rune-emberline.png"><img src="website/site/img/rune-emberline.webp" alt="Emberline's dark leads dashboard rendered by Rune, with pipeline figures, revenue bars and lead statuses"></a>
+      <br>
+      <sub><b>Emberline on Rune.</b> A CRM dashboard with sample data. Run <code>just rune-app emberline</code>.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="website/site/img/full/rune-audience.png"><img src="website/site/img/rune-audience.webp" alt="Inkwell's light newsletter dashboard rendered by Rune, with subscriber growth and audience sources"></a>
+      <br>
+      <sub><b>Inkwell on Rune.</b> Newsletter analytics with sample data. Run <code>just rune-app audience</code>.</sub>
+    </td>
+  </tr>
+</table>
+
 A Rune build links no GPUI. It runs the mods and every provider kind, keeps
 state where the GPUI build does, reloads live, and has keys, the menu bar and
-terminals kept by herdr-core or tmux. It draws every element; a `ui.view` is
-Rust an app writes for one renderer. [docs/rune-coverage.md](docs/rune-coverage.md)
-lists how each component fares.
+terminals kept by herdr-core or tmux. A `ui.view` is Rust an app writes for
+one renderer. [docs/rune-coverage.md](docs/rune-coverage.md) lists which
+component demos draw; it does not establish visual or behavioral parity.
 
 An app on the library chooses the same way: `moonframe_rune::Moonframe` is the
 same builder, so `extern crate moonframe_rune as moonframe;` behind a feature
 is all its code needs, beside its own `ui.view`s.
 
-It is still behind in places: it has none of the `moonframe` commands or
-profiles, windows of their own, named themes or animations. `ui.video` is 8-bit; `ui.map` doesn't
+It supports profiles through the `app` commands, and `--check` to load them
+headlessly. Other `moonframe` commands, windows of their own, named themes
+and animations are not available yet. Layout can differ from GPUI.
+`ui.video` is 8-bit; `ui.map` doesn't
 turn or route; text fields lack the writing modes; and a `ui.browser` needs a
 window on screen to show. CI packages it beside the GPUI build, as
 `rune-package-*` artifacts that a release does not publish.

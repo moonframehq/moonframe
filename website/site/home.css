@@ -30,6 +30,7 @@ code { font:.84em var(--mono); background:#2a1a100d; padding:1px 5px; border-rad
 h1 { font-size:clamp(52px, 8vw, 96px); line-height:.98; letter-spacing:-.03em; font-weight:500 }
 h1 i { color:var(--acc-hi) }
 .deck { font-size:22px; line-height:1.5; color:var(--ink2); max-width:740px; margin:26px auto 0 }
+.deck a { text-decoration:underline; text-decoration-color:var(--acc); text-underline-offset:4px }
 .hero .start { display:inline-flex; gap:14px; margin-top:32px; font:14px var(--sans); align-items:center }
 .btn { padding:13px 20px; border-radius:4px; background:var(--ink); color:var(--paper); font-weight:600 }
 .btn.o { background:none; color:var(--ink); border:1px solid var(--ink) }
@@ -197,6 +198,18 @@ kbd { font:12px var(--mono); border:1px solid var(--rule); border-bottom-width:2
 .cols > div { break-inside:avoid; padding-bottom:26px }
 .cols p { font-size:16px; color:var(--ink2) }
 .pull { font-size:42px; line-height:1.2; font-style:italic; text-align:center; max-width:880px; margin:0 auto; padding:56px 0 }
+
+/* Renderers: real app captures, with the backend named beside each. */
+#renderers a:not(.renderer-shot) { color:var(--acc); text-decoration:underline; text-underline-offset:3px }
+.renderer-shots { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap:28px; margin-top:36px }
+.renderer-shot { display:block; cursor:zoom-in }
+.renderer-shot:focus-visible { outline:2px solid var(--acc); outline-offset:5px }
+.renderer-shot img { display:block; width:100%; height:auto; border-radius:8px; box-shadow:0 16px 32px -18px #2a1a1066 }
+.renderer-shots code { display:inline-block; margin-top:6px }
+.renderer-notes { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap:32px; margin-top:32px }
+.renderer-notes h3 { font:600 13px var(--sans); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px }
+.renderer-notes p { font-size:17px; color:var(--ink2) }
+.renderer-notes pre { font:13px/1.7 var(--mono); background:var(--ink); color:var(--paper); padding:16px; margin-top:16px; border-radius:4px; overflow-x:auto }
 
 /* Get started */
 .getstarted { padding:0 0 72px }

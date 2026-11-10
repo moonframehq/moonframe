@@ -1,8 +1,10 @@
 # Moonframe
 
-> Moonframe is a factory for native desktop apps whose whole window is written in Luau. Rust and GPUI draw it, check it and keep it safe. Every panel, split, toolbar and status bar is a Luau file that reloads as you save, and its state is kept. An app runs one of two ways: as a profile of the `moonframe` binary (Luau only, no Rust build), or as a Rust binary of its own on the `moonframe` library crate.
+> Moonframe is a factory for native desktop apps whose whole window is written in Luau. Rust checks its element trees; GPUI draws them by default, with Rune as an experimental alternative. Both renderers use the same Luau. Every panel, split, toolbar and status bar is a Luau file that reloads as you save, and its state is kept. An app runs one of two ways: as a profile of the `moonframe` binary (Luau only, no Rust build), or as a Rust binary of its own on the `moonframe` library crate.
 
 This file is for coding agents. If the user says something like "use Moonframe for my app", follow the steps below. They tell you how to pick the right way to start, which command to run, and how to check your work.
+
+The steps below use the default GPUI build, which ships in installed apps and published releases. To try the experimental Rune backend from a source checkout, use `just rune`, `just rune-gallery`, or `just rune-app NAME`. Rune supports profiles and `--check`, but not the full CLI, named themes, animations or separate mod windows; layouts can differ. See [the backend guide](https://github.com/moonframehq/moonframe#what-draws-the-window) and [component coverage](https://github.com/moonframehq/moonframe/blob/main/docs/rune-coverage.md). A renderer is chosen at build time, not by a runtime setting.
 
 ## Step 1: get the `moonframe` command
 
