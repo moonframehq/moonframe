@@ -1,0 +1,3 @@
+- read: The Extended Mind, Annie Murphy Paul
+- a note app that forgets on purpose?
+- idea: link notes by question, not topic

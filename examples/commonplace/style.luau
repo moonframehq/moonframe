@@ -1,0 +1,77 @@
+-- Commonplace's look: warm paper cards on a soft frame in light, charcoal
+-- in dark, one ink-blue accent for links and the caret.
+return style {
+	font_size = 14,
+	radius = 8,
+
+	colors = {
+		background = { light = "#f3f1ec", dark = "#151517" },
+		foreground = { light = "#24231f", dark = "#dedcd6" },
+		sidebar = { light = "#f3f1ec", dark = "#151517" },
+		card = { light = "#fffefb", dark = "#1e1e21" },
+		border = { light = "#e5e2da", dark = "#2b2b2f" },
+		["muted-foreground"] = { light = "#8c8a83", dark = "#8b8a86" },
+		accent = { light = "#2f6fd6", dark = "#6ea2ff" },
+		["list-hover"] = { light = "#0000000a", dark = "#ffffff0b" },
+		["list-active"] = { light = "#2f6fd614", dark = "#6ea2ff1f" },
+		success = { light = "#2f9e5b", dark = "#4cc27a" },
+		warning = { light = "#c98a0b", dark = "#f0b13a" },
+		danger = { light = "#d4483f", dark = "#ff6b61" },
+	},
+
+	rules = {
+		pane = { transition = "slide-fade normal ease-out" },
+		["input-caret"] = { background = "accent" },
+		["input-selection"] = { background = "accent/22" },
+		["input-placeholder"] = { color = "muted-foreground" },
+		markdown = { size = "large" },
+		[".frame"] = { background = "background" },
+		[".card"] = {
+			background = "card",
+			radius = 14,
+			border = true,
+			border_color = "border",
+			shadow = "0 1px 2px #0000000d, 0 10px 28px -12px #00000026",
+		},
+		[".card-pane"] = { padding = { 0, 10, 12, 0 } },
+		[".card-pane-last"] = { padding = { 0, 12, 12, 0 } },
+		[".topbar"] = { padding = { 0, 14 }, gap = 10 },
+		[".search-box"] = {
+			padding = { 6, 12 },
+			radius = 9,
+			gap = 8,
+			background = "card",
+			border = true,
+			border_color = "border",
+		},
+		[".search-hint"] = { color = "muted-foreground" },
+		-- A field inside a box of its own: no border or fill of its own.
+		[".bare-input"] = { background = "#00000000", border = "none", padding = 0 },
+		-- Sidebar navigation: inset pills.
+		[".nav"] = { padding = { 4, 8 }, gap = 1 },
+		[".nav-row"] = { padding = { 6, 10 }, radius = 8, gap = 10 },
+		[".nav-row:hover"] = { background = "list-hover" },
+		[".nav-row:selected"] = { background = "list-active", color = "accent" },
+		[".nav-icon"] = { color = "muted-foreground" },
+		[".nav-count"] = { size = "small", color = "muted-foreground" },
+		[".nav-heading"] = { padding = { 14, 18, 4, 18 }, size = "small", weight = "medium", color = "muted-foreground" },
+		[".tag"] = { color = "#9c63c9" },
+		-- Cards' headers and quiet labels.
+		[".card-head"] = { padding = { 12, 16 }, gap = 8, border = "bottom", border_color = "border" },
+		[".card-title"] = { weight = "semibold" },
+		[".muted"] = { color = "muted-foreground" },
+		[".small"] = { size = "small" },
+		[".section-label"] = { size = "small", weight = "medium", color = "muted-foreground", case = "upper" },
+		-- Note list rows.
+		[".note-row"] = { padding = { 10, 12 }, radius = 10, gap = 3, margin = { 0, 8 } },
+		[".note-row:hover"] = { background = "list-hover" },
+		[".note-row:selected"] = { background = "list-active" },
+		[".note-row-title"] = { weight = "semibold" },
+		[".note-row-excerpt"] = { size = "small", color = "muted-foreground" },
+		-- Context cards (backlinks, mentions).
+		[".ref"] = { padding = { 8, 10 }, radius = 8, gap = 2, background = "background/60" },
+		[".ref-title"] = { size = "small", weight = "medium", color = "accent" },
+		[".ref-context"] = { size = "small", color = "muted-foreground" },
+		[".demo-label"] = { size = "small", color = "warning" },
+	},
+}

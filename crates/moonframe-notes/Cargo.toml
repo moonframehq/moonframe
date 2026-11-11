@@ -1,0 +1,42 @@
+[package]
+description            = "Commonplace's notes engine: a vault of markdown files, indexed in SQLite (links, tags, full-text search)"
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-notes"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "commonplace"
+path = "src/bin/commonplace.rs"
+
+[features]
+# The `notes` native provider for Moonframe apps (Commonplace).
+provider = ["dep:chrono", "dep:moonframe-core", "dep:moonframe-providers", "dep:notify"]
+
+[dependencies]
+base64.workspace      = true
+chrono                = { optional = true, workspace = true }
+markdown.workspace    = true
+moonframe-core        = { optional = true, workspace = true }
+moonframe-providers   = { optional = true, workspace = true }
+notify                = { optional = true, workspace = true }
+rusqlite.workspace    = true
+serde.workspace       = true
+serde_json.workspace  = true
+sha2.workspace        = true
+similar               = "2"
+thiserror.workspace   = true
+tracing.workspace     = true
+unicode-normalization = "0.1"
+uuid.workspace        = true
+walkdir               = "2"
+yaml-rust2            = "0.10"
+
+[dev-dependencies]
+tempfile.workspace = true
