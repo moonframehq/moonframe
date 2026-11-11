@@ -107,6 +107,7 @@ impl Folders {
 }
 
 /// `path` as one shell word.
+#[cfg(unix)]
 fn quoted(path: &Path) -> String {
     let text = path.display().to_string();
     if text
@@ -116,6 +117,21 @@ fn quoted(path: &Path) -> String {
         text
     } else {
         format!("'{}'", text.replace('\'', r"'\''"))
+    }
+}
+
+/// `path` as one word for `cmd`, which knows no single quotes; a Windows
+/// path cannot hold a double quote.
+#[cfg(not(unix))]
+fn quoted(path: &Path) -> String {
+    let text = path.display().to_string();
+    if text
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || r"\/:._-+~".contains(c))
+    {
+        text
+    } else {
+        format!("\"{text}\"")
     }
 }
 
@@ -168,7 +184,7 @@ mod tests {
         assert!(
             editable
                 .check
-                .ends_with(&format!("--check {}", host_app.display())),
+                .ends_with(&format!("--check {}", quoted(&host_app))),
             "{}",
             editable.check
         );
@@ -213,7 +229,7 @@ mod tests {
         assert!(
             editable
                 .check
-                .contains(&format!("--user {}", user.display())),
+                .contains(&format!("--user {}", quoted(&user))),
             "{}",
             editable.check
         );
@@ -237,9 +253,20 @@ mod tests {
         assert!(editable.overlay());
     }
 
+    #[cfg(unix)]
     #[test]
     fn odd_paths_are_quoted_for_the_shell() {
         assert_eq!(quoted(Path::new("/a/b-c.d")), "/a/b-c.d");
         assert_eq!(quoted(Path::new("/a b/it's")), r"'/a b/it'\''s'");
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn odd_paths_are_quoted_for_cmd() {
+        assert_eq!(quoted(Path::new(r"C:\a\b-c.d")), r"C:\a\b-c.d");
+        assert_eq!(
+            quoted(Path::new(r"\\?\C:\a b\it's")),
+            r#""\\?\C:\a b\it's""#
+        );
     }
 }
