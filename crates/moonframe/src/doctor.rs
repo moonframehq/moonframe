@@ -8,7 +8,7 @@ mod rollback;
 
 use {
     crate::paths::Folders,
-    moonframe_core::SHELL,
+    moonframe_core::{SHELL, entries::Entries},
     std::{
         fs,
         path::{Path, PathBuf},
@@ -35,11 +35,19 @@ Options:
 /// Where broken files are moved to in the user's folder.
 const ASIDE: &str = ".broken";
 
-pub(crate) fn run(folders: &Folders, words: &[String]) -> ExitCode {
+pub(crate) fn run(
+    folders: &Folders,
+    entries: &Entries,
+    sources: &[PathBuf],
+    words: &[String],
+) -> ExitCode {
     let fix = match words {
         [] => false,
         [word] if word == "--fix" => true,
-        [word] if word == "--rollback" => return rollback::run(folders),
+        [word] if word == "--rollback" => {
+            let roots = entries.apply(folders.roots());
+            return rollback::run(folders, sources, &roots);
+        },
         [word] if word == "help" || word == "--help" || word == "-h" => {
             println!("{USAGE}");
             return ExitCode::SUCCESS;

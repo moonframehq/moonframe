@@ -139,7 +139,12 @@ impl Hub {
                 async {}
             })
             .detach();
-            let history = crate::history::open(&launch.folders);
+            let sources =
+                crate::agent_entries::selected(&launch.entries, launch.folders.user.as_deref())
+                    .into_iter()
+                    .map(|(_, path)| path)
+                    .collect::<Vec<_>>();
+            let history = crate::history::open_with_sources(&launch.folders, &sources);
             // An agent's run is marked before it starts, to come back to.
             #[cfg(feature = "acp")]
             if let Some(history) = &history {

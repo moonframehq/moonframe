@@ -1,25 +1,25 @@
 //! `moonframe doctor --rollback`: takes the app back to the newest moment
 //! it loaded. Each moment is loaded from a copy first, so the folders and a
 //! running window only ever see the one that passed. Taking a folder back
-//! goes through the history, so `moonframe history redo` undoes it.
+//! goes through the history, so `moonframe history redo` undoes it. Active
+//! user miniapp sources are part of the same rollback.
 
 use {
     crate::{history::Kept, paths::Folders},
     moonframe_core::Roots,
     moonframe_history::{History, Snapshot},
-    std::process::ExitCode,
+    std::{path::PathBuf, process::ExitCode},
 };
 
 /// Snapshots read from each folder, and moments tried.
 const LOOK_BACK: usize = 200;
 const MOST_TRIED: usize = 50;
 
-pub(super) fn run(folders: &Folders) -> ExitCode {
-    let Some(kept) = crate::history::open(folders) else {
+pub(super) fn run(folders: &Folders, sources: &[PathBuf], roots: &Roots) -> ExitCode {
+    let Some(kept) = crate::history::open_with_sources(folders, sources) else {
         eprintln!("doctor: no history to go back in: git cannot run, or there is no folder");
         return ExitCode::from(2);
     };
-    let roots = folders.roots();
     let problems = crate::cli::problems(roots.clone());
     if problems.is_empty() {
         println!("ok: the app loads, so there is nothing to roll back");
@@ -28,7 +28,7 @@ pub(super) fn run(folders: &Folders) -> ExitCode {
     for (name, error) in &problems {
         println!("{name}: {error}");
     }
-    match find_and_restore(&kept, &roots) {
+    match find_and_restore(&kept, roots) {
         Ok(true) => {
             println!("`moonframe history redo` goes forward again");
             ExitCode::SUCCESS

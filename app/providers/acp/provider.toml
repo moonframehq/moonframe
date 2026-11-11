@@ -27,11 +27,11 @@ starters = ["feedback"]
 # The permission questions a mod's agents answer themselves, always
 # "allow once" (never "always"); every other question waits on you in the
 # run. "read": tools that only look (read, search, think). "app": those,
-# edits of files in the app's own folder (`app.acp.writable`, which the app
-# keeps, so Undo takes a run back) except its providers/ and manifests,
-# which say what runs and what is allowed, and the app's check command as
-# it is; anything else asks. "all": every tool, so the agent edits files and runs
-# commands as you without asking. "ask": every one asks.
+# edits in the app's writable folder (`app.acp.writable`) and in selected
+# user miniapps when a run targets the app, except provider code and manifests,
+# plus the app's check command as it is; anything else asks. The app keeps
+# these folders, so Undo takes a run back. "all": every tool, so the agent
+# edits files and runs commands as you without asking. "ask": every one asks.
 # Only this file sets it; a mod can't ask for more. To change it, copy this
 # folder to ~/.config/moonframe/providers/acp (or the app's own
 # providers/acp) and set feedback there.

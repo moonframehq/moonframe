@@ -20,8 +20,8 @@ use {
 #[derive(Debug)]
 pub(crate) struct Kept(Vec<History>);
 
-/// The history of the app's folders, if it has a folder and git runs.
-pub(crate) fn open(folders: &Folders) -> Option<Arc<Kept>> {
+/// The history of the app's folders, including selected external sources.
+pub(crate) fn open_with_sources(folders: &Folders, sources: &[PathBuf]) -> Option<Arc<Kept>> {
     if !cfg!(feature = "studio") {
         return None;
     }
@@ -39,6 +39,26 @@ pub(crate) fn open(folders: &Folders) -> Option<Arc<Kept>> {
     let layers = roots.app_layers().map(Path::to_owned).collect::<Vec<_>>();
     let others = others(&own, folders, &layers, in_checkout);
     kept.extend(others.iter().filter_map(|folder| open(folder)));
+    let mut tracked: Vec<PathBuf> = kept
+        .iter()
+        .map(|history| history.folder().to_owned())
+        .collect();
+    for source in sources {
+        let Ok(folder) = source.canonicalize() else {
+            continue;
+        };
+        if !folder.is_dir()
+            || tracked
+                .iter()
+                .any(|known| folder.starts_with(known) || known.starts_with(&folder))
+        {
+            continue;
+        }
+        if let Some(history) = open(&folder) {
+            tracked.push(folder);
+            kept.push(history);
+        }
+    }
     Some(Arc::new(Kept(kept)))
 }
 

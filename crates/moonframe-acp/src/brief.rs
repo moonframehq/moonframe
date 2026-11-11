@@ -30,7 +30,9 @@ pub(crate) fn brief(editable: &Editable) -> String {
          one at the same path in a lower one:\n",
     );
     for (role, path) in &editable.layers {
-        let _ = writeln!(text, "- {role}: {}", path.display());
+        if !role.starts_with("entry:") {
+            let _ = writeln!(text, "- {role}: {}", path.display());
+        }
     }
     let writable = editable.writable.display();
     if editable.overlay() {
@@ -49,6 +51,22 @@ pub(crate) fn brief(editable: &Editable) -> String {
              packages alone; to change one of their files for this app, copy it to the same path \
              in {writable}."
         );
+    }
+    let entries: Vec<_> = editable
+        .layers
+        .iter()
+        .filter_map(|(role, path)| role.strip_prefix("entry:").map(|name| (name, path)))
+        .collect();
+    if !entries.is_empty() {
+        text.push_str(
+            "\nThe following host-selected miniapps are active in this window. They are user \
+             source, not app layers: you may read and edit their files when the request targets \
+             one. Their provider code and manifests remain guarded and require permission.\n",
+        );
+        for (name, path) in entries {
+            let _ = writeln!(text, "\n### {name}: {}\n", path.display());
+            let _ = writeln!(text, "{}", index(path));
+        }
     }
     let _ = writeln!(
         text,
@@ -258,5 +276,23 @@ mod tests {
         let text = brief(&editable);
         assert!(text.contains("are read-only to you"), "{text}");
         assert!(text.contains("style.luau (1)"), "{text}");
+    }
+
+    #[test]
+    fn a_selected_miniapp_is_explicitly_editable_and_indexed() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut editable = hosted(dir.path());
+        let miniapp = dir.path().join("config/miniapps/foobar");
+        std::fs::create_dir_all(&miniapp).unwrap();
+        std::fs::write(miniapp.join("main.luau"), "one\ntwo\n").unwrap();
+        editable
+            .layers
+            .push(("entry:user:foobar".to_owned(), miniapp.clone()));
+
+        let text = brief(&editable);
+        assert!(text.contains("host-selected miniapps are active"), "{text}");
+        assert!(text.contains("user:foobar"), "{text}");
+        assert!(text.contains("main.luau (2)"), "{text}");
+        assert!(!text.contains(&format!("- entry:user:foobar: {}", miniapp.display())));
     }
 }

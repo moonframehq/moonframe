@@ -281,11 +281,11 @@ The window reloads while an agent edits it, so you can watch it work.
   straight to picking: click an element, choose its level in the card,
   and Enter opens the box with it attached; set `inspect_shortcut` in `settings.toml` to use another key,
   or `""` for none. The window follows that file as it changes. A coding agent in the background changes
-  that app's own files with every permission, checks them, then screenshots
-  your window and looks at the result before it answers; the window reloads
-  with the change. Each request becomes a conversation under **Feedback &
-  fixes**, so when something is not quite right you reply and the agent
-  carries on from there.
+  that app's own files and selected user miniapp files without pausing for
+  each edit, checks them, then screenshots your window and looks at the result
+  before it answers; the window reloads with the change. Each request becomes
+  a conversation under **Feedback & fixes**, so when something is not quite
+  right you reply and the agent carries on from there.
 - **The skill.** Claude Code picks up `.claude/skills/moonframe`, which
   tells an agent where a feature belongs, how to build it, and how to check
   it with `just check` and `just types`.

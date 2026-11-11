@@ -14,7 +14,8 @@ pub struct Editable {
     /// The app's name for people.
     pub title: String,
     /// The folders the window runs on, lowest first, each with what it is:
-    /// `toolbox`, `package`, `app`, `user`.
+    /// `toolbox`, `package`, `app`, `user`; `entry:<namespace>:<id>` names a
+    /// selected user miniapp source, not a precedence layer.
     pub layers: Vec<(String, PathBuf)>,
     /// The app's own folder: its `main.luau`, mods and style.
     pub app: PathBuf,

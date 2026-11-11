@@ -25,6 +25,7 @@
 //! [`gestures`], beside GPUI's own `on_pinch` and `on_mouse_pressure`.
 
 mod actions;
+mod agent_entries;
 mod agent_files;
 mod alerts;
 mod app;

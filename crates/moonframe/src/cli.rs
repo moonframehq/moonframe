@@ -471,6 +471,7 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
         return crate::bundle::run(&args.folders, words);
     }
     let folders = args.folders;
+    let editable_entries = crate::agent_entries::selected(&launch.entries, folders.user.as_deref());
     paths::set_user_folder(folders.user.clone());
     let _ =
         crate::CRASH_DIR.set(paths::state(folders.profile.as_deref()).with_extension("crashes"));
@@ -529,12 +530,21 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
     if cfg!(feature = "studio")
         && let Some(words) = &args.history
     {
-        return crate::history::run(&folders, words);
+        let paths = editable_entries
+            .iter()
+            .map(|(_, path)| path.clone())
+            .collect::<Vec<_>>();
+        return crate::history::run(&folders, &paths, words);
     }
     if cfg!(feature = "studio")
         && let Some(words) = args.doctor
     {
-        return on_a_view_stack(move || crate::doctor::run(&folders, &words));
+        let entries = launch.entries.clone();
+        let paths = editable_entries
+            .iter()
+            .map(|(_, path)| path.clone())
+            .collect::<Vec<_>>();
+        return on_a_view_stack(move || crate::doctor::run(&folders, &entries, &paths, &words));
     }
     if args.check {
         let roots = launch.entries.apply(folders.roots());
@@ -597,7 +607,9 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
         moonframe_providers::set_installed(installed);
     }
     let hints = std::mem::take(&mut launch.agent);
-    moonframe_providers::set_editable(folders.editable(hints.guide, hints.check));
+    let mut editable = folders.editable(hints.guide, hints.check);
+    crate::agent_entries::append(&mut editable, &editable_entries);
+    moonframe_providers::set_editable(editable);
     if let Some(profile) = &folders.profile {
         moonframe_providers::set_profile(profile);
     }

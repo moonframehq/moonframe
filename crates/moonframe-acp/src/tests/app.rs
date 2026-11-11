@@ -91,6 +91,53 @@ fn edits_outside_the_app_and_other_commands_still_ask() {
 }
 
 #[test]
+fn an_app_targeted_run_can_edit_a_selected_user_miniapp() {
+    let mut rig = app_rig("edit", "user/miniapps/foobar/main.luau", "true", AGENT);
+    let entry = rig._dir.path().join("user/miniapps/foobar");
+    std::fs::create_dir_all(&entry).unwrap();
+    std::fs::write(entry.join("main.luau"), "return mod {}\n").unwrap();
+    rig.acp
+        .editable
+        .as_mut()
+        .unwrap()
+        .layers
+        .push(("entry:user:foobar".to_owned(), entry));
+
+    rig.send(
+        "feedback",
+        json!({ "start": "Change this miniapp", "app": true }),
+    );
+    let run = rig.wait_for("done");
+    assert_eq!(answered(&rig), "yes");
+    let sent = rig.sent();
+    let prompt = sent[2]["params"]["prompt"][0]["text"].as_str().unwrap();
+    assert!(prompt.contains("miniapps are active"), "{prompt}");
+    assert!(!run["question"].is_object(), "{run}");
+    assert!(
+        !rig.acp.last.as_ref().unwrap()["target"]["layers"]
+            .to_string()
+            .contains("miniapps/foobar"),
+        "target metadata should not publish external source paths"
+    );
+}
+
+#[test]
+fn a_non_app_run_cannot_auto_edit_a_selected_user_miniapp() {
+    let mut rig = app_rig("edit", "user/miniapps/foobar/main.luau", "true", AGENT);
+    let entry = rig._dir.path().join("user/miniapps/foobar");
+    std::fs::create_dir_all(&entry).unwrap();
+    rig.acp
+        .editable
+        .as_mut()
+        .unwrap()
+        .layers
+        .push(("entry:user:foobar".to_owned(), entry));
+
+    rig.send("feedback", json!({ "start": "Change this miniapp" }));
+    assert!(rig.wait_for("waiting")["question"].is_object());
+}
+
+#[test]
 fn the_apps_check_runs_without_asking() {
     let mut rig = app_rig("execute", "notes --check", "notes --check", AGENT);
     rig.send("feedback", json!({ "start": "Go", "app": true }));

@@ -556,7 +556,7 @@ impl Acp {
                 .iter()
                 .find(|(name, _)| name == moonframe_providers::owner(from))
                 .map_or(Allow::Ask, |(_, allow)| *allow),
-            scope: self.scope(&cwd),
+            scope: self.scope(&cwd, on_app),
             cwd: cwd.clone(),
             installed: self.installed.clone(),
             now,
@@ -579,9 +579,9 @@ impl Acp {
         Ok(id)
     }
 
-    /// What [`Allow::App`] lets a run in `cwd` touch: the app's writable
-    /// folder, and its check.
-    fn scope(&self, cwd: &Path) -> Scope {
+    /// What [`Allow::App`] lets an app-targeted run in `cwd` touch: the app's
+    /// writable folder, selected user miniapps, and its check.
+    fn scope(&self, cwd: &Path, on_app: bool) -> Scope {
         let check = self
             .installed
             .as_ref()
@@ -591,13 +591,23 @@ impl Acp {
                     .as_ref()
                     .map(|editable| editable.check.clone())
             });
+        let mut writable: Vec<PathBuf> = self
+            .writable
+            .iter()
+            .filter_map(|folder| folder.canonicalize().ok())
+            .collect();
+        if on_app {
+            writable.extend(
+                self.editable
+                    .iter()
+                    .flat_map(|editable| &editable.layers)
+                    .filter(|(role, _)| role.starts_with("entry:"))
+                    .filter_map(|(_, folder)| folder.canonicalize().ok()),
+            );
+        }
         Scope {
             cwd: cwd.to_owned(),
-            writable: self
-                .writable
-                .iter()
-                .filter_map(|folder| folder.canonicalize().ok())
-                .collect(),
+            writable,
             commands: check.into_iter().collect(),
         }
     }
@@ -696,7 +706,7 @@ impl Acp {
                 "workdir": editable.workdir,
                 "overlay": editable.overlay(),
                 "check": editable.check,
-                "layers": editable.layers.iter().map(|(role, path)| json!({ "role": role, "path": path })).collect::<Vec<_>>(),
+                "layers": editable.layers.iter().filter(|(role, _)| !role.starts_with("entry:")).map(|(role, path)| json!({ "role": role, "path": path })).collect::<Vec<_>>(),
             })),
             // Only when agents work over it: `cwd` sends them elsewhere.
             "installed": self.installed.as_ref().filter(|installed| installed.folder == self.cwd).map(|installed| json!({

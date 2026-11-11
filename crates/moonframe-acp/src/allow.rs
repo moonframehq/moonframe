@@ -16,9 +16,9 @@ pub(crate) enum Allow {
     Ask,
     /// Tools that only look (read, search, think); the rest wait.
     Read,
-    /// Tools that only look, edits of files in the app's writable folder
-    /// (which the app keeps, so a run can be undone), and the app's own
-    /// check command; the rest wait.
+    /// Tools that only look, edits of files in the app's writable folder and
+    /// selected user miniapps on app-targeted runs, and the app's own check
+    /// command; the rest wait.
     App,
     /// Every tool.
     All,
@@ -133,7 +133,10 @@ fn guarded(rest: &Path) -> bool {
         .components()
         .map(|part| part.as_os_str().to_string_lossy().to_lowercase())
         .collect();
-    names.iter().any(|name| name == "providers")
+    names
+        .iter()
+        .any(|name| matches!(name.as_str(), "provider" | "providers"))
+        || names.last().is_some_and(|name| name == "provider.toml")
         || names
             .last()
             .is_some_and(|name| matches!(name.as_str(), "moonframe.toml" | "packages.toml"))
@@ -455,6 +458,31 @@ mod tests {
         assert!(Allow::All.covers_call(&call("execute", &[], Some("rm x")), &scope));
         for level in [Allow::Ask, Allow::Read, Allow::App, Allow::All] {
             assert_eq!(Allow::parse(level.name()), Some(level));
+        }
+    }
+
+    #[test]
+    fn selected_miniapps_are_editable_but_their_provider_code_is_guarded() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("app/mods")).unwrap();
+        let entry = dir.path().join("user/miniapps/clock");
+        std::fs::create_dir_all(entry.join("provider")).unwrap();
+        let mut scope = scope(dir.path());
+        scope.writable.push(entry.canonicalize().unwrap());
+
+        let source = [PathBuf::from("user/miniapps/clock/main.luau")];
+        assert!(Allow::App.covers_call(&call("edit", &source, None), &scope));
+
+        for guarded in [
+            "user/miniapps/clock/provider/main.rs",
+            "user/miniapps/clock/provider/provider.toml",
+            "user/miniapps/clock/provider.toml",
+        ] {
+            let paths = [PathBuf::from(guarded)];
+            assert!(
+                !Allow::App.covers_call(&call("edit", &paths, None), &scope),
+                "{guarded}"
+            );
         }
     }
 
