@@ -231,10 +231,14 @@ jobs:
         with:
           version: 0.17.0
           use-cache: false
+      # Four platforms' caches overflow the repository's 10 GB, so they
+      # evicted each other and runs built cold. ARM Linux, the largest,
+      # builds cold every time instead, beside the `rune` and `features` jobs
+      # that take as long.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: checks
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: ${{ github.ref == 'refs/heads/main' && matrix.runner != 'ubuntu-24.04-arm' }}
       - name: Lint every target and feature
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Test
@@ -339,11 +343,16 @@ jobs:
   # runner, and beside `checks` rather than after it, so a cold run is not
   # their sum.
   features:
-    name: Minimal and individual capability builds
+    name: Capability builds (${{ matrix.shard }}/3)
     needs: [changes, zizmor]
     if: >-
       !cancelled() && needs.changes.outputs.build == 'true' &&
       (needs.zizmor.result == 'success' || needs.zizmor.result == 'skipped')
+    # A third of the selections each, side by side.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -373,8 +382,11 @@ jobs:
           key: checks
           save-if: false
       - name: Lint each capability on its own
-        run: python3 scripts/check-features.py --lint
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 scripts/check-features.py --lint --shard "$SHARD/3"
       - name: Test the minimal builds
+        if: matrix.shard == 1
         run: |
           cargo test --locked -p moonframe --no-default-features
           cargo test --locked -p moonframe-packages --no-default-features
@@ -382,8 +394,9 @@ jobs:
           cargo clippy --locked -p moonframe-mux --no-default-features --features herdr-core --all-targets -- -D warnings
 
   # The Rune build is its own selection: linking no GPUI is what it is for,
-  # so its tests and every example run without GPUI's features. On every
-  # platform, beside `checks`.
+  # so its tests and every example run without GPUI's features. Beside
+  # `checks`, on Linux and macOS: the renderer is experimental, and its
+  # Windows and ARM builds took as long as the rest of CI.
   rune:
     name: Rune build (${{ matrix.runner }})
     needs: [changes, zizmor]
@@ -393,7 +406,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
+        runner: [macos-15, ubuntu-24.04]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     permissions:
@@ -407,10 +420,6 @@ jobs:
         run: scripts/install-linux-deps.sh
       - name: Install the pinned Rust toolchain
         run: rustup toolchain install
-      - name: Stop Windows Defender scanning the build
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Set-MpPreference -DisableRealtimeMonitoring $true
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
           version: 0.17.0
