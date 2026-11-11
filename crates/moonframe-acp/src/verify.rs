@@ -204,7 +204,8 @@ fn blank(line: &str) -> String {
     blanked
 }
 
-#[cfg(test)]
+// The commands are sh, as the check is on Unix; Windows runs cmd.
+#[cfg(all(test, unix))]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
