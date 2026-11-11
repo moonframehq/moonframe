@@ -226,7 +226,18 @@ fn targets(input: Option<&serde_json::Value>) -> Option<Vec<PathBuf>> {
     let mut named = Vec::new();
     for (key, value) in fields {
         match key.as_str() {
-            "changes" => named.extend(value.as_object()?.keys().map(PathBuf::from)),
+            "changes" => {
+                for (file, change) in value.as_object()? {
+                    // Its text only: a `move_path` would send it elsewhere.
+                    let only_text = change.as_object()?.keys().all(|key| {
+                        matches!(key.as_str(), "type" | "kind" | "content" | "unified_diff")
+                    });
+                    if !only_text {
+                        return None;
+                    }
+                    named.push(PathBuf::from(file));
+                }
+            },
             // Several edits of the one file: text only.
             "edits" => {
                 for edit in value.as_array()? {
@@ -312,12 +323,16 @@ mod tests {
         assert!(allowed(&with("edit", Box::leak(Box::new(edit)))));
         let multi = json!({ "file_path": "app/style.luau", "edits": [{ "old_string": "a", "new_string": "b" }] });
         assert!(allowed(&with("edit", Box::leak(Box::new(multi)))));
-        let patch = json!({ "changes": { "app/a.luau": {}, "app/b.luau": {} } });
+        let patch = json!({ "changes": {
+            "app/a.luau": { "type": "update", "unified_diff": "@@" },
+            "app/b.luau": { "type": "add", "content": "x" },
+        } });
         assert!(allowed(&with("edit", Box::leak(Box::new(patch)))));
         // A patch reaching outside, a key not read here, an edit naming
         // another file, and any move ask.
         for input in [
             json!({ "changes": { "app/a.luau": {}, "crates/lib.rs": {} } }),
+            json!({ "changes": { "app/a.luau": { "type": "update", "move_path": "crates/x" } } }),
             json!({ "file_path": "app/style.luau", "new_path": "crates/lib.rs" }),
             json!({ "file_path": "app/style.luau", "edits": [{ "file_path": "crates/x" }] }),
             json!("app/style.luau"),
