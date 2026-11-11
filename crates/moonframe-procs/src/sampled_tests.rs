@@ -308,8 +308,13 @@ fn the_system_provider_reads_this_machine() {
     let message = moonframe_providers::from_json(&json!({ "query": own })).unwrap();
     provider.receive(&host, "monitor", message);
     let mine = awaited(&seen, 1, |shown| shown["query"] == own);
-    assert_eq!(mine["groups"][0]["pid"], std::process::id(), "{mine}");
-    assert!(mine["groups"][0]["mem"].as_i64().unwrap() > 0);
+    // The query matches pids that merely contain ours (636 matches 6360), and
+    // groups are sorted by CPU, so ours need not come first.
+    let ours = mine["groups"]
+        .as_array()
+        .and_then(|groups| groups.iter().find(|g| g["pid"] == std::process::id()))
+        .unwrap_or_else(|| panic!("this process is not listed: {mine}"));
+    assert!(ours["mem"].as_i64().unwrap() > 0, "{ours}");
     let memory = &mine["memory"];
     assert!(memory["total"].as_i64().unwrap() > 0, "{memory}");
     assert!(memory["used"].as_i64().unwrap() > 0, "{memory}");
