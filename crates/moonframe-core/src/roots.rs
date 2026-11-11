@@ -364,6 +364,14 @@ impl Roots {
         found
     }
 
+    /// Each layer's folder `dir`, where it has one, lowest first.
+    pub(crate) fn dirs(&self, dir: &str) -> Vec<PathBuf> {
+        self.folder_layers(dir)
+            .map(|layer| layer.join(dir))
+            .filter(|path| path.is_dir())
+            .collect()
+    }
+
     /// The layers laid out like an app folder, all but single-mod packages,
     /// that bring what is under `dir` (`""` for the folder's own files).
     fn folder_layers(&self, dir: &str) -> impl Iterator<Item = &Path> {

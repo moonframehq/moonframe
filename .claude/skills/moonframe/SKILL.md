@@ -1641,6 +1641,54 @@ return mod {
 - The app's name in the menu bar is its title (`title` in moonframe.toml);
   menus and keys change when the shell reloads.
 
+## Words in the user's language
+
+Any app layer may hold `locales/<language>/*.ftl`, messages in
+[Fluent](https://projectfluent.org/fluent/guide/) by ID. `en-US` is the
+language the app is written in; add others as folders beside it (`fr`,
+`pt-BR`). A view asks for one with `ui.t`:
+
+```text
+locales/en-US/inbox.ftl          locales/fr/inbox.ftl
+inbox-title = Inbox              inbox-title = Boîte de réception
+inbox-unread = { $count ->       inbox-unread = { $count ->
+    [one] One unread message         [one] Un message non lu
+   *[other] { $count } unread       *[other] { $count } non lus
+}                                }
+compose = Compose                compose = Écrire
+    .tooltip = New message           .tooltip = Nouveau message
+```
+
+```lua
+ui.panel { title = ui.t "inbox-title",
+	ui.text(ui.t("inbox-unread", { count = #state.unread })),
+	ui.button { ui.t "compose", tooltip = ui.t "compose.tooltip", msg = "compose" },
+	ui.text(ui.number(app.usage.tokens)),                 -- 1,234,567 / 1 234 567
+	ui.text(ui.date(mail.received, { style = "short", time = true })),
+}
+```
+
+- The language is the best match between the folders the app has and the
+  user's system languages; `MOONFRAME_LANG=fr` (or `fr,de`) overrides
+  them, to try a translation: `MOONFRAME_LANG=fr just check`.
+  `ui.locale()` names the one chosen.
+- A message missing from a translation shows in English; one missing from
+  English shows as its ID, so a typo is visible. Numbers stay numbers in
+  the arguments, so `{ $count -> [one] … }` picks the plural the language
+  has, and `{ $count }` is written with its digits and separators.
+- `ui.number(n, { decimals = 2 })` and `ui.date(seconds, { style =
+  "short" | "medium" | "long", date = false, time = true | "seconds" })`
+  write numbers and dates the language's way, even in an app with no
+  translations: use them for any number or date a person reads.
+- A higher layer's message replaces a lower one's of the same ID, so a
+  package or the user's folder can reword any of the app's words.
+- `just check` reports `.ftl` files that do not parse, by line, and IDs in a
+  translation that English lacks. Editing an `.ftl` file reloads the window.
+- Menu titles `View`, `Window` and `Help` stay in English: the host finds
+  its own menus by them. Their items, and every other menu, translate.
+- Use it for an app meant for others (a profile, a bundle); a quick mod or a
+  mockup can write its words in place.
+
 ## Patterns
 
 **Long lists.** Anything that can grow past a screenful (files, logs,

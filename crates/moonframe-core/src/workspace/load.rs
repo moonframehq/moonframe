@@ -18,7 +18,11 @@ impl Workspace {
         self.reloading = true;
         self.style_generation += 1;
         self.load_style();
-        self.library = Library::read(self.roots.entries("components", "luau"));
+        let (words, problems) = crate::words::Words::read(&self.roots, &self.languages);
+        self.words = words;
+        self.words_errors = problems;
+        self.library =
+            Library::read(self.roots.entries("components", "luau")).with_words(self.words.clone());
         self.components = self.library.catalogue(&self.stylesheet);
         let mut rules = Rules::default();
         for component in &self.components {

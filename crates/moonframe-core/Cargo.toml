@@ -11,9 +11,19 @@ version.workspace      = true
 workspace = true
 
 [dependencies]
-mlua.workspace      = true
-thiserror.workspace = true
-tracing.workspace   = true
+chrono.workspace          = true
+fluent-bundle.workspace   = true
+fluent-langneg.workspace  = true
+fluent-syntax.workspace   = true
+icu_datetime.workspace    = true
+icu_decimal.workspace     = true
+icu_locale_core.workspace = true
+intl-memoizer.workspace   = true
+mlua.workspace            = true
+sys-locale.workspace      = true
+thiserror.workspace       = true
+tracing.workspace         = true
+unic-langid.workspace     = true
 
 [dev-dependencies]
 tempfile.workspace = true

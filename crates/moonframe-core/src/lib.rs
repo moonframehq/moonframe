@@ -46,6 +46,7 @@ mod schema;
 mod style;
 mod vm;
 mod window;
+pub mod words;
 mod workspace;
 // keep-sorted end
 

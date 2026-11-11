@@ -120,9 +120,10 @@ fn watch(
                     || path.file_name().is_some_and(|name| name == "Cargo.lock");
                 found.providers |= !built && !path.is_dir();
             } else {
+                // `.ftl`: the app's words, which modules read on load.
                 found.modules |= path
                     .extension()
-                    .is_some_and(|extension| extension == "luau")
+                    .is_some_and(|extension| extension == "luau" || extension == "ftl")
                     || path.is_dir();
             }
         }
