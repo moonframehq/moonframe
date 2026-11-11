@@ -36,8 +36,8 @@ pub(crate) struct Call<'a> {
     pub(crate) kind: Option<&'a str>,
     pub(crate) paths: &'a [PathBuf],
     pub(crate) command: Option<&'a str>,
-    /// What the tool was given, as the agent sent it.
-    pub(crate) input: Option<&'a serde_json::Value>,
+    /// Other files named in its input, or unknown if it may name others.
+    pub(crate) targets: Option<&'a [PathBuf]>,
 }
 
 impl Allow {
@@ -84,7 +84,7 @@ impl Allow {
             // Only when every file it touches is known: a move's other
             // end, or a patch naming files under keys not read here, would
             // otherwise go unchecked. A move always asks.
-            Some("edit" | "delete") => targets(call.input).is_some_and(|named| {
+            Some("edit" | "delete") => call.targets.is_some_and(|named| {
                 let paths: Vec<&Path> = call
                     .paths
                     .iter()
@@ -204,7 +204,7 @@ fn viewer(piped: &str) -> bool {
 /// The files an edit's `input` names besides those the protocol shows: the
 /// keys of a `changes` map (a patch over several files). None when it has
 /// anything else that could name a file, so the user is asked.
-fn targets(input: Option<&serde_json::Value>) -> Option<Vec<PathBuf>> {
+pub(crate) fn input_targets(input: Option<&serde_json::Value>) -> Option<Vec<PathBuf>> {
     /// Keys that name the file edited (read by `guard::paths`) or hold
     /// only text.
     const KNOWN: [&str; 10] = [
@@ -228,11 +228,7 @@ fn targets(input: Option<&serde_json::Value>) -> Option<Vec<PathBuf>> {
         match key.as_str() {
             "changes" => {
                 for (file, change) in value.as_object()? {
-                    // Its text only: a `move_path` would send it elsewhere.
-                    let only_text = change.as_object()?.keys().all(|key| {
-                        matches!(key.as_str(), "type" | "kind" | "content" | "unified_diff")
-                    });
-                    if !only_text {
+                    if !text_only(change) {
                         return None;
                     }
                     named.push(PathBuf::from(file));
@@ -254,6 +250,29 @@ fn targets(input: Option<&serde_json::Value>) -> Option<Vec<PathBuf>> {
         }
     }
     Some(named)
+}
+
+/// Whether a patch's `change` to one file holds only its text, every value
+/// of a known shape: a move to another file, at any depth, is refused.
+fn text_only(change: &serde_json::Value) -> bool {
+    use serde_json::Value;
+    let Some(fields) = change.as_object() else {
+        return false;
+    };
+    fields.iter().all(|(key, value)| match key.as_str() {
+        "type" | "content" | "unified_diff" => value.is_string(),
+        // `{ type = "update", move_path = nil }`, as Codex sends it.
+        "kind" => match value {
+            Value::String(_) => true,
+            Value::Object(kind) => kind.iter().all(|(key, value)| match key.as_str() {
+                "type" => value.is_string(),
+                "move_path" => value.is_null(),
+                _ => false,
+            }),
+            _ => false,
+        },
+        _ => false,
+    })
 }
 
 /// The shell command a tool call's input names, as agents send it: a
@@ -302,7 +321,7 @@ mod tests {
             kind: Some(kind),
             paths,
             command,
-            input: None,
+            targets: Some(&[]),
         }
     }
 
@@ -312,38 +331,41 @@ mod tests {
         std::fs::create_dir_all(dir.path().join("app/mods")).unwrap();
         let scope = scope(dir.path());
         let inside = [PathBuf::from("app/style.luau")];
-        let with = |kind: &'static str, input: &'static serde_json::Value| Call {
-            kind: Some(kind),
-            paths: &inside,
-            command: None,
-            input: Some(input),
+        let allowed = |kind: &'static str, input: Option<&serde_json::Value>| {
+            let named = input_targets(input);
+            let call = Call {
+                kind: Some(kind),
+                paths: &inside,
+                command: None,
+                targets: named.as_deref(),
+            };
+            Allow::App.covers_call(&call, &scope)
         };
-        let allowed = |call: &Call<'_>| Allow::App.covers_call(call, &scope);
         let edit = json!({ "file_path": "app/style.luau", "old_string": "a", "new_string": "b" });
-        assert!(allowed(&with("edit", Box::leak(Box::new(edit)))));
+        assert!(allowed("edit", Some(&edit)));
         let multi = json!({ "file_path": "app/style.luau", "edits": [{ "old_string": "a", "new_string": "b" }] });
-        assert!(allowed(&with("edit", Box::leak(Box::new(multi)))));
+        assert!(allowed("edit", Some(&multi)));
         let patch = json!({ "changes": {
             "app/a.luau": { "type": "update", "unified_diff": "@@" },
             "app/b.luau": { "type": "add", "content": "x" },
+            "app/c.luau": { "kind": { "type": "update", "move_path": null }, "unified_diff": "@@" },
         } });
-        assert!(allowed(&with("edit", Box::leak(Box::new(patch)))));
+        assert!(allowed("edit", Some(&patch)));
         // A patch reaching outside, a key not read here, an edit naming
         // another file, and any move ask.
         for input in [
             json!({ "changes": { "app/a.luau": {}, "crates/lib.rs": {} } }),
             json!({ "changes": { "app/a.luau": { "type": "update", "move_path": "crates/x" } } }),
+            json!({ "changes": { "app/a.luau": { "kind": { "type": "update", "move_path": "crates/x" } } } }),
+            json!({ "changes": { "app/a.luau": { "content": { "move_path": "crates/x" } } } }),
             json!({ "file_path": "app/style.luau", "new_path": "crates/lib.rs" }),
             json!({ "file_path": "app/style.luau", "edits": [{ "file_path": "crates/x" }] }),
             json!("app/style.luau"),
         ] {
-            assert!(
-                !allowed(&with("edit", Box::leak(Box::new(input.clone())))),
-                "{input}"
-            );
+            assert!(!allowed("edit", Some(&input)), "{input}");
         }
         let moved = json!({ "path": "app/style.luau" });
-        assert!(!allowed(&with("move", Box::leak(Box::new(moved)))));
+        assert!(!allowed("move", Some(&moved)));
     }
 
     #[test]
