@@ -645,6 +645,10 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
             if let Some(report) = &launch.providers.on_entry_status {
                 workspace.on_entry_status(report.clone());
             }
+            if let Some(report) = &launch.view_diagnostics {
+                workspace.on_view_diagnostic(report.clone());
+            }
+            workspace.share_views(launch.entries.clone());
             let mut provider_options = launch.providers.clone();
             provider_options.state_dir = folders.user.as_ref().map(|_| {
                 paths::state(folders.profile.as_deref()).with_file_name("entry-providers")
@@ -656,6 +660,7 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
                 natives,
                 crate::app::Launch {
                     entries: launch.entries.clone(),
+                    view_diagnostics: launch.view_diagnostics.clone(),
                     providers: provider_options,
                     folders: folders.clone(),
                     backends: backends.clone(),

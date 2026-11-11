@@ -9,6 +9,13 @@ use {
     std::sync::{Arc, Mutex},
 };
 
+fn in_app(roots: &Roots) -> crate::entries::CheckOptions {
+    crate::entries::CheckOptions {
+        roots: Some(roots.clone()),
+        ..Default::default()
+    }
+}
+
 fn component(text: &str) -> String {
     format!("return component {{ build = function() return ui.text \"{text}\" end }}")
 }
@@ -175,10 +182,13 @@ fn check_reports_each_file_and_resolves_components_against_the_app() {
     assert_eq!(alone.len(), 1, "{alone:?}");
     assert_eq!(alone[0].severity, Severity::Warning);
     let roots = Roots::from(dir.path());
-    assert_eq!(check_in(external.path(), &policy, Some(&roots)), Vec::new());
+    assert_eq!(
+        check_in(external.path(), &policy, &in_app(&roots)),
+        Vec::new()
+    );
     let bare_app = app(&[]);
     let bare = Roots::from(bare_app.path());
-    let missing = check_in(external.path(), &policy, Some(&bare));
+    let missing = check_in(external.path(), &policy, &in_app(&bare));
     assert_eq!(missing[0].severity, Severity::Error);
 
     write(
@@ -192,7 +202,7 @@ fn check_reports_each_file_and_resolves_components_against_the_app() {
         "main.luau",
         "return mod { view = function() error('boom') end }",
     );
-    let found = check_in(external.path(), &policy, Some(&roots));
+    let found = check_in(external.path(), &policy, &in_app(&roots));
     let files: Vec<_> = found
         .iter()
         .map(|found| found.file.file_name().unwrap().to_str().unwrap().to_owned())

@@ -42,7 +42,20 @@ impl<'p> Fields<'p> {
                 (Value::String(key), value) => {
                     let key = key.to_string_lossy();
                     if !keys.iter().any(|group| group.contains(&key.as_str())) {
-                        return Err(cx.fail(unknown(&key, keys)));
+                        let takes = takes(keys);
+                        let kind = cx.kind();
+                        let shown = crate::diagnostic::short(&value);
+                        // The line may come after the refused key.
+                        let stamped = match table.raw_get::<Value>(SOURCE_LINE) {
+                            Ok(Value::Integer(number)) => u32::try_from(number).ok(),
+                            _ => None,
+                        };
+                        return Err(cx.fail(unknown(&key, &takes)).with(|detail| {
+                            detail.suggestion = crate::diagnostic::unknown_key(kind, &key, &takes);
+                            detail.key = Some(key.clone());
+                            detail.value = Some(shown);
+                            detail.line = stamped;
+                        }));
                     }
                     named.insert(key, value);
                 },
@@ -71,6 +84,11 @@ impl<'p> Fields<'p> {
         &self.items
     }
 
+    /// Its named keys.
+    pub(crate) fn keys(&self) -> impl Iterator<Item = &str> {
+        self.named.keys().map(String::as_str)
+    }
+
     pub(crate) fn raw(&self, key: &str) -> Option<&Value> {
         self.named.get(key)
     }
@@ -79,7 +97,18 @@ impl<'p> Fields<'p> {
     pub(crate) fn get<T: Read>(&self, key: &str) -> Result<Option<T>, Error> {
         self.named
             .get(key)
-            .map(|value| T::read(value, &self.cx.key(key)))
+            .map(|value| {
+                T::read(value, &self.cx.key(key)).map_err(|error| {
+                    error.with(|detail| {
+                        if detail.value.is_none() {
+                            detail.value = Some(crate::diagnostic::short(value));
+                        }
+                        if detail.line.is_none() {
+                            detail.line = self.line;
+                        }
+                    })
+                })
+            })
             .transpose()
     }
 
@@ -101,12 +130,15 @@ impl<'p> Fields<'p> {
     }
 }
 
-fn unknown(key: &str, keys: &[&[&str]]) -> String {
-    // `type` tags elements; it is never a key a script chooses.
-    let takes: Vec<&str> = keys
-        .iter()
+/// The keys a reader takes. `type` tags elements; it is never a key a
+/// script chooses.
+fn takes<'k>(keys: &[&[&'k str]]) -> Vec<&'k str> {
+    keys.iter()
         .flat_map(|group| group.iter().copied())
         .filter(|key| *key != "type")
-        .collect();
+        .collect()
+}
+
+fn unknown(key: &str, takes: &[&str]) -> String {
     format!("unknown key `{key}`; it takes {}", takes.join(", "))
 }

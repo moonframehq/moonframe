@@ -28,6 +28,7 @@ use {
 /// own folder, and the user's `~/.config/<name>` on top.
 pub struct Moonframe {
     pub(crate) entries: moonframe_core::entries::Entries,
+    pub(crate) view_diagnostics: Option<moonframe_core::ViewDiagnostics>,
     pub(crate) providers: moonframe_providers::ProviderOptions,
     pub(crate) errors: Vec<String>,
     pub(crate) identity: Identity,
@@ -72,6 +73,7 @@ impl Moonframe {
         identity.updates = None;
         Self {
             entries: Default::default(),
+            view_diagnostics: None,
             providers: Default::default(),
             errors: Vec::new(),
             log: format!("error,moonframe=info,{}=info", name.replace('-', "_")),

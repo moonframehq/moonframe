@@ -10,6 +10,7 @@
 //! ```
 
 // keep-sorted start
+mod diagnose;
 mod load;
 mod messages;
 mod render;
@@ -18,6 +19,7 @@ mod slot;
 mod windows;
 // keep-sorted end
 
+pub use diagnose::ViewDiagnostics;
 pub(crate) use scope::read_style;
 
 use {
@@ -60,6 +62,17 @@ const MAX_SENDS_PER_UPDATE: usize = 256;
 
 pub struct Workspace {
     entry_statuses: Option<crate::entries::EntryStatuses>,
+    /// Hears each new element problem, any module's.
+    view_diagnostics: Option<ViewDiagnostics>,
+    /// What was told of each module's view problems.
+    told: BTreeMap<String, diagnose::Told>,
+    /// Set while reloading, which reports every entry at its end.
+    reloading: bool,
+    /// Whether views are read strictly, as a check reads them.
+    strict: bool,
+    /// Where entries' views are published as they draw, and the draw each
+    /// was published at.
+    shared: Option<(crate::entries::Entries, BTreeMap<String, u64>)>,
     roots: Roots,
     /// The components mods can `use`.
     library: Library,
@@ -245,6 +258,17 @@ pub struct Slot {
     view_error: Option<Error>,
     /// Children of the view that could not be read, each marked in place.
     broken: Vec<Error>,
+    /// What the view drew that is noted but not marked.
+    notes: Vec<Error>,
+    /// Whether its view is read strictly, as a check reads it.
+    strict: bool,
+    /// Counts its loads, so problems told of an older source are told
+    /// again.
+    loads: u64,
+    /// Counts the views it drew.
+    draws: u64,
+    /// The keys of `app` its last view read.
+    reads: Reads,
     /// The state saved from an earlier run, for its first load.
     restored: Option<Data>,
     /// The state last saved, so an unchanged one is not saved again.
@@ -290,6 +314,11 @@ impl Workspace {
     ) -> Self {
         let mut workspace = Self {
             entry_statuses: None,
+            view_diagnostics: None,
+            told: BTreeMap::new(),
+            reloading: false,
+            strict: false,
+            shared: None,
             roots: roots.into(),
             library: Library::default(),
             scopes: BTreeMap::new(),

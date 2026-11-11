@@ -279,7 +279,7 @@ fn unknown_icon(name: &str) -> String {
                 || icon
                     .split('-')
                     .any(|part| part.len() > 2 && name.contains(part))
-                || edits(icon, name) <= 2
+                || crate::schema::edits(icon, name) <= 2
         })
         .take(6)
         .collect();
@@ -294,27 +294,15 @@ fn unknown_icon(name: &str) -> String {
     }
 }
 
-/// How many single-letter changes turn `a` into `b`.
-fn edits(a: &str, b: &str) -> usize {
-    let b: Vec<char> = b.chars().collect();
-    let mut row: Vec<usize> = (0..=b.len()).collect();
-    for (i, ca) in a.chars().enumerate() {
-        let mut last = row[0];
-        row[0] = i + 1;
-        for (j, cb) in b.iter().enumerate() {
-            let next = (row[j + 1] + 1)
-                .min(row[j] + 1)
-                .min(last + usize::from(ca != *cb));
-            last = row[j + 1];
-            row[j + 1] = next;
-        }
-    }
-    row[b.len()]
-}
-
 impl Read for IconName {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
         let name = String::read(value, cx)?;
-        Self::new(&name).ok_or_else(|| cx.fail(unknown_icon(&name)))
+        Self::new(&name).ok_or_else(|| {
+            cx.fail(unknown_icon(&name)).with(|detail| {
+                let close = crate::schema::nearest(&name, ICONS.iter().copied());
+                detail.suggestion =
+                    (!close.is_empty()).then(|| format!("close icon names: {}", close.join(", ")));
+            })
+        })
     }
 }

@@ -29,6 +29,7 @@ mod tokens;
 // keep-sorted start
 mod component;
 mod data;
+mod diagnostic;
 pub mod entries;
 mod error;
 mod keys;
@@ -41,6 +42,7 @@ mod persist;
 mod read;
 mod request;
 mod roots;
+mod schema;
 mod style;
 mod vm;
 mod window;
@@ -50,6 +52,7 @@ mod workspace;
 pub use {
     component::{Component, Demo, catalogue},
     data::Data,
+    diagnostic::{ViewDiagnostic, ViewLevel},
     error::Error,
     keys::{Chord, Keys, Pressed},
     menus::{About, AppMenu, MenuCommand, MenuEntry},
@@ -63,6 +66,9 @@ pub use {
         WindowRequest,
     },
     roots::{AppLayer, Roots, mod_name},
+    schema::{
+        ElementSchema, KeySchema, KeyType, SCHEMA_VERSION, Schema, StyleSchema, TokenSet, schema,
+    },
     style::{
         Case, Color, Corners, Curve, Font, Gradient, Look, MonoFont, Paint, Part, Resolved, Rules,
         Shade, Shadow, ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token,
@@ -70,7 +76,9 @@ pub use {
     },
     vm::printable,
     window::{Chrome, Display, ModWindowSize, Platform, Titlebar, WindowPlace, WindowState},
-    workspace::{DEMO, DEVTOOLS, FEEDBACK, PROVIDER, SHELL, Slot, TOPIC, Workspace},
+    workspace::{
+        DEMO, DEVTOOLS, FEEDBACK, PROVIDER, SHELL, Slot, TOPIC, ViewDiagnostics, Workspace,
+    },
 };
 
 #[cfg(test)]

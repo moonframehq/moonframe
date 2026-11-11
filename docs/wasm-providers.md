@@ -391,21 +391,23 @@ On the runtime handle, `use moonframe::EmbeddedEntries` and call
 `entries.add_entry_embedded::<Notes>("builtin", "notes")`; one added before
 `run` waits until the app knows its cache folder.
 
-**Checking an entry.** `moonframe::check_entry(path, &policy, app_roots,
-&["mshub.entities"])` returns a `Vec<Diagnostic>` (`severity`, `file`,
-`message`) for a host CLI's `<app> miniapp check`: it compiles and loads
-`main.luau`, draws its first view headlessly, loads each component and
-`style.luau`, reads `provider/provider.toml` with its capabilities checked
-against the names given, and applies `policy` (prebuilt-only, process,
-socket). With `app_roots` as `None`, a `use` of a component the entry does not
-bring is only a warning. The Luau-only part is
-`moonframe_core::entries::check(path, &policy)` (or `check_in` with the app's
-`Roots`). Static type-checking stays with `luau-lsp analyze`, as `just types`
-runs it.
+**Checking an entry.** `moonframe::check_entry(path, &policy, &options)`
+returns a `Vec<Diagnostic>` (`severity`, `file`, `line`, `message`) for a host
+CLI's `<app> miniapp check`. It loads `main.luau`, components and
+`style.luau`, draws the view with no data and then with each case
+`CheckOptions` gives (fake `app` tables, starting states, messages), reads
+`provider/provider.toml` with its capabilities checked against
+`options.capabilities`, and applies `policy`. An entry that ships a
+`sample.json` (beside `main.luau` or in `provider/`) is drawn with it as its
+provider's data, so a branch that only draws once data arrives is checked:
+ship one. See [checking what miniapps draw](library.md#checking-what-miniapps-draw)
+for every option, live diagnostics, snapshots and headless renders.
 
 `EntryStatus` contains `name`, `kind` (`Mod`/`Provider`), `state`
-(`Ok`/`Building`/`Stale`/`Failed`), optional `error`, and `revision` (an opaque
-fingerprint of the attempted revision, not a monotonic counter). The callback
+(`Ok`/`Building`/`Stale`/`Failed`), optional `error`, `revision` (an opaque
+fingerprint of the attempted revision, not a monotonic counter), and
+`view_errors`: what the entry's views drew wrong, as `ViewDiagnostic`s, sent
+when they change and empty once the view draws cleanly. The callback
 runs on the loading thread; keep it short. Wasm build/instantiate progress and
 errors use this callback. It does not publish a topic. On-demand providers
 report once wanted. Headless integrations use `Capabilities::capability`,

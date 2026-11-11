@@ -16,7 +16,7 @@ use {
 const SHADOW_COLOR: u32 = 0x0000_0040;
 const MAX_SHADOW_LAYERS: usize = 8;
 
-const SHEET_KEYS: &[&str] = &[
+pub(crate) const SHEET_KEYS: &[&str] = &[
     "font_size",
     "font_family",
     "mono",
@@ -27,7 +27,7 @@ const SHEET_KEYS: &[&str] = &[
     "looks",
     "rules",
 ];
-const STYLE_KEYS: &[&str] = &[
+pub(crate) const STYLE_KEYS: &[&str] = &[
     "background",
     "gradient",
     "color",

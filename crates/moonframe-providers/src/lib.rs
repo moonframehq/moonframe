@@ -580,6 +580,7 @@ impl Providers {
                             },
                             error: Some(problem.to_string()),
                             revision: fingerprint.revision(),
+                            view_errors: Vec::new(),
                         });
                     }
                     if stale {

@@ -2,10 +2,16 @@
 
 mod check;
 mod files;
+mod scenarios;
+mod typecheck;
+mod views;
 
 pub use {
     check::{Diagnostic, Severity, check, check_in},
     files::EntryFiles,
+    scenarios::CheckOptions,
+    typecheck::typecheck,
+    views::ViewSnapshot,
 };
 
 use std::{
@@ -51,6 +57,8 @@ struct Registry {
     changed: Option<Arc<dyn Fn() + Send + Sync>>,
     /// Embedded entries, written once the host knows its cache folder.
     files: files::Pending,
+    /// What each entry's view last drew.
+    views: BTreeMap<String, ViewSnapshot>,
 }
 
 impl Entries {
@@ -98,6 +106,9 @@ impl Entries {
                 .entries
                 .retain(|_, entry| entry.namespace != namespace);
             registry.files.forget_root(namespace);
+            registry
+                .views
+                .retain(|name, _| name.split_once(':').is_none_or(|(ns, _)| ns != namespace));
             registry.changed.clone()
         };
         if let Some(changed) = changed {
@@ -151,6 +162,7 @@ impl Entries {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             registry.entries.remove(&format!("{namespace}:{id}"));
+            registry.views.remove(&format!("{namespace}:{id}"));
             registry.files.forget(namespace, id);
             registry.changed.clone()
         };
@@ -213,6 +225,10 @@ pub struct EntryStatus {
     pub state: EntryState,
     pub error: Option<String>,
     pub revision: u64,
+    /// What the entry's views drew wrong last (a warning sign in each
+    /// element's place), its instances' included; empty once they draw
+    /// cleanly. Sent again only when this changes.
+    pub view_errors: Vec<crate::ViewDiagnostic>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

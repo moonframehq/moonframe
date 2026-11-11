@@ -412,6 +412,7 @@ impl Module {
         app: &Rc<AppData>,
         sheet: &Stylesheet,
         windows: &BTreeMap<String, ListWindow>,
+        strict: bool,
     ) -> Result<(Node, Vec<Error>, Reads), Error> {
         self.meter.reset();
         let app = self.lens.open(&self.lua, app)?;
@@ -427,7 +428,7 @@ impl Module {
         let tree = call.map_err(|error| Error::from(error).context("view"))?;
         // A list's rows are built as it is read, and may read `app` too.
         let (node, problems) =
-            node::read(&tree, sheet, windows).map_err(|error| error.context("view"))?;
+            node::read(&tree, sheet, windows, strict).map_err(|error| error.context("view"))?;
         self.read_peaks();
         Ok((
             node,

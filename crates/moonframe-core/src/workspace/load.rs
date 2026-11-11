@@ -15,6 +15,7 @@ impl Workspace {
     /// Reads every module again, adds mods that appeared, drops those that
     /// went, and keeps each module's state across the reload.
     pub fn reload(&mut self) {
+        self.reloading = true;
         self.style_generation += 1;
         self.load_style();
         self.library = Library::read(self.roots.entries("components", "luau"));
@@ -63,7 +64,37 @@ impl Workspace {
             self.load_instance(&key);
         }
         self.settle();
+        self.reloading = false;
         self.report_entries();
+    }
+
+    /// Starts the mod `name` again from `state`, as `init(previous)` gets
+    /// it, or from its own `init`, and draws: what a check or a headless
+    /// render starts a mod from.
+    pub fn restart(&mut self, name: &str, state: Option<Data>) {
+        let (library, scoped) = self.scoped(name);
+        let candidates = self.roots.mod_candidates(name);
+        let strict = self.strict;
+        let Some(slot) = self.mods.get_mut(name) else {
+            return;
+        };
+        *slot = Slot {
+            restored: state,
+            scoped,
+            strict,
+            ..Slot::default()
+        };
+        slot.load_layered(name, &candidates, &library);
+        self.settle();
+    }
+
+    /// Reads every view strictly from now on, as a check does: classes and
+    /// states no rule styles are noted.
+    pub fn set_strict(&mut self, strict: bool) {
+        if self.strict != strict {
+            self.strict = strict;
+            self.reload();
+        }
     }
 
     /// Loads (or reloads) the instance at `key` from its mod or component.

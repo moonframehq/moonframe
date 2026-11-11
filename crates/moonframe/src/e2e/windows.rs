@@ -91,6 +91,7 @@ fn windows_with_entries(
             &workspace,
             Natives::from([("echo".to_owned(), echo)]),
             Launch {
+                view_diagnostics: None,
                 entries,
                 providers: Default::default(),
                 folders,

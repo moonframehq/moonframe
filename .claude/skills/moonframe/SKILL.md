@@ -1850,9 +1850,29 @@ terminal log. There are four kinds:
     `EmbeddedEntries::add_entry_embedded` on the handle) writes the folder to
     the cache at start, so release bundles need no files; in debug use
     `.entry(...)` on the source folder for live reload.
-  - `moonframe::check_entry(path, &policy, app_roots, &capability_names)`
-    returns `Diagnostic`s (Luau load + first view, components, style,
-    provider.toml, policy) for a host's `<app> miniapp check`.
+  - `moonframe::check_entry(path, &policy, &CheckOptions { name, roots, app,
+    state, messages, strict, capabilities, luau_lsp, .. })` returns
+    `Diagnostic`s with `file:line`: Luau errors, budget overruns, every element
+    the view refuses in each data case, components, style, provider.toml,
+    policy, and with `luau_lsp` a static type-check. **Ship a `sample.json`**
+    (beside `main.luau` or in `provider/`) with what the provider publishes:
+    the check draws with it, so a branch that only shows once data arrives
+    is checked. `strict` also refuses classes/states no rule styles.
+  - Live: a refused element (`ui.row { padding = 8 }`, `ui.button { selected
+    = true }`, an unknown icon) draws a warning sign and is reported once as
+    a `ViewDiagnostic` (module, path such as `column[1].row`, element, key,
+    value, line, message, suggestion) through `Moonframe::on_view_diagnostic`
+    (every mod), `EntryStatus::view_errors` and a warn log line. The sign's
+    tooltip says the same. `entries.snapshot_view(name)` returns the drawn
+    tree as data. With `capture`, `moonframe::render_entry(path, &policy,
+    &options, (w, h))` renders an entry to PNG. `moonframe::schema()` lists
+    every element, key, token and icon as data. See docs/library.md,
+    "Checking what miniapps draw".
+  - Element mistakes to avoid: `padding`/`gap` take `none|small|normal|large`
+    on an element (pixels go in `style = { padding = 8 }` or a class rule);
+    `ui.button` marks the current one with `variant`, not `selected`
+    (`ui.item` has `selected`); icon names come from `IconName` in
+    types/moonframe.d.luau.
 - **`kind = "static"`, `file = "sample.json"`:** a JSON file in the
   folder, published as it is: no code runs, so it needs no approval when
   installed. It is published again when the file changes and on any

@@ -78,32 +78,42 @@ impl Workspace {
     }
 
     pub(super) fn report_entries(&self) {
-        use crate::entries::{EntryKind, EntryState, EntryStatus};
         let Some(report) = &self.entry_statuses else {
             return;
         };
-        for (name, entry) in self.roots.external_entries() {
-            let Some(slot) = self.mods.get(name) else {
-                continue;
-            };
-            let style_error = self
-                .scopes
-                .get(name)
-                .and_then(|scope| scope.style_error.as_ref());
-            let error = slot.error().or(style_error).map(ToString::to_string);
-            report(EntryStatus {
-                name: name.clone(),
-                kind: EntryKind::Mod,
-                state: if error.is_none() {
-                    EntryState::Ok
-                } else if slot.module.is_some() {
-                    EntryState::Stale
-                } else {
-                    EntryState::Failed
-                },
-                error,
-                revision: revision(entry),
-            });
+        for name in self.roots.external_entries().keys() {
+            if let Some(status) = self.entry_status(name) {
+                report(status);
+            }
+        }
+    }
+
+    /// The entry `name`'s status: its mod's load and view, its stylesheet,
+    /// and what its views drew wrong.
+    pub(super) fn status_of(&self, name: &str) -> crate::entries::EntryStatus {
+        use crate::entries::{EntryKind, EntryState, EntryStatus};
+        let slot = self.mods.get(name);
+        let style_error = self
+            .scopes
+            .get(name)
+            .and_then(|scope| scope.style_error.as_ref());
+        let error = slot
+            .and_then(Slot::error)
+            .or(style_error)
+            .map(ToString::to_string);
+        EntryStatus {
+            name: name.to_owned(),
+            kind: EntryKind::Mod,
+            state: if error.is_none() {
+                EntryState::Ok
+            } else if slot.is_some_and(|slot| slot.module.is_some()) {
+                EntryState::Stale
+            } else {
+                EntryState::Failed
+            },
+            error,
+            revision: self.roots.external_entries().get(name).map_or(0, revision),
+            view_errors: self.entry_view_errors(name),
         }
     }
 }

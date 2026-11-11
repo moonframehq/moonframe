@@ -35,6 +35,8 @@ pub(crate) struct Cx<'p> {
     names: &'p Names,
     /// List levels below the root, to bound how deep a tree goes.
     depth: usize,
+    /// The element being read, its path and kind, for problems to name.
+    element: Option<std::rc::Rc<(String, &'static str)>>,
 }
 
 impl<'p> Cx<'p> {
@@ -43,11 +45,26 @@ impl<'p> Cx<'p> {
             at: String::new(),
             names,
             depth: 0,
+            element: None,
+        }
+    }
+
+    /// The element `kind` under this path: `column[2].button`.
+    pub(crate) fn element(&self, kind: &'static str) -> Self {
+        let cx = self.key(kind);
+        Self {
+            element: Some(std::rc::Rc::new((cx.at.clone(), kind))),
+            ..cx
         }
     }
 
     pub(crate) fn names(&self) -> &'p Names {
         self.names
+    }
+
+    /// The kind of the element being read, if any.
+    pub(crate) fn kind(&self) -> Option<&'static str> {
+        self.element.as_deref().map(|(_, kind)| *kind)
     }
 
     pub(crate) fn depth(&self) -> usize {
@@ -92,7 +109,8 @@ impl<'p> Cx<'p> {
     }
 
     pub(crate) fn fail(&self, problem: impl Display) -> Error {
-        Error::at(&self.at, problem)
+        let element = self.element.as_deref().cloned();
+        Error::at(&self.at, problem).with(|detail| detail.element = element)
     }
 }
 

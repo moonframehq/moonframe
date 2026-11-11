@@ -19,6 +19,21 @@ impl Slot {
         &self.broken
     }
 
+    /// What its last view drew that still works but is noted: deprecated
+    /// keys, and in a strict check, unstyled classes and states.
+    pub fn notes(&self) -> &[Error] {
+        &self.notes
+    }
+
+    /// Each problem of its last view as a diagnostic, broken first.
+    pub fn view_diagnostics(&self, module: &str) -> Vec<crate::ViewDiagnostic> {
+        self.broken
+            .iter()
+            .chain(&self.notes)
+            .map(|error| crate::ViewDiagnostic::new(module, error))
+            .collect()
+    }
+
     pub fn rules(&self) -> &Rules {
         &self.rules
     }
@@ -131,6 +146,7 @@ impl Slot {
         match loaded {
             Ok(module) => {
                 self.rollback = self.module.replace(module);
+                self.loads += 1;
                 self.fresh = true;
                 self.dirty = true;
                 self.load_error = None;
@@ -187,14 +203,38 @@ impl Slot {
         };
         match module
             .rules(sheet)
-            .and_then(|rules| Ok((rules, module.view(app, sheet, &self.lists)?)))
+            .and_then(|rules| Ok((rules, module.view(app, sheet, &self.lists, self.strict)?)))
         {
-            Ok((rules, (view, broken, reads))) => {
+            Ok((rules, (view, problems, reads))) => {
                 self.rollback = None;
+                self.draws += 1;
+                self.reads = reads.clone();
                 self.rules = self.scoped.clone();
                 self.rules.layer(&rules);
                 self.view = Some(view);
+                let (broken, notes): (Vec<Error>, Vec<Error>) =
+                    problems.into_iter().partition(Error::is_broken);
                 self.broken = broken;
+                // A class or state the mod's own rules style is styled.
+                let own = &self.rules;
+                self.notes = notes
+                    .into_iter()
+                    .filter(|note| {
+                        let Some(detail) = note.detail() else {
+                            return true;
+                        };
+                        let value = detail.value.as_deref().unwrap_or_default();
+                        match detail.key.as_deref() {
+                            Some("class") if detail.level == crate::ViewLevel::Strict => {
+                                !own.styles_class(value)
+                            },
+                            Some("state") if detail.level == crate::ViewLevel::Strict => {
+                                !own.styles_state(value)
+                            },
+                            _ => true,
+                        }
+                    })
+                    .collect();
                 self.view_error = None;
                 self.drawn = Some(Drawn {
                     style_generation: style,

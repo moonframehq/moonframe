@@ -39,6 +39,8 @@ const CASCADE: Pixels = px(28.);
 #[derive(Clone)]
 pub(crate) struct Launch {
     pub(crate) entries: moonframe_core::entries::Entries,
+    /// Hears each element problem any window's views draw.
+    pub(crate) view_diagnostics: Option<moonframe_core::ViewDiagnostics>,
     pub(crate) providers: moonframe_providers::ProviderOptions,
     pub(crate) folders: Folders,
     pub(crate) backends: Arc<Backends>,
@@ -402,6 +404,10 @@ pub fn open_main_window(cx: &mut App) {
     if let Some(report) = &launch.providers.on_entry_status {
         workspace.on_entry_status(report.clone());
     }
+    if let Some(report) = &launch.view_diagnostics {
+        workspace.on_view_diagnostic(report.clone());
+    }
+    workspace.share_views(launch.entries.clone());
     let bounds = cascaded(launch.chrome, cx);
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
