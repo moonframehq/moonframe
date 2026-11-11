@@ -36,6 +36,8 @@ pub struct Moonframe {
     pub(crate) assets: Option<Arc<dyn AssetSource>>,
     pub(crate) project: Option<PathBuf>,
     pub(crate) keep: Vec<String>,
+    /// What agents changing the app are told and check it with.
+    pub(crate) agent: AgentHints,
     pub(crate) natives: Natives,
     pub(crate) views: Registry,
     pub(crate) log: String,
@@ -49,6 +51,14 @@ pub struct Moonframe {
 /// A layer an app adds to the log; see [`Moonframe::log_layer`].
 pub type LogLayer =
     Box<dyn tracing_subscriber::Layer<tracing_subscriber::Registry> + Send + Sync + 'static>;
+
+/// What a host says to agents changing its app, from
+/// [`Moonframe::agent_guide`] and [`Moonframe::agent_check`].
+#[derive(Clone, Debug, Default)]
+pub(crate) struct AgentHints {
+    pub(crate) guide: Option<String>,
+    pub(crate) check: Option<String>,
+}
 
 /// Where the host's own app folder comes from.
 #[derive(Clone)]
@@ -81,6 +91,7 @@ impl Moonframe {
             app: None,
             project: None,
             keep: Vec::new(),
+            agent: AgentHints::default(),
             log_layers: Vec::new(),
             natives: crate::natives::natives(),
             views: Registry::default(),
@@ -185,6 +196,23 @@ impl Moonframe {
     /// app, as a profile's `keep` does: `["terminal"]`, say.
     pub fn keep<'a>(mut self, names: impl IntoIterator<Item = &'a str>) -> Self {
         self.keep.extend(names.into_iter().map(str::to_owned));
+        self
+    }
+
+    /// More for an agent changing this app through the `feedback` mod's
+    /// sparkles, after Moonframe's own short guide: its conventions, which
+    /// files hold what, what not to touch. Usually
+    /// `include_str!("agent.md")`.
+    pub fn agent_guide(mut self, guide: &str) -> Self {
+        self.agent.guide = Some(guide.to_owned());
+        self
+    }
+
+    /// The shell command an agent checks its change with, instead of this
+    /// executable's own `--check` on the same folders (which needs no
+    /// build and takes about a second).
+    pub fn agent_check(mut self, command: &str) -> Self {
+        self.agent.check = Some(command.to_owned());
         self
     }
 

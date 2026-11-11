@@ -2,6 +2,7 @@ use {
     super::*,
     moonframe_providers::{Event, from_json},
     std::{
+        process::{Command, Stdio},
         sync::Mutex,
         time::{Duration, Instant},
     },
@@ -402,25 +403,6 @@ fn a_missing_agent_says_what_to_install() {
 }
 
 #[test]
-fn the_app_folder_is_named_from_the_workdir() {
-    let repo = std::env::temp_dir().join(format!("moonframe-acp-app-{}", std::process::id()));
-    let provider = repo.join("examples/ledger/providers/acp");
-    std::fs::create_dir_all(&provider).unwrap();
-    std::fs::create_dir_all(repo.join(".git")).unwrap();
-    let cwd = workdir(&provider, None, None);
-    assert_eq!(cwd.canonicalize().unwrap(), repo.canonicalize().unwrap());
-    assert_eq!(
-        app_folder(&provider, &cwd).as_deref(),
-        Some("examples/ledger")
-    );
-    assert_eq!(
-        app_folder(&provider, &std::env::temp_dir().join("elsewhere")),
-        None
-    );
-    std::fs::remove_dir_all(&repo).unwrap();
-}
-
-#[test]
 fn context_is_left_out_when_empty() {
     let prompt = compose("", "  Just this ", &json!({}), "0123");
     assert_eq!(prompt, "Just this");
@@ -509,6 +491,7 @@ fn installed_rig(kind: &str, path: &str) -> Rig {
         check: "moonframe --check".to_owned(),
         skill: None,
     });
+    rig.acp.writable = Some(dir.path().join("user"));
     // Kept for the rig's life, as the bundle is.
     std::mem::forget(dir);
     rig
@@ -669,5 +652,10 @@ fn run_ids_never_repeat_and_can_name_a_mark() {
 }
 
 #[cfg(unix)]
+mod app;
+mod bench;
+#[cfg(unix)]
 mod quit;
 mod replies;
+#[cfg(unix)]
+mod warm;

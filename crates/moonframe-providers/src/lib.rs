@@ -46,6 +46,7 @@
 mod asynchronous;
 #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
 mod capability;
+mod editable;
 mod fingerprint;
 mod fixed;
 mod installed;
@@ -238,7 +239,10 @@ impl Publisher {
 }
 
 /// The providers of an app, each running on its own thread.
-pub use installed::{Installed, installed, set_installed};
+pub use {
+    editable::{Editable, editable, repository, set_editable},
+    installed::{Installed, installed, set_installed},
+};
 
 /// The profile this run serves, if any, which process providers see as
 /// `MOONFRAME_PROFILE`; set once at launch with [`set_profile`].

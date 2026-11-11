@@ -596,6 +596,8 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
     if let Some(installed) = folders.installed() {
         moonframe_providers::set_installed(installed);
     }
+    let hints = std::mem::take(&mut launch.agent);
+    moonframe_providers::set_editable(folders.editable(hints.guide, hints.check));
     if let Some(profile) = &folders.profile {
         moonframe_providers::set_profile(profile);
     }

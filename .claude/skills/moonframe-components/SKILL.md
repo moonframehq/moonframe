@@ -512,7 +512,7 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | `open` | show it |
 | `placeholder` | grey text while empty (default: two examples) |
 | `reply` | the reply the mod has from `follow_type`; Reply is greyed out while it is blank |
-| `runs` | runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it) |
+| `runs` | runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it). A run's `warning` shows under it (a change that broke the app comes back undone, saying why), and `checking` shows while the provider checks the app after it |
 | `send` | sent by Send and ⌘↩, with `value` set to the text from ⌘↩ |
 | `text` | the text the mod has from `change`; Send is greyed out while it is blank |
 | `to` | mod its own messages go to, if not the drawing one |

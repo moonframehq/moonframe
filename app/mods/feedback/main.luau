@@ -1,9 +1,12 @@
 -- Make it yours: accent sparkles in the title bar open a dialog where the
 -- user writes what should change in the app. The `acp` provider hands it
 -- to a coding agent (Claude by default, over the Agent Client Protocol)
--- working on the app's own files, so the window reloads with the change;
--- the dialog follows each run under "Feedback & fixes", where the agent
--- asks before each change unless providers/acp's `allow` lets it. The icon
+-- working on the app's own files, so the window reloads with the change.
+-- The provider tells the agent about whichever app runs this (its folders,
+-- its check), and undoes a change that breaks it. The dialog follows each
+-- run under "Feedback & fixes", where the agent asks before what
+-- providers/acp's `allow` does not cover: by default, anything but
+-- reading and editing the app's own folder and running its check. The icon
 -- spins while an agent works, and shows a dot when one finished since the
 -- dialog was last open. Inspect in the dialog picks an element in the
 -- window to attach, or to copy for an agent of the user's own; the app's
@@ -50,77 +53,46 @@ type State = {
 	-- The last request came from the Developer tools (`quiet`): a failure
 	-- shows there, not by opening the dialog.
 	quiet: boolean?,
-	-- From `app.acp`: our runs (newest first), the app folder agents
-	-- change, and this window's process, to screenshot.
+	-- From `app.acp`: our runs (newest first), and this window's process,
+	-- to screenshot.
 	runs: { any },
-	folder: string?,
 	pid: number?,
-	-- From `app.acp`, in an installed app: where its signed files are, and
-	-- the user's folder over them, which agents change instead.
-	installed: any?,
 }
 
--- How the agent checks its change in the user's window, the process `pid`.
+-- How the agent looks at the user's window (the process `pid`), when the
+-- change calls for it: a color or a word that passes the check does not.
 local function look(pid: number?): string
-	local shot = if pid
-		then `\`just screenshot target/feedback.png {pid}\` (the user's window, process {pid}, which reloaded with your change)`
-		else "`just screenshot target/feedback.png <pid of the user's window>`"
-	return `Then look at it: screenshot it with {shot}, read the picture, and check it shows what they asked for. Checks passing is not enough. If it does not, find out why, fix it, and look again, until it does or you know why it cannot.`
-end
-
--- How the agent looks at the window of an installed app, which has no
--- justfile around it.
-local function look_installed(pid: number?): string
 	local window = if pid then `the user's window (process {pid})` else "the user's window"
-	return `Then look at it: screenshot {window}, which reloaded with your change (on macOS, find its window number with CGWindowListCopyWindowInfo, then \`screencapture -x -o -l<number> <file>\`), read the picture, and check it shows what they asked for. Checks passing is not enough. If it does not, find out why, fix it, and look again, until it does or you know why it cannot. If this machine will not let you take a screenshot, say so.`
+	return `Look at {window} only for a change of layout or size, or when you cannot tell from the code that it shows: on macOS, \`screencapture -x -o -l<window number> <file>\`, with the number from CGWindowListCopyWindowInfo for that process. A change of color, text or style that passes the check needs no screenshot.`
 end
 
--- Where an agent works on the installed app: never in its signed bundle.
-local function overlay(installed: any): string
-	return `This is the installed app. Its files are in {installed.files}, inside {installed.bundle}, which is signed: read and copy from there, but never change, add or delete anything in {installed.bundle}, by any means, shell commands included. That breaks the signature, and the next update takes the change away. Work in {installed.folder}, the user's folder, laid out the same way: a file there wins over the one at the same path in the app, the open window reloads at once, and removing it brings the app's back. So to change a built-in file, copy it to the same path there and change the copy. Keep the override as small as you can, because a copied mod no longer gets that mod's updates: a style.luau there is merged over the app's, so for looks write only the rules that change.`
-end
-
--- How the agent should work on the app in `folder` (from the repository
--- agents work in: `app`, or an app package such as `examples/ledger`), or
--- on the `installed` app; the user's words follow.
-local function instructions(folder: string?, pid: number?, follow: boolean, installed: any?): string
-	local where, check
-	local guide = "Read the moonframe skill (.claude/skills/moonframe/SKILL.md in the Moonframe repository) before changing anything, and the moonframe-components catalogue before writing UI."
-	local seen = look(pid)
-	if installed then
-		where = overlay(installed)
-		check = `Run \`{installed.check}\` until it passes.`
-		seen = look_installed(pid)
-		guide = if installed.skill
-			then `Read the moonframe skill ({installed.skill}) before changing anything, and the moonframe-components skill beside it before writing UI.`
-			else "Read the moonframe skill, if you have it, before changing anything."
-	elseif folder == nil or folder == "app" or folder == "." then
-		where =
-			"The UI is Luau under app/ (or ~/.config/moonframe, laid out the same way), and the user's open window reloads as files change, so a change that passes the checks is live at once."
-		check = "Run `just check` and `just types` (or `moonframe --check <folder>` where there is no justfile) until they pass."
-	else
-		where = `The app is the package in {folder}: its moonframe.toml names it, main.luau is its shell, and its mods/, components/, providers/ and style.luau sit beside it; its README.md says what each part does, so read it first. It runs as a profile over the built-in app in app/, whose components and providers it uses: change {folder}, and app/ only for a component every app should share. The user's open window reloads as files change, so a change that passes the checks is live at once.`
-		check = `Check it as \`just check-examples\` does, until it passes: link it into a throwaway user folder (\`target/release/moonframe --user "$DIR" app link {folder} --yes\`, then \`target/release/moonframe --user "$DIR" --profile <its name> --check\`), and run \`just types {folder}\`. Build target/release/moonframe first only if it is missing or you changed Rust.`
-	end
+-- How the agent should work on the app. The provider adds what it needs
+-- to know about this app (`app = true`): its folders, where to write, the
+-- command that checks it, a short guide and an index of its files, from
+-- the app that runs it, so nothing here names this repository's tools.
+local function instructions(pid: number?, follow: boolean): string
 	return [[
-The user of this Moonframe app wrote this in the app's "Send feedback" dialog. Change the app so it does what they ask.
+The user of this Moonframe app wrote this in the app's "Make it yours" dialog. Change the app so it does what they ask.
 
 How to work:
-- ]] .. guide .. " " .. where .. [[
+- Follow "This app" below: change files only where it says, and run its check command after your edits until it reports no problems. Go straight to the file: the context's Inspect pick and the file index say where things are.
+- Keep the change to what they ask for, as small as it can be. When it is unclear which part they mean and nothing was picked with Inspect, change the likeliest one and say which: do not hunt for it.
+- ]] .. look(pid) .. [[
 
-- Keep the change to what they ask for.
-- ]] .. check .. [[
-
-- ]] .. seen .. [[
-
-- Do not commit, push, or stop the user's running app.
-- End with two or three plain sentences for the user: what you changed and where, and what you saw in the window; or why you did not.]]
+- Do not commit, push, build, or stop the user's running app: it reloads by itself.
+- End with two or three plain sentences for the user: what you changed and where; or why you did not.]]
 		.. if follow
 			then [[
 
 
-This continues a conversation: `conversation` in the context has the user's earlier requests and the answers given, oldest first, and their new words say what is still wrong. Do not trust the earlier answers: read the files as they are now and look at the window before changing anything.]]
+This continues a conversation: `conversation` in the context has the user's earlier requests and the answers given, oldest first, and their new words say what is still wrong. Do not trust the earlier answers: read the files as they are now before changing anything.]]
 			else ""
+end
+
+-- Starts the agent ahead of the request, while the user writes it, so the
+-- run that follows takes it without waiting for it to start.
+local function warm(agent: string?): any
+	return { to = "provider:acp", msg = { warm = true, agent = agent } }
 end
 
 -- Where the agent works, with the home folder as ~.
@@ -182,8 +154,6 @@ return mod {
 			reply = "",
 			following = nil,
 			runs = {},
-			folder = nil,
-			installed = nil,
 			pid = nil,
 		}
 	end,
@@ -197,6 +167,7 @@ return mod {
 				state.seen = state.latest
 				if state.open then
 					state.error = nil
+					return state, { warm(state.agent) }
 				else
 					-- Closing drops the pick; Inspect hides the dialog
 					-- without `close`, so it survives picking.
@@ -251,8 +222,6 @@ return mod {
 			state.tab = msg.value and msg.value.title
 		elseif msg.topic == "provider/acp" then
 			state.runs = ours(msg.value)
-			state.folder = msg.value and msg.value.app
-			state.installed = msg.value and msg.value.installed
 			state.pid = msg.value and msg.value.pid
 			state.latest = newest(state.runs)
 			if state.open then
@@ -273,6 +242,7 @@ return mod {
 		elseif msg.agent_pick then
 			state.agent = msg.agent_pick
 			state.picking = false
+			return state, { warm(state.agent) }
 		elseif msg.expand then
 			state.expanded = if state.expanded == msg.expand then nil else msg.expand
 			state.reply = ""
@@ -322,7 +292,8 @@ return mod {
 							id = "feedback",
 							thread = msg.follow,
 							agent = state.agent,
-							instructions = instructions(state.folder, state.pid, true, state.installed),
+							app = true,
+							instructions = instructions(state.pid, true),
 							context = { main_tab = state.tab, conversation = said },
 						},
 					},
@@ -352,7 +323,8 @@ return mod {
 						start = text,
 						id = "feedback",
 						agent = state.agent,
-						instructions = instructions(state.folder, state.pid, false, state.installed),
+						app = true,
+						instructions = instructions(state.pid, false),
 						context = context,
 					},
 				},
@@ -362,6 +334,11 @@ return mod {
 				table.insert(sends, STOP_LISTENING)
 			end
 			return state, sends
+		elseif msg.reply == "feedback" and msg.action == "finished" then
+			-- Ready for a follow-up while the dialog is still open.
+			if state.open then
+				return state, { warm(state.agent) }
+			end
 		elseif msg.reply == "feedback" and msg.action == "start" then
 			local following = state.following
 			state.following = nil
@@ -431,7 +408,15 @@ return mod {
 		elseif #options == 0 then
 			note = "No coding agent is installed here. Install one with an ACP mode (claude-agent-acp, codex-acp, gemini, opencode or copilot), or Node for npx."
 		else
-			note = `A background agent ({title}) in {short(acp.workdir)}{if acp.app and acp.app ~= "." then "/" .. acp.app else ""} implements it, asking you here before each change unless providers/acp allows it; your window reloads with the change, and it reports back under Feedback & fixes. It gets what you're looking at, your window and the build.`
+			local writable = acp.writable or acp.workdir
+			-- What it does without asking, as providers/acp's `allow` says.
+			local level = acp.allow and acp.allow.feedback
+			local asks = if level == "all"
+				then "without asking you"
+				elseif level == "app" then "on its own, asking you here before anything outside it"
+				elseif level == "read" then "asking you here before each change"
+				else "asking you here before each step"
+			note = `A background agent ({title}) changes {short(writable)} {asks}; your window reloads with the change, a change that breaks the app is undone, and it reports back under Feedback & fixes. It gets what you're looking at, your window and the build.`
 		end
 
 		-- Sparkles, not a help `?`: this changes the app, it is not docs.

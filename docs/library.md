@@ -234,6 +234,8 @@ fn main() -> std::process::ExitCode {
 | `.embedded_app::<E>()` | its app folder compiled in (`#[derive(moonframe::rust_embed::RustEmbed)]`, `#[crate_path = "moonframe::rust_embed"]`), for a lone executable |
 | `.project_dir(path)` | the source checkout for an embedded app's debug branch bar; pass `env!("CARGO_MANIFEST_DIR")` from the host crate, including when Cargo builds into an external target folder |
 | `.keep(mods)` | the starter's mods it shows (from `app/mods` here), as a profile's `keep`; the Developer tools come whatever it names, and `feedback` adds their Agent tab |
+| `.agent_guide(text)` | what the agent behind `feedback`'s sparkles is told about this app, after Moonframe's own short guide: its conventions, which files hold what (`include_str!("agent.md")`) |
+| `.agent_check(command)` | the shell command that agent checks the app with, instead of this executable's own `--check` on the same folders (about a second, no build) |
 | `.native(name, make)` | a native provider (below) |
 | `.native_async(name, make)` | a native provider written with `async fn`, on tokio (below) |
 | `.tokio(handle)` | the tokio runtime async providers and `on_runtime` use (below) |
