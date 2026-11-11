@@ -143,7 +143,7 @@ impl Run {
                 status: field("status"),
                 paths: Vec::new(),
                 command: None,
-                input: None,
+                targets: None,
                 began: None,
                 ended: None,
                 ms: tool.get("ms").and_then(Value::as_u64),

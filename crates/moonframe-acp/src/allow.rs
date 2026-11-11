@@ -5,6 +5,10 @@
 
 use std::path::{Component, Path, PathBuf};
 
+/// Bound the extra paths kept from patch inputs for each tool call.
+const MAX_TARGET_PATHS: usize = 256;
+const MAX_TARGET_PATH_BYTES: usize = 16 << 10;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum Allow {
     /// Every question waits on the user.
@@ -224,11 +228,16 @@ pub(crate) fn input_targets(input: Option<&serde_json::Value>) -> Option<Vec<Pat
     };
     let fields = input.as_object()?;
     let mut named = Vec::new();
+    let mut named_bytes: usize = 0;
     for (key, value) in fields {
         match key.as_str() {
             "changes" => {
                 for (file, change) in value.as_object()? {
                     if !text_only(change) {
+                        return None;
+                    }
+                    named_bytes = named_bytes.saturating_add(file.len());
+                    if named.len() == MAX_TARGET_PATHS || named_bytes > MAX_TARGET_PATH_BYTES {
                         return None;
                     }
                     named.push(PathBuf::from(file));
@@ -351,6 +360,19 @@ mod tests {
             "app/c.luau": { "kind": { "type": "update", "move_path": null }, "unified_diff": "@@" },
         } });
         assert!(allowed("edit", Some(&patch)));
+        let many = (0..=MAX_TARGET_PATHS)
+            .map(|index| {
+                (
+                    format!("app/{index}.luau"),
+                    json!({"type": "update", "unified_diff": "@@"}),
+                )
+            })
+            .collect::<serde_json::Map<_, _>>();
+        assert!(input_targets(Some(&json!({"changes": many}))).is_none());
+        let long = format!("app/{}", "x".repeat(MAX_TARGET_PATH_BYTES));
+        let large =
+            serde_json::Map::from_iter([(long, json!({"type": "update", "unified_diff": "@@"}))]);
+        assert!(input_targets(Some(&json!({"changes": large}))).is_none());
         // A patch reaching outside, a key not read here, an edit naming
         // another file, and any move ask.
         for input in [
