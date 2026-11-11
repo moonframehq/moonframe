@@ -2,11 +2,13 @@ use {
     super::*,
     moonframe_providers::{Event, from_json},
     std::{
-        process::{Command, Stdio},
         sync::Mutex,
         time::{Duration, Instant},
     },
 };
+
+#[cfg(unix)]
+use std::process::{Command, Stdio};
 
 /// A stand-in ACP agent: answers the handshake, the session and the
 /// prompt by their ids, reports a tool call, asks permission for it, then
