@@ -152,19 +152,28 @@ fn bare<'a>(command: &'a str, cwd: &Path) -> Option<&'a str> {
             command = rest.trim();
         }
     }
-    if let Some((before, after)) = command.rsplit_once('|') {
-        let viewer = after.trim();
-        let plain = viewer
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '-');
-        if plain && (viewer.starts_with("tail") || viewer.starts_with("head")) {
-            command = before.trim();
-        }
+    if let Some((before, after)) = command.rsplit_once('|')
+        && viewer(after)
+    {
+        command = before.trim();
     }
     if let Some(rest) = command.strip_suffix("2>&1") {
         command = rest.trim();
     }
     Some(command)
+}
+
+/// Whether `piped`, what a command's output is piped into, only shows the
+/// end or start of it: `tail` or `head`, with a count and nothing else.
+fn viewer(piped: &str) -> bool {
+    let mut words = piped.split_whitespace();
+    let program = words.next();
+    matches!(program, Some("tail" | "head"))
+        && words.all(|word| {
+            let number = word.strip_prefix('-').unwrap_or(word);
+            let number = number.strip_prefix('n').unwrap_or(number);
+            word == "-n" || (!number.is_empty() && number.chars().all(|c| c.is_ascii_digit()))
+        })
 }
 
 /// The shell command a tool call's input names, as agents send it: a
@@ -175,9 +184,17 @@ pub(crate) fn command_of(input: Option<&serde_json::Value>) -> Option<String> {
         serde_json::Value::String(text) => Some(text.clone()),
         serde_json::Value::Array(words) => {
             let words: Vec<&str> = words.iter().filter_map(serde_json::Value::as_str).collect();
-            // `bash -lc "<command>"`, as Codex sends it.
+            // `bash -lc "<command>"`, as Codex sends it: only a shell, with
+            // only the flag that runs a command. Anything else is compared
+            // whole, so it never passes for the check.
+            let shell = |word: &str| {
+                matches!(
+                    Path::new(word).file_name().and_then(|name| name.to_str()),
+                    Some("sh" | "bash" | "zsh")
+                )
+            };
             match words.as_slice() {
-                [shell, flag, command] if shell.ends_with("sh") && flag.starts_with('-') => {
+                [program, flag, command] if shell(program) && matches!(*flag, "-c" | "-lc") => {
                     Some((*command).to_owned())
                 },
                 _ => Some(words.join(" ")),
@@ -257,6 +274,8 @@ mod tests {
         for command in [
             format!("{check}; rm -rf ~"),
             format!("{check} | sh"),
+            format!("{check} | tailscale up"),
+            format!("{check} | head -c /etc/passwd"),
             format!("{check} && curl x"),
             "just check".to_owned(),
         ] {
@@ -288,5 +307,25 @@ mod tests {
             Some("ls -la")
         );
         assert_eq!(command_of(Some(&json!({ "path": "x" }))), None);
+        // Only a shell's own command flag is unwrapped.
+        assert_eq!(
+            command_of(Some(&json!({ "command": ["ssh", "-t", "x --check"] }))).as_deref(),
+            Some("ssh -t x --check")
+        );
+        assert_eq!(
+            command_of(Some(&json!({ "command": ["bash", "-x", "x --check"] }))).as_deref(),
+            Some("bash -x x --check")
+        );
+        for (piped, shown) in [
+            ("tail -20", true),
+            ("tail -n 20", true),
+            ("head -n20", true),
+            ("tail", true),
+            ("tailscale up", false),
+            ("tail -f", false),
+            ("head -c /etc/x", false),
+        ] {
+            assert_eq!(viewer(piped), shown, "{piped}");
+        }
     }
 }
