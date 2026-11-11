@@ -8,10 +8,16 @@ use super::*;
 /// rig's folder), with `app/` as the app's writable folder and `check` as
 /// its check.
 fn app_rig(kind: &str, path: &str, check: &str, agent: &str) -> Rig {
+    // As agents send them: a file tool names its file, a shell its command.
+    let key = if kind == "execute" {
+        "command"
+    } else {
+        "file_path"
+    };
     let agent = agent.replace(
         r#""kind":"edit","status":"in_progress""#,
         &format!(
-            r#""kind":"{kind}","status":"in_progress","locations":[{{"path":"{path}"}}],"rawInput":{{"command":"{path}"}}"#
+            r#""kind":"{kind}","status":"in_progress","locations":[{{"path":"{path}"}}],"rawInput":{{"{key}":"{path}"}}"#
         ),
     );
     let mut rig = rig_with(&agent, json!({ "feedback": "app" }));

@@ -99,6 +99,8 @@ pub(crate) struct Tool {
     paths: Vec<PathBuf>,
     /// The shell command it runs, if it said.
     command: Option<String>,
+    /// What it was given, as the agent sent it.
+    input: Option<Value>,
     /// When it started and ended, in milliseconds from the run's start.
     began: Option<u64>,
     ended: Option<u64>,
@@ -589,6 +591,7 @@ impl Run {
                         call.raw_input.as_ref(),
                     ),
                     command: crate::allow::command_of(call.raw_input.as_ref()),
+                    input: call.raw_input.clone(),
                     began: Some(at),
                     ended: None,
                     ms: None,
@@ -604,6 +607,7 @@ impl Run {
                     if update.fields.raw_input.is_some() {
                         tool.command = crate::allow::command_of(update.fields.raw_input.as_ref())
                             .or(tool.command.take());
+                        tool.input.clone_from(&update.fields.raw_input);
                     }
                     if let Some(status) = update.fields.status {
                         tool.status = enum_name(&status);
@@ -712,10 +716,17 @@ impl Run {
                     .find(|tool| tool.id == call)
                     .and_then(|tool| tool.command.clone())
             });
+        let input = request.tool_call.fields.raw_input.clone().or_else(|| {
+            self.tools
+                .iter()
+                .find(|tool| tool.id == call)
+                .and_then(|tool| tool.input.clone())
+        });
         let asked = Call {
             kind: kind.as_deref(),
             paths: &paths,
             command: command.as_deref(),
+            input: input.as_ref(),
         };
         if self.allow.covers_call(&asked, &self.scope)
             && let Some((option, ..)) = options.iter().find(|option| option.2 == "allow_once")

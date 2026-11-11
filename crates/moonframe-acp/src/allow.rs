@@ -36,6 +36,8 @@ pub(crate) struct Call<'a> {
     pub(crate) kind: Option<&'a str>,
     pub(crate) paths: &'a [PathBuf],
     pub(crate) command: Option<&'a str>,
+    /// What the tool was given, as the agent sent it.
+    pub(crate) input: Option<&'a serde_json::Value>,
 }
 
 impl Allow {
@@ -79,13 +81,18 @@ impl Allow {
             return false;
         }
         match call.kind {
-            Some("edit" | "delete" | "move") => {
-                !call.paths.is_empty()
-                    && call
-                        .paths
-                        .iter()
-                        .all(|path| scope.holds(&scope.cwd.join(path)))
-            },
+            // Only when every file it touches is known: a move's other
+            // end, or a patch naming files under keys not read here, would
+            // otherwise go unchecked. A move always asks.
+            Some("edit" | "delete") => targets(call.input).is_some_and(|named| {
+                let paths: Vec<&Path> = call
+                    .paths
+                    .iter()
+                    .map(PathBuf::as_path)
+                    .chain(named.iter().map(PathBuf::as_path))
+                    .collect();
+                !paths.is_empty() && paths.iter().all(|path| scope.holds(&scope.cwd.join(path)))
+            }),
             Some("execute") => call
                 .command
                 .and_then(|command| bare(command, &scope.cwd))
@@ -143,6 +150,10 @@ fn resolved(path: &Path) -> PathBuf {
 /// into the folder they work in, and before `2>&1` and a pipe into `tail`
 /// or `head`. None when anything else is chained to it.
 fn bare<'a>(command: &'a str, cwd: &Path) -> Option<&'a str> {
+    // One line, as the check is: a newline would run another command.
+    if command.trim().chars().any(char::is_control) {
+        return None;
+    }
     let mut command = command.trim();
     for cd in [
         format!("cd {} && ", cwd.display()),
@@ -166,14 +177,72 @@ fn bare<'a>(command: &'a str, cwd: &Path) -> Option<&'a str> {
 /// Whether `piped`, what a command's output is piped into, only shows the
 /// end or start of it: `tail` or `head`, with a count and nothing else.
 fn viewer(piped: &str) -> bool {
-    let mut words = piped.split_whitespace();
+    // Plain words on one line: a newline would start another command.
+    if !piped
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '-')
+    {
+        return false;
+    }
+    let mut words = piped.split(' ').filter(|word| !word.is_empty());
     let program = words.next();
+    let mut counted = false;
     matches!(program, Some("tail" | "head"))
         && words.all(|word| {
-            let number = word.strip_prefix('-').unwrap_or(word);
-            let number = number.strip_prefix('n').unwrap_or(number);
-            word == "-n" || (!number.is_empty() && number.chars().all(|c| c.is_ascii_digit()))
+            // `-20`, `-n20`, or `-n` then `20`; a bare word is a file.
+            let count = |text: &str| !text.is_empty() && text.chars().all(|c| c.is_ascii_digit());
+            let ok = match word.strip_prefix('-') {
+                Some("n") => !counted,
+                Some(rest) => count(rest.strip_prefix('n').unwrap_or(rest)),
+                None => std::mem::take(&mut counted),
+            };
+            counted = word == "-n";
+            ok
         })
+}
+
+/// The files an edit's `input` names besides those the protocol shows: the
+/// keys of a `changes` map (a patch over several files). None when it has
+/// anything else that could name a file, so the user is asked.
+fn targets(input: Option<&serde_json::Value>) -> Option<Vec<PathBuf>> {
+    /// Keys that name the file edited (read by `guard::paths`) or hold
+    /// only text.
+    const KNOWN: [&str; 10] = [
+        "abs_path",
+        "content",
+        "description",
+        "file_path",
+        "new_string",
+        "notebook_path",
+        "old_string",
+        "path",
+        "replace_all",
+        "edits",
+    ];
+    let Some(input) = input else {
+        return Some(Vec::new());
+    };
+    let fields = input.as_object()?;
+    let mut named = Vec::new();
+    for (key, value) in fields {
+        match key.as_str() {
+            "changes" => named.extend(value.as_object()?.keys().map(PathBuf::from)),
+            // Several edits of the one file: text only.
+            "edits" => {
+                for edit in value.as_array()? {
+                    let only_text = edit.as_object()?.keys().all(|key| {
+                        matches!(key.as_str(), "old_string" | "new_string" | "replace_all")
+                    });
+                    if !only_text {
+                        return None;
+                    }
+                }
+            },
+            key if KNOWN.contains(&key) => {},
+            _ => return None,
+        }
+    }
+    Some(named)
 }
 
 /// The shell command a tool call's input names, as agents send it: a
@@ -222,7 +291,44 @@ mod tests {
             kind: Some(kind),
             paths,
             command,
+            input: None,
         }
+    }
+
+    #[test]
+    fn edits_whose_files_are_not_all_known_ask() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("app/mods")).unwrap();
+        let scope = scope(dir.path());
+        let inside = [PathBuf::from("app/style.luau")];
+        let with = |kind: &'static str, input: &'static serde_json::Value| Call {
+            kind: Some(kind),
+            paths: &inside,
+            command: None,
+            input: Some(input),
+        };
+        let allowed = |call: &Call<'_>| Allow::App.covers_call(call, &scope);
+        let edit = json!({ "file_path": "app/style.luau", "old_string": "a", "new_string": "b" });
+        assert!(allowed(&with("edit", Box::leak(Box::new(edit)))));
+        let multi = json!({ "file_path": "app/style.luau", "edits": [{ "old_string": "a", "new_string": "b" }] });
+        assert!(allowed(&with("edit", Box::leak(Box::new(multi)))));
+        let patch = json!({ "changes": { "app/a.luau": {}, "app/b.luau": {} } });
+        assert!(allowed(&with("edit", Box::leak(Box::new(patch)))));
+        // A patch reaching outside, a key not read here, an edit naming
+        // another file, and any move ask.
+        for input in [
+            json!({ "changes": { "app/a.luau": {}, "crates/lib.rs": {} } }),
+            json!({ "file_path": "app/style.luau", "new_path": "crates/lib.rs" }),
+            json!({ "file_path": "app/style.luau", "edits": [{ "file_path": "crates/x" }] }),
+            json!("app/style.luau"),
+        ] {
+            assert!(
+                !allowed(&with("edit", Box::leak(Box::new(input.clone())))),
+                "{input}"
+            );
+        }
+        let moved = json!({ "path": "app/style.luau" });
+        assert!(!allowed(&with("move", Box::leak(Box::new(moved)))));
     }
 
     #[test]
@@ -275,6 +381,7 @@ mod tests {
             format!("{check}; rm -rf ~"),
             format!("{check} | sh"),
             format!("{check} | tailscale up"),
+            format!("{check}\nrm -rf x"),
             format!("{check} | head -c /etc/passwd"),
             format!("{check} && curl x"),
             "just check".to_owned(),
@@ -324,6 +431,9 @@ mod tests {
             ("tailscale up", false),
             ("tail -f", false),
             ("head -c /etc/x", false),
+            ("tail 20", false),
+            ("tail -5\nrm -rf x", false),
+            ("tail\t-5", false),
         ] {
             assert_eq!(viewer(piped), shown, "{piped}");
         }
