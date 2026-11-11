@@ -205,7 +205,7 @@ jobs:
       matrix:
         runner: [macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -259,27 +259,12 @@ jobs:
         run: cargo test --locked -p moonframe-pi -- --include-ignored
       # A workspace build unifies features and can hide accidental defaults.
       # The dependency boundaries differ by platform, so every runner checks
-      # them (from `cargo tree`, without building).
+      # them (from `cargo tree`, without building); the `features` job
+      # builds each capability on its own.
       - name: Check the capability dependency boundaries
         run: python3 scripts/check-features.py
-      # Each capability on its own is about thirty more builds of the app,
-      # each with its own dependencies: on every runner they made a cold run
-      # several times longer, and the caches too big to all be kept. One
-      # runner builds them; the others build every feature together above.
-      - name: Check minimal and individual capability builds
-        if: matrix.runner == 'ubuntu-24.04'
-        run: |
-          python3 scripts/check-features.py --lint
-          cargo test --locked -p moonframe --no-default-features
-          cargo test --locked -p moonframe-packages --no-default-features
-          cargo test --locked -p moonframe-providers
-          cargo clippy --locked -p moonframe-mux --no-default-features --features herdr-core --all-targets -- -D warnings
       - name: Load every built-in module headlessly
         run: cargo run --locked -p moonframe-app -- --check --no-user app
-      # The Rune build is its own selection: linking no GPUI is what it is for,
-      # so its tests and every example run here too, without GPUI's features.
-      - name: Test the Rune build
-        run: scripts/check-rune.sh
       - name: Load every example app headlessly
         run: |
           cargo build --locked -p moonframe-app -p moonframe-host-example
@@ -349,13 +334,104 @@ jobs:
       - name: Check the WASM guide page matches its Markdown
         run: '"$RUNNER_TEMP/guide/bin/python" website/tools/wasm-guide.py --check'
 
+  # Each capability on its own, and the minimal builds: about thirty builds
+  # of the app with their own dependencies. Platform-neutral enough for one
+  # runner, and beside `checks` rather than after it, so a cold run is not
+  # their sum.
+  features:
+    name: Minimal and individual capability builds
+    needs: [changes, zizmor]
+    if: >-
+      !cancelled() && needs.changes.outputs.build == 'true' &&
+      (needs.zizmor.result == 'success' || needs.zizmor.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: scripts/install-linux-deps.sh
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - name: Stop Windows Defender scanning the build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.17.0
+          use-cache: false
+      # The `checks` job's cache, read only: most dependencies are built the
+      # same, and saving another cache per job would overflow the 10 GB.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: checks
+          key: checks
+          save-if: false
+      - name: Lint each capability on its own
+        run: python3 scripts/check-features.py --lint
+      - name: Test the minimal builds
+        run: |
+          cargo test --locked -p moonframe --no-default-features
+          cargo test --locked -p moonframe-packages --no-default-features
+          cargo test --locked -p moonframe-providers
+          cargo clippy --locked -p moonframe-mux --no-default-features --features herdr-core --all-targets -- -D warnings
+
+  # The Rune build is its own selection: linking no GPUI is what it is for,
+  # so its tests and every example run without GPUI's features. On every
+  # platform, beside `checks`.
+  rune:
+    name: Rune build (${{ matrix.runner }})
+    needs: [changes, zizmor]
+    if: >-
+      !cancelled() && needs.changes.outputs.build == 'true' &&
+      (needs.zizmor.result == 'success' || needs.zizmor.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: scripts/install-linux-deps.sh
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install
+      - name: Stop Windows Defender scanning the build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.17.0
+          use-cache: false
+      # The `checks` job's cache, read only: most dependencies are built the
+      # same, and saving another cache per job would overflow the 10 GB.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: checks
+          key: checks
+          save-if: false
+      - name: Test the Rune build
+        run: scripts/check-rune.sh
+
   # Each change to Cargo.lock (or the toolchain) keys a new Rust cache, and
   # the old ones stay until GitHub evicts something to stay under its 10 GB:
   # often another platform's current cache, whose next run then builds
   # cold. On main, once the caches are saved, drop those superseded.
   prune-caches:
     name: Prune superseded caches
-    needs: [lint, checks]
+    needs: [lint, checks, features, rune]
     if: >-
       !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.checks.result != 'skipped'
@@ -390,7 +466,7 @@ jobs:
   # was skipped because Changes found nothing for it to check.
   ci-passed:
     name: CI passed
-    needs: [changes, zizmor, lint, checks, site, wasm-guide]
+    needs: [changes, zizmor, lint, checks, features, rune, site, wasm-guide]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
