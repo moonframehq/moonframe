@@ -11,6 +11,7 @@ use {
         read::{Cx, Fields, NO_NAMES, Read as _},
         style,
         vm::{self, Meter},
+        words::Words,
     },
     mlua::{Function, Lua, Table, Value},
     std::{
@@ -21,9 +22,13 @@ use {
     },
 };
 
-/// Every component's source, by name, as the reload found them.
+/// Every component's source, by name, as the reload found them, and the
+/// app's words, which every state they are loaded into is given too.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct Library(Rc<BTreeMap<String, Source>>);
+pub(crate) struct Library {
+    sources: Rc<BTreeMap<String, Source>>,
+    words: Words,
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct Source {
@@ -37,7 +42,16 @@ const LOADED: &str = "moonframe.components";
 
 impl Library {
     pub(crate) fn read(files: BTreeMap<String, PathBuf>) -> Self {
-        Self(Rc::new(sources(files).collect()))
+        Self {
+            sources: Rc::new(sources(files).collect()),
+            words: Words::default(),
+        }
+    }
+
+    /// These components, with `words` for `ui.t` and the formats.
+    pub(crate) fn with_words(mut self, words: Words) -> Self {
+        self.words = words;
+        self
     }
 
     /// These components with `files` over them: a miniapp's own, which its
@@ -46,9 +60,12 @@ impl Library {
         if files.is_empty() {
             return self.clone();
         }
-        let mut all = (*self.0).clone();
+        let mut all = (*self.sources).clone();
         all.extend(sources(files));
-        Self(Rc::new(all))
+        Self {
+            sources: Rc::new(all),
+            words: self.words.clone(),
+        }
     }
 }
 
@@ -94,12 +111,13 @@ impl Library {
                 Ok(node)
             })
         })?;
-        lua.globals().raw_set("use", use_)
+        lua.globals().raw_set("use", use_)?;
+        self.words.install(lua)
     }
 
     /// The file the component `name` comes from.
     pub(crate) fn path(&self, name: &str) -> Option<PathBuf> {
-        self.0.get(name).map(|source| source.path.clone())
+        self.sources.get(name).map(|source| source.path.clone())
     }
 
     /// The component `name`'s definition table, for an instance's own state.
@@ -126,8 +144,8 @@ impl Library {
             },
             _ => {},
         }
-        let source = self.0.get(name).ok_or_else(|| {
-            let known: Vec<&str> = self.0.keys().map(String::as_str).collect();
+        let source = self.sources.get(name).ok_or_else(|| {
+            let known: Vec<&str> = self.sources.keys().map(String::as_str).collect();
             mlua::Error::runtime(format!(
                 "no component named `{name}`; there are: {}",
                 known.join(", ")
@@ -155,7 +173,7 @@ impl Library {
 
     /// Every component, read for the window's list.
     pub(crate) fn catalogue(&self, sheet: &Stylesheet) -> Vec<Component> {
-        self.0
+        self.sources
             .iter()
             .map(|(name, source)| {
                 let read = describe(self, name, sheet);

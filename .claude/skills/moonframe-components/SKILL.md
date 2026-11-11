@@ -243,6 +243,12 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `==`), or calls it now: for a costly part of a view that depends on a few
   values. A table counts as the same while it is the same table, even if
   changed inside.
+- **Words in the user's language:** `ui.t("inbox-unread", { count = n })`
+  is the message of that ID in the app's `locales/<language>/*.ftl`
+  (Fluent), in the language the user prefers, English when it lacks one,
+  and the ID itself when English does too. `ui.number(1234.5, { decimals =
+  2 })` and `ui.date(seconds, { style = "short", time = true })` write
+  numbers and dates the language's way; `ui.locale()` names it.
 - **Views run only when needed:** a view runs again when its state or props
   change (any message to its `update`), when a key of `app` it read
   changes, or on a reload; otherwise its last tree is kept. Read `app.x`

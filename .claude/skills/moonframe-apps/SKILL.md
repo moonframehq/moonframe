@@ -30,6 +30,7 @@ my-app/
   mods/<name>/        its mods
   components/         its own components, if any
   providers/          its own providers, if any
+  locales/<lang>/     its words, as Fluent .ftl files (en-US first), if translated
   icon.png            its icon, 1024 px square (Dock, bundles)
 ```
 
@@ -58,6 +59,12 @@ View > Developer Tools (⌥⌘J) docks Pick, the picked element's Luau source
 to edit and save, its mod's state and, when the app keeps `feedback` (the
 sparkle that asks an agent for a change), agent sessions beside the app.
 With Developer Mode off they don't show.
+
+**Translating an app.** An app meant for others keeps the words people
+read in `locales/en-US/*.ftl` and shows them with `ui.t "id"`, and writes
+numbers and dates with `ui.number` and `ui.date`, so a translation is a
+folder of `.ftl` files beside `en-US` (see "Words in the user's language"
+in the moonframe skill). Try one with `MOONFRAME_LANG=fr`.
 
 ## Commands
 

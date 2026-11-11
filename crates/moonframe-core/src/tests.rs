@@ -39,6 +39,7 @@ mod video;
 mod view_diagnostics;
 mod views;
 mod windows;
+mod words;
 // keep-sorted end
 
 const SHELL_SOURCE: &str = r#"

@@ -1315,6 +1315,21 @@ type MapRoute = {
 	dashed: boolean?,
 }
 
+-- `ui.number`'s options: `decimals` fixes the digits after the point
+-- (0 to 20); without it, up to three show and trailing zeros drop.
+type NumberOptions = {
+	decimals: number?,
+}
+
+-- `ui.date`'s options: how long (`style`, default "medium"), whether the
+-- date shows (default true), and the time of day (true or "minutes",
+-- "seconds"; default none).
+type DateOptions = {
+	style: ("short" | "medium" | "long")?,
+	date: boolean?,
+	time: (boolean | "minutes" | "seconds")?,
+}
+
 declare ui: {
 	row: (props: StackProps) -> Element,
 	column: (props: StackProps) -> Element,
@@ -1350,6 +1365,18 @@ declare ui: {
 	-- What `build()` returned the last time this view asked for `key` with
 	-- the same `deps` (compared with `==`), or `build()` now.
 	memo: <T>(key: string, deps: { any }, build: () -> T) -> T,
+	-- The message `id` (or `id.attribute`) of the app's `locales/<language>/
+	-- *.ftl` in the user's language, with named arguments (strings, numbers
+	-- or booleans); English when the language lacks it, `id` itself when
+	-- English does too.
+	t: (id: string, args: { [string]: any }?) -> string,
+	-- `value` the language's way: `1,234.5`, `1 234,5`, `1.234,5`.
+	number: (value: number, options: NumberOptions?) -> string,
+	-- The moment `seconds` after 1970 (UTC) in the system's time zone, the
+	-- language's way: `Nov 10, 2026`, `10 nov. 2026`.
+	date: (seconds: number, options: DateOptions?) -> string,
+	-- The language the app's words show in, as a BCP 47 tag: `en-US`, `fr`.
+	locale: () -> string,
 }
 
 -- One commit of `app.git.log`.

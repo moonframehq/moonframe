@@ -3,13 +3,15 @@
 -- The sidebar is a row's child, not a split pane, so its width can ease
 -- between full and rail as `side-nav`'s states say.
 
+-- "View" and "Window" stay as they are: the host finds its own menus by
+-- these titles, to merge the first and put the second last.
 local MENUS: { { title: string, items: { any } } } = {
 	{ title = "View", items = {
-		{ label = "Fold or Unfold the Sidebar", msg = "fold", to = "sidebar", shortcut = "secondary-s" },
+		{ label = ui.t "menu-fold", msg = "fold", to = "sidebar", shortcut = "secondary-s" },
 	} },
 	{ title = "Window", items = {
-		{ label = "Minimize", command = "minimize", shortcut = "secondary-m" },
-		{ label = "Zoom", command = "maximize" },
+		{ label = ui.t "menu-minimize", command = "minimize", shortcut = "secondary-m" },
+		{ label = ui.t "menu-zoom", command = "maximize" },
 	} },
 }
 
@@ -45,7 +47,7 @@ return mod {
 					class = "titlebar-button",
 					msg = "fold",
 					to = "sidebar",
-					tooltip = "Fold sidebar (⌘S)",
+					tooltip = ui.t "fold-tooltip",
 					ui.icon "panel-left",
 				},
 			},
