@@ -90,6 +90,7 @@ impl Transcript {
                                 "title": tool.title,
                                 "kind": tool.kind,
                                 "status": tool.status,
+                                "ms": tool.duration(),
                             }),
                             None => json!({ "id": id, "title": "", "kind": "", "status": "" }),
                         })
@@ -131,6 +132,10 @@ impl Transcript {
                             kind: field("kind"),
                             status: field("status"),
                             paths: Vec::new(),
+                            command: None,
+                            began: None,
+                            ended: None,
+                            ms: call.get("ms").and_then(Value::as_u64),
                         });
                     }
                 },
@@ -153,6 +158,10 @@ mod tests {
             kind: "read".to_owned(),
             status: "completed".to_owned(),
             paths: Vec::new(),
+            command: None,
+            began: None,
+            ended: None,
+            ms: None,
         }
     }
 

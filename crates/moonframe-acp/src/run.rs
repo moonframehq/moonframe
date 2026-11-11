@@ -5,7 +5,9 @@
 //! the run under the provider's lock, a writer thread writes queued lines
 //! in order, so a run never blocks on an agent that stops reading.
 
+pub(crate) use crate::allow::Allow;
 use {
+    crate::allow::{Call, Scope},
     acp::v1 as wire,
     moonframe_providers::{Handle, Installed},
     serde_json::{Value, json},
@@ -25,8 +27,15 @@ use {
     transcript::Transcript,
 };
 
+mod answers;
 mod json;
+mod timing;
 mod transcript;
+
+use {
+    answers::{agent_info, cancelled, enum_name, fields_paths, model_name, selected},
+    timing::Timing,
+};
 
 /// The longest line read from an agent.
 const MAX_LINE: usize = 16 << 20;
@@ -88,6 +97,21 @@ pub(crate) struct Tool {
     status: String,
     /// The files it said it works on, for the permission question it asks.
     paths: Vec<PathBuf>,
+    /// The shell command it runs, if it said.
+    command: Option<String>,
+    /// When it started and ended, in milliseconds from the run's start.
+    began: Option<u64>,
+    ended: Option<u64>,
+    /// How long it took, for one restored from a saved run.
+    ms: Option<u64>,
+}
+
+impl Tool {
+    /// How long it took, once it ended.
+    pub(crate) fn duration(&self) -> Option<u64> {
+        self.ms
+            .or_else(|| Some(self.ended?.saturating_sub(self.began?)))
+    }
 }
 
 /// A permission question the agent asked, waiting on the user.
@@ -114,6 +138,12 @@ pub(crate) enum Inbound {
 
 pub(crate) struct Run {
     pub(crate) id: String,
+    /// Which agent process it talks to, for what that process says to find
+    /// it: a warm agent's run gets its id only when a mod starts it.
+    pub(crate) conn: u64,
+    /// The agent opened its session before any prompt came: a warm agent,
+    /// waiting for a run.
+    ready: bool,
     /// The mod that started it: the only one that may stop it, answer it
     /// or forget it.
     pub(crate) owner: String,
@@ -151,6 +181,10 @@ pub(crate) struct Run {
     cwd: PathBuf,
     /// The app as installed, which the agent may not write in.
     installed: Option<Installed>,
+    /// What [`Allow::App`] lets it touch.
+    scope: Scope,
+    /// How long each part of it took.
+    pub(crate) timing: Timing,
     /// What the user should know beyond the agent's answer.
     warning: Option<String>,
     /// Finished, and the bundle's signature was checked after it.
@@ -164,6 +198,8 @@ pub(crate) struct Run {
     changed: bool,
     /// The app was taken back to before it.
     undone: bool,
+    /// The app is being checked after it.
+    pub(crate) checking: bool,
     session: Option<String>,
     next: i64,
     pending: BTreeMap<i64, Pending>,
@@ -173,42 +209,6 @@ pub(crate) struct Run {
     pid: Option<u32>,
     log: VecDeque<String>,
     host: Option<Handle>,
-}
-
-/// Which permission questions a run answers itself, as the user set for
-/// its mod in provider.toml's `[settings] allow`; never a mod's own choice.
-/// Each is answered "allow once", never "always": the agent asks again
-/// next time, and nothing it was allowed outlives the run.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum Allow {
-    /// Every question waits on the user.
-    #[default]
-    Ask,
-    /// Tools that only look (read, search, think); the rest wait.
-    Read,
-    /// Every tool.
-    All,
-}
-
-impl Allow {
-    pub(crate) fn parse(name: &str) -> Option<Self> {
-        match name {
-            "ask" => Some(Self::Ask),
-            "read" => Some(Self::Read),
-            "all" => Some(Self::All),
-            _ => None,
-        }
-    }
-
-    /// Whether a tool of `kind` is answered without asking. A tool whose
-    /// kind is unknown counts as one that changes things.
-    pub(crate) fn covers(self, kind: Option<&str>) -> bool {
-        match self {
-            Self::Ask => false,
-            Self::Read => matches!(kind, Some("read" | "search" | "think")),
-            Self::All => true,
-        }
-    }
 }
 
 /// What a mod asked to start.
@@ -223,6 +223,7 @@ pub(crate) struct Start {
     pub(crate) allow: Allow,
     pub(crate) cwd: PathBuf,
     pub(crate) installed: Option<Installed>,
+    pub(crate) scope: Scope,
     pub(crate) now: u64,
 }
 
@@ -230,6 +231,8 @@ impl Run {
     pub(crate) fn new(start: Start, host: Option<Handle>) -> Self {
         Self {
             id: start.id,
+            conn: 0,
+            ready: false,
             owner: start.owner,
             request: start.request,
             agent: start.agent,
@@ -253,12 +256,15 @@ impl Run {
             allow: start.allow,
             cwd: start.cwd,
             installed: start.installed,
+            scope: start.scope,
+            timing: Timing::default(),
             warning: None,
             checked: false,
             exited: Arc::new(AtomicBool::new(true)),
             kept: false,
             changed: false,
             undone: false,
+            checking: false,
             session: None,
             next: 0,
             pending: BTreeMap::new(),
@@ -268,6 +274,55 @@ impl Run {
             log: VecDeque::new(),
             host,
         }
+    }
+
+    /// Makes a warm agent's run the one a mod started: it takes `start`'s
+    /// place, keeping the agent and what it said as it started.
+    pub(crate) fn adopt(&mut self, start: Start) {
+        self.id = start.id;
+        self.owner = start.owner;
+        self.request = start.request;
+        self.text = start.text;
+        self.thread = start.thread;
+        self.prompt = start.prompt;
+        self.allow = start.allow;
+        self.scope = start.scope;
+        self.installed = start.installed;
+        self.started = start.now;
+        self.timing = Timing::warm(self.ready);
+        if std::mem::take(&mut self.ready) {
+            self.send_prompt();
+        }
+    }
+
+    /// A warm agent: started ahead of a run that has not come yet.
+    pub(crate) fn is_warm(&self) -> bool {
+        self.prompt.is_empty()
+    }
+
+    pub(crate) fn cwd(&self) -> &std::path::Path {
+        &self.cwd
+    }
+
+    /// Sends the run's prompt in its open session.
+    fn send_prompt(&mut self) {
+        let Some(session) = self.session.clone() else {
+            return;
+        };
+        let prompt = json!({
+            "sessionId": session,
+            "prompt": [{ "type": "text", "text": self.prompt }],
+        });
+        self.status = Status::Running;
+        self.request_rpc("session/prompt", &prompt, Pending::Prompt);
+    }
+
+    fn open_session(&mut self) {
+        self.request_rpc(
+            "session/new",
+            &json!({ "cwd": self.cwd, "mcpServers": [] }),
+            Pending::NewSession,
+        );
     }
 
     pub(crate) fn started(&self) -> u64 {
@@ -357,6 +412,8 @@ impl Run {
         self.outbox = Some(outbox);
         self.exited.store(false, Ordering::Release);
         self.pid = Some(child.id());
+        let now = self.timing.now();
+        self.timing.spawned.get_or_insert(now);
         self.child = Some(child);
         self.request_rpc(
             "initialize",
@@ -444,12 +501,10 @@ impl Run {
         };
         match pending {
             Pending::Initialize => {
+                let at = self.timing.now();
+                self.timing.initialized.get_or_insert(at);
                 self.agent_info = agent_info(&value);
-                self.request_rpc(
-                    "session/new",
-                    &json!({ "cwd": self.cwd, "mcpServers": [] }),
-                    Pending::NewSession,
-                );
+                self.open_session();
             },
             Pending::NewSession => {
                 if let Some(model) = model_name(&value) {
@@ -458,14 +513,15 @@ impl Run {
                 let Ok(response) = serde_json::from_value::<wire::NewSessionResponse>(value) else {
                     return self.fail("the agent's session was invalid".to_owned(), now);
                 };
-                let session = response.session_id.0.to_string();
-                let prompt = json!({
-                    "sessionId": session,
-                    "prompt": [{ "type": "text", "text": self.prompt }],
-                });
-                self.session = Some(session);
-                self.status = Status::Running;
-                self.request_rpc("session/prompt", &prompt, Pending::Prompt);
+                self.session = Some(response.session_id.0.to_string());
+                let at = self.timing.now();
+                self.timing.session.get_or_insert(at);
+                // A warm agent waits for its run's prompt.
+                if self.prompt.is_empty() {
+                    self.ready = true;
+                } else {
+                    self.send_prompt();
+                }
             },
             Pending::Prompt => {
                 let reason = serde_json::from_value::<wire::PromptResponse>(value)
@@ -496,6 +552,8 @@ impl Run {
         match notification.update {
             wire::SessionUpdate::AgentMessageChunk(chunk) => {
                 if let wire::ContentBlock::Text(text) = chunk.content {
+                    let at = self.timing.now();
+                    self.timing.first_token.get_or_insert(at);
                     if self.fresh {
                         self.message.clear();
                         self.fresh = false;
@@ -512,6 +570,8 @@ impl Run {
                 }
             },
             wire::SessionUpdate::ToolCall(call) => {
+                let at = self.timing.now();
+                self.timing.first_token.get_or_insert(at);
                 self.fresh = true;
                 self.tool_count += 1;
                 if self.tools.len() == MAX_TOOLS {
@@ -528,6 +588,10 @@ impl Run {
                         &call.locations,
                         call.raw_input.as_ref(),
                     ),
+                    command: crate::allow::command_of(call.raw_input.as_ref()),
+                    began: Some(at),
+                    ended: None,
+                    ms: None,
                 });
             },
             wire::SessionUpdate::ToolCallUpdate(update) => {
@@ -537,8 +601,15 @@ impl Run {
                     if let Some(title) = update.fields.title {
                         tool.title = title;
                     }
+                    if update.fields.raw_input.is_some() {
+                        tool.command = crate::allow::command_of(update.fields.raw_input.as_ref())
+                            .or(tool.command.take());
+                    }
                     if let Some(status) = update.fields.status {
                         tool.status = enum_name(&status);
+                        if matches!(tool.status.as_str(), "completed" | "failed") {
+                            tool.ended.get_or_insert(self.timing.now());
+                        }
                     }
                     if let Some(kind) = update.fields.kind {
                         tool.kind = enum_name(&kind);
@@ -634,7 +705,19 @@ impl Run {
         }
         // Allowed once, never always; without an "allow once" option the
         // user decides.
-        if self.allow.covers(kind.as_deref())
+        let command = crate::allow::command_of(request.tool_call.fields.raw_input.as_ref())
+            .or_else(|| {
+                self.tools
+                    .iter()
+                    .find(|tool| tool.id == call)
+                    .and_then(|tool| tool.command.clone())
+            });
+        let asked = Call {
+            kind: kind.as_deref(),
+            paths: &paths,
+            command: command.as_deref(),
+        };
+        if self.allow.covers_call(&asked, &self.scope)
             && let Some((option, ..)) = options.iter().find(|option| option.2 == "allow_once")
         {
             return self.respond(&id, Ok(selected(option)));
@@ -718,6 +801,8 @@ impl Run {
     }
 
     fn finish(&mut self, status: Status, now: u64) {
+        let at = self.timing.now();
+        self.timing.ended.get_or_insert(at);
         self.status = status;
         self.finished = Some(now);
         self.question = None;
@@ -752,7 +837,8 @@ impl Run {
                 self.exited.store(true, Ordering::Release);
             }
         }
-        if let Some(host) = &self.host {
+        // A warm agent's run has no mod to tell.
+        if let Some(host) = self.host.as_ref().filter(|_| !self.owner.is_empty()) {
             let mut answer = json!({
                 "reply": self.request,
                 "action": "finished",
@@ -801,94 +887,6 @@ impl Run {
     }
 }
 
-/// Who the agent says it is, from its `initialize` answer.
-fn agent_info(value: &Value) -> Option<Value> {
-    let info = value.get("agentInfo")?;
-    let text = |key: &str| {
-        info.get(key)
-            .and_then(Value::as_str)
-            .filter(|text| !text.is_empty())
-    };
-    let name = text("name")?;
-    Some(json!({ "name": name, "title": text("title"), "version": text("version") }))
-}
-
-/// The model a session says it uses, by its name: the select option of the
-/// `model` category in `configOptions`, else the unstable `models` state.
-fn model_name(value: &Value) -> Option<String> {
-    let named = |current: &str, choices: &[&Value]| {
-        choices
-            .iter()
-            .find(|choice| {
-                choice
-                    .get("value")
-                    .or_else(|| choice.get("modelId"))
-                    .and_then(Value::as_str)
-                    == Some(current)
-            })
-            .and_then(|choice| choice.get("name").and_then(Value::as_str))
-            .unwrap_or(current)
-            .to_owned()
-    };
-    let options = value.get("configOptions").and_then(Value::as_array);
-    for option in options.into_iter().flatten() {
-        if option.get("category").and_then(Value::as_str) != Some("model") {
-            continue;
-        }
-        let Some(current) = option.get("currentValue").and_then(Value::as_str) else {
-            continue;
-        };
-        // Choices, or groups of them.
-        let mut choices = Vec::new();
-        for choice in option
-            .get("options")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            match choice.get("options").and_then(Value::as_array) {
-                Some(group) => choices.extend(group),
-                None => choices.push(choice),
-            }
-        }
-        return Some(named(current, &choices));
-    }
-    let models = value.get("models")?;
-    let current = models.get("currentModelId").and_then(Value::as_str)?;
-    let choices: Vec<&Value> = models
-        .get("availableModels")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .collect();
-    Some(named(current, &choices))
-}
-
-/// The files a tool call's fields name.
-fn fields_paths(fields: &wire::ToolCallUpdateFields) -> Vec<PathBuf> {
-    crate::guard::paths(
-        fields.content.as_deref().unwrap_or_default(),
-        fields.locations.as_deref().unwrap_or_default(),
-        fields.raw_input.as_ref(),
-    )
-}
-
-fn selected(option: &str) -> Value {
-    json!({ "outcome": { "outcome": "selected", "optionId": option } })
-}
-
-fn cancelled() -> Value {
-    json!({ "outcome": { "outcome": "cancelled" } })
-}
-
-/// A wire enum's name as the protocol spells it (`in_progress`).
-fn enum_name(value: &impl serde::Serialize) -> String {
-    serde_json::to_value(value)
-        .ok()
-        .and_then(|value| value.as_str().map(str::to_owned))
-        .unwrap_or_default()
-}
-
 /// Reads the agent's output a line at a time until it ends.
 fn read_lines(output: impl Read, deliver: &impl Fn(Inbound)) {
     let mut reader = BufReader::new(output);
@@ -908,28 +906,4 @@ fn read_lines(output: impl Read, deliver: &impl Fn(Inbound)) {
         }
     };
     deliver(Inbound::Closed(problem));
-}
-
-#[cfg(test)]
-mod tests {
-    use {super::*, serde_json::json};
-
-    #[test]
-    fn the_model_is_named_from_either_way_an_agent_says_it() {
-        // An unstable `models` state, as some adapters send.
-        let models = json!({ "models": {
-            "currentModelId": "default",
-            "availableModels": [{ "modelId": "default", "name": "Default (Opus)" }],
-        } });
-        assert_eq!(model_name(&models).as_deref(), Some("Default (Opus)"));
-        // A grouped select, whose value has no name: the value.
-        let grouped = json!({ "configOptions": [
-            { "id": "mode", "category": "mode", "type": "select", "currentValue": "ask", "options": [] },
-            { "id": "model", "category": "model", "type": "select", "currentValue": "x",
-              "options": [{ "group": "g", "name": "G", "options": [{ "value": "y", "name": "Y" }] }] },
-        ] });
-        assert_eq!(model_name(&grouped).as_deref(), Some("x"));
-        assert_eq!(model_name(&json!({})), None);
-        assert!(agent_info(&json!({ "agentInfo": { "name": "" } })).is_none());
-    }
 }

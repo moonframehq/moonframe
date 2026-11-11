@@ -1,7 +1,7 @@
 //! A run as `app.acp` shows it, and as it is saved and restored.
 
 use {
-    super::{Allow, Run, Start, Status, Tool, Transcript},
+    super::{Allow, Run, Scope, Start, Status, Timing, Tool, Transcript},
     serde_json::{Value, json},
     std::path::PathBuf,
 };
@@ -16,7 +16,7 @@ impl Run {
             .take(12)
             .rev()
             .map(|tool| {
-                json!({ "id": tool.id, "title": tool.title, "kind": tool.kind, "status": tool.status })
+                json!({ "id": tool.id, "title": tool.title, "kind": tool.kind, "status": tool.status, "ms": tool.duration() })
             })
             .collect();
         let plan: Vec<Value> = self
@@ -58,6 +58,8 @@ impl Run {
             "warning": self.warning,
             "changed": self.changed,
             "undone": self.undone,
+            "checking": self.checking,
+            "timing": self.timing.to_json(),
         })
     }
 
@@ -85,6 +87,7 @@ impl Run {
                 allow: Allow::Ask,
                 cwd: text("cwd").map(PathBuf::from).unwrap_or_default(),
                 installed: None,
+                scope: Scope::default(),
                 now: value.get("started").and_then(Value::as_u64).unwrap_or(0),
             },
             None,
@@ -113,6 +116,7 @@ impl Run {
             .filter(|info| info.is_object())
             .cloned();
         run.model = text("model");
+        run.timing = Timing::restore(value.get("timing"));
         let (transcript, tools) = Transcript::restore(value.get("parts"));
         run.transcript = transcript;
         run.tools.extend(tools);
@@ -138,6 +142,10 @@ impl Run {
                 kind: field("kind"),
                 status: field("status"),
                 paths: Vec::new(),
+                command: None,
+                began: None,
+                ended: None,
+                ms: tool.get("ms").and_then(Value::as_u64),
             });
         }
         for entry in value

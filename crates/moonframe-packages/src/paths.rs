@@ -6,6 +6,8 @@
 //! the toolbox, the starter's `app/`: from its bundle, from this checkout,
 //! or compiled in (the moonframe crate's `embed` and `launch` find it).
 
+mod editable;
+
 use {
     crate::packages,
     moonframe_core::{AppLayer, Roots},

@@ -1,0 +1,292 @@
+//! Which permission questions a run answers itself, as the user set for its
+//! mod in provider.toml's `[settings] allow`; never a mod's own choice.
+//! Each is answered "allow once", never "always": the agent asks again next
+//! time, and nothing it was allowed outlives the run.
+
+use std::path::{Component, Path, PathBuf};
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Allow {
+    /// Every question waits on the user.
+    #[default]
+    Ask,
+    /// Tools that only look (read, search, think); the rest wait.
+    Read,
+    /// Tools that only look, edits of files in the app's writable folder
+    /// (which the app keeps, so a run can be undone), and the app's own
+    /// check command; the rest wait.
+    App,
+    /// Every tool.
+    All,
+}
+
+/// What a run may touch under [`Allow::App`].
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Scope {
+    /// Where the agent works: relative paths are from here.
+    pub(crate) cwd: PathBuf,
+    /// The folders it may edit in, resolved.
+    pub(crate) writable: Vec<PathBuf>,
+    /// Commands it may run as they are: the app's check.
+    pub(crate) commands: Vec<String>,
+}
+
+/// One tool call asking permission.
+pub(crate) struct Call<'a> {
+    pub(crate) kind: Option<&'a str>,
+    pub(crate) paths: &'a [PathBuf],
+    pub(crate) command: Option<&'a str>,
+}
+
+impl Allow {
+    pub(crate) fn parse(name: &str) -> Option<Self> {
+        match name {
+            "ask" => Some(Self::Ask),
+            "read" => Some(Self::Read),
+            "app" => Some(Self::App),
+            "all" => Some(Self::All),
+            _ => None,
+        }
+    }
+
+    /// Its name in provider.toml.
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Ask => "ask",
+            Self::Read => "read",
+            Self::App => "app",
+            Self::All => "all",
+        }
+    }
+
+    /// Whether a tool of `kind` is answered without asking, whatever it
+    /// works on. A tool whose kind is unknown counts as one that changes
+    /// things.
+    pub(crate) fn covers(self, kind: Option<&str>) -> bool {
+        match self {
+            Self::Ask => false,
+            Self::Read | Self::App => matches!(kind, Some("read" | "search" | "think")),
+            Self::All => true,
+        }
+    }
+
+    /// Whether `call` is answered without asking, within `scope`.
+    pub(crate) fn covers_call(self, call: &Call<'_>, scope: &Scope) -> bool {
+        if self.covers(call.kind) {
+            return true;
+        }
+        if self != Self::App {
+            return false;
+        }
+        match call.kind {
+            Some("edit" | "delete" | "move") => {
+                !call.paths.is_empty()
+                    && call
+                        .paths
+                        .iter()
+                        .all(|path| scope.holds(&scope.cwd.join(path)))
+            },
+            Some("execute") => call
+                .command
+                .and_then(|command| bare(command, &scope.cwd))
+                .is_some_and(|command| scope.commands.iter().any(|known| known.trim() == command)),
+            _ => false,
+        }
+    }
+}
+
+impl Scope {
+    /// Whether `path` is in a writable folder: no `..`, links followed,
+    /// and nothing that says what runs or what is allowed.
+    pub(crate) fn holds(&self, path: &Path) -> bool {
+        if path
+            .components()
+            .any(|part| matches!(part, Component::ParentDir))
+        {
+            return false;
+        }
+        let path = resolved(path);
+        self.writable.iter().any(|folder| {
+            path.strip_prefix(folder)
+                .is_ok_and(|rest| !rest.as_os_str().is_empty() && !guarded(rest))
+        })
+    }
+}
+
+/// Whether `rest`, a path in a writable folder, configures what runs or
+/// what is allowed: a provider (whose `provider.toml` holds this very
+/// `allow`, and may start a program), or the app's manifests. An agent
+/// editing one could give itself more, so the user is always asked.
+fn guarded(rest: &Path) -> bool {
+    let names: Vec<String> = rest
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().to_lowercase())
+        .collect();
+    names.iter().any(|name| name == "providers")
+        || names
+            .last()
+            .is_some_and(|name| matches!(name.as_str(), "moonframe.toml" | "packages.toml"))
+}
+
+/// `path` with its nearest folder that exists resolved: a file being made
+/// goes by where it will be.
+fn resolved(path: &Path) -> PathBuf {
+    path.ancestors()
+        .find_map(|folder| {
+            let rest = path.strip_prefix(folder).ok()?;
+            Some(folder.canonicalize().ok()?.join(rest))
+        })
+        .unwrap_or_else(|| path.to_owned())
+}
+
+/// The command at the heart of `command`, as agents wrap it: after a `cd`
+/// into the folder they work in, and before `2>&1` and a pipe into `tail`
+/// or `head`. None when anything else is chained to it.
+fn bare<'a>(command: &'a str, cwd: &Path) -> Option<&'a str> {
+    let mut command = command.trim();
+    for cd in [
+        format!("cd {} && ", cwd.display()),
+        format!("cd '{}' && ", cwd.display()),
+    ] {
+        if let Some(rest) = command.strip_prefix(&cd) {
+            command = rest.trim();
+        }
+    }
+    if let Some((before, after)) = command.rsplit_once('|') {
+        let viewer = after.trim();
+        let plain = viewer
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '-');
+        if plain && (viewer.starts_with("tail") || viewer.starts_with("head")) {
+            command = before.trim();
+        }
+    }
+    if let Some(rest) = command.strip_suffix("2>&1") {
+        command = rest.trim();
+    }
+    Some(command)
+}
+
+/// The shell command a tool call's input names, as agents send it: a
+/// string, or words.
+pub(crate) fn command_of(input: Option<&serde_json::Value>) -> Option<String> {
+    let command = input?.get("command")?;
+    match command {
+        serde_json::Value::String(text) => Some(text.clone()),
+        serde_json::Value::Array(words) => {
+            let words: Vec<&str> = words.iter().filter_map(serde_json::Value::as_str).collect();
+            // `bash -lc "<command>"`, as Codex sends it.
+            match words.as_slice() {
+                [shell, flag, command] if shell.ends_with("sh") && flag.starts_with('-') => {
+                    Some((*command).to_owned())
+                },
+                _ => Some(words.join(" ")),
+            }
+        },
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use {super::*, serde_json::json};
+
+    fn scope(dir: &Path) -> Scope {
+        Scope {
+            cwd: dir.to_owned(),
+            writable: vec![dir.join("app").canonicalize().unwrap()],
+            commands: vec!["/bin/notes --check /repo/app".to_owned()],
+        }
+    }
+
+    fn call<'a>(kind: &'a str, paths: &'a [PathBuf], command: Option<&'a str>) -> Call<'a> {
+        Call {
+            kind: Some(kind),
+            paths,
+            command,
+        }
+    }
+
+    #[test]
+    fn the_app_level_edits_the_app_folder_and_runs_its_check_only() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("app/mods")).unwrap();
+        let scope = scope(dir.path());
+        let app = Allow::App;
+        let inside = [PathBuf::from("app/mods/new/main.luau")];
+        let absolute = [dir.path().join("app/style.luau")];
+        let outside = [PathBuf::from("crates/lib.rs")];
+        let escaping = [PathBuf::from("app/../crates/lib.rs")];
+        let mixed = [inside[0].clone(), outside[0].clone()];
+        assert!(app.covers_call(&call("edit", &inside, None), &scope));
+        assert!(app.covers_call(&call("delete", &absolute, None), &scope));
+        assert!(!app.covers_call(&call("edit", &outside, None), &scope));
+        assert!(!app.covers_call(&call("edit", &escaping, None), &scope));
+        assert!(!app.covers_call(&call("edit", &mixed, None), &scope));
+        // Nothing that says what runs or what is allowed, nor the folder.
+        for guarded in [
+            "app/providers/acp/provider.toml",
+            "app/Providers/mine/main.wasm",
+            "app/moonframe.toml",
+            "app/packages.toml",
+            "app",
+        ] {
+            let paths = [PathBuf::from(guarded)];
+            assert!(
+                !app.covers_call(&call("edit", &paths, None), &scope),
+                "{guarded}"
+            );
+        }
+        // An edit that names no file could be anywhere.
+        assert!(!app.covers_call(&call("edit", &[], None), &scope));
+        assert!(app.covers_call(&call("read", &outside, None), &scope));
+
+        let check = "/bin/notes --check /repo/app";
+        for command in [
+            check.to_owned(),
+            format!("{check} 2>&1"),
+            format!("{check} 2>&1 | tail -20"),
+            format!("cd {} && {check}", dir.path().display()),
+        ] {
+            assert!(
+                app.covers_call(&call("execute", &[], Some(&command)), &scope),
+                "{command}"
+            );
+        }
+        for command in [
+            format!("{check}; rm -rf ~"),
+            format!("{check} | sh"),
+            format!("{check} && curl x"),
+            "just check".to_owned(),
+        ] {
+            assert!(
+                !app.covers_call(&call("execute", &[], Some(&command)), &scope),
+                "{command}"
+            );
+        }
+        // Other levels are as they were.
+        assert!(!Allow::Read.covers_call(&call("edit", &inside, None), &scope));
+        assert!(Allow::All.covers_call(&call("execute", &[], Some("rm x")), &scope));
+        for level in [Allow::Ask, Allow::Read, Allow::App, Allow::All] {
+            assert_eq!(Allow::parse(level.name()), Some(level));
+        }
+    }
+
+    #[test]
+    fn commands_come_as_text_or_words() {
+        assert_eq!(
+            command_of(Some(&json!({ "command": "just check" }))).as_deref(),
+            Some("just check")
+        );
+        assert_eq!(
+            command_of(Some(&json!({ "command": ["bash", "-lc", "x --check"] }))).as_deref(),
+            Some("x --check")
+        );
+        assert_eq!(
+            command_of(Some(&json!({ "command": ["ls", "-la"] }))).as_deref(),
+            Some("ls -la")
+        );
+        assert_eq!(command_of(Some(&json!({ "path": "x" }))), None);
+    }
+}

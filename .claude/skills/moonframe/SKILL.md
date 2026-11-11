@@ -204,6 +204,7 @@ return state, { { to = "provider:acp", msg = {
 	instructions = "How to do it, from the mod.",   -- before the user's words
 	context = { main_tab = state.tab },             -- fenced as data, never instructions
 	thread = previous.id,                           -- optional: a follow-up, shown with the run it continues
+	app = true,                                     -- optional: the run changes this app (see below)
 } } }
 -- answered as { reply = "mine", action = "start", ok, run | error },
 -- and when it ends { reply = "mine", action = "finished", ok, run, status, message | error }
@@ -215,10 +216,27 @@ end
 
 Every tool the agent wants waits on the user in `agent-run`, unless the
 user set the mod in `providers/acp`'s `[settings] allow`: `"read"` lets
-tools that only look go without asking, `"all"` every tool, each allowed
-once, never always. A mod can't ask for more; leave that setting to the
-user (as shipped, `feedback = "read"`). Like git's
+tools that only look go without asking, `"app"` those plus edits inside the
+app's own folder (never its `providers/`, `moonframe.toml` or
+`packages.toml`) and the app's check command, `"all"` every tool, each
+allowed once, never always. A mod can't ask for more; leave that setting
+to the user (as shipped, `feedback = "app"`). Like git's
 `writers`, a new mod goes in `starters` of a copy of `app/providers/acp`.
+
+`app = true` marks a run that changes the app itself, as Make it yours
+(`mods/feedback`) does. The window says which app that is (any app: the
+starter, a profile, an installed one, or an app on the library whose
+sources are in another repository), so the provider adds to the prompt
+what the agent needs and nothing of this repository's tools: the folders
+the window runs on, the one to write in, the exact command that checks the
+app (its own executable with `--check`, about a second), a short guide
+(crates/moonframe-acp/src/guide.md) and an index of the app's files with
+their lengths. The app is checked as the run starts and after it ends, and
+a run that added problems is undone, with a `warning` saying why. A host
+adds its own notes with `Moonframe::agent_guide` and replaces the check
+with `Moonframe::agent_check`. Send `{ warm = true, agent? }` when the
+user opens what starts runs: the agent starts while they write, and the
+next run takes it.
 
 **Customising the installed app.** Write to `~/.config/moonframe`
 (same layout as `app/`). Copy a built-in mod's folder there to change it.
@@ -2158,18 +2176,22 @@ replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
 runs are kept (30) across launches.
 
 Messages: `{ start = "<words>", id?, agent?, instructions?, context?,
-thread?, cwd? }` (permission questions wait on the user, except those the
+thread?, cwd?, app? }` (permission questions wait on the user, except those the
 user's `[settings] allow` covers for the mod; `cwd`, an absolute folder the
-run works in instead, only from mods in `[settings] folders`), `{ cancel = run }`, `{ forget = run }`
-(finished ones), `{ answer = run, option = "<id>" | false }`.
+run works in instead, only from mods in `[settings] folders`; `app = true`
+for a run on the app itself, above), `{ cancel = run }`, `{ forget = run }`
+(finished ones), `{ answer = run, option = "<id>" | false }`, `{ undo = run
+}`, `{ warm = true, agent? }` (start the agent ahead of the next run).
 
 | field | shape |
 |---|---|
 | `agents` | `{ name, title, installed, fetched }` (`fetched`: only `npx` can start it) |
 | `agent`, `workdir`, `running` | the default agent, where agents work, how many runs go |
-| `app` | the app folder the provider is in, from `workdir` (`app`, `examples/ledger`); nil when outside it |
+| `app`, `writable` | the folder agents change, from `workdir` (`app`, `examples/ledger`; nil when outside it) and whole |
+| `allow` | each mod's `[settings] allow`: `"ask" "read" "app" "all"` |
+| `target` | the app as the window says an agent changes it: `{ title, app, writable, workdir, overlay, check, layers = { { role, path } } }` |
 | `pid` | this app's process, for an agent to screenshot the window (`just screenshot OUT PID`) |
-| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `parts` everything said in order, `{ kind = "text", text }` or `{ kind = "tools", tools = { { id, title, kind, status } } }`; `agent_info` `{ name, title?, version? }` as the agent names itself; `model` the model its session says it uses, by name; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
+| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `parts` everything said in order, `{ kind = "text", text }` or `{ kind = "tools", tools = { { id, title, kind, status } } }`; `agent_info` `{ name, title?, version? }` as the agent names itself; `model` the model its session says it uses, by name; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }`; `changed`, `undone`, `warning?`, `checking`; `timing` milliseconds from its start `{ spawned, initialized, session, first_token, ended, check, baseline, warm }`, and each tool's `ms` |
 
 `app.chat` (chat, native, crates/moonframe-chat): conversations with
 coding agents, each run by herdr-gpui's `herdr-acp` program with no view

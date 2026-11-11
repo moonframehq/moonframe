@@ -3,8 +3,8 @@
 # new session's prompt to a coding agent over the Agent Client Protocol, in
 # the folder you pick under it, and shows the reply as it streams, its tool
 # calls and its permission questions. Send feedback (the built-in
-# mods/feedback, kept in moonframe.toml) starts agents here too, told to
-# change this app's folder.
+# mods/feedback, kept in moonframe.toml) starts agents here too, told by
+# the window to change this app's folder.
 interval = 0.25
 kind     = "native"
 
@@ -17,6 +17,7 @@ starters = ["canvas", "feedback"]
 # composer) rather than this app's.
 folders = ["canvas"]
 # Questions for tools that only look are allowed once; every edit, command
-# and anything else waits for your answer in the session. A mod can't ask
+# and anything else waits for your answer in the session. Send feedback's
+# agent may also edit this app's folder and run its check. A mod can't ask
 # for more: only this file sets it (see the app's providers/acp for "all").
-allow = { canvas = "read", feedback = "read" }
+allow = { canvas = "read", feedback = "app" }
