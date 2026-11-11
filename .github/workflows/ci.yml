@@ -220,6 +220,12 @@ jobs:
         run: scripts/install-linux-deps.sh
       - name: Install the pinned Rust toolchain
         run: rustup toolchain install
+      # Defender scans every file Cargo writes, which makes a cold Windows
+      # build several times slower. The runner is thrown away afterwards.
+      - name: Stop Windows Defender scanning the build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
       # The `ghostty` terminal builds libghostty-vt with Zig (see mise.toml).
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
@@ -252,8 +258,16 @@ jobs:
         if: matrix.runner == 'ubuntu-24.04'
         run: cargo test --locked -p moonframe-pi -- --include-ignored
       # A workspace build unifies features and can hide accidental defaults.
-      # Check the dependency boundaries and each capability on its own.
+      # The dependency boundaries differ by platform, so every runner checks
+      # them (from `cargo tree`, without building).
+      - name: Check the capability dependency boundaries
+        run: python3 scripts/check-features.py
+      # Each capability on its own is about thirty more builds of the app,
+      # each with its own dependencies: on every runner they made a cold run
+      # several times longer, and the caches too big to all be kept. One
+      # runner builds them; the others build every feature together above.
       - name: Check minimal and individual capability builds
+        if: matrix.runner == 'ubuntu-24.04'
         run: |
           python3 scripts/check-features.py --lint
           cargo test --locked -p moonframe --no-default-features
@@ -334,6 +348,43 @@ jobs:
           "$RUNNER_TEMP/guide/bin/pip" install --quiet --disable-pip-version-check --no-deps --only-binary :all: --require-hashes -r "$RUNNER_TEMP/guide.txt"
       - name: Check the WASM guide page matches its Markdown
         run: '"$RUNNER_TEMP/guide/bin/python" website/tools/wasm-guide.py --check'
+
+  # Each change to Cargo.lock (or the toolchain) keys a new Rust cache, and
+  # the old ones stay until GitHub evicts something to stay under its 10 GB:
+  # often another platform's current cache, whose next run then builds
+  # cold. On main, once the caches are saved, drop those superseded.
+  prune-caches:
+    name: Prune superseded caches
+    needs: [lint, checks]
+    if: >-
+      !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.checks.result != 'skipped'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write # delete caches
+    steps:
+      - name: Delete main's older caches of each kind
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Newest first; a Rust cache's kind is its key without the two
+          # trailing hashes (environment and Cargo.lock).
+          gh cache list --repo "$GITHUB_REPOSITORY" --ref refs/heads/main --limit 100 \
+            --sort created_at --order desc --json id,key --jq '.[] | "\(.id) \(.key)"' |
+            while read -r id key; do
+              case $key in
+                v0-rust-*) kind=${key%-*-*} ;;
+                *) kind=$key ;;
+              esac
+              if [[ " ${seen:-} " == *" $kind "* ]]; then
+                echo "delete $key"
+                gh cache delete --repo "$GITHUB_REPOSITORY" "$id"
+              else
+                seen="${seen:-} $kind"
+              fi
+            done
 
   # One stable context for branch protection: every job above passed, or
   # was skipped because Changes found nothing for it to check.
