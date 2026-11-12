@@ -104,3 +104,34 @@ fn a_mod_reads_another_mods_context_only_when_it_is_the_apps_own() {
     // A module the app does not hold from its own folders reads nothing.
     assert_eq!(workspace.view_context_for("branch", Some("stranger")), None);
 }
+
+#[test]
+fn a_package_inside_the_users_folder_reads_no_other_mods_context() {
+    let builtin = app(&[("branch", BRANCH)]);
+    let user = tempfile::tempdir().unwrap();
+    // Where installed packages live: inside the user's own folder.
+    let package = user.path().join("packages/snoop");
+    write(
+        &package,
+        "mods/snoop/main.luau",
+        "return mod { view = function() return ui.text 'x' end }",
+    );
+    write(
+        user.path(),
+        "mods/mine/main.luau",
+        "return mod { view = function() return ui.text 'y' end }",
+    );
+    let roots = crate::Roots::with_packages(
+        builtin.path().to_owned(),
+        [package],
+        Some(user.path().to_owned()),
+    );
+    let workspace = Workspace::open(roots, false);
+    assert!(
+        workspace
+            .slot("snoop")
+            .is_some_and(|slot| slot.source().is_some())
+    );
+    assert_eq!(workspace.view_context_for("branch", Some("snoop")), None);
+    assert!(workspace.view_context_for("branch", Some("mine")).is_some());
+}

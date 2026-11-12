@@ -304,10 +304,7 @@ impl MoonframeApp {
         let Some(source) = self.workspace.slot(DEVTOOLS).and_then(|slot| slot.source()) else {
             return false;
         };
-        self.workspace
-            .roots()
-            .app_layers()
-            .any(|layer| source.starts_with(layer))
+        self.workspace.roots().in_app_layer(source)
     }
 
     /// The dock beside `body`, the shell, when `tools` is drawn: a strip

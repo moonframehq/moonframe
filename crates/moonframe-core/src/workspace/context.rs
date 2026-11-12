@@ -76,11 +76,7 @@ impl Workspace {
     fn own_module(&self, name: &str) -> bool {
         self.slot(name)
             .and_then(Slot::source)
-            .is_some_and(|source| {
-                self.roots
-                    .app_layers()
-                    .any(|layer| source.starts_with(layer))
-            })
+            .is_some_and(|source| self.roots.in_app_layer(source))
     }
 }
 
