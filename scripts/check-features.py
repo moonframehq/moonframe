@@ -37,6 +37,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--release", action="store_true", help="lint with the release profile")
+    parser.add_argument("--shard", default="1/1", metavar="I/N",
+                        help="with --lint, build only the I-th of N equal parts of the selections")
     args = parser.parse_args()
     metadata = json.loads(cargo("metadata", "--locked", "--format-version", "1",
                                 "--no-deps", capture=True))
@@ -99,7 +101,9 @@ def main():
     if args.lint:
         # One package at a time: workspace feature unification would mask
         # missing cfg gates and accidentally enabled defaults.
-        for feature in ["", *sorted(features)]:
+        index, count = (int(part) for part in args.shard.split("/"))
+        assert 1 <= index <= count, f"--shard {args.shard}: want I/N with 1 <= I <= N"
+        for feature in ["", *sorted(features)][index - 1::count]:
             print(f"lint: {feature or 'minimal'}", flush=True)
             cargo("clippy", "--quiet", "--locked", "-p", "moonframe-app", "-p", "moonframe",
                   *(["--release"] if args.release else []),
