@@ -9,7 +9,8 @@ const INSPECT: &str = if cfg!(target_os = "macos") {
     "ctrl-shift-x"
 };
 
-/// A window whose shell mounts the real `mods/feedback`.
+/// A window whose shell mounts the real `mods/feedback`, with the window
+/// it opens.
 fn with_feedback(cx: &mut TestAppContext) -> Window<'_> {
     let dir = folder(
         r#"
@@ -23,33 +24,62 @@ return mod {
     );
     let app = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
     std::fs::create_dir(dir.path().join("mods")).unwrap();
-    std::os::unix::fs::symlink(app.join("mods/feedback"), dir.path().join("mods/feedback"))
+    for name in ["feedback", "feedback-window"] {
+        std::os::unix::fs::symlink(
+            app.join("mods").join(name),
+            dir.path().join("mods").join(name),
+        )
         .unwrap();
+    }
     open_in(cx, dir)
 }
 
+impl Window<'_> {
+    /// What the feedback window's mod draws, as a string to search: it
+    /// opens in a window of its own, which this test window does not draw.
+    fn feedback_window(&mut self) -> String {
+        let app = self.app.clone();
+        self.cx.read_entity(&app, |app, _| {
+            format!(
+                "{:?}",
+                app.workspace
+                    .slot("feedback-window")
+                    .and_then(|slot| slot.view())
+            )
+        })
+    }
+
+    /// Whether the feedback mod has its window open.
+    fn feedback_open(&mut self) -> bool {
+        let app = self.app.clone();
+        self.cx.read_entity(&app, |app, _| {
+            let state = app.workspace.slot("feedback").and_then(|slot| slot.state());
+            matches!(state, Some(Ok(moonframe_core::Data::Map(fields))) if fields.get("open") == Some(&moonframe_core::Data::Bool(true)))
+        })
+    }
+}
+
 #[gpui_kit::test]
-fn the_inspect_shortcut_opens_the_dialog_on_a_pick(cx: &mut TestAppContext) {
+fn the_inspect_shortcut_opens_the_window_on_a_pick(cx: &mut TestAppContext) {
     let mut window = with_feedback(cx);
-    assert!(!window.shows("feedback-chip"));
+    assert!(!window.feedback_window().contains("feedback-chip"));
     window.keys(INSPECT);
     window.click("target");
     assert!(
-        !window.shows("feedback-chip"),
+        !window.feedback_window().contains("feedback-chip"),
         "the card chooses the level first"
     );
     window.keys("enter");
+    assert!(window.feedback_open(), "using the pick opens the window");
+    let drawn = window.feedback_window();
+    assert!(drawn.contains("feedback-chip"), "with the pick attached");
     assert!(
-        window.shows("feedback-chip"),
-        "using the pick opens the dialog"
+        drawn.contains("Selected in Moonframe"),
+        "and its report, for the Copy button"
     );
-    // The Copy button is at the right end of the chip's row.
-    let row = window.bounds("feedback-attached");
-    window.click_at(point(row.right() - px(20.), row.center().y));
-    let copied = window.cx.read_from_clipboard().and_then(|item| item.text());
     assert!(
-        copied.is_some_and(|text| text.starts_with("Selected in Moonframe")),
-        "Copy puts the report on the clipboard"
+        !window.shows("feedback-body"),
+        "in a window of its own, not over the app"
     );
 }
 
@@ -80,11 +110,11 @@ fn the_inspect_shortcut_follows_the_settings_live(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn escaping_the_inspect_shortcut_leaves_the_dialog_closed(cx: &mut TestAppContext) {
+fn escaping_the_inspect_shortcut_leaves_the_window_closed(cx: &mut TestAppContext) {
     let mut window = with_feedback(cx);
     window.keys(INSPECT);
     window.keys("escape");
-    assert!(!window.shows("feedback-body"), "nothing was picked");
+    assert!(!window.feedback_open(), "nothing was picked");
 }
 
 #[gpui_kit::test]
@@ -98,10 +128,7 @@ fn a_pick_for_a_mod_waits_on_its_card(cx: &mut TestAppContext) {
         "the card shows the pick"
     );
     window.keys("escape");
-    assert!(
-        !window.shows("feedback-body"),
-        "cancelled: nothing attached"
-    );
+    assert!(!window.feedback_open(), "cancelled: nothing attached");
     assert!(
         app.read_with(window.cx, |app, _| app.inspector.asker.is_none()),
         "the mod heard there was no pick"

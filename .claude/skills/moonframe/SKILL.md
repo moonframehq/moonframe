@@ -2461,6 +2461,18 @@ For that:
 
 ## Extending the host
 
+**Cargo features: keep every default.** An app on the library (a Rust
+crate depending on `moonframe`) keeps Moonframe's default features: they
+are how its users change it, with Developer Mode (`studio`), Make it yours
+(`acp`) and Wasm providers (`wasm`, which runs the toolbox's `system`
+behind `app.system`, and the providers users install). With
+`default-features = false`, list every other default (`acp`, `alacritty`,
+`browser`, `chat`, `docs`, `forge`, `git`, `markdown`, `prose`, `shell`,
+`studio`, `tokio`, `updates`, `usage`, `wasm`) and turn off only the one
+it must. When `app.<provider>` stays nil though the provider ships, check
+the host's `Cargo.toml` before the Luau: the feature is likely off, which
+no Luau change fixes. Say so to the user instead of hunting.
+
 **Revision selection.** `use "revision-timeline"` (or `ui.revision_timeline`)
 draws a native Time Machine-style ruler, with Dock-like magnification in Rust.
 Pass ordered `entries = { { id, day, label } }`, a stable `selected` id and

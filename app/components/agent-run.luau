@@ -244,7 +244,7 @@ return component {
 		local lines = props.lines or 6
 		return ui.column {
 			class = "agent-run",
-			props.request and ui.text { run.text, class = "agent-run-request", lines = 3, tooltip = run.text },
+			props.request and ui.text { run.text, class = "agent-run-request", lines = 3 },
 			ui.row {
 				class = "agent-run-head",
 				align = "center",
@@ -266,13 +266,12 @@ return component {
 			#plan > 0 and ui.column { class = "agent-run-plan", table.unpack(plan) },
 			#tools > 0 and ui.column { gap = "small", table.unpack(tools) },
 			question,
-			run.error ~= nil and ui.text { run.error, class = "agent-run-error", wrap = true, lines = 4, tooltip = run.error },
+			run.error ~= nil and ui.text { run.error, class = "agent-run-error", wrap = true, lines = 4 },
 			lines > 0 and run.message ~= nil and ui.text {
 				run.message,
 				class = "agent-run-message",
 				wrap = true,
 				lines = lines,
-				tooltip = run.message,
 			},
 		}
 	end,

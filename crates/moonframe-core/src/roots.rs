@@ -87,7 +87,13 @@ impl Layer {
             Role::App | Role::Package => true,
             // Every app gets the Developer tools: they show only in
             // Developer Mode, and are how its Luau is changed as it runs.
-            Role::Toolbox(keep) => name == crate::DEVTOOLS || keep.iter().any(|kept| kept == name),
+            // Keeping the sparkle keeps the window it opens.
+            Role::Toolbox(keep) => {
+                name == crate::DEVTOOLS
+                    || keep.iter().any(|kept| {
+                        kept == name || (kept == crate::FEEDBACK && name == crate::FEEDBACK_WINDOW)
+                    })
+            },
             Role::Style => false,
         }
     }

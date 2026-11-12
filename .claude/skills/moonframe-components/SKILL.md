@@ -507,6 +507,7 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | `expanded` | id of the conversation shown open (its first run), each run with `agent-run`; one waiting on an answer is always open |
 | `follow` | show a box to reply in under the open conversation: Reply sends `{ follow = id }` (⌘↩ with `value`), each edit `{ follow_type = id, value }`; start the follow-up with `thread = id` |
 | `id` | keeps the text across renders (default "feedback") |
+| `inline` | draw it as a window's content (a mod opened with `app:window`) instead of a dialog over the app: no backdrop or title, and the runs fill the height; `open` and `dismiss` then do nothing |
 | `inspect` | show an Inspect button that starts Inspect Element for the mod (`command = "inspect"`); the pick comes back on the topic `app/inspect` |
 | `note` | muted lines under the field: who acts on the feedback, and what goes with it |
 | `open` | show it |

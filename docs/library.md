@@ -53,11 +53,24 @@ so are `map` (`ui.map` street maps), `speech` (dictation), `video` (`ui.video`) 
 and live machines ask for (`awake`, `crash`, `displays`, `dock`, `guard`,
 `restart`, `socket`), which few apps need. The starter has them all.
 
-An app that needs none of git, the markdown editor or kept terminals can
-leave them out, and with them the herdr-gpui crates they build on:
+**Keep every default.** They are what lets the people using the app change
+it: Developer Mode (`studio`: Inspect Element, the Developer tools), Make
+it yours (`acp`, the agent behind the sparkles), and the mods and providers
+they add, many of them Wasm (`wasm`, which also runs the toolbox's `system`
+provider: CPU and memory). A feature left out is gone for every user of
+that build, and nothing at run time brings it back: a mod reading
+`app.system` sees nil, and an installed Wasm provider says the feature is
+off. So the plain line above is the one to use.
+
+When the app must turn a default off (to make `herdr-core` a feature of its
+own, say), write `default-features = false` and list every other default,
+so nothing else goes with it:
 
 ```toml
-moonframe = { default-features = false, features = ["acp", "alacritty", "tokio"], git = "..." }
+moonframe = { default-features = false, features = [
+  "acp", "alacritty", "browser", "chat", "docs", "forge", "git", "markdown",
+  "prose", "shell", "studio", "tokio", "updates", "usage", "wasm",
+], git = "..." }
 ```
 
 A built-in provider a feature leaves out (`git`, `docs`, `acp`) publishes
@@ -65,11 +78,11 @@ nothing: the starter's mods reading `app.git` see nil and carry on, and only
 a message to it reports that the feature is off.
 
 `wasm` is the runtime for sandboxed WebAssembly (WASM) providers (wasmtime, the
-largest dependency). An app whose providers are all native or processes
-leaves it out to build faster and ship a smaller binary; the line above
-does, with no `wasm`. Its WASM providers then behave the same way, the
-toolbox's `system` among them: nothing published, and a message to one
-says the feature is off. `bundle` then builds none of them.
+largest dependency). Leaving it out builds faster and ships a smaller
+binary, but the app then runs no WASM provider, the toolbox's `system` and
+those its users install among them: nothing published, and a message to one
+says the feature is off. `bundle` then builds none of them. Only a sealed
+app that ships a fixed set of native providers has a reason to.
 
 To add a sandboxed component alongside native providers, follow
 [Building WebAssembly (WASM) providers](wasm-providers.md).
@@ -106,8 +119,8 @@ ship only their selected components.
 | `tokio` | Async native-provider support. |
 | `wasm` | Wasmtime and building/running Wasm providers. |
 
-An app with just ordinary UI can use `default-features = false` with no
-features. SQLite state saving still works. Without `terminal`, Moonframe's
+A sealed app with just ordinary UI can use `default-features = false` with
+no features (its users then get no Developer Mode or Wasm providers). SQLite state saving still works. Without `terminal`, Moonframe's
 terminal crate and PTY dependency are omitted. `herdr-core` is independent:
 it can keep state without Moonframe terminals, although its upstream client
 currently brings its own terminal dependencies.
