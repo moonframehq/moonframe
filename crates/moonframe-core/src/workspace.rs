@@ -44,6 +44,9 @@ pub const DEVTOOLS: &str = "devtools";
 /// The mod that asks agents for a change (the sparkle), whose runs are the
 /// Developer tools' agent sessions.
 pub const FEEDBACK: &str = "feedback";
+/// The window `feedback` opens its dialog in: an app that keeps `feedback`
+/// gets it too.
+pub const FEEDBACK_WINDOW: &str = "feedback-window";
 
 /// The name messages use for the shell.
 pub const SHELL: &str = "shell";

@@ -78,7 +78,8 @@ pub use {
     vm::printable,
     window::{Chrome, Display, ModWindowSize, Platform, Titlebar, WindowPlace, WindowState},
     workspace::{
-        DEMO, DEVTOOLS, FEEDBACK, PROVIDER, SHELL, Slot, TOPIC, ViewDiagnostics, Workspace,
+        DEMO, DEVTOOLS, FEEDBACK, FEEDBACK_WINDOW, PROVIDER, SHELL, Slot, TOPIC, ViewDiagnostics,
+        Workspace,
     },
 };
 

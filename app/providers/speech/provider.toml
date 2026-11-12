@@ -10,7 +10,7 @@ kind     = "native"
 [settings]
 # The mods that may listen, with the components they draw; any other is
 # refused. Each listens only from a click of its mic button.
-recorders = ["feedback"]
+recorders = ["feedback", "feedback-window"]
 # The engines a mod that names none may use, best first. Only what is listed
 # here is picked by itself, so your voice leaves this machine only if you add
 # a remote engine. To change it, copy this folder to
