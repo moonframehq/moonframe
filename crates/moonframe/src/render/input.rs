@@ -121,7 +121,10 @@ impl RenderOnce for Field {
             &self.rest
         };
         let theme = cx.theme();
-        let size = text_pixels(look.base.size, theme);
+        let size = look
+            .base
+            .font_size
+            .map_or_else(|| text_pixels(look.base.size, theme), px);
         let line = (size * LINE).round();
         let rows = match (&editor, self.input.multiline) {
             (_, false) => 1,

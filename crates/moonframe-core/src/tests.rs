@@ -17,6 +17,7 @@ mod dictation;
 mod elements;
 mod entries;
 mod entry_scopes;
+mod font_size;
 mod gestures;
 mod history;
 mod lightbox;

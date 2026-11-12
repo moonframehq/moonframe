@@ -72,6 +72,9 @@ type Style = {
 	margin: Sides?,
 	shadow: Shadow?,
 	size: TextSize?,
+	-- Text size in pixels, over `size` (6 to 64): text that must match
+	-- what another toolkit draws at a size the app was given.
+	font_size: number?,
 	weight: Weight?,
 	font: ("sans" | "mono")?,
 	-- Letter case of a text: `upper` for headings.
