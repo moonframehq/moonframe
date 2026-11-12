@@ -63,7 +63,8 @@ pub use {
 use {
     moonframe_core::{
         APP, Action, Appearance, Command, DEMO, Error, ListWindow, PROVIDER, Persist, Pick,
-        PickKind, Platform, Request, Roots, Titlebar, WindowRequest, WindowState, Workspace,
+        PickKind, Platform, Request, Roots, Titlebar, WindowPlace, WindowRequest, WindowState,
+        Workspace,
     },
     moonframe_packages::{identity, packages, paths},
     moonframe_providers::{Event, Natives, Providers},
@@ -281,13 +282,13 @@ impl Ui {
                 true
             },
             Request::Edit(edit) => {
-                self.apply_edit(from, &edit);
+                self.edit_where_drawn(from, edit);
                 true
             },
             // A preview opens nothing, as on GPUI.
             Request::Window(_) if from.starts_with(DEMO) => false,
-            Request::Window(WindowRequest::Open { name, .. }) => {
-                self.show_mod_window(from, &name);
+            Request::Window(WindowRequest::Open { name, place, .. }) => {
+                self.show_mod_window(from, &name, place);
                 true
             },
             Request::Window(WindowRequest::Close(name)) => {
@@ -335,7 +336,7 @@ impl Ui {
         }
         if let Action::Window(name) = action {
             if !from.starts_with(DEMO) && !self.hand_to_main(from, action) {
-                self.show_mod_window(from, name);
+                self.show_mod_window(from, name, None);
             }
             return;
         }
@@ -370,13 +371,13 @@ impl Ui {
     }
 
     /// Opens the mod `name` in its window, as `from` asked, or says why not.
-    fn show_mod_window(&mut self, from: &str, name: &str) {
+    fn show_mod_window(&mut self, from: &str, name: &str, place: Option<WindowPlace>) {
         if self.workspace().slot(name).is_none() {
             self.workspace_mut().refuse(
                 from,
                 Error::new(format!("`app:window`: no mod named `{name}`")),
             );
-        } else if !self.open_mod_window(name) {
+        } else if !self.open_mod_window(name, place) {
             tracing::warn!("`{name}` showed after launch: its window opens on the next one");
         }
     }

@@ -14,8 +14,8 @@
 use {
     crate::Ui,
     moonframe_core::{
-        Action, Appearance, Command, ModWindowSize, Platform, SHELL, Titlebar, WindowState,
-        Workspace,
+        Action, Appearance, Command, Edit, ModWindowSize, Platform, SHELL, Titlebar, WindowPlace,
+        WindowState, Workspace,
     },
     rune::{App, AppHandle, AppSpec, Chrome, Tx, WindowHandle, WindowOptions, WindowSpec},
     std::{
@@ -41,6 +41,9 @@ pub(crate) struct Shared {
     pub(crate) menu_actions: RefCell<Vec<Action>>,
     /// Counts the changes one window made that the others have to draw.
     generation: Cell<u64>,
+    /// The text fields mods' windows draw, by their key (`<mod>:<id>`), and
+    /// the mod whose window holds each: `app:edit` goes there.
+    field_windows: RefCell<HashMap<String, String>>,
     /// Every window's handle, to wake it for such a change.
     handles: RefCell<Vec<AppHandle<Ui>>>,
     /// The main window's, which does what mods ask of the app.
@@ -54,6 +57,7 @@ impl Shared {
             appearance: Cell::new(Appearance::System),
             menu_actions: RefCell::default(),
             generation: Cell::new(0),
+            field_windows: RefCell::default(),
             handles: RefCell::default(),
             main: RefCell::default(),
         }
@@ -63,6 +67,19 @@ impl Shared {
     /// own fields; it marks itself touched.
     pub(crate) fn workspace_mut(&self) -> RefMut<'_, Workspace> {
         self.workspace.borrow_mut()
+    }
+
+    /// A mod's window, `window`, drew the field `key`.
+    pub(crate) fn drew_field(&self, key: &str, window: &str) {
+        let mut fields = self.field_windows.borrow_mut();
+        if fields.get(key).is_none_or(|known| known != window) {
+            fields.insert(key.to_owned(), window.to_owned());
+        }
+    }
+
+    /// The mod whose window last drew the field `key`, if a mod's window did.
+    pub(crate) fn field_window(&self, key: &str) -> Option<String> {
+        self.field_windows.borrow().get(key).cloned()
     }
 
     /// Every window's handle: they share the menu bar's items.
@@ -117,17 +134,41 @@ impl Ui {
         self.seen.replace(generation) != generation
     }
 
-    /// Opens the mod `name`'s window, or raises it. Only the main window
-    /// keeps their handles; false when the mod has none.
-    pub(crate) fn open_mod_window(&mut self, name: &str) -> bool {
+    /// Opens the mod `name`'s window, or raises it; `place` outranks where
+    /// its `window` key puts it. Only the main window keeps their handles;
+    /// false when the mod has none.
+    pub(crate) fn open_mod_window(&mut self, name: &str, place: Option<WindowPlace>) -> bool {
         let Some(window) = self.mod_windows.get(name) else {
             return false;
         };
+        if place.unwrap_or(window.place) != WindowPlace::default() {
+            tracing::warn!(
+                "`{name}` asks for a screen or full screen, which only GPUI does yet: it opens as an ordinary window"
+            );
+        }
         window.handle.update(|ui, _| ui.opened = true);
         window.native.open();
         let state = window.state(true);
         self.workspace_mut().set_mod_window(name, Some(state));
         true
+    }
+
+    /// Does `app:edit` from `from` where its field is: in the window that
+    /// drew it, which keeps its text. The main window's own fields first.
+    pub(crate) fn edit_where_drawn(&mut self, from: &str, edit: Edit) {
+        let key = format!("{from}:{}", edit.field);
+        let theirs = (!self.fields.get_mut().contains_key(&key))
+            .then(|| self.shared.field_window(&key))
+            .flatten()
+            .and_then(|name| self.mod_windows.get(&name));
+        if let Some(window) = theirs {
+            let from = from.to_owned();
+            window
+                .handle
+                .update(move |ui, _| ui.apply_edit(&from, &edit));
+            return;
+        }
+        self.apply_edit(from, &edit);
     }
 
     /// Closes the mod `name`'s window, as `app:window` asks.
@@ -170,6 +211,8 @@ pub(crate) struct ModWindow {
     native: WindowHandle,
     handle: AppHandle<Ui>,
     titlebar: Titlebar,
+    /// Where its `window` key asks it to open.
+    place: WindowPlace,
 }
 
 impl ModWindow {
@@ -238,12 +281,20 @@ pub(crate) fn add(app: &mut App<Ui>, main: &mut Ui) {
         let (titlebar, chrome) = chrome(&sizing);
         let mut ui = Ui::for_window(main, &name);
         ui.titlebar = titlebar;
+        // Its pages (`ui.browser`) go in its own native window.
+        let parent = Rc::clone(&ui.browsers.parent);
         // Made when first opened, not at launch.
         let window = App::new(spec)
             .chrome(chrome)
             .windowless()
             .on_close(closed)
             .init(move || ui);
+        let ready = window.handle();
+        let window = window.on_ready(move |native| {
+            *parent.borrow_mut() = Some(native.clone());
+            // An idle window polls no more: what waited for it has to hear.
+            ready.update(|_, _| {});
+        });
         let spec = WindowSpec::from_app(name.clone(), window)
             .options(WindowOptions {
                 min_size: Some(min_size),
@@ -256,6 +307,7 @@ pub(crate) fn add(app: &mut App<Ui>, main: &mut Ui) {
             native,
             handle,
             titlebar,
+            place: sizing.place,
         });
     }
     *main.shared.main.borrow_mut() = Some(app.handle());

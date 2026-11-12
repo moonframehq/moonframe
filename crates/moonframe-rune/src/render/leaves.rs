@@ -276,6 +276,10 @@ impl<'w> Painter<'w> {
         pen.mono |= input.mono;
         let id = input.id.as_deref().unwrap_or(&place.path);
         let key = format!("{}:{id}", place.owner);
+        // `app:edit` from its mod finds it in this window.
+        if let Some(window) = &self.ui.shows {
+            self.ui.shared.drew_field(&key, window);
+        }
         let mut fields = self.ui.fields.borrow_mut();
         let field = fields.entry(key.clone()).or_default();
         if input.value.is_some() && input.value != field.passed {

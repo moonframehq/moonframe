@@ -678,7 +678,9 @@ is all its code needs, beside its own `ui.view`s.
 
 It supports profiles through the `app` commands, and `--check` to load them
 headlessly. A mod opens in a window of its own (`app:window`) as on GPUI,
-except one that first shows after launch, which waits for the next. Other
+except one that first shows after launch, which waits for the next, and
+always as an ordinary window: a screen or full screen it asks for is
+GPUI's only for now (the log says so). Other
 `moonframe` commands, the theme picker, named themes and animations are not
 available yet. Layout can differ from GPUI.
 `ui.video` is 8-bit; `ui.map` doesn't

@@ -1,7 +1,11 @@
 //! Mods in windows of their own: two Rune windows, each with its own `Ui`,
 //! drawing from one workspace.
 
-use {super::*, crate::windows};
+use {
+    super::*,
+    crate::windows,
+    moonframe_core::{Edit, EditChange},
+};
 
 /// A shell that shows a count, and a mod `counter` whose button adds to it
 /// and which says whether its window is in front.
@@ -25,6 +29,7 @@ fn app() -> TempDir {
         view = function(state, app)
             return ui.column {
                 ui.button { "Add", msg = "add", to = "shell" },
+                ui.input { id = "note", value = "bold" },
                 ui.text { `active {app.window.active}` },
             }
         end,
@@ -139,4 +144,74 @@ fn only_a_windows_own_commands_stay_in_a_mods_window() {
     ] {
         assert!(!windows::window_command(command), "{command:?}");
     }
+}
+
+/// Bold, as a formatting button asks with `app:edit`.
+fn bold() -> Edit {
+    Edit {
+        field: "note".to_owned(),
+        change: EditChange::Wrap {
+            before: "**".to_owned(),
+            after: "**".to_owned(),
+        },
+        expected: None,
+    }
+}
+
+/// What the workspace says went wrong, by mod.
+fn problems(window: &Runtime<Ui>) -> Vec<String> {
+    let workspace = window.state.workspace();
+    workspace
+        .problems()
+        .iter()
+        .map(|(name, problem)| format!("{name}: {problem}"))
+        .collect()
+}
+
+#[test]
+fn an_edit_goes_to_the_window_that_drew_its_field() {
+    let dir = app();
+    let main = Ui::open(dir.path().to_owned(), None);
+    let side = Ui::for_window(&main, "counter");
+    let mut main = Runtime::new(main, view, (800., 600.), Env::new(true, 2.));
+    let mut side = Runtime::new(side, view, (300., 200.), Env::new(true, 2.));
+    settle(&mut main);
+    settle(&mut side);
+    let key = "counter:note";
+    assert_eq!(
+        side.state.shared.field_window(key).as_deref(),
+        Some("counter")
+    );
+    assert!(
+        !main.state.fields.get_mut().contains_key(key),
+        "the main window has no such field"
+    );
+    // The window that drew the field edits it.
+    side.update(|ui, _| ui.apply_edit("counter", &bold()));
+    let text = side.state.fields.get_mut()[key].edit.text.clone();
+    assert!(text.contains("**"), "{text}");
+    // With no window to hand it to, the main window says it has no such field.
+    main.update(|ui, _| ui.edit_where_drawn("counter", bold()));
+    assert!(
+        problems(&main)
+            .iter()
+            .any(|problem| problem.contains("note")),
+        "{:?}",
+        problems(&main)
+    );
+}
+
+#[test]
+fn an_edit_for_a_mods_window_is_handed_to_it() {
+    let dir = app();
+    let mut main = Ui::open(dir.path().to_owned(), None);
+    let spec = rune::AppSpec::new("test", (800., 600.), unused_init, view);
+    let mut app = rune::App::new(spec);
+    windows::add(&mut app, &mut main);
+    main.shared.drew_field("counter:note", "counter");
+    let mut main = Runtime::new(main, view, (800., 600.), Env::new(true, 2.));
+    settle(&mut main);
+    // Handed to the counter's window: the main window refuses nothing.
+    main.update(|ui, _| ui.edit_where_drawn("counter", bold()));
+    assert!(problems(&main).is_empty(), "{:?}", problems(&main));
 }
