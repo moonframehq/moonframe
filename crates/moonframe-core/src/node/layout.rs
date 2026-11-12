@@ -20,6 +20,9 @@ pub struct Frame {
     /// While scrolled to its end, stay there as the content grows: a chat
     /// or a log. Scrolled back, it stays where the user put it.
     pub follow: bool,
+    /// Draw a scrollbar while it scrolls (the default); `false` scrolls
+    /// with none, as a sidebar a host draws its own way may.
+    pub scrollbar: bool,
     /// Give up space when the parent is short of it (the default); `false`
     /// keeps the content's size, so a strip is never squeezed.
     pub shrink: bool,

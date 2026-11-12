@@ -345,6 +345,9 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
         if frame.follow {
             follow(handle, axis);
         }
+        if !frame.scrollbar {
+            return self.track_scroll(handle);
+        }
         self.track_scroll(handle).child(
             div()
                 .absolute()
