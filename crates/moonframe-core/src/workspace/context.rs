@@ -59,6 +59,29 @@ impl Workspace {
             problems,
         })
     }
+
+    /// [`Workspace::view_context`] of `owner`, for a reader: the user's own
+    /// (none), or the module `asker`, which gets it only when it drew the
+    /// element itself or is one of the app's own (the built-in app's, the
+    /// app's or the user's, never a package's). A mod that asks for a pick
+    /// must not read another mod's state through it.
+    pub fn view_context_for(&self, owner: &str, asker: Option<&str>) -> Option<ViewContext> {
+        match asker {
+            Some(asker) if asker != owner && !self.own_module(asker) => None,
+            _ => self.view_context(owner),
+        }
+    }
+
+    /// Whether the module `name` comes from one of the app's own folders.
+    fn own_module(&self, name: &str) -> bool {
+        self.slot(name)
+            .and_then(Slot::source)
+            .is_some_and(|source| {
+                self.roots
+                    .app_layers()
+                    .any(|layer| source.starts_with(layer))
+            })
+    }
 }
 
 /// The most text one value takes in a report.

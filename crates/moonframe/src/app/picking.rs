@@ -68,7 +68,7 @@ impl MoonframeApp {
             ("picked".to_owned(), Data::Bool(picked.is_some())),
         ]);
         if let Some(picked) = picked {
-            let pick = inspect::pick(picked, &self.workspace);
+            let pick = inspect::pick(picked, &self.workspace, Some(&asker));
             fields.insert("element".to_owned(), Data::String(pick.element));
             fields.insert("mod".to_owned(), Data::String(pick.owner));
             fields.insert("at".to_owned(), Data::String(pick.at));

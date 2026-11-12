@@ -154,13 +154,16 @@ pub(crate) struct Pick {
     pub(crate) report: String,
 }
 
-pub(crate) fn pick(placed: &Placed, workspace: &Workspace) -> Pick {
+/// A pick for `asker`, the mod it is handed to, or the user's own (none):
+/// a mod reads the live values only as [`Workspace::view_context_for`]
+/// allows.
+pub(crate) fn pick(placed: &Placed, workspace: &Workspace, asker: Option<&str>) -> Pick {
     let (owner, at) = origin(placed, workspace);
     Pick {
         element: placed.crumb.label.clone(),
         owner,
         at,
-        report: report(placed, workspace),
+        report: report_for(placed, workspace, asker),
     }
 }
 
@@ -195,8 +198,14 @@ pub(crate) fn source_of(
     (owner.to_owned(), source, line)
 }
 
-/// A pick, written for an agent to act on.
+/// A pick, written for the user's agent to act on: the selection file
+/// and the clipboard.
 pub(crate) fn report(placed: &Placed, workspace: &Workspace) -> String {
+    report_for(placed, workspace, None)
+}
+
+/// The same, for `asker` (see [`pick`]).
+fn report_for(placed: &Placed, workspace: &Workspace, asker: Option<&str>) -> String {
     let trail = placed.crumb.trail();
     let (owner, at) = origin(placed, workspace);
     let mut out = String::from("Selected in Moonframe (View > Inspect Element):\n");
@@ -219,7 +228,7 @@ pub(crate) fn report(placed: &Placed, workspace: &Workspace) -> String {
     if let Some(copy) = copy_to(workspace.slot(&owner).and_then(|slot| slot.source())) {
         let _ = writeln!(out, "{copy}");
     }
-    if let Some(context) = workspace.view_context(&owner) {
+    if let Some(context) = workspace.view_context_for(&owner, asker) {
         out.push_str(&context.report(&owner));
     }
     out

@@ -78,3 +78,29 @@ fn a_view_context_holds_the_mod_problems() {
         context.problems
     );
 }
+
+#[test]
+fn a_mod_reads_another_mods_context_only_when_it_is_the_apps_own() {
+    let dir = app(&[
+        ("branch", BRANCH),
+        (
+            "asker",
+            "return mod { view = function() return ui.text 'x' end }",
+        ),
+    ]);
+    let workspace = Workspace::open(dir.path(), false);
+    // The user's own reader, the mod that drew it, and one of the app's own.
+    assert!(workspace.view_context_for("branch", None).is_some());
+    assert!(
+        workspace
+            .view_context_for("branch", Some("branch"))
+            .is_some()
+    );
+    assert!(
+        workspace
+            .view_context_for("branch", Some("asker"))
+            .is_some()
+    );
+    // A module the app does not hold from its own folders reads nothing.
+    assert_eq!(workspace.view_context_for("branch", Some("stranger")), None);
+}

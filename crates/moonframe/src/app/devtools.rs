@@ -134,7 +134,7 @@ impl MoonframeApp {
         if !self.devtools_open() {
             return;
         }
-        let pick = inspect::pick(picked, &self.workspace);
+        let pick = inspect::pick(picked, &self.workspace, Some(DEVTOOLS));
         let (_, file, line) = inspect::source_of(picked, &self.workspace);
         let trail: Vec<Data> = picked
             .crumb

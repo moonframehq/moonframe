@@ -132,7 +132,7 @@ impl MoonframeApp {
     /// What was picked, how to hand it to an agent, and how to pick again.
     fn card(&self, selected: &inspect::Placed, cx: &Context<Self>) -> AnyElement {
         let theme = cx.theme();
-        let pick = inspect::pick(selected, &self.workspace);
+        let pick = inspect::pick(selected, &self.workspace, None);
         // Picked for a mod: the card chooses the level, then hands it over.
         let asked = self.inspector.asker.is_some();
         let mono = |text: String| {
