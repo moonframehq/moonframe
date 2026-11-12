@@ -56,6 +56,7 @@ mod history;
 mod hub;
 mod icon;
 mod listeners;
+mod live;
 mod live_settings;
 mod machine;
 mod main_window;
@@ -112,6 +113,8 @@ pub(crate) struct MoonframeApp {
     pub(crate) inspector: Inspector,
     /// The stylesheet's and providers' problems: open, or dismissed.
     problem_state: problems::Problems,
+    /// What the window hits, written for `--check` (see `crate::live`).
+    live: crate::live::Live,
     /// The shells `ui.terminal` elements show.
     #[cfg(feature = "terminal")]
     pub(crate) terminals: Terminals,
@@ -298,6 +301,7 @@ impl MoonframeApp {
             drag: false,
             inspector: Inspector::default(),
             problem_state: problems::Problems::default(),
+            live: crate::live::Live::new(folders.user.is_some(), joined.id, watcher.is_some()),
             chosen: String::new(),
             gallery: None,
             look,
@@ -336,6 +340,7 @@ impl MoonframeApp {
             last_pane: 0,
         };
         app.load_measure();
+        live::ticking(cx);
         app.load_inspect_shortcut(cx);
         app.apply_theme(cx);
         // What the mods' `init` sent providers as they started.
@@ -857,6 +862,7 @@ impl MoonframeApp {
         crate::host_menus::install(self.workspace.menus(), cx);
         self.apply_theme(cx);
         report(&self.workspace);
+        self.live.reloaded(self._watcher.is_some());
         cx.notify();
     }
 
@@ -877,6 +883,7 @@ impl MoonframeApp {
         crate::host_menus::install(self.workspace.menus(), cx);
         self.apply_theme(cx);
         report(&self.workspace);
+        self.live.reloaded(self._watcher.is_some());
         self.reload_providers(Some(roots), cx);
         true
     }

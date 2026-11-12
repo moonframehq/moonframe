@@ -98,11 +98,18 @@ appears without touching the shell.
 **A status bar widget.** A mod with `region = "status-right"` (or
 `status`) and `order` to place it. The view is a small `ui.row { align =
 "center", gap = "small", ... }`, for example from `use "stat"`. Give
-changing numbers a fixed width.
+changing numbers a fixed width. For CPU and memory, `app.system` is
+`{ cpu, cpu_history, memory, memory_used, memory_total, received,
+transmitted }` (`cpu` and `memory` from 0 to 1, `memory_used` and
+`memory_total` in bytes, the network in bytes a second); draw `cpu_history` with `use
+"sparkline"` rather than keeping samples yourself. If you do keep samples
+in state, see "Data that is really there".
 
 **A widget with live data.** Read `app.<provider>`, and draw a placeholder
-while it is nil. If no provider has the data, write one (see "Providers").
-Never invent the data in Luau unless it is labelled demo data.
+while it is nil. Read only fields its provider publishes (the provider
+tables below, or its source), each tested for its type before use. If no
+provider has the data, write one (see "Providers"). Never invent the data
+in Luau unless it is labelled demo data.
 
 **Something clickable that opens a sheet.** `ui.popover` around the
 widget, with `open` in the mod's state (see "Sheets and menus").
@@ -627,6 +634,9 @@ must stay plain data (see the rules above): a function in it is not saved.
   step. A file from a newer app opens read-only.
 - To start a mod over, change what `init` builds; to drop old state, ignore
   `previous` when it lacks what you need.
+- The same `previous` comes back after each live reload, so a field added
+  by an edit is nil in it until `init` fills it in. Never
+  `return previous or { ... }` once the state has grown.
 
 ## Instances: mods and components with state of their own
 
@@ -1037,6 +1047,13 @@ Tabs open and close with the `.tabs-tab` rule's transition (see
    `ok: ...` or one `module: problem` line per module. Fix the problems until
    it prints `ok`. The messages give the exact place, e.g.
    `explorer: view: panel[2].item: unknown key `lable`; it takes ...`.
+   When a window of the app is open on the same folders, the check waits
+   for it to reload your edit and adds what it hit drawing with its real
+   state and provider data, as `window: <module>: <problem>` lines (see
+   "Data that is really there"); with none, it adds
+   `ok: the open window draws it ...`. Those are the failures the headless
+   load cannot see, so fix them the same way. If it notes the window has
+   not reloaded yet, run it again.
 3. If the window is running, it has already reloaded. Module state is kept
    across reloads. To see the result, run `just screenshot`, then Read
    `target/screenshot.png`.
@@ -1113,6 +1130,8 @@ return mod {
 	-- A third argument, `restored`, is true when `previous` was saved by an
 	-- earlier run rather than kept across a reload: what only held while the
 	-- app ran (a shell's activity, say) is stale then.
+	-- After an edit, `previous` is the old state: fill in fields it lacks
+	-- (see "Data that is really there").
 	init = function(previous, props)
 		return previous or { selected = nil }
 	end,
@@ -2442,8 +2461,41 @@ not copied between mods.
 
 **Keys a node does not take are dropped, with a warning on every run.**
 `float` belongs on a row or column, not on `ui.text`; wrap the text.
-`--check` does not run views with real data, so read the log
-(`unknown key ...`) after a change.
+The headless load does not run views with real data; the `window:` lines
+of `--check` do, while a window is open.
+
+### Data that is really there
+
+The headless check draws each mod from a fresh `init(nil)` with no
+provider data, so a branch that only runs with data is never drawn
+there. The user's window draws it with both. Two mistakes pass the
+headless load and break the window:
+
+- **State from before the edit.** The window keeps each mod's state
+  across a reload and a relaunch and hands it to `init` as `previous`. A
+  field you just added is nil in it, so `return previous or { cpu = {} }`
+  leaves `state.cpu` nil and `#state.cpu` fails on the user's window only.
+  Fill in each field `previous` lacks:
+
+  ```lua
+  init = function(previous)
+  	local state = if type(previous) == "table" then previous else {}
+  	if type(state.cpu) ~= "table" then state.cpu = {} end
+  	return state
+  end,
+  ```
+
+- **Provider fields.** `app.<provider>` is nil until its first publish and
+  holds only what that provider publishes. Look its shape up (the tables
+  in this skill, or the provider's source) rather than guessing a name,
+  and test each field's type before arithmetic, `#` or string formatting.
+
+`--check` reports what the open window hit (`window: statusbar: view:
+runtime error: statusbar:78: attempt to get length of a nil value`), so
+run it after each edit with the window open, and say in your answer what
+it confirmed. With no window open, nothing checks these: reason about
+`previous` and nil provider data yourself, or start one (Loop, step 4)
+and check again.
 
 **Host views are drawn over the app.** A `ui.view` is laid out in a layer
 over its placeholder, so a host view drawing again (a terminal printing)
@@ -2609,7 +2661,7 @@ instead.
 
 | Command | Does |
 | --- | --- |
-| `just check` | loads everything headlessly (your folder and packages included); run after each edit |
+| `just check` | loads everything headlessly (your folder and packages included), then adds what an open window of the app hit (`window:` lines); run after each edit |
 | `just check-builtin` | the same for `app/` alone |
 | `just types` | strict Luau type check against `types/moonframe.d.luau` |
 | `just screenshot OUT PID` | captures the window of the process you started |
