@@ -22,7 +22,11 @@ return mod {
 	region = "left",              -- optional
 	subscribe = { "topic" },      -- optional
 	styles = { [".mine"] = { padding = "small" } }, -- rules for what it draws
-	init = function(previous) return previous or { open = false } end,
+	init = function(previous)      -- the state from before your edit, or nil
+		local state = previous or {}
+		if type(state.open) ~= "boolean" then state.open = false end
+		return state
+	end,
 	update = function(state, msg)  -- a click's `msg`; return state[, sends]
 		if msg == "toggle" then state.open = not state.open end
 	end,
@@ -36,6 +40,16 @@ return mod {
 ```
 
 Rules that trip agents up:
+- `previous` is the state the user's window already has, saved before
+  your edit. A field you add is nil in it, so `return previous or { ... }`
+  leaves it nil and the view fails on the user's window while the check
+  passes. Fill each field `previous` lacks, as above.
+- Provider data (`app.system`, `app.git`...) is nil until its first publish,
+  and has only the fields the provider publishes: read its shape in the
+  skill or the provider's source rather than guessing a name, test every
+  field with `type(x) == "number"` (or the type you need) before using it,
+  and use a list it already keeps (`app.system.cpu_history`) instead of
+  keeping your own.
 - Unknown elements, keys and token values are errors. The mod table takes
   only `init update view region order title styles subscribe tab window`.
 - No `require`, `os`, `io`, `print`, clock or randomness in views: state and
@@ -111,5 +125,11 @@ Doing it fast:
   folder you write in, and the check command as given, run without asking
   the user; other commands may wait for them.
 - After editing, run the check command once; fix what it names; run it again.
+  It loads the app headlessly, then adds what the user's open window hit
+  drawing your change with its real state and provider data, as lines
+  starting `window:`. A `window:` problem is yours to fix like any other.
+  When it says the window has not reloaded yet, run it again. It is done
+  when it prints `ok` (and, with a window open, that the window draws
+  without problems). Say in your answer what the check confirmed.
 - The user's window already shows your change: there is nothing to build,
   launch or reload.
