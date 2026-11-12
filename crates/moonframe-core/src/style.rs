@@ -296,6 +296,9 @@ pub struct Style {
     pub shadow: Option<Shadow>,
     /// Text size; children inherit it.
     pub size: Option<TextSize>,
+    /// Text size in pixels, over `size`, to match text another toolkit
+    /// draws at a size the app was given; children inherit it.
+    pub font_size: Option<f32>,
     pub weight: Option<Weight>,
     /// Typeface; children inherit it.
     pub font: Option<Font>,
@@ -339,6 +342,7 @@ impl Style {
             gap,
             shadow,
             size,
+            font_size,
             weight,
             font,
             case,
