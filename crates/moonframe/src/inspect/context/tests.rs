@@ -1,5 +1,5 @@
 use {
-    super::click,
+    super::{click, typed},
     moonframe_core::{Action, Data},
 };
 
@@ -16,5 +16,26 @@ fn a_click_says_what_it_sends_on_one_line() {
     assert_eq!(
         click(&Action::Window("devtools".to_owned())),
         "a click opens the mod devtools in its own window"
+    );
+}
+
+#[test]
+fn an_input_says_the_message_update_gets() {
+    let (change, submit) = (Data::map([("edit", Data::Bool(true))]), Data::from("save"));
+    let said = typed(None, [
+        ("change", Some(&change)),
+        ("submit", Some(&submit)),
+        ("blur", None),
+    ])
+    .unwrap();
+    assert!(
+        said.contains(
+            "on change sends { caret = \"<caret byte>\", edit = true, value = \"<text>\", }"
+        ),
+        "{said}"
+    );
+    assert!(
+        said.contains("on submit sends { msg = \"save\", value = \"<text>\", }"),
+        "{said}"
     );
 }

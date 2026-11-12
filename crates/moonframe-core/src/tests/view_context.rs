@@ -135,3 +135,20 @@ fn a_package_inside_the_users_folder_reads_no_other_mods_context() {
     assert_eq!(workspace.view_context_for("branch", Some("snoop")), None);
     assert!(workspace.view_context_for("branch", Some("mine")).is_some());
 }
+
+#[test]
+fn a_mod_in_its_own_window_reports_that_window() {
+    let report = r#"return mod { view = function(_, app)
+        return ui.text(tostring(app.window.maximized))
+    end }"#;
+    let dir = app(&[("tool", report)]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    let own = crate::WindowState {
+        maximized: true,
+        ..Default::default()
+    };
+    workspace.set_mod_window("tool", Some(own));
+    let reads = workspace.view_context("tool").unwrap().reads.unwrap();
+    let window = reads.iter().find(|(key, _)| key == "window").unwrap();
+    assert_eq!(window.1.get("maximized"), Some(&Data::Bool(true)));
+}

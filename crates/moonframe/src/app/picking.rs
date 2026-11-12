@@ -1,6 +1,9 @@
 //! Picking an element for an agent or a mod, and what is done with the pick.
 
-use super::*;
+use {
+    super::*,
+    std::sync::atomic::{AtomicBool, Ordering},
+};
 
 impl MoonframeApp {
     /// Starts picking an element, or stops.
@@ -183,21 +186,27 @@ impl MoonframeApp {
         let Some(selected) = &self.inspector.selected else {
             return;
         };
-        let current = self
-            .inspector
-            .placed(&selected.path)
-            .unwrap_or_else(|| selected.clone());
-        let report = inspect::report(&current, &self.workspace);
+        // The element as last drawn, so Copy for agent and a mod's pick
+        // hand over what the file says too.
+        if let Some(current) = self.inspector.placed(&selected.path) {
+            self.inspector.selected = Some(current);
+        }
+        let Some(selected) = &self.inspector.selected else {
+            return;
+        };
+        let report = inspect::report(selected, &self.workspace);
         if self.inspector.saved.as_ref() != Some(&report) {
             self.save_selection(Some(report));
         }
     }
 
     /// Saves `report` where agents read the selection, or removes what is
-    /// there when there is none.
+    /// there when there is none. A save that fails is not remembered, so
+    /// the next refresh tries again.
     fn save_selection(&mut self, report: Option<String>) {
-        write_selection(report.as_deref());
-        self.inspector.saved = report;
+        self.inspector.saved = write_selection(report.as_deref())
+            .then_some(report)
+            .flatten();
     }
 
     /// Copies the selection for an agent and closes its card. The saved
@@ -225,7 +234,11 @@ impl MoonframeApp {
     }
 }
 
-fn write_selection(report: Option<&str>) {
+/// Whether the last save of the selection failed.
+static FAILING: AtomicBool = AtomicBool::new(false);
+
+/// Whether it saved.
+fn write_selection(report: Option<&str>) -> bool {
     let path = paths::selection();
     let saved = match report {
         Some(report) => path
@@ -238,11 +251,20 @@ fn write_selection(report: Option<&str>) {
         },
     };
     match saved {
-        // Written again as the window changes: not worth a line each time.
-        Ok(()) if report.is_some() => tracing::debug!("selection saved to {}", path.display()),
-        Ok(()) => {},
+        Ok(()) => {
+            FAILING.store(false, Ordering::Relaxed);
+            // Written again as the window changes: not worth a line each time.
+            if report.is_some() {
+                tracing::debug!("selection saved to {}", path.display());
+            }
+            true
+        },
         Err(error) => {
-            tracing::warn!("cannot save the selection to {}: {error}", path.display())
+            // Tried again at each refresh: told once until it works again.
+            if !FAILING.swap(true, Ordering::Relaxed) {
+                tracing::warn!("cannot save the selection to {}: {error}", path.display());
+            }
+            false
         },
     }
 }

@@ -46,3 +46,23 @@ fn a_line_stays_on_one_line() {
     assert!(!text.contains('\n'), "{text}");
     assert!(text.ends_with("--[[ cut to fit ]]"), "{text}");
 }
+
+#[test]
+fn keys_and_strings_stay_valid_luau() {
+    let tricky = Data::map([
+        ("end", Data::Bool(true)),
+        ("bell", Data::from("a\u{7}b\tc")),
+        (&*"k".repeat(STRING + 50), Data::Integer(1)),
+    ]);
+    let text = tricky.to_luau_line(10_000);
+    assert!(text.contains("[\"end\"] = true,"), "{text}");
+    assert!(text.contains("\"a\\u{7}b\\tc\""), "{text}");
+    // A long key is quoted and cut like any string.
+    assert!(
+        text.contains(&format!(
+            "[\"{}\" --[[ 50 more chars ]]]",
+            "k".repeat(STRING)
+        )),
+        "{text}"
+    );
+}

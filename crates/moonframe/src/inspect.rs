@@ -222,7 +222,10 @@ fn report_for(placed: &Placed, workspace: &Workspace, asker: Option<&str>) -> St
         f32::from(size.width),
         f32::from(size.height)
     );
-    if let Some(does) = &placed.crumb.does {
+    // What it sends can carry its mod's state, so it is read as that is.
+    if let Some(does) = &placed.crumb.does
+        && workspace.may_read_context(&owner, asker)
+    {
         let _ = writeln!(out, "- {does}");
     }
     if let Some(copy) = copy_to(workspace.slot(&owner).and_then(|slot| slot.source())) {

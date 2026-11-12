@@ -3,10 +3,13 @@
 //!
 //! [`ViewContext::report`]: moonframe_core::ViewContext::report
 
-use moonframe_core::{Action, Data, Node};
+use moonframe_core::{Action, Data, Input, Node};
 
 /// A message an element sends, at most.
 const MESSAGE: usize = 300;
+/// What an input's message holds in place of its text and caret.
+const TEXT: &str = "<text>";
+const CARET: &str = "<caret byte>";
 
 /// What clicking, or typing in, `node` sends, as the report says it.
 pub(super) fn does(node: &Node) -> Option<String> {
@@ -14,21 +17,44 @@ pub(super) fn does(node: &Node) -> Option<String> {
         Node::Stack(stack) => stack.action.as_ref(),
         Node::Button(button) => button.action.as_ref(),
         Node::Item(item) => item.action.as_ref(),
-        Node::Input(input) => {
-            let to = input.to.as_deref();
-            let sends: Vec<String> = [
-                ("change", &input.change),
-                ("submit", &input.submit),
-                ("blur", &input.blur),
-            ]
-            .into_iter()
-            .filter_map(|(on, msg)| Some(format!("on {on} sends {}", send(to, msg.as_ref()?))))
-            .collect();
-            return (!sends.is_empty()).then(|| sends.join("; "));
-        },
+        Node::Input(input) => return typing(input),
         _ => None,
     }?;
     Some(click(action))
+}
+
+/// What an input sends as it is typed in, submitted and left, in the
+/// shape `update` gets: the host adds the text as `value` (wrapping a
+/// message that is not a table as `{ msg, value }`), and on change where
+/// the caret is.
+fn typing(input: &Input) -> Option<String> {
+    typed(input.to.as_deref(), [
+        ("change", input.change.as_ref()),
+        ("submit", input.submit.as_ref()),
+        ("blur", input.blur.as_ref()),
+    ])
+}
+
+/// [`typing`], from the mod the field sends `to` and its messages by event.
+fn typed(to: Option<&str>, events: [(&str, Option<&Data>); 3]) -> Option<String> {
+    let sends: Vec<String> = events
+        .into_iter()
+        .filter_map(|(on, msg)| {
+            let mut sent = Input::message(msg?, TEXT);
+            if on == "change"
+                && let Data::Map(fields) = &mut sent
+            {
+                fields.insert("caret".to_owned(), Data::from(CARET));
+            }
+            Some(format!("on {on} sends {}", send(to, &sent)))
+        })
+        .collect();
+    (!sends.is_empty()).then(|| {
+        format!(
+            "{} ({TEXT} and {CARET} stand for the field's own)",
+            sends.join("; ")
+        )
+    })
 }
 
 fn click(action: &Action) -> String {

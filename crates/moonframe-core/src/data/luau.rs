@@ -8,6 +8,11 @@ use {crate::Data, std::fmt::Write as _};
 const DEPTH: usize = 6;
 const ENTRIES: usize = 40;
 const STRING: usize = 160;
+/// Luau's reserved words, which a table key must quote.
+const KEYWORDS: &[&str] = &[
+    "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local",
+    "nil", "not", "or", "repeat", "return", "then", "true", "until", "while",
+];
 
 impl Data {
     /// The value as Luau laid out on lines, at most about `budget` bytes:
@@ -129,11 +134,15 @@ impl Writer {
         self.out.push('}');
     }
 
+    /// A table key: bare when Luau reads it as a name, else quoted (and,
+    /// like any string, cut to [`STRING`] characters).
     fn key(&mut self, key: &str) {
-        let bare = key
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        let bare = key.len() <= STRING
+            && !KEYWORDS.contains(&key)
+            && key
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
             && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
         if bare {
             self.out.push_str(key);
@@ -144,13 +153,26 @@ impl Writer {
         }
     }
 
+    /// A Luau string literal, cut to [`STRING`] characters.
     fn string(&mut self, text: &str) {
         let count = text.chars().count();
-        if count <= STRING {
-            let _ = write!(self.out, "{text:?}");
-        } else {
-            let short: String = text.chars().take(STRING).collect();
-            let _ = write!(self.out, "{short:?} --[[ {} more chars ]]", count - STRING);
+        self.out.push('"');
+        for c in text.chars().take(STRING) {
+            match c {
+                '"' => self.out.push_str("\\\""),
+                '\\' => self.out.push_str("\\\\"),
+                '\n' => self.out.push_str("\\n"),
+                '\r' => self.out.push_str("\\r"),
+                '\t' => self.out.push_str("\\t"),
+                c if c.is_control() => {
+                    let _ = write!(self.out, "\\u{{{:x}}}", u32::from(c));
+                },
+                c => self.out.push(c),
+            }
+        }
+        self.out.push('"');
+        if count > STRING {
+            let _ = write!(self.out, " --[[ {} more chars ]]", count - STRING);
         }
     }
 }

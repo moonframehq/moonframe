@@ -34,12 +34,18 @@ impl Workspace {
                 // What a provider shares is most of `app`: copy the rest
                 // of it only for a key outside that.
                 let mut app = None;
+                // A mod in a window of its own, and what it mounts, read
+                // that window as `app.window`, as `Slot::render` gives it.
+                let window = slot.drawn.as_ref().and_then(|drawn| drawn.window);
                 Some(
                     keys.iter()
                         .map(|key| {
-                            let value = self.host.get(key).cloned().or_else(|| {
-                                app.get_or_insert_with(|| self.app()).get(key).cloned()
-                            });
+                            let value = match &window {
+                                Some(window) if key == "window" => Some(window.data()),
+                                _ => self.host.get(key).cloned().or_else(|| {
+                                    app.get_or_insert_with(|| self.app()).get(key).cloned()
+                                }),
+                            };
                             (key.clone(), value.unwrap_or_default())
                         })
                         .collect(),
@@ -66,10 +72,16 @@ impl Workspace {
     /// app's or the user's, never a package's). A mod that asks for a pick
     /// must not read another mod's state through it.
     pub fn view_context_for(&self, owner: &str, asker: Option<&str>) -> Option<ViewContext> {
-        match asker {
-            Some(asker) if asker != owner && !self.own_module(asker) => None,
-            _ => self.view_context(owner),
-        }
+        self.may_read_context(owner, asker)
+            .then(|| self.view_context(owner))
+            .flatten()
+    }
+
+    /// Whether `asker` (none for the user's own reader) may read what
+    /// `owner` drew from, as [`Workspace::view_context_for`] decides: also
+    /// what its elements send, which can carry its state.
+    pub fn may_read_context(&self, owner: &str, asker: Option<&str>) -> bool {
+        asker.is_none_or(|asker| asker == owner || self.own_module(asker))
     }
 
     /// Whether the module `name` comes from one of the app's own folders.
