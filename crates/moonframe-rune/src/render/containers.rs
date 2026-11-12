@@ -394,7 +394,7 @@ impl<'w> Painter<'w> {
     }
 
     pub(super) fn region(&self, region: &'w Region, place: &Place<'w>) -> El {
-        let mods = self.ui.workspace.region(&region.name);
+        let mods = self.ws.region(&region.name);
         let mods = mods.into_iter().enumerate();
         let element = stacked(region.direction)
             .key(place.path.clone())

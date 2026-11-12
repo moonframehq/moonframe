@@ -38,7 +38,7 @@ impl<'w> Painter<'w> {
     /// on GPUI. A family Rune can't find falls back to a proportional one, so
     /// only one the stylesheet names is asked for.
     fn mono(&self) -> TextStyle {
-        let mono = &self.ui.workspace.stylesheet().mono;
+        let mono = &self.ws.stylesheet().mono;
         let size = mono.size.unwrap_or(FONT_SIZE);
         let mut style = TextStyle::new(size, mono.weight.unwrap_or(400.));
         style.family = match &mono.family {

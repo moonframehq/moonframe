@@ -677,8 +677,10 @@ same builder, so `extern crate moonframe_rune as moonframe;` behind a feature
 is all its code needs, beside its own `ui.view`s.
 
 It supports profiles through the `app` commands, and `--check` to load them
-headlessly. Other `moonframe` commands, windows of their own, named themes
-and animations are not available yet. Layout can differ from GPUI.
+headlessly. A mod opens in a window of its own (`app:window`) as on GPUI,
+except one that first shows after launch, which waits for the next. Other
+`moonframe` commands, the theme picker, named themes and animations are not
+available yet. Layout can differ from GPUI.
 `ui.video` is 8-bit; `ui.map` doesn't
 turn or route; text fields lack the writing modes; and a `ui.browser` needs a
 window on screen to show. CI packages it beside the GPUI build, as

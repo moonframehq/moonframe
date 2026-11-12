@@ -10,8 +10,11 @@ use {
 /// The most items the shell's menus can have.
 const SLOTS: usize = 64;
 
+/// A menu item, in whichever window is in front: a mod's window hands the
+/// main one what it does not do itself (see `Ui::act`).
 fn fire<const SLOT: usize>(ui: &mut Ui, tx: &mut Tx) {
-    if let Some(action) = ui.menu_actions.get(SLOT).cloned() {
+    let action = ui.shared.menu_actions.borrow().get(SLOT).cloned();
+    if let Some(action) = action {
         ui.act(SHELL, &action, tx);
     }
 }
@@ -31,14 +34,14 @@ impl Ui {
     /// The shell's menus as Rune's items, keeping what each does.
     fn menu_items(&mut self) -> Vec<MenuItem<Ui>> {
         let mut actions: Vec<Action> = Vec::new();
-        let title = self
-            .workspace
+        let workspace = self.workspace();
+        let title = workspace
             .about()
             .name
             .unwrap_or_else(|| moonframe_packages::identity().title.clone());
         // First in the app menu, where the system's own About was.
         let mut items = vec![MenuItem::new(format!("About {title}"), show_about).id("about")];
-        for menu in self.workspace.menus() {
+        for menu in workspace.menus() {
             for entry in &menu.items {
                 match entry {
                     MenuEntry::Separator => {
@@ -59,28 +62,37 @@ impl Ui {
                 }
             }
         }
-        self.menu_actions = actions;
+        drop(workspace);
+        *self.shared.menu_actions.borrow_mut() = actions;
         items
     }
 
     /// Puts the shell's menus in the menu bar, if they changed.
     pub(crate) fn sync_menus(&mut self) {
-        let menus = self.workspace.menus().to_vec();
+        let menus = self.workspace().menus().to_vec();
         if self.shown_menus.as_ref() == Some(&menus) {
             return;
         }
         let Some(app) = self.app.clone() else {
             return;
         };
-        let items = self.menu_items();
         self.shown_menus = Some(menus);
-        set(&app, items);
+        // Each window has its own items, all doing the same: the bar shows
+        // the front window's.
+        let mut handles = self.shared.handles();
+        if handles.is_empty() {
+            handles.push(app);
+        }
+        for handle in handles {
+            let items = self.menu_items();
+            set(&handle, items);
+        }
     }
 }
 
 /// The About panel, with what draws this build.
 fn show_about(ui: &mut Ui, _: &mut Tx) {
-    let about = ui.workspace.about();
+    let about = ui.workspace().about();
     let name = about
         .name
         .clone()

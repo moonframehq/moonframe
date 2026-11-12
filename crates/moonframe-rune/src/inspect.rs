@@ -46,7 +46,7 @@ impl Ui {
             ("asker".to_owned(), Data::String(from.to_owned())),
             ("picking".to_owned(), Data::Bool(true)),
         ]);
-        self.workspace
+        self.workspace_mut()
             .app_topic("inspect", from, Data::Map(started));
     }
 
@@ -97,9 +97,10 @@ impl Ui {
         ]);
         if let Some(crumb) = crumb {
             let source = self
-                .workspace
+                .workspace()
                 .slot(&crumb.owner)
-                .and_then(|slot| slot.source());
+                .and_then(|slot| slot.source())
+                .map(ToOwned::to_owned);
             let file =
                 source.map_or_else(|| crumb.owner.clone(), |path| path.display().to_string());
             let at = match crumb.line {
@@ -114,7 +115,7 @@ impl Ui {
             fields.insert("at".to_owned(), Data::String(at));
             fields.insert("report".to_owned(), Data::String(report));
         }
-        self.workspace
+        self.workspace_mut()
             .app_topic("inspect", &asker, Data::Map(fields));
     }
 

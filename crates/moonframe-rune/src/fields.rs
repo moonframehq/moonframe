@@ -42,7 +42,7 @@ impl Ui {
                 "`app:edit`: no field with `id = \"{}\"` drawn by `{from}`",
                 edit.field
             );
-            self.workspace.refuse(from, Error::new(problem));
+            self.workspace_mut().refuse(from, Error::new(problem));
             return;
         };
         let (start, end) = field.edit.range();

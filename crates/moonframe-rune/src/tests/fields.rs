@@ -86,7 +86,8 @@ fn an_edit_wraps_the_selection_and_says_so() {
 fn an_edit_of_no_such_field_is_refused() {
     let (_dir, mut window) = notes();
     window.update(|ui, _| ui.apply_edit(SHELL, &edit("elsewhere")));
-    let problems = window.state.workspace.problems();
+    let workspace = window.state.workspace();
+    let problems = workspace.problems();
     assert!(
         problems
             .iter()

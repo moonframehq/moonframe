@@ -48,7 +48,7 @@ fn fared(window: &mut Runtime<Ui>, name: &str) -> Fared {
     // Without a demo the page draws the component's `example`.
     if let Some(error) = window
         .state
-        .workspace
+        .workspace()
         .demo(name)
         .and_then(|(_, slot)| slot.error())
     {
@@ -80,9 +80,9 @@ fn every_component_draws_or_says_what_it_lacks() {
     let mut ui = Ui::open(app, None);
     ui.gallery = true;
     ui.waker = Some(Arc::new(|| {}));
-    ui.workspace.show_demos(true);
+    ui.workspace_mut().show_demos(true);
     let names: Vec<(String, String)> = ui
-        .workspace
+        .workspace()
         .components()
         .iter()
         .map(|component| (component.name.clone(), component.category.clone()))

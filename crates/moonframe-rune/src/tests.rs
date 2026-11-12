@@ -19,6 +19,7 @@ mod font_size;
 mod maps;
 mod markdown;
 mod terminals;
+mod windows;
 // keep-sorted end
 
 use terminals::wait;
@@ -104,7 +105,7 @@ fn the_starter_app_loads_without_a_problem() {
     let window = open(&app);
     let problems: Vec<String> = window
         .state
-        .workspace
+        .workspace()
         .problems()
         .iter()
         .map(|(name, problem)| format!("{name}: {problem}"))
@@ -133,7 +134,8 @@ fn the_stylesheets_colors_go_over_the_theme() {
         "return mod { view = function() return ui.column { class = 'x', grow = true } end }",
     );
     let window = open(dir.path());
-    let sheet = window.state.workspace.stylesheet();
+    let workspace = window.state.workspace();
+    let sheet = workspace.stylesheet();
     let palette = theme::Palette {
         dark: true,
         overrides: &sheet.overrides,
@@ -378,7 +380,7 @@ fn gallery(first: &str) -> Runtime<Ui> {
     let app = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app");
     let mut ui = Ui::open(app, None);
     ui.gallery = true;
-    ui.workspace.show_demos(true);
+    ui.workspace_mut().show_demos(true);
     ui.preview = Some(first.to_owned());
     let mut window = Runtime::new(ui, view, (1000., 800.), Env::new(true, 2.));
     settle(&mut window);
@@ -644,7 +646,7 @@ fn toggling_the_theme_chooses_the_other_one() {
     window.update(|ui, tx| {
         ui.act("shell", &Action::Command(Command::ToggleTheme), tx);
     });
-    assert_eq!(window.state.appearance, Appearance::Light);
+    assert_eq!(window.state.shared.appearance.get(), Appearance::Light);
     window.update(|ui, tx| {
         poll(ui, 0., tx);
     });

@@ -57,8 +57,7 @@ impl<'w> Painter<'w> {
             .map(|field| field.edit.text.clone())
             .unwrap_or_default();
         let components: Vec<&'w Component> = self
-            .ui
-            .workspace
+            .ws
             .components()
             .iter()
             .filter(|component| matches(component, &query))
@@ -226,7 +225,7 @@ impl<'w> Painter<'w> {
             parent: Direction::Column,
             ..place.clone()
         };
-        let demo = self.ui.workspace.demo(&component.name);
+        let demo = self.ws.demo(&component.name);
         match (&component.preview, demo) {
             (Err(error), _) => (
                 self.marker(&format!("{}: {error}", component.path_name()), place),
