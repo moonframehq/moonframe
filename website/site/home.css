@@ -21,6 +21,10 @@ code { font:.84em var(--mono); background:#2a1a100d; padding:1px 5px; border-rad
 .mast img { width:28px; border-radius:7px }
 .mast nav { display:flex; gap:22px; justify-content:flex-end }
 .mast nav a:hover { color:var(--acc) }
+.mast nav a.star, .mast nav a.star:hover { color:var(--paper) }
+.star { display:inline-flex; gap:7px; align-items:baseline; margin:-6px 0; padding:5px 12px; border-radius:999px; background:var(--ink); color:var(--paper); font-weight:600; letter-spacing:.06em; transition:background .15s }
+.star:hover { background:var(--acc) }
+.star .icon { width:1.15em; height:1.15em; flex:none; align-self:center; background:currentColor; -webkit-mask:url(img/github.svg) center / contain no-repeat; mask:url(img/github.svg) center / contain no-repeat }
 .sub { display:flex; justify-content:space-between; font:13px var(--sans); color:var(--dim); padding:8px 0; border-bottom:1px solid var(--rule) }
 .sub b { color:var(--ink); font-weight:600 }
 
