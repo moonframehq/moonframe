@@ -269,6 +269,9 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 		key = "run-" .. first.id,
 		class = "feedback-item",
 		gap = "small",
+		-- Its own height in the scrolling list, or a short window squeezes
+		-- its lines over each other.
+		shrink = false,
 		ui.row {
 			class = "feedback-item-head",
 			align = "start",
@@ -446,6 +449,8 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 			grow = inline,
 			ui.column {
 				class = "feedback-body",
+				-- The request keeps its room; the runs below scroll.
+				shrink = false,
 				not inline and ui.text { "Make it yours", class = "feedback-title" },
 				ui.input {
 					id = props.id or "feedback",

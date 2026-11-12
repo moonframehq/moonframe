@@ -33,7 +33,8 @@ end
 
 return mod {
 	title = "Make it yours",
-	window = { size = { width = 760, height = 760 }, min_size = { width = 520, height = 420 } },
+	-- Sized for the request and its buttons; runs below scroll.
+	window = { size = { width = 760, height = 460 }, min_size = { width = 520, height = 320 } },
 	subscribe = { "feedback/dialog", "app/inspect" },
 
 	init = function(previous)
