@@ -47,7 +47,8 @@ end }"#;
 
 #[test]
 fn a_font_size_outside_its_range_is_refused() {
-    let tiny = r#"return mod { view = function() return ui.text { "x", style = { font_size = 2 } } end }"#;
+    let tiny =
+        r#"return mod { view = function() return ui.text { "x", style = { font_size = 2 } } end }"#;
     let error = view_of(tiny).unwrap_err();
     assert!(error.contains("font_size"), "{error}");
 }

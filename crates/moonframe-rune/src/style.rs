@@ -53,9 +53,9 @@ impl Ink {
                 .color
                 .as_ref()
                 .map_or(self.color, |color| palette.color(color)),
-            size: style.font_size.unwrap_or_else(|| {
-                style.size.map_or(self.size, |size| pixels(size, self.base))
-            }),
+            size: style
+                .font_size
+                .unwrap_or_else(|| style.size.map_or(self.size, |size| pixels(size, self.base))),
             weight: style.weight.map_or(self.weight, weight),
             mono: style.font.map_or(self.mono, |font| font == Font::Mono),
             ..self
