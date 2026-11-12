@@ -125,8 +125,8 @@ fn by_key(key: &str) -> KeyType {
         "align" | "self_align" => Tokens(token_set!(Align)),
         "anchor_clicks" | "backdrop" | "dashed" | "disabled" | "divider" | "drag" | "extended"
         | "fixed" | "focus" | "follow" | "glide" | "grow" | "hug" | "lazy" | "mono"
-        | "multiline" | "open" | "prose" | "selected" | "shrink" | "small" | "spin" | "spread"
-        | "strike" | "truncate" | "typewriter" | "visible" | "wrap" => Bool,
+        | "multiline" | "open" | "prose" | "scrollbar" | "selected" | "shrink" | "small"
+        | "spin" | "spread" | "strike" | "truncate" | "typewriter" | "visible" | "wrap" => Bool,
         "badge" | "browser" | "class" | "code" | "component" | "copy" | "cwd" | "detail" | "id"
         | "key" | "label" | "mod" | "name" | "placeholder" | "src" | "state" | "syntax"
         | "text" | "title" | "to" | "tooltip" | "url" | "value" => String,

@@ -275,6 +275,9 @@ type StackProps = {
 	scroll_to: number?,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
+	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
+	-- the system's setting).
+	scrollbar: boolean?,
 	-- false keeps the content's size when the parent is short of space.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.
@@ -381,6 +384,9 @@ type PanelProps = {
 	scroll: (boolean | "x" | "y" | "both")?,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
+	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
+	-- the system's setting).
+	scrollbar: boolean?,
 	-- false keeps the content's size when the parent is short of space.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.
@@ -417,6 +423,9 @@ type PaneProps = {
 	scroll: (boolean | "x" | "y" | "both")?,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
+	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
+	-- the system's setting).
+	scrollbar: boolean?,
 	[number]: Child,
 }
 

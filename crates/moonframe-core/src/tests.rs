@@ -29,6 +29,7 @@ mod packages;
 mod paint;
 mod pointer;
 mod revision_timeline;
+mod scrollbar;
 mod shell;
 mod state;
 mod styles;

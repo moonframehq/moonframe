@@ -17,6 +17,7 @@ fn column() -> Stack {
             border: None,
             scroll: Scroll::No,
             follow: false,
+            scrollbar: true,
             shrink: true,
             self_align: None,
             hug: false,
