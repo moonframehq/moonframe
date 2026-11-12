@@ -8,6 +8,7 @@
 
 mod both_backends;
 mod host_views;
+mod inspect_context;
 mod regressions;
 mod revision_timeline;
 mod windows;

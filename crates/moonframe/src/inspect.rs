@@ -4,7 +4,9 @@
 //! without adding a layout box; the pointer then finds the deepest node
 //! under it, and ↑ and ↓ step out to the nodes around it and back
 //! ([`aim`]). The pick names the mod, its file and line, and the elements
-//! around it, and is saved where agents read it (`paths::selection`).
+//! around it, with the live values the mod drew it from ([`context`]), and
+//! is saved where agents read it (`paths::selection`), kept current while
+//! it stays selected.
 
 use {
     crate::paths,
@@ -14,6 +16,7 @@ use {
 };
 
 mod aim;
+mod context;
 
 pub(crate) use aim::Target;
 
@@ -32,6 +35,8 @@ pub(crate) struct Crumb {
     /// mod's root marker, which is not drawn.
     pub(crate) path: Option<String>,
     pub(crate) parent: Option<Rc<Crumb>>,
+    /// What clicking, or typing in, the node sends, when it does.
+    pub(crate) does: Option<String>,
 }
 
 impl Crumb {
@@ -42,6 +47,7 @@ impl Crumb {
             owner: None,
             path: Some(path.to_owned()),
             parent,
+            does: context::does(node),
         })
     }
 
@@ -52,6 +58,7 @@ impl Crumb {
             owner: Some(name.to_owned()),
             path: None,
             parent,
+            does: None,
         })
     }
 
@@ -102,6 +109,9 @@ pub(crate) struct Inspector {
     /// The element path of the card's row under the pointer, which the
     /// window outlines to show where that row is.
     pub(crate) previewed: Option<String>,
+    /// The report last saved where agents read the selection, so it is
+    /// written again only when what it says changes.
+    pub(crate) saved: Option<String>,
     /// Where the card's list of elements is scrolled.
     pub(crate) ladder: ScrollHandle,
     /// The mod that started this pick (`command = "inspect"`): it hears
@@ -194,8 +204,23 @@ pub(crate) fn report(placed: &Placed, workspace: &Workspace) -> String {
     let _ = writeln!(out, "- mod: {owner}, drawn by {at}");
     let path: Vec<&str> = trail.iter().map(|crumb| crumb.label.as_str()).collect();
     let _ = writeln!(out, "- inside: {}", path.join(" > "));
+    let (corner, size) = (placed.bounds.origin, placed.bounds.size);
+    let _ = writeln!(
+        out,
+        "- drawn at {:.0},{:.0}, {:.0}×{:.0} px",
+        f32::from(corner.x),
+        f32::from(corner.y),
+        f32::from(size.width),
+        f32::from(size.height)
+    );
+    if let Some(does) = &placed.crumb.does {
+        let _ = writeln!(out, "- {does}");
+    }
     if let Some(copy) = copy_to(workspace.slot(&owner).and_then(|slot| slot.source())) {
         let _ = writeln!(out, "{copy}");
+    }
+    if let Some(context) = workspace.view_context(&owner) {
+        out.push_str(&context.report(&owner));
     }
     out
 }

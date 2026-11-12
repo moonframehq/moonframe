@@ -1,0 +1,132 @@
+//! What a mod's view was drawn from, as it is now: its state, the props
+//! it was given, and the keys of `app` it read with what they hold. An
+//! inspector pick hands it to an agent with the element's file and line
+//! ([`ViewContext::report`]), so the agent knows the values behind what it
+//! sees, not only the code.
+
+use {super::*, std::fmt::Write as _};
+
+/// What a mod's last view was drawn from.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ViewContext {
+    /// Its state; none before it loads, and an error when the state holds
+    /// what data cannot (a function).
+    pub state: Option<Result<Data, Error>>,
+    /// What it was drawn with as an instance; nil for a mod in its own place.
+    pub props: Data,
+    /// The keys of `app` its last view read, each with what it holds now
+    /// (nil for a key nothing shares); none when it went through all of
+    /// `app`.
+    pub reads: Option<Vec<(String, Data)>>,
+    /// What is wrong with it: its load, update or view error, then each
+    /// child its view could not draw.
+    pub problems: Vec<String>,
+}
+
+impl Workspace {
+    /// What the module `name` (as [`Workspace::slot`] finds it) drew its
+    /// last view from.
+    pub fn view_context(&self, name: &str) -> Option<ViewContext> {
+        let slot = self.slot(name)?;
+        let reads = match &slot.reads {
+            Reads::All => None,
+            Reads::Keys(keys) => {
+                // What a provider shares is most of `app`: copy the rest
+                // of it only for a key outside that.
+                let mut app = None;
+                Some(
+                    keys.iter()
+                        .map(|key| {
+                            let value = self.host.get(key).cloned().or_else(|| {
+                                app.get_or_insert_with(|| self.app()).get(key).cloned()
+                            });
+                            (key.clone(), value.unwrap_or_default())
+                        })
+                        .collect(),
+                )
+            },
+        };
+        let problems = slot
+            .error()
+            .into_iter()
+            .chain(slot.broken())
+            .map(ToString::to_string)
+            .collect();
+        Some(ViewContext {
+            state: slot.state(),
+            props: slot.props.clone(),
+            reads,
+            problems,
+        })
+    }
+}
+
+/// The most text one value takes in a report.
+const STATE: usize = 4000;
+const PROPS: usize = 1500;
+/// Each key of `app` the view read, and all of them together.
+const READ: usize = 600;
+const READS: usize = 3000;
+
+impl ViewContext {
+    /// The context as lines of an inspector's report on an element `owner`
+    /// drew, values written as Luau and cut to fit.
+    pub fn report(&self, owner: &str) -> String {
+        let mut out = String::new();
+        match &self.state {
+            Some(Ok(Data::Nil)) | None => {},
+            Some(Ok(state)) => {
+                let _ = writeln!(
+                    out,
+                    "- state of {owner}, as it is now:\n{}",
+                    block(state, STATE)
+                );
+            },
+            Some(Err(error)) => {
+                let _ = writeln!(out, "- state of {owner}: cannot be shown ({error})");
+            },
+        }
+        if self.props != Data::Nil {
+            let _ = writeln!(
+                out,
+                "- props it was drawn with:\n{}",
+                block(&self.props, PROPS)
+            );
+        }
+        match &self.reads {
+            None => {
+                let _ = writeln!(
+                    out,
+                    "- reads from app: all of it (it goes through every key)"
+                );
+            },
+            Some(reads) if reads.is_empty() => {},
+            Some(reads) => {
+                let _ = writeln!(out, "- reads from app (key = value now):");
+                let mut left = READS;
+                for (index, (key, value)) in reads.iter().enumerate() {
+                    if left == 0 {
+                        let _ = writeln!(out, "  -- {} more keys cut", reads.len() - index);
+                        break;
+                    }
+                    let text = value.to_luau_line(READ.min(left));
+                    left = left.saturating_sub(text.len());
+                    let _ = writeln!(out, "  app.{key} = {text}");
+                }
+            },
+        }
+        for problem in &self.problems {
+            let _ = writeln!(out, "- problem: {problem}");
+        }
+        out
+    }
+}
+
+/// `data` as an indented Luau block under a report line.
+fn block(data: &Data, budget: usize) -> String {
+    data.to_luau(budget)
+        .lines()
+        .map(|line| format!("  {line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
