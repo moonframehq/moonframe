@@ -81,9 +81,7 @@ impl Writer {
             Data::Integer(value) => {
                 let _ = write!(self.out, "{value}");
             },
-            Data::Number(value) => {
-                let _ = write!(self.out, "{value}");
-            },
+            Data::Number(value) => self.number(*value),
             Data::String(text) => self.string(text),
             Data::List(items) if items.is_empty() => self.out.push_str("{}"),
             Data::Map(entries) if entries.is_empty() => self.out.push_str("{}"),
@@ -132,6 +130,26 @@ impl Writer {
         }
         self.break_line(depth);
         self.out.push('}');
+    }
+
+    /// A number as Luau reads it back: what has no literal as the
+    /// expression that makes it, and the very large or small in exponent
+    /// form rather than hundreds of digits.
+    fn number(&mut self, value: f64) {
+        let _ = if value.is_nan() {
+            write!(self.out, "0/0")
+        } else if value.is_infinite() {
+            let sign = if value < 0. {
+                "-"
+            } else {
+                ""
+            };
+            write!(self.out, "{sign}math.huge")
+        } else if value != 0. && !(1e-5..1e15).contains(&value.abs()) {
+            write!(self.out, "{value:e}")
+        } else {
+            write!(self.out, "{value}")
+        };
     }
 
     /// A table key: bare when Luau reads it as a name, else quoted (and,

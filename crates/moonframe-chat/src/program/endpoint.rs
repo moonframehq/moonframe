@@ -90,18 +90,21 @@ mod tests {
         assert_eq!(listening(std::process::id(), dir.path()), Some(endpoint));
     }
 
-    /// Waits for `pid` to run `sleep`: until it execs, a forked child still
-    /// holds this process's descriptors, the test's socket among them, and
+    /// Waits for `pid` to exec: until then, a forked child still holds
+    /// this process's descriptors, the test's socket among them, and
     /// `/proc` shows it as the child's. Exec closes it (close-on-exec).
+    /// Its program is then no longer this test's, whatever `sleep` resolves
+    /// to (busybox and coreutils' single binary are not named `sleep`).
     #[cfg(target_os = "linux")]
     fn wait_for_exec(pid: u32) {
+        let this = std::env::current_exe().unwrap();
         for _ in 0..500 {
             let exe = std::fs::read_link(format!("/proc/{pid}/exe"));
-            if exe.is_ok_and(|exe| exe.ends_with("sleep")) {
+            if exe.is_ok_and(|exe| exe != this) {
                 return;
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        panic!("{pid} never ran sleep");
+        panic!("{pid} never exec'd");
     }
 }

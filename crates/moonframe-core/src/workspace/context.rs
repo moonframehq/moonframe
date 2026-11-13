@@ -4,7 +4,10 @@
 //! ([`ViewContext::report`]), so the agent knows the values behind what it
 //! sees, not only the code.
 
-use {super::*, std::fmt::Write as _};
+use {
+    super::{render::BUILT, *},
+    std::fmt::Write as _,
+};
 
 /// What a mod's last view was drawn from.
 #[derive(Clone, Debug, PartialEq)]
@@ -31,8 +34,8 @@ impl Workspace {
         let reads = match &slot.reads {
             Reads::All => None,
             Reads::Keys(keys) => {
-                // What a provider shares is most of `app`: copy the rest
-                // of it only for a key outside that.
+                // What a provider shares is most of `app`: build the rest
+                // of it only for a key `app` sets itself.
                 let mut app = None;
                 // A mod in a window of its own, and what it mounts, read
                 // that window as `app.window`, as `Slot::render` gives it.
@@ -42,9 +45,11 @@ impl Workspace {
                         .map(|key| {
                             let value = match &window {
                                 Some(window) if key == "window" => Some(window.data()),
-                                _ => self.host.get(key).cloned().or_else(|| {
+                                // What `app` sets over the host's, as the view got it.
+                                _ if BUILT.contains(&key.as_str()) => {
                                     app.get_or_insert_with(|| self.app()).get(key).cloned()
-                                }),
+                                },
+                                _ => self.host.get(key).cloned(),
                             };
                             (key.clone(), value.unwrap_or_default())
                         })
@@ -79,9 +84,10 @@ impl Workspace {
 
     /// Whether `asker` (none for the user's own reader) may read what
     /// `owner` drew from, as [`Workspace::view_context_for`] decides: also
-    /// what its elements send, which can carry its state.
+    /// what its elements send, which can carry its state. A module also
+    /// reads what it mounted, and a mod its own instances (see [`holds`]).
     pub fn may_read_context(&self, owner: &str, asker: Option<&str>) -> bool {
-        asker.is_none_or(|asker| asker == owner || self.own_module(asker))
+        asker.is_none_or(|asker| holds(asker, owner) || self.own_module(asker))
     }
 
     /// Whether the module `name` comes from one of the app's own folders.
@@ -90,6 +96,20 @@ impl Workspace {
             .and_then(Slot::source)
             .is_some_and(|source| self.roots.in_app_layer(source))
     }
+}
+
+/// Whether the module `owner` is `asker` or kept under it: a component it
+/// mounted (`tally/tabs#main`, `tally#b/tabs#main`), or, for a mod, one of
+/// its own instances (`tally#b`), which runs its code. Never a sibling
+/// instance (`tally#a` and `tally#b`, mounted by different mods with
+/// props of their own), nor, for a component, the mod that mounted it.
+fn holds(asker: &str, owner: &str) -> bool {
+    let Some(rest) = owner.strip_prefix(asker) else {
+        return false;
+    };
+    rest.is_empty()
+        || rest.starts_with('/')
+        || (rest.starts_with('#') && !asker.contains(['/', '#']))
 }
 
 /// The most text one value takes in a report.
@@ -160,4 +180,46 @@ fn block(data: &Data, budget: usize) -> String {
         .map(|line| format!("  {line}"))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_keys_app_sets_itself_are_built() {
+        let dir = tempfile::tempdir().unwrap();
+        let workspace = Workspace::open(dir.path(), false);
+        let app = workspace.app();
+        for key in BUILT {
+            assert!(app.contains_key(*key), "{key}");
+        }
+        for key in app.keys().filter(|key| !workspace.host.contains_key(*key)) {
+            assert!(BUILT.contains(&key.as_str()), "{key}");
+        }
+    }
+
+    #[test]
+    fn a_module_holds_itself_what_it_mounted_and_a_mod_its_instances() {
+        for (asker, owner) in [
+            ("tally", "tally"),
+            ("tally", "tally#b"),
+            ("tally", "tally/tabs#main"),
+            ("tally", "tally#b/tabs#main"),
+            ("tally#b", "tally#b/tabs#main"),
+        ] {
+            assert!(holds(asker, owner), "{asker} holds {owner}");
+        }
+        for (asker, owner) in [
+            ("tally#a", "tally#b"),
+            ("tally#b", "tally"),
+            ("x/tabs#1", "x"),
+            ("x/tabs#1", "x/tabs#2"),
+            ("tal", "tally#b"),
+            ("tally", "tallyho"),
+        ] {
+            assert!(!holds(asker, owner), "{asker} does not hold {owner}");
+        }
+    }
 }

@@ -66,3 +66,15 @@ fn keys_and_strings_stay_valid_luau() {
         "{text}"
     );
 }
+
+#[test]
+fn numbers_read_back_as_luau() {
+    let line = |value: f64| Data::Number(value).to_luau_line(100);
+    assert_eq!(line(f64::NAN), "0/0");
+    assert_eq!(line(f64::INFINITY), "math.huge");
+    assert_eq!(line(f64::NEG_INFINITY), "-math.huge");
+    assert_eq!(line(1e300), "1e300");
+    assert_eq!(line(-2.5e-9), "-2.5e-9");
+    assert_eq!(line(0.25), "0.25");
+    assert_eq!(line(1500.), "1500");
+}

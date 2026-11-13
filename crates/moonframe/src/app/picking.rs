@@ -182,28 +182,55 @@ impl MoonframeApp {
     /// Saves the selection's report again when what it says has changed
     /// since: the mod's state, what it read from `app`, the element's text
     /// or place. An agent reading it later finds the window as it is.
-    pub(crate) fn refresh_selection(&mut self) {
-        let Some(selected) = &self.inspector.selected else {
-            return;
-        };
+    /// It is made again only once the window drew since, and never over a
+    /// pick another window saved after this one's. Whether the selection
+    /// changed, so its card is drawn again.
+    pub(crate) fn refresh_selection(&mut self) -> bool {
+        let frame = self.inspector.frame();
+        if self.inspector.selected.is_none()
+            || self.inspector.superseded
+            || self.inspector.reported == Some(frame)
+        {
+            return false;
+        }
+        self.inspector.reported = Some(frame);
         // The element as last drawn, so Copy for agent and a mod's pick
         // hand over what the file says too.
-        if let Some(current) = self.inspector.placed(&selected.path) {
-            self.inspector.selected = Some(current);
-        }
-        let Some(selected) = &self.inspector.selected else {
-            return;
+        let Some(selected) = self
+            .inspector
+            .selected
+            .as_ref()
+            .and_then(|selected| self.inspector.placed(&selected.path))
+            .or_else(|| self.inspector.selected.clone())
+        else {
+            return false;
         };
-        let report = inspect::report(selected, &self.workspace);
-        if self.inspector.saved.as_ref() != Some(&report) {
-            self.save_selection(Some(report));
+        let report = inspect::report(&selected, &self.workspace);
+        self.inspector.selected = Some(selected);
+        if self.inspector.saved.as_ref() == Some(&report) {
+            return false;
         }
+        // Another window picked since: its pick is the one agents read.
+        if self.inspector.saved.is_some() && !holds(self.inspector.saved.as_deref()) {
+            self.inspector.superseded = true;
+            self.inspector.saved = None;
+            return false;
+        }
+        self.inspector.saved = write_selection(Some(&report)).then_some(report);
+        true
     }
 
-    /// Saves `report` where agents read the selection, or removes what is
-    /// there when there is none. A save that fails is not remembered, so
-    /// the next refresh tries again.
+    /// Saves `report` where agents read the selection, a new pick of this
+    /// window's, or removes what is there when there is none and it is
+    /// still this window's. A save that fails is not remembered, so the
+    /// next refresh tries again.
     fn save_selection(&mut self, report: Option<String>) {
+        let superseded = std::mem::take(&mut self.inspector.superseded);
+        self.inspector.reported = None;
+        if report.is_none() && (superseded || !holds(self.inspector.saved.as_deref())) {
+            self.inspector.saved = None;
+            return;
+        }
         self.inspector.saved = write_selection(report.as_deref())
             .then_some(report)
             .flatten();
@@ -239,7 +266,7 @@ static FAILING: AtomicBool = AtomicBool::new(false);
 
 /// Whether it saved.
 fn write_selection(report: Option<&str>) -> bool {
-    let path = paths::selection();
+    let path = selection_file();
     let saved = match report {
         Some(report) => path
             .parent()
@@ -269,17 +296,52 @@ fn write_selection(report: Option<&str>) -> bool {
     }
 }
 
+/// Where agents read the selection. Each test thread keeps its own, so
+/// tests drawn at once do not take each other's picks for another window's.
+pub(crate) fn selection_file() -> PathBuf {
+    #[cfg(test)]
+    #[allow(clippy::expect_used)]
+    {
+        thread_local! {
+            static FILE: tempfile::TempDir = tempfile::tempdir().expect("a folder for the selection");
+        }
+        FILE.with(|folder| folder.path().join("selection.md"))
+    }
+    #[cfg(not(test))]
+    paths::selection()
+}
+
+/// Whether the selection file holds `saved`, what this window last wrote
+/// there: no other window saved its own pick, or removed it, since. With
+/// nothing saved, a file left over is not this window's to remove.
+fn holds(saved: Option<&str>) -> bool {
+    saved.is_some_and(|saved| {
+        std::fs::read_to_string(selection_file()).is_ok_and(|text| text == saved)
+    })
+}
+
 /// Writes `text` to `path` readable by this user only: the report holds a
-/// mod's state, which can be anything the user typed.
+/// mod's state, which can be anything the user typed. It goes to a file
+/// beside it first, then takes its place, so a reader never finds it
+/// half written.
 fn write_private(path: &Path, text: &str) -> std::io::Result<()> {
     use std::io::Write as _;
+    let mut name = path.file_name().unwrap_or_default().to_owned();
+    name.push(format!(".{}.tmp", std::process::id()));
+    let temporary = path.with_file_name(name);
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-    let mut file = options.open(path)?;
-    // A file saved before kept its old mode: tighten it too.
-    #[cfg(unix)]
-    file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
-    file.write_all(text.as_bytes())
+    let written = options.open(&temporary).and_then(|mut file| {
+        // One left over from before kept its old mode: tighten it too.
+        #[cfg(unix)]
+        file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
+        file.write_all(text.as_bytes())
+    });
+    let moved = written.and_then(|()| std::fs::rename(&temporary, path));
+    if moved.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    moved
 }

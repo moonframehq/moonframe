@@ -152,3 +152,40 @@ fn a_mod_in_its_own_window_reports_that_window() {
     let window = reads.iter().find(|(key, _)| key == "window").unwrap();
     assert_eq!(window.1.get("maximized"), Some(&Data::Bool(true)));
 }
+
+#[test]
+fn a_view_context_reports_the_app_keys_as_the_view_got_them() {
+    let read = r#"return mod { view = function(_, app)
+        return ui.text(tostring(app.dark) .. tostring(app.git))
+    end }"#;
+    let dir = app(&[("reader", read)]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    // A host key named like one `app` sets itself is not what the view saw.
+    workspace.set_host("dark", Data::from("shadowed"));
+    workspace.set_host("git", Data::from("main"));
+    let reads = workspace.view_context("reader").unwrap().reads.unwrap();
+    let value = |name: &str| {
+        reads
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, v)| v.clone())
+    };
+    assert_eq!(value("dark"), Some(Data::Bool(false)));
+    assert_eq!(value("git"), Some(Data::from("main")));
+}
+
+#[test]
+fn a_mod_reads_the_context_of_its_own_instances() {
+    let dir = app(&[("tally", TALLY)]);
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod { view = function()
+            return ui.mount { "tally", id = "b", props = { label = "B", start = 10 } }
+        end }"#,
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(workspace.may_read_context("tally#b", Some("tally")));
+    assert!(workspace.may_read_context("tally#b/tabs#main", Some("tally#b")));
+    assert!(!workspace.may_read_context("tally#b", Some("stranger")));
+}
