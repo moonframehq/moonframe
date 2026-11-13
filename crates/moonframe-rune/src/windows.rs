@@ -17,7 +17,10 @@ use {
         Action, Appearance, Command, Edit, ModWindowSize, Platform, SHELL, Titlebar, WindowPlace,
         WindowState, Workspace,
     },
-    rune::{App, AppHandle, AppSpec, Chrome, Tx, WindowHandle, WindowOptions, WindowSpec},
+    rune::{
+        App, AppHandle, AppSpec, Chrome, MacWindowOptions, Tx, WindowHandle, WindowOptions,
+        WindowSpec,
+    },
     std::{
         cell::{Cell, Ref, RefCell, RefMut},
         collections::HashMap,
@@ -31,6 +34,11 @@ use {
 /// key does not say: the GPUI app's.
 const SIZE: (f32, f32) = (420., 560.);
 const MIN_SIZE: (f32, f32) = (280., 240.);
+
+/// AppKit's `NSWindowCollectionBehaviorMoveToActiveSpace`: a mod's window,
+/// kept hidden between openings, opens on the Space the user is on, not
+/// on the one it first opened on.
+const MOVE_TO_ACTIVE_SPACE: usize = 1 << 1;
 
 /// What every window of the app draws from.
 pub(crate) struct Shared {
@@ -369,10 +377,13 @@ pub(crate) fn add(app: &mut App<Ui>, main: &mut Ui) {
             ready.update(|_, _| {});
         });
         let spec = WindowSpec::from_app(name.clone(), window)
-            .options(WindowOptions {
-                min_size: Some(min_size),
-                ..WindowOptions::default()
-            })
+            .configured_options(
+                WindowOptions {
+                    min_size: Some(min_size),
+                    ..WindowOptions::default()
+                }
+                .macos(MacWindowOptions::default().collection_behavior(MOVE_TO_ACTIVE_SPACE)),
+            )
             .on_focus(focused);
         let (handle, native) = app.window(spec);
         handles.push(handle.clone());
