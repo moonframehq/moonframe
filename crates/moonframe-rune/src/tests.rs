@@ -19,6 +19,7 @@ mod fields;
 mod font_size;
 mod maps;
 mod markdown;
+mod reload;
 mod splits;
 mod terminals;
 mod windows;
