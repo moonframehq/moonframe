@@ -442,6 +442,130 @@ fn same_run(a: &Cell, b: &Cell) -> bool {
     (a.fg, a.bg, a.bold, a.italic, a.underline) == (b.fg, b.bg, b.bold, b.italic, b.underline)
 }
 
+/// A part of a cell, in eighths of it: left, top, right, bottom.
+type Part = [u8; 4];
+
+/// The parts of its cell a block element (U+2580 to U+259F) fills, and how
+/// strongly (the shades); none for any other character. Painted on the
+/// cell grid, as terminals draw them, they meet their neighbours exactly,
+/// where a font's glyphs leave seams.
+fn block(ch: char) -> Option<(Vec<Part>, f32)> {
+    const FULL: Part = [0, 0, 8, 8];
+    const UL: Part = [0, 0, 4, 4];
+    const UR: Part = [4, 0, 8, 4];
+    const LL: Part = [0, 4, 4, 8];
+    const LR: Part = [4, 4, 8, 8];
+    let code = u32::from(ch);
+    let eighths = |n: u32| u8::try_from(n).unwrap_or(8);
+    let parts = match ch {
+        '▀' => vec![[0, 0, 8, 4]],
+        // Lower one to seven eighths.
+        '▁'..='▇' => vec![[0, 8 - eighths(code - 0x2580), 8, 8]],
+        '█' => vec![FULL],
+        // Left seven eighths down to one.
+        '▉'..='▏' => vec![[0, 0, eighths(0x2590 - code), 8]],
+        '▐' => vec![[4, 0, 8, 8]],
+        '░' => return Some((vec![FULL], 0.25)),
+        '▒' => return Some((vec![FULL], 0.5)),
+        '▓' => return Some((vec![FULL], 0.75)),
+        '▔' => vec![[0, 0, 8, 1]],
+        '▕' => vec![[7, 0, 8, 8]],
+        '▖' => vec![LL],
+        '▗' => vec![LR],
+        '▘' => vec![UL],
+        '▙' => vec![UL, LL, LR],
+        '▚' => vec![UL, LR],
+        '▛' => vec![UL, UR, LL],
+        '▜' => vec![UL, UR, LR],
+        '▝' => vec![UR],
+        '▞' => vec![UR, LL],
+        '▟' => vec![UR, LL, LR],
+        _ => return None,
+    };
+    Some((parts, 1.))
+}
+
+/// What a row paints under its text: each run of a background color, then
+/// its blocks, as rectangles on the cell grid. Square, snapped to whole
+/// points: a run of cells is one color edge to edge, with no seam or
+/// rounded corner between them.
+fn painted(
+    cells: &[Cell],
+    at: (f32, Metrics),
+    foreground: RuneColor,
+    key: &str,
+) -> impl Iterator<Item = El> {
+    let key = key.to_owned();
+    paint(cells, at, foreground).into_iter().enumerate().map(
+        move |(n, ([x, y, width, height], color))| {
+            el().key(format!("{key}-paint{n}"))
+                .absolute(x, y)
+                .size(width, height)
+                .fill(color)
+                .inert()
+        },
+    )
+}
+
+/// The rectangles [`painted`] draws, as `[x, y, width, height]` and color.
+pub(crate) fn paint(
+    cells: &[Cell],
+    (top, metrics): (f32, Metrics),
+    foreground: RuneColor,
+) -> Vec<([f32; 4], RuneColor)> {
+    let rect = |(first, last): (usize, usize), [left, up, right, down]: Part| {
+        let x = |column: usize, eighth: u8| {
+            #[allow(clippy::cast_precision_loss, reason = "a row has a few hundred cells")]
+            let column = column as f32;
+            (PADDING + (column + f32::from(eighth) / 8.) * metrics.width).round()
+        };
+        let y = |eighth: u8| (top + f32::from(eighth) / 8. * metrics.height).round();
+        let (x0, x1) = (x(first, left), x(last, right));
+        let (y0, y1) = (y(up), y(down));
+        [x0, y0, x1 - x0, y1 - y0]
+    };
+    let mut drawn = Vec::new();
+    // Backgrounds, a run of cells at a time.
+    let mut start = 0;
+    while start < cells.len() {
+        let bg = cells[start].bg;
+        let end = cells[start..]
+            .iter()
+            .position(|cell| cell.bg != bg)
+            .map_or(cells.len(), |len| start + len);
+        if bg != Color::Default {
+            drawn.push((rect((start, end - 1), [0, 0, 8, 8]), rgb(bg, foreground)));
+        }
+        start = end;
+    }
+    // Blocks: a run of the same one, in the same color, filling its cells'
+    // width, is one rectangle.
+    let mut column = 0;
+    while column < cells.len() {
+        let cell = cells[column];
+        let Some((parts, strength)) = block(cell.ch) else {
+            column += 1;
+            continue;
+        };
+        let wide = parts.iter().all(|part| part[0] == 0 && part[2] == 8);
+        let end = if wide {
+            cells[column..]
+                .iter()
+                .position(|next| next.ch != cell.ch || next.fg != cell.fg)
+                .map_or(cells.len(), |len| column + len)
+        } else {
+            column + 1
+        };
+        let color = rgb(cell.fg, foreground);
+        let color = color.alpha(color.a * strength);
+        for part in parts {
+            drawn.push((rect((column, end - 1), part), color));
+        }
+        column = end;
+    }
+    drawn
+}
+
 /// One row of cells as text and spans. A row keeps its trailing blanks only
 /// where they are painted.
 pub(crate) fn row_text(cells: &[Cell], foreground: RuneColor) -> (String, Vec<Span>) {
@@ -462,9 +586,6 @@ pub(crate) fn row_text(cells: &[Cell], foreground: RuneColor) -> (String, Vec<Sp
         if cell.bold {
             span.weight = Some(700.);
         }
-        if cell.bg != Color::Default {
-            span.bg = Some(rgb(cell.bg, foreground));
-        }
         if cell.underline {
             span.underline = Some(color);
         }
@@ -478,8 +599,9 @@ pub(crate) fn row_text(cells: &[Cell], foreground: RuneColor) -> (String, Vec<Sp
             finish(&run, line.len(), &mut spans);
             run = Some((line.len(), *cell));
         }
-        // A cell is one column, but text would take a tab to its next stop.
-        line.push(if cell.ch.is_control() {
+        // A cell is one column, but text would take a tab to its next stop;
+        // a block is painted on the grid, not drawn from the font.
+        line.push(if cell.ch.is_control() || block(cell.ch).is_some() {
             ' '
         } else {
             cell.ch
@@ -500,11 +622,18 @@ pub(crate) fn grid(
     let (foreground, style) = ink;
     let mut rows = Vec::with_capacity(usize::from(screen.rows) + 1);
     for row in 0..screen.rows {
-        let (line, spans) = row_text(screen.row(row), foreground);
-        if line.is_empty() {
+        let cells = screen.row(row);
+        let top = PADDING + f32::from(row) * metrics.height;
+        rows.extend(painted(
+            cells,
+            (top, metrics),
+            foreground,
+            &format!("{key}-row{row}"),
+        ));
+        let (line, spans) = row_text(cells, foreground);
+        if line.trim_end().is_empty() {
             continue;
         }
-        let top = PADDING + f32::from(row) * metrics.height;
         rows.push(
             rich(line, spans)
                 .font(style)
