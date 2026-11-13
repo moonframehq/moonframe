@@ -154,6 +154,8 @@ pub struct Ui {
     pub(crate) mod_windows: windows::ModWindows,
     /// The workspace changed since the last poll: other windows draw it.
     pub(crate) touched: Cell<bool>,
+    /// The poll is running: a change it makes is handed on as it ends.
+    pub(crate) polling: Cell<bool>,
     /// The last change other windows made that this one has drawn.
     pub(crate) seen: Cell<u64>,
     pub(crate) dark: bool,
@@ -330,6 +332,7 @@ impl Ui {
 
     /// Runs what a control asks for, as `MoonframeApp::dispatch` does.
     pub(crate) fn act(&mut self, from: &str, action: &Action, tx: &mut Tx) {
+        self.shared.acted();
         if let Action::Browser { to, id, command } = action {
             self.browser_command(to.as_deref().unwrap_or(from), id, *command, tx);
             return;
@@ -521,6 +524,7 @@ impl Ui {
             titlebar: Titlebar::System,
             mod_windows: windows::ModWindows::new(),
             touched: Cell::new(false),
+            polling: Cell::new(false),
             seen: Cell::new(0),
             dark: true,
             system_dark: Cell::new(true),
@@ -571,7 +575,8 @@ fn setup(ui: &mut Ui, waker: Waker) {
     ui.images = Some(ImageCache::new(Arc::clone(&waker)));
     ui.waker = Some(Arc::clone(&waker));
     // A mod's window draws what the main window's providers said.
-    if !ui.is_main() {
+    if let Some(name) = &ui.shows {
+        ui.shared.opening_step(name, "set up");
         return;
     }
     let provider_wake = Arc::clone(&waker);
@@ -608,13 +613,26 @@ fn capture_delay() -> Option<Duration> {
 
 fn view(ui: &Ui, cx: &mut Cx<Ui>) -> El {
     ui.system_dark.set(cx.system_dark());
-    render::window(ui)
+    let began = Instant::now();
+    let window = render::window(ui);
+    if let Some(name) = &ui.shows {
+        ui.shared.drew(name, began.elapsed());
+    }
+    window
 }
 
 /// Each frame's housekeeping: the system's appearance, what providers said
 /// and were sent, lists to refill, and what mods asked of a host this backend
 /// does not have yet.
 fn poll(ui: &mut Ui, _: f64, tx: &mut Tx) -> bool {
+    ui.polling.set(true);
+    let changed = polled(ui, tx);
+    ui.polling.set(false);
+    changed
+}
+
+/// The poll's work; see [`poll`].
+fn polled(ui: &mut Ui, tx: &mut Tx) -> bool {
     let mut changed = false;
     // The first frames started what the view shows: let it answer, once.
     if (!ui.terminals.views.get_mut().is_empty() || ui.map_tiles.fetching())

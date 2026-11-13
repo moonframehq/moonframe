@@ -23,6 +23,7 @@ use {
         collections::HashMap,
         rc::Rc,
         sync::Arc,
+        time::{Duration, Instant},
     },
 };
 
@@ -48,6 +49,11 @@ pub(crate) struct Shared {
     handles: RefCell<Vec<AppHandle<Ui>>>,
     /// The main window's, which does what mods ask of the app.
     main: RefCell<Option<AppHandle<Ui>>>,
+    /// When the user last clicked or chose something, and when each mod's
+    /// window was asked to open and has not drawn yet: what the logs time
+    /// an opening window from.
+    acted: Cell<Option<Instant>>,
+    opening: RefCell<HashMap<String, Instant>>,
 }
 
 impl Shared {
@@ -60,7 +66,58 @@ impl Shared {
             field_windows: RefCell::default(),
             handles: RefCell::default(),
             main: RefCell::default(),
+            acted: Cell::default(),
+            opening: RefCell::default(),
         }
+    }
+
+    /// The user clicked or chose something: an opening window is timed
+    /// from it.
+    pub(crate) fn acted(&self) {
+        self.acted.set(Some(Instant::now()));
+    }
+
+    /// The mod `name`'s window was asked to open.
+    fn asked_to_open(&self, name: &str) {
+        let now = Instant::now();
+        let since = self.acted.get().map(|acted| now - acted);
+        tracing::info!(
+            "`{name}`'s window: asked to open {} after the last click",
+            ms(since)
+        );
+        self.opening.borrow_mut().insert(name.to_owned(), now);
+    }
+
+    /// How long ago the mod `name`'s window was asked to open, while it
+    /// has not drawn yet.
+    fn since_asked(&self, name: &str) -> Option<Duration> {
+        self.opening.borrow().get(name).map(Instant::elapsed)
+    }
+
+    /// The mod `name`'s window reached `step` of opening.
+    pub(crate) fn opening_step(&self, name: &str, step: &str) {
+        if let Some(since) = self.since_asked(name) {
+            tracing::info!(
+                "`{name}`'s window: {step} {} after it was asked",
+                ms(Some(since))
+            );
+        }
+    }
+
+    /// The mod `name`'s window drew, its view taking `view`: the first
+    /// time since it was asked to open, the log says how long that took.
+    pub(crate) fn drew(&self, name: &str, view: Duration) {
+        let Some(asked) = self.opening.borrow_mut().remove(name) else {
+            return;
+        };
+        let after = asked.elapsed();
+        let total = self.acted.get().map(|acted| acted.elapsed());
+        tracing::info!(
+            "`{name}`'s window: first frame {} after it was asked, {} after the click (its view took {})",
+            ms(Some(after)),
+            ms(total),
+            ms(Some(view)),
+        );
     }
 
     /// The workspace, to change, for a window that holds another of its
@@ -95,8 +152,15 @@ impl Ui {
     }
 
     /// The workspace, to change; the other windows draw what changed.
+    /// A handler's first change wakes every window's poll: Rune runs none
+    /// after a handler, so what a click asked of the app (`app:window`,
+    /// a provider) would wait for whatever woke a window next.
     pub(crate) fn workspace_mut(&self) -> RefMut<'_, Workspace> {
-        self.touched.set(true);
+        if !self.touched.replace(true) && !self.polling.get() {
+            for handle in self.shared.handles.borrow().iter() {
+                handle.wake();
+            }
+        }
         self.shared.workspace.borrow_mut()
     }
 
@@ -146,8 +210,14 @@ impl Ui {
                 "`{name}` asks for a screen or full screen, which only GPUI does yet: it opens as an ordinary window"
             );
         }
+        self.shared.asked_to_open(name);
         window.handle.update(|ui, _| ui.opened = true);
+        let began = Instant::now();
         window.native.open();
+        self.shared.opening_step(
+            name,
+            &format!("opened natively ({})", ms(Some(began.elapsed()))),
+        );
         let state = window.state(true);
         self.workspace_mut().set_mod_window(name, Some(state));
         true
@@ -290,7 +360,10 @@ pub(crate) fn add(app: &mut App<Ui>, main: &mut Ui) {
             .on_close(closed)
             .init(move || ui);
         let ready = window.handle();
+        let shared = Rc::clone(&main.shared);
+        let shows = name.clone();
         let window = window.on_ready(move |native| {
+            shared.opening_step(&shows, "ready");
             *parent.borrow_mut() = Some(native.clone());
             // An idle window polls no more: what waited for it has to hear.
             ready.update(|_, _| {});
@@ -347,3 +420,11 @@ pub(crate) fn focused(ui: &mut Ui, active: bool, _: &mut Tx) {
 
 /// The windows the main one keeps, by the mod each shows.
 pub(crate) type ModWindows = HashMap<String, ModWindow>;
+
+/// A duration for the logs, in milliseconds; `unknown` when there is none.
+fn ms(duration: Option<Duration>) -> String {
+    duration.map_or_else(
+        || "unknown".to_owned(),
+        |duration| format!("{:.0} ms", duration.as_secs_f64() * 1000.),
+    )
+}
