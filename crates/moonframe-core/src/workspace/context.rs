@@ -84,10 +84,10 @@ impl Workspace {
 
     /// Whether `asker` (none for the user's own reader) may read what
     /// `owner` drew from, as [`Workspace::view_context_for`] decides: also
-    /// what its elements send, which can carry its state. A mod drew what
-    /// its own instances and components drew (`tally#b`, `tally/tabs#main`).
+    /// what its elements send, which can carry its state. A module also
+    /// reads what it mounted, and a mod its own instances (see [`holds`]).
     pub fn may_read_context(&self, owner: &str, asker: Option<&str>) -> bool {
-        asker.is_none_or(|asker| module_of(asker) == module_of(owner) || self.own_module(asker))
+        asker.is_none_or(|asker| holds(asker, owner) || self.own_module(asker))
     }
 
     /// Whether the module `name` comes from one of the app's own folders.
@@ -98,10 +98,18 @@ impl Workspace {
     }
 }
 
-/// The mod whose code made the module `name`: `tally` for itself, its
-/// instance `tally#b`, and the component `tally/tabs#main` it mounted.
-fn module_of(name: &str) -> &str {
-    name.split(['/', '#']).next().unwrap_or(name)
+/// Whether the module `owner` is `asker` or kept under it: a component it
+/// mounted (`tally/tabs#main`, `tally#b/tabs#main`), or, for a mod, one of
+/// its own instances (`tally#b`), which runs its code. Never a sibling
+/// instance (`tally#a` and `tally#b`, mounted by different mods with
+/// props of their own), nor, for a component, the mod that mounted it.
+fn holds(asker: &str, owner: &str) -> bool {
+    let Some(rest) = owner.strip_prefix(asker) else {
+        return false;
+    };
+    rest.is_empty()
+        || rest.starts_with('/')
+        || (rest.starts_with('#') && !asker.contains(['/', '#']))
 }
 
 /// The most text one value takes in a report.
@@ -193,9 +201,25 @@ mod tests {
     }
 
     #[test]
-    fn a_module_belongs_to_the_mod_whose_code_made_it() {
-        assert_eq!(module_of("tally"), "tally");
-        assert_eq!(module_of("tally#b"), "tally");
-        assert_eq!(module_of("tally#b/tabs#main"), "tally");
+    fn a_module_holds_itself_what_it_mounted_and_a_mod_its_instances() {
+        for (asker, owner) in [
+            ("tally", "tally"),
+            ("tally", "tally#b"),
+            ("tally", "tally/tabs#main"),
+            ("tally", "tally#b/tabs#main"),
+            ("tally#b", "tally#b/tabs#main"),
+        ] {
+            assert!(holds(asker, owner), "{asker} holds {owner}");
+        }
+        for (asker, owner) in [
+            ("tally#a", "tally#b"),
+            ("tally#b", "tally"),
+            ("x/tabs#1", "x"),
+            ("x/tabs#1", "x/tabs#2"),
+            ("tal", "tally#b"),
+            ("tally", "tallyho"),
+        ] {
+            assert!(!holds(asker, owner), "{asker} does not hold {owner}");
+        }
     }
 }

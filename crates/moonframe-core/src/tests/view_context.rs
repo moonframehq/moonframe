@@ -186,6 +186,6 @@ fn a_mod_reads_the_context_of_its_own_instances() {
     );
     let workspace = Workspace::open(dir.path(), false);
     assert!(workspace.may_read_context("tally#b", Some("tally")));
-    assert!(workspace.may_read_context("tally/tabs#main", Some("tally#b")));
+    assert!(workspace.may_read_context("tally#b/tabs#main", Some("tally#b")));
     assert!(!workspace.may_read_context("tally#b", Some("stranger")));
 }
