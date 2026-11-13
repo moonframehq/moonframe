@@ -1,5 +1,5 @@
-//! A border takes room, as on GPUI: what a bordered element holds sits
-//! inside it rather than painting over it.
+//! How elements are boxed as on GPUI: a border takes room, so what a
+//! bordered element holds sits inside it; a disabled button dims whole.
 
 use super::*;
 
@@ -38,5 +38,39 @@ return mod {
     assert!(
         prop[0] > padded[0],
         "the prop's padding, and the border: {prop:?}"
+    );
+}
+
+#[test]
+fn a_disabled_button_keeps_its_label_color_and_dims_whole() {
+    let main = r#"
+return mod {
+	view = function()
+		return ui.column { ui.button { "Send", variant = "primary", disabled = true } }
+	end,
+}
+"#;
+    let dir = folder(main);
+    let window = open(dir.path());
+    let elements = window.elements();
+    let label = elements
+        .iter()
+        .find(|element| element.text.as_deref() == Some("Send"))
+        .expect("drawn");
+    let workspace = window.state.workspace();
+    let palette = theme::Palette {
+        dark: window.state.dark,
+        overrides: &workspace.stylesheet().overrides,
+    };
+    let white = palette.token(moonframe_core::Token::AccentForeground);
+    assert_eq!(
+        label.text_color,
+        Some(white),
+        "white on the accent, not gray"
+    );
+    assert!(
+        (label.opacity - 0.5).abs() < 0.01,
+        "dimmed: {}",
+        label.opacity
     );
 }

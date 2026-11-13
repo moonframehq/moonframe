@@ -130,9 +130,6 @@ impl<'w> Painter<'w> {
         pen.color = token(ink);
         // A size of the button's own, unless the stylesheet sets one.
         pen.size = pen.base * SM;
-        if button.disabled {
-            pen.color = token(Token::MutedForeground);
-        }
         let pen = pen.under(&look.base, self.palette);
         let (height, sides) = match (button.small, button.label.is_empty()) {
             (true, true) => (21., 0.),
@@ -174,6 +171,8 @@ impl<'w> Painter<'w> {
             );
         }
         let element = looked(element, &look, None, self.palette);
+        // Dimmed whole, as GPUI's: its label keeps its own color, white on
+        // a primary button, rather than gray on a faded fill.
         let element = if button.disabled {
             element.opacity(0.5)
         } else {
