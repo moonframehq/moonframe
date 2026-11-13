@@ -9,9 +9,11 @@ pub(super) fn ticking(cx: &mut Context<MoonframeApp>) {
         loop {
             cx.background_executor().timer(TICK).await;
             if this
-                .update(cx, |this, _| {
+                .update(cx, |this, cx| {
                     this.live.tick(&this.workspace);
-                    this.refresh_selection();
+                    if this.refresh_selection() {
+                        cx.notify();
+                    }
                 })
                 .is_err()
             {

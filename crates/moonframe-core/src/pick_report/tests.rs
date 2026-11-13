@@ -1,6 +1,6 @@
 use {
-    super::{click, typed},
-    moonframe_core::{Action, Data},
+    super::{PickReport, Sends, click, typed},
+    crate::{Action, Data, Workspace},
 };
 
 #[test]
@@ -37,5 +37,33 @@ fn an_input_says_the_message_update_gets() {
     assert!(
         said.contains("on submit sends { msg = \"save\", value = \"<text>\", }"),
         "{said}"
+    );
+}
+
+#[test]
+fn what_a_click_sends_to_another_mod_is_read_as_that_mods_values() {
+    let dir = tempfile::tempdir().unwrap();
+    let workspace = Workspace::open(dir.path(), false);
+    let sends = Sends::Click(Action::Send {
+        to: Some("secret".to_owned()),
+        msg: Data::from("token"),
+    });
+    let pick = PickReport {
+        element: "button",
+        owner: "asker",
+        at: "main.luau:3",
+        sends: Some(&sends),
+        ..PickReport::default()
+    };
+    // The user's own reader is told; a mod that may not read `secret` is not.
+    assert!(
+        workspace
+            .pick_report(&pick, None)
+            .contains("a click sends \"token\" to secret's update")
+    );
+    assert!(
+        !workspace
+            .pick_report(&pick, Some("asker"))
+            .contains("a click sends")
     );
 }

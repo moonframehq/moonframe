@@ -232,7 +232,7 @@ mod tests {
             owner: None,
             path: Some(path.to_owned()),
             parent: parent.map(|placed| placed.crumb.clone()),
-            does: None,
+            sends: None,
         })
     }
 
@@ -277,7 +277,7 @@ mod tests {
             owner: Some("table".to_owned()),
             path: None,
             parent: Some(panel.crumb.clone()),
-            does: None,
+            sends: None,
         });
         let mut list = placed(
             "list.mail-list",
@@ -292,7 +292,7 @@ mod tests {
             owner: None,
             path: Some("mail/1".to_owned()),
             parent: Some(marker),
-            does: None,
+            sends: None,
         });
         let mut recorded = vec![panel, header, list.clone()];
         for index in 9..12 {

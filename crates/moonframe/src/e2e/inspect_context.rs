@@ -72,3 +72,35 @@ fn a_picked_button_says_what_its_click_sends(cx: &mut TestAppContext) {
         "{report}"
     );
 }
+
+#[gpui_kit::test]
+fn a_pick_saved_by_another_window_since_stays(cx: &mut TestAppContext) {
+    let mut window = open(cx, SHELL);
+    let app = window.app.clone();
+    app.update(window.cx, |app, cx| app.toggle_inspect(cx));
+    window.settle();
+    window.click("target");
+    let file = crate::app::selection_file();
+    assert!(
+        std::fs::read_to_string(&file)
+            .unwrap()
+            .contains("count = 7,")
+    );
+
+    // Another window picks: its report is the one agents read from now on.
+    std::fs::write(&file, "another window's pick").unwrap();
+    app.update(window.cx, |app, cx| {
+        app.deliver(
+            moonframe_core::SHELL,
+            Data::map([("bump", Data::Integer(3))]),
+            cx,
+        );
+        app.refresh_selection();
+        // Nor does dropping this window's selection take theirs away.
+        app.dismiss(cx);
+    });
+    assert_eq!(
+        std::fs::read_to_string(&file).unwrap(),
+        "another window's pick"
+    );
+}

@@ -3,6 +3,18 @@
 
 use super::{messages::topic_message, *};
 
+/// The keys of `app` it sets itself, over any the host shares by that name.
+pub(super) const BUILT: &[&str] = &[
+    "appearance",
+    "capabilities",
+    "dark",
+    "kinds",
+    "looks",
+    "mods",
+    "regions",
+    "window",
+];
+
 impl Workspace {
     /// Draws everything, hands each module loaded since the last time the
     /// current value of the topics it hears (so one that joins late starts

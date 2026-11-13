@@ -4,7 +4,8 @@
 //! without adding a layout box; the pointer then finds the deepest node
 //! under it, and ↑ and ↓ step out to the nodes around it and back
 //! ([`aim`]). The pick names the mod, its file and line, and the elements
-//! around it, with the live values the mod drew it from ([`context`]), and
+//! around it, with the live values the mod drew it from (core's
+//! [`Workspace::pick_report`]), and
 //! is saved where agents read it (`paths::selection`), kept current while
 //! it stays selected.
 
@@ -12,11 +13,10 @@ use {
     crate::paths,
     gpui_kit::*,
     moonframe_core::{Node, Workspace},
-    std::{cell::RefCell, fmt::Write as _, path::Path, rc::Rc},
+    std::{cell::RefCell, path::Path, rc::Rc},
 };
 
 mod aim;
-mod context;
 
 pub(crate) use aim::Target;
 
@@ -35,8 +35,9 @@ pub(crate) struct Crumb {
     /// mod's root marker, which is not drawn.
     pub(crate) path: Option<String>,
     pub(crate) parent: Option<Rc<Crumb>>,
-    /// What clicking, or typing in, the node sends, when it does.
-    pub(crate) does: Option<String>,
+    /// What clicking, or typing in, the node sends, when it does: written
+    /// out only for the pick a report is made of.
+    pub(crate) sends: Option<moonframe_core::Sends>,
 }
 
 impl Crumb {
@@ -47,7 +48,7 @@ impl Crumb {
             owner: None,
             path: Some(path.to_owned()),
             parent,
-            does: context::does(node),
+            sends: moonframe_core::Sends::of(node),
         })
     }
 
@@ -58,7 +59,7 @@ impl Crumb {
             owner: Some(name.to_owned()),
             path: None,
             parent,
-            does: None,
+            sends: None,
         })
     }
 
@@ -112,6 +113,14 @@ pub(crate) struct Inspector {
     /// The report last saved where agents read the selection, so it is
     /// written again only when what it says changes.
     pub(crate) saved: Option<String>,
+    /// Another window saved a pick of its own over this one's since: this
+    /// one leaves the file alone until it picks again.
+    pub(crate) superseded: bool,
+    /// How many frames were asked to record, and that count when the
+    /// selection's report was last made: it is made again only once the
+    /// window drew since, which is when what it says can have changed.
+    frames: std::cell::Cell<u64>,
+    pub(crate) reported: Option<u64>,
     /// Where the card's list of elements is scrolled.
     pub(crate) ladder: ScrollHandle,
     /// The mod that started this pick (`command = "inspect"`): it hears
@@ -127,6 +136,7 @@ impl Inspector {
     /// Where this frame's nodes record themselves, when anything needs them.
     pub(crate) fn sink(&self) -> Option<Sink> {
         (self.picking || self.selected.is_some()).then(|| {
+            self.frames.set(self.frames.get().wrapping_add(1));
             // Asked more than once a frame: only the first finds a record.
             let mut sink = self.sink.borrow_mut();
             if !sink.is_empty() {
@@ -134,6 +144,11 @@ impl Inspector {
             }
             self.sink.clone()
         })
+    }
+
+    /// Which frame was drawn last, as [`Inspector::reported`] counts.
+    pub(crate) fn frame(&self) -> u64 {
+        self.frames.get()
     }
 
     /// The same, for painting what was recorded.
@@ -208,49 +223,33 @@ pub(crate) fn report(placed: &Placed, workspace: &Workspace) -> String {
 fn report_for(placed: &Placed, workspace: &Workspace, asker: Option<&str>) -> String {
     let trail = placed.crumb.trail();
     let (owner, at) = origin(placed, workspace);
-    let mut out = String::from("Selected in Moonframe (View > Inspect Element):\n");
-    let _ = writeln!(out, "- element: {}", placed.crumb.label);
-    let _ = writeln!(out, "- mod: {owner}, drawn by {at}");
-    let path: Vec<&str> = trail.iter().map(|crumb| crumb.label.as_str()).collect();
-    let _ = writeln!(out, "- inside: {}", path.join(" > "));
+    let inside: Vec<&str> = trail.iter().map(|crumb| crumb.label.as_str()).collect();
     let (corner, size) = (placed.bounds.origin, placed.bounds.size);
-    let _ = writeln!(
-        out,
-        "- drawn at {:.0},{:.0}, {:.0}×{:.0} px",
-        f32::from(corner.x),
-        f32::from(corner.y),
-        f32::from(size.width),
-        f32::from(size.height)
-    );
-    // What it sends can carry its mod's state, so it is read as that is.
-    if let Some(does) = &placed.crumb.does
-        && workspace.may_read_context(&owner, asker)
-    {
-        let _ = writeln!(out, "- {does}");
-    }
-    if let Some(copy) = copy_to(workspace.slot(&owner).and_then(|slot| slot.source())) {
-        let _ = writeln!(out, "{copy}");
-    }
-    if let Some(context) = workspace.view_context_for(&owner, asker) {
-        out.push_str(&context.report(&owner));
-    }
-    out
-}
-
-/// What to do with `source` when it ships in the installed app: it is
-/// signed, so the change goes in a copy, which wins over it.
-fn copy_to(source: Option<&Path>) -> Option<String> {
-    let folder = &moonframe_providers::installed()?.folder;
-    let path = paths::overlay(source?)?;
-    Some(read_only(&folder.join(path)))
-}
-
-fn read_only(copy: &Path) -> String {
-    format!(
-        "- read-only: that file ships in the signed app. Copy it to {} and change the copy, \
-         which replaces it at once",
-        copy.display()
+    let copy_to = copy_to(workspace.slot(&owner).and_then(|slot| slot.source()));
+    workspace.pick_report(
+        &moonframe_core::PickReport {
+            element: &placed.crumb.label,
+            owner: &owner,
+            at: &at,
+            inside: &inside,
+            drawn: Some([
+                f32::from(corner.x),
+                f32::from(corner.y),
+                f32::from(size.width),
+                f32::from(size.height),
+            ]),
+            sends: placed.crumb.sends.as_ref(),
+            copy_to: copy_to.as_deref(),
+        },
+        asker,
     )
+}
+
+/// Where to copy `source` when it ships in the installed app: it is
+/// signed, so the change goes in a copy, which wins over it.
+fn copy_to(source: Option<&Path>) -> Option<std::path::PathBuf> {
+    let folder = &moonframe_providers::installed()?.folder;
+    Some(folder.join(paths::overlay(source?)?))
 }
 
 fn location(source: Option<&Path>, line: Option<u32>) -> String {

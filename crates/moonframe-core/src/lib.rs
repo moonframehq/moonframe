@@ -39,6 +39,7 @@ mod node;
 mod peaks;
 pub mod perf;
 mod persist;
+mod pick_report;
 mod read;
 mod request;
 mod roots;
@@ -60,6 +61,7 @@ pub use {
     module::Meta,
     node::*,
     persist::Persist,
+    pick_report::{PickReport, Sends},
     read::MAX_DOCUMENT,
     request::{
         APP, AppIcon, Appearance, Awake, Devtools, DevtoolsPlace, Dock, Edit, EditChange, Guard,
