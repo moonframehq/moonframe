@@ -564,6 +564,7 @@ mod tests {
             key: None,
             pointer: None,
             children,
+            slots: Vec::new(),
         }
     }
 

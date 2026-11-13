@@ -83,6 +83,14 @@ impl Place<'_> {
             ..self.clone()
         }
     }
+
+    /// The place of a child its stack names with `key`.
+    fn keyed(&self, key: &str) -> Self {
+        Self {
+            path: format!("{}/:{key}", self.path),
+            ..self.clone()
+        }
+    }
 }
 
 /// The whole window: the shell, or the mod a window of its own shows.
@@ -338,6 +346,26 @@ impl<'w> Painter<'w> {
                 drawn
             },
         }
+    }
+
+    /// A stack's children, each named by its `key`, else by where it
+    /// stands in the Luau table (`slots`) rather than its turn among the
+    /// children shown: a `cond and ...` before it, coming and going, leaves
+    /// it the same element, where its new turn would fade it out and in.
+    fn stacked(&self, nodes: &'w [Node], slots: &[usize], place: &Place<'w>) -> Vec<El> {
+        let slotted = slots.len() == nodes.len();
+        nodes
+            .iter()
+            .enumerate()
+            .map(|(index, node)| {
+                let inner = match node {
+                    Node::Stack(stack) if let Some(key) = &stack.key => place.keyed(key),
+                    _ if slotted => place.child(slots[index].saturating_sub(1)),
+                    _ => place.child(index),
+                };
+                self.node(node, &inner)
+            })
+            .collect()
     }
 
     fn nodes(&self, nodes: &'w [Node], place: &Place<'w>) -> Vec<El> {

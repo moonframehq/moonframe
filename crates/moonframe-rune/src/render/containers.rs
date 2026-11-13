@@ -181,7 +181,7 @@ impl<'w> Painter<'w> {
         // Across a column that scrolls sideways, rows keep the column's width
         // rather than each its own, so what they fill lines up.
         let sideways = column && matches!(stack.frame.scroll, Scroll::X | Scroll::Both);
-        let children = self.nodes(&stack.children, &inner);
+        let children = self.stacked(&stack.children, &stack.slots, &inner);
         let element = element.children(children.into_iter().map(|child| {
             if sideways {
                 child.w_full()
@@ -309,6 +309,18 @@ impl<'w> Painter<'w> {
             .enumerate()
             .filter(|(_, pane)| pane.visible)
             .collect();
+        // A pane shown or hidden moves the others in one step: springing,
+        // a terminal beside it would be fitted, and its shell redraw, on
+        // every frame of the way.
+        let indices: Vec<usize> = shown.iter().map(|(index, _)| *index).collect();
+        let before = self
+            .ui
+            .splits_shown
+            .borrow_mut()
+            .insert(place.path.clone(), indices.clone());
+        if before.is_some_and(|before| before != indices) {
+            element = element.instant_changes();
+        }
         for (at, (index, pane)) in shown.iter().enumerate() {
             let inner = place.child(*index);
             let look = self.look(Part::Pane, &pane.look, States::default(), &inner);
@@ -318,7 +330,12 @@ impl<'w> Painter<'w> {
                 ink: inner.ink.under(&look.base, self.palette),
                 ..inner.clone()
             };
-            let body = col().children(self.nodes(&pane.children, &content));
+            // Keyed by its place in the split, not its turn among the panes
+            // shown: one hidden before it would make it a new pane, faded
+            // out and in again.
+            let body = col()
+                .key(inner.path.clone())
+                .children(self.nodes(&pane.children, &content));
             let body = looked(body, &look, pane.frame.border, self.palette);
             let body = framed(body, &pane.frame, true, self.palette);
             let body = match sized {

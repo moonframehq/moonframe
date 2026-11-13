@@ -97,6 +97,11 @@ pub struct Stack {
     /// most stacks have none.
     pub pointer: Option<Box<Pointer>>,
     pub children: Vec<Node>,
+    /// Where each child stands in the Luau table, one-based, counting the
+    /// `false` a `cond and ...` left: a renderer that names children by
+    /// place keeps each itself as one before it comes and goes. Empty when
+    /// not read from Luau.
+    pub slots: Vec<usize>,
 }
 
 /// A titled section: a header with optional actions over a column body.

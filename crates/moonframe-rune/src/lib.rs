@@ -165,6 +165,9 @@ pub struct Ui {
     pub(crate) lists: RefCell<HashMap<String, Watched>>,
     /// Pane sizes the user dragged to, by the pane's path.
     pub(crate) panes: HashMap<String, f32>,
+    /// Which panes each split showed last, by the split's path: the frame
+    /// one shows or hides lands at once.
+    pub(crate) splits_shown: RefCell<HashMap<String, Vec<usize>>>,
     /// The same providers the GPUI app runs, started once Rune has a waker.
     providers: Option<Providers>,
     events: Option<Receiver<Event>>,
@@ -531,6 +534,7 @@ impl Ui {
             fields: RefCell::default(),
             lists: RefCell::default(),
             panes: HashMap::new(),
+            splits_shown: RefCell::default(),
             providers: None,
             events: None,
             links: BTreeMap::new(),

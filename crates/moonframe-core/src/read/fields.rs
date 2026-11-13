@@ -1,5 +1,5 @@
 use {
-    super::{Cx, Read, list_to, position, within},
+    super::{Cx, Read, position, slotted_to, within},
     crate::Error,
     mlua::{Table, Value},
     std::{collections::BTreeMap, ops::RangeInclusive},
@@ -11,6 +11,8 @@ pub(crate) struct Fields<'p> {
     cx: Cx<'p>,
     named: BTreeMap<String, Value>,
     items: Vec<Value>,
+    /// Where each of `items` stands in the table, one-based.
+    slots: Vec<usize>,
     line: Option<u32>,
 }
 
@@ -63,10 +65,12 @@ impl<'p> Fields<'p> {
                 _ => return Err(cx.fail("keys are names or list positions")),
             }
         }
+        let (items, slots) = slotted_to(table, last)?;
         Ok(Self {
             cx: cx.clone(),
             named,
-            items: list_to(table, last)?,
+            items,
+            slots,
             line,
         })
     }
@@ -82,6 +86,11 @@ impl<'p> Fields<'p> {
 
     pub(crate) fn items(&self) -> &[Value] {
         &self.items
+    }
+
+    /// Where each of [`items`](Self::items) stands in the table, one-based.
+    pub(crate) fn slots(&self) -> &[usize] {
+        &self.slots
     }
 
     /// Its named keys.

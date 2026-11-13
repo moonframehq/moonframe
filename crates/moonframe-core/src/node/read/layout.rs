@@ -59,6 +59,7 @@ impl Build for Stack {
                 .filter(|pointer| !pointer.is_empty())
                 .map(Box::new),
             children: tree.children(fields)?,
+            slots: fields.slots().to_vec(),
         })
     }
 }
