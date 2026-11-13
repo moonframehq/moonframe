@@ -42,7 +42,8 @@ pub(crate) fn watching(ui: &Ui, wake: Waker) -> Option<Watching> {
     })
     .inspect_err(|error| tracing::warn!("not watching for changes: {error}"))
     .ok()?;
-    for layer in ui.workspace.roots().layers() {
+    let workspace = ui.workspace();
+    for layer in workspace.roots().layers() {
         if let Err(error) = watcher.watch(layer, RecursiveMode::Recursive) {
             tracing::warn!("not watching {}: {error}", layer.display());
         }
@@ -61,7 +62,7 @@ impl Ui {
             .as_ref()
             .is_some_and(|watching| watching.changed.swap(false, Ordering::AcqRel));
         if changed {
-            self.workspace.reload();
+            self.workspace_mut().reload();
         }
         changed
     }

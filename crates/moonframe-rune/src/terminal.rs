@@ -565,7 +565,7 @@ impl Ui {
         }
         let any = !told.is_empty();
         for (owner, msg) in told {
-            self.workspace.send(&owner, &owner, msg);
+            self.workspace_mut().send(&owner, &owner, msg);
         }
         any
     }
@@ -601,7 +601,7 @@ impl Ui {
                 },
                 other => other,
             };
-            self.workspace.send(&owner, &owner, exited);
+            self.workspace_mut().send(&owner, &owner, exited);
         }
     }
 

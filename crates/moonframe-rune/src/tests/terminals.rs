@@ -361,7 +361,14 @@ return mod {
     wait(&mut window, 20);
     let rect = rect_of(&window, |element| element.role == "terminal");
     let screen = window.state.terminals.screen("shell/two").unwrap();
-    let height = window.state.workspace.stylesheet().mono.size.unwrap_or(13.) * 1.3;
+    let height = window
+        .state
+        .workspace()
+        .stylesheet()
+        .mono
+        .size
+        .unwrap_or(13.)
+        * 1.3;
     let wanted = ((rect[3] - 2. * terminal::PADDING) / height).floor() as u16;
     assert_eq!(screen.rows, wanted, "{rect:?}");
 }

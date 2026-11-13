@@ -19,7 +19,9 @@ mod shell;
 
 use {
     crate::{Ui, inspect::Crumb, style::Ink, theme::Palette},
-    moonframe_core::{Direction, Look, Node, Part, Resolved, Rules, SHELL, Slot, States, Token},
+    moonframe_core::{
+        Direction, Look, Node, Part, Resolved, Rules, SHELL, Slot, States, Token, Workspace,
+    },
     rune::{Cursor, Drag, El, Phase, col, text},
     std::{cell::RefCell, sync::LazyLock},
 };
@@ -43,6 +45,8 @@ const PROBLEM_WIDTH: f32 = 320.;
 /// What one frame's drawing shares.
 pub(crate) struct Painter<'w> {
     ui: &'w Ui,
+    /// The workspace, borrowed for the frame: every window draws from it.
+    ws: &'w Workspace,
     palette: Palette<'w>,
     /// Popovers and overlays, drawn last at the window's root: a Rune
     /// overlay has to come after its anchor to draw above it.
@@ -71,7 +75,7 @@ impl Place<'_> {
     }
 }
 
-/// The whole window.
+/// The whole window: the shell, or the mod a window of its own shows.
 pub(crate) fn window(ui: &Ui) -> El {
     ui.layers.borrow_mut().clear();
     ui.browsers.wanted.borrow_mut().clear();
@@ -80,17 +84,18 @@ pub(crate) fn window(ui: &Ui) -> El {
     ui.terminals.shown.borrow_mut().clear();
     ui.videos.frame_began();
     ui.crumbs.borrow_mut().clear();
+    let workspace = ui.workspace();
     let painter = Painter {
         ui,
+        ws: &workspace,
         palette: Palette {
             dark: ui.dark,
-            overrides: &ui.workspace.stylesheet().overrides,
+            overrides: &workspace.stylesheet().overrides,
         },
         floating: RefCell::default(),
         stage: RefCell::default(),
     };
-    let base = ui
-        .workspace
+    let base = workspace
         .stylesheet()
         .font_size
         .unwrap_or(DEFAULT_FONT_SIZE);
@@ -107,7 +112,10 @@ pub(crate) fn window(ui: &Ui) -> El {
         },
         mounts: 0,
     };
-    let shell = if ui.gallery {
+    let shell = if let Some(name) = &ui.shows {
+        // As GPUI's mod window: the mod fills it.
+        painter.slot(name, &place)
+    } else if ui.gallery {
         painter.gallery(&place)
     } else {
         painter.slot(SHELL, &place)
@@ -171,15 +179,8 @@ fn named(node: &Node) -> Option<(String, Option<u32>)> {
 
 impl<'w> Painter<'w> {
     fn look(&self, part: Part, look: &Look, states: States, place: &Place) -> Resolved {
-        let local = self
-            .ui
-            .workspace
-            .slot(place.owner)
-            .map_or(&*NO_RULES, Slot::rules);
-        self.ui
-            .workspace
-            .stylesheet()
-            .resolve_in(part, look, states, local)
+        let local = self.ws.slot(place.owner).map_or(&*NO_RULES, Slot::rules);
+        self.ws.stylesheet().resolve_in(part, look, states, local)
     }
 
     /// A small marker in place of what could not be drawn, saying why.
@@ -196,14 +197,14 @@ impl<'w> Painter<'w> {
 
     /// The view of the mod `name`, or what is wrong with it.
     fn slot(&self, name: &'w str, place: &Place<'w>) -> El {
-        let slot = self.ui.workspace.slot(name);
+        let slot = self.ws.slot(name);
         self.mounted(name, slot, place)
     }
 
     /// What a mod adds to a row region: its view, or with `spread` each of
     /// that view's children. One with a problem stays whole, to show it.
     fn members(&self, name: &'w str, place: &Place<'w>) -> Vec<El> {
-        let slot = self.ui.workspace.slot(name);
+        let slot = self.ws.slot(name);
         match slot
             .filter(|slot| slot.error().is_none())
             .and_then(Slot::view)
@@ -290,7 +291,7 @@ impl<'w> Painter<'w> {
             Node::RevisionTimeline(_) => self.not_here_named("ui.revision_timeline", place),
             Node::Region(region) => self.region(region, place),
             Node::Mount(name) => self.slot(name, place),
-            Node::Instance(instance) => match self.ui.workspace.instance(place.owner, instance) {
+            Node::Instance(instance) => match self.ws.instance(place.owner, instance) {
                 Some((key, slot)) => self.mounted(key, Some(slot), place),
                 None => self.marker(&format!("no instance {}", instance.id), place),
             },

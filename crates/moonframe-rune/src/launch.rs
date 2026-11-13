@@ -326,14 +326,16 @@ impl Moonframe {
         if let Err(problem) = crate::dock::set_icon(ui.icon.as_deref()) {
             tracing::warn!("no Dock icon: {problem}");
         }
-        let size = ui.workspace.chrome().size.unwrap_or(SIZE);
-        let app = App::new(AppSpec {
+        let size = ui.workspace().chrome().size.unwrap_or(SIZE);
+        let mut app = App::new(AppSpec {
             setup: Some(crate::setup),
             poll: Some(crate::poll),
             on_key: Some(crate::on_key),
             ..AppSpec::new(title, size, crate::unused_init, crate::view)
         });
         ui.app = Some(app.handle());
+        // A window, hidden until asked for, for each mod to open in.
+        crate::windows::add(&mut app, &mut ui);
         let ready = app.handle();
         let parent: Rc<RefCell<Option<WindowHandle>>> = Rc::default();
         ui.browsers.parent = Rc::clone(&parent);

@@ -276,6 +276,10 @@ impl<'w> Painter<'w> {
         pen.mono |= input.mono;
         let id = input.id.as_deref().unwrap_or(&place.path);
         let key = format!("{}:{id}", place.owner);
+        // `app:edit` from its mod finds it in this window.
+        if let Some(window) = &self.ui.shows {
+            self.ui.shared.drew_field(&key, window);
+        }
         let mut fields = self.ui.fields.borrow_mut();
         let field = fields.entry(key.clone()).or_default();
         if input.value.is_some() && input.value != field.passed {
@@ -509,13 +513,14 @@ impl Ui {
     /// read it: `ui.image`'s own rule, so a mod reaches only the app's files.
     fn picture(&self, owner: &str, image: &Image) -> Option<rune::Image> {
         let cache = self.images.as_ref()?;
-        let source = match self.workspace.slot(owner).and_then(|slot| slot.source()) {
+        let workspace = self.workspace();
+        let source = match workspace.slot(owner).and_then(|slot| slot.source()) {
             Some(source) => source,
             // A demo made from a component's example has no file of its own:
             // the component's folder is where its pictures are.
             None => {
                 let name = owner.strip_prefix(DEMO).unwrap_or(owner);
-                let components = self.workspace.components();
+                let components = workspace.components();
                 &components
                     .iter()
                     .find(|component| component.name == name)?
@@ -523,12 +528,7 @@ impl Ui {
             },
         };
         let folder = source.parent()?;
-        let mut allowed: Vec<_> = self
-            .workspace
-            .roots()
-            .layers()
-            .map(ToOwned::to_owned)
-            .collect();
+        let mut allowed: Vec<_> = workspace.roots().layers().map(ToOwned::to_owned).collect();
         allowed.push(moonframe_packages::paths::images());
         let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
         let path = image.resolve(folder, home.as_deref(), &allowed)?;
