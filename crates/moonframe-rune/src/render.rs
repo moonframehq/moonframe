@@ -20,9 +20,10 @@ mod shell;
 use {
     crate::{Ui, inspect::Crumb, style::Ink, theme::Palette},
     moonframe_core::{
-        Direction, Look, Node, Part, Resolved, Rules, SHELL, Slot, States, Token, Workspace,
+        Direction, IconName, Look, Node, Part, Resolved, Rules, SHELL, Slot, States, Token,
+        Workspace,
     },
-    rune::{Cursor, Drag, El, Phase, col, text},
+    rune::{Cursor, Drag, El, Phase, col, row, text},
     std::{cell::RefCell, sync::LazyLock},
 };
 
@@ -41,6 +42,11 @@ const MAX_MOUNTS: usize = 16;
 const DEFAULT_FONT_SIZE: f32 = 14.;
 /// The widest a problem floating over a view gets.
 const PROBLEM_WIDTH: f32 = 320.;
+/// The tallest a problem's card gets, and the most of its message it shows.
+const PROBLEM_HEIGHT: f32 = 72.;
+const PROBLEM_TEXT: usize = 300;
+/// A broken mod's sign, round.
+const BROKEN_SIZE: f32 = 20.;
 
 /// What one frame's drawing shares.
 pub(crate) struct Painter<'w> {
@@ -53,6 +59,10 @@ pub(crate) struct Painter<'w> {
     floating: RefCell<Vec<El>>,
     /// The same for a demo's layers, drawn on the browser's stage.
     stage: RefCell<Vec<El>>,
+    /// What is wrong with mods that still show their last good view: in a
+    /// corner of the window, over everything, so a broken edit never moves
+    /// the layout.
+    problems: RefCell<Vec<El>>,
 }
 
 /// Where a node is drawn: the mod that drew it, its unique path, and what it
@@ -94,6 +104,7 @@ pub(crate) fn window(ui: &Ui) -> El {
         },
         floating: RefCell::default(),
         stage: RefCell::default(),
+        problems: RefCell::default(),
     };
     let base = workspace
         .stylesheet()
@@ -134,6 +145,19 @@ pub(crate) fn window(ui: &Ui) -> El {
         .into_inner()
         .into_iter()
         .fold(root, El::child);
+    let problems = painter.problems.into_inner();
+    let root = if problems.is_empty() {
+        root
+    } else {
+        root.child(
+            col()
+                .key("problems")
+                .pin(None, None, Some(8.), Some(32.))
+                .max_w(PROBLEM_WIDTH)
+                .gap(4.)
+                .children(problems),
+        )
+    };
     if ui.inspecting.asker.is_none() || ui.inspecting.clicked() {
         return root;
     }
@@ -183,16 +207,69 @@ impl<'w> Painter<'w> {
         self.ws.stylesheet().resolve_in(part, look, states, local)
     }
 
-    /// A small marker in place of what could not be drawn, saying why.
+    /// A text field's selection: the theme's accent, faint. Rune's own, and
+    /// its caret, follow its default foreground, white whatever the theme.
+    fn selection(&self) -> rune::Color {
+        self.palette.token(Token::Accent).alpha(0.3)
+    }
+
+    /// The sign of a mod whose view broke: a small warning, what went wrong
+    /// in its tooltip, cut short as a problem's card is.
+    fn broken(&self, owner: &str, error: &str) -> El {
+        let message = format!("{owner}: {error}");
+        let mut shown: String = message.chars().take(PROBLEM_TEXT).collect();
+        if message.chars().count() > PROBLEM_TEXT {
+            shown.push('…');
+        }
+        let danger = self.palette.token(Token::Danger);
+        let sign = IconName::new("triangle-alert")
+            .as_ref()
+            .and_then(crate::icons::icon)
+            .map_or_else(
+                || text("!").color(danger),
+                |found| rune::icon(found, 12.).color(danger),
+            );
+        row()
+            .key(format!("broken:{owner}"))
+            .size(BROKEN_SIZE, BROKEN_SIZE)
+            .items_center()
+            .justify_center()
+            .radius(BROKEN_SIZE / 2.)
+            .fill(self.palette.token(Token::Background))
+            .border(1., danger)
+            .label(format!("{owner} is broken"))
+            .help(shown)
+            .child(sign)
+    }
+
+    /// A small marker in place of what could not be drawn, saying why: as
+    /// GPUI's, a card no taller than [`PROBLEM_HEIGHT`] that cuts a long
+    /// message (a traceback) short, so it never takes over the window.
     fn marker(&self, message: &str, place: &Place) -> El {
         self.ui
             .left_out
             .borrow_mut()
             .insert(format!("marker: {message}"));
-        text(message)
-            .font(place.ink.text_style())
-            .color(self.palette.token(Token::Danger))
-            .wrap()
+        let mut shown: String = message.chars().take(PROBLEM_TEXT).collect();
+        if message.chars().count() > PROBLEM_TEXT {
+            shown.push('…');
+        }
+        let mut ink = place.ink;
+        ink.size = (ink.base * 0.85).round();
+        col()
+            .min_w(0.)
+            .max_h(PROBLEM_HEIGHT)
+            .padding(6.)
+            .radius(6.)
+            .clip_rounded(6.)
+            .fill(self.palette.token(Token::Background))
+            .border(1., self.palette.token(Token::Danger))
+            .child(
+                text(&shown)
+                    .font(ink.text_style())
+                    .color(self.palette.token(Token::Danger))
+                    .wrap(),
+            )
     }
 
     /// The view of the mod `name`, or what is wrong with it.
@@ -232,7 +309,8 @@ impl<'w> Painter<'w> {
         };
         let Some(view) = slot.view() else {
             return match slot.error() {
-                Some(error) => self.marker(&format!("{owner}: {error}"), place),
+                // Never drawn yet: only the sign, in its place.
+                Some(error) => self.broken(owner, &error.to_string()),
                 None => rune::el(),
             };
         };
@@ -243,15 +321,22 @@ impl<'w> Painter<'w> {
             ..place.clone()
         };
         let drawn = self.node(view, &inner);
-        match slot.error() {
-            None => drawn,
-            // The last good view keeps its place, and the problem floats
-            // over its corner: an edit that breaks never moves the layout.
-            Some(error) => col().grow(1.).min_w(0.).min_h(0.).child(drawn).child(
-                self.marker(&format!("{owner}: {error}"), place)
-                    .pin(None, Some(4.), Some(4.), None)
-                    .max_w(PROBLEM_WIDTH),
-            ),
+        let Some(error) = slot.error() else {
+            return drawn;
+        };
+        // The last good view stays as it was, a broken sign pinned over its
+        // corner, the problem in its tooltip: an edit that breaks never
+        // moves the layout. A view that holds no children (a lone text)
+        // has the sign in the window's corner instead.
+        let sign = self.broken(owner, &error.to_string());
+        match view {
+            Node::Stack(_) | Node::Panel(_) => {
+                drawn.child(sign.pin(None, Some(2.), Some(2.), None))
+            },
+            _ => {
+                self.problems.borrow_mut().push(sign);
+                drawn
+            },
         }
     }
 

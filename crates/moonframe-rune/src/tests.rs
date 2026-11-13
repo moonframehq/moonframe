@@ -454,11 +454,76 @@ return mod {
     assert!(shows(&window, "kept"), "the view stays");
     let told = window.elements().iter().any(|element| {
         element
+            .label
+            .as_deref()
+            .is_some_and(|label| label.ends_with("is broken"))
+    });
+    assert!(told, "a sign shows the problem");
+}
+
+#[test]
+fn a_view_that_breaks_never_moves_the_layout() {
+    // The status bar's view starts failing at runtime, with a traceback.
+    let main = r#"
+return mod {
+	view = function()
+		return ui.column {
+			grow = true,
+			ui.button { "Break", msg = "break", to = "bar" },
+			ui.column { grow = true, ui.text { "body" } },
+			ui.mount "bar",
+		}
+	end,
+}
+"#;
+    let dir = folder(main);
+    let bar = dir.path().join("mods/bar");
+    std::fs::create_dir_all(&bar).unwrap();
+    let source = r#"return mod {
+	init = function(previous) return previous or { load = { cpu = 3 } } end,
+	update = function(state, msg)
+		if msg == "break" then state.load = nil end
+	end,
+	view = function(state)
+		return ui.row { height = 26, shrink = false, ui.text { `cpu {state.load.cpu}` } }
+	end,
+}"#;
+    std::fs::write(bar.join("main.luau"), source).unwrap();
+    let mut window = open(dir.path());
+    let at = |window: &Runtime<Ui>, text: &str| {
+        rect_of(window, |element| element.text.as_deref() == Some(text))
+    };
+    let (body, status) = (at(&window, "body"), at(&window, "cpu 3"));
+    let button = at(&window, "Break");
+    click_at(&mut window, button);
+    assert_eq!(at(&window, "body"), body, "the rest stays where it was");
+    assert_eq!(at(&window, "cpu 3"), status, "the last good view stays");
+    // A sign on the view's corner says it broke; what went wrong is its
+    // tooltip, not text over the window.
+    let sign = window
+        .elements()
+        .iter()
+        .find(|element| element.key.as_deref() == Some("broken:bar"))
+        .map(|element| (element.rect, element.label.clone(), element.help.clone()))
+        .expect("the sign shows");
+    let ([x, y, w, h], label, help) = sign;
+    assert_eq!(label.as_deref(), Some("bar is broken"));
+    let help = help.unwrap_or_default();
+    assert!(help.starts_with("bar:") && help.contains("cpu"), "{help}");
+    assert!(w <= 20. && h <= 20., "a small sign: {:?}", sign.0);
+    assert!(
+        y >= status[1] - 26. && y + h <= status[1] + 26.,
+        "on the bar: {:?}",
+        sign.0
+    );
+    assert!(x + w <= 800., "inside the window");
+    let told = window.elements().iter().any(|element| {
+        element
             .text
             .as_deref()
-            .is_some_and(|text| text.contains("no mod named"))
+            .is_some_and(|text| text.contains("bar:"))
     });
-    assert!(told, "the problem shows");
+    assert!(!told, "no problem text over the window");
 }
 
 #[test]

@@ -132,7 +132,8 @@ impl<'w> Painter<'w> {
     fn search(&self, place: &Place<'w>) -> El {
         let mut fields = self.ui.fields.borrow_mut();
         let field = fields.entry(SEARCH.to_owned()).or_default();
-        let shown = text_input(&field.edit, place.ink.text_style());
+        let shown = text_input(&field.edit, place.ink.text_style())
+            .caret(place.ink.color, self.selection());
         drop(fields);
         let muted = self.palette.token(Token::MutedForeground);
         row()

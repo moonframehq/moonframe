@@ -337,6 +337,7 @@ impl<'w> Painter<'w> {
             .key(place.path.clone())
             .placeholder(input.placeholder.clone().unwrap_or_default(), muted)
             .color(pen.color)
+            .caret(pen.color, self.selection())
             .px(8.)
             .py(6.)
             .radius(6.);
