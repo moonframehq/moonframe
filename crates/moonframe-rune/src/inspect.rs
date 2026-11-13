@@ -110,7 +110,10 @@ impl Ui {
             let mut report = String::from("Selected in Moonframe (View > Inspect Element):\n");
             let _ = writeln!(report, "- element: {}", crumb.element);
             let _ = writeln!(report, "- mod: {}, drawn by {at}", crumb.owner);
-            if let Some(context) = self.workspace.view_context_for(&crumb.owner, Some(&asker)) {
+            if let Some(context) = self
+                .workspace()
+                .view_context_for(&crumb.owner, Some(&asker))
+            {
                 report.push_str(&context.report(&crumb.owner));
             }
             fields.insert("element".to_owned(), Data::String(crumb.element));
