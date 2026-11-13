@@ -323,9 +323,9 @@ impl Moonframe {
             ui.show_appearance(appearance);
         }
         crate::dock::set_name(title);
-        if let Err(problem) = crate::dock::set_icon(ui.icon.as_deref()) {
-            tracing::warn!("no Dock icon: {problem}");
-        }
+        // Set once the window is up, as GPUI does: AppKit, finishing its
+        // launch, puts back the binary's own (`exec`) over one set before.
+        let icon = ui.icon.clone();
         let size = ui.workspace().chrome().size.unwrap_or(SIZE);
         let mut app = App::new(AppSpec {
             setup: Some(crate::setup),
@@ -342,6 +342,9 @@ impl Moonframe {
         app.args(given.rest)
             .init(move || ui)
             .on_ready(move |window| {
+                if let Err(problem) = crate::dock::set_icon(icon.as_deref()) {
+                    tracing::warn!("no Dock icon: {problem}");
+                }
                 *parent.borrow_mut() = Some(window.clone());
                 // An idle window polls no more: what waited for it has to hear.
                 ready.update(|_, _| {});
