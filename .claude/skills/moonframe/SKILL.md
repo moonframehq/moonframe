@@ -262,12 +262,32 @@ user can copy the same text with **Copy for agent**:
 
 ```text
 Selected in Moonframe (View > Inspect Element):
-- element: text.status-text "⎇ main +29"
-- mod: status, drawn by /…/app/mods/status/main.luau:33
-- inside: mod shell > column > … > region "status-right" > mod status > row > text.status-text "⎇ main +29"
+- element: button "Push"
+- mod: status, drawn by /…/app/mods/status/main.luau:41
+- inside: mod shell > column > … > region "status-right" > mod status > row > button "Push"
+- drawn at 1412,876, 58×22 px
+- a click sends { push = true, } to its mod's update
+- state of status, as it is now:
+  {
+    menu = false,
+    pushing = false,
+  }
+- reads from app (key = value now):
+  app.git = { ahead = 2, branch = "main", dirty = 29, }
 ```
 
-In an installed app the report ends with a `- read-only:` line when that file
+Besides where the element was built, the report holds what the window is
+showing now: what a click on the element (or typing in an input) sends, the
+state of the mod that drew it, the props it was drawn with when it is an
+instance, each key of `app` its view read with its value (a provider's data
+as the view saw it), and any problem the mod has. Values are Luau, cut to
+fit (`-- 12 more`, `--[[ 300 more chars ]]`). The file is written again
+while the element stays selected, whenever any of that changes, so read it
+when you need it rather than relying on an old copy. Use the state and the
+`app` values to write a change that fits the data it will meet, and to
+explain what the user sees.
+
+In an installed app the report has a `- read-only:` line when that file
 ships in the signed bundle: copy it where it says and change the copy.
 
 The pointer finds the deepest element under it. While picking, **↑**

@@ -108,7 +108,8 @@ and how to try it.
   and survives a reload.
 - **An inspector.** <b>View &gt; Inspect Element</b> picks anything in the
   window, like a browser's developer tools, and tells an agent which file
-  and line drew it. <b>View &gt; Developer Tools</b> docks beside the window
+  and line drew it, what a click on it sends, and the live state and data
+  its mod drew it from. <b>View &gt; Developer Tools</b> docks beside the window
   (or opens in its own): edit the picked element's Luau and save to see it
   at once, read its mod's state, or ask an agent in a session that stays open.
 - **Your folder over the app.** `~/.config/moonframe` holds your own mods,
@@ -292,7 +293,8 @@ The window reloads while an agent edits it, so you can watch it work.
 - **"Add it here."** <b>View &gt; Inspect Element</b> (⌥⌘I), click an
   element (↑ and ↓ first for the row, list or panel around it), and say
   "add a list of branches here". The selection, with its
-  file and line, is saved where the agent reads it.
+  file and line, its mod's state and the data it read, is saved where the
+  agent reads it, and kept current while it stays selected.
 - **Pick a component.** In the Components window, <b>Copy for agent</b>
   copies a request to add that component at your selection.
 - **See it before it is made.** Ask for ideas ("show me three takes on the

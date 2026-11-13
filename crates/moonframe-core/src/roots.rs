@@ -235,6 +235,17 @@ impl Roots {
             .map(|layer| layer.path.as_path())
     }
 
+    /// Whether `source` belongs to one of [`Roots::app_layers`]: the
+    /// deepest layer holding it decides, so a package installed inside the
+    /// user's folder (`packages/<name>`) is still a package.
+    pub fn in_app_layer(&self, source: &Path) -> bool {
+        self.layers
+            .iter()
+            .filter(|layer| source.starts_with(&layer.path))
+            .max_by_key(|layer| layer.path.components().count())
+            .is_some_and(|layer| matches!(layer.role, Role::App | Role::Toolbox(_)))
+    }
+
     /// Every folder, lowest first.
     pub fn layers(&self) -> impl Iterator<Item = &Path> {
         self.layers.iter().map(|layer| layer.path.as_path())

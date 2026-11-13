@@ -2,6 +2,8 @@
 //! carried over a reload. Free of functions, userdata, and cycles, and
 //! bounded, so a module cannot hand the host something it cannot keep.
 
+mod luau;
+
 use {
     crate::{
         Error,

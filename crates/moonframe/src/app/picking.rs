@@ -1,6 +1,9 @@
 //! Picking an element for an agent or a mod, and what is done with the pick.
 
-use super::*;
+use {
+    super::*,
+    std::sync::atomic::{AtomicBool, Ordering},
+};
 
 impl MoonframeApp {
     /// Starts picking an element, or stops.
@@ -68,7 +71,7 @@ impl MoonframeApp {
             ("picked".to_owned(), Data::Bool(picked.is_some())),
         ]);
         if let Some(picked) = picked {
-            let pick = inspect::pick(picked, &self.workspace);
+            let pick = inspect::pick(picked, &self.workspace, Some(&asker));
             fields.insert("element".to_owned(), Data::String(pick.element));
             fields.insert("mod".to_owned(), Data::String(pick.owner));
             fields.insert("at".to_owned(), Data::String(pick.at));
@@ -82,7 +85,7 @@ impl MoonframeApp {
     fn forget_selection(&mut self) {
         self.inspector.leaf = None;
         if self.inspector.selected.take().is_some() {
-            save_selection(None);
+            self.save_selection(None);
         }
     }
 
@@ -91,7 +94,7 @@ impl MoonframeApp {
         self.inspector.leaf = picked.as_ref().map(|picked| self.inspector.deepest(picked));
         self.inspector.picking = false;
         self.inspector.unhover();
-        save_selection(
+        self.save_selection(
             picked
                 .as_ref()
                 .map(|picked| inspect::report(picked, &self.workspace)),
@@ -176,6 +179,36 @@ impl MoonframeApp {
         }
     }
 
+    /// Saves the selection's report again when what it says has changed
+    /// since: the mod's state, what it read from `app`, the element's text
+    /// or place. An agent reading it later finds the window as it is.
+    pub(crate) fn refresh_selection(&mut self) {
+        let Some(selected) = &self.inspector.selected else {
+            return;
+        };
+        // The element as last drawn, so Copy for agent and a mod's pick
+        // hand over what the file says too.
+        if let Some(current) = self.inspector.placed(&selected.path) {
+            self.inspector.selected = Some(current);
+        }
+        let Some(selected) = &self.inspector.selected else {
+            return;
+        };
+        let report = inspect::report(selected, &self.workspace);
+        if self.inspector.saved.as_ref() != Some(&report) {
+            self.save_selection(Some(report));
+        }
+    }
+
+    /// Saves `report` where agents read the selection, or removes what is
+    /// there when there is none. A save that fails is not remembered, so
+    /// the next refresh tries again.
+    fn save_selection(&mut self, report: Option<String>) {
+        self.inspector.saved = write_selection(report.as_deref())
+            .then_some(report)
+            .flatten();
+    }
+
     /// Copies the selection for an agent and closes its card. The saved
     /// file stays, so an agent told "here" still finds it.
     pub(crate) fn copy_selection(&mut self, cx: &mut Context<Self>) {
@@ -201,25 +234,52 @@ impl MoonframeApp {
     }
 }
 
-/// Saves `report` where agents read the selection, or removes what is
-/// there when there is none.
-fn save_selection(report: Option<String>) {
+/// Whether the last save of the selection failed.
+static FAILING: AtomicBool = AtomicBool::new(false);
+
+/// Whether it saved.
+fn write_selection(report: Option<&str>) -> bool {
     let path = paths::selection();
-    let saved = match &report {
+    let saved = match report {
         Some(report) => path
             .parent()
             .map_or(Ok(()), std::fs::create_dir_all)
-            .and_then(|()| std::fs::write(&path, report)),
+            .and_then(|()| write_private(&path, report)),
         None => match std::fs::remove_file(&path) {
             Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
             _ => Ok(()),
         },
     };
     match saved {
-        Ok(()) if report.is_some() => tracing::info!("selection saved to {}", path.display()),
-        Ok(()) => {},
+        Ok(()) => {
+            FAILING.store(false, Ordering::Relaxed);
+            // Written again as the window changes: not worth a line each time.
+            if report.is_some() {
+                tracing::debug!("selection saved to {}", path.display());
+            }
+            true
+        },
         Err(error) => {
-            tracing::warn!("cannot save the selection to {}: {error}", path.display())
+            // Tried again at each refresh: told once until it works again.
+            if !FAILING.swap(true, Ordering::Relaxed) {
+                tracing::warn!("cannot save the selection to {}: {error}", path.display());
+            }
+            false
         },
     }
+}
+
+/// Writes `text` to `path` readable by this user only: the report holds a
+/// mod's state, which can be anything the user typed.
+fn write_private(path: &Path, text: &str) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let mut file = options.open(path)?;
+    // A file saved before kept its old mode: tighten it too.
+    #[cfg(unix)]
+    file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
+    file.write_all(text.as_bytes())
 }

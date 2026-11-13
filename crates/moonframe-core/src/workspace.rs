@@ -10,6 +10,7 @@
 //! ```
 
 // keep-sorted start
+mod context;
 mod diagnose;
 mod load;
 mod messages;
@@ -19,8 +20,8 @@ mod slot;
 mod windows;
 // keep-sorted end
 
-pub use diagnose::ViewDiagnostics;
 pub(crate) use scope::read_style;
+pub use {context::ViewContext, diagnose::ViewDiagnostics};
 
 use {
     crate::{

@@ -67,7 +67,7 @@ impl Workspace {
 
     /// What every `view` gets as `app`: what the host shares, the mods,
     /// which regions they asked for, and the theme.
-    fn app(&self) -> AppData {
+    pub(super) fn app(&self) -> AppData {
         let mut regions: BTreeMap<String, Vec<Data>> = BTreeMap::new();
         let names: BTreeSet<&str> = self
             .mods

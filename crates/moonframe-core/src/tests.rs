@@ -38,6 +38,7 @@ mod switchyard;
 mod task_manager;
 mod topics;
 mod video;
+mod view_context;
 mod view_diagnostics;
 mod views;
 mod windows;
