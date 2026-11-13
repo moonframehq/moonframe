@@ -73,7 +73,7 @@ mod view;
 mod watch;
 mod windows;
 pub(crate) use fonts::list_ahead as list_fonts_ahead;
-#[cfg(test)]
+#[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use picking::selection_file;
 
 #[cfg(all(test, unix, feature = "markdown"))]
