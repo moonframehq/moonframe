@@ -21,6 +21,7 @@ mod gestures;
 mod history;
 mod lightbox;
 mod maps;
+mod menu_checks;
 mod mods;
 mod motion;
 mod orbit;

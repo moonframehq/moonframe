@@ -1627,6 +1627,9 @@ return mod {
 
 - An item sends `msg` to the shell, or to `to`, as a click from the shell
   would, or runs an app `command`. `"-"` is a separator.
+- `checked = { key = value }` ticks the item while the shell's state has
+  those values, as a choice the shell keeps changes (`checked = true`
+  always): `{ label = "Grid", msg = { layout = "grid" }, checked = { layout = "grid" } }`.
 - `shortcut` is a key named as `keys` names them (`secondary-t` is ⌘T on
   macOS, Ctrl-T elsewhere); it shows in the menu and works while the window
   has focus. A focused terminal keeps plain and Ctrl keys, not ⌘ ones.
