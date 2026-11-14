@@ -69,7 +69,8 @@ return {
 ## 3. Check it
 
 ```sh
-moonframe mockup check FILE     # the installed app (add --profile NAME)
+moonframe mockup check FILE     # the installed app
+moonframe --profile NAME mockup check FILE   # an app running as a profile
 just mockup check FILE          # in the moonframe repository
 ```
 

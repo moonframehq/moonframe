@@ -53,8 +53,13 @@ if (window.HerdrKit) {
     const pick = document.createElement("button");
     pick.textContent = "Pick";
     pick.onclick = () => {
-      navigator.clipboard?.writeText(`${question}: ${variant.title}`);
-      pick.textContent = "Copied";
+      const choice = `${question}: ${variant.title}`;
+      const failed = () => {
+        pick.textContent = "Copy failed";
+        window.prompt("Copy this choice to the agent:", choice);
+      };
+      if (!navigator.clipboard) return failed();
+      navigator.clipboard.writeText(choice).then(() => { pick.textContent = "Copied"; }, failed);
     };
     head.append(name, pick);
     card.append(head, variant.body);

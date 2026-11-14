@@ -40,8 +40,35 @@ end
 "#;
 
 /// The file's lines inside [`HEAD`] and [`TAIL`]; `use` and `ui` still work.
+/// `export type`, allowed only at a file's top, becomes a plain `type`, which
+/// a function may declare, padded so columns stay where they were.
 fn wrapped(file: &str) -> String {
+    let file: String = file
+        .split_inclusive('\n')
+        .map(|line| {
+            let indent = line.len() - line.trim_start().len();
+            match line[indent..].strip_prefix("export type") {
+                Some(rest) if rest.starts_with(char::is_whitespace) => {
+                    format!("{}       type{rest}", &line[..indent])
+                },
+                _ => line.to_owned(),
+            }
+        })
+        .collect();
     format!("{HEAD}{file}{TAIL}")
+}
+
+/// The line of the live mod that [`closing`] flips.
+const DONE_FALSE: &str = "\nlocal DONE = false\n";
+
+/// The live mod `text` with its tab closing: the last `DONE` line, the
+/// mod's own, as the file above it may hold one too. `None` when `text` has
+/// none, as no mod [`live`] wrote.
+pub(super) fn closing(text: &str) -> Option<String> {
+    let at = text.rfind(DONE_FALSE)?;
+    let mut out = text.to_owned();
+    out.replace_range(at..at + DONE_FALSE.len(), "\nlocal DONE = true\n");
+    Some(out)
 }
 
 /// A Luau string literal of `text`.
@@ -175,6 +202,27 @@ mod tests {
         assert!(
             live("return {}", "/tmp/x \"y\".luau", "1", false).contains(r#""/tmp/x \"y\".luau""#)
         );
+    }
+
+    #[test]
+    fn closing_flips_the_mods_own_flag() -> Result<(), String> {
+        let file = "local DONE = false\nreturn { variants = {} }\n";
+        let open = live(file, "f", "r", false);
+        let closed = closing(&open).ok_or("no flag")?;
+        assert_eq!(closed, live(file, "f", "r", true));
+        assert!(closing("return {}").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn export_type_works_inside_the_wrapper() {
+        let file =
+            "export type Row = { name: string }\n  export type T = number\nlocal exported = 1\n";
+        let source = wrapped(file);
+        let lines: Vec<&str> = source.lines().collect();
+        assert!(lines[0].ends_with("       type Row = { name: string }"));
+        assert_eq!(lines[1], "         type T = number");
+        assert_eq!(lines[2], "local exported = 1");
     }
 
     #[test]

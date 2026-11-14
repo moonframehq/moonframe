@@ -42,6 +42,9 @@ DIR is FILE's folder/<name>.mockup unless --out says otherwise.";
 /// user's (or the profile's) folder.
 pub(crate) fn run(roots: &Roots, own: Option<&Path>, words: &[String]) -> ExitCode {
     let result = match words {
+        _ if words.iter().any(|word| word == "--profile") => {
+            Err("--profile goes before `mockup`: moonframe --profile NAME mockup ...".to_owned())
+        },
         [command, file, rest @ ..] if command != "close" => {
             let file = PathBuf::from(file);
             match command.as_str() {
@@ -139,10 +142,17 @@ fn open(roots: &Roots, own: Option<&Path>, file: &Path) -> Result<(), String> {
     check(roots, file)?;
     let file = std::path::absolute(file).map_err(|error| error.to_string())?;
     let text = read(&file)?;
+    // New on every run, not only when the file changes, so `open` brings
+    // the tab back after the user closed it.
     let round = {
         use std::hash::{Hash as _, Hasher as _};
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         text.hash(&mut hasher);
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+            .hash(&mut hasher);
         format!("{:016x}", hasher.finish())
     };
     let live = live_file(own)?;
@@ -167,7 +177,12 @@ fn close(own: Option<&Path>) -> Result<(), String> {
         println!("no Mockups tab to close");
         return Ok(());
     };
-    let closing = text.replacen("local DONE = false", "local DONE = true", 1);
+    let closing = source::closing(&text).ok_or_else(|| {
+        format!(
+            "{}: not a mod `moonframe mockup open` wrote; remove its folder by hand",
+            live.display()
+        )
+    })?;
     std::fs::write(&live, closing).map_err(|error| format!("{}: {error}", live.display()))?;
     std::thread::sleep(std::time::Duration::from_secs(2));
     if let Some(dir) = live.parent() {

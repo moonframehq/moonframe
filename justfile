@@ -266,7 +266,13 @@ component-shot name out="" dir="app":
 # open or close a live Mockups tab; `just mockup help` says more.
 # Draw UI ideas from one Luau file with the app's own components
 mockup *args:
-    cargo run --quiet --release -p moonframe-app --features capture -- mockup {{args}}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo build --quiet --release -p moonframe-app --features capture
+    bin="$(cd "${CARGO_TARGET_DIR:-target}" && pwd)/release/moonframe"
+    # FILE and --out are read from where `just` was run, not from here.
+    cd {{quote(invocation_directory())}}
+    exec "$bin" mockup {{args}}
 
 # Format Rust (nightly rustfmt) and TOML (taplo).
 format:
