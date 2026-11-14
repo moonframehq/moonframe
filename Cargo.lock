@@ -5817,7 +5817,7 @@ version = "1.1.1"
 dependencies = [
  "chrono",
  "fluent-bundle",
- "fluent-langneg 0.13.1",
+ "fluent-langneg 0.14.2",
  "fluent-syntax",
  "icu_datetime",
  "icu_decimal",

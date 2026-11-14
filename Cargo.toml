@@ -81,7 +81,7 @@ herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", package = "
 # `ui.number` and `ui.date` write numbers and dates in its language
 # (moonframe-core). fluent-langneg 0.13 is the one fluent-bundle matches with.
 fluent-bundle   = "0.16"
-fluent-langneg  = "0.13"
+fluent-langneg  = "0.14"
 fluent-syntax   = "0.12"
 icu_datetime    = "2.4"
 icu_decimal     = "2.4"
