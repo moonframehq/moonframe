@@ -38,6 +38,9 @@ Usage: moonframe [OPTIONS] [DIR]
        moonframe [--user DIR] [--profile NAME] doctor [--fix | --rollback]
                                          find what in your folder breaks the app,
                                          and move it aside; see `doctor help`
+       moonframe [--profile NAME] mockup check|render|page|open|close FILE
+                                         draw ideas for a UI with the app's own
+                                         components; see `mockup help`
        moonframe init [DIR] [--name NAME] [--path CHECKOUT]
                                          start an app of your own on the Moonframe
                                          library, or add one to a crate; see `init help`
@@ -103,6 +106,8 @@ struct Args {
     history: Option<Vec<String>>,
     /// The words after `doctor`, to find broken files in the folder.
     doctor: Option<Vec<String>>,
+    /// The words after `mockup`, to draw ideas from the components.
+    mockup: Option<Vec<String>>,
     /// The words after `init`, to start an app on the library.
     init: Option<Vec<String>>,
     /// The words after `bundle`, to bundle an app on the library.
@@ -141,6 +146,7 @@ fn parse_args(
     let mut init = None;
     let mut history = None;
     let mut doctor = None;
+    let mut mockup = None;
     let mut bundle = None;
     let mut panes = None;
     let mut profile = None;
@@ -174,6 +180,19 @@ fn parse_args(
             },
             "history" if builtin.is_none() => history = Some(args.by_ref().collect()),
             "doctor" if builtin.is_none() => doctor = Some(args.by_ref().collect()),
+            // Like `app`, a folder's name too: the command only before its words.
+            "mockup" | "mockups" if builtin.is_none() => {
+                let rest: Vec<String> = args.by_ref().collect();
+                if rest
+                    .first()
+                    .is_some_and(|word| crate::mockup::COMMANDS.contains(&word.as_str()))
+                {
+                    mockup = Some(rest);
+                } else {
+                    builtin = Some(PathBuf::from(&arg));
+                    args = rest.into_iter();
+                }
+            },
             "init" if builtin.is_none() => init = Some(args.by_ref().collect()),
             "bundle" if builtin.is_none() => bundle = Some(args.by_ref().collect()),
             "pane" | "panes" if builtin.is_none() => panes = Some(args.by_ref().collect()),
@@ -212,6 +231,7 @@ fn parse_args(
             || packages.is_some()
             || history.is_some()
             || doctor.is_some()
+            || mockup.is_some()
             || catalogue
             || component.is_some()
             || preview_only
@@ -257,6 +277,7 @@ fn parse_args(
         apps,
         history,
         doctor,
+        mockup,
         init,
         bundle,
         panes,
@@ -564,6 +585,13 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
             .map(|(_, path)| path.clone())
             .collect::<Vec<_>>();
         return on_a_view_stack(move || crate::doctor::run(&folders, &entries, &paths, &words));
+    }
+    if cfg!(feature = "studio")
+        && let Some(words) = args.mockup
+    {
+        let roots = launch.entries.apply(folders.roots());
+        let own = folders.own();
+        return on_a_view_stack(move || crate::mockup::run(&roots, own.as_deref(), &words));
     }
     if args.check {
         let roots = launch.entries.apply(folders.roots());

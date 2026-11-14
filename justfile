@@ -262,6 +262,12 @@ rune-check:
 component-shot name out="" dir="app":
     scripts/component-shot.sh {{name}} {{ if out == "" { "target/components/" + name + ".png" } else { out } }} {{dir}}
 
+# check, render (headless PNGs, light and dark), page (--open in Sheprd),
+# open or close a live Mockups tab; `just mockup help` says more.
+# Draw UI ideas from one Luau file with the app's own components
+mockup *args:
+    cargo run --quiet --release -p moonframe-app --features capture -- mockup {{args}}
+
 # Format Rust (nightly rustfmt) and TOML (taplo).
 format:
     cargo +{{nightly_toolchain}} fmt --all

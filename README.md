@@ -298,9 +298,11 @@ The window reloads while an agent edits it, so you can watch it work.
 - **Pick a component.** In the Components window, <b>Copy for agent</b>
   copies a request to add that component at your selection.
 - **See it before it is made.** Ask for ideas ("show me three takes on the
-  status bar") and the `moonframe-mockups` skill draws them live, side by
-  side, in a Mockups tab of your window. <b>Pick</b> copies your choice for
-  the agent; nothing real changes until then.
+  status bar") and the `moonframe-mockups` skill writes them as one Luau
+  file on the app's own components. `moonframe mockup` checks it, then
+  shows the variants side by side: rendered in light and dark in a Sheprd
+  tab, or live in a Mockups tab of your window. <b>Pick</b> hands your
+  choice to the agent; nothing real changes until then.
 
 ## Mods from git
 

@@ -81,9 +81,9 @@ keeps the user's window running; Rust changes don't.
 
 **"Show me some ideas first."** When the user wants options or mockups
 before a change, use the **moonframe-mockups** skill
-(`.claude/skills/moonframe-mockups`): variants drawn live in a throwaway
-`mods/mockup` in the user's folder, opened in a tab, applied only once the
-user picks one.
+(`.claude/skills/moonframe-mockups`): variants written as one Luau file on
+the app's components, checked and shown by `moonframe mockup` (PNGs in a
+Sheprd tab, or live in a Mockups tab), applied only once the user picks one.
 
 **"Add X here."** Read `~/.cache/moonframe/selection.md`
 (see "Here: the user's selection"). Open the file at the line it gives,

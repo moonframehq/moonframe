@@ -38,7 +38,7 @@ return component {
 	category = "Layout",
 	icon = "sparkles",
 	description = "Variants of one change one under another, each live in a lettered card with a Pick button that copies which one to apply.",
-	when = "Showing the user a few ideas for a change before making it, so they can pick one: the moonframe-mockups skill builds a throwaway mod around it. Not for real content; for choosing between options inside the app use `choice-cards`.",
+	when = "Showing the user a few ideas for a change before making it, so they can pick one: `moonframe mockup open` builds a throwaway mod around it. Not for real content; for choosing between options inside the app use `choice-cards`.",
 	props = {
 		["ask"] = "what the user asked for, shown on top and quoted in the pick",
 		["variants"] = "list of { name, note?, body (an element or a list of elements) }",
