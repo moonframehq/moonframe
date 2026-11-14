@@ -15,7 +15,9 @@
 - **Right:** the sheet it fills. Step 1 adds a row per app found; step 2
   writes APY, monthly fee, minimum deposit and rating cell by cell, the row
   being worked on highlighted and the cell being typed outlined with a
-  caret, the cells still to come as grey skeleton bars. The grid is the
+  caret, the cells still to come as grey skeleton bars. The download button
+  above it saves the sheet as it stands as an A4 PDF (`app:pdf`, macOS), in
+  `~/.cache/moonframe/sorrel/competitors.pdf`, and its tooltip says where. The grid is the
   `spreadsheet` component (`app/components/spreadsheet.luau`).
 
 The agent is a **scripted demo**, not a model: `providers/research`, a Rust
