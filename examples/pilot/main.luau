@@ -81,7 +81,11 @@ local function notice(state: State, event: any, pi: any, app_active: boolean): {
 		return sends
 	end
 	local words = if event.kind == "failed" then "Failed" elseif event.kind == "waiting" then "Needs you" else "Finished"
-	table.insert(sends, { to = "app:notify", msg = { title = `{words}: {event.title}`, body = event.body, id = event.thread } })
+	-- A thread's latest news takes the place of what it said before.
+	table.insert(sends, {
+		to = "app:notify",
+		msg = { title = `{words}: {event.title}`, body = event.body, id = event.thread, replace = event.thread ~= nil },
+	})
 	if pi.prefs.sounds then
 		table.insert(sends, { to = "app:sound", msg = "default" })
 	end

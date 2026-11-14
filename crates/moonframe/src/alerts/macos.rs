@@ -1,6 +1,7 @@
 //! Sounds with `NSSound`, notifications with `UNUserNotificationCenter`.
 
 use {
+    super::Permission,
     block2::RcBlock,
     moonframe_core::Notification,
     objc2::{
@@ -9,13 +10,14 @@ use {
         runtime::{Bool, NSObject, NSObjectProtocol, ProtocolObject},
     },
     objc2_app_kit::NSSound,
-    objc2_foundation::{NSBundle, NSData, NSError, NSString},
+    objc2_foundation::{NSArray, NSBundle, NSData, NSError, NSString},
     objc2_user_notifications::{
-        UNAuthorizationOptions, UNMutableNotificationContent, UNNotification,
-        UNNotificationPresentationOptions, UNNotificationRequest, UNNotificationResponse,
-        UNUserNotificationCenter, UNUserNotificationCenterDelegate,
+        UNAuthorizationOptions, UNAuthorizationStatus, UNMutableNotificationContent,
+        UNNotification, UNNotificationPresentationOptions, UNNotificationRequest,
+        UNNotificationResponse, UNNotificationSettings, UNUserNotificationCenter,
+        UNUserNotificationCenterDelegate,
     },
-    std::{cell::Cell, path::Path, sync::OnceLock},
+    std::{cell::Cell, path::Path, ptr::NonNull, sync::OnceLock},
 };
 
 /// The sounds playing: `NSSound` stops when its last reference goes.
@@ -52,7 +54,7 @@ impl Sounds {
 /// Whether this run is an app bundle with an identifier: the notification
 /// centre throws for a bare binary (`cargo run`), so nothing is posted
 /// from one.
-fn bundled() -> bool {
+pub(super) fn bundled() -> bool {
     static BUNDLED: OnceLock<bool> = OnceLock::new();
     *BUNDLED.get_or_init(|| {
         let bundle = NSBundle::mainBundle();
@@ -63,6 +65,9 @@ fn bundled() -> bool {
 /// What is told of each click, with the notification's identifier.
 type Clicked = Box<dyn Fn(&str) + Send + Sync>;
 static CLICKED: OnceLock<Clicked> = OnceLock::new();
+/// What is told of whether the user lets the app post notifications.
+type Changed = Box<dyn Fn(Permission) + Send + Sync>;
+static CHANGED: OnceLock<Changed> = OnceLock::new();
 
 thread_local! {
     /// The centre's delegate, which it holds weakly; the main thread's.
@@ -71,47 +76,103 @@ thread_local! {
     static ASKED: Cell<bool> = const { Cell::new(false) };
 }
 
-/// Hears clicks from now on, when the app is a bundle.
-pub(super) fn listen(clicked: Clicked) {
-    if !bundled() || CLICKED.set(clicked).is_err() {
+/// Hears clicks from now on, and whether notifications are allowed, now
+/// and after each answer: in a bundle, as the caller checks.
+pub(super) fn listen(clicked: Clicked, changed: Changed) {
+    if CLICKED.set(clicked).is_err() || CHANGED.set(changed).is_err() {
         return;
     }
     let delegate = Delegate::new();
     let center = UNUserNotificationCenter::currentNotificationCenter();
     center.setDelegate(Some(ProtocolObject::from_ref(&*delegate)));
     DELEGATE.set(Some(delegate));
+    read_permission();
 }
 
-/// Posts `notification` as `identifier`; false when this run cannot (a
-/// bare binary), for the caller to show it otherwise. The first one asks
-/// the user to allow notifications; until they do, macOS drops them.
+/// Tells [`listen`]'s `changed` whether notifications are allowed, once the
+/// centre says.
+#[allow(
+    unsafe_code,
+    reason = "reading the settings the centre passes; see SAFETY"
+)]
+pub(super) fn read_permission() {
+    let Some(changed) = CHANGED.get() else {
+        return;
+    };
+    let read = RcBlock::new(move |settings: NonNull<UNNotificationSettings>| {
+        // SAFETY: the centre passes valid settings.
+        let status = unsafe { settings.as_ref() }.authorizationStatus();
+        changed(match status {
+            UNAuthorizationStatus::NotDetermined => Permission::Undecided,
+            UNAuthorizationStatus::Denied => Permission::Denied,
+            _ => Permission::Allowed,
+        });
+    });
+    UNUserNotificationCenter::currentNotificationCenter()
+        .getNotificationSettingsWithCompletionHandler(&read);
+}
+
+/// Asks the user to allow notifications; once answered, or at once if
+/// they have before, says how it stands.
 #[allow(
     unsafe_code,
     reason = "reading the errors the centre passes; see SAFETY"
 )]
+pub(super) fn ask() {
+    ASKED.set(true);
+    let answered = RcBlock::new(|granted: Bool, error: *mut NSError| {
+        if !granted.as_bool() {
+            // SAFETY: the centre passes a valid error or null.
+            let reason =
+                unsafe { error.as_ref() }.map(|error| error.localizedDescription().to_string());
+            tracing::info!(
+                "notifications are not allowed{}",
+                reason
+                    .map(|reason| format!(": {reason}"))
+                    .unwrap_or_default()
+            );
+        }
+        read_permission();
+    });
+    UNUserNotificationCenter::currentNotificationCenter()
+        .requestAuthorizationWithOptions_completionHandler(
+            UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound,
+            &answered,
+        );
+}
+
+/// Posts `notification` as `identifier`; false when this run cannot (a
+/// bare binary), for the caller to show it otherwise. The first one asks
+/// the user to allow notifications, unless a mod asked before; until they
+/// do, macOS drops them. One that replaces takes the place of those
+/// delivered with its mod and `id`.
+#[allow(unsafe_code, reason = "reading what the centre passes; see SAFETY")]
 pub(super) fn post(identifier: &str, notification: &Notification) -> bool {
     if !bundled() {
         return false;
     }
+    if !ASKED.get() {
+        ask();
+    }
     let center = UNUserNotificationCenter::currentNotificationCenter();
-    if !ASKED.replace(true) {
-        let answered = RcBlock::new(|granted: Bool, error: *mut NSError| {
-            if !granted.as_bool() {
-                // SAFETY: the centre passes a valid error or null.
-                let reason =
-                    unsafe { error.as_ref() }.map(|error| error.localizedDescription().to_string());
-                tracing::info!(
-                    "notifications are not allowed{}",
-                    reason
-                        .map(|reason| format!(": {reason}"))
-                        .unwrap_or_default()
-                );
+    if notification.replace {
+        let posted = identifier.to_owned();
+        let delivered = RcBlock::new(move |delivered: NonNull<NSArray<UNNotification>>| {
+            // SAFETY: the centre passes a valid array.
+            let delivered = unsafe { delivered.as_ref() };
+            let replaced: Vec<Retained<NSString>> = delivered
+                .iter()
+                .map(|notification| notification.request().identifier())
+                .filter(|other| super::replaced_by(&posted, &other.to_string()))
+                .collect();
+            if !replaced.is_empty() {
+                UNUserNotificationCenter::currentNotificationCenter()
+                    .removeDeliveredNotificationsWithIdentifiers(&NSArray::from_retained_slice(
+                        &replaced,
+                    ));
             }
         });
-        center.requestAuthorizationWithOptions_completionHandler(
-            UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound,
-            &answered,
-        );
+        center.getDeliveredNotificationsWithCompletionHandler(&delivered);
     }
     let content = UNMutableNotificationContent::new();
     content.setTitle(&NSString::from_str(&notification.title));

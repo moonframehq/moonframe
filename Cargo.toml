@@ -126,8 +126,8 @@ moonframe-usage          = { path = "crates/moonframe-usage" }
 notify                   = "8"
 objc2                    = "0.6"
 objc2-app-kit            = { default-features = false, features = ["NSApplication", "NSImage", "NSResponder", "std"], version = "0.3" }
-objc2-foundation         = { default-features = false, features = ["NSAttributedString", "NSBundle", "NSData", "NSDictionary", "NSProcessInfo", "NSString", "std"], version = "0.3" }
-objc2-user-notifications = { default-features = false, features = ["UNNotification", "UNNotificationContent", "UNNotificationRequest", "UNNotificationResponse", "UNUserNotificationCenter", "block2", "std"], version = "0.3" }
+objc2-foundation         = { default-features = false, features = ["NSArray", "NSAttributedString", "NSBundle", "NSData", "NSDictionary", "NSProcessInfo", "NSString", "std"], version = "0.3" }
+objc2-user-notifications = { default-features = false, features = ["UNNotification", "UNNotificationContent", "UNNotificationRequest", "UNNotificationResponse", "UNNotificationSettings", "UNUserNotificationCenter", "block2", "std"], version = "0.3" }
 objc2-web-kit            = { default-features = false, features = ["WKWebView", "objc2-app-kit", "std"], version = "0.3" }
 portable-pty             = "0.9"
 raw-window-handle        = "0.6"

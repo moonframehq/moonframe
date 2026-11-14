@@ -804,7 +804,7 @@ end
   absolute, and inside the app's folders. Never a URL. Sounds closer than
   150 ms apart are dropped. macOS plays them (`NSSound`); Linux with
   `paplay` or `aplay` when installed; Windows plays none yet (logged).
-- `app:notify`, `msg` `{ title, body?, id? }`: a system notification. macOS
+- `app:notify`, `msg` `{ title, body?, id?, replace? }`: a system notification. macOS
   posts it through the Notification Center when the app runs as a bundle
   (an installed app, `just bundle`, `just bundle-app`), asking the user to
   allow notifications the first time; it shows even when the window is in
@@ -813,7 +813,17 @@ end
   show it as a toast in the window instead, for 5 s. Clicking either brings
   the app and its window forward and tells the mod that posted it, if it subscribes to
   `app/notification`: `{ topic = "app/notification", value = { id, clicked
-  = true } }`. At most 5 notifications in 10 s are posted.
+  = true } }`; a click that starts the app waits for its window. Put what
+  to open in `id` (a page, a thread). `replace = true` (with an `id`) takes
+  the place of the mod's earlier ones with that `id`, from this run or an
+  earlier one, rather than stacking: "Uploading…" then "Uploaded".
+  At most 5 notifications in 10 s are posted.
+- `app:notify`, `msg` `{ ask = true }`: asks the user to allow notifications
+  now, posting none, as a button that turns them on would; the system asks
+  only once. `app.notifications` says how it stands: `"allowed"`,
+  `"denied"` (turned off in System Settings), `"undecided"` (not asked yet),
+  or `"in-window"` (no system notifications here: toasts show them); nil
+  until the system says, and read again each time a window comes forward.
 
 ```lua
 return mod {
