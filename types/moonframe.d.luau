@@ -2065,6 +2065,9 @@ type App = {
 	links: { [string]: ProviderLink }?,
 	-- Nil until a mod first asks `app:awake`.
 	awake: AwakeState?,
+	-- Whether the user lets the app post notifications (`app:notify`);
+	-- nil until the system says, read again as a window comes forward.
+	notifications: NotificationPermission?,
 	-- Nil unless the last run panicked.
 	crash: CrashReport?,
 	-- Cargo feature names mapped to whether this host compiled them in.
@@ -2095,6 +2098,9 @@ type App = {
 -- What `{ to = "app:notify", msg = ... }` posts. A click on it brings the
 -- window forward and sends the posting mod, if it subscribes to
 -- `app/notification`, `{ topic = "app/notification", value = NotificationClick }`.
+-- `{ ask = true }` instead posts nothing and asks the user to allow
+-- notifications now (once; the first one posted asks otherwise), with
+-- `app.notifications` saying the answer.
 type NotifyMsg = {
 	-- At most 256 bytes.
 	title: string,
@@ -2102,7 +2108,16 @@ type NotifyMsg = {
 	body: string?,
 	-- 1 to 128 of a-z A-Z 0-9 - _ . : /, handed back on a click.
 	id: string?,
-}
+	-- Takes the place of the ones this mod posted with the same `id`
+	-- (this run or an earlier one) rather than adding to them. Needs `id`.
+	replace: boolean?,
+} | { ask: true }
+
+-- Whether the user lets the app post notifications, in
+-- `app.notifications`: "in-window" where the system shows none (Linux,
+-- Windows, a bare binary) and a toast shows them; "undecided" until the
+-- user is asked.
+type NotificationPermission = "allowed" | "denied" | "undecided" | "in-window"
 
 type NotificationClick = {
 	id: string?,

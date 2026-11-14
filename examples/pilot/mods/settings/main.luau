@@ -94,7 +94,18 @@ local function providers_page(pi: any): { any }
 	return rows
 end
 
-local function general_page(pi: any): { any }
+-- What the system says of notifications, `app.notifications`, for the
+-- switch that turns them on.
+local function notifications_note(permission: string?): string
+	if permission == "denied" then
+		return "Turned off for this app in System Settings › Notifications."
+	elseif permission == "in-window" then
+		return "Shown in the window: this run cannot post system notifications."
+	end
+	return "When a background thread finishes, fails or asks something."
+end
+
+local function general_page(pi: any, app: any): { any }
 	local prefs = pi.prefs
 	return {
 		heading("General"),
@@ -103,8 +114,8 @@ local function general_page(pi: any): { any }
 			gap = "none",
 			settings_row {
 				title = "Notify when a thread needs you",
-				description = "When a background thread finishes, fails or asks something.",
-				switch { on = prefs.notifications, msg = { set_pref = { notifications = not prefs.notifications } }, to = "provider:pi" },
+				description = notifications_note(app.notifications),
+				switch { on = prefs.notifications, msg = { notifications = not prefs.notifications } },
 			},
 			settings_row {
 				title = "Play a sound",
@@ -252,6 +263,13 @@ return mod {
 			(state.endpoint :: any)[msg.field] = msg.value
 		elseif msg.appearance then
 			return state, { { to = "app:appearance", msg = msg.appearance } }
+		elseif msg.notifications ~= nil then
+			local sends: { any } = { { to = "provider:pi", msg = { set_pref = { notifications = msg.notifications } } } }
+			-- Turning them on is when to ask the user to allow them.
+			if msg.notifications then
+				table.insert(sends, { to = "app:notify", msg = { ask = true } })
+			end
+			return state, sends
 		elseif msg.dark_theme or msg.light_theme then
 			state.theme_open = false
 			return state, { { to = "app:theme", msg = if msg.dark_theme then { dark = msg.dark_theme } else { light = msg.light_theme } } }
@@ -277,7 +295,7 @@ return mod {
 		local body: { any } = {}
 		if pi and pi.available ~= false then
 			body = if state.page == "providers" then providers_page(pi)
-				elseif state.page == "general" then general_page(pi)
+				elseif state.page == "general" then general_page(pi, app)
 				elseif state.page == "appearance" then appearance_page(state, app)
 				elseif state.page == "shortcuts" then shortcuts_page()
 				else about_page(pi)

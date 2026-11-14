@@ -29,7 +29,9 @@ pi CLI and back.
   ⌘1 to ⌘9 sidebar threads, ⌘J terminal, ⌘R changes, ⌘E files, ⌘F find,
   ⌘⇧M model, ⌘. stop, ⌥⌘B workbench.
 - Notifications and a Dock badge when a background thread finishes, fails or
-  needs you. An extension's questions appear above the composer.
+  needs you; each thread keeps one notification, its latest, and turning
+  them on in Settings asks macOS to allow them. An extension's questions
+  appear above the composer.
 
 ```sh
 moonframe app link examples/pilot   # from the repository: a profile running it in place
