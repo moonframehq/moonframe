@@ -2684,7 +2684,7 @@ instead.
 | `just check` | loads everything headlessly (your folder and packages included), then adds what an open window of the app hit (`window:` lines); run after each edit |
 | `just check-builtin` | the same for `app/` alone |
 | `just types` | strict Luau type check against `types/moonframe.d.luau` |
-| `just screenshot OUT PID` | captures the window of the process you started |
+| `just screenshot OUT PID` | captures the window of the process you started (macOS, Linux on X11 or Sway/Hyprland, Windows from Git Bash) |
 | `just component-shot NAME [OUT]` | captures a component's preview page from a background instance it starts and stops; never takes focus |
 | `just run` | opens the window on `app/` (the user usually has one open) |
 | `just providers` | builds and lints the Wasm providers |

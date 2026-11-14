@@ -3,8 +3,9 @@
 
 For each component in website/site/data/components.js this opens the app's
 Components window on its preview alone (scripts/component-shot.sh with
---preview-only; macOS, needs Screen Recording permission, and Accessibility
-to make the window tall), trims the capture to what the preview draws, and
+--preview-only; on macOS it needs Screen Recording permission, and
+Accessibility to make the window tall; window-shot.sh lists what Linux and
+Windows need), trims the capture to what the preview draws, and
 writes website/site/img/components/<name>.webp at 2x. Run from the repo root,
 after `python3 website/tools/components-data.py` (it runs that again at the
 end, so data/components.js records each picture's size):
