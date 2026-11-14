@@ -19,7 +19,7 @@ type Edge = "none" | "all" | "top" | "bottom" | "left" | "right"
 type Border = boolean | Edge
 type Direction = "row" | "column"
 type Variant = "normal" | "primary" | "ghost" | "outline" | "danger"
-type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | "check-for-updates" | "new-window" | BrowserCommand
+type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | "check-for-updates" | "new-window" | "activate" | BrowserCommand
 -- Run on the `ui.browser` the control's `browser` key names.
 type BrowserCommand = "browser-back" | "browser-forward" | "browser-reload" | "browser-stop" | "browser-open"
 
@@ -2067,6 +2067,10 @@ type App = {
 	awake: AwakeState?,
 	-- Nil unless the last run panicked.
 	crash: CrashReport?,
+	-- How each system-wide shortcut mods claimed (`app:hotkey`) stands, by
+	-- its keys; nil until a mod first claims one. "taken" when another app
+	-- holds them for itself alone.
+	hotkeys: { [string]: "claimed" | "taken" | "unsupported" }?,
 	-- Cargo feature names mapped to whether this host compiled them in.
 	capabilities: { [string]: boolean },
 	mods: { string },
@@ -2127,6 +2131,44 @@ type PickMsg = {
 	folder: string?,
 }
 
+-- What `{ to = "app:status-item", msg = ... }` shows: the mod's item in the
+-- menu bar (macOS), changed when asked again; `false` takes it away, and
+-- `{ popup = { StatusLine } }` drops a menu down from it at once.
+type StatusItemMsg = {
+	-- A system symbol's name (SF Symbols), such as "tray.and.arrow.down".
+	symbol: string?,
+	-- Or an image file, found as `app:icon` finds one.
+	image: string?,
+	-- Drawn in the menu bar's colour (default true).
+	template: boolean?,
+	-- At most 64 bytes beside the icon, or alone.
+	title: string?,
+	tooltip: string?,
+	items: { StatusLine }?,
+}
+
+-- A line of a menu bar item's menu: "-", or an item whose click sends `msg`
+-- to the mod (or `to`). Without `msg` it is a heading. `shortcut` only shows.
+type StatusLine = "-" | {
+	label: string,
+	msg: Data?,
+	to: string?,
+	enabled: boolean?,
+	checked: boolean?,
+	shortcut: string?,
+}
+
+-- What `{ to = "app:hotkey", msg = ... }` claims: `keys` system-wide, each
+-- press sending `msg` to the mod (or `to`) whichever app is in front; or,
+-- with `release = true`, gives them back. `keys` has two modifiers, not
+-- both shift ("ctrl-alt-l"), or is a function key.
+type HotkeyMsg = {
+	keys: string,
+	msg: Data?,
+	to: string?,
+	release: boolean?,
+}
+
 -- What `{ to = "app:edit", msg = ... }` does to the sending mod's input
 -- with `id = field`, around its selection, keeping undo and focus; the
 -- field then sends its `change`. `wrap` puts `{ before, after }` around the
@@ -2176,7 +2218,8 @@ type DevtoolsMsg =
 -- in the Dock, changed at once until the app quits; macOS only),
 -- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
--- `"app:devtools"` (`msg` a `DevtoolsMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
+-- `"app:devtools"` (`msg` a `DevtoolsMsg`), `"app:status-item"` (`msg` a
+-- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
 type Send = {
 	to: string,
 	msg: Data,

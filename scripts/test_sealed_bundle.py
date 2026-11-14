@@ -27,12 +27,14 @@ ui.map { pins = {} }
     def test_what_a_live_app_asks_for_selects_its_features(self):
         refs = references('''
 ui.video { source = "scan" }
-local asked = { { to = "app:awake" }, { to = "app:dock" }, { to = "app:guard" }, { to = "app:restart" } }
+local asked = { { to = "app:awake" }, { to = "app:dock" }, { to = "app:guard" }, { to = "app:restart" },
+  { to = "app:status-item" }, { to = "app:hotkey" } }
 local notice = app.crash
 local shown = app.displays
 local spot = { display = "external" }
 ''', set())
-        self.assertEqual(refs.features, {"awake", "crash", "displays", "dock", "guard", "restart", "video"})
+        self.assertEqual(refs.features, {"awake", "crash", "displays", "dock", "guard", "hotkey", "restart",
+                                         "status-item", "video"})
 
     def test_escaped_and_long_literal_imports(self):
         refs = references(r'''use "\x63ard"; use [=[badge]=]; use('\099ode')''', set())

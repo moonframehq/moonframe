@@ -742,8 +742,10 @@ end,
 - `app:command`, `msg` a command's name: runs it as a control's `command`
   does, with the same commands (`quit` `reload` `toggle-theme`
   `show-themes` `minimize` `maximize` `close-window` `check-for-updates`
-  `new-window` `inspect`) and nothing else. It runs once the update that
+  `new-window` `inspect` `activate`) and nothing else. It runs once the update that
   asked is done; `reload` and `new-window` asked from `init` are ignored.
+  `activate` brings the app and the window forward (restoring it from the
+  Dock): what a menu bar item's Open line or a summoning hotkey sends.
 - `app:appearance`, `msg` `"system"`, `"light"` or `"dark"`: whether the
   window follows the system's light or dark (and switches live as it
   does) or stays one. It is kept across launches for the app and profile
@@ -851,6 +853,63 @@ update = function(state, msg)
 	if type(msg) == "table" and msg.busy ~= nil then
 		state.busy = msg.busy
 		return state, { { to = "app:icon", msg = if msg.busy then "icons/busy.png" else "default" } }
+	end
+end,
+```
+
+- `app:status-item`, `msg` `{ symbol | image, template?, title?, tooltip?,
+  items? }`: the mod's item in the menu bar (macOS), beside the clock. One
+  per mod: asking again changes it (send it only when what it shows
+  changes, not every frame), `false` takes it away, and so does the mod
+  going (reloaded without it, its package removed). A reload keeps it only
+  when the mod asks for it again as it loads: send it from `init` (which
+  a reload runs again with the state kept), not only when something
+  changes. `symbol` is a system
+  symbol's name (SF Symbols: `tray.and.arrow.down`), `image` an image file
+  found as `app:icon` finds one, drawn 18 points tall; either is drawn in
+  the menu bar's own colour unless `template = false`. `title` is short
+  text beside it (`✓`, `3`), `tooltip` what hovering says. `items` is its
+  menu: `"-"`, or `{ label, msg?, to?, enabled?, checked?, shortcut? }`; a
+  click sends `msg` to the mod (or `to`), as a menu item's does; a line
+  without `msg` is a heading, never clickable; `shortcut` only shows a key
+  beside the label (a hotkey's, say). `{ popup = items }` drops a menu down
+  from the mod's item at once, as if clicked: what else there is when the
+  hotkey's action has nothing to work on. Elsewhere than macOS it does
+  nothing. What it sends goes to the front main window's mod, and the app
+  does not come forward: send `app:command` `"activate"` for that.
+- `app:hotkey`, `msg` `{ keys, msg, to? }`: claims `keys` (`ctrl-alt-l`,
+  named as `keys` are, with two modifiers, not both shift, or a function
+  key: one alone would take ⌘C, Ctrl-A or ⌥E from every app) system-wide
+  for the mod: each press sends `msg` to it (or `to`), whichever app is in
+  front, and the app does not come forward, so the mod can act on what the
+  user is doing elsewhere; the window does not see the press. `{ keys,
+  release = true }` gives them back (under any spelling), as does the mod
+  going, or loading again without asking for them: claim them from
+  `init`. Keys held here, by another mod or under another spelling
+  (`secondary` is `cmd` on macOS), are the sender's error. Views read how
+  each stands in `app.hotkeys`: `{ ["ctrl-alt-l"] = "claimed" | "taken" |
+  "unsupported" }`, `"taken"` when another app holds them for itself alone
+  (say so in the menu: `"Capture (shortcut taken)"`; claiming again tries
+  again), `"unsupported"` off macOS. Apps that share their keys, and
+  system shortcuts (Spotlight's ⌘Space), may win without saying so: pick
+  keys with ctrl and alt.
+
+```lua
+-- examples/lantern/mods/menubar: CPU beside a flame, ⌃⌥L to come forward
+init = function()
+	return {}, {
+		{ to = "app:status-item", msg = { symbol = "flame", title = "12%", items = {
+			{ label = "Busiest processes" },               -- a heading
+			{ label = "rustc · 40%", msg = "processes" },
+			"-",
+			{ label = "Show Lantern", msg = "show", shortcut = "ctrl-alt-l" },
+		} } },
+		{ to = "app:hotkey", msg = { keys = "ctrl-alt-l", msg = "show" } },
+	}
+end,
+update = function(state, msg)
+	if msg == "show" then
+		return state, { { to = "app:command", msg = "activate" } }
 	end
 end,
 ```
@@ -1288,7 +1347,7 @@ Text-like elements take their main value positionally:
 - border: `true`, `all`, `top`, `bottom`, `left`, `right`, `none`
 - direction: `row` `column`
 - variant (button): `normal` `primary` `ghost` `outline` `danger`
-- command: `quit` `reload` `toggle-theme` (light to dark or back, keeping the themes) `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `new-window` (another main window: its own copy of the layout, the same providers; only the first keeps mod state across launches) `inspect` (Inspect Element for the mod: see "Here")
+- command: `quit` `reload` `toggle-theme` (light to dark or back, keeping the themes) `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `new-window` (another main window: its own copy of the layout, the same providers; only the first keeps mod state across launches) `inspect` (Inspect Element for the mod: see "Here") `activate` (the app and the window forward, restored from the Dock)
 - place (overlay): `center` `top` `bottom` `left` `right` `top-start`
   `top-end` `bottom-start` `bottom-end`
 - browser commands (with `browser = "<id>"`): `browser-back`

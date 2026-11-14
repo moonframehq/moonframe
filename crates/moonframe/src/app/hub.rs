@@ -184,6 +184,7 @@ impl Hub {
         );
         menu_actions(cx);
         hear_notification_clicks(cx);
+        menu_bar::listen(cx);
         take_panes(&folders, cx);
         #[cfg(feature = "updates")]
         check_for_updates_daily(&folders, cx);
@@ -347,6 +348,15 @@ fn deliver(deliveries: Vec<(WeakEntity<MoonframeApp>, Delivery)>, cx: &mut App) 
                 app.flush(&from, cx);
             },
         });
+    }
+}
+
+/// Shares `data` as `app.<key>` in every main window, and in those that
+/// open later.
+pub(super) fn share_everywhere(key: &str, data: Data, cx: &mut App) {
+    if let Some(hub) = hub_of(cx) {
+        let deliveries = hub.update(cx, |hub, _| hub.share(key.to_owned(), data));
+        deliver(deliveries, cx);
     }
 }
 
