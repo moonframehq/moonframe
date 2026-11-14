@@ -517,7 +517,14 @@ pub fn write(
             ));
             continue;
         }
-        match manifest.notes.get(&note.id).cloned() {
+        // A manifest is a file in the vault anyone could edit: a place it
+        // names outside the vault, or not a note's, counts as none.
+        let known = manifest
+            .notes
+            .get(&note.id)
+            .filter(|known| inside(&known.path) && crate::scan::is_note(&known.path))
+            .cloned();
+        match known {
             Some(known) => {
                 if known.modified == note.modified && root.join(&known.path).exists() {
                     report.unchanged += 1;
