@@ -134,7 +134,7 @@ impl Ui {
     }
 
     fn offer(&mut self, pressed: &Pressed, tx: &mut Tx) -> bool {
-        let shortcut = self.workspace.menus().iter().find_map(|menu| {
+        let shortcut = self.workspace().menus().iter().find_map(|menu| {
             menu.items.iter().find_map(|entry| match entry {
                 MenuEntry::Item(item)
                     if item
@@ -152,7 +152,7 @@ impl Ui {
             return true;
         }
         let hearers: Vec<(String, Data)> = self
-            .workspace
+            .workspace()
             .mod_keys()
             .filter_map(|(owner, keys)| {
                 Some((owner.to_owned(), keys.message(None, pressed, MAC)?.clone()))

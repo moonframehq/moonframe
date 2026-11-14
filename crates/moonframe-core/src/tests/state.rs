@@ -25,7 +25,7 @@ fn mod_state_outlives_the_workspace() {
 
 /// A mod that counts, shows the label it was mounted with, and starts from
 /// its props' `start`.
-const TALLY: &str = r#"
+pub(super) const TALLY: &str = r#"
 return mod {
   init = function(previous, props)
     return previous or { count = props and props.start or 0 }

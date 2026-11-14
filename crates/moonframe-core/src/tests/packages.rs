@@ -275,3 +275,30 @@ fn every_app_gets_the_developer_tools() {
     assert!(brings(&["terminal"]));
     assert!(brings(&[]));
 }
+
+#[test]
+fn keeping_feedback_keeps_its_window() {
+    const PANEL: &str = r#"return mod { view = function() return ui.text "x" end }"#;
+    let builtin = app(&[
+        ("feedback", PANEL),
+        ("feedback-window", PANEL),
+        ("terminal", PANEL),
+    ]);
+    let brings = |keep: &[&str]| {
+        let app = tempfile::tempdir().unwrap();
+        let roots = crate::Roots::hosted(
+            builtin.path().to_owned(),
+            crate::AppLayer {
+                path: app.path().to_owned(),
+                keep: keep.iter().map(|name| (*name).to_owned()).collect(),
+            },
+            [],
+            None,
+        );
+        !roots.mod_candidates(crate::FEEDBACK_WINDOW).is_empty()
+    };
+    assert!(brings(&["feedback"]));
+    assert!(brings(&["feedback-window"]));
+    assert!(!brings(&["terminal"]));
+    assert!(!brings(&[]));
+}

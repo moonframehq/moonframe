@@ -87,7 +87,13 @@ impl Layer {
             Role::App | Role::Package => true,
             // Every app gets the Developer tools: they show only in
             // Developer Mode, and are how its Luau is changed as it runs.
-            Role::Toolbox(keep) => name == crate::DEVTOOLS || keep.iter().any(|kept| kept == name),
+            // Keeping the sparkle keeps the window it opens.
+            Role::Toolbox(keep) => {
+                name == crate::DEVTOOLS
+                    || keep.iter().any(|kept| {
+                        kept == name || (kept == crate::FEEDBACK && name == crate::FEEDBACK_WINDOW)
+                    })
+            },
             Role::Style => false,
         }
     }
@@ -229,6 +235,17 @@ impl Roots {
             .map(|layer| layer.path.as_path())
     }
 
+    /// Whether `source` belongs to one of [`Roots::app_layers`]: the
+    /// deepest layer holding it decides, so a package installed inside the
+    /// user's folder (`packages/<name>`) is still a package.
+    pub fn in_app_layer(&self, source: &Path) -> bool {
+        self.layers
+            .iter()
+            .filter(|layer| source.starts_with(&layer.path))
+            .max_by_key(|layer| layer.path.components().count())
+            .is_some_and(|layer| matches!(layer.role, Role::App | Role::Toolbox(_)))
+    }
+
     /// Every folder, lowest first.
     pub fn layers(&self) -> impl Iterator<Item = &Path> {
         self.layers.iter().map(|layer| layer.path.as_path())
@@ -362,6 +379,14 @@ impl Roots {
             }
         }
         found
+    }
+
+    /// Each layer's folder `dir`, where it has one, lowest first.
+    pub(crate) fn dirs(&self, dir: &str) -> Vec<PathBuf> {
+        self.folder_layers(dir)
+            .map(|layer| layer.join(dir))
+            .filter(|path| path.is_dir())
+            .collect()
     }
 
     /// The layers laid out like an app folder, all but single-mod packages,

@@ -19,8 +19,11 @@ mod shell;
 
 use {
     crate::{Ui, inspect::Crumb, style::Ink, theme::Palette},
-    moonframe_core::{Direction, Look, Node, Part, Resolved, Rules, SHELL, Slot, States, Token},
-    rune::{Cursor, Drag, El, Phase, col, text},
+    moonframe_core::{
+        Direction, IconName, Look, Node, Part, Resolved, Rules, SHELL, Slot, States, Token,
+        Workspace,
+    },
+    rune::{Cursor, Drag, El, Phase, col, row, text},
     std::{cell::RefCell, sync::LazyLock},
 };
 
@@ -39,16 +42,27 @@ const MAX_MOUNTS: usize = 16;
 const DEFAULT_FONT_SIZE: f32 = 14.;
 /// The widest a problem floating over a view gets.
 const PROBLEM_WIDTH: f32 = 320.;
+/// The tallest a problem's card gets, and the most of its message it shows.
+const PROBLEM_HEIGHT: f32 = 72.;
+const PROBLEM_TEXT: usize = 300;
+/// A broken mod's sign, round.
+const BROKEN_SIZE: f32 = 20.;
 
 /// What one frame's drawing shares.
 pub(crate) struct Painter<'w> {
     ui: &'w Ui,
+    /// The workspace, borrowed for the frame: every window draws from it.
+    ws: &'w Workspace,
     palette: Palette<'w>,
     /// Popovers and overlays, drawn last at the window's root: a Rune
     /// overlay has to come after its anchor to draw above it.
     floating: RefCell<Vec<El>>,
     /// The same for a demo's layers, drawn on the browser's stage.
     stage: RefCell<Vec<El>>,
+    /// What is wrong with mods that still show their last good view: in a
+    /// corner of the window, over everything, so a broken edit never moves
+    /// the layout.
+    problems: RefCell<Vec<El>>,
 }
 
 /// Where a node is drawn: the mod that drew it, its unique path, and what it
@@ -69,9 +83,17 @@ impl Place<'_> {
             ..self.clone()
         }
     }
+
+    /// The place of a child its stack names with `key`.
+    fn keyed(&self, key: &str) -> Self {
+        Self {
+            path: format!("{}/:{key}", self.path),
+            ..self.clone()
+        }
+    }
 }
 
-/// The whole window.
+/// The whole window: the shell, or the mod a window of its own shows.
 pub(crate) fn window(ui: &Ui) -> El {
     ui.layers.borrow_mut().clear();
     ui.browsers.wanted.borrow_mut().clear();
@@ -80,17 +102,19 @@ pub(crate) fn window(ui: &Ui) -> El {
     ui.terminals.shown.borrow_mut().clear();
     ui.videos.frame_began();
     ui.crumbs.borrow_mut().clear();
+    let workspace = ui.workspace();
     let painter = Painter {
         ui,
+        ws: &workspace,
         palette: Palette {
             dark: ui.dark,
-            overrides: &ui.workspace.stylesheet().overrides,
+            overrides: &workspace.stylesheet().overrides,
         },
         floating: RefCell::default(),
         stage: RefCell::default(),
+        problems: RefCell::default(),
     };
-    let base = ui
-        .workspace
+    let base = workspace
         .stylesheet()
         .font_size
         .unwrap_or(DEFAULT_FONT_SIZE);
@@ -107,7 +131,10 @@ pub(crate) fn window(ui: &Ui) -> El {
         },
         mounts: 0,
     };
-    let shell = if ui.gallery {
+    let shell = if let Some(name) = &ui.shows {
+        // As GPUI's mod window: the mod fills it.
+        painter.slot(name, &place)
+    } else if ui.gallery {
         painter.gallery(&place)
     } else {
         painter.slot(SHELL, &place)
@@ -126,6 +153,19 @@ pub(crate) fn window(ui: &Ui) -> El {
         .into_inner()
         .into_iter()
         .fold(root, El::child);
+    let problems = painter.problems.into_inner();
+    let root = if problems.is_empty() {
+        root
+    } else {
+        root.child(
+            col()
+                .key("problems")
+                .pin(None, None, Some(8.), Some(32.))
+                .max_w(PROBLEM_WIDTH)
+                .gap(4.)
+                .children(problems),
+        )
+    };
     if ui.inspecting.asker.is_none() || ui.inspecting.clicked() {
         return root;
     }
@@ -171,39 +211,85 @@ fn named(node: &Node) -> Option<(String, Option<u32>)> {
 
 impl<'w> Painter<'w> {
     fn look(&self, part: Part, look: &Look, states: States, place: &Place) -> Resolved {
-        let local = self
-            .ui
-            .workspace
-            .slot(place.owner)
-            .map_or(&*NO_RULES, Slot::rules);
-        self.ui
-            .workspace
-            .stylesheet()
-            .resolve_in(part, look, states, local)
+        let local = self.ws.slot(place.owner).map_or(&*NO_RULES, Slot::rules);
+        self.ws.stylesheet().resolve_in(part, look, states, local)
     }
 
-    /// A small marker in place of what could not be drawn, saying why.
+    /// A text field's selection: the theme's accent, faint. Rune's own, and
+    /// its caret, follow its default foreground, white whatever the theme.
+    fn selection(&self) -> rune::Color {
+        self.palette.token(Token::Accent).alpha(0.3)
+    }
+
+    /// The sign of a mod whose view broke: a small warning, what went wrong
+    /// in its tooltip, cut short as a problem's card is.
+    fn broken(&self, owner: &str, error: &str) -> El {
+        let message = format!("{owner}: {error}");
+        let mut shown: String = message.chars().take(PROBLEM_TEXT).collect();
+        if message.chars().count() > PROBLEM_TEXT {
+            shown.push('…');
+        }
+        let danger = self.palette.token(Token::Danger);
+        let sign = IconName::new("triangle-alert")
+            .as_ref()
+            .and_then(crate::icons::icon)
+            .map_or_else(
+                || text("!").color(danger),
+                |found| rune::icon(found, 12.).color(danger),
+            );
+        row()
+            .key(format!("broken:{owner}"))
+            .size(BROKEN_SIZE, BROKEN_SIZE)
+            .items_center()
+            .justify_center()
+            .radius(BROKEN_SIZE / 2.)
+            .fill(self.palette.token(Token::Background))
+            .border(1., danger)
+            .label(format!("{owner} is broken"))
+            .help(shown)
+            .child(sign)
+    }
+
+    /// A small marker in place of what could not be drawn, saying why: as
+    /// GPUI's, a card no taller than [`PROBLEM_HEIGHT`] that cuts a long
+    /// message (a traceback) short, so it never takes over the window.
     fn marker(&self, message: &str, place: &Place) -> El {
         self.ui
             .left_out
             .borrow_mut()
             .insert(format!("marker: {message}"));
-        text(message)
-            .font(place.ink.text_style())
-            .color(self.palette.token(Token::Danger))
-            .wrap()
+        let mut shown: String = message.chars().take(PROBLEM_TEXT).collect();
+        if message.chars().count() > PROBLEM_TEXT {
+            shown.push('…');
+        }
+        let mut ink = place.ink;
+        ink.size = (ink.base * 0.85).round();
+        col()
+            .min_w(0.)
+            .max_h(PROBLEM_HEIGHT)
+            .padding(6.)
+            .radius(6.)
+            .clip_rounded(6.)
+            .fill(self.palette.token(Token::Background))
+            .border(1., self.palette.token(Token::Danger))
+            .child(
+                text(&shown)
+                    .font(ink.text_style())
+                    .color(self.palette.token(Token::Danger))
+                    .wrap(),
+            )
     }
 
     /// The view of the mod `name`, or what is wrong with it.
     fn slot(&self, name: &'w str, place: &Place<'w>) -> El {
-        let slot = self.ui.workspace.slot(name);
+        let slot = self.ws.slot(name);
         self.mounted(name, slot, place)
     }
 
     /// What a mod adds to a row region: its view, or with `spread` each of
     /// that view's children. One with a problem stays whole, to show it.
     fn members(&self, name: &'w str, place: &Place<'w>) -> Vec<El> {
-        let slot = self.ui.workspace.slot(name);
+        let slot = self.ws.slot(name);
         match slot
             .filter(|slot| slot.error().is_none())
             .and_then(Slot::view)
@@ -231,7 +317,8 @@ impl<'w> Painter<'w> {
         };
         let Some(view) = slot.view() else {
             return match slot.error() {
-                Some(error) => self.marker(&format!("{owner}: {error}"), place),
+                // Never drawn yet: only the sign, in its place.
+                Some(error) => self.broken(owner, &error.to_string()),
                 None => rune::el(),
             };
         };
@@ -242,16 +329,43 @@ impl<'w> Painter<'w> {
             ..place.clone()
         };
         let drawn = self.node(view, &inner);
-        match slot.error() {
-            None => drawn,
-            // The last good view keeps its place, and the problem floats
-            // over its corner: an edit that breaks never moves the layout.
-            Some(error) => col().grow(1.).min_w(0.).min_h(0.).child(drawn).child(
-                self.marker(&format!("{owner}: {error}"), place)
-                    .pin(None, Some(4.), Some(4.), None)
-                    .max_w(PROBLEM_WIDTH),
-            ),
+        let Some(error) = slot.error() else {
+            return drawn;
+        };
+        // The last good view stays as it was, a broken sign pinned over its
+        // corner, the problem in its tooltip: an edit that breaks never
+        // moves the layout. A view that holds no children (a lone text)
+        // has the sign in the window's corner instead.
+        let sign = self.broken(owner, &error.to_string());
+        match view {
+            Node::Stack(_) | Node::Panel(_) => {
+                drawn.child(sign.pin(None, Some(2.), Some(2.), None))
+            },
+            _ => {
+                self.problems.borrow_mut().push(sign);
+                drawn
+            },
         }
+    }
+
+    /// A stack's children, each named by its `key`, else by where it
+    /// stands in the Luau table (`slots`) rather than its turn among the
+    /// children shown: a `cond and ...` before it, coming and going, leaves
+    /// it the same element, where its new turn would fade it out and in.
+    fn stacked(&self, nodes: &'w [Node], slots: &[usize], place: &Place<'w>) -> Vec<El> {
+        let slotted = slots.len() == nodes.len();
+        nodes
+            .iter()
+            .enumerate()
+            .map(|(index, node)| {
+                let inner = match node {
+                    Node::Stack(stack) if let Some(key) = &stack.key => place.keyed(key),
+                    _ if slotted => place.child(slots[index].saturating_sub(1)),
+                    _ => place.child(index),
+                };
+                self.node(node, &inner)
+            })
+            .collect()
     }
 
     fn nodes(&self, nodes: &'w [Node], place: &Place<'w>) -> Vec<El> {
@@ -290,7 +404,7 @@ impl<'w> Painter<'w> {
             Node::RevisionTimeline(_) => self.not_here_named("ui.revision_timeline", place),
             Node::Region(region) => self.region(region, place),
             Node::Mount(name) => self.slot(name, place),
-            Node::Instance(instance) => match self.ui.workspace.instance(place.owner, instance) {
+            Node::Instance(instance) => match self.ws.instance(place.owner, instance) {
                 Some((key, slot)) => self.mounted(key, Some(slot), place),
                 None => self.marker(&format!("no instance {}", instance.id), place),
             },

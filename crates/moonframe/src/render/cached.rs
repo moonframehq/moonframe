@@ -543,6 +543,7 @@ mod tests {
                 border: None,
                 scroll: Scroll::No,
                 follow: false,
+                scrollbar: true,
                 shrink: true,
                 self_align: None,
                 hug: false,
@@ -563,6 +564,7 @@ mod tests {
             key: None,
             pointer: None,
             children,
+            slots: Vec::new(),
         }
     }
 

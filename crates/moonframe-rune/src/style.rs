@@ -53,7 +53,9 @@ impl Ink {
                 .color
                 .as_ref()
                 .map_or(self.color, |color| palette.color(color)),
-            size: style.size.map_or(self.size, |size| pixels(size, self.base)),
+            size: style
+                .font_size
+                .unwrap_or_else(|| style.size.map_or(self.size, |size| pixels(size, self.base))),
             weight: style.weight.map_or(self.weight, weight),
             mono: style.font.map_or(self.mono, |font| font == Font::Mono),
             ..self
@@ -196,6 +198,41 @@ pub(crate) fn looked(
         },
         None => element,
     }
+}
+
+/// Moves what a bordered element holds inside its border, as GPUI lays
+/// it out: a Rune border takes no room, so a child that fills (a terminal,
+/// a header) would paint over it. Each bordered side's padding, whichever
+/// set it (the frame's outranks the look's), grows by the border's width.
+pub(crate) fn inset_by_border(element: El, look: &Resolved, frame: &Frame) -> El {
+    let Some(border) = frame.border.or(look.base.border) else {
+        return element;
+    };
+    let sides = match border {
+        Border::All => [true; 4],
+        Border::Top => [true, false, false, false],
+        Border::Right => [false, true, false, false],
+        Border::Bottom => [false, false, true, false],
+        Border::Left => [false, false, false, true],
+        Border::None => return element,
+    };
+    let given = frame.padding.map(|padding| padding.pixels());
+    let style = &look.base.padding;
+    let [top, right, bottom, left] =
+        [style.top, style.right, style.bottom, style.left].map(|side| given.or(side).unwrap_or(0.));
+    let grown = |padding: f32, bordered: bool| {
+        padding
+            + if bordered {
+                1.
+            } else {
+                0.
+            }
+    };
+    element
+        .pt(grown(top, sides[0]))
+        .pr(grown(right, sides[1]))
+        .pb(grown(bottom, sides[2]))
+        .pl(grown(left, sides[3]))
 }
 
 /// What a frame places: size, growth, scrolling and where it floats.

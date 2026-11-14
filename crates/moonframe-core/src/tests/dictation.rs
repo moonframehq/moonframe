@@ -1,8 +1,11 @@
-//! Exercise the shipped mic and feedback mod through real instance routing.
+//! Exercise the shipped mic, drawn by the feedback window's mod, and the
+//! feedback mod it answers, through real instance routing.
 
 use super::*;
 
-const BUTTON: &str = "feedback/dictation#prompt";
+const BUTTON: &str = "feedback-window/dictation#prompt";
+const FEEDBACK: &str = include_str!("../../../../app/mods/feedback/main.luau");
+const WINDOW: &str = include_str!("../../../../app/mods/feedback-window/main.luau");
 
 fn map(fields: &[(&str, Data)]) -> Data {
     Data::Map(
@@ -13,8 +16,10 @@ fn map(fields: &[(&str, Data)]) -> Data {
     )
 }
 
-fn fixture(source: &str) -> (tempfile::TempDir, Workspace) {
-    let dir = app(&[("feedback", source)]);
+/// The feedback mod and its window's mod (whose view is `window`, the mic
+/// alone in a test of the mic).
+fn fixture(window: &str) -> (tempfile::TempDir, Workspace) {
+    let dir = app(&[("feedback", FEEDBACK), ("feedback-window", window)]);
     write(
         dir.path(),
         "main.luau",
@@ -52,7 +57,7 @@ fn speech(workspace: &mut Workspace, state: &str) {
         map(&[
             ("available", Data::Bool(true)),
             ("state", state.into()),
-            ("owner", "feedback".into()),
+            ("owner", "feedback-window".into()),
         ]),
     );
 }
@@ -84,7 +89,7 @@ fn sent(workspace: &mut Workspace, action: &str) -> bool {
 
 #[test]
 fn closing_feedback_cancels_a_microphone_still_opening() {
-    let (_dir, mut workspace) = fixture(include_str!("../../../../app/mods/feedback/main.luau"));
+    let (_dir, mut workspace) = fixture(WINDOW);
     workspace.send("feedback", "feedback", "open".into());
     button(&mut workspace, "start".into());
     assert!(sent(&mut workspace, "start"));
@@ -105,10 +110,10 @@ fn closing_feedback_cancels_a_microphone_still_opening() {
 
 #[test]
 fn hidden_feedback_cancels_a_late_listening_notification() {
-    let (_dir, mut workspace) = fixture(include_str!("../../../../app/mods/feedback/main.luau"));
+    let (_dir, mut workspace) = fixture(WINDOW);
     workspace.send(
         BUTTON,
-        "feedback",
+        "feedback-window",
         map(&[("msg", "listening".into()), ("value", Data::Bool(true))]),
     );
     assert!(sent(&mut workspace, "cancel"));
@@ -116,7 +121,7 @@ fn hidden_feedback_cancels_a_late_listening_notification() {
 
 #[test]
 fn a_failed_start_clears_the_parents_listening_state() {
-    let (_dir, mut workspace) = fixture(include_str!("../../../../app/mods/feedback/main.luau"));
+    let (_dir, mut workspace) = fixture(WINDOW);
     workspace.send("feedback", "feedback", "open".into());
     button(&mut workspace, "start".into());
     assert!(sent(&mut workspace, "start"));
@@ -131,8 +136,7 @@ fn a_failed_start_clears_the_parents_listening_state() {
 #[test]
 fn reload_cancels_pending_recording_and_transcribing_takes() {
     for phase in ["opening", "recording", "transcribing"] {
-        let (_dir, mut workspace) =
-            fixture(include_str!("../../../../app/mods/feedback/main.luau"));
+        let (_dir, mut workspace) = fixture(WINDOW);
         workspace.send("feedback", "feedback", "open".into());
         button(&mut workspace, "start".into());
         assert!(sent(&mut workspace, "start"));
@@ -203,7 +207,7 @@ end }
 
 #[test]
 fn releasing_a_hold_after_startup_still_sends_release() {
-    let (_dir, mut workspace) = fixture(include_str!("../../../../app/mods/feedback/main.luau"));
+    let (_dir, mut workspace) = fixture(WINDOW);
     workspace.send("feedback", "feedback", "open".into());
     button(
         &mut workspace,

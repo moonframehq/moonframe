@@ -39,6 +39,7 @@ mod node;
 mod peaks;
 pub mod perf;
 mod persist;
+mod pick_report;
 mod read;
 mod request;
 mod roots;
@@ -46,6 +47,7 @@ mod schema;
 mod style;
 mod vm;
 mod window;
+pub mod words;
 mod workspace;
 // keep-sorted end
 
@@ -59,6 +61,7 @@ pub use {
     module::Meta,
     node::*,
     persist::Persist,
+    pick_report::{PickReport, Sends},
     read::MAX_DOCUMENT,
     request::{
         APP, AppIcon, Appearance, Awake, Devtools, DevtoolsPlace, Dock, Edit, EditChange, Guard,
@@ -77,7 +80,8 @@ pub use {
     vm::printable,
     window::{Chrome, Display, ModWindowSize, Platform, Titlebar, WindowPlace, WindowState},
     workspace::{
-        DEMO, DEVTOOLS, FEEDBACK, PROVIDER, SHELL, Slot, TOPIC, ViewDiagnostics, Workspace,
+        DEMO, DEVTOOLS, FEEDBACK, FEEDBACK_WINDOW, PROVIDER, SHELL, Slot, TOPIC, ViewContext,
+        ViewDiagnostics, Workspace,
     },
 };
 

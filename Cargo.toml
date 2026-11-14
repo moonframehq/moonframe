@@ -37,7 +37,7 @@ license      = "MIT"
 publish      = false
 repository   = "https://github.com/moonframehq/moonframe"
 rust-version = "1.99"
-version      = "1.0.1"
+version      = "1.1.1"
 
 [workspace.lints.rust]
 unsafe_code           = "deny"
@@ -78,6 +78,18 @@ herdr-github        = { git = "https://github.com/penso/herdr-gpui", package = "
 herdr-i18n          = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-i18n", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
 herdr-usage         = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-usage", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
 herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-vcs", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
+# An app's translations (`locales/<language>/*.ftl`) and how `ui.t`,
+# `ui.number` and `ui.date` write numbers and dates in its language
+# (moonframe-core). fluent-langneg 0.13 is the one fluent-bundle matches with.
+fluent-bundle   = "0.16"
+fluent-langneg  = "0.13"
+fluent-syntax   = "0.12"
+icu_datetime    = "2.4"
+icu_decimal     = "2.4"
+icu_locale_core = "2.4"
+intl-memoizer   = "0.5"
+sys-locale      = "0.3"
+unic-langid     = "0.9"
 # What GPUI's `RenderImage` is built from, for a turned `ui.map`'s picture.
 image = { default-features = false, version = "0.25" }
 # `ui.image` zooms by the picture's own size, read from its header.

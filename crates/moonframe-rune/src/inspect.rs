@@ -7,7 +7,7 @@ use {
     crate::Ui,
     moonframe_core::{DEMO, Data},
     rune::{Picked, Tx},
-    std::{collections::BTreeMap, fmt::Write as _},
+    std::collections::BTreeMap,
 };
 
 /// What a node records of itself while picking, by its element's key.
@@ -46,7 +46,7 @@ impl Ui {
             ("asker".to_owned(), Data::String(from.to_owned())),
             ("picking".to_owned(), Data::Bool(true)),
         ]);
-        self.workspace
+        self.workspace_mut()
             .app_topic("inspect", from, Data::Map(started));
     }
 
@@ -97,24 +97,41 @@ impl Ui {
         ]);
         if let Some(crumb) = crumb {
             let source = self
-                .workspace
+                .workspace()
                 .slot(&crumb.owner)
-                .and_then(|slot| slot.source());
-            let file =
-                source.map_or_else(|| crumb.owner.clone(), |path| path.display().to_string());
+                .and_then(|slot| slot.source())
+                .map(ToOwned::to_owned);
+            let file = source
+                .as_ref()
+                .map_or_else(|| crumb.owner.clone(), |path| path.display().to_string());
             let at = match crumb.line {
                 Some(line) => format!("{file}:{line}"),
                 None => file,
             };
-            let mut report = String::from("Selected in Moonframe (View > Inspect Element):\n");
-            let _ = writeln!(report, "- element: {}", crumb.element);
-            let _ = writeln!(report, "- mod: {}, drawn by {at}", crumb.owner);
+            // Where to copy the file when it ships signed, as on GPUI.
+            let copy_to = moonframe_providers::installed().and_then(|installed| {
+                Some(
+                    installed
+                        .folder
+                        .join(moonframe_packages::paths::overlay(source.as_deref()?)?),
+                )
+            });
+            let report = self.workspace().pick_report(
+                &moonframe_core::PickReport {
+                    element: &crumb.element,
+                    owner: &crumb.owner,
+                    at: &at,
+                    copy_to: copy_to.as_deref(),
+                    ..moonframe_core::PickReport::default()
+                },
+                Some(&asker),
+            );
             fields.insert("element".to_owned(), Data::String(crumb.element));
             fields.insert("mod".to_owned(), Data::String(crumb.owner));
             fields.insert("at".to_owned(), Data::String(at));
             fields.insert("report".to_owned(), Data::String(report));
         }
-        self.workspace
+        self.workspace_mut()
             .app_topic("inspect", &asker, Data::Map(fields));
     }
 

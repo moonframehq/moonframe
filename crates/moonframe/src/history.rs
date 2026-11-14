@@ -5,12 +5,12 @@
 
 mod kept;
 
-pub(crate) use kept::{Kept, open};
+pub(crate) use kept::{Kept, open_with_sources};
 use {
     crate::paths::{self, Folders},
     moonframe_history::Snapshot,
     std::{
-        path::Path,
+        path::{Path, PathBuf},
         process::ExitCode,
         time::{SystemTime, UNIX_EPOCH},
     },
@@ -39,16 +39,17 @@ Commands:
   snapshot      take one now, if anything changed
 
 settings.toml, databases, installed packages and other profiles are left
-out: undo never changes them.";
+out: undo never changes them. User-selected miniapp source folders are kept
+when they are active in the window.";
 
 /// `moonframe history <words>`.
-pub(crate) fn run(folders: &Folders, words: &[String]) -> ExitCode {
+pub(crate) fn run(folders: &Folders, sources: &[PathBuf], words: &[String]) -> ExitCode {
     let words: Vec<&str> = words.iter().map(String::as_str).collect();
     if matches!(words.first(), Some(&("help" | "-h" | "--help"))) {
         println!("{}", crate::cli::branded(USAGE));
         return ExitCode::SUCCESS;
     }
-    let Some(history) = open(folders) else {
+    let Some(history) = open_with_sources(folders, sources) else {
         eprintln!(
             "{} history: no folder to keep, or git cannot run; drop --no-user",
             paths::name()

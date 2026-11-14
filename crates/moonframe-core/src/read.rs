@@ -304,15 +304,24 @@ pub(crate) fn position(index: i64) -> usize {
 /// The list part of a table up to `last`, its highest position, skipping
 /// `nil` and `false`.
 pub(crate) fn list_to(table: &Table, last: usize) -> Result<Vec<Value>, Error> {
+    Ok(slotted_to(table, last)?.0)
+}
+
+/// [`list_to`], with the position (one-based) each item kept holds: a
+/// `cond and ui.icon "x"` skipped leaves its siblings where they stand.
+pub(crate) fn slotted_to(table: &Table, last: usize) -> Result<(Vec<Value>, Vec<usize>), Error> {
     if last > MAX_ITEMS {
         return Err(Error::new(format!("more than {MAX_ITEMS} list positions")));
     }
-    let mut items = Vec::new();
+    let (mut items, mut slots) = (Vec::new(), Vec::new());
     for index in 1..=last {
         match table.raw_get::<Value>(index)? {
             Value::Nil | Value::Boolean(false) => {},
-            value => items.push(value),
+            value => {
+                items.push(value);
+                slots.push(index);
+            },
         }
     }
-    Ok(items)
+    Ok((items, slots))
 }

@@ -3,6 +3,18 @@
 
 use super::{messages::topic_message, *};
 
+/// The keys of `app` it sets itself, over any the host shares by that name.
+pub(super) const BUILT: &[&str] = &[
+    "appearance",
+    "capabilities",
+    "dark",
+    "kinds",
+    "looks",
+    "mods",
+    "regions",
+    "window",
+];
+
 impl Workspace {
     /// Draws everything, hands each module loaded since the last time the
     /// current value of the topics it hears (so one that joins late starts
@@ -67,7 +79,7 @@ impl Workspace {
 
     /// What every `view` gets as `app`: what the host shares, the mods,
     /// which regions they asked for, and the theme.
-    fn app(&self) -> AppData {
+    pub(super) fn app(&self) -> AppData {
         let mut regions: BTreeMap<String, Vec<Data>> = BTreeMap::new();
         let names: BTreeSet<&str> = self
             .mods

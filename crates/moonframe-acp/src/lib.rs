@@ -41,23 +41,28 @@
 //! or that the bundle's signature broke.
 
 mod agents;
+mod allow;
+mod brief;
 mod guard;
 mod keeper;
+mod launch;
+mod place;
 mod run;
 mod tree;
+mod verify;
 
 pub use keeper::{Keeper, set_keeper};
 use {
+    allow::Scope,
     moonframe_core::Data,
-    moonframe_providers::{Handle, Installed, Mods, Native, to_json},
+    moonframe_providers::{Editable, Handle, Installed, Mods, Native, to_json},
     run::{Allow, Inbound, Run, Start, Status},
     serde_json::{Value, json},
     std::{
-        collections::hash_map::RandomState,
+        collections::{HashMap, hash_map::RandomState},
         ffi::OsString,
         hash::{BuildHasher, Hasher},
         path::{Path, PathBuf},
-        process::{Command, Stdio},
         sync::{Arc, Mutex, MutexGuard, PoisonError, atomic::Ordering},
         time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     },
@@ -88,6 +93,10 @@ struct State {
     dirty: bool,
     /// A run finished or was forgotten since the runs were last saved.
     unsaved: bool,
+    /// The app as checked when each run on it started, by run.
+    baselines: HashMap<String, verify::Pending>,
+    /// An agent started ahead of a run, waiting for one (see `launch`).
+    warm: Option<Run>,
 }
 
 #[derive(Default)]
@@ -105,11 +114,15 @@ pub struct Acp {
     default_agent: String,
     /// Where agents work.
     cwd: PathBuf,
-    /// The app folder this provider is in, from `cwd` (`app`,
-    /// `examples/ledger`), when agents work around it.
+    /// The folder they change, from `cwd` (`app`, `examples/ledger`), when
+    /// agents work around it.
     app: Option<String>,
+    /// The folder they change.
+    writable: Option<PathBuf>,
     /// The app as installed, if it is.
     installed: Option<Installed>,
+    /// The app as the host says an agent changes it.
+    editable: Option<Editable>,
     /// The folders agents are looked for in.
     path: OsString,
     /// Commands replacing an agent's own (`[settings] commands`), by name.
@@ -161,21 +174,32 @@ impl Native for Acp {
             home.as_deref(),
         );
         self.installed = moonframe_providers::installed().cloned();
-        let cwd = settings.get("cwd").and_then(Value::as_str);
-        self.cwd = match (&self.installed, cwd) {
-            // Whatever folder the provider was copied to, and even with a
-            // repository around it: the window runs the bundle and this.
-            (Some(installed), None) => installed.folder.clone(),
-            _ => workdir(host.dir(), cwd, home.as_deref()),
-        };
-        self.app = app_folder(host.dir(), &self.cwd);
-        let state = std::env::var_os("XDG_STATE_HOME")
-            .map(PathBuf::from)
-            .or_else(|| home.as_ref().map(|home| home.join(".local/state")));
+        self.editable = moonframe_providers::editable().cloned();
+        let place = place::place(
+            host.dir(),
+            settings.get("cwd").and_then(Value::as_str),
+            home.as_deref(),
+            self.installed.as_ref(),
+            self.editable.as_ref(),
+        );
+        self.cwd = place.cwd;
+        self.app = place.app;
+        self.writable = place.writable;
+        // Beside the app's own state, so each app and profile keeps its own.
+        let state = self
+            .editable
+            .as_ref()
+            .and_then(|editable| Some(editable.state.as_deref()?.parent()?.to_owned()))
+            .or_else(|| {
+                std::env::var_os("XDG_STATE_HOME")
+                    .map(PathBuf::from)
+                    .or_else(|| home.as_ref().map(|home| home.join(".local/state")))
+                    .map(|state| state.join("moonframe"))
+            });
         let profile = moonframe_providers::profile().unwrap_or("default");
         self.store = match settings.get("store").and_then(Value::as_str) {
             Some(store) => Some(PathBuf::from(store)),
-            None => state.map(|state| state.join("moonframe/acp").join(format!("{profile}.json"))),
+            None => state.map(|state| state.join("acp").join(format!("{profile}.json"))),
         };
         self.restore();
         self.look_for_agents();
@@ -198,6 +222,7 @@ impl Native for Acp {
         }
         self.check_seal();
         self.keep_finished();
+        self.expire_warm();
         self.publish(host);
     }
 
@@ -215,6 +240,9 @@ impl Native for Acp {
             if let Ok(data) = moonframe_providers::from_json(&answer) {
                 host.send(from, data);
             }
+        } else if message.get("warm").and_then(Value::as_bool) == Some(true) {
+            self.warm(host, from, &message);
+            return;
         } else if let Some(id) = text("cancel") {
             self.with_own_run(from, id, |run, now| run.cancel(now));
         } else if let Some(id) = text("answer") {
@@ -249,13 +277,19 @@ impl Drop for Acp {
     /// with the app, and its agent live on.
     fn drop(&mut self) {
         let now = now();
-        let mut state = lock(&self.state);
-        let leaving: Vec<_> = state.runs.iter().filter_map(Run::agent).collect();
-        for run in &mut state.runs {
+        let mut guard = lock(&self.state);
+        let state = &mut *guard;
+        let leaving: Vec<_> = state
+            .runs
+            .iter()
+            .chain(state.warm.iter())
+            .filter_map(Run::agent)
+            .collect();
+        for run in state.runs.iter_mut().chain(state.warm.iter_mut()) {
             run.stop(now);
         }
         state.unsaved = true;
-        drop(state);
+        drop(guard);
         self.save();
         let deadline = Instant::now() + QUIT_WAIT;
         while Instant::now() < deadline
@@ -290,11 +324,72 @@ impl Acp {
         for id in finished {
             let changed = keeper.after(&id);
             let mut state = lock(&self.state);
+            let baseline = state.baselines.remove(&id);
             if let Some(run) = state.runs.iter_mut().find(|run| run.id == id) {
                 run.set_changed(changed);
+                if let (true, Some(baseline), Some(editable)) = (changed, baseline, &self.editable)
+                {
+                    run.checking = true;
+                    self.verify(&id, baseline, editable, &keeper);
+                }
             }
             state.dirty = true;
             state.unsaved = true;
+        }
+    }
+
+    /// Checks the app after the run `id` changed it, on a thread of its own,
+    /// and takes it back to before the run when it added problems.
+    fn verify(
+        &self,
+        id: &str,
+        baseline: verify::Pending,
+        editable: &Editable,
+        keeper: &Arc<dyn Keeper>,
+    ) {
+        let (shared, keeper, id) = (Arc::clone(&self.state), Arc::clone(keeper), id.to_owned());
+        let (command, cwd) = (editable.check.clone(), self.cwd.clone());
+        let checking = std::thread::Builder::new()
+            .name("acp-verify".to_owned())
+            .spawn(move || {
+                let before = baseline.wait();
+                let after = verify::run(&command, &cwd);
+                let added = before.as_ref().map(|before| after.added(before));
+                // Undone under the lock, so the user's Undo can't come
+                // between: one or the other takes the app back.
+                let mut state = lock(&shared);
+                let broke = added.as_ref().is_some_and(|added| !added.is_empty());
+                let undoable = state.runs.iter().any(|run| run.id == id && run.undoable());
+                let undone = (broke && undoable).then(|| keeper.undo(&id));
+                if let Some(run) = state.runs.iter_mut().find(|run| run.id == id) {
+                    run.checking = false;
+                    run.timing.check = Some(after.ms);
+                    run.timing.baseline = before.as_ref().map(|before| before.ms);
+                    let first = added
+                        .as_ref()
+                        .and_then(|added| added.first().cloned())
+                        .unwrap_or_default();
+                    match undone {
+                        Some(Ok(())) => {
+                            run.set_undone();
+                            run.warn(format!(
+                                "The change broke the app, so it was undone: {first}"
+                            ));
+                        },
+                        Some(Err(error)) => run.warn(format!(
+                            "The change broke the app ({first}), and undoing it failed: {error}"
+                        )),
+                        None => {},
+                    }
+                }
+                state.dirty = true;
+                state.unsaved = true;
+            });
+        if let Err(error) = checking {
+            tracing::warn!(
+                provider = "acp",
+                "cannot check the app after a run: {error}"
+            );
         }
     }
 
@@ -423,85 +518,98 @@ impl Acp {
         self.serial += 1;
         let now = now();
         let id = run_id(self.serial);
-        let prompt = compose(instructions, words, &context, &nonce(&id));
+        // A run on the app itself: its agent is told about the app, and the
+        // app is checked before and after it.
+        let on_app = message.get("app").and_then(Value::as_bool) == Some(true);
+        let editable = self.editable.as_ref().filter(|_| on_app);
+        let instructions = match editable {
+            Some(editable) => format!("{}\n\n{}", instructions.trim(), brief::brief(editable)),
+            None => instructions.to_owned(),
+        };
+        let prompt = compose(&instructions, words, &context, &nonce(&id));
         // Before the agent can write anything.
-        if let Some(keeper) = self.keeper() {
+        let keeper = self.keeper();
+        if let Some(keeper) = &keeper {
             keeper.before(&id);
         }
+        // Checked beside the agent starting, before it can have changed
+        // anything: only what the run adds is undone.
+        if let (Some(editable), Some(_)) = (editable, &keeper) {
+            let baseline = verify::Pending::start(&editable.check, &cwd);
+            lock(&self.state).baselines.insert(id.clone(), baseline);
+        }
 
-        let mut command = Command::new(&program);
-        command
-            .args(&args)
-            .current_dir(&cwd)
-            .env("PATH", &self.path)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        tree::own_group(&mut command);
-        let child = command
-            .spawn()
-            .map_err(|error| format!("cannot start {}: {error}", agent.title))?;
-        let run = Run::new(
-            Start {
-                id: id.clone(),
-                owner: from.to_owned(),
-                request: message.get("id").cloned().unwrap_or(Value::Null),
-                agent,
-                text: words.to_owned(),
-                thread: message
-                    .get("thread")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned),
-                prompt,
-                // The user's setting, never the mod's message.
-                allow: self
-                    .allow
-                    .iter()
-                    .find(|(name, _)| name == moonframe_providers::owner(from))
-                    .map_or(Allow::Ask, |(_, allow)| *allow),
-                cwd,
-                installed: self.installed.clone(),
-                now,
-            },
-            Some(host.clone()),
-        );
-        let shared = Arc::clone(&self.state);
-        let run_id = id.clone();
-        let deliver = move |inbound: Inbound| {
-            let mut state = lock(&shared);
-            let Some(run) = state.runs.iter_mut().find(|run| run.id == run_id) else {
-                return;
-            };
-            let was = run.status;
-            run.receive(inbound, crate::now());
-            let finished = run.status.finished() && !was.finished();
-            state.dirty = true;
-            if finished {
-                state.unsaved = true;
-            }
+        let start = Start {
+            id: id.clone(),
+            owner: from.to_owned(),
+            request: message.get("id").cloned().unwrap_or(Value::Null),
+            agent,
+            text: words.to_owned(),
+            thread: message
+                .get("thread")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            prompt,
+            // The user's setting, never the mod's message.
+            allow: self
+                .allow
+                .iter()
+                .find(|(name, _)| name == moonframe_providers::owner(from))
+                .map_or(Allow::Ask, |(_, allow)| *allow),
+            scope: self.scope(&cwd, on_app),
+            cwd: cwd.clone(),
+            installed: self.installed.clone(),
+            now,
         };
-        tracing::info!(
-            provider = "acp",
-            agent = agent.name,
-            from,
-            "starting {}",
-            program.display()
-        );
-        // In the list before its threads start, so nothing they say is lost.
+        let launched = match self.take_warm(agent, &cwd) {
+            Some(mut run) => {
+                run.adopt(start);
+                lock(&self.state).runs.push(run);
+                Ok(())
+            },
+            None => self.launch(Run::new(start, Some(host.clone())), &program, &args, false),
+        };
         let mut state = lock(&self.state);
-        state.runs.push(run);
-        let attached = state
-            .runs
-            .last_mut()
-            .map(|run| run.attach(child, deliver))
-            .unwrap_or(Ok(()));
-        if let Err(error) = attached {
-            state.runs.pop();
+        if let Err(error) = launched {
+            state.baselines.remove(&id);
             return Err(error);
         }
         prune(&mut state.runs);
         state.dirty = true;
         Ok(id)
+    }
+
+    /// What [`Allow::App`] lets an app-targeted run in `cwd` touch: the app's
+    /// writable folder, selected user miniapps, and its check.
+    fn scope(&self, cwd: &Path, on_app: bool) -> Scope {
+        let check = self
+            .installed
+            .as_ref()
+            .map(|installed| installed.check.clone())
+            .or_else(|| {
+                self.editable
+                    .as_ref()
+                    .map(|editable| editable.check.clone())
+            });
+        let mut writable: Vec<PathBuf> = self
+            .writable
+            .iter()
+            .filter_map(|folder| folder.canonicalize().ok())
+            .collect();
+        if on_app {
+            writable.extend(
+                self.editable
+                    .iter()
+                    .flat_map(|editable| &editable.layers)
+                    .filter(|(role, _)| role.starts_with("entry:"))
+                    .filter_map(|(_, folder)| folder.canonicalize().ok()),
+            );
+        }
+        Scope {
+            cwd: cwd.to_owned(),
+            writable,
+            commands: check.into_iter().collect(),
+        }
     }
 
     /// The folder a run of `from` asked to work in: an absolute folder that
@@ -586,6 +694,20 @@ impl Acp {
             "agent": self.default_agent,
             "workdir": self.cwd,
             "app": self.app,
+            "writable": self.writable,
+            // What each mod's runs do without asking, as the user set it.
+            "allow": self.allow.iter().map(|(name, allow)| (name.clone(), json!(allow.name()))).collect::<serde_json::Map<_, _>>(),
+            // The app as the host says an agent changes it: its folders,
+            // lowest first, and the command that checks it.
+            "target": self.editable.as_ref().map(|editable| json!({
+                "title": editable.title,
+                "app": editable.app,
+                "writable": editable.writable,
+                "workdir": editable.workdir,
+                "overlay": editable.overlay(),
+                "check": editable.check,
+                "layers": editable.layers.iter().filter(|(role, _)| !role.starts_with("entry:")).map(|(role, path)| json!({ "role": role, "path": path })).collect::<Vec<_>>(),
+            })),
             // Only when agents work over it: `cwd` sends them elsewhere.
             "installed": self.installed.as_ref().filter(|installed| installed.folder == self.cwd).map(|installed| json!({
                 "bundle": installed.bundle,
@@ -698,52 +820,6 @@ fn run_id(serial: u64) -> String {
         .duration_since(UNIX_EPOCH)
         .map_or(0, |time| time.as_micros());
     format!("{started}-{serial}-{}", nonce(&serial.to_string()))
-}
-
-/// Where agents work: `[settings] cwd`, else the repository holding the
-/// app folder this provider is in (its edits reload the window), else the
-/// user's folder over an installed app.
-fn workdir(dir: &Path, setting: Option<&str>, home: Option<&Path>) -> PathBuf {
-    if let Some(setting) = setting {
-        return match (setting.strip_prefix("~/"), home) {
-            (Some(rest), Some(home)) => home.join(rest),
-            _ => PathBuf::from(setting),
-        };
-    }
-    let start = dir.join("..").join("..");
-    let start = std::path::absolute(&start).unwrap_or(start);
-    let start = start.canonicalize().unwrap_or(start);
-    if let Some(repo) = start
-        .ancestors()
-        .find(|folder| folder.join(".git").exists())
-    {
-        return repo.to_owned();
-    }
-    let config = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| home.map(|home| home.join(".config")))
-        .unwrap_or_default();
-    config.join("moonframe")
-}
-
-/// The app folder holding the provider folder `dir`, from `cwd`; none when
-/// it is not inside `cwd`.
-fn app_folder(dir: &Path, cwd: &Path) -> Option<String> {
-    let app = dir.join("..").join("..");
-    let app = std::path::absolute(&app).unwrap_or(app);
-    let app = app.canonicalize().ok()?;
-    let cwd = cwd.canonicalize().ok()?;
-    let rest = app.strip_prefix(&cwd).ok()?;
-    if rest.as_os_str().is_empty() {
-        return Some(".".to_owned());
-    }
-    // Joined with `/` on every system: the mod shows it, and the agent is
-    // told it, as a path from the repository.
-    let parts: Vec<String> = rest
-        .components()
-        .map(|part| part.as_os_str().to_string_lossy().into_owned())
-        .collect();
-    Some(parts.join("/"))
 }
 
 /// Keeps the newest runs, never dropping one that is going.

@@ -1,12 +1,18 @@
 # Coding agents (Claude, Codex, Gemini, OpenCode, Copilot) run for mods
 # over the Agent Client Protocol, shared as `app.acp`: the agents found
 # here, and each run's status, the agent's latest message, its tool calls,
-# plan, and a permission question waiting on the user.
+# plan, how long each part took (`timing`), and a permission question
+# waiting on the user.
 # Mods start a run with `{ start = "<words>", ... }` and stop, answer or
-# forget their own (see crates/moonframe-acp).
+# forget their own (see crates/moonframe-acp). A run with `app = true`
+# changes the app itself: the agent is told which app runs this (its
+# folders, the one to write in, the one command that checks it, a short
+# guide and an index of its files), as the host says, so an app on the
+# library gets its own repository and not Moonframe's; and the app is
+# checked before and after, a change that adds problems being undone.
 # A native provider: Rust built into the app (crates/moonframe-acp, the
 # `acp` feature). The agents run with your access, in the app's repository
-# (else ~/.config/moonframe), and ask you before what `allow` doesn't
+# (else your folder over the app), and ask you before what `allow` doesn't
 # cover. In an installed app they work in your folder, and nothing `allow`
 # says lets them write in the signed app.
 interval = 0.25
@@ -20,12 +26,16 @@ agent = "claude"
 starters = ["feedback"]
 # The permission questions a mod's agents answer themselves, always
 # "allow once" (never "always"); every other question waits on you in the
-# run. "read": tools that only look (read, search, think). "all": every
-# tool, so the agent edits files and runs commands as you without asking.
-# Only this file sets it; a mod can't ask for more. To let Send feedback
-# change the app without asking, copy this folder to
-# ~/.config/moonframe/providers/acp and set feedback = "all" there.
-allow = { feedback = "read" }
+# run. "read": tools that only look (read, search, think). "app": those,
+# edits in the app's writable folder (`app.acp.writable`) and in selected
+# user miniapps when a run targets the app, except provider code and manifests,
+# plus the app's check command as it is; anything else asks. The app keeps
+# these folders, so Undo takes a run back. "all": every tool, so the agent
+# edits files and runs commands as you without asking. "ask": every one asks.
+# Only this file sets it; a mod can't ask for more. To change it, copy this
+# folder to ~/.config/moonframe/providers/acp (or the app's own
+# providers/acp) and set feedback there.
+allow = { feedback = "app" }
 # Commands replacing an agent's own ACP command, e.g.
 # commands = { claude = ["claude-agent-acp"] }
 # Where agents work, instead of the app's repository:

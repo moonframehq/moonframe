@@ -10,6 +10,7 @@
 //! ```
 
 // keep-sorted start
+mod context;
 mod diagnose;
 mod load;
 mod messages;
@@ -19,8 +20,8 @@ mod slot;
 mod windows;
 // keep-sorted end
 
-pub use diagnose::ViewDiagnostics;
 pub(crate) use scope::read_style;
+pub use {context::ViewContext, diagnose::ViewDiagnostics};
 
 use {
     crate::{
@@ -44,6 +45,9 @@ pub const DEVTOOLS: &str = "devtools";
 /// The mod that asks agents for a change (the sparkle), whose runs are the
 /// Developer tools' agent sessions.
 pub const FEEDBACK: &str = "feedback";
+/// The window `feedback` opens its dialog in: an app that keeps `feedback`
+/// gets it too.
+pub const FEEDBACK_WINDOW: &str = "feedback-window";
 
 /// The name messages use for the shell.
 pub const SHELL: &str = "shell";
@@ -89,6 +93,12 @@ pub struct Workspace {
     instances: BTreeMap<String, Mounted>,
     stylesheet: Stylesheet,
     style_error: Option<Error>,
+    /// The languages the user prefers, most preferred first, and the
+    /// app's words in the best of them.
+    languages: Vec<unic_langid::LanguageIdentifier>,
+    words: crate::words::Words,
+    /// Why some of the app's messages did not load.
+    words_errors: Vec<Error>,
     dark: bool,
     /// The appearance the user chose, and what the app adds about it
     /// (the themes), as views see them in `app.appearance`.
@@ -329,6 +339,9 @@ impl Workspace {
             instances: BTreeMap::new(),
             stylesheet: Stylesheet::default(),
             style_error: None,
+            languages: crate::words::requested(),
+            words: crate::words::Words::default(),
+            words_errors: Vec::new(),
             dark,
             window: WindowState::default(),
             mod_windows: BTreeMap::new(),
@@ -681,6 +694,7 @@ impl Workspace {
         self.style_error
             .iter()
             .map(|error| ("style", error))
+            .chain(self.words_errors.iter().map(|error| ("locales", error)))
             .chain(modules)
             .chain(components)
             .chain(demos)
@@ -690,6 +704,26 @@ impl Workspace {
 
     pub fn style_error(&self) -> Option<&Error> {
         self.style_error.as_ref()
+    }
+
+    /// The language the app's words are shown in, as a BCP 47 tag.
+    pub fn locale(&self) -> String {
+        self.words.locale()
+    }
+
+    /// Shows the app in the first of `tags` (BCP 47, most preferred first)
+    /// it has words in, reloading when that changes the list. Tags that do
+    /// not parse are skipped; none left means the system's languages.
+    pub fn set_languages(&mut self, tags: &[&str]) {
+        let mut languages: Vec<unic_langid::LanguageIdentifier> =
+            tags.iter().filter_map(|tag| tag.parse().ok()).collect();
+        if languages.is_empty() {
+            languages = crate::words::requested();
+        }
+        if languages != self.languages {
+            self.languages = languages;
+            self.reload();
+        }
     }
 
     /// The shell, each mod and each mounted copy of a mod (a tab's

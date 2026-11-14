@@ -20,6 +20,9 @@ pub struct Frame {
     /// While scrolled to its end, stay there as the content grows: a chat
     /// or a log. Scrolled back, it stays where the user put it.
     pub follow: bool,
+    /// Draw a scrollbar while it scrolls (the default); `false` scrolls
+    /// with none, as a sidebar a host draws its own way may.
+    pub scrollbar: bool,
     /// Give up space when the parent is short of it (the default); `false`
     /// keeps the content's size, so a strip is never squeezed.
     pub shrink: bool,
@@ -94,6 +97,11 @@ pub struct Stack {
     /// most stacks have none.
     pub pointer: Option<Box<Pointer>>,
     pub children: Vec<Node>,
+    /// Where each child stands in the Luau table, one-based, counting the
+    /// `false` a `cond and ...` left: a renderer that names children by
+    /// place keeps each itself as one before it comes and goes. Empty when
+    /// not read from Luau.
+    pub slots: Vec<usize>,
 }
 
 /// A titled section: a header with optional actions over a column body.

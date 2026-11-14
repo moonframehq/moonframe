@@ -20,6 +20,7 @@ impl Frame {
                 .get::<ScrollKey>("scroll")?
                 .map_or(Scroll::No, |key| key.0),
             follow: fields.get("follow")?.unwrap_or(false),
+            scrollbar: fields.get("scrollbar")?.unwrap_or(true),
             shrink: fields.get("shrink")?.unwrap_or(true),
             self_align: fields.get("self_align")?,
             hug: fields.get("hug")?.unwrap_or(false),

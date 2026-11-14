@@ -3,22 +3,6 @@
 
 type State = { folder: string, open: string? }
 
-local NAMES: { [string]: string } = {
-	compose = "Compose",
-	search = "Search",
-	calendar = "Calendar",
-	automation = "Automation",
-	inbox = "Inbox",
-	starred = "Starred",
-	scheduled = "Scheduled",
-	drafts = "Drafts",
-	sent = "Sent",
-	spam = "Spam",
-	trash = "Trash",
-	settings = "Settings",
-	support = "Support & Feedback",
-}
-
 local MESSAGES: { any } = {
 	{ id = "m1", from = "Maya Okafor", subject = "Offsite agenda, final draft", preview = "Moved the design review to Thursday morning so the eng folks can join after standup.", time = "9:41", unread = true },
 	{ id = "m2", from = "Linear", subject = "3 issues assigned to you", preview = "MAIL-212 Sidebar collapse animation, MAIL-218 Labels lose their colour in dark mode…", time = "9:12", unread = true },
@@ -96,8 +80,9 @@ return mod {
 			ui.row {
 				class = "inbox-head",
 				align = "center",
-				ui.text { NAMES[state.folder] or "Label", class = "inbox-title" },
-				ui.text { `{#MESSAGES} conversations`, class = "inbox-count" },
+				-- A folder's name is `folder-<id>`; a label falls back to "Label".
+				ui.text { if state.folder:match "^label" then ui.t "folder-label" else ui.t(`folder-{state.folder}`), class = "inbox-title" },
+				ui.text { ui.t("conversations", { count = #MESSAGES }), class = "inbox-count" },
 			},
 			ui.column { grow = true, scroll = true, gap = "none", table.unpack(rows) },
 		}

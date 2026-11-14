@@ -57,8 +57,7 @@ impl<'w> Painter<'w> {
             .map(|field| field.edit.text.clone())
             .unwrap_or_default();
         let components: Vec<&'w Component> = self
-            .ui
-            .workspace
+            .ws
             .components()
             .iter()
             .filter(|component| matches(component, &query))
@@ -133,7 +132,8 @@ impl<'w> Painter<'w> {
     fn search(&self, place: &Place<'w>) -> El {
         let mut fields = self.ui.fields.borrow_mut();
         let field = fields.entry(SEARCH.to_owned()).or_default();
-        let shown = text_input(&field.edit, place.ink.text_style());
+        let shown = text_input(&field.edit, place.ink.text_style())
+            .caret(place.ink.color, self.selection());
         drop(fields);
         let muted = self.palette.token(Token::MutedForeground);
         row()
@@ -226,7 +226,7 @@ impl<'w> Painter<'w> {
             parent: Direction::Column,
             ..place.clone()
         };
-        let demo = self.ui.workspace.demo(&component.name);
+        let demo = self.ws.demo(&component.name);
         match (&component.preview, demo) {
             (Err(error), _) => (
                 self.marker(&format!("{}: {error}", component.path_name()), place),

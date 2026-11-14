@@ -301,6 +301,54 @@ fn a_tab_in_a_cell_takes_one_cell_as_any_blank_does() {
 }
 
 #[test]
+fn blocks_and_backgrounds_are_painted_on_the_cell_grid() {
+    use moonframe_terminal::{Cell, Color};
+    // A logo's row: a letter on black, then blocks in orange.
+    let orange = Color::Rgb(0xd7, 0x77, 0x57);
+    let cells: Vec<Cell> = "x▐▛██"
+        .chars()
+        .enumerate()
+        .map(|(column, ch)| Cell {
+            ch,
+            fg: orange,
+            bg: if column < 2 {
+                Color::Rgb(0, 0, 0)
+            } else {
+                Color::Default
+            },
+            ..Cell::default()
+        })
+        .collect();
+    let (line, spans) = terminal::row_text(&cells, rune::Color::WHITE);
+    assert_eq!(line.trim_end(), "x", "blocks are not drawn from the font");
+    assert!(
+        spans.iter().all(|span| span.bg.is_none()),
+        "nor backgrounds as highlights"
+    );
+    let metrics = render::Metrics {
+        width: 8.,
+        height: 16.,
+    };
+    let rects: Vec<[f32; 4]> = terminal::paint(&cells, (8., metrics), rune::Color::WHITE)
+        .into_iter()
+        .map(|(rect, _)| rect)
+        .collect();
+    let left = terminal::PADDING;
+    assert_eq!(rects, [
+        // The black under the first two cells, as one.
+        [left, 8., 16., 16.],
+        // ▐: the right half.
+        [left + 12., 8., 4., 16.],
+        // ▛: three quarters.
+        [left + 16., 8., 4., 8.],
+        [left + 20., 8., 4., 8.],
+        [left + 16., 16., 4., 8.],
+        // ██: one, across both cells.
+        [left + 24., 8., 16., 16.],
+    ]);
+}
+
+#[test]
 fn a_shell_that_exited_gives_its_slot_back_once_its_tab_has_gone() {
     let main = r#"
 local tabbed = use "tabbed"
@@ -361,7 +409,14 @@ return mod {
     wait(&mut window, 20);
     let rect = rect_of(&window, |element| element.role == "terminal");
     let screen = window.state.terminals.screen("shell/two").unwrap();
-    let height = window.state.workspace.stylesheet().mono.size.unwrap_or(13.) * 1.3;
+    let height = window
+        .state
+        .workspace()
+        .stylesheet()
+        .mono
+        .size
+        .unwrap_or(13.)
+        * 1.3;
     let wanted = ((rect[3] - 2. * terminal::PADDING) / height).floor() as u16;
     assert_eq!(screen.rows, wanted, "{rect:?}");
 }

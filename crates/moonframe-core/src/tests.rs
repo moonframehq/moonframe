@@ -17,6 +17,7 @@ mod dictation;
 mod elements;
 mod entries;
 mod entry_scopes;
+mod font_size;
 mod gestures;
 mod history;
 mod lightbox;
@@ -30,6 +31,7 @@ mod packages;
 mod paint;
 mod pointer;
 mod revision_timeline;
+mod scrollbar;
 mod shell;
 mod state;
 mod styles;
@@ -37,9 +39,11 @@ mod switchyard;
 mod task_manager;
 mod topics;
 mod video;
+mod view_context;
 mod view_diagnostics;
 mod views;
 mod windows;
+mod words;
 // keep-sorted end
 
 const SHELL_SOURCE: &str = r#"

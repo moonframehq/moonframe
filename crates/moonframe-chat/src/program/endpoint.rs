@@ -81,10 +81,30 @@ mod tests {
         let address = dir.path().join(format!("{endpoint}.sock"));
         let _listener = UnixListener::bind(&address).unwrap();
         let mut other = Command::new("/bin/sleep").arg("10").spawn().unwrap();
+        #[cfg(target_os = "linux")]
+        wait_for_exec(other.id());
         let found = listening(other.id(), dir.path());
         other.kill().unwrap();
         other.wait().unwrap();
         assert!(found.is_none(), "claimed another process's socket");
         assert_eq!(listening(std::process::id(), dir.path()), Some(endpoint));
+    }
+
+    /// Waits for `pid` to exec: until then, a forked child still holds
+    /// this process's descriptors, the test's socket among them, and
+    /// `/proc` shows it as the child's. Exec closes it (close-on-exec).
+    /// Its program is then no longer this test's, whatever `sleep` resolves
+    /// to (busybox and coreutils' single binary are not named `sleep`).
+    #[cfg(target_os = "linux")]
+    fn wait_for_exec(pid: u32) {
+        let this = std::env::current_exe().unwrap();
+        for _ in 0..500 {
+            let exe = std::fs::read_link(format!("/proc/{pid}/exe"));
+            if exe.is_ok_and(|exe| exe != this) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        panic!("{pid} never exec'd");
     }
 }

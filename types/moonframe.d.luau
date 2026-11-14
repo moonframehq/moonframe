@@ -72,6 +72,9 @@ type Style = {
 	margin: Sides?,
 	shadow: Shadow?,
 	size: TextSize?,
+	-- Text size in pixels, over `size` (6 to 64): text that must match
+	-- what another toolkit draws at a size the app was given.
+	font_size: number?,
 	weight: Weight?,
 	font: ("sans" | "mono")?,
 	-- Letter case of a text: `upper` for headings.
@@ -275,6 +278,9 @@ type StackProps = {
 	scroll_to: number?,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
+	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
+	-- the system's setting).
+	scrollbar: boolean?,
 	-- false keeps the content's size when the parent is short of space.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.
@@ -381,6 +387,9 @@ type PanelProps = {
 	scroll: (boolean | "x" | "y" | "both")?,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
+	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
+	-- the system's setting).
+	scrollbar: boolean?,
 	-- false keeps the content's size when the parent is short of space.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.
@@ -417,6 +426,9 @@ type PaneProps = {
 	scroll: (boolean | "x" | "y" | "both")?,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
+	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
+	-- the system's setting).
+	scrollbar: boolean?,
 	[number]: Child,
 }
 
@@ -1315,6 +1327,21 @@ type MapRoute = {
 	dashed: boolean?,
 }
 
+-- `ui.number`'s options: `decimals` fixes the digits after the point
+-- (0 to 20); without it, up to three show and trailing zeros drop.
+type NumberOptions = {
+	decimals: number?,
+}
+
+-- `ui.date`'s options: how long (`style`, default "medium"), whether the
+-- date shows (default true), and the time of day (true or "minutes",
+-- "seconds"; default none).
+type DateOptions = {
+	style: ("short" | "medium" | "long")?,
+	date: boolean?,
+	time: (boolean | "minutes" | "seconds")?,
+}
+
 declare ui: {
 	row: (props: StackProps) -> Element,
 	column: (props: StackProps) -> Element,
@@ -1350,6 +1377,18 @@ declare ui: {
 	-- What `build()` returned the last time this view asked for `key` with
 	-- the same `deps` (compared with `==`), or `build()` now.
 	memo: <T>(key: string, deps: { any }, build: () -> T) -> T,
+	-- The message `id` (or `id.attribute`) of the app's `locales/<language>/
+	-- *.ftl` in the user's language, with named arguments (strings, numbers
+	-- or booleans); English when the language lacks it, `id` itself when
+	-- English does too.
+	t: (id: string, args: { [string]: any }?) -> string,
+	-- `value` the language's way: `1,234.5`, `1 234,5`, `1.234,5`.
+	number: (value: number, options: NumberOptions?) -> string,
+	-- The moment `seconds` after 1970 (UTC) in the system's time zone, the
+	-- language's way: `Nov 10, 2026`, `10 nov. 2026`.
+	date: (seconds: number, options: DateOptions?) -> string,
+	-- The language the app's words show in, as a BCP 47 tag: `en-US`, `fr`.
+	locale: () -> string,
 }
 
 -- One commit of `app.git.log`.
@@ -1866,6 +1905,8 @@ type AcpTool = {
 	kind: string,
 	-- "pending", "in_progress", "completed" or "failed".
 	status: string,
+	-- How long it took, in milliseconds, once it ended.
+	ms: number?,
 }
 
 type AcpRun = {
@@ -1898,8 +1939,45 @@ type AcpRun = {
 	question: { title: string, options: { { id: string, name: string, kind: string } } }?,
 	-- It left the app's folders different; undo it with `{ undo = id }`.
 	changed: boolean,
-	-- The app was taken back to before it.
+	-- The app was taken back to before it: by the user, or because the
+	-- change broke it (`warning` says so).
 	undone: boolean,
+	-- What the user should know beyond the agent's answer.
+	warning: string?,
+	-- The app is being checked after a run on it (`app = true`).
+	checking: boolean?,
+	-- Milliseconds from its start: when the agent started, shook hands,
+	-- opened its session, first spoke, ended its turn, and how long the
+	-- app's check took after it (and before it, `baseline`). `warm` when it
+	-- took an agent started ahead (`{ warm = true }`).
+	timing: AcpTiming?,
+}
+
+type AcpTiming = {
+	spawned: number?,
+	initialized: number?,
+	session: number?,
+	first_token: number?,
+	ended: number?,
+	check: number?,
+	baseline: number?,
+	warm: boolean,
+}
+
+-- The app as the window says an agent changes it.
+type AcpTarget = {
+	title: string,
+	-- Its own folder, the one agents write in (the user's folder over it,
+	-- when it is no one's source: `overlay`), and the folder they work in.
+	app: string,
+	writable: string,
+	workdir: string,
+	overlay: boolean,
+	-- The shell command that checks it headlessly, in about a second.
+	check: string,
+	-- The folders the window runs on, lowest first: `toolbox`, `package`,
+	-- `app`, `user`.
+	layers: { { role: string, path: string } },
 }
 
 type Acp = {
@@ -1910,8 +1988,14 @@ type Acp = {
 	-- The folder agents work in.
 	workdir: string,
 	-- The app folder they change, from `workdir` (`app`, `examples/ledger`),
-	-- when it is inside it.
+	-- when it is inside it, and the whole path.
 	app: string?,
+	writable: string?,
+	-- What each mod's runs do without asking (`[settings] allow`), by mod:
+	-- "ask", "read", "app" or "all".
+	allow: { [string]: string },
+	-- The app as the window says an agent changes it.
+	target: AcpTarget?,
 	-- This app's process: an agent screenshots the window with it.
 	pid: number,
 	running: number,

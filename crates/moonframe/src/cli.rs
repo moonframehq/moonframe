@@ -311,7 +311,23 @@ fn problems_with(
 /// Loads every module headlessly: what an agent runs after an edit.
 fn check(roots: Roots, capabilities: moonframe_providers::Capabilities) -> ExitCode {
     let workspace = crate::capabilities::open(roots.clone(), false, None);
-    let problems = problems_with(&workspace, &roots, &capabilities);
+    let mut problems = problems_with(&workspace, &roots, &capabilities);
+    // What the open window hit drawing with its real state and data, which
+    // this headless load cannot see.
+    let seen = crate::live::seen(&roots);
+    problems.extend(
+        seen.problems
+            .iter()
+            .map(|problem| match problem.split_once(": ") {
+                Some((name, error)) => (name.to_owned(), error.to_owned()),
+                None => (problem.clone(), String::new()),
+            }),
+    );
+    if seen.behind > 0 {
+        eprintln!(
+            "note: the open window has not reloaded the newest edit yet; run the check again"
+        );
+    }
     if problems.is_empty() {
         let mods = workspace.mod_names().collect::<Vec<_>>();
         let providers = moonframe_providers::names(&roots);
@@ -330,6 +346,9 @@ fn check(roots: Roots, capabilities: moonframe_providers::Capabilities) -> ExitC
             components.len(),
             components.join(", ")
         );
+        if seen.windows > 0 {
+            println!("ok: the open window draws it with its real state and data, without problems");
+        }
         return ExitCode::SUCCESS;
     }
     for (name, error) in problems {
@@ -471,6 +490,7 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
         return crate::bundle::run(&args.folders, words);
     }
     let folders = args.folders;
+    let editable_entries = crate::agent_entries::selected(&launch.entries, folders.user.as_deref());
     paths::set_user_folder(folders.user.clone());
     let _ =
         crate::CRASH_DIR.set(paths::state(folders.profile.as_deref()).with_extension("crashes"));
@@ -529,12 +549,21 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
     if cfg!(feature = "studio")
         && let Some(words) = &args.history
     {
-        return crate::history::run(&folders, words);
+        let paths = editable_entries
+            .iter()
+            .map(|(_, path)| path.clone())
+            .collect::<Vec<_>>();
+        return crate::history::run(&folders, &paths, words);
     }
     if cfg!(feature = "studio")
         && let Some(words) = args.doctor
     {
-        return on_a_view_stack(move || crate::doctor::run(&folders, &words));
+        let entries = launch.entries.clone();
+        let paths = editable_entries
+            .iter()
+            .map(|(_, path)| path.clone())
+            .collect::<Vec<_>>();
+        return on_a_view_stack(move || crate::doctor::run(&folders, &entries, &paths, &words));
     }
     if args.check {
         let roots = launch.entries.apply(folders.roots());
@@ -596,6 +625,10 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
     if let Some(installed) = folders.installed() {
         moonframe_providers::set_installed(installed);
     }
+    let hints = std::mem::take(&mut launch.agent);
+    let mut editable = folders.editable(hints.guide, hints.check);
+    crate::agent_entries::append(&mut editable, &editable_entries);
+    moonframe_providers::set_editable(editable);
     if let Some(profile) = &folders.profile {
         moonframe_providers::set_profile(profile);
     }

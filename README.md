@@ -108,7 +108,8 @@ and how to try it.
   and survives a reload.
 - **An inspector.** <b>View &gt; Inspect Element</b> picks anything in the
   window, like a browser's developer tools, and tells an agent which file
-  and line drew it. <b>View &gt; Developer Tools</b> docks beside the window
+  and line drew it, what a click on it sends, and the live state and data
+  its mod drew it from. <b>View &gt; Developer Tools</b> docks beside the window
   (or opens in its own): edit the picked element's Luau and save to see it
   at once, read its mod's state, or ask an agent in a session that stays open.
 - **Your folder over the app.** `~/.config/moonframe` holds your own mods,
@@ -281,18 +282,19 @@ The window reloads while an agent edits it, so you can watch it work.
   straight to picking: click an element, choose its level in the card,
   and Enter opens the box with it attached; set `inspect_shortcut` in `settings.toml` to use another key,
   or `""` for none. The window follows that file as it changes. A coding agent in the background changes
-  that app's own files with every permission, checks them, then screenshots
-  your window and looks at the result before it answers; the window reloads
-  with the change. Each request becomes a conversation under **Feedback &
-  fixes**, so when something is not quite right you reply and the agent
-  carries on from there.
+  that app's own files and selected user miniapp files without pausing for
+  each edit, checks them, then screenshots your window and looks at the result
+  before it answers; the window reloads with the change. Each request becomes
+  a conversation under **Feedback & fixes**, so when something is not quite
+  right you reply and the agent carries on from there.
 - **The skill.** Claude Code picks up `.claude/skills/moonframe`, which
   tells an agent where a feature belongs, how to build it, and how to check
   it with `just check` and `just types`.
 - **"Add it here."** <b>View &gt; Inspect Element</b> (⌥⌘I), click an
   element (↑ and ↓ first for the row, list or panel around it), and say
   "add a list of branches here". The selection, with its
-  file and line, is saved where the agent reads it.
+  file and line, its mod's state and the data it read, is saved where the
+  agent reads it, and kept current while it stays selected.
 - **Pick a component.** In the Components window, <b>Copy for agent</b>
   copies a request to add that component at your selection.
 - **See it before it is made.** Ask for ideas ("show me three takes on the
@@ -677,8 +679,12 @@ same builder, so `extern crate moonframe_rune as moonframe;` behind a feature
 is all its code needs, beside its own `ui.view`s.
 
 It supports profiles through the `app` commands, and `--check` to load them
-headlessly. Other `moonframe` commands, windows of their own, named themes
-and animations are not available yet. Layout can differ from GPUI.
+headlessly. A mod opens in a window of its own (`app:window`) as on GPUI,
+except one that first shows after launch, which waits for the next, and
+always as an ordinary window: a screen or full screen it asks for is
+GPUI's only for now (the log says so). Other
+`moonframe` commands, the theme picker, named themes and animations are not
+available yet. Layout can differ from GPUI.
 `ui.video` is 8-bit; `ui.map` doesn't
 turn or route; text fields lack the writing modes; and a `ui.browser` needs a
 window on screen to show. CI packages it beside the GPUI build, as

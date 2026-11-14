@@ -130,9 +130,6 @@ impl<'w> Painter<'w> {
         pen.color = token(ink);
         // A size of the button's own, unless the stylesheet sets one.
         pen.size = pen.base * SM;
-        if button.disabled {
-            pen.color = token(Token::MutedForeground);
-        }
         let pen = pen.under(&look.base, self.palette);
         let (height, sides) = match (button.small, button.label.is_empty()) {
             (true, true) => (21., 0.),
@@ -174,6 +171,8 @@ impl<'w> Painter<'w> {
             );
         }
         let element = looked(element, &look, None, self.palette);
+        // Dimmed whole, as GPUI's: its label keeps its own color, white on
+        // a primary button, rather than gray on a faded fill.
         let element = if button.disabled {
             element.opacity(0.5)
         } else {
@@ -276,6 +275,10 @@ impl<'w> Painter<'w> {
         pen.mono |= input.mono;
         let id = input.id.as_deref().unwrap_or(&place.path);
         let key = format!("{}:{id}", place.owner);
+        // `app:edit` from its mod finds it in this window.
+        if let Some(window) = &self.ui.shows {
+            self.ui.shared.drew_field(&key, window);
+        }
         let mut fields = self.ui.fields.borrow_mut();
         let field = fields.entry(key.clone()).or_default();
         if input.value.is_some() && input.value != field.passed {
@@ -333,6 +336,7 @@ impl<'w> Painter<'w> {
             .key(place.path.clone())
             .placeholder(input.placeholder.clone().unwrap_or_default(), muted)
             .color(pen.color)
+            .caret(pen.color, self.selection())
             .px(8.)
             .py(6.)
             .radius(6.);
@@ -509,13 +513,14 @@ impl Ui {
     /// read it: `ui.image`'s own rule, so a mod reaches only the app's files.
     fn picture(&self, owner: &str, image: &Image) -> Option<rune::Image> {
         let cache = self.images.as_ref()?;
-        let source = match self.workspace.slot(owner).and_then(|slot| slot.source()) {
+        let workspace = self.workspace();
+        let source = match workspace.slot(owner).and_then(|slot| slot.source()) {
             Some(source) => source,
             // A demo made from a component's example has no file of its own:
             // the component's folder is where its pictures are.
             None => {
                 let name = owner.strip_prefix(DEMO).unwrap_or(owner);
-                let components = self.workspace.components();
+                let components = workspace.components();
                 &components
                     .iter()
                     .find(|component| component.name == name)?
@@ -523,12 +528,7 @@ impl Ui {
             },
         };
         let folder = source.parent()?;
-        let mut allowed: Vec<_> = self
-            .workspace
-            .roots()
-            .layers()
-            .map(ToOwned::to_owned)
-            .collect();
+        let mut allowed: Vec<_> = workspace.roots().layers().map(ToOwned::to_owned).collect();
         allowed.push(moonframe_packages::paths::images());
         let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
         let path = image.resolve(folder, home.as_deref(), &allowed)?;

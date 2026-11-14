@@ -46,6 +46,10 @@ type Props = {
 	-- Sent by the Copy button, and whether it has been pressed.
 	copy: any,
 	copied: boolean?,
+	-- Drawn as the content of a window of its own rather than as a dialog
+	-- over the app: no backdrop, no title (the window has it), and the
+	-- runs fill the height.
+	inline: boolean?,
 	to: string?,
 }
 
@@ -85,6 +89,74 @@ local function detail(run: any): string
 		return first_line(run.message)
 	end
 	return `{status.label} · {run.agent_title}`
+end
+
+-- How long a run took, as "2 min" or "26s".
+local function took(run: any): string?
+	if not (run.started and run.finished) then
+		return nil
+	end
+	local seconds = math.max(0, math.floor(run.finished - run.started))
+	return if seconds >= 60 then `{math.floor(seconds / 60)} min {seconds % 60}s` else `{seconds}s`
+end
+
+-- One conversation as Markdown, to paste where its problems get fixed:
+-- each request with what the agent said and did, in order, and how it
+-- ended.
+local function export(turns: { any }): string
+	local out = {}
+	local function add(line: string)
+		table.insert(out, line)
+	end
+	for index, run in turns do
+		add(if index == 1 then "## Request" else "## Follow-up")
+		add("")
+		add(run.text or "")
+		add("")
+		local status = (STATUS[run.status] or STATUS.stopped).label
+		local facts = { `{run.agent_title or run.agent}`, status }
+		if run.model then
+			table.insert(facts, run.model)
+		end
+		local time = took(run)
+		if time then
+			table.insert(facts, time)
+		end
+		if run.cwd then
+			table.insert(facts, `in {run.cwd}`)
+		end
+		add(`_{table.concat(facts, " · ")}_`)
+		add("")
+		local parts: { any } = run.parts or {}
+		for _, part in parts do
+			if part.kind == "text" and part.text ~= "" then
+				add(part.text)
+				add("")
+			elseif part.kind == "tools" then
+				for _, tool in part.tools or {} do
+					add(`- [{tool.status or "?"}] {tool.title or tool.id}`)
+				end
+				add("")
+			end
+		end
+		if #parts == 0 and run.message then
+			add(run.message)
+			add("")
+		end
+		if run.error then
+			add(`**Error:** {run.error}`)
+			add("")
+		end
+		if run.warning then
+			add(`**Warning:** {run.warning}`)
+			add("")
+		end
+		if run.undone then
+			add("_Its changes were undone._")
+			add("")
+		end
+	end
+	return table.concat(out, "\n")
 end
 
 -- Runs (newest first) as conversations, newest first: each request with
@@ -132,17 +204,46 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 				table.insert(body, ui.text { turn.warning, class = "feedback-error", wrap = true })
 			end
 		end
-		local undoable, undone = false, false
+		local undoable, undone, checking = false, false, false
 		for _, turn in turns do
 			undoable = undoable or (turn.changed and not turn.undone)
 			undone = undone or turn.undone
+			checking = checking or turn.checking == true
 		end
-		if props.undo and undoable and not going then
+		-- The whole conversation as Markdown, to report what went wrong.
+		local copy_session = ui.button {
+			"Copy session",
+			icon = "copy",
+			variant = "ghost",
+			small = true,
+			copy = export(turns),
+			tooltip = "Copy this conversation as Markdown: the requests, what the agent said and ran, and how it ended",
+		}
+		if checking then
+			-- The provider checks the app after a run on it, and undoes a
+			-- change that broke it.
 			table.insert(body, ui.row {
+				gap = "small",
+				align = "center",
+				ui.icon { name = "loader-circle", spin = true, class = "feedback-detail" },
+				ui.text { "Checking the app…", class = "feedback-detail" },
+			})
+		elseif props.undo and undoable and not going then
+			table.insert(body, ui.row {
+				align = "center",
 				ui.button { "Undo these changes", variant = "outline", msg = { undo_thread = first.id }, to = to },
+				ui.spacer(),
+				copy_session,
 			})
 		elseif props.undo and undone then
-			table.insert(body, ui.text { "These changes were undone", class = "feedback-detail" })
+			table.insert(body, ui.row {
+				align = "center",
+				ui.text { "These changes were undone", class = "feedback-detail" },
+				ui.spacer(),
+				copy_session,
+			})
+		else
+			table.insert(body, ui.row { ui.spacer(), copy_session })
 		end
 		local blank = string.match(props.reply or "", "^%s*$") ~= nil
 		if props.follow and not going then
@@ -168,6 +269,9 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 		key = "run-" .. first.id,
 		class = "feedback-item",
 		gap = "small",
+		-- Its own height in the scrolling list, or a short window squeezes
+		-- its lines over each other.
+		shrink = false,
 		ui.row {
 			class = "feedback-item-head",
 			align = "start",
@@ -177,7 +281,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 			ui.column {
 				grow = true,
 				gap = "none",
-				ui.text { first_line(first.text), class = "feedback-request", truncate = true, tooltip = first.text },
+				ui.text { first_line(first.text), class = "feedback-request", truncate = true },
 				not open and ui.text {
 					if #turns > 1 then `{#turns} turns · {detail(run)}` else detail(run),
 					class = "feedback-detail",
@@ -214,7 +318,7 @@ return component {
 		["error"] = "why the last send failed, shown above the buttons",
 		["change"] = "sent on each edit, with `value` set to the text",
 		["send"] = "sent by Send and ⌘↩, with `value` set to the text from ⌘↩",
-		["runs"] = "runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it)",
+		["runs"] = "runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it). A run's `warning` shows under it (a change that broke the app comes back undone, saying why), and `checking` shows while the provider checks the app after it",
 		["expanded"] = "id of the conversation shown open (its first run), each run with `agent-run`; one waiting on an answer is always open",
 		["undo"] = "show Undo these changes under an open conversation whose runs changed the app (`changed`, not yet `undone`): it sends `{ undo_thread = id }`; send the provider `{ undo = run }` for each of its runs, newest first",
 		["follow"] = "show a box to reply in under the open conversation: Reply sends `{ follow = id }` (⌘↩ with `value`), each edit `{ follow_type = id, value }`; start the follow-up with `thread = id`",
@@ -225,6 +329,7 @@ return component {
 		["detach"] = "msg the chip's × sends",
 		["copy"] = "msg the Copy button sends, as well as copying, e.g. to set `copied`",
 		["copied"] = "show \"Copied\" with a check on the Copy button",
+		["inline"] = "draw it as a window's content (a mod opened with `app:window`) instead of a dialog over the app: no backdrop or title, and the runs fill the height; `open` and `dismiss` then do nothing",
 		["to"] = "mod its own messages go to, if not the drawing one",
 	},
 	styles = {
@@ -338,6 +443,83 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 			footer,
 			ui.button { "Send", variant = "primary", msg = props.send, to = props.to, disabled = blank }
 		)
+		local inline = props.inline == true
+		local content = ui.column {
+			gap = "none",
+			grow = inline,
+			ui.column {
+				class = "feedback-body",
+				-- The request keeps its room; the runs below scroll.
+				shrink = false,
+				not inline and ui.text { "Make it yours", class = "feedback-title" },
+				ui.input {
+					id = props.id or "feedback",
+					value = props.value,
+					placeholder = props.placeholder or PLACEHOLDER,
+					multiline = true,
+					-- Smaller once there are runs below, which get the room;
+					-- it grows as the request does.
+					rows = if #rows > 0 then 3 else 6,
+					max_rows = 10,
+					focus = props.open,
+					change = props.change,
+					submit = not blank and props.send or nil,
+					to = props.to,
+				},
+				props.note ~= nil and ui.text { props.note, class = "feedback-note", wrap = true },
+				props.error ~= nil and ui.text { props.error, class = "feedback-error", wrap = true },
+				props.attached ~= nil and ui.row {
+					class = "feedback-attached",
+					align = "center",
+					ui.row {
+						class = "feedback-chip",
+						align = "center",
+						grow = true,
+						ui.icon { name = "inspector", class = "feedback-running", size = "small" },
+						ui.text { props.attached.element, class = "feedback-chip-element", truncate = true },
+						props.attached.at ~= nil and ui.text {
+							short_at(props.attached.at),
+							class = "feedback-chip-at",
+							truncate = true,
+							tooltip = props.attached.at,
+						},
+						ui.row {
+							class = "feedback-action",
+							msg = props.detach,
+							to = props.to,
+							tooltip = "Don't attach it",
+							ui.icon "close",
+						},
+					},
+					props.attached.report ~= nil and ui.button {
+						if props.copied then "Copied" else "Copy",
+						icon = if props.copied then "check" else "copy",
+						variant = "outline",
+						copy = props.attached.report,
+						msg = props.copy,
+						to = props.to,
+						tooltip = "Copy the element, to paste in your own agent",
+					},
+				},
+				ui.row(footer),
+			},
+			#rows > 0 and ui.column {
+				class = "feedback-history",
+				grow = inline,
+				ui.text { "Feedback & fixes", class = "feedback-heading" },
+				ui.column {
+					gap = "none",
+					grow = inline,
+					max_height = if inline then nil else 520,
+					scroll = true,
+					follow = true,
+					table.unpack(rows),
+				},
+			},
+		}
+		if inline then
+			return content
+		end
 		return ui.overlay {
 			open = props.open,
 			dismiss = props.dismiss,
@@ -346,68 +528,7 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 			to = props.to,
 			keys = { escape = props.dismiss },
 			class = "feedback",
-			content = ui.column {
-				gap = "none",
-				ui.column {
-					class = "feedback-body",
-					ui.text { "Make it yours", class = "feedback-title" },
-					ui.input {
-						id = props.id or "feedback",
-						value = props.value,
-						placeholder = props.placeholder or PLACEHOLDER,
-						multiline = true,
-						-- Smaller once there are runs below, which get the room;
-						-- it grows as the request does.
-						rows = if #rows > 0 then 3 else 6,
-						max_rows = 10,
-						focus = props.open,
-						change = props.change,
-						submit = not blank and props.send or nil,
-						to = props.to,
-					},
-					props.note ~= nil and ui.text { props.note, class = "feedback-note", wrap = true },
-					props.error ~= nil and ui.text { props.error, class = "feedback-error", wrap = true },
-					props.attached ~= nil and ui.row {
-						class = "feedback-attached",
-						align = "center",
-						ui.row {
-							class = "feedback-chip",
-							align = "center",
-							grow = true,
-							ui.icon { name = "inspector", class = "feedback-running", size = "small" },
-							ui.text { props.attached.element, class = "feedback-chip-element", truncate = true },
-							props.attached.at ~= nil and ui.text {
-								short_at(props.attached.at),
-								class = "feedback-chip-at",
-								truncate = true,
-								tooltip = props.attached.at,
-							},
-							ui.row {
-								class = "feedback-action",
-								msg = props.detach,
-								to = props.to,
-								tooltip = "Don't attach it",
-								ui.icon "close",
-							},
-						},
-						props.attached.report ~= nil and ui.button {
-							if props.copied then "Copied" else "Copy",
-							icon = if props.copied then "check" else "copy",
-							variant = "outline",
-							copy = props.attached.report,
-							msg = props.copy,
-							to = props.to,
-							tooltip = "Copy the element, to paste in your own agent",
-						},
-					},
-					ui.row(footer),
-				},
-				#rows > 0 and ui.column {
-					class = "feedback-history",
-					ui.text { "Feedback & fixes", class = "feedback-heading" },
-					ui.column { gap = "none", max_height = 520, scroll = true, follow = true, table.unpack(rows) },
-				},
-			},
+			content = content,
 		}
 	end,
 }

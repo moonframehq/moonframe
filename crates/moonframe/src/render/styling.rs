@@ -64,6 +64,9 @@ pub(super) trait StyleExt: Styled + Sized {
         if let Some(size) = style.size {
             self = self.text_scaled(size, theme);
         }
+        if let Some(size) = style.font_size {
+            self = self.text_size(px(size));
+        }
         if let Some(weight) = style.weight {
             self = self.weighted(weight);
         }
@@ -344,6 +347,9 @@ pub(super) trait FrameExt: StyleExt + StatefulInteractiveElement {
         };
         if frame.follow {
             follow(handle, axis);
+        }
+        if !frame.scrollbar {
+            return self.track_scroll(handle);
         }
         self.track_scroll(handle).child(
             div()

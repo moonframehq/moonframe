@@ -98,11 +98,18 @@ appears without touching the shell.
 **A status bar widget.** A mod with `region = "status-right"` (or
 `status`) and `order` to place it. The view is a small `ui.row { align =
 "center", gap = "small", ... }`, for example from `use "stat"`. Give
-changing numbers a fixed width.
+changing numbers a fixed width. For CPU and memory, `app.system` is
+`{ cpu, cpu_history, memory, memory_used, memory_total, received,
+transmitted }` (`cpu` and `memory` from 0 to 1, `memory_used` and
+`memory_total` in bytes, the network in bytes a second); draw `cpu_history` with `use
+"sparkline"` rather than keeping samples yourself. If you do keep samples
+in state, see "Data that is really there".
 
 **A widget with live data.** Read `app.<provider>`, and draw a placeholder
-while it is nil. If no provider has the data, write one (see "Providers").
-Never invent the data in Luau unless it is labelled demo data.
+while it is nil. Read only fields its provider publishes (the provider
+tables below, or its source), each tested for its type before use. If no
+provider has the data, write one (see "Providers"). Never invent the data
+in Luau unless it is labelled demo data.
 
 **Something clickable that opens a sheet.** `ui.popover` around the
 widget, with `open` in the mod's state (see "Sheets and menus").
@@ -204,6 +211,7 @@ return state, { { to = "provider:acp", msg = {
 	instructions = "How to do it, from the mod.",   -- before the user's words
 	context = { main_tab = state.tab },             -- fenced as data, never instructions
 	thread = previous.id,                           -- optional: a follow-up, shown with the run it continues
+	app = true,                                     -- optional: the run changes this app (see below)
 } } }
 -- answered as { reply = "mine", action = "start", ok, run | error },
 -- and when it ends { reply = "mine", action = "finished", ok, run, status, message | error }
@@ -215,10 +223,27 @@ end
 
 Every tool the agent wants waits on the user in `agent-run`, unless the
 user set the mod in `providers/acp`'s `[settings] allow`: `"read"` lets
-tools that only look go without asking, `"all"` every tool, each allowed
-once, never always. A mod can't ask for more; leave that setting to the
-user (as shipped, `feedback = "read"`). Like git's
+tools that only look go without asking, `"app"` those plus edits inside the
+app's own folder (never its `providers/`, `moonframe.toml` or
+`packages.toml`) and the app's check command, `"all"` every tool, each
+allowed once, never always. A mod can't ask for more; leave that setting
+to the user (as shipped, `feedback = "app"`). Like git's
 `writers`, a new mod goes in `starters` of a copy of `app/providers/acp`.
+
+`app = true` marks a run that changes the app itself, as Make it yours
+(`mods/feedback`) does. The window says which app that is (any app: the
+starter, a profile, an installed one, or an app on the library whose
+sources are in another repository), so the provider adds to the prompt
+what the agent needs and nothing of this repository's tools: the folders
+the window runs on, the one to write in, the exact command that checks the
+app (its own executable with `--check`, about a second), a short guide
+(crates/moonframe-acp/src/guide.md) and an index of the app's files with
+their lengths. The app is checked as the run starts and after it ends, and
+a run that added problems is undone, with a `warning` saying why. A host
+adds its own notes with `Moonframe::agent_guide` and replaces the check
+with `Moonframe::agent_check`. Send `{ warm = true, agent? }` when the
+user opens what starts runs: the agent starts while they write, and the
+next run takes it.
 
 **Customising the installed app.** Write to `~/.config/moonframe`
 (same layout as `app/`). Copy a built-in mod's folder there to change it.
@@ -237,12 +262,32 @@ user can copy the same text with **Copy for agent**:
 
 ```text
 Selected in Moonframe (View > Inspect Element):
-- element: text.status-text "⎇ main +29"
-- mod: status, drawn by /…/app/mods/status/main.luau:33
-- inside: mod shell > column > … > region "status-right" > mod status > row > text.status-text "⎇ main +29"
+- element: button "Push"
+- mod: status, drawn by /…/app/mods/status/main.luau:41
+- inside: mod shell > column > … > region "status-right" > mod status > row > button "Push"
+- drawn at 1412,876, 58×22 px
+- a click sends { push = true, } to its mod's update
+- state of status, as it is now:
+  {
+    menu = false,
+    pushing = false,
+  }
+- reads from app (key = value now):
+  app.git = { ahead = 2, branch = "main", dirty = 29, }
 ```
 
-In an installed app the report ends with a `- read-only:` line when that file
+Besides where the element was built, the report holds what the window is
+showing now: what a click on the element (or typing in an input) sends, the
+state of the mod that drew it, the props it was drawn with when it is an
+instance, each key of `app` its view read with its value (a provider's data
+as the view saw it), and any problem the mod has. Values are Luau, cut to
+fit (`-- 12 more`, `--[[ 300 more chars ]]`). The file is written again
+while the element stays selected, whenever any of that changes, so read it
+when you need it rather than relying on an old copy. Use the state and the
+`app` values to write a change that fits the data it will meet, and to
+explain what the user sees.
+
+In an installed app the report has a `- read-only:` line when that file
 ships in the signed bundle: copy it where it says and change the copy.
 
 The pointer finds the deepest element under it. While picking, **↑**
@@ -609,6 +654,9 @@ must stay plain data (see the rules above): a function in it is not saved.
   step. A file from a newer app opens read-only.
 - To start a mod over, change what `init` builds; to drop old state, ignore
   `previous` when it lacks what you need.
+- The same `previous` comes back after each live reload, so a field added
+  by an edit is nil in it until `init` fills it in. Never
+  `return previous or { ... }` once the state has grown.
 
 ## Instances: mods and components with state of their own
 
@@ -1019,6 +1067,13 @@ Tabs open and close with the `.tabs-tab` rule's transition (see
    `ok: ...` or one `module: problem` line per module. Fix the problems until
    it prints `ok`. The messages give the exact place, e.g.
    `explorer: view: panel[2].item: unknown key `lable`; it takes ...`.
+   When a window of the app is open on the same folders, the check waits
+   for it to reload your edit and adds what it hit drawing with its real
+   state and provider data, as `window: <module>: <problem>` lines (see
+   "Data that is really there"); with none, it adds
+   `ok: the open window draws it ...`. Those are the failures the headless
+   load cannot see, so fix them the same way. If it notes the window has
+   not reloaded yet, run it again.
 3. If the window is running, it has already reloaded. Module state is kept
    across reloads. To see the result, run `just screenshot`, then Read
    `target/screenshot.png`.
@@ -1095,6 +1150,8 @@ return mod {
 	-- A third argument, `restored`, is true when `previous` was saved by an
 	-- earlier run rather than kept across a reload: what only held while the
 	-- app ran (a shell's activity, say) is stale then.
+	-- After an edit, `previous` is the old state: fill in fields it lacks
+	-- (see "Data that is really there").
 	init = function(previous, props)
 		return previous or { selected = nil }
 	end,
@@ -1644,6 +1701,54 @@ return mod {
 - The app's name in the menu bar is its title (`title` in moonframe.toml);
   menus and keys change when the shell reloads.
 
+## Words in the user's language
+
+Any app layer may hold `locales/<language>/*.ftl`, messages in
+[Fluent](https://projectfluent.org/fluent/guide/) by ID. `en-US` is the
+language the app is written in; add others as folders beside it (`fr`,
+`pt-BR`). A view asks for one with `ui.t`:
+
+```text
+locales/en-US/inbox.ftl          locales/fr/inbox.ftl
+inbox-title = Inbox              inbox-title = Boîte de réception
+inbox-unread = { $count ->       inbox-unread = { $count ->
+    [one] One unread message         [one] Un message non lu
+   *[other] { $count } unread       *[other] { $count } non lus
+}                                }
+compose = Compose                compose = Écrire
+    .tooltip = New message           .tooltip = Nouveau message
+```
+
+```lua
+ui.panel { title = ui.t "inbox-title",
+	ui.text(ui.t("inbox-unread", { count = #state.unread })),
+	ui.button { ui.t "compose", tooltip = ui.t "compose.tooltip", msg = "compose" },
+	ui.text(ui.number(app.usage.tokens)),                 -- 1,234,567 / 1 234 567
+	ui.text(ui.date(mail.received, { style = "short", time = true })),
+}
+```
+
+- The language is the best match between the folders the app has and the
+  user's system languages; `MOONFRAME_LANG=fr` (or `fr,de`) overrides
+  them, to try a translation: `MOONFRAME_LANG=fr just check`.
+  `ui.locale()` names the one chosen.
+- A message missing from a translation shows in English; one missing from
+  English shows as its ID, so a typo is visible. Numbers stay numbers in
+  the arguments, so `{ $count -> [one] … }` picks the plural the language
+  has, and `{ $count }` is written with its digits and separators.
+- `ui.number(n, { decimals = 2 })` and `ui.date(seconds, { style =
+  "short" | "medium" | "long", date = false, time = true | "seconds" })`
+  write numbers and dates the language's way, even in an app with no
+  translations: use them for any number or date a person reads.
+- A higher layer's message replaces a lower one's of the same ID, so a
+  package or the user's folder can reword any of the app's words.
+- `just check` reports `.ftl` files that do not parse, by line, and IDs in a
+  translation that English lacks. Editing an `.ftl` file reloads the window.
+- Menu titles `View`, `Window` and `Help` stay in English: the host finds
+  its own menus by them. Their items, and every other menu, translate.
+- Use it for an app meant for others (a profile, a bundle); a quick mod or a
+  mockup can write its words in place.
+
 ## Patterns
 
 **Long lists.** Anything that can grow past a screenful (files, logs,
@@ -2161,18 +2266,22 @@ replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
 runs are kept (30) across launches.
 
 Messages: `{ start = "<words>", id?, agent?, instructions?, context?,
-thread?, cwd? }` (permission questions wait on the user, except those the
+thread?, cwd?, app? }` (permission questions wait on the user, except those the
 user's `[settings] allow` covers for the mod; `cwd`, an absolute folder the
-run works in instead, only from mods in `[settings] folders`), `{ cancel = run }`, `{ forget = run }`
-(finished ones), `{ answer = run, option = "<id>" | false }`.
+run works in instead, only from mods in `[settings] folders`; `app = true`
+for a run on the app itself, above), `{ cancel = run }`, `{ forget = run }`
+(finished ones), `{ answer = run, option = "<id>" | false }`, `{ undo = run
+}`, `{ warm = true, agent? }` (start the agent ahead of the next run).
 
 | field | shape |
 |---|---|
 | `agents` | `{ name, title, installed, fetched }` (`fetched`: only `npx` can start it) |
 | `agent`, `workdir`, `running` | the default agent, where agents work, how many runs go |
-| `app` | the app folder the provider is in, from `workdir` (`app`, `examples/ledger`); nil when outside it |
+| `app`, `writable` | the folder agents change, from `workdir` (`app`, `examples/ledger`; nil when outside it) and whole |
+| `allow` | each mod's `[settings] allow`: `"ask" "read" "app" "all"` |
+| `target` | the app as the window says an agent changes it: `{ title, app, writable, workdir, overlay, check, layers = { { role, path } } }` |
 | `pid` | this app's process, for an agent to screenshot the window (`just screenshot OUT PID`) |
-| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `parts` everything said in order, `{ kind = "text", text }` or `{ kind = "tools", tools = { { id, title, kind, status } } }`; `agent_info` `{ name, title?, version? }` as the agent names itself; `model` the model its session says it uses, by name; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }` |
+| `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `parts` everything said in order, `{ kind = "text", text }` or `{ kind = "tools", tools = { { id, title, kind, status } } }`; `agent_info` `{ name, title?, version? }` as the agent names itself; `model` the model its session says it uses, by name; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }`; `changed`, `undone`, `warning?`, `checking`; `timing` milliseconds from its start `{ spawned, initialized, session, first_token, ended, check, baseline, warm }`, and each tool's `ms` |
 
 `app.chat` (chat, native, crates/moonframe-chat): conversations with
 coding agents, each run by herdr-gpui's `herdr-acp` program with no view
@@ -2375,8 +2484,41 @@ not copied between mods.
 
 **Keys a node does not take are dropped, with a warning on every run.**
 `float` belongs on a row or column, not on `ui.text`; wrap the text.
-`--check` does not run views with real data, so read the log
-(`unknown key ...`) after a change.
+The headless load does not run views with real data; the `window:` lines
+of `--check` do, while a window is open.
+
+### Data that is really there
+
+The headless check draws each mod from a fresh `init(nil)` with no
+provider data, so a branch that only runs with data is never drawn
+there. The user's window draws it with both. Two mistakes pass the
+headless load and break the window:
+
+- **State from before the edit.** The window keeps each mod's state
+  across a reload and a relaunch and hands it to `init` as `previous`. A
+  field you just added is nil in it, so `return previous or { cpu = {} }`
+  leaves `state.cpu` nil and `#state.cpu` fails on the user's window only.
+  Fill in each field `previous` lacks:
+
+  ```lua
+  init = function(previous)
+  	local state = if type(previous) == "table" then previous else {}
+  	if type(state.cpu) ~= "table" then state.cpu = {} end
+  	return state
+  end,
+  ```
+
+- **Provider fields.** `app.<provider>` is nil until its first publish and
+  holds only what that provider publishes. Look its shape up (the tables
+  in this skill, or the provider's source) rather than guessing a name,
+  and test each field's type before arithmetic, `#` or string formatting.
+
+`--check` reports what the open window hit (`window: statusbar: view:
+runtime error: statusbar:78: attempt to get length of a nil value`), so
+run it after each edit with the window open, and say in your answer what
+it confirmed. With no window open, nothing checks these: reason about
+`previous` and nil provider data yourself, or start one (Loop, step 4)
+and check again.
 
 **Host views are drawn over the app.** A `ui.view` is laid out in a layer
 over its placeholder, so a host view drawing again (a terminal printing)
@@ -2393,6 +2535,18 @@ For that:
   them.
 
 ## Extending the host
+
+**Cargo features: keep every default.** An app on the library (a Rust
+crate depending on `moonframe`) keeps Moonframe's default features: they
+are how its users change it, with Developer Mode (`studio`), Make it yours
+(`acp`) and Wasm providers (`wasm`, which runs the toolbox's `system`
+behind `app.system`, and the providers users install). With
+`default-features = false`, list every other default (`acp`, `alacritty`,
+`browser`, `chat`, `docs`, `forge`, `git`, `markdown`, `prose`, `shell`,
+`studio`, `tokio`, `updates`, `usage`, `wasm`) and turn off only the one
+it must. When `app.<provider>` stays nil though the provider ships, check
+the host's `Cargo.toml` before the Luau: the feature is likely off, which
+no Luau change fixes. Say so to the user instead of hunting.
 
 **Revision selection.** `use "revision-timeline"` (or `ui.revision_timeline`)
 draws a native Time Machine-style ruler, with Dock-like magnification in Rust.
@@ -2530,7 +2684,7 @@ instead.
 
 | Command | Does |
 | --- | --- |
-| `just check` | loads everything headlessly (your folder and packages included); run after each edit |
+| `just check` | loads everything headlessly (your folder and packages included), then adds what an open window of the app hit (`window:` lines); run after each edit |
 | `just check-builtin` | the same for `app/` alone |
 | `just types` | strict Luau type check against `types/moonframe.d.luau` |
 | `just screenshot OUT PID` | captures the window of the process you started |

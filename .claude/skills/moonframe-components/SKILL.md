@@ -243,6 +243,12 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `==`), or calls it now: for a costly part of a view that depends on a few
   values. A table counts as the same while it is the same table, even if
   changed inside.
+- **Words in the user's language:** `ui.t("inbox-unread", { count = n })`
+  is the message of that ID in the app's `locales/<language>/*.ftl`
+  (Fluent), in the language the user prefers, English when it lacks one,
+  and the ID itself when English does too. `ui.number(1234.5, { decimals =
+  2 })` and `ui.date(seconds, { style = "short", time = true })` write
+  numbers and dates the language's way; `ui.locale()` names it.
 - **Views run only when needed:** a view runs again when its state or props
   change (any message to its `update`), when a key of `app` it read
   changes, or on a reload; otherwise its last tree is kept. Read `app.x`
@@ -501,12 +507,13 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | `expanded` | id of the conversation shown open (its first run), each run with `agent-run`; one waiting on an answer is always open |
 | `follow` | show a box to reply in under the open conversation: Reply sends `{ follow = id }` (⌘↩ with `value`), each edit `{ follow_type = id, value }`; start the follow-up with `thread = id` |
 | `id` | keeps the text across renders (default "feedback") |
+| `inline` | draw it as a window's content (a mod opened with `app:window`) instead of a dialog over the app: no backdrop or title, and the runs fill the height; `open` and `dismiss` then do nothing |
 | `inspect` | show an Inspect button that starts Inspect Element for the mod (`command = "inspect"`); the pick comes back on the topic `app/inspect` |
 | `note` | muted lines under the field: who acts on the feedback, and what goes with it |
 | `open` | show it |
 | `placeholder` | grey text while empty (default: two examples) |
 | `reply` | the reply the mod has from `follow_type`; Reply is greyed out while it is blank |
-| `runs` | runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it) |
+| `runs` | runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it). A run's `warning` shows under it (a change that broke the app comes back undone, saying why), and `checking` shows while the provider checks the app after it |
 | `send` | sent by Send and ⌘↩, with `value` set to the text from ⌘↩ |
 | `text` | the text the mod has from `change`; Send is greyed out while it is blank |
 | `to` | mod its own messages go to, if not the drawing one |
