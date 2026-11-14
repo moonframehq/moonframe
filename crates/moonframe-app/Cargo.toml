@@ -50,6 +50,7 @@ default = [
   "projects",
   "prose",
   "restart",
+  "share",
   "shell",
   "socket",
   "speech",
@@ -96,6 +97,7 @@ prose         = ["moonframe/prose"]
 restart       = ["moonframe/restart"]
 rune          = ["dep:moonframe-rune", "moonframe-rune/ghostty"]
 sealed        = ["moonframe/sealed"]
+share         = ["moonframe/share"]
 shell         = ["moonframe/shell"]
 socket        = ["moonframe/socket"]
 speech        = ["moonframe/speech"]

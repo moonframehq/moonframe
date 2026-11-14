@@ -725,6 +725,7 @@ type IconName =
 	| "server"
 	| "settings"
 	| "settings-2"
+	| "share"
 	| "shield"
 	| "sliders-horizontal"
 	| "smile-plus"
@@ -2127,6 +2128,21 @@ type PickMsg = {
 	folder: string?,
 }
 
+-- What `{ to = "app:share", msg = ... }` offers to the system's share menu
+-- (macOS), at the pointer. Files must be the app's (its folders, the image
+-- cache `~/.cache/<app>/images` or the share cache `~/.cache/<app>/share`)
+-- or picked by the user for the mod. With `reply`, the mod hears it
+-- back with `service` (the name of the one picked) or `cancelled = true`.
+type ShareMsg = {
+	-- A web address: https:// or http://.
+	url: string?,
+	-- At most 4096 bytes, beside the rest.
+	text: string?,
+	-- At most 20, named as `ui.image` names pictures.
+	files: { string }?,
+	reply: Data?,
+}
+
 -- What `{ to = "app:edit", msg = ... }` does to the sending mod's input
 -- with `id = field`, around its selection, keeping undo and focus; the
 -- field then sends its `change`. `wrap` puts `{ before, after }` around the
@@ -2176,7 +2192,7 @@ type DevtoolsMsg =
 -- in the Dock, changed at once until the app quits; macOS only),
 -- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
--- `"app:devtools"` (`msg` a `DevtoolsMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
+-- `"app:devtools"` (`msg` a `DevtoolsMsg`), `"app:share"` (`msg` a `ShareMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
 type Send = {
 	to: string,
 	msg: Data,

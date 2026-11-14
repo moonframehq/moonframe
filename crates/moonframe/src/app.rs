@@ -67,6 +67,7 @@ mod panes;
 mod picking;
 mod problems;
 mod quick_inspect;
+mod sharing;
 mod toasts;
 mod updates;
 mod view;
@@ -815,6 +816,7 @@ impl MoonframeApp {
             Request::Dock(dock) => self.dock_request(from, &dock),
             Request::Restart(name) => self.restart_provider(from, &name, cx),
             Request::Devtools(request) => self.devtools_request(from, request, cx),
+            Request::Share(request) => self.share_request(from, request, window, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);

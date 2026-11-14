@@ -1,5 +1,6 @@
 -- A web page with an address bar: back, forward, reload (stop while the page
--- loads), the address, the title, and a button that opens the page in the
+-- loads), the address, the title, with `share` a button that offers the page
+-- to the system's share menu (`app:share`), and one that opens it in the
 -- system browser. The page is a `ui.browser`; the bar drives it with the
 -- host's browser commands, and its address field is the page's own
 -- (`ui.input { browser = id }`): Enter goes where it says, a host over
@@ -26,6 +27,9 @@ type Props = {
 	navigate: any,
 	loading: any,
 	zoom: number?,
+	-- A Share button for a web page: its address and title to the
+	-- system's share menu (macOS; the app needs the `share` feature).
+	share: boolean?,
 }
 
 return component {
@@ -35,7 +39,7 @@ return component {
 	-- Offered by tab bars' + menu. A tab passes `navigate` and keeps what
 	-- it reports as `page`, so the tab shows the page it is on.
 	tab = { title = "Browser", icon = "globe", props = { url = "https://luau.org" }, report = "navigate" },
-	description = "A web page with an address bar: back, forward, reload or stop, an editable address, the title, and open in the system browser.",
+	description = "A web page with an address bar: back, forward, reload or stop, an editable address, the title, optionally share, and open in the system browser.",
 	when = "A web page in a pane, with browser chrome. Keep the page's `navigate` messages in state and pass the latest as `page`; the address bar navigates on its own. For a bare page without a bar use `ui.browser`.",
 	props = {
 		["id"] = "keeps the page across renders; one per id",
@@ -44,6 +48,7 @@ return component {
 		["navigate"] = "message sent as the page navigates, loads or its title changes; keep it and pass it as `page`",
 		["loading"] = "message sent as loads start and finish, with `loading` and `url` added",
 		["zoom"] = "page zoom, 0.25 to 5",
+		["share"] = "true: a Share button that offers a web page's address and title to the system's share menu (`app:share`; macOS, and the app built with `share`)",
 	},
 	styles = {
 		[".browser"] = { gap = 0, radius = 8, border = true },
@@ -56,6 +61,7 @@ return component {
 		id = "example",
 		url = "https://example.com",
 		page = { url = "https://example.com/", title = "Example Domain", back = true, forward = false },
+		share = true,
 	},
 	usage = [[
 local browser = use "browser"
@@ -70,6 +76,12 @@ browser { id = "docs", url = state.url, page = state.page, navigate = { navigate
 		local page: Page = props.page or {}
 		local address = page.url or props.url or ""
 		local busy = page.loading == true
+		-- A web page can go to the share menu, when the caller offers it;
+		-- `app:share` takes addresses of at most 2048 bytes, text 4096.
+		local sharing = props.share == true
+			and (string.sub(address, 1, 8) == "https://" or string.sub(address, 1, 7) == "http://")
+		local shareable = #address <= 2048
+		local title = if page.title and page.title ~= "" and #page.title <= 4096 then page.title else nil
 		local function chrome(label: string, icon: string, command: string, disabled: boolean?)
 			return ui.button {
 				icon = icon :: any,
@@ -110,6 +122,15 @@ browser { id = "docs", url = state.url, page = state.page, navigate = { navigate
 					grow = true,
 				},
 				page.title and page.title ~= "" and ui.text { page.title, class = "browser-title", truncate = true },
+				sharing and ui.button {
+					icon = "share",
+					small = true,
+					variant = "ghost",
+					tooltip = if shareable then "Share" else "This address is too long to share",
+					disabled = not shareable,
+					to = if shareable then "app:share" else nil,
+					msg = if shareable then { url = address, text = title } else nil,
+				},
 				chrome("Open in the system browser", "external-link", "browser-open"),
 			},
 			ui.browser {
