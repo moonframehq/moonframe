@@ -34,7 +34,8 @@ pub(crate) struct Job {
 
 /// Starts making `source` into a PDF at `out`, on `paper` (else the
 /// system's). Call [`finish`] with its id once `done` answers or the wait
-/// is given up, to let its view go.
+/// is given up, to let its view go; one given up mid-print is kept until
+/// its print is over, which answers `done`, and needs a second call then.
 #[cfg(all(feature = "browser", target_os = "macos"))]
 pub(crate) fn render(source: Source, paper: Option<Paper>, out: PathBuf) -> Result<Job, String> {
     macos::render(source, paper, out)

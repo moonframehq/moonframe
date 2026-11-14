@@ -21,7 +21,7 @@ const MAX_URL: usize = 2048;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pdf {
     pub source: PdfSource,
-    /// The PDF to write: relative to the app's cache folder's `pdf/`, or a
+    /// The PDF to write: relative to the app's cache folder, or a
     /// path inside the app's cache or state folders. The app checks it.
     pub pdf: String,
     pub paper: Option<Paper>,
@@ -145,38 +145,39 @@ pub fn private_host(url: &str) -> bool {
         return true;
     };
     let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
-    // Credentials in an address are refused too.
-    if authority.contains('@') {
+    // Credentials in an address are refused too, and every IPv6 literal,
+    // IPv4 ones written in it (`[::ffff:10.0.0.1]`) among them, as the
+    // app's rules block them all as the page loads.
+    if authority.contains('@') || authority.starts_with('[') {
         return true;
     }
-    let host = match authority.strip_prefix('[') {
-        Some(v6) => v6.split(']').next().unwrap_or_default(),
-        None => authority
-            .rsplit_once(':')
-            .map_or(authority, |(host, _)| host),
-    }
-    .to_ascii_lowercase();
+    let host = authority
+        .rsplit_once(':')
+        .map_or(authority, |(host, _)| host)
+        .to_ascii_lowercase();
+    // A name may end in a dot: `localhost.` is `localhost`.
+    let host = host.trim_end_matches('.');
     if host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local") {
         return true;
     }
-    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
-        return match ip {
-            std::net::IpAddr::V4(ip) => {
-                ip.is_loopback()
-                    || ip.is_private()
-                    || ip.is_link_local()
-                    || ip.is_unspecified()
-                    || ip.is_broadcast()
-            },
-            std::net::IpAddr::V6(ip) => {
-                ip.is_loopback()
-                    || ip.is_unspecified()
-                    || (ip.segments()[0] & 0xfe00) == 0xfc00
-                    || (ip.segments()[0] & 0xffc0) == 0xfe80
-            },
-        };
+    // A host ending in a number is an IPv4 address to a browser, in any
+    // form (`2130706433`, `0x7f.1`, `0177.0.0.1`): the usual one is
+    // checked, the rest refused.
+    let last = host.rsplit('.').next().unwrap_or_default();
+    let numeric = (!last.is_empty() && last.bytes().all(|byte| byte.is_ascii_digit()))
+        || last
+            .strip_prefix("0x")
+            .is_some_and(|hex| hex.bytes().all(|byte| byte.is_ascii_hexdigit()));
+    if !numeric {
+        return false;
     }
-    false
+    host.parse::<std::net::Ipv4Addr>().map_or(true, |ip| {
+        ip.is_loopback()
+            || ip.is_private()
+            || ip.is_link_local()
+            || ip.is_unspecified()
+            || ip.is_broadcast()
+    })
 }
 
 #[cfg(test)]
@@ -300,5 +301,21 @@ mod tests {
         }
         assert!(!private_host("https://example.com:8443/a"));
         assert!(!private_host("https://8.8.8.8/"));
+        assert!(!private_host("https://example.com./"));
+        assert!(!private_host("https://cdn.2024.example/"));
+        for private in [
+            "http://localhost./",
+            "http://LOCALHOST.:3000/",
+            "http://app.localhost./",
+            "http://10.0.0.1./",
+            "http://[::ffff:192.168.0.1]/",
+            "http://[2001:db8::1]/",
+            "http://2130706433/",
+            "http://0x7f.1/",
+            "http://0177.0.0.1/",
+            "http://127.1/",
+        ] {
+            assert!(private_host(private), "{private}");
+        }
     }
 }

@@ -31,7 +31,7 @@ use {
     },
     std::{
         cell::{Cell, RefCell},
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         ffi::c_void,
         path::PathBuf,
     },
@@ -61,7 +61,8 @@ const OFFLINE_FILE: &str = r#"[
 /// (rules have no alternation, so one each), nor files.
 const ONLINE: &str = r#"[
     {"trigger": {"url-filter": "^file:"}, "action": {"type": "block"}},
-    {"trigger": {"url-filter": "^https?://localhost[:/]"}, "action": {"type": "block"}},
+    {"trigger": {"url-filter": "^https?://localhost\\.?[:/]"}, "action": {"type": "block"}},
+    {"trigger": {"url-filter": "^https?://[^/:]*\\.localhost\\.?[:/]"}, "action": {"type": "block"}},
     {"trigger": {"url-filter": "^https?://127\\."}, "action": {"type": "block"}},
     {"trigger": {"url-filter": "^https?://0\\."}, "action": {"type": "block"}},
     {"trigger": {"url-filter": "^https?://10\\."}, "action": {"type": "block"}},
@@ -78,11 +79,14 @@ const ONLINE: &str = r#"[
 struct Running {
     window: Retained<NSWindow>,
     view: Retained<WKWebView>,
-    _delegate: Retained<Delegate>,
+    delegate: Retained<Delegate>,
 }
 
 thread_local! {
     static RUNNING: RefCell<HashMap<u64, Running>> = RefCell::new(HashMap::new());
+    /// PDFs waiting for their rules to compile, counted with `RUNNING`;
+    /// one taken out before its rules are ready was given up.
+    static STARTING: RefCell<HashSet<u64>> = RefCell::new(HashSet::new());
     static NEXT: Cell<u64> = const { Cell::new(1) };
     /// The compiled rules for each kind of page, once compiled.
     static RULES: RefCell<[Option<Retained<WKContentRuleList>>; 3]> =
@@ -91,13 +95,15 @@ thread_local! {
 
 pub(super) fn render(source: Source, paper: Option<Paper>, out: PathBuf) -> Result<Job, String> {
     let main = MainThreadMarker::new().ok_or("PDFs are made on the main thread only")?;
-    if RUNNING.with_borrow(HashMap::len) >= MAX_RUNNING {
+    if RUNNING.with_borrow(HashMap::len) + STARTING.with_borrow(HashSet::len) >= MAX_RUNNING {
         return Err(format!(
             "{MAX_RUNNING} PDFs are being made already; ask again once one is done"
         ));
     }
     let id = NEXT.get();
     NEXT.set(id + 1);
+    STARTING.with_borrow_mut(|starting| starting.insert(id));
+    let starting = Starting(id);
     let (answer, done) = oneshot::channel();
     let kind = match source {
         Source::Html(_) => 0,
@@ -111,20 +117,49 @@ pub(super) fn render(source: Source, paper: Option<Paper>, out: PathBuf) -> Resu
         out,
         answer,
     };
-    with_rules(kind, main, move |rules| match rules {
-        Ok(rules) => start(job, &rules, main),
-        Err(problem) => {
-            let _ = job.answer.send(Err(problem));
-        },
+    with_rules(kind, main, move |rules| {
+        let given_up = !STARTING.with_borrow(|starting| starting.contains(&id));
+        drop(starting);
+        match rules {
+            // Dropping the job tells its `done` it was given up.
+            _ if given_up => {},
+            Ok(rules) => start(job, &rules, main),
+            Err(problem) => {
+                let _ = job.answer.send(Err(problem));
+            },
+        }
     });
     Ok(Job { id, done })
 }
 
-/// Lets the view of the PDF `id` go, done or not.
+/// Holds a PDF's place in `STARTING` until its rules are ready, or they
+/// never come.
+struct Starting(u64);
+
+impl Drop for Starting {
+    fn drop(&mut self) {
+        STARTING.with_borrow_mut(|starting| starting.remove(&self.0));
+    }
+}
+
+/// Lets the view of the PDF `id` go, done or not. One printing is kept
+/// until its print is over, as AppKit holds its delegate till then: that
+/// answers its `done`, and a second call lets it go.
 pub(super) fn finish(id: u64) {
-    let running = RUNNING.with_borrow_mut(|running| running.remove(&id));
-    if let Some(running) = running {
-        unsafe { running.view.setNavigationDelegate(None) };
+    if STARTING.with_borrow_mut(|starting| starting.remove(&id)) {
+        return;
+    }
+    let printing = RUNNING.with_borrow(|running| {
+        running.get(&id).map(|running| {
+            // SAFETY: the view is ours, on the main thread; it loads no more.
+            unsafe { running.view.setNavigationDelegate(None) };
+            running.delegate.ivars().printing.get()
+        })
+    });
+    if printing != Some(false) {
+        return;
+    }
+    if let Some(running) = RUNNING.with_borrow_mut(|running| running.remove(&id)) {
         running.window.close();
     }
 }
@@ -247,6 +282,7 @@ fn start(job: Pending, rules: &WKContentRuleList, main: MainThreadMarker) {
         paper,
         out: job.out,
         answer: RefCell::new(Some(job.answer)),
+        printing: Cell::new(false),
     });
     // SAFETY: the delegate lives in `RUNNING` as long as the view does.
     unsafe { view.setNavigationDelegate(Some(ProtocolObject::from_ref(&*delegate))) };
@@ -274,7 +310,7 @@ fn start(job: Pending, rules: &WKContentRuleList, main: MainThreadMarker) {
         running.insert(id, Running {
             window,
             view,
-            _delegate: delegate,
+            delegate,
         })
     });
 }
@@ -285,6 +321,9 @@ struct Printing {
     paper: NSSize,
     out: PathBuf,
     answer: RefCell<Option<oneshot::Sender<Result<(), String>>>>,
+    /// A print operation is running: AppKit holds this delegate, unretained,
+    /// until it calls `printed`.
+    printing: Cell<bool>,
 }
 
 define_class!(
@@ -301,6 +340,11 @@ define_class!(
     unsafe impl WKNavigationDelegate for Delegate {
         #[unsafe(method(webView:didFinishNavigation:))]
         fn did_finish(&self, view: &WKWebView, _navigation: Option<&WKNavigation>) {
+            // A page that goes on to another (a redirect from script) is
+            // printed once, as it first finished.
+            if self.ivars().printing.get() || self.ivars().answer.borrow().is_none() {
+                return;
+            }
             if let Err(problem) = self.print(view) {
                 self.answer(Err(problem));
             }
@@ -326,6 +370,7 @@ define_class!(
         /// The print operation is over.
         #[unsafe(method(printOperationDidRun:success:contextInfo:))]
         fn printed(&self, _operation: &NSPrintOperation, success: Bool, _context: *mut c_void) {
+            self.ivars().printing.set(false);
             let out = &self.ivars().out;
             self.answer(if success.as_bool() && out.is_file() {
                 Ok(())
@@ -392,8 +437,10 @@ impl Delegate {
             printed.setFrame(view.bounds());
         }
         let delegate: &AnyObject = self;
+        printing.printing.set(true);
         // SAFETY: the window holds the view; the delegate answers the
-        // selector, with the operation, a flag and the null context.
+        // selector, with the operation, a flag and the null context, and
+        // `finish` keeps it until then.
         unsafe {
             operation.runOperationModalForWindow_delegate_didRunSelector_contextInfo(
                 &window,

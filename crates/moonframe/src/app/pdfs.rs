@@ -38,21 +38,26 @@ impl MoonframeApp {
         let from = from.to_owned();
         cx.spawn(async move |this, cx| {
             let timeout = cx.background_executor().timer(pdf::TIMEOUT);
-            let done = futures::future::select(job.done, Box::pin(timeout)).await;
+            let (done, still_printing) =
+                match futures::future::select(job.done, Box::pin(timeout)).await {
+                    futures::future::Either::Left((done, _)) => (
+                        done.unwrap_or_else(|_| Err("the PDF was given up".to_owned())),
+                        None,
+                    ),
+                    futures::future::Either::Right((_, done)) => (
+                        Err(format!(
+                            "the page took longer than {} s",
+                            pdf::TIMEOUT.as_secs()
+                        )),
+                        Some(done),
+                    ),
+                };
             pdf::finish(job.id);
-            let written = match done {
-                futures::future::Either::Left((Ok(Ok(())), _)) => std::fs::rename(&partial, &out)
+            let written = done.and_then(|()| {
+                std::fs::rename(&partial, &out)
                     .map(|()| out.to_string_lossy().into_owned())
-                    .map_err(|error| format!("cannot write {}: {error}", out.display())),
-                futures::future::Either::Left((Ok(Err(problem)), _)) => Err(problem),
-                futures::future::Either::Left((Err(_), _)) => {
-                    Err("the PDF was given up".to_owned())
-                },
-                futures::future::Either::Right(_) => Err(format!(
-                    "the page took longer than {} s",
-                    pdf::TIMEOUT.as_secs()
-                )),
-            };
+                    .map_err(|error| format!("cannot write {}: {error}", out.display()))
+            });
             if written.is_err() {
                 let _ = std::fs::remove_file(&partial);
             }
@@ -61,6 +66,13 @@ impl MoonframeApp {
             }
             if let Some(answer) = request.answer(written) {
                 let _ = this.update(cx, |app, cx| app.deliver(&from, answer, cx));
+            }
+            // One given up mid-print is let go once its print is over, and
+            // what that wrote with it.
+            if let Some(done) = still_printing {
+                let _ = done.await;
+                pdf::finish(job.id);
+                let _ = std::fs::remove_file(&partial);
             }
         })
         .detach();
@@ -116,9 +128,20 @@ fn pdf_path(name: &str, roots: &[PathBuf]) -> Result<PathBuf, String> {
     let (Some(folder), Some(file)) = (path.parent(), path.file_name()) else {
         return Err(refuse());
     };
-    // Only made inside them: a folder outside is never created.
-    let lexical = roots.iter().any(|root| folder.starts_with(root));
-    if !lexical {
+    let Some(root) = roots.iter().find(|root| folder.starts_with(root)) else {
+        return Err(refuse());
+    };
+    std::fs::create_dir_all(root)
+        .map_err(|error| format!("cannot make {}: {error}", root.display()))?;
+    // Only made inside them: the deepest folder already there, links
+    // followed, must be inside before the rest are made, so none is ever
+    // made outside through a link.
+    let existing = folder
+        .ancestors()
+        .find(|folder| folder.symlink_metadata().is_ok())
+        .unwrap_or(root);
+    let real = existing.canonicalize().map_err(|_| refuse())?;
+    if !inside(&real, roots) {
         return Err(refuse());
     }
     std::fs::create_dir_all(folder)
@@ -151,13 +174,17 @@ fn html_file(name: &str, roots: &[PathBuf]) -> Result<PathBuf, String> {
     }
 }
 
-/// Where the PDF is printed before it is put in place: beside it, hidden.
+/// Where the PDF is printed before it is put in place: beside it, hidden,
+/// and named for this request alone, so two making the same PDF never
+/// write one file.
 fn partial_path(out: &Path) -> PathBuf {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
     let name = out
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
-    out.with_file_name(format!(".{name}.{}.partial", std::process::id()))
+    let request = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    out.with_file_name(format!(".{name}.{}.{request}.partial", std::process::id()))
 }
 
 #[cfg(test)]
@@ -191,12 +218,22 @@ mod tests {
             assert!(pdf_path(&bad, &roots).is_err(), "{bad}");
         }
         assert!(!elsewhere.join("c.pdf").exists());
-        // A link out of the cache is followed and refused.
+        // A link out of the cache is followed and refused, and no folder is
+        // made through it.
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(&elsewhere, cache.join("out")).unwrap();
             assert!(pdf_path("out/d.pdf", &roots).is_err());
+            assert!(pdf_path("out/new/deeper/d.pdf", &roots).is_err());
+            assert!(!elsewhere.join("new").exists(), "nothing made outside");
+            std::os::unix::fs::symlink(dir.path().join("gone"), cache.join("dangling")).unwrap();
+            assert!(pdf_path("dangling/e.pdf", &roots).is_err());
+            assert!(!dir.path().join("gone").exists());
         }
+        // The cache itself is made if it is not there yet.
+        let fresh = [dir.path().join("fresh/cache")];
+        assert!(pdf_path("f.pdf", &fresh).is_ok());
+        assert!(fresh[0].is_dir());
         std::fs::create_dir_all(cache.join("dir.pdf")).unwrap();
         assert!(pdf_path("dir.pdf", &roots).is_err(), "a folder");
 
@@ -214,6 +251,11 @@ mod tests {
                 .unwrap()
                 .to_string_lossy()
                 .starts_with(".a.pdf.")
+        );
+        assert_ne!(
+            partial,
+            partial_path(&PathBuf::from("/c/articles/a.pdf")),
+            "each request prints to a file of its own"
         );
     }
 }
