@@ -63,6 +63,10 @@ pub struct Input {
     /// A code editor's caret goes to this line (from 1), scrolled into
     /// view, when it changes or the field takes a new `value`.
     pub line: Option<u32>,
+    /// Sent with `fraction` as the text scrolls (a multiline field).
+    pub scrolled: Option<Data>,
+    /// Where to scroll the text to; a new one scrolls.
+    pub scroll_at: Option<ScrollAt>,
 }
 
 /// What a writing field keeps in full while the rest of its text fades.

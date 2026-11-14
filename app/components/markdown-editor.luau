@@ -7,7 +7,8 @@
 -- launches. Links go to the drawing mod as { open_link = url, from = path,
 -- root }. Given a `root` (the project the file is in, as `app.docs.root` or
 -- `app.files.path` names it), it reads and saves there even after the
--- project moves to another repository.
+-- project moves to another repository. Side by side, the source and the
+-- preview scroll together.
 
 local segmented = use "segmented"
 local markdown = use "markdown"
@@ -41,6 +42,11 @@ type State = {
 	error: string?,
 	-- "Saved", until the next edit.
 	note: string?,
+	-- Side by side, where each pane is to follow the other: the fraction
+	-- the other was scrolled to, with a count that makes each move new.
+	source_at: { fraction: number, seq: number }?,
+	preview_at: { fraction: number, seq: number }?,
+	scrolls: number?,
 }
 
 type Props = {
@@ -194,8 +200,21 @@ markdown_editor { id = "readme", path = "README.md" }
 			state.text = msg.value
 			state.dirty = true
 			state.note = nil
+		elseif msg.scrolled then
+			-- One pane moved: the other follows it there.
+			state.scrolls = (state.scrolls or 0) + 1
+			local at = { fraction = msg.fraction, seq = state.scrolls :: number }
+			if msg.scrolled == "source" then
+				state.preview_at = at
+			else
+				state.source_at = at
+			end
 		elseif msg.mode then
 			state.mode = msg.mode
+			-- Where each pane followed the other is of the last side by side:
+			-- the next one starts from where the panes are then.
+			state.source_at = nil
+			state.preview_at = nil
 		elseif msg.link then
 			return state, { { to = "parent", msg = { open_link = msg.url, from = state.path, root = state.root } } }
 		elseif msg.changed and msg.changed == state.path then
@@ -331,6 +350,7 @@ markdown_editor { id = "readme", path = "README.md" }
 				retry = "retry",
 			}
 		else
+			local split = state.mode == "split"
 			local source = ui.input {
 				id = "source",
 				class = "md-editor-source",
@@ -341,12 +361,16 @@ markdown_editor { id = "readme", path = "README.md" }
 				grow = true,
 				mono = true,
 				keys = { ["secondary-s"] = "save" },
+				scrolled = split and { scrolled = "source" } or nil,
+				scroll_at = split and state.source_at or nil,
 			}
 			local preview = markdown {
 				text = state.text,
 				link = { link = true },
 				grow = true,
 				scroll = true,
+				scrolled = split and { scrolled = "preview" } or nil,
+				scroll_at = split and state.preview_at or nil,
 			}
 			if state.mode == "view" then
 				body = preview

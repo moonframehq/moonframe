@@ -28,6 +28,8 @@ impl Build for Input {
         "typewriter",
         "code",
         "line",
+        "scrolled",
+        "scroll_at",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
@@ -99,7 +101,9 @@ impl Build for Input {
             .unwrap_or_default();
         let to = fields.get::<String>("to")?;
         let browser = fields.get::<BrowserId>("browser")?.map(|id| id.0);
+        let (scrolled, scroll_at) = scrolling(fields, multiline, "multiline = true")?;
         if to.is_some()
+            && scrolled.is_none()
             && change.is_none()
             && select.is_none()
             && submit.is_none()
@@ -108,10 +112,10 @@ impl Build for Input {
             && capture.is_none()
             && browser.is_none()
         {
-            return Err(fields
-                .cx()
-                .key("to")
-                .fail("`to` goes with `change`, `select`, `submit`, `blur`, `keys` or `browser`"));
+            return Err(fields.cx().key("to").fail(
+                "`to` goes with `change`, `select`, `submit`, `blur`, `keys`, `scrolled` or \
+                     `browser`",
+            ));
         }
         Ok(Self {
             look: Look::from_fields(fields)?,
@@ -144,6 +148,8 @@ impl Build for Input {
             typewriter,
             line: caret_line(fields, code.is_some())?,
             code,
+            scrolled,
+            scroll_at,
         })
     }
 }
@@ -211,6 +217,8 @@ impl Build for Markdown {
         "find_index",
         "found",
         "stream",
+        "scrolled",
+        "scroll_at",
     ]];
 
     fn build(_: Element, fields: &Fields, _: &mut Tree<'_>) -> Result<Self, Error> {
@@ -220,13 +228,14 @@ impl Build for Markdown {
         let outline = fields.get::<Data>("outline")?;
         let section = fields.get::<Data>("section")?;
         let found = fields.get::<Data>("found")?;
-        let sends = [&link, &image, &outline, &section, &found]
+        let scroll = fields.get("scroll")?.unwrap_or(false);
+        let (scrolled, scroll_at) = scrolling(fields, scroll, "scroll = true")?;
+        let sends = [&link, &image, &outline, &section, &found, &scrolled]
             .iter()
             .any(|msg| msg.is_some());
         if to.is_some() && !sends {
             return Err(fields.cx().key("to").fail("`to` goes with `link`"));
         }
-        let scroll = fields.get("scroll")?.unwrap_or(false);
         let lines = fields.get::<f32>("lines")?;
         let lines = match lines {
             None => None,
@@ -276,6 +285,8 @@ impl Build for Markdown {
             find_index,
             found,
             stream: fields.get("stream")?.unwrap_or(false),
+            scrolled,
+            scroll_at,
         })
     }
 }
@@ -294,6 +305,47 @@ impl Read for Reveal {
         Ok(Self {
             at: at as usize,
             seq: fields.get::<f32>("seq")?.unwrap_or(0.0) as i64,
+        })
+    }
+}
+
+/// `scrolled` and `scroll_at`, which go with an element that scrolls its
+/// own text: `scrolls` says whether this one does, `needs` what makes it.
+fn scrolling(
+    fields: &Fields,
+    scrolls: bool,
+    needs: &str,
+) -> Result<(Option<Data>, Option<ScrollAt>), Error> {
+    let scrolled = fields.get::<Data>("scrolled")?;
+    let scroll_at = fields.get::<ScrollAt>("scroll_at")?;
+    if !scrolls {
+        for (key, set) in [
+            ("scrolled", scrolled.is_some()),
+            ("scroll_at", scroll_at.is_some()),
+        ] {
+            if set {
+                return Err(fields
+                    .cx()
+                    .key(key)
+                    .fail(format!("`{key}` goes with `{needs}`")));
+            }
+        }
+    }
+    Ok((scrolled, scroll_at))
+}
+
+impl Read for ScrollAt {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let fields = Fields::read(value, cx, &[&["fraction", "seq"]])?;
+        let Some(fraction) = fields.number("fraction", 0.0..=1.0)? else {
+            return Err(cx
+                .key("fraction")
+                .fail("`scroll_at` needs `fraction`, from 0 (the top) to 1 (the end)"));
+        };
+        Ok(Self {
+            fraction,
+            // As a double: an f32 runs out of whole numbers past 2^24.
+            seq: fields.get::<f64>("seq")?.unwrap_or(0.0) as i64,
         })
     }
 }

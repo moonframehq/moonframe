@@ -446,6 +446,10 @@ pub struct Markdown {
     pub found: Option<Data>,
     /// Fade in what is added to `text`, as an answer streams in.
     pub stream: bool,
+    /// Sent with `fraction` as the reader scrolls a scrolling document.
+    pub scrolled: Option<Data>,
+    /// Where to scroll a scrolling document to; a new one scrolls.
+    pub scroll_at: Option<ScrollAt>,
 }
 
 /// A place in a document to scroll to: bytes into its text, as `headings`
@@ -455,6 +459,39 @@ pub struct Markdown {
 pub struct Reveal {
     pub at: usize,
     pub seq: i64,
+}
+
+/// How far down its text a scrolling element is, or should be: a
+/// `fraction` from 0, the top, to 1, the end of its text at the bottom of
+/// the view. `seq` tells two requests for one place apart, as with
+/// [`Reveal`]. A source and its preview follow each other with it.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ScrollAt {
+    pub fraction: f32,
+    pub seq: i64,
+}
+
+impl ScrollAt {
+    /// Steps a fraction is rounded to.
+    const STEPS: f32 = 10_000.0;
+
+    /// What `scrolled` sends for `msg` at `fraction`, in the shape of
+    /// [`Markdown::message`].
+    pub fn message(msg: &Data, fraction: f32) -> Data {
+        // Rounded again as a double, so Luau reads 0.07 and not 0.0700000003.
+        let steps = f64::from(Self::STEPS);
+        let fraction = (f64::from(fraction) * steps).round() / steps;
+        Markdown::note(msg, [("fraction", Data::Number(fraction))])
+    }
+
+    /// The fraction scrolled when `offset` of `max` pixels can be scrolled,
+    /// rounded so that pixel jitter does not read as a move.
+    pub fn fraction(offset: f32, max: f32) -> f32 {
+        if max <= 0.0 || !offset.is_finite() || !max.is_finite() {
+            return 0.0;
+        }
+        ((offset / max).clamp(0.0, 1.0) * Self::STEPS).round() / Self::STEPS
+    }
 }
 
 impl Markdown {
