@@ -69,7 +69,7 @@ type State = {
 -- change calls for it: a color or a word that passes the check does not.
 local function look(pid: number?): string
 	local window = if pid then `the user's window (process {pid})` else "the user's window"
-	return `Look at {window} only for a change of layout or size, or when you cannot tell from the code that it shows: on macOS, \`screencapture -x -o -l<window number> <file>\`, with the number from CGWindowListCopyWindowInfo for that process. A change of color, text or style that passes the check needs no screenshot.`
+	return `Look at {window} only for a change of layout or size, or when you cannot tell from the code that it shows: on macOS, \`screencapture -x -o -l<window number> <file>\`, with the number from CGWindowListCopyWindowInfo for that process; on Linux under X11, \`import -window <id> <file>\`, with the id from \`xdotool search --all --onlyvisible --pid <process>\`; on Windows, PrintWindow with PW_RENDERFULLCONTENT on that process's window, from PowerShell. A change of color, text or style that passes the check needs no screenshot.`
 end
 
 -- How the agent should work on the app. The provider adds what it needs
