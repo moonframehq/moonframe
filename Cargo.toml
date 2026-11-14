@@ -53,7 +53,7 @@ alacritty_terminal = "0.26"
 # Dates a document list shows, in local time (moonframe-documents).
 chrono = { default-features = false, features = ["clock"], version = "0.4" }
 # Pictures sent to the pi agent (moonframe-pi).
-base64 = "0.22"
+base64 = "0.23"
 # Colored command-line output, plain when piped or under NO_COLOR.
 anstream = "1"
 anstyle  = "1"
