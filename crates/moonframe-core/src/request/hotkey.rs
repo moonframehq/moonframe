@@ -3,6 +3,10 @@
 //! mod (or `to`) its `msg` at each press, until it gives the keys back
 //! with `{ keys = ..., release = true }`. Whether each was claimed, or is
 //! another app's, shows in `app.hotkeys`. Only macOS has them yet.
+//!
+//! Keys need two modifiers (ctrl, alt, shift, cmd or secondary, at least
+//! one of them not shift), or a function key: one modifier alone takes
+//! what every app uses, ⌘C, Ctrl-A in a text field, ⌥E for an accent.
 
 use {
     super::APP,
@@ -21,8 +25,8 @@ pub enum Hotkey {
         msg: Data,
         to: Option<String>,
     },
-    /// Gives `keys` back.
-    Release(String),
+    /// Gives `keys` back, under any spelling of them.
+    Release { keys: String, chord: Chord },
 }
 
 /// `{ keys, msg, to }` or `{ keys, release = true }`.
@@ -45,19 +49,21 @@ pub(super) fn hotkey(msg: &Data) -> Result<Hotkey, Error> {
         return Err(fail(usage));
     };
     let chord = Chord::parse(keys).map_err(|problem| fail(&problem))?;
-    let function = chord
-        .key
-        .strip_prefix('f')
-        .is_some_and(|number| number.parse::<u32>().is_ok());
-    if !(chord.ctrl || chord.alt || chord.cmd || chord.secondary || function) {
-        return Err(fail(&format!(
-            "`{keys}` would take a key from every app; add ctrl, alt, cmd or secondary"
-        )));
-    }
     match fields.get("release") {
         None => {},
-        Some(Data::Bool(true)) if fields.len() == 2 => return Ok(Hotkey::Release(keys.clone())),
+        Some(Data::Bool(true)) if fields.len() == 2 => {
+            return Ok(Hotkey::Release {
+                keys: keys.clone(),
+                chord,
+            });
+        },
         Some(_) => return Err(fail("`release = true` comes with `keys` alone")),
+    }
+    if !for_every_app(&chord) {
+        return Err(fail(&format!(
+            "`{keys}` would take a key or shortcut every app uses; use two modifiers, \
+             such as ctrl-alt or ctrl-shift, or a function key"
+        )));
     }
     let msg = match fields.get("msg") {
         None | Some(Data::Nil) => return Err(fail("needs the `msg` a press sends")),
@@ -76,6 +82,23 @@ pub(super) fn hotkey(msg: &Data) -> Result<Hotkey, Error> {
         msg,
         to,
     })
+}
+
+/// Whether `chord` may be taken from every app: a function key, or two
+/// modifiers, at least one of them not shift.
+fn for_every_app(chord: &Chord) -> bool {
+    let function = chord
+        .key
+        .strip_prefix('f')
+        .is_some_and(|number| number.parse::<u32>().is_ok());
+    let held = [
+        chord.ctrl,
+        chord.alt,
+        chord.shift,
+        chord.cmd || chord.secondary,
+    ];
+    let count = held.into_iter().filter(|on| *on).count();
+    function || (count >= 2 && (chord.ctrl || chord.alt || chord.cmd || chord.secondary))
 }
 
 #[cfg(test)]
@@ -113,14 +136,18 @@ mod tests {
         assert!(chord.ctrl && chord.shift && chord.key == "space");
         assert_eq!(msg, Data::from("capture"));
         assert_eq!(to.as_deref(), Some("capture"));
-        assert_eq!(
-            hotkey(&map(&[
-                ("keys", Data::from("f5")),
-                ("release", Data::Bool(true))
-            ]))
-            .unwrap(),
-            Hotkey::Release("f5".to_owned())
-        );
+        let Hotkey::Release { keys, chord } = hotkey(&map(&[
+            ("keys", Data::from("f5")),
+            ("release", Data::Bool(true)),
+        ]))
+        .unwrap() else {
+            panic!("not a release");
+        };
+        assert_eq!((keys.as_str(), chord.key.as_str()), ("f5", "f5"));
+        for keys in ["ctrl-alt-l", "cmd-shift-k", "secondary-alt-k", "shift-f5"] {
+            let claim = map(&[("keys", Data::from(keys)), ("msg", Data::from("x"))]);
+            assert!(hotkey(&claim).is_ok(), "{keys}");
+        }
     }
 
     #[test]
@@ -141,10 +168,25 @@ mod tests {
                 ]),
                 "every app",
             ),
-            (map(&[("keys", Data::from("ctrl-k"))]), "needs the `msg`"),
+            (
+                map(&[("keys", Data::from("cmd-c")), ("msg", Data::from("x"))]),
+                "every app",
+            ),
+            (
+                map(&[("keys", Data::from("ctrl-a")), ("msg", Data::from("x"))]),
+                "every app",
+            ),
+            (
+                map(&[("keys", Data::from("alt-e")), ("msg", Data::from("x"))]),
+                "every app",
+            ),
+            (
+                map(&[("keys", Data::from("ctrl-alt-k"))]),
+                "needs the `msg`",
+            ),
             (
                 map(&[
-                    ("keys", Data::from("ctrl-k")),
+                    ("keys", Data::from("ctrl-alt-k")),
                     ("msg", Data::from("x")),
                     ("release", Data::Bool(true)),
                 ]),
@@ -152,7 +194,7 @@ mod tests {
             ),
             (
                 map(&[
-                    ("keys", Data::from("ctrl-k")),
+                    ("keys", Data::from("ctrl-alt-k")),
                     ("msg", Data::from("x")),
                     ("to", Data::from("not a mod")),
                 ]),

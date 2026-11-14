@@ -178,7 +178,8 @@ fn key_equivalent(chord: &Chord) -> (String, NSEventModifierFlags) {
         "tab" => "\t".to_owned(),
         "escape" => "\u{1b}".to_owned(),
         "backspace" => "\u{8}".to_owned(),
-        "delete" => "\u{7f}".to_owned(),
+        "delete" => function(0xF728),
+        "insert" => function(0xF727),
         "up" => function(0xF700),
         "down" => function(0xF701),
         "left" => function(0xF702),
@@ -286,6 +287,10 @@ mod tests {
             ("k", NSEventModifierFlags::Command)
         );
         assert_eq!(key_equivalent(&chord("f5")).0, "\u{F708}");
+        // A named key is the one character AppKit has for it.
+        assert_eq!(key_equivalent(&chord("ctrl-insert")).0, "\u{F727}");
+        assert_eq!(key_equivalent(&chord("ctrl-delete")).0, "\u{F728}");
+        assert_eq!(key_equivalent(&chord("ctrl-backspace")).0, "\u{8}");
     }
 
     #[test]

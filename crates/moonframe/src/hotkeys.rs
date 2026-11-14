@@ -1,10 +1,13 @@
 //! System-wide shortcuts mods claim (`app:hotkey`), kept app-wide: each
-//! keys belongs to one mod, and a press is queued for the app, which hands
-//! the claim's `msg` to the front main window's mod; see `app::menu_bar`.
-//! macOS registers them with Carbon's hot keys, which need no permission;
+//! keys belongs to one mod, whatever their spelling (`secondary` is ⌘ on
+//! macOS), and a press is queued for the app, which hands the claim's
+//! `msg` to the front main window's mod; see `app::menu_bar`. macOS
+//! registers them with Carbon's hot keys, which need no permission;
 //! elsewhere a claim stands as `"unsupported"`. Which are claimed shows as
 //! `app.hotkeys`: `{ ["ctrl-shift-space"] = "claimed" | "taken" |
-//! "unsupported" }`, `"taken"` when another app holds them.
+//! "unsupported" }`, `"taken"` when the system refused them because
+//! another app holds them for itself alone. An app that shares them, and
+//! the system's own shortcuts, go unreported.
 
 #[cfg(all(feature = "hotkey", target_os = "macos"))]
 mod macos;
@@ -20,7 +23,7 @@ use {
 pub(crate) enum State {
     #[cfg_attr(not(all(feature = "hotkey", target_os = "macos")), allow(dead_code))]
     Claimed,
-    /// Another app holds them.
+    /// Another app holds them for itself alone: asking again tries again.
     #[cfg_attr(not(all(feature = "hotkey", target_os = "macos")), allow(dead_code))]
     Taken,
     /// Not on this platform.
@@ -46,6 +49,7 @@ pub(crate) struct Pressed {
 
 struct Claim {
     owner: String,
+    /// As the system takes it: [`canonical`].
     chord: Chord,
     to: String,
     msg: Data,
@@ -88,8 +92,10 @@ fn pressed(keys: &str) {
 }
 
 /// Claims `keys` for the mod `owner`: a press sends `msg` to `to`. Asking
-/// again changes what it sends. Keys another mod here holds (under any
-/// spelling) are refused; another app's stand as [`State::Taken`].
+/// again changes what it sends, and tries the system again when they
+/// were [`State::Taken`]. Keys held here under another spelling, by
+/// another mod or this one, are refused; another app's stand as
+/// [`State::Taken`].
 pub(crate) fn claim(
     owner: &str,
     keys: &str,
@@ -108,6 +114,7 @@ fn claim_with(
     msg: Data,
     register: impl FnOnce(&str, &Chord) -> Result<(State, Option<Registered>), String>,
 ) -> Result<(), String> {
+    let chord = canonical(&chord);
     CLAIMS.with_borrow_mut(|claims| {
         if let Some((held, other)) = claims
             .iter()
@@ -121,6 +128,9 @@ fn claim_with(
         if let Some(claim) = claims.get_mut(keys) {
             claim.to = to;
             claim.msg = msg;
+            if claim.state == State::Taken {
+                (claim.state, claim._registered) = register(keys, &claim.chord)?;
+            }
             return Ok(());
         }
         let (state, registered) = register(keys, &chord)?;
@@ -136,21 +146,34 @@ fn claim_with(
     })
 }
 
-/// Gives `keys` back, if the mod `owner` holds them.
-pub(crate) fn release(owner: &str, keys: &str) -> Result<(), String> {
-    CLAIMS.with_borrow_mut(|claims| match claims.get(keys) {
-        Some(claim) if claim.owner == owner => {
-            claims.remove(keys);
-            Ok(())
-        },
-        Some(claim) => Err(format!("`{keys}` is held by {}", claim.owner)),
-        None => Ok(()),
+/// Gives `chord` back, as the mod `owner` spelt it in `keys` or not, if
+/// that mod holds it.
+pub(crate) fn release(owner: &str, keys: &str, chord: &Chord) -> Result<(), String> {
+    let chord = canonical(chord);
+    CLAIMS.with_borrow_mut(|claims| {
+        let Some((held, holder)) = claims
+            .iter()
+            .find(|(_, claim)| claim.chord == chord)
+            .map(|(held, claim)| (held.clone(), claim.owner.clone()))
+        else {
+            return Ok(());
+        };
+        if holder != owner {
+            return Err(format!("`{keys}` is held by {holder}"));
+        }
+        claims.remove(&held);
+        Ok(())
     })
 }
 
-/// Gives back what the mods `gone` held.
-pub(crate) fn forget(gone: impl Fn(&str) -> bool) {
-    CLAIMS.with_borrow_mut(|claims| claims.retain(|_, claim| !gone(&claim.owner)));
+/// Gives back each claim `stale` names, by its mod and its keys as
+/// written: whether there was any.
+pub(crate) fn forget(stale: impl Fn(&str, &str) -> bool) -> bool {
+    CLAIMS.with_borrow_mut(|claims| {
+        let before = claims.len();
+        claims.retain(|keys, claim| !stale(&claim.owner, keys));
+        claims.len() != before
+    })
 }
 
 /// The mods holding any.
@@ -168,6 +191,20 @@ pub(crate) fn data() -> Data {
                 .collect(),
         )
     })
+}
+
+/// `chord` as the system takes it: `secondary` is ⌘ on macOS, Ctrl
+/// elsewhere, so `cmd-alt-k` and `secondary-alt-k` are the same keys.
+fn canonical(chord: &Chord) -> Chord {
+    let mut chord = chord.clone();
+    if std::mem::take(&mut chord.secondary) {
+        if cfg!(target_os = "macos") {
+            chord.cmd = true;
+        } else {
+            chord.ctrl = true;
+        }
+    }
+    chord
 }
 
 #[cfg(all(feature = "hotkey", target_os = "macos"))]
@@ -198,26 +235,27 @@ mod tests {
         move |_, _| Ok((state, None))
     }
 
-    fn states() -> Data {
-        data()
+    fn claim(owner: &str, keys: &str, state: State) -> Result<(), String> {
+        claim_with(
+            owner,
+            keys,
+            chord(keys),
+            owner.to_owned(),
+            Data::from("go"),
+            fake(state),
+        )
+    }
+
+    fn state(keys: &str) -> State {
+        CLAIMS.with_borrow(|claims| claims[keys].state)
     }
 
     #[test]
     fn each_keys_belong_to_one_mod() {
-        let claim = |owner: &str, keys: &str, state| {
-            claim_with(
-                owner,
-                keys,
-                chord(keys),
-                owner.to_owned(),
-                Data::from("go"),
-                fake(state),
-            )
-        };
         assert!(claim("capture", "ctrl-shift-space", State::Claimed).is_ok());
         assert!(claim("other", "f5", State::Taken).is_ok());
         assert_eq!(
-            states(),
+            data(),
             Data::Map(BTreeMap::from([
                 ("ctrl-shift-space".to_owned(), Data::from("claimed")),
                 ("f5".to_owned(), Data::from("taken")),
@@ -230,14 +268,56 @@ mod tests {
         assert!(problem.contains("as `ctrl-shift-space`"), "{problem}");
         // Asked again, it only changes what a press sends.
         assert!(claim("capture", "ctrl-shift-space", State::Taken).is_ok());
-        assert_eq!(
-            CLAIMS.with_borrow(|claims| claims["ctrl-shift-space"].state),
-            State::Claimed
-        );
-        assert!(release("other", "ctrl-shift-space").is_err());
-        assert!(release("capture", "ctrl-shift-space").is_ok());
-        forget(|owner| owner == "other");
-        assert_eq!(states(), Data::Map(BTreeMap::new()));
+        assert_eq!(state("ctrl-shift-space"), State::Claimed);
+        assert!(release("other", "ctrl-shift-space", &chord("ctrl-shift-space")).is_err());
+        // Given back under another spelling.
+        assert!(release("capture", "shift-ctrl-space", &chord("shift-ctrl-space")).is_ok());
+        assert!(forget(|owner, _| owner == "other"));
+        assert!(!forget(|owner, _| owner == "other"));
+        assert_eq!(data(), Data::Map(BTreeMap::new()));
         assert!(owners().is_empty());
+    }
+
+    #[test]
+    fn secondary_is_the_key_it_stands_for() {
+        let same = if cfg!(target_os = "macos") {
+            "cmd-alt-k"
+        } else {
+            "ctrl-alt-k"
+        };
+        assert!(claim("capture", "secondary-alt-k", State::Claimed).is_ok());
+        let problem = claim("other", same, State::Claimed).unwrap_err();
+        assert!(
+            problem.contains("as `secondary-alt-k` by capture"),
+            "{problem}"
+        );
+        assert!(release("capture", same, &chord(same)).is_ok());
+        assert!(owners().is_empty());
+    }
+
+    #[test]
+    fn keys_another_app_held_are_tried_again() {
+        assert!(claim("capture", "ctrl-alt-k", State::Taken).is_ok());
+        assert_eq!(state("ctrl-alt-k"), State::Taken);
+        assert!(claim("capture", "ctrl-alt-k", State::Claimed).is_ok());
+        assert_eq!(state("ctrl-alt-k"), State::Claimed);
+    }
+
+    #[test]
+    fn only_the_claims_named_are_forgotten() {
+        assert!(claim("capture", "ctrl-alt-k", State::Claimed).is_ok());
+        assert!(claim("capture", "ctrl-alt-j", State::Claimed).is_ok());
+        assert!(claim("other", "ctrl-alt-l", State::Claimed).is_ok());
+        // `capture` loaded again asking for ctrl-alt-j alone.
+        assert!(forget(
+            |owner, keys| owner == "capture" && keys != "ctrl-alt-j"
+        ));
+        assert_eq!(
+            data(),
+            Data::Map(BTreeMap::from([
+                ("ctrl-alt-j".to_owned(), Data::from("claimed")),
+                ("ctrl-alt-l".to_owned(), Data::from("claimed")),
+            ]))
+        );
     }
 }

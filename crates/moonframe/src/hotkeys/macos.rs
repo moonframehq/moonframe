@@ -76,8 +76,14 @@ const PARAM_DIRECT_OBJECT: u32 = four(b"----");
 const TYPE_HOT_KEY_ID: u32 = four(b"hkid");
 /// This app's hot keys, among every app's.
 const SIGNATURE: u32 = four(b"MnFr");
-/// Another app registered the same keys.
+/// Another app registered the same keys for itself alone.
 const HOT_KEY_EXISTS: OSStatus = -9878;
+/// Passes an event on to the next handler.
+const EVENT_NOT_HANDLED: OSStatus = -9874;
+/// `kEventHotKeyExclusive`: no other app that asks the same may share
+/// them, and registering fails when one holds them so. Apps that share
+/// theirs are not seen.
+const EXCLUSIVE: u32 = 1;
 
 const CMD_KEY: u32 = 1 << 8;
 const SHIFT_KEY: u32 = 1 << 9;
@@ -106,7 +112,8 @@ impl Drop for Registered {
     }
 }
 
-/// Registers `chord` as `keys`: `None` when another app holds it.
+/// Registers `chord` as `keys`: `None` when another app holds it for
+/// itself alone.
 pub(super) fn register(keys: &str, chord: &Chord) -> Result<Option<Registered>, String> {
     if objc2::MainThreadMarker::new().is_none() {
         return Err("hot keys are registered from the main thread only".to_owned());
@@ -128,7 +135,7 @@ pub(super) fn register(keys: &str, chord: &Chord) -> Result<Option<Registered>, 
                 id,
             },
             GetApplicationEventTarget(),
-            0,
+            EXCLUSIVE,
             &raw mut hot_key,
         )
     };
@@ -170,7 +177,8 @@ fn install() -> Result<(), String> {
     Ok(())
 }
 
-/// A hot key was pressed: finds which, and queues its press.
+/// A hot key was pressed: finds which, and queues its press. Another's
+/// (a different signature) goes on to the next handler.
 unsafe extern "C" fn handle(_: EventHandlerCallRef, event: EventRef, _: *mut c_void) -> OSStatus {
     let mut id = EventHotKeyID::default();
     // SAFETY: the event Carbon passed, read into a value of the size given.
@@ -186,7 +194,7 @@ unsafe extern "C" fn handle(_: EventHandlerCallRef, event: EventRef, _: *mut c_v
         )
     };
     if status != 0 || id.signature != SIGNATURE {
-        return status;
+        return EVENT_NOT_HANDLED;
     }
     if let Some(keys) = KEYS.with_borrow(|keys| keys.get(&id.id).cloned()) {
         super::pressed(&keys);

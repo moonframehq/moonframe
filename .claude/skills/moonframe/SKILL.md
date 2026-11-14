@@ -861,7 +861,10 @@ end,
   items? }`: the mod's item in the menu bar (macOS), beside the clock. One
   per mod: asking again changes it (send it only when what it shows
   changes, not every frame), `false` takes it away, and so does the mod
-  going (reloaded without it, its package removed). `symbol` is a system
+  going (reloaded without it, its package removed). A reload keeps it only
+  when the mod asks for it again as it loads: send it from `init` (which
+  a reload runs again with the state kept), not only when something
+  changes. `symbol` is a system
   symbol's name (SF Symbols: `tray.and.arrow.down`), `image` an image file
   found as `app:icon` finds one, drawn 18 points tall; either is drawn in
   the menu bar's own colour unless `template = false`. `title` is short
@@ -874,18 +877,22 @@ end,
   hotkey's action has nothing to work on. Elsewhere than macOS it does
   nothing. What it sends goes to the front main window's mod, and the app
   does not come forward: send `app:command` `"activate"` for that.
-- `app:hotkey`, `msg` `{ keys, msg, to? }`: claims `keys` (`ctrl-shift-space`,
-  named as `keys` are, with ctrl, alt, cmd or secondary, or a function key)
-  system-wide for the mod: each press sends `msg` to it (or `to`), whichever
-  app is in front, and the app does not come forward, so the mod can act on
-  what the user is doing elsewhere; the window does not see the press.
-  `{ keys, release = true }` gives them back, as does the mod going. Keys
-  another mod here holds are the sender's error. Views read how each stands
-  in `app.hotkeys`: `{ ["ctrl-shift-space"] = "claimed" | "taken" |
-  "unsupported" }`, `"taken"` when another app holds them (say so in the
-  menu: `"Capture (shortcut taken)"`), `"unsupported"` off macOS. System
-  shortcuts (Spotlight's ⌘Space) may win without saying so: pick keys
-  with ctrl and alt.
+- `app:hotkey`, `msg` `{ keys, msg, to? }`: claims `keys` (`ctrl-alt-l`,
+  named as `keys` are, with two modifiers, not both shift, or a function
+  key: one alone would take ⌘C, Ctrl-A or ⌥E from every app) system-wide
+  for the mod: each press sends `msg` to it (or `to`), whichever app is in
+  front, and the app does not come forward, so the mod can act on what the
+  user is doing elsewhere; the window does not see the press. `{ keys,
+  release = true }` gives them back (under any spelling), as does the mod
+  going, or loading again without asking for them: claim them from
+  `init`. Keys held here, by another mod or under another spelling
+  (`secondary` is `cmd` on macOS), are the sender's error. Views read how
+  each stands in `app.hotkeys`: `{ ["ctrl-alt-l"] = "claimed" | "taken" |
+  "unsupported" }`, `"taken"` when another app holds them for itself alone
+  (say so in the menu: `"Capture (shortcut taken)"`; claiming again tries
+  again), `"unsupported"` off macOS. Apps that share their keys, and
+  system shortcuts (Spotlight's ⌘Space), may win without saying so: pick
+  keys with ctrl and alt.
 
 ```lua
 -- examples/lantern/mods/menubar: CPU beside a flame, ⌃⌥L to come forward

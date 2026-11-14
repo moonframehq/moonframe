@@ -665,12 +665,10 @@ impl MoonframeApp {
         self.hub
             .update(cx, |hub, _| hub.send(id, wanted, outbox, from));
         let mut requests = self.workspace.take_requests();
+        self.sweep_menu_bar((from == "reload").then_some(&requests[..]), cx);
         // A reload runs every `init` again, as a new window does: one that
         // asks for either would loop, so what `init` asks as the app (or a
         // window) starts or reloads reloads nothing and opens no window.
-        if matches!(from, "reload" | "packages") {
-            self.forget_gone_owners(cx);
-        }
         if matches!(from, "start" | "reload" | "packages") {
             requests.retain(|(asker, request)| {
                 let looping = match request {

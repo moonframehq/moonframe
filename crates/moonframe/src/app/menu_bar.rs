@@ -4,7 +4,9 @@
 //! sends goes to the front main window's mod, as a menu item's does; the
 //! app does not come forward for it, so a hotkey can act on the app the
 //! user is in. A mod that goes away (reloaded without it, its package
-//! removed) takes its item and hotkeys with it.
+//! removed, an instance no main window mounts) takes its item and hotkeys
+//! with it, and one reloaded keeps only those it asks for again as it
+//! loads.
 
 use {
     super::*,
@@ -13,6 +15,7 @@ use {
         status_item::{self, Icon, Line, Look},
     },
     moonframe_core::{Hotkey, StatusEntry, StatusIcon, StatusItem, StatusLook},
+    std::collections::BTreeSet,
 };
 
 impl MoonframeApp {
@@ -101,7 +104,7 @@ impl MoonframeApp {
                 to.unwrap_or_else(|| from.to_owned()),
                 msg,
             ),
-            Hotkey::Release(keys) => hotkeys::release(from, &keys),
+            Hotkey::Release { keys, chord } => hotkeys::release(from, &keys, &chord),
         };
         match done {
             Ok(()) => share_hotkeys(cx),
@@ -111,18 +114,118 @@ impl MoonframeApp {
         }
     }
 
-    /// Takes away the items and hotkeys of mods no longer here.
-    pub(super) fn forget_gone_owners(&mut self, cx: &mut Context<Self>) {
-        let gone = |owner: &str| self.workspace.slot(owner).is_none();
-        for owner in status_item::owners() {
-            if gone(&owner) {
-                status_item::remove(&owner);
+    /// Takes away the items and hotkeys of mods no main window has. After
+    /// a reload (`reloaded`, what the mods asked as they loaded again),
+    /// also those a mod here that loaded cleanly did not ask for again:
+    /// one whose keys changed gives the old ones back, and one that no
+    /// longer asks for an item loses it. What it asks again stays, so an
+    /// item keeps its place in the menu bar.
+    pub(super) fn sweep_menu_bar(
+        &mut self,
+        reloaded: Option<&[(String, Request)]>,
+        cx: &mut Context<Self>,
+    ) {
+        let items = status_item::owners();
+        let holders = hotkeys::owners();
+        if items.is_empty() && holders.is_empty() {
+            return;
+        }
+        let sweep = Sweep {
+            gone: self.gone(items.iter().chain(&holders), cx),
+            reloaded: reloaded.map(|requests| Reloaded {
+                // Loaded again here without a problem, so its `init` ran.
+                renewed: items
+                    .iter()
+                    .chain(&holders)
+                    .filter(|owner| {
+                        self.workspace
+                            .slot(owner)
+                            .is_some_and(|slot| slot.error().is_none())
+                    })
+                    .map(String::as_str)
+                    .collect(),
+                requests,
+            }),
+        };
+        for owner in &items {
+            if sweep.takes_item(owner) {
+                status_item::remove(owner);
             }
         }
-        if hotkeys::owners().iter().any(|owner| gone(owner)) {
-            hotkeys::forget(gone);
+        if hotkeys::forget(|owner, keys| sweep.takes_hotkey(owner, keys)) {
             share_hotkeys(cx);
         }
+    }
+
+    /// Which of `owners` no main window has: a mod or an instance mounted
+    /// in none of them.
+    fn gone<'a>(
+        &self,
+        owners: impl Iterator<Item = &'a String>,
+        cx: &Context<Self>,
+    ) -> BTreeSet<String> {
+        let missing: BTreeSet<&String> = owners
+            .filter(|owner| self.workspace.slot(owner).is_none())
+            .collect();
+        if missing.is_empty() {
+            return BTreeSet::new();
+        }
+        let me = cx.entity_id();
+        let others: Vec<_> = hub::every(cx)
+            .into_iter()
+            .filter(|app| app.entity_id() != me)
+            .collect();
+        missing
+            .into_iter()
+            .filter(|owner| {
+                !others
+                    .iter()
+                    .any(|app| app.read(cx).workspace.slot(owner).is_some())
+            })
+            .cloned()
+            .collect()
+    }
+}
+
+/// What [`MoonframeApp::sweep_menu_bar`] takes away.
+struct Sweep<'a> {
+    /// Mods no main window has.
+    gone: BTreeSet<String>,
+    reloaded: Option<Reloaded<'a>>,
+}
+
+/// A reload in this window.
+struct Reloaded<'a> {
+    /// The mods that loaded again cleanly, so their `init` ran.
+    renewed: BTreeSet<&'a str>,
+    /// What the mods asked as they loaded again.
+    requests: &'a [(String, Request)],
+}
+
+impl Sweep<'_> {
+    fn takes_item(&self, owner: &str) -> bool {
+        self.gone.contains(owner)
+            || self.not_asked_again(owner, |request| {
+                matches!(request, Request::StatusItem(StatusItem::Show(_)))
+            })
+    }
+
+    fn takes_hotkey(&self, owner: &str, keys: &str) -> bool {
+        self.gone.contains(owner)
+            || self.not_asked_again(owner, |request| {
+                matches!(request, Request::Hotkey(Hotkey::Claim { keys: asked, .. }) if asked == keys)
+            })
+    }
+
+    /// Whether `owner` loaded again without asking for what `asks` is.
+    fn not_asked_again(&self, owner: &str, asks: impl Fn(&Request) -> bool) -> bool {
+        self.reloaded.as_ref().is_some_and(|reloaded| {
+            reloaded.renewed.contains(owner)
+                && !reloaded
+                    .requests
+                    .iter()
+                    .any(|(from, request)| from == owner && asks(request))
+        })
     }
 }
 
@@ -184,5 +287,74 @@ fn deliver(from: &str, to: &str, msg: Data, cx: &mut App) {
             app.workspace.send(from, to, msg);
             app.flush("app", cx);
         });
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use {
+        super::{Reloaded, Sweep},
+        moonframe_core::{Chord, Data, Hotkey, Request, StatusItem, StatusLook},
+        std::collections::BTreeSet,
+    };
+
+    fn claim(from: &str, keys: &str) -> (String, Request) {
+        (
+            from.to_owned(),
+            Request::Hotkey(Hotkey::Claim {
+                keys: keys.to_owned(),
+                chord: Chord::parse(keys).unwrap(),
+                msg: Data::from("go"),
+                to: None,
+            }),
+        )
+    }
+
+    fn show(from: &str) -> (String, Request) {
+        (
+            from.to_owned(),
+            Request::StatusItem(StatusItem::Show(StatusLook {
+                icon: None,
+                template: true,
+                title: Some("1".to_owned()),
+                tooltip: None,
+                items: Vec::new(),
+            })),
+        )
+    }
+
+    #[test]
+    fn a_reload_keeps_only_what_is_asked_for_again() {
+        let requests = [claim("capture", "ctrl-alt-j"), show("lantern")];
+        let sweep = Sweep {
+            gone: BTreeSet::from(["removed".to_owned()]),
+            reloaded: Some(Reloaded {
+                renewed: BTreeSet::from(["capture", "lantern", "quiet"]),
+                requests: &requests,
+            }),
+        };
+        // Its keys changed from ctrl-alt-k to ctrl-alt-j.
+        assert!(sweep.takes_hotkey("capture", "ctrl-alt-k"));
+        assert!(!sweep.takes_hotkey("capture", "ctrl-alt-j"));
+        assert!(!sweep.takes_item("lantern"));
+        // Loaded again asking for nothing.
+        assert!(sweep.takes_item("quiet"));
+        assert!(sweep.takes_hotkey("quiet", "f5"));
+        // Gone; or failed to load, so its `init` did not run again.
+        assert!(sweep.takes_item("removed"));
+        assert!(!sweep.takes_item("broken"));
+        assert!(!sweep.takes_hotkey("broken", "f5"));
+    }
+
+    #[test]
+    fn without_a_reload_only_what_is_gone_goes() {
+        let sweep = Sweep {
+            gone: BTreeSet::from(["removed".to_owned()]),
+            reloaded: None,
+        };
+        assert!(sweep.takes_hotkey("removed", "f5"));
+        assert!(!sweep.takes_hotkey("capture", "f5"));
+        assert!(!sweep.takes_item("lantern"));
     }
 }

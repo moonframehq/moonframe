@@ -2068,7 +2068,8 @@ type App = {
 	-- Nil unless the last run panicked.
 	crash: CrashReport?,
 	-- How each system-wide shortcut mods claimed (`app:hotkey`) stands, by
-	-- its keys; nil until a mod first claims one.
+	-- its keys; nil until a mod first claims one. "taken" when another app
+	-- holds them for itself alone.
 	hotkeys: { [string]: "claimed" | "taken" | "unsupported" }?,
 	-- Cargo feature names mapped to whether this host compiled them in.
 	capabilities: { [string]: boolean },
@@ -2159,7 +2160,8 @@ type StatusLine = "-" | {
 
 -- What `{ to = "app:hotkey", msg = ... }` claims: `keys` system-wide, each
 -- press sending `msg` to the mod (or `to`) whichever app is in front; or,
--- with `release = true`, gives them back.
+-- with `release = true`, gives them back. `keys` has two modifiers, not
+-- both shift ("ctrl-alt-l"), or is a function key.
 type HotkeyMsg = {
 	keys: string,
 	msg: Data?,
