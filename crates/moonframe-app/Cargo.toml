@@ -41,6 +41,7 @@ default = [
   "gpui",
   "guard",
   "herdr-core",
+  "hotkey",
   "map",
   "markdown",
   "math",
@@ -53,6 +54,7 @@ default = [
   "shell",
   "socket",
   "speech",
+  "status-item",
   "studio",
   "tokio",
   "transcripts",
@@ -84,6 +86,7 @@ git       = ["moonframe/git"]
 gpui          = ["moonframe"]
 guard         = ["moonframe/guard"]
 herdr-core    = ["moonframe/herdr-core"]
+hotkey        = ["moonframe/hotkey"]
 map           = ["moonframe/map"]
 map-benchmark = ["moonframe/map-benchmark"]
 markdown      = ["moonframe/markdown"]
@@ -99,6 +102,7 @@ sealed        = ["moonframe/sealed"]
 shell         = ["moonframe/shell"]
 socket        = ["moonframe/socket"]
 speech        = ["moonframe/speech"]
+status-item   = ["moonframe/status-item"]
 studio        = ["moonframe/studio"]
 syntax        = ["moonframe/syntax"]
 terminal      = ["moonframe/terminal"]

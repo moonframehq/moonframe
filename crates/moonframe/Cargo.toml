@@ -80,6 +80,9 @@ speech = ["dep:moonframe-speech"]
 # `app:guard`: a mod holds back closing and quitting. Off by default; the
 # starter turns it on.
 guard = []
+# `app:hotkey`: system-wide shortcuts for mods (macOS). Off by default; the
+# starter turns it on.
+hotkey = []
 # State kept by herdr-core (`hc`) when installed; with `terminal`, it also
 # keeps shells across launches. tmux and local PTYs only need `terminal`.
 herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
@@ -154,6 +157,9 @@ syntax = [
   "gpui-kit/tree-sitter-yaml",
   # keep-sorted end
 ]
+# `app:status-item`: a mod's item in the menu bar, with its menu (macOS).
+# Off by default; the starter turns it on.
+status-item = []
 # Terminal rendering and local/tmux sessions. Engines enable this too.
 terminal = ["dep:moonframe-mux", "dep:moonframe-terminal", "moonframe-mux/terminal"]
 # Native providers written with `async fn` (`.native_async`), and a tokio
@@ -230,7 +236,7 @@ moonframe-frames   = { optional = true, workspace = true }
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
 block2.workspace           = true
 objc2.workspace            = true
-objc2-app-kit              = { features = ["NSBezierPath", "NSColor", "NSControl", "NSDockTile", "NSEvent", "NSImageView", "NSRunningApplication", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
+objc2-app-kit              = { features = ["NSBezierPath", "NSButton", "NSButtonCell", "NSCell", "NSColor", "NSControl", "NSDockTile", "NSEvent", "NSImageView", "NSMenu", "NSMenuItem", "NSRunningApplication", "NSSound", "NSStatusBar", "NSStatusBarButton", "NSStatusItem", "NSView", "NSWindow", "block2"], workspace = true }
 objc2-foundation.workspace = true
 # Finding the AppKit window a trackpad gesture happened in.
 raw-window-handle.workspace = true

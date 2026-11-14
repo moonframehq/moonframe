@@ -62,6 +62,7 @@ mod machine;
 mod main_window;
 mod measuring;
 mod menu;
+mod menu_bar;
 mod omarchy;
 mod panes;
 mod picking;
@@ -633,6 +634,10 @@ impl MoonframeApp {
             Command::Inspect => self.inspect_for(SHELL, cx),
             Command::CheckForUpdates => self.check_for_updates(true, cx),
             Command::NewWindow => cx.defer(open_main_window),
+            Command::Activate => {
+                cx.activate(true);
+                window.activate_window();
+            },
         }
     }
 
@@ -663,6 +668,9 @@ impl MoonframeApp {
         // A reload runs every `init` again, as a new window does: one that
         // asks for either would loop, so what `init` asks as the app (or a
         // window) starts or reloads reloads nothing and opens no window.
+        if matches!(from, "reload" | "packages") {
+            self.forget_gone_owners(cx);
+        }
         if matches!(from, "start" | "reload" | "packages") {
             requests.retain(|(asker, request)| {
                 let looping = match request {
@@ -815,6 +823,8 @@ impl MoonframeApp {
             Request::Dock(dock) => self.dock_request(from, &dock),
             Request::Restart(name) => self.restart_provider(from, &name, cx),
             Request::Devtools(request) => self.devtools_request(from, request, cx),
+            Request::StatusItem(request) => self.status_item_request(from, request, cx),
+            Request::Hotkey(request) => self.hotkey_request(from, request, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);

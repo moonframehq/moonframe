@@ -20,6 +20,9 @@ projects, and a jack-o'-lantern under string lights.
   `vm_stat` and `sysctl` on macOS and reads the system directly on Linux
   and Windows: groups by name with heat bars, the CPU over the last two
   minutes, memory and pressure.
+- **In the menu bar** (macOS): a flame with the CPU in use beside it, the
+  busiest processes in its menu, and ⌃⌥L from any app to bring Lantern
+  forward (`mods/menubar`, with `app:status-item` and `app:hotkey`).
 - **Changes**: from the built-in `git` provider, for the repository the app
   runs from: its worktrees, untracked and modified files, one diff open.
 - **The Hallows palette** is in `style.luau`; the starter has it as the

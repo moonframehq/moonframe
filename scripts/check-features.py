@@ -52,8 +52,8 @@ def main():
         assert starter[name] == [f"moonframe/{name}"], name
     # Off in the library, on in the starter: Ghostty needs Zig, and few apps
     # need a street map, LaTeX, live video or what long runs ask of the machine.
-    opt_in = {"awake", "crash", "displays", "dock", "documents", "ghostty", "guard", "map", "math", "pi", "planner", "procs", "projects", "restart",
-              "socket", "speech", "transcripts", "video"}
+    opt_in = {"awake", "crash", "displays", "dock", "documents", "ghostty", "guard", "hotkey", "map", "math", "pi", "planner", "procs", "projects", "restart",
+              "socket", "speech", "status-item", "transcripts", "video"}
     assert set(starter["default"]) == set(library["default"]) | opt_in | {"gpui"}
 
     optional = {

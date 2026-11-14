@@ -4,12 +4,12 @@ use {super::*, std::io::Read as _};
 
 /// Largest image `app:icon` shows, in bytes and pixels a side: what a mod
 /// hands AppKit to decode on the main thread.
-const MAX_ICON_BYTES: u64 = 4 * 1024 * 1024;
+pub(super) const MAX_ICON_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_ICON_SIDE: usize = 4096;
 
 /// The image in `file`, read once and at most [`MAX_ICON_BYTES`] of it,
 /// whatever the file has become since it was found.
-fn read_icon(file: &Path) -> Result<Vec<u8>, String> {
+pub(super) fn read_icon(file: &Path) -> Result<Vec<u8>, String> {
     let mut bytes = Vec::new();
     std::fs::File::open(file)
         .and_then(|opened| opened.take(MAX_ICON_BYTES + 1).read_to_end(&mut bytes))
