@@ -560,6 +560,15 @@ impl Workspace {
         self.shell.module.as_ref().map_or(&[], Module::menus)
     }
 
+    /// Whether a shell menu item's check mark changed since the last call,
+    /// so the bar is built again.
+    pub fn take_menus_changed(&mut self) -> bool {
+        self.shell
+            .module
+            .as_mut()
+            .is_some_and(Module::take_menus_changed)
+    }
+
     /// What the About panel shows, as the shell says.
     pub fn about(&self) -> crate::About {
         self.shell

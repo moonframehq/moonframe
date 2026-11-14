@@ -226,6 +226,8 @@ launches; another starts from each mod's `init` and saves nothing.
 An item sends `msg` to `to` (the shell without it) or runs a `command`;
 `shortcut` is a key as `keys` name them (`secondary` is ⌘ on macOS, Ctrl
 elsewhere). The receiving mod handles the message in `update` like a click.
+`checked = { layout = "grid" }` ticks an item while the shell's state has
+those values (a layout or mode the shell keeps); `checked = true` always.
 About is macOS's own panel (icon, name, version, credits); a toast elsewhere.
 
 **Check for Updates…** sits under About when the app names the GitHub

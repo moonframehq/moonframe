@@ -98,6 +98,9 @@ markdown = ["dep:markdown", "syntax"]
 # LaTeX in a `ui.markdown`, drawn by latex-rust, which carries its math font.
 # Off by default, as few apps need one; the starter turns it on.
 math = ["dep:latex-rust", "markdown"]
+# The `notes` native provider (`app.notes`): a Commonplace vault of markdown
+# notes, indexed and watched. Off by default; the starter turns it on.
+notes = ["dep:moonframe-notes", "moonframe-notes/provider"]
 # The `pi` and `repo` native providers (`app.pi`, `app.repo`): threads of the
 # pi coding agent and the checkout they work in, for Pilot. Off by default;
 # the starter turns it on.
@@ -191,6 +194,7 @@ moonframe-forge               = { optional = true, workspace = true }
 moonframe-git                 = { optional = true, workspace = true }
 moonframe-history.workspace   = true
 moonframe-mux                 = { optional = true, workspace = true }
+moonframe-notes               = { optional = true, workspace = true }
 moonframe-packages            = { default-features = false, path = "../moonframe-packages" }
 moonframe-pi                  = { optional = true, workspace = true }
 moonframe-planner             = { optional = true, workspace = true }

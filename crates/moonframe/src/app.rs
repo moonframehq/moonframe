@@ -607,6 +607,9 @@ impl MoonframeApp {
     /// Passes on what the mods sent providers, and draws again.
     fn flush(&mut self, from: &str, cx: &mut Context<Self>) {
         self.forward(from, cx);
+        if self.workspace.take_menus_changed() {
+            crate::host_menus::install(self.workspace.menus(), cx);
+        }
         report(&self.workspace);
         cx.notify();
     }

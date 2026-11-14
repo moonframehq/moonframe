@@ -1,0 +1,15 @@
+# Commonplace's vault, shared as `app.notes`: markdown files in a folder,
+# indexed (links, tags, full-text search) and watched for changes made in
+# other apps. A native provider: Rust built into the app
+# (crates/moonframe-notes, the `notes` feature), working on your own files
+# with your access.
+interval = 0.25
+kind     = "native"
+start    = "always"
+
+[settings]
+# The vault: a folder of markdown notes (Obsidian's format). Unset, it is the
+# one last opened from the app, else ~/Commonplace, made the first time.
+# vault = "~/Commonplace"
+# The mods that may change the vault; any mod may read it.
+writers = ["journal", "library", "shell", "workspace"]

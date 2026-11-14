@@ -216,6 +216,9 @@ pub(crate) struct Module {
     props: Value,
     /// What `init` sent, for the workspace to deliver once it is loaded.
     pending: Vec<Send>,
+    /// Set when a menu item's check mark followed the state; taken by
+    /// [`Module::take_menus_changed`].
+    menus_changed: bool,
 }
 
 impl Module {
@@ -316,7 +319,7 @@ impl Module {
             },
             None => (previous, Vec::new()),
         };
-        Ok(Self {
+        let mut module = Self {
             pending,
             lens: Lens::new(&lua)?,
             lua,
@@ -325,7 +328,50 @@ impl Module {
             definition,
             state,
             props,
-        })
+            menus_changed: false,
+        };
+        module.mark_menus();
+        module.menus_changed = false;
+        Ok(module)
+    }
+
+    /// Ticks each menu item whose `checked` values the state now has.
+    fn mark_menus(&mut self) {
+        let Some(menus) = &mut self.definition.menus else {
+            return;
+        };
+        let state = match &self.state {
+            Value::Table(table) => Some(table),
+            _ => None,
+        };
+        for menu in &mut menus.0 {
+            for entry in &mut menu.items {
+                let crate::MenuEntry::Item(item) = entry else {
+                    continue;
+                };
+                let Some(check) = &item.check else {
+                    continue;
+                };
+                let on = state.is_some_and(|state| {
+                    check.iter().all(|(key, want)| {
+                        state
+                            .raw_get::<Value>(key.as_str())
+                            .ok()
+                            .and_then(|value| Data::read(&value).ok())
+                            .is_some_and(|value| &value == want)
+                    })
+                });
+                if on != item.checked {
+                    item.checked = on;
+                    self.menus_changed = true;
+                }
+            }
+        }
+    }
+
+    /// Whether a check mark changed since the last call.
+    pub(crate) fn take_menus_changed(&mut self) -> bool {
+        std::mem::take(&mut self.menus_changed)
     }
 
     /// The topic patterns it hears, as written: names, or prefixes ending
@@ -399,6 +445,7 @@ impl Module {
         if !state.is_nil() {
             self.state = state;
         }
+        self.mark_menus();
         let sends = Option::<Vec<Send>>::read(&sends, &Cx::root(&NO_NAMES).key("sends"))
             .map_err(|error| error.context("update"))?;
         Ok(sends.unwrap_or_default())
