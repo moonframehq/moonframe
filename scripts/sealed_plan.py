@@ -37,6 +37,27 @@ FEATURES = set(NATIVES.values()) | {
 }
 SKIP = {".git", ".claude", ".DS_Store", ".moonframe-embedded", "target", "types",
         "__pycache__", ".luaurc"}
+# The URL schemes no app may claim: RESERVED_SCHEMES in
+# crates/moonframe-packages/src/packages/manifest.rs, which a test compares.
+RESERVED_SCHEMES = {
+    # keep-sorted start
+    "about",
+    "blob",
+    "data",
+    "facetime",
+    "file",
+    "ftp",
+    "http",
+    "https",
+    "javascript",
+    "mailto",
+    "sms",
+    "ssh",
+    "tel",
+    "ws",
+    "wss",
+    # keep-sorted end
+}
 
 
 def manifest(path):
@@ -48,6 +69,17 @@ def names(value, label):
     if not isinstance(value, list) or any(not isinstance(v, str) or not re.fullmatch(r"[a-z0-9_-]+", v) for v in value):
         raise ValueError(f"{label} must be an array of plain names")
     return set(value)
+
+
+def schemes(value):
+    """The URL schemes an app claims, as valid_scheme in manifest.rs accepts them."""
+    if not isinstance(value, list) or any(
+            not isinstance(v, str) or not re.fullmatch(r"[a-z][a-z0-9+.-]{0,63}", v) or v in RESERVED_SCHEMES
+            for v in value):
+        raise ValueError("app.schemes must be an array of URL schemes an app may claim: a lowercase "
+                         "letter, then up to 63 of a-z 0-9 + - ., and none the web or the system owns "
+                         "(http, file, mailto, ...)")
+    return list(value)
 
 
 def profile_paths(user, profile):
@@ -115,6 +147,7 @@ class Plan:
         icon = self.metadata.get("icon", "icon.png")
         if not isinstance(icon, str) or Path(icon).is_absolute() or ".." in Path(icon).parts:
             raise ValueError("app.icon must name a file inside the app folder")
+        self.schemes = schemes(self.metadata.get("schemes", []))
         self.config = data.get("bundle", {})
         if not isinstance(self.config, dict):
             raise ValueError("bundle must be a TOML table")

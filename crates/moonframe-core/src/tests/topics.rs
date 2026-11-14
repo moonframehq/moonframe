@@ -139,6 +139,32 @@ fn the_apps_own_topics_reach_only_their_mod_and_no_mod_forges_them() {
 }
 
 #[test]
+fn the_apps_news_reaches_every_module_that_hears_it_and_is_not_kept() {
+    let hears = listener(r#""app/url""#);
+    let prefix = listener(r#""app/*""#);
+    let deaf = listener(r#""tabs/main""#);
+    let dir = app(&[("hears", &hears), ("prefix", &prefix), ("deaf", &deaf)]);
+    let memory = Memory::default();
+    let mut workspace = Workspace::open_with(dir.path(), false, Some(Box::new(memory.clone())));
+    let heard = |workspace: &Workspace, name: &str| match workspace
+        .slot(name)
+        .and_then(crate::Slot::view)
+    {
+        Some(Node::Text(text)) => text.text.clone(),
+        other => panic!("{other:?}"),
+    };
+    workspace.app_news(
+        "url",
+        Data::Map([("branch".to_owned(), Data::from("notes:/new"))].into()),
+    );
+    assert_eq!(heard(&workspace, "hears"), "app/url=notes:/new");
+    assert_eq!(heard(&workspace, "prefix"), "app/url=notes:/new");
+    assert_eq!(heard(&workspace, "deaf"), "nothing");
+    assert!(workspace.topic("app/url").is_none());
+    assert!(!memory.0.borrow().0.contains_key("topic:app/url"));
+}
+
+#[test]
 fn an_instance_mounted_late_catches_up_on_its_topics() {
     let watcher = listener(r#""tabs/main""#);
     let dir = app(&[("publisher", PUBLISHER), ("watcher", &watcher)]);

@@ -2,11 +2,12 @@
 
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
 from sealed_luau import references
-from sealed_plan import Plan, profile_paths
+from sealed_plan import RESERVED_SCHEMES, Plan, profile_paths
 
 
 class ScannerTests(unittest.TestCase):
@@ -179,6 +180,23 @@ class PlanTests(unittest.TestCase):
         self.write(self.app / "main.luau", 'return app.custom')
         with self.assertRaisesRegex(ValueError, "custom Rust host"):
             self.plan()
+
+    def test_an_app_claims_only_plain_schemes_of_its_own(self):
+        self.write(self.app / "moonframe.toml", '[app]\nname = "test"\nschemes = ["ok", "ok-beta.2+x"]\n')
+        self.assertEqual(self.plan().schemes, ["ok", "ok-beta.2+x"])
+        for bad in ('"ok"', '["https"]', '["file"]', '["OK"]', '["2ok"]', '["ok:"]', '[""]',
+                    '["o k"]', '[1]', f'["{"o" * 65}"]'):
+            with self.subTest(schemes=bad):
+                self.write(self.app / "moonframe.toml", f'[app]\nname = "test"\nschemes = {bad}\n')
+                with self.assertRaisesRegex(ValueError, "app.schemes"):
+                    self.plan()
+
+    def test_reserved_schemes_match_the_manifests(self):
+        source = (Path(__file__).resolve().parent.parent
+                  / "crates/moonframe-packages/src/packages/manifest.rs").read_text()
+        block = re.search(r"const RESERVED_SCHEMES: &\[&str\] = &\[(.*?)\];", source, re.S)
+        self.assertIsNotNone(block)
+        self.assertEqual(set(re.findall(r'"([^"]+)"', block.group(1))), RESERVED_SCHEMES)
 
     def test_profile_uses_enabled_packages_in_id_order(self):
         folder = self.root / "user/profiles/test"

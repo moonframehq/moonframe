@@ -90,6 +90,7 @@ def build(plan, out):
             values.append(("version", metadata["version"]))
         if icon.is_file():
             values.append(("icon", str(icon)))
+        values.extend(("scheme", scheme) for scheme in plan.schemes)
         for _, value in values:
             if any(c in value for c in "\t\r\n"):
                 raise ValueError("bundle metadata may not contain tabs or newlines")

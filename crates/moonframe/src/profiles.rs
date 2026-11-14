@@ -438,6 +438,9 @@ fn print_paths(user: &Path, name: &str) -> Result<(), String> {
     if icon.is_file() {
         println!("icon\t{}", icon.display());
     }
+    for scheme in &manifest.schemes {
+        println!("scheme\t{scheme}");
+    }
     for package in packages {
         println!("package\t{}", package.display());
     }

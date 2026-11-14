@@ -48,6 +48,11 @@ pub struct App {
     /// app menu gets Check for Updates. Needs `version`.
     #[serde(default)]
     pub(crate) updates: Option<String>,
+    /// The URL schemes it opens (`["my-app"]`): its bundle claims them, and
+    /// a `my-app:` link opened anywhere brings it forward and reaches its
+    /// mods on `app/url`.
+    #[serde(default)]
+    pub schemes: Vec<String>,
 }
 
 impl App {
@@ -117,6 +122,15 @@ impl App {
                 ));
             }
         }
+        if let Some(scheme) = app.schemes.iter().find(|scheme| !valid_scheme(scheme)) {
+            return Err(format!(
+                "{}: `{}` is not a URL scheme an app may claim: a lowercase letter, then \
+                 up to 63 of a-z 0-9 + - ., and none the web or the system owns (http, \
+                 file, mailto, ...)",
+                path.display(),
+                printable(scheme)
+            ));
+        }
         Ok(Some(app))
     }
 }
@@ -151,6 +165,40 @@ pub(crate) fn valid_title(title: &str) -> bool {
         && !title
             .chars()
             .any(|c| c.is_control() || matches!(c, '/' | '\\' | '<' | '>' | '&' | ':'))
+}
+
+/// Schemes the web or the system owns, which no app takes over. Sealed
+/// builds check the same list (`scripts/sealed_plan.py`), which a test
+/// compares.
+const RESERVED_SCHEMES: &[&str] = &[
+    // keep-sorted start
+    "about",
+    "blob",
+    "data",
+    "facetime",
+    "file",
+    "ftp",
+    "http",
+    "https",
+    "javascript",
+    "mailto",
+    "sms",
+    "ssh",
+    "tel",
+    "ws",
+    "wss",
+    // keep-sorted end
+];
+
+/// Whether an app may claim the URL scheme `scheme`: RFC 3986's letters,
+/// lowercase (the system matches schemes in any case), and not one of
+/// [`RESERVED_SCHEMES`].
+pub fn valid_scheme(scheme: &str) -> bool {
+    let mut chars = scheme.chars();
+    chars.next().is_some_and(|c| c.is_ascii_lowercase())
+        && scheme.len() <= 64
+        && chars.all(|c| matches!(c, 'a'..='z' | '0'..='9' | '+' | '-' | '.'))
+        && !RESERVED_SCHEMES.contains(&scheme)
 }
 
 /// Whether `icon` is a relative path that stays inside the app's folder.

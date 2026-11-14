@@ -578,6 +578,23 @@ fn an_app_updated_from_github_names_its_repository_and_version() {
     }
 }
 
+#[test]
+fn an_app_claims_only_plain_schemes_of_its_own() {
+    let dir = tempfile::tempdir().unwrap();
+    let read = |manifest: &str| {
+        fs::write(dir.path().join("moonframe.toml"), manifest).unwrap();
+        App::read(dir.path())
+    };
+    let app = read("[app]\nname = \"ok\"\nschemes = [\"ok\", \"ok-beta.2+x\"]\n")
+        .unwrap()
+        .unwrap();
+    assert_eq!(app.schemes, ["ok", "ok-beta.2+x"]);
+    for bad in ["https", "file", "OK", "2ok", "ok:", "ok/x", "", "o k"] {
+        let problem = read(&format!("[app]\nname = \"ok\"\nschemes = [\"{bad}\"]\n")).unwrap_err();
+        assert!(problem.contains("is not a URL scheme"), "{bad}: {problem}");
+    }
+}
+
 /// A package's native provider runs no code of its own, but it replaces the
 /// app's built-in one with its settings (git's `writers`), so it is asked
 /// about, and the prompt says what it changes.

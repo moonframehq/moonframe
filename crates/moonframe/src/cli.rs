@@ -641,133 +641,135 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
         let saved = crate::placement::load(&path);
         (path, saved)
     });
-    gpui_kit::application()
-        .with_assets(crate::assets::Assets::new(launch.assets))
-        .run(move |cx| {
-            crate::app::list_fonts_ahead(cx);
-            gpui_kit::init(cx);
-            crate::actions::bind_keys(cx);
-            crate::host_menus::install(&[], cx);
-            cx.on_action(|_: &crate::actions::Quit, cx| crate::app::guard::quit(cx));
-            cx.on_window_closed(|cx, id| {
-                crate::video::window_closed(id);
-                if cx.windows().is_empty() {
-                    cx.quit();
-                }
-            })
-            .detach();
-
-            // Each mod's state and the topics come back from the last run:
-            // from herdr-core when it runs here, else SQLite, each profile
-            // its own. Only with the user's folder: `--no-user` runs
-            // (checks, screenshots) start fresh and keep nothing.
-            let backends = Arc::new(Backends::for_app(&paths::namespace(
-                folders.profile.as_deref(),
-            )));
-            let persist = folders
-                .user
-                .as_ref()
-                .and_then(|_| crate::persist::open(&backends, folders.profile.as_deref()));
-            // The shell says what window it wants, so it loads first.
-            let mut workspace = crate::capabilities::open(
-                launch.entries.apply(folders.roots()),
-                cx.theme().is_dark(),
-                persist,
-            );
-            workspace.set_host("renderer", moonframe_core::Data::from("gpui"));
-            if let Some(report) = &launch.providers.on_entry_status {
-                workspace.on_entry_status(report.clone());
-            }
-            if let Some(report) = &launch.view_diagnostics {
-                workspace.on_view_diagnostic(report.clone());
-            }
-            workspace.share_views(launch.entries.clone());
-            let mut provider_options = launch.providers.clone();
-            provider_options.state_dir = folders.user.as_ref().map(|_| {
-                paths::state(folders.profile.as_deref()).with_file_name("entry-providers")
-            });
-            let chrome = workspace.chrome();
-            // What every main window shares: the providers first.
-            crate::app::Hub::install(
-                &workspace,
-                natives,
-                crate::app::Launch {
-                    entries: launch.entries.clone(),
-                    view_diagnostics: launch.view_diagnostics.clone(),
-                    providers: provider_options,
-                    folders: folders.clone(),
-                    backends: backends.clone(),
-                    views: views.clone(),
-                    chrome,
-                },
-                cx,
-            );
-            let placement = placement.filter(|_| chrome.remember);
-            // The shell's size if it asks, kept within the screen.
-            let (width, height) = chrome.size.unwrap_or((1280., 820.));
-            let screen = cx.primary_display().map(|display| display.bounds().size);
-            let (width, height) = match screen {
-                Some(screen) => (
-                    width.min(f32::from(screen.width) - 40.),
-                    height.min(f32::from(screen.height) - 60.),
-                ),
-                None => (width, height),
-            };
-            // Where the window last was, if it still fits a screen; else
-            // the shell's size, centered.
-            let (window_bounds, display_id) = placement
-                .as_ref()
-                .and_then(|(_, saved)| crate::placement::reopen(saved.as_ref()?, cx))
-                .map_or_else(
-                    || {
-                        let size = size(px(width), px(height));
-                        (
-                            WindowBounds::Windowed(Bounds::centered(None, size, cx)),
-                            None,
-                        )
-                    },
-                    |(bounds, display)| (bounds, Some(display)),
-                );
-            let options = WindowOptions {
-                window_bounds: Some(window_bounds),
-                display_id,
-                window_min_size: Some(size(px(640.), px(400.))),
-                app_id: Some(crate::app_id()),
-                focus: !background,
-                ..framed(chrome)
-            };
-            let opened = cx.open_window(options, |window, cx| {
-                let view = cx.new(|cx| {
-                    let mut app = MoonframeApp::new(
-                        workspace,
-                        chrome,
-                        folders.clone(),
-                        backends,
-                        views,
-                        window,
-                        cx,
-                    );
-                    if let Some(name) = &component {
-                        app.show_component(name, cx);
-                    }
-                    app
-                });
-                let kept = placement.map(|(path, _)| path);
-                let view = cx.new(|cx| crate::app::MainWindow::new(view, kept, window, cx));
-                cx.new(|cx| Root::new(view, window, cx))
-            });
-            if let Err(error) = opened {
-                eprintln!("{}: unable to open a window: {error}", paths::name());
+    let application =
+        gpui_kit::application().with_assets(crate::assets::Assets::new(launch.assets));
+    crate::app::links::listen(&application, folders.schemes());
+    application.run(move |cx| {
+        crate::app::list_fonts_ahead(cx);
+        gpui_kit::init(cx);
+        crate::actions::bind_keys(cx);
+        crate::host_menus::install(&[], cx);
+        cx.on_action(|_: &crate::actions::Quit, cx| crate::app::guard::quit(cx));
+        cx.on_window_closed(|cx, id| {
+            crate::video::window_closed(id);
+            if cx.windows().is_empty() {
                 cx.quit();
             }
-            if !background {
-                cx.activate(true);
-            }
-            // After the window: nothing waits for it, and it takes a while.
-            if let Err(problem) = crate::dock::set_icon(icon.as_deref()) {
-                tracing::warn!("{problem}");
-            }
+        })
+        .detach();
+
+        // Each mod's state and the topics come back from the last run:
+        // from herdr-core when it runs here, else SQLite, each profile
+        // its own. Only with the user's folder: `--no-user` runs
+        // (checks, screenshots) start fresh and keep nothing.
+        let backends = Arc::new(Backends::for_app(&paths::namespace(
+            folders.profile.as_deref(),
+        )));
+        let persist = folders
+            .user
+            .as_ref()
+            .and_then(|_| crate::persist::open(&backends, folders.profile.as_deref()));
+        // The shell says what window it wants, so it loads first.
+        let mut workspace = crate::capabilities::open(
+            launch.entries.apply(folders.roots()),
+            cx.theme().is_dark(),
+            persist,
+        );
+        workspace.set_host("renderer", moonframe_core::Data::from("gpui"));
+        if let Some(report) = &launch.providers.on_entry_status {
+            workspace.on_entry_status(report.clone());
+        }
+        if let Some(report) = &launch.view_diagnostics {
+            workspace.on_view_diagnostic(report.clone());
+        }
+        workspace.share_views(launch.entries.clone());
+        let mut provider_options = launch.providers.clone();
+        provider_options.state_dir = folders
+            .user
+            .as_ref()
+            .map(|_| paths::state(folders.profile.as_deref()).with_file_name("entry-providers"));
+        let chrome = workspace.chrome();
+        // What every main window shares: the providers first.
+        crate::app::Hub::install(
+            &workspace,
+            natives,
+            crate::app::Launch {
+                entries: launch.entries.clone(),
+                view_diagnostics: launch.view_diagnostics.clone(),
+                providers: provider_options,
+                folders: folders.clone(),
+                backends: backends.clone(),
+                views: views.clone(),
+                chrome,
+            },
+            cx,
+        );
+        let placement = placement.filter(|_| chrome.remember);
+        // The shell's size if it asks, kept within the screen.
+        let (width, height) = chrome.size.unwrap_or((1280., 820.));
+        let screen = cx.primary_display().map(|display| display.bounds().size);
+        let (width, height) = match screen {
+            Some(screen) => (
+                width.min(f32::from(screen.width) - 40.),
+                height.min(f32::from(screen.height) - 60.),
+            ),
+            None => (width, height),
+        };
+        // Where the window last was, if it still fits a screen; else
+        // the shell's size, centered.
+        let (window_bounds, display_id) = placement
+            .as_ref()
+            .and_then(|(_, saved)| crate::placement::reopen(saved.as_ref()?, cx))
+            .map_or_else(
+                || {
+                    let size = size(px(width), px(height));
+                    (
+                        WindowBounds::Windowed(Bounds::centered(None, size, cx)),
+                        None,
+                    )
+                },
+                |(bounds, display)| (bounds, Some(display)),
+            );
+        let options = WindowOptions {
+            window_bounds: Some(window_bounds),
+            display_id,
+            window_min_size: Some(size(px(640.), px(400.))),
+            app_id: Some(crate::app_id()),
+            focus: !background,
+            ..framed(chrome)
+        };
+        let opened = cx.open_window(options, |window, cx| {
+            let view = cx.new(|cx| {
+                let mut app = MoonframeApp::new(
+                    workspace,
+                    chrome,
+                    folders.clone(),
+                    backends,
+                    views,
+                    window,
+                    cx,
+                );
+                if let Some(name) = &component {
+                    app.show_component(name, cx);
+                }
+                app
+            });
+            let kept = placement.map(|(path, _)| path);
+            let view = cx.new(|cx| crate::app::MainWindow::new(view, kept, window, cx));
+            cx.new(|cx| Root::new(view, window, cx))
         });
+        if let Err(error) = opened {
+            eprintln!("{}: unable to open a window: {error}", paths::name());
+            cx.quit();
+        }
+        if !background {
+            cx.activate(true);
+        }
+        // After the window: nothing waits for it, and it takes a while.
+        if let Err(problem) = crate::dock::set_icon(icon.as_deref()) {
+            tracing::warn!("{problem}");
+        }
+    });
     ExitCode::SUCCESS
 }
 

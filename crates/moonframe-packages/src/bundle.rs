@@ -130,7 +130,13 @@ fn bundle(folders: &Folders, out: &Path) -> Result<PathBuf, String> {
         icns(&icon, &resources.join("AppIcon.icns"))?;
         fs::write(
             contents.join("Info.plist"),
-            info_plist(&title, &id, &exe_name, &identity.version),
+            info_plist(
+                &title,
+                &id,
+                &exe_name,
+                &identity.version,
+                &folders.schemes(),
+            ),
         )
         .map_err(text)?;
         let signed = Command::new("codesign")
@@ -440,12 +446,13 @@ fn icns(png: &[u8], out: &Path) -> Result<(), String> {
     }
 }
 
-fn info_plist(title: &str, id: &str, exe: &str, version: &str) -> String {
+fn info_plist(title: &str, id: &str, exe: &str, version: &str, schemes: &[String]) -> String {
     let escape = |text: &str| {
         text.replace('&', "&amp;")
             .replace('<', "&lt;")
             .replace('>', "&gt;")
     };
+    let urls = url_types(id, schemes);
     let (title, id, exe, version) = (escape(title), escape(id), escape(exe), escape(version));
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -463,9 +470,59 @@ fn info_plist(title: &str, id: &str, exe: &str, version: &str) -> String {
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSMicrophoneUsageDescription</key><string>{title} listens only while you dictate.</string>
-    <key>NSSpeechRecognitionUsageDescription</key><string>{title} turns what you dictate into text on this Mac.</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>{title} turns what you dictate into text on this Mac.</string>{urls}
 </dict>
 </plist>
 "#
     )
+}
+
+/// The plist's `CFBundleURLTypes`, which has macOS open the app's links:
+/// nothing when it has no `schemes`. They are plain (`valid_scheme`).
+fn url_types(id: &str, schemes: &[String]) -> String {
+    let schemes: Vec<&String> = schemes
+        .iter()
+        .filter(|scheme| crate::packages::valid_scheme(scheme))
+        .collect();
+    if schemes.is_empty() {
+        return String::new();
+    }
+    let id = id
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+    let list: String = schemes
+        .iter()
+        .map(|scheme| format!("<string>{scheme}</string>"))
+        .collect();
+    format!(
+        "\n    <key>CFBundleURLTypes</key><array><dict>\
+         <key>CFBundleURLName</key><string>{id}</string>\
+         <key>CFBundleURLSchemes</key><array>{list}</array>\
+         </dict></array>"
+    )
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_bundle_claims_the_apps_schemes() {
+        let plist = info_plist("Notes", "dev.example.notes", "notes", "1.0.0", &[]);
+        assert!(!plist.contains("CFBundleURLTypes"));
+        let schemes = ["notes".to_owned(), "notes-beta".to_owned()];
+        let plist = info_plist("Notes", "dev.example.notes", "notes", "1.0.0", &schemes);
+        assert!(plist.contains(
+            "<key>CFBundleURLName</key><string>dev.example.notes</string>\
+             <key>CFBundleURLSchemes</key><array><string>notes</string>\
+             <string>notes-beta</string></array>"
+        ));
+        // One the app may not claim never reaches the plist.
+        let plist = info_plist("Notes", "dev.example.notes", "notes", "1.0.0", &[
+            "https".to_owned()
+        ]);
+        assert!(!plist.contains("CFBundleURLTypes"));
+    }
 }

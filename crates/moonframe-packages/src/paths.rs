@@ -446,6 +446,18 @@ impl Folders {
         })
     }
 
+    /// The URL schemes the app opens: its manifest's `schemes`, and outside
+    /// a profile also those the app was launched with.
+    pub fn schemes(&self) -> Vec<String> {
+        let mut schemes = self.manifest().map(|app| app.schemes).unwrap_or_default();
+        if self.profile.is_none() {
+            schemes.extend(crate::identity().schemes.iter().cloned());
+        }
+        schemes.sort();
+        schemes.dedup();
+        schemes
+    }
+
     /// The app's name for people: its manifest's title, else its name, else
     /// the profile's, else the one the app was launched with.
     pub fn title(&self) -> String {

@@ -2109,6 +2109,23 @@ type NotificationClick = {
 	clicked: boolean,
 }
 
+-- A link to one of the app's URL schemes (`schemes` in its moonframe.toml),
+-- opened in a browser or another app: a module that subscribes to `app/url`
+-- hears `{ topic = "app/url", value = AppUrl }`. Anyone can open one: treat
+-- what it carries as untrusted.
+type AppUrl = {
+	-- The whole link, as opened.
+	url: string,
+	-- Lowercase, one the app claims.
+	scheme: string,
+	-- `notes://host/path` has one; `notes:/path` has none.
+	host: string?,
+	path: string,
+	-- Each parameter decoded, the first of a name.
+	query: { [string]: string },
+	fragment: string?,
+}
+
 -- What `{ to = "app:pick", msg = ... }` opens: the system's panel to open
 -- files, pick folders, or name a file to save. The answer comes back to
 -- the mod as `reply` with `paths` (a list; `path` for a save) or

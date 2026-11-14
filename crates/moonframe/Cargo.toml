@@ -212,6 +212,7 @@ toml.workspace                = true
 tracing.workspace             = true
 tracing-subscriber.workspace  = true
 ureq                          = { optional = true, workspace = true }
+url.workspace                 = true
 
 [dev-dependencies]
 # Real windows, headless: `src/e2e.rs` clicks and types in them. As for

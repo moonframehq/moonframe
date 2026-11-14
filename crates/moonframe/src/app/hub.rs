@@ -7,8 +7,8 @@
 //! - the last of everything shared as `app.<key>`, for a window that opens
 //!   later;
 //! - the history of the app's folders, and what runs once for the app:
-//!   the menu actions, notification clicks, `moonframe pane new`, update
-//!   checks.
+//!   the menu actions, notification clicks, links to the app's schemes,
+//!   `moonframe pane new`, update checks.
 //!
 //! What app-wide comes without a window (a menu item, a notification
 //! click) goes to the front main window: the active one, else the one
@@ -184,6 +184,7 @@ impl Hub {
         );
         menu_actions(cx);
         hear_notification_clicks(cx);
+        links::deliver(cx);
         take_panes(&folders, cx);
         #[cfg(feature = "updates")]
         check_for_updates_daily(&folders, cx);

@@ -55,6 +55,7 @@ pub(crate) mod guard;
 mod history;
 mod hub;
 mod icon;
+pub(crate) mod links;
 mod listeners;
 mod live;
 mod live_settings;
@@ -718,6 +719,18 @@ impl MoonframeApp {
     /// and its window forward and tells the mod, on `app/notification`:
     /// `{ id, clicked = true }`.
     fn notification_clicked(&mut self, from: &str, id: Option<String>, cx: &mut Context<Self>) {
+        self.come_forward(cx);
+        let clicked = std::collections::BTreeMap::from([
+            ("id".to_owned(), id.map_or(Data::Nil, Data::String)),
+            ("clicked".to_owned(), Data::Bool(true)),
+        ]);
+        self.workspace
+            .app_topic("notification", from, Data::Map(clicked));
+        self.flush("notification", cx);
+    }
+
+    /// Brings the app and this main window forward.
+    fn come_forward(&self, cx: &mut Context<Self>) {
         cx.activate(true);
         let main = self.main_window;
         if let Some(window) = cx
@@ -727,13 +740,6 @@ impl MoonframeApp {
         {
             let _ = window.update(cx, |_, window, _| window.activate_window());
         }
-        let clicked = std::collections::BTreeMap::from([
-            ("id".to_owned(), id.map_or(Data::Nil, Data::String)),
-            ("clicked".to_owned(), Data::Bool(true)),
-        ]);
-        self.workspace
-            .app_topic("notification", from, Data::Map(clicked));
-        self.flush("notification", cx);
     }
 
     /// The toast was clicked: when it shows a notification, as a click on
