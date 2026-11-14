@@ -117,9 +117,12 @@ pub(super) fn favicons(text: &str) -> Value {
 /// raw text (code included: a view only shows what it finds).
 fn hosts(text: &str) -> impl Iterator<Item = String> + '_ {
     text.match_indices("://").filter_map(|(at, _)| {
+        // The scheme's letters are ASCII: start after the last other
+        // character, by its length, so an accent before it stays whole.
         let start = text[..at]
-            .rfind(|c: char| !c.is_ascii_alphabetic())
-            .map_or(0, |before| before + 1);
+            .char_indices()
+            .rfind(|(_, c)| !c.is_ascii_alphabetic())
+            .map_or(0, |(before, c)| before + c.len_utf8());
         let rest = &text[start..];
         let end = rest
             .find(|c: char| c.is_whitespace() || "()[]<>\"'`|*,".contains(c))

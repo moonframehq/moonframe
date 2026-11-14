@@ -200,3 +200,9 @@ fn favicons_are_looked_up_by_host_and_fetched_when_missing() {
         ("c.example", true, vec!["https://c.example"]),
     ]);
 }
+
+#[test]
+fn hosts_are_found_after_any_character() {
+    let found: Vec<String> = hosts("café:https://example.com — éhttps://b.org/x").collect();
+    assert_eq!(found, ["example.com", "b.org"]);
+}
