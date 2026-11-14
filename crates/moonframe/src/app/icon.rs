@@ -39,12 +39,6 @@ impl MoonframeApp {
     /// relative to the mod's folder, `~/...`, or absolute, of at most
     /// `max_bytes` and inside the app's folders.
     pub(super) fn mod_file(&self, from: &str, src: &str, max_bytes: u64) -> Option<PathBuf> {
-        let folder = self
-            .workspace
-            .slot(from)
-            .and_then(|slot| slot.source())
-            .and_then(Path::parent)
-            .unwrap_or(Path::new("."));
         let allowed: Vec<PathBuf> = self
             .workspace
             .roots()
@@ -52,7 +46,22 @@ impl MoonframeApp {
             .map(Path::to_owned)
             .collect();
         let home = std::env::home_dir();
-        moonframe_core::resolve_file(src, folder, home.as_deref(), &allowed, max_bytes)
+        moonframe_core::resolve_file(
+            src,
+            self.mod_folder(from),
+            home.as_deref(),
+            &allowed,
+            max_bytes,
+        )
+    }
+
+    /// The folder of the mod `from`, which names files relative to it.
+    pub(super) fn mod_folder(&self, from: &str) -> &Path {
+        self.workspace
+            .slot(from)
+            .and_then(|slot| slot.source())
+            .and_then(Path::parent)
+            .unwrap_or(Path::new("."))
     }
 
     /// Shows the icon the mod `from` asked for, or the app's own again.

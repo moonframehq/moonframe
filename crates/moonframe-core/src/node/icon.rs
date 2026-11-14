@@ -227,6 +227,7 @@ pub const ICONS: &[&str] = &[
     "server",
     "settings",
     "settings-2",
+    "share",
     "shield",
     "sliders-horizontal",
     "smile-plus",

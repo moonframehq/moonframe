@@ -698,7 +698,7 @@ A whole mod using it, with state: `app/components/demos/swap-view.luau`.
 
 #### `browser`
 
-**Browser.** A web page with an address bar: back, forward, reload or stop, an editable address, the title, and open in the system browser.
+**Browser.** A web page with an address bar: back, forward, reload or stop, an editable address, the title, optionally share, and open in the system browser.
 
 **When:** A web page in a pane, with browser chrome. Keep the page's `navigate` messages in state and pass the latest as `page`; the address bar navigates on its own. For a bare page without a bar use `ui.browser`.
 
@@ -708,6 +708,7 @@ A whole mod using it, with state: `app/components/demos/swap-view.luau`.
 | `loading` | message sent as loads start and finish, with `loading` and `url` added |
 | `navigate` | message sent as the page navigates, loads or its title changes; keep it and pass it as `page` |
 | `page` | the last `navigate` message: `url`, `title`, `loading`, `back`, `forward` |
+| `share` | true: a Share button that offers a web page's address and title to the system's share menu (`app:share`; macOS, and the app built with `share`) |
 | `url` | address to load (http, https, file); a new value navigates |
 | `zoom` | page zoom, 0.25 to 5 |
 

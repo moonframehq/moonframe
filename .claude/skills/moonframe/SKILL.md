@@ -855,6 +855,28 @@ update = function(state, msg)
 end,
 ```
 
+- `app:share`, `msg` `{ url?, text?, files?, reply? }`: the system's share
+  menu (macOS's share picker: Mail, Messages, AirDrop, Notes, Copy...) at
+  the pointer, so send it from the click that asks. `url` is a web address
+  (`https://`, `http://`), `text` up to 4 KiB beside it (a page's title, a
+  table as text), `files` up to 20 paths named as `ui.image` names
+  pictures. A file must be the app's: in its folders, or in its cache or
+  state folders (where a provider writes a PDF), or one the user picked for
+  this mod with `app:pick` (or dropped on it); any other is the sender's
+  error. Nothing leaves until the user picks a service and goes on in it.
+  With `reply`, the mod hears it back with `service` (the name of the one
+  picked, `"Mail"`; the user may still cancel in it) or `cancelled = true`
+  added. Elsewhere than macOS there is no menu yet, and the reply says
+  `cancelled`. The `browser` component has a Share button with `share =
+  true`.
+
+```lua
+-- a toolbar button: the page to the share menu, hearing what was picked
+ui.button { icon = "share", tooltip = "Share", to = "app:share",
+	msg = { url = state.page.url, text = state.page.title, reply = { shared = true } } }
+-- in update: if msg.shared then state.note = msg.service or "not shared" end
+```
+
 - `app:pick`, `msg` `{ kind = "open" | "folder" | "save", reply, multiple?,
   prompt?, types?, name?, folder? }`: the system's panel to open files
   (`types` keeps those extensions), pick folders, or name a file to save

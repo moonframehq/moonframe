@@ -1,11 +1,36 @@
 -- The project's bar across the card: its name and star, a search field in
--- the middle, then who is in the project, Share and more.
+-- the middle, then who is in the project, Share and more. Share offers the
+-- sheet as it stands, as tab-separated text, to the system's share menu
+-- (`app:share`): Mail, Notes, Messages.
 
 local avatar = use "avatar"
 local icon_button = use "icon-button"
 local kbd = use "kbd"
 
-type State = { query: string, focus: boolean, starred: boolean }
+type State = { query: string, focus: boolean, starred: boolean, shared: string? }
+
+local KEYS = { "apy", "fee", "deposit", "rating" }
+
+-- The sheet as far as the agent has written it, as tab-separated text:
+-- what Share hands the menu. Nil until it has found an app.
+local function sheet_text(data: any): string?
+	local run = data and data.run
+	if not run or run.found == 0 then
+		return nil
+	end
+	local lines = { "Company\tType\tAPY\tMonthly fee\tMin. deposit\tApp rating\tSource" }
+	for index = 1, run.found do
+		local item = data.apps[index]
+		local cells = { item.name, item.type }
+		for c, key in KEYS do
+			local written = run.step > 2 or (run.step == 2 and (index < run.row or (index == run.row and c <= run.cell)))
+			table.insert(cells, if written then tostring(item[key]) else "")
+		end
+		table.insert(cells, item.source)
+		table.insert(lines, table.concat(cells, "\t"))
+	end
+	return table.concat(lines, "\n")
+end
 
 return mod {
 	region = "top",
@@ -37,11 +62,14 @@ return mod {
 			state.focus = false
 		elseif type(msg) == "table" and msg.msg == "clear" then
 			state.query = ""
+		elseif type(msg) == "table" and msg.shared then
+			state.shared = msg.service
 		end
 	end,
 
 	view = function(state: State, app)
 		local data = app.research
+		local sheet = sheet_text(data)
 		return ui.row {
 			class = "bar",
 			drag = true,
@@ -106,8 +134,12 @@ return mod {
 					class = "bar-share",
 					height = 34,
 					align = "center",
-					msg = "star",
-					tooltip = "Share (not in this example)",
+					to = if sheet then "app:share" else nil,
+					msg = if sheet then { text = sheet, reply = { shared = true } } else nil,
+					tooltip = if not sheet
+						then "Nothing to share yet"
+						elseif state.shared then `Share the sheet (last with {state.shared})`
+						else "Share the sheet as text",
 					ui.icon { name = "upload", size = "small" },
 					ui.text { "Share", weight = "medium" },
 				},

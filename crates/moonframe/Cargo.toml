@@ -154,6 +154,9 @@ syntax = [
   "gpui-kit/tree-sitter-yaml",
   # keep-sorted end
 ]
+# `app:share`: the system's share menu for an address, text or files
+# (macOS). Off by default; the starter turns it on.
+share = []
 # Terminal rendering and local/tmux sessions. Engines enable this too.
 terminal = ["dep:moonframe-mux", "dep:moonframe-terminal", "moonframe-mux/terminal"]
 # Native providers written with `async fn` (`.native_async`), and a tokio
@@ -228,10 +231,10 @@ gpui-apple-capture = { features = ["font-kit"], optional = true, package = "gpui
 metal              = { optional = true, workspace = true }
 moonframe-frames   = { optional = true, workspace = true }
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
-block2.workspace           = true
-objc2.workspace            = true
-objc2-app-kit              = { features = ["NSBezierPath", "NSColor", "NSControl", "NSDockTile", "NSEvent", "NSImageView", "NSRunningApplication", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
-objc2-foundation.workspace = true
+block2.workspace = true
+objc2.workspace  = true
+objc2-app-kit    = { features = ["NSBezierPath", "NSColor", "NSControl", "NSDockTile", "NSEvent", "NSImageView", "NSRunningApplication", "NSSharingService", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
+objc2-foundation = { features = ["NSArray", "NSURL"], workspace = true }
 # Finding the AppKit window a trackpad gesture happened in.
 raw-window-handle.workspace = true
 # `app:notify`: system notifications, and hearing their clicks.

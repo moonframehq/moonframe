@@ -77,6 +77,7 @@ mod render;
 #[cfg(feature = "capture")]
 mod render_entry;
 mod settings;
+mod share;
 mod terminal;
 mod theme_picker;
 mod themes;

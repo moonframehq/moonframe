@@ -14,6 +14,7 @@ mod edit;
 mod guard;
 mod icon;
 mod pick;
+mod share;
 mod window;
 
 pub use {
@@ -24,6 +25,7 @@ pub use {
     guard::Guard,
     icon::{AppIcon, ICON_TYPES},
     pick::{Pick, PickKind},
+    share::Share,
     window::WindowRequest,
 };
 
@@ -82,6 +84,9 @@ pub enum Request {
     /// `app:open`: opens a web address (`https://` or `http://`) in the
     /// system's browser: a pull request, a sign-in page.
     Open(String),
+    /// `app:share`: the system's share menu for an address, text or
+    /// files, at the pointer; what the user picked goes back to the mod.
+    Share(Share),
 }
 
 /// What `app:sound` plays.
@@ -160,6 +165,7 @@ impl Request {
             "open" => open(msg).map(Self::Open),
             "icon" => icon::icon(msg).map(Self::Icon),
             "devtools" => devtools::devtools(msg).map(Self::Devtools),
+            "share" => share::share(msg).map(Self::Share),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -189,6 +195,7 @@ pub const NAMES: &[&str] = &[
     "open",
     "icon",
     "devtools",
+    "share",
 ];
 
 /// Longest address `app:open` opens.
