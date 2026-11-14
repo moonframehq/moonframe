@@ -143,6 +143,7 @@ fn note(vault: &Vault, path: &str) -> Result<Value, Error> {
             "hash": digest(&text),
             "text": text,
             "info": vault.index().info(path)?,
+            "favicons": super::enhance::favicons(&text),
         })),
         Err(Error::NotFound(_)) => {
             Ok(json!({ "path": path, "exists": false, "title": crate::stem(path), "text": "" }))

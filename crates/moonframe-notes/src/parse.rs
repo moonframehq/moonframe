@@ -6,8 +6,11 @@
 
 mod frontmatter;
 mod inline;
+mod web;
 
-pub(crate) use {frontmatter::with_id, inline::WikiSpan};
+#[cfg(feature = "provider")]
+pub(crate) use web::{is_web, web_links};
+pub(crate) use {frontmatter::with_id, inline::WikiSpan, web::WebLink};
 
 use {
     crate::text::{self, Lines},
@@ -325,6 +328,8 @@ struct Structure {
     tasks: Vec<Task>,
     /// `[text](url)` and `![alt](url)`: where the url is, and the url.
     markdown_links: Vec<(Range<usize>, String)>,
+    /// Links leaving for the web (see `web`).
+    web: Vec<WebLink>,
 }
 
 fn walk(node: &Node, source: &str, lines: &Lines, mask: &mut Mask, out: &mut Structure) {
@@ -386,6 +391,8 @@ fn walk(node: &Node, source: &str, lines: &Lines, mask: &mut Mask, out: &mut Str
             if let Some(url) = span.as_ref().and_then(|span| url_span(source, span)) {
                 out.markdown_links.push((url, link.url.clone()));
             }
+            out.web
+                .extend(span.and_then(|span| web::classify(source, span, &link.url)));
         },
         Node::Image(image) => {
             if let Some(url) = span.as_ref().and_then(|span| url_span(source, span)) {

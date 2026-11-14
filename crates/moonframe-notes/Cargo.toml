@@ -17,13 +17,21 @@ path = "src/bin/commonplace.rs"
 
 [features]
 # The `notes` native provider for Moonframe apps (Commonplace).
-provider = ["dep:chrono", "dep:moonframe-core", "dep:moonframe-providers", "dep:notify"]
+provider = [
+  "dep:chrono",
+  "dep:moonframe-core",
+  "dep:moonframe-packages",
+  "dep:moonframe-providers",
+  "dep:notify",
+  "dep:ureq",
+]
 
 [dependencies]
 base64.workspace      = true
 chrono                = { optional = true, workspace = true }
 markdown.workspace    = true
 moonframe-core        = { optional = true, workspace = true }
+moonframe-packages    = { optional = true, workspace = true }
 moonframe-providers   = { optional = true, workspace = true }
 notify                = { optional = true, workspace = true }
 rusqlite.workspace    = true
@@ -34,6 +42,7 @@ similar               = "2"
 thiserror.workspace   = true
 tracing.workspace     = true
 unicode-normalization = "0.1"
+ureq                  = { optional = true, workspace = true }
 uuid.workspace        = true
 walkdir               = "2"
 yaml-rust2            = "0.10"

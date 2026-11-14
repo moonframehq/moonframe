@@ -46,7 +46,7 @@ fn text<'a>(value: &'a Value, key: &str) -> &'a str {
     value.get(key).and_then(Value::as_str).unwrap_or("")
 }
 
-fn stamp() -> String {
+pub(super) fn stamp() -> String {
     chrono::Local::now().format("%Y-%m-%d %H%M").to_string()
 }
 

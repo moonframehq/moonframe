@@ -1,7 +1,8 @@
 -- Commonplace's shell. The window shows one of three layouts over the same
 -- vault, picked in View: Library (places, list, page, links), Journal
 -- (today's outline and the inbox) or Workspace (tree, tabs, wiki agent).
--- The choice is kept across launches. Each layout is a mod of its own.
+-- The choice is kept across launches. Each layout is a mod of its own. The
+-- agent chat (mods/chat) opens beside whichever is shown, with ⌘J.
 
 local LAYOUTS = {
 	{ id = "library", label = "Library Layout", shortcut = "secondary-alt-1" },
@@ -12,8 +13,16 @@ local LAYOUTS = {
 local function view_menu(): { any }
 	local items: { any } = {}
 	for _, layout in LAYOUTS do
-		table.insert(items, { label = layout.label, msg = { layout = layout.id }, shortcut = layout.shortcut })
+		table.insert(items, {
+			label = layout.label,
+			msg = { layout = layout.id },
+			shortcut = layout.shortcut,
+			-- Ticked while it is the layout shown.
+			checked = { layout = layout.id },
+		})
 	end
+	table.insert(items, "-")
+	table.insert(items, { label = "Agent Chat", msg = "chat", shortcut = "secondary-j", checked = { chat = true } })
 	return items
 end
 
@@ -31,7 +40,7 @@ local MENUS: { { title: string, items: { any } } } = {
 	} },
 }
 
-type State = { layout: string }
+type State = { layout: string, chat: boolean }
 
 local function known(id: any): boolean
 	for _, layout in LAYOUTS do
@@ -56,14 +65,24 @@ return mod {
 
 	init = function(previous: State?): State
 		if previous and known(previous.layout) then
+			previous.chat = previous.chat == true
 			return previous
 		end
-		return { layout = "library" }
+		return { layout = "library", chat = false }
 	end,
 
 	update = function(state: State, msg)
-		if type(msg) == "table" and known(msg.layout) then
+		if msg == "chat" then
+			state.chat = not state.chat
+		elseif type(msg) ~= "table" then
+			return
+		elseif known(msg.layout) then
 			state.layout = msg.layout
+		elseif msg.chat ~= nil then
+			state.chat = msg.chat == true
+		elseif msg.link then
+			-- A note the agent named: the layout shown opens it.
+			return state, { { to = state.layout, msg = msg.link } }
 		end
 	end,
 
@@ -72,8 +91,28 @@ return mod {
 			grow = true,
 			gap = "none",
 			class = "frame",
-			ui.mount(state.layout),
-			ui.row { float = { at = "bottom-right", inset = 20 }, ui.mount "feedback" },
+			ui.row {
+				grow = true,
+				gap = "none",
+				ui.column { grow = true, ui.mount(state.layout) },
+				state.chat and ui.column { width = 380, shrink = false, ui.mount "chat" },
+			},
+			ui.row {
+				float = { at = "bottom-right", inset = 20 },
+				gap = "small",
+				align = "center",
+				not state.chat and ui.row {
+					class = "chat-toggle",
+					msg = "chat",
+					tooltip = "Agent chat (⌘J)",
+					align = "center",
+					justify = "center",
+					width = 32,
+					height = 32,
+					ui.icon "message-square",
+				},
+				ui.mount "feedback",
+			},
 		}
 	end,
 }

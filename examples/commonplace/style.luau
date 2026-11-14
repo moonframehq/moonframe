@@ -58,6 +58,10 @@ return style {
 		[".tag"] = { color = "#9c63c9" },
 		-- Cards' headers and quiet labels.
 		[".card-head"] = { padding = { 12, 16 }, gap = 8, border = "bottom", border_color = "border" },
+		[".head-action"] = { gap = 6, padding = { 3, 8 }, radius = 6, color = "muted-foreground" },
+		[".head-action:hover"] = { background = "list-hover", color = "foreground" },
+		[".chat-toggle"] = { background = "card", border = true, border_color = "border", radius = 16, color = "accent", shadow = "0 2px 8px #0000001a" },
+		[".chat-toggle:hover"] = { background = "list-hover" },
 		[".card-title"] = { weight = "semibold" },
 		[".muted"] = { color = "muted-foreground" },
 		[".small"] = { size = "small" },

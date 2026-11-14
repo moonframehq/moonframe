@@ -3,7 +3,8 @@
 //!
 //! Publishes a small summary: `{ available, reason?, vault = { path,
 //! name }, status ("indexing" "ready"), counts = { all, notes, wiki, raw,
-//! journal }, tags, today, today_path, import?, version }`. `version` goes
+//! journal }, tags, today, today_path, import?, enhancing, version }`
+//! (`enhancing`: the notes being enhanced). `version` goes
 //! up each time the index changes.
 //!
 //! What a mod shows it asks for as a live query (see `views`):
@@ -19,13 +20,16 @@
 //! `capture = { text, to? = "inbox" | "today" }`, `inbox = { op = "keep" |
 //! "task" | "note" | "drop", line }`, `today = true`, `import = { source =
 //! "apple-notes", export?, into?, dry_run? }` (`export`: the folder of
-//! Notes.app's Markdown export, joined with what Notes.app says), `open_vault = path`.
+//! Notes.app's Markdown export, joined with what Notes.app says), `enhance
+//! = { path }` (titles for bare web links, favicons for their hosts; see
+//! `enhance`), `open_vault = path`.
 //!
 //! The vault is `[settings] vault` (`~` allowed), else the one last opened
 //! with `open_vault`, else `~/Commonplace`, made with a starting layout the
 //! first time. Its index is in the cache folder, or at `[settings] index`.
 
 mod actions;
+mod enhance;
 #[cfg(test)]
 mod tests;
 mod views;
@@ -98,6 +102,7 @@ pub(crate) struct Provider {
     /// editor: the base an edit is merged from.
     known: HashMap<String, String>,
     import: Arc<Mutex<ImportState>>,
+    enhance: Arc<Mutex<enhance::Enhancing>>,
     last_import: Option<String>,
     scanned: Option<Instant>,
     published: Option<String>,
@@ -175,6 +180,7 @@ impl Provider {
             "import": if import.running || import.report.is_some() || import.error.is_some() {
                 json!({ "running": import.running, "phase": import.phase, "done": import.done, "total": import.total, "report": import.report, "error": import.error })
             } else { Value::Null },
+            "enhancing": self.enhancing(),
             "version": self.version,
         })
     }
@@ -370,6 +376,7 @@ impl Provider {
         if self.import_finished(host) {
             changed = true;
         }
+        changed |= self.enhance_finished(host);
         if changed {
             self.changed(host);
         } else {
@@ -466,6 +473,10 @@ impl Provider {
         }
         if let Some(import) = message.get("import") {
             self.start_import(host, from, reply, import);
+            return;
+        }
+        if let Some(enhance) = message.get("enhance") {
+            self.start_enhance(host, from, reply, enhance);
             return;
         }
         // Everything else changes files now: write waiting edits first.

@@ -1,12 +1,16 @@
-# Send feedback: the built-in `acp` provider, here so that the agent the
-# `?` starts (the built-in mods/feedback, kept in moonframe.toml) is told
-# to change this app's folder.
+# Coding agents over the Agent Client Protocol: the built-in `acp`
+# provider, here so that Commonplace's agent chat (mods/chat) may start
+# them in the vault's folder, and the `?` (the built-in mods/feedback, kept
+# in moonframe.toml) in this app's.
 interval = 0.25
 kind     = "native"
 
 [settings]
 agent    = "claude"
-starters = ["feedback"]
-# Questions for tools that only look are allowed once; the rest ask you
-# (see the app's providers/acp for "all").
-allow = { feedback = "read" }
+starters = ["chat", "feedback"]
+# The chat names the vault's folder for each run.
+folders = ["chat"]
+# Tools that only look (read, search) run without asking; anything that
+# changes a note asks you first, in the chat. Set chat = "all" to let the
+# agent edit the vault without asking.
+allow = { chat = "read", feedback = "read" }

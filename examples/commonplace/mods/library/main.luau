@@ -1,5 +1,5 @@
--- The Library layout: places and tags, a list of notes, the page (to read,
--- or its source to edit), and a card of what links to it. Everything comes
+-- The Library layout: places and tags, a list of notes, the page (read and
+-- edited in place), and a card of what links to it. Everything comes
 -- from the notes provider: the mod asks for what it shows as live views
 -- (`watch`), which the provider answers again whenever the vault changes.
 
@@ -12,8 +12,10 @@ type State = {
 	tag: string?,
 	query: string,
 	open: string?,
-	mode: string,
 	tab: string,
+	-- An enhance of the open note running, and what the last one said.
+	enhancing: boolean?,
+	notice: string?,
 	views: { [string]: any },
 }
 
@@ -74,9 +76,13 @@ end
 
 local function open(state: State, path: string)
 	state.open = path
+	state.notice = nil
 	state.views.note = nil
 	state.views.context = nil
-	return state, note_watches(state)
+	local sends = note_watches(state)
+	-- The agent chat works on the note in view.
+	table.insert(sends, { to = "topic:commonplace/open", msg = { path = path } })
+	return state, sends
 end
 
 -- A snippet or excerpt on one line: match marks and line breaks gone.
@@ -217,11 +223,19 @@ local function editor(state: State)
 			class = "card-head",
 			align = "center",
 			ui.row { grow = true, gap = "none", ui.text { state.open or "", class = "muted small", truncate = true } },
-			state.open and segmented { small = true, selected = state.mode, options = { { id = "page", label = "Page" }, { id = "source", label = "Edit" } } },
+			state.notice and ui.text { state.notice, class = "muted small", truncate = true },
+			state.open and ui.row {
+				class = "head-action",
+				align = "center",
+				msg = if state.enhancing then nil else "enhance",
+				tooltip = "Fetch page titles and site icons for this note's links",
+				ui.icon { name = if state.enhancing then "loader-circle" else "sparkles", spin = state.enhancing == true, size = "small" },
+				ui.text { if state.enhancing then "Enhancing…" else "Enhance", class = "small" },
+			},
 			state.open and icon_button { icon = "trash-2", tooltip = "Move to the trash", size = "small", msg = "trash" },
 		},
 		if note and note.text
-			then ui.column { grow = true, scroll = state.mode ~= "source", align = if state.mode == "source" then "stretch" else "center", note_page { note = note, mode = state.mode } }
+			then ui.column { grow = true, scroll = true, align = "center", note_page { id = "library", note = note } }
 			else ui.column { grow = true, align = "center", justify = "center", ui.text { if state.open then "Opening…" else "Pick a note.", class = "muted" } },
 	}
 end
@@ -273,9 +287,11 @@ return mod {
 	title = "Library",
 
 	init = function(previous: State?): (State, { any })
-		local state: State = previous or { section = "notes", query = "", mode = "page", tab = "links", views = {} }
+		local state: State = previous or { section = "notes", query = "", tab = "links", views = {} }
 		-- Views come again from the provider; keep none from before.
 		state.views = {}
+		state.enhancing = nil
+		state.notice = nil
 		return state, watches(state, true)
 	end,
 
@@ -283,6 +299,10 @@ return mod {
 		if type(msg) ~= "table" then
 			if msg == "new" then
 				return state, { { to = "provider:notes", msg = { create = { path = "notes/Untitled.md", text = "", unique = true }, id = "new" } } }
+			elseif msg == "enhance" and state.open then
+				state.enhancing = true
+				state.notice = nil
+				return state, { { to = "provider:notes", msg = { enhance = { path = state.open }, id = "enhance" } } }
 			elseif msg == "trash" and state.open then
 				local path = state.open
 				state.open = nil
@@ -330,6 +350,11 @@ return mod {
 		if msg.reply ~= nil then
 			if (msg.action == "create" or msg.action == "today") and msg.ok and msg.path then
 				return open(state, msg.path)
+			elseif msg.action == "enhance" then
+				state.enhancing = nil
+				state.notice = if msg.ok
+					then `{msg.titled or 0} titles, {msg.icons or 0} icons`
+					else msg.error or "Enhance failed"
 			elseif msg.action == "save" and msg.outcome == "merged" and state.views.note then
 				state.views.note.text = msg.text
 			end
@@ -353,8 +378,6 @@ return mod {
 			return state, watches(state)
 		elseif msg.open then
 			return open(state, msg.open)
-		elseif msg.select then
-			state.mode = msg.select
 		elseif msg.tab then
 			state.tab = msg.tab
 		elseif msg.edit and state.open then
