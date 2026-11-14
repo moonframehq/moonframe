@@ -1,10 +1,10 @@
 //! One document on screen: the text view's state, kept across frames, and
-//! what the mod asked of it (`find`, `reveal`, `outline`, `section`), carried
-//! out as the view's parse lands. Laid out by the window, as only then is
-//! there a window to keep state in.
+//! what the mod asked of it (`find`, `reveal`, `outline`, `section`,
+//! `scrolled`, `scroll_at`), carried out as the view's parse lands. Laid out
+//! by the window, as only then is there a window to keep state in.
 
 use {
-    super::{blocks, outline::Outline, search, send},
+    super::{blocks, outline::Outline, scrolling::Scrolling, search, send},
     crate::app::MoonframeApp,
     gpui_kit::{
         component::text::{
@@ -88,6 +88,7 @@ struct Kept {
     outlining: Option<Task<()>>,
     section: Option<usize>,
     tracking: bool,
+    scrolling: Scrolling,
     _observing: Option<Subscription>,
 }
 
@@ -148,7 +149,8 @@ impl RenderOnce for Document {
             kept.take(&self.markdown, self.colors, &state, window, cx);
             kept.settle(&state, window, cx);
             let rendered = state.read(cx).rendered_text();
-            if kept.pending.is_some() && !kept.revealing && rendered.source() == kept.text {
+            let waiting = kept.pending.is_some() || kept.scrolling.pending();
+            if waiting && !kept.revealing && rendered.source() == kept.text {
                 // Schedule from render, rather than the parse observer: the
                 // list will lay out this version before the next frame.
                 kept.reveal_after_layout(&state, rendered, window, cx);
@@ -214,6 +216,7 @@ impl Kept {
             outlining: None,
             section: None,
             tracking: false,
+            scrolling: Scrolling::default(),
             _observing: None,
         }
     }
@@ -234,6 +237,7 @@ impl Kept {
         self.outline_msg.clone_from(&markdown.outline);
         self.section_msg.clone_from(&markdown.section);
         self.colors = Some(colors);
+        self.scrolling.take(markdown);
         if markdown.reveal != self.reveal {
             self.reveal = markdown.reveal;
             self.pending = markdown.reveal.map(|reveal| reveal.at);
@@ -325,6 +329,9 @@ impl Kept {
             let block = state.read(cx).list_state().logical_scroll_top().item_ix;
             self.scrolled(block, window, cx);
         }
+        if let Some(msg) = self.scrolling.moved(state, cx) {
+            self.tell(msg, window, cx);
+        }
     }
 
     /// Parsing precedes layout. `TextView` resets its list when the block
@@ -355,8 +362,12 @@ impl Kept {
                     let outline = Outline::parse(current.source());
                     go_to(&state, &current, &outline, at, scroll, cx);
                 }
+                // After a reveal, so that a `scroll_at` with it wins.
+                if current == rendered && current.source() == kept.text {
+                    kept.scrolling.apply(&state, cx);
+                }
                 kept.settle(&state, window, cx);
-                if kept.pending.is_some() {
+                if kept.pending.is_some() || kept.scrolling.pending() {
                     cx.notify();
                 }
             })

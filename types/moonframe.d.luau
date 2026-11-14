@@ -958,6 +958,13 @@ type MarkdownProps = {
 	found: Data,
 	-- Fade in what is added to `text`, as an answer streams in.
 	stream: boolean?,
+	-- With `scroll`: sent as the reader scrolls, with `fraction` added, from
+	-- 0 (the top) to 1 (the end at the bottom). Not sent for `scroll_at`.
+	scrolled: Data,
+	-- With `scroll`: scrolls to `fraction` (0 to 1) when it changes; a new
+	-- `seq` goes to one place again. A source and its preview follow each
+	-- other with `scrolled` and `scroll_at`.
+	scroll_at: { fraction: number, seq: number? }?,
 	[number]: string,
 }
 
@@ -1088,6 +1095,13 @@ type InputProps = {
 	-- A code editor's caret goes to this line (from 1), scrolled into view,
 	-- when it changes or the field takes a new `value`.
 	line: number?,
+	-- With `multiline`: sent as the text scrolls (the wheel, the scrollbar,
+	-- the caret carrying it), with `fraction` added, from 0 (the top) to 1
+	-- (the last line at the bottom). Not sent for `scroll_at`.
+	scrolled: Data,
+	-- With `multiline`: scrolls the text to `fraction` (0 to 1) when it
+	-- changes; a new `seq` goes to one place again.
+	scroll_at: { fraction: number, seq: number? }?,
 }
 
 type RegionProps = {

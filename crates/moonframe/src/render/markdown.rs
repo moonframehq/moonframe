@@ -11,6 +11,7 @@ mod document;
 mod math;
 mod outline;
 mod parts;
+mod scrolling;
 mod search;
 
 use {

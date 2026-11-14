@@ -201,8 +201,9 @@ pub struct Ui {
     pub(crate) carry_targets: RefCell<Vec<render::Target>>,
     /// Each document that follows its structure, by its place.
     pub(crate) documents: RefCell<HashMap<String, render::Document>>,
-    /// Documents to scroll, each to a place in its text, next frame.
-    pub(crate) markdown_reveals: RefCell<Vec<(String, f32)>>,
+    /// Documents to scroll, each to a place in its text, next frame: gliding
+    /// there, or at once when it follows another scroll (`scroll_at`).
+    pub(crate) markdown_reveals: RefCell<Vec<(String, f32, bool)>>,
     pub(crate) inspecting: inspect::Inspecting,
     /// What each element is, while picking, by its key.
     pub(crate) crumbs: RefCell<HashMap<String, inspect::Crumb>>,
@@ -654,8 +655,12 @@ fn polled(ui: &mut Ui, tx: &mut Tx) -> bool {
     changed |= ui.reload_changed();
     changed |= ui.settle_browsers();
     changed |= ui.tell_selections();
-    for (document, y) in ui.markdown_reveals.take() {
-        tx.scroll_to(document, 0., y);
+    for (document, y, at_once) in ui.markdown_reveals.take() {
+        if at_once {
+            tx.scroll_to_instant(document, 0., y);
+        } else {
+            tx.scroll_to(document, 0., y);
+        }
         changed = true;
     }
     for (owner, to, note) in ui.markdown_notes.take() {

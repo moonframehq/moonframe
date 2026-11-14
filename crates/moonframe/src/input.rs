@@ -8,6 +8,8 @@
 //! with `browser` is that page's address bar: Enter loads what it says,
 //! focus selects it, and Escape puts back the page's address. A field
 //! with `prose`, `dim` or `typewriter` is a writing field (the `prose` feature).
+//! A multiline field tells and takes how far down it is scrolled (`scrolled`,
+//! `scroll_at`).
 
 #[cfg(feature = "prose")]
 mod prose;
@@ -56,6 +58,9 @@ macro_rules! on_state {
         }
     };
 }
+
+// After `on_state!`, which it uses.
+mod scrolling;
 
 impl Editor {
     fn new(input: &Input, window: &mut Window, cx: &mut App) -> Self {
@@ -193,6 +198,7 @@ pub(crate) struct Wiring {
     pub(crate) blur: Option<Data>,
     pub(crate) keys: Vec<(KeyChord, Data)>,
     pub(crate) capture: Option<Data>,
+    pub(crate) scrolled: Option<Data>,
     pub(crate) multiline: bool,
     pub(crate) disabled: bool,
     /// The browser it is the address bar of.
@@ -210,6 +216,7 @@ impl Wiring {
             blur: input.blur.clone(),
             keys: input.keys.clone(),
             capture: input.capture.clone(),
+            scrolled: input.scrolled.clone(),
             multiline: input.multiline,
             disabled: input.disabled,
             browser: input.browser.clone(),
@@ -249,6 +256,7 @@ struct Field {
     seen: u64,
     window: WindowId,
     selection: (std::ops::Range<usize>, usize),
+    scrolling: scrolling::Scrolling,
     _events: Subscription,
     _selection: Subscription,
     /// A writing field follows its caret, for what it keeps in focus.
@@ -333,6 +341,7 @@ impl Inputs {
                 focus: false,
                 seen: frame,
                 window: window.window_handle().window_id(),
+                scrolling: scrolling::Scrolling::default(),
                 _events: events,
                 _selection: selection,
                 _caret: caret,
@@ -381,11 +390,22 @@ impl Inputs {
             writing.apply(input, state, window, cx);
         }
         editor.set_disabled(input.disabled, cx);
+        if input.multiline {
+            field.scrolling.take(input, &editor, cx);
+        }
         let take_focus = input.focus && !field.focus && !input.disabled;
         field.focus = input.focus;
         drop(registry);
         if take_focus {
             editor.focus(window, cx);
+        }
+        // A drag of the scrollbar draws the app again, and nothing else.
+        if let Some((owner, action)) = self.scrolled(key, cx) {
+            let app = app.clone();
+            window.defer(cx, move |window, cx| {
+                app.update(cx, |app, cx| app.dispatch(&owner, &action, window, cx))
+                    .ok();
+            });
         }
         Some(editor)
     }
@@ -491,8 +511,9 @@ fn subscribe(
     .ok()
 }
 
-/// gpui-base notifies on caret movement without emitting a text Change.
-/// Compare selections so cursor blinking and styling don't send messages.
+/// gpui-base notifies on caret movement and scrolling without emitting a
+/// text Change. Compare selections and offsets so cursor blinking and
+/// styling don't send messages.
 fn observe_selection(
     app: &WeakEntity<MoonframeApp>,
     editor: &Editor,
@@ -507,6 +528,9 @@ fn observe_selection(
             window,
             move |app, _, window, cx| {
                 app.input_selection(&key, window, cx);
+                if let Some((owner, action)) = app.inputs.scrolled(&key, cx) {
+                    app.dispatch(&owner, &action, window, cx);
+                }
             }
         ))
     })

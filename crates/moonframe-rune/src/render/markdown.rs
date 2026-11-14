@@ -4,6 +4,7 @@
 #[allow(dead_code, reason = "shared with GPUI, which reads all of it")]
 #[path = "../../../moonframe/src/render/markdown/outline.rs"]
 mod outline;
+mod scrolling;
 
 use {
     super::{Painter, Place},
@@ -49,6 +50,7 @@ pub(crate) struct Document {
     reveal: Option<Reveal>,
     /// A block to scroll to the top of the document once it is laid out.
     pub(crate) pending: Option<usize>,
+    scrolling: scrolling::Scrolling,
 }
 
 /// The key of a document's top-level block `index`.
@@ -246,8 +248,24 @@ impl<'w> Painter<'w> {
             if let (Some([_, top, ..]), Some([_, at, ..])) = (top, at) {
                 document.pending = None;
                 let mut reveals = self.ui.markdown_reveals.borrow_mut();
-                reveals.push((path.to_owned(), at - top));
+                reveals.push((path.to_owned(), at - top, false));
             }
+        }
+        if !markdown.scroll {
+            return;
+        }
+        let looked = document.scrolling.look(
+            markdown,
+            rune::memo::window_layout(path),
+            rune::memo::window_layout(&format!("{path}-text")),
+        );
+        drop(documents);
+        if let Some(y) = looked.scroll {
+            let mut reveals = self.ui.markdown_reveals.borrow_mut();
+            reveals.push((path.to_owned(), y, true));
+        }
+        if let Some(msg) = looked.tell {
+            self.tell(markdown, msg, place);
         }
     }
 
