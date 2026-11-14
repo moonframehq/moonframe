@@ -201,6 +201,21 @@ local function select_task(state: any, id: string?)
 	local task = id and find(state.tasks, id)
 	if task then state.due_month = task.finish end
 end
+-- An `orbit:` link (moonframe.toml's `schemes`), opened from a browser or
+-- `open`: `orbit:/new?title=…` adds a task, `orbit:/task?id=TASK-3` opens one.
+local function open_link(state: any, link: any)
+	local id = if link.path == "/task" then link.query.id else nil
+	if link.path == "/new" then
+		id = `TASK-{state.next}`
+		state.next += 1
+		local title = if link.query.title and string.find(link.query.title, "%S") then link.query.title else "Untitled task"
+		table.insert(state.tasks, task_of(id, title, state.project, "todo", "sarah", 0, 4, "Design"))
+	end
+	local task = id and find(state.tasks, id)
+	if not task then return end
+	state.project, state.page, state.query, state.conditions = task.project, task.project, "", {}
+	select_task(state, task.id)
+end
 local function move_task(state: any, id: string, group: string, target: string?, after: boolean)
 	if id == target then return end
 	local source = find(state.tasks, id)
@@ -217,6 +232,7 @@ end
 
 return mod {
 	keys = { escape = "close-task" } :: { [string]: any },
+	subscribe = { "app/url" },
 	init = function(previous: any): any
 		local state = if previous and previous.version == 1 then previous else initial()
 		state.board_over, state.table_over, state.day_over, state.moving = nil, nil, nil, nil
@@ -255,6 +271,7 @@ return mod {
 			state.calendar_at = if state.view == "timeline" or state.calendar_view == "month" then month_step(state.calendar_at, delta)
 				else state.calendar_at + delta * (if state.calendar_view == "week" then 7 else 1)
 		elseif type(msg) ~= "table" then return
+		elseif msg.topic == "app/url" then open_link(state, msg.value)
 		elseif msg.page then
 			state.page = msg.page
 			if find(PROJECTS, msg.page) then state.project = msg.page end

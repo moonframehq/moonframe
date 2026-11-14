@@ -194,3 +194,48 @@ fn orbit_filters_comments_reactions_and_attachment_replies_work() {
         &Data::from("/example/brief.txt")
     );
 }
+
+#[test]
+fn orbit_links_add_and_open_tasks() {
+    let mut app = Orbit::new();
+    let link = |path: &str, query: &[(&str, &str)]| {
+        Data::Map(
+            [
+                ("path".to_owned(), Data::from(path)),
+                (
+                    "query".to_owned(),
+                    Data::Map(
+                        query
+                            .iter()
+                            .map(|(name, value)| ((*name).to_owned(), Data::from(*value)))
+                            .collect(),
+                    ),
+                ),
+            ]
+            .into(),
+        )
+    };
+    app.workspace
+        .app_news("url", link("/task", &[("id", "APP-202")]));
+    app.check();
+    assert_eq!(field(&app.state(), "selected"), &Data::from("APP-202"));
+    assert_eq!(field(&app.state(), "page"), &Data::from("mobile"));
+
+    app.workspace
+        .app_news("url", link("/new", &[("title", "Call the printer")]));
+    app.check();
+    let Data::String(id) = field(&app.state(), "selected").clone() else {
+        panic!("not selected")
+    };
+    assert_eq!(
+        field(&app.task(&id), "title"),
+        &Data::from("Call the printer")
+    );
+    assert_eq!(field(&app.task(&id), "project"), &Data::from("mobile"));
+
+    // One it doesn't know changes nothing.
+    app.workspace
+        .app_news("url", link("/task", &[("id", "NOPE-1")]));
+    app.check();
+    assert_eq!(field(&app.state(), "selected"), &Data::String(id));
+}

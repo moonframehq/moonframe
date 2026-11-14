@@ -719,9 +719,45 @@ return mod {
 - `provider/<name>` carries a provider's data each time it publishes, for a
   mod that must react (not only redraw); views still read `app.<name>`.
 - Names are 1 to 128 of `a-z A-Z 0-9 - _ . / :`; `provider/` is the
-  providers', and `app/` the app's own (`app/inspect`, `app/notification`). Previews (the Components window) hear nothing.
+  providers', and `app/` the app's own (`app/inspect`, `app/notification`,
+  `app/url`). Previews (the Components window) hear nothing.
 - Use a topic when several modules share a value; use `to = "<mod>"` when
   one module tells another.
+
+**Links to the app (`app/url`).** An app that claims URL schemes
+(`schemes = ["notes"]` in its `moonframe.toml`, or `.url_scheme("notes")`
+on the library) opens its links: a `notes:` link opened in a browser,
+another app or with `open` brings the app and its front main window
+forward, and every module there that subscribes to `app/url` hears it,
+read: `{ topic = "app/url", value = { url, scheme, host?, path, query,
+fragment? } }`. `query` holds each parameter decoded (`+` and `%20` are
+spaces), the first of a name; `host` is there for `notes://host/path`,
+not for `notes:/path`. It is news, not kept: a mod loading later does not
+hear it. A link that starts the app waits for its window.
+
+- Only a bundle hears links (macOS: `just bundle-app NAME`, or an app on
+  the library's `bundle`), once it has been opened once; a run from source
+  hears none.
+- Any web page can ask to open one, so treat it as input from anyone: ask
+  the user before acting on what it carries (saving a page, sending
+  something), and read only the paths you expect. Links of a scheme the
+  app did not claim, longer than 8 KiB, or more than 5 in 10 s are dropped.
+- A provider hears a link through a mod: the mod sends it on.
+
+```lua
+return mod {
+	subscribe = { "app/url" },
+	update = function(state, msg)
+		if type(msg) == "table" and msg.topic == "app/url" then
+			local link = msg.value
+			if link.path == "/capture" and link.query.url then
+				state.offer = { url = link.query.url, title = link.query.title }   -- shown for the user to confirm
+			end
+		end
+	end,
+	view = function(state) return ui.text(if state.offer then state.offer.url else "") end,
+}
+```
 
 ## Asking the app
 

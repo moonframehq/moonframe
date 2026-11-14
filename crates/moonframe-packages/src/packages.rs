@@ -32,7 +32,7 @@ pub use {
     contents::Contents,
     create::git_init,
     install::{install, installed, link},
-    manifest::{App, valid_name},
+    manifest::{App, valid_name, valid_scheme},
     source::beside,
 };
 pub(crate) use {

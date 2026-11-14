@@ -152,6 +152,24 @@ impl Moonframe {
         self
     }
 
+    /// A URL scheme it opens, such as `notes`: its bundle claims it, and a
+    /// `notes:` link opened anywhere (a browser, another app, `open
+    /// notes:/new`) brings the app forward and reaches every mod in its
+    /// front window that subscribes to `app/url`. Call it once per
+    /// scheme. The same as `schemes` in an app's `moonframe.toml`; only an
+    /// app running from its bundle (macOS) hears its links.
+    pub fn url_scheme(mut self, scheme: &str) -> Self {
+        if crate::packages::valid_scheme(scheme) {
+            self.identity.schemes.push(scheme.to_owned());
+        } else {
+            eprintln!(
+                "`{scheme}` is not a URL scheme an app may claim (a-z first, then a-z 0-9 + - .; \
+                 not http, file, mailto, ...): no links"
+            );
+        }
+        self
+    }
+
     /// Its app folder, while it runs from its sources: usually
     /// `concat!(env!("CARGO_MANIFEST_DIR"), "/app")`, so edits show live. A
     /// bundle's own `Resources/app` takes precedence, and `DIR` on the

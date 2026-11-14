@@ -34,6 +34,8 @@ pub struct Identity {
     /// The GitHub repository (`owner/repo`) whose releases update it:
     /// Check for Updates in the app menu.
     pub updates: Option<String>,
+    /// The URL schemes it opens, as an app's manifest's `schemes`.
+    pub schemes: Vec<String>,
     /// Built on the library by another app rather than the starter: the
     /// built-in app is only a toolbox under the host's own.
     pub hosted: bool,
@@ -48,6 +50,7 @@ impl Identity {
             icon: None,
             version: env!("CARGO_PKG_VERSION").to_owned(),
             updates: Some("moonframehq/moonframe".to_owned()),
+            schemes: Vec::new(),
             hosted: false,
         }
     }

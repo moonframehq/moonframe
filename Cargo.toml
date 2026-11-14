@@ -151,6 +151,8 @@ tracing            = "0.1"
 tracing-subscriber = { default-features = false, features = ["ansi", "env-filter", "fmt", "std"], version = "0.3" }
 # Check for Updates: GitHub's releases API and the download (moonframe).
 ureq = "3.5"
+# Links to an app's own URL schemes, read for its mods (moonframe).
+url = "2.5"
 # The ids of pi threads, which pi takes as session ids (moonframe-pi).
 uuid          = { features = ["v4"], version = "1" }
 wasmtime      = "50"

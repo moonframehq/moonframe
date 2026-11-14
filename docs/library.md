@@ -243,6 +243,7 @@ fn main() -> std::process::ExitCode {
 | `Moonframe::new(name)` | the app's name: `~/.config/<name>`, `~/.cache/<name>`, `~/.local/state/<name>`, its document in herdr-core, its default id `dev.moonframe.<name>` |
 | `.title`, `.app_id`, `.version`, `.icon` | how the menu bar, About panel, Dock and bundle name it; an `icon.png` (or a `moonframe.toml` `[app]` title and icon) in its app folder wins |
 | `.updates("owner/repo")` | the GitHub repository it is released from: **Check for Updates…** in the app menu, a daily check in a release build, and on macOS an install over the running `.app`; see [updates.md](updates.md) |
+| `.url_scheme("notes")` | a URL scheme its bundle claims (once per scheme, as `schemes` in a `moonframe.toml`): a `notes:` link opened in a browser or another app brings it forward, and its mods hear it on `app/url` (macOS, from the bundle) |
 | `.app_dir(path)` | its app folder while it runs from source; edits reload live |
 | `.embedded_app::<E>()` | its app folder compiled in (`#[derive(moonframe::rust_embed::RustEmbed)]`, `#[crate_path = "moonframe::rust_embed"]`), for a lone executable |
 | `.project_dir(path)` | the source checkout for an embedded app's debug branch bar; pass `env!("CARGO_MANIFEST_DIR")` from the host crate, including when Cargo builds into an external target folder |

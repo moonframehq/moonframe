@@ -461,6 +461,15 @@ impl Workspace {
         self.settle();
     }
 
+    /// Tells every module that subscribes to the app's own topic
+    /// `app/<name>` (which no mod can publish or forge), and draws again.
+    /// It is news, not kept: a module loading later does not hear it.
+    pub fn app_news(&mut self, name: &str, value: Data) {
+        let deliveries = self.deliveries(&format!("{APP_TOPIC}{name}"), &value);
+        self.process(deliveries.into());
+        self.settle();
+    }
+
     /// Stops sharing `app.<key>`, with the reason when there is one.
     pub fn clear_host(&mut self, key: &str, problem: Option<Error>) {
         self.host.remove(key);

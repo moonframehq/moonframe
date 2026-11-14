@@ -42,6 +42,12 @@ More screenshots: [dark mode](../../docs/screenshots/apps/orbit-dark.png),
   projects. **My tasks** shows Sarah's tasks across the workspace.
 - The sun button switches light/dark appearance. ⌘/Ctrl-1…4 switches
   views, ⌘/Ctrl-0 opens Overview, and ⌘/Ctrl-N creates a task.
+- **Links:** Orbit claims the `orbit:` scheme (`schemes` in its
+  `moonframe.toml`), so once it is bundled (`just bundle-app orbit`) and
+  opened once, `open 'orbit:/new?title=Call%20the%20printer'` (or the
+  same link in a browser) adds a task and opens it, and
+  `open 'orbit:/task?id=TASK-3'` opens that one. The workspace mod hears
+  them on `app/url`.
 
 Attachments are references to paths on this machine, not uploads. The
 initial `design-brief.md` entries are labelled sample attachments. Comments
