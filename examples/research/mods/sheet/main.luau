@@ -3,11 +3,13 @@
 -- at the foot. As the scripted demo plays (`app.research.run`), step 1 adds
 -- a row per app found, step 2 writes APY, fee, minimum and rating cell by
 -- cell, the current row highlighted and the cell being typed outlined.
+-- The download button saves the sheet as it stands as a PDF (`app:pdf`, on
+-- A4 pages), in the app's cache folder, and says where.
 
 local spreadsheet = use "spreadsheet"
 local icon_button = use "icon-button"
 
-type State = { selected: { row: number, key: string }? }
+type State = { selected: { row: number, key: string }?, saved: string?, failed: string? }
 
 local KEYS = { "apy", "fee", "deposit", "rating" }
 
@@ -22,6 +24,41 @@ local COLUMNS: { any } = {
 }
 
 local ROWS = 26 -- numbered rows drawn, the rest empty
+
+local function escape(text: string): string
+	return (string.gsub(string.gsub(string.gsub(text, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"))
+end
+
+-- The sheet as far as the agent has written it, as a page to print: what
+-- the download button makes a PDF of. Nil until it has found an app.
+local function sheet_html(data: any): string?
+	local run = data and data.run
+	if not run or run.found == 0 then
+		return nil
+	end
+	local head = {}
+	for _, column in COLUMNS do
+		table.insert(head, `<th>{escape(column.title)}</th>`)
+	end
+	local rows = {}
+	for index = 1, run.found do
+		local item = data.apps[index]
+		local cells = { `<td><b>{escape(item.name)}</b></td>`, `<td>{escape(item.type)}</td>` }
+		for c, key in KEYS do
+			local written = run.step > 2 or (run.step == 2 and (index < run.row or (index == run.row and c <= run.cell)))
+			table.insert(cells, `<td>{if written then escape(tostring(item[key])) else ""}</td>`)
+		end
+		table.insert(cells, `<td>{escape(item.source)}</td>`)
+		table.insert(rows, `<tr>{table.concat(cells)}</tr>`)
+	end
+	return `<html><head><title>{escape(data.sheet)}</title><style>`
+		.. "body { font: 11pt -apple-system, sans-serif; color: #1f2328; }"
+		.. "h1 { font-size: 18pt; margin: 0 0 4pt; } p { color: #59636e; margin: 0 0 14pt; }"
+		.. "table { border-collapse: collapse; width: 100%; } tr { break-inside: avoid; }"
+		.. "th { text-align: left; background: #f0f2f4; } th, td { padding: 5pt 7pt; border-bottom: 1px solid #d8dee4; }"
+		.. `</style></head><body><h1>{escape(data.sheet)}</h1><p>{escape(data.project)} · {run.found} apps</p>`
+		.. `<table><thead><tr>{table.concat(head)}</tr></thead><tbody>{table.concat(rows)}</tbody></table></body></html>`
+end
 
 return mod {
 	region = "main",
@@ -66,6 +103,8 @@ return mod {
 	update = function(state: State, msg)
 		if type(msg) == "table" and msg.cell then
 			state.selected = msg.cell
+		elseif type(msg) == "table" and msg.saved then
+			state.saved, state.failed = msg.path, msg.error
 		end
 	end,
 
@@ -168,6 +207,7 @@ return mod {
 		end
 
 		local sources = if data then data.sources else 0
+		local sheet = sheet_html(data)
 		return ui.column {
 			class = "bay-body",
 			grow = true,
@@ -223,7 +263,18 @@ return mod {
 					action("arrow-up-down", "Sort"),
 					action("layers", "Group"),
 					ui.row { class = "doc-rule", width = 1, height = 18 },
-					action("download", nil),
+					ui.row {
+						class = "doc-action",
+						height = 30,
+						align = "center",
+						to = if sheet then "app:pdf" else nil,
+						msg = if sheet then { html = sheet, pdf = "sorrel/competitors.pdf", paper = "a4", reply = { saved = true } } else nil,
+						tooltip = if state.failed then `Not saved: {state.failed}`
+							elseif state.saved then `Saved as {state.saved}`
+							elseif sheet then "Save the sheet as a PDF"
+							else "Nothing to save yet",
+						ui.icon { name = if state.saved then "check" else "download", size = "small" },
+					},
 					action("ellipsis", nil),
 				},
 				ui.row {

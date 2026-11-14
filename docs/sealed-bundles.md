@@ -40,7 +40,7 @@ fallback definitions are omitted.
 - Native provider manifests select their Cargo features. Any selected Wasm
   provider enables Wasmtime; only selected Wasm providers are built.
 - `ui.terminal`, `ui.browser`, `ui.map`, `ui.markdown` and `ui.video` select their host capabilities.
-- `app:awake`, `app:dock`, `app:guard` and `app:restart`, `app.crash` and `app.displays`, a window's `display` or `fullscreen`, a socket provider and a provider's `restart` select theirs.
+- `app:awake`, `app:dock`, `app:guard`, `app:restart` and `app:pdf` (the `browser` feature), `app.crash` and `app.displays`, a window's `display` or `fullscreen`, a socket provider and a provider's `restart` select theirs.
   Literal terminal property tables select their engine, defaulting to
   Alacritty; literal `ghostty` and `herdr-core` selections enable those
   optional capabilities too. Otherwise

@@ -102,7 +102,7 @@ ship only their selected components.
 | `guard` | `app:guard`: a mod holds back closing and quitting. Off by default. |
 | `restart` | `app:restart`, and `restart = "on-failure"` for process providers. Off by default; without it a process that goes stays gone. |
 | `socket` | Socket providers (`kind = "socket"`), on Unix. Off by default; without it one fails as it starts. |
-| `browser` | Native web views and Wry on macOS/Windows. Linux keeps its system-browser fallback. |
+| `browser` | Native web views and Wry on macOS/Windows, and `app:pdf` (pages made into PDF files, macOS). Linux keeps its system-browser fallback. |
 | `terminal` | Terminal rendering, local PTYs and tmux; choose an engine below to run a shell. |
 | `alacritty`, `ghostty` | Each enables `terminal` and its respective emulator. |
 | `herdr-core` | herdr-core state storage and, with `terminal`, persistent terminals. |

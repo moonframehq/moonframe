@@ -13,6 +13,7 @@ mod dock;
 mod edit;
 mod guard;
 mod icon;
+mod pdf;
 mod pick;
 mod window;
 
@@ -23,6 +24,7 @@ pub use {
     edit::{Edit, EditChange, Splice},
     guard::Guard,
     icon::{AppIcon, ICON_TYPES},
+    pdf::{Paper, Pdf, PdfSource, private_host},
     pick::{Pick, PickKind},
     window::WindowRequest,
 };
@@ -82,6 +84,9 @@ pub enum Request {
     /// `app:open`: opens a web address (`https://` or `http://`) in the
     /// system's browser: a pull request, a sign-in page.
     Open(String),
+    /// `app:pdf`: a page rendered to a PDF file under the app's cache or
+    /// state; the file's path (or why not) goes back to the mod.
+    Pdf(Pdf),
 }
 
 /// What `app:sound` plays.
@@ -160,6 +165,7 @@ impl Request {
             "open" => open(msg).map(Self::Open),
             "icon" => icon::icon(msg).map(Self::Icon),
             "devtools" => devtools::devtools(msg).map(Self::Devtools),
+            "pdf" => pdf::pdf(msg).map(Self::Pdf),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -189,6 +195,7 @@ pub const NAMES: &[&str] = &[
     "open",
     "icon",
     "devtools",
+    "pdf",
 ];
 
 /// Longest address `app:open` opens.

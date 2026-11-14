@@ -2127,6 +2127,23 @@ type PickMsg = {
 	folder: string?,
 }
 
+-- What `{ to = "app:pdf", msg = ... }` makes: a page as a PDF file (macOS).
+-- One of `html`, `html_file` and `url`. With `reply`, the mod hears it back
+-- with `path` (the file written) or `error`.
+type PdfMsg = {
+	-- The page's text: no script, nothing from the network but `data:`.
+	html: string?,
+	-- An `.html` file under the app's cache or state folders, shown as `html`.
+	html_file: string?,
+	-- An https:// page on the internet, in a session of its own.
+	url: string?,
+	-- Where: relative to the app's cache folder, or under its cache or state.
+	pdf: string,
+	-- The system's paper unless given.
+	paper: ("a4" | "letter")?,
+	reply: Data?,
+}
+
 -- What `{ to = "app:edit", msg = ... }` does to the sending mod's input
 -- with `id = field`, around its selection, keeping undo and focus; the
 -- field then sends its `change`. `wrap` puts `{ before, after }` around the
@@ -2176,7 +2193,7 @@ type DevtoolsMsg =
 -- in the Dock, changed at once until the app quits; macOS only),
 -- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
--- `"app:devtools"` (`msg` a `DevtoolsMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
+-- `"app:devtools"` (`msg` a `DevtoolsMsg`), `"app:pdf"` (`msg` a `PdfMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
 type Send = {
 	to: string,
 	msg: Data,
