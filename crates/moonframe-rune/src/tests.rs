@@ -20,6 +20,7 @@ mod font_size;
 mod maps;
 mod markdown;
 mod reload;
+mod scroll_sync;
 mod splits;
 mod terminals;
 mod windows;

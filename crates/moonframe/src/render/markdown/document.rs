@@ -4,7 +4,12 @@
 //! by the window, as only then is there a window to keep state in.
 
 use {
-    super::{blocks, outline::Outline, scrolling::Scrolling, search, send},
+    super::{
+        blocks,
+        outline::Outline,
+        scrolling::{Applied, Scrolling},
+        search, send,
+    },
     crate::app::MoonframeApp,
     gpui_kit::{
         component::text::{
@@ -363,11 +368,15 @@ impl Kept {
                     go_to(&state, &current, &outline, at, scroll, cx);
                 }
                 // After a reveal, so that a `scroll_at` with it wins.
+                let mut applied = Applied::Done;
                 if current == rendered && current.source() == kept.text {
-                    kept.scrolling.apply(&state, cx);
+                    applied = kept.scrolling.apply(&state, cx);
                 }
                 kept.settle(&state, window, cx);
-                if kept.pending.is_some() || kept.scrolling.pending() {
+                // A document with no height waits for a draw that gives it
+                // one, rather than drawing again every frame.
+                let scroll_waits = kept.scrolling.pending() && applied != Applied::NoRoom;
+                if kept.pending.is_some() || scroll_waits {
                     cx.notify();
                 }
             })

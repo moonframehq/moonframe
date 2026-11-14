@@ -6,11 +6,12 @@
 //! A move of that place, with the same blocks, is the reader scrolling (the
 //! wheel, the scrollbar, a jump to a heading). A new parse that changes the
 //! blocks moves it too, and a document whose text changes is not the reader
-//! moving, so then it is only noted. Nor is a move the mod asked for.
+//! moving, so then it is only noted. Nor is a move the mod asked for: the
+//! list scrolls at once, so [`ScrollFollow`] notes it as landed there.
 
 use {
     gpui_kit::{component::text::TextViewState, *},
-    moonframe_core::{Data, Markdown, ScrollAt},
+    moonframe_core::{Data, Markdown, ScrollAt, ScrollFollow},
 };
 
 /// Where a document was last seen scrolled.
@@ -26,42 +27,51 @@ struct Seen {
 #[derive(Default)]
 pub(super) struct Scrolling {
     msg: Option<Data>,
-    /// The last `scroll_at` taken, and its fraction until it is carried out.
-    taken: Option<ScrollAt>,
-    pending: Option<f32>,
+    follow: ScrollFollow,
     seen: Option<Seen>,
+}
+
+/// What became of a waiting `scroll_at`.
+#[derive(PartialEq)]
+pub(super) enum Applied {
+    /// Nothing waited, or it was carried out.
+    Done,
+    /// The document has no height yet, so it waits for one: the next draw
+    /// that gives it one tries again, and no frame is asked for meanwhile.
+    NoRoom,
 }
 
 impl Scrolling {
     /// Takes this frame's `scrolled` and `scroll_at`.
     pub(super) fn take(&mut self, markdown: &Markdown) {
         self.msg.clone_from(&markdown.scrolled);
-        if markdown.scroll_at != self.taken {
-            self.taken = markdown.scroll_at;
-            self.pending = markdown.scroll_at.map(|at| at.fraction);
-        }
+        self.follow.take(markdown.scroll_at);
     }
 
     /// Whether a `scroll_at` waits for the document to be laid out.
     pub(super) fn pending(&self) -> bool {
-        self.pending.is_some()
+        self.follow.pending()
     }
 
     /// Carries out a waiting `scroll_at`, once the list has a size.
-    pub(super) fn apply(&mut self, state: &Entity<TextViewState>, cx: &mut App) {
-        let Some(fraction) = self.pending else {
-            return;
-        };
+    pub(super) fn apply(&mut self, state: &Entity<TextViewState>, cx: &mut App) -> Applied {
+        if !self.follow.pending() {
+            return Applied::Done;
+        }
         let list = state.read(cx).list_state().clone();
         if list.viewport_bounds().size.height <= px(0.) {
-            return;
+            return Applied::NoRoom;
         }
-        self.pending = None;
-        let max = list.max_offset_for_scrollbar().y;
-        list.set_offset_from_scrollbar(point(px(0.), -(max * fraction)));
+        let max = list.max_offset_for_scrollbar().y.as_f32();
+        let offset = -list.scroll_px_offset_for_scrollbar().y.as_f32();
+        if let Some(y) = self.follow.scroll(offset, max) {
+            list.set_offset_from_scrollbar(point(px(0.), px(-y)));
+            self.follow.landed(y);
+        }
         // The mod's own move: not one to tell it of.
         self.seen = Some(seen(&list));
         state.update(cx, |_, cx| cx.notify());
+        Applied::Done
     }
 
     /// The message to send if the reader moved the document since it was

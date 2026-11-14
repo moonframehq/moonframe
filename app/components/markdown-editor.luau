@@ -211,6 +211,10 @@ markdown_editor { id = "readme", path = "README.md" }
 			end
 		elseif msg.mode then
 			state.mode = msg.mode
+			-- Where each pane followed the other is of the last side by side:
+			-- the next one starts from where the panes are then.
+			state.source_at = nil
+			state.preview_at = nil
 		elseif msg.link then
 			return state, { { to = "parent", msg = { open_link = msg.url, from = state.path, root = state.root } } }
 		elseif msg.changed and msg.changed == state.path then

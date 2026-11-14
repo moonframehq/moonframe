@@ -3,7 +3,7 @@
 
 use {
     super::*,
-    crate::{Input, Markdown, ScrollAt},
+    crate::{Input, Markdown, ScrollAt, ScrollFollow},
 };
 
 fn view(element: &str) -> Result<Node, String> {
@@ -151,4 +151,89 @@ fn scrolling_goes_with_an_element_that_scrolls() {
     // `to` goes with `scrolled` as with any message.
     assert!(view("ui.input { multiline = true, scrolled = 'moved', to = 'other' }").is_ok());
     assert!(view("ui.markdown { 'a', scroll = true, scrolled = 'moved', to = 'other' }").is_ok());
+}
+
+#[test]
+fn a_seq_past_what_a_float_holds_whole_still_tells_requests_apart() {
+    let at = |seq: i64| {
+        let Ok(Node::Input(input)) = view(&format!(
+            "ui.input {{ multiline = true, scroll_at = {{ fraction = 0.5, seq = {seq} }} }}"
+        )) else {
+            panic!("no input");
+        };
+        input.scroll_at.unwrap().seq
+    };
+    let big = 1 << 24;
+    assert_ne!(at(big), at(big + 1));
+}
+
+/// A field 1000 points from its last line, for [`ScrollFollow`].
+const MAX: f32 = 1000.0;
+
+fn asked(fraction: f32, seq: i64) -> Option<ScrollAt> {
+    Some(ScrollAt { fraction, seq })
+}
+
+#[test]
+fn a_request_is_not_told_back_however_long_it_takes_to_land() {
+    let mut follow = ScrollFollow::default();
+    assert_eq!(follow.moved(0.0, MAX, true), None, "first seen");
+    follow.take(asked(0.5, 1));
+    assert_eq!(follow.scroll(0.0, MAX), Some(500.0));
+    // Many looks before the engine lays it out: still nothing to tell.
+    for _ in 0..50 {
+        assert_eq!(follow.moved(0.0, MAX, true), None);
+    }
+    assert_eq!(follow.moved(500.0, MAX, true), None, "landed");
+    // The reader moves on from there, and that is told.
+    assert_eq!(follow.moved(600.0, MAX, true), Some(0.6));
+    // The same request again is not new; a new `seq` is.
+    follow.take(asked(0.5, 1));
+    assert_eq!(follow.scroll(600.0, MAX), None);
+    follow.take(asked(0.5, 2));
+    assert_eq!(follow.scroll(600.0, MAX), Some(500.0));
+}
+
+#[test]
+fn a_readers_move_while_a_request_waits_is_told() {
+    let mut follow = ScrollFollow::default();
+    follow.moved(0.0, MAX, true);
+    follow.take(asked(0.5, 1));
+    assert_eq!(follow.scroll(0.0, MAX), Some(500.0));
+    // The reader scrolls before it lands.
+    assert_eq!(follow.moved(100.0, MAX, true), Some(0.1));
+    assert_eq!(follow.moved(100.0, MAX, true), None, "and only once");
+    // Or after it landed somewhere else entirely.
+    follow.take(asked(0.8, 2));
+    assert_eq!(follow.scroll(100.0, MAX), Some(800.0));
+    assert_eq!(follow.moved(300.0, MAX, true), Some(0.3));
+}
+
+#[test]
+fn a_move_that_is_not_the_readers_is_only_noted() {
+    let mut follow = ScrollFollow::default();
+    follow.moved(0.0, MAX, true);
+    assert_eq!(follow.moved(40.0, MAX, false), None, "the text grew");
+    assert_eq!(
+        follow.moved(40.0, MAX, true),
+        None,
+        "and that is where it is"
+    );
+    // Forgotten, it starts again from where it is next seen.
+    follow.forget();
+    assert_eq!(follow.moved(900.0, MAX, true), None);
+    assert_eq!(follow.moved(1000.0, MAX, true), Some(1.0));
+}
+
+#[test]
+fn a_request_for_where_the_text_is_already_needs_no_scroll() {
+    let mut follow = ScrollFollow::default();
+    follow.take(asked(0.25, 1));
+    assert!(follow.pending());
+    assert_eq!(follow.scroll(250.0, MAX), None);
+    assert!(!follow.pending());
+    assert_eq!(follow.moved(250.0, MAX, true), None);
+    // Text with nowhere to scroll stays at the top.
+    follow.take(asked(1.0, 2));
+    assert_eq!(follow.scroll(0.0, 0.0), None);
 }

@@ -44,6 +44,7 @@ mod read;
 mod request;
 mod roots;
 mod schema;
+mod scroll_follow;
 mod style;
 mod vm;
 mod window;
@@ -72,6 +73,7 @@ pub use {
     schema::{
         ElementSchema, KeySchema, KeyType, SCHEMA_VERSION, Schema, StyleSchema, TokenSet, schema,
     },
+    scroll_follow::{SCROLL_JITTER, ScrollFollow},
     style::{
         Case, Color, Corners, Curve, Font, Gradient, Look, MonoFont, Paint, Part, Resolved, Rules,
         Shade, Shadow, ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token,

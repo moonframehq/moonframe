@@ -4,35 +4,22 @@
 //! asks. Where the text sits in its scroll, from the last layout, says how
 //! far it is scrolled. A move as the text changes length is the text, not
 //! the reader, and the move a `scroll_at` asked for is the mod's own: neither
-//! is told.
+//! is told. [`ScrollFollow`] tells the reader's moves from the mod's.
 
-use moonframe_core::{Data, Markdown, ScrollAt};
-
-/// How many views a `scroll_at` may take to show before the document is
-/// taken to have gone elsewhere.
-const PATIENCE: u8 = 8;
-
-/// Points of a move too small to tell.
-const JITTER: f32 = 0.5;
-
-/// Where a document was last seen scrolled, in points: how far down, and
-/// how tall its text is.
-#[derive(Clone, Copy)]
-struct Seen {
-    offset: f32,
-    height: f32,
-}
+use {
+    moonframe_core::{Data, Markdown, SCROLL_JITTER, ScrollAt, ScrollFollow},
+    std::hash::{DefaultHasher, Hash, Hasher},
+};
 
 /// What a document keeps of its scrolling.
 #[derive(Default)]
 pub(crate) struct Scrolling {
-    /// The last `scroll_at` taken, and its fraction until it is carried out.
-    taken: Option<ScrollAt>,
-    pending: Option<f32>,
-    /// The offset a `scroll_at` asked for, until it shows, and the views it
-    /// has left.
-    expect: Option<(f32, u8)>,
-    seen: Option<Seen>,
+    follow: ScrollFollow,
+    /// How tall its text was last seen, in points.
+    height: Option<f32>,
+    /// The text it was last drawn with, hashed: the layout a draw reads is
+    /// the last frame's, so it is not yet of a text that just changed.
+    text: Option<u64>,
 }
 
 /// What one look at a document found and asks for.
@@ -42,6 +29,8 @@ pub(super) struct Looked {
     pub(super) scroll: Option<f32>,
     /// The message to send.
     pub(super) tell: Option<Data>,
+    /// A `scroll_at` waits for this text to be laid out: draw again.
+    pub(super) again: bool,
 }
 
 impl Scrolling {
@@ -54,41 +43,34 @@ impl Scrolling {
         view: Option<[f32; 4]>,
         text: Option<[f32; 4]>,
     ) -> Looked {
-        if markdown.scroll_at != self.taken {
-            self.taken = markdown.scroll_at;
-            self.pending = markdown.scroll_at.map(|at| at.fraction);
-        }
+        self.follow.take(markdown.scroll_at);
+        let mut hasher = DefaultHasher::new();
+        markdown.text.hash(&mut hasher);
+        let hash = hasher.finish();
+        let new_text = self.text.replace(hash).is_some_and(|before| before != hash);
         let (Some([_, top, _, shown]), Some([_, y, _, height])) = (view, text) else {
             return Looked::default();
         };
-        let now = Seen {
-            offset: top - y,
-            height,
-        };
+        let offset = top - y;
         let max = (height - shown).max(0.);
         let mut looked = Looked::default();
-        if let Some(fraction) = self.pending.take() {
-            let offset = max * fraction;
-            self.expect = Some((offset, PATIENCE));
-            looked.scroll = Some(offset);
-            return looked;
-        }
-        if let Some((offset, views)) = self.expect {
-            if (now.offset - offset).abs() < JITTER || views == 0 {
-                self.expect = None;
-                self.seen = Some(now);
-            } else {
-                self.expect = Some((offset, views - 1));
+        if self.follow.pending() {
+            if new_text {
+                // Its layout is of the old text: wait for the new one.
+                looked.again = true;
+                return looked;
             }
-            return looked;
+            looked.scroll = self.follow.scroll(offset, max);
         }
-        let Some(before) = self.seen.replace(now) else {
-            return looked;
-        };
-        let moved = (now.offset - before.offset).abs() >= JITTER
-            && (now.height - before.height).abs() < JITTER;
-        if let (true, Some(msg)) = (moved, &markdown.scrolled) {
-            looked.tell = Some(ScrollAt::message(msg, ScrollAt::fraction(now.offset, max)));
+        let grew = self
+            .height
+            .replace(height)
+            .is_some_and(|before| (height - before).abs() >= SCROLL_JITTER);
+        let reader = !new_text && !grew;
+        if let (Some(fraction), Some(msg)) =
+            (self.follow.moved(offset, max, reader), &markdown.scrolled)
+        {
+            looked.tell = Some(ScrollAt::message(msg, fraction));
         }
         looked
     }

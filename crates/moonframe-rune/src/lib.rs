@@ -204,6 +204,8 @@ pub struct Ui {
     /// Documents to scroll, each to a place in its text, next frame: gliding
     /// there, or at once when it follows another scroll (`scroll_at`).
     pub(crate) markdown_reveals: RefCell<Vec<(String, f32, bool)>>,
+    /// A document's `scroll_at` waits for its new text to be laid out.
+    pub(crate) markdown_again: Cell<bool>,
     pub(crate) inspecting: inspect::Inspecting,
     /// What each element is, while picking, by its key.
     pub(crate) crumbs: RefCell<HashMap<String, inspect::Crumb>>,
@@ -553,6 +555,7 @@ impl Ui {
             markdown_notes: RefCell::default(),
             opens: opens::Opens::default(),
             documents: RefCell::default(),
+            markdown_again: Cell::default(),
             carrying: RefCell::default(),
             carry_targets: RefCell::default(),
             markdown_reveals: RefCell::default(),
@@ -663,6 +666,7 @@ fn polled(ui: &mut Ui, tx: &mut Tx) -> bool {
         }
         changed = true;
     }
+    changed |= ui.markdown_again.take();
     for (owner, to, note) in ui.markdown_notes.take() {
         ui.send(&owner, &to, note);
         changed = true;

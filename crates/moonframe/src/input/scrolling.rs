@@ -5,79 +5,40 @@
 //!
 //! Any move of the text is told (the wheel, the scrollbar, the caret
 //! carrying it along as the user types) but the one a `scroll_at` asked
-//! for, so two fields that follow each other do not echo.
+//! for, so two fields that follow each other do not echo. [`ScrollFollow`]
+//! tells the two apart.
 
 use {
     super::{Editor, Inputs},
     gpui_kit::*,
-    moonframe_core::{Action, Input, ScrollAt},
+    moonframe_core::{Action, Input, ScrollAt, ScrollFollow},
 };
 
-/// How often a field is looked at, after a `scroll_at`, before its text is
-/// taken to have gone elsewhere: the engine scrolls at its next layout.
-const PATIENCE: u8 = 8;
-
-/// Pixels of a move too small to tell.
-const JITTER: f32 = 0.5;
-
-/// What a field keeps of its scrolling.
-#[derive(Default)]
-pub(super) struct Scrolling {
-    /// The last `scroll_at` taken, and its fraction until it is carried out.
-    taken: Option<ScrollAt>,
-    pending: Option<f32>,
-    /// The offset a `scroll_at` asked for, until the field shows it, and
-    /// the looks it has left.
-    expect: Option<(f32, u8)>,
-    /// The offset last seen, in pixels down the text.
-    seen: Option<f32>,
-}
-
-impl Scrolling {
-    /// Takes the field's `scroll_at`, and scrolls there once it is laid out.
-    pub(super) fn take(&mut self, input: &Input, editor: &Editor, cx: &mut App) {
-        if input.scroll_at != self.taken {
-            self.taken = input.scroll_at;
-            self.pending = input.scroll_at.map(|at| at.fraction);
-        }
-        self.apply(editor, cx);
-    }
-
-    fn apply(&mut self, editor: &Editor, cx: &mut App) {
-        let Some(fraction) = self.pending else {
-            return;
-        };
-        let Some((_, max)) = editor.scrolled(cx) else {
-            return;
-        };
-        self.pending = None;
-        let y = max * fraction;
-        self.expect = Some((y, PATIENCE));
-        editor.scroll_down(y, cx);
-    }
-
-    /// The fraction to tell, if the text moved since last seen other than
-    /// where a `scroll_at` took it.
-    pub(super) fn moved(&mut self, editor: &Editor, cx: &mut App) -> Option<f32> {
-        self.apply(editor, cx);
-        let (offset, max) = editor.scrolled(cx)?;
-        if let Some((y, looks)) = self.expect {
-            if (offset - y).abs() < JITTER || looks == 0 {
-                self.expect = None;
-                self.seen = Some(offset);
-            } else {
-                self.expect = Some((y, looks - 1));
-            }
-            return None;
-        }
-        let before = self.seen.replace(offset)?;
-        ((offset - before).abs() >= JITTER).then(|| ScrollAt::fraction(offset, max))
-    }
-}
-
 impl Editor {
-    /// How far down its text the field is scrolled and the most it can be,
-    /// in pixels; `None` until it is laid out.
+    /// Takes the field's `scroll_at`, and scrolls there once it is laid out.
+    pub(super) fn take_scroll(&self, follow: &mut ScrollFollow, input: &Input, cx: &mut App) {
+        follow.take(input.scroll_at);
+        self.follow(follow, cx);
+    }
+
+    /// Carries out a waiting `scroll_at`, once the field is laid out.
+    fn follow(&self, follow: &mut ScrollFollow, cx: &mut App) {
+        if !follow.pending() {
+            return;
+        }
+        let Some((offset, max)) = self.scrolled(cx) else {
+            return;
+        };
+        if let Some(y) = follow.scroll(offset, max) {
+            self.scroll_down(y, cx);
+        }
+    }
+
+    /// How far down its text the field is scrolled and the most it can be
+    /// while its last line is in view, in pixels; `None` until it is laid
+    /// out. `input_bounds` leaves out the field's padding, so `max` is
+    /// where gpui-base's own clamp puts the last line at the bottom; it
+    /// scrolls further only into a code editor's room under that line.
     fn scrolled(&self, cx: &App) -> Option<(f32, f32)> {
         on_state!(self, |state| {
             let state = state.read(cx);
@@ -107,8 +68,17 @@ impl Inputs {
     pub(super) fn scrolled(&self, key: &str, cx: &mut App) -> Option<(String, Action)> {
         let mut registry = self.0.borrow_mut();
         let field = registry.fields.get_mut(key)?;
-        let fraction = field.scrolling.moved(&field.editor, cx)?;
-        let msg = field.wiring.scrolled.as_ref()?;
+        if !field.wiring.multiline {
+            return None;
+        }
+        field.editor.follow(&mut field.scrolling, cx);
+        // A field that tells nothing need not be looked at.
+        let Some(msg) = field.wiring.scrolled.as_ref() else {
+            field.scrolling.forget();
+            return None;
+        };
+        let (offset, max) = field.editor.scrolled(cx)?;
+        let fraction = field.scrolling.moved(offset, max, true)?;
         Some((field.wiring.owner.clone(), Action::Send {
             to: field.wiring.to.clone(),
             msg: ScrollAt::message(msg, fraction),

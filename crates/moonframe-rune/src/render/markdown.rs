@@ -264,6 +264,9 @@ impl<'w> Painter<'w> {
             let mut reveals = self.ui.markdown_reveals.borrow_mut();
             reveals.push((path.to_owned(), y, true));
         }
+        if looked.again {
+            self.ui.markdown_again.set(true);
+        }
         if let Some(msg) = looked.tell {
             self.tell(markdown, msg, place);
         }

@@ -256,7 +256,7 @@ struct Field {
     seen: u64,
     window: WindowId,
     selection: (std::ops::Range<usize>, usize),
-    scrolling: scrolling::Scrolling,
+    scrolling: moonframe_core::ScrollFollow,
     _events: Subscription,
     _selection: Subscription,
     /// A writing field follows its caret, for what it keeps in focus.
@@ -341,7 +341,7 @@ impl Inputs {
                 focus: false,
                 seen: frame,
                 window: window.window_handle().window_id(),
-                scrolling: scrolling::Scrolling::default(),
+                scrolling: moonframe_core::ScrollFollow::default(),
                 _events: events,
                 _selection: selection,
                 _caret: caret,
@@ -391,7 +391,7 @@ impl Inputs {
         }
         editor.set_disabled(input.disabled, cx);
         if input.multiline {
-            field.scrolling.take(input, &editor, cx);
+            editor.take_scroll(&mut field.scrolling, input, cx);
         }
         let take_focus = input.focus && !field.focus && !input.disabled;
         field.focus = input.focus;

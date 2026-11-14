@@ -344,7 +344,8 @@ impl Read for ScrollAt {
         };
         Ok(Self {
             fraction,
-            seq: fields.get::<f32>("seq")?.unwrap_or(0.0) as i64,
+            // As a double: an f32 runs out of whole numbers past 2^24.
+            seq: fields.get::<f64>("seq")?.unwrap_or(0.0) as i64,
         })
     }
 }
