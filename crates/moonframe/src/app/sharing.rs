@@ -9,8 +9,9 @@ use {
 
 impl MoonframeApp {
     /// Shows the share menu the mod `from` asked for. Its files must be
-    /// the app's own (its folders, its cache and state) or the user's
-    /// choice for that mod (`app:pick`, a drop); anything else is refused.
+    /// the app's own (its folders, or the cache folders providers write
+    /// for mods: images, and files to share) or the user's choice for
+    /// that mod (`app:pick`, a drop); anything else is refused.
     pub(super) fn share_request(
         &mut self,
         from: &str,
@@ -53,18 +54,7 @@ impl MoonframeApp {
 
     /// The file `src` names for the mod `from`, if it may share it.
     fn shared_file(&self, from: &str, src: &str) -> Result<PathBuf, String> {
-        let mut allowed: Vec<PathBuf> = self
-            .workspace
-            .roots()
-            .layers()
-            .map(Path::to_owned)
-            .collect();
-        allowed.push(paths::cache());
-        allowed.extend(
-            paths::state(self.folders.profile.as_deref())
-                .parent()
-                .map(Path::to_owned),
-        );
+        let allowed = shared_roots(self.workspace.roots().layers());
         let home = std::env::home_dir();
         shareable(
             src,
@@ -76,9 +66,20 @@ impl MoonframeApp {
     }
 }
 
+/// Where a mod's files may be shared from: the app's `layers`, and the
+/// cache folders providers write for mods. Never the whole cache or state
+/// folder, which hold every mod's state, undo history and other profiles'
+/// files.
+fn shared_roots<'a>(layers: impl Iterator<Item = &'a Path>) -> Vec<PathBuf> {
+    layers
+        .map(Path::to_owned)
+        .chain([paths::images(), paths::shared()])
+        .collect()
+}
+
 /// The file `src` names for a mod in `folder`, if it may share it: one in
-/// `allowed` (the app's folders, its cache and state), or one the user
-/// gave the mod (`granted`).
+/// `allowed` (the app's folders, the image and share caches), or one the
+/// user gave the mod (`granted`).
 fn shareable(
     src: &str,
     folder: &Path,
@@ -98,8 +99,8 @@ fn shareable(
         .filter(|real| real.is_file() && granted(real))
         .ok_or_else(|| {
             format!(
-                "`{src}` is no file in the app's folders, its cache or state, or one the user \
-                 picked for this mod"
+                "`{src}` is no file in the app's folders, its image or share cache, or one the \
+                 user picked for this mod"
             )
         })
 }
@@ -107,7 +108,28 @@ fn shareable(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use super::shareable;
+    use {
+        super::{shareable, shared_roots},
+        crate::paths,
+        std::path::Path,
+    };
+
+    #[test]
+    fn the_cache_and_state_folders_are_not_shared_whole() {
+        let app = Path::new("/apps/news");
+        let roots = shared_roots([app].into_iter());
+        assert!(roots.iter().any(|root| root == app));
+        assert!(roots.contains(&paths::images()) && roots.contains(&paths::shared()));
+        let state = paths::state(Some("work"));
+        let undo = state.with_file_name("history");
+        for kept in [&state, &undo, &paths::selection(), &paths::builds()] {
+            assert!(
+                !roots.iter().any(|root| kept.starts_with(root)),
+                "{} is shareable",
+                kept.display()
+            );
+        }
+    }
 
     #[test]
     fn a_mod_shares_the_apps_files_and_what_the_user_gave_it() {

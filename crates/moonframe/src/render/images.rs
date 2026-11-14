@@ -75,13 +75,13 @@ pub(crate) fn grant(owner: &str, paths: &[PathBuf]) {
     });
 }
 
-/// Whether the mod `owner` was given `real`, a canonical file path.
 /// Whether the user gave the mod `owner` the file at `real` (canonical):
 /// picked or dropped it, or a folder holding it.
 pub(crate) fn is_granted(owner: &str, real: &Path) -> bool {
     granted(owner, real)
 }
 
+/// Whether the mod `owner` was given `real`, a canonical file path.
 fn granted(owner: &str, real: &Path) -> bool {
     GRANTED.with_borrow(|granted| {
         granted.get(grantee(owner)).is_some_and(|grants| {

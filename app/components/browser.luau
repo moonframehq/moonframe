@@ -76,9 +76,12 @@ browser { id = "docs", url = state.url, page = state.page, navigate = { navigate
 		local page: Page = props.page or {}
 		local address = page.url or props.url or ""
 		local busy = page.loading == true
-		-- A web page can go to the share menu, when the caller offers it.
+		-- A web page can go to the share menu, when the caller offers it;
+		-- `app:share` takes addresses of at most 2048 bytes, text 4096.
 		local sharing = props.share == true
 			and (string.sub(address, 1, 8) == "https://" or string.sub(address, 1, 7) == "http://")
+		local shareable = #address <= 2048
+		local title = if page.title and page.title ~= "" and #page.title <= 4096 then page.title else nil
 		local function chrome(label: string, icon: string, command: string, disabled: boolean?)
 			return ui.button {
 				icon = icon :: any,
@@ -123,9 +126,10 @@ browser { id = "docs", url = state.url, page = state.page, navigate = { navigate
 					icon = "share",
 					small = true,
 					variant = "ghost",
-					tooltip = "Share",
-					to = "app:share",
-					msg = { url = address, text = if page.title and page.title ~= "" then page.title else nil },
+					tooltip = if shareable then "Share" else "This address is too long to share",
+					disabled = not shareable,
+					to = if shareable then "app:share" else nil,
+					msg = if shareable then { url = address, text = title } else nil,
 				},
 				chrome("Open in the system browser", "external-link", "browser-open"),
 			},

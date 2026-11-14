@@ -237,6 +237,13 @@ pub fn images() -> PathBuf {
     cache().join("images")
 }
 
+/// Where providers write files for mods to share (`app:share`), such as a
+/// PDF: `$XDG_CACHE_HOME/<name>/share`, by default under `~/.cache`. Mods
+/// may share files from here, the image cache and the app's own folders.
+pub fn shared() -> PathBuf {
+    cache().join("share")
+}
+
 /// Where the inspector saves the selected element for agents:
 /// `$XDG_CACHE_HOME/<name>/selection.md`, by default under `~/.cache`.
 pub fn selection() -> PathBuf {

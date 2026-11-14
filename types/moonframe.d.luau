@@ -2129,8 +2129,9 @@ type PickMsg = {
 }
 
 -- What `{ to = "app:share", msg = ... }` offers to the system's share menu
--- (macOS), at the pointer. Files must be the app's (its folders, cache or
--- state) or picked by the user for the mod. With `reply`, the mod hears it
+-- (macOS), at the pointer. Files must be the app's (its folders, the image
+-- cache `~/.cache/<app>/images` or the share cache `~/.cache/<app>/share`)
+-- or picked by the user for the mod. With `reply`, the mod hears it
 -- back with `service` (the name of the one picked) or `cancelled = true`.
 type ShareMsg = {
 	-- A web address: https:// or http://.

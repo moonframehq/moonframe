@@ -140,7 +140,7 @@ return mod {
 						then "Nothing to share yet"
 						elseif state.shared then `Share the sheet (last with {state.shared})`
 						else "Share the sheet as text",
-					ui.icon { name = "upload", size = "small" },
+					ui.icon { name = "share", size = "small" },
 					ui.text { "Share", weight = "medium" },
 				},
 				icon_button { icon = "ellipsis", tooltip = "More", msg = "star" },
