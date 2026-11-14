@@ -167,7 +167,9 @@ pub(crate) fn valid_title(title: &str) -> bool {
             .any(|c| c.is_control() || matches!(c, '/' | '\\' | '<' | '>' | '&' | ':'))
 }
 
-/// Schemes the web or the system owns, which no app takes over.
+/// Schemes the web or the system owns, which no app takes over. Sealed
+/// builds check the same list (`scripts/sealed_plan.py`), which a test
+/// compares.
 const RESERVED_SCHEMES: &[&str] = &[
     // keep-sorted start
     "about",

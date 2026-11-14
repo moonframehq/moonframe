@@ -44,10 +44,10 @@ More screenshots: [dark mode](../../docs/screenshots/apps/orbit-dark.png),
   views, ⌘/Ctrl-0 opens Overview, and ⌘/Ctrl-N creates a task.
 - **Links:** Orbit claims the `orbit:` scheme (`schemes` in its
   `moonframe.toml`), so once it is bundled (`just bundle-app orbit`) and
-  opened once, `open 'orbit:/new?title=Call%20the%20printer'` (or the
-  same link in a browser) adds a task and opens it, and
-  `open 'orbit:/task?id=TASK-3'` opens that one. The workspace mod hears
-  them on `app/url`.
+  opened once, `open 'orbit:/task?id=APP-202'` opens that task, and
+  `open 'orbit:/new?title=Call%20the%20printer'` (or the same link in a
+  browser) proposes a task, added once you confirm it: any web page can
+  open a link. The workspace mod hears them on `app/url`.
 
 Attachments are references to paths on this machine, not uploads. The
 initial `design-brief.md` entries are labelled sample attachments. Comments

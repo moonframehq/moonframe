@@ -196,7 +196,7 @@ fn orbit_filters_comments_reactions_and_attachment_replies_work() {
 }
 
 #[test]
-fn orbit_links_add_and_open_tasks() {
+fn orbit_links_open_tasks_and_propose_new_ones() {
     let mut app = Orbit::new();
     let link = |path: &str, query: &[(&str, &str)]| {
         Data::Map(
@@ -221,9 +221,25 @@ fn orbit_links_add_and_open_tasks() {
     assert_eq!(field(&app.state(), "selected"), &Data::from("APP-202"));
     assert_eq!(field(&app.state(), "page"), &Data::from("mobile"));
 
+    // A new task is only proposed until the user confirms it.
+    let before = app.state();
     app.workspace
         .app_news("url", link("/new", &[("title", "Call the printer")]));
     app.check();
+    assert_eq!(field(&app.state(), "tasks"), field(&before, "tasks"));
+    assert_eq!(
+        field(field(&app.state(), "offer"), "title"),
+        &Data::from("Call the printer")
+    );
+    app.send("return 'drop-offer'");
+    assert_eq!(field(&app.state(), "offer"), &Data::Nil);
+    assert_eq!(field(&app.state(), "tasks"), field(&before, "tasks"));
+
+    app.workspace
+        .app_news("url", link("/new", &[("title", "Call the printer")]));
+    app.check();
+    app.send("return 'add-offer'");
+    assert_eq!(field(&app.state(), "offer"), &Data::Nil);
     let Data::String(id) = field(&app.state(), "selected").clone() else {
         panic!("not selected")
     };

@@ -7,6 +7,7 @@ local filter_builder = use "filter-builder"
 local avatar = use "avatar"
 local avatar_stack = use "avatar-stack"
 local progress = use "progress"
+local confirm = use "confirm"
 
 local GROUPS = {
 	{ id = "todo", label = "To do", color = "#9699a8", dot = "#9699a8" },
@@ -201,20 +202,32 @@ local function select_task(state: any, id: string?)
 	local task = id and find(state.tasks, id)
 	if task then state.due_month = task.finish end
 end
--- An `orbit:` link (moonframe.toml's `schemes`), opened from a browser or
--- `open`: `orbit:/new?title=…` adds a task, `orbit:/task?id=TASK-3` opens one.
-local function open_link(state: any, link: any)
-	local id = if link.path == "/task" then link.query.id else nil
-	if link.path == "/new" then
-		id = `TASK-{state.next}`
-		state.next += 1
-		local title = if link.query.title and string.find(link.query.title, "%S") then link.query.title else "Untitled task"
-		table.insert(state.tasks, task_of(id, title, state.project, "todo", "sarah", 0, 4, "Design"))
-	end
-	local task = id and find(state.tasks, id)
+local function open_task(state: any, id: string)
+	local task = find(state.tasks, id)
 	if not task then return end
 	state.project, state.page, state.query, state.conditions = task.project, task.project, "", {}
 	select_task(state, task.id)
+end
+-- An `orbit:` link (moonframe.toml's `schemes`), opened from a browser or
+-- `open`: `orbit:/task?id=APP-202` opens a task, and `orbit:/new?title=…`
+-- proposes one, added only once the user confirms: any web page can open
+-- a link.
+local function open_link(state: any, link: any)
+	if link.path == "/task" and link.query.id then
+		open_task(state, link.query.id)
+	elseif link.path == "/new" then
+		local title = link.query.title
+		state.offer = { title = if title and string.find(title, "%S") then title else "Untitled task", project = state.project }
+	end
+end
+local function add_offer(state: any)
+	local offer = state.offer
+	state.offer = nil
+	if not offer then return end
+	local id = `TASK-{state.next}`
+	state.next += 1
+	table.insert(state.tasks, task_of(id, offer.title, offer.project, "todo", "sarah", 0, 4, "Design"))
+	open_task(state, id)
 end
 local function move_task(state: any, id: string, group: string, target: string?, after: boolean)
 	if id == target then return end
@@ -236,13 +249,15 @@ return mod {
 	init = function(previous: any): any
 		local state = if previous and previous.version == 1 then previous else initial()
 		state.board_over, state.table_over, state.day_over, state.moving = nil, nil, nil, nil
-		state.filtering, state.filter_open, state.reaction_picker = false, nil, nil
+		state.filtering, state.filter_open, state.reaction_picker, state.offer = false, nil, nil, nil
 		close_picker(state)
 		return state
 	end,
 	update = function(state: any, msg: any)
 		local task = state.selected and find(state.tasks, state.selected)
 		if msg == "close-task" then select_task(state, nil)
+		elseif msg == "add-offer" then add_offer(state)
+		elseif msg == "drop-offer" then state.offer = nil
 		elseif msg == "close-picker" then close_picker(state)
 		elseif msg == "filter" then state.filtering = not state.filtering
 		elseif msg == "close-filter" or msg == "done" then state.filtering, state.filter_open = false, nil
@@ -483,6 +498,17 @@ return mod {
 				},
 				task and ui.column { width = 400, shrink = false, detail { task = decorated(task), state = state,
 					choices = { status = GROUPS, people = PEOPLE, priority = PRIORITIES, mentions = mentions }, dates = dates_for(state.due_month, "month") } },
+			},
+			state.offer and confirm {
+				open = true,
+				title = "Add a task from a link?",
+				message = "A link opened outside Orbit asks to add this task.",
+				icon = "link",
+				items = { { label = state.offer.title, detail = (find(PROJECTS, state.offer.project) or project).name, icon = "circle-dashed" } },
+				confirm = "add-offer",
+				cancel = "drop-offer",
+				confirm_label = "Add task",
+				cancel_label = "Don't add",
 			},
 		}
 	end,
