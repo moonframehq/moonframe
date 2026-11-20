@@ -38,7 +38,7 @@ return component {
 
 	build = function(props: Props)
 		local label_width = props.label_width or 96
-		local rows = {}
+		local rows: { Element } = {}
 		for index, row in props.rows do
 			local control = row.control
 			if typeof(control) == "table" and control.type == nil then

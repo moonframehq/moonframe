@@ -227,7 +227,7 @@ return mod {
 		}
 
 		-- Five headline figures.
-		local cells = {}
+		local cells: { Element } = {}
 		for index, kpi in today.kpis do
 			if index > 1 then
 				table.insert(cells, ui.row { class = "strip-rule", width = 1 })
@@ -333,7 +333,7 @@ return mod {
 				table.insert(due_rows, item)
 			end
 		end
-		local due_list = {}
+		local due_list: { Element } = {}
 		for index, item in due_rows do
 			table.insert(due_list, ui.row {
 				class = if index == #due_rows then { "list-row", "list-row-last" } else "list-row",
@@ -387,7 +387,7 @@ return mod {
 		local ex = today.exceptions
 		local left_width = 362
 		local fixed_width = math.floor((left_width - 4) * ex.fixed / (ex.fixed + ex.outstanding))
-		local with = {}
+		local with: { Element } = {}
 		for _, who in ex.with do
 			table.insert(with, ui.row {
 				gap = "small",
@@ -399,7 +399,7 @@ return mod {
 				ui.text { tostring(who.count), class = "mono-small" },
 			})
 		end
-		local days = {}
+		local days: { Element } = {}
 		local track = 206
 		for _, d in ex.days do
 			table.insert(days, ui.row {
@@ -506,7 +506,7 @@ return mod {
 				due_count[id] = (due_count[id] or 0) + 1
 			end
 		end
-		local table_rows = {}
+		local table_rows: { Element } = {}
 		for position, entry in deadlines do
 			local row = entry.row
 			local id = due_id(row.due)

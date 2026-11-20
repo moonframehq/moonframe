@@ -103,7 +103,7 @@ recipient_field {
 	build = function(props: Props)
 		local pick = props.pick or "pick"
 		local remove = props.remove or "remove"
-		local chips = {}
+		local chips: { Element } = {}
 		local recipients: { any } = props.recipients or {}
 		for index, value in recipients do
 			local person = recipient(value)

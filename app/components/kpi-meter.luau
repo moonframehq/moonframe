@@ -78,7 +78,7 @@ return component {
 			end
 		end
 		local room = width - gaps - dots
-		local bar = {}
+		local bar: { Element } = {}
 		for _, segment in segments do
 			if segment.dot then
 				table.insert(bar, ui.row {
@@ -100,7 +100,7 @@ return component {
 				})
 			end
 		end
-		local legend = {}
+		local legend: { Element } = {}
 		local items: { Legend } = props.legend or {}
 		for _, item in items do
 			table.insert(legend, ui.row {

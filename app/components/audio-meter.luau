@@ -52,7 +52,7 @@ return component {
 		local function fraction(level: number): number
 			return math.clamp((level - floor) / -floor, 0, 1)
 		end
-		local bars = {}
+		local bars: { Element } = {}
 		for index, channel in props.channels do
 			local class = if channel.level >= danger
 				then { "audio-meter-fill", "audio-meter-danger" }

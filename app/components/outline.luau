@@ -66,7 +66,7 @@ markdown { text = state.text, grow = true, scroll = true, reveal = state.reveal,
 		for _, heading in headings do
 			top = math.min(top, heading.level)
 		end
-		local rows = {}
+		local rows: { Element } = {}
 		for index, heading in headings do
 			if props.depth and heading.level > props.depth then
 				continue

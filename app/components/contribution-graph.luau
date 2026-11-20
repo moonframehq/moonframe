@@ -204,8 +204,8 @@ contribution_graph {
 		local lead = row_of(first) - 1
 		local weeks = (lead + count + 6) // 7
 
-		local columns = {}
-		local labels = {}
+		local columns: { Element } = {}
+		local labels: { Element } = {}
 		local last_month = nil
 		local label_start = 1
 		local label_text = nil
@@ -223,7 +223,7 @@ contribution_graph {
 		end
 
 		for week = 1, weeks do
-			local cells = {}
+			local cells: { Element } = {}
 			for row = 1, 7 do
 				local index = (week - 1) * 7 + row - lead
 				-- Keep every week seven rows tall, including a short range.
@@ -264,7 +264,7 @@ contribution_graph {
 		end
 		close_label(weeks + 1)
 
-		local day_labels = {}
+		local day_labels: { Element } = {}
 		for row = 1, 7 do
 			local weekday = if monday then row % 7 + 1 else row
 			local name = WEEKDAYS[weekday]

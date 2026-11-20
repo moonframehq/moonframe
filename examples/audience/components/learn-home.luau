@@ -117,7 +117,7 @@ return component {
 
 		-- My progress: a sheet with the figures, the weeks and every course.
 		local function progress_sheet()
-			local rows = {}
+			local rows: { Element } = {}
 			for index, enrolled in data.enrolled do
 				local done = if index == 1 then state.completed else enrolled.done
 				local finished = done >= enrolled.total
@@ -252,8 +252,8 @@ return component {
 			return a.rank < b.rank
 		end)
 		local limit = if state.all then #shown else math.min(6, #shown)
-		local grid = {}
-		local row = {}
+		local grid: { Element } = {}
+		local row: { Element } = {}
 		for index = 1, limit do
 			local guide = shown[index]
 			local category = category_of(data, guide.category)

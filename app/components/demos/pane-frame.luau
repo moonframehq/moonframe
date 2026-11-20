@@ -105,12 +105,12 @@ return mod {
 				table.unpack(lines),
 			}
 		end
-		local rows = {}
+		local rows: { Element } = {}
 		if state.zoomed then
 			rows[1] = ui.row { grow = true, frame(state.zoomed, true) }
 		else
 			for r, row in state.rows do
-				local frames = {}
+				local frames: { Element } = {}
 				for c, id in row do
 					frames[c] = frame(id, #row == 1)
 				end

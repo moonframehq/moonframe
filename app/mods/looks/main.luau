@@ -96,7 +96,7 @@ return mod {
 
 	view = function(state: State, app)
 		local sheet = (app.looks and app.looks.tabs) or "classic"
-		local tiles = {}
+		local tiles: { Element } = {}
 		local function tile(id: string, name: string, look: string, note: string?)
 			local pick = { look = id }
 			table.insert(tiles, ui.column {
@@ -120,7 +120,7 @@ return mod {
 			tile(look, title(look), look)
 		end
 
-		local layouts = {}
+		local layouts: { Element } = {}
 		for _, layout in LAYOUTS do
 			table.insert(layouts, ui.row {
 				class = "layout-row",

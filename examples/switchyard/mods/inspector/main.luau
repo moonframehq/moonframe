@@ -51,7 +51,7 @@ local function checks_view(state: State, app: any): any
 		return ui.text { forge.error, tone = "muted", wrap = true, style = { padding = { 8, 12 } } }
 	end
 	local branch = state.branch
-	local rows = {}
+	local rows: { Element } = {}
 	local prs = {}
 	for _, pr in forge.prs or {} do
 		if not branch or pr.branch == branch then

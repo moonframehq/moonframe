@@ -151,7 +151,7 @@ mention_field {
 			return { [event] = "choose", item = person.id, edit = edit(person) }
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		for index, person in found do
 			table.insert(rows, ui.row {
 				class = "mention-field-row",

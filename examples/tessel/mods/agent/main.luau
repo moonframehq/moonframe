@@ -308,7 +308,7 @@ return mod {
 				},
 			}
 		else
-			local turns = {}
+			local turns: { Element } = {}
 			for _, message in messages do
 				table.insert(turns, chat_message {
 					from = message.from,

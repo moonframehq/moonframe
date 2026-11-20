@@ -68,7 +68,7 @@ return mod {
 
 	view = function(state: State, app)
 		local fund = app.fund
-		local rows = {}
+		local rows: { Element } = {}
 		for _, section in SECTIONS do
 			table.insert(rows, ui.text { string.upper(section.title), class = "side-heading" })
 			for _, item in section.items do

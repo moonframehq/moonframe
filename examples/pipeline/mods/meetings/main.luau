@@ -453,7 +453,7 @@ return mod {
 		end
 		local panel
 		if picked then
-			local people = {}
+			local people: { Element } = {}
 			for _, name in picked.participants do
 				table.insert(people, ui.row {
 					align = "center",

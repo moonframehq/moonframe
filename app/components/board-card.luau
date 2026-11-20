@@ -81,7 +81,7 @@ return component {
 	build = function(props: Props)
 		local badge_tone = props.badge_tone and TONES[props.badge_tone]
 		local outline = props.tone and TONES[props.tone]
-		local labels = {}
+		local labels: { Element } = {}
 		local tags: { any } = props.labels or {}
 		for _, tag in tags do
 			local color = tag.color or "muted-foreground"

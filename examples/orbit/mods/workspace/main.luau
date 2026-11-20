@@ -412,12 +412,12 @@ return mod {
 		for _, item in shown(state) do table.insert(list, decorated(item)) end
 		for _, person in PEOPLE do table.insert(mentions, { name = person.label, detail = "Orbit team" }) end
 		for i = 1, 4 do table.insert(team, { name = PEOPLE[i].label }) end
-		local nav = {}
+		local nav: { Element } = {}
 		local function nav_row(label: string, icon: string, id: string, count: number?)
 			return ui.row { class = "orbit-nav", align = "center", selected = state.page == id, msg = { page = id },
 				ui.icon { name = icon :: any, size = "small" }, ui.text { label, size = "small" }, ui.spacer(), count and ui.text { tostring(count), size = "small", tone = "muted" } }
 		end
-		local cards, total, done = {}, #state.tasks, 0
+		local cards: { Element }, total, done = {}, #state.tasks, 0
 		for _, item in state.tasks do if item.status == "done" then done += 1 end end
 		for _, p in PROJECTS do
 			local n, completed = 0, 0
@@ -427,7 +427,7 @@ return mod {
 				status = "In progress", tone = "accent", progress = completed / math.max(1, n), tasks = `{completed}/{n}`, due = "November 2026",
 				people = team, starred = state.starred[p.id], star = { star = p.id }, msg = { page = p.id }, width = 300 })
 		end
-		local tabs = {}
+		local tabs: { Element } = {}
 		for _, tab in TABS do table.insert(tabs, ui.row { class = "orbit-tab", selected = state.view == tab.id, align = "center", msg = { view = tab.id },
 			ui.icon { name = tab.icon :: any, size = "small" }, ui.text { tab.label, size = "small" } }) end
 		local body

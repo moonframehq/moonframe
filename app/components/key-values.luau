@@ -20,7 +20,7 @@ return component {
 	example = { rows = { { "Branch", "main" }, { "Ahead", "2 commits" }, { "Changed", "14 files" } } },
 
 	build = function(props: Props)
-		local rows = {}
+		local rows: { Element } = {}
 		for index, pair in props.rows do
 			rows[index] = ui.row {
 				gap = "small",

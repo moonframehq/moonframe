@@ -18,7 +18,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local rows = {}
+		local rows: { Element } = {}
 		for _, name in NAMES do
 			table.insert(
 				rows,

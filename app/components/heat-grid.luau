@@ -78,9 +78,9 @@ heat_grid { levels = 2, columns = { { 2 }, { 2 }, { 2 }, { 1 }, { 0 }, { 0 }, { 
 		local rows: number = props.rows or tallest
 		local tooltips: { string } = props.tooltips or {}
 
-		local columns = {}
+		local columns: { Element } = {}
 		for index, column in props.columns do
-			local cells = {}
+			local cells: { Element } = {}
 			for row = 1, rows do
 				local fill = empty
 				if type(column) == "table" then
@@ -106,7 +106,7 @@ heat_grid { levels = 2, columns = { { 2 }, { 2 }, { 2 }, { 1 }, { 0 }, { 0 }, { 
 			})
 		end
 
-		local labels = {}
+		local labels: { Element } = {}
 		local label_list: { string } = props.labels or {}
 		for _, label in label_list do
 			table.insert(labels, ui.text { label, class = "heat-grid-label" })

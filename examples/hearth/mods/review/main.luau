@@ -272,7 +272,7 @@ return mod {
 		end
 
 		local function kpi_strip(kpis: { any })
-			local cells = {}
+			local cells: { Element } = {}
 			for index, kpi in kpis do
 				local arrow = if kpi.up then "arrow-up" else "arrow-down"
 				table.insert(cells, ui.column {
@@ -379,7 +379,7 @@ return mod {
 					sum += row.count
 				end
 				local shares = {}
-				local lines = {}
+				local lines: { Element } = {}
 				for _, row in rows do
 					table.insert(shares, { share = row.count, color = row.color, label = `{row.label} · {row.count}` })
 					table.insert(lines, ui.row {
@@ -406,7 +406,7 @@ return mod {
 				)
 			end
 
-			local authors = {}
+			local authors: { Element } = {}
 			for _, person in data.authors do
 				table.insert(authors, ui.row {
 					class = "break-row",
@@ -498,7 +498,7 @@ return mod {
 				},
 			}
 		elseif state.tab == "pulls" then
-			local rows = {}
+			local rows: { Element } = {}
 			for _, pull in data.pulls do
 				if state.author == "all" or pull.author == state.author then
 					table.insert(rows, pr_row {
@@ -606,7 +606,7 @@ return mod {
 				card({}, head(`{#rows} open issues`), table.unpack(rows)),
 			}
 		else
-			local rows = {}
+			local rows: { Element } = {}
 			for index, item in SETTINGS do
 				table.insert(rows, settings_row {
 					title = item.title,

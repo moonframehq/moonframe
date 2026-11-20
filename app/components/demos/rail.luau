@@ -40,7 +40,7 @@ return mod {
 		end
 		local names = nil
 		if state.expanded then
-			local rows = {}
+			local rows: { Element } = {}
 			for i, s in SPACES do
 				rows[i] = ui.item { s.name, detail = s.branch, selected = s.id == state.selected, msg = { select = s.id } }
 			end

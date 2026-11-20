@@ -192,7 +192,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 	local to = props.to
 	local status = STATUS[run.status] or STATUS.stopped
 	local going = run.status == "starting" or run.status == "running" or run.status == "waiting"
-	local body = {}
+	local body: { Element } = {}
 	if open then
 		for index, turn in turns do
 			if index > 1 then
@@ -417,7 +417,7 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 	build = function(props: Props)
 		local blank = string.match(props.text or "", "^%s*$") ~= nil
 		local runs: { any } = props.runs or {}
-		local rows = {}
+		local rows: { Element } = {}
 		for _, turns in conversations(runs) do
 			local open = turns[1].id == props.expanded or turns[#turns].status == "waiting"
 			table.insert(rows, conversation(turns, open, props))

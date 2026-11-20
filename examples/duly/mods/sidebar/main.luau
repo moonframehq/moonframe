@@ -114,7 +114,7 @@ return mod {
 			}
 		end
 
-		local top, pages, folders = {}, {}, {}
+		local top: { Element }, pages: { Element }, folders: { Element } = {}, {}, {}
 		for _, item in TOP do
 			if matches(item.label, query) then
 				table.insert(top, row(item))

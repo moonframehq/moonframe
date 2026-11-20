@@ -232,7 +232,7 @@ return component {
 			samples[index] = math.clamp(at(points, slope, (index - 1) / (SAMPLES - 1)), 0, 1)
 		end
 		local color = props.color or "accent"
-		local layers = {}
+		local layers: { Element } = {}
 		if props.values and #props.values > 1 then
 			table.insert(layers, ui.row {
 				float = "fill",
@@ -273,7 +273,7 @@ return component {
 			},
 		})
 		-- The grid, then the points, in the inset square the curve uses.
-		local marks = {}
+		local marks: { Element } = {}
 		local lines = props.grid or 3
 		for step = 1, lines do
 			local fraction = step / (lines + 1)

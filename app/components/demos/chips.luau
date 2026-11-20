@@ -22,7 +22,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local selected, shown = {}, {}
+		local selected, shown: { Element } = {}, {}
 		for id in state.on do
 			table.insert(selected, id)
 		end

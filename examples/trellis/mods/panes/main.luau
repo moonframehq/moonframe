@@ -221,7 +221,7 @@ return mod {
 		local window = app.window
 		local inset = not props.sidebar and window.platform == "macos" and not window.fullscreen
 
-		local strip = {}
+		local strip: { Element } = {}
 		for _, each in state.tabs do
 			local count = #all_leaves(each.root)
 			local selected = tab ~= nil and each.id == tab.id

@@ -174,7 +174,7 @@ bar_chart {
 			}
 		end
 
-		local columns = {}
+		local columns: { Element } = {}
 		for index, bucket in props.buckets do
 			-- Top of the stack first: the column draws downwards.
 			local pieces = {}
@@ -227,9 +227,9 @@ bar_chart {
 		-- Gridlines: one-pixel rows spread from the top to the bottom, each
 		-- holding a dashed line, floated behind the bars.
 		local grid = nil
-		local steps = {}
+		local steps: { Element } = {}
 		if ticks and ticks > 0 then
-			local lines = {}
+			local lines: { Element } = {}
 			for step = ticks, 0, -1 do
 				table.insert(steps, ui.row {
 					height = 1,

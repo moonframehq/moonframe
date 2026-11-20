@@ -200,7 +200,7 @@ tabs {
 		local close = props.close or "close"
 		local context = props.context or "tab_menu"
 
-		local cells = {}
+		local cells: { Element } = {}
 		for _, tab in props.tabs do
 			local id = tab.id or tab.label
 			local selected = id == props.selected

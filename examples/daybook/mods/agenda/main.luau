@@ -125,14 +125,14 @@ return mod {
 			if #items == 0 then
 				return ui.text { empty, class = "agenda-empty" }
 			end
-			local rows = {}
+			local rows: { Element } = {}
 			for _, item in items do
 				table.insert(rows, row(item))
 			end
 			return ui.column { gap = "none", shrink = false, table.unpack(rows) }
 		end
 
-		local body = {}
+		local body: { Element } = {}
 		local query = string.lower(state.query)
 		if query ~= "" then
 			local found = {}
@@ -210,7 +210,7 @@ return mod {
 			table.insert(body, ui.column { grow = true, scroll = true, list(day, "Nothing on this day") })
 		elseif state.view == "upcoming" then
 			table.insert(body, heading("Upcoming", "The next two weeks"))
-			local sections = {}
+			local sections: { Element } = {}
 			for _, day in planner.days do
 				local items = {}
 				for _, item in planner.items do

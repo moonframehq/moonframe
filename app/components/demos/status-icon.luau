@@ -37,7 +37,7 @@ return mod {
 
 	view = function(state)
 		local size = tonumber(state.size)
-		local rows = {}
+		local rows: { Element } = {}
 		for index, task in state.tasks do
 			rows[index] = ui.row {
 				gap = "normal",

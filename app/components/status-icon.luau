@@ -53,7 +53,7 @@ local function pie(quarters: number, diameter: number, color: string)
 		{ top = q, left = 0, radius = { 0, 0, 0, q } },
 		{ top = 0, left = 0, radius = { q, 0, 0, 0 } },
 	}
-	local parts = {}
+	local parts: { Element } = {}
 	for index = 1, quarters do
 		local quarter = QUARTERS[index]
 		table.insert(parts, ui.row {

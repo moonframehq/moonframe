@@ -107,7 +107,7 @@ return mod {
 			table.insert(options, { id = id, label = TITLES[id], count = counts[id] or 0 })
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		for _, m in state.messages do
 			if m.category ~= state.category then
 				continue

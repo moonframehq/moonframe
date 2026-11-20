@@ -19,7 +19,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local rows = {}
+		local rows: { Element } = {}
 		for _, branch in state.branches do
 			table.insert(rows, ui.item { branch, detail = "~/code/ledger-api" })
 		end

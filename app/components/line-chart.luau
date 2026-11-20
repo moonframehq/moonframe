@@ -93,7 +93,7 @@ return component {
 		end
 
 		-- The slots: a faint column each, lit under the pointer, picked on a click.
-		local slots = {}
+		local slots: { Element } = {}
 		for index = 1, count do
 			local bar = props.bars and props.bars[index]
 			table.insert(slots, ui.column {
@@ -112,7 +112,7 @@ return component {
 		end
 
 		-- The lines, each over the whole plot, from the first slot's middle to the last's.
-		local layers = {}
+		local layers: { Element } = {}
 		for _, series in props.series do
 			table.insert(layers, ui.column {
 				float = { top = 0, left = slot / 2 },
@@ -156,7 +156,7 @@ return component {
 
 		local base = ui.row { class = "line-chart-base", float = { top = height, left = 0 }, width = width, height = 1 }
 
-		local names = {}
+		local names: { Element } = {}
 		for index, label in labels do
 			local on = selected == index
 			table.insert(names, ui.column {
@@ -169,7 +169,7 @@ return component {
 			})
 		end
 
-		local ticks = {}
+		local ticks: { Element } = {}
 		local tick_labels: { string } = props.ticks or {}
 		for _, tick in tick_labels do
 			table.insert(ticks, ui.text { tick, class = "line-chart-tick" })

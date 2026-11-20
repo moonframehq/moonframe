@@ -23,7 +23,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local rows = {}
+		local rows: { Element } = {}
 		for _, shortcut in SHORTCUTS do
 			table.insert(
 				rows,

@@ -140,7 +140,7 @@ code_view {
 				row = draw,
 			}
 		else
-			local rows = table.create(#lines)
+			local rows = table.create<<Element>>(#lines)
 			for index = 1, #lines do
 				rows[index] = draw(index)
 			end

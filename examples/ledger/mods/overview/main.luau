@@ -106,7 +106,7 @@ return mod {
 
 		-- Cash for the next 13 weeks.
 		local cash = fund.cash
-		local accounts = {}
+		local accounts: { Element } = {}
 		for _, account in cash.accounts do
 			table.insert(accounts, ui.row {
 				class = "account",
@@ -196,7 +196,7 @@ return mod {
 
 		-- The current raise.
 		local raise = fund.raise
-		local stages = {}
+		local stages: { Element } = {}
 		for _, stage in raise.stages do
 			local people = {}
 			for _, name in stage.people do

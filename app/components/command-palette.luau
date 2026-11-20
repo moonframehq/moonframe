@@ -288,7 +288,7 @@ command_palette {
 		local highlighted = clamp(state.highlighted, #found)
 		local grouped = shape.headings and state.query == ""
 
-		local rows = {}
+		local rows: { Element } = {}
 		local heading: string? = nil
 		for index, command in found do
 			if grouped and command.group and command.group ~= heading then

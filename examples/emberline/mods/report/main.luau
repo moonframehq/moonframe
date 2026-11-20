@@ -103,7 +103,7 @@ return mod {
 		end
 
 		-- The three pipeline figures, one card split in three.
-		local kpis = {}
+		local kpis: { Element } = {}
 		for index, kpi in data.kpis do
 			table.insert(kpis, ui.column {
 				class = if index > 1 then { "kpi", "kpi-split" } else "kpi",
@@ -122,7 +122,7 @@ return mod {
 		for index, m in revenue.months do
 			bars[index] = { label = m.label, value = m.value, tooltip = `{m.label}  {m.amount}` }
 		end
-		local chips = {}
+		local chips: { Element } = {}
 		for _, g in revenue.growth do
 			table.insert(chips, ui.column {
 				class = "chip",
@@ -161,7 +161,7 @@ return mod {
 		}
 
 		-- Leads by status, each on its own scale.
-		local levels = {}
+		local levels: { Element } = {}
 		for _, row in data.status.rows do
 			table.insert(levels, level_row {
 				label = row.label,
@@ -188,7 +188,7 @@ return mod {
 
 		-- Web visits: the figure, its weeks as a curve, and its sources.
 		local visits = data.visits
-		local sources = {}
+		local sources: { Element } = {}
 		for index, source in visits.sources do
 			if index > 1 then
 				table.insert(sources, ui.row { class = "source-rule", height = 1 })
@@ -215,7 +215,7 @@ return mod {
 		}
 
 		-- The hottest deals, and where leads come from.
-		local deals = {}
+		local deals: { Element } = {}
 		for _, deal in data.deals do
 			table.insert(deals, ui.row {
 				class = "deal",
@@ -253,7 +253,7 @@ return mod {
 			ui.column { gap = "none", style = { margin = { top = 10 } }, table.unpack(deals) },
 		}
 
-		local origins = {}
+		local origins: { Element } = {}
 		for _, source in data.sources do
 			table.insert(origins, ui.column {
 				gap = "small",

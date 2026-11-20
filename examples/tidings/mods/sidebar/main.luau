@@ -58,7 +58,7 @@ return mod {
 	view = function(state: State, app)
 		local mailbox = app.mailbox
 		local account = mailbox and mailbox.account
-		local rows = {}
+		local rows: { Element } = {}
 		for _, place in PLACES do
 			local count = if place.id == "mail" then state.unread else place.count
 			table.insert(rows, ui.row {

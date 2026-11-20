@@ -162,7 +162,7 @@ pagination {
 			}
 		end
 
-		local cells = {}
+		local cells: { Element } = {}
 		table.insert(cells, button(ui.icon { name = "chevron-left" }, if page > 1 then page - 1 else nil))
 		for _, n in numbers(page, pages, math.max(props.window or 7, 3), props.ellipsis ~= false) do
 			if n == 0 then

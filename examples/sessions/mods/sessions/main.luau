@@ -122,7 +122,7 @@ return mod {
 			end
 		end
 
-		local list = {}
+		local list: { Element } = {}
 		for index, home in order do
 			local name, tag = heading(home)
 			table.insert(list, ui.row {

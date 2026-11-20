@@ -209,7 +209,7 @@ return mod {
 				row = function(i)
 					local m = rows[i]
 					local on = m.id == selected
-					local chips = {}
+					local chips: { Element } = {}
 					for _, chip in m.chips do
 						table.insert(chips, ui.row {
 							class = "chip",

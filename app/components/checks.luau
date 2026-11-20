@@ -95,7 +95,7 @@ return component {
 			}
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		if not props.collapsed then
 			for index, check in props.checks do
 				local state = check.state or "pending"

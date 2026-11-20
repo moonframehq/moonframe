@@ -164,7 +164,7 @@ gantt {
 		local columns = { min = -100000, max = 100000, value = 0, speed = 1 / dw, step = 1 }
 
 		-- The header: months over the days they start, then the days.
-		local months, numbers = {}, {}
+		local months: { Element }, numbers: { Element } = {}, {}
 		for index, day in days do
 			local left = (index - 1) * dw
 			if day.month or index == 1 then
@@ -197,7 +197,7 @@ gantt {
 		end
 
 		-- Behind the rows: weekends and today.
-		local backdrop = {}
+		local backdrop: { Element } = {}
 		for index, day in days do
 			local left = (index - 1) * dw
 			if day.weekend then
@@ -209,7 +209,7 @@ gantt {
 		end
 
 		-- The rows: a name on the left, and on the right a bar or a diamond.
-		local names, lanes = {}, {}
+		local names: { Element }, lanes: { Element } = {}, {}
 		local spans: { [string]: Span } = {}
 		for index, row in rows do
 			if row.heading then

@@ -81,7 +81,7 @@ return mod {
 		local projects = app.projects
 		local file = projects and projects.file
 
-		local tabs = {}
+		local tabs: { Element } = {}
 		for _, path in state.tabs do
 			local name = string.match(path, "([^/]+)$") or path
 			table.insert(tabs, ui.row {

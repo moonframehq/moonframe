@@ -79,7 +79,7 @@ mockups { ask = "a busier status bar", file = "~/.config/moonframe/mods/mockup/m
 	},
 
 	build = function(props: Props)
-		local cards = {}
+		local cards: { Element } = {}
 		for index, variant in props.variants do
 			local letter = string.char(64 + index)
 			local body = variant.body

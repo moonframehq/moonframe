@@ -112,7 +112,7 @@ return mod {
 			}
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		for _, section in SECTIONS do
 			if section.title then
 				table.insert(rows, ui.row {
@@ -127,7 +127,7 @@ return mod {
 				table.insert(rows, row(item))
 			end
 		end
-		local foot = {}
+		local foot: { Element } = {}
 		for _, item in FOOT do
 			table.insert(foot, row(item))
 		end

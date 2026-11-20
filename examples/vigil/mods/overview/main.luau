@@ -168,7 +168,7 @@ return mod {
 			}
 		end
 		local function pairs_table(rows: { { string } }, gap: number)
-			local keys, values = {}, {}
+			local keys: { Element }, values: { Element } = {}, {}
 			for _, pair in rows do
 				table.insert(keys, ui.text { pair[1], class = "key", wrap = false })
 				table.insert(values, ui.text { pair[2], class = "value", wrap = false })
@@ -189,7 +189,7 @@ return mod {
 		end
 
 		-- The range and the way to Analytics.
-		local ranges = {}
+		local ranges: { Element } = {}
 		for _, id in RANGES do
 			local on = id == state.range
 			table.insert(ranges, ui.row {
@@ -308,7 +308,7 @@ return mod {
 			},
 		}
 
-		local errored_rows = {}
+		local errored_rows: { Element } = {}
 		for _, row in data.errored do
 			table.insert(errored_rows, ui.column {
 				style = { gap = 6 },
@@ -428,7 +428,7 @@ return mod {
 			}
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		if live then
 			table.insert(rows, cells(true, nil,
 				ui.text { "Started", class = "table-head" },

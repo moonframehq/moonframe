@@ -210,7 +210,7 @@ return mod {
 				rows = rows,
 			}
 		else
-			local lanes = {}
+			local lanes: { Element } = {}
 			for _, stage in data.stages do
 				local cards = {}
 				for _, deal in data.deals do

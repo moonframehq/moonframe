@@ -118,7 +118,7 @@ return mod {
 			},
 		}
 
-		local cells = {}
+		local cells: { Element } = {}
 		for index, kpi in notice.kpis do
 			if index > 1 then
 				table.insert(cells, ui.row { class = "strip-rule", width = 1 })
@@ -138,7 +138,7 @@ return mod {
 
 		-- How fast invoices were paid.
 		local speed = notice.speed
-		local legend = {}
+		local legend: { Element } = {}
 		for _, share in speed.shares do
 			table.insert(legend, ui.row {
 				gap = "small",
@@ -150,7 +150,7 @@ return mod {
 		end
 
 		-- Each figure and how it was reached.
-		local figures = {}
+		local figures: { Element } = {}
 		for _, figure in notice.figures do
 			table.insert(figures, ui.row {
 				class = "row",
@@ -167,7 +167,7 @@ return mod {
 
 		-- On time each month; the axis starts at 80%.
 		local month = state.month or #notice.months
-		local months = {}
+		local months: { Element } = {}
 		for index, m in notice.months do
 			local on = index == month
 			table.insert(months, ui.column {
@@ -182,12 +182,12 @@ return mod {
 				ui.row { class = if on then "month-bar-on" else "month-bar", width = 102, height = math.floor((m.value - 80) * 3) },
 			})
 		end
-		local month_labels = {}
+		local month_labels: { Element } = {}
 		for _, m in notice.months do
 			table.insert(month_labels, ui.row { grow = true, justify = "center", ui.text { m.label, class = "mono-muted" } })
 		end
 
-		local evidence = {}
+		local evidence: { Element } = {}
 		for index, item in notice.evidence do
 			table.insert(evidence, ui.row {
 				class = if index == #notice.evidence then { "kv", "kv-last" } else "kv",
@@ -230,7 +230,7 @@ return mod {
 		}
 
 		-- What is ready to send.
-		local steps = {}
+		local steps: { Element } = {}
 		for index, step in notice.steps do
 			local tone = TONES[step.tone] or "muted-foreground"
 			table.insert(steps, ui.row {
@@ -260,7 +260,7 @@ return mod {
 			insight_note { text = notice.insight },
 		}
 
-		local scope = {}
+		local scope: { Element } = {}
 		for index, item in notice.scope do
 			table.insert(scope, ui.row {
 				class = if index == #notice.scope then { "kv", "kv-last" } else "kv",

@@ -76,7 +76,7 @@ local function pieces(line: string): { { string } }
 end
 
 local function draw_line(line: string): any
-	local texts = {}
+	local texts: { Element } = {}
 	for _, piece in pieces(line) do
 		local style, text = piece[1], piece[2]
 		local fg, flags = string.match(style, "^([^;]*);?(.*)$")
@@ -162,7 +162,7 @@ return component {
 				end,
 			}
 		else
-			local drawn = {}
+			local drawn: { Element } = {}
 			for _, line in lines do
 				table.insert(drawn, draw_line(line))
 			end

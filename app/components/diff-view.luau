@@ -212,7 +212,7 @@ return component {
 			}
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		for _, hunk in props.hunks do
 			if hunk.header then
 				table.insert(rows, ui.row {

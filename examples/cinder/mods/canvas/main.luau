@@ -192,7 +192,7 @@ local function render_run(state: State, run: any): { any }
 		table.insert(items, reply { parts = parts, key = run.id, unfolded = state.unfolded })
 	end
 	if run.question then
-		local buttons = {}
+		local buttons: { Element } = {}
 		for _, option in run.question.options do
 			-- Allowing always is refused by the provider: once at most.
 			if option.kind ~= "allow_always" then
@@ -502,7 +502,7 @@ return mod {
 			})
 		else
 			-- The new session: Cinder sitting on the import pill.
-			local recent = {}
+			local recent: { Element } = {}
 			local count = 0
 			if history then
 				count = history.total or 0

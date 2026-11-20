@@ -177,7 +177,7 @@ return mod {
 		end
 
 		local function kpis(cells: { { label: string, value: string, note: string } }): any
-			local items = {}
+			local items: { Element } = {}
 			for index, cell in cells do
 				table.insert(items, ui.column {
 					class = if index == #cells then { "kpi", "kpi-last" } else "kpi",
@@ -235,7 +235,7 @@ return mod {
 				local wanted = state.filter == "all" or status == state.filter or (state.filter == "active" and status == "deploying")
 				local matches = query == "" or string.find(string.lower(service.name .. " " .. table.concat(service.tags, " ")), query, 1, true) ~= nil
 				if wanted and matches then
-					local tags = {}
+					local tags: { Element } = {}
 					for _, label in service.tags do
 						table.insert(tags, tag { label = label })
 					end
@@ -272,7 +272,7 @@ return mod {
 				table.insert(rows, ui.row { padding = "large", ui.text { "No service matches.", class = "muted" } })
 			end
 
-			local filters = {}
+			local filters: { Element } = {}
 			for index, id in FILTERS do
 				local count = 0
 				for _, service in services do
@@ -442,7 +442,7 @@ return mod {
 			local troubled = 0
 			for _, service in services do
 				local h = service.history
-				local cells = {}
+				local cells: { Element } = {}
 				for cell = 1, 48 do
 					local hot = false
 					for sample = (cell - 1) * 2 + 1, cell * 2 do

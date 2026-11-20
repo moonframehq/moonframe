@@ -303,7 +303,7 @@ return mod {
 						ui.text { m.date, class = "rd-small" },
 					})
 				else
-					local recipients = {}
+					local recipients: { Element } = {}
 					for _, part in { { "to", m.to }, { "cc", m.cc } } do
 						if part[2] ~= "" then
 							table.insert(recipients, ui.row {
@@ -313,7 +313,7 @@ return mod {
 							})
 						end
 					end
-					local files = {}
+					local files: { Element } = {}
 					for _, file in m.files do
 						table.insert(files, file_card { file = file })
 					end
@@ -404,7 +404,7 @@ return mod {
 			items = ordered
 		end
 
-		local chips = {}
+		local chips: { Element } = {}
 		for _, label in thread.labels do
 			table.insert(chips, ui.row {
 				class = "chip-round",

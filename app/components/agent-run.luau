@@ -216,7 +216,7 @@ return component {
 
 		local question: any = false
 		if run.question then
-			local buttons = {}
+			local buttons: { Element } = {}
 			for _, option in run.question.options do
 				table.insert(
 					buttons,

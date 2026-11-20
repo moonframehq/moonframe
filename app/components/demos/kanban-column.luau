@@ -93,7 +93,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local columns = {}
+		local columns: { Element } = {}
 		for _, column in COLUMNS do
 			local cards = {}
 			for _, id in state.board[column.id] do

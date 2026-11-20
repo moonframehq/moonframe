@@ -27,7 +27,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local rows = {}
+		local rows: { Element } = {}
 		for index, pr in PRS do
 			rows[index] = pr_row {
 				number = pr.number,

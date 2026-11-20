@@ -27,7 +27,7 @@ return mod {
 
 	view = function(state)
 		local count = 0
-		local rows = {}
+		local rows: { Element } = {}
 		for _, file in FILES do
 			if state.checked[file] then
 				count += 1

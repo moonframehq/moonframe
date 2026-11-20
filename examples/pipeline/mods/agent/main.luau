@@ -162,7 +162,7 @@ return mod {
 			}
 		end
 
-		local turns = {}
+		local turns: { Element } = {}
 		if data then
 			table.insert(turns, ui.text {
 				if #late > 0

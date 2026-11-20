@@ -24,7 +24,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local buttons = {}
+		local buttons: { Element } = {}
 		for _, name in SUGGESTIONS do
 			local has = table.find(state.tags, name) ~= nil
 			table.insert(buttons, ui.button { if has then `− {name}` else `+ {name}`, small = true, variant = "ghost", msg = { add = name } })

@@ -24,7 +24,7 @@ return component {
 					query = state.picker_query, search = "picker-search", id = `pick-{field}`, highlighted = state.highlighted },
 			}
 		end
-		local checks, files, comments = {}, {}, {}
+		local checks: { Element }, files: { Element }, comments: { Element } = {}, {}, {}
 		for index, sub in task.subtasks do
 			table.insert(checks, ui.row { align = "center", gap = "small",
 				task_check { state = if sub.done then "done" else "open", msg = { subtask = index } },

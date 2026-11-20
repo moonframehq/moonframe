@@ -584,7 +584,7 @@ return mod {
 		local key = timeline_key(state)
 
 		-- The tab strip: this workspace's chats, then a new-chat menu.
-		local strip = {}
+		local strip: { Element } = {}
 		for _, id in tabs(state) do
 			local chat = by_id[id]
 			if chat then
@@ -643,7 +643,7 @@ return mod {
 			added[item.id] = true
 		end
 		local working = transcript ~= nil and transcript.status ~= nil and transcript.status.state == "working"
-		local thread = {}
+		local thread: { Element } = {}
 		if transcript and (transcript.hidden or 0) > 0 then
 			table.insert(thread, ui.text { `{transcript.hidden} earlier entries`, tone = "muted", size = "small" })
 		end
@@ -676,7 +676,7 @@ return mod {
 			})
 		end
 		for _, permission in (transcript and transcript.permissions) or {} do
-			local buttons = {}
+			local buttons: { Element } = {}
 			for _, option in permission.options or {} do
 				local allows = option.kind == "allow_once" or option.kind == "allow_always"
 				table.insert(buttons, ui.button { option.name, small = true,
@@ -694,7 +694,7 @@ return mod {
 				ui.icon { name = "loader", size = "small", spin = true }, ui.text { "Working…" } })
 		end
 		local plan = (transcript and transcript.plan) or {}
-		local plan_rows = {}
+		local plan_rows: { Element } = {}
 		for _, step in plan do
 			local done = step.status == "completed"
 			table.insert(plan_rows, ui.row { align = "center", gap = "small",
@@ -714,7 +714,7 @@ return mod {
 				ui.text { service.reason or "Chats are not available", wrap = true },
 			}
 		elseif #thread == 0 then
-			local starts = {}
+			local starts: { Element } = {}
 			for _, option in agent_options do
 				table.insert(starts, ui.row { class = "chat-agent", align = "center", msg = { pick_new = option.id },
 					ui.icon { name = (option.icon or "bot") :: any }, ui.text { option.label } })

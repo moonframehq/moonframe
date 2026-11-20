@@ -242,7 +242,7 @@ return component {
 		for _, edge in edges do
 			table.insert(lines, line_of(edge, placed, row_height, #commits))
 		end
-		local rows = {}
+		local rows: { Element } = {}
 		for row, commit in commits do
 			local spot = placed[commit.sha]
 			table.insert(lines, dot_of(spot.lane, (row - 0.5) * row_height))

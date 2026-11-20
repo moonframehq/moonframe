@@ -32,7 +32,7 @@ return mod {
 
 	view = function(state, app)
 		local working, asking = 0, 0
-		local rows = {}
+		local rows: { Element } = {}
 		for _, session: any in state.list do
 			if going(session.status) then
 				working += 1

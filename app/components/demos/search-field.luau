@@ -52,7 +52,7 @@ return mod {
 
 	view = function(state)
 		local found = matches(state.query)
-		local rows = {}
+		local rows: { Element } = {}
 		for index, file in found do
 			rows[index] = ui.item { file, selected = index == state.index, msg = { pick = file } }
 		end

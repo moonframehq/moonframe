@@ -86,7 +86,7 @@ return component {
 		local event = props.event or "select"
 		local size = props.size or 34
 		local wide = props.width or 112
-		local cells = {}
+		local cells: { Element } = {}
 		for _, item in props.items do
 			local on = item.id == props.selected
 			local state = if on then "on" else "off"

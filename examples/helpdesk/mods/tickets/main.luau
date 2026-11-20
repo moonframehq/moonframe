@@ -213,14 +213,14 @@ return mod {
 
 		-- The week: a sentence with its figure in bold, a bar, a legend.
 		local week = desk.week
-		local words = {}
+		local words: { Element } = {}
 		local sentence = `{desk.assistant} resolved *{week.share}%* of {week.total} tickets with no human, first reply in {week.first_reply} on average.`
 		for word in string.gmatch(sentence, "%S+") do
 			local bold = string.match(word, "^%*(.*)%*$")
 			table.insert(words, ui.text { (bold or word) .. " ", weight = if bold then "bold" else nil })
 		end
 		local shades = { assistant = "lime", team = "ink", open = "low" }
-		local shares, keys = {}, {}
+		local shares, keys: { Element } = {}, {}
 		for _, part in week.split do
 			table.insert(shares, { share = part.count, color = shades[part.id], label = `{part.label} {part.count}` })
 			table.insert(keys, ui.row {
@@ -232,7 +232,7 @@ return mod {
 			})
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		for _, ticket in list do
 			local source = SOURCES[ticket.source] or SOURCES.web
 			local status = if ticket.status == "resolved"

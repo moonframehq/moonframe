@@ -41,7 +41,7 @@ local function render_tools(key: string, tools: { Tool }, open: boolean)
 	if not open then
 		return head
 	end
-	local rows = {}
+	local rows: { Element } = {}
 	for _, tool in tools do
 		local look = tool.status and TOOL_STATUS[tool.status]
 		table.insert(rows, ui.row {
@@ -89,7 +89,7 @@ return component {
 	build = function(props)
 		local key: string = props.key or "reply"
 		local unfolded: { [string]: boolean } = props.unfolded or {}
-		local out = {}
+		local out: { Element } = {}
 		local parts: { any } = props.parts or {}
 		for index, part in parts do
 			if part.kind == "tools" then

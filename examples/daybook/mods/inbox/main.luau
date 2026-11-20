@@ -114,7 +114,7 @@ return mod {
 			return (a.time or "99") < (b.time or "99")
 		end)
 
-		local sections = {}
+		local sections: { Element } = {}
 		local function section(title: string, items: { any })
 			if #items == 0 then
 				return

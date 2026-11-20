@@ -84,7 +84,7 @@ spotlight_bars {
 		end
 		local event = props.event or "select"
 
-		local columns = {}
+		local columns: { Element } = {}
 		for index, bar in props.bars do
 			local on = index == props.selected
 			local h = math.max(28, math.floor(math.clamp(bar.value, 0, max) / max * height + 0.5))

@@ -44,7 +44,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local items = {}
+		local items: { Element } = {}
 		for _, release in RELEASES do
 			items[#items + 1] = release_notes {
 				name = "Moonframe",

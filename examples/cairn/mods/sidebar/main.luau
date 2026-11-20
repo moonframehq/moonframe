@@ -290,7 +290,7 @@ return mod {
 
 	view = function(state: State, app)
 		local query = string.lower(state.query)
-		local rows = {}
+		local rows: { Element } = {}
 		for _, session in sessions(state) do
 			local haystack = string.lower(session.title .. " " .. session.name)
 			if query == "" or string.find(haystack, query, 1, true) then

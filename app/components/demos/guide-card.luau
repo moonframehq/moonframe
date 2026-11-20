@@ -19,7 +19,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local cards = {}
+		local cards: { Element } = {}
 		for _, guide in GUIDES do
 			local read = state.read[guide.id] or 0
 			table.insert(cards, ui.row {
