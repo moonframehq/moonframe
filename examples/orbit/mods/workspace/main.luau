@@ -152,8 +152,9 @@ local function initial(): any
 		task_of("DS-301", "Refresh color tokens", "system", "done", "sarah", -5, -1, "Foundations"),
 		task_of("DS-302", "Document the new components", "system", "progress", "priya", 0, 12, "Content"),
 	}
-	for id, dep in { ["WEB-103"] = "WEB-101", ["WEB-104"] = "WEB-102", ["WEB-106"] = "WEB-103", ["WEB-108"] = "WEB-105", ["WEB-110"] = "WEB-109" } do
-		find(tasks, id :: string).depends = dep
+	local depends: { [string]: string } = { ["WEB-103"] = "WEB-101", ["WEB-104"] = "WEB-102", ["WEB-106"] = "WEB-103", ["WEB-108"] = "WEB-105", ["WEB-110"] = "WEB-109" }
+	for id, dep in depends do
+		find(tasks, id).depends = dep
 	end
 	return { version = 1, tasks = tasks, page = "website", project = "website", view = "board", selected = nil,
 		query = "", folded = {}, conditions = {}, match = "all", next = 401, filter_next = 1,

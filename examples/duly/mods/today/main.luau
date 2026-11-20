@@ -463,7 +463,7 @@ return mod {
 		}
 
 		-- Deadlines, sortable, each opening its page.
-		local deadlines = {}
+		local deadlines: { { index: number, row: any } } = {}
 		for index, row in today.deadlines do
 			table.insert(deadlines, { index = index, row = row })
 		end

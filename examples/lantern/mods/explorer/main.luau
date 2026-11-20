@@ -8,6 +8,11 @@ local file_tree = use "file-tree"
 
 type State = { open: { [string]: boolean? }, selected: string? }
 
+-- What this pane reads of the projects provider's open project: its folder,
+-- and its changed files, each a line of status, lines added and removed,
+-- and path, split by tabs.
+type Project = { path: string, files: { string } }
+
 local function open_list(open: { [string]: boolean? }): string
 	local paths = {}
 	for path in open do
@@ -46,7 +51,7 @@ return mod {
 
 	view = function(state: State, app)
 		local projects = app.projects
-		local current = projects and projects.current
+		local current: Project? = projects and projects.current
 		if not current then
 			return ui.column {
 				grow = true,

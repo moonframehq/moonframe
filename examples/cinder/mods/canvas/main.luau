@@ -413,8 +413,8 @@ return mod {
 		local reading = state.open ~= "" and thread == nil
 		local usable, agent = agents(state, acp)
 		local runs: { any } = if thread then session_runs(acp, thread) else {}
-		local working = nil
-		for _, run in runs do
+		local working: AcpRun? = nil
+		for _, run: AcpRun in runs do
 			if going(run) then
 				working = run
 			end

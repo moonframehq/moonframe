@@ -81,10 +81,11 @@ local function draw_line(line: string): any
 		local style, text = piece[1], piece[2]
 		local fg, flags = string.match(style, "^([^;]*);?(.*)$")
 		local classes = { "shell-text" }
-		local inline = nil
+		local inline: Style? = nil
 		if fg and fg ~= "" then
 			if string.sub(fg, 1, 1) == "#" then
-				inline = { color = fg }
+				local colored: Style = { color = fg }
+				inline = colored
 			else
 				table.insert(classes, `ansi-{fg}`)
 			end
@@ -122,7 +123,31 @@ local function status_row(run: any, stop: any): any
 	}
 end
 
-return component {
+-- A run as `app.shell` shares it (see crates/moonframe-shell/src/lib.rs).
+type ShellRun = {
+	id: string,
+	command: string,
+	status: string,
+	code: number?,
+	error: string?,
+	elapsed_ms: number?,
+	output: string?,
+	text: string?,
+	lines: number?,
+	hidden: number?,
+}
+
+type Props = {
+	run: ShellRun,
+	stop: Data,
+	rerun: Data,
+	terminal: Data,
+	add: Data,
+	added: boolean?,
+	title: string?,
+}
+
+return component<<Props>> {
 	title = "Shell Card",
 	category = "Data",
 	icon = "square-terminal",

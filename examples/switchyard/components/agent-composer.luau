@@ -103,7 +103,7 @@ return component {
 		for _, queued in props.queued or {} do
 			table.insert(chips, ui.row { class = "composer-chip", align = "center", hug = true,
 				ui.icon { name = "history", size = "small" },
-				ui.text { `Queued: {queued.text}`, class = "composer-queued", truncate = true, max_width = 320 },
+				ui.row { max_width = 320, ui.text { `Queued: {queued.text}`, class = "composer-queued", truncate = true } },
 				ui.row { class = "composer-chip-x", msg = { unqueue = queued.id }, tooltip = "Don't send it", ui.icon { name = "close", size = "small" } },
 			})
 		end

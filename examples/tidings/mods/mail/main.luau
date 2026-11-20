@@ -403,7 +403,7 @@ return mod {
 					shrink = false,
 					align = "center",
 					justify = "center",
-					style = { background = thread.color },
+					style = { background = thread.color :: Color },
 					ui.text { (string.match(thread.sender, "^" .. utf8.charpattern) or ""), size = "small", weight = "bold" },
 				}
 			end

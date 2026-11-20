@@ -139,7 +139,7 @@ return mod {
 		-- How fast invoices were paid.
 		local speed = notice.speed
 		local legend: { Element } = {}
-		for _, share in speed.shares do
+		for _, share: any in speed.shares do
 			table.insert(legend, ui.row {
 				gap = "small",
 				align = "center",

@@ -8,7 +8,11 @@ local function going(status: string): boolean
 	return status == "starting" or status == "running" or status == "waiting"
 end
 
-return mod {
+type State = {
+	list: { any },
+}
+
+return mod<<State>> {
 	subscribe = { "cairn/sessions" },
 
 	styles = {

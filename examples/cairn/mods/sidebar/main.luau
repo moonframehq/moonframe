@@ -152,7 +152,7 @@ end
 
 -- Where a new session may start: the folders of the sessions, then the
 -- user's projects, each once.
-local function folders(state: State, app): { any }
+local function folders(state: State, app: App): { any }
 	local items: { any } = { { heading = "Start in" } }
 	local listed: { [string]: boolean } = {}
 	local function add(path: string?, detail: string?)

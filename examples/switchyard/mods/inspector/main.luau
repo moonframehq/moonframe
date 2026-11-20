@@ -112,7 +112,7 @@ return mod {
 	},
 
 	init = function(previous: State?): (State, { any })
-		local state = previous or { tab = "files", scope = "uncommitted", folded = {}, open = {}, file = nil, limit = 400 }
+		local state: State = previous or { tab = "files", scope = "uncommitted", folded = {}, open = {}, file = nil, limit = 400 }
 		return state, { { to = "provider:projects", msg = { forge = state.tab == "checks" } } }
 	end,
 

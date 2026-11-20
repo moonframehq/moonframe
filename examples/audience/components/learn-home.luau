@@ -234,14 +234,14 @@ return component {
 		for _, category in data.categories do
 			table.insert(options, { id = category.id, label = category.label })
 		end
-		local shown = {}
+		local shown: { any } = {}
 		for _, guide in data.guides do
 			if state.filter == "all" or guide.category == state.filter then
 				table.insert(shown, guide)
 			end
 		end
 		local matching = #shown
-		table.sort(shown, function(a, b)
+		table.sort(shown, function(a: any, b: any)
 			if state.sort == "newest" then
 				if (a.new or false) ~= (b.new or false) then
 					return a.new == true

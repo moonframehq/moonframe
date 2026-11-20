@@ -184,8 +184,8 @@ return mod {
 		end
 
 		local query = string.lower(state.query)
-		local shown = {}
-		local all = {}
+		local shown: { any } = {}
+		local all: { any } = {}
 		for _, row in state.added do
 			table.insert(all, row)
 		end

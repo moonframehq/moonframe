@@ -69,7 +69,7 @@ local SEVERITIES: { any } = {
 	{ id = "warning", label = "Warning" },
 	{ id = "info", label = "Info" },
 }
-local SEVERITY_COLOR = { critical = "#d9604c", warning = "#e1b64e", info = "#619cf8" }
+local SEVERITY_COLOR: { [string]: string } = { critical = "#d9604c", warning = "#e1b64e", info = "#619cf8" }
 
 local SETTINGS: { any } = {
 	{ id = "every", title = "Review every pull request", description = "Run a review when a pull request opens or gets new commits." },
@@ -158,7 +158,7 @@ return mod {
 		[".placeholder"] = { padding = 40, gap = 10 },
 	},
 
-	init = function(previous: State?): State
+	init = function(previous: State?): (State, { Send })
 		local state: State = previous
 			or ({
 				page = "review",
@@ -317,7 +317,7 @@ return mod {
 		end
 
 		-- The days shown: the last `range` of the thirty.
-		local days = {}
+		local days: { any } = {}
 		local count = tonumber(state.range) or 30
 		for index, day in data.days do
 			if index > #data.days - count then
@@ -380,7 +380,7 @@ return mod {
 				end
 				local shares = {}
 				local lines: { Element } = {}
-				for _, row in rows do
+				for _, row: any in rows do
 					table.insert(shares, { share = row.count, color = row.color, label = `{row.label} · {row.count}` })
 					table.insert(lines, ui.row {
 						class = "break-row",

@@ -59,7 +59,10 @@ local function going(run: any): boolean
 	return run.status == "starting" or run.status == "running" or run.status == "waiting"
 end
 
-local function current_session(state: State): any
+-- The fields of a `cairn/sessions` entry the chat reads.
+type Session = { id: string, title: string, folder: string, name: string }
+
+local function current_session(state: State): Session?
 	for _, session: any in state.list do
 		if session.id == state.current then
 			return session

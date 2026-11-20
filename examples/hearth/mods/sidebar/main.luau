@@ -7,6 +7,9 @@ local kbd = use "kbd"
 
 type State = { page: string, query: string }
 
+-- One row of the sidebar: a page, maybe tagged, marked or pinned.
+type Item = { id: string, label: string, icon: IconName, tag: string?, marks: { IconName }?, pinned: boolean? }
+
 -- A typed list: some rows carry a tag or provider marks, some not.
 local SECTIONS: { { title: string?, count: string?, items: { any } } } = {
 	{ items = { { id = "overview", label = "Overview", icon = "house" } } },
@@ -33,7 +36,7 @@ local SECTIONS: { { title: string?, count: string?, items: { any } } } = {
 	} },
 }
 
-local FOOT: { any } = {
+local FOOT: { Item } = {
 	{ id = "sources", label = "Sources", icon = "plug" },
 	{ id = "settings", label = "Settings", icon = "settings" },
 }
@@ -91,7 +94,7 @@ return mod {
 		local org = data and data.org or { name = "Hearth", project = "core", region = "EU" }
 		local user = data and data.user or { name = "", initials = "" }
 
-		local function row(item: any)
+		local function row(item: Item)
 			local selected = item.id == state.page
 			return ui.row {
 				class = "side-row",

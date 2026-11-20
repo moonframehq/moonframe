@@ -145,7 +145,7 @@ return mod {
 				height = 38,
 				align = "center",
 				gap = "normal",
-				ui.icon { name = "loader-circle", size = "small", spin = run.playing, class = "plan-active" },
+				ui.icon { name = "loader-circle", size = "small", spin = run.playing :: boolean, class = "plan-active" },
 				ui.text { text, truncate = true },
 				ui.spacer(),
 				ui.text { detail, class = "plan-count" },

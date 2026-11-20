@@ -16,6 +16,9 @@ local table_view = use "table"
 
 type State = { filter: string? }
 
+-- A stage of the raise, as the fund provider sends it.
+type Stage = { label: string, value: string, count: number, color: string, hatch: boolean, people: { string }, note: string? }
+
 return mod {
 	region = "main",
 	title = "Overview",
@@ -107,7 +110,7 @@ return mod {
 		-- Cash for the next 13 weeks.
 		local cash = fund.cash
 		local accounts: { Element } = {}
-		for _, account in cash.accounts do
+		for _, account: any in cash.accounts do
 			table.insert(accounts, ui.row {
 				class = "account",
 				width = 22,
@@ -197,7 +200,7 @@ return mod {
 		-- The current raise.
 		local raise = fund.raise
 		local stages: { Element } = {}
-		for _, stage in raise.stages do
+		for _, stage: Stage in raise.stages do
 			local people = {}
 			for _, name in stage.people do
 				table.insert(people, { name = name })

@@ -189,7 +189,7 @@ return mod {
 		-- Web visits: the figure, its weeks as a curve, and its sources.
 		local visits = data.visits
 		local sources: { Element } = {}
-		for index, source in visits.sources do
+		for index, source: any in visits.sources do
 			if index > 1 then
 				table.insert(sources, ui.row { class = "source-rule", height = 1 })
 			end
@@ -216,7 +216,7 @@ return mod {
 
 		-- The hottest deals, and where leads come from.
 		local deals: { Element } = {}
-		for _, deal in data.deals do
+		for _, deal: any in data.deals do
 			table.insert(deals, ui.row {
 				class = "deal",
 				align = "center",
@@ -254,7 +254,7 @@ return mod {
 		}
 
 		local origins: { Element } = {}
-		for _, source in data.sources do
+		for _, source: any in data.sources do
 			table.insert(origins, ui.column {
 				gap = "small",
 				style = { padding = { 8, 0 } },

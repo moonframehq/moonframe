@@ -15,7 +15,7 @@ local function render_text(text: string): { any }
 	return { ui.markdown { text = text } }
 end
 
-local TOOL_STATUS = {
+local TOOL_STATUS: { [string]: { icon: IconName, class: string, spin: boolean? } } = {
 	pending = { icon = "circle-dashed", class = "cinder-reply-faint" },
 	in_progress = { icon = "loader-circle", class = "cinder-reply-faint", spin = true },
 	failed = { icon = "circle-x", class = "cinder-reply-failed" },

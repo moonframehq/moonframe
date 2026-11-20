@@ -46,7 +46,7 @@ local function mark(side: number)
 	}
 end
 
-local function find(desk, id: string?)
+local function find(desk: any, id: string?): any
 	for _, ticket in desk.tickets do
 		if ticket.id == id then
 			return ticket

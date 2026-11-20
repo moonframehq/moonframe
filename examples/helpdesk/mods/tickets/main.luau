@@ -58,14 +58,14 @@ local function matches(ticket, view: string, query: string): boolean
 	return false
 end
 
-local function visible(desk, state: State): { any }
-	local list = {}
+local function visible(desk: any, state: State): { any }
+	local list: { any } = {}
 	for _, ticket in desk.tickets do
 		if matches(ticket, state.view, state.query) then
 			table.insert(list, ticket)
 		end
 	end
-	table.sort(list, function(a, b)
+	table.sort(list, function(a: any, b: any)
 		if state.sort == "oldest" then
 			return a.minutes > b.minutes
 		elseif state.sort == "priority" and RANK[a.priority] ~= RANK[b.priority] then

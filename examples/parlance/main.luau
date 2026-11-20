@@ -29,7 +29,11 @@ local function bar_button(icon: string, tooltip: string, msg: any, off: boolean?
 	}
 end
 
-return mod {
+type State = {
+	left: boolean,
+}
+
+return mod<<State>> {
 	window = { titlebar = "hidden", traffic_lights = { x = 17, y = 15 }, size = { width = 1240, height = 1180 } },
 
 	about = {

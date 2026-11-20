@@ -108,7 +108,7 @@ return component {
 		local found: { Element } = {}
 		local last_kind
 		local headings = { guide = "Guides", lesson = "Lessons", help = "Help articles" }
-		for index, result in results do
+		for index, result: any in results do
 			if result.kind ~= last_kind then
 				last_kind = result.kind
 				table.insert(found, ui.text { headings[result.kind], class = "search-group" })

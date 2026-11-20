@@ -21,7 +21,11 @@ local MENUS: { { title: string, items: { any } } } = {
 	} },
 }
 
-return mod {
+type State = {
+	left: boolean,
+}
+
+return mod<<State>> {
 	window = { titlebar = "hidden", traffic_lights = { x = 18, y = 22 }, size = { width = 1600, height = 1180 } },
 
 	about = {

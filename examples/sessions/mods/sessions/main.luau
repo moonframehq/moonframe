@@ -107,7 +107,7 @@ return mod {
 		local query = string.lower(state.query)
 
 		-- Groups in the order their newest session comes.
-		local groups, order = {}, {}
+		local groups: { [string]: { any } }, order: { string } = {}, {}
 		for _, project in (projects and projects.projects) or {} do
 			local matches = query == "" or string.find(string.lower(project.name), query, 1, true)
 				or string.find(string.lower(project.branch), query, 1, true)

@@ -349,8 +349,8 @@ return mod {
 								height = html.height,
 								ui.browser {
 									id = id,
-									url = if app.dark then html.dark else html.light,
-									navigate = { page = m.id },
+									url = if app.dark then html.dark :: string else html.light :: string,
+									navigate = { page = m.id :: number },
 									class = "rd-web",
 								},
 							},
@@ -411,8 +411,8 @@ return mod {
 				align = "center",
 				hug = true,
 				style = { background = label.color .. "24" },
-				ui.row { width = 6, height = 6, style = { background = label.color, radius = 3 } },
-				ui.text { label.title, size = "small", style = { color = label.color } },
+				ui.row { width = 6, height = 6, style = { background = label.color :: Color, radius = 3 } },
+				ui.text { label.title, size = "small", style = { color = label.color :: Color } },
 			})
 		end
 

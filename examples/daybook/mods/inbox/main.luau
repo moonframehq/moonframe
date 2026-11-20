@@ -94,7 +94,7 @@ return mod {
 			}
 		end
 
-		local overdue, undated, today = {}, {}, {}
+		local overdue: { any }, undated: { any }, today: { any } = {}, {}, {}
 		for _, item in planner.items do
 			if item.kind == "note" then
 				if show_notes then
@@ -110,7 +110,7 @@ return mod {
 				end
 			end
 		end
-		table.sort(today, function(a, b)
+		table.sort(today, function(a: any, b: any)
 			return (a.time or "99") < (b.time or "99")
 		end)
 

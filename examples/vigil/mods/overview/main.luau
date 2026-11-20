@@ -91,7 +91,7 @@ return mod {
 		[".actions-menu"] = { background = "#303030", radius = 14, padding = 6, border = true, border_color = "#ffffff14", shadow = "0 12px 32px #00000080", margin = { 0, 24, 64, 0 } },
 	},
 
-	init = function(previous: State?): State
+	init = function(previous: State?): (State, { Send })
 		local state: State = previous or { page = "overview", range = "1H", tab = "live", actions = false }
 		state.actions = false
 		return state, { { to = "provider:vigil", msg = { range = state.range } } }

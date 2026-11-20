@@ -67,7 +67,7 @@ local function matching(state: State, store: any): { any }
 	end
 	if state.newest then
 		table.sort(list, function(a, b)
-			return a.time > b.time
+			return (a.time :: number) > (b.time :: number)
 		end)
 	end
 	return list

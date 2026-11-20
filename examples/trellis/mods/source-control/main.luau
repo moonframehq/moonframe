@@ -69,7 +69,7 @@ return mod {
 		[".sc-sha"] = { size = "small", font = "mono", color = "accent" },
 	},
 
-	init = function(previous: State?)
+	init = function(previous: State?): (State, ...{ Send })
 		local state: State = previous
 			or { tab = "branch", message = "", folded = {}, changes_open = true, pending = nil, result = nil, made = 0, focus = false }
 		state.pending, state.result, state.focus = nil, nil, false

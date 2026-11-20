@@ -28,7 +28,7 @@ return component {
 		for index, sub in task.subtasks do
 			table.insert(checks, ui.row { align = "center", gap = "small",
 				task_check { state = if sub.done then "done" else "open", msg = { subtask = index } },
-				ui.text { sub.title, strike = sub.done, tone = if sub.done then "muted" else nil, size = "small" },
+				ui.text { sub.title :: string, strike = sub.done :: boolean, tone = if sub.done then "muted" else nil, size = "small" },
 			})
 		end
 		for index, file in task.files do

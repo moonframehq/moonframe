@@ -339,7 +339,7 @@ local function on_reply(state: State, msg: any): (State, { any }?)
 	elseif pending and pending.kind == "start" and msg.chat then
 		switch_thread(state, function()
 			state.selected[pending.path] = msg.chat
-			state.known[msg.chat] = { status = "starting", working = false, cwd = pending.path }
+			state.known[msg.chat] = { status = "starting", working = false, cwd = pending.path :: string }
 		end)
 		-- Only the loose workspace draft belongs to its first chat. A
 		-- draft from an existing chat stays there when another is opened.
@@ -633,9 +633,9 @@ return mod {
 		end
 		table.sort(items, function(a, b)
 			if a.order ~= b.order then
-				return a.order < b.order
+				return (a.order :: number) < (b.order :: number)
 			end
-			return a.seq < b.seq
+			return (a.seq :: number) < (b.seq :: number)
 		end)
 
 		local added = {}
@@ -788,7 +788,7 @@ return mod {
 			table.insert(settings, { key = "mode", value = value, options = choices, selected = modes.current, open = state.menu == "mode", order = 4 })
 		end
 		table.sort(settings, function(a, b)
-			return a.order < b.order
+			return (a.order :: number) < (b.order :: number)
 		end)
 
 		local usage = transcript and transcript.usage

@@ -19,7 +19,7 @@ type State = {
 	messages: { [string]: { any } },
 }
 
-local KNOWLEDGE = {
+local KNOWLEDGE: { { id: string, label: string, icon: string, color: string, on: boolean, connect: boolean? } } = {
 	{ id = "peoplebase", label = "Peoplebase", icon = "user", color = "#4f46e5", on = true },
 	{ id = "drive", label = "Google Drive", icon = "cloud", color = "#1a73e8", on = false, connect = true },
 	{ id = "slack", label = "Slack", icon = "hash", color = "#c2410c", on = true },

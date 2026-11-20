@@ -248,7 +248,7 @@ return mod {
 		end
 
 		local tier_shares, tier_rows: { Element } = {}, {}
-		for _, tier in data.tiers do
+		for _, tier: any in data.tiers do
 			table.insert(tier_shares, { share = tier.share, color = tier.color, label = tier.label })
 			table.insert(tier_rows, ratio_row {
 				label = tier.label,

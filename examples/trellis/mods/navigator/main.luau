@@ -146,7 +146,7 @@ return mod {
 		[".avatar"] = { radius = 7 },
 	},
 
-	init = function(previous: State?)
+	init = function(previous: State?): (State, ...{ Send })
 		local state: State = previous
 			or {
 				selected = nil,

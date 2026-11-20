@@ -236,13 +236,13 @@ return mod {
 			})
 		else
 			local kind = if state.view == "notes" then "note" elseif state.view == "events" then "event" else "task"
-			local open, done = {}, {}
+			local open: { any }, done: { any } = {}, {}
 			for _, item in planner.items do
 				if item.kind == kind then
 					table.insert(if item.state == "done" then done else open, item)
 				end
 			end
-			table.sort(open, function(a, b)
+			table.sort(open, function(a: any, b: any)
 				return (a.date or "~") < (b.date or "~")
 			end)
 			table.insert(body, heading(VIEW_TITLES[state.view] or "Tasks", `{#open} {if kind == "note" then "notes" else "to come"}`))
