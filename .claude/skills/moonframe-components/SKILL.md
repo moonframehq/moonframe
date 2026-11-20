@@ -316,6 +316,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`dot-chart`](#dot-chart) | Data | A daily or weekly count compared with the period before (signups, orders), where the squares' rhythm reads better than smooth bars. For stacked counts by kind use `bar-chart`; for a balance against a floor use `forecast-chart`; for a trend line use `ui.line`. |
 | [`file-card`](#file-card) | Data | Attachments on a task, a comment or a message, in a grid of tiles or a list of rows, while they upload and after. For the area files are dropped on use `dropzone`; for a file in a tree use `tree` with `file-icon`; for a picture to look at closely use `image-viewer`. |
 | [`file-icon`](#file-icon) | Data | Beside a file name in a tree, a tab or a list of changes. For a generic icon use `ui.icon`. |
+| [`flow-diagram`](#flow-diagram) | Data | Explain how the parts of a system talk to each other, and what moves between them now: a request path, a cache miss, a retry, a pipeline. The caller places each node in a grid cell, so the same diagram fits a side panel and a full pane. Pass a growing `time` to move the tokens; leave it out for a still diagram. For a line of commits use `commit-graph`; for a tree use `tree`; for places on a map use `route-map`. |
 | [`forecast-chart`](#forecast-chart) | Data | A balance or capacity projected over weeks or months against a minimum (cash against a floor, stock against a reorder point). For counts per bucket, stacked by kind, use `bar-chart`; for a small trend use `sparkline` or `ui.line`. |
 | [`gantt`](#gantt) | Data | A project's schedule or timeline: when tasks run, how far they are, what waits on what. For events placed in hours use `week-calendar`; for a dated list of events use `timeline`; for a board by status use `kanban-column`. |
 | [`guide-card`](#guide-card) | Data | Cards of reading material or courses the reader works through (guides, docs, tutorials), three or so to a row, each with how far the reader got. For one featured course with actions use `course-card`; for a plain titled box use `card`; for a linked record inside a message use `record-card`. |
@@ -1709,6 +1710,49 @@ local file_icon = use "file-icon"
 
 file_icon { name = "app.go" }
 ```
+
+#### `flow-diagram`
+
+**Flow Diagram.** A small system diagram on a grid: named nodes with an icon and a meter, links between neighbours, a tinted group around nodes, and coloured tokens that travel the links.
+
+**When:** Explain how the parts of a system talk to each other, and what moves between them now: a request path, a cache miss, a retry, a pipeline. The caller places each node in a grid cell, so the same diagram fits a side panel and a full pane. Pass a growing `time` to move the tokens; leave it out for a still diagram. For a line of commits use `commit-graph`; for a tree use `tree`; for places on a map use `route-map`.
+
+| Prop | Meaning |
+| --- | --- |
+| `columns` | the grid's width in cells (default: what the nodes use) |
+| `event` | key of the message a click on a node sends, default "select": { select = id } |
+| `flows` | { path = { ids }, tokens = { tones }, lane? }: one token for each tone, spread along the path. Tokens travel only steps with a link in `links` (either way round), skipping any other step; `lane` (-1, 0, 1) keeps two flows on one link apart |
+| `groups` | { label, nodes = { ids } }: a tinted box around the cells of its nodes, its label at the top right |
+| `height` | pixels (default 120 for each row) |
+| `links` | { from, to, label? }: two nodes in one row or one column (a slanted link is left out); the head points at `to`; `label` shows above a level link and beside an upright one |
+| `nodes` | { id, label, sublabel?, icon?, col, row, tone?, note?, meter? = { text, level?, tone? }, planned? }: `col` and `row` count from 0 (a negative one moves the whole grid over); `tone` is accent \| success \| warning \| danger |
+| `rows` | the grid's height in cells (default: what the nodes use) |
+| `selected` | the id of the node to show as picked |
+| `size` | small \| normal: the most a node takes. In a narrow cell it narrows to fit and cuts its name short (the tooltip shows it whole); where two cards leave no room for a link's head, the link shows as a short line in the gap between them |
+| `speed` | how far a token goes each second, in cells along its path (default 0.55): the same in any grid |
+| `time` | seconds: where the tokens are. The caller owns the clock |
+| `to` | mod to send the click to, if not the drawing one |
+
+**Styles:** `.flow-diagram` `.flow-diagram-cell` `.flow-diagram-fill-accent` `.flow-diagram-fill-danger` `.flow-diagram-fill-plain` `.flow-diagram-fill-success` `.flow-diagram-fill-warning` `.flow-diagram-group` `.flow-diagram-group-label` `.flow-diagram-head` `.flow-diagram-icon` `.flow-diagram-icon-accent` `.flow-diagram-icon-danger` `.flow-diagram-icon-success` `.flow-diagram-icon-warning` `.flow-diagram-label` `.flow-diagram-line` `.flow-diagram-link-label` `.flow-diagram-link-label-side` `.flow-diagram-meter` `.flow-diagram-meter-text` `.flow-diagram-node` `.flow-diagram-node:hover` `.flow-diagram-node:selected` `.flow-diagram-node-accent` `.flow-diagram-node-danger` `.flow-diagram-node-planned` `.flow-diagram-node-success` `.flow-diagram-node-warning` `.flow-diagram-note` `.flow-diagram-plate` `.flow-diagram-plate:selected` `.flow-diagram-plate-flat` `.flow-diagram-sublabel` `.flow-diagram-text-accent` `.flow-diagram-text-danger` `.flow-diagram-text-plain` `.flow-diagram-text-success` `.flow-diagram-text-warning` `.flow-diagram-token` `.flow-diagram-token-accent` `.flow-diagram-token-danger` `.flow-diagram-token-plain` `.flow-diagram-token-success` `.flow-diagram-token-warning` `.flow-diagram-top` `.flow-diagram-track`
+
+```lua
+local flow_diagram = use "flow-diagram"
+
+flow_diagram {
+	nodes = {
+		{ id = "web", label = "Web app", icon = "globe", col = 0, row = 0 },
+		{ id = "api", label = "API", icon = "server", col = 1, row = 0 },
+		{ id = "db", label = "Database", icon = "database", col = 2, row = 0 },
+	},
+	links = { { from = "web", to = "api", label = "HTTPS" }, { from = "api", to = "db" } },
+	flows = { { path = { "web", "api", "db" }, tokens = { "warning", "warning", "danger" } } },
+	time = state.seconds,      -- from a clock the mod owns
+	selected = state.node,
+	event = "node",            -- a click sends { node = id }
+}
+```
+
+A whole mod using it, with state: `app/components/demos/flow-diagram.luau`.
 
 #### `forecast-chart`
 
