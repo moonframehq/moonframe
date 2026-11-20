@@ -2443,7 +2443,7 @@ export type Mod<State> = {
 	-- id = ..., props = ... }`), nil for a mod in its own place. `restored`
 	-- says `previous` was saved by an earlier run, not kept across a reload.
 	-- Returns the state and, as `update` may, a list of `Send`s.
-	init: ((previous: State?, props: any?, restored: boolean) -> (State, ...any))?,
+	init: ((previous: State?, props: any?, restored: boolean) -> (State, ...{ Send }))?,
 	-- Returns nothing to keep the state it changed in place, or the new
 	-- state and optionally a list of `Send`s. Its results are left untyped
 	-- so it may return nothing on some paths; the host checks them. A
