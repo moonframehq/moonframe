@@ -10,6 +10,7 @@ Prints what luau-lsp reports and fails when it reports anything.
     scripts/luau-types.py LUAU_LSP DIR
 """
 
+import hashlib
 import importlib.util
 import pathlib
 import subprocess
@@ -35,6 +36,12 @@ def apps(top: pathlib.Path):
         roots.add(top)
     roots.discard(BUILT_IN)
     return sorted(roots, key=lambda root: len(root.parts), reverse=True)
+
+
+def definitions_path(root: pathlib.Path) -> pathlib.Path:
+    """Keep absolute inputs and ambiguous directory names inside OUT."""
+    digest = hashlib.sha256(str(root.resolve()).encode()).hexdigest()
+    return OUT / f"{digest}.d.luau"
 
 
 def analyze(lsp: str, definitions: pathlib.Path, files) -> str:
@@ -63,7 +70,7 @@ def main() -> int:
     reports = [analyze(lsp, DEFINITIONS, rest)]
     for root, members in sorted(groups.items()):
         found = provider_types.providers([BUILT_IN, root])
-        definitions = OUT / ("-".join(root.parts) + ".d.luau")
+        definitions = definitions_path(root)
         definitions.parent.mkdir(parents=True, exist_ok=True)
         definitions.write_text(provider_types.definitions(text, found, str(DEFINITIONS)))
         reports.append(analyze(lsp, definitions, members))

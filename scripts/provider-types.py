@@ -60,6 +60,32 @@ def declared(folder: pathlib.Path):
     return {name: (generics, body) for name, generics, body in component_types.aliases(source)}
 
 
+# Preserve literals and comments, then distinguish references from field and
+# argument names by the next significant token.
+TOKENS = re.compile(
+    r"--\[(=*)\[.*?\]\1\]|--[^\n]*|"
+    r"\[(=*)\[.*?\]\2\]|"
+    r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|"
+    r"[A-Za-z_]\w*|\s+|.",
+    re.S,
+)
+
+
+def rename_references(body: str, aliases, prefix: str, generics: str) -> str:
+    tokens = [match.group() for match in TOKENS.finditer(body)]
+    significant = [i for i, token in enumerate(tokens)
+                   if not token.isspace() and not token.startswith("--")]
+    # Generic parameters shadow aliases with the same name.
+    parameters = set(re.findall(r"(?:<|,)\s*([A-Za-z_]\w*)", generics))
+    for position, index in enumerate(significant):
+        token = tokens[index]
+        previous = tokens[significant[position - 1]] if position else ""
+        following = tokens[significant[position + 1]] if position + 1 < len(significant) else ""
+        if token in aliases and token not in parameters and following != ":" and previous != ".":
+            tokens[index] = prefix + token
+    return "".join(tokens)
+
+
 def generate(found):
     """The aliases section and the fields section."""
     types, fields, overloads = [], [], []
@@ -68,9 +94,8 @@ def generate(found):
         if "Published" not in aliases:
             raise SystemExit(f"{folder}/types.luau: no `export type Published`")
         prefix = "Provider" + pascal(name)
-        local = re.compile(r"\b(" + "|".join(re.escape(alias) for alias in aliases) + r")\b")
         for alias, (generics, body) in aliases.items():
-            body = local.sub(lambda m: prefix + m.group(1), body)
+            body = rename_references(body, aliases, prefix, generics)
             # A body led by a comment starts on a line of its own.
             space = "\n\t" if body.startswith("--") else " "
             types.append(f"type {prefix}{alias}{generics} ={space}{body}\n")

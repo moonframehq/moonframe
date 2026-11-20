@@ -219,6 +219,7 @@ provider-types:
 # Fail when types/moonframe.d.luau's provider types are out of date, or a
 # provider's published.json does not match its types.luau.
 provider-types-check:
+    python3 -I scripts/test_provider_types.py
     python3 -I scripts/provider-types.py --check
 
 # Type-check the app's Luau against types/moonframe.d.luau in strict mode;
