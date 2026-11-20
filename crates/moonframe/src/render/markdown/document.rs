@@ -6,6 +6,7 @@
 use {
     super::{
         blocks,
+        holding::Holding,
         outline::Outline,
         scrolling::{Applied, Scrolling},
         search, send,
@@ -94,7 +95,14 @@ struct Kept {
     section: Option<usize>,
     tracking: bool,
     scrolling: Scrolling,
+    holding: Holding,
     _observing: Option<Subscription>,
+}
+
+impl AsMut<Holding> for Kept {
+    fn as_mut(&mut self) -> &mut Holding {
+        &mut self.holding
+    }
 }
 
 /// A document, drawn when the window lays it out.
@@ -149,12 +157,15 @@ impl RenderOnce for Document {
             }
             current
         });
+        let scroll = self.markdown.scroll;
+        kept.update(cx, |kept, cx| kept.hold(&text, scroll, &state, window, cx));
         state.update(cx, |state, cx| state.set_text(&text, cx));
         kept.update(cx, |kept, cx| {
             kept.take(&self.markdown, self.colors, &state, window, cx);
             kept.settle(&state, window, cx);
             let rendered = state.read(cx).rendered_text();
-            let waiting = kept.pending.is_some() || kept.scrolling.pending();
+            let waiting =
+                kept.pending.is_some() || kept.scrolling.pending() || kept.holding.waiting();
             if waiting && !kept.revealing && rendered.source() == kept.text {
                 // Schedule from render, rather than the parse observer: the
                 // list will lay out this version before the next frame.
@@ -222,6 +233,7 @@ impl Kept {
             section: None,
             tracking: false,
             scrolling: Scrolling::default(),
+            holding: Holding::default(),
             _observing: None,
         }
     }
@@ -278,6 +290,32 @@ impl Kept {
         }
     }
 
+    /// Notes where the reader is before a scrolling document's text becomes
+    /// `text`, to go back there once it is laid out.
+    fn hold(
+        &mut self,
+        text: &str,
+        scroll: bool,
+        state: &Entity<TextViewState>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !scroll || self.text == text {
+            return;
+        }
+        let list = state.read(cx).list_state().clone();
+        if self.holding.changes(&self.text, text, &list) {
+            let state = state.downgrade();
+            self.holding
+                .read(text.to_owned(), window, cx, move |_, _, cx| {
+                    // Drawn again, the document goes back once it is laid out.
+                    if let Some(state) = state.upgrade() {
+                        state.update(cx, |_, cx| cx.notify());
+                    }
+                });
+        }
+    }
+
     /// Takes a finished outline, and tells the mod if its headings moved.
     fn outlined_as(&mut self, outline: Outline, window: &mut Window, cx: &mut Context<Self>) {
         if outline.headings == self.outline.headings {
@@ -295,6 +333,10 @@ impl Kept {
 
     /// A scrolling document reached top-level block `block`.
     fn scrolled(&mut self, block: usize, window: &mut Window, cx: &mut Context<Self>) {
+        // Until it goes back to the place held, the block is a passing one.
+        if self.holding.waiting() {
+            return;
+        }
         let section = self.outline.section(block);
         if section == self.section {
             return;
@@ -358,6 +400,14 @@ impl Kept {
             kept.update(cx, |kept, cx| {
                 kept.revealing = false;
                 let current = state.read(cx).rendered_text();
+                // Before a reveal, which goes elsewhere if it waits too.
+                if current == rendered
+                    && current.source() == kept.text
+                    && kept.holding.apply(&state, cx)
+                {
+                    // Kept in place, not moved: nothing to tell the mod.
+                    kept.scrolling.note(&state, cx);
+                }
                 // A newer parse or request may have arrived in the meantime.
                 if current == rendered
                     && current.source() == kept.text
