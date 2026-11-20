@@ -201,6 +201,14 @@ providers-examples:
 setup-luau:
     scripts/setup-luau-lsp.sh
 
+# Type each component's `use "name"` in types/moonframe.d.luau from its Props.
+component-types:
+    python3 -I scripts/component-types.py
+
+# Fail when types/moonframe.d.luau's component types are out of date.
+component-types-check:
+    python3 -I scripts/component-types.py --check
+
 # Type-check the app's Luau against types/moonframe.d.luau in strict mode.
 types dir="app":
     #!/usr/bin/env bash
@@ -354,4 +362,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check check-file-size check-sorted lint test rune-check test-sealed-bundles types providers providers-examples check-builtin components-check check-examples patterns-check wasm-guide-check
+ci: format-check check-file-size check-sorted lint test rune-check test-sealed-bundles component-types-check types providers providers-examples check-builtin components-check check-examples patterns-check wasm-guide-check
