@@ -2079,6 +2079,10 @@ type App = {
 	dark: boolean,
 	-- Absent where nothing draws, as in `--check`.
 	renderer: Renderer?,
+	-- The app's name, as its menu bar shows it ("Moonframe", or the
+	-- title of the app running as a profile or of the host app). Absent
+	-- where nothing draws, as in `--check`.
+	title: string?,
 	appearance: Appearance,
 	window: WindowState,
 	-- Every screen, the primary one first.
