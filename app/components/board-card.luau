@@ -26,7 +26,7 @@ type Props = {
 	accept: any,
 }
 
-local TONES = { danger = "danger", warning = "warning", success = "success", accent = "accent" }
+local TONES: { [string]: string } = { danger = "danger", warning = "warning", success = "success", accent = "accent" }
 
 return component {
 	title = "Board Card",

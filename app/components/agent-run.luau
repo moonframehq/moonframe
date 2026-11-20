@@ -35,7 +35,10 @@ type Props = {
 	to: string?,
 }
 
-local STATUS = {
+-- How a status is drawn: its icon, the class tinting it, its words.
+type Look = { icon: string, tone: string, label: string, spin: boolean? }
+
+local STATUS: { [string]: Look } = {
 	starting = { icon = "loader-circle", tone = "agent-run-accent", label = "Starting", spin = true },
 	running = { icon = "loader-circle", tone = "agent-run-accent", label = "Working", spin = true },
 	waiting = { icon = "circle-alert", tone = "agent-run-warning", label = "Needs your answer" },
@@ -45,7 +48,7 @@ local STATUS = {
 	stopped = { icon = "circle-alert", tone = "agent-run-muted", label = "Stopped when the app quit" },
 }
 
-local TOOL_STATUS = {
+local TOOL_STATUS: { [string]: { icon: string, tone: string, spin: boolean? } } = {
 	pending = { icon = "circle-dashed", tone = "agent-run-muted" },
 	in_progress = { icon = "loader-circle", tone = "agent-run-accent", spin = true },
 	completed = { icon = "circle-check", tone = "agent-run-success" },

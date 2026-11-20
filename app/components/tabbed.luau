@@ -67,6 +67,24 @@ type Props = {
 	show: string?,
 }
 
+-- What a tab's content reports. A browser sends its page; a shell sends
+-- `exited`, or an `event` ("folder" with `path`, "title", "started",
+-- "notice" with `body`, "finished" with `status` and `took_ms`).
+type Report = {
+	tab_report: string,
+	exited: boolean?,
+	event: string?,
+	path: string?,
+	title: string?,
+	body: string?,
+	status: number?,
+	took_ms: number?,
+	url: string?,
+	loading: boolean?,
+	back: boolean?,
+	forward: boolean?,
+}
+
 -- A shell that dies as it starts must not be started again without end.
 local MOST_RESPAWNED = 3
 
@@ -198,11 +216,12 @@ end
 
 -- What a tab's shell reported: whether the tab changed, and a notification
 -- to post, if any.
-local function keep_shell_event(state: State, tab: Tab, msg): (boolean, any)
+local function keep_shell_event(state: State, tab: Tab, msg: Report): (boolean, any)
 	local hidden = tab.id ~= state.selected
-	local title
+	local title: string?
 	if msg.event == "folder" then
-		title = folder_name(msg.path)
+		-- A folder event always names its path.
+		title = folder_name(msg.path :: string)
 		tab.folder = title
 	elseif msg.event == "title" and msg.title ~= "" then
 		title = msg.title
@@ -220,7 +239,7 @@ local function keep_shell_event(state: State, tab: Tab, msg): (boolean, any)
 			return false, nil
 		end
 		tab.attention = "done"
-		if msg.took_ms < LONG_COMMAND_MS then
+		if (msg.took_ms :: number) < LONG_COMMAND_MS then
 			return true, nil
 		end
 		local failed = msg.status ~= nil and msg.status ~= 0
@@ -240,7 +259,7 @@ end
 -- Keeps what a tab's content reported: a browser's page and title, what a
 -- shell does. A shell that exited closes its tab. Returns whether anything
 -- changed, and a notification to post, if any.
-local function keep_report(state: State, props: Props, msg): (boolean, any)
+local function keep_report(state: State, props: Props, msg: Report): (boolean, any)
 	local tab = find(state.tabs, "id", msg.tab_report)
 	if not tab then
 		return false, nil

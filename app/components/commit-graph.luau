@@ -59,10 +59,13 @@ end
 
 -- Gives each commit a lane, and each line from a commit to a parent the lane
 -- it runs down. A first parent carries on in its child's lane.
-local function layout(commits: { Commit })
+type Spot = { row: number, lane: number }
+type Edge = { row: number, lane: number, through: number, parent: string }
+
+local function layout(commits: { Commit }): ({ [string]: Spot }, { Edge }, number)
 	local lanes: { [number]: string } = {}
-	local placed: { [string]: { row: number, lane: number } } = {}
-	local edges = {}
+	local placed: { [string]: Spot } = {}
+	local edges: { Edge } = {}
 	local widest = 1
 	for row, commit in commits do
 		local lane = lane_to(lanes, commit.sha) or free_lane(lanes)
@@ -93,7 +96,7 @@ end
 -- The line of one edge: out of the commit into its lane on the next row, down
 -- it, and into the parent's lane on the last row. A parent older than the
 -- commits shown runs off the bottom.
-local function line_of(edge, placed, row_height: number, rows: number): any
+local function line_of(edge: Edge, placed: { [string]: Spot }, row_height: number, rows: number): any
 	local function y_of(row: number): number
 		return (row - 0.5) * row_height
 	end

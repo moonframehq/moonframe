@@ -139,8 +139,9 @@ mention_field {
 		local event = props.event or "mention"
 		local highlighted = math.clamp(props.highlighted or 1, 1, math.max(#found, 1))
 
-		-- What picking someone does: replace the `@query` with `@Name `.
-		local function edit(person: Person)
+		-- What picking someone does: replace the `@query` with `@Name `. An
+		-- `EditMsg`, typed as the `Data` a `msg` takes.
+		local function edit(person: Person): Data
 			local expected = trigger .. (query or "")
 			local insert = person.insert or `{trigger}{person.name} `
 			return { field = props.id, insert = insert, back = #expected, at = props.caret or #value, expect = expected }

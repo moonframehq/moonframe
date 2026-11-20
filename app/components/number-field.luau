@@ -101,7 +101,7 @@ return component {
 		end
 		local live = not props.disabled and props.change ~= nil
 		-- The drag's range: open-ended where no bound is given.
-		local range = {
+		local range: Range = {
 			min = min or -1e12,
 			max = max or 1e12,
 			step = step,

@@ -148,7 +148,7 @@ code_view {
 				class = "code-view-body",
 				height = props.height,
 				grow = props.grow,
-				scroll = scrolls and "both",
+				scroll = if scrolls then "both" else false,
 				table.unpack(rows),
 			}
 		end

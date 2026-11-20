@@ -9,9 +9,26 @@ local avatar = use "avatar"
 
 type Day = { label: string?, month: string?, weekend: boolean?, today: boolean? }
 
+-- A task: its first and last columns (from 1, the last included). A row
+-- with `heading` is a heading over the tasks after it instead, and has
+-- only `count` and `color` besides.
+type Row = {
+	heading: string?,
+	count: number?,
+	id: string,
+	label: string,
+	start: number,
+	finish: number?,
+	progress: number?,
+	color: string?,
+	avatar: string?,
+	done: boolean?,
+	milestone: boolean?,
+}
+
 type Props = {
 	days: { Day },
-	rows: { any },
+	rows: { Row },
 	deps: { any }?,
 	day_width: number?,
 	row_height: number?,
@@ -161,7 +178,7 @@ gantt {
 		local resize = props.resize or "resize"
 		local to = props.to
 		-- A drag's `value` is the whole columns moved since the press.
-		local columns = { min = -100000, max = 100000, value = 0, speed = 1 / dw, step = 1 }
+		local columns: Range = { min = -100000, max = 100000, value = 0, speed = 1 / dw, step = 1 }
 
 		-- The header: months over the days they start, then the days.
 		local months: { Element }, numbers: { Element } = {}, {}

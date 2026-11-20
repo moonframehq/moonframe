@@ -68,7 +68,7 @@ return component {
 	},
 
 	build = function(props: Props)
-		local counts = { passed = 0, failed = 0, pending = 0 }
+		local counts: { [string]: number } = { passed = 0, failed = 0, pending = 0 }
 		local counted = 0
 		for _, check in props.checks do
 			local state = check.state or "pending"

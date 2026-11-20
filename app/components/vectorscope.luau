@@ -51,7 +51,7 @@ return component {
 		local function at(x: number, y: number): (number, number)
 			return middle + x * radius, middle - y * radius
 		end
-		local ring = table.create(RING * 2 + 2)
+		local ring = table.create<<number>>(RING * 2 + 2)
 		for step = 0, RING do
 			local angle = step / RING * 2 * math.pi
 			local x, y = at(math.cos(angle), math.sin(angle))
@@ -64,7 +64,7 @@ return component {
 		local _, bottom = at(0, -1)
 		-- The skin-tone line, 123 degrees round from the blue axis.
 		local skin_x, skin_y = at(-0.54, 0.84)
-		local paths = {
+		local paths: { Polyline } = {
 			{ points = ring, color = "#ffffff33", stroke = 1 },
 			{ points = { left, centre_y, right, centre_y }, color = "#ffffff1f", stroke = 1 },
 			{ points = { centre_x, top, centre_x, bottom }, color = "#ffffff1f", stroke = 1 },

@@ -122,7 +122,7 @@ end
 -- Lanes for events that overlap in one day: each gets { lane, lanes }.
 local function lanes_of(events: { Event }): { [string]: { lane: number, lanes: number } }
 	local sorted = table.clone(events)
-	table.sort(sorted, function(a, b)
+	table.sort(sorted, function(a: Event, b: Event)
 		return a.start < b.start or (a.start == b.start and a.finish > b.finish)
 	end)
 	local out = {}
@@ -330,7 +330,7 @@ local function month_view(props: Props, events: { Event }): any
 		table.insert(by_day[event.day], event)
 	end
 	for _, list in by_day do
-		table.sort(list, function(a, b)
+		table.sort(list, function(a: Event, b: Event)
 			return a.start < b.start
 		end)
 	end

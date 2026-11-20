@@ -237,7 +237,7 @@ return component {
 						table.insert(rows, ui.row { gap = "none", shrink = false, side(line, "old"), side(line, "new", "diff-view-split") })
 						index += 1
 					else
-						local dels, adds = {}, {}
+						local dels: { Line }, adds: { Line } = {}, {}
 						while index <= #lines and lines[index].kind == "del" do
 							table.insert(dels, lines[index])
 							index += 1
@@ -302,7 +302,7 @@ return component {
 				gap = "none",
 				height = if props.height then props.height else nil,
 				grow = props.grow,
-				scroll = scrolls and "both",
+				scroll = if scrolls then "both" else false,
 				table.unpack(rows),
 			},
 		}

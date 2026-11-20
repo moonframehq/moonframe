@@ -55,7 +55,10 @@ type Props = {
 
 local PLACEHOLDER = "What should change? For example:\n• Focus the prompt when I open a session\n• Make deploys faster"
 
-local STATUS = {
+-- How a run's status is drawn: its icon, the class tinting it, its words.
+type Status = { icon: string, class: string, label: string, spin: boolean? }
+
+local STATUS: { [string]: Status } = {
 	starting = { icon = "loader-circle", class = "feedback-running", label = "Starting", spin = true },
 	running = { icon = "loader-circle", class = "feedback-running", label = "Working on it", spin = true },
 	waiting = { icon = "circle-alert", class = "feedback-waiting", label = "Needs your answer" },
@@ -258,7 +261,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 					rows = 2,
 					grow = true,
 					change = { follow_type = first.id },
-					submit = not blank and { follow = first.id } or nil,
+					submit = if not blank then { follow = first.id } else nil,
 					to = to,
 				},
 				ui.button { "Reply", variant = "primary", msg = { follow = first.id }, to = to, disabled = blank },

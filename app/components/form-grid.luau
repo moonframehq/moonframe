@@ -42,7 +42,7 @@ return component {
 		for index, row in props.rows do
 			local control = row.control
 			if typeof(control) == "table" and control.type == nil then
-				control = ui.row { align = "center", gap = "small", table.unpack(control) }
+				control = ui.row { align = "center", gap = "small", table.unpack(control :: { Element }) }
 			end
 			rows[index] = ui.row {
 				align = "start",

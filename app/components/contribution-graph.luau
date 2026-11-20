@@ -29,8 +29,8 @@ type Props = {
 	to: string?,
 }
 
-local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
-local MONTH_NAMES = {
+local MONTHS: { string } = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+local MONTH_NAMES: { string } = {
 	"January",
 	"February",
 	"March",
@@ -44,7 +44,7 @@ local MONTH_NAMES = {
 	"November",
 	"December",
 }
-local WEEKDAYS = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" }
+local WEEKDAYS: { string } = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" }
 
 -- Days since 1970-01-01 for a date, and back (Howard Hinnant's algorithms).
 local function days_from_civil(y: number, m: number, d: number): number
@@ -206,9 +206,9 @@ contribution_graph {
 
 		local columns: { Element } = {}
 		local labels: { Element } = {}
-		local last_month = nil
+		local last_month: number? = nil
 		local label_start = 1
-		local label_text = nil
+		local label_text: string? = nil
 		local function close_label(upto: number)
 			local span = upto - label_start
 			if span > 0 then

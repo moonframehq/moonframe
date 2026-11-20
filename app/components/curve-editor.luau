@@ -95,7 +95,7 @@ local function at(points: { Point }, slope: { number }, x: number): number
 end
 
 local function copy(points: { Point }): { Point }
-	local out = table.create(#points)
+	local out = table.create<<Point>>(#points)
 	for index, point in points do
 		out[index] = { point[1], point[2] }
 	end
@@ -227,7 +227,7 @@ return component {
 		local inner = size - 2 * INSET
 		local points = props.points
 		local slope = slopes(points)
-		local samples = table.create(SAMPLES)
+		local samples = table.create<<number>>(SAMPLES)
 		for index = 1, SAMPLES do
 			samples[index] = math.clamp(at(points, slope, (index - 1) / (SAMPLES - 1)), 0, 1)
 		end
@@ -288,7 +288,7 @@ return component {
 				ui.row {
 					class = "curve-editor-handle",
 					selected = state.dragging == index,
-					style = props.color and { border_color = props.color } or nil,
+					style = if props.color then { border_color = props.color } else nil,
 					float = { left = -HANDLE / 2, top = -HANDLE / 2 },
 					width = HANDLE,
 					height = HANDLE,

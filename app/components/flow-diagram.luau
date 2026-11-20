@@ -412,11 +412,13 @@ flow_diagram {
 		-- A negative cell moves the whole grid over, so every node is inside the box.
 		local min_col, min_row = 0, 0
 		for _, node in props.nodes do
-			min_col, min_row = math.min(min_col, node.col), math.min(min_row, node.row)
+			min_col = math.min(min_col, node.col)
+			min_row = math.min(min_row, node.row)
 		end
 		local cols, rows = props.columns or 1, props.rows or 1
 		for _, node in props.nodes do
-			cols, rows = math.max(cols, node.col - min_col + 1), math.max(rows, node.row - min_row + 1)
+			cols = math.max(cols, node.col - min_col + 1)
+			rows = math.max(rows, node.row - min_row + 1)
 		end
 		local at: { [string]: Point }, kids: { any } = {}, {}
 		for _, node in props.nodes do
@@ -428,8 +430,10 @@ flow_diagram {
 			for _, id in group.nodes do
 				local where = at[id]
 				if where then
-					left, top = math.min(left, where.col), math.min(top, where.row)
-					right, bottom = math.max(right, where.col), math.max(bottom, where.row)
+					left = math.min(left, where.col)
+					top = math.min(top, where.row)
+					right = math.max(right, where.col)
+					bottom = math.max(bottom, where.row)
 				end
 			end
 			if right >= 0 then

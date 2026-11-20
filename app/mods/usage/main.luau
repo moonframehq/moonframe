@@ -216,7 +216,7 @@ local function sheet(usage: any, provider: any)
 			ui.text { entry.name, class = "usage-tab-label" },
 		}
 	end
-	local blocks = if provider then body(provider) else {}
+	local blocks: { Element } = if provider then body(provider) else {}
 	return ui.column {
 		max_height = SHEET_MAX_HEIGHT,
 		scroll = "y",
