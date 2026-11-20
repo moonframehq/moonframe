@@ -160,7 +160,7 @@ impl MoonframeApp {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix, feature = "markdown"))]
 impl MoonframeApp {
     /// Whether the frame drawn last replayed what stood still in it.
     pub(crate) fn replayed_last_frame(&self) -> bool {

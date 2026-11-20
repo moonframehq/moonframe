@@ -100,7 +100,7 @@ impl Cached {
     }
 
     /// Whether the frame drawn last replayed the kept views.
-    #[cfg(test)]
+    #[cfg(all(test, unix, feature = "markdown"))]
     pub(crate) fn replayed(&self) -> bool {
         self.live_frame
     }
