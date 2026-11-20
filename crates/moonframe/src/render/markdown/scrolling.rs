@@ -74,6 +74,12 @@ impl Scrolling {
         Applied::Done
     }
 
+    /// Notes where the document is without telling the mod: a move made
+    /// for the reader, not by them.
+    pub(super) fn note(&mut self, state: &Entity<TextViewState>, cx: &App) {
+        self.seen = Some(seen(state.read(cx).list_state()));
+    }
+
     /// The message to send if the reader moved the document since it was
     /// last seen.
     pub(super) fn moved(&mut self, state: &Entity<TextViewState>, cx: &App) -> Option<Data> {
