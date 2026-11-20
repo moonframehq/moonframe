@@ -78,11 +78,13 @@ impl MoonframeApp {
     }
 
     /// Opens the mod `name` in a window of its own, or raises it; `place`
-    /// outranks where the mod's `window` key puts it.
+    /// outranks where the mod's `window` key puts it, and `size` the size
+    /// it opens at. An open window grows to `size`, never shrinks.
     pub(super) fn show_mod_window(
         &mut self,
         name: &str,
         place: Option<moonframe_core::WindowPlace>,
+        size: Option<(f32, f32)>,
         cx: &mut Context<Self>,
     ) {
         let Some(slot) = self.workspace.slot(name) else {
@@ -96,6 +98,13 @@ impl MoonframeApp {
         let mut sizing = slot.meta().and_then(|meta| meta.window).unwrap_or_default();
         if let Some(place) = place {
             sizing.place = place;
+        }
+        if let Some(size) = size {
+            sizing.size = Some(size);
+            // Never under its smallest, which would refuse to open.
+            sizing.min_size = sizing
+                .min_size
+                .map(|min| (min.0.min(size.0), min.1.min(size.1)));
         }
         if sizing.place != moonframe_core::WindowPlace::default()
             && !self.built_with(name, cfg!(feature = "displays"), "displays")
@@ -122,7 +131,12 @@ impl MoonframeApp {
             match open {
                 Some(_) if crate::background() => {},
                 Some(handle) => {
-                    let _ = handle.update(cx, |_, window, _| window.activate_window());
+                    let _ = handle.update(cx, |_, window, _| {
+                        if let Some(size) = size {
+                            grow(window, size);
+                        }
+                        window.activate_window();
+                    });
                 },
                 None => {
                     if let Some(handle) =
@@ -154,7 +168,9 @@ impl MoonframeApp {
                     Error::new(format!("`app:window`: no mod named `{name}`")),
                 );
             },
-            WindowRequest::Open { name, place, .. } => self.show_mod_window(&name, place, cx),
+            WindowRequest::Open {
+                name, place, size, ..
+            } => self.show_mod_window(&name, place, size, cx),
             WindowRequest::Close(name) => {
                 // After this update: the mod may have asked from its own
                 // window, which is busy until it returns. Resolve its
@@ -177,13 +193,17 @@ impl MoonframeApp {
         window: &Window,
         cx: &mut Context<Self>,
     ) -> (AnyElement, bool) {
+        let id = Some(window.window_handle().window_id());
+        // Inspect Element picks here too, once the pointer comes here.
+        let inspected = self.inspector.in_window(id);
+        let sink = inspected.then(|| self.inspector.sink()).flatten();
         let mut painter = Painter::new(
             &self.workspace,
             &mut self.motion,
             #[cfg(feature = "terminal")]
             &mut self.terminals,
             &self.inputs,
-            None,
+            sink,
             cx.theme(),
         )
         .with_views(&mut self.views)
@@ -191,11 +211,17 @@ impl MoonframeApp {
         let content = painter.window(name, cx);
         let frame = painter.finish();
         let animating = self.after_frame(frame, window, cx);
+        let inspector = if inspected {
+            self.inspector_layers(window.viewport_size(), cx)
+        } else {
+            self.inspector_catcher(id, cx).into_iter().collect()
+        };
         let content = div()
             .relative()
             .size_full()
             .child(content)
             .children(self.problems_layer(cx))
+            .children(inspector)
             .into_any_element();
         (content, animating)
     }
@@ -281,5 +307,15 @@ impl MoonframeApp {
             component.usage
         );
         self.copy(request, cx);
+    }
+}
+
+/// Makes `window` at least `size`, keeping what the user made larger.
+fn grow(window: &mut Window, size: (f32, f32)) {
+    let now = window.viewport_size();
+    let width = f32::from(now.width).max(size.0);
+    let height = f32::from(now.height).max(size.1);
+    if width > f32::from(now.width) || height > f32::from(now.height) {
+        window.resize(gpui_kit::size(px(width), px(height)));
     }
 }

@@ -1027,7 +1027,10 @@ end,
   raises it), as a control's `window = "<mod>"` does, or closes it. `send`
   reaches the mod's `update` (from the asking mod) before its window
   draws, so it opens on a page; a `send` to a mod that does not exist is
-  the sender's error. The mod's `title` titles the window, and its
+  the sender's error. `size = { width, height }` opens it at that size
+  instead of its `window` key's, and grows it to that size if it is
+  already open, never shrinking it (a window that lists more once it has
+  something to list). The mod's `title` titles the window, and its
   `window = { size = { width, height }, min_size = { width, height } }`
   sizes it (both kept within the screen, as the main window's `size` is;
   420x560 and 280x240 when unset; a size takes effect the next time the
@@ -1264,6 +1267,13 @@ Tabs open and close with the `.tabs-tab` rule's transition (see
 time. Run it after `just check`.
 - It catches unknown `ui` functions, wrong token values (`tone = "loud"`),
   and wrong value types before anything runs.
+- Component calls are typed too: `use "stat-tile"` returns a function of
+  the component's own `type Props`, so `stat_tile { value = 42 }` fails
+  (`value` is a string, `label` is missing). The records inside a list prop
+  are not checked yet. `just component-types` writes these into
+  `types/moonframe.d.luau` from `app/components`; run it after changing a
+  component's `Props`, or `just ci` fails. A name with no built-in
+  component takes any props.
 - It does not catch misspelled keys (`lable`), because Luau allows extra
   fields in a table literal. `just check` catches those.
 - Annotations are optional. Add them where they help, e.g.

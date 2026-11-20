@@ -183,6 +183,8 @@ jobs:
         run: just check-sorted
       - name: Check Cargo.lock is in sync
         run: just lockfile-check
+      - name: Check the component types are current
+        run: just component-types-check
       - name: Type-check the app's Luau
         run: just types
       - name: Type-check the example apps' Luau

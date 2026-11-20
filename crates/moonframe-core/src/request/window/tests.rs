@@ -102,6 +102,7 @@ fn update_opens_raises_and_closes_a_mods_window() {
         name: "settings".to_owned(),
         send: None,
         place: None,
+        size: None,
     };
     assert_eq!(workspace.take_requests(), [
         ("asker".to_owned(), Request::Window(open.clone())),
@@ -134,6 +135,7 @@ fn a_window_can_ask_for_a_screen_and_to_fill_it() {
                 display: Some(Display::External),
                 fullscreen: true,
             }),
+            size: None,
         })
     )]);
     ask(
@@ -144,6 +146,41 @@ fn a_window_can_ask_for_a_screen_and_to_fill_it() {
         ]),
     );
     assert!(error(&workspace).contains("`display` is"));
+}
+
+#[test]
+fn a_window_can_ask_for_a_size() {
+    let (_dir, mut workspace) = workspace();
+    let size = |width: i64, height: i64| {
+        map(&[
+            ("width", Data::Integer(width)),
+            ("height", Data::Integer(height)),
+        ])
+    };
+    ask(
+        &mut workspace,
+        map(&[("open", Data::from("settings")), ("size", size(760, 460))]),
+    );
+    assert_eq!(error(&workspace), "");
+    assert_eq!(workspace.take_requests(), [(
+        "asker".to_owned(),
+        Request::Window(WindowRequest::Open {
+            name: "settings".to_owned(),
+            send: None,
+            place: None,
+            size: Some((760., 460.)),
+        })
+    )]);
+    ask(
+        &mut workspace,
+        map(&[("open", Data::from("settings")), ("size", size(760, 10))]),
+    );
+    assert!(error(&workspace).contains("`size` is"));
+    ask(
+        &mut workspace,
+        map(&[("close", Data::from("settings")), ("size", size(760, 460))]),
+    );
+    assert!(error(&workspace).contains("go with `open`"));
 }
 
 #[test]
@@ -165,6 +202,7 @@ fn what_a_window_opens_with_reaches_its_mod_first() {
             name: "settings".to_owned(),
             send: Some(send),
             place: None,
+            size: None,
         })
     )]);
 }
@@ -219,7 +257,11 @@ fn a_bad_window_request_is_the_senders_error() {
         ),
         (
             map(&[("open", Data::from("a")), ("size", Data::Integer(3))]),
-            "unknown key `size`",
+            "`size` is",
+        ),
+        (
+            map(&[("open", Data::from("a")), ("width", Data::Integer(3))]),
+            "unknown key `width`",
         ),
     ] {
         ask(&mut workspace, wrong);

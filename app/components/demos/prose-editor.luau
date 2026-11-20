@@ -14,10 +14,10 @@ Markdown takes its shape as it is typed: *emphasis*, **strong**, `code` and [lin
 > Quotes lean back a little.]]
 
 type State = {
-	dim: string?,
+	dim: ("sentence" | "paragraph")?,
 	typewriter: boolean,
 	text: string,
-	show: string,
+	show: "words" | "characters" | "sentences" | "reading",
 }
 
 return mod<<State>> {

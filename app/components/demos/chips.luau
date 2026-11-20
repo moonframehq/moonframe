@@ -26,9 +26,9 @@ return mod<<State>> {
 	end,
 
 	view = function(state)
-		local selected, shown: { Element } = {}, {}
+		local selected: { string }, shown: { Element } = {}, {}
 		for id in state.on do
-			table.insert(selected, id)
+			table.insert(selected, id :: string)
 		end
 		local counts: { [string]: number } = { open = 0, mine = 0, agent = 0, draft = 0, failing = 0 }
 		for _, pr in PRS do
