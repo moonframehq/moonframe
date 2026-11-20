@@ -2284,9 +2284,11 @@ type EditMsg = {
 -- What `{ to = "app:window", msg = ... }` asks: a mod's name opens that
 -- mod in a window of its own (or raises it), as a control's `window` does;
 -- `{ open = "<mod>", send = <msg> }` first delivers `send` to its `update`,
--- so it opens on a page; `{ close = "<mod>" }` closes it. Any mod may ask
--- for any mod's window; never the shell's.
-type WindowMsg = string | { open: string, send: Data? } | { close: string }
+-- so it opens on a page; `size` opens it at that size over its `window`
+-- key's, and grows it to that size if it is open (never shrinking it);
+-- `{ close = "<mod>" }` closes it. Any mod may ask for any mod's window;
+-- never the shell's.
+type WindowMsg = string | { open: string, send: Data?, size: { width: number, height: number }? } | { close: string }
 
 -- What the Developer tools (mods/devtools, and only it) ask with
 -- `{ to = "app:devtools", msg = ... }`: where they show; a Luau file of the

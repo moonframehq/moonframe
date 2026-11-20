@@ -77,7 +77,7 @@ impl MoonframeApp {
             self.window_request(DEVTOOLS, WindowRequest::Close(DEVTOOLS.to_owned()), cx);
         }
         if place == DevtoolsPlace::Window {
-            self.show_mod_window(DEVTOOLS, None, cx);
+            self.show_mod_window(DEVTOOLS, None, None, cx);
         }
         self.tell_place();
         if place != DevtoolsPlace::Closed

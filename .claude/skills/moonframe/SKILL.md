@@ -1027,7 +1027,10 @@ end,
   raises it), as a control's `window = "<mod>"` does, or closes it. `send`
   reaches the mod's `update` (from the asking mod) before its window
   draws, so it opens on a page; a `send` to a mod that does not exist is
-  the sender's error. The mod's `title` titles the window, and its
+  the sender's error. `size = { width, height }` opens it at that size
+  instead of its `window` key's, and grows it to that size if it is
+  already open, never shrinking it (a window that lists more once it has
+  something to list). The mod's `title` titles the window, and its
   `window = { size = { width, height }, min_size = { width, height } }`
   sizes it (both kept within the screen, as the main window's `size` is;
   420x560 and 280x240 when unset; a size takes effect the next time the

@@ -576,7 +576,7 @@ impl MoonframeApp {
         if let Action::Window(name) = action {
             // A preview opens nothing.
             if !from.starts_with(moonframe_core::DEMO) {
-                self.show_mod_window(name, None, cx);
+                self.show_mod_window(name, None, None, cx);
             }
             return;
         }
