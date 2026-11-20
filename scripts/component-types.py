@@ -37,8 +37,11 @@ def aliases(source: str):
             elif char in "})>":
                 depth -= 1
             elif char == "\n" and depth == 0:
-                # A union or intersection may go on over more lines.
-                if not source[at + 1 :].lstrip(" \t").startswith(("|", "&")):
+                # A union or intersection may go on over more lines, and
+                # comments may come before or between its members.
+                ahead = re.sub(r"^(?:[ \t]*(?:--[^\n]*)?\n)*", "", source[at + 1 :])
+                started = strip_comments(source[match.end() : at]).strip()
+                if started and not ahead.lstrip(" \t").startswith(("|", "&")):
                     break
             at += 1
         yield match.group(1), match.group(2) or "", source[match.end() : at].strip()

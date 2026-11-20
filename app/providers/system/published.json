@@ -1,0 +1,9 @@
+{
+  "cpu": 0.12,
+  "cpu_history": [0.1, 0.14, 0.12],
+  "memory": 0.61,
+  "memory_used": 10485760000,
+  "memory_total": 17179869184,
+  "received": 2048,
+  "transmitted": 512
+}
