@@ -67,7 +67,7 @@ return mod {
 		[".side-user"] = { padding = { 10, 4 }, gap = 10 },
 	},
 
-	init = function(previous: State?): State
+	init = function(previous: State?): (State, { Send })
 		local state = previous or { selected = "pipeline" }
 		-- Start the shell and the top bar on the page last shown.
 		return state, { { to = "topic:tally/page", msg = if PAGES[state.selected] then state.selected else "pipeline" } }
@@ -83,7 +83,7 @@ return mod {
 	view = function(state: State, app)
 		local deals = app.deals
 		local window = app.window
-		local rows = {}
+		local rows: { Element } = {}
 		for _, section in SECTIONS do
 			table.insert(rows, ui.text { string.upper(section.title), class = "side-heading" })
 			for _, item in section.items do

@@ -57,7 +57,7 @@ return component {
 		local width = props.width or 520
 		local height = 34
 		local scale = width / props.total
-		local parts = {}
+		local parts: { Element } = {}
 		local used = 0
 		for _, segment in props.segments do
 			local color = segment.color or TONES[segment.tone or "accent"] or "accent"
@@ -82,11 +82,11 @@ return component {
 		end
 		local marker = props.marker
 		local at: number = if marker then math.min(width - 1, marker.value * scale) else 0
-		local ticks = {}
+		local ticks: { Element } = {}
 		for _ = 0, props.ticks or 40 do
 			table.insert(ticks, ui.row { class = "progress-stack-tick", width = 1, height = 4 })
 		end
-		local labels = {}
+		local labels: { Element } = {}
 		local given: { string } = props.labels or {}
 		for _, label in given do
 			table.insert(labels, ui.text { label, class = "progress-stack-label" })

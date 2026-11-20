@@ -117,7 +117,7 @@ return mod {
 			ui.button { "Add subscribers", icon = "plus", class = "page-primary", msg = "add" },
 		}
 
-		local kpis = {}
+		local kpis: { Element } = {}
 		for index, kpi in data.kpis do
 			table.insert(kpis, ui.row {
 				class = if index > 1 then "kpi-split" else nil,
@@ -181,7 +181,7 @@ return mod {
 			dot_chart { columns = columns, max = growth.max, rows = 8, ticks = growth.ticks, labels = growth.labels },
 		}
 
-		local sources = {}
+		local sources: { Element } = {}
 		for index, source in data.sources do
 			if index > 1 then
 				table.insert(sources, ui.row { class = "row-rule", height = 1 })
@@ -226,7 +226,7 @@ return mod {
 			}
 		end
 
-		local places = {}
+		local places: { Element } = {}
 		for _, place in data.locations do
 			table.insert(places, ratio_row {
 				label = place.name,
@@ -236,7 +236,7 @@ return mod {
 			})
 		end
 
-		local device_shares, device_rows = {}, {}
+		local device_shares, device_rows: { Element } = {}, {}
 		for _, device in data.devices.rows do
 			table.insert(device_shares, { share = device.share, color = device.color, label = device.label })
 			table.insert(device_rows, ratio_row {
@@ -247,8 +247,8 @@ return mod {
 			})
 		end
 
-		local tier_shares, tier_rows = {}, {}
-		for _, tier in data.tiers do
+		local tier_shares, tier_rows: { Element } = {}, {}
+		for _, tier: any in data.tiers do
 			table.insert(tier_shares, { share = tier.share, color = tier.color, label = tier.label })
 			table.insert(tier_rows, ratio_row {
 				label = tier.label,

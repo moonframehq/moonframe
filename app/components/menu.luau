@@ -90,7 +90,7 @@ local function draw(props: Props)
 		end
 	end
 
-	local rows = {}
+	local rows: { Element } = {}
 	local scroll_to = nil
 	local scrolling = props.max_height ~= nil
 	for index, entry in props.items do
@@ -169,7 +169,7 @@ local function draw(props: Props)
 	}
 end
 
-return component {
+return component<<Props>> {
 	title = "Menu",
 	category = "Overlays",
 	icon = "menu",

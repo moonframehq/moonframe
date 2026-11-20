@@ -11,7 +11,13 @@ local OPENED = {
 	report = "Opening a new issue…",
 }
 
-return mod {
+type State = {
+	open: boolean,
+	inline: boolean,
+	note: string,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = true, inline = false, note = "" }
 	end,

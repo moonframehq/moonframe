@@ -18,7 +18,13 @@ local COLUMNS: { any } = {
 	{ key = "source", title = "Source", icon = "link" },
 }
 
-return mod {
+type State = {
+	written: number,
+	-- The cell clicked, as the spreadsheet sends it.
+	picked: { row: number, key: string }?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { written = 3, picked = nil }
 	end,

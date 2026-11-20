@@ -282,7 +282,7 @@ return mod {
 			ui.column { max_width = 600, gap = "none", ui.text { service.description, class = "description" } },
 		}
 
-		local tab_items = {}
+		local tab_items: { Element } = {}
 		for index, id in TABS do
 			table.insert(tab_items, ui.row {
 				class = if index == #TABS then { "tab", "tab-last" } else "tab",
@@ -300,7 +300,7 @@ return mod {
 		end
 
 		local function kpis(cells: { { label: string, value: string, note: string } }): any
-			local items = {}
+			local items: { Element } = {}
 			for index, cell in cells do
 				table.insert(items, ui.column {
 					class = if index == #cells then { "kpi", "kpi-last" } else "kpi",
@@ -368,7 +368,7 @@ return mod {
 
 		local body: { any }
 		if state.tab == "resource" then
-			local panels = {}
+			local panels: { Element } = {}
 			for index, r in RESOURCES do
 				local res = resources[r.key]
 				local limit_box = ui.row {
@@ -419,7 +419,7 @@ return mod {
 				}, { width = 662, height = 180 }),
 			}
 
-			local alert_rows = {}
+			local alert_rows: { Element } = {}
 			for index, alert in state.alerts do
 				local value = nil
 				if alert.metric == "p95" then
@@ -464,7 +464,7 @@ return mod {
 				ui.row { gap = "large", align = "stretch", usage, alerts },
 			}
 		elseif state.tab == "overview" then
-			local deploys = {}
+			local deploys: { Element } = {}
 			for _, deploy in service.deploys do
 				table.insert(deploys, ui.row {
 					class = "list-row",
@@ -475,7 +475,7 @@ return mod {
 					ui.text { `{deploy.who} · {deploy.when}`, class = "muted-small", wrap = false },
 				})
 			end
-			local details = {}
+			local details: { Element } = {}
 			for _, pair in {
 				{ "Regions", service.regions },
 				{ "Version", service.version },

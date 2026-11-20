@@ -10,7 +10,12 @@ local VIEWS = {
 	{ id = "usage", icon = "chart-column", tooltip = "Usage" },
 }
 
-return mod {
+type State = {
+	selected: string,
+	counts: { [string]: number },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { selected = "terminals", counts = { pulls = 3, issues = 1, agents = 2 } }
 	end,

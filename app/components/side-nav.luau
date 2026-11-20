@@ -384,7 +384,7 @@ side_nav {
 		end
 		local foot: any = nil
 		if props.footer and #props.footer > 0 then
-			local rows = {}
+			local rows: { Element } = {}
 			for _, item in props.footer do
 				table.insert(rows, item_row(item))
 			end

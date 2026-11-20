@@ -16,6 +16,9 @@ local table_view = use "table"
 
 type State = { filter: string? }
 
+-- A stage of the raise, as the fund provider sends it.
+type Stage = { label: string, value: string, count: number, color: string, hatch: boolean, people: { string }, note: string? }
+
 return mod {
 	region = "main",
 	title = "Overview",
@@ -106,8 +109,8 @@ return mod {
 
 		-- Cash for the next 13 weeks.
 		local cash = fund.cash
-		local accounts = {}
-		for _, account in cash.accounts do
+		local accounts: { Element } = {}
+		for _, account: any in cash.accounts do
 			table.insert(accounts, ui.row {
 				class = "account",
 				width = 22,
@@ -196,8 +199,8 @@ return mod {
 
 		-- The current raise.
 		local raise = fund.raise
-		local stages = {}
-		for _, stage in raise.stages do
+		local stages: { Element } = {}
+		for _, stage: Stage in raise.stages do
 			local people = {}
 			for _, name in stage.people do
 				table.insert(people, { name = name })
@@ -242,9 +245,9 @@ return mod {
 		}
 
 		-- The funds.
-		local rows = {}
+		local rows: { { [string]: any } } = {}
 		for index, row in fund.funds.rows do
-			table.insert(rows, {
+			rows[#rows + 1] = {
 				id = tostring(index),
 				fund = ui.row {
 					align = "center",
@@ -257,7 +260,7 @@ return mod {
 				dpi = row.dpi,
 				irr = row.irr,
 				curve = ui.line { points = row.curve, baseline = 0, area = true, dots = "last", width = 104, height = 34, min = -1.4, max = 1.0, class = "fund-curve" },
-			})
+			}
 		end
 		local funds_card = dashboard_card {
 			title = "Funds",

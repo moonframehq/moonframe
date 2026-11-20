@@ -77,7 +77,7 @@ course_card {
 
 	build = function(props: Props)
 		local bar = props.bar or 240
-		local buttons = {}
+		local buttons: { Element } = {}
 		local primary = props.primary
 		if primary then
 			table.insert(buttons, ui.row {

@@ -25,7 +25,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local links = {}
+		local links: { Element } = {}
 		for _, page in PAGES do
 			table.insert(links, ui.item { page, selected = page == state.history[state.at], msg = { visit = page } })
 		end

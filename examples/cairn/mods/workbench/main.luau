@@ -20,7 +20,7 @@ type State = {
 	current: string?,
 	folder: string?,
 	picked: string?,
-	folded: { [string]: boolean },
+	folded: { [string]: boolean? },
 	-- Sessions whose terminal is open.
 	shells: { [string]: boolean },
 	adding: boolean,
@@ -37,7 +37,7 @@ local function current_session(list: { any }, id: string?): any
 end
 
 -- The projects provider's open project, when it is the session's folder.
-local function project(app, folder: string?): any
+local function project(app: App, folder: string?): any
 	local current = app.projects and app.projects.current
 	if current and folder and current.path == folder then
 		return current

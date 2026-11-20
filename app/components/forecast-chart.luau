@@ -78,7 +78,7 @@ return component {
 		local floor = props.floor or 0
 		local top_room = 44
 		local scale = height / props.max
-		local columns = {}
+		local columns: { Element } = {}
 		for index, bar in props.bars do
 			local value = math.max(0, math.min(bar.value, props.max))
 			local held = math.min(value, floor)
@@ -108,7 +108,7 @@ return component {
 				held > 0 and ui.hatch { class = "forecast-held", width = props.bar or 28, height = held * scale, gap = 5 },
 			})
 		end
-		local labels = {}
+		local labels: { Element } = {}
 		for _, bar in props.bars do
 			local class = { "forecast-label" }
 			if bar.current then
@@ -118,7 +118,7 @@ return component {
 			end
 			table.insert(labels, ui.row { grow = true, justify = "center", ui.text { string.upper(bar.label), class = class, wrap = false } })
 		end
-		local ticks = {}
+		local ticks: { Element } = {}
 		local given: { string } = props.ticks or {}
 		for _, tick in given do
 			table.insert(ticks, ui.text { tick, class = "forecast-tick" })

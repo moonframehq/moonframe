@@ -60,9 +60,9 @@ return component {
 		local size = props.size or 13
 		local color = props.color or "accent"
 		local shade = props.shade or "muted-foreground/12"
-		local columns = {}
+		local columns: { Element } = {}
 		for _, column in props.columns do
-			local squares = {}
+			local squares: { Element } = {}
 			-- Top row first, so a column grows from the bottom.
 			for row = rows, 1, -1 do
 				local floor = (row - 1) * step
@@ -87,12 +87,12 @@ return component {
 				table.unpack(squares),
 			})
 		end
-		local ticks = {}
+		local ticks: { Element } = {}
 		local tick_list: { string } = props.ticks or {}
 		for _, tick in tick_list do
 			table.insert(ticks, ui.text { tick, class = "dot-chart-tick" })
 		end
-		local labels = {}
+		local labels: { Element } = {}
 		local label_list: { string } = props.labels or {}
 		for _, label in label_list do
 			table.insert(labels, ui.text { label, class = "dot-chart-label" })

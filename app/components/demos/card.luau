@@ -4,7 +4,13 @@ local card = use "card"
 
 local CANDIDATES = { "fix/rounding", "chore/deps", "feat/export-csv", "docs/api" }
 
-return mod {
+type State = {
+	worktrees: { string },
+	selected: string,
+	next: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { worktrees = { "main", "feat/multi-currency" }, selected = "main", next = 1 }
 	end,

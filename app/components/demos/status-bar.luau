@@ -5,7 +5,15 @@ local switch = use "switch"
 
 local BRANCHES = { "main", "feat/multi-currency", "fix/rounding" }
 
-return mod {
+type State = {
+	branch: number,
+	blocked: number,
+	dark: boolean,
+	separators: boolean,
+	shortcuts: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { branch = 2, blocked = 1, dark = true, separators = false, shortcuts = false }
 	end,

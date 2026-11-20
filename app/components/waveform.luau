@@ -58,7 +58,7 @@ return component {
 	build = function(props: Props)
 		local width = props.width or 320
 		local height = props.height or 140
-		local paths = {}
+		local paths: { Polyline } = {}
 		local lines: { number } = props.lines or LINES
 		for _, level in lines do
 			local y = (1 - level) * (height - 1)
@@ -77,7 +77,7 @@ return component {
 				-- As wide as a column's share, so that columns meet, within
 				-- what `ui.paths` takes.
 				local stroke = math.clamp(span / math.max(columns, 1), 1, 8)
-				local points = {}
+				local points: { number } = {}
 				for column = 1, columns do
 					local x = left + (column - 0.5) * span / columns
 					local top = (1 - math.clamp(band.high[column] or 0, 0, 1)) * height

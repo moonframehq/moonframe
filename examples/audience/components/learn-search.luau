@@ -105,10 +105,10 @@ return component {
 		local hi = math.clamp(state.hi, 1, math.max(#results, 1))
 		local open_msg = if results[hi] then { open = open_result(results[hi], data) } else "search-close"
 
-		local found = {}
+		local found: { Element } = {}
 		local last_kind
 		local headings = { guide = "Guides", lesson = "Lessons", help = "Help articles" }
-		for index, result in results do
+		for index, result: any in results do
 			if result.kind ~= last_kind then
 				last_kind = result.kind
 				table.insert(found, ui.text { headings[result.kind], class = "search-group" })

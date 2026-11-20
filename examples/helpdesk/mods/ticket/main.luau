@@ -46,7 +46,7 @@ local function mark(side: number)
 	}
 end
 
-local function find(desk, id: string?)
+local function find(desk: any, id: string?): any
 	for _, ticket in desk.tickets do
 		if ticket.id == id then
 			return ticket
@@ -245,7 +245,7 @@ return mod {
 		}
 
 		-- Chips and watchers.
-		local faces = {}
+		local faces: { Element } = {}
 		for index, name in ticket.watchers do
 			table.insert(faces, ui.row {
 				class = "face",
@@ -287,7 +287,7 @@ return mod {
 		end
 
 		-- SLA clocks.
-		local clocks = {}
+		local clocks: { Element } = {}
 		for _, clock in ticket.sla do
 			local met = clock.left == "Met"
 			local used = math.clamp(clock.used or 0, 0, 1)
@@ -360,7 +360,7 @@ return mod {
 		local check = ticket.check
 		local card = nil
 		if check then
-			local steps = {}
+			local steps: { Element } = {}
 			for _, step in check.steps do
 				local icon, note, tone
 				if step.state == "done" then
@@ -469,7 +469,7 @@ return mod {
 				},
 			}
 		end
-		local messages = {}
+		local messages: { Element } = {}
 		local earlier = ticket.earlier or {}
 		if state.earlier then
 			for _, entry in earlier do

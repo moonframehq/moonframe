@@ -81,7 +81,7 @@ return component {
 			keys.tab = { complete = completions[math.clamp(at, 1, #completions)].insert }
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		for index, completion in completions do
 			table.insert(rows, ui.row { class = "completion", align = "center", selected = index == (props.highlighted or 1),
 				msg = { complete = completion.insert },
@@ -92,7 +92,7 @@ return component {
 			})
 		end
 
-		local chips = {}
+		local chips: { Element } = {}
 		for _, chip in props.context or {} do
 			table.insert(chips, ui.row { class = "composer-chip", align = "center", hug = true,
 				ui.icon { name = "square-terminal", size = "small" },
@@ -103,12 +103,12 @@ return component {
 		for _, queued in props.queued or {} do
 			table.insert(chips, ui.row { class = "composer-chip", align = "center", hug = true,
 				ui.icon { name = "history", size = "small" },
-				ui.text { `Queued: {queued.text}`, class = "composer-queued", truncate = true, max_width = 320 },
+				ui.row { max_width = 320, ui.text { `Queued: {queued.text}`, class = "composer-queued", truncate = true } },
 				ui.row { class = "composer-chip-x", msg = { unqueue = queued.id }, tooltip = "Don't send it", ui.icon { name = "close", size = "small" } },
 			})
 		end
 
-		local settings = {}
+		local settings: { Element } = {}
 		for _, setting in props.settings or {} do
 			table.insert(settings, dropdown {
 				open = setting.open,

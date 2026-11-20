@@ -3,7 +3,17 @@
 local sidebar = use "sidebar"
 local status_dot = use "status-dot"
 
-local function row(space, selected: boolean)
+type Space = { id: string, name: string, branch: string, status: string }
+
+type State = {
+	selected: string,
+	folded: { [string]: boolean },
+	update_ready: boolean,
+	spaces: { Space },
+	agents: { Space },
+}
+
+local function row(space: Space, selected: boolean)
 	return ui.row {
 		class = "sidebar-example-row",
 		selected = selected,
@@ -19,7 +29,7 @@ local function row(space, selected: boolean)
 	}
 end
 
-return mod {
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -59,7 +69,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local spaces, agents = {}, {}
+		local spaces: { Element }, agents: { Element } = {}, {}
 		for i, space in state.spaces do
 			spaces[i] = row(space, space.id == state.selected)
 		end

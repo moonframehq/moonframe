@@ -41,7 +41,7 @@ return component {
 		local data = props.data
 
 		-- Upcoming live sessions, each with Register and its card.
-		local sessions = {}
+		local sessions: { Element } = {}
 		for index, session in data.sessions do
 			if index > 1 then
 				table.insert(sessions, ui.row { class = "rule", height = 1 })

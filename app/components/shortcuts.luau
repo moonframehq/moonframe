@@ -134,7 +134,7 @@ return component {
 			sizes[target] += #rows + 2
 		end
 
-		local cols = {}
+		local cols: { Element } = {}
 		for index, bucket in buckets do
 			cols[index] = ui.column { class = "shortcuts-column", grow = true, table.unpack(bucket) }
 		end

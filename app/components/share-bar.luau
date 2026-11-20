@@ -42,7 +42,7 @@ return component {
 			total += share.share
 		end
 		local room = width - 3 * math.max(0, #props.shares - 1)
-		local parts = {}
+		local parts: { Element } = {}
 		for _, share in props.shares do
 			table.insert(parts, ui.row {
 				class = "share-bar-part",

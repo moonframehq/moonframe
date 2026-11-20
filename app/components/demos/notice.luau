@@ -3,7 +3,14 @@
 local notice = use "notice"
 local segmented = use "segmented"
 
-return mod {
+type State = {
+	shown: boolean,
+	expanded: boolean,
+	tone: string,
+	opened: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { shown = true, expanded = false, tone = "warning", opened = false }
 	end,

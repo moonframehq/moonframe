@@ -148,7 +148,7 @@ return mod {
 		local code = state.mode == "code"
 
 		-- New and Search.
-		local nav = {}
+		local nav: { Element } = {}
 		table.insert(nav, ui.row {
 			class = "em-row em-new",
 			align = "center",
@@ -187,7 +187,7 @@ return mod {
 		end
 
 		-- The sessions by repository, or the chats.
-		local rows = {}
+		local rows: { Element } = {}
 		local first = true
 		if not code then
 			table.insert(rows, ui.text { "Chats are not in Cinder yet. Code mode runs an agent in a folder.", class = "em-empty", wrap = true })

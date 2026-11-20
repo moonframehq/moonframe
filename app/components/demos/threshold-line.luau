@@ -4,13 +4,18 @@ local threshold_line = use "threshold-line"
 
 local HISTORY = { 1.4, 1.2, 0.9, 0.85, 0.8, 1.1, 1.05, 1.15, 1.3, 1.7 }
 
-return mod {
+type State = {
+	values: { number },
+	seed: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { values = table.clone(HISTORY), seed = 11 }
 	end,
 
 	update = function(state, msg)
-		local value
+		local value: number?
 		if msg == "sample" then
 			-- A small pseudo-random walk, so the demo needs no clock.
 			state.seed = (state.seed * 1103515245 + 12345) % 2147483648

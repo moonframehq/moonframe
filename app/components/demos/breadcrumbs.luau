@@ -51,7 +51,7 @@ return mod {
 		if state.level == 3 then
 			body = ui.text { `Showing {mr.id}: {mr.title}`, tone = "muted" }
 		elseif state.level == 2 then
-			local rows = {}
+			local rows: { Element } = {}
 			for i, m in MRS do
 				rows[i] = ui.item { `{m.id} {m.title}`, msg = { open = i } }
 			end

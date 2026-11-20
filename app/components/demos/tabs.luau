@@ -10,7 +10,17 @@ local NEW: { any } = {
 	{ label = "TODO.md", icon = "file" },
 }
 
-return mod {
+type Tab = { id: string, label: string, icon: string, status: string?, badge: number? }
+
+type State = {
+	variant: string,
+	selected: string?,
+	next: number,
+	menu: string?,
+	tabs: { Tab },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {

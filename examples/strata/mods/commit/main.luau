@@ -138,7 +138,7 @@ return mod {
 			-- Another commit: its first file opens.
 			local first = commit and commit.files and commit.files[1]
 			local file = first and file_of(first)
-			return state, open_file(state, file and file.path)
+			return state, open_file(state, if file then file.path else nil)
 		elseif msg.toggle then
 			return state, open_file(state, if msg.toggle == state.open then nil else msg.toggle)
 		elseif msg.switch then

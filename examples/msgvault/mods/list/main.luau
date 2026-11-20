@@ -123,7 +123,7 @@ return mod {
 								msg = { file = f.id },
 								to = "provider:vault",
 								if f.thumb
-									then ui.image { src = f.thumb, width = 40, height = 40, fit = "cover", class = "fl-thumb" }
+									then ui.image { src = f.thumb :: string, width = 40, height = 40, fit = "cover", class = "fl-thumb" }
 									else ui.row {
 										class = "fl-tile",
 										width = 40,
@@ -209,13 +209,13 @@ return mod {
 				row = function(i)
 					local m = rows[i]
 					local on = m.id == selected
-					local chips = {}
+					local chips: { Element } = {}
 					for _, chip in m.chips do
 						table.insert(chips, ui.row {
 							class = "chip",
 							shrink = false,
 							style = { background = chip.color .. "24" },
-							ui.text { chip.title, size = "small", style = { color = chip.color } },
+							ui.text { chip.title, size = "small", style = { color = chip.color :: Color } },
 						})
 					end
 					return ui.row {

@@ -37,7 +37,12 @@ local SECTIONS: { any } = {
 	},
 }
 
-return mod {
+type State = {
+	collapsed: boolean,
+	selected: string,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { collapsed = false, selected = "calendar" }
 	end,

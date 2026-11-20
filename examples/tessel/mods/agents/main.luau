@@ -452,10 +452,10 @@ return mod {
 		end
 
 		local function grid(list: { any })
-			local rows = {}
+			local rows: { Element } = {}
 			local i = 1
 			while i <= #list do
-				local cells = {}
+				local cells: { Element } = {}
 				for j = i, math.min(i + 2, #list) do
 					table.insert(cells, card(list[j]))
 				end
@@ -470,7 +470,7 @@ return mod {
 				return ui.row { class = "empty", ui.text "No agents match." }
 			end
 			if state.layout == "list" then
-				local lines = {}
+				local lines: { Element } = {}
 				for _, agent in list do
 					table.insert(lines, line(agent))
 				end
@@ -708,7 +708,7 @@ return mod {
 				},
 			})
 
-			local cells = {}
+			local cells: { Element } = {}
 			for i, kpi in KPIS do
 				table.insert(cells, ui.column {
 					class = "kpi",
@@ -823,7 +823,7 @@ return mod {
 
 			local function run_steps(run: any)
 				local list = steps_of(run)
-				local rows = {}
+				local rows: { Element } = {}
 				-- Newest first, as a feed.
 				for i = #list, 1, -1 do
 					local item = list[i]
@@ -880,7 +880,7 @@ return mod {
 				return ui.column { class = "steps", table.unpack(rows) }
 			end
 
-			local runs = {}
+			local runs: { Element } = {}
 			if data and data.runs then
 				for _, run in data.runs do
 					local status = run_status(run)

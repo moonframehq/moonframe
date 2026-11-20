@@ -46,7 +46,13 @@ local PROJECTS: { any } = {
 	},
 }
 
-return mod {
+type State = {
+	starred: { [string]: boolean? },
+	selected: string,
+	menu: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { starred = { mobile = true }, selected = "mobile", menu = nil }
 	end,
@@ -65,7 +71,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local cards = {}
+		local cards: { Element } = {}
 		for index, project in PROJECTS do
 			cards[index] = project_card {
 				name = project.name,
@@ -87,7 +93,7 @@ return mod {
 				width = 290,
 			}
 		end
-		local starred = {}
+		local starred: { string } = {}
 		for _, project in PROJECTS do
 			if state.starred[project.id] then
 				table.insert(starred, project.name)

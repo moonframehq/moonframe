@@ -28,7 +28,7 @@ local function bars(size: number, lit: number, dashes: boolean)
 	local width = math.max(2, round(size * 0.2))
 	local gap = math.max(1, round(size * 0.1))
 	local heights = { round(size * 0.4), round(size * 0.62), round(size * 0.84) }
-	local parts = {}
+	local parts: { Element } = {}
 	for index = 1, 3 do
 		table.insert(parts, ui.row {
 			class = if index <= lit then { "priority-icon-bar", "priority-icon-lit" } else "priority-icon-bar",

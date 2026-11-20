@@ -64,7 +64,7 @@ end
 -- picker in a popover on it while open.
 local function reactions(props: Props): any
 	local key = props.react or "react"
-	local pills = {}
+	local pills: { Element } = {}
 	local list: { Reaction } = props.reactions or {}
 	for _, reaction in list do
 		table.insert(pills, ui.row {

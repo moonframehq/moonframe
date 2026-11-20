@@ -259,7 +259,7 @@ settings_page {
 			table.unpack(buttons),
 		}
 
-		local nav = {}
+		local nav: { [string]: any } = {}
 		for key, value in props.nav or {} do
 			nav[key] = value
 		end

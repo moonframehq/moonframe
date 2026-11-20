@@ -4,7 +4,14 @@ local diff_counts = use "diff-counts"
 local stepper = use "stepper"
 local switch = use "switch"
 
-return mod {
+type State = {
+	added: number,
+	removed: number,
+	files: boolean,
+	zero: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { added = 38, removed = 16, files = true, zero = false }
 	end,

@@ -150,7 +150,7 @@ return mod {
 			end
 		end
 
-		local tab_rows = {}
+		local tab_rows: { Element } = {}
 		if implicit and shown then
 			table.insert(tab_rows, ui.row {
 				class = "agent-tab",
@@ -177,7 +177,7 @@ return mod {
 			})
 		end
 
-		local picks = {}
+		local picks: { Element } = {}
 		for index, project in (projects and projects.projects) or {} do
 			if index > 14 then
 				break

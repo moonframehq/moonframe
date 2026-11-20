@@ -158,7 +158,7 @@ return mod {
 							height = 20,
 							align = "center",
 							justify = "center",
-							style = { background = item.color },
+							style = { background = item.color :: Color },
 							ui.icon { name = item.icon :: any, size = "small" },
 						},
 						ui.text { item.name, truncate = true },

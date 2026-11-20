@@ -150,7 +150,7 @@ spreadsheet {
 			}
 		end
 
-		local heads = {}
+		local heads: { Element } = {}
 		if numbers then
 			table.insert(heads, ui.row {
 				class = "spreadsheet-head-cell",
@@ -177,7 +177,7 @@ spreadsheet {
 		local filled = #props.rows
 		local function draw(index: number)
 			local row = props.rows[index]
-			local cells = {}
+			local cells: { Element } = {}
 			if numbers then
 				table.insert(cells, number(index))
 			end
@@ -200,7 +200,7 @@ spreadsheet {
 			-- Each row is its cells' height and its bottom border.
 			rows = ui.list { id = props.id or "spreadsheet", count = count, row_height = height + 1, row = draw, grow = true }
 		else
-			local body = table.create(count)
+			local body = table.create<<Element>>(count)
 			for index = 1, count do
 				body[index] = draw(index)
 			end

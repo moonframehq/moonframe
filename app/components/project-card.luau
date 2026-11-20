@@ -102,7 +102,7 @@ ui.row { gap = "large",
 
 	build = function(props: Props)
 		local color = props.color or "accent"
-		local meta = {}
+		local meta: { Element } = {}
 		if props.tasks then
 			table.insert(meta, ui.row {
 				align = "center",

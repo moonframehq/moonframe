@@ -88,7 +88,7 @@ return mod {
 			}
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		for _, item in PLACES do
 			table.insert(rows, row(item))
 		end

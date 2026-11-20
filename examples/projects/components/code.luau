@@ -244,11 +244,11 @@ return component {
 		local limit = math.min(#lines, props.limit or 400)
 		local lang = lang_of(props.path)
 		local width = 8 * #tostring(props.total or #lines) + 2
-		local rows = {}
+		local rows: { Element } = {}
 		local in_block = false
 		for number = 1, limit do
 			local line = lines[number]
-			local cells = {}
+			local cells: { Element } = {}
 			if lang and line ~= "" then
 				local key = `{LANG_NAMES[lang]}{if in_block then "+" else "-"}{line}`
 				local hit = seen[key]

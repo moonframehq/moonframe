@@ -6,7 +6,18 @@
 local table_view = use "table"
 local switch = use "switch"
 
-local DEVICES = {
+type Device = {
+	id: string,
+	name: string,
+	os: string,
+	cpu: number,
+	memory: number,
+	seen: number,
+	-- Sorting reads a column by its key.
+	[string]: string | number,
+}
+
+local DEVICES: { Device } = {
 	{ id = "studio", name = "mac-studio", os = "macOS 26.1", cpu = 42, memory = 72, seen = 0 },
 	{ id = "build", name = "build-01", os = "Ubuntu 24.04", cpu = 31, memory = 48, seen = 60 },
 	{ id = "air", name = "macbook-air", os = "macOS 26.0", cpu = 8, memory = 61, seen = 300 },
@@ -155,14 +166,22 @@ return mod {
 
 	view = function(state: State)
 		local sorted = table.clone(DEVICES)
-		table.sort(sorted, function(a, b)
+		table.sort(sorted, function(a: Device, b: Device)
 			local x, y = a[state.sort], b[state.sort]
-			if state.descending then
-				return x > y
+			-- A column holds only numbers or only text: compare like with like.
+			if type(x) == "number" and type(y) == "number" then
+				if state.descending then
+					return x > y
+				end
+				return x < y
 			end
-			return x < y
+			local p, q = tostring(x), tostring(y)
+			if state.descending then
+				return p > q
+			end
+			return p < q
 		end)
-		local rows = {}
+		local rows: { { [string]: any } } = {}
 		for index, device in sorted do
 			rows[index] = {
 				id = device.id,

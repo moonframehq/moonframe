@@ -53,7 +53,7 @@ return mod {
 		[".chg-menu"] = { padding = 0 },
 	},
 
-	init = function(previous: State?)
+	init = function(previous: State?): (State, ...{ Send })
 		local state: State = previous or { open = nil, staged = false, picking = false }
 		state.picking = false
 		if state.open then

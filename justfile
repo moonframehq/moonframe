@@ -209,7 +209,8 @@ component-types:
 component-types-check:
     python3 -I scripts/component-types.py --check
 
-# Type-check the app's Luau against types/moonframe.d.luau in strict mode.
+# Type-check the app's Luau against types/moonframe.d.luau in strict mode,
+# with Luau's new type solver.
 types dir="app":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -218,7 +219,7 @@ types dir="app":
     while IFS= read -r -d '' file; do
         files+=("$file")
     done < <(find "{{dir}}" -name '*.luau' -not -name '*.d.luau' -print0 | sort -z)
-    output=$("$lsp" analyze --platform=standard --definitions=@moonframe=types/moonframe.d.luau "${files[@]}" 2>&1 | grep -v '^\[INFO\]' || true)
+    output=$("$lsp" analyze --flag:LuauSolverV2=true --platform=standard --definitions=@moonframe=types/moonframe.d.luau "${files[@]}" 2>&1 | grep -v '^\[INFO\]' || true)
     if [ -n "$output" ]; then
         echo "$output"
         exit 1

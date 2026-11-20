@@ -4,13 +4,18 @@ local sparkline = use "sparkline"
 
 local HISTORY = { 0.1, 0.3, 0.2, 0.5, 0.4, 0.9, 0.6, 0.3, 0.2, 0.4, 0.7, 0.5 }
 
-return mod {
+type State = {
+	values: { number },
+	seed: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { values = table.clone(HISTORY), seed = 7 }
 	end,
 
 	update = function(state, msg)
-		local value
+		local value: number?
 		if msg == "sample" then
 			-- A small pseudo-random walk, so the demo needs no clock.
 			state.seed = (state.seed * 1103515245 + 12345) % 2147483648

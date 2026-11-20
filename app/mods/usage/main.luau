@@ -103,7 +103,7 @@ local function section(entry: any)
 	if entry.kind == "limit" then
 		return window(entry.window)
 	end
-	local rows = {}
+	local rows: { Element } = {}
 	if entry.kind == "facts" then
 		for index, fact in entry.facts do
 			rows[index] = pair(fact.label, fact.value)
@@ -137,7 +137,7 @@ local function updated(usage: any): string
 end
 
 local function body(provider: any)
-	local blocks = {}
+	local blocks: { Element } = {}
 	local function add(element)
 		if #blocks > 0 then
 			table.insert(blocks, ui.divider())
@@ -216,7 +216,7 @@ local function sheet(usage: any, provider: any)
 			ui.text { entry.name, class = "usage-tab-label" },
 		}
 	end
-	local blocks = if provider then body(provider) else {}
+	local blocks: { Element } = if provider then body(provider) else {}
 	return ui.column {
 		max_height = SHEET_MAX_HEIGHT,
 		scroll = "y",
@@ -272,7 +272,7 @@ return mod {
 		if usage == nil or (#usage.providers == 0 and not usage.error) then
 			return ui.row {}
 		end
-		local widgets = {}
+		local widgets: { Element } = {}
 		for _, id in usage.headline do
 			local provider = find(usage, id)
 			if provider then
