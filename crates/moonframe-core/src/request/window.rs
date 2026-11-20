@@ -7,7 +7,10 @@
 
 use {
     super::APP,
-    crate::{Data, Display, Error, SHELL, WindowPlace},
+    crate::{
+        Data, Display, Error, SHELL, WindowPlace,
+        window::{MOD_WINDOW_HEIGHT, MOD_WINDOW_WIDTH},
+    },
 };
 
 /// What `app:window` asks.
@@ -20,6 +23,9 @@ pub enum WindowRequest {
         name: String,
         send: Option<Data>,
         place: Option<WindowPlace>,
+        /// `{ width, height }`: the size it opens at, over its `window`
+        /// key's; an open window grows to it, never shrinks.
+        size: Option<(f32, f32)>,
     },
     /// Closes the mod `name`'s window, if it is open.
     Close(String),
@@ -46,6 +52,7 @@ pub(super) fn window(msg: &Data) -> Result<WindowRequest, Error> {
                 name: name(msg)?,
                 send: None,
                 place: None,
+                size: None,
             });
         },
         Data::Map(fields) => fields,
@@ -54,13 +61,25 @@ pub(super) fn window(msg: &Data) -> Result<WindowRequest, Error> {
     if let Some(key) = fields.keys().find(|key| {
         !matches!(
             key.as_str(),
-            "open" | "send" | "close" | "display" | "fullscreen"
+            "open" | "send" | "close" | "display" | "fullscreen" | "size"
         )
     }) {
         return Err(fail(&format!(
-            "unknown key `{key}`; it takes open, send, display, fullscreen and close"
+            "unknown key `{key}`; it takes open, send, display, fullscreen, size and close"
         )));
     }
+    let size = match fields.get("size") {
+        None | Some(Data::Nil) => None,
+        Some(size) => Some(window_size(size).ok_or_else(|| {
+            fail(&format!(
+                "`size` is {{ width, height }}, width {}–{} and height {}–{}",
+                MOD_WINDOW_WIDTH.start(),
+                MOD_WINDOW_WIDTH.end(),
+                MOD_WINDOW_HEIGHT.start(),
+                MOD_WINDOW_HEIGHT.end()
+            ))
+        })?),
+    };
     let display = match fields.get("display") {
         None | Some(Data::Nil) => None,
         Some(display) => Some(Display::from_data(display).ok_or_else(|| {
@@ -84,17 +103,38 @@ pub(super) fn window(msg: &Data) -> Result<WindowRequest, Error> {
                 .cloned()
                 .filter(|send| *send != Data::Nil),
             place,
+            size,
         }),
-        (None, Some(close)) if !fields.contains_key("send") && place.is_none() => {
+        (None, Some(close))
+            if !fields.contains_key("send") && place.is_none() && size.is_none() =>
+        {
             Ok(WindowRequest::Close(name(close)?))
         },
-        (None, Some(_)) if place.is_some() => {
-            Err(fail("`display` and `fullscreen` go with `open`"))
+        (None, Some(_)) if place.is_some() || size.is_some() => {
+            Err(fail("`display`, `fullscreen` and `size` go with `open`"))
         },
         (None, Some(_)) => Err(fail("`send` goes with `open`")),
         (Some(_), Some(_)) => Err(fail("takes `open` or `close`, not both")),
         (None, None) => Err(fail(usage)),
     }
+}
+
+/// `{ width, height }` within what a mod's window may ask for.
+fn window_size(value: &Data) -> Option<(f32, f32)> {
+    let Data::Map(fields) = value else {
+        return None;
+    };
+    if fields.keys().any(|key| key != "width" && key != "height") {
+        return None;
+    }
+    let number = |key: &str| match fields.get(key)? {
+        Data::Integer(value) => Some(*value as f32),
+        Data::Number(value) => Some(*value as f32),
+        _ => None,
+    };
+    let (width, height) = (number("width")?, number("height")?);
+    (MOD_WINDOW_WIDTH.contains(&width) && MOD_WINDOW_HEIGHT.contains(&height))
+        .then_some((width, height))
 }
 
 #[cfg(test)]

@@ -249,6 +249,8 @@ impl MoonframeApp {
         };
         workspace.set_dark(theme.is_dark());
         workspace.set_window(window_state(chrome.titlebar, window, cx));
+        // The app's name, as the menu bar shows it: `app.title`.
+        workspace.set_host("title", Data::from(crate::title()));
         // What the providers shared before this window opened.
         for (key, data) in joined.latest {
             workspace.set_host(&key, data);
@@ -578,7 +580,7 @@ impl MoonframeApp {
         if let Action::Window(name) = action {
             // A preview opens nothing.
             if !from.starts_with(moonframe_core::DEMO) {
-                self.show_mod_window(name, None, cx);
+                self.show_mod_window(name, None, None, cx);
             }
             return;
         }
