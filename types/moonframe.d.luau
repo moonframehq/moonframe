@@ -6,29 +6,32 @@
 -- checks every value at run time; types catch mistakes before it runs.
 
 -- Values that cross between a module and the host: messages and state.
-type Data = nil | boolean | number | string | { [any]: any }
+export type Data = nil | boolean | number | string | { [any]: any }
 
-type Space = "none" | "small" | "normal" | "large"
-type Tone = "normal" | "muted" | "accent" | "success" | "warning" | "danger"
-type TextSize = "small" | "normal" | "large" | "title" | "headline" | "display" | "hero"
-type Weight = "light" | "normal" | "medium" | "semibold" | "bold"
-type Align = "stretch" | "start" | "center" | "end"
-type Justify = "start" | "center" | "end" | "between"
-type Surface = "background" | "sidebar" | "muted" | "secondary"
-type Edge = "none" | "all" | "top" | "bottom" | "left" | "right"
-type Border = boolean | Edge
-type Direction = "row" | "column"
-type Variant = "normal" | "primary" | "ghost" | "outline" | "danger"
-type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | "check-for-updates" | "new-window" | "activate" | BrowserCommand
+export type Space = "none" | "small" | "normal" | "large"
+export type Tone = "normal" | "muted" | "accent" | "success" | "warning" | "danger"
+export type TextSize = "small" | "normal" | "large" | "title" | "headline" | "display" | "hero"
+export type Weight = "light" | "normal" | "medium" | "semibold" | "bold"
+export type Align = "stretch" | "start" | "center" | "end"
+export type Justify = "start" | "center" | "end" | "between"
+export type Surface = "background" | "sidebar" | "muted" | "secondary"
+export type Edge = "none" | "all" | "top" | "bottom" | "left" | "right"
+export type Border = boolean | Edge
+export type Direction = "row" | "column"
+export type Variant = "normal" | "primary" | "ghost" | "outline" | "danger"
+export type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | "check-for-updates" | "new-window" | "activate" | BrowserCommand
 -- Run on the `ui.browser` the control's `browser` key names.
-type BrowserCommand = "browser-back" | "browser-forward" | "browser-reload" | "browser-stop" | "browser-open"
+export type BrowserCommand = "browser-back" | "browser-forward" | "browser-reload" | "browser-stop" | "browser-open"
 
 -- `#rrggbb`, a palette name, or a theme color, optionally `name/NN`.
-type Color = string
+export type Color = string
 -- A space name or pixels.
-type Spacing = Space | number
+export type Spacing = Space | number
 -- One spacing, `{ y, x }`, `{ top, right, bottom, left }`, or named edges.
-type Sides = Spacing | { Spacing } | {
+-- The list and the named edges share one table type: Luau's new solver
+-- cannot match a table literal against a union of two table types.
+export type Sides = Spacing | {
+	[number]: Spacing,
 	x: Spacing?,
 	y: Spacing?,
 	top: Spacing?,
@@ -36,7 +39,7 @@ type Sides = Spacing | { Spacing } | {
 	bottom: Spacing?,
 	left: Spacing?,
 }
-type ShadowLayer = {
+export type ShadowLayer = {
 	x: number?,
 	y: number?,
 	blur: number?,
@@ -45,10 +48,10 @@ type ShadowLayer = {
 	inset: boolean?,
 }
 -- A preset (`"small"`), a CSS string (`"0 4px 12px #0003"`), a layer, or layers.
-type Shadow = string | ShadowLayer | { string | ShadowLayer }
-type TransitionKind = "slide" | "fade" | "slide-fade" | "rise" | "none"
+export type Shadow = string | ShadowLayer | { string | ShadowLayer }
+export type TransitionKind = "slide" | "fade" | "slide-fade" | "rise" | "none"
 -- `"slide 220ms ease-out"`, or a table; durations are ms, `"220ms"`, or a speed.
-type Transition = string | {
+export type Transition = string | {
 	kind: TransitionKind?,
 	duration: (number | string)?,
 	curve: string?,
@@ -56,7 +59,7 @@ type Transition = string | {
 	delay: (number | string)?,
 }
 
-type Style = {
+export type Style = {
 	background: Color?,
 	-- A linear gradient over the background: `"180deg, #ffa53a, #ff6200"`
 	-- (0 runs up, 90 right, 180 down, the default), or `{ from, to, angle }`.
@@ -96,14 +99,14 @@ type Style = {
 }
 
 -- What a `ui` function returns; the host reads its fields.
-type Element = { type: string }
+export type Element = { type: string }
 -- A child: an element, a string (plain text), or false/nil (skipped).
-type Child = Element | string | false | nil
+export type Child = Element | string | false | nil
 -- Class names: `"a b"` or `{ "a", "b" }`.
-type Class = string | { string }
+export type Class = string | { string }
 
 -- Where `float` pins an element over its parent.
-type FloatAt =
+export type FloatAt =
 	"top-left"
 	| "top-right"
 	| "bottom-left"
@@ -116,7 +119,10 @@ type FloatAt =
 -- Out of the flow, over the parent: pinned to an edge or corner
 -- (`"top-right"`), set in from it (`{ at = "top-right", inset = 4 }`), or at
 -- pixel offsets from its edges (`{ top = -4, right = -4 }`, negative overhangs).
-type Float = FloatAt | { at: FloatAt, inset: number? } | {
+-- One table type for both tables, as for `Sides`; `at` takes no offsets.
+export type Float = FloatAt | {
+	at: FloatAt?,
+	inset: number?,
 	top: number?,
 	right: number?,
 	bottom: number?,
@@ -127,7 +133,7 @@ type Float = FloatAt | { at: FloatAt, inset: number? } | {
 -- 0.1, top = 0.2, width = 0.5, height = 0.3 }`. A crop frame over a
 -- picture (in a `ui.image`'s `overlay`, fractions of the picture), a
 -- marker on a track.
-type Area = {
+export type Area = {
 	left: number?,
 	top: number?,
 	width: number?,
@@ -135,7 +141,7 @@ type Area = {
 }
 
 -- The pointer's shape over a row or column.
-type Cursor =
+export type Cursor =
 	"default"
 	| "pointer"
 	| "text"
@@ -156,7 +162,7 @@ type Cursor =
 -- or bottom, `max` at the right or top); with it, `value` plus pixels
 -- dragged times `speed` (a number scrubbed by dragging its label). It
 -- snaps to `step` and stays between `min` and `max`.
-type Range = {
+export type Range = {
 	min: number,
 	max: number,
 	step: number?,
@@ -169,7 +175,7 @@ type Range = {
 -- fields; anything else arrives as `{ msg = msg, ... }`). `x` and `y` are
 -- fractions of the box as it was when the button went down (0 to 1 inside,
 -- beyond while dragging outside); `dx` and `dy` pixels since then.
-type PointerMsg = {
+export type PointerMsg = {
 	phase: "down" | "move" | "up" | "hover" | "leave",
 	x: number,
 	y: number,
@@ -191,7 +197,7 @@ type PointerMsg = {
 -- What a `rotate` message carries: `angle` the degrees two fingers turned
 -- since the last message, clockwise, how far through the turn it is, and
 -- where over the box (`x`, `y`), with the keys held. On macOS.
-type RotateMsg = {
+export type RotateMsg = {
 	x: number,
 	y: number,
 	width: number,
@@ -206,7 +212,7 @@ type RotateMsg = {
 }
 
 -- What a `swipe` message carries: which way it went, as a browser reads it.
-type SwipeMsg = {
+export type SwipeMsg = {
 	x: number,
 	y: number,
 	width: number,
@@ -220,7 +226,7 @@ type SwipeMsg = {
 }
 
 -- What a `force` message carries: how hard the press is, from 0 to 1.
-type ForceMsg = {
+export type ForceMsg = {
 	x: number,
 	y: number,
 	width: number,
@@ -236,7 +242,7 @@ type ForceMsg = {
 -- What a `wheel` message carries: `dx`, `dy` the pixels scrolled, `zoom`
 -- a trackpad pinch's change (0.1 is 10 % larger, 0 for a scroll), and
 -- where over the box (`x`, `y`), with the keys held.
-type WheelMsg = {
+export type WheelMsg = {
 	x: number,
 	y: number,
 	dx: number,
@@ -255,7 +261,7 @@ type WheelMsg = {
 -- literals such as `variant = "ghost"` check against their unions.
 
 -- A stack with `msg` or `command` is clickable as a whole, like a button.
-type StackProps = {
+export type StackProps = {
 	class: Class?,
 	style: Style?,
 	-- A state of the view's own naming, which `:<state>` rules match.
@@ -362,7 +368,7 @@ type StackProps = {
 -- which nothing follows: clear what `over` showed then. `x` and `y` are
 -- where the pointer is, as fractions of the target's box (before or after
 -- a row's middle, say), `from` is the mod that drew what is carried.
-type CarryMsg = {
+export type CarryMsg = {
 	phase: "over" | "leave" | "drop",
 	carry: Data,
 	from: string,
@@ -372,7 +378,7 @@ type CarryMsg = {
 	height: number,
 }
 
-type PanelProps = {
+export type PanelProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -407,7 +413,7 @@ type PanelProps = {
 	[number]: Child,
 }
 
-type PaneProps = {
+export type PaneProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -432,14 +438,14 @@ type PaneProps = {
 	[number]: Child,
 }
 
-type SplitProps = {
+export type SplitProps = {
 	id: string?,
 	-- false: no hairline between panes; a handle shows only when hovered.
 	divider: boolean?,
 	[number]: Element | false | nil,
 }
 
-type TextProps = {
+export type TextProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -467,7 +473,7 @@ type TextProps = {
 
 -- Clicking sends `msg` to an `update` (to the mod `to`, else its own), or
 -- runs an app `command`.
-type ButtonProps = {
+export type ButtonProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -488,7 +494,7 @@ type ButtonProps = {
 	[number]: string,
 }
 
-type ItemProps = {
+export type ItemProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -507,7 +513,7 @@ type ItemProps = {
 	[number]: string,
 }
 
-type BadgeProps = {
+export type BadgeProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -523,7 +529,7 @@ type BadgeProps = {
 }
 
 -- The bundled icons (Lucide); the host refuses any other name.
-type IconName =
+export type IconName =
 	| "a-large-small"
 	| "activity"
 	| "agent-amp"
@@ -776,7 +782,7 @@ type IconName =
 	| "zoom-out"
 
 -- Drawn at the size and color of text, so `color` and `size` style it.
-type IconProps = {
+export type IconProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -797,12 +803,12 @@ type IconProps = {
 	[number]: string,
 }
 
-type Fit = "contain" | "cover" | "fill" | "scale-down" | "none"
+export type Fit = "contain" | "cover" | "fill" | "scale-down" | "none"
 
 -- A picture from a file: relative to the mod's folder, `~/...`, or absolute.
 -- Not a URL: have a provider download it to a cache. A missing file leaves
 -- an empty box of `width` x `height`. `radius` in a rule rounds it.
-type ImageProps = {
+export type ImageProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -835,7 +841,7 @@ type ImageProps = {
 -- A line through `points`, evenly spaced across its box. Its style's
 -- `color` strokes it, `background` fills the area to the baseline, and
 -- `border_color` draws the baseline, dashed.
-type LineProps = {
+export type LineProps = {
 	class: Class?,
 	style: Style?,
 	points: { number },
@@ -851,7 +857,7 @@ type LineProps = {
 }
 
 -- Time Machine-style vertical ruler, with native Dock-like magnification.
-type RevisionTimelineProps = {
+export type RevisionTimelineProps = {
 	id: string?,
 	entries: { { id: string, day: string?, label: string, summary: string? } },
 	selected: string?,
@@ -884,7 +890,7 @@ type RevisionTimelineProps = {
 -- connectors of a diagram. Each line is stroked in its `color`, else the
 -- style's `color`, else the border color. Without `width` and `height` it
 -- fills its parent; it takes no clicks, so it can float over what it links.
-type PathsProps = {
+export type PathsProps = {
 	class: Class?,
 	style: Style?,
 	paths: { Polyline },
@@ -892,7 +898,7 @@ type PathsProps = {
 	height: number?,
 }
 
-type Polyline = {
+export type Polyline = {
 	-- Corners in order, flat: { x1, y1, x2, y2, ... }, in pixels.
 	points: { number },
 	color: string?,
@@ -904,7 +910,7 @@ type Polyline = {
 }
 
 -- A box of diagonal stripes in its style's `color` over its `background`.
-type HatchProps = {
+export type HatchProps = {
 	class: Class?,
 	style: Style?,
 	gap: number?,
@@ -922,7 +928,7 @@ type HatchProps = {
 -- table getting a `url` field and anything else arriving as
 -- `{ msg = link, url = url }`; a `#heading` link scrolls to its heading. A
 -- `[label](cite:source)` link draws a source chip.
-type MarkdownProps = {
+export type MarkdownProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -969,14 +975,14 @@ type MarkdownProps = {
 	[number]: string,
 }
 
-type TerminalEngine = "alacritty" | "ghostty"
+export type TerminalEngine = "alacritty" | "ghostty"
 -- What keeps the shell running: `auto` (default) is herdr-core, else tmux,
 -- else a pty. herdr-core and tmux keep it across launches; a pty ends with
 -- the app. One that isn't installed falls back to the next.
-type TerminalBackend = "auto" | "herdr-core" | "tmux" | "pty"
+export type TerminalBackend = "auto" | "herdr-core" | "tmux" | "pty"
 
 -- A live shell (your login shell). The host keeps it by mod and `id`.
-type TerminalProps = {
+export type TerminalProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1001,7 +1007,7 @@ type TerminalProps = {
 -- A web page in a native view, kept by mod and `id`. `url` navigates when
 -- it changes from the last one given; the user's own navigation stands
 -- until then. Only http, https and file addresses.
-type BrowserProps = {
+export type BrowserProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1024,7 +1030,7 @@ type BrowserProps = {
 -- `id`, so it lives across reloads and while hidden, and hands it `props`,
 -- telling it when they change. What the user does in it comes back to this
 -- mod's `update` as messages the view chooses.
-type ViewProps = {
+export type ViewProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1038,7 +1044,7 @@ type ViewProps = {
 -- the tree); `value` replaces the text only when it differs from the last
 -- `value` passed. Messages carry the text: a table `msg` gets a `value`
 -- field, anything else arrives as `{ msg = msg, value = text }`.
-type InputProps = {
+export type InputProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1105,7 +1111,7 @@ type InputProps = {
 	scroll_at: { fraction: number, seq: number? }?,
 }
 
-type RegionProps = {
+export type RegionProps = {
 	name: string,
 	direction: Direction?,
 	gap: Space?,
@@ -1113,10 +1119,10 @@ type RegionProps = {
 }
 
 -- Which side of its anchor a popover opens on.
-type Side = "top" | "bottom" | "left" | "right"
+export type Side = "top" | "bottom" | "left" | "right"
 -- The anchor's edge it lines up with: left or right above and below, top or
 -- bottom beside.
-type Anchor = "start" | "end"
+export type Anchor = "start" | "end"
 
 -- Keystrokes an open popover or overlay takes, to the message each sends
 -- to this mod's `update`: `{ escape = "close", down = "next", ["cmd-k"] = "find" }`.
@@ -1125,11 +1131,11 @@ type Anchor = "start" | "end"
 -- ctrl elsewhere); keys `a`-`z`, `0`-`9`, a symbol such as `/`, `f1`-`f24`,
 -- `escape`, `enter`, `tab`, `space`, `backspace`, `delete`, `insert`, `up`,
 -- `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`.
-type Keys = { [string]: Data }
+export type Keys = { [string]: Data }
 
 -- Content floating beside its anchor (the list part). While `open`, a click
 -- outside sends `dismiss`. A `popover` stylesheet rule styles and animates it.
-type PopoverProps = {
+export type PopoverProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1149,7 +1155,7 @@ type PopoverProps = {
 	[number]: Child,
 }
 
-type Placement =
+export type Placement =
 	"center"
 	| "top"
 	| "bottom"
@@ -1166,7 +1172,7 @@ type Placement =
 -- backdrop or outside the content sends `dismiss`, and so does Escape unless
 -- `keys` takes it. An `overlay` rule styles and animates the content, an
 -- `overlay-backdrop` rule the dimmed window behind.
-type OverlayProps = {
+export type OverlayProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1185,7 +1191,7 @@ type OverlayProps = {
 -- Rows of one height, of which only those showing are built and drawn, so
 -- a list of any length costs a screenful. `row(i)` builds row `i` (from 1)
 -- and is called again as the list scrolls; keep it cheap and pure.
-type ListProps = {
+export type ListProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1211,7 +1217,7 @@ type ListProps = {
 
 -- A rectangle or line the host draws in a `ui.video`, in fractions of the
 -- picture; a line has no `width` or no `height`.
-type VideoGuide = {
+export type VideoGuide = {
 	x: number,
 	y: number,
 	width: number?,
@@ -1221,7 +1227,7 @@ type VideoGuide = {
 }
 
 -- `ui.video { source = "camera" }`: frames from a ring in shared memory.
-type VideoProps = {
+export type VideoProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1259,7 +1265,7 @@ type VideoProps = {
 -- the `vector-*` maps need no key; the others need the provider's API key in
 -- `key`. The `vector-*` maps are OpenFreeMap vector tiles drawn on the GPU by
 -- gpui-maps, in builds with the `map-vector` feature.
-type MapProvider =
+export type MapProvider =
 	"openstreetmap"
 	| "carto-light"
 	| "carto-dark"
@@ -1281,7 +1287,7 @@ type MapProvider =
 -- buttons zoom; two fingers turn it. Without `center` and `zoom` it frames
 -- the pins and routes. Its style's `color`
 -- strokes routes without their own.
-type MapProps = {
+export type MapProps = {
 	class: Class?,
 	style: Style?,
 	provider: MapProvider?,
@@ -1315,7 +1321,7 @@ type MapProps = {
 	grow: boolean?,
 }
 
-type MapPin = {
+export type MapPin = {
 	lat: number,
 	lon: number,
 	-- Up to three characters, drawn in the pin: "1", "A".
@@ -1338,7 +1344,7 @@ type MapPin = {
 -- Either `points`, drawn as they are, or `via` stops the host routes along
 -- streets (OpenStreetMap data, through routing.openstreetmap.de) by `mode`;
 -- straight and faint until the way is known.
-type MapRoute = {
+export type MapRoute = {
 	-- Corners in order, flat: { lat1, lon1, lat2, lon2, ... }.
 	points: { number }?,
 	-- Stops in order, flat, two to 25 of them.
@@ -1351,14 +1357,14 @@ type MapRoute = {
 
 -- `ui.number`'s options: `decimals` fixes the digits after the point
 -- (0 to 20); without it, up to three show and trailing zeros drop.
-type NumberOptions = {
+export type NumberOptions = {
 	decimals: number?,
 }
 
 -- `ui.date`'s options: how long (`style`, default "medium"), whether the
 -- date shows (default true), and the time of day (true or "minutes",
 -- "seconds"; default none).
-type DateOptions = {
+export type DateOptions = {
 	style: ("short" | "medium" | "long")?,
 	date: boolean?,
 	time: (boolean | "minutes" | "seconds")?,
@@ -1414,7 +1420,7 @@ declare ui: {
 }
 
 -- One commit of `app.git.log`.
-type GitCommit = {
+export type GitCommit = {
 	sha: string,
 	short: string,
 	parents: { string },
@@ -1427,7 +1433,7 @@ type GitCommit = {
 }
 
 -- This machine's load, sampled by the host once a second.
-type System = {
+export type System = {
 	-- Fractions from 0 to 1.
 	cpu: number,
 	-- Oldest first, ending with `cpu`.
@@ -1440,11 +1446,11 @@ type System = {
 	transmitted: number,
 }
 
-type Platform = "macos" | "linux" | "windows"
-type Titlebar = "system" | "hidden"
+export type Platform = "macos" | "linux" | "windows"
+export type Titlebar = "system" | "hidden"
 
 -- The window, for a title bar the layout draws itself.
-type WindowState = {
+export type WindowState = {
 	platform: Platform,
 	-- `hidden` when the shell asked for it and the system agreed (a Linux
 	-- compositor can insist on its own title bar).
@@ -1459,7 +1465,7 @@ type WindowState = {
 
 -- A screen, in `app.displays`. `x`, `y`, `width` and `height` are its
 -- place among the others, in points.
-type DisplayInfo = {
+export type DisplayInfo = {
 	id: number,
 	primary: boolean,
 	x: number,
@@ -1469,7 +1475,7 @@ type DisplayInfo = {
 }
 
 -- How a process or socket provider's link stands, in `app.links`.
-type ProviderLink = {
+export type ProviderLink = {
 	-- Whether the provider has its program.
 	connected: boolean?,
 	-- Messages not yet written.
@@ -1480,7 +1486,7 @@ type ProviderLink = {
 }
 
 -- How `app:awake` stands, in `app.awake`.
-type AwakeState = {
+export type AwakeState = {
 	-- Whether the system agreed to stay awake.
 	held: boolean,
 	-- Whether the display stays on too.
@@ -1490,7 +1496,7 @@ type AwakeState = {
 }
 
 -- The last run's panic, in `app.crash`.
-type CrashReport = {
+export type CrashReport = {
 	-- What it said.
 	message: string,
 	-- The report's path, for the user to read or send.
@@ -1498,10 +1504,10 @@ type CrashReport = {
 }
 
 -- Light, dark, or as the system is (switching as it does).
-type AppearanceMode = "system" | "light" | "dark"
+export type AppearanceMode = "system" | "light" | "dark"
 
 -- `app.appearance`: set it with `{ to = "app:appearance", msg = "dark" }`.
-type Appearance = {
+export type Appearance = {
 	-- What the user chose, kept across launches for the app and profile.
 	mode: AppearanceMode,
 	-- Whether the window is dark now (as `app.dark`).
@@ -1519,7 +1525,7 @@ type Appearance = {
 }
 
 -- A theme as `app.appearance.themes` lists it. Colors are `#rrggbb`.
-type ThemeInfo = {
+export type ThemeInfo = {
 	name: string,
 	-- Made for dark windows: only such a theme can be the `dark_theme`.
 	dark: boolean,
@@ -1533,7 +1539,7 @@ type ThemeInfo = {
 
 -- `app.git`, from providers/git. When `available` is false only `reason`
 -- is set (and `repository = false`); every other field is there otherwise.
-type GitFile = {
+export type GitFile = {
 	path: string,
 	-- "M", "A", "D", "R" (renamed or copied), "?" (untracked) or "U" (conflict).
 	status: string,
@@ -1546,7 +1552,7 @@ type GitFile = {
 	old_path: string?,
 }
 
-type GitWorktree = {
+export type GitWorktree = {
 	path: string,
 	-- "" when detached.
 	branch: string,
@@ -1562,7 +1568,7 @@ type GitWorktree = {
 	bare: boolean,
 }
 
-type GitBranch = {
+export type GitBranch = {
 	name: string,
 	-- Short sha.
 	head: string,
@@ -1576,7 +1582,7 @@ type GitBranch = {
 	current: boolean,
 }
 
-type GitRemote = {
+export type GitRemote = {
 	name: string,
 	url: string,
 	host: string,
@@ -1588,7 +1594,7 @@ type GitRemote = {
 	web_url: string?,
 }
 
-type GitDiffLine = {
+export type GitDiffLine = {
 	-- "add", "del" or "ctx".
 	kind: string,
 	-- Line numbers in the old and new file; `old` is nil on "add" lines,
@@ -1599,7 +1605,7 @@ type GitDiffLine = {
 	text: string,
 }
 
-type GitDiff = {
+export type GitDiff = {
 	path: string,
 	binary: boolean,
 	-- Lines in all hunks; at most 1200, then `truncated`.
@@ -1610,7 +1616,7 @@ type GitDiff = {
 
 -- One commit with what it changed, against its first parent (a first
 -- commit against nothing).
-type GitShown = {
+export type GitShown = {
 	sha: string,
 	short: string,
 	parents: { string },
@@ -1634,7 +1640,7 @@ type GitShown = {
 	diff: GitDiff?,
 }
 
-type Git = {
+export type Git = {
 	available: boolean,
 	reason: string?,
 	repository: boolean,
@@ -1671,7 +1677,7 @@ type Git = {
 }
 
 -- A forge account; `avatar_path` is a cached image file once downloaded.
-type ForgePerson = {
+export type ForgePerson = {
 	login: string,
 	name: string?,
 	bot: boolean?,
@@ -1679,7 +1685,7 @@ type ForgePerson = {
 	avatar_path: string?,
 }
 
-type ForgeChecks = {
+export type ForgeChecks = {
 	total: number,
 	passed: number,
 	failed: number,
@@ -1688,7 +1694,7 @@ type ForgeChecks = {
 }
 
 -- A pull request (GitHub) or merge request (GitLab).
-type ForgePr = {
+export type ForgePr = {
 	number: number,
 	title: string,
 	-- "open", "closed" or "merged".
@@ -1720,7 +1726,7 @@ type ForgePr = {
 	check_list: { { name: string, outcome: string, url: string? } }?,
 }
 
-type ForgeIssue = {
+export type ForgeIssue = {
 	number: number,
 	title: string,
 	url: string,
@@ -1734,7 +1740,7 @@ type ForgeIssue = {
 -- sends `provider:github` (or `provider:gitlab`) `{ sign_in = true }`,
 -- `{ token = "..." }`, `{ use_cli = true }`, `{ cancel = true }` or
 -- `{ sign_out = true }`, from a mod in the provider's `accounts`.
-type ForgeAuth = {
+export type ForgeAuth = {
 	-- "checking", "signed_out", "pending" (a device code is up),
 	-- "verifying" or "signed_in".
 	status: string,
@@ -1759,7 +1765,7 @@ type ForgeAuth = {
 
 -- `app.github` and `app.gitlab`. `auth` and `host` are always there; when
 -- `available` is false the rest is not, only `reason`.
-type Forge = {
+export type Forge = {
 	available: boolean,
 	reason: string?,
 	host: string,
@@ -1780,7 +1786,7 @@ type Forge = {
 }
 
 -- A coding-agent CLI running on this machine.
-type Agent = {
+export type Agent = {
 	pid: number,
 	ppid: number,
 	-- "claude", "codex", "gemini", "cursor", "opencode", "aider", "amp",
@@ -1799,7 +1805,7 @@ type Agent = {
 	status: string,
 }
 
-type Agents = {
+export type Agents = {
 	available: boolean,
 	reason: string?,
 	agents: { Agent },
@@ -1807,14 +1813,14 @@ type Agents = {
 }
 
 -- One entry of a folder, from the `files` provider.
-type FileEntry = {
+export type FileEntry = {
 	name: string,
 	dir: boolean,
 	-- Ignored by git: editors dim these.
 	ignored: boolean,
 }
 
-type Files = {
+export type Files = {
 	-- False only when the folder can't be read; then only `reason` comes
 	-- with it. Outside any repository it lists home.
 	available: boolean,
@@ -1833,7 +1839,7 @@ type Files = {
 -- What this machine has for keeping terminals (the `herdr` provider).
 -- The `docs` provider: the folder whose text files it reads and saves for
 -- the mod that asks (`{ read = path }`, `{ write = path, text, version }`).
-type Docs = {
+export type Docs = {
 	available: boolean,
 	reason: string?,
 	root: string?,
@@ -1842,7 +1848,7 @@ type Docs = {
 -- One limit window of a service's plan (the `usage` provider). Shares are
 -- 0 to 1; `pace` is where an even spend would have left the bar of what is
 -- left (`usage-bar`'s `pace`), nil early in a window or without a reset.
-type UsageWindow = {
+export type UsageWindow = {
 	title: string,
 	kind: "session" | "daily" | "weekly" | "monthly" | "named",
 	used: number,
@@ -1858,7 +1864,7 @@ type UsageWindow = {
 	pace_note: string?,
 }
 
-type UsageBalance = {
+export type UsageBalance = {
 	label: string,
 	amount: number,
 	total: number?,
@@ -1872,13 +1878,13 @@ type UsageBalance = {
 	fraction: number?,
 }
 
-type UsageSection =
+export type UsageSection =
 	{ kind: "limit", window: UsageWindow }
 	| { kind: "facts", title: string, facts: { { label: string, value: string } } }
 	| { kind: "shares", title: string, shares: { { label: string, share: number } } }
 
 -- One service signed in on the host, or one `show_providers` asks for.
-type UsageProvider = {
+export type UsageProvider = {
 	id: string,
 	name: string,
 	-- A bundled logo (`agent-claude`), nil when the app has none for it.
@@ -1907,7 +1913,7 @@ type UsageProvider = {
 
 -- Plan usage of the AI services signed in on `host` (the `usage` provider),
 -- read every 10 minutes at most. Any message to `provider:usage` refreshes.
-type Usage = {
+export type Usage = {
 	available: boolean,
 	-- "local", "ssh:<target>" or "wsl:<distro>".
 	host: string?,
@@ -1923,7 +1929,7 @@ type Usage = {
 	headline: { string },
 }
 
-type Herdr = {
+export type Herdr = {
 	installed: boolean,
 	version: string?,
 	path: string?,
@@ -1938,7 +1944,7 @@ type Herdr = {
 
 -- `app.acp`, from providers/acp: coding agents run for mods over the
 -- Agent Client Protocol.
-type AcpAgent = {
+export type AcpAgent = {
 	-- "claude", "codex", "copilot", "gemini" or "opencode".
 	name: string,
 	title: string,
@@ -1948,7 +1954,7 @@ type AcpAgent = {
 	fetched: boolean,
 }
 
-type AcpTool = {
+export type AcpTool = {
 	id: string,
 	title: string,
 	-- "read", "edit", "delete", "move", "search", "execute", "think", "fetch", "other"...
@@ -1959,7 +1965,7 @@ type AcpTool = {
 	ms: number?,
 }
 
-type AcpRun = {
+export type AcpRun = {
 	id: string,
 	-- The mod that started it: the only one it obeys.
 	owner: string,
@@ -2003,7 +2009,7 @@ type AcpRun = {
 	timing: AcpTiming?,
 }
 
-type AcpTiming = {
+export type AcpTiming = {
 	spawned: number?,
 	initialized: number?,
 	session: number?,
@@ -2015,7 +2021,7 @@ type AcpTiming = {
 }
 
 -- The app as the window says an agent changes it.
-type AcpTarget = {
+export type AcpTarget = {
 	title: string,
 	-- Its own folder, the one agents write in (the user's folder over it,
 	-- when it is no one's source: `overlay`), and the folder they work in.
@@ -2030,7 +2036,7 @@ type AcpTarget = {
 	layers: { { role: string, path: string } },
 }
 
-type Acp = {
+export type Acp = {
 	available: boolean,
 	agents: { AcpAgent },
 	-- The agent a start without `agent` gets.
@@ -2054,7 +2060,7 @@ type Acp = {
 }
 
 -- `app.speech`, from providers/speech: dictation, for `use "dictation"`.
-type SpeechEngine = {
+export type SpeechEngine = {
 	name: string,
 	title: string,
 	kind: "apple" | "command" | "remote",
@@ -2065,7 +2071,7 @@ type SpeechEngine = {
 	reason: string?,
 }
 
-type Speech = {
+export type Speech = {
 	-- Some engine in `prefer` is ready; `reason` says why not otherwise.
 	available: boolean,
 	reason: string?,
@@ -2082,7 +2088,7 @@ type Speech = {
 
 -- A native provider's answer to an action a mod asked for, arriving in that
 -- mod's `update`: `reply` is the `id` the mod sent, else the action's name.
-type Reply = {
+export type Reply = {
 	reply: any,
 	action: string,
 	ok: boolean,
@@ -2092,7 +2098,7 @@ type Reply = {
 }
 
 -- `ui.mount { "explorer", id = "files-2", props = { ... } }`.
-type MountProps = {
+export type MountProps = {
 	mod: string?,
 	id: string?,
 	props: any,
@@ -2100,10 +2106,10 @@ type MountProps = {
 }
 
 -- What draws this build.
-type Renderer = "gpui" | "rune"
+export type Renderer = "gpui" | "rune"
 
 -- What every `view` gets as `app`.
-type App = {
+export type App = {
 	dark: boolean,
 	-- Absent where nothing draws, as in `--check`.
 	renderer: Renderer?,
@@ -2155,7 +2161,7 @@ type App = {
 -- `{ ask = true }` instead posts nothing and asks the user to allow
 -- notifications now (once; the first one posted asks otherwise), with
 -- `app.notifications` saying the answer.
-type NotifyMsg = {
+export type NotifyMsg = {
 	-- At most 256 bytes.
 	title: string,
 	-- At most 2048 bytes.
@@ -2172,9 +2178,9 @@ type NotifyMsg = {
 -- Windows, a bare binary) and a toast shows them; "denied" where the user
 -- turned them off, toasts showing them too; "undecided" until the user is
 -- asked.
-type NotificationPermission = "allowed" | "denied" | "undecided" | "in-window"
+export type NotificationPermission = "allowed" | "denied" | "undecided" | "in-window"
 
-type NotificationClick = {
+export type NotificationClick = {
 	id: string?,
 	clicked: boolean,
 }
@@ -2183,7 +2189,7 @@ type NotificationClick = {
 -- opened in a browser or another app: a module that subscribes to `app/url`
 -- hears `{ topic = "app/url", value = AppUrl }`. Anyone can open one: treat
 -- what it carries as untrusted.
-type AppUrl = {
+export type AppUrl = {
 	-- The whole link, as opened.
 	url: string,
 	-- Lowercase, one the app claims.
@@ -2201,7 +2207,7 @@ type AppUrl = {
 -- the mod as `reply` with `paths` (a list; `path` for a save) or
 -- `cancelled = true` added. What the user picks may show in that mod's
 -- `ui.image` (and its components').
-type PickMsg = {
+export type PickMsg = {
 	kind: ("open" | "folder" | "save")?,
 	reply: Data,
 	multiple: boolean?,
@@ -2219,7 +2225,7 @@ type PickMsg = {
 -- cache `~/.cache/<app>/images` or the share cache `~/.cache/<app>/share`)
 -- or picked by the user for the mod. With `reply`, the mod hears it
 -- back with `service` (the name of the one picked) or `cancelled = true`.
-type ShareMsg = {
+export type ShareMsg = {
 	-- A web address: https:// or http://.
 	url: string?,
 	-- At most 4096 bytes, beside the rest.
@@ -2232,7 +2238,7 @@ type ShareMsg = {
 -- What `{ to = "app:status-item", msg = ... }` shows: the mod's item in the
 -- menu bar (macOS), changed when asked again; `false` takes it away, and
 -- `{ popup = { StatusLine } }` drops a menu down from it at once.
-type StatusItemMsg = {
+export type StatusItemMsg = {
 	-- A system symbol's name (SF Symbols), such as "tray.and.arrow.down".
 	symbol: string?,
 	-- Or an image file, found as `app:icon` finds one.
@@ -2247,7 +2253,7 @@ type StatusItemMsg = {
 
 -- A line of a menu bar item's menu: "-", or an item whose click sends `msg`
 -- to the mod (or `to`). Without `msg` it is a heading. `shortcut` only shows.
-type StatusLine = "-" | {
+export type StatusLine = "-" | {
 	label: string,
 	msg: Data?,
 	to: string?,
@@ -2260,7 +2266,7 @@ type StatusLine = "-" | {
 -- press sending `msg` to the mod (or `to`) whichever app is in front; or,
 -- with `release = true`, gives them back. `keys` has two modifiers, not
 -- both shift ("ctrl-alt-l"), or is a function key.
-type HotkeyMsg = {
+export type HotkeyMsg = {
 	keys: string,
 	msg: Data?,
 	to: string?,
@@ -2270,7 +2276,7 @@ type HotkeyMsg = {
 -- What `{ to = "app:pdf", msg = ... }` makes: a page as a PDF file (macOS).
 -- One of `html`, `html_file` and `url`. With `reply`, the mod hears it back
 -- with `path` (the file written) or `error`.
-type PdfMsg = {
+export type PdfMsg = {
 	-- The page's text: no script, nothing from the network but `data:`.
 	html: string?,
 	-- An `.html` file under the app's cache or state folders, shown as `html`.
@@ -2293,7 +2299,7 @@ type PdfMsg = {
 -- replaces the selection and the `back` bytes before it: an `@name`
 -- completed, an emoji. A toolbar button can send it directly with
 -- `to = "app:edit"`.
-type EditMsg = {
+export type EditMsg = {
 	field: string,
 	wrap: { string }?,
 	lines: string?,
@@ -2310,7 +2316,7 @@ type EditMsg = {
 -- `{ open = "<mod>", send = <msg> }` first delivers `send` to its `update`,
 -- so it opens on a page; `{ close = "<mod>" }` closes it. Any mod may ask
 -- for any mod's window; never the shell's.
-type WindowMsg = string | { open: string, send: Data? } | { close: string }
+export type WindowMsg = string | { open: string, send: Data? } | { close: string }
 
 -- What the Developer tools (mods/devtools, and only it) ask with
 -- `{ to = "app:devtools", msg = ... }`: where they show; a Luau file of the
@@ -2318,7 +2324,7 @@ type WindowMsg = string | { open: string, send: Data? } | { close: string }
 -- `error`); a mod's state (with `state`, `problem`); or another element of
 -- the selection's trail to select. Answers come back as `reply` with fields
 -- added; picks arrive on `app/selection`, the place on `app/devtools`.
-type DevtoolsMsg =
+export type DevtoolsMsg =
 	{ place: "dock" | "window" | "closed" }
 	| { read: string, reply: Data? }
 	| { save: string, text: string, reply: Data? }
@@ -2336,7 +2342,7 @@ type DevtoolsMsg =
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
 -- `"app:devtools"` (`msg` a `DevtoolsMsg`), `"app:share"` (`msg` a `ShareMsg`), `"app:status-item"` (`msg` a
 -- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
-type Send = {
+export type Send = {
 	to: string,
 	msg: Data,
 }
@@ -2344,7 +2350,7 @@ type Send = {
 -- `titlebar = "hidden"` puts the layout under the title bar (macOS keeps its
 -- traffic lights, at `traffic_lights` from the top left) or drops the system
 -- frame (Linux, Windows). Give the layout a `drag = true` row to move it.
-type Window = {
+export type Window = {
 	titlebar: Titlebar?,
 	traffic_lights: { x: number?, y: number? }?,
 	-- The size the window opens at, before the user resizes it.
@@ -2358,7 +2364,7 @@ type Window = {
 -- control's `window` or `app:window` opens it: the size it opens at and
 -- the smallest the user can make it, each kept within the screen; 420x560
 -- and 280x240 when unset.
-type ModWindow = {
+export type ModWindow = {
 	size: { width: number, height: number }?,
 	min_size: { width: number, height: number }?,
 	-- The screen it opens on: an `id` from `app.displays`. "external" is the
@@ -2370,10 +2376,24 @@ type ModWindow = {
 	traffic_lights: { x: number?, y: number? }?,
 }
 
+-- What a mod's `window` takes: a `Window` in main.luau, a `ModWindow` in
+-- another mod, in one table type with the fields of both, since Luau's new
+-- solver cannot match a table literal against a union of two table types.
+-- The host reads the fields that apply where the mod is.
+export type WindowFrame = {
+	titlebar: Titlebar?,
+	traffic_lights: { x: number?, y: number? }?,
+	size: { width: number?, height: number? }?,
+	remember: boolean?,
+	min_size: { width: number, height: number }?,
+	display: ("primary" | "external" | number)?,
+	fullscreen: boolean?,
+}
+
 -- A menu item in the shell's `menus`: it sends `msg` (to the shell, or to
 -- `to`) or runs `command`; `shortcut` is a key as `keys` take them, such as
 -- "secondary-t". "-" between items draws a line.
-type MenuItem = {
+export type MenuItem = {
 	label: string,
 	msg: Data?,
 	to: string?,
@@ -2383,13 +2403,13 @@ type MenuItem = {
 
 -- `items` holds `MenuItem`s and "-"; typed loosely so items with `msg` and
 -- with `command` mix in one list. The host checks each.
-type AppMenu = {
+export type AppMenu = {
 	title: string,
 	items: { any },
 }
 
 -- What the About panel says besides the app's name and icon.
-type About = {
+export type About = {
 	name: string?,
 	version: string?,
 	description: string?,
@@ -2401,7 +2421,7 @@ type About = {
 -- and a new tab of it starts with `props`. `report` names the prop a tab
 -- passes as a message, whose `url` and `title` the tab keeps (a browser's
 -- `navigate`).
-type TabEntry = {
+export type TabEntry = {
 	title: string?,
 	icon: IconName?,
 	props: any,
@@ -2409,7 +2429,7 @@ type TabEntry = {
 }
 
 -- One of `app.kinds`: what a tab bar can open.
-type TabKind = {
+export type TabKind = {
 	-- "component:terminal" or "mod:explorer".
 	kind: string,
 	title: string,
@@ -2418,7 +2438,7 @@ type TabKind = {
 	report: string?,
 }
 
-type Mod<State> = {
+export type Mod<State> = {
 	-- `props` is what an instance was mounted with (`ui.mount { "name",
 	-- id = ..., props = ... }`), nil for a mod in its own place. `restored`
 	-- says `previous` was saved by an earlier run, not kept across a reload.
@@ -2446,7 +2466,7 @@ type Mod<State> = {
 	styles: { [string]: Style }?,
 	-- In main.luau, the main window's frame, read when the app starts (a
 	-- `Window`); in another mod, the size of its own window (a `ModWindow`).
-	window: (Window | ModWindow)?,
+	window: WindowFrame?,
 	-- Only in main.luau: menus after the app menu (a "View" one merges into
 	-- the host's), and what About says.
 	menus: { AppMenu }?,
@@ -2456,7 +2476,7 @@ type Mod<State> = {
 declare function mod<State>(definition: Mod<State>): Mod<State>
 
 -- The fixed-width font terminals and `font = "mono"` text use.
-type MonoFont = {
+export type MonoFont = {
 	family: string?,
 	size: number?,
 	-- 100 (thin) to 900 (black); 400 is regular.
@@ -2470,7 +2490,7 @@ type MonoFont = {
 	ligatures: boolean?,
 }
 
-type Stylesheet = {
+export type Stylesheet = {
 	font_size: number?,
 	font_family: string?,
 	mono: MonoFont?,
@@ -2495,7 +2515,7 @@ declare function style(sheet: Stylesheet): Stylesheet
 
 -- A component in components/<name>.luau: a ready-made piece of view that
 -- mods `use`, listed in the Components gallery with a preview of `example`.
-type Component<Props> = {
+export type Component<Props> = {
 	title: string?,
 	description: string?,
 	-- The heading it is listed under in the Components gallery.
