@@ -1608,6 +1608,32 @@ type GitDiff = {
 	hunks: { { header: string, old_start: number, new_start: number, lines: { GitDiffLine } } },
 }
 
+-- One commit with what it changed, against its first parent (a first
+-- commit against nothing).
+type GitShown = {
+	sha: string,
+	short: string,
+	parents: { string },
+	author: string,
+	email: string,
+	-- Seconds since 1970.
+	time: number,
+	refs: { string },
+	subject: string,
+	-- The message past its subject, or "".
+	body: string,
+	-- "<status>\t<added>\t<deleted>\t<path>", status A, D, M or R; at most
+	-- 400, then `truncated`, with `count` all of them.
+	files: { string },
+	count: number,
+	truncated: boolean,
+	added: number,
+	deleted: number,
+	-- One of its files, asked for with `{ show_diff = path }`, until
+	-- `{ show_diff = false }`.
+	diff: GitDiff?,
+}
+
 type Git = {
 	available: boolean,
 	reason: string?,
@@ -1640,6 +1666,8 @@ type Git = {
 	log: { GitCommit }?,
 	-- The file asked for with `{ diff = path }`, until `{ diff = false }`.
 	diff: GitDiff?,
+	-- The commit asked for with `{ show = sha }`, until `{ show = false }`.
+	commit: GitShown?,
 }
 
 -- A forge account; `avatar_path` is a cached image file once downloaded.

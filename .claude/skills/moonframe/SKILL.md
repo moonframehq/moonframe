@@ -2273,6 +2273,7 @@ repository is refused with the reason. Pick the folder with `app:pick`
 | `stashes` | count |
 | `log` | once a mod sends `{ log = 200 }` (at most 500; `false` stops it): `{ sha, short, parents, author, time, refs, subject }`, children before parents, of every branch, tag and HEAD. Draw it with `use "commit-graph"`; the `history` mod is a tab that does |
 | `diff` | `{ path, binary, lines, truncated, hunks = { { header, old_start, new_start, lines = { { kind ("add" "del" "ctx"), old?, new?, text } } } } }`, at most 1200 lines of 300 characters |
+| `commit` | once a mod sends `{ show = sha }` (a full or short hex id; `false` stops it): `{ sha, short, parents, author, email, time, refs, subject, body, files, count, truncated, added, deleted }`, `files` as `"<status>\t<added>\t<deleted>\t<path>"` for `change-tree`, at most 400. A merge is compared with its first parent. `{ show_diff = path }` adds one of its files as `diff`, shaped as above (`false` stops it); `examples/strata` uses both |
 
 `app.docs` (docs, native): `{ available, root }`, the root `app.files`
 lists, followed as it moves; a file read before it moved is still watched

@@ -85,7 +85,7 @@ fn commit(fields: &[&str; FIELDS]) -> Option<Value> {
 }
 
 /// `HEAD -> main, origin/main, tag: v1` as `main`, `origin/main`, `v1`.
-fn names(refs: &str) -> Vec<&str> {
+pub(crate) fn names(refs: &str) -> Vec<&str> {
     refs.split(", ")
         .map(|name| name.strip_prefix("HEAD -> ").unwrap_or(name))
         .map(|name| name.strip_prefix("tag: ").unwrap_or(name))
