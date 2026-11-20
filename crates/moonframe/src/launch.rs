@@ -40,6 +40,8 @@ pub struct Moonframe {
     pub(crate) agent: AgentHints,
     pub(crate) natives: Natives,
     pub(crate) views: Registry,
+    /// The mod whose menu bar item the main window hangs under; see [`Moonframe::panel`].
+    pub(crate) panel: Option<String>,
     pub(crate) log: String,
     /// The app's own log layers, from [`Moonframe::log_layer`].
     pub(crate) log_layers: Vec<LogLayer>,
@@ -95,6 +97,7 @@ impl Moonframe {
             log_layers: Vec::new(),
             natives: crate::natives::natives(),
             views: Registry::default(),
+            panel: None,
             assets: None,
             #[cfg(feature = "tokio")]
             runtime: None,
@@ -318,6 +321,19 @@ impl Moonframe {
     /// The log filter used when `RUST_LOG` is not set.
     pub fn log(mut self, filter: &str) -> Self {
         filter.clone_into(&mut self.log);
+        self
+    }
+
+    /// Runs as a menu bar app, on macOS: no Dock icon, and the main window
+    /// is a panel under the menu bar item of the mod `owner`
+    /// (`app:status-item`). A click on the item shows it, a click elsewhere
+    /// hides it, and so do closing it, minimizing it and Cmd-W: the app
+    /// quits only on Quit. The item's menu opens on a right click. While
+    /// `owner` shows no item, the app keeps its Dock icon and the window is a
+    /// normal one, so the app is never out of reach. Elsewhere, and without
+    /// the `status-item` feature, the window stays a normal one.
+    pub fn panel(mut self, owner: &str) -> Self {
+        self.panel = Some(owner.to_owned());
         self
     }
 

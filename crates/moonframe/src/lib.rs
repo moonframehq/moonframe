@@ -66,6 +66,7 @@ mod mod_window;
 mod motion;
 mod natives;
 mod overlay;
+mod panel;
 mod panes;
 mod pdf;
 #[cfg(any(feature = "terminal", feature = "herdr-core"))]

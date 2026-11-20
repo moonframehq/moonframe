@@ -662,6 +662,7 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
     }
     let component = args.component.filter(|_| !crate::release());
     let (natives, views) = (launch.natives, launch.views);
+    let panel = launch.panel.take();
     // Where the main window was, read before the window opens; only with
     // the user's folder, as the rest of what the app keeps.
     let placement = folders.user.as_ref().map(|_| {
@@ -672,11 +673,19 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
     let application =
         gpui_kit::application().with_assets(crate::assets::Assets::new(launch.assets));
     crate::app::links::listen(&application, folders.schemes());
+    if panel.is_some() {
+        crate::panel::listen(&application);
+    }
     application.run(move |cx| {
         crate::app::list_fonts_ahead(cx);
         gpui_kit::init(cx);
         crate::actions::bind_keys(cx);
         crate::host_menus::install(&[], cx);
+        // A panel app has no Dock icon, from before its window opens.
+        if let Some(owner) = &panel {
+            crate::panel::start(owner, cx);
+        }
+        let panel = crate::panel::on();
         cx.on_action(|_: &crate::actions::Quit, cx| crate::app::guard::quit(cx));
         cx.on_window_closed(|cx, id| {
             crate::video::window_closed(id);
@@ -732,7 +741,8 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
             },
             cx,
         );
-        let placement = placement.filter(|_| chrome.remember);
+        // A panel hangs under its item: no place to remember.
+        let placement = placement.filter(|_| chrome.remember && !panel);
         // The shell's size if it asks, kept within the screen.
         let (width, height) = chrome.size.unwrap_or((1280., 820.));
         let screen = cx.primary_display().map(|display| display.bounds().size);
@@ -763,10 +773,14 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
             display_id,
             window_min_size: Some(size(px(640.), px(400.))),
             app_id: Some(crate::app_id()),
-            focus: !background,
+            focus: !background && !panel,
+            show: !panel,
             ..framed(chrome)
         };
         let opened = cx.open_window(options, |window, cx| {
+            if panel {
+                crate::panel::attach(window, cx);
+            }
             let view = cx.new(|cx| {
                 let mut app = MoonframeApp::new(
                     workspace,
@@ -790,7 +804,7 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
             eprintln!("{}: unable to open a window: {error}", paths::name());
             cx.quit();
         }
-        if !background {
+        if !background && !panel {
             cx.activate(true);
         }
         // After the window: nothing waits for it, and it takes a while.

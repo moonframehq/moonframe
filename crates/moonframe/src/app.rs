@@ -14,7 +14,7 @@ use {
         inspect::{self, Inspector, Placed},
         mod_window::ModWindow,
         motion::Motion,
-        packages,
+        packages, panel,
         paths::{self, Folders},
         render::{Finished, KeyLayer, ListRequest, Painter, cached::Cached},
         settings,
@@ -628,6 +628,18 @@ impl MoonframeApp {
     }
 
     fn run(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
+        // A panel hides; it is never minimized, closed or opened twice.
+        match panel::route(command, window) {
+            Some(panel::Route::Hide) => {
+                panel::hide();
+                return;
+            },
+            Some(panel::Route::Show) => {
+                panel::show();
+                return;
+            },
+            None => {},
+        }
         match command {
             // Unless a mod in any window holds it back.
             Command::Quit => cx.defer(guard::quit),
@@ -700,6 +712,8 @@ impl MoonframeApp {
         if !requests.is_empty() {
             self.carry_out(requests, cx);
         }
+        // After the requests carried out above: whether the panel's item is there.
+        cx.defer(panel::check);
     }
 
     /// Does what mods asked of the app (`to = "app:<what>"`), once the
@@ -758,7 +772,14 @@ impl MoonframeApp {
             .into_iter()
             .find(|window| window.window_id() == main)
         {
-            let _ = window.update(cx, |_, window, _| window.activate_window());
+            // A panel comes forward under its item.
+            let _ = window.update(cx, |_, window, _| {
+                if panel::is(window) {
+                    panel::show();
+                } else {
+                    window.activate_window();
+                }
+            });
         }
     }
 
