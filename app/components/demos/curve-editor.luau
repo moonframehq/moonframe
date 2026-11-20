@@ -7,7 +7,13 @@ local segmented = use "segmented"
 local COLORS = { rgb = nil, red = "#ef4444", green = "#22c55e", blue = "#3b82f6" }
 local HISTOGRAM = { 1, 3, 8, 16, 30, 46, 58, 62, 55, 44, 40, 46, 52, 44, 30, 18, 9, 4, 2, 1 }
 
-return mod {
+-- Each channel's points, by channel name.
+type State = {
+	channel: string,
+	curves: { [string]: { { number } } },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {

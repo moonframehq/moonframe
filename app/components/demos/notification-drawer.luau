@@ -4,7 +4,9 @@
 local notification_drawer = use "notification-drawer"
 local icon_button = use "icon-button"
 
-local function samples()
+type Item = { id: number, title: string, body: string, time: string, level: string, read: boolean }
+
+local function samples(): { Item }
 	return {
 		{ id = 1, title = "CRM sync failed - auth token expired", body = "The OAuth token for the CRM has expired. Re-authenticate to resume syncing.", time = "15m ago", level = "error", read = false },
 		{ id = 2, title = "Lead scoring pipeline completed", body = "Processed and scored 284 new leads from the sales inbox.", time = "30m ago", level = "success", read = false },
@@ -14,7 +16,13 @@ local function samples()
 	}
 end
 
-return mod {
+type State = {
+	open: boolean,
+	filter: string,
+	items: { Item },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = true, filter = "all", items = samples() }
 	end,

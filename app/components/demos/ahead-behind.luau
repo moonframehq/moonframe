@@ -3,7 +3,13 @@
 local ahead_behind = use "ahead-behind"
 local switch = use "switch"
 
-return mod {
+type State = {
+	ahead: number,
+	behind: number,
+	synced: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { ahead = 2, behind = 1, synced = true }
 	end,

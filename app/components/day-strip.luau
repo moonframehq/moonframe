@@ -51,7 +51,7 @@ return component {
 
 	build = function(props: Props)
 		local key = props.event or "select"
-		local cells = {}
+		local cells: { Element } = {}
 		for _, day in props.days do
 			local number = { "day-strip-number" }
 			local weekday = { "day-strip-weekday" }

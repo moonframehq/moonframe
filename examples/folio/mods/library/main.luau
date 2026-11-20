@@ -12,7 +12,7 @@ local SECTIONS: { { id: string, label: string, icon: any } } = {
 }
 
 -- How many documents each section holds.
-local function counts(documents: { any })
+local function counts(documents: { any }): { [string]: number }
 	local all, favorites, trash = 0, 0, 0
 	for _, doc in documents do
 		if doc.trashed then

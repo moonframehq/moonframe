@@ -100,7 +100,7 @@ return mod {
 			local apps = data.apps
 			local row = run.row
 			local current = apps[row]
-			local lines = {}
+			local lines: { Element } = {}
 			for _, agent in data.agents do
 				local done, total = tally(apps, agent.id, function(index)
 					return index < row
@@ -145,7 +145,7 @@ return mod {
 				height = 38,
 				align = "center",
 				gap = "normal",
-				ui.icon { name = "loader-circle", size = "small", spin = run.playing, class = "plan-active" },
+				ui.icon { name = "loader-circle", size = "small", spin = run.playing :: boolean, class = "plan-active" },
 				ui.text { text, truncate = true },
 				ui.spacer(),
 				ui.text { detail, class = "plan-count" },
@@ -162,7 +162,7 @@ return mod {
 				{ active = `{run.reviewed} of {n}`, done = `{n} reviewed` },
 				{ active = "Writing", done = "Ready" },
 			}
-			local steps = {}
+			local steps: { Element } = {}
 			for index, title in data.steps do
 				local kind = if index < s then "done" elseif index == s then "active" else "pending"
 				local extra = nil
@@ -239,7 +239,7 @@ return mod {
 			}
 		end
 
-		local body = {}
+		local body: { Element } = {}
 		if data and run then
 			table.insert(body, chat_message { from = "user", text = data.prompt })
 			table.insert(body, ui.column {

@@ -3,7 +3,12 @@
 local course_card = use "course-card"
 local heat_grid = use "heat-grid"
 
-return mod {
+type State = {
+	done: number,
+	total: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { done = 3, total = 8 }
 	end,

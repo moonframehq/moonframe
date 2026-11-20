@@ -18,6 +18,10 @@ type State = {
 	workspace: { path: string, name: string, branch: string }?,
 }
 
+-- A repository: its main work tree's name and path, and its work trees
+-- as the projects provider lists them.
+type Repo = { name: string, path: string, trees: { any } }
+
 local function workspace_of(project: any): any
 	return { path = project.path, name = project.name, branch = project.branch }
 end
@@ -116,7 +120,7 @@ return mod {
 
 		-- Each project by its path, and the repositories by their main
 		-- work tree, in the order their newest work tree comes.
-		local by_path, repos, order = {}, {}, {}
+		local by_path: { [string]: any }, repos: { [string]: Repo }, order: { string } = {}, {}, {}
 		for _, project in (projects and projects.projects) or {} do
 			by_path[project.path] = project
 		end
@@ -133,7 +137,7 @@ return mod {
 		for _, main in order do
 			local repo = repos[main]
 			local rows = {}
-			local trees = if #repo.trees > 0 then repo.trees else { { path = repo.path, branch = (by_path[repo.path] or {}).branch, primary = true } }
+			local trees: { any } = if #repo.trees > 0 then repo.trees else { { path = repo.path, branch = (by_path[repo.path] or {}).branch, primary = true } }
 			for _, tree in trees do
 				local project = by_path[tree.path]
 				local branch = tree.branch or (project and project.branch) or "detached"

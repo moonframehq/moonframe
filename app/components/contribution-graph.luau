@@ -29,8 +29,8 @@ type Props = {
 	to: string?,
 }
 
-local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
-local MONTH_NAMES = {
+local MONTHS: { string } = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+local MONTH_NAMES: { string } = {
 	"January",
 	"February",
 	"March",
@@ -44,7 +44,7 @@ local MONTH_NAMES = {
 	"November",
 	"December",
 }
-local WEEKDAYS = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" }
+local WEEKDAYS: { string } = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" }
 
 -- Days since 1970-01-01 for a date, and back (Howard Hinnant's algorithms).
 local function days_from_civil(y: number, m: number, d: number): number
@@ -204,11 +204,11 @@ contribution_graph {
 		local lead = row_of(first) - 1
 		local weeks = (lead + count + 6) // 7
 
-		local columns = {}
-		local labels = {}
-		local last_month = nil
+		local columns: { Element } = {}
+		local labels: { Element } = {}
+		local last_month: number? = nil
 		local label_start = 1
-		local label_text = nil
+		local label_text: string? = nil
 		local function close_label(upto: number)
 			local span = upto - label_start
 			if span > 0 then
@@ -223,7 +223,7 @@ contribution_graph {
 		end
 
 		for week = 1, weeks do
-			local cells = {}
+			local cells: { Element } = {}
 			for row = 1, 7 do
 				local index = (week - 1) * 7 + row - lead
 				-- Keep every week seven rows tall, including a short range.
@@ -264,7 +264,7 @@ contribution_graph {
 		end
 		close_label(weeks + 1)
 
-		local day_labels = {}
+		local day_labels: { Element } = {}
 		for row = 1, 7 do
 			local weekday = if monday then row % 7 + 1 else row
 			local name = WEEKDAYS[weekday]

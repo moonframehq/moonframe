@@ -34,7 +34,7 @@ return component {
 		local count = math.max(1, math.floor(props.ticks or 110))
 		local lit = math.round(math.clamp(props.value or 0, 0, 1) * count)
 		local color = props.color
-		local ticks = table.create(count)
+		local ticks = table.create<<Element>>(count)
 		for index = 1, count do
 			local on = index <= lit
 			ticks[index] = ui.row {

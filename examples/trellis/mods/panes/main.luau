@@ -69,8 +69,8 @@ local function new_tab(state: State)
 		state.full = true
 		return
 	end
-	local leaf = { id = fresh(state, "p"), kind = "term", slot = slot }
-	local tab = { id = fresh(state, "tab"), title = `Terminal {#state.tabs + 1}`, root = leaf, focus = leaf.id }
+	local leaf: Node = { id = fresh(state, "p"), kind = "term", slot = slot }
+	local tab: Tab = { id = fresh(state, "tab"), title = `Terminal {#state.tabs + 1}`, root = leaf, focus = leaf.id }
 	if #state.tabs == 0 then
 		tab.title = "Terminal"
 	end
@@ -122,7 +122,7 @@ local function split(state: State, kind: string, at: string?)
 		return
 	end
 	local target = at or tab.focus
-	local made = { id = fresh(state, "p"), kind = "term", slot = slot }
+	local made: Node = { id = fresh(state, "p"), kind = "term", slot = slot }
 	local root = replace(tab.root, target, function(leaf: Node): Node?
 		return { id = fresh(state, "s"), kind = kind, a = leaf, b = made }
 	end)
@@ -221,7 +221,7 @@ return mod {
 		local window = app.window
 		local inset = not props.sidebar and window.platform == "macos" and not window.fullscreen
 
-		local strip = {}
+		local strip: { Element } = {}
 		for _, each in state.tabs do
 			local count = #all_leaves(each.root)
 			local selected = tab ~= nil and each.id == tab.id

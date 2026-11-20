@@ -20,8 +20,8 @@ type State = {
 	show: "words" | "characters" | "sentences" | "reading",
 }
 
-return mod {
-	init = function(previous: State?): State
+return mod<<State>> {
+	init = function(previous)
 		return previous or { dim = "sentence", typewriter = false, text = TEXT, show = "words" }
 	end,
 

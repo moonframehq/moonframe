@@ -24,6 +24,9 @@ type State = {
 	reopened: boolean,
 }
 
+-- A folder of projects in the list, with its rows.
+type Group = { title: string, rows: { any } }
+
 local function name_of(path: string): string
 	return string.match(path, "([^/\\]+)[/\\]*$") or path
 end
@@ -227,7 +230,7 @@ return mod {
 		-- Projects by their folder, in the order the provider lists them
 		-- (most recently active first), and by path to find a recent one.
 		local by_path: { [string]: any } = {}
-		local groups: { { title: string, rows: { any } } } = {}
+		local groups: { Group } = {}
 		local group_of: { [string]: number } = {}
 		for _, project in (projects and projects.projects) or {} do
 			by_path[project.path] = project
@@ -245,7 +248,8 @@ return mod {
 				local folder = project.home or "Elsewhere"
 				local index = group_of[folder]
 				if not index then
-					table.insert(groups, { title = folder, rows = {} })
+					local group: Group = { title = folder, rows = {} }
+					table.insert(groups, group)
 					index = #groups
 					group_of[folder] = index
 				end

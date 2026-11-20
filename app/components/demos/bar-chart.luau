@@ -20,7 +20,13 @@ local DAYS: { { any } } = {
 	{ "Sun", { 8, 2, 2 } },
 }
 
-return mod {
+type State = {
+	shown: { [string]: boolean },
+	axis: boolean,
+	legend: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { shown = { input = true, output = true, cache = true }, axis = true, legend = true }
 	end,

@@ -3,7 +3,14 @@
 local error_state = use "error-state"
 local switch = use "switch"
 
-return mod {
+type State = {
+	retrying: boolean,
+	attempts: number,
+	block: boolean,
+	note: string,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { retrying = false, attempts = 0, block = false, note = "" }
 	end,

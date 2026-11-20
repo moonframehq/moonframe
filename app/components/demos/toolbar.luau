@@ -2,7 +2,12 @@
 -- list, Remove deletes the last branch.
 local toolbar = use "toolbar"
 
-return mod {
+type State = {
+	branches: { string },
+	next: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { branches = { "main", "fix/menus", "feature/inspect" }, next = 1 }
 	end,
@@ -19,7 +24,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local rows = {}
+		local rows: { Element } = {}
 		for _, branch in state.branches do
 			table.insert(rows, ui.item { branch, detail = "~/code/ledger-api" })
 		end

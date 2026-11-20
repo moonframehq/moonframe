@@ -144,7 +144,7 @@ return mod {
 	end,
 
 	view = function(state: State)
-		local kpis = {}
+		local kpis: { Element } = {}
 		for _, kpi in KPIS do
 			table.insert(kpis, ui.column {
 				class = "kpi",
@@ -182,7 +182,7 @@ return mod {
 			table.insert(head, cell(column.width, ui.text(column.title)))
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		for _, workflow in state.workflows do
 			table.insert(rows, ui.row {
 				class = "table-row",
@@ -226,7 +226,7 @@ return mod {
 			})
 		end
 
-		local templates = {}
+		local templates: { Element } = {}
 		for i = state.first, math.min(#TEMPLATES, state.first + SHOWN - 1) do
 			local template = TEMPLATES[i]
 			table.insert(templates, ui.column {

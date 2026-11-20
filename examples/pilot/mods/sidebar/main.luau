@@ -302,7 +302,7 @@ return mod {
 				return built
 			end)
 		end
-		local nav = {}
+		local nav: { Element } = {}
 		for _, page in PAGES do
 			table.insert(nav, ui.row {
 				class = "side-page",

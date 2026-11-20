@@ -22,8 +22,8 @@ local function plural(n: number, one: string, many: string): string
 	return `{n} {if n == 1 then one else many}`
 end
 
--- The four figures of `text`.
-local function count(text: string, wpm: number)
+-- The four figures of `text`, by name.
+local function count(text: string, wpm: number): { [string]: string }
 	local words = 0
 	for _ in string.gmatch(text, "[%w'’]+") do
 		words += 1

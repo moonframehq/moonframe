@@ -177,14 +177,14 @@ return mod {
 
 		local body
 		if state.view == "list" then
-			local rows = {}
+			local rows: { { [string]: any } } = {}
 			local stage_names = {}
 			for _, stage in data.stages do
 				stage_names[stage.id] = stage.label
 			end
 			for _, deal in data.deals do
 				if shown(deal) then
-					table.insert(rows, {
+					rows[#rows + 1] = {
 						id = deal.id,
 						company = deal.company,
 						summary = deal.summary,
@@ -193,7 +193,7 @@ return mod {
 						date = deal.date,
 						owner = deal.owner,
 						chance = `{deal.chance}%`,
-					})
+					}
 				end
 			end
 			body = table_view {
@@ -210,7 +210,7 @@ return mod {
 				rows = rows,
 			}
 		else
-			local lanes = {}
+			local lanes: { Element } = {}
 			for _, stage in data.stages do
 				local cards = {}
 				for _, deal in data.deals do

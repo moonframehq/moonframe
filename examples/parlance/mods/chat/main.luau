@@ -106,7 +106,7 @@ return mod {
 		local chat = chats and chats.chat
 		local streaming = chats ~= nil and chats.streaming == true
 		local messages = if chat then chat.messages else {}
-		local turns = {}
+		local turns: { Element } = {}
 		for index, message in messages do
 			local last = index == #messages
 			if message.role == "user" then

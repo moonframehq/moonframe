@@ -18,7 +18,15 @@ local function figure(label: string, value: string)
 	}
 end
 
-return mod {
+type State = {
+	zoom: number?,
+	center: { number },
+	gain: number,
+	stats: { [string]: any },
+	probed: { [string]: any }?,
+}
+
+return mod<<State>> {
 	region = "main",
 
 	init = function(previous)

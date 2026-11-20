@@ -5,7 +5,31 @@ local switch = use "switch"
 local segmented = use "segmented"
 local dropdown = use "dropdown"
 
-local SAVED = { preset = "comfortable", footer = "always", agents = true, icons = false, theme = "dark", ligatures = true }
+type Values = {
+	preset: string,
+	footer: string,
+	agents: boolean,
+	icons: boolean,
+	theme: string,
+	ligatures: boolean,
+	-- The switches flip their setting by name.
+	[string]: string | boolean,
+}
+
+type State = {
+	page: string,
+	values: Values,
+	saved: Values,
+	preset_open: boolean,
+}
+
+type Page = {
+	title: string,
+	subtitle: string?,
+	sections: { { title: string, rows: { any } } },
+}
+
+local SAVED: Values = { preset = "comfortable", footer = "always", agents = true, icons = false, theme = "dark", ligatures = true }
 
 local PRESETS = {
 	{ id = "comfortable", label = "Comfortable Rounded" },
@@ -30,7 +54,7 @@ local NAV_GROUPS = {
 	},
 }
 
-local function pages(state)
+local function pages(state: State): { [string]: Page }
 	local v = state.values
 	return {
 		sidebar = {
@@ -108,7 +132,7 @@ local function pages(state)
 	}
 end
 
-local function dirty(state): boolean
+local function dirty(state: State): boolean
 	for key in SAVED do
 		if state.values[key] ~= state.saved[key] then
 			return true
@@ -117,7 +141,7 @@ local function dirty(state): boolean
 	return false
 end
 
-return mod {
+return mod<<State>> {
 	init = function(previous)
 		return previous or { page = "sidebar", values = table.clone(SAVED), saved = table.clone(SAVED), preset_open = false }
 	end,

@@ -140,7 +140,7 @@ code_view {
 				row = draw,
 			}
 		else
-			local rows = table.create(#lines)
+			local rows = table.create<<Element>>(#lines)
 			for index = 1, #lines do
 				rows[index] = draw(index)
 			end
@@ -148,7 +148,7 @@ code_view {
 				class = "code-view-body",
 				height = props.height,
 				grow = props.grow,
-				scroll = scrolls and "both",
+				scroll = if scrolls then "both" else false,
 				table.unpack(rows),
 			}
 		end

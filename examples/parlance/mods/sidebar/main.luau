@@ -70,7 +70,7 @@ return mod {
 	view = function(state: State, app)
 		local chats = app.chats
 		local current = chats and chats.current
-		local rows = {}
+		local rows: { Element } = {}
 
 		local function folder(group: any)
 			local open = state.open[group.id] == true

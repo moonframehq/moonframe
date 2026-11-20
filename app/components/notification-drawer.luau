@@ -225,7 +225,7 @@ notification_drawer {
 		local inside = width - 2 * SIDE - 2 * TRACK
 		local cell = inside / math.max(1, #filters)
 
-		local tabs = {}
+		local tabs: { Element } = {}
 		for i, filter in filters do
 			local count = filter.count
 			if count == nil then

@@ -57,7 +57,7 @@ return component {
 		local steps = 120
 		local here = math.floor(watched * steps + 0.5)
 		local buffered = math.min(steps, here + 28)
-		local scrub = {}
+		local scrub: { Element } = {}
 		for step = 1, steps do
 			local fill = if step <= here then "accent" elseif step <= buffered then "#ffffff59" else "#ffffff26"
 			table.insert(scrub, ui.row {
@@ -127,7 +127,7 @@ return component {
 
 		-- Overview, transcript or resources under the player.
 		local body
-		local resources = {}
+		local resources: { Element } = {}
 		for _, file in course.resources do
 			table.insert(resources, ui.row {
 				class = "file-row",
@@ -155,7 +155,7 @@ return component {
 			})
 		end
 		if state.tab == "transcript" then
-			local lines = {}
+			local lines: { Element } = {}
 			for _, line in lesson.transcript or {} do
 				table.insert(lines, ui.row {
 					gap = "large",
@@ -171,7 +171,7 @@ return component {
 		elseif state.tab == "resources" then
 			body = ui.column { gap = "small", max_width = 520, table.unpack(resources) }
 		else
-			local takeaways = {}
+			local takeaways: { Element } = {}
 			for _, line in lesson.takeaways or {} do
 				table.insert(takeaways, ui.row {
 					class = "takeaway",
@@ -257,7 +257,7 @@ return component {
 		}
 
 		-- The syllabus on the right.
-		local rows = {}
+		local rows: { Element } = {}
 		for number, item in lessons do
 			local is_done = number <= state.completed
 			local is_next = number == state.completed + 1

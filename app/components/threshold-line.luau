@@ -95,7 +95,7 @@ return component {
 			return false
 		end
 
-		local layers = {}
+		local layers: { Element } = {}
 		-- Runs of segments with an end past the threshold, redrawn over it.
 		local start: number? = nil
 		for index = 1, #points do

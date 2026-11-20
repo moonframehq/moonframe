@@ -168,7 +168,7 @@ return mod {
 		end
 		section("folders", "Folders", folders, true)
 		local tags = {}
-		for _, tag in (planner and planner.tags) or {} do
+		for _, tag: any in (planner and planner.tags) or {} do
 			table.insert(tags, row(
 				ui.row { width = 8, height = 8, style = { background = tag.color, radius = 4 } },
 				tag.name,

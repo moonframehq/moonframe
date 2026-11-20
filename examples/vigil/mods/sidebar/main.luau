@@ -64,11 +64,11 @@ return mod {
 				ui.text { item.label, class = "side-label", state = if on then "on" else nil },
 			}
 		end
-		local top = {}
+		local top: { Element } = {}
 		for _, item in PAGES do
 			table.insert(top, row(item))
 		end
-		local bottom = {}
+		local bottom: { Element } = {}
 		for _, item in ACCOUNT do
 			table.insert(bottom, row(item))
 		end

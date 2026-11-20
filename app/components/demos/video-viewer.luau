@@ -3,7 +3,12 @@
 -- `examples/framebench` runs it against a real ring.
 local video_viewer = use "video-viewer"
 
-return mod {
+type State = {
+	zoom: number?,
+	center: { number },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { zoom = nil :: number?, center = { 0.5, 0.5 } }
 	end,

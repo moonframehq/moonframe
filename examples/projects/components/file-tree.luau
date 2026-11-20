@@ -61,7 +61,7 @@ return component {
 		local toggle = props.toggle or "toggle"
 		local pick = props.pick or "pick"
 		local indent = props.indent or 14
-		local rows = {}
+		local rows: { Element } = {}
 
 		local function add(dir: string, depth: number)
 			local entries = dirs[dir]

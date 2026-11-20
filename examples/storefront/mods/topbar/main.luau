@@ -72,7 +72,7 @@ return mod {
 		[".topbar-tools"] = { gap = 4, padding = { right = 14 } },
 	},
 
-	init = function(previous: State?): State
+	init = function(previous: State?): (State, { Send })
 		if previous and previous.tabs then
 			return previous, publish(previous)
 		end

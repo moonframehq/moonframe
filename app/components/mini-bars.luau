@@ -53,7 +53,7 @@ return component {
 			end
 		end
 		local on = props.highlight or last
-		local columns = {}
+		local columns: { Element } = {}
 		for index, bar in props.bars do
 			local size = if most > 0 then math.max(3, bar.value / most * height) else 3
 			local body

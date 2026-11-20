@@ -403,7 +403,7 @@ return mod {
 					shrink = false,
 					align = "center",
 					justify = "center",
-					style = { background = thread.color },
+					style = { background = thread.color :: Color },
 					ui.text { (string.match(thread.sender, "^" .. utf8.charpattern) or ""), size = "small", weight = "bold" },
 				}
 			end
@@ -606,7 +606,7 @@ return mod {
 
 		-- The card's head: the title with its menu, compose, search, then the
 		-- filter tabs with their unread counts.
-		local tabs = {}
+		local tabs: { Element } = {}
 		for _, filter in FILTERS do
 			local count = if filter.id == "all" then 0 else unread_in(state, filter.id)
 			table.insert(tabs, ui.row {

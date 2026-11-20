@@ -12,7 +12,13 @@ local LABELS = {
 	delete = "Delete worktree checkout",
 }
 
-return mod {
+type State = {
+	open: boolean,
+	teleported: boolean,
+	last: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = true, teleported = false, last = nil }
 	end,

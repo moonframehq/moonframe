@@ -32,7 +32,11 @@ local RELEASES: { any } = {
 	},
 }
 
-return mod {
+type State = {
+	open: { [string]: boolean },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = { ["1.4.0"] = true } }
 	end,
@@ -44,7 +48,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local items = {}
+		local items: { Element } = {}
 		for _, release in RELEASES do
 			items[#items + 1] = release_notes {
 				name = "Moonframe",

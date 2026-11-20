@@ -129,7 +129,7 @@ return mod {
 			},
 		}
 
-		local cells = {}
+		local cells: { Element } = {}
 		for index, kpi in reports.kpis do
 			if index > 1 then
 				table.insert(cells, ui.row { class = "strip-rule", width = 1 })
@@ -149,7 +149,7 @@ return mod {
 
 		-- On time by notice type.
 		local track = 340
-		local types = {}
+		local types: { Element } = {}
 		for _, kind in reports.types do
 			table.insert(types, ui.row {
 				align = "center",
@@ -180,7 +180,7 @@ return mod {
 
 		-- Payment speed by month.
 		local month = state.month or #reports.months
-		local months = {}
+		local months: { Element } = {}
 		for index, m in reports.months do
 			local on = index == month
 			table.insert(months, ui.column {
@@ -195,7 +195,7 @@ return mod {
 				ui.row { class = if on then "month-bar-on" else "month-bar", width = 102, height = math.floor((m.value - 70) * 10.5) },
 			})
 		end
-		local labels = {}
+		local labels: { Element } = {}
 		for _, m in reports.months do
 			table.insert(labels, ui.column {
 				grow = true,
@@ -214,7 +214,7 @@ return mod {
 		}
 
 		-- Gaps in the public record.
-		local gaps = {}
+		local gaps: { Element } = {}
 		for index, gap in reports.gaps do
 			table.insert(gaps, ui.row {
 				class = if index == #reports.gaps then { "kv", "kv-last" } else "kv",
@@ -232,7 +232,7 @@ return mod {
 		}
 
 		-- The export pack: tick the files to include.
-		local exports = {}
+		local exports: { Element } = {}
 		for index, item in reports.exports do
 			local on = not state.skip[item.id]
 			table.insert(exports, ui.row {

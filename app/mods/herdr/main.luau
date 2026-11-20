@@ -82,7 +82,7 @@ return mod {
 		},
 	},
 
-	init = function(previous: State?)
+	init = function(previous: State?): (State, { Send })
 		local state: State = {
 			dismissed = previous ~= nil and previous.dismissed or false,
 			asked = false,

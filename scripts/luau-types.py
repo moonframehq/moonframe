@@ -48,7 +48,7 @@ def analyze(lsp: str, definitions: pathlib.Path, files) -> str:
     if not files:
         return ""
     result = subprocess.run(
-        [lsp, "analyze", "--platform=standard", f"--definitions=@moonframe={definitions}", *map(str, files)],
+        [lsp, "analyze", "--flag:LuauSolverV2=true", "--platform=standard", f"--definitions=@moonframe={definitions}", *map(str, files)],
         capture_output=True,
         text=True,
     )

@@ -9,7 +9,15 @@ local GROUPS = {
 	{ id = "done", title = "Done" },
 }
 
-return mod {
+type Agent = { name: string, agent: string, status: string }
+
+type State = {
+	folded: { [string]: boolean },
+	next: number,
+	agents: { Agent },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -47,7 +55,7 @@ return mod {
 			group_header { title = "studio", icon = "server", status = "idle", detail = "online", count = #state.agents, toggle = false, band = true },
 		}
 		for _, group in GROUPS do
-			local rows = {}
+			local rows: { Element } = {}
 			for index, agent in state.agents do
 				if agent.status == group.id then
 					rows[#rows + 1] = ui.row {

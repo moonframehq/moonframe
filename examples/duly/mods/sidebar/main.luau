@@ -114,7 +114,7 @@ return mod {
 			}
 		end
 
-		local top, pages, folders = {}, {}, {}
+		local top: { Element }, pages: { Element }, folders: { Element } = {}, {}, {}
 		for _, item in TOP do
 			if matches(item.label, query) then
 				table.insert(top, row(item))
@@ -125,7 +125,7 @@ return mod {
 				table.insert(pages, row(item))
 			end
 		end
-		for _, folder in (data and data.folders) or {} do
+		for _, folder: any in (data and data.folders) or {} do
 			local children = {}
 			for _, child in folder.items do
 				if matches(child, query) then

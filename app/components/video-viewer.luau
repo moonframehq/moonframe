@@ -123,10 +123,10 @@ return component {
 		-- The pointer moves in points, the picture in device pixels.
 		local density = state.density or 1
 		local most = props.max or 32
-		local function send(next_zoom: number?, next_center: { number })
+		local function send(next_zoom: number?, next_center: { number }): (State, { Send }?)
 			next_center = { math.clamp(next_center[1], 0, 1), math.clamp(next_center[2], 0, 1) }
 			if not props.change then
-				return state
+				return state, nil
 			end
 			return state, { { to = "parent", msg = with(props.change, { zoom = next_zoom, center = next_center, viewed = true }) } }
 		end

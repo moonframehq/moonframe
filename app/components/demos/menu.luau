@@ -3,7 +3,15 @@
 -- to" opens a submenu beside it; picking there moves the tab.
 local menu = use "menu"
 
-return mod {
+type State = {
+	pinned: boolean,
+	panes: number,
+	last: string,
+	place: string,
+	expanded: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { pinned = true, panes = 2, last = "rename", place = "left", expanded = "move" :: string? }
 	end,

@@ -39,10 +39,10 @@ return component {
 		local rows: { string } = props.rows or CINDER.rows
 		local colors: { [string]: string } = props.colors or CINDER.colors
 		local size: number = props.pixel or 3
-		local lines = {}
+		local lines: { Element } = {}
 		for _, line in rows do
 			-- One box per run of the same character.
-			local runs = {}
+			local runs: { Element } = {}
 			local i = 1
 			while i <= #line do
 				local char = string.sub(line, i, i)

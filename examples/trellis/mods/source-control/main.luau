@@ -69,7 +69,7 @@ return mod {
 		[".sc-sha"] = { size = "small", font = "mono", color = "accent" },
 	},
 
-	init = function(previous: State?)
+	init = function(previous: State?): (State, ...{ Send })
 		local state: State = previous
 			or { tab = "branch", message = "", folded = {}, changes_open = true, pending = nil, result = nil, made = 0, focus = false }
 		state.pending, state.result, state.focus = nil, nil, false
@@ -201,7 +201,7 @@ return mod {
 
 		local forge = projects.forge
 		local counts = { branch = current.count, prs = forge and not forge.error and #forge.prs or nil }
-		local tab_row = {}
+		local tab_row: { Element } = {}
 		for _, each in TABS do
 			local count = counts[each.id]
 			table.insert(tab_row, ui.row {
@@ -307,7 +307,7 @@ return mod {
 				},
 			}
 		elseif state.tab == "history" then
-			local rows = {}
+			local rows: { Element } = {}
 			for _, commit in current.log or {} do
 				table.insert(rows, ui.column {
 					class = "sc-row",
@@ -328,7 +328,7 @@ return mod {
 				then empty_state { icon = "history", title = "No commits yet" }
 				else ui.column { grow = true, scroll = true, gap = "none", ui.column { shrink = false, gap = "none", table.unpack(rows) } }
 		else
-			local rows = {}
+			local rows: { Element } = {}
 			if forge and forge.path == current.path and not forge.error then
 				if state.tab == "prs" then
 					for _, pr in forge.prs do

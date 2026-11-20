@@ -3,7 +3,13 @@
 -- async `lookup` provider (Rust on tokio), and the `counter` view (Rust
 -- too), which tells this mod each time it is clicked.
 
-return mod {
+type State = {
+	counted: number,
+	step: number,
+	word: string,
+}
+
+return mod<<State>> {
 	about = {
 		version = "0.1",
 		description = "An app of its own on the Moonframe library.",

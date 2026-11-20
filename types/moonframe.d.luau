@@ -1,34 +1,39 @@
 -- Types for Moonframe modules: the `ui`, `mod`, `style`, and `log`
 -- globals the host gives every script. `just types` checks app/ against
 -- them in strict mode; editors with luau-lsp read them for completion.
+-- They need Luau's new type solver (luau-lsp's `--flag:LuauSolverV2=true`,
+-- or the editor's "new solver" setting): `use` is typed by a type function.
 --
 -- These mirror what the host accepts (crates/moonframe-core). The host still
 -- checks every value at run time; types catch mistakes before it runs.
 
 -- Values that cross between a module and the host: messages and state.
-type Data = nil | boolean | number | string | { [any]: any }
+export type Data = nil | boolean | number | string | { [any]: any }
 
-type Space = "none" | "small" | "normal" | "large"
-type Tone = "normal" | "muted" | "accent" | "success" | "warning" | "danger"
-type TextSize = "small" | "normal" | "large" | "title" | "headline" | "display" | "hero"
-type Weight = "light" | "normal" | "medium" | "semibold" | "bold"
-type Align = "stretch" | "start" | "center" | "end"
-type Justify = "start" | "center" | "end" | "between"
-type Surface = "background" | "sidebar" | "muted" | "secondary"
-type Edge = "none" | "all" | "top" | "bottom" | "left" | "right"
-type Border = boolean | Edge
-type Direction = "row" | "column"
-type Variant = "normal" | "primary" | "ghost" | "outline" | "danger"
-type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | "check-for-updates" | "new-window" | "activate" | BrowserCommand
+export type Space = "none" | "small" | "normal" | "large"
+export type Tone = "normal" | "muted" | "accent" | "success" | "warning" | "danger"
+export type TextSize = "small" | "normal" | "large" | "title" | "headline" | "display" | "hero"
+export type Weight = "light" | "normal" | "medium" | "semibold" | "bold"
+export type Align = "stretch" | "start" | "center" | "end"
+export type Justify = "start" | "center" | "end" | "between"
+export type Surface = "background" | "sidebar" | "muted" | "secondary"
+export type Edge = "none" | "all" | "top" | "bottom" | "left" | "right"
+export type Border = boolean | Edge
+export type Direction = "row" | "column"
+export type Variant = "normal" | "primary" | "ghost" | "outline" | "danger"
+export type Command = "quit" | "reload" | "toggle-theme" | "show-themes" | "inspect" | "minimize" | "maximize" | "close-window" | "check-for-updates" | "new-window" | "activate" | BrowserCommand
 -- Run on the `ui.browser` the control's `browser` key names.
-type BrowserCommand = "browser-back" | "browser-forward" | "browser-reload" | "browser-stop" | "browser-open"
+export type BrowserCommand = "browser-back" | "browser-forward" | "browser-reload" | "browser-stop" | "browser-open"
 
 -- `#rrggbb`, a palette name, or a theme color, optionally `name/NN`.
-type Color = string
+export type Color = string
 -- A space name or pixels.
-type Spacing = Space | number
+export type Spacing = Space | number
 -- One spacing, `{ y, x }`, `{ top, right, bottom, left }`, or named edges.
-type Sides = Spacing | { Spacing } | {
+-- The list and the named edges share one table type: Luau's new solver
+-- cannot match a table literal against a union of two table types.
+export type Sides = Spacing | {
+	[number]: Spacing,
 	x: Spacing?,
 	y: Spacing?,
 	top: Spacing?,
@@ -36,7 +41,7 @@ type Sides = Spacing | { Spacing } | {
 	bottom: Spacing?,
 	left: Spacing?,
 }
-type ShadowLayer = {
+export type ShadowLayer = {
 	x: number?,
 	y: number?,
 	blur: number?,
@@ -45,10 +50,10 @@ type ShadowLayer = {
 	inset: boolean?,
 }
 -- A preset (`"small"`), a CSS string (`"0 4px 12px #0003"`), a layer, or layers.
-type Shadow = string | ShadowLayer | { string | ShadowLayer }
-type TransitionKind = "slide" | "fade" | "slide-fade" | "rise" | "none"
+export type Shadow = string | ShadowLayer | { string | ShadowLayer }
+export type TransitionKind = "slide" | "fade" | "slide-fade" | "rise" | "none"
 -- `"slide 220ms ease-out"`, or a table; durations are ms, `"220ms"`, or a speed.
-type Transition = string | {
+export type Transition = string | {
 	kind: TransitionKind?,
 	duration: (number | string)?,
 	curve: string?,
@@ -56,7 +61,7 @@ type Transition = string | {
 	delay: (number | string)?,
 }
 
-type Style = {
+export type Style = {
 	background: Color?,
 	-- A linear gradient over the background: `"180deg, #ffa53a, #ff6200"`
 	-- (0 runs up, 90 right, 180 down, the default), or `{ from, to, angle }`.
@@ -96,14 +101,14 @@ type Style = {
 }
 
 -- What a `ui` function returns; the host reads its fields.
-type Element = { type: string }
+export type Element = { type: string }
 -- A child: an element, a string (plain text), or false/nil (skipped).
-type Child = Element | string | false | nil
+export type Child = Element | string | false | nil
 -- Class names: `"a b"` or `{ "a", "b" }`.
-type Class = string | { string }
+export type Class = string | { string }
 
 -- Where `float` pins an element over its parent.
-type FloatAt =
+export type FloatAt =
 	"top-left"
 	| "top-right"
 	| "bottom-left"
@@ -116,7 +121,10 @@ type FloatAt =
 -- Out of the flow, over the parent: pinned to an edge or corner
 -- (`"top-right"`), set in from it (`{ at = "top-right", inset = 4 }`), or at
 -- pixel offsets from its edges (`{ top = -4, right = -4 }`, negative overhangs).
-type Float = FloatAt | { at: FloatAt, inset: number? } | {
+-- One table type for both tables, as for `Sides`; `at` takes no offsets.
+export type Float = FloatAt | {
+	at: FloatAt?,
+	inset: number?,
 	top: number?,
 	right: number?,
 	bottom: number?,
@@ -127,7 +135,7 @@ type Float = FloatAt | { at: FloatAt, inset: number? } | {
 -- 0.1, top = 0.2, width = 0.5, height = 0.3 }`. A crop frame over a
 -- picture (in a `ui.image`'s `overlay`, fractions of the picture), a
 -- marker on a track.
-type Area = {
+export type Area = {
 	left: number?,
 	top: number?,
 	width: number?,
@@ -135,7 +143,7 @@ type Area = {
 }
 
 -- The pointer's shape over a row or column.
-type Cursor =
+export type Cursor =
 	"default"
 	| "pointer"
 	| "text"
@@ -156,7 +164,7 @@ type Cursor =
 -- or bottom, `max` at the right or top); with it, `value` plus pixels
 -- dragged times `speed` (a number scrubbed by dragging its label). It
 -- snaps to `step` and stays between `min` and `max`.
-type Range = {
+export type Range = {
 	min: number,
 	max: number,
 	step: number?,
@@ -169,7 +177,7 @@ type Range = {
 -- fields; anything else arrives as `{ msg = msg, ... }`). `x` and `y` are
 -- fractions of the box as it was when the button went down (0 to 1 inside,
 -- beyond while dragging outside); `dx` and `dy` pixels since then.
-type PointerMsg = {
+export type PointerMsg = {
 	phase: "down" | "move" | "up" | "hover" | "leave",
 	x: number,
 	y: number,
@@ -191,7 +199,7 @@ type PointerMsg = {
 -- What a `rotate` message carries: `angle` the degrees two fingers turned
 -- since the last message, clockwise, how far through the turn it is, and
 -- where over the box (`x`, `y`), with the keys held. On macOS.
-type RotateMsg = {
+export type RotateMsg = {
 	x: number,
 	y: number,
 	width: number,
@@ -206,7 +214,7 @@ type RotateMsg = {
 }
 
 -- What a `swipe` message carries: which way it went, as a browser reads it.
-type SwipeMsg = {
+export type SwipeMsg = {
 	x: number,
 	y: number,
 	width: number,
@@ -220,7 +228,7 @@ type SwipeMsg = {
 }
 
 -- What a `force` message carries: how hard the press is, from 0 to 1.
-type ForceMsg = {
+export type ForceMsg = {
 	x: number,
 	y: number,
 	width: number,
@@ -236,7 +244,7 @@ type ForceMsg = {
 -- What a `wheel` message carries: `dx`, `dy` the pixels scrolled, `zoom`
 -- a trackpad pinch's change (0.1 is 10 % larger, 0 for a scroll), and
 -- where over the box (`x`, `y`), with the keys held.
-type WheelMsg = {
+export type WheelMsg = {
 	x: number,
 	y: number,
 	dx: number,
@@ -255,7 +263,7 @@ type WheelMsg = {
 -- literals such as `variant = "ghost"` check against their unions.
 
 -- A stack with `msg` or `command` is clickable as a whole, like a button.
-type StackProps = {
+export type StackProps = {
 	class: Class?,
 	style: Style?,
 	-- A state of the view's own naming, which `:<state>` rules match.
@@ -362,7 +370,7 @@ type StackProps = {
 -- which nothing follows: clear what `over` showed then. `x` and `y` are
 -- where the pointer is, as fractions of the target's box (before or after
 -- a row's middle, say), `from` is the mod that drew what is carried.
-type CarryMsg = {
+export type CarryMsg = {
 	phase: "over" | "leave" | "drop",
 	carry: Data,
 	from: string,
@@ -372,7 +380,7 @@ type CarryMsg = {
 	height: number,
 }
 
-type PanelProps = {
+export type PanelProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -407,7 +415,7 @@ type PanelProps = {
 	[number]: Child,
 }
 
-type PaneProps = {
+export type PaneProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -432,14 +440,14 @@ type PaneProps = {
 	[number]: Child,
 }
 
-type SplitProps = {
+export type SplitProps = {
 	id: string?,
 	-- false: no hairline between panes; a handle shows only when hovered.
 	divider: boolean?,
 	[number]: Element | false | nil,
 }
 
-type TextProps = {
+export type TextProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -467,7 +475,7 @@ type TextProps = {
 
 -- Clicking sends `msg` to an `update` (to the mod `to`, else its own), or
 -- runs an app `command`.
-type ButtonProps = {
+export type ButtonProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -488,7 +496,7 @@ type ButtonProps = {
 	[number]: string,
 }
 
-type ItemProps = {
+export type ItemProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -507,7 +515,7 @@ type ItemProps = {
 	[number]: string,
 }
 
-type BadgeProps = {
+export type BadgeProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -523,7 +531,7 @@ type BadgeProps = {
 }
 
 -- The bundled icons (Lucide); the host refuses any other name.
-type IconName =
+export type IconName =
 	| "a-large-small"
 	| "activity"
 	| "agent-amp"
@@ -776,7 +784,7 @@ type IconName =
 	| "zoom-out"
 
 -- Drawn at the size and color of text, so `color` and `size` style it.
-type IconProps = {
+export type IconProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -797,12 +805,12 @@ type IconProps = {
 	[number]: string,
 }
 
-type Fit = "contain" | "cover" | "fill" | "scale-down" | "none"
+export type Fit = "contain" | "cover" | "fill" | "scale-down" | "none"
 
 -- A picture from a file: relative to the mod's folder, `~/...`, or absolute.
 -- Not a URL: have a provider download it to a cache. A missing file leaves
 -- an empty box of `width` x `height`. `radius` in a rule rounds it.
-type ImageProps = {
+export type ImageProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -835,7 +843,7 @@ type ImageProps = {
 -- A line through `points`, evenly spaced across its box. Its style's
 -- `color` strokes it, `background` fills the area to the baseline, and
 -- `border_color` draws the baseline, dashed.
-type LineProps = {
+export type LineProps = {
 	class: Class?,
 	style: Style?,
 	points: { number },
@@ -851,7 +859,7 @@ type LineProps = {
 }
 
 -- Time Machine-style vertical ruler, with native Dock-like magnification.
-type RevisionTimelineProps = {
+export type RevisionTimelineProps = {
 	id: string?,
 	entries: { { id: string, day: string?, label: string, summary: string? } },
 	selected: string?,
@@ -884,7 +892,7 @@ type RevisionTimelineProps = {
 -- connectors of a diagram. Each line is stroked in its `color`, else the
 -- style's `color`, else the border color. Without `width` and `height` it
 -- fills its parent; it takes no clicks, so it can float over what it links.
-type PathsProps = {
+export type PathsProps = {
 	class: Class?,
 	style: Style?,
 	paths: { Polyline },
@@ -892,7 +900,7 @@ type PathsProps = {
 	height: number?,
 }
 
-type Polyline = {
+export type Polyline = {
 	-- Corners in order, flat: { x1, y1, x2, y2, ... }, in pixels.
 	points: { number },
 	color: string?,
@@ -904,7 +912,7 @@ type Polyline = {
 }
 
 -- A box of diagonal stripes in its style's `color` over its `background`.
-type HatchProps = {
+export type HatchProps = {
 	class: Class?,
 	style: Style?,
 	gap: number?,
@@ -922,7 +930,7 @@ type HatchProps = {
 -- table getting a `url` field and anything else arriving as
 -- `{ msg = link, url = url }`; a `#heading` link scrolls to its heading. A
 -- `[label](cite:source)` link draws a source chip.
-type MarkdownProps = {
+export type MarkdownProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -969,14 +977,14 @@ type MarkdownProps = {
 	[number]: string,
 }
 
-type TerminalEngine = "alacritty" | "ghostty"
+export type TerminalEngine = "alacritty" | "ghostty"
 -- What keeps the shell running: `auto` (default) is herdr-core, else tmux,
 -- else a pty. herdr-core and tmux keep it across launches; a pty ends with
 -- the app. One that isn't installed falls back to the next.
-type TerminalBackend = "auto" | "herdr-core" | "tmux" | "pty"
+export type TerminalBackend = "auto" | "herdr-core" | "tmux" | "pty"
 
 -- A live shell (your login shell). The host keeps it by mod and `id`.
-type TerminalProps = {
+export type TerminalProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1001,7 +1009,7 @@ type TerminalProps = {
 -- A web page in a native view, kept by mod and `id`. `url` navigates when
 -- it changes from the last one given; the user's own navigation stands
 -- until then. Only http, https and file addresses.
-type BrowserProps = {
+export type BrowserProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1024,7 +1032,7 @@ type BrowserProps = {
 -- `id`, so it lives across reloads and while hidden, and hands it `props`,
 -- telling it when they change. What the user does in it comes back to this
 -- mod's `update` as messages the view chooses.
-type ViewProps = {
+export type ViewProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1038,7 +1046,7 @@ type ViewProps = {
 -- the tree); `value` replaces the text only when it differs from the last
 -- `value` passed. Messages carry the text: a table `msg` gets a `value`
 -- field, anything else arrives as `{ msg = msg, value = text }`.
-type InputProps = {
+export type InputProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1105,7 +1113,7 @@ type InputProps = {
 	scroll_at: { fraction: number, seq: number? }?,
 }
 
-type RegionProps = {
+export type RegionProps = {
 	name: string,
 	direction: Direction?,
 	gap: Space?,
@@ -1113,10 +1121,10 @@ type RegionProps = {
 }
 
 -- Which side of its anchor a popover opens on.
-type Side = "top" | "bottom" | "left" | "right"
+export type Side = "top" | "bottom" | "left" | "right"
 -- The anchor's edge it lines up with: left or right above and below, top or
 -- bottom beside.
-type Anchor = "start" | "end"
+export type Anchor = "start" | "end"
 
 -- Keystrokes an open popover or overlay takes, to the message each sends
 -- to this mod's `update`: `{ escape = "close", down = "next", ["cmd-k"] = "find" }`.
@@ -1125,11 +1133,11 @@ type Anchor = "start" | "end"
 -- ctrl elsewhere); keys `a`-`z`, `0`-`9`, a symbol such as `/`, `f1`-`f24`,
 -- `escape`, `enter`, `tab`, `space`, `backspace`, `delete`, `insert`, `up`,
 -- `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`.
-type Keys = { [string]: Data }
+export type Keys = { [string]: Data }
 
 -- Content floating beside its anchor (the list part). While `open`, a click
 -- outside sends `dismiss`. A `popover` stylesheet rule styles and animates it.
-type PopoverProps = {
+export type PopoverProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1149,7 +1157,7 @@ type PopoverProps = {
 	[number]: Child,
 }
 
-type Placement =
+export type Placement =
 	"center"
 	| "top"
 	| "bottom"
@@ -1166,7 +1174,7 @@ type Placement =
 -- backdrop or outside the content sends `dismiss`, and so does Escape unless
 -- `keys` takes it. An `overlay` rule styles and animates the content, an
 -- `overlay-backdrop` rule the dimmed window behind.
-type OverlayProps = {
+export type OverlayProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1185,7 +1193,7 @@ type OverlayProps = {
 -- Rows of one height, of which only those showing are built and drawn, so
 -- a list of any length costs a screenful. `row(i)` builds row `i` (from 1)
 -- and is called again as the list scrolls; keep it cheap and pure.
-type ListProps = {
+export type ListProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1211,7 +1219,7 @@ type ListProps = {
 
 -- A rectangle or line the host draws in a `ui.video`, in fractions of the
 -- picture; a line has no `width` or no `height`.
-type VideoGuide = {
+export type VideoGuide = {
 	x: number,
 	y: number,
 	width: number?,
@@ -1221,7 +1229,7 @@ type VideoGuide = {
 }
 
 -- `ui.video { source = "camera" }`: frames from a ring in shared memory.
-type VideoProps = {
+export type VideoProps = {
 	class: Class?,
 	style: Style?,
 	state: string?,
@@ -1259,7 +1267,7 @@ type VideoProps = {
 -- the `vector-*` maps need no key; the others need the provider's API key in
 -- `key`. The `vector-*` maps are OpenFreeMap vector tiles drawn on the GPU by
 -- gpui-maps, in builds with the `map-vector` feature.
-type MapProvider =
+export type MapProvider =
 	"openstreetmap"
 	| "carto-light"
 	| "carto-dark"
@@ -1281,7 +1289,7 @@ type MapProvider =
 -- buttons zoom; two fingers turn it. Without `center` and `zoom` it frames
 -- the pins and routes. Its style's `color`
 -- strokes routes without their own.
-type MapProps = {
+export type MapProps = {
 	class: Class?,
 	style: Style?,
 	provider: MapProvider?,
@@ -1315,7 +1323,7 @@ type MapProps = {
 	grow: boolean?,
 }
 
-type MapPin = {
+export type MapPin = {
 	lat: number,
 	lon: number,
 	-- Up to three characters, drawn in the pin: "1", "A".
@@ -1338,7 +1346,7 @@ type MapPin = {
 -- Either `points`, drawn as they are, or `via` stops the host routes along
 -- streets (OpenStreetMap data, through routing.openstreetmap.de) by `mode`;
 -- straight and faint until the way is known.
-type MapRoute = {
+export type MapRoute = {
 	-- Corners in order, flat: { lat1, lon1, lat2, lon2, ... }.
 	points: { number }?,
 	-- Stops in order, flat, two to 25 of them.
@@ -1351,14 +1359,14 @@ type MapRoute = {
 
 -- `ui.number`'s options: `decimals` fixes the digits after the point
 -- (0 to 20); without it, up to three show and trailing zeros drop.
-type NumberOptions = {
+export type NumberOptions = {
 	decimals: number?,
 }
 
 -- `ui.date`'s options: how long (`style`, default "medium"), whether the
 -- date shows (default true), and the time of day (true or "minutes",
 -- "seconds"; default none).
-type DateOptions = {
+export type DateOptions = {
 	style: ("short" | "medium" | "long")?,
 	date: boolean?,
 	time: (boolean | "minutes" | "seconds")?,
@@ -1414,7 +1422,7 @@ declare ui: {
 }
 
 -- One commit of `app.git.log`.
-type GitCommit = {
+export type GitCommit = {
 	sha: string,
 	short: string,
 	parents: { string },
@@ -1429,13 +1437,13 @@ type GitCommit = {
 -- This machine's load, sampled by the host once a second.
 -- What the `system` provider publishes, as `app.system`; declared in
 -- app/providers/system/types.luau.
-type System = ProviderSystemPublished
+export type System = ProviderSystemPublished
 
-type Platform = "macos" | "linux" | "windows"
-type Titlebar = "system" | "hidden"
+export type Platform = "macos" | "linux" | "windows"
+export type Titlebar = "system" | "hidden"
 
 -- The window, for a title bar the layout draws itself.
-type WindowState = {
+export type WindowState = {
 	platform: Platform,
 	-- `hidden` when the shell asked for it and the system agreed (a Linux
 	-- compositor can insist on its own title bar).
@@ -1450,7 +1458,7 @@ type WindowState = {
 
 -- A screen, in `app.displays`. `x`, `y`, `width` and `height` are its
 -- place among the others, in points.
-type DisplayInfo = {
+export type DisplayInfo = {
 	id: number,
 	primary: boolean,
 	x: number,
@@ -1460,7 +1468,7 @@ type DisplayInfo = {
 }
 
 -- How a process or socket provider's link stands, in `app.links`.
-type ProviderLink = {
+export type ProviderLink = {
 	-- Whether the provider has its program.
 	connected: boolean?,
 	-- Messages not yet written.
@@ -1471,7 +1479,7 @@ type ProviderLink = {
 }
 
 -- How `app:awake` stands, in `app.awake`.
-type AwakeState = {
+export type AwakeState = {
 	-- Whether the system agreed to stay awake.
 	held: boolean,
 	-- Whether the display stays on too.
@@ -1481,7 +1489,7 @@ type AwakeState = {
 }
 
 -- The last run's panic, in `app.crash`.
-type CrashReport = {
+export type CrashReport = {
 	-- What it said.
 	message: string,
 	-- The report's path, for the user to read or send.
@@ -1489,10 +1497,10 @@ type CrashReport = {
 }
 
 -- Light, dark, or as the system is (switching as it does).
-type AppearanceMode = "system" | "light" | "dark"
+export type AppearanceMode = "system" | "light" | "dark"
 
 -- `app.appearance`: set it with `{ to = "app:appearance", msg = "dark" }`.
-type Appearance = {
+export type Appearance = {
 	-- What the user chose, kept across launches for the app and profile.
 	mode: AppearanceMode,
 	-- Whether the window is dark now (as `app.dark`).
@@ -1510,7 +1518,7 @@ type Appearance = {
 }
 
 -- A theme as `app.appearance.themes` lists it. Colors are `#rrggbb`.
-type ThemeInfo = {
+export type ThemeInfo = {
 	name: string,
 	-- Made for dark windows: only such a theme can be the `dark_theme`.
 	dark: boolean,
@@ -1524,7 +1532,7 @@ type ThemeInfo = {
 
 -- `app.git`, from providers/git. When `available` is false only `reason`
 -- is set (and `repository = false`); every other field is there otherwise.
-type GitFile = {
+export type GitFile = {
 	path: string,
 	-- "M", "A", "D", "R" (renamed or copied), "?" (untracked) or "U" (conflict).
 	status: string,
@@ -1537,7 +1545,7 @@ type GitFile = {
 	old_path: string?,
 }
 
-type GitWorktree = {
+export type GitWorktree = {
 	path: string,
 	-- "" when detached.
 	branch: string,
@@ -1553,7 +1561,7 @@ type GitWorktree = {
 	bare: boolean,
 }
 
-type GitBranch = {
+export type GitBranch = {
 	name: string,
 	-- Short sha.
 	head: string,
@@ -1567,7 +1575,7 @@ type GitBranch = {
 	current: boolean,
 }
 
-type GitRemote = {
+export type GitRemote = {
 	name: string,
 	url: string,
 	host: string,
@@ -1579,7 +1587,7 @@ type GitRemote = {
 	web_url: string?,
 }
 
-type GitDiffLine = {
+export type GitDiffLine = {
 	-- "add", "del" or "ctx".
 	kind: string,
 	-- Line numbers in the old and new file; `old` is nil on "add" lines,
@@ -1590,7 +1598,7 @@ type GitDiffLine = {
 	text: string,
 }
 
-type GitDiff = {
+export type GitDiff = {
 	path: string,
 	binary: boolean,
 	-- Lines in all hunks; at most 1200, then `truncated`.
@@ -1601,7 +1609,7 @@ type GitDiff = {
 
 -- One commit with what it changed, against its first parent (a first
 -- commit against nothing).
-type GitShown = {
+export type GitShown = {
 	sha: string,
 	short: string,
 	parents: { string },
@@ -1625,7 +1633,7 @@ type GitShown = {
 	diff: GitDiff?,
 }
 
-type Git = {
+export type Git = {
 	available: boolean,
 	reason: string?,
 	repository: boolean,
@@ -1662,7 +1670,7 @@ type Git = {
 }
 
 -- A forge account; `avatar_path` is a cached image file once downloaded.
-type ForgePerson = {
+export type ForgePerson = {
 	login: string,
 	name: string?,
 	bot: boolean?,
@@ -1670,7 +1678,7 @@ type ForgePerson = {
 	avatar_path: string?,
 }
 
-type ForgeChecks = {
+export type ForgeChecks = {
 	total: number,
 	passed: number,
 	failed: number,
@@ -1679,7 +1687,7 @@ type ForgeChecks = {
 }
 
 -- A pull request (GitHub) or merge request (GitLab).
-type ForgePr = {
+export type ForgePr = {
 	number: number,
 	title: string,
 	-- "open", "closed" or "merged".
@@ -1711,7 +1719,7 @@ type ForgePr = {
 	check_list: { { name: string, outcome: string, url: string? } }?,
 }
 
-type ForgeIssue = {
+export type ForgeIssue = {
 	number: number,
 	title: string,
 	url: string,
@@ -1725,7 +1733,7 @@ type ForgeIssue = {
 -- sends `provider:github` (or `provider:gitlab`) `{ sign_in = true }`,
 -- `{ token = "..." }`, `{ use_cli = true }`, `{ cancel = true }` or
 -- `{ sign_out = true }`, from a mod in the provider's `accounts`.
-type ForgeAuth = {
+export type ForgeAuth = {
 	-- "checking", "signed_out", "pending" (a device code is up),
 	-- "verifying" or "signed_in".
 	status: string,
@@ -1750,7 +1758,7 @@ type ForgeAuth = {
 
 -- `app.github` and `app.gitlab`. `auth` and `host` are always there; when
 -- `available` is false the rest is not, only `reason`.
-type Forge = {
+export type Forge = {
 	available: boolean,
 	reason: string?,
 	host: string,
@@ -1773,18 +1781,18 @@ type Forge = {
 -- A coding-agent CLI running on this machine.
 -- What the `agents` provider publishes, as `app.agents`; declared in
 -- app/providers/agents/types.luau.
-type Agent = ProviderAgentsAgent
-type Agents = ProviderAgentsPublished
+export type Agent = ProviderAgentsAgent
+export type Agents = ProviderAgentsPublished
 
 -- One entry of a folder, from the `files` provider.
-type FileEntry = {
+export type FileEntry = {
 	name: string,
 	dir: boolean,
 	-- Ignored by git: editors dim these.
 	ignored: boolean,
 }
 
-type Files = {
+export type Files = {
 	-- False only when the folder can't be read; then only `reason` comes
 	-- with it. Outside any repository it lists home.
 	available: boolean,
@@ -1803,7 +1811,7 @@ type Files = {
 -- What this machine has for keeping terminals (the `herdr` provider).
 -- The `docs` provider: the folder whose text files it reads and saves for
 -- the mod that asks (`{ read = path }`, `{ write = path, text, version }`).
-type Docs = {
+export type Docs = {
 	available: boolean,
 	reason: string?,
 	root: string?,
@@ -1812,7 +1820,7 @@ type Docs = {
 -- One limit window of a service's plan (the `usage` provider). Shares are
 -- 0 to 1; `pace` is where an even spend would have left the bar of what is
 -- left (`usage-bar`'s `pace`), nil early in a window or without a reset.
-type UsageWindow = {
+export type UsageWindow = {
 	title: string,
 	kind: "session" | "daily" | "weekly" | "monthly" | "named",
 	used: number,
@@ -1828,7 +1836,7 @@ type UsageWindow = {
 	pace_note: string?,
 }
 
-type UsageBalance = {
+export type UsageBalance = {
 	label: string,
 	amount: number,
 	total: number?,
@@ -1842,13 +1850,13 @@ type UsageBalance = {
 	fraction: number?,
 }
 
-type UsageSection =
+export type UsageSection =
 	{ kind: "limit", window: UsageWindow }
 	| { kind: "facts", title: string, facts: { { label: string, value: string } } }
 	| { kind: "shares", title: string, shares: { { label: string, share: number } } }
 
 -- One service signed in on the host, or one `show_providers` asks for.
-type UsageProvider = {
+export type UsageProvider = {
 	id: string,
 	name: string,
 	-- A bundled logo (`agent-claude`), nil when the app has none for it.
@@ -1877,7 +1885,7 @@ type UsageProvider = {
 
 -- Plan usage of the AI services signed in on `host` (the `usage` provider),
 -- read every 10 minutes at most. Any message to `provider:usage` refreshes.
-type Usage = {
+export type Usage = {
 	available: boolean,
 	-- "local", "ssh:<target>" or "wsl:<distro>".
 	host: string?,
@@ -1893,7 +1901,7 @@ type Usage = {
 	headline: { string },
 }
 
-type Herdr = {
+export type Herdr = {
 	installed: boolean,
 	version: string?,
 	path: string?,
@@ -1908,7 +1916,7 @@ type Herdr = {
 
 -- `app.acp`, from providers/acp: coding agents run for mods over the
 -- Agent Client Protocol.
-type AcpAgent = {
+export type AcpAgent = {
 	-- "claude", "codex", "copilot", "gemini" or "opencode".
 	name: string,
 	title: string,
@@ -1918,7 +1926,7 @@ type AcpAgent = {
 	fetched: boolean,
 }
 
-type AcpTool = {
+export type AcpTool = {
 	id: string,
 	title: string,
 	-- "read", "edit", "delete", "move", "search", "execute", "think", "fetch", "other"...
@@ -1929,7 +1937,7 @@ type AcpTool = {
 	ms: number?,
 }
 
-type AcpRun = {
+export type AcpRun = {
 	id: string,
 	-- The mod that started it: the only one it obeys.
 	owner: string,
@@ -1973,7 +1981,7 @@ type AcpRun = {
 	timing: AcpTiming?,
 }
 
-type AcpTiming = {
+export type AcpTiming = {
 	spawned: number?,
 	initialized: number?,
 	session: number?,
@@ -1985,7 +1993,7 @@ type AcpTiming = {
 }
 
 -- The app as the window says an agent changes it.
-type AcpTarget = {
+export type AcpTarget = {
 	title: string,
 	-- Its own folder, the one agents write in (the user's folder over it,
 	-- when it is no one's source: `overlay`), and the folder they work in.
@@ -2000,7 +2008,7 @@ type AcpTarget = {
 	layers: { { role: string, path: string } },
 }
 
-type Acp = {
+export type Acp = {
 	available: boolean,
 	agents: { AcpAgent },
 	-- The agent a start without `agent` gets.
@@ -2024,7 +2032,7 @@ type Acp = {
 }
 
 -- `app.speech`, from providers/speech: dictation, for `use "dictation"`.
-type SpeechEngine = {
+export type SpeechEngine = {
 	name: string,
 	title: string,
 	kind: "apple" | "command" | "remote",
@@ -2035,7 +2043,7 @@ type SpeechEngine = {
 	reason: string?,
 }
 
-type Speech = {
+export type Speech = {
 	-- Some engine in `prefer` is ready; `reason` says why not otherwise.
 	available: boolean,
 	reason: string?,
@@ -2052,7 +2060,7 @@ type Speech = {
 
 -- A native provider's answer to an action a mod asked for, arriving in that
 -- mod's `update`: `reply` is the `id` the mod sent, else the action's name.
-type Reply = {
+export type Reply = {
 	reply: any,
 	action: string,
 	ok: boolean,
@@ -2062,7 +2070,7 @@ type Reply = {
 }
 
 -- `ui.mount { "explorer", id = "files-2", props = { ... } }`.
-type MountProps = {
+export type MountProps = {
 	mod: string?,
 	id: string?,
 	props: any,
@@ -2070,10 +2078,10 @@ type MountProps = {
 }
 
 -- What draws this build.
-type Renderer = "gpui" | "rune"
+export type Renderer = "gpui" | "rune"
 
 -- What every `view` gets as `app`.
-type App = {
+export type App = {
 	dark: boolean,
 	-- Absent where nothing draws, as in `--check`.
 	renderer: Renderer?,
@@ -2132,7 +2140,7 @@ type App = {
 -- `{ ask = true }` instead posts nothing and asks the user to allow
 -- notifications now (once; the first one posted asks otherwise), with
 -- `app.notifications` saying the answer.
-type NotifyMsg = {
+export type NotifyMsg = {
 	-- At most 256 bytes.
 	title: string,
 	-- At most 2048 bytes.
@@ -2149,9 +2157,9 @@ type NotifyMsg = {
 -- Windows, a bare binary) and a toast shows them; "denied" where the user
 -- turned them off, toasts showing them too; "undecided" until the user is
 -- asked.
-type NotificationPermission = "allowed" | "denied" | "undecided" | "in-window"
+export type NotificationPermission = "allowed" | "denied" | "undecided" | "in-window"
 
-type NotificationClick = {
+export type NotificationClick = {
 	id: string?,
 	clicked: boolean,
 }
@@ -2160,7 +2168,7 @@ type NotificationClick = {
 -- opened in a browser or another app: a module that subscribes to `app/url`
 -- hears `{ topic = "app/url", value = AppUrl }`. Anyone can open one: treat
 -- what it carries as untrusted.
-type AppUrl = {
+export type AppUrl = {
 	-- The whole link, as opened.
 	url: string,
 	-- Lowercase, one the app claims.
@@ -2178,7 +2186,7 @@ type AppUrl = {
 -- the mod as `reply` with `paths` (a list; `path` for a save) or
 -- `cancelled = true` added. What the user picks may show in that mod's
 -- `ui.image` (and its components').
-type PickMsg = {
+export type PickMsg = {
 	kind: ("open" | "folder" | "save")?,
 	reply: Data,
 	multiple: boolean?,
@@ -2196,7 +2204,7 @@ type PickMsg = {
 -- cache `~/.cache/<app>/images` or the share cache `~/.cache/<app>/share`)
 -- or picked by the user for the mod. With `reply`, the mod hears it
 -- back with `service` (the name of the one picked) or `cancelled = true`.
-type ShareMsg = {
+export type ShareMsg = {
 	-- A web address: https:// or http://.
 	url: string?,
 	-- At most 4096 bytes, beside the rest.
@@ -2209,7 +2217,7 @@ type ShareMsg = {
 -- What `{ to = "app:status-item", msg = ... }` shows: the mod's item in the
 -- menu bar (macOS), changed when asked again; `false` takes it away, and
 -- `{ popup = { StatusLine } }` drops a menu down from it at once.
-type StatusItemMsg = {
+export type StatusItemMsg = {
 	-- A system symbol's name (SF Symbols), such as "tray.and.arrow.down".
 	symbol: string?,
 	-- Or an image file, found as `app:icon` finds one.
@@ -2224,7 +2232,7 @@ type StatusItemMsg = {
 
 -- A line of a menu bar item's menu: "-", or an item whose click sends `msg`
 -- to the mod (or `to`). Without `msg` it is a heading. `shortcut` only shows.
-type StatusLine = "-" | {
+export type StatusLine = "-" | {
 	label: string,
 	msg: Data?,
 	to: string?,
@@ -2237,7 +2245,7 @@ type StatusLine = "-" | {
 -- press sending `msg` to the mod (or `to`) whichever app is in front; or,
 -- with `release = true`, gives them back. `keys` has two modifiers, not
 -- both shift ("ctrl-alt-l"), or is a function key.
-type HotkeyMsg = {
+export type HotkeyMsg = {
 	keys: string,
 	msg: Data?,
 	to: string?,
@@ -2247,7 +2255,7 @@ type HotkeyMsg = {
 -- What `{ to = "app:pdf", msg = ... }` makes: a page as a PDF file (macOS).
 -- One of `html`, `html_file` and `url`. With `reply`, the mod hears it back
 -- with `path` (the file written) or `error`.
-type PdfMsg = {
+export type PdfMsg = {
 	-- The page's text: no script, nothing from the network but `data:`.
 	html: string?,
 	-- An `.html` file under the app's cache or state folders, shown as `html`.
@@ -2270,7 +2278,7 @@ type PdfMsg = {
 -- replaces the selection and the `back` bytes before it: an `@name`
 -- completed, an emoji. A toolbar button can send it directly with
 -- `to = "app:edit"`.
-type EditMsg = {
+export type EditMsg = {
 	field: string,
 	wrap: { string }?,
 	lines: string?,
@@ -2289,7 +2297,7 @@ type EditMsg = {
 -- key's, and grows it to that size if it is open (never shrinking it);
 -- `{ close = "<mod>" }` closes it. Any mod may ask for any mod's window;
 -- never the shell's.
-type WindowMsg = string | { open: string, send: Data?, size: { width: number, height: number }? } | { close: string }
+export type WindowMsg = string | { open: string, send: Data?, size: { width: number, height: number }? } | { close: string }
 
 -- What the Developer tools (mods/devtools, and only it) ask with
 -- `{ to = "app:devtools", msg = ... }`: where they show; a Luau file of the
@@ -2297,7 +2305,7 @@ type WindowMsg = string | { open: string, send: Data?, size: { width: number, he
 -- `error`); a mod's state (with `state`, `problem`); or another element of
 -- the selection's trail to select. Answers come back as `reply` with fields
 -- added; picks arrive on `app/selection`, the place on `app/devtools`.
-type DevtoolsMsg =
+export type DevtoolsMsg =
 	{ place: "dock" | "window" | "closed" }
 	| { read: string, reply: Data? }
 	| { save: string, text: string, reply: Data? }
@@ -2315,7 +2323,7 @@ type DevtoolsMsg =
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
 -- `"app:devtools"` (`msg` a `DevtoolsMsg`), `"app:share"` (`msg` a `ShareMsg`), `"app:status-item"` (`msg` a
 -- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
-type Send = {
+export type Send = {
 	to: string,
 	msg: Data,
 }
@@ -2370,7 +2378,7 @@ declare send:
 -- `titlebar = "hidden"` puts the layout under the title bar (macOS keeps its
 -- traffic lights, at `traffic_lights` from the top left) or drops the system
 -- frame (Linux, Windows). Give the layout a `drag = true` row to move it.
-type Window = {
+export type Window = {
 	titlebar: Titlebar?,
 	traffic_lights: { x: number?, y: number? }?,
 	-- The size the window opens at, before the user resizes it.
@@ -2384,7 +2392,7 @@ type Window = {
 -- control's `window` or `app:window` opens it: the size it opens at and
 -- the smallest the user can make it, each kept within the screen; 420x560
 -- and 280x240 when unset.
-type ModWindow = {
+export type ModWindow = {
 	size: { width: number, height: number }?,
 	min_size: { width: number, height: number }?,
 	-- The screen it opens on: an `id` from `app.displays`. "external" is the
@@ -2396,10 +2404,24 @@ type ModWindow = {
 	traffic_lights: { x: number?, y: number? }?,
 }
 
+-- What a mod's `window` takes: a `Window` in main.luau, a `ModWindow` in
+-- another mod, in one table type with the fields of both, since Luau's new
+-- solver cannot match a table literal against a union of two table types.
+-- The host reads the fields that apply where the mod is.
+export type WindowFrame = {
+	titlebar: Titlebar?,
+	traffic_lights: { x: number?, y: number? }?,
+	size: { width: number?, height: number? }?,
+	remember: boolean?,
+	min_size: { width: number, height: number }?,
+	display: ("primary" | "external" | number)?,
+	fullscreen: boolean?,
+}
+
 -- A menu item in the shell's `menus`: it sends `msg` (to the shell, or to
 -- `to`) or runs `command`; `shortcut` is a key as `keys` take them, such as
 -- "secondary-t". "-" between items draws a line.
-type MenuItem = {
+export type MenuItem = {
 	label: string,
 	msg: Data?,
 	to: string?,
@@ -2409,13 +2431,13 @@ type MenuItem = {
 
 -- `items` holds `MenuItem`s and "-"; typed loosely so items with `msg` and
 -- with `command` mix in one list. The host checks each.
-type AppMenu = {
+export type AppMenu = {
 	title: string,
 	items: { any },
 }
 
 -- What the About panel says besides the app's name and icon.
-type About = {
+export type About = {
 	name: string?,
 	version: string?,
 	description: string?,
@@ -2427,7 +2449,7 @@ type About = {
 -- and a new tab of it starts with `props`. `report` names the prop a tab
 -- passes as a message, whose `url` and `title` the tab keeps (a browser's
 -- `navigate`).
-type TabEntry = {
+export type TabEntry = {
 	title: string?,
 	icon: IconName?,
 	props: any,
@@ -2435,7 +2457,7 @@ type TabEntry = {
 }
 
 -- One of `app.kinds`: what a tab bar can open.
-type TabKind = {
+export type TabKind = {
 	-- "component:terminal" or "mod:explorer".
 	kind: string,
 	title: string,
@@ -2444,11 +2466,12 @@ type TabKind = {
 	report: string?,
 }
 
-type Mod<State> = {
+export type Mod<State> = {
 	-- `props` is what an instance was mounted with (`ui.mount { "name",
 	-- id = ..., props = ... }`), nil for a mod in its own place. `restored`
 	-- says `previous` was saved by an earlier run, not kept across a reload.
-	init: ((previous: State?, props: any?, restored: boolean) -> State)?,
+	-- Returns the state and, as `update` may, a list of `Send`s.
+	init: ((previous: State?, props: any?, restored: boolean) -> (State, ...{ Send }))?,
 	-- Returns nothing to keep the state it changed in place, or the new
 	-- state and optionally a list of `Send`s. Its results are left untyped
 	-- so it may return nothing on some paths; the host checks them. A
@@ -2472,7 +2495,7 @@ type Mod<State> = {
 	styles: { [string]: Style }?,
 	-- In main.luau, the main window's frame, read when the app starts (a
 	-- `Window`); in another mod, the size of its own window (a `ModWindow`).
-	window: (Window | ModWindow)?,
+	window: WindowFrame?,
 	-- Only in main.luau: menus after the app menu (a "View" one merges into
 	-- the host's), and what About says.
 	menus: { AppMenu }?,
@@ -2482,7 +2505,7 @@ type Mod<State> = {
 declare function mod<State>(definition: Mod<State>): Mod<State>
 
 -- The fixed-width font terminals and `font = "mono"` text use.
-type MonoFont = {
+export type MonoFont = {
 	family: string?,
 	size: number?,
 	-- 100 (thin) to 900 (black); 400 is regular.
@@ -2496,7 +2519,7 @@ type MonoFont = {
 	ligatures: boolean?,
 }
 
-type Stylesheet = {
+export type Stylesheet = {
 	font_size: number?,
 	font_family: string?,
 	mono: MonoFont?,
@@ -2521,7 +2544,7 @@ declare function style(sheet: Stylesheet): Stylesheet
 
 -- A component in components/<name>.luau: a ready-made piece of view that
 -- mods `use`, listed in the Components gallery with a preview of `example`.
-type Component<Props> = {
+export type Component<Props> = {
 	title: string?,
 	description: string?,
 	-- The heading it is listed under in the Components gallery.
@@ -2554,719 +2577,724 @@ declare function component<Props>(definition: Component<Props>): Component<Props
 -- generated: component props (just component-types) start
 type UseAboutLink = any
 type UseAboutProps = {
-	open: boolean?,
-	dismiss: any,
-	name: string,
-	version: string?,
-	tagline: string?,
-	icon: string?,
-	image: string?,
-	info: { { string } }?,
-	links: { UseAboutLink }?,
-	copyright: string?,
-	copy: string?,
-	inline: boolean?,
-	width: number?,
-	to: string?,
+	read open: boolean?,
+	read dismiss: any,
+	read name: string,
+	read version: string?,
+	read tagline: string?,
+	read icon: string?,
+	read image: string?,
+	read info: { { string } }?,
+	read links: { UseAboutLink }?,
+	read copyright: string?,
+	read copy: string?,
+	read inline: boolean?,
+	read width: number?,
+	read to: string?,
 }
 type UseAccordionItem = any
 type UseAccordionProps = {
-	items: { UseAccordionItem },
-	open: any,
-	event: string?,
-	to: string?,
+	read items: { UseAccordionItem },
+	read open: any,
+	read event: string?,
+	read to: string?,
 }
 type UseActionTilesTile = any
 type UseActionTilesRow = any
 type UseActionTilesProps = {
-	title: string?,
-	subtitle: string?,
-	trailing: any,
-	tiles: { UseActionTilesTile }?,
-	columns: number?,
-	rows: { UseActionTilesRow }?,
-	destructive: UseActionTilesRow?,
-	width: number?,
-	event: string?,
-	to: string?,
+	read title: string?,
+	read subtitle: string?,
+	read trailing: any,
+	read tiles: { UseActionTilesTile }?,
+	read columns: number?,
+	read rows: { UseActionTilesRow }?,
+	read destructive: UseActionTilesRow?,
+	read width: number?,
+	read event: string?,
+	read to: string?,
 }
 type UseActivityBarItem = any
 type UseActivityBarProps = {
-	items: { UseActivityBarItem },
-	bottom: { UseActivityBarItem }?,
-	selected: string?,
-	event: string?,
-	to: string?,
-	height: number?,
-	fill: boolean?,
+	read items: { UseActivityBarItem },
+	read bottom: { UseActivityBarItem }?,
+	read selected: string?,
+	read event: string?,
+	read to: string?,
+	read height: number?,
+	read fill: boolean?,
 }
 type UseAgentRunTool = any
 type UseAgentRunOption = any
 type UseAgentRunRun = any
 type UseAgentRunProps = {
-	run: UseAgentRunRun,
-	lines: number?,
-	tools: number?,
-	request: boolean?,
-	to: string?,
+	read run: UseAgentRunRun,
+	read lines: number?,
+	read tools: number?,
+	read request: boolean?,
+	read to: string?,
 }
+type UseAgentRunLook = any
 type UseAheadBehindProps = {
-	ahead: number?,
-	behind: number?,
-	synced: boolean?,
-	tooltip: string?,
+	read ahead: number?,
+	read behind: number?,
+	read synced: boolean?,
+	read tooltip: string?,
 }
 type UseAudioMeterChannel = any
 type UseAudioMeterProps = {
-	channels: { UseAudioMeterChannel },
-	height: number?,
-	bar: number?,
-	floor: number?,
-	warn: number?,
-	danger: number?,
+	read channels: { UseAudioMeterChannel },
+	read height: number?,
+	read bar: number?,
+	read floor: number?,
+	read warn: number?,
+	read danger: number?,
 }
 type UseAvatarStackProps = {
-	people: { any },
-	count: number?,
-	most: number?,
-	size: string?,
+	read people: { any },
+	read count: number?,
+	read most: number?,
+	read size: string?,
 }
 type UseAvatarProps = {
-	name: string?,
-	initial: string?,
-	letters: number?,
-	size: string?,
-	shape: string?,
-	color: string?,
-	status: string?,
-	src: string?,
-	tooltip: string?,
+	read name: string?,
+	read initial: string?,
+	read letters: number?,
+	read size: string?,
+	read shape: string?,
+	read color: string?,
+	read status: string?,
+	read src: string?,
+	read tooltip: string?,
 }
 type UseBannerAction = any
 type UseBannerProps = {
-	text: string,
-	detail: string?,
-	icon: string?,
-	tone: string?,
-	solid: boolean?,
-	mono: boolean?,
-	action: any,
-	dismiss: any,
-	to: string?,
+	read text: string,
+	read detail: string?,
+	read icon: string?,
+	read tone: string?,
+	read solid: boolean?,
+	read mono: boolean?,
+	read action: any,
+	read dismiss: any,
+	read to: string?,
 }
 type UseBarChartSeries = any
 type UseBarChartBucket = any
 type UseBarChartProps = {
-	buckets: { UseBarChartBucket },
-	series: { UseBarChartSeries }?,
-	height: number?,
-	bar: number?,
-	gap: number?,
-	max: number?,
-	axis: boolean?,
-	legend: boolean?,
-	unit: string?,
-	every: number?,
-	slot: number?,
-	ticks: number?,
-	grid: boolean?,
-	grow: boolean?,
+	read buckets: { UseBarChartBucket },
+	read series: { UseBarChartSeries }?,
+	read height: number?,
+	read bar: number?,
+	read gap: number?,
+	read max: number?,
+	read axis: boolean?,
+	read legend: boolean?,
+	read unit: string?,
+	read every: number?,
+	read slot: number?,
+	read ticks: number?,
+	read grid: boolean?,
+	read grow: boolean?,
 }
 type UseBoardCardProps = {
-	title: string,
-	subtitle: string?,
-	badge: string?,
-	badge_tone: string?,
-	amount: string?,
-	date: string?,
-	owner: string?,
-	owner_color: string?,
-	tone: string?,
-	msg: any,
-	context: any,
-	to: string?,
-	selected: boolean?,
-	labels: { any }?,
-	key: string?,
-	carry: any,
-	accept: any,
+	read title: string,
+	read subtitle: string?,
+	read badge: string?,
+	read badge_tone: string?,
+	read amount: string?,
+	read date: string?,
+	read owner: string?,
+	read owner_color: string?,
+	read tone: string?,
+	read msg: any,
+	read context: any,
+	read to: string?,
+	read selected: boolean?,
+	read labels: { any }?,
+	read key: string?,
+	read carry: any,
+	read accept: any,
 }
 type UseBreadcrumbsCrumb = any
 type UseBreadcrumbsProps = {
-	crumbs: { UseBreadcrumbsCrumb },
-	back: any,
-	position: string?,
-	up: any,
-	down: any,
-	actions: { any }?,
-	event: string?,
-	to: string?,
+	read crumbs: { UseBreadcrumbsCrumb },
+	read back: any,
+	read position: string?,
+	read up: any,
+	read down: any,
+	read actions: { any }?,
+	read event: string?,
+	read to: string?,
 }
 type UseBrowserPage = any
 type UseBrowserProps = {
-	id: string?,
-	url: string?,
-	page: UseBrowserPage?,
-	navigate: any,
-	loading: any,
-	zoom: number?,
-	share: boolean?,
+	read id: string?,
+	read url: string?,
+	read page: UseBrowserPage?,
+	read navigate: any,
+	read loading: any,
+	read zoom: number?,
+	read share: boolean?,
 }
 type UseButtonGroupButton = any
 type UseButtonGroupProps = {
-	buttons: { UseButtonGroupButton },
-	selected: string?,
-	event: string?,
-	small: boolean?,
-	to: string?,
+	read buttons: { UseButtonGroupButton },
+	read selected: string?,
+	read event: string?,
+	read small: boolean?,
+	read to: string?,
 }
 type UseCaffeineAwake = any
 type UseCaffeineProps = {
-	awake: UseCaffeineAwake?,
-	scope: string?,
-	reason: string?,
-	variant: string?,
-	size: string?,
-	disabled: boolean?,
+	read awake: UseCaffeineAwake?,
+	read scope: string?,
+	read reason: string?,
+	read variant: string?,
+	read size: string?,
+	read disabled: boolean?,
 }
 type UseCardProps = {
-	title: string?,
-	subtitle: string?,
-	actions: { any }?,
-	[number]: any,
+	read title: string?,
+	read subtitle: string?,
+	read actions: { any }?,
+	read [number]: any,
 }
 type UseChangeTreeProps = {
-	files: { string }?,
-	selected: string?,
-	folded: { [string]: boolean? }?,
-	fold: string?,
-	pick: string?,
-	to: string?,
-	indent: number?,
-	counts: boolean?,
-	mark: string?,
-	plain: boolean?,
+	read files: { string }?,
+	read selected: string?,
+	read folded: { [string]: boolean? }?,
+	read fold: string?,
+	read pick: string?,
+	read to: string?,
+	read indent: number?,
+	read counts: boolean?,
+	read mark: string?,
+	read plain: boolean?,
 }
 type UseChangeTreeFolder = any
 type UseChatMarkdownProps = {
-	text: string?,
-	cursor: boolean?,
-	link: any,
-	to: string?,
+	read text: string?,
+	read cursor: boolean?,
+	read link: any,
+	read to: string?,
 }
 type UseChatMessageProps = {
-	from: string?,
-	author: string?,
-	icon: string?,
-	text: string?,
-	[number]: any,
+	read from: string?,
+	read author: string?,
+	read icon: string?,
+	read text: string?,
+	read [number]: any,
 }
 type UseCheckboxProps = {
-	checked: boolean?,
-	indeterminate: boolean?,
-	label: string?,
-	description: string?,
-	msg: any,
-	disabled: boolean?,
-	to: string?,
+	read checked: boolean?,
+	read indeterminate: boolean?,
+	read label: string?,
+	read description: string?,
+	read msg: any,
+	read disabled: boolean?,
+	read to: string?,
 }
 type UseChecksCheck = any
 type UseChecksProps = {
-	checks: { UseChecksCheck },
-	title: string?,
-	event: string?,
-	to: string?,
-	collapsed: boolean?,
-	toggle: any,
+	read checks: { UseChecksCheck },
+	read title: string?,
+	read event: string?,
+	read to: string?,
+	read collapsed: boolean?,
+	read toggle: any,
 }
 type UseChipsChip = any
 type UseChipsProps = {
-	chips: { UseChipsChip },
-	selected: { string }?,
-	event: string?,
-	wrap: boolean?,
-	to: string?,
+	read chips: { UseChipsChip },
+	read selected: { string }?,
+	read event: string?,
+	read wrap: boolean?,
+	read to: string?,
 }
 type UseChoiceCardsCard = any
 type UseChoiceCardsProps = {
-	options: { UseChoiceCardsCard },
-	selected: string?,
-	width: number?,
-	event: string?,
-	to: string?,
+	read options: { UseChoiceCardsCard },
+	read selected: string?,
+	read width: number?,
+	read event: string?,
+	read to: string?,
 }
 type UseCodeViewProps = {
-	text: string?,
-	lines: { string }?,
-	start: number?,
-	highlight: { number }?,
-	numbers: boolean?,
-	path: string?,
-	language: string?,
-	height: number?,
-	grow: boolean?,
-	event: string?,
-	to: string?,
-	id: string?,
+	read text: string?,
+	read lines: { string }?,
+	read start: number?,
+	read highlight: { number }?,
+	read numbers: boolean?,
+	read path: string?,
+	read language: string?,
+	read height: number?,
+	read grow: boolean?,
+	read event: string?,
+	read to: string?,
+	read id: string?,
 }
 type UseCollapsibleProps = {
-	title: string,
-	open: boolean?,
-	summary: string?,
-	icon: string?,
-	toggle: any,
-	id: string?,
-	to: string?,
-	flat: boolean?,
-	[number]: any,
+	read title: string,
+	read open: boolean?,
+	read summary: string?,
+	read icon: string?,
+	read toggle: any,
+	read id: string?,
+	read to: string?,
+	read flat: boolean?,
+	read [number]: any,
 }
 type UseCommandPaletteCommand = any
 type UseCommandPaletteState = any
 type UseCommandPaletteProps = {
-	id: string?,
-	open: boolean?,
-	commands: { UseCommandPaletteCommand }?,
-	placeholder: string?,
-	look: string?,
-	dismiss: any,
-	event: string?,
-	width: number?,
-	rows: number?,
-	empty: string?,
-	prefix: string?,
+	read id: string?,
+	read open: boolean?,
+	read commands: { UseCommandPaletteCommand }?,
+	read placeholder: string?,
+	read look: string?,
+	read dismiss: any,
+	read event: string?,
+	read width: number?,
+	read rows: number?,
+	read empty: string?,
+	read prefix: string?,
 }
 type UseCommandPaletteShape = any
+type UseCommandPaletteRanked = any
 type UseCommentCardProps = {
-	author: string,
-	action: string?,
-	age: string?,
-	seconds: number?,
-	body: string?,
-	location: string?,
-	locate: any,
-	badge: string?,
-	avatar: string?,
-	to: string?,
-	actions: { any }?,
-	reactions: { UseCommentCardReaction }?,
-	react: string?,
-	add_reaction: any,
-	picker: any,
-	picker_open: boolean?,
-	[number]: any,
+	read author: string,
+	read action: string?,
+	read age: string?,
+	read seconds: number?,
+	read body: string?,
+	read location: string?,
+	read locate: any,
+	read badge: string?,
+	read avatar: string?,
+	read to: string?,
+	read actions: { any }?,
+	read reactions: { UseCommentCardReaction }?,
+	read react: string?,
+	read add_reaction: any,
+	read picker: any,
+	read picker_open: boolean?,
+	read [number]: any,
 }
 type UseCommentCardReaction = any
 type UseCommitGraphCommit = any
 type UseCommitGraphProps = {
-	commits: { UseCommitGraphCommit },
-	select: any,
-	selected: string?,
-	row_height: number?,
-	compact: boolean?,
+	read commits: { UseCommitGraphCommit },
+	read select: any,
+	read selected: string?,
+	read row_height: number?,
+	read compact: boolean?,
 }
+type UseCommitGraphSpot = any
+type UseCommitGraphEdge = any
 type UseComposerProps = {
-	id: string?,
-	value: string?,
-	placeholder: string?,
-	agent: string?,
-	icon: string?,
-	change: any,
-	submit: any,
-	attach: any,
-	send: any,
-	actions: { any }?,
-	to: string?,
-	focus: boolean?,
+	read id: string?,
+	read value: string?,
+	read placeholder: string?,
+	read agent: string?,
+	read icon: string?,
+	read change: any,
+	read submit: any,
+	read attach: any,
+	read send: any,
+	read actions: { any }?,
+	read to: string?,
+	read focus: boolean?,
 }
 type UseConfirmProps = {
-	open: boolean?,
-	title: string,
-	message: string?,
-	detail: string?,
-	items: { any }?,
-	items_title: string?,
-	confirm: any,
-	cancel: any,
-	confirm_label: string?,
-	cancel_label: string?,
-	danger: boolean?,
-	icon: string?,
-	to: string?,
+	read open: boolean?,
+	read title: string,
+	read message: string?,
+	read detail: string?,
+	read items: { any }?,
+	read items_title: string?,
+	read confirm: any,
+	read cancel: any,
+	read confirm_label: string?,
+	read cancel_label: string?,
+	read danger: boolean?,
+	read icon: string?,
+	read to: string?,
 }
 type UseContextMenuProps = {
-	open: boolean?,
-	context: any,
-	dismiss: any,
-	items: { any },
-	highlighted: any,
-	expanded: any,
-	expand: string?,
-	submenu_highlighted: any,
-	event: string?,
-	keys: { [string]: any }?,
-	width: number?,
-	side: string?,
-	align: string?,
-	to: string?,
-	[number]: any,
+	read open: boolean?,
+	read context: any,
+	read dismiss: any,
+	read items: { any },
+	read highlighted: any,
+	read expanded: any,
+	read expand: string?,
+	read submenu_highlighted: any,
+	read event: string?,
+	read keys: { [string]: any }?,
+	read width: number?,
+	read side: string?,
+	read align: string?,
+	read to: string?,
+	read [number]: any,
 }
 type UseContributionGraphProps = {
-	days: { number },
-	start: string,
-	thresholds: { number }?,
-	palette: { string }?,
-	color: string?,
-	empty: string?,
-	size: number?,
-	gap: number?,
-	week_start: string?,
-	weekdays: boolean?,
-	months: boolean?,
-	legend: boolean?,
-	noun: string?,
-	nouns: string?,
-	note: string?,
-	note_msg: any?,
-	selected: string?,
-	event: string?,
-	to: string?,
+	read days: { number },
+	read start: string,
+	read thresholds: { number }?,
+	read palette: { string }?,
+	read color: string?,
+	read empty: string?,
+	read size: number?,
+	read gap: number?,
+	read week_start: string?,
+	read weekdays: boolean?,
+	read months: boolean?,
+	read legend: boolean?,
+	read noun: string?,
+	read nouns: string?,
+	read note: string?,
+	read note_msg: any?,
+	read selected: string?,
+	read event: string?,
+	read to: string?,
 }
 type UseCopyFieldProps = {
-	text: string,
-	label: string?,
-	copied: boolean?,
-	msg: any,
-	button: string?,
-	to: string?,
+	read text: string,
+	read label: string?,
+	read copied: boolean?,
+	read msg: any,
+	read button: string?,
+	read to: string?,
 }
 type UseCountBubbleProps = {
-	count: number,
-	max: number?,
-	tone: string?,
-	zero: boolean?,
-	tooltip: string?,
-	float: any,
+	read count: number,
+	read max: number?,
+	read tone: string?,
+	read zero: boolean?,
+	read tooltip: string?,
+	read float: any,
 }
-type UseCountryCodeProps = { code: string }
+type UseCountryCodeProps = { read code: string }
 type UseCourseCardAction = any
 type UseCourseCardProps = {
-	title: string,
-	eyebrow: string?,
-	meta: string?,
-	primary: UseCourseCardAction?,
-	secondary: UseCourseCardAction?,
-	progress: number?,
-	label: string?,
-	detail: string?,
-	bar: number?,
-	aside: any,
-	to: string?,
+	read title: string,
+	read eyebrow: string?,
+	read meta: string?,
+	read primary: UseCourseCardAction?,
+	read secondary: UseCourseCardAction?,
+	read progress: number?,
+	read label: string?,
+	read detail: string?,
+	read bar: number?,
+	read aside: any,
+	read to: string?,
 }
 type UseCurveEditorPoint = any
 type UseCurveEditorProps = {
-	points: { UseCurveEditorPoint },
-	change: any,
-	size: number?,
-	color: string?,
-	values: { number }?,
-	grid: number?,
-	id: string?,
-	disabled: boolean?,
+	read points: { UseCurveEditorPoint },
+	read change: any,
+	read size: number?,
+	read color: string?,
+	read values: { number }?,
+	read grid: number?,
+	read id: string?,
+	read disabled: boolean?,
 }
 type UseCurveEditorState = any
 type UseDashboardCardProps = {
-	title: string,
-	icon: string?,
-	meta: any,
-	menu: any,
-	to: string?,
-	grow: boolean?,
-	padding: boolean?,
-	footer: any,
-	[number]: any,
+	read title: string,
+	read icon: string?,
+	read meta: any,
+	read menu: any,
+	read to: string?,
+	read grow: boolean?,
+	read padding: boolean?,
+	read footer: any,
+	read [number]: any,
 }
 type UseDatePickerPreset = any
 type UseDatePickerProps = {
-	title: string?,
-	weeks: { any },
-	selected: string?,
-	weekdays: { string }?,
-	event: string?,
-	previous: any,
-	next: any,
-	today: any,
-	presets: { UseDatePickerPreset }?,
-	preset: string?,
-	presets_side: string?,
-	open: boolean?,
-	toggle: any,
-	dismiss: any,
-	value: string?,
-	placeholder: string?,
-	overdue: boolean?,
-	width: number?,
-	align: string?,
-	to: string?,
+	read title: string?,
+	read weeks: { any },
+	read selected: string?,
+	read weekdays: { string }?,
+	read event: string?,
+	read previous: any,
+	read next: any,
+	read today: any,
+	read presets: { UseDatePickerPreset }?,
+	read preset: string?,
+	read presets_side: string?,
+	read open: boolean?,
+	read toggle: any,
+	read dismiss: any,
+	read value: string?,
+	read placeholder: string?,
+	read overdue: boolean?,
+	read width: number?,
+	read align: string?,
+	read to: string?,
 }
 type UseDateTileProps = {
-	month: string,
-	day: string,
-	tone: string?,
-	size: string?,
+	read month: string,
+	read day: string,
+	read tone: string?,
+	read size: string?,
 }
 type UseDayStripDay = any
 type UseDayStripProps = {
-	days: { UseDayStripDay },
-	selected: string?,
-	event: string?,
-	to: string?,
+	read days: { UseDayStripDay },
+	read selected: string?,
+	read event: string?,
+	read to: string?,
 }
 type UseDialogButton = any
 type UseDialogProps = {
-	open: boolean?,
-	dismiss: any,
-	title: string?,
-	subtitle: string?,
-	icon: string?,
-	tone: string?,
-	size: string?,
-	width: number?,
-	height: number?,
-	place: string?,
-	backdrop: boolean?,
-	hint: boolean?,
-	plain: boolean?,
-	close: boolean?,
-	buttons: { UseDialogButton }?,
-	actions: { any }?,
-	note: string?,
-	submit: any,
-	keys: { [string]: any }?,
-	to: string?,
-	class: string?,
-	[number]: any,
+	read open: boolean?,
+	read dismiss: any,
+	read title: string?,
+	read subtitle: string?,
+	read icon: string?,
+	read tone: string?,
+	read size: string?,
+	read width: number?,
+	read height: number?,
+	read place: string?,
+	read backdrop: boolean?,
+	read hint: boolean?,
+	read plain: boolean?,
+	read close: boolean?,
+	read buttons: { UseDialogButton }?,
+	read actions: { any }?,
+	read note: string?,
+	read submit: any,
+	read keys: { [string]: any }?,
+	read to: string?,
+	read class: string?,
+	read [number]: any,
 }
 type UseDictationProps = {
-	id: string?,
-	text: any,
-	failed: any,
-	listening: any,
-	engine: string?,
-	speech: any,
+	read id: string?,
+	read text: any,
+	read failed: any,
+	read listening: any,
+	read engine: string?,
+	read speech: any,
 }
 type UseDictationState = any
 type UseDiffCountsProps = {
-	added: number?,
-	removed: number?,
-	files: number?,
-	size: string?,
-	zero: boolean?,
+	read added: number?,
+	read removed: number?,
+	read files: number?,
+	read size: string?,
+	read zero: boolean?,
 }
 type UseDiffViewLine = any
 type UseDiffViewHunk = any
 type UseDiffViewProps = {
-	path: string?,
-	status: string?,
-	hunks: { UseDiffViewHunk },
-	split: boolean?,
-	collapsed: boolean?,
-	height: number?,
-	grow: boolean?,
-	header: boolean?,
-	event: string?,
-	to: string?,
-	actions: { any }?,
-	switch: string?,
+	read path: string?,
+	read status: string?,
+	read hunks: { UseDiffViewHunk },
+	read split: boolean?,
+	read collapsed: boolean?,
+	read height: number?,
+	read grow: boolean?,
+	read header: boolean?,
+	read event: string?,
+	read to: string?,
+	read actions: { any }?,
+	read switch: string?,
 }
 type UseDocumentCardProps = {
-	title: string,
-	text: string?,
-	date: string?,
-	lines: number?,
-	favorite: boolean?,
-	star: any?,
-	selected: boolean?,
-	msg: any?,
-	context: any?,
-	width: number?,
-	height: number?,
-	to: string?,
+	read title: string,
+	read text: string?,
+	read date: string?,
+	read lines: number?,
+	read favorite: boolean?,
+	read star: any?,
+	read selected: boolean?,
+	read msg: any?,
+	read context: any?,
+	read width: number?,
+	read height: number?,
+	read to: string?,
 }
 type UseDocumentRowProps = {
-	title: string,
-	excerpt: string?,
-	date: string?,
-	words: number?,
-	favorite: boolean?,
-	selected: boolean?,
-	lines: number?,
-	msg: any?,
-	context: any?,
-	to: string?,
+	read title: string,
+	read excerpt: string?,
+	read date: string?,
+	read words: number?,
+	read favorite: boolean?,
+	read selected: boolean?,
+	read lines: number?,
+	read msg: any?,
+	read context: any?,
+	read to: string?,
 }
 type UseDotChartColumn = any
 type UseDotChartProps = {
-	columns: { UseDotChartColumn },
-	max: number,
-	rows: number?,
-	ticks: { string }?,
-	labels: { string }?,
-	size: number?,
-	color: string?,
-	shade: string?,
+	read columns: { UseDotChartColumn },
+	read max: number,
+	read rows: number?,
+	read ticks: { string }?,
+	read labels: { string }?,
+	read size: number?,
+	read color: string?,
+	read shade: string?,
 }
 type UseDropdownProps = {
-	open: boolean?,
-	label: string?,
-	value: string?,
-	icon: string?,
-	options: { any },
-	selected: string?,
-	toggle: any,
-	dismiss: any,
-	event: string?,
-	highlighted: any,
-	expanded: any,
-	expand: string?,
-	submenu_highlighted: any,
-	keys: { [string]: any }?,
-	width: number?,
-	align: string?,
-	side: string?,
-	placeholder: string?,
-	disabled: boolean?,
-	to: string?,
-	chevron: string?,
-	trigger_width: number?,
+	read open: boolean?,
+	read label: string?,
+	read value: string?,
+	read icon: string?,
+	read options: { any },
+	read selected: string?,
+	read toggle: any,
+	read dismiss: any,
+	read event: string?,
+	read highlighted: any,
+	read expanded: any,
+	read expand: string?,
+	read submenu_highlighted: any,
+	read keys: { [string]: any }?,
+	read width: number?,
+	read align: string?,
+	read side: string?,
+	read placeholder: string?,
+	read disabled: boolean?,
+	read to: string?,
+	read chevron: string?,
+	read trigger_width: number?,
 }
 type UseDropzoneProps = {
-	title: string?,
-	detail: string?,
-	icon: string?,
-	compact: boolean?,
-	drop: any,
-	browse: any,
-	to: string?,
-	width: number?,
-	height: number?,
+	read title: string?,
+	read detail: string?,
+	read icon: string?,
+	read compact: boolean?,
+	read drop: any,
+	read browse: any,
+	read to: string?,
+	read width: number?,
+	read height: number?,
 }
 type UseEmojiPickerProps = {
-	recent: { string }?,
-	event: string?,
-	query: string?,
-	search: any,
-	id: string?,
-	focus: boolean?,
-	cancel: any,
-	columns: number?,
-	height: number?,
-	to: string?,
+	read recent: { string }?,
+	read event: string?,
+	read query: string?,
+	read search: any,
+	read id: string?,
+	read focus: boolean?,
+	read cancel: any,
+	read columns: number?,
+	read height: number?,
+	read to: string?,
 }
 type UseEmptyStateProps = {
-	icon: string?,
-	title: string,
-	message: string?,
-	action: string?,
-	msg: any,
+	read icon: string?,
+	read title: string,
+	read message: string?,
+	read action: string?,
+	read msg: any,
 }
 type UseErrorStateProps = {
-	title: string?,
-	message: string?,
-	details: string?,
-	icon: string?,
-	retry: any,
-	retry_label: string?,
-	secondary: any,
-	block: boolean?,
-	retrying: boolean?,
-	to: string?,
+	read title: string?,
+	read message: string?,
+	read details: string?,
+	read icon: string?,
+	read retry: any,
+	read retry_label: string?,
+	read secondary: any,
+	read block: boolean?,
+	read retrying: boolean?,
+	read to: string?,
 }
 type UseFeedbackProps = {
-	open: boolean?,
-	dismiss: any,
-	id: string?,
-	value: string?,
-	text: string?,
-	placeholder: string?,
-	note: string?,
-	error: string?,
-	change: any,
-	send: any,
-	runs: { any }?,
-	expanded: string?,
-	undo: boolean?,
-	follow: boolean?,
-	reply: string?,
-	actions: { any }?,
-	inspect: boolean?,
-	attached: { element: string, at: string?, report: string? }?,
-	detach: any,
-	copy: any,
-	copied: boolean?,
-	inline: boolean?,
-	to: string?,
+	read open: boolean?,
+	read dismiss: any,
+	read id: string?,
+	read value: string?,
+	read text: string?,
+	read placeholder: string?,
+	read note: string?,
+	read error: string?,
+	read change: any,
+	read send: any,
+	read runs: { any }?,
+	read expanded: string?,
+	read undo: boolean?,
+	read follow: boolean?,
+	read reply: string?,
+	read actions: { any }?,
+	read inspect: boolean?,
+	read attached: { read element: string, read at: string?, read report: string? }?,
+	read detach: any,
+	read copy: any,
+	read copied: boolean?,
+	read inline: boolean?,
+	read to: string?,
 }
+type UseFeedbackStatus = any
 type UseFileCardProps = {
-	name: string,
-	src: string?,
-	detail: string?,
-	progress: number?,
-	layout: string?,
-	remove: any,
-	msg: any,
-	selected: boolean?,
-	to: string?,
-	width: number?,
+	read name: string,
+	read src: string?,
+	read detail: string?,
+	read progress: number?,
+	read layout: string?,
+	read remove: any,
+	read msg: any,
+	read selected: boolean?,
+	read to: string?,
+	read width: number?,
 }
 type UseFileIconProps = {
-	name: string,
-	dir: boolean?,
-	open: boolean?,
+	read name: string,
+	read dir: boolean?,
+	read open: boolean?,
 }
 type UseFilterBuilderCondition = any
 type UseFilterBuilderField = any
 type UseFilterBuilderProps = {
-	match: string?,
-	conditions: { UseFilterBuilderCondition }?,
-	fields: { UseFilterBuilderField },
-	open: string?,
-	to: string?,
+	read match: string?,
+	read conditions: { UseFilterBuilderCondition }?,
+	read fields: { UseFilterBuilderField },
+	read open: string?,
+	read to: string?,
 }
 type UseFilterDropdownOption = any
 type UseFilterDropdownProps = {
-	icon: string?,
-	label: string?,
-	placeholder: string?,
-	options: { any },
-	selected: any,
-	multiple: boolean?,
-	any: string?,
-	open: boolean?,
-	toggle: any,
-	dismiss: any,
-	event: string?,
-	clear: any,
-	width: number?,
-	plain: boolean?,
-	to: string?,
+	read icon: string?,
+	read label: string?,
+	read placeholder: string?,
+	read options: { any },
+	read selected: any,
+	read multiple: boolean?,
+	read any: string?,
+	read open: boolean?,
+	read toggle: any,
+	read dismiss: any,
+	read event: string?,
+	read clear: any,
+	read width: number?,
+	read plain: boolean?,
+	read to: string?,
 }
 type UseFindBarProps = {
-	id: string?,
-	value: string?,
-	placeholder: string?,
-	count: number?,
-	index: number?,
-	change: any,
-	event: string?,
-	closable: boolean?,
-	focus: boolean?,
-	replace: boolean?,
-	replacement: string?,
-	replace_change: any,
-	replace_one: any,
-	replace_all: any,
-	width: number?,
-	to: string?,
+	read id: string?,
+	read value: string?,
+	read placeholder: string?,
+	read count: number?,
+	read index: number?,
+	read change: any,
+	read event: string?,
+	read closable: boolean?,
+	read focus: boolean?,
+	read replace: boolean?,
+	read replacement: string?,
+	read replace_change: any,
+	read replace_one: any,
+	read replace_all: any,
+	read width: number?,
+	read to: string?,
 }
 type UseFlowDiagramMeter = any
 type UseFlowDiagramNode = any
@@ -3277,1687 +3305,1709 @@ type UseFlowDiagramPoint = any
 type UseFlowDiagramSize = any
 type UseFlowDiagramStep = any
 type UseFlowDiagramProps = {
-	nodes: { UseFlowDiagramNode },
-	links: { UseFlowDiagramLink }?,
-	groups: { UseFlowDiagramGroup }?,
-	flows: { UseFlowDiagramFlow }?,
-	columns: number?,
-	rows: number?,
-	time: number?,
-	speed: number?,
-	selected: string?,
-	event: string?,
-	to: string?,
-	size: string?,
-	height: number?,
+	read nodes: { UseFlowDiagramNode },
+	read links: { UseFlowDiagramLink }?,
+	read groups: { UseFlowDiagramGroup }?,
+	read flows: { UseFlowDiagramFlow }?,
+	read columns: number?,
+	read rows: number?,
+	read time: number?,
+	read speed: number?,
+	read selected: string?,
+	read event: string?,
+	read to: string?,
+	read size: string?,
+	read height: number?,
 }
 type UseForecastChartBar = any
 type UseForecastChartProps = {
-	bars: { UseForecastChartBar },
-	max: number,
-	floor: number?,
-	ticks: { string }?,
-	height: number?,
-	bar: number?,
-	event: string?,
-	to: string?,
+	read bars: { UseForecastChartBar },
+	read max: number,
+	read floor: number?,
+	read ticks: { string }?,
+	read height: number?,
+	read bar: number?,
+	read event: string?,
+	read to: string?,
 }
 type UseForgeAccountProps = {
-	forge: any,
-	brand: string?,
-	msg: any,
-	to: string?,
+	read forge: any,
+	read brand: string?,
+	read msg: any,
+	read to: string?,
 }
 type UseForgePrProps = {
-	forge: any,
-	branch: string?,
-	pr: any,
-	changes: any,
-	brand: boolean?,
-	open: boolean?,
+	read forge: any,
+	read branch: string?,
+	read pr: any,
+	read changes: any,
+	read brand: boolean?,
+	read open: boolean?,
 }
 type UseForgeSignInProps = {
-	forge: any,
-	provider: string?,
+	read forge: any,
+	read provider: string?,
 }
 type UseFormGridRow = any
 type UseFormGridProps = {
-	rows: { UseFormGridRow },
-	label_width: number?,
-	gap: number?,
+	read rows: { UseFormGridRow },
+	read label_width: number?,
+	read gap: number?,
 }
 type UseGanttDay = any
+type UseGanttRow = any
 type UseGanttProps = {
-	days: { UseGanttDay },
-	rows: { any },
-	deps: { any }?,
-	day_width: number?,
-	row_height: number?,
-	label_width: number?,
-	selected: string?,
-	event: string?,
-	move: string?,
-	resize: string?,
-	moving: any,
-	height: number?,
-	grow: boolean?,
-	to: string?,
+	read days: { UseGanttDay },
+	read rows: { UseGanttRow },
+	read deps: { any }?,
+	read day_width: number?,
+	read row_height: number?,
+	read label_width: number?,
+	read selected: string?,
+	read event: string?,
+	read move: string?,
+	read resize: string?,
+	read moving: any,
+	read height: number?,
+	read grow: boolean?,
+	read to: string?,
 }
 type UseGanttSpan = any
 type UseGhosttyTerminalProps = {
-	id: string?,
-	cwd: string?,
-	backend: string?,
-	exit: any,
-	shell: any,
-	style: any,
+	read id: string?,
+	read cwd: string?,
+	read backend: string?,
+	read exit: any,
+	read shell: any,
+	read style: any,
 }
 type UseGroupHeaderProps = {
-	title: string,
-	id: string?,
-	count: (number | string)?,
-	status: string?,
-	icon: string?,
-	detail: string?,
-	collapsed: boolean?,
-	toggle: any,
-	add: any,
-	add_tooltip: string?,
-	actions: { any }?,
-	band: boolean?,
-	to: string?,
+	read title: string,
+	read id: string?,
+	read count: (number | string)?,
+	read status: string?,
+	read icon: string?,
+	read detail: string?,
+	read collapsed: boolean?,
+	read toggle: any,
+	read add: any,
+	read add_tooltip: string?,
+	read actions: { any }?,
+	read band: boolean?,
+	read to: string?,
 }
 type UseGuideCardProps = {
-	title: string,
-	category: string?,
-	color: string?,
-	tint: string?,
-	icon: string?,
-	read: string?,
-	progress: number?,
-	done: boolean?,
-	new: boolean?,
-	selected: boolean?,
-	msg: any,
-	to: string?,
-	bar: number?,
+	read title: string,
+	read category: string?,
+	read color: string?,
+	read tint: string?,
+	read icon: string?,
+	read read: string?,
+	read progress: number?,
+	read done: boolean?,
+	read new: boolean?,
+	read selected: boolean?,
+	read msg: any,
+	read to: string?,
+	read bar: number?,
 }
 type UseHeatGridProps = {
-	columns: { any },
-	rows: number?,
-	levels: number?,
-	size: number?,
-	gap: number?,
-	color: string?,
-	empty: string?,
-	spread: boolean?,
-	labels: { string }?,
-	tooltips: { string }?,
+	read columns: { any },
+	read rows: number?,
+	read levels: number?,
+	read size: number?,
+	read gap: number?,
+	read color: string?,
+	read empty: string?,
+	read spread: boolean?,
+	read labels: { string }?,
+	read tooltips: { string }?,
 }
 type UseHistogramChannel = any
 type UseHistogramMarker = any
 type UseHistogramProps = {
-	channels: { UseHistogramChannel },
-	width: number?,
-	height: number?,
-	max: number?,
-	log: boolean?,
-	markers: { UseHistogramMarker }?,
-	drag: any,
-	shade: boolean?,
-	to: string?,
+	read channels: { UseHistogramChannel },
+	read width: number?,
+	read height: number?,
+	read max: number?,
+	read log: boolean?,
+	read markers: { UseHistogramMarker }?,
+	read drag: any,
+	read shade: boolean?,
+	read to: string?,
 }
 type UseIconButtonProps = {
-	icon: string,
-	tooltip: string?,
-	msg: any,
-	command: any,
-	variant: string?,
-	size: string?,
-	active: boolean?,
-	badge: any,
-	disabled: boolean?,
-	tone: string?,
-	to: string?,
+	read icon: string,
+	read tooltip: string?,
+	read msg: any,
+	read command: any,
+	read variant: string?,
+	read size: string?,
+	read active: boolean?,
+	read badge: any,
+	read disabled: boolean?,
+	read tone: string?,
+	read to: string?,
 }
 type UseImageViewerProps = {
-	src: string,
-	zoom: number?,
-	center: { number }?,
-	change: any,
-	to: string?,
-	overlay: { any }?,
-	controls: boolean?,
-	min: number?,
-	max: number?,
-	width: number?,
-	height: number?,
-	id: string?,
+	read src: string,
+	read zoom: number?,
+	read center: { number }?,
+	read change: any,
+	read to: string?,
+	read overlay: { any }?,
+	read controls: boolean?,
+	read min: number?,
+	read max: number?,
+	read width: number?,
+	read height: number?,
+	read id: string?,
 }
 type UseImageViewerState = any
 type UseInsightNoteProps = {
-	label: string?,
-	icon: string?,
-	text: string,
-	link: string?,
-	after: string?,
-	msg: any,
-	to: string?,
+	read label: string?,
+	read icon: string?,
+	read text: string,
+	read link: string?,
+	read after: string?,
+	read msg: any,
+	read to: string?,
 }
 type UseKanbanColumnProps = {
-	title: string,
-	color: string?,
-	count: number?,
-	total: string?,
-	add: any,
-	add_label: string?,
-	to: string?,
-	width: number?,
-	accept: any,
-	over: boolean?,
-	marker: number?,
-	[number]: any,
+	read title: string,
+	read color: string?,
+	read count: number?,
+	read total: string?,
+	read add: any,
+	read add_label: string?,
+	read to: string?,
+	read width: number?,
+	read accept: any,
+	read over: boolean?,
+	read marker: number?,
+	read [number]: any,
 }
 type UseKbdProps = {
-	keys: any,
-	small: boolean?,
-	plain: boolean?,
+	read keys: any,
+	read small: boolean?,
+	read plain: boolean?,
 }
 type UseKeyHintsHint = any
 type UseKeyHintsProps = {
-	hints: { UseKeyHintsHint },
-	caps: boolean?,
-	separator: string?,
-	justify: string?,
+	read hints: { UseKeyHintsHint },
+	read caps: boolean?,
+	read separator: string?,
+	read justify: string?,
 }
 type UseKeyValuesProps = {
-	rows: { { string } },
-	width: number?,
+	read rows: { { string } },
+	read width: number?,
 }
 type UseKpiCellProps = {
-	title: string,
-	value: string,
-	icon: string?,
-	tint: string?,
-	delta: string?,
-	good: boolean?,
-	caption: string?,
-	menu: any,
-	to: string?,
+	read title: string,
+	read value: string,
+	read icon: string?,
+	read tint: string?,
+	read delta: string?,
+	read good: boolean?,
+	read caption: string?,
+	read menu: any,
+	read to: string?,
 }
 type UseKpiMeterSegment = any
 type UseKpiMeterLegend = any
 type UseKpiMeterProps = {
-	title: string,
-	value: string,
-	caption: string?,
-	caption_color: string?,
-	dot: string?,
-	mono: boolean?,
-	segments: { UseKpiMeterSegment }?,
-	legend: { UseKpiMeterLegend }?,
-	width: number?,
-	msg: any,
-	to: string?,
+	read title: string,
+	read value: string,
+	read caption: string?,
+	read caption_color: string?,
+	read dot: string?,
+	read mono: boolean?,
+	read segments: { UseKpiMeterSegment }?,
+	read legend: { UseKpiMeterLegend }?,
+	read width: number?,
+	read msg: any,
+	read to: string?,
 }
 type UseLevelRowProps = {
-	label: string,
-	value: string?,
-	fraction: number,
-	color: string?,
-	end_color: string?,
-	width: number?,
-	label_width: number?,
-	height: number?,
-	tooltip: string?,
-	msg: any?,
-	to: string?,
+	read label: string,
+	read value: string?,
+	read fraction: number,
+	read color: string?,
+	read end_color: string?,
+	read width: number?,
+	read label_width: number?,
+	read height: number?,
+	read tooltip: string?,
+	read msg: any?,
+	read to: string?,
 }
 type UseLightboxPicture = any
 type UseLightboxProps = {
-	open: boolean?,
-	dismiss: any,
-	pictures: { UseLightboxPicture }?,
-	index: number?,
-	event: string?,
-	zoom: number?,
-	center: any,
-	change: any,
-	to: string?,
+	read open: boolean?,
+	read dismiss: any,
+	read pictures: { UseLightboxPicture }?,
+	read index: number?,
+	read event: string?,
+	read zoom: number?,
+	read center: any,
+	read change: any,
+	read to: string?,
 }
 type UseLineChartSeries = any
 type UseLineChartProps = {
-	labels: { string },
-	series: { UseLineChartSeries },
-	bars: { number }?,
-	max: number,
-	min: number?,
-	ticks: { string }?,
-	width: number?,
-	height: number?,
-	selected: number?,
-	card: any,
-	card_width: number?,
-	tips: { string }?,
-	event: string?,
-	to: string?,
+	read labels: { string },
+	read series: { UseLineChartSeries },
+	read bars: { number }?,
+	read max: number,
+	read min: number?,
+	read ticks: { string }?,
+	read width: number?,
+	read height: number?,
+	read selected: number?,
+	read card: any,
+	read card_width: number?,
+	read tips: { string }?,
+	read event: string?,
+	read to: string?,
 }
 type UseListRow = any
 type UseListProps = {
-	rows: { UseListRow },
-	selected: string?,
-	to: string?,
+	read rows: { UseListRow },
+	read selected: string?,
+	read to: string?,
 }
 type UseLoadingProps = {
-	text: string?,
-	detail: string?,
-	block: boolean?,
-	skeleton: boolean?,
-	count: number?,
-	widths: { number }?,
+	read text: string?,
+	read detail: string?,
+	read block: boolean?,
+	read skeleton: boolean?,
+	read count: number?,
+	read widths: { number }?,
 }
 type UseMailRowTag = any
 type UseMailRowProps = {
-	from: string,
-	subject: string?,
-	preview: string?,
-	time: string?,
-	account: string?,
-	unread: boolean?,
-	count: number?,
-	starred: boolean?,
-	star: any,
-	attachment: boolean?,
-	tag: UseMailRowTag?,
-	avatar: string?,
-	color: string?,
-	selected: boolean?,
-	msg: any,
-	context: any,
-	to: string?,
+	read from: string,
+	read subject: string?,
+	read preview: string?,
+	read time: string?,
+	read account: string?,
+	read unread: boolean?,
+	read count: number?,
+	read starred: boolean?,
+	read star: any,
+	read attachment: boolean?,
+	read tag: UseMailRowTag?,
+	read avatar: string?,
+	read color: string?,
+	read selected: boolean?,
+	read msg: any,
+	read context: any,
+	read to: string?,
 }
 type UseMarkdownEditorMode = any
+type UseMarkdownEditorScrollAt = any
 type UseMarkdownEditorState = any
 type UseMarkdownEditorProps = {
-	path: string?,
-	root: string?,
-	text: string?,
-	mode: string?,
-	id: string?,
+	read path: string?,
+	read root: string?,
+	read text: string?,
+	read mode: string?,
+	read id: string?,
 }
 type UseMarkdownProps = {
-	text: string?,
-	link: any,
-	to: string?,
-	grow: boolean?,
-	scroll: boolean?,
-	max_width: number?,
-	lines: number?,
-	images: boolean?,
-	image: any,
-	outline: any,
-	section: any,
-	reveal: { at: number, seq: number? }?,
-	find: string?,
-	find_index: number?,
-	found: any,
-	stream: boolean?,
-	scrolled: any,
-	scroll_at: { fraction: number, seq: number? }?,
+	read text: string?,
+	read link: any,
+	read to: string?,
+	read grow: boolean?,
+	read scroll: boolean?,
+	read max_width: number?,
+	read lines: number?,
+	read images: boolean?,
+	read image: any,
+	read outline: any,
+	read section: any,
+	read reveal: { read at: number, read seq: number? }?,
+	read find: string?,
+	read find_index: number?,
+	read found: any,
+	read stream: boolean?,
+	read scrolled: any,
+	read scroll_at: { read fraction: number, read seq: number? }?,
 }
 type UseMentionFieldPerson = any
 type UseMentionFieldProps = {
-	id: string,
-	value: string?,
-	caret: number?,
-	people: { UseMentionFieldPerson }?,
-	change: any,
-	submit: any,
-	blur: any,
-	placeholder: string?,
-	multiline: boolean?,
-	rows: number?,
-	max_rows: number?,
-	highlighted: number?,
-	event: string?,
-	dismiss: any,
-	most: number?,
-	width: number?,
-	grow: boolean?,
-	focus: boolean?,
-	to: string?,
-	trigger: string?,
-	heading: string?,
+	read id: string,
+	read value: string?,
+	read caret: number?,
+	read people: { UseMentionFieldPerson }?,
+	read change: any,
+	read submit: any,
+	read blur: any,
+	read placeholder: string?,
+	read multiline: boolean?,
+	read rows: number?,
+	read max_rows: number?,
+	read highlighted: number?,
+	read event: string?,
+	read dismiss: any,
+	read most: number?,
+	read width: number?,
+	read grow: boolean?,
+	read focus: boolean?,
+	read to: string?,
+	read trigger: string?,
+	read heading: string?,
 }
 type UseMenuItem = any
 type UseMenuProps = {
-	items: { any },
-	max_height: number?,
-	highlighted: any,
-	event: string?,
-	expanded: any,
-	expand: string?,
-	submenu_highlighted: any,
-	submenu_width: number?,
-	to: string?,
+	read items: { any },
+	read max_height: number?,
+	read highlighted: any,
+	read event: string?,
+	read expanded: any,
+	read expand: string?,
+	read submenu_highlighted: any,
+	read submenu_width: number?,
+	read to: string?,
 }
 type UseMessageHeaderProps = {
-	subject: string?,
-	from: string,
-	email: string?,
-	recipients: any,
-	cc: any,
-	date: string?,
-	avatar: string?,
-	color: string?,
-	actions: { any }?,
-	sender: any,
-	to: string?,
-	[number]: any,
+	read subject: string?,
+	read from: string,
+	read email: string?,
+	read recipients: any,
+	read cc: any,
+	read date: string?,
+	read avatar: string?,
+	read color: string?,
+	read actions: { any }?,
+	read sender: any,
+	read to: string?,
+	read [number]: any,
 }
 type UseMeterProps = {
-	value: number,
-	width: number?,
-	warn: number?,
-	label: string?,
-	percent: boolean?,
+	read value: number,
+	read width: number?,
+	read warn: number?,
+	read label: string?,
+	read percent: boolean?,
 }
 type UseMetricProps = {
-	label: string,
-	value: string,
-	note: string?,
-	tone: string?,
-	size: string?,
+	read label: string,
+	read value: string,
+	read note: string?,
+	read tone: string?,
+	read size: string?,
 }
 type UseMiniBarsBar = any
 type UseMiniBarsProps = {
-	bars: { UseMiniBarsBar },
-	highlight: number?,
-	height: number?,
-	bar: number?,
+	read bars: { UseMiniBarsBar },
+	read highlight: number?,
+	read height: number?,
+	read bar: number?,
 }
 type UseMockupsVariant = any
 type UseMockupsProps = {
-	ask: string?,
-	variants: { UseMockupsVariant },
-	file: string?,
-	width: number?,
+	read ask: string?,
+	read variants: { UseMockupsVariant },
+	read file: string?,
+	read width: number?,
 }
 type UseMonthGridDay = any
 type UseMonthGridProps = {
-	weeks: { { UseMonthGridDay } },
-	selected: string?,
-	weekdays: { string }?,
-	event: string?,
-	to: string?,
+	read weeks: { { UseMonthGridDay } },
+	read selected: string?,
+	read weekdays: { string }?,
+	read event: string?,
+	read to: string?,
 }
 type UseNavButtonsProps = {
-	can_back: boolean?,
-	can_forward: boolean?,
-	back: any,
-	forward: any,
-	small: boolean?,
-	to: string?,
+	read can_back: boolean?,
+	read can_forward: boolean?,
+	read back: any,
+	read forward: any,
+	read small: boolean?,
+	read to: string?,
 }
 type UseNoteCardProps = {
-	id: any,
-	number: number?,
-	location: string?,
-	text: string,
-	selected: boolean?,
-	event: string?,
-	remove: string?,
-	to: string?,
+	read id: any,
+	read number: number?,
+	read location: string?,
+	read text: string,
+	read selected: boolean?,
+	read event: string?,
+	read remove: string?,
+	read to: string?,
 }
 type UseNoticeProps = {
-	id: any,
-	tone: string?,
-	icon: string?,
-	title: string?,
-	text: string?,
-	action: any,
-	dismiss: any,
-	foldable: boolean?,
-	expanded: boolean?,
-	toggle: any,
-	to: string?,
-	[number]: any,
+	read id: any,
+	read tone: string?,
+	read icon: string?,
+	read title: string?,
+	read text: string?,
+	read action: any,
+	read dismiss: any,
+	read foldable: boolean?,
+	read expanded: boolean?,
+	read toggle: any,
+	read to: string?,
+	read [number]: any,
 }
 type UseNotificationDrawerItem = any
 type UseNotificationDrawerFilter = any
 type UseNotificationDrawerProps = {
-	open: boolean?,
-	items: { UseNotificationDrawerItem }?,
-	filter: string?,
-	filters: { UseNotificationDrawerFilter }?,
-	title: string?,
-	width: number?,
-	top: number?,
-	backdrop: boolean?,
-	dismiss: any,
-	mark_read: any,
-	mark_read_label: string?,
-	event: string?,
-	remove: any,
-	empty: string?,
-	to: string?,
+	read open: boolean?,
+	read items: { UseNotificationDrawerItem }?,
+	read filter: string?,
+	read filters: { UseNotificationDrawerFilter }?,
+	read title: string?,
+	read width: number?,
+	read top: number?,
+	read backdrop: boolean?,
+	read dismiss: any,
+	read mark_read: any,
+	read mark_read_label: string?,
+	read event: string?,
+	read remove: any,
+	read empty: string?,
+	read to: string?,
 }
 type UseNumberFieldProps = {
-	value: number,
-	change: any,
-	min: number?,
-	max: number?,
-	step: number?,
-	speed: number?,
-	decimals: number?,
-	label: string?,
-	unit: string?,
-	width: number?,
-	buttons: boolean?,
-	id: string?,
-	disabled: boolean?,
-	to: string?,
+	read value: number,
+	read change: any,
+	read min: number?,
+	read max: number?,
+	read step: number?,
+	read speed: number?,
+	read decimals: number?,
+	read label: string?,
+	read unit: string?,
+	read width: number?,
+	read buttons: boolean?,
+	read id: string?,
+	read disabled: boolean?,
+	read to: string?,
 }
 type UseNumberedListProps = {
-	items: { string },
-	start: number?,
+	read items: { string },
+	read start: number?,
 }
 type UseOnboardingPage = any
 type UseOnboardingProps = {
-	open: boolean?,
-	title: string?,
-	icon: string?,
-	badge: string?,
-	pages: { UseOnboardingPage }?,
-	current: number?,
-	back: any,
-	next: any,
-	done: any,
-	dismiss: any,
-	event: string?,
-	done_label: string?,
-	width: number?,
-	to: string?,
-	[number]: any,
+	read open: boolean?,
+	read title: string?,
+	read icon: string?,
+	read badge: string?,
+	read pages: { UseOnboardingPage }?,
+	read current: number?,
+	read back: any,
+	read next: any,
+	read done: any,
+	read dismiss: any,
+	read event: string?,
+	read done_label: string?,
+	read width: number?,
+	read to: string?,
+	read [number]: any,
 }
 type UseOutlineHeading = any
 type UseOutlineProps = {
-	headings: { UseOutlineHeading }?,
-	current: number?,
-	event: string?,
-	indent: number?,
-	depth: number?,
-	empty: string?,
-	to: string?,
+	read headings: { UseOutlineHeading }?,
+	read current: number?,
+	read event: string?,
+	read indent: number?,
+	read depth: number?,
+	read empty: string?,
+	read to: string?,
 }
 type UsePageProps = {
-	title: string,
-	subtitle: string?,
-	icon: string?,
-	actions: { any }?,
-	width: number?,
-	footer: any,
-	height: number?,
-	[number]: any,
+	read title: string,
+	read subtitle: string?,
+	read icon: string?,
+	read actions: { any }?,
+	read width: number?,
+	read footer: any,
+	read height: number?,
+	read [number]: any,
 }
 type UsePagerProps = {
-	count: number,
-	page: number,
-	back: any,
-	next: any,
-	back_label: string?,
-	next_label: string?,
-	event: string?,
-	to: string?,
+	read count: number,
+	read page: number,
+	read back: any,
+	read next: any,
+	read back_label: string?,
+	read next_label: string?,
+	read event: string?,
+	read to: string?,
 }
 type UsePaginationProps = {
-	page: number,
-	total: number,
-	per_page: number?,
-	noun: string?,
-	summary: boolean?,
-	window: number?,
-	ellipsis: boolean?,
-	event: string?,
-	sizes: { number }?,
-	size_open: boolean?,
-	size_toggle: any,
-	size_dismiss: any,
-	size_event: string?,
-	size_label: string?,
-	to: string?,
+	read page: number,
+	read total: number,
+	read per_page: number?,
+	read noun: string?,
+	read summary: boolean?,
+	read window: number?,
+	read ellipsis: boolean?,
+	read event: string?,
+	read sizes: { number }?,
+	read size_open: boolean?,
+	read size_toggle: any,
+	read size_dismiss: any,
+	read size_event: string?,
+	read size_label: string?,
+	read to: string?,
 }
 type UsePaneFrameProps = {
-	title: string,
-	icon: string?,
-	subtitle: string?,
-	status: string?,
-	focused: boolean?,
-	zoomed: boolean?,
-	header: string?,
-	focus: any,
-	split_right: any,
-	split_down: any,
-	zoom: any,
-	close: any,
-	actions: { any }?,
-	leading: { any }?,
-	menu: any,
-	click_focus: boolean?,
-	to: string?,
-	height: number?,
-	[number]: any,
+	read title: string,
+	read icon: string?,
+	read subtitle: string?,
+	read status: string?,
+	read focused: boolean?,
+	read zoomed: boolean?,
+	read header: string?,
+	read focus: any,
+	read split_right: any,
+	read split_down: any,
+	read zoom: any,
+	read close: any,
+	read actions: { any }?,
+	read leading: { any }?,
+	read menu: any,
+	read click_focus: boolean?,
+	read to: string?,
+	read height: number?,
+	read [number]: any,
 }
 type UsePickerOption = any
 type UsePickerProps = {
-	options: { any },
-	selected: any,
-	multiple: boolean?,
-	open: boolean?,
-	toggle: any,
-	dismiss: any,
-	event: string?,
-	query: string?,
-	search: any,
-	id: string?,
-	create: any,
-	highlighted: string?,
-	highlight: string?,
-	keys: { [string]: any }?,
-	placeholder: string?,
-	icon: string?,
-	empty: string?,
-	width: number?,
-	align: string?,
-	trigger: any,
-	to: string?,
+	read options: { any },
+	read selected: any,
+	read multiple: boolean?,
+	read open: boolean?,
+	read toggle: any,
+	read dismiss: any,
+	read event: string?,
+	read query: string?,
+	read search: any,
+	read id: string?,
+	read create: any,
+	read highlighted: string?,
+	read highlight: string?,
+	read keys: { [string]: any }?,
+	read placeholder: string?,
+	read icon: string?,
+	read empty: string?,
+	read width: number?,
+	read align: string?,
+	read trigger: any,
+	read to: string?,
 }
 type UsePillTabsItem = any
 type UsePillTabsProps = {
-	items: { UsePillTabsItem },
-	selected: string?,
-	event: string?,
-	width: number?,
-	size: number?,
-	to: string?,
+	read items: { UsePillTabsItem },
+	read selected: string?,
+	read event: string?,
+	read width: number?,
+	read size: number?,
+	read to: string?,
 }
 type UsePillProps = {
-	label: string,
-	icon: string?,
-	tone: string?,
-	color: string?,
-	size: string?,
-	msg: any,
-	to: string?,
-	tooltip: string?,
+	read label: string,
+	read icon: string?,
+	read tone: string?,
+	read color: string?,
+	read size: string?,
+	read msg: any,
+	read to: string?,
+	read tooltip: string?,
 }
 type UsePixelIconProps = {
-	pattern: { string },
-	colors: { string },
-	size: number?,
-	mirror: boolean?,
-	tooltip: string?,
+	read pattern: { string },
+	read colors: { string },
+	read size: number?,
+	read mirror: boolean?,
+	read tooltip: string?,
 }
 type UsePrBadgeProps = {
-	number: number | string,
-	kind: string?,
-	tone: string?,
-	icon: string?,
-	checks: string?,
-	label: string?,
-	tooltip: string?,
-	msg: any,
-	to: string?,
+	read number: number | string,
+	read kind: string?,
+	read tone: string?,
+	read icon: string?,
+	read checks: string?,
+	read label: string?,
+	read tooltip: string?,
+	read msg: any,
+	read to: string?,
 }
 type UsePrRowProps = {
-	number: number | string,
-	kind: string?,
-	title: string,
-	tone: string?,
-	draft: boolean?,
-	branch: string?,
-	target: string?,
-	author: string?,
-	age: string?,
-	seconds: number?,
-	checks: string?,
-	added: number?,
-	removed: number?,
-	comments: number?,
-	labels: { string }?,
-	selected: boolean?,
-	event: string?,
-	to: string?,
-	msg: any,
-	context: any,
+	read number: number | string,
+	read kind: string?,
+	read title: string,
+	read tone: string?,
+	read draft: boolean?,
+	read branch: string?,
+	read target: string?,
+	read author: string?,
+	read age: string?,
+	read seconds: number?,
+	read checks: string?,
+	read added: number?,
+	read removed: number?,
+	read comments: number?,
+	read labels: { string }?,
+	read selected: boolean?,
+	read event: string?,
+	read to: string?,
+	read msg: any,
+	read context: any,
 }
 type UsePriorityIconProps = {
-	priority: string?,
-	size: number?,
-	tooltip: string?,
-	label: (string | boolean)?,
+	read priority: string?,
+	read size: number?,
+	read tooltip: string?,
+	read label: (string | boolean)?,
 }
 type UseProgressStackSegment = any
 type UseProgressStackProps = {
-	segments: { UseProgressStackSegment },
-	total: number,
-	width: number?,
-	marker: { value: number, label: string }?,
-	labels: { string }?,
-	ticks: number?,
+	read segments: { UseProgressStackSegment },
+	read total: number,
+	read width: number?,
+	read marker: { read value: number, read label: string }?,
+	read labels: { string }?,
+	read ticks: number?,
 }
 type UseProgressProps = {
-	value: number?,
-	busy: boolean?,
-	label: string?,
-	detail: string?,
-	tone: string?,
-	width: number?,
-	height: number?,
-	percent: boolean?,
+	read value: number?,
+	read busy: boolean?,
+	read label: string?,
+	read detail: string?,
+	read tone: string?,
+	read width: number?,
+	read height: number?,
+	read percent: boolean?,
 }
 type UseProjectCardProps = {
-	name: string,
-	icon: string?,
-	color: string?,
-	description: string?,
-	status: string?,
-	tone: string?,
-	status_color: string?,
-	starred: boolean?,
-	star: any,
-	progress: number?,
-	tasks: string?,
-	due: string?,
-	updated: string?,
-	people: { any }?,
-	selected: boolean?,
-	msg: any,
-	context: any,
-	to: string?,
-	width: number?,
+	read name: string,
+	read icon: string?,
+	read color: string?,
+	read description: string?,
+	read status: string?,
+	read tone: string?,
+	read status_color: string?,
+	read starred: boolean?,
+	read star: any,
+	read progress: number?,
+	read tasks: string?,
+	read due: string?,
+	read updated: string?,
+	read people: { any }?,
+	read selected: boolean?,
+	read msg: any,
+	read context: any,
+	read to: string?,
+	read width: number?,
 }
 type UseProseEditorProps = {
-	id: string?,
-	value: string?,
-	placeholder: string?,
-	change: any?,
-	submit: any?,
-	keys: { [string]: any }?,
-	to: string?,
-	dim: ("sentence" | "paragraph")?,
-	typewriter: boolean?,
-	markdown: boolean?,
-	mono: boolean?,
-	size: ("normal" | "large" | "title")?,
-	measure: number?,
-	focus: boolean?,
+	read id: string?,
+	read value: string?,
+	read placeholder: string?,
+	read change: any?,
+	read submit: any?,
+	read keys: { [string]: any }?,
+	read to: string?,
+	read dim: ("sentence" | "paragraph")?,
+	read typewriter: boolean?,
+	read markdown: boolean?,
+	read mono: boolean?,
+	read size: ("normal" | "large" | "title")?,
+	read measure: number?,
+	read focus: boolean?,
 }
 type UseRadioGroupOption = any
 type UseRadioGroupProps = {
-	options: { UseRadioGroupOption },
-	selected: string?,
-	horizontal: boolean?,
-	event: string?,
-	to: string?,
+	read options: { UseRadioGroupOption },
+	read selected: string?,
+	read horizontal: boolean?,
+	read event: string?,
+	read to: string?,
 }
 type UseRailItem = any
 type UseRailProps = {
-	items: { UseRailItem },
-	selected: string?,
-	event: string?,
-	to: string?,
-	header: { any }?,
-	footer: { any }?,
-	height: number?,
-	fill: boolean?,
+	read items: { UseRailItem },
+	read selected: string?,
+	read event: string?,
+	read to: string?,
+	read header: { any }?,
+	read footer: { any }?,
+	read height: number?,
+	read fill: boolean?,
 }
 type UseRatioRowProps = {
-	label: string,
-	count: string?,
-	percent: string?,
-	icon: string?,
-	leading: any,
-	share: number?,
-	color: string?,
-	width: number?,
-	msg: any,
-	to: string?,
+	read label: string,
+	read count: string?,
+	read percent: string?,
+	read icon: string?,
+	read leading: any,
+	read share: number?,
+	read color: string?,
+	read width: number?,
+	read msg: any,
+	read to: string?,
 }
 type UseRecipientFieldRecipient = any
 type UseRecipientFieldProps = {
-	label: string?,
-	recipients: { any }?,
-	id: string?,
-	value: string?,
-	placeholder: string?,
-	change: any,
-	submit: any,
-	focus: boolean?,
-	keys: { [string]: any }?,
-	suggestions: { any }?,
-	highlighted: number?,
-	pick: string?,
-	remove: string?,
-	dismiss: any,
-	trailing: { any }?,
-	width: number?,
-	to: string?,
+	read label: string?,
+	read recipients: { any }?,
+	read id: string?,
+	read value: string?,
+	read placeholder: string?,
+	read change: any,
+	read submit: any,
+	read focus: boolean?,
+	read keys: { [string]: any }?,
+	read suggestions: { any }?,
+	read highlighted: number?,
+	read pick: string?,
+	read remove: string?,
+	read dismiss: any,
+	read trailing: { any }?,
+	read width: number?,
+	read to: string?,
 }
 type UseReconnectingProps = {
-	open: boolean?,
-	host: string?,
-	title: string?,
-	reason: string?,
-	status: string?,
-	retry: any,
-	retry_label: string?,
-	secondary: any,
-	dismiss: any,
-	icon: string?,
-	to: string?,
+	read open: boolean?,
+	read host: string?,
+	read title: string?,
+	read reason: string?,
+	read status: string?,
+	read retry: any,
+	read retry_label: string?,
+	read secondary: any,
+	read dismiss: any,
+	read icon: string?,
+	read to: string?,
 }
 type UseRecordCardProps = {
-	title: string,
-	detail: string?,
-	icon: string?,
-	tone: string?,
-	msg: any,
-	to: string?,
+	read title: string,
+	read detail: string?,
+	read icon: string?,
+	read tone: string?,
+	read msg: any,
+	read to: string?,
 }
 type UseRelativeTimeProps = {
-	seconds: number,
-	compact: boolean?,
-	prefix: string?,
-	tooltip: string?,
-	size: string?,
+	read seconds: number,
+	read compact: boolean?,
+	read prefix: string?,
+	read tooltip: string?,
+	read size: string?,
 }
 type UseReleaseNotesHighlight = any
 type UseReleaseNotesProps = {
-	version: string,
-	date: string?,
-	name: string?,
-	badge: string?,
-	summary: string?,
-	highlights: { UseReleaseNotesHighlight }?,
-	fixes: { string }?,
-	fixes_title: string?,
-	collapsed: boolean?,
-	toggle: any,
-	id: any,
-	to: string?,
+	read version: string,
+	read date: string?,
+	read name: string?,
+	read badge: string?,
+	read summary: string?,
+	read highlights: { UseReleaseNotesHighlight }?,
+	read fixes: { string }?,
+	read fixes_title: string?,
+	read collapsed: boolean?,
+	read toggle: any,
+	read id: any,
+	read to: string?,
 }
 type UseRichTextPart = any
 type UseRichTextProps = {
-	parts: { any },
-	size: string?,
-	to: string?,
+	read parts: { any },
+	read size: string?,
+	read to: string?,
 }
 type UseRouteMapStop = any
 type UseRouteMapLeg = any
 type UseRouteMapProps = {
-	stops: { UseRouteMapStop },
-	legs: { UseRouteMapLeg }?,
-	provider: string?,
-	key: string?,
-	travel: string?,
-	marker: string?,
-	selected: number?,
-	event: string?,
-	routed: any,
-	height: number?,
-	grow: boolean?,
-	to: string?,
+	read stops: { UseRouteMapStop },
+	read legs: { UseRouteMapLeg }?,
+	read provider: string?,
+	read key: string?,
+	read travel: string?,
+	read marker: string?,
+	read selected: number?,
+	read event: string?,
+	read routed: any,
+	read height: number?,
+	read grow: boolean?,
+	read to: string?,
 }
 type UseSearchFieldProps = {
-	id: string?,
-	value: string?,
-	placeholder: string?,
-	change: any,
-	submit: any,
-	cancel: any,
-	previous: any,
-	next: any,
-	to: string?,
-	focus: boolean?,
-	width: number?,
-	grow: boolean?,
-	icon: any,
-	shortcut: any,
+	read id: string?,
+	read value: string?,
+	read placeholder: string?,
+	read change: any,
+	read submit: any,
+	read cancel: any,
+	read previous: any,
+	read next: any,
+	read to: string?,
+	read focus: boolean?,
+	read width: number?,
+	read grow: boolean?,
+	read icon: any,
+	read shortcut: any,
 }
 type UseSectionProps = {
-	title: string,
-	[number]: any,
+	read title: string,
+	read [number]: any,
 }
 type UseSegmentedOption = any
 type UseSegmentedProps = {
-	options: { UseSegmentedOption },
-	selected: string?,
-	event: string?,
-	small: boolean?,
-	grow: boolean?,
-	to: string?,
+	read options: { UseSegmentedOption },
+	read selected: string?,
+	read event: string?,
+	read small: boolean?,
+	read grow: boolean?,
+	read to: string?,
 }
 type UseSelectionToolbarProps = {
-	[number]: any,
-	field: string,
-	selected: number?,
-	tools: { string }?,
-	side: any,
+	read [number]: any,
+	read field: string,
+	read selected: number?,
+	read tools: { string }?,
+	read side: any,
 }
 type UseSeriesChartSeries = any
 type UseSeriesChartLabel = any
 type UseSeriesChartProps = {
-	series: { UseSeriesChartSeries },
-	width: number?,
-	height: number?,
-	min: number?,
-	max: number?,
-	ticks: { string }?,
-	labels: { UseSeriesChartLabel }?,
-	titles: { string }?,
-	unit: string?,
-	pinned: number?,
-	event: string?,
-	to: string?,
-	legend: boolean?,
+	read series: { UseSeriesChartSeries },
+	read width: number?,
+	read height: number?,
+	read min: number?,
+	read max: number?,
+	read ticks: { string }?,
+	read labels: { UseSeriesChartLabel }?,
+	read titles: { string }?,
+	read unit: string?,
+	read pinned: number?,
+	read event: string?,
+	read to: string?,
+	read legend: boolean?,
 }
 type UseSettingsNavItem = any
 type UseSettingsNavGroup = any
 type UseSettingsNavProps = {
-	groups: { UseSettingsNavGroup },
-	selected: string?,
-	title: string?,
-	subtitle: string?,
-	search: any,
-	footer: any,
-	event: string?,
-	width: number?,
-	scroll: boolean?,
-	height: number?,
-	to: string?,
+	read groups: { UseSettingsNavGroup },
+	read selected: string?,
+	read title: string?,
+	read subtitle: string?,
+	read search: any,
+	read footer: any,
+	read event: string?,
+	read width: number?,
+	read scroll: boolean?,
+	read height: number?,
+	read to: string?,
 }
 type UseSettingsPageRow = any
 type UseSettingsPageSection = any
 type UseSettingsPageProps = {
-	nav: any,
-	title: string?,
-	subtitle: string?,
-	sections: { UseSettingsPageSection }?,
-	status: string?,
-	state: string?,
-	buttons: { any }?,
-	height: number?,
-	to: string?,
-	[number]: any,
+	read nav: any,
+	read title: string?,
+	read subtitle: string?,
+	read sections: { UseSettingsPageSection }?,
+	read status: string?,
+	read state: string?,
+	read buttons: { any }?,
+	read height: number?,
+	read to: string?,
+	read [number]: any,
 }
 type UseSettingsRowProps = {
-	title: string,
-	description: string?,
-	tag: string?,
-	tag_tone: string?,
-	disabled: boolean?,
-	reason: string?,
-	stacked: boolean?,
-	border: boolean?,
-	[number]: any,
+	read title: string,
+	read description: string?,
+	read tag: string?,
+	read tag_tone: string?,
+	read disabled: boolean?,
+	read reason: string?,
+	read stacked: boolean?,
+	read border: boolean?,
+	read [number]: any,
 }
 type UseShareBarShare = any
 type UseShareBarProps = {
-	shares: { UseShareBarShare },
-	width: number?,
-	height: number?,
+	read shares: { UseShareBarShare },
+	read width: number?,
+	read height: number?,
 }
 type UseSheetProps = {
-	open: boolean?,
-	dismiss: any,
-	side: string?,
-	title: string?,
-	subtitle: string?,
-	icon: string?,
-	width: number?,
-	height: number?,
-	backdrop: boolean?,
-	actions: { any }?,
-	footer: any,
-	keys: { [string]: any }?,
-	to: string?,
-	[number]: any,
+	read open: boolean?,
+	read dismiss: any,
+	read side: string?,
+	read title: string?,
+	read subtitle: string?,
+	read icon: string?,
+	read width: number?,
+	read height: number?,
+	read backdrop: boolean?,
+	read actions: { any }?,
+	read footer: any,
+	read keys: { [string]: any }?,
+	read to: string?,
+	read [number]: any,
 }
 type UseShortcutFieldProps = {
-	id: string?,
-	value: string?,
-	recording: boolean?,
-	event: string?,
-	clearable: boolean?,
-	placeholder: string?,
-	width: number?,
-	to: string?,
+	read id: string?,
+	read value: string?,
+	read recording: boolean?,
+	read event: string?,
+	read clearable: boolean?,
+	read placeholder: string?,
+	read width: number?,
+	read to: string?,
 }
 type UseShortcutsItem = any
 type UseShortcutsGroup = any
 type UseShortcutsProps = {
-	open: boolean?,
-	dismiss: any,
-	title: string?,
-	subtitle: string?,
-	groups: { UseShortcutsGroup },
-	columns: number?,
-	search: any,
-	note: string?,
-	width: number?,
-	height: number?,
-	inline: boolean?,
-	to: string?,
+	read open: boolean?,
+	read dismiss: any,
+	read title: string?,
+	read subtitle: string?,
+	read groups: { UseShortcutsGroup },
+	read columns: number?,
+	read search: any,
+	read note: string?,
+	read width: number?,
+	read height: number?,
+	read inline: boolean?,
+	read to: string?,
 }
 type UseSideNavItem = any
 type UseSideNavSection = any
 type UseSideNavAccount = any
 type UseSideNavProps = {
-	collapsed: boolean?,
-	selected: string?,
-	sections: { UseSideNavSection }?,
-	footer: { UseSideNavItem }?,
-	account: UseSideNavAccount?,
-	header: any,
-	toggle: any,
-	event: string?,
-	to: string?,
-	stagger: number?,
-	height: number?,
+	read collapsed: boolean?,
+	read selected: string?,
+	read sections: { UseSideNavSection }?,
+	read footer: { UseSideNavItem }?,
+	read account: UseSideNavAccount?,
+	read header: any,
+	read toggle: any,
+	read event: string?,
+	read to: string?,
+	read stagger: number?,
+	read height: number?,
 }
 type UseSidePanelsProps = {
-	id: string?,
-	sidebar: any,
-	list: any,
-	main: any,
-	left: boolean?,
-	middle: boolean?,
-	sidebar_size: number?,
-	list_size: number?,
-	height: number?,
+	read id: string?,
+	read sidebar: any,
+	read list: any,
+	read main: any,
+	read left: boolean?,
+	read middle: boolean?,
+	read sidebar_size: number?,
+	read list_size: number?,
+	read height: number?,
 }
 type UseSidebarSectionProps = {
-	title: string,
-	count: (number | string)?,
-	collapsed: boolean?,
-	toggle: any,
-	id: string?,
-	to: string?,
-	actions: { any }?,
-	fixed: boolean?,
-	[number]: any,
+	read title: string,
+	read count: (number | string)?,
+	read collapsed: boolean?,
+	read toggle: any,
+	read id: string?,
+	read to: string?,
+	read actions: { any }?,
+	read fixed: boolean?,
+	read [number]: any,
 }
 type UseSidebarSection = any
 type UseSidebarFooterItem = any
 type UseSidebarProps = {
-	header: any,
-	sections: { UseSidebarSection }?,
-	footer: { UseSidebarFooterItem }?,
-	to: string?,
-	width: number?,
-	height: number?,
-	fill: boolean?,
-	[number]: any,
+	read header: any,
+	read sections: { UseSidebarSection }?,
+	read footer: { UseSidebarFooterItem }?,
+	read to: string?,
+	read width: number?,
+	read height: number?,
+	read fill: boolean?,
+	read [number]: any,
 }
 type UseSliderProps = {
-	value: number,
-	min: number?,
-	max: number?,
-	step: number?,
-	change: any,
-	label: string?,
-	unit: string?,
-	decimals: number?,
-	default: number?,
-	width: number?,
-	inline: boolean?,
-	label_width: number?,
-	colors: { string }?,
-	disabled: boolean?,
-	to: string?,
+	read value: number,
+	read min: number?,
+	read max: number?,
+	read step: number?,
+	read change: any,
+	read label: string?,
+	read unit: string?,
+	read decimals: number?,
+	read default: number?,
+	read width: number?,
+	read inline: boolean?,
+	read label_width: number?,
+	read colors: { string }?,
+	read disabled: boolean?,
+	read to: string?,
 }
 type UseSparklineProps = {
-	values: { number },
-	samples: number?,
-	height: number?,
-	hot: number?,
+	read values: { number },
+	read samples: number?,
+	read height: number?,
+	read hot: number?,
 }
 type UseSplitViewProps = {
-	id: string?,
-	sidebar: any,
-	main: any,
-	inspector: any,
-	bottom_panel: any,
-	left: boolean?,
-	right: boolean?,
-	bottom: boolean?,
-	sidebar_size: number?,
-	inspector_size: number?,
-	bottom_size: number?,
-	height: number?,
+	read id: string?,
+	read sidebar: any,
+	read main: any,
+	read inspector: any,
+	read bottom_panel: any,
+	read left: boolean?,
+	read right: boolean?,
+	read bottom: boolean?,
+	read sidebar_size: number?,
+	read inspector_size: number?,
+	read bottom_size: number?,
+	read height: number?,
 }
 type UseSpotlightBarsBar = any
 type UseSpotlightBarsProps = {
-	bars: { UseSpotlightBarsBar },
-	selected: number?,
-	height: number?,
-	max: number?,
-	bar: number?,
-	event: string?,
-	to: string?,
+	read bars: { UseSpotlightBarsBar },
+	read selected: number?,
+	read height: number?,
+	read max: number?,
+	read bar: number?,
+	read event: string?,
+	read to: string?,
 }
 type UseSpreadsheetColumn = any
 type UseSpreadsheetProps = {
-	columns: { UseSpreadsheetColumn },
-	rows: { { [string]: any } },
-	current: number?,
-	selected: { row: number, key: string }?,
-	caret: boolean?,
-	blank: number?,
-	numbers: boolean?,
-	row_height: number?,
-	event: string?,
-	to: string?,
-	grow: boolean?,
-	height: number?,
-	id: string?,
+	read columns: { UseSpreadsheetColumn },
+	read rows: { { [string]: any } },
+	read current: number?,
+	read selected: { read row: number, read key: string }?,
+	read caret: boolean?,
+	read blank: number?,
+	read numbers: boolean?,
+	read row_height: number?,
+	read event: string?,
+	read to: string?,
+	read grow: boolean?,
+	read height: number?,
+	read id: string?,
 }
 type UseStatTileProps = {
-	label: string,
-	value: string,
-	unit: string?,
-	icon: string?,
-	delta: string?,
-	trend: string?,
-	good: string?,
-	detail: string?,
-	msg: any,
-	to: string?,
-	selected: boolean?,
-	width: number?,
-	[number]: any,
+	read label: string,
+	read value: string,
+	read unit: string?,
+	read icon: string?,
+	read delta: string?,
+	read trend: string?,
+	read good: string?,
+	read detail: string?,
+	read msg: any,
+	read to: string?,
+	read selected: boolean?,
+	read width: number?,
+	read [number]: any,
 }
 type UseStatProps = {
-	icon: string?,
-	label: string?,
-	value: string,
-	width: number?,
-	tone: any,
+	read icon: string?,
+	read label: string?,
+	read value: string,
+	read width: number?,
+	read tone: any,
 }
 type UseStatusBarEntry = any
 type UseStatusBarProps = {
-	left: { any }?,
-	right: { any }?,
-	separators: boolean?,
-	to: string?,
+	read left: { any }?,
+	read right: { any }?,
+	read separators: boolean?,
+	read to: string?,
 }
 type UseStatusDotProps = {
-	status: string?,
-	size: string?,
-	spin: boolean?,
-	chip: boolean?,
-	label: string?,
-	tooltip: string?,
+	read status: string?,
+	read size: string?,
+	read spin: boolean?,
+	read chip: boolean?,
+	read label: string?,
+	read tooltip: string?,
 }
 type UseStatusIconProps = {
-	status: string?,
-	progress: number?,
-	color: string?,
-	size: number?,
-	tooltip: string?,
-	label: (string | boolean)?,
+	read status: string?,
+	read progress: number?,
+	read color: string?,
+	read size: number?,
+	read tooltip: string?,
+	read label: (string | boolean)?,
 }
 type UseStepperProps = {
-	value: number,
-	unit: string?,
-	min: number?,
-	max: number?,
-	decrement: any,
-	increment: any,
-	label: string?,
-	width: number?,
-	to: string?,
+	read value: number,
+	read unit: string?,
+	read min: number?,
+	read max: number?,
+	read decrement: any,
+	read increment: any,
+	read label: string?,
+	read width: number?,
+	read to: string?,
 }
 type UseSwapViewProps = {
-	key: string,
-	width: number?,
-	grow: boolean?,
-	[number]: any,
+	read key: string,
+	read width: number?,
+	read grow: boolean?,
+	read [number]: any,
 }
 type UseSwatchesSwatch = any
 type UseSwatchesProps = {
-	colors: { UseSwatchesSwatch },
-	selected: string?,
-	none: boolean?,
-	event: string?,
-	size: number?,
-	to: string?,
+	read colors: { UseSwatchesSwatch },
+	read selected: string?,
+	read none: boolean?,
+	read event: string?,
+	read size: number?,
+	read to: string?,
 }
 type UseSwitchProps = {
-	on: boolean?,
-	label: string?,
-	description: string?,
-	msg: any,
-	disabled: boolean?,
-	small: boolean?,
-	to: string?,
+	read on: boolean?,
+	read label: string?,
+	read description: string?,
+	read msg: any,
+	read disabled: boolean?,
+	read small: boolean?,
+	read to: string?,
 }
 type UseSystemLoadProps = {
-	cpu: number,
-	memory: number,
-	history: { number }?,
-	samples: number?,
-	compact: boolean?,
-	icons: boolean?,
+	read cpu: number,
+	read memory: number,
+	read history: { number }?,
+	read samples: number?,
+	read compact: boolean?,
+	read icons: boolean?,
 }
+type UseTabViewTab = any
 type UseTabViewProps = {
-	tab: any,
-	kind: any,
+	read tab: UseTabViewTab?,
+	read kind: TabKind?,
 }
 type UseTabbedTab = any
 type UseTabbedState = any
 type UseTabbedProps = {
-	id: string?,
-	start: string?,
-	offer: { string }?,
-	variant: string?,
-	show: string?,
+	read id: string?,
+	read start: string?,
+	read offer: { string }?,
+	read variant: string?,
+	read show: string?,
 }
+type UseTabbedReport = any
 type UseTableColumn = any
 type UseTableProps = {
-	columns: { UseTableColumn },
-	rows: { { [string]: any } }?,
-	selected: any,
-	sort: string?,
-	descending: boolean?,
-	sortable: boolean?,
-	zebra: boolean?,
-	empty: string?,
-	event: string?,
-	to: string?,
-	height: number?,
-	grow: boolean?,
-	checkable: boolean?,
-	checks: any,
-	check: string?,
-	check_all: any,
-	bordered: boolean?,
-	id: string?,
-	groups: { any }?,
-	fold: string?,
-	add_label: string?,
-	reorder: string?,
-	marker: any,
+	read columns: { UseTableColumn },
+	read rows: { { [string]: any } }?,
+	read selected: any,
+	read sort: string?,
+	read descending: boolean?,
+	read sortable: boolean?,
+	read zebra: boolean?,
+	read empty: string?,
+	read event: string?,
+	read to: string?,
+	read height: number?,
+	read grow: boolean?,
+	read checkable: boolean?,
+	read checks: any,
+	read check: string?,
+	read check_all: any,
+	read bordered: boolean?,
+	read id: string?,
+	read groups: { any }?,
+	read fold: string?,
+	read add_label: string?,
+	read reorder: string?,
+	read marker: any,
 }
 type UseTabsTab = any
 type UseTabsProps = {
-	tabs: { UseTabsTab },
-	selected: string?,
-	variant: string?,
-	add: any,
-	add_menu: any,
-	event: string?,
-	close: string?,
-	context: string?,
-	closable: boolean?,
-	grow: boolean?,
-	width: number?,
-	to: string?,
-	in_bar: boolean?,
+	read tabs: { UseTabsTab },
+	read selected: string?,
+	read variant: string?,
+	read add: any,
+	read add_menu: any,
+	read event: string?,
+	read close: string?,
+	read context: string?,
+	read closable: boolean?,
+	read grow: boolean?,
+	read width: number?,
+	read to: string?,
+	read in_bar: boolean?,
 }
 type UseTagsProps = {
-	tags: { string },
-	tone: any,
+	read tags: { string },
+	read tone: any,
 }
 type UseTaskCheckProps = {
-	state: string?,
-	msg: any,
-	to: string?,
-	tooltip: string?,
+	read state: string?,
+	read msg: any,
+	read to: string?,
+	read tooltip: string?,
 }
 type UseTaskRowProps = {
-	title: string,
-	state: string?,
-	event: boolean?,
-	date: string?,
-	time: string?,
-	due: boolean?,
-	icon: string?,
-	tags: { any }?,
-	carry: any,
-	accept: any,
-	leading: any,
-	toggle: any,
-	msg: any,
-	context: any,
-	to: string?,
-	selected: boolean?,
+	read title: string,
+	read state: string?,
+	read event: boolean?,
+	read date: string?,
+	read time: string?,
+	read due: boolean?,
+	read icon: string?,
+	read tags: { any }?,
+	read carry: any,
+	read accept: any,
+	read leading: any,
+	read toggle: any,
+	read msg: any,
+	read context: any,
+	read to: string?,
+	read selected: boolean?,
 }
 type UseTerminalProps = {
-	id: string?,
-	cwd: string?,
-	backend: string?,
-	exit: any,
-	shell: any,
-	style: any,
+	read id: string?,
+	read cwd: string?,
+	read backend: string?,
+	read exit: any,
+	read shell: any,
+	read style: any,
 }
 type UseTextEditorProps = {
-	id: string,
-	value: string?,
-	change: any,
-	blur: any,
-	submit: any,
-	placeholder: string?,
-	rows: number?,
-	max_rows: number?,
-	preview: boolean?,
-	switch: any,
-	tools: { string }?,
-	empty: string?,
-	focus: boolean?,
-	to: string?,
+	read id: string,
+	read value: string?,
+	read change: any,
+	read blur: any,
+	read submit: any,
+	read placeholder: string?,
+	read rows: number?,
+	read max_rows: number?,
+	read preview: boolean?,
+	read switch: any,
+	read tools: { string }?,
+	read empty: string?,
+	read focus: boolean?,
+	read to: string?,
 }
 type UseThinkingProps = {
-	seconds: number?,
-	label: string?,
-	open: boolean?,
-	msg: any,
-	to: string?,
-	text: string?,
+	read seconds: number?,
+	read label: string?,
+	read open: boolean?,
+	read msg: any,
+	read to: string?,
+	read text: string?,
 }
 type UseThresholdLineProps = {
-	points: { number },
-	threshold: number,
-	label: string?,
-	breach: string?,
-	width: number?,
-	height: number?,
-	min: number?,
-	max: number?,
-	dot: boolean?,
-	stroke: number?,
-	tooltip: string?,
+	read points: { number },
+	read threshold: number,
+	read label: string?,
+	read breach: string?,
+	read width: number?,
+	read height: number?,
+	read min: number?,
+	read max: number?,
+	read dot: boolean?,
+	read stroke: number?,
+	read tooltip: string?,
 }
 type UseTickMeterProps = {
-	value: number,
-	color: string?,
-	ticks: number?,
-	height: number?,
-	tooltip: string?,
+	read value: number,
+	read color: string?,
+	read ticks: number?,
+	read height: number?,
+	read tooltip: string?,
 }
 type UseTimePickerProps = {
-	hour: number?,
-	minute: number?,
-	step: number?,
-	clock: number?,
-	presets: { any }?,
-	event: string?,
-	to: string?,
+	read hour: number?,
+	read minute: number?,
+	read step: number?,
+	read clock: number?,
+	read presets: { any }?,
+	read event: string?,
+	read to: string?,
 }
 type UseTimelineEntry = any
 type UseTimelineProps = {
-	entries: { UseTimelineEntry },
-	selected: any,
-	event: string?,
-	to: string?,
-	mono: boolean?,
-	empty: string?,
+	read entries: { UseTimelineEntry },
+	read selected: any,
+	read event: string?,
+	read to: string?,
+	read mono: boolean?,
+	read empty: string?,
 }
 type UseTitleBarWindow = any
 type UseTitleBarProps = {
-	window: UseTitleBarWindow?,
-	inset: number?,
-	leading: { any }?,
-	back: any,
-	forward: any,
-	can_back: boolean?,
-	can_forward: boolean?,
-	title: string?,
-	center: boolean?,
-	actions: { any }?,
-	to: string?,
-	[number]: any,
+	read window: UseTitleBarWindow?,
+	read inset: number?,
+	read leading: { any }?,
+	read back: any,
+	read forward: any,
+	read can_back: boolean?,
+	read can_forward: boolean?,
+	read title: string?,
+	read center: boolean?,
+	read actions: { any }?,
+	read to: string?,
+	read [number]: any,
 }
 type UseToastProps = {
-	id: any,
-	level: string?,
-	icon: any,
-	source: string?,
-	title: string?,
-	body: string?,
-	full: boolean?,
-	action: any,
-	dismiss: any,
-	event: string?,
-	width: number?,
-	to: string?,
+	read id: any,
+	read level: string?,
+	read icon: any,
+	read source: string?,
+	read title: string?,
+	read body: string?,
+	read full: boolean?,
+	read action: any,
+	read dismiss: any,
+	read event: string?,
+	read width: number?,
+	read to: string?,
 }
 type UseToastsItem = any
 type UseToastsProps = {
-	items: { UseToastsItem },
-	place: string?,
-	width: number?,
-	max: number?,
-	event: string?,
-	to: string?,
+	read items: { UseToastsItem },
+	read place: string?,
+	read width: number?,
+	read max: number?,
+	read event: string?,
+	read to: string?,
 }
 type UseToolbarButton = any
 type UseToolbarProps = {
-	buttons: { UseToolbarButton },
+	read buttons: { UseToolbarButton },
 }
 type UseTreeNode = any
 type UseTreeProps = {
-	nodes: { UseTreeNode },
-	selected: string?,
-	guides: boolean?,
-	select: string?,
-	fold: string?,
-	to: string?,
-	indent: number?,
+	read nodes: { UseTreeNode },
+	read selected: string?,
+	read guides: boolean?,
+	read select: string?,
+	read fold: string?,
+	read to: string?,
+	read indent: number?,
 }
 type UseUpdatePillProps = {
-	name: string?,
-	version: string?,
-	text: string?,
-	icon: string?,
-	restart: any,
-	restart_label: string?,
-	notes: any,
-	notes_label: string?,
-	dismiss: any,
-	floating: boolean?,
-	place: string?,
-	downloading: boolean?,
-	to: string?,
+	read name: string?,
+	read version: string?,
+	read text: string?,
+	read icon: string?,
+	read restart: any,
+	read restart_label: string?,
+	read notes: any,
+	read notes_label: string?,
+	read dismiss: any,
+	read floating: boolean?,
+	read place: string?,
+	read downloading: boolean?,
+	read to: string?,
 }
 type UseUsageBarProps = {
-	title: string?,
-	left: number,
-	pace: number?,
-	resets: string?,
-	note: string?,
-	width: number?,
-	warn: number?,
-	danger: number?,
+	read title: string?,
+	read left: number,
+	read pace: number?,
+	read resets: string?,
+	read note: string?,
+	read width: number?,
+	read warn: number?,
+	read danger: number?,
 }
 type UseVectorscopeProps = {
-	points: { number },
-	size: number?,
-	color: string?,
-	targets: boolean?,
+	read points: { number },
+	read size: number?,
+	read color: string?,
+	read targets: boolean?,
 }
 type UseVerticalBarProps = {
-	value: number,
-	height: number?,
-	width: number?,
-	warn: number?,
-	label: string?,
-	percent: boolean?,
-	tooltip: string?,
+	read value: number,
+	read height: number?,
+	read width: number?,
+	read warn: number?,
+	read label: string?,
+	read percent: boolean?,
+	read tooltip: string?,
 }
 type UseVideoViewerProps = {
-	source: string,
-	zoom: number?,
-	center: { number }?,
-	change: any,
-	stats: any,
-	probed: any,
-	guides: { any }?,
-	color: string?,
-	extended: boolean?,
-	black: number?,
-	white: number?,
-	gain: number?,
-	gamma: number?,
-	controls: boolean?,
-	max: number?,
-	width: number?,
-	height: number?,
-	id: string?,
+	read source: string,
+	read zoom: number?,
+	read center: { number }?,
+	read change: any,
+	read stats: any,
+	read probed: any,
+	read guides: { any }?,
+	read color: string?,
+	read extended: boolean?,
+	read black: number?,
+	read white: number?,
+	read gain: number?,
+	read gamma: number?,
+	read controls: boolean?,
+	read max: number?,
+	read width: number?,
+	read height: number?,
+	read id: string?,
 }
 type UseVideoViewerState = any
 type UseWaveformBand = any
 type UseWaveformChannel = any
 type UseWaveformProps = {
-	channels: { UseWaveformChannel },
-	parade: boolean?,
-	width: number?,
-	height: number?,
-	lines: { number }?,
+	read channels: { UseWaveformChannel },
+	read parade: boolean?,
+	read width: number?,
+	read height: number?,
+	read lines: { number }?,
 }
 type UseWeekCalendarDay = any
 type UseWeekCalendarEvent = any
 type UseWeekCalendarProps = {
-	view: string?,
-	views: any,
-	title: string?,
-	today: any,
-	previous: any,
-	next: any,
-	days: { UseWeekCalendarDay }?,
-	weeks: { { UseWeekCalendarDay } }?,
-	weekdays: { string }?,
-	events: { UseWeekCalendarEvent }?,
-	selected: string?,
-	hours: { from: number?, to: number? }?,
-	hour_height: number?,
-	column_width: number?,
-	day_width: number?,
-	gutter: number?,
-	now: { day: string, hour: number }?,
-	more: number?,
-	event: string?,
-	switch: string?,
-	pick_day: string?,
-	move: string?,
-	over: string?,
-	to: string?,
-	grow: boolean?,
-	height: number?,
-	header: boolean?,
+	read view: string?,
+	read views: any,
+	read title: string?,
+	read today: any,
+	read previous: any,
+	read next: any,
+	read days: { UseWeekCalendarDay }?,
+	read weeks: { { UseWeekCalendarDay } }?,
+	read weekdays: { string }?,
+	read events: { UseWeekCalendarEvent }?,
+	read selected: string?,
+	read hours: { read from: number?, read to: number? }?,
+	read hour_height: number?,
+	read column_width: number?,
+	read day_width: number?,
+	read gutter: number?,
+	read now: { read day: string, read hour: number }?,
+	read more: number?,
+	read event: string?,
+	read switch: string?,
+	read pick_day: string?,
+	read move: string?,
+	read over: string?,
+	read to: string?,
+	read grow: boolean?,
+	read height: number?,
+	read header: boolean?,
 }
 type UseWritingStatsProps = {
-	text: string?,
-	show: ("words" | "characters" | "sentences" | "reading")?,
-	wpm: number?,
-	msg: any?,
-	to: string?,
-	tooltip: string?,
+	read text: string?,
+	read show: ("words" | "characters" | "sentences" | "reading")?,
+	read wpm: number?,
+	read msg: any?,
+	read to: string?,
+	read tooltip: string?,
 }
 
+-- Each component's Props by its name.
+type UseProps = {
+	["about"]: UseAboutProps,
+	["accordion"]: UseAccordionProps,
+	["action-tiles"]: UseActionTilesProps,
+	["activity-bar"]: UseActivityBarProps,
+	["agent-run"]: UseAgentRunProps,
+	["ahead-behind"]: UseAheadBehindProps,
+	["audio-meter"]: UseAudioMeterProps,
+	["avatar-stack"]: UseAvatarStackProps,
+	["avatar"]: UseAvatarProps,
+	["banner"]: UseBannerProps,
+	["bar-chart"]: UseBarChartProps,
+	["board-card"]: UseBoardCardProps,
+	["breadcrumbs"]: UseBreadcrumbsProps,
+	["browser"]: UseBrowserProps,
+	["button-group"]: UseButtonGroupProps,
+	["caffeine"]: UseCaffeineProps,
+	["card"]: UseCardProps,
+	["change-tree"]: UseChangeTreeProps,
+	["chat-markdown"]: UseChatMarkdownProps,
+	["chat-message"]: UseChatMessageProps,
+	["checkbox"]: UseCheckboxProps,
+	["checks"]: UseChecksProps,
+	["chips"]: UseChipsProps,
+	["choice-cards"]: UseChoiceCardsProps,
+	["code-view"]: UseCodeViewProps,
+	["collapsible"]: UseCollapsibleProps,
+	["command-palette"]: UseCommandPaletteProps,
+	["comment-card"]: UseCommentCardProps,
+	["commit-graph"]: UseCommitGraphProps,
+	["composer"]: UseComposerProps,
+	["confirm"]: UseConfirmProps,
+	["context-menu"]: UseContextMenuProps,
+	["contribution-graph"]: UseContributionGraphProps,
+	["copy-field"]: UseCopyFieldProps,
+	["count-bubble"]: UseCountBubbleProps,
+	["country-code"]: UseCountryCodeProps,
+	["course-card"]: UseCourseCardProps,
+	["curve-editor"]: UseCurveEditorProps,
+	["dashboard-card"]: UseDashboardCardProps,
+	["date-picker"]: UseDatePickerProps,
+	["date-tile"]: UseDateTileProps,
+	["day-strip"]: UseDayStripProps,
+	["dialog"]: UseDialogProps,
+	["dictation"]: UseDictationProps,
+	["diff-counts"]: UseDiffCountsProps,
+	["diff-view"]: UseDiffViewProps,
+	["document-card"]: UseDocumentCardProps,
+	["document-row"]: UseDocumentRowProps,
+	["dot-chart"]: UseDotChartProps,
+	["dropdown"]: UseDropdownProps,
+	["dropzone"]: UseDropzoneProps,
+	["emoji-picker"]: UseEmojiPickerProps,
+	["empty-state"]: UseEmptyStateProps,
+	["error-state"]: UseErrorStateProps,
+	["feedback"]: UseFeedbackProps,
+	["file-card"]: UseFileCardProps,
+	["file-icon"]: UseFileIconProps,
+	["filter-builder"]: UseFilterBuilderProps,
+	["filter-dropdown"]: UseFilterDropdownProps,
+	["find-bar"]: UseFindBarProps,
+	["flow-diagram"]: UseFlowDiagramProps,
+	["forecast-chart"]: UseForecastChartProps,
+	["forge-account"]: UseForgeAccountProps,
+	["forge-pr"]: UseForgePrProps,
+	["forge-sign-in"]: UseForgeSignInProps,
+	["form-grid"]: UseFormGridProps,
+	["gantt"]: UseGanttProps,
+	["ghostty-terminal"]: UseGhosttyTerminalProps,
+	["group-header"]: UseGroupHeaderProps,
+	["guide-card"]: UseGuideCardProps,
+	["heat-grid"]: UseHeatGridProps,
+	["histogram"]: UseHistogramProps,
+	["icon-button"]: UseIconButtonProps,
+	["image-viewer"]: UseImageViewerProps,
+	["insight-note"]: UseInsightNoteProps,
+	["kanban-column"]: UseKanbanColumnProps,
+	["kbd"]: UseKbdProps,
+	["key-hints"]: UseKeyHintsProps,
+	["key-values"]: UseKeyValuesProps,
+	["kpi-cell"]: UseKpiCellProps,
+	["kpi-meter"]: UseKpiMeterProps,
+	["level-row"]: UseLevelRowProps,
+	["lightbox"]: UseLightboxProps,
+	["line-chart"]: UseLineChartProps,
+	["list"]: UseListProps,
+	["loading"]: UseLoadingProps,
+	["mail-row"]: UseMailRowProps,
+	["markdown-editor"]: UseMarkdownEditorProps,
+	["markdown"]: UseMarkdownProps,
+	["mention-field"]: UseMentionFieldProps,
+	["menu"]: UseMenuProps,
+	["message-header"]: UseMessageHeaderProps,
+	["meter"]: UseMeterProps,
+	["metric"]: UseMetricProps,
+	["mini-bars"]: UseMiniBarsProps,
+	["mockups"]: UseMockupsProps,
+	["month-grid"]: UseMonthGridProps,
+	["nav-buttons"]: UseNavButtonsProps,
+	["note-card"]: UseNoteCardProps,
+	["notice"]: UseNoticeProps,
+	["notification-drawer"]: UseNotificationDrawerProps,
+	["number-field"]: UseNumberFieldProps,
+	["numbered-list"]: UseNumberedListProps,
+	["onboarding"]: UseOnboardingProps,
+	["outline"]: UseOutlineProps,
+	["page"]: UsePageProps,
+	["pager"]: UsePagerProps,
+	["pagination"]: UsePaginationProps,
+	["pane-frame"]: UsePaneFrameProps,
+	["picker"]: UsePickerProps,
+	["pill-tabs"]: UsePillTabsProps,
+	["pill"]: UsePillProps,
+	["pixel-icon"]: UsePixelIconProps,
+	["pr-badge"]: UsePrBadgeProps,
+	["pr-row"]: UsePrRowProps,
+	["priority-icon"]: UsePriorityIconProps,
+	["progress-stack"]: UseProgressStackProps,
+	["progress"]: UseProgressProps,
+	["project-card"]: UseProjectCardProps,
+	["prose-editor"]: UseProseEditorProps,
+	["radio-group"]: UseRadioGroupProps,
+	["rail"]: UseRailProps,
+	["ratio-row"]: UseRatioRowProps,
+	["recipient-field"]: UseRecipientFieldProps,
+	["reconnecting"]: UseReconnectingProps,
+	["record-card"]: UseRecordCardProps,
+	["relative-time"]: UseRelativeTimeProps,
+	["release-notes"]: UseReleaseNotesProps,
+	["rich-text"]: UseRichTextProps,
+	["route-map"]: UseRouteMapProps,
+	["search-field"]: UseSearchFieldProps,
+	["section"]: UseSectionProps,
+	["segmented"]: UseSegmentedProps,
+	["selection-toolbar"]: UseSelectionToolbarProps,
+	["series-chart"]: UseSeriesChartProps,
+	["settings-nav"]: UseSettingsNavProps,
+	["settings-page"]: UseSettingsPageProps,
+	["settings-row"]: UseSettingsRowProps,
+	["share-bar"]: UseShareBarProps,
+	["sheet"]: UseSheetProps,
+	["shortcut-field"]: UseShortcutFieldProps,
+	["shortcuts"]: UseShortcutsProps,
+	["side-nav"]: UseSideNavProps,
+	["side-panels"]: UseSidePanelsProps,
+	["sidebar-section"]: UseSidebarSectionProps,
+	["sidebar"]: UseSidebarProps,
+	["slider"]: UseSliderProps,
+	["sparkline"]: UseSparklineProps,
+	["split-view"]: UseSplitViewProps,
+	["spotlight-bars"]: UseSpotlightBarsProps,
+	["spreadsheet"]: UseSpreadsheetProps,
+	["stat-tile"]: UseStatTileProps,
+	["stat"]: UseStatProps,
+	["status-bar"]: UseStatusBarProps,
+	["status-dot"]: UseStatusDotProps,
+	["status-icon"]: UseStatusIconProps,
+	["stepper"]: UseStepperProps,
+	["swap-view"]: UseSwapViewProps,
+	["swatches"]: UseSwatchesProps,
+	["switch"]: UseSwitchProps,
+	["system-load"]: UseSystemLoadProps,
+	["tab-view"]: UseTabViewProps,
+	["tabbed"]: UseTabbedProps,
+	["table"]: UseTableProps,
+	["tabs"]: UseTabsProps,
+	["tags"]: UseTagsProps,
+	["task-check"]: UseTaskCheckProps,
+	["task-row"]: UseTaskRowProps,
+	["terminal"]: UseTerminalProps,
+	["text-editor"]: UseTextEditorProps,
+	["thinking"]: UseThinkingProps,
+	["threshold-line"]: UseThresholdLineProps,
+	["tick-meter"]: UseTickMeterProps,
+	["time-picker"]: UseTimePickerProps,
+	["timeline"]: UseTimelineProps,
+	["title-bar"]: UseTitleBarProps,
+	["toast"]: UseToastProps,
+	["toasts"]: UseToastsProps,
+	["toolbar"]: UseToolbarProps,
+	["tree"]: UseTreeProps,
+	["update-pill"]: UseUpdatePillProps,
+	["usage-bar"]: UseUsageBarProps,
+	["vectorscope"]: UseVectorscopeProps,
+	["vertical-bar"]: UseVerticalBarProps,
+	["video-viewer"]: UseVideoViewerProps,
+	["waveform"]: UseWaveformProps,
+	["week-calendar"]: UseWeekCalendarProps,
+	["writing-stats"]: UseWritingStatsProps,
+}
+
+-- The Props of the component `name`, or `any` for a name it does not
+-- know (an app's own components) or one only known at run time.
+type function UseOf(name)
+	if name:is("singleton") then
+		local props = UseProps:readproperty(name)
+		if props then
+			return props
+		end
+	end
+	return types.any
+end
+
 -- The component `name`'s `build`: `local stat = use "stat"`, then
--- `stat { value = "12%" }` wherever an element goes.
-declare use:
-	((name: "about") -> (props: UseAboutProps) -> Element)
-	& ((name: "accordion") -> (props: UseAccordionProps) -> Element)
-	& ((name: "action-tiles") -> (props: UseActionTilesProps) -> Element)
-	& ((name: "activity-bar") -> (props: UseActivityBarProps) -> Element)
-	& ((name: "agent-run") -> (props: UseAgentRunProps) -> Element)
-	& ((name: "ahead-behind") -> (props: UseAheadBehindProps) -> Element)
-	& ((name: "audio-meter") -> (props: UseAudioMeterProps) -> Element)
-	& ((name: "avatar-stack") -> (props: UseAvatarStackProps) -> Element)
-	& ((name: "avatar") -> (props: UseAvatarProps) -> Element)
-	& ((name: "banner") -> (props: UseBannerProps) -> Element)
-	& ((name: "bar-chart") -> (props: UseBarChartProps) -> Element)
-	& ((name: "board-card") -> (props: UseBoardCardProps) -> Element)
-	& ((name: "breadcrumbs") -> (props: UseBreadcrumbsProps) -> Element)
-	& ((name: "browser") -> (props: UseBrowserProps) -> Element)
-	& ((name: "button-group") -> (props: UseButtonGroupProps) -> Element)
-	& ((name: "caffeine") -> (props: UseCaffeineProps) -> Element)
-	& ((name: "card") -> (props: UseCardProps) -> Element)
-	& ((name: "change-tree") -> (props: UseChangeTreeProps) -> Element)
-	& ((name: "chat-markdown") -> (props: UseChatMarkdownProps) -> Element)
-	& ((name: "chat-message") -> (props: UseChatMessageProps) -> Element)
-	& ((name: "checkbox") -> (props: UseCheckboxProps) -> Element)
-	& ((name: "checks") -> (props: UseChecksProps) -> Element)
-	& ((name: "chips") -> (props: UseChipsProps) -> Element)
-	& ((name: "choice-cards") -> (props: UseChoiceCardsProps) -> Element)
-	& ((name: "code-view") -> (props: UseCodeViewProps) -> Element)
-	& ((name: "collapsible") -> (props: UseCollapsibleProps) -> Element)
-	& ((name: "command-palette") -> (props: UseCommandPaletteProps) -> Element)
-	& ((name: "comment-card") -> (props: UseCommentCardProps) -> Element)
-	& ((name: "commit-graph") -> (props: UseCommitGraphProps) -> Element)
-	& ((name: "composer") -> (props: UseComposerProps) -> Element)
-	& ((name: "confirm") -> (props: UseConfirmProps) -> Element)
-	& ((name: "context-menu") -> (props: UseContextMenuProps) -> Element)
-	& ((name: "contribution-graph") -> (props: UseContributionGraphProps) -> Element)
-	& ((name: "copy-field") -> (props: UseCopyFieldProps) -> Element)
-	& ((name: "count-bubble") -> (props: UseCountBubbleProps) -> Element)
-	& ((name: "country-code") -> (props: UseCountryCodeProps) -> Element)
-	& ((name: "course-card") -> (props: UseCourseCardProps) -> Element)
-	& ((name: "curve-editor") -> (props: UseCurveEditorProps) -> Element)
-	& ((name: "dashboard-card") -> (props: UseDashboardCardProps) -> Element)
-	& ((name: "date-picker") -> (props: UseDatePickerProps) -> Element)
-	& ((name: "date-tile") -> (props: UseDateTileProps) -> Element)
-	& ((name: "day-strip") -> (props: UseDayStripProps) -> Element)
-	& ((name: "dialog") -> (props: UseDialogProps) -> Element)
-	& ((name: "dictation") -> (props: UseDictationProps) -> Element)
-	& ((name: "diff-counts") -> (props: UseDiffCountsProps) -> Element)
-	& ((name: "diff-view") -> (props: UseDiffViewProps) -> Element)
-	& ((name: "document-card") -> (props: UseDocumentCardProps) -> Element)
-	& ((name: "document-row") -> (props: UseDocumentRowProps) -> Element)
-	& ((name: "dot-chart") -> (props: UseDotChartProps) -> Element)
-	& ((name: "dropdown") -> (props: UseDropdownProps) -> Element)
-	& ((name: "dropzone") -> (props: UseDropzoneProps) -> Element)
-	& ((name: "emoji-picker") -> (props: UseEmojiPickerProps) -> Element)
-	& ((name: "empty-state") -> (props: UseEmptyStateProps) -> Element)
-	& ((name: "error-state") -> (props: UseErrorStateProps) -> Element)
-	& ((name: "feedback") -> (props: UseFeedbackProps) -> Element)
-	& ((name: "file-card") -> (props: UseFileCardProps) -> Element)
-	& ((name: "file-icon") -> (props: UseFileIconProps) -> Element)
-	& ((name: "filter-builder") -> (props: UseFilterBuilderProps) -> Element)
-	& ((name: "filter-dropdown") -> (props: UseFilterDropdownProps) -> Element)
-	& ((name: "find-bar") -> (props: UseFindBarProps) -> Element)
-	& ((name: "flow-diagram") -> (props: UseFlowDiagramProps) -> Element)
-	& ((name: "forecast-chart") -> (props: UseForecastChartProps) -> Element)
-	& ((name: "forge-account") -> (props: UseForgeAccountProps) -> Element)
-	& ((name: "forge-pr") -> (props: UseForgePrProps) -> Element)
-	& ((name: "forge-sign-in") -> (props: UseForgeSignInProps) -> Element)
-	& ((name: "form-grid") -> (props: UseFormGridProps) -> Element)
-	& ((name: "gantt") -> (props: UseGanttProps) -> Element)
-	& ((name: "ghostty-terminal") -> (props: UseGhosttyTerminalProps) -> Element)
-	& ((name: "group-header") -> (props: UseGroupHeaderProps) -> Element)
-	& ((name: "guide-card") -> (props: UseGuideCardProps) -> Element)
-	& ((name: "heat-grid") -> (props: UseHeatGridProps) -> Element)
-	& ((name: "histogram") -> (props: UseHistogramProps) -> Element)
-	& ((name: "icon-button") -> (props: UseIconButtonProps) -> Element)
-	& ((name: "image-viewer") -> (props: UseImageViewerProps) -> Element)
-	& ((name: "insight-note") -> (props: UseInsightNoteProps) -> Element)
-	& ((name: "kanban-column") -> (props: UseKanbanColumnProps) -> Element)
-	& ((name: "kbd") -> (props: UseKbdProps) -> Element)
-	& ((name: "key-hints") -> (props: UseKeyHintsProps) -> Element)
-	& ((name: "key-values") -> (props: UseKeyValuesProps) -> Element)
-	& ((name: "kpi-cell") -> (props: UseKpiCellProps) -> Element)
-	& ((name: "kpi-meter") -> (props: UseKpiMeterProps) -> Element)
-	& ((name: "level-row") -> (props: UseLevelRowProps) -> Element)
-	& ((name: "lightbox") -> (props: UseLightboxProps) -> Element)
-	& ((name: "line-chart") -> (props: UseLineChartProps) -> Element)
-	& ((name: "list") -> (props: UseListProps) -> Element)
-	& ((name: "loading") -> (props: UseLoadingProps) -> Element)
-	& ((name: "mail-row") -> (props: UseMailRowProps) -> Element)
-	& ((name: "markdown-editor") -> (props: UseMarkdownEditorProps) -> Element)
-	& ((name: "markdown") -> (props: UseMarkdownProps) -> Element)
-	& ((name: "mention-field") -> (props: UseMentionFieldProps) -> Element)
-	& ((name: "menu") -> (props: UseMenuProps) -> Element)
-	& ((name: "message-header") -> (props: UseMessageHeaderProps) -> Element)
-	& ((name: "meter") -> (props: UseMeterProps) -> Element)
-	& ((name: "metric") -> (props: UseMetricProps) -> Element)
-	& ((name: "mini-bars") -> (props: UseMiniBarsProps) -> Element)
-	& ((name: "mockups") -> (props: UseMockupsProps) -> Element)
-	& ((name: "month-grid") -> (props: UseMonthGridProps) -> Element)
-	& ((name: "nav-buttons") -> (props: UseNavButtonsProps) -> Element)
-	& ((name: "note-card") -> (props: UseNoteCardProps) -> Element)
-	& ((name: "notice") -> (props: UseNoticeProps) -> Element)
-	& ((name: "notification-drawer") -> (props: UseNotificationDrawerProps) -> Element)
-	& ((name: "number-field") -> (props: UseNumberFieldProps) -> Element)
-	& ((name: "numbered-list") -> (props: UseNumberedListProps) -> Element)
-	& ((name: "onboarding") -> (props: UseOnboardingProps) -> Element)
-	& ((name: "outline") -> (props: UseOutlineProps) -> Element)
-	& ((name: "page") -> (props: UsePageProps) -> Element)
-	& ((name: "pager") -> (props: UsePagerProps) -> Element)
-	& ((name: "pagination") -> (props: UsePaginationProps) -> Element)
-	& ((name: "pane-frame") -> (props: UsePaneFrameProps) -> Element)
-	& ((name: "picker") -> (props: UsePickerProps) -> Element)
-	& ((name: "pill-tabs") -> (props: UsePillTabsProps) -> Element)
-	& ((name: "pill") -> (props: UsePillProps) -> Element)
-	& ((name: "pixel-icon") -> (props: UsePixelIconProps) -> Element)
-	& ((name: "pr-badge") -> (props: UsePrBadgeProps) -> Element)
-	& ((name: "pr-row") -> (props: UsePrRowProps) -> Element)
-	& ((name: "priority-icon") -> (props: UsePriorityIconProps) -> Element)
-	& ((name: "progress-stack") -> (props: UseProgressStackProps) -> Element)
-	& ((name: "progress") -> (props: UseProgressProps) -> Element)
-	& ((name: "project-card") -> (props: UseProjectCardProps) -> Element)
-	& ((name: "prose-editor") -> (props: UseProseEditorProps) -> Element)
-	& ((name: "radio-group") -> (props: UseRadioGroupProps) -> Element)
-	& ((name: "rail") -> (props: UseRailProps) -> Element)
-	& ((name: "ratio-row") -> (props: UseRatioRowProps) -> Element)
-	& ((name: "recipient-field") -> (props: UseRecipientFieldProps) -> Element)
-	& ((name: "reconnecting") -> (props: UseReconnectingProps) -> Element)
-	& ((name: "record-card") -> (props: UseRecordCardProps) -> Element)
-	& ((name: "relative-time") -> (props: UseRelativeTimeProps) -> Element)
-	& ((name: "release-notes") -> (props: UseReleaseNotesProps) -> Element)
-	& ((name: "rich-text") -> (props: UseRichTextProps) -> Element)
-	& ((name: "route-map") -> (props: UseRouteMapProps) -> Element)
-	& ((name: "search-field") -> (props: UseSearchFieldProps) -> Element)
-	& ((name: "section") -> (props: UseSectionProps) -> Element)
-	& ((name: "segmented") -> (props: UseSegmentedProps) -> Element)
-	& ((name: "selection-toolbar") -> (props: UseSelectionToolbarProps) -> Element)
-	& ((name: "series-chart") -> (props: UseSeriesChartProps) -> Element)
-	& ((name: "settings-nav") -> (props: UseSettingsNavProps) -> Element)
-	& ((name: "settings-page") -> (props: UseSettingsPageProps) -> Element)
-	& ((name: "settings-row") -> (props: UseSettingsRowProps) -> Element)
-	& ((name: "share-bar") -> (props: UseShareBarProps) -> Element)
-	& ((name: "sheet") -> (props: UseSheetProps) -> Element)
-	& ((name: "shortcut-field") -> (props: UseShortcutFieldProps) -> Element)
-	& ((name: "shortcuts") -> (props: UseShortcutsProps) -> Element)
-	& ((name: "side-nav") -> (props: UseSideNavProps) -> Element)
-	& ((name: "side-panels") -> (props: UseSidePanelsProps) -> Element)
-	& ((name: "sidebar-section") -> (props: UseSidebarSectionProps) -> Element)
-	& ((name: "sidebar") -> (props: UseSidebarProps) -> Element)
-	& ((name: "slider") -> (props: UseSliderProps) -> Element)
-	& ((name: "sparkline") -> (props: UseSparklineProps) -> Element)
-	& ((name: "split-view") -> (props: UseSplitViewProps) -> Element)
-	& ((name: "spotlight-bars") -> (props: UseSpotlightBarsProps) -> Element)
-	& ((name: "spreadsheet") -> (props: UseSpreadsheetProps) -> Element)
-	& ((name: "stat-tile") -> (props: UseStatTileProps) -> Element)
-	& ((name: "stat") -> (props: UseStatProps) -> Element)
-	& ((name: "status-bar") -> (props: UseStatusBarProps) -> Element)
-	& ((name: "status-dot") -> (props: UseStatusDotProps) -> Element)
-	& ((name: "status-icon") -> (props: UseStatusIconProps) -> Element)
-	& ((name: "stepper") -> (props: UseStepperProps) -> Element)
-	& ((name: "swap-view") -> (props: UseSwapViewProps) -> Element)
-	& ((name: "swatches") -> (props: UseSwatchesProps) -> Element)
-	& ((name: "switch") -> (props: UseSwitchProps) -> Element)
-	& ((name: "system-load") -> (props: UseSystemLoadProps) -> Element)
-	& ((name: "tab-view") -> (props: UseTabViewProps) -> Element)
-	& ((name: "tabbed") -> (props: UseTabbedProps) -> Element)
-	& ((name: "table") -> (props: UseTableProps) -> Element)
-	& ((name: "tabs") -> (props: UseTabsProps) -> Element)
-	& ((name: "tags") -> (props: UseTagsProps) -> Element)
-	& ((name: "task-check") -> (props: UseTaskCheckProps) -> Element)
-	& ((name: "task-row") -> (props: UseTaskRowProps) -> Element)
-	& ((name: "terminal") -> (props: UseTerminalProps) -> Element)
-	& ((name: "text-editor") -> (props: UseTextEditorProps) -> Element)
-	& ((name: "thinking") -> (props: UseThinkingProps) -> Element)
-	& ((name: "threshold-line") -> (props: UseThresholdLineProps) -> Element)
-	& ((name: "tick-meter") -> (props: UseTickMeterProps) -> Element)
-	& ((name: "time-picker") -> (props: UseTimePickerProps) -> Element)
-	& ((name: "timeline") -> (props: UseTimelineProps) -> Element)
-	& ((name: "title-bar") -> (props: UseTitleBarProps) -> Element)
-	& ((name: "toast") -> (props: UseToastProps) -> Element)
-	& ((name: "toasts") -> (props: UseToastsProps) -> Element)
-	& ((name: "toolbar") -> (props: UseToolbarProps) -> Element)
-	& ((name: "tree") -> (props: UseTreeProps) -> Element)
-	& ((name: "update-pill") -> (props: UseUpdatePillProps) -> Element)
-	& ((name: "usage-bar") -> (props: UseUsageBarProps) -> Element)
-	& ((name: "vectorscope") -> (props: UseVectorscopeProps) -> Element)
-	& ((name: "vertical-bar") -> (props: UseVerticalBarProps) -> Element)
-	& ((name: "video-viewer") -> (props: UseVideoViewerProps) -> Element)
-	& ((name: "waveform") -> (props: UseWaveformProps) -> Element)
-	& ((name: "week-calendar") -> (props: UseWeekCalendarProps) -> Element)
-	& ((name: "writing-stats") -> (props: UseWritingStatsProps) -> Element)
-	& ((name: string) -> (props: any) -> Element)
+-- `stat { value = "12%" }` wherever an element goes. The `""` in the
+-- bound keeps the name's literal type (a bound of only `string` widens
+-- it), so `UseOf` can look it up; `keyof<UseProps>` there would do the
+-- same but is too complex for the solver at every call.
+declare function use<K>(name: K & ("" | string)): (props: UseOf<K>) -> Element
 -- generated: component props end
 
 -- Prints to the terminal that runs the app.

@@ -57,7 +57,7 @@ return component {
 
 	build = function(props: Props)
 		local event = props.event or "select"
-		local cells = {}
+		local cells: { Element } = {}
 		for _, option in props.options do
 			local id = option.id or option.label
 			local chosen = id == props.selected

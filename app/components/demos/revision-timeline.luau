@@ -20,7 +20,23 @@ for index, label in {
 		summary = if index % 3 == 1 then "A demo conversation turn. Move along the rail to preview another message, then click to jump to it." else nil })
 end
 
-local function preset(name: string)
+type State = {
+	preset: string,
+	selected: number,
+	width: number,
+	tick_width: number,
+	magnification: number,
+	radius: number,
+	spread: number,
+	dates: boolean,
+	preview: boolean,
+	side: string,
+	labels: string,
+	-- The sliders and switches set their field by name.
+	[string]: number | boolean,
+}
+
+local function preset(name: string): State
 	local chat = name == "chat"
 	return { preset = name, selected = if chat then 10 else 36, width = 300,
 		tick_width = if chat then 6 else 12, magnification = if chat then 4 else 4.5,
@@ -28,7 +44,7 @@ local function preset(name: string)
 		dates = not chat, preview = chat, side = if chat then "left" else "right", labels = if chat then "hover" else "all" }
 end
 
-return mod {
+return mod<<State>> {
 	init = function() return preset("time-machine") end,
 	update = function(state, msg)
 		if type(msg) ~= "table" then return end
@@ -43,7 +59,9 @@ return mod {
 		local chat = state.preset == "chat"
 		local entries = if chat then turns else revisions
 		local function control(field: string, label: string, min: number, max: number, step: number)
-			return slider { label = label, value = state[field], min = min, max = max,
+			-- Only the number fields have a slider.
+			local value = state[field]
+			return slider { label = label, value = if type(value) == "number" then value else 0, min = min, max = max,
 				step = step, decimals = if step < 1 then 1 else 0, change = { set = field }, width = 220 }
 		end
 		return ui.column { gap = "normal",

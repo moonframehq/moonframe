@@ -46,7 +46,7 @@ return mod {
 	end,
 
 	view = function(state: State)
-		local rows = {}
+		local rows: { Element } = {}
 		for _, message in MESSAGES do
 			table.insert(rows, ui.row {
 				class = "inbox-row",

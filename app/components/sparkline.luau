@@ -32,7 +32,7 @@ return component {
 	build = function(props: Props)
 		local samples = props.samples or 16
 		local height = props.height or 12
-		local bars = {}
+		local bars: { Element } = {}
 		for index = math.max(1, #props.values - samples + 1), #props.values do
 			local sample = math.clamp(props.values[index], 0, 1)
 			bars[#bars + 1] = ui.row {

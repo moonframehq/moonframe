@@ -19,6 +19,9 @@ local error_state = use "error-state"
 
 type Mode = "view" | "edit" | "split"
 
+-- Where a pane is to scroll to, as an input's `scroll_at` takes it.
+type ScrollAt = { fraction: number, seq: number? }
+
 type State = {
 	path: string?,
 	-- The project the file is in; the current one when nil.
@@ -44,8 +47,8 @@ type State = {
 	note: string?,
 	-- Side by side, where each pane is to follow the other: the fraction
 	-- the other was scrolled to, with a count that makes each move new.
-	source_at: { fraction: number, seq: number }?,
-	preview_at: { fraction: number, seq: number }?,
+	source_at: ScrollAt?,
+	preview_at: ScrollAt?,
 	scrolls: number?,
 }
 
@@ -150,7 +153,7 @@ markdown_editor { id = "readme", path = "README.md" }
 			state = previous
 		else
 			local mode = (props and props.mode) or (previous and previous.mode) or "split"
-			state = {
+			local fresh: State = {
 				path = path,
 				root = root,
 				dirty = false,
@@ -160,6 +163,7 @@ markdown_editor { id = "readme", path = "README.md" }
 				outside = false,
 				missing = false,
 			}
+			state = fresh
 		end
 		-- Nothing is on its way at a launch.
 		state.saving = nil
@@ -203,7 +207,7 @@ markdown_editor { id = "readme", path = "README.md" }
 		elseif msg.scrolled then
 			-- One pane moved: the other follows it there.
 			state.scrolls = (state.scrolls or 0) + 1
-			local at = { fraction = msg.fraction, seq = state.scrolls :: number }
+			local at: ScrollAt = { fraction = msg.fraction, seq = state.scrolls :: number }
 			if msg.scrolled == "source" then
 				state.preview_at = at
 			else
@@ -361,7 +365,7 @@ markdown_editor { id = "readme", path = "README.md" }
 				grow = true,
 				mono = true,
 				keys = { ["secondary-s"] = "save" },
-				scrolled = split and { scrolled = "source" } or nil,
+				scrolled = if split then { scrolled = "source" } else nil,
 				scroll_at = split and state.source_at or nil,
 			}
 			local preview = markdown {

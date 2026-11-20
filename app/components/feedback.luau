@@ -55,7 +55,10 @@ type Props = {
 
 local PLACEHOLDER = "What should change? For example:\n• Focus the prompt when I open a session\n• Make deploys faster"
 
-local STATUS = {
+-- How a run's status is drawn: its icon, the class tinting it, its words.
+type Status = { icon: string, class: string, label: string, spin: boolean? }
+
+local STATUS: { [string]: Status } = {
 	starting = { icon = "loader-circle", class = "feedback-running", label = "Starting", spin = true },
 	running = { icon = "loader-circle", class = "feedback-running", label = "Working on it", spin = true },
 	waiting = { icon = "circle-alert", class = "feedback-waiting", label = "Needs your answer" },
@@ -192,7 +195,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 	local to = props.to
 	local status = STATUS[run.status] or STATUS.stopped
 	local going = run.status == "starting" or run.status == "running" or run.status == "waiting"
-	local body = {}
+	local body: { Element } = {}
 	if open then
 		for index, turn in turns do
 			if index > 1 then
@@ -270,7 +273,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 					rows = 2,
 					grow = true,
 					change = { follow_type = first.id },
-					submit = not blank and { follow = first.id } or nil,
+					submit = if not blank then { follow = first.id } else nil,
 					to = to,
 				},
 				ui.button { "Reply", variant = "primary", msg = { follow = first.id }, to = to, disabled = blank },
@@ -422,7 +425,7 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 	build = function(props: Props)
 		local blank = string.match(props.text or "", "^%s*$") ~= nil
 		local runs: { any } = props.runs or {}
-		local rows = {}
+		local rows: { Element } = {}
 		for _, turns in conversations(runs) do
 			local open = turns[1].id == props.expanded or turns[#turns].status == "waiting"
 			table.insert(rows, conversation(turns, open, props))

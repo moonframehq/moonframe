@@ -65,7 +65,7 @@ return mod {
 	end,
 
 	view = function(state: State)
-		local groups = {}
+		local groups: { Element } = {}
 		for _, section in SECTIONS do
 			local rows = { ui.text { section.title, class = "side-heading" } }
 			for _, item in section.items do

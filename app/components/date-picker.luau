@@ -163,7 +163,7 @@ date_picker {
 		if #presets == 0 then
 			body = ui.column { class = "date-picker", calendar }
 		elseif bottom then
-			local chips = {}
+			local chips: { Element } = {}
 			for _, preset in presets do
 				table.insert(chips, ui.row {
 					class = "date-picker-chip",
@@ -179,7 +179,7 @@ date_picker {
 				ui.row { class = "date-picker-chips", wrap = true, table.unpack(chips) },
 			}
 		else
-			local rows = {}
+			local rows: { Element } = {}
 			for _, preset in presets do
 				table.insert(rows, ui.row {
 					class = "date-picker-preset",

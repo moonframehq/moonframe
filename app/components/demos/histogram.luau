@@ -8,7 +8,13 @@ local RED = { 2, 6, 14, 30, 52, 70, 64, 48, 40, 52, 66, 50, 30, 16, 8, 3, 2, 1, 
 local GREEN = { 1, 4, 10, 22, 40, 60, 74, 66, 50, 44, 46, 38, 24, 12, 5, 2, 1, 1, 0, 0 }
 local BLUE = { 4, 10, 22, 40, 58, 62, 50, 40, 36, 34, 30, 22, 14, 8, 4, 1, 1, 0, 0, 0 }
 
-return mod {
+type State = {
+	shadow: number,
+	highlight: number,
+	log: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { shadow = 0.06, highlight = 0.82, log = false }
 	end,

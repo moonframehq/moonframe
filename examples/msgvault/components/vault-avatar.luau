@@ -5,7 +5,13 @@
 
 local NARROW = { I = true, ["1"] = true }
 
-return component {
+type Props = {
+	initials: string?,
+	hue: number?,
+	size: number?,
+}
+
+return component<<Props>> {
 	title = "Vault Avatar",
 	category = "Data",
 	icon = "user",

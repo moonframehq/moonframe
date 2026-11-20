@@ -14,7 +14,12 @@ local function button(icon: string, msg: string, tooltip: string)
 	return ui.row { class = "rail-item", width = 36, justify = "center", msg = msg, tooltip = tooltip, ui.icon { name = icon :: any } }
 end
 
-return mod {
+type State = {
+	selected: string,
+	expanded: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { selected = "2", expanded = false }
 	end,
@@ -40,7 +45,7 @@ return mod {
 		end
 		local names = nil
 		if state.expanded then
-			local rows = {}
+			local rows: { Element } = {}
 			for i, s in SPACES do
 				rows[i] = ui.item { s.name, detail = s.branch, selected = s.id == state.selected, msg = { select = s.id } }
 			end

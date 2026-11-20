@@ -9,7 +9,11 @@ local READINGS = {
 	{ cpu = 6, memory = 3.9, agents = 1 },
 }
 
-return mod {
+type State = {
+	at: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { at = 1 }
 	end,

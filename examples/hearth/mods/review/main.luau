@@ -69,7 +69,7 @@ local SEVERITIES: { any } = {
 	{ id = "warning", label = "Warning" },
 	{ id = "info", label = "Info" },
 }
-local SEVERITY_COLOR = { critical = "#d9604c", warning = "#e1b64e", info = "#619cf8" }
+local SEVERITY_COLOR: { [string]: string } = { critical = "#d9604c", warning = "#e1b64e", info = "#619cf8" }
 
 local SETTINGS: { any } = {
 	{ id = "every", title = "Review every pull request", description = "Run a review when a pull request opens or gets new commits." },
@@ -158,7 +158,7 @@ return mod {
 		[".placeholder"] = { padding = 40, gap = 10 },
 	},
 
-	init = function(previous: State?): State
+	init = function(previous: State?): (State, { Send })
 		local state: State = previous
 			or ({
 				page = "review",
@@ -272,7 +272,7 @@ return mod {
 		end
 
 		local function kpi_strip(kpis: { any })
-			local cells = {}
+			local cells: { Element } = {}
 			for index, kpi in kpis do
 				local arrow = if kpi.up then "arrow-up" else "arrow-down"
 				table.insert(cells, ui.column {
@@ -317,7 +317,7 @@ return mod {
 		end
 
 		-- The days shown: the last `range` of the thirty.
-		local days = {}
+		local days: { any } = {}
 		local count = tonumber(state.range) or 30
 		for index, day in data.days do
 			if index > #data.days - count then
@@ -379,8 +379,8 @@ return mod {
 					sum += row.count
 				end
 				local shares = {}
-				local lines = {}
-				for _, row in rows do
+				local lines: { Element } = {}
+				for _, row: any in rows do
 					table.insert(shares, { share = row.count, color = row.color, label = `{row.label} · {row.count}` })
 					table.insert(lines, ui.row {
 						class = "break-row",
@@ -406,7 +406,7 @@ return mod {
 				)
 			end
 
-			local authors = {}
+			local authors: { Element } = {}
 			for _, person in data.authors do
 				table.insert(authors, ui.row {
 					class = "break-row",
@@ -498,7 +498,7 @@ return mod {
 				},
 			}
 		elseif state.tab == "pulls" then
-			local rows = {}
+			local rows: { Element } = {}
 			for _, pull in data.pulls do
 				if state.author == "all" or pull.author == state.author then
 					table.insert(rows, pr_row {
@@ -606,7 +606,7 @@ return mod {
 				card({}, head(`{#rows} open issues`), table.unpack(rows)),
 			}
 		else
-			local rows = {}
+			local rows: { Element } = {}
 			for index, item in SETTINGS do
 				table.insert(rows, settings_row {
 					title = item.title,
