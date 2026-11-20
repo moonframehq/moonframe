@@ -561,6 +561,7 @@ mod tests {
             spread: false,
             selected: false,
             scroll_to: None,
+            measure: None,
             action: None,
             extras: Default::default(),
             drag: false,

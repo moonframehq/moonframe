@@ -276,6 +276,9 @@ type StackProps = {
 	scroll: (boolean | "x" | "y" | "both")?,
 	-- Reveal this direct child (one-based) when the index changes.
 	scroll_to: number?,
+	-- With `scroll`: sent with `width`, `height`, `content_width`,
+	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
+	measure: Data,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows

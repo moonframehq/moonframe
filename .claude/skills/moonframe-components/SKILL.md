@@ -132,6 +132,19 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   changes. It scrolls only as far as needed and leaves wheel scrolling
   free between changes. Set it to nil to reset the request.
 
+- **Measure a scrolling stack** (`row`, `column`): with `scroll` enabled,
+  `measure = msg` sends `msg` (to `to`, else the drawing mod) with its
+  box's `width` and `height`, its content's `content_width` and
+  `content_height`, how far it is scrolled (`x`, `y`), how many of its
+  first children end inside its box (`fit`, as laid out before scrolling)
+  and the first and last child any part of which shows (`first`, `last`,
+  one-based; 0 when none does), each time one of them changes: as it lays
+  out, resizes and scrolls, in whole pixels. A strip shows its arrows only
+  while `content_width > width`, each unavailable at its end (`x == 0`,
+  `x >= content_width - width`); a row of pills (`scroll = "x", scrollbar =
+  false`) keeps the first `fit` and opens the rest from Show more; a list
+  keeps `first`, to reveal it with `scroll_to` when it comes back.
+
 - **Frame keys** (`row`, `column`, `panel`): `grow`, `width`, `height`,
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `follow = true` (with `scroll`:
   while at its end, stay there as the content grows, as a chat or log
