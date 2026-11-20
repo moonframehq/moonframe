@@ -169,7 +169,7 @@ local function draw(props: Props)
 	}
 end
 
-return component {
+return component<<Props>> {
 	title = "Menu",
 	category = "Overlays",
 	icon = "menu",
