@@ -134,7 +134,7 @@ return mod {
 			elseif msg == "close-sort" then
 				state.sort_open = false
 			elseif msg == "new" then
-				return state, { { to = "provider:desk", msg = { new = true } } }
+				return state, { send "provider:desk" { new = true } }
 			end
 			return state
 		end

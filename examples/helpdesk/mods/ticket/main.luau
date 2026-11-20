@@ -167,7 +167,7 @@ return mod {
 			if msg == "toggle-earlier" then
 				state.earlier = not state.earlier
 			elseif msg == "act" and state.selected then
-				return state, { { to = "provider:desk", msg = { act = state.selected } } }
+				return state, { send "provider:desk" { act = state.selected } }
 			elseif msg == "assign" and state.selected then
 				state.assigned[state.selected] = not state.assigned[state.selected]
 			elseif msg == "send" then
@@ -184,7 +184,7 @@ return mod {
 			end
 			state.selected = id
 			if id then
-				return state, { { to = "provider:desk", msg = { watch = id } } }
+				return state, { send "provider:desk" { watch = id } }
 			end
 		elseif msg.tab then
 			state.tab = msg.tab
@@ -193,7 +193,7 @@ return mod {
 		elseif msg.msg == "submit" and state.selected and string.match(msg.value or "", "%S") then
 			state.draft = ""
 			return state, {
-				{ to = "provider:desk", msg = { reply = { id = state.selected, text = msg.value, internal = state.tab == "note" } } },
+				send "provider:desk" { reply = { id = state.selected, text = msg.value, internal = state.tab == "note" } },
 			}
 		end
 		return state

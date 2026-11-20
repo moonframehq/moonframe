@@ -1,0 +1,8 @@
+{
+  "left": 1500,
+  "length": 1500,
+  "clock": "25:00",
+  "running": false,
+  "sessions": 0,
+  "build": "wasm"
+}

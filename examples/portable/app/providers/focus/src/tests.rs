@@ -66,3 +66,36 @@ fn saved_state_restores_where_it_was() {
     assert_eq!(next.view()["running"], true);
     assert!(next.restore("not json").is_err());
 }
+
+/// Each top-level key with its JSON kind.
+fn shape(value: &Value) -> Vec<(String, &'static str)> {
+    let kind = |value: &Value| match value {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    };
+    let mut found: Vec<_> = value
+        .as_object()
+        .expect("an object")
+        .iter()
+        .map(|(key, value)| (key.clone(), kind(value)))
+        .collect();
+    found.sort();
+    found
+}
+
+/// types.luau's `Published` is checked against published.json (`just
+/// provider-types-check`); this holds what the timer publishes to it.
+#[test]
+fn it_publishes_what_published_json_shows() {
+    let example: Value = serde_json::from_str(include_str!("../published.json")).unwrap();
+    let mut focus = started(25);
+    assert_eq!(shape(&focus.tick().expect("shown once")), shape(&example));
+    assert_eq!(
+        shape(&focus.receive(json!("start")).expect("an answer")),
+        shape(&example)
+    );
+}
