@@ -27,22 +27,71 @@ pub const MAX_DOCUMENT: usize = 1024 * 1024;
 /// No stylesheet names, for values that cannot use any.
 pub(crate) static NO_NAMES: Names = Names::NONE;
 
+/// A path such as `panel[2].item.style`, kept as links to its parent so a
+/// read that succeeds never formats it: only a problem spells it out.
+#[derive(Clone, Debug, Default)]
+struct Path(Option<std::rc::Rc<Step>>);
+
+#[derive(Debug)]
+struct Step {
+    parent: Path,
+    segment: Segment,
+}
+
+#[derive(Debug)]
+enum Segment {
+    Key(Box<str>),
+    Index(usize),
+    Quoted(Box<str>),
+}
+
+impl Path {
+    fn push(&self, segment: Segment) -> Self {
+        Self(Some(std::rc::Rc::new(Step {
+            parent: self.clone(),
+            segment,
+        })))
+    }
+
+    fn render(&self) -> String {
+        let mut steps = Vec::new();
+        let mut at = self;
+        while let Some(step) = &at.0 {
+            steps.push(&step.segment);
+            at = &step.parent;
+        }
+        let mut out = String::new();
+        for segment in steps.into_iter().rev() {
+            match segment {
+                Segment::Key(key) if out.is_empty() => out.push_str(key),
+                Segment::Key(key) => {
+                    out.push('.');
+                    out.push_str(key);
+                },
+                Segment::Index(index) => out.push_str(&format!("[{index}]")),
+                Segment::Quoted(key) => out.push_str(&format!("[\"{key}\"]")),
+            }
+        }
+        out
+    }
+}
+
 /// Where a reader is, and the stylesheet names it reads against.
 #[derive(Clone, Debug)]
 pub(crate) struct Cx<'p> {
     /// A path such as `panel[2].item.style`; empty at the root.
-    at: String,
+    at: Path,
     names: &'p Names,
     /// List levels below the root, to bound how deep a tree goes.
     depth: usize,
     /// The element being read, its path and kind, for problems to name.
-    element: Option<std::rc::Rc<(String, &'static str)>>,
+    element: Option<std::rc::Rc<(Path, &'static str)>>,
 }
 
 impl<'p> Cx<'p> {
     pub(crate) fn root(names: &'p Names) -> Self {
         Self {
-            at: String::new(),
+            at: Path::default(),
             names,
             depth: 0,
             element: None,
@@ -73,12 +122,10 @@ impl<'p> Cx<'p> {
 
     /// A named key: `style.background`.
     pub(crate) fn key(&self, key: &str) -> Self {
-        let at = if self.at.is_empty() {
-            key.to_owned()
-        } else {
-            format!("{}.{key}", self.at)
-        };
-        Self { at, ..self.clone() }
+        Self {
+            at: self.at.push(Segment::Key(key.into())),
+            ..self.clone()
+        }
     }
 
     /// A named key that holds an element, one level down: a popover's
@@ -94,7 +141,7 @@ impl<'p> Cx<'p> {
     /// A list position, counted from 1 as Lua does: `column[2]`.
     pub(crate) fn index(&self, index: usize) -> Self {
         Self {
-            at: format!("{}[{index}]", self.at),
+            at: self.at.push(Segment::Index(index)),
             depth: self.depth + 1,
             ..self.clone()
         }
@@ -103,14 +150,17 @@ impl<'p> Cx<'p> {
     /// A key that is not a name, such as a selector: `rules[".card"]`.
     pub(crate) fn quoted(&self, key: &str) -> Self {
         Self {
-            at: format!("{}[\"{key}\"]", self.at),
+            at: self.at.push(Segment::Quoted(key.into())),
             ..self.clone()
         }
     }
 
     pub(crate) fn fail(&self, problem: impl Display) -> Error {
-        let element = self.element.as_deref().cloned();
-        Error::at(&self.at, problem).with(|detail| detail.element = element)
+        let element = self
+            .element
+            .as_deref()
+            .map(|(path, kind)| (path.render(), *kind));
+        Error::at(&self.at.render(), problem).with(|detail| detail.element = element)
     }
 }
 
