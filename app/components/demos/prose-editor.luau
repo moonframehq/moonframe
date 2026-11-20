@@ -13,8 +13,15 @@ Markdown takes its shape as it is typed: *emphasis*, **strong**, `code` and [lin
 - Lists keep their bullets quiet
 > Quotes lean back a little.]]
 
+type State = {
+	dim: ("sentence" | "paragraph")?,
+	typewriter: boolean,
+	text: string,
+	show: "words" | "characters" | "sentences" | "reading",
+}
+
 return mod {
-	init = function(previous)
+	init = function(previous: State?): State
 		return previous or { dim = "sentence", typewriter = false, text = TEXT, show = "words" }
 	end,
 

@@ -22,9 +22,9 @@ return mod {
 	end,
 
 	view = function(state)
-		local selected, shown = {}, {}
+		local selected: { string }, shown = {}, {}
 		for id in state.on do
-			table.insert(selected, id)
+			table.insert(selected, id :: string)
 		end
 		local counts = { open = 0, mine = 0, agent = 0, draft = 0, failing = 0 }
 		for _, pr in PRS do

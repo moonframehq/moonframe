@@ -2531,9 +2531,2414 @@ type Component<Props> = {
 
 declare function component<Props>(definition: Component<Props>): Component<Props>
 
+-- generated: component props (just component-types) start
+type UseAboutLink = any
+type UseAboutProps = {
+	open: boolean?,
+	dismiss: any,
+	name: string,
+	version: string?,
+	tagline: string?,
+	icon: string?,
+	image: string?,
+	info: { { string } }?,
+	links: { UseAboutLink }?,
+	copyright: string?,
+	copy: string?,
+	inline: boolean?,
+	width: number?,
+	to: string?,
+}
+type UseAccordionItem = any
+type UseAccordionProps = {
+	items: { UseAccordionItem },
+	open: any,
+	event: string?,
+	to: string?,
+}
+type UseActionTilesTile = any
+type UseActionTilesRow = any
+type UseActionTilesProps = {
+	title: string?,
+	subtitle: string?,
+	trailing: any,
+	tiles: { UseActionTilesTile }?,
+	columns: number?,
+	rows: { UseActionTilesRow }?,
+	destructive: UseActionTilesRow?,
+	width: number?,
+	event: string?,
+	to: string?,
+}
+type UseActivityBarItem = any
+type UseActivityBarProps = {
+	items: { UseActivityBarItem },
+	bottom: { UseActivityBarItem }?,
+	selected: string?,
+	event: string?,
+	to: string?,
+	height: number?,
+	fill: boolean?,
+}
+type UseAgentRunTool = any
+type UseAgentRunOption = any
+type UseAgentRunRun = any
+type UseAgentRunProps = {
+	run: UseAgentRunRun,
+	lines: number?,
+	tools: number?,
+	request: boolean?,
+	to: string?,
+}
+type UseAheadBehindProps = {
+	ahead: number?,
+	behind: number?,
+	synced: boolean?,
+	tooltip: string?,
+}
+type UseAudioMeterChannel = any
+type UseAudioMeterProps = {
+	channels: { UseAudioMeterChannel },
+	height: number?,
+	bar: number?,
+	floor: number?,
+	warn: number?,
+	danger: number?,
+}
+type UseAvatarStackProps = {
+	people: { any },
+	count: number?,
+	most: number?,
+	size: string?,
+}
+type UseAvatarProps = {
+	name: string?,
+	initial: string?,
+	letters: number?,
+	size: string?,
+	shape: string?,
+	color: string?,
+	status: string?,
+	src: string?,
+	tooltip: string?,
+}
+type UseBannerAction = any
+type UseBannerProps = {
+	text: string,
+	detail: string?,
+	icon: string?,
+	tone: string?,
+	solid: boolean?,
+	mono: boolean?,
+	action: any,
+	dismiss: any,
+	to: string?,
+}
+type UseBarChartSeries = any
+type UseBarChartBucket = any
+type UseBarChartProps = {
+	buckets: { UseBarChartBucket },
+	series: { UseBarChartSeries }?,
+	height: number?,
+	bar: number?,
+	gap: number?,
+	max: number?,
+	axis: boolean?,
+	legend: boolean?,
+	unit: string?,
+	every: number?,
+	slot: number?,
+	ticks: number?,
+	grid: boolean?,
+	grow: boolean?,
+}
+type UseBoardCardProps = {
+	title: string,
+	subtitle: string?,
+	badge: string?,
+	badge_tone: string?,
+	amount: string?,
+	date: string?,
+	owner: string?,
+	owner_color: string?,
+	tone: string?,
+	msg: any,
+	context: any,
+	to: string?,
+	selected: boolean?,
+	labels: { any }?,
+	key: string?,
+	carry: any,
+	accept: any,
+}
+type UseBreadcrumbsCrumb = any
+type UseBreadcrumbsProps = {
+	crumbs: { UseBreadcrumbsCrumb },
+	back: any,
+	position: string?,
+	up: any,
+	down: any,
+	actions: { any }?,
+	event: string?,
+	to: string?,
+}
+type UseBrowserPage = any
+type UseBrowserProps = {
+	id: string?,
+	url: string?,
+	page: UseBrowserPage?,
+	navigate: any,
+	loading: any,
+	zoom: number?,
+	share: boolean?,
+}
+type UseButtonGroupButton = any
+type UseButtonGroupProps = {
+	buttons: { UseButtonGroupButton },
+	selected: string?,
+	event: string?,
+	small: boolean?,
+	to: string?,
+}
+type UseCaffeineAwake = any
+type UseCaffeineProps = {
+	awake: UseCaffeineAwake?,
+	scope: string?,
+	reason: string?,
+	variant: string?,
+	size: string?,
+	disabled: boolean?,
+}
+type UseCardProps = {
+	title: string?,
+	subtitle: string?,
+	actions: { any }?,
+	[number]: any,
+}
+type UseChangeTreeProps = {
+	files: { string }?,
+	selected: string?,
+	folded: { [string]: boolean? }?,
+	fold: string?,
+	pick: string?,
+	to: string?,
+	indent: number?,
+	counts: boolean?,
+	mark: string?,
+	plain: boolean?,
+}
+type UseChangeTreeFolder = any
+type UseChatMarkdownProps = {
+	text: string?,
+	cursor: boolean?,
+	link: any,
+	to: string?,
+}
+type UseChatMessageProps = {
+	from: string?,
+	author: string?,
+	icon: string?,
+	text: string?,
+	[number]: any,
+}
+type UseCheckboxProps = {
+	checked: boolean?,
+	indeterminate: boolean?,
+	label: string?,
+	description: string?,
+	msg: any,
+	disabled: boolean?,
+	to: string?,
+}
+type UseChecksCheck = any
+type UseChecksProps = {
+	checks: { UseChecksCheck },
+	title: string?,
+	event: string?,
+	to: string?,
+	collapsed: boolean?,
+	toggle: any,
+}
+type UseChipsChip = any
+type UseChipsProps = {
+	chips: { UseChipsChip },
+	selected: { string }?,
+	event: string?,
+	wrap: boolean?,
+	to: string?,
+}
+type UseChoiceCardsCard = any
+type UseChoiceCardsProps = {
+	options: { UseChoiceCardsCard },
+	selected: string?,
+	width: number?,
+	event: string?,
+	to: string?,
+}
+type UseCodeViewProps = {
+	text: string?,
+	lines: { string }?,
+	start: number?,
+	highlight: { number }?,
+	numbers: boolean?,
+	path: string?,
+	language: string?,
+	height: number?,
+	grow: boolean?,
+	event: string?,
+	to: string?,
+	id: string?,
+}
+type UseCollapsibleProps = {
+	title: string,
+	open: boolean?,
+	summary: string?,
+	icon: string?,
+	toggle: any,
+	id: string?,
+	to: string?,
+	flat: boolean?,
+	[number]: any,
+}
+type UseCommandPaletteCommand = any
+type UseCommandPaletteState = any
+type UseCommandPaletteProps = {
+	id: string?,
+	open: boolean?,
+	commands: { UseCommandPaletteCommand }?,
+	placeholder: string?,
+	look: string?,
+	dismiss: any,
+	event: string?,
+	width: number?,
+	rows: number?,
+	empty: string?,
+	prefix: string?,
+}
+type UseCommandPaletteShape = any
+type UseCommentCardProps = {
+	author: string,
+	action: string?,
+	age: string?,
+	seconds: number?,
+	body: string?,
+	location: string?,
+	locate: any,
+	badge: string?,
+	avatar: string?,
+	to: string?,
+	actions: { any }?,
+	reactions: { UseCommentCardReaction }?,
+	react: string?,
+	add_reaction: any,
+	picker: any,
+	picker_open: boolean?,
+	[number]: any,
+}
+type UseCommentCardReaction = any
+type UseCommitGraphCommit = any
+type UseCommitGraphProps = {
+	commits: { UseCommitGraphCommit },
+	select: any,
+	selected: string?,
+	row_height: number?,
+	compact: boolean?,
+}
+type UseComposerProps = {
+	id: string?,
+	value: string?,
+	placeholder: string?,
+	agent: string?,
+	icon: string?,
+	change: any,
+	submit: any,
+	attach: any,
+	send: any,
+	actions: { any }?,
+	to: string?,
+	focus: boolean?,
+}
+type UseConfirmProps = {
+	open: boolean?,
+	title: string,
+	message: string?,
+	detail: string?,
+	items: { any }?,
+	items_title: string?,
+	confirm: any,
+	cancel: any,
+	confirm_label: string?,
+	cancel_label: string?,
+	danger: boolean?,
+	icon: string?,
+	to: string?,
+}
+type UseContextMenuProps = {
+	open: boolean?,
+	context: any,
+	dismiss: any,
+	items: { any },
+	highlighted: any,
+	expanded: any,
+	expand: string?,
+	submenu_highlighted: any,
+	event: string?,
+	keys: { [string]: any }?,
+	width: number?,
+	side: string?,
+	align: string?,
+	to: string?,
+	[number]: any,
+}
+type UseContributionGraphProps = {
+	days: { number },
+	start: string,
+	thresholds: { number }?,
+	palette: { string }?,
+	color: string?,
+	empty: string?,
+	size: number?,
+	gap: number?,
+	week_start: string?,
+	weekdays: boolean?,
+	months: boolean?,
+	legend: boolean?,
+	noun: string?,
+	nouns: string?,
+	note: string?,
+	note_msg: any?,
+	selected: string?,
+	event: string?,
+	to: string?,
+}
+type UseCopyFieldProps = {
+	text: string,
+	label: string?,
+	copied: boolean?,
+	msg: any,
+	button: string?,
+	to: string?,
+}
+type UseCountBubbleProps = {
+	count: number,
+	max: number?,
+	tone: string?,
+	zero: boolean?,
+	tooltip: string?,
+	float: any,
+}
+type UseCountryCodeProps = { code: string }
+type UseCourseCardAction = any
+type UseCourseCardProps = {
+	title: string,
+	eyebrow: string?,
+	meta: string?,
+	primary: UseCourseCardAction?,
+	secondary: UseCourseCardAction?,
+	progress: number?,
+	label: string?,
+	detail: string?,
+	bar: number?,
+	aside: any,
+	to: string?,
+}
+type UseCurveEditorPoint = any
+type UseCurveEditorProps = {
+	points: { UseCurveEditorPoint },
+	change: any,
+	size: number?,
+	color: string?,
+	values: { number }?,
+	grid: number?,
+	id: string?,
+	disabled: boolean?,
+}
+type UseCurveEditorState = any
+type UseDashboardCardProps = {
+	title: string,
+	icon: string?,
+	meta: any,
+	menu: any,
+	to: string?,
+	grow: boolean?,
+	padding: boolean?,
+	footer: any,
+	[number]: any,
+}
+type UseDatePickerPreset = any
+type UseDatePickerProps = {
+	title: string?,
+	weeks: { any },
+	selected: string?,
+	weekdays: { string }?,
+	event: string?,
+	previous: any,
+	next: any,
+	today: any,
+	presets: { UseDatePickerPreset }?,
+	preset: string?,
+	presets_side: string?,
+	open: boolean?,
+	toggle: any,
+	dismiss: any,
+	value: string?,
+	placeholder: string?,
+	overdue: boolean?,
+	width: number?,
+	align: string?,
+	to: string?,
+}
+type UseDateTileProps = {
+	month: string,
+	day: string,
+	tone: string?,
+	size: string?,
+}
+type UseDayStripDay = any
+type UseDayStripProps = {
+	days: { UseDayStripDay },
+	selected: string?,
+	event: string?,
+	to: string?,
+}
+type UseDialogButton = any
+type UseDialogProps = {
+	open: boolean?,
+	dismiss: any,
+	title: string?,
+	subtitle: string?,
+	icon: string?,
+	tone: string?,
+	size: string?,
+	width: number?,
+	height: number?,
+	place: string?,
+	backdrop: boolean?,
+	hint: boolean?,
+	plain: boolean?,
+	close: boolean?,
+	buttons: { UseDialogButton }?,
+	actions: { any }?,
+	note: string?,
+	submit: any,
+	keys: { [string]: any }?,
+	to: string?,
+	class: string?,
+	[number]: any,
+}
+type UseDictationProps = {
+	id: string?,
+	text: any,
+	failed: any,
+	listening: any,
+	engine: string?,
+	speech: any,
+}
+type UseDictationState = any
+type UseDiffCountsProps = {
+	added: number?,
+	removed: number?,
+	files: number?,
+	size: string?,
+	zero: boolean?,
+}
+type UseDiffViewLine = any
+type UseDiffViewHunk = any
+type UseDiffViewProps = {
+	path: string?,
+	status: string?,
+	hunks: { UseDiffViewHunk },
+	split: boolean?,
+	collapsed: boolean?,
+	height: number?,
+	grow: boolean?,
+	header: boolean?,
+	event: string?,
+	to: string?,
+	actions: { any }?,
+	switch: string?,
+}
+type UseDocumentCardProps = {
+	title: string,
+	text: string?,
+	date: string?,
+	lines: number?,
+	favorite: boolean?,
+	star: any?,
+	selected: boolean?,
+	msg: any?,
+	context: any?,
+	width: number?,
+	height: number?,
+	to: string?,
+}
+type UseDocumentRowProps = {
+	title: string,
+	excerpt: string?,
+	date: string?,
+	words: number?,
+	favorite: boolean?,
+	selected: boolean?,
+	lines: number?,
+	msg: any?,
+	context: any?,
+	to: string?,
+}
+type UseDotChartColumn = any
+type UseDotChartProps = {
+	columns: { UseDotChartColumn },
+	max: number,
+	rows: number?,
+	ticks: { string }?,
+	labels: { string }?,
+	size: number?,
+	color: string?,
+	shade: string?,
+}
+type UseDropdownProps = {
+	open: boolean?,
+	label: string?,
+	value: string?,
+	icon: string?,
+	options: { any },
+	selected: string?,
+	toggle: any,
+	dismiss: any,
+	event: string?,
+	highlighted: any,
+	expanded: any,
+	expand: string?,
+	submenu_highlighted: any,
+	keys: { [string]: any }?,
+	width: number?,
+	align: string?,
+	side: string?,
+	placeholder: string?,
+	disabled: boolean?,
+	to: string?,
+	chevron: string?,
+	trigger_width: number?,
+}
+type UseDropzoneProps = {
+	title: string?,
+	detail: string?,
+	icon: string?,
+	compact: boolean?,
+	drop: any,
+	browse: any,
+	to: string?,
+	width: number?,
+	height: number?,
+}
+type UseEmojiPickerProps = {
+	recent: { string }?,
+	event: string?,
+	query: string?,
+	search: any,
+	id: string?,
+	focus: boolean?,
+	cancel: any,
+	columns: number?,
+	height: number?,
+	to: string?,
+}
+type UseEmptyStateProps = {
+	icon: string?,
+	title: string,
+	message: string?,
+	action: string?,
+	msg: any,
+}
+type UseErrorStateProps = {
+	title: string?,
+	message: string?,
+	details: string?,
+	icon: string?,
+	retry: any,
+	retry_label: string?,
+	secondary: any,
+	block: boolean?,
+	retrying: boolean?,
+	to: string?,
+}
+type UseFeedbackProps = {
+	open: boolean?,
+	dismiss: any,
+	id: string?,
+	value: string?,
+	text: string?,
+	placeholder: string?,
+	note: string?,
+	error: string?,
+	change: any,
+	send: any,
+	runs: { any }?,
+	expanded: string?,
+	undo: boolean?,
+	follow: boolean?,
+	reply: string?,
+	actions: { any }?,
+	inspect: boolean?,
+	attached: { element: string, at: string?, report: string? }?,
+	detach: any,
+	copy: any,
+	copied: boolean?,
+	inline: boolean?,
+	to: string?,
+}
+type UseFileCardProps = {
+	name: string,
+	src: string?,
+	detail: string?,
+	progress: number?,
+	layout: string?,
+	remove: any,
+	msg: any,
+	selected: boolean?,
+	to: string?,
+	width: number?,
+}
+type UseFileIconProps = {
+	name: string,
+	dir: boolean?,
+	open: boolean?,
+}
+type UseFilterBuilderCondition = any
+type UseFilterBuilderField = any
+type UseFilterBuilderProps = {
+	match: string?,
+	conditions: { UseFilterBuilderCondition }?,
+	fields: { UseFilterBuilderField },
+	open: string?,
+	to: string?,
+}
+type UseFilterDropdownOption = any
+type UseFilterDropdownProps = {
+	icon: string?,
+	label: string?,
+	placeholder: string?,
+	options: { any },
+	selected: any,
+	multiple: boolean?,
+	any: string?,
+	open: boolean?,
+	toggle: any,
+	dismiss: any,
+	event: string?,
+	clear: any,
+	width: number?,
+	plain: boolean?,
+	to: string?,
+}
+type UseFindBarProps = {
+	id: string?,
+	value: string?,
+	placeholder: string?,
+	count: number?,
+	index: number?,
+	change: any,
+	event: string?,
+	closable: boolean?,
+	focus: boolean?,
+	replace: boolean?,
+	replacement: string?,
+	replace_change: any,
+	replace_one: any,
+	replace_all: any,
+	width: number?,
+	to: string?,
+}
+type UseFlowDiagramMeter = any
+type UseFlowDiagramNode = any
+type UseFlowDiagramLink = any
+type UseFlowDiagramGroup = any
+type UseFlowDiagramFlow = any
+type UseFlowDiagramPoint = any
+type UseFlowDiagramSize = any
+type UseFlowDiagramStep = any
+type UseFlowDiagramProps = {
+	nodes: { UseFlowDiagramNode },
+	links: { UseFlowDiagramLink }?,
+	groups: { UseFlowDiagramGroup }?,
+	flows: { UseFlowDiagramFlow }?,
+	columns: number?,
+	rows: number?,
+	time: number?,
+	speed: number?,
+	selected: string?,
+	event: string?,
+	to: string?,
+	size: string?,
+	height: number?,
+}
+type UseForecastChartBar = any
+type UseForecastChartProps = {
+	bars: { UseForecastChartBar },
+	max: number,
+	floor: number?,
+	ticks: { string }?,
+	height: number?,
+	bar: number?,
+	event: string?,
+	to: string?,
+}
+type UseForgeAccountProps = {
+	forge: any,
+	brand: string?,
+	msg: any,
+	to: string?,
+}
+type UseForgePrProps = {
+	forge: any,
+	branch: string?,
+	pr: any,
+	changes: any,
+	brand: boolean?,
+	open: boolean?,
+}
+type UseForgeSignInProps = {
+	forge: any,
+	provider: string?,
+}
+type UseFormGridRow = any
+type UseFormGridProps = {
+	rows: { UseFormGridRow },
+	label_width: number?,
+	gap: number?,
+}
+type UseGanttDay = any
+type UseGanttProps = {
+	days: { UseGanttDay },
+	rows: { any },
+	deps: { any }?,
+	day_width: number?,
+	row_height: number?,
+	label_width: number?,
+	selected: string?,
+	event: string?,
+	move: string?,
+	resize: string?,
+	moving: any,
+	height: number?,
+	grow: boolean?,
+	to: string?,
+}
+type UseGanttSpan = any
+type UseGhosttyTerminalProps = {
+	id: string?,
+	cwd: string?,
+	backend: string?,
+	exit: any,
+	shell: any,
+	style: any,
+}
+type UseGroupHeaderProps = {
+	title: string,
+	id: string?,
+	count: (number | string)?,
+	status: string?,
+	icon: string?,
+	detail: string?,
+	collapsed: boolean?,
+	toggle: any,
+	add: any,
+	add_tooltip: string?,
+	actions: { any }?,
+	band: boolean?,
+	to: string?,
+}
+type UseGuideCardProps = {
+	title: string,
+	category: string?,
+	color: string?,
+	tint: string?,
+	icon: string?,
+	read: string?,
+	progress: number?,
+	done: boolean?,
+	new: boolean?,
+	selected: boolean?,
+	msg: any,
+	to: string?,
+	bar: number?,
+}
+type UseHeatGridProps = {
+	columns: { any },
+	rows: number?,
+	levels: number?,
+	size: number?,
+	gap: number?,
+	color: string?,
+	empty: string?,
+	spread: boolean?,
+	labels: { string }?,
+	tooltips: { string }?,
+}
+type UseHistogramChannel = any
+type UseHistogramMarker = any
+type UseHistogramProps = {
+	channels: { UseHistogramChannel },
+	width: number?,
+	height: number?,
+	max: number?,
+	log: boolean?,
+	markers: { UseHistogramMarker }?,
+	drag: any,
+	shade: boolean?,
+	to: string?,
+}
+type UseIconButtonProps = {
+	icon: string,
+	tooltip: string?,
+	msg: any,
+	command: any,
+	variant: string?,
+	size: string?,
+	active: boolean?,
+	badge: any,
+	disabled: boolean?,
+	tone: string?,
+	to: string?,
+}
+type UseImageViewerProps = {
+	src: string,
+	zoom: number?,
+	center: { number }?,
+	change: any,
+	to: string?,
+	overlay: { any }?,
+	controls: boolean?,
+	min: number?,
+	max: number?,
+	width: number?,
+	height: number?,
+	id: string?,
+}
+type UseImageViewerState = any
+type UseInsightNoteProps = {
+	label: string?,
+	icon: string?,
+	text: string,
+	link: string?,
+	after: string?,
+	msg: any,
+	to: string?,
+}
+type UseKanbanColumnProps = {
+	title: string,
+	color: string?,
+	count: number?,
+	total: string?,
+	add: any,
+	add_label: string?,
+	to: string?,
+	width: number?,
+	accept: any,
+	over: boolean?,
+	marker: number?,
+	[number]: any,
+}
+type UseKbdProps = {
+	keys: any,
+	small: boolean?,
+	plain: boolean?,
+}
+type UseKeyHintsHint = any
+type UseKeyHintsProps = {
+	hints: { UseKeyHintsHint },
+	caps: boolean?,
+	separator: string?,
+	justify: string?,
+}
+type UseKeyValuesProps = {
+	rows: { { string } },
+	width: number?,
+}
+type UseKpiCellProps = {
+	title: string,
+	value: string,
+	icon: string?,
+	tint: string?,
+	delta: string?,
+	good: boolean?,
+	caption: string?,
+	menu: any,
+	to: string?,
+}
+type UseKpiMeterSegment = any
+type UseKpiMeterLegend = any
+type UseKpiMeterProps = {
+	title: string,
+	value: string,
+	caption: string?,
+	caption_color: string?,
+	dot: string?,
+	mono: boolean?,
+	segments: { UseKpiMeterSegment }?,
+	legend: { UseKpiMeterLegend }?,
+	width: number?,
+	msg: any,
+	to: string?,
+}
+type UseLevelRowProps = {
+	label: string,
+	value: string?,
+	fraction: number,
+	color: string?,
+	end_color: string?,
+	width: number?,
+	label_width: number?,
+	height: number?,
+	tooltip: string?,
+	msg: any?,
+	to: string?,
+}
+type UseLightboxPicture = any
+type UseLightboxProps = {
+	open: boolean?,
+	dismiss: any,
+	pictures: { UseLightboxPicture }?,
+	index: number?,
+	event: string?,
+	zoom: number?,
+	center: any,
+	change: any,
+	to: string?,
+}
+type UseLineChartSeries = any
+type UseLineChartProps = {
+	labels: { string },
+	series: { UseLineChartSeries },
+	bars: { number }?,
+	max: number,
+	min: number?,
+	ticks: { string }?,
+	width: number?,
+	height: number?,
+	selected: number?,
+	card: any,
+	card_width: number?,
+	tips: { string }?,
+	event: string?,
+	to: string?,
+}
+type UseListRow = any
+type UseListProps = {
+	rows: { UseListRow },
+	selected: string?,
+	to: string?,
+}
+type UseLoadingProps = {
+	text: string?,
+	detail: string?,
+	block: boolean?,
+	skeleton: boolean?,
+	count: number?,
+	widths: { number }?,
+}
+type UseMailRowTag = any
+type UseMailRowProps = {
+	from: string,
+	subject: string?,
+	preview: string?,
+	time: string?,
+	account: string?,
+	unread: boolean?,
+	count: number?,
+	starred: boolean?,
+	star: any,
+	attachment: boolean?,
+	tag: UseMailRowTag?,
+	avatar: string?,
+	color: string?,
+	selected: boolean?,
+	msg: any,
+	context: any,
+	to: string?,
+}
+type UseMarkdownEditorMode = any
+type UseMarkdownEditorState = any
+type UseMarkdownEditorProps = {
+	path: string?,
+	root: string?,
+	text: string?,
+	mode: string?,
+	id: string?,
+}
+type UseMarkdownProps = {
+	text: string?,
+	link: any,
+	to: string?,
+	grow: boolean?,
+	scroll: boolean?,
+	max_width: number?,
+	lines: number?,
+	images: boolean?,
+	image: any,
+	outline: any,
+	section: any,
+	reveal: { at: number, seq: number? }?,
+	find: string?,
+	find_index: number?,
+	found: any,
+	stream: boolean?,
+	scrolled: any,
+	scroll_at: { fraction: number, seq: number? }?,
+}
+type UseMentionFieldPerson = any
+type UseMentionFieldProps = {
+	id: string,
+	value: string?,
+	caret: number?,
+	people: { UseMentionFieldPerson }?,
+	change: any,
+	submit: any,
+	blur: any,
+	placeholder: string?,
+	multiline: boolean?,
+	rows: number?,
+	max_rows: number?,
+	highlighted: number?,
+	event: string?,
+	dismiss: any,
+	most: number?,
+	width: number?,
+	grow: boolean?,
+	focus: boolean?,
+	to: string?,
+	trigger: string?,
+	heading: string?,
+}
+type UseMenuItem = any
+type UseMenuProps = {
+	items: { any },
+	max_height: number?,
+	highlighted: any,
+	event: string?,
+	expanded: any,
+	expand: string?,
+	submenu_highlighted: any,
+	submenu_width: number?,
+	to: string?,
+}
+type UseMessageHeaderProps = {
+	subject: string?,
+	from: string,
+	email: string?,
+	recipients: any,
+	cc: any,
+	date: string?,
+	avatar: string?,
+	color: string?,
+	actions: { any }?,
+	sender: any,
+	to: string?,
+	[number]: any,
+}
+type UseMeterProps = {
+	value: number,
+	width: number?,
+	warn: number?,
+	label: string?,
+	percent: boolean?,
+}
+type UseMetricProps = {
+	label: string,
+	value: string,
+	note: string?,
+	tone: string?,
+	size: string?,
+}
+type UseMiniBarsBar = any
+type UseMiniBarsProps = {
+	bars: { UseMiniBarsBar },
+	highlight: number?,
+	height: number?,
+	bar: number?,
+}
+type UseMockupsVariant = any
+type UseMockupsProps = {
+	ask: string?,
+	variants: { UseMockupsVariant },
+	file: string?,
+	width: number?,
+}
+type UseMonthGridDay = any
+type UseMonthGridProps = {
+	weeks: { { UseMonthGridDay } },
+	selected: string?,
+	weekdays: { string }?,
+	event: string?,
+	to: string?,
+}
+type UseNavButtonsProps = {
+	can_back: boolean?,
+	can_forward: boolean?,
+	back: any,
+	forward: any,
+	small: boolean?,
+	to: string?,
+}
+type UseNoteCardProps = {
+	id: any,
+	number: number?,
+	location: string?,
+	text: string,
+	selected: boolean?,
+	event: string?,
+	remove: string?,
+	to: string?,
+}
+type UseNoticeProps = {
+	id: any,
+	tone: string?,
+	icon: string?,
+	title: string?,
+	text: string?,
+	action: any,
+	dismiss: any,
+	foldable: boolean?,
+	expanded: boolean?,
+	toggle: any,
+	to: string?,
+	[number]: any,
+}
+type UseNotificationDrawerItem = any
+type UseNotificationDrawerFilter = any
+type UseNotificationDrawerProps = {
+	open: boolean?,
+	items: { UseNotificationDrawerItem }?,
+	filter: string?,
+	filters: { UseNotificationDrawerFilter }?,
+	title: string?,
+	width: number?,
+	top: number?,
+	backdrop: boolean?,
+	dismiss: any,
+	mark_read: any,
+	mark_read_label: string?,
+	event: string?,
+	remove: any,
+	empty: string?,
+	to: string?,
+}
+type UseNumberFieldProps = {
+	value: number,
+	change: any,
+	min: number?,
+	max: number?,
+	step: number?,
+	speed: number?,
+	decimals: number?,
+	label: string?,
+	unit: string?,
+	width: number?,
+	buttons: boolean?,
+	id: string?,
+	disabled: boolean?,
+	to: string?,
+}
+type UseNumberedListProps = {
+	items: { string },
+	start: number?,
+}
+type UseOnboardingPage = any
+type UseOnboardingProps = {
+	open: boolean?,
+	title: string?,
+	icon: string?,
+	badge: string?,
+	pages: { UseOnboardingPage }?,
+	current: number?,
+	back: any,
+	next: any,
+	done: any,
+	dismiss: any,
+	event: string?,
+	done_label: string?,
+	width: number?,
+	to: string?,
+	[number]: any,
+}
+type UseOutlineHeading = any
+type UseOutlineProps = {
+	headings: { UseOutlineHeading }?,
+	current: number?,
+	event: string?,
+	indent: number?,
+	depth: number?,
+	empty: string?,
+	to: string?,
+}
+type UsePageProps = {
+	title: string,
+	subtitle: string?,
+	icon: string?,
+	actions: { any }?,
+	width: number?,
+	footer: any,
+	height: number?,
+	[number]: any,
+}
+type UsePagerProps = {
+	count: number,
+	page: number,
+	back: any,
+	next: any,
+	back_label: string?,
+	next_label: string?,
+	event: string?,
+	to: string?,
+}
+type UsePaginationProps = {
+	page: number,
+	total: number,
+	per_page: number?,
+	noun: string?,
+	summary: boolean?,
+	window: number?,
+	ellipsis: boolean?,
+	event: string?,
+	sizes: { number }?,
+	size_open: boolean?,
+	size_toggle: any,
+	size_dismiss: any,
+	size_event: string?,
+	size_label: string?,
+	to: string?,
+}
+type UsePaneFrameProps = {
+	title: string,
+	icon: string?,
+	subtitle: string?,
+	status: string?,
+	focused: boolean?,
+	zoomed: boolean?,
+	header: string?,
+	focus: any,
+	split_right: any,
+	split_down: any,
+	zoom: any,
+	close: any,
+	actions: { any }?,
+	leading: { any }?,
+	menu: any,
+	click_focus: boolean?,
+	to: string?,
+	height: number?,
+	[number]: any,
+}
+type UsePickerOption = any
+type UsePickerProps = {
+	options: { any },
+	selected: any,
+	multiple: boolean?,
+	open: boolean?,
+	toggle: any,
+	dismiss: any,
+	event: string?,
+	query: string?,
+	search: any,
+	id: string?,
+	create: any,
+	highlighted: string?,
+	highlight: string?,
+	keys: { [string]: any }?,
+	placeholder: string?,
+	icon: string?,
+	empty: string?,
+	width: number?,
+	align: string?,
+	trigger: any,
+	to: string?,
+}
+type UsePillTabsItem = any
+type UsePillTabsProps = {
+	items: { UsePillTabsItem },
+	selected: string?,
+	event: string?,
+	width: number?,
+	size: number?,
+	to: string?,
+}
+type UsePillProps = {
+	label: string,
+	icon: string?,
+	tone: string?,
+	color: string?,
+	size: string?,
+	msg: any,
+	to: string?,
+	tooltip: string?,
+}
+type UsePixelIconProps = {
+	pattern: { string },
+	colors: { string },
+	size: number?,
+	mirror: boolean?,
+	tooltip: string?,
+}
+type UsePrBadgeProps = {
+	number: number | string,
+	kind: string?,
+	tone: string?,
+	icon: string?,
+	checks: string?,
+	label: string?,
+	tooltip: string?,
+	msg: any,
+	to: string?,
+}
+type UsePrRowProps = {
+	number: number | string,
+	kind: string?,
+	title: string,
+	tone: string?,
+	draft: boolean?,
+	branch: string?,
+	target: string?,
+	author: string?,
+	age: string?,
+	seconds: number?,
+	checks: string?,
+	added: number?,
+	removed: number?,
+	comments: number?,
+	labels: { string }?,
+	selected: boolean?,
+	event: string?,
+	to: string?,
+	msg: any,
+	context: any,
+}
+type UsePriorityIconProps = {
+	priority: string?,
+	size: number?,
+	tooltip: string?,
+	label: (string | boolean)?,
+}
+type UseProgressStackSegment = any
+type UseProgressStackProps = {
+	segments: { UseProgressStackSegment },
+	total: number,
+	width: number?,
+	marker: { value: number, label: string }?,
+	labels: { string }?,
+	ticks: number?,
+}
+type UseProgressProps = {
+	value: number?,
+	busy: boolean?,
+	label: string?,
+	detail: string?,
+	tone: string?,
+	width: number?,
+	height: number?,
+	percent: boolean?,
+}
+type UseProjectCardProps = {
+	name: string,
+	icon: string?,
+	color: string?,
+	description: string?,
+	status: string?,
+	tone: string?,
+	status_color: string?,
+	starred: boolean?,
+	star: any,
+	progress: number?,
+	tasks: string?,
+	due: string?,
+	updated: string?,
+	people: { any }?,
+	selected: boolean?,
+	msg: any,
+	context: any,
+	to: string?,
+	width: number?,
+}
+type UseProseEditorProps = {
+	id: string?,
+	value: string?,
+	placeholder: string?,
+	change: any?,
+	submit: any?,
+	keys: { [string]: any }?,
+	to: string?,
+	dim: ("sentence" | "paragraph")?,
+	typewriter: boolean?,
+	markdown: boolean?,
+	mono: boolean?,
+	size: ("normal" | "large" | "title")?,
+	measure: number?,
+	focus: boolean?,
+}
+type UseRadioGroupOption = any
+type UseRadioGroupProps = {
+	options: { UseRadioGroupOption },
+	selected: string?,
+	horizontal: boolean?,
+	event: string?,
+	to: string?,
+}
+type UseRailItem = any
+type UseRailProps = {
+	items: { UseRailItem },
+	selected: string?,
+	event: string?,
+	to: string?,
+	header: { any }?,
+	footer: { any }?,
+	height: number?,
+	fill: boolean?,
+}
+type UseRatioRowProps = {
+	label: string,
+	count: string?,
+	percent: string?,
+	icon: string?,
+	leading: any,
+	share: number?,
+	color: string?,
+	width: number?,
+	msg: any,
+	to: string?,
+}
+type UseRecipientFieldRecipient = any
+type UseRecipientFieldProps = {
+	label: string?,
+	recipients: { any }?,
+	id: string?,
+	value: string?,
+	placeholder: string?,
+	change: any,
+	submit: any,
+	focus: boolean?,
+	keys: { [string]: any }?,
+	suggestions: { any }?,
+	highlighted: number?,
+	pick: string?,
+	remove: string?,
+	dismiss: any,
+	trailing: { any }?,
+	width: number?,
+	to: string?,
+}
+type UseReconnectingProps = {
+	open: boolean?,
+	host: string?,
+	title: string?,
+	reason: string?,
+	status: string?,
+	retry: any,
+	retry_label: string?,
+	secondary: any,
+	dismiss: any,
+	icon: string?,
+	to: string?,
+}
+type UseRecordCardProps = {
+	title: string,
+	detail: string?,
+	icon: string?,
+	tone: string?,
+	msg: any,
+	to: string?,
+}
+type UseRelativeTimeProps = {
+	seconds: number,
+	compact: boolean?,
+	prefix: string?,
+	tooltip: string?,
+	size: string?,
+}
+type UseReleaseNotesHighlight = any
+type UseReleaseNotesProps = {
+	version: string,
+	date: string?,
+	name: string?,
+	badge: string?,
+	summary: string?,
+	highlights: { UseReleaseNotesHighlight }?,
+	fixes: { string }?,
+	fixes_title: string?,
+	collapsed: boolean?,
+	toggle: any,
+	id: any,
+	to: string?,
+}
+type UseRichTextPart = any
+type UseRichTextProps = {
+	parts: { any },
+	size: string?,
+	to: string?,
+}
+type UseRouteMapStop = any
+type UseRouteMapLeg = any
+type UseRouteMapProps = {
+	stops: { UseRouteMapStop },
+	legs: { UseRouteMapLeg }?,
+	provider: string?,
+	key: string?,
+	travel: string?,
+	marker: string?,
+	selected: number?,
+	event: string?,
+	routed: any,
+	height: number?,
+	grow: boolean?,
+	to: string?,
+}
+type UseSearchFieldProps = {
+	id: string?,
+	value: string?,
+	placeholder: string?,
+	change: any,
+	submit: any,
+	cancel: any,
+	previous: any,
+	next: any,
+	to: string?,
+	focus: boolean?,
+	width: number?,
+	grow: boolean?,
+	icon: any,
+	shortcut: any,
+}
+type UseSectionProps = {
+	title: string,
+	[number]: any,
+}
+type UseSegmentedOption = any
+type UseSegmentedProps = {
+	options: { UseSegmentedOption },
+	selected: string?,
+	event: string?,
+	small: boolean?,
+	grow: boolean?,
+	to: string?,
+}
+type UseSelectionToolbarProps = {
+	[number]: any,
+	field: string,
+	selected: number?,
+	tools: { string }?,
+	side: any,
+}
+type UseSeriesChartSeries = any
+type UseSeriesChartLabel = any
+type UseSeriesChartProps = {
+	series: { UseSeriesChartSeries },
+	width: number?,
+	height: number?,
+	min: number?,
+	max: number?,
+	ticks: { string }?,
+	labels: { UseSeriesChartLabel }?,
+	titles: { string }?,
+	unit: string?,
+	pinned: number?,
+	event: string?,
+	to: string?,
+	legend: boolean?,
+}
+type UseSettingsNavItem = any
+type UseSettingsNavGroup = any
+type UseSettingsNavProps = {
+	groups: { UseSettingsNavGroup },
+	selected: string?,
+	title: string?,
+	subtitle: string?,
+	search: any,
+	footer: any,
+	event: string?,
+	width: number?,
+	scroll: boolean?,
+	height: number?,
+	to: string?,
+}
+type UseSettingsPageRow = any
+type UseSettingsPageSection = any
+type UseSettingsPageProps = {
+	nav: any,
+	title: string?,
+	subtitle: string?,
+	sections: { UseSettingsPageSection }?,
+	status: string?,
+	state: string?,
+	buttons: { any }?,
+	height: number?,
+	to: string?,
+	[number]: any,
+}
+type UseSettingsRowProps = {
+	title: string,
+	description: string?,
+	tag: string?,
+	tag_tone: string?,
+	disabled: boolean?,
+	reason: string?,
+	stacked: boolean?,
+	border: boolean?,
+	[number]: any,
+}
+type UseShareBarShare = any
+type UseShareBarProps = {
+	shares: { UseShareBarShare },
+	width: number?,
+	height: number?,
+}
+type UseSheetProps = {
+	open: boolean?,
+	dismiss: any,
+	side: string?,
+	title: string?,
+	subtitle: string?,
+	icon: string?,
+	width: number?,
+	height: number?,
+	backdrop: boolean?,
+	actions: { any }?,
+	footer: any,
+	keys: { [string]: any }?,
+	to: string?,
+	[number]: any,
+}
+type UseShortcutFieldProps = {
+	id: string?,
+	value: string?,
+	recording: boolean?,
+	event: string?,
+	clearable: boolean?,
+	placeholder: string?,
+	width: number?,
+	to: string?,
+}
+type UseShortcutsItem = any
+type UseShortcutsGroup = any
+type UseShortcutsProps = {
+	open: boolean?,
+	dismiss: any,
+	title: string?,
+	subtitle: string?,
+	groups: { UseShortcutsGroup },
+	columns: number?,
+	search: any,
+	note: string?,
+	width: number?,
+	height: number?,
+	inline: boolean?,
+	to: string?,
+}
+type UseSideNavItem = any
+type UseSideNavSection = any
+type UseSideNavAccount = any
+type UseSideNavProps = {
+	collapsed: boolean?,
+	selected: string?,
+	sections: { UseSideNavSection }?,
+	footer: { UseSideNavItem }?,
+	account: UseSideNavAccount?,
+	header: any,
+	toggle: any,
+	event: string?,
+	to: string?,
+	stagger: number?,
+	height: number?,
+}
+type UseSidePanelsProps = {
+	id: string?,
+	sidebar: any,
+	list: any,
+	main: any,
+	left: boolean?,
+	middle: boolean?,
+	sidebar_size: number?,
+	list_size: number?,
+	height: number?,
+}
+type UseSidebarSectionProps = {
+	title: string,
+	count: (number | string)?,
+	collapsed: boolean?,
+	toggle: any,
+	id: string?,
+	to: string?,
+	actions: { any }?,
+	fixed: boolean?,
+	[number]: any,
+}
+type UseSidebarSection = any
+type UseSidebarFooterItem = any
+type UseSidebarProps = {
+	header: any,
+	sections: { UseSidebarSection }?,
+	footer: { UseSidebarFooterItem }?,
+	to: string?,
+	width: number?,
+	height: number?,
+	fill: boolean?,
+	[number]: any,
+}
+type UseSliderProps = {
+	value: number,
+	min: number?,
+	max: number?,
+	step: number?,
+	change: any,
+	label: string?,
+	unit: string?,
+	decimals: number?,
+	default: number?,
+	width: number?,
+	inline: boolean?,
+	label_width: number?,
+	colors: { string }?,
+	disabled: boolean?,
+	to: string?,
+}
+type UseSparklineProps = {
+	values: { number },
+	samples: number?,
+	height: number?,
+	hot: number?,
+}
+type UseSplitViewProps = {
+	id: string?,
+	sidebar: any,
+	main: any,
+	inspector: any,
+	bottom_panel: any,
+	left: boolean?,
+	right: boolean?,
+	bottom: boolean?,
+	sidebar_size: number?,
+	inspector_size: number?,
+	bottom_size: number?,
+	height: number?,
+}
+type UseSpotlightBarsBar = any
+type UseSpotlightBarsProps = {
+	bars: { UseSpotlightBarsBar },
+	selected: number?,
+	height: number?,
+	max: number?,
+	bar: number?,
+	event: string?,
+	to: string?,
+}
+type UseSpreadsheetColumn = any
+type UseSpreadsheetProps = {
+	columns: { UseSpreadsheetColumn },
+	rows: { { [string]: any } },
+	current: number?,
+	selected: { row: number, key: string }?,
+	caret: boolean?,
+	blank: number?,
+	numbers: boolean?,
+	row_height: number?,
+	event: string?,
+	to: string?,
+	grow: boolean?,
+	height: number?,
+	id: string?,
+}
+type UseStatTileProps = {
+	label: string,
+	value: string,
+	unit: string?,
+	icon: string?,
+	delta: string?,
+	trend: string?,
+	good: string?,
+	detail: string?,
+	msg: any,
+	to: string?,
+	selected: boolean?,
+	width: number?,
+	[number]: any,
+}
+type UseStatProps = {
+	icon: string?,
+	label: string?,
+	value: string,
+	width: number?,
+	tone: any,
+}
+type UseStatusBarEntry = any
+type UseStatusBarProps = {
+	left: { any }?,
+	right: { any }?,
+	separators: boolean?,
+	to: string?,
+}
+type UseStatusDotProps = {
+	status: string?,
+	size: string?,
+	spin: boolean?,
+	chip: boolean?,
+	label: string?,
+	tooltip: string?,
+}
+type UseStatusIconProps = {
+	status: string?,
+	progress: number?,
+	color: string?,
+	size: number?,
+	tooltip: string?,
+	label: (string | boolean)?,
+}
+type UseStepperProps = {
+	value: number,
+	unit: string?,
+	min: number?,
+	max: number?,
+	decrement: any,
+	increment: any,
+	label: string?,
+	width: number?,
+	to: string?,
+}
+type UseSwapViewProps = {
+	key: string,
+	width: number?,
+	grow: boolean?,
+	[number]: any,
+}
+type UseSwatchesSwatch = any
+type UseSwatchesProps = {
+	colors: { UseSwatchesSwatch },
+	selected: string?,
+	none: boolean?,
+	event: string?,
+	size: number?,
+	to: string?,
+}
+type UseSwitchProps = {
+	on: boolean?,
+	label: string?,
+	description: string?,
+	msg: any,
+	disabled: boolean?,
+	small: boolean?,
+	to: string?,
+}
+type UseSystemLoadProps = {
+	cpu: number,
+	memory: number,
+	history: { number }?,
+	samples: number?,
+	compact: boolean?,
+	icons: boolean?,
+}
+type UseTabViewProps = {
+	tab: any,
+	kind: any,
+}
+type UseTabbedTab = any
+type UseTabbedState = any
+type UseTabbedProps = {
+	id: string?,
+	start: string?,
+	offer: { string }?,
+	variant: string?,
+	show: string?,
+}
+type UseTableColumn = any
+type UseTableProps = {
+	columns: { UseTableColumn },
+	rows: { { [string]: any } }?,
+	selected: any,
+	sort: string?,
+	descending: boolean?,
+	sortable: boolean?,
+	zebra: boolean?,
+	empty: string?,
+	event: string?,
+	to: string?,
+	height: number?,
+	grow: boolean?,
+	checkable: boolean?,
+	checks: any,
+	check: string?,
+	check_all: any,
+	bordered: boolean?,
+	id: string?,
+	groups: { any }?,
+	fold: string?,
+	add_label: string?,
+	reorder: string?,
+	marker: any,
+}
+type UseTabsTab = any
+type UseTabsProps = {
+	tabs: { UseTabsTab },
+	selected: string?,
+	variant: string?,
+	add: any,
+	add_menu: any,
+	event: string?,
+	close: string?,
+	context: string?,
+	closable: boolean?,
+	grow: boolean?,
+	width: number?,
+	to: string?,
+	in_bar: boolean?,
+}
+type UseTagsProps = {
+	tags: { string },
+	tone: any,
+}
+type UseTaskCheckProps = {
+	state: string?,
+	msg: any,
+	to: string?,
+	tooltip: string?,
+}
+type UseTaskRowProps = {
+	title: string,
+	state: string?,
+	event: boolean?,
+	date: string?,
+	time: string?,
+	due: boolean?,
+	icon: string?,
+	tags: { any }?,
+	carry: any,
+	accept: any,
+	leading: any,
+	toggle: any,
+	msg: any,
+	context: any,
+	to: string?,
+	selected: boolean?,
+}
+type UseTerminalProps = {
+	id: string?,
+	cwd: string?,
+	backend: string?,
+	exit: any,
+	shell: any,
+	style: any,
+}
+type UseTextEditorProps = {
+	id: string,
+	value: string?,
+	change: any,
+	blur: any,
+	submit: any,
+	placeholder: string?,
+	rows: number?,
+	max_rows: number?,
+	preview: boolean?,
+	switch: any,
+	tools: { string }?,
+	empty: string?,
+	focus: boolean?,
+	to: string?,
+}
+type UseThinkingProps = {
+	seconds: number?,
+	label: string?,
+	open: boolean?,
+	msg: any,
+	to: string?,
+	text: string?,
+}
+type UseThresholdLineProps = {
+	points: { number },
+	threshold: number,
+	label: string?,
+	breach: string?,
+	width: number?,
+	height: number?,
+	min: number?,
+	max: number?,
+	dot: boolean?,
+	stroke: number?,
+	tooltip: string?,
+}
+type UseTickMeterProps = {
+	value: number,
+	color: string?,
+	ticks: number?,
+	height: number?,
+	tooltip: string?,
+}
+type UseTimePickerProps = {
+	hour: number?,
+	minute: number?,
+	step: number?,
+	clock: number?,
+	presets: { any }?,
+	event: string?,
+	to: string?,
+}
+type UseTimelineEntry = any
+type UseTimelineProps = {
+	entries: { UseTimelineEntry },
+	selected: any,
+	event: string?,
+	to: string?,
+	mono: boolean?,
+	empty: string?,
+}
+type UseTitleBarWindow = any
+type UseTitleBarProps = {
+	window: UseTitleBarWindow?,
+	inset: number?,
+	leading: { any }?,
+	back: any,
+	forward: any,
+	can_back: boolean?,
+	can_forward: boolean?,
+	title: string?,
+	center: boolean?,
+	actions: { any }?,
+	to: string?,
+	[number]: any,
+}
+type UseToastProps = {
+	id: any,
+	level: string?,
+	icon: any,
+	source: string?,
+	title: string?,
+	body: string?,
+	full: boolean?,
+	action: any,
+	dismiss: any,
+	event: string?,
+	width: number?,
+	to: string?,
+}
+type UseToastsItem = any
+type UseToastsProps = {
+	items: { UseToastsItem },
+	place: string?,
+	width: number?,
+	max: number?,
+	event: string?,
+	to: string?,
+}
+type UseToolbarButton = any
+type UseToolbarProps = {
+	buttons: { UseToolbarButton },
+}
+type UseTreeNode = any
+type UseTreeProps = {
+	nodes: { UseTreeNode },
+	selected: string?,
+	guides: boolean?,
+	select: string?,
+	fold: string?,
+	to: string?,
+	indent: number?,
+}
+type UseUpdatePillProps = {
+	name: string?,
+	version: string?,
+	text: string?,
+	icon: string?,
+	restart: any,
+	restart_label: string?,
+	notes: any,
+	notes_label: string?,
+	dismiss: any,
+	floating: boolean?,
+	place: string?,
+	downloading: boolean?,
+	to: string?,
+}
+type UseUsageBarProps = {
+	title: string?,
+	left: number,
+	pace: number?,
+	resets: string?,
+	note: string?,
+	width: number?,
+	warn: number?,
+	danger: number?,
+}
+type UseVectorscopeProps = {
+	points: { number },
+	size: number?,
+	color: string?,
+	targets: boolean?,
+}
+type UseVerticalBarProps = {
+	value: number,
+	height: number?,
+	width: number?,
+	warn: number?,
+	label: string?,
+	percent: boolean?,
+	tooltip: string?,
+}
+type UseVideoViewerProps = {
+	source: string,
+	zoom: number?,
+	center: { number }?,
+	change: any,
+	stats: any,
+	probed: any,
+	guides: { any }?,
+	color: string?,
+	extended: boolean?,
+	black: number?,
+	white: number?,
+	gain: number?,
+	gamma: number?,
+	controls: boolean?,
+	max: number?,
+	width: number?,
+	height: number?,
+	id: string?,
+}
+type UseVideoViewerState = any
+type UseWaveformBand = any
+type UseWaveformChannel = any
+type UseWaveformProps = {
+	channels: { UseWaveformChannel },
+	parade: boolean?,
+	width: number?,
+	height: number?,
+	lines: { number }?,
+}
+type UseWeekCalendarDay = any
+type UseWeekCalendarEvent = any
+type UseWeekCalendarProps = {
+	view: string?,
+	views: any,
+	title: string?,
+	today: any,
+	previous: any,
+	next: any,
+	days: { UseWeekCalendarDay }?,
+	weeks: { { UseWeekCalendarDay } }?,
+	weekdays: { string }?,
+	events: { UseWeekCalendarEvent }?,
+	selected: string?,
+	hours: { from: number?, to: number? }?,
+	hour_height: number?,
+	column_width: number?,
+	day_width: number?,
+	gutter: number?,
+	now: { day: string, hour: number }?,
+	more: number?,
+	event: string?,
+	switch: string?,
+	pick_day: string?,
+	move: string?,
+	over: string?,
+	to: string?,
+	grow: boolean?,
+	height: number?,
+	header: boolean?,
+}
+type UseWritingStatsProps = {
+	text: string?,
+	show: ("words" | "characters" | "sentences" | "reading")?,
+	wpm: number?,
+	msg: any?,
+	to: string?,
+	tooltip: string?,
+}
+
 -- The component `name`'s `build`: `local stat = use "stat"`, then
 -- `stat { value = "12%" }` wherever an element goes.
-declare function use(name: string): (props: any) -> Element
+declare use:
+	((name: "about") -> (props: UseAboutProps) -> Element)
+	& ((name: "accordion") -> (props: UseAccordionProps) -> Element)
+	& ((name: "action-tiles") -> (props: UseActionTilesProps) -> Element)
+	& ((name: "activity-bar") -> (props: UseActivityBarProps) -> Element)
+	& ((name: "agent-run") -> (props: UseAgentRunProps) -> Element)
+	& ((name: "ahead-behind") -> (props: UseAheadBehindProps) -> Element)
+	& ((name: "audio-meter") -> (props: UseAudioMeterProps) -> Element)
+	& ((name: "avatar-stack") -> (props: UseAvatarStackProps) -> Element)
+	& ((name: "avatar") -> (props: UseAvatarProps) -> Element)
+	& ((name: "banner") -> (props: UseBannerProps) -> Element)
+	& ((name: "bar-chart") -> (props: UseBarChartProps) -> Element)
+	& ((name: "board-card") -> (props: UseBoardCardProps) -> Element)
+	& ((name: "breadcrumbs") -> (props: UseBreadcrumbsProps) -> Element)
+	& ((name: "browser") -> (props: UseBrowserProps) -> Element)
+	& ((name: "button-group") -> (props: UseButtonGroupProps) -> Element)
+	& ((name: "caffeine") -> (props: UseCaffeineProps) -> Element)
+	& ((name: "card") -> (props: UseCardProps) -> Element)
+	& ((name: "change-tree") -> (props: UseChangeTreeProps) -> Element)
+	& ((name: "chat-markdown") -> (props: UseChatMarkdownProps) -> Element)
+	& ((name: "chat-message") -> (props: UseChatMessageProps) -> Element)
+	& ((name: "checkbox") -> (props: UseCheckboxProps) -> Element)
+	& ((name: "checks") -> (props: UseChecksProps) -> Element)
+	& ((name: "chips") -> (props: UseChipsProps) -> Element)
+	& ((name: "choice-cards") -> (props: UseChoiceCardsProps) -> Element)
+	& ((name: "code-view") -> (props: UseCodeViewProps) -> Element)
+	& ((name: "collapsible") -> (props: UseCollapsibleProps) -> Element)
+	& ((name: "command-palette") -> (props: UseCommandPaletteProps) -> Element)
+	& ((name: "comment-card") -> (props: UseCommentCardProps) -> Element)
+	& ((name: "commit-graph") -> (props: UseCommitGraphProps) -> Element)
+	& ((name: "composer") -> (props: UseComposerProps) -> Element)
+	& ((name: "confirm") -> (props: UseConfirmProps) -> Element)
+	& ((name: "context-menu") -> (props: UseContextMenuProps) -> Element)
+	& ((name: "contribution-graph") -> (props: UseContributionGraphProps) -> Element)
+	& ((name: "copy-field") -> (props: UseCopyFieldProps) -> Element)
+	& ((name: "count-bubble") -> (props: UseCountBubbleProps) -> Element)
+	& ((name: "country-code") -> (props: UseCountryCodeProps) -> Element)
+	& ((name: "course-card") -> (props: UseCourseCardProps) -> Element)
+	& ((name: "curve-editor") -> (props: UseCurveEditorProps) -> Element)
+	& ((name: "dashboard-card") -> (props: UseDashboardCardProps) -> Element)
+	& ((name: "date-picker") -> (props: UseDatePickerProps) -> Element)
+	& ((name: "date-tile") -> (props: UseDateTileProps) -> Element)
+	& ((name: "day-strip") -> (props: UseDayStripProps) -> Element)
+	& ((name: "dialog") -> (props: UseDialogProps) -> Element)
+	& ((name: "dictation") -> (props: UseDictationProps) -> Element)
+	& ((name: "diff-counts") -> (props: UseDiffCountsProps) -> Element)
+	& ((name: "diff-view") -> (props: UseDiffViewProps) -> Element)
+	& ((name: "document-card") -> (props: UseDocumentCardProps) -> Element)
+	& ((name: "document-row") -> (props: UseDocumentRowProps) -> Element)
+	& ((name: "dot-chart") -> (props: UseDotChartProps) -> Element)
+	& ((name: "dropdown") -> (props: UseDropdownProps) -> Element)
+	& ((name: "dropzone") -> (props: UseDropzoneProps) -> Element)
+	& ((name: "emoji-picker") -> (props: UseEmojiPickerProps) -> Element)
+	& ((name: "empty-state") -> (props: UseEmptyStateProps) -> Element)
+	& ((name: "error-state") -> (props: UseErrorStateProps) -> Element)
+	& ((name: "feedback") -> (props: UseFeedbackProps) -> Element)
+	& ((name: "file-card") -> (props: UseFileCardProps) -> Element)
+	& ((name: "file-icon") -> (props: UseFileIconProps) -> Element)
+	& ((name: "filter-builder") -> (props: UseFilterBuilderProps) -> Element)
+	& ((name: "filter-dropdown") -> (props: UseFilterDropdownProps) -> Element)
+	& ((name: "find-bar") -> (props: UseFindBarProps) -> Element)
+	& ((name: "flow-diagram") -> (props: UseFlowDiagramProps) -> Element)
+	& ((name: "forecast-chart") -> (props: UseForecastChartProps) -> Element)
+	& ((name: "forge-account") -> (props: UseForgeAccountProps) -> Element)
+	& ((name: "forge-pr") -> (props: UseForgePrProps) -> Element)
+	& ((name: "forge-sign-in") -> (props: UseForgeSignInProps) -> Element)
+	& ((name: "form-grid") -> (props: UseFormGridProps) -> Element)
+	& ((name: "gantt") -> (props: UseGanttProps) -> Element)
+	& ((name: "ghostty-terminal") -> (props: UseGhosttyTerminalProps) -> Element)
+	& ((name: "group-header") -> (props: UseGroupHeaderProps) -> Element)
+	& ((name: "guide-card") -> (props: UseGuideCardProps) -> Element)
+	& ((name: "heat-grid") -> (props: UseHeatGridProps) -> Element)
+	& ((name: "histogram") -> (props: UseHistogramProps) -> Element)
+	& ((name: "icon-button") -> (props: UseIconButtonProps) -> Element)
+	& ((name: "image-viewer") -> (props: UseImageViewerProps) -> Element)
+	& ((name: "insight-note") -> (props: UseInsightNoteProps) -> Element)
+	& ((name: "kanban-column") -> (props: UseKanbanColumnProps) -> Element)
+	& ((name: "kbd") -> (props: UseKbdProps) -> Element)
+	& ((name: "key-hints") -> (props: UseKeyHintsProps) -> Element)
+	& ((name: "key-values") -> (props: UseKeyValuesProps) -> Element)
+	& ((name: "kpi-cell") -> (props: UseKpiCellProps) -> Element)
+	& ((name: "kpi-meter") -> (props: UseKpiMeterProps) -> Element)
+	& ((name: "level-row") -> (props: UseLevelRowProps) -> Element)
+	& ((name: "lightbox") -> (props: UseLightboxProps) -> Element)
+	& ((name: "line-chart") -> (props: UseLineChartProps) -> Element)
+	& ((name: "list") -> (props: UseListProps) -> Element)
+	& ((name: "loading") -> (props: UseLoadingProps) -> Element)
+	& ((name: "mail-row") -> (props: UseMailRowProps) -> Element)
+	& ((name: "markdown-editor") -> (props: UseMarkdownEditorProps) -> Element)
+	& ((name: "markdown") -> (props: UseMarkdownProps) -> Element)
+	& ((name: "mention-field") -> (props: UseMentionFieldProps) -> Element)
+	& ((name: "menu") -> (props: UseMenuProps) -> Element)
+	& ((name: "message-header") -> (props: UseMessageHeaderProps) -> Element)
+	& ((name: "meter") -> (props: UseMeterProps) -> Element)
+	& ((name: "metric") -> (props: UseMetricProps) -> Element)
+	& ((name: "mini-bars") -> (props: UseMiniBarsProps) -> Element)
+	& ((name: "mockups") -> (props: UseMockupsProps) -> Element)
+	& ((name: "month-grid") -> (props: UseMonthGridProps) -> Element)
+	& ((name: "nav-buttons") -> (props: UseNavButtonsProps) -> Element)
+	& ((name: "note-card") -> (props: UseNoteCardProps) -> Element)
+	& ((name: "notice") -> (props: UseNoticeProps) -> Element)
+	& ((name: "notification-drawer") -> (props: UseNotificationDrawerProps) -> Element)
+	& ((name: "number-field") -> (props: UseNumberFieldProps) -> Element)
+	& ((name: "numbered-list") -> (props: UseNumberedListProps) -> Element)
+	& ((name: "onboarding") -> (props: UseOnboardingProps) -> Element)
+	& ((name: "outline") -> (props: UseOutlineProps) -> Element)
+	& ((name: "page") -> (props: UsePageProps) -> Element)
+	& ((name: "pager") -> (props: UsePagerProps) -> Element)
+	& ((name: "pagination") -> (props: UsePaginationProps) -> Element)
+	& ((name: "pane-frame") -> (props: UsePaneFrameProps) -> Element)
+	& ((name: "picker") -> (props: UsePickerProps) -> Element)
+	& ((name: "pill-tabs") -> (props: UsePillTabsProps) -> Element)
+	& ((name: "pill") -> (props: UsePillProps) -> Element)
+	& ((name: "pixel-icon") -> (props: UsePixelIconProps) -> Element)
+	& ((name: "pr-badge") -> (props: UsePrBadgeProps) -> Element)
+	& ((name: "pr-row") -> (props: UsePrRowProps) -> Element)
+	& ((name: "priority-icon") -> (props: UsePriorityIconProps) -> Element)
+	& ((name: "progress-stack") -> (props: UseProgressStackProps) -> Element)
+	& ((name: "progress") -> (props: UseProgressProps) -> Element)
+	& ((name: "project-card") -> (props: UseProjectCardProps) -> Element)
+	& ((name: "prose-editor") -> (props: UseProseEditorProps) -> Element)
+	& ((name: "radio-group") -> (props: UseRadioGroupProps) -> Element)
+	& ((name: "rail") -> (props: UseRailProps) -> Element)
+	& ((name: "ratio-row") -> (props: UseRatioRowProps) -> Element)
+	& ((name: "recipient-field") -> (props: UseRecipientFieldProps) -> Element)
+	& ((name: "reconnecting") -> (props: UseReconnectingProps) -> Element)
+	& ((name: "record-card") -> (props: UseRecordCardProps) -> Element)
+	& ((name: "relative-time") -> (props: UseRelativeTimeProps) -> Element)
+	& ((name: "release-notes") -> (props: UseReleaseNotesProps) -> Element)
+	& ((name: "rich-text") -> (props: UseRichTextProps) -> Element)
+	& ((name: "route-map") -> (props: UseRouteMapProps) -> Element)
+	& ((name: "search-field") -> (props: UseSearchFieldProps) -> Element)
+	& ((name: "section") -> (props: UseSectionProps) -> Element)
+	& ((name: "segmented") -> (props: UseSegmentedProps) -> Element)
+	& ((name: "selection-toolbar") -> (props: UseSelectionToolbarProps) -> Element)
+	& ((name: "series-chart") -> (props: UseSeriesChartProps) -> Element)
+	& ((name: "settings-nav") -> (props: UseSettingsNavProps) -> Element)
+	& ((name: "settings-page") -> (props: UseSettingsPageProps) -> Element)
+	& ((name: "settings-row") -> (props: UseSettingsRowProps) -> Element)
+	& ((name: "share-bar") -> (props: UseShareBarProps) -> Element)
+	& ((name: "sheet") -> (props: UseSheetProps) -> Element)
+	& ((name: "shortcut-field") -> (props: UseShortcutFieldProps) -> Element)
+	& ((name: "shortcuts") -> (props: UseShortcutsProps) -> Element)
+	& ((name: "side-nav") -> (props: UseSideNavProps) -> Element)
+	& ((name: "side-panels") -> (props: UseSidePanelsProps) -> Element)
+	& ((name: "sidebar-section") -> (props: UseSidebarSectionProps) -> Element)
+	& ((name: "sidebar") -> (props: UseSidebarProps) -> Element)
+	& ((name: "slider") -> (props: UseSliderProps) -> Element)
+	& ((name: "sparkline") -> (props: UseSparklineProps) -> Element)
+	& ((name: "split-view") -> (props: UseSplitViewProps) -> Element)
+	& ((name: "spotlight-bars") -> (props: UseSpotlightBarsProps) -> Element)
+	& ((name: "spreadsheet") -> (props: UseSpreadsheetProps) -> Element)
+	& ((name: "stat-tile") -> (props: UseStatTileProps) -> Element)
+	& ((name: "stat") -> (props: UseStatProps) -> Element)
+	& ((name: "status-bar") -> (props: UseStatusBarProps) -> Element)
+	& ((name: "status-dot") -> (props: UseStatusDotProps) -> Element)
+	& ((name: "status-icon") -> (props: UseStatusIconProps) -> Element)
+	& ((name: "stepper") -> (props: UseStepperProps) -> Element)
+	& ((name: "swap-view") -> (props: UseSwapViewProps) -> Element)
+	& ((name: "swatches") -> (props: UseSwatchesProps) -> Element)
+	& ((name: "switch") -> (props: UseSwitchProps) -> Element)
+	& ((name: "system-load") -> (props: UseSystemLoadProps) -> Element)
+	& ((name: "tab-view") -> (props: UseTabViewProps) -> Element)
+	& ((name: "tabbed") -> (props: UseTabbedProps) -> Element)
+	& ((name: "table") -> (props: UseTableProps) -> Element)
+	& ((name: "tabs") -> (props: UseTabsProps) -> Element)
+	& ((name: "tags") -> (props: UseTagsProps) -> Element)
+	& ((name: "task-check") -> (props: UseTaskCheckProps) -> Element)
+	& ((name: "task-row") -> (props: UseTaskRowProps) -> Element)
+	& ((name: "terminal") -> (props: UseTerminalProps) -> Element)
+	& ((name: "text-editor") -> (props: UseTextEditorProps) -> Element)
+	& ((name: "thinking") -> (props: UseThinkingProps) -> Element)
+	& ((name: "threshold-line") -> (props: UseThresholdLineProps) -> Element)
+	& ((name: "tick-meter") -> (props: UseTickMeterProps) -> Element)
+	& ((name: "time-picker") -> (props: UseTimePickerProps) -> Element)
+	& ((name: "timeline") -> (props: UseTimelineProps) -> Element)
+	& ((name: "title-bar") -> (props: UseTitleBarProps) -> Element)
+	& ((name: "toast") -> (props: UseToastProps) -> Element)
+	& ((name: "toasts") -> (props: UseToastsProps) -> Element)
+	& ((name: "toolbar") -> (props: UseToolbarProps) -> Element)
+	& ((name: "tree") -> (props: UseTreeProps) -> Element)
+	& ((name: "update-pill") -> (props: UseUpdatePillProps) -> Element)
+	& ((name: "usage-bar") -> (props: UseUsageBarProps) -> Element)
+	& ((name: "vectorscope") -> (props: UseVectorscopeProps) -> Element)
+	& ((name: "vertical-bar") -> (props: UseVerticalBarProps) -> Element)
+	& ((name: "video-viewer") -> (props: UseVideoViewerProps) -> Element)
+	& ((name: "waveform") -> (props: UseWaveformProps) -> Element)
+	& ((name: "week-calendar") -> (props: UseWeekCalendarProps) -> Element)
+	& ((name: "writing-stats") -> (props: UseWritingStatsProps) -> Element)
+	& ((name: string) -> (props: any) -> Element)
+-- generated: component props end
 
 -- Prints to the terminal that runs the app.
 declare function log(...: any): ()

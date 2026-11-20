@@ -1267,6 +1267,13 @@ Tabs open and close with the `.tabs-tab` rule's transition (see
 time. Run it after `just check`.
 - It catches unknown `ui` functions, wrong token values (`tone = "loud"`),
   and wrong value types before anything runs.
+- Component calls are typed too: `use "stat-tile"` returns a function of
+  the component's own `type Props`, so `stat_tile { value = 42 }` fails
+  (`value` is a string, `label` is missing). The records inside a list prop
+  are not checked yet. `just component-types` writes these into
+  `types/moonframe.d.luau` from `app/components`; run it after changing a
+  component's `Props`, or `just ci` fails. A name with no built-in
+  component takes any props.
 - It does not catch misspelled keys (`lable`), because Luau allows extra
   fields in a table literal. `just check` catches those.
 - Annotations are optional. Add them where they help, e.g.
