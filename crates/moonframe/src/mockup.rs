@@ -94,6 +94,9 @@ fn check(roots: &Roots, file: &Path) -> Result<(), String> {
     };
     let mut errors = 0;
     for mut problem in check_in(&entry, &RootPolicy::default(), &options) {
+        if unstyled_elsewhere(&problem.message, &text) {
+            continue;
+        }
         if problem.file.starts_with(work.path()) {
             problem.file = file.to_owned();
         }
@@ -111,6 +114,22 @@ fn check(roots: &Roots, file: &Path) -> Result<(), String> {
             file.display()
         )),
     }
+}
+
+/// Whether `message` is a class no rule styles that the mockup's own `text`
+/// never names: a hook a component draws for apps to style (`diff-view-ctx`,
+/// `title-bar-actions`), which the mockup could neither drop nor style.
+fn unstyled_elsewhere(message: &str, text: &str) -> bool {
+    let Some((_, rest)) = message.split_once("no rule styles the class `") else {
+        return false;
+    };
+    let Some((class, _)) = rest.split_once('`') else {
+        return false;
+    };
+    // A component shares its root class's name: `use "change-tree"` names
+    // the component, not the class.
+    let loads = text.matches(&format!("use \"{class}\"")).count();
+    text.matches(class).count() == loads
 }
 
 #[cfg(feature = "capture")]
@@ -190,4 +209,25 @@ fn close(own: Option<&Path>) -> Result<(), String> {
     }
     println!("closed the Mockups tab and removed its mod");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unstyled_elsewhere;
+
+    #[test]
+    fn only_the_mockups_own_unstyled_classes_count() {
+        let problem = "x.luau:4: error: row.class: no rule styles the class `diff-view-ctx` (got diff-view-ctx)";
+        assert!(unstyled_elsewhere(problem, "diff_view { path = \"a.rs\" }"));
+        assert!(!unstyled_elsewhere(
+            problem,
+            "ui.row { class = \"diff-view-ctx\" }"
+        ));
+        let root = "x.luau:4: error: column.class: no rule styles the class `change-tree`";
+        assert!(unstyled_elsewhere(root, "local tree = use \"change-tree\""));
+        assert!(!unstyled_elsewhere(
+            "x.luau:4: error: unknown key `gapp`",
+            "ui.row {}"
+        ));
+    }
 }

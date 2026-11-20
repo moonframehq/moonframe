@@ -22,7 +22,11 @@
 //! - `{ worktree_add = { branch, base? }, root, id = ... }` adds a worktree;
 //! - `{ worktree_remove = "<path>", root, id = ... }` removes one;
 //! - `{ open = "<folder>", id = ... }` watches the repository holding that
-//!   folder from now on (see [`open`]).
+//!   folder from now on (see [`open`]);
+//! - `{ show = "<sha>" }` adds that commit as `commit` (see [`show`]): its
+//!   author, message, parents and changed files, until `{ show = false }`;
+//! - `{ show_diff = "<path>" }` adds one of its files' diff as
+//!   `commit.diff`, until `{ show_diff = false }`.
 //!
 //! A write names the repository it is for (`root`, as `app.git.root` gave
 //! it) and is refused when the provider no longer watches that one: the
@@ -41,6 +45,7 @@ mod diff;
 mod log;
 mod open;
 mod refs;
+mod show;
 mod status;
 mod worktrees;
 // keep-sorted end
@@ -174,6 +179,8 @@ pub struct Git {
     stashes: u64,
     /// The file whose diff is kept in `diff`.
     diff_path: Option<String>,
+    /// The commit a mod asked to look at, published as `commit`.
+    shown: Option<show::Shown>,
     ticks: u32,
     looks: u32,
     /// The status moved while messages came too fast to read worktrees,
@@ -247,6 +254,7 @@ impl Native for Git {
             },
             _ => {},
         }
+        self.show(field("show"), field("show_diff"));
         if let Some(Data::String(folder)) = field("open") {
             self.open(host, from, field("id"), folder);
         }
@@ -292,6 +300,30 @@ impl Native for Git {
 }
 
 impl Git {
+    /// Opens or closes the commit on show and its file's diff, as a
+    /// message's `show` and `show_diff` ask.
+    fn show(&mut self, show: Option<&Data>, file: Option<&Data>) {
+        let Some(root) = self.root.clone() else {
+            return;
+        };
+        let repo = Repo::at(&root);
+        match show {
+            Some(Data::String(sha)) if !self.shown.as_ref().is_some_and(|shown| shown.is(sha)) => {
+                self.shown = show::Shown::read(&repo, sha);
+            },
+            Some(Data::Bool(false) | Data::Nil) => self.shown = None,
+            _ => {},
+        }
+        let Some(shown) = &mut self.shown else {
+            return;
+        };
+        match file {
+            Some(Data::String(path)) => shown.open_diff(&repo, path),
+            Some(Data::Bool(false) | Data::Nil) => shown.close_diff(),
+            _ => {},
+        }
+    }
+
     /// Reads the commits a mod asked for; nothing if none did.
     fn read_log(&mut self) {
         if let (Some(limit), Some(root)) = (self.log_limit, &self.root) {
@@ -490,6 +522,9 @@ impl Git {
                 diff::parse(path, "")
             };
             fields.insert("diff".to_owned(), diff);
+        }
+        if let (Some(shown), Value::Object(fields)) = (&self.shown, &mut out) {
+            fields.insert("commit".to_owned(), shown.json());
         }
         // Last, in the room the rest leaves: the host refuses a publish past
         // its limit whole, and a diff is what the user is looking at.

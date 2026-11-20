@@ -36,6 +36,11 @@ pub(crate) struct Numstat {
 }
 
 impl Numstat {
+    /// The lines `path` added and deleted.
+    pub(crate) fn of(&self, path: &str) -> (u64, u64) {
+        self.by_path.get(path).copied().unwrap_or((0, 0))
+    }
+
     /// `added\tdeleted\tpath\0`, or for a rename `added\tdeleted\t\0old\0new\0`;
     /// binary files count `-`, read as 0.
     pub(crate) fn parse(bytes: &[u8]) -> Self {
