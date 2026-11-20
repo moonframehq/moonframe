@@ -4,7 +4,12 @@ local key_hints = use "key-hints"
 local segmented = use "segmented"
 local switch = use "switch"
 
-return mod {
+type State = {
+	caps: boolean,
+	justify: string,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { caps = false, justify = "start" }
 	end,

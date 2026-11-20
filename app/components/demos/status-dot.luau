@@ -4,9 +4,16 @@ local status_dot = use "status-dot"
 local segmented = use "segmented"
 local switch = use "switch"
 
-local CYCLE = { working = "blocked", blocked = "done", done = "idle", idle = "unknown", unknown = "working" }
+local CYCLE: { [string]: string } = { working = "blocked", blocked = "done", done = "idle", idle = "unknown", unknown = "working" }
 
-return mod {
+type State = {
+	size: string,
+	spin: boolean,
+	chip: boolean,
+	agents: { { name: string, status: string } },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -36,7 +43,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local rows = {}
+		local rows: { Element } = {}
 		for index, agent in state.agents do
 			rows[index] = ui.row {
 				gap = "normal",

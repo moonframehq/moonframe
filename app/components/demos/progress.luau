@@ -7,7 +7,13 @@ local switch = use "switch"
 
 local TOTAL = 2006
 
-return mod {
+type State = {
+	percent: number,
+	busy: boolean,
+	tone: string,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { percent = 60, busy = false, tone = "accent" }
 	end,

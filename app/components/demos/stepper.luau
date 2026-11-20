@@ -8,7 +8,15 @@ local LIMITS = {
 	delay = { min = 0, max = 2, step = 0.25 },
 }
 
-return mod {
+type State = {
+	font: number,
+	panes: number,
+	delay: number,
+	-- The buttons step their field by name.
+	[string]: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { font = 14, panes = 2, delay = 0.5 }
 	end,

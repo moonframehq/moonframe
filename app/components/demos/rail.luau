@@ -14,7 +14,12 @@ local function button(icon: string, msg: string, tooltip: string)
 	return ui.row { class = "rail-item", width = 36, justify = "center", msg = msg, tooltip = tooltip, ui.icon { name = icon :: any } }
 end
 
-return mod {
+type State = {
+	selected: string,
+	expanded: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { selected = "2", expanded = false }
 	end,

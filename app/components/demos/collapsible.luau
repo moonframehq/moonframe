@@ -2,7 +2,12 @@
 -- "Dispatch agent" changes the first one's summary.
 local collapsible = use "collapsible"
 
-return mod {
+type State = {
+	open: { [string]: boolean },
+	dispatched: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = { agent = true, advanced = false }, dispatched = false }
 	end,

@@ -10,7 +10,12 @@ local PRS: { any } = {
 	{ number = 831, title = "Toasts stack upward", branch = "fix/toasts", author = "penso", seconds = 14 * 86400, checks = "passed", added = 22, removed = 9, tone = "merged" },
 }
 
-return mod {
+type State = {
+	selected: number,
+	flagged: { [number]: boolean },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { selected = 850, flagged = {} }
 	end,

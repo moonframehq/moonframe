@@ -3,7 +3,13 @@
 local sheet = use "sheet"
 local segmented = use "segmented"
 
-return mod {
+type State = {
+	open: boolean,
+	side: string,
+	review: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = true, side = "right", review = nil :: string? }
 	end,

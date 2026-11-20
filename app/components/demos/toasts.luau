@@ -1,7 +1,23 @@
 -- A toast stack: the buttons push a toast, × dismisses one, Clear removes all.
 local toasts = use "toasts"
 
-local KINDS = {
+type Toast = {
+	id: number?,
+	level: string,
+	icon: boolean?,
+	source: string,
+	title: string,
+	body: string,
+	action: { label: string, msg: string }?,
+}
+
+type State = {
+	items: { Toast },
+	next: number,
+	note: string,
+}
+
+local KINDS: { [string]: Toast } = {
 	success = { level = "success", source = "moonframe", title = "Worktree created", body = "feature/inspect at ~/code/app-inspect" },
 	warning = {
 		level = "warning",
@@ -13,19 +29,19 @@ local KINDS = {
 	error = { level = "error", icon = true, source = "devbox", title = "Agent exited with code 1", body = "cargo test failed in crates/moonframe-core" },
 }
 
-local function push(state: any, kind: string)
+local function push(state: State, kind: string)
 	state.next += 1
 	local item = table.clone(KINDS[kind])
 	item.id = state.next
 	table.insert(state.items, item)
 end
 
-return mod {
+return mod<<State>> {
 	init = function(previous)
 		if previous then
 			return previous
 		end
-		local state = { items = {} :: { any }, next = 0, note = "" }
+		local state: State = { items = {}, next = 0, note = "" }
 		push(state, "success")
 		push(state, "warning")
 		return state

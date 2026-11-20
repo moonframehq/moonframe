@@ -14,7 +14,11 @@ Type on the left; the **preview** follows on the right.
 See the [Luau guide](https://luau.org).
 ]]
 
-return mod {
+type State = {
+	clicked: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { clicked = nil }
 	end,

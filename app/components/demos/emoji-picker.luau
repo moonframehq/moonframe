@@ -3,7 +3,14 @@
 -- Frequently used. Escape or a click outside closes it.
 local emoji_picker = use "emoji-picker"
 
-return mod {
+type State = {
+	open: boolean,
+	query: string,
+	picked: { string },
+	recent: { string },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = true, query = "", picked = {}, recent = { "👍", "🎉", "❤️", "🚀", "👀" } }
 	end,

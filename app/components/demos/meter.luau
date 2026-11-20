@@ -6,7 +6,10 @@ local stepper = use "stepper"
 local NAMES = { "memory", "disk", "quota" }
 local LABELS = { memory = "Memory", disk = "Disk", quota = "API quota" }
 
-return mod {
+-- Each reading by its name in NAMES.
+type State = { [string]: number }
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { memory = 0.62, disk = 0.85, quota = 0.3 }
 	end,

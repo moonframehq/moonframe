@@ -6,7 +6,19 @@ local slider = use "slider"
 
 local DEFAULTS = { contrast = 0, brightness = 0, saturation = 0, radius = 1.2, quality = 90 }
 
-return mod {
+type State = {
+	contrast: number,
+	brightness: number,
+	saturation: number,
+	radius: number,
+	quality: number,
+	hue: number,
+	last: string,
+	-- A slider sets its field by name.
+	[string]: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or { contrast = 12, brightness = -4, saturation = 30, radius = 1.2, quality = 90, hue = 200, last = "" }

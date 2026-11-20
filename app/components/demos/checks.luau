@@ -2,7 +2,14 @@
 -- re-run it (it goes pending; click again to finish it as passed).
 local checks = use "checks"
 
-return mod {
+type Check = { id: string, name: string, state: string, detail: string }
+
+type State = {
+	collapsed: boolean,
+	checks: { Check },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {

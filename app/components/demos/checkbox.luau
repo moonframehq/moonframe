@@ -4,7 +4,12 @@ local checkbox = use "checkbox"
 
 local FILES = { "src/tabs.rs", "src/menu.rs", "app/style.luau", "README.md" }
 
-return mod {
+type State = {
+	checked: { [string]: boolean? },
+	sign: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { checked = { ["src/tabs.rs"] = true, ["app/style.luau"] = true }, sign = false }
 	end,

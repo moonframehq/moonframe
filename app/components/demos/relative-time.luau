@@ -10,7 +10,12 @@ local EVENTS = {
 	{ label = "Worktree created", seconds = 40 * 86400 },
 }
 
-return mod {
+type State = {
+	offset: number,
+	compact: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { offset = 0, compact = false }
 	end,

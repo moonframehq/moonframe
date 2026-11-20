@@ -23,7 +23,14 @@ local function matches(query: string): { string }
 	return found
 end
 
-return mod {
+type State = {
+	query: string,
+	value: string?,
+	index: number,
+	opened: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { query = "", value = nil :: string?, index = 1, opened = nil :: string? }
 	end,

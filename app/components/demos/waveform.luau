@@ -17,7 +17,11 @@ local RED_LOW, RED_HIGH = columns(0.5, 0.2)
 local GREEN_LOW, GREEN_HIGH = columns(0.45, 0.25)
 local BLUE_LOW, BLUE_HIGH = columns(0.35, 0.15)
 
-return mod {
+type State = {
+	parade: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { parade = true }
 	end,

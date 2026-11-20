@@ -10,7 +10,13 @@ local TEXT = {
 	error = { "Agent exited with code 1", "cargo test failed in crates/moonframe-core" },
 }
 
-return mod {
+type State = {
+	shown: boolean,
+	level: string,
+	reconnects: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { shown = true, level = "warning", reconnects = 0 }
 	end,

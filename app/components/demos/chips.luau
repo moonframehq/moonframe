@@ -10,7 +10,11 @@ local PRS: { any } = {
 	{ title = "Theme picker cards", open = true },
 }
 
-return mod {
+type State = {
+	on: { [string]: boolean? },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { on = { open = true } }
 	end,
@@ -26,7 +30,7 @@ return mod {
 		for id in state.on do
 			table.insert(selected, id)
 		end
-		local counts = { open = 0, mine = 0, agent = 0, draft = 0, failing = 0 }
+		local counts: { [string]: number } = { open = 0, mine = 0, agent = 0, draft = 0, failing = 0 }
 		for _, pr in PRS do
 			local keep = true
 			for id in counts do

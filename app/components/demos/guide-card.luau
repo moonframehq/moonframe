@@ -7,7 +7,11 @@ local GUIDES = {
 	{ id = "pricing", title = "Price your paid tier", category = "Monetization", color = "#f08a24", icon = "tag", read = "12 min read" },
 }
 
-return mod {
+type State = {
+	read: { [string]: number },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { read = { subject = 1, referral = 0.4, pricing = 0 } }
 	end,

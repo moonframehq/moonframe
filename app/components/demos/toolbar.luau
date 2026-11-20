@@ -2,7 +2,12 @@
 -- list, Remove deletes the last branch.
 local toolbar = use "toolbar"
 
-return mod {
+type State = {
+	branches: { string },
+	next: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { branches = { "main", "fix/menus", "feature/inspect" }, next = 1 }
 	end,

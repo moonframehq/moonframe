@@ -16,7 +16,18 @@ local function shown(reactions: { any }): { any }
 	return list
 end
 
-return mod {
+type Reaction = { emoji: string, others: number, mine: boolean, tooltip: string? }
+
+type State = {
+	opened: string?,
+	resolved: boolean,
+	replies: number,
+	picking: boolean,
+	query: string,
+	reactions: { Reaction },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -64,7 +75,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local thread = {
+		local thread: { Element } = {
 			comment_card {
 				author = "alice",
 				action = "requested changes",

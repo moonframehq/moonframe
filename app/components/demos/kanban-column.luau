@@ -19,8 +19,14 @@ local CARDS: { [string]: any } = {
 	web140 = { title = "Create homepage wireframes", key = "WEB-140", labels = { { label = "Design", color = "#8b5cf6" } }, date = "Tomorrow", owner = "TI" },
 }
 
+type State = {
+	-- Each column's card ids, top to bottom.
+	board: { [string]: { string } },
+	target: { column: string, index: number, card: string? }?,
+}
+
 -- Where `id` sits: its column and index.
-local function find(state, id: string): (string?, number?)
+local function find(state: State, id: string): (string?, number?)
 	for column, cards in state.board do
 		local at = table.find(cards, id)
 		if at then
@@ -31,7 +37,7 @@ local function find(state, id: string): (string?, number?)
 end
 
 -- Moves `id` to before index `at` of `column`.
-local function move(state, id: string, column: string, at: number)
+local function move(state: State, id: string, column: string, at: number)
 	local from, index = find(state, id)
 	if not from or not index then
 		return
@@ -44,7 +50,7 @@ local function move(state, id: string, column: string, at: number)
 	table.insert(cards, math.clamp(at, 1, #cards + 1), id)
 end
 
-return mod {
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -95,7 +101,7 @@ return mod {
 	view = function(state)
 		local columns: { Element } = {}
 		for _, column in COLUMNS do
-			local cards = {}
+			local cards: { Element } = {}
 			for _, id in state.board[column.id] do
 				local card = CARDS[id]
 				table.insert(cards, board_card {

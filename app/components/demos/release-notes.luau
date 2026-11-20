@@ -32,7 +32,11 @@ local RELEASES: { any } = {
 	},
 }
 
-return mod {
+type State = {
+	open: { [string]: boolean },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = { ["1.4.0"] = true } }
 	end,

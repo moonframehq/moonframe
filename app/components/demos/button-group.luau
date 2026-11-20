@@ -2,7 +2,14 @@
 -- zoom (each greys out at its limit; the % resets it). Refresh counts its clicks.
 local button_group = use "button-group"
 
-return mod {
+type State = {
+	view: string,
+	scope: string,
+	zoom: number,
+	refreshed: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { view = "unified", scope = "uncommitted", zoom = 100, refreshed = 0 }
 	end,

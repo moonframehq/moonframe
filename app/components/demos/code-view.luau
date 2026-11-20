@@ -5,7 +5,12 @@ local switch = use "switch"
 
 local SOURCE = "impl Book {\n    /// Balance per currency; amounts in different currencies never mix.\n    pub fn balances(&self) -> HashMap<Currency, i64> {\n        let mut totals = HashMap::new();\n        for posting in &self.entries {\n            *totals.entry(posting.currency).or_default() += posting.cents;\n        }\n        totals\n    }\n}"
 
-return mod {
+type State = {
+	highlight: { number },
+	numbers: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { highlight = { 26, 27 }, numbers = true }
 	end,
