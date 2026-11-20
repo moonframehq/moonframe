@@ -3926,6 +3926,7 @@ A whole mod using it, with state: `app/components/demos/recipient-field.luau`.
 | `cancel` | sent on Esc |
 | `change` | sent on each edit, with `value` set to the text |
 | `focus` | take focus when it appears |
+| `grow` | fill the width of its row or column instead |
 | `icon` | an icon before the text (`true` for a magnifier); draws the field in a rounded box of its own |
 | `id` | keeps the text across renders |
 | `next` | sent on down |

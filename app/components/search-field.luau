@@ -18,6 +18,7 @@ type Props = {
 	to: string?,
 	focus: boolean?,
 	width: number?,
+	grow: boolean?,
 	icon: any,
 	shortcut: any,
 }
@@ -40,6 +41,7 @@ return component {
 		["to"] = "the mod the messages go to",
 		["focus"] = "take focus when it appears",
 		["width"] = "pixels",
+		["grow"] = "fill the width of its row or column instead",
 		["icon"] = "an icon before the text (`true` for a magnifier); draws the field in a rounded box of its own",
 		["shortcut"] = "keys shown as a cap at the end, such as \"cmd-k\" (it only shows them: the mod binds the key); draws the boxed field",
 	},
@@ -76,7 +78,7 @@ search {
 			to = props.to,
 			focus = props.focus,
 			width = if boxed then nil else props.width,
-			grow = if boxed then true else nil,
+			grow = if boxed then true else props.grow,
 			class = if boxed then "search-field-input" else nil,
 		}
 		if not boxed then
@@ -87,6 +89,7 @@ search {
 			class = "search-field",
 			align = "center",
 			width = props.width,
+			grow = props.grow,
 			icon and ui.icon { name = icon :: any, class = "search-field-icon" },
 			field,
 			props.shortcut and kbd { keys = props.shortcut, small = true },
