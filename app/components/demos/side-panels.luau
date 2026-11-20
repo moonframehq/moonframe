@@ -23,7 +23,13 @@ local VIEWS = {
 	recent = { title = "Last 7 Days", icon = "clock" },
 }
 
-return mod {
+type State = {
+	left: boolean,
+	middle: boolean,
+	view: string,
+}
+
+return mod<<State>> {
 	styles = {
 		[".demo-sheet"] = { background = "muted", radius = 8, padding = 10, gap = 2 },
 		[".demo-new"] = { border = "all", border_color = "border", radius = 8, padding = 6 },
@@ -34,8 +40,10 @@ return mod {
 	end,
 
 	update = function(state, msg)
-		if msg == "left" or msg == "middle" then
-			state[msg] = not state[msg]
+		if msg == "left" then
+			state.left = not state.left
+		elseif msg == "middle" then
+			state.middle = not state.middle
 		elseif typeof(msg) == "table" and msg.select then
 			state.view = msg.select
 		end

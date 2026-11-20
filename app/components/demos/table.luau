@@ -181,7 +181,7 @@ return mod {
 			end
 			return p < q
 		end)
-		local rows = {}
+		local rows: { { [string]: any } } = {}
 		for index, device in sorted do
 			rows[index] = {
 				id = device.id,

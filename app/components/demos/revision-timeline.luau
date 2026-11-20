@@ -59,7 +59,9 @@ return mod<<State>> {
 		local chat = state.preset == "chat"
 		local entries = if chat then turns else revisions
 		local function control(field: string, label: string, min: number, max: number, step: number)
-			return slider { label = label, value = state[field], min = min, max = max,
+			-- Only the number fields have a slider.
+			local value = state[field]
+			return slider { label = label, value = if type(value) == "number" then value else 0, min = min, max = max,
 				step = step, decimals = if step < 1 then 1 else 0, change = { set = field }, width = 220 }
 		end
 		return ui.column { gap = "normal",

@@ -5,7 +5,12 @@ local segmented = use "segmented"
 
 local NEXT = { backlog = "todo", todo = "progress", progress = "review", review = "done", done = "cancelled", cancelled = "backlog" }
 
-return mod {
+type State = {
+	size: string,
+	tasks: { { title: string, status: string, progress: number? } },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {

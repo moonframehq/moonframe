@@ -5,7 +5,12 @@ local segmented = use "segmented"
 
 local NEXT = { none = "low", low = "medium", medium = "high", high = "urgent", urgent = "none" }
 
-return mod {
+type State = {
+	size: string,
+	tasks: { { title: string, priority: string } },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {

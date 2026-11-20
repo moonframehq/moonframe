@@ -375,7 +375,7 @@ return mod {
 		local first_id, last_id = id_of(first), id_of(last)
 
 		local events = {}
-		local rows = {}
+		local rows: { { [string]: any } } = {}
 		local from, to = 8, 18
 		for _, meeting in data.meetings do
 			if shown(meeting) then
@@ -396,14 +396,14 @@ return mod {
 				end
 				local n = parse(meeting.date)
 				local _, m, d = civil(n)
-				table.insert(rows, {
+				rows[#rows + 1] = {
 					id = meeting.id,
 					title = meeting.title,
 					related = meeting.related,
 					date = `{DAYS[weekday(n) + 1]}, {string.sub(MONTHS[m], 1, 3)} {d}`,
 					time = range(meeting),
 					host = if meeting.host == me then `{meeting.host} (You)` else meeting.host,
-				})
+				}
 			end
 		end
 

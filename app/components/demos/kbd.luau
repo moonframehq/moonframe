@@ -11,7 +11,11 @@ local SHORTCUTS = {
 	{ "Zoom out", "cmd--" },
 }
 
-return mod {
+type State = {
+	look: string,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { look = "caps" }
 	end,

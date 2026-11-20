@@ -20,7 +20,7 @@ type State = {
 	current: string?,
 	folder: string?,
 	picked: string?,
-	folded: { [string]: boolean },
+	folded: { [string]: boolean? },
 	-- Sessions whose terminal is open.
 	shells: { [string]: boolean },
 	adding: boolean,
