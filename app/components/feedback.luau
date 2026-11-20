@@ -220,7 +220,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 			tooltip = "Copy this conversation as Markdown: the requests, what the agent said and ran, and how it ended",
 		}
 		-- Forgets the conversation; not while it runs.
-		local remove = not going and ui.button {
+		local remove = if going then nil else ui.button {
 			"Remove",
 			icon = "trash",
 			variant = "ghost",
