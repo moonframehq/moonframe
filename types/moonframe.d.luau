@@ -1435,18 +1435,9 @@ export type GitCommit = {
 }
 
 -- This machine's load, sampled by the host once a second.
-export type System = {
-	-- Fractions from 0 to 1.
-	cpu: number,
-	-- Oldest first, ending with `cpu`.
-	cpu_history: { number },
-	memory: number,
-	memory_used: number,
-	memory_total: number,
-	-- Bytes per second.
-	received: number,
-	transmitted: number,
-}
+-- What the `system` provider publishes, as `app.system`; declared in
+-- app/providers/system/types.luau.
+export type System = ProviderSystemPublished
 
 export type Platform = "macos" | "linux" | "windows"
 export type Titlebar = "system" | "hidden"
@@ -1788,31 +1779,10 @@ export type Forge = {
 }
 
 -- A coding-agent CLI running on this machine.
-export type Agent = {
-	pid: number,
-	ppid: number,
-	-- "claude", "codex", "gemini", "cursor", "opencode", "aider", "amp",
-	-- "copilot", "droid", "kiro", "qwen", "goose", "crush", ...
-	name: string,
-	-- Its command line, cut to 200 characters.
-	command: string,
-	cwd: string?,
-	tty: string?,
-	-- Unix seconds.
-	started: number,
-	elapsed_seconds: number,
-	-- Percent of one core.
-	cpu: number,
-	-- Always "running": what it is doing is not visible from outside.
-	status: string,
-}
-
-export type Agents = {
-	available: boolean,
-	reason: string?,
-	agents: { Agent },
-	count: number,
-}
+-- What the `agents` provider publishes, as `app.agents`; declared in
+-- app/providers/agents/types.luau.
+export type Agent = ProviderAgentsAgent
+export type Agents = ProviderAgentsPublished
 
 -- One entry of a folder, from the `files` provider.
 export type FileEntry = {
@@ -2140,13 +2110,10 @@ export type App = {
 	capabilities: { [string]: boolean },
 	mods: { string },
 	regions: { [string]: { string } },
-	-- Nil until the first sample arrives (from the `system` provider).
-	system: System?,
 	-- Nil until each provider first publishes.
 	git: Git?,
 	github: Forge?,
 	gitlab: Forge?,
-	agents: Agents?,
 	files: Files?,
 	docs: Docs?,
 	herdr: Herdr?,
@@ -2157,7 +2124,13 @@ export type App = {
 	kinds: { TabKind },
 	-- The stylesheet's `looks`: which look each kind of component takes.
 	looks: { [string]: string },
-	-- What each provider in app/providers/ publishes, as `app.<name>`.
+	-- Each provider with a types.luau beside its provider.toml (`system`,
+	-- `agents`, ...), nil until it first publishes.
+	-- generated: provider fields (just provider-types) start
+	agents: ProviderAgentsPublished?,
+	system: ProviderSystemPublished?,
+	-- generated: provider fields end
+	-- What any other provider publishes, as `app.<name>`.
 	[string]: any,
 }
 
@@ -2354,6 +2327,53 @@ export type Send = {
 	to: string,
 	msg: Data,
 }
+
+-- generated: provider types (just provider-types) start
+type ProviderAgentsAgent = {
+	pid: number,
+	ppid: number,
+	-- "claude", "codex", "gemini", "cursor", "opencode", "aider", "amp",
+	-- "copilot", "droid", "kiro", "qwen", "goose", "crush", ...
+	name: string,
+	-- Its command line, cut to 200 characters.
+	command: string,
+	cwd: string?,
+	tty: string?,
+	-- Unix seconds.
+	started: number,
+	elapsed_seconds: number,
+	-- Percent of one core.
+	cpu: number,
+	-- Always "running": what it is doing is not visible from outside.
+	status: string,
+}
+type ProviderAgentsPublished = {
+	available: boolean,
+	reason: string?,
+	agents: { ProviderAgentsAgent },
+	count: number,
+}
+type ProviderSystemPublished = {
+	-- Fractions from 0 to 1.
+	cpu: number,
+	-- Oldest first, ending with `cpu`.
+	cpu_history: { number },
+	memory: number,
+	memory_used: number,
+	memory_total: number,
+	-- Bytes per second.
+	received: number,
+	transmitted: number,
+}
+type ProviderSystemMessage = "clear"
+
+-- A message for `update` to return: `send "provider:desk" { watch = id }`
+-- is `{ to = "provider:desk", msg = { watch = id } }`, its `msg` typed
+-- by the provider's `Message` where it declares one.
+declare send:
+	((to: "provider:system") -> (msg: ProviderSystemMessage) -> Send)
+	& ((to: string) -> (msg: Data) -> Send)
+-- generated: provider types end
 
 -- `titlebar = "hidden"` puts the layout under the title bar (macOS keeps its
 -- traffic lights, at `traffic_lights` from the top left) or drops the system

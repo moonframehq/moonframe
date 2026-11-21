@@ -162,19 +162,24 @@ return mod {
 		return state
 	end,
 
-	update = function(state: State, msg)
-		if type(msg) ~= "table" then
-			if msg == "toggle-earlier" then
+	update = function(state: State, incoming: string | { topic: string?, value: string?, tab: string?, msg: string? })
+		local msg: { topic: string?, value: string?, tab: string?, msg: string? }
+		if type(incoming) ~= "table" then
+			if incoming == "toggle-earlier" then
 				state.earlier = not state.earlier
-			elseif msg == "act" and state.selected then
-				return state, { { to = "provider:desk", msg = { act = state.selected } } }
-			elseif msg == "assign" and state.selected then
+				return state
+			elseif incoming == "act" and state.selected then
+				return state, { send "provider:desk" { act = state.selected } }
+			elseif incoming == "assign" and state.selected then
 				state.assigned[state.selected] = not state.assigned[state.selected]
-			elseif msg == "send" then
-				msg = { msg = "submit", value = state.draft }
+				return state
+			elseif incoming == "send" then
+				msg = { msg = "submit", value = state.draft, topic = nil, tab = nil }
 			else
 				return state
 			end
+		else
+			msg = incoming
 		end
 		if msg.topic == "desk/selected" then
 			local id = if type(msg.value) == "string" and msg.value ~= "" then msg.value else nil
@@ -184,17 +189,19 @@ return mod {
 			end
 			state.selected = id
 			if id then
-				return state, { { to = "provider:desk", msg = { watch = id } } }
+				local message: { watch: string } = { watch = id }
+				return state, { send "provider:desk" (message) }
 			end
 		elseif msg.tab then
 			state.tab = msg.tab
 		elseif msg.msg == "typing" then
-			state.draft = msg.value
+			state.draft = msg.value or ""
 		elseif msg.msg == "submit" and state.selected and string.match(msg.value or "", "%S") then
 			state.draft = ""
-			return state, {
-				{ to = "provider:desk", msg = { reply = { id = state.selected, text = msg.value, internal = state.tab == "note" } } },
+			local message: { reply: { id: string, text: string, internal: boolean? } } = {
+				reply = { id = state.selected, text = msg.value or "", internal = state.tab == "note" },
 			}
+			return state, { send "provider:desk" (message) }
 		end
 		return state
 	end,

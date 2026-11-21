@@ -607,6 +607,50 @@ Subscribing to `provider/counter` or sending a message also starts it.
 Once started, it keeps running even if the view is hidden. Use
 `start = "always"` only when it should work before any mod needs it.
 
+## Declare its types
+
+Without types, `app.counter` is `any` to the Luau checker: a view that
+reads a field the provider never publishes, or sends it a message it
+ignores, passes `just types` and fails quietly at runtime. Declare both in
+`providers/counter/types.luau`:
+
+```lua
+-- What app.counter holds.
+export type Published = {
+    count: number,
+}
+
+-- What send "provider:counter" takes.
+export type Message = { add: boolean } | { reset: boolean }
+```
+
+Then send with `send`, which builds the same `{ to = ..., msg = ... }` a
+literal would, so its message is checked:
+
+```lua
+update = function(state, msg)
+    return state, { send "provider:counter" { add = true } }
+end,
+```
+
+`just types DIR` checks the app's mods against them: reading
+`counter.total`, or sending `{ ad = true }`, is a type error with its line.
+For a provider in the starter's `app/providers/`, `just provider-types`
+also copies them into `types/moonframe.d.luau`, so every app sees them;
+`just provider-types-check` (in `just ci`) fails when that copy is stale.
+
+Keep an example of what it publishes beside them as `published.json`, and
+hold both sides to it: `just provider-types-check` fails when the file's
+keys or kinds differ from `Published`, and a test in the crate compares a
+real `tick` against it (see `examples/portable/app/providers/focus`). Then
+neither the Rust nor the Luau side can change without the other.
+
+Limits: only `Published`'s own fields are held to the example, a level
+deep; button `msg = ..., to = ...` and plain `{ to = ..., msg = ... }`
+tables are not checked, only `send`; and the type names (`Published`) are
+not visible in mods, whose own annotations are checked against them by
+shape. Nothing checks the published JSON at runtime.
+
 ## Build, run and check
 
 From the app folder, compile the exact component:
@@ -751,11 +795,13 @@ When asked to build a WASM provider:
 2. Copy the matching WIT locally; create an independent `cdylib` crate
    with `kind = "wasm"`. Keep manifest keys separate from `[settings]`.
 3. Define the published JSON shape and accepted message payloads before
-   writing the view. Validate settings and handle unknown messages.
+   writing the view, in `types.luau` (`Published`, `Message`) with an
+   example `published.json` and a test holding `tick` to it. Validate
+   settings and handle unknown messages.
 4. Implement `start`, `tick`, `receive` and `export!`. Publish whole
    snapshots, bound work and memory, and do not assume runtime state persists.
-5. Read `app.<name>` with a nil fallback; send payloads to
-   `provider:<name>`. Follow the Moonframe and component skills for UI.
+5. Read `app.<name>` with a nil fallback; send payloads with
+   `send "provider:<name>" { ... }`. Follow the Moonframe and component skills for UI.
 6. Build for `wasm32-wasip2`, run the app's headless checks and Luau type
    checks where configured, then verify startup, a message and reload.
    State explicitly when an interactive check was not performed.

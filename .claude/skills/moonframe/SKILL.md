@@ -169,6 +169,9 @@ For a palette, add `keys = { up = "prev", down = "next" }` and
 
 **Mods that talk.** Send `msg = ..., to = "other"` from a control, or
 return sends from `update`. Messages to `provider:<name>` go to a provider.
+In `update`, build them with `send "provider:<name>" { ... }` (the same
+`{ to = ..., msg = ... }` table): where the provider declares a `Message`
+type, `just types` checks the message, which a bare table never is.
 
 **Remember something across launches.** Every mod's state is saved on its
 own and comes back to `init` as `previous` next launch (see "State that
@@ -2038,8 +2041,9 @@ installed), the native `app.acp` (coding agents a mod runs over ACP), and
 the native `app.usage` (plan usage of Claude, Codex, Copilot and the other
 AI services signed in here).
 Their shapes are under "Built-in providers" below and typed in
-`types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`, `Acp`,
-`Usage`, and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
+`types/moonframe.d.luau` (`Git`, `Forge`, `Files`, `Herdr`, `Acp`,
+`Usage`, and `Reply` for answers to actions; `system` and `agents` from
+their own `types.luau`, see "Providers"). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
 is labelled demo data.
 
@@ -2166,6 +2170,21 @@ terminal log. There are four kinds:
   installed. It is published again when the file changes and on any
   message (a mod's Refresh hears back). The file is checked like anything
   a provider publishes. Use it for sample data; `examples/tessel` does.
+- **Its types, `types.luau` beside `provider.toml`:** `export type
+  Published` (what `app.<name>` holds) and optionally `export type Message`
+  (what `send "provider:<name>"` takes). With them, `just types DIR` fails
+  on a view that reads a field the provider never publishes or a `send`
+  of a message it does not take; without, `app.<name>` is `any`. Give
+  every new provider one. Keep `published.json` beside it, an example of
+  what it publishes: `just provider-types-check` holds its top level to
+  `Published`, and a test in the provider holds a real `tick` to it (see
+  `examples/portable/app/providers/focus` and `examples/helpdesk/providers/desk`).
+  A provider in `app/providers/` needs `just provider-types` after a
+  change, which copies its types into `types/moonframe.d.luau`; an app's
+  own providers are read by `just types DIR` directly. Only `send` is
+  checked (not button `msg`/`to` or bare tables), mods cannot name the
+  types (their own annotations are checked against them by shape), and
+  nothing checks the JSON at runtime.
 - **`kind = "process"`, `command = [...]`:** any program run in the folder.
   - Each line it prints on stdout is one JSON value to publish. Each message
     arrives on stdin as a `{"from":"<mod>","message":...}` line (compact,
