@@ -104,9 +104,12 @@ fn body(svg: &str) -> Option<(f32, String)> {
     Some((size, shapes))
 }
 
-/// The icon `name`, parsed on first use; `None` when no SVG has it.
+/// The icon `name`, parsed on first use; `None` when no SVG has it. An app
+/// icon is [`moonframe_core::MISSING_APP_ICON`].
 pub(crate) fn icon(name: &IconName) -> Option<&'static Icon> {
-    let key = name.name();
+    // This backend draws from its own icons alone, so a host's app icon is
+    // the placeholder it would be were the host missing it.
+    let key = name.bundled().unwrap_or(moonframe_core::MISSING_APP_ICON);
     PARSED.with_borrow_mut(|parsed| {
         *parsed.entry(key).or_insert_with(|| {
             let data = source(&format!("{key}.svg"))?;

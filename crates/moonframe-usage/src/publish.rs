@@ -125,7 +125,7 @@ pub(crate) fn icon(id: &str, path: Option<&str>) -> Option<&'static str> {
     named
         .or_else(alias)
         .or_else(|| IconName::new(&format!("agent-{id}")))
-        .map(|name| name.name())
+        .and_then(|name| name.bundled())
 }
 
 pub(crate) fn window(limit: &Window, now: SystemTime) -> Value {
