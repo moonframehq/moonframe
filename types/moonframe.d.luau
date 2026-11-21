@@ -530,7 +530,10 @@ export type BadgeProps = {
 	[number]: string,
 }
 
--- The bundled icons (Lucide); the host refuses any other name.
+-- The bundled icons (Lucide); the host refuses any other name, except an
+-- app's own, `app-NAME` (its `icons/app-NAME.svg`), which a mod passes as a
+-- string from its data: `ui.icon(name :: any)`. One the app lacks draws a
+-- dashed circle, a placeholder.
 export type IconName =
 	| "a-large-small"
 	| "activity"
