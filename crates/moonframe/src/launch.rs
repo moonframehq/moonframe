@@ -295,6 +295,9 @@ impl Moonframe {
 
     /// The app's own assets, for its views: GPUI asks them first, so a path
     /// they hold wins over Moonframe's, and the rest fall through to it.
+    /// `icons/app-NAME.svg` among them is the icon mods name `app-NAME`
+    /// (`ui.icon "app-NAME"`), drawn in the text's color as Moonframe's are;
+    /// one they lack draws a placeholder (`MISSING_APP_ICON`).
     pub fn assets(mut self, assets: impl AssetSource) -> Self {
         self.assets = Some(Arc::new(assets));
         self

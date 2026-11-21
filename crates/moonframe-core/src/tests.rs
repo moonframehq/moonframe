@@ -10,6 +10,7 @@ use {
 };
 
 // keep-sorted start
+mod app_icons;
 mod check_data;
 mod checks;
 mod components;
