@@ -195,8 +195,10 @@ pub(crate) struct HostLayers {
     layers: Rc<Layers>,
 }
 
-/// A host view laid out, and where.
+/// A host view laid out directly at its placeholder, and where. Its ID
+/// scope keeps repeated placements distinct without a wrapper layout node.
 pub(crate) struct Drawn {
+    id: ElementId,
     element: AnyElement,
     spot: Spot,
 }
@@ -260,13 +262,15 @@ impl Element for HostLayers {
             let turn = seen.entry(entity).or_default();
             let id = ElementId::NamedInteger(format!("host-{turn}").into(), entity.as_u64());
             *turn += 1;
-            let mut element = div().id(id).size_full().child(slot.view).into_any_element();
+            let mut element = slot.view.into_any_element();
             within(&spot, window, |window| {
-                let room = spot.bounds.size.map(AvailableSpace::Definite);
-                element.layout_as_root(room, window, cx);
-                element.prepaint_at(spot.bounds.origin, window, cx);
+                window.with_id(id.clone(), |window| {
+                    let room = spot.bounds.size.map(AvailableSpace::Definite);
+                    element.layout_as_root(room, window, cx);
+                    element.prepaint_at(spot.bounds.origin, window, cx);
+                });
             });
-            drawn.push(Drawn { element, spot });
+            drawn.push(Drawn { id, element, spot });
         }
         drawn
     }
@@ -281,8 +285,10 @@ impl Element for HostLayers {
         window: &mut Window,
         cx: &mut App,
     ) {
-        for Drawn { element, spot } in drawn {
-            within(spot, window, |window| element.paint(window, cx));
+        for Drawn { id, element, spot } in drawn {
+            within(spot, window, |window| {
+                window.with_id(id.clone(), |window| element.paint(window, cx));
+            });
         }
     }
 }

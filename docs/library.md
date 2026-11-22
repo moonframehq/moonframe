@@ -455,10 +455,13 @@ cargo test --locked -p moonframe --no-default-features --lib hosted::
 cargo test --locked -p moonframe --no-default-features --lib hosted_signal_redraw_benchmark -- --ignored --nocapture --test-threads=1
 ```
 
-The benchmark drives 10,000 model notifications and checks that every new
-value is painted while the shell and a host-owned cached sidebar never
-render again. Its elapsed time measures the headless draw loop, not GPU
-presentation or display FPS.
+The benchmarks drive 50,000 model notifications with one or eight hosted
+placements and check that every new value is painted while the shell and
+host-owned cached sidebars never render again. Their elapsed time measures
+the headless draw loop, not GPU presentation or display FPS. For comparisons,
+build both versions with the same optimization settings (for example,
+`--config 'profile.dev.package.moonframe.opt-level=2'`), alternate their test
+binaries across multiple runs, and compare medians.
 
 ### More than one window
 
