@@ -2726,6 +2726,11 @@ costs what it costs in its own app: the Luau layout is replayed whole.
 For that:
 - **Root:** the view's root fills its box (`size_full()`), since it is
   laid out at the slot's size.
+- **Redraws:** hosted roots render on each scheduled window frame; the
+  Luau shell stays cached. A host may notify its view, a descendant view,
+  or a separate model read while drawing. Cache subviews only when the
+  host also notifies a view in that cached subtree: GPUI 0.3.12 does not
+  invalidate a cached view when only a separate model notifies.
 - **What goes over it:** use `float`/`area`, a popover, or an overlay.
   Something that overlaps it through a negative margin or overflow sits
   under it.

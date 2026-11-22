@@ -1,7 +1,14 @@
 use {
-    super::{Layers, Slot, refinement},
-    gpui_kit::{AnyView, AppContext as _, FontWeight, Refineable as _, TextStyle, WhiteSpace, px},
-    std::rc::Rc,
+    super::{Layers, Placeholder, Slot, refinement},
+    gpui_kit::{
+        AnyView, AppContext as _, Bounds, ContentMask, Context, Element as _, EmptyView,
+        FontWeight, IntoElement, Refineable as _, Render, Styled as _, TestAppContext, TextStyle,
+        WhiteSpace, Window, canvas, point, px, size,
+    },
+    std::{
+        cell::{Cell, RefCell},
+        rc::Rc,
+    },
 };
 
 #[test]
@@ -40,8 +47,97 @@ fn a_frame_notes_its_host_views_afresh() {
     assert_eq!(layers.frames(), frames + 1);
 }
 
+#[gpui_kit::test]
+fn placements_reuse_metadata_until_a_placeholder_prepaints(cx: &mut TestAppContext) {
+    struct Probe(Rc<Cell<bool>>);
+
+    impl Render for Probe {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let complete = self.0.clone();
+            canvas(
+                move |_, window, cx| {
+                    let view = AnyView::from(cx.new(|_| EmptyView));
+                    let layers = Layers::default();
+                    let mut placeholders = Vec::new();
+                    for _ in 0..2 {
+                        let spot = Rc::new(RefCell::new(None));
+                        layers.slots.borrow_mut().push(Slot {
+                            view: view.clone(),
+                            spot: spot.clone(),
+                        });
+                        placeholders.push(Placeholder {
+                            spot,
+                            placements: layers.placements.clone(),
+                        });
+                    }
+                    let empty = layers.placements();
+                    assert!(empty.is_empty());
+                    let original = Bounds::new(point(px(10.), px(20.)), size(px(300.), px(200.)));
+                    placeholders[0].prepaint(None, None, original, &mut (), window, cx);
+                    let single = layers.placements();
+                    assert_eq!(single.len(), 1);
+                    assert!(!Rc::ptr_eq(&single, &empty));
+                    assert!(Rc::ptr_eq(&single, &layers.placements()));
+
+                    placeholders[1].prepaint(None, None, original, &mut (), window, cx);
+                    let both = layers.placements();
+                    assert_eq!(both.len(), placeholders.len());
+                    assert_ne!(both[0].id, both[1].id);
+                    assert_eq!(both[0].id, single[0].id);
+                    assert!(!Rc::ptr_eq(&both, &single));
+
+                    let moved = Bounds::new(point(px(40.), px(50.)), size(px(200.), px(100.)));
+                    let style = TextStyle {
+                        font_family: "Menlo".into(),
+                        color: gpui_kit::red(),
+                        ..TextStyle::default()
+                    };
+                    window.with_rem_size(Some(px(24.)), |window| {
+                        window.with_text_style(Some(refinement(&style)), |window| {
+                            window.with_content_mask(
+                                Some(ContentMask { bounds: moved }),
+                                |window| {
+                                    placeholders[0].prepaint(
+                                        None,
+                                        None,
+                                        moved,
+                                        &mut (),
+                                        window,
+                                        cx,
+                                    );
+                                },
+                            );
+                        });
+                    });
+                    let updated = layers.placements();
+                    assert!(!Rc::ptr_eq(&updated, &both));
+                    assert_eq!(updated[0].spot.bounds, moved);
+                    assert_eq!(updated[0].spot.text, style);
+                    assert_eq!(updated[0].spot.rem, px(24.));
+                    assert_eq!(updated[0].spot.mask.bounds, moved);
+                    assert_eq!(both[0].spot.bounds, original);
+                    assert!(Rc::ptr_eq(&updated, &layers.placements()));
+                    layers.begin();
+                    let cleared = layers.placements();
+                    assert!(cleared.is_empty());
+                    let _placeholder = layers.place(view);
+                    assert!(!Rc::ptr_eq(&cleared, &layers.placements()));
+                    complete.set(true);
+                },
+                |_, _, _, _| (),
+            )
+            .size_full()
+        }
+    }
+
+    let complete = Rc::new(Cell::new(false));
+    let (_, cx) = cx.add_window_view(|_, _| Probe(complete.clone()));
+    cx.run_until_parked();
+    assert!(complete.get());
+}
+
 /// A view to note, never drawn.
 fn placeholder_view() -> AnyView {
-    let cx = gpui_kit::TestAppContext::single();
-    cx.update(|cx| AnyView::from(cx.new(|_| gpui_kit::EmptyView)))
+    let cx = TestAppContext::single();
+    cx.update(|cx| AnyView::from(cx.new(|_| EmptyView)))
 }
