@@ -436,6 +436,10 @@ impl Render for Editor { /* ... */ }
   contract: notify the cached view or a descendant view when it changes.
   Notifying only a separate model does not invalidate a cached view in
   GPUI 0.3.12.
+  Placement metadata (IDs, geometry, clipping and inherited text style) is
+  reused while the shell is replayed, but discarded whenever a placeholder
+  prepaints or the shell changes its placements. This does not cache hosted
+  content or suppress host rendering.
 - The `view` stylesheet rule styles the box it fills (`radius`, `padding`,
   `border`, ...). Previews in the Components window show a placeholder.
 - Trackpad gestures: GPUI's `on_pinch` and `on_mouse_pressure` work as
