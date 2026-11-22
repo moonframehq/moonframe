@@ -521,6 +521,7 @@ jobs:
       - name: Commit the cask to the tap
         env:
           HOMEBREW_TAP_SSH_KEY: ${{ secrets.HOMEBREW_TAP_SSH_KEY }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/release/update-homebrew.sh "$VERSION" moonframe.rb
 
   # The apps with a [release] table go out as a release of their own,
@@ -820,4 +821,5 @@ jobs:
       - name: Commit the casks to the tap
         env:
           HOMEBREW_TAP_SSH_KEY: ${{ secrets.HOMEBREW_TAP_SSH_KEY }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/release/update-homebrew.sh "$VERSION" casks/*.rb
