@@ -33,8 +33,10 @@ const MAX_VIEWS: usize = 512;
 ///
 /// It fills the box the `view` rule styles: its root element is laid out at
 /// that box's size, so give it `size_full()`. In the main window, notifying
-/// it, or a view drawn inside it notifying itself, draws it again and nothing
-/// else of the window.
+/// it, a descendant view, or a model read while drawing it redraws the host
+/// layers while the Luau shell stays cached. Hosted roots render on every
+/// scheduled window frame; the host may cache subviews whose changes notify
+/// a view in that cached subtree.
 pub trait HostView: Render + Sized {
     /// The mod gave other `props`. The view was made with the first ones
     /// ([`ViewInit::props`]); it draws again after this.

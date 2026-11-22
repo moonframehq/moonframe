@@ -1,5 +1,5 @@
 //! Host views drawn over the app rather than inside it, so that one drawing
-//! again by itself, as a terminal printing does, costs what it costs alone.
+//! again by itself, as a terminal printing does, leaves the Luau shell cached.
 //!
 //! GPUI draws a view again when it is notified, and every view it was drawn
 //! inside with it. Drawn inside the app, a host view drawing again would draw
@@ -7,8 +7,14 @@
 //! `ui.view` goes, which notes where it lands, and the window's own view
 //! ([`crate::app::MainWindow`]) draws the app as a cached view and then
 //! [`HostLayers`], which lays each host view out over its placeholder. A host
-//! view drawing again then draws only itself, the window's view and GPUI's
-//! root: the app and the other host views are replayed as they were painted.
+//! view drawing again then draws the host layers, the window's view and
+//! GPUI's root: the app is replayed as it was painted.
+//!
+//! Host roots are not implicitly cached. GPUI 0.3.12 schedules a frame
+//! when a model read during rendering notifies, but only view notifications
+//! invalidate cached view ancestry. Caching a host root would hide updates
+//! from separate models its descendants read. Hosts may cache their own
+//! subviews when they can uphold that stronger notification contract.
 //!
 //! Each frame that draws the app notes where every host view goes before the
 //! layers are laid out, so a host view follows its place (a new layout, a
@@ -254,11 +260,7 @@ impl Element for HostLayers {
             let turn = seen.entry(entity).or_default();
             let id = ElementId::NamedInteger(format!("host-{turn}").into(), entity.as_u64());
             *turn += 1;
-            let mut element = div()
-                .id(id)
-                .size_full()
-                .child(slot.view.cached(full()))
-                .into_any_element();
+            let mut element = div().id(id).size_full().child(slot.view).into_any_element();
             within(&spot, window, |window| {
                 let room = spot.bounds.size.map(AvailableSpace::Definite);
                 element.layout_as_root(room, window, cx);
@@ -295,14 +297,6 @@ fn within<R>(spot: &Spot, window: &mut Window, f: impl FnOnce(&mut Window) -> R)
     })
 }
 
-/// A cached view's style: all of its box.
-fn full() -> StyleRefinement {
-    let mut style = StyleRefinement::default();
-    style.size.width = Some(relative(1.).into());
-    style.size.height = Some(relative(1.).into());
-    style
-}
-
 /// `style` as a refinement that sets every field, so that it is the text
 /// style whatever is set around it.
 fn refinement(style: &TextStyle) -> TextStyleRefinement {
@@ -326,5 +320,9 @@ fn refinement(style: &TextStyle) -> TextStyleRefinement {
     }
 }
 
+// keep-sorted start
+#[cfg(test)]
+mod redraw_tests;
 #[cfg(test)]
 mod tests;
+// keep-sorted end

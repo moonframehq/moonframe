@@ -428,6 +428,14 @@ impl Render for Editor { /* ... */ }
   `Messenger`. `messenger.send(data)` reaches that mod's `update`, from any
   thread.
 - When the mod's `props` change, `set_props` runs and the view draws again.
+- In the main window, hosted views draw over placeholders beside the cached
+  Luau shell. Notifying a hosted view, its descendant, or a model read while
+  drawing it schedules a redraw without rendering the shell again. Hosted
+  roots are not implicitly cached: they render on each scheduled window
+  frame. A host can cache its own subviews when it can satisfy GPUI's cache
+  contract: notify the cached view or a descendant view when it changes.
+  Notifying only a separate model does not invalidate a cached view in
+  GPUI 0.3.12.
 - The `view` stylesheet rule styles the box it fills (`radius`, `padding`,
   `border`, ...). Previews in the Components window show a placeholder.
 - Trackpad gestures: GPUI's `on_pinch` and `on_mouse_pressure` work as
@@ -439,6 +447,18 @@ impl Render for Editor { /* ... */ }
 `moonframe::Data` is what crosses between Rust and Luau: `Data::map`,
 `get`, `as_str`, `as_i64`, `as_f64`, `as_bool`, and `From` for strings,
 numbers, booleans and lists.
+
+The hosted redraw regression tests run without a desktop:
+
+```sh
+cargo test --locked -p moonframe --no-default-features --lib hosted::
+cargo test --locked -p moonframe --no-default-features --lib hosted_signal_redraw_benchmark -- --ignored --nocapture --test-threads=1
+```
+
+The benchmark drives 10,000 model notifications and checks that every new
+value is painted while the shell and a host-owned cached sidebar never
+render again. Its elapsed time measures the headless draw loop, not GPU
+presentation or display FPS.
 
 ### More than one window
 
