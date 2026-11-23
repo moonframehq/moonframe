@@ -19,6 +19,7 @@ impl Build for Stack {
             "selected",
             "drag",
             "key",
+            "keys",
             "scroll_to",
         ],
         pointer::POINTER,
@@ -55,6 +56,7 @@ impl Build for Stack {
             extras: Extras::from_fields(fields)?,
             drag: fields.get("drag")?.unwrap_or(false),
             key: fields.get::<PlainId>("key")?.map(|key| key.0),
+            keys: fields.get("keys")?.unwrap_or_default(),
             pointer: Some(Pointer::from_fields(fields)?)
                 .filter(|pointer| !pointer.is_empty())
                 .map(Box::new),

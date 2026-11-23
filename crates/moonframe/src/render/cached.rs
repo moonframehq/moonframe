@@ -565,6 +565,7 @@ mod tests {
             extras: Default::default(),
             drag: false,
             key: None,
+            keys: Default::default(),
             pointer: None,
             children,
             slots: Vec::new(),

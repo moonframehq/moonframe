@@ -201,6 +201,9 @@ pub(crate) struct MoonframeApp {
     /// The open popovers and overlays each window's last frame drew, which
     /// take their `keys` before anything else in that window only.
     pub(crate) key_layers: HashMap<WindowId, Vec<KeyLayer>>,
+    /// The rows and columns with keys each window's last frame drew,
+    /// which take them while focus is inside.
+    pub(crate) focus_keys: HashMap<WindowId, Vec<crate::render::FocusKeys>>,
     /// Sends keys to the topmost overlay or popover, else a focused
     /// terminal, before key bindings see them.
     _keys: Subscription,
@@ -350,6 +353,7 @@ impl MoonframeApp {
             close_guard: None,
             awake: Default::default(),
             key_layers: HashMap::new(),
+            focus_keys: HashMap::new(),
             history: joined.history,
             _watcher: watcher,
             _settings_watcher: settings_watcher,

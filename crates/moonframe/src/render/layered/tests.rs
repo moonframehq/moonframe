@@ -36,6 +36,7 @@ fn column() -> Stack {
         extras: Default::default(),
         drag: false,
         key: None,
+        keys: Default::default(),
         pointer: None,
         children: Vec::new(),
         slots: Vec::new(),

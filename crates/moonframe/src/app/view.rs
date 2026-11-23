@@ -88,6 +88,7 @@ impl Render for MoonframeApp {
             .map(AnyWindowHandle::window_id)
             .collect();
         self.key_layers.retain(|id, _| open.contains(id));
+        self.focus_keys.retain(|id, _| open.contains(id));
         self.after_frame(frame, window, cx);
         // A terminal that just appeared (a new tab, or one selected) takes
         // the keyboard, once it is drawn.

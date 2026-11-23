@@ -8,6 +8,7 @@
 
 // keep-sorted start
 mod both_backends;
+mod focus_keys;
 mod host_views;
 mod inspect_context;
 mod markdown_scroll;

@@ -149,6 +149,12 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   on an icon's corner), `area` (out of the flow at fractions of the parent,
   `area = { left = 0.1, top = 0.2, width = 0.5, height = 0.3 }`: a crop
   frame, a marker on a track). `grow` with a `width` or `height` grows from that size.
+- **Keys while inside** (`row`, `column`): `keys = { left = <msg>, ... }`,
+  named as an overlay's are, sends its messages to the drawing mod while
+  focus is inside it (a click anywhere in it gives it focus, and a control
+  in it keeps it there) and no text field has it, ahead of the mod's own
+  `keys`: a deck whose arrows dismiss and keep only once the reader is in
+  it. The innermost row or column with the key takes it.
 - **Pointer keys** (`row`, `column`): `pointer = <msg>` is sent as a button
   goes down on it, as the pointer moves while held (anywhere in the
   window), and as it comes up, with `phase` (`down` `move` `up`), `x`, `y`

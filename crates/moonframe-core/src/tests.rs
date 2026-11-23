@@ -19,6 +19,7 @@ mod elements;
 mod entries;
 mod entry_scopes;
 mod flow_diagram;
+mod focus_keys;
 mod font_size;
 mod gestures;
 mod history;
