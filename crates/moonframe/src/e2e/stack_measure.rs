@@ -43,3 +43,26 @@ fn a_list_says_how_far_it_is_scrolled_and_which_rows_show(cx: &mut TestAppContex
     window.settle();
     assert_eq!(window.log().split('|').count(), lines, "{}", window.log());
 }
+
+#[gpui_kit::test]
+fn changing_the_measure_message_reports_unchanged_geometry(cx: &mut TestAppContext) {
+    let source = r#"
+return mod {
+    init = function() return { log = "", phase = "first" } end,
+    update = function(state, msg)
+        logged(state, msg.msg)
+        if state.phase == "first" then state.phase = "second" end
+    end,
+    view = function(state)
+        return shell(state, ui.column {
+            height = 100, scroll = true, measure = state.phase,
+            ui.row { height = 200, shrink = false, ui.text { "item" } },
+        })
+    end,
+}
+"#;
+    let mut window = open(cx, source);
+    assert_eq!(window.log(), "|first|second");
+    window.settle();
+    assert_eq!(window.log(), "|first|second");
+}

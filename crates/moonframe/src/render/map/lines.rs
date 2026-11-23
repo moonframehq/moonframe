@@ -158,6 +158,8 @@ thread_local! {
 struct Announcements {
     frame: u64,
     routes: HashMap<usize, Ask>,
+    msg: Option<Data>,
+    to: Option<String>,
 }
 
 impl Announcements {
@@ -166,12 +168,22 @@ impl Announcements {
         frame: u64,
         asked: &[Option<Ask>],
         found: Vec<(usize, Ask, Arc<Way>)>,
+        msg: &Data,
+        to: Option<&str>,
     ) -> Vec<(usize, Arc<Way>)> {
         // A remounted map may belong to a mod whose state started over.
-        if frame > 0 && self.frame + 1 < frame {
+        let message_changed = self.msg.as_ref() != Some(msg);
+        let destination_changed = self.to.as_deref() != to;
+        if (frame > 0 && self.frame + 1 < frame) || message_changed || destination_changed {
             self.routes.clear();
         }
         self.frame = frame;
+        if message_changed {
+            self.msg = Some(msg.clone());
+        }
+        if destination_changed {
+            self.to = to.map(str::to_owned);
+        }
         // Track the inputs, including drawn, removed and pending routes,
         // rather than only replacing the last successfully announced way.
         self.routes
@@ -204,8 +216,11 @@ pub(super) fn announce(
                 TOLD.with_borrow_mut(|told| told.remove(&key));
                 return;
             };
-            let newly_found = TOLD
-                .with_borrow_mut(|told| told.entry(key).or_default().take(frame, &asked, found));
+            let newly_found = TOLD.with_borrow_mut(|told| {
+                told.entry(key)
+                    .or_default()
+                    .take(frame, &asked, found, &msg, sender.to.as_deref())
+            });
             for (index, way) in newly_found {
                 let fields = BTreeMap::from([
                     ("route".to_owned(), Data::Number((index + 1) as f64)),
@@ -233,7 +248,7 @@ pub(super) fn announce(
 mod tests {
     use {
         super::{Announcements, Arc, Ask, Way},
-        moonframe_core::{Route, TravelMode},
+        moonframe_core::{Data, Route, TravelMode},
     };
 
     #[test]
@@ -264,18 +279,30 @@ mod tests {
         };
         let asked = [walk.clone()];
         let mut told = Announcements::default();
-        assert_eq!(told.take(1, &asked, found()).len(), 1);
-        assert!(told.take(2, &asked, found()).is_empty());
+        let msg = Data::String("route".to_owned());
+        assert_eq!(told.take(1, &asked, found(), &msg, None).len(), 1);
+        assert!(told.take(2, &asked, found(), &msg, None).is_empty());
         // Walk -> Drawn -> Walk; then Walk -> pending Bike -> Walk.
         for (index, replacement) in [None, bike].into_iter().enumerate() {
             let frame = 3 + 2 * index as u64;
-            assert!(told.take(frame, &[replacement], Vec::new()).is_empty());
-            assert_eq!(told.take(frame + 1, &asked, found()).len(), 1);
+            assert!(
+                told.take(frame, &[replacement], Vec::new(), &msg, None)
+                    .is_empty()
+            );
+            assert_eq!(told.take(frame + 1, &asked, found(), &msg, None).len(), 1);
         }
         // Removing the route entirely also invalidates its announcement.
-        assert!(told.take(7, &[], Vec::new()).is_empty());
-        assert_eq!(told.take(8, &asked, found()).len(), 1);
+        assert!(told.take(7, &[], Vec::new(), &msg, None).is_empty());
+        assert_eq!(told.take(8, &asked, found(), &msg, None).len(), 1);
         // A map absent for a frame is newly mounted when it returns.
-        assert_eq!(told.take(10, &asked, found()).len(), 1);
+        assert_eq!(told.take(10, &asked, found(), &msg, None).len(), 1);
+        assert_eq!(told.take(11, &asked, found(), &msg, Some("other")).len(), 1);
+        assert_eq!(told.take(12, &asked, found(), &msg, Some("other")).len(), 0);
+        let changed = Data::String("new route".to_owned());
+        assert_eq!(
+            told.take(13, &asked, found(), &changed, Some("other"))
+                .len(),
+            1
+        );
     }
 }

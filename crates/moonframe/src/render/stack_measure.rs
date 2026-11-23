@@ -14,11 +14,17 @@ use {
 thread_local! {
     /// What each stack last told its mod, by its window and place, so it is
     /// told only of changes.
-    static TOLD: RefCell<HashMap<String, Reading>> = RefCell::new(HashMap::new());
+    static TOLD: RefCell<HashMap<String, Announcement>> = RefCell::new(HashMap::new());
     /// The frame each stack was last drawn in: one missing from the frame
     /// before is drawn anew, and its mod (whose state may have started over)
     /// is told again.
     static SEEN: RefCell<HashMap<String, u64>> = RefCell::new(HashMap::new());
+}
+
+struct Announcement {
+    reading: Reading,
+    msg: Data,
+    to: Option<String>,
 }
 
 /// What a stack says, in whole pixels and one-based children.
@@ -149,7 +155,21 @@ pub(super) fn reader(
                 handle.offset(),
                 &boxes,
             );
-            if TOLD.with_borrow_mut(|told| told.insert(key, reading) == Some(reading)) {
+            let changed = TOLD.with_borrow_mut(|told| {
+                if told.get(&key).is_some_and(|previous| {
+                    previous.reading == reading && previous.msg == msg && previous.to == sender.to
+                }) {
+                    false
+                } else {
+                    told.insert(key, Announcement {
+                        reading,
+                        msg: msg.clone(),
+                        to: sender.to.clone(),
+                    });
+                    true
+                }
+            });
+            if !changed {
                 return;
             }
             let msg = reading.message(&msg);
