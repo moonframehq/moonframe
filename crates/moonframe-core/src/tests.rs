@@ -32,6 +32,7 @@ mod packages;
 mod paint;
 mod pointer;
 mod revision_timeline;
+mod scroll_end;
 mod scroll_sync;
 mod scrollbar;
 mod shell;

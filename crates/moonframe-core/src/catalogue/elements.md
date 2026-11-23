@@ -148,6 +148,14 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   on an icon's corner), `area` (out of the flow at fractions of the parent,
   `area = { left = 0.1, top = 0.2, width = 0.5, height = 0.3 }`: a crop
   frame, a marker on a track). `grow` with a `width` or `height` grows from that size.
+- **Ends** (`row`, `column`, with `scroll`): `at_end = <msg>` sends `msg`
+  to the drawing mod with `at_end = true` or `false` as it first lays out
+  and each time it reaches or leaves its end (its bottom; a row that
+  scrolls only sideways, its right), within the 24 px `follow` keeps:
+  show a chat's "latest message" button while it is `false`.
+  `scroll_end = <value>` scrolls to the end each time the value changes,
+  so `scroll_end = { seq = n }` with a new `n` asks again; with `follow` it
+  stays there as lines arrive.
 - **Pointer keys** (`row`, `column`): `pointer = <msg>` is sent as a button
   goes down on it, as the pointer moves while held (anywhere in the
   window), and as it comes up, with `phase` (`down` `move` `up`), `x`, `y`

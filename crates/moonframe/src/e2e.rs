@@ -13,6 +13,7 @@ mod inspect_context;
 mod markdown_scroll;
 mod regressions;
 mod revision_timeline;
+mod scroll_end;
 mod scroll_sync;
 mod spinner;
 mod stack_measure;

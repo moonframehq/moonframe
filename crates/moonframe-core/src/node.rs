@@ -10,6 +10,7 @@ use {
 
 // keep-sorted start
 mod embed;
+mod ends;
 mod gesture;
 mod icon;
 mod input;
@@ -25,7 +26,7 @@ mod video;
 // keep-sorted end
 
 pub use {
-    embed::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*,
+    embed::*, ends::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*,
     revision_timeline::*, snapshot::*, tokens::*, video::*,
 };
 

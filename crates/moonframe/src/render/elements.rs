@@ -70,6 +70,17 @@ impl<'w> Draw<'w> for Stack {
         };
         let handle = painter.motion.scroll_to(&place.path, self.scroll_to);
         let drawn = children.len();
+        let ends = self.ends.as_deref().and_then(|ends| {
+            super::ends::ends(
+                ends,
+                self.direction,
+                &self.frame,
+                &handle,
+                painter,
+                place,
+                cx,
+            )
+        });
         let element = element.children(children).scrollbars(
             &self.frame,
             self.direction,
@@ -88,6 +99,7 @@ impl<'w> Draw<'w> for Stack {
                 cx,
             )
         }));
+        let element = element.children(ends);
         // Hugging only says something across a column.
         let element = if self.frame.hug
             && self.frame.self_align.is_none()
