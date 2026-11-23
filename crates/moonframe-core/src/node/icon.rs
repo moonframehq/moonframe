@@ -1,26 +1,72 @@
 //! The bundled icons and the names that pick one.
 
-/// One of [`ICONS`]; anything else is refused when the view is read, so a
-/// typo is an error rather than a blank space.
+use std::sync::Arc;
+
+/// What names a host app's own icon: this, then its name in the host's
+/// assets (`app-sessions` is the host's `icons/app-sessions.svg`).
+pub const APP_ICON: &str = "app-";
+/// What an app icon the host does not ship draws instead: a dashed outline,
+/// so a missing file shows as a gap to fill rather than nothing at all.
+pub const MISSING_APP_ICON: &str = "circle-dashed";
+/// The longest name an app icon takes after [`APP_ICON`].
+const MAX_APP_ICON: usize = 64;
+
+/// One of [`ICONS`], or an icon the host app ships (`app-…`, see
+/// [`APP_ICON`]); anything else is refused when the view is read, so a typo
+/// is an error rather than a blank space. A host's icon is only checked for
+/// its shape: one the host lacks draws [`MISSING_APP_ICON`].
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct IconName(&'static str);
+pub struct IconName(Name);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Name {
+    Bundled(&'static str),
+    App(Arc<str>),
+}
 
 impl IconName {
     pub fn new(name: &str) -> Option<Self> {
+        if let Some(rest) = name.strip_prefix(APP_ICON) {
+            return app_icon(rest).then(|| Self(Name::App(name.into())));
+        }
         ICONS
             .binary_search(&name)
             .ok()
-            .map(|index| Self(ICONS[index]))
+            .map(|index| Self(Name::Bundled(ICONS[index])))
     }
 
-    pub fn name(&self) -> &'static str {
-        self.0
+    pub fn name(&self) -> &str {
+        match &self.0 {
+            Name::Bundled(name) => name,
+            Name::App(name) => name,
+        }
+    }
+
+    /// The name when Moonframe bundles the icon, not the host app.
+    pub fn bundled(&self) -> Option<&'static str> {
+        match self.0 {
+            Name::Bundled(name) => Some(name),
+            Name::App(_) => None,
+        }
     }
 
     /// Where the app's assets keep it.
     pub fn path(&self) -> String {
-        format!("icons/{}.svg", self.0)
+        format!("icons/{}.svg", self.name())
     }
+}
+
+/// Whether `rest`, after [`APP_ICON`], is a name an app icon may have:
+/// lowercase words of letters and digits joined by single hyphens.
+fn app_icon(rest: &str) -> bool {
+    !rest.is_empty()
+        && rest.len() <= MAX_APP_ICON
+        && rest.split('-').all(|word| {
+            !word.is_empty()
+                && word
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+        })
 }
 
 /// The icons the app bundles, sorted: gpui-kit's Lucide set, and the app's
@@ -227,6 +273,7 @@ pub const ICONS: &[&str] = &[
     "server",
     "settings",
     "settings-2",
+    "share",
     "shield",
     "sliders-horizontal",
     "smile-plus",

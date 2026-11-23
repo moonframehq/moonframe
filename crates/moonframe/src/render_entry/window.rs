@@ -26,6 +26,10 @@ const SETTLE: usize = 4;
 pub(super) struct Job<'a> {
     /// The entry, `<namespace>:<id>`.
     pub(super) name: &'a str,
+    /// The layers the app is laid over, before its entries: the window
+    /// keeps them, where an app would find its own from its folders.
+    pub(super) layers: Roots,
+    /// `layers` with the entries applied.
     pub(super) roots: Roots,
     pub(super) entries: Entries,
     /// The shell's folder.
@@ -141,7 +145,13 @@ fn open(
     let handle = cx
         .open_window(size(px(width), px(height)), |window, cx| {
             let view = cx.new(|cx| {
-                MoonframeApp::new(workspace, chrome, folders, backends, views, window, cx)
+                let mut app =
+                    MoonframeApp::new(workspace, chrome, folders, backends, views, window, cx);
+                // Its folders are only the shell's: laid out over them, as
+                // the entries' first reconcile would, it loses the
+                // components and styles of the layers it was given.
+                app.keep_layers(job.layers.clone());
+                app
             });
             app = Some(view.clone());
             let view = cx.new(|cx| crate::app::MainWindow::new(view, None, window, cx));

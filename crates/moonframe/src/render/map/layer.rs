@@ -297,7 +297,10 @@ fn base_layer(map: &Map, frame: Frame, z: u8, grid: Grid) -> (Div, Vec<Tile>) {
 pub(super) fn placeholder(provider: MapProvider) -> Hsla {
     let dark = matches!(
         provider,
-        MapProvider::CartoDark | MapProvider::StadiaSmoothDark
+        MapProvider::CartoDark
+            | MapProvider::StadiaSmoothDark
+            | MapProvider::VectorDark
+            | MapProvider::VectorGraphite
     );
     if dark {
         rgb(0x262626).into()

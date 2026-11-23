@@ -141,7 +141,7 @@ return component {
 			}
 		end
 
-		local cards = {}
+		local cards: { Element } = {}
 		for index, item in ipairs(highlights) do
 			cards[index] = ui.row {
 				class = "release-notes-card",

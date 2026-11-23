@@ -5,7 +5,19 @@ local tabs = use "tabs"
 local icon_button = use "icon-button"
 local segmented = use "segmented"
 
-return mod {
+type Tab = { id: string, label: string, icon: string, status: string? }
+
+type State = {
+	platform: string,
+	sidebar: boolean,
+	branch: string,
+	next: number,
+	tabs: { Tab },
+	history: { string },
+	at: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -13,10 +25,10 @@ return mod {
 				sidebar = true,
 				branch = "feat/multi-currency",
 				next = 3,
-				tabs = ({
+				tabs = {
 					{ id = "editor", label = "editor", icon = "terminal", status = "working" },
 					{ id = "lazygit", label = "lazygit", icon = "git-branch" },
-				} :: { any }),
+				},
 				history = { "lazygit", "editor" },
 				at = 2,
 			}
@@ -57,7 +69,7 @@ return mod {
 					end
 				end
 				-- Forget the closed tab in the history.
-				local kept = {}
+				local kept: { string } = {}
 				for _, id in state.history do
 					if id ~= msg.close and kept[#kept] ~= id then
 						kept[#kept + 1] = id

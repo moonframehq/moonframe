@@ -2,7 +2,16 @@
 -- "a-z" to sort the agents by name.
 local section = use "sidebar-section"
 
-return mod {
+type Agent = { name: string, agent: string }
+
+type State = {
+	selected: string,
+	folded: { [string]: boolean },
+	sorted: boolean,
+	agents: { Agent },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -32,11 +41,11 @@ return mod {
 	view = function(state)
 		local agents = table.clone(state.agents)
 		if state.sorted then
-			table.sort(agents, function(a, b)
+			table.sort(agents, function(a: Agent, b: Agent)
 				return a.name < b.name
 			end)
 		end
-		local rows = {}
+		local rows: { Element } = {}
 		for i, a in agents do
 			rows[i] = ui.item { a.name, detail = a.agent, selected = a.name == state.selected, msg = { open = a.name } }
 		end

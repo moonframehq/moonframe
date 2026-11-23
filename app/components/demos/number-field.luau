@@ -9,7 +9,10 @@ local LIMITS = {
 	zoom = { min = 1, max = 400 },
 }
 
-return mod {
+-- Each field's value by its name in LIMITS.
+type State = { [string]: number }
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { ppi = 300, slot = 1, zoom = 100 }
 	end,

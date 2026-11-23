@@ -117,7 +117,7 @@ return component {
 
 		-- My progress: a sheet with the figures, the weeks and every course.
 		local function progress_sheet()
-			local rows = {}
+			local rows: { Element } = {}
 			for index, enrolled in data.enrolled do
 				local done = if index == 1 then state.completed else enrolled.done
 				local finished = done >= enrolled.total
@@ -234,14 +234,14 @@ return component {
 		for _, category in data.categories do
 			table.insert(options, { id = category.id, label = category.label })
 		end
-		local shown = {}
+		local shown: { any } = {}
 		for _, guide in data.guides do
 			if state.filter == "all" or guide.category == state.filter then
 				table.insert(shown, guide)
 			end
 		end
 		local matching = #shown
-		table.sort(shown, function(a, b)
+		table.sort(shown, function(a: any, b: any)
 			if state.sort == "newest" then
 				if (a.new or false) ~= (b.new or false) then
 					return a.new == true
@@ -252,8 +252,8 @@ return component {
 			return a.rank < b.rank
 		end)
 		local limit = if state.all then #shown else math.min(6, #shown)
-		local grid = {}
-		local row = {}
+		local grid: { Element } = {}
+		local row: { Element } = {}
 		for index = 1, limit do
 			local guide = shown[index]
 			local category = category_of(data, guide.category)

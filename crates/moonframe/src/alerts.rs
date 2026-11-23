@@ -8,11 +8,15 @@
 //!   when the app runs as a bundle (the system refuses a bare binary);
 //!   everywhere else, and from a bare binary, a toast in the window shows
 //!   them instead. A click on one brings the window forward, and the mod
-//!   that posted it hears it.
+//!   that posted it hears it. One posted with `replace` takes the place of
+//!   those the mod posted with the same `id`, from this run or an earlier
+//!   one. Whether the user lets the app post them is read as it changes,
+//!   for `app.notifications`; once they turn them off, the toast shows
+//!   them too.
 //!
 //! Both are rate-limited, so a mod in a loop cannot flood the speakers or
-//! the notification centre; so are web pages opened (`app:open`), so it
-//! cannot flood the browser either.
+//! the notification centre; so are asking to allow notifications, and web
+//! pages opened (`app:open`), so it cannot flood the browser either.
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -33,6 +37,12 @@ const NOTIFY_BURST: usize = 5;
 const NOTIFY_WINDOW: Duration = Duration::from_secs(10);
 /// At most this many web pages opened in [`NOTIFY_WINDOW`].
 const OPEN_BURST: usize = 3;
+/// At most this many asks to allow notifications in [`NOTIFY_WINDOW`].
+const ASK_BURST: usize = 2;
+/// How many of the notifications posted this run with an `id` are kept,
+/// for one that replaces them to take back even before the system lists
+/// them.
+const RECENT: usize = 64;
 /// `app:icon` requests closer together than this are refused.
 const ICON_GAP: Duration = Duration::from_millis(100);
 /// Largest sound file played.
@@ -41,6 +51,9 @@ pub(crate) const MAX_SOUND_BYTES: u64 = 2 * 1024 * 1024;
 /// Separates the parts of a notification's identifier, which carries
 /// who posted it and its `id` through the system and back.
 const SEPARATOR: char = '\u{1f}';
+/// Where a notification's identifier has its number, one that replaces
+/// has this instead.
+const REPLACING: &str = "replacing";
 
 /// How a notification was shown.
 #[derive(Debug, PartialEq)]
@@ -52,13 +65,46 @@ pub(crate) enum Posted {
     Toast,
 }
 
+/// Whether the user lets the app post notifications, as `app.notifications`
+/// says it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Permission {
+    /// The system shows them.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    Allowed,
+    /// The user turned them off: a toast in the window shows them instead.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    Denied,
+    /// Not asked yet: the first one posted, or `{ ask = true }`, asks.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    Undecided,
+    /// No system notifications here (Linux, Windows, a bare binary): a
+    /// toast in the window shows them.
+    InWindow,
+}
+
+impl Permission {
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Allowed => "allowed",
+            Self::Denied => "denied",
+            Self::Undecided => "undecided",
+            Self::InWindow => "in-window",
+        }
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct Alerts {
     last_sound: Option<Instant>,
     last_icon: Option<Instant>,
     posted: VecDeque<Instant>,
     opened: VecDeque<Instant>,
+    asked: VecDeque<Instant>,
     sequence: u64,
+    /// The identifiers of the last [`RECENT`] notifications the system
+    /// posted this run with an `id`, the oldest first.
+    recent: VecDeque<String>,
     #[cfg(target_os = "macos")]
     sounds: macos::Sounds,
 }
@@ -186,34 +232,86 @@ impl Alerts {
             ));
         }
         self.sequence += 1;
-        let identifier = identifier(self.sequence, from, notification.id.as_deref());
+        // One that replaces is always posted as the same, so it takes the
+        // place of the last one even before the system lists it.
+        let sequence = (!notification.replace).then_some(self.sequence);
+        let identifier = identifier(sequence, from, notification.id.as_deref());
+        // Those it replaces from this run, also any the system has not
+        // listed as delivered yet.
+        let replaced = if notification.replace {
+            take_replaced(&mut self.recent, &identifier)
+        } else {
+            Vec::new()
+        };
         #[cfg(target_os = "macos")]
-        if macos::post(&identifier, notification) {
+        if macos::post(&identifier, notification, &replaced) {
+            if notification.id.is_some() && !notification.replace {
+                remember(&mut self.recent, identifier);
+            }
             return Ok(Posted::System);
         }
-        let _ = identifier;
+        let _ = (identifier, replaced);
         Ok(Posted::Toast)
+    }
+
+    /// Asks the user to allow notifications, if they have not answered
+    /// yet, telling [`listen`]'s `changed` how it then stands. More than
+    /// [`ASK_BURST`] in [`NOTIFY_WINDOW`] is an error.
+    pub(crate) fn ask(&mut self) -> Result<(), String> {
+        if !admit(&mut self.asked, ASK_BURST) {
+            return Err(format!(
+                "more than {ASK_BURST} asks to allow notifications in {} s are dropped",
+                NOTIFY_WINDOW.as_secs()
+            ));
+        }
+        #[cfg(target_os = "macos")]
+        if macos::bundled() {
+            macos::ask();
+        }
+        Ok(())
     }
 }
 
 /// Has `clicked` called with the mod and the `id` of each notification the
 /// user clicks, from now on: where the system posts them (macOS, in a
-/// bundle). Call it once, at launch, so a click that opens the app is
-/// heard.
-pub(crate) fn listen(clicked: impl Fn(String, Option<String>) + Send + Sync + 'static) {
+/// bundle); and `changed` with whether the user lets the app post them,
+/// now and each time that may have changed. Call it once, at launch, so a
+/// click that opens the app is heard.
+pub(crate) fn listen(
+    clicked: impl Fn(String, Option<String>) + Send + Sync + 'static,
+    changed: impl Fn(Permission) + Send + Sync + 'static,
+) {
     #[cfg(target_os = "macos")]
-    macos::listen(Box::new(move |identifier: &str| {
-        if let Some((from, id)) = parse_identifier(identifier) {
-            clicked(from, id);
-        }
-    }));
-    #[cfg(not(target_os = "macos"))]
+    if macos::bundled() {
+        macos::listen(
+            Box::new(move |identifier: &str| {
+                if let Some((from, id)) = parse_identifier(identifier) {
+                    clicked(from, id);
+                }
+            }),
+            Box::new(changed),
+        );
+        return;
+    }
     let _ = clicked;
+    changed(Permission::InWindow);
 }
 
-/// A notification's identifier: unique, and carrying who posted it and
-/// its `id` back when it is clicked.
-fn identifier(sequence: u64, from: &str, id: Option<&str>) -> String {
+/// Reads again whether the user lets the app post notifications, telling
+/// [`listen`]'s `changed`: they may have changed it in the system's
+/// settings.
+pub(crate) fn refresh() {
+    #[cfg(target_os = "macos")]
+    if macos::bundled() {
+        macos::read_permission();
+    }
+}
+
+/// A notification's identifier: carrying who posted it and its `id` back
+/// when it is clicked; unique with a `sequence`, else the same each time
+/// the mod posts that `id`.
+fn identifier(sequence: Option<u64>, from: &str, id: Option<&str>) -> String {
+    let sequence = sequence.map_or_else(|| REPLACING.to_owned(), |sequence| sequence.to_string());
     format!(
         "moonframe{SEPARATOR}{sequence}{SEPARATOR}{from}{SEPARATOR}{}",
         id.unwrap_or("")
@@ -221,7 +319,6 @@ fn identifier(sequence: u64, from: &str, id: Option<&str>) -> String {
 }
 
 /// Who posted the notification `identifier`, and its `id`.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn parse_identifier(identifier: &str) -> Option<(String, Option<String>)> {
     let mut parts = identifier.split(SEPARATOR);
     if parts.next()? != "moonframe" {
@@ -231,6 +328,34 @@ fn parse_identifier(identifier: &str) -> Option<(String, Option<String>)> {
     let from = parts.next().filter(|from| !from.is_empty())?;
     let id = parts.next()?;
     Some((from.to_owned(), (!id.is_empty()).then(|| id.to_owned())))
+}
+
+/// Whether the notification `other` is one that `identifier`, posted with
+/// `replace`, takes the place of: the same mod's, with the same `id`.
+fn replaced_by(identifier: &str, other: &str) -> bool {
+    other != identifier
+        && parse_identifier(identifier)
+            .is_some_and(|posted| parse_identifier(other).is_some_and(|other| other == posted))
+}
+
+/// Keeps `identifier`, of a notification posted with an `id`, among the
+/// last [`RECENT`].
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn remember(recent: &mut VecDeque<String>, identifier: String) {
+    if recent.len() >= RECENT {
+        recent.pop_front();
+    }
+    recent.push_back(identifier);
+}
+
+/// Takes out of `recent` those that `identifier`, posted with `replace`,
+/// takes the place of.
+fn take_replaced(recent: &mut VecDeque<String>, identifier: &str) -> Vec<String> {
+    let (replaced, kept): (Vec<String>, Vec<String>) = std::mem::take(recent)
+        .into_iter()
+        .partition(|other| replaced_by(identifier, other));
+    *recent = kept.into();
+    replaced
 }
 
 /// A short two-note chime as a WAV file: 16-bit mono at 44.1 kHz, made
@@ -297,16 +422,71 @@ mod tests {
 
     #[test]
     fn a_notification_says_who_posted_it_when_clicked() {
-        let identifier = identifier(7, "agents/list#main", Some("pane-3"));
+        let identifier = identifier(Some(7), "agents/list#main", Some("pane-3"));
         assert_eq!(
             parse_identifier(&identifier),
             Some(("agents/list#main".to_owned(), Some("pane-3".to_owned())))
         );
         assert_eq!(
-            parse_identifier(&super::identifier(8, "agents", None)),
+            parse_identifier(&super::identifier(Some(8), "agents", None)),
             Some(("agents".to_owned(), None))
         );
         assert_eq!(parse_identifier("someone else's"), None);
+    }
+
+    #[test]
+    fn one_that_replaces_takes_the_place_of_the_mods_with_its_id() {
+        let replacing = identifier(None, "share", Some("upload"));
+        assert_eq!(replacing, identifier(None, "share", Some("upload")));
+        assert_eq!(
+            parse_identifier(&replacing),
+            Some(("share".to_owned(), Some("upload".to_owned())))
+        );
+        for (other, replaced) in [
+            (identifier(Some(3), "share", Some("upload")), true),
+            (identifier(Some(4), "share", Some("download")), false),
+            (identifier(Some(5), "share", None), false),
+            (identifier(Some(6), "other", Some("upload")), false),
+            ("someone else's".to_owned(), false),
+            // Itself the system replaces as it posts it again.
+            (replacing.clone(), false),
+        ] {
+            assert_eq!(replaced_by(&replacing, &other), replaced, "{other:?}");
+        }
+    }
+
+    #[test]
+    fn one_that_replaces_takes_back_those_posted_this_run() {
+        let mut recent = VecDeque::new();
+        for (sequence, id) in [(1, "upload"), (2, "download"), (3, "upload")] {
+            remember(&mut recent, identifier(Some(sequence), "share", Some(id)));
+        }
+        let replacing = identifier(None, "share", Some("upload"));
+        assert_eq!(take_replaced(&mut recent, &replacing), [
+            identifier(Some(1), "share", Some("upload")),
+            identifier(Some(3), "share", Some("upload")),
+        ]);
+        assert_eq!(recent, [identifier(Some(2), "share", Some("download"))]);
+        assert!(take_replaced(&mut recent, &replacing).is_empty());
+
+        // Only the last few are kept.
+        for sequence in 0..RECENT as u64 * 2 {
+            remember(&mut recent, identifier(Some(sequence), "share", Some("x")));
+        }
+        assert_eq!(recent.len(), RECENT);
+        assert_eq!(
+            recent.front(),
+            Some(&identifier(Some(RECENT as u64), "share", Some("x")))
+        );
+    }
+
+    #[test]
+    fn asking_to_allow_notifications_is_rate_limited() {
+        let mut alerts = Alerts::default();
+        for _ in 0..ASK_BURST {
+            assert!(alerts.ask().is_ok());
+        }
+        assert!(alerts.ask().unwrap_err().contains("asks to allow"));
     }
 
     #[test]
@@ -322,6 +502,7 @@ mod tests {
             title: "Done".to_owned(),
             body: String::new(),
             id: None,
+            replace: false,
         };
         // Pretend the window already posted its burst.
         alerts.posted = std::iter::repeat_n(Instant::now(), NOTIFY_BURST).collect();

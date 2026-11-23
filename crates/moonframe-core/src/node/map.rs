@@ -120,7 +120,57 @@ providers! {
         key: true,
         max_zoom: 22,
     },
+    /// Vector tiles drawn on the GPU by gpui-maps: OpenFreeMap's Dark
+    /// style. Needs the `map-vector` feature; `url` is no tile address.
+    /// `max_zoom` is 20 for every vector provider: the map zooms one past
+    /// it, 21, which is gpui-maps' own ceiling of 20 (it counts 512-pixel
+    /// tiles). Any higher and its map stops while the pins and routes go
+    /// on growing.
+    VectorDark = "vector-dark" {
+        url: "vector:dark",
+        attribution: "© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors",
+        key: false,
+        max_zoom: 20,
+    },
+    /// Vector tiles drawn by gpui-maps: Graphite, a quiet slate backdrop
+    /// for routes (Liberty recoloured).
+    VectorGraphite = "vector-graphite" {
+        url: "vector:graphite",
+        attribution: "© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors",
+        key: false,
+        max_zoom: 20,
+    },
+    /// Vector tiles drawn by gpui-maps: OpenFreeMap's Liberty style.
+    VectorLiberty = "vector-liberty" {
+        url: "vector:liberty",
+        attribution: "© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors",
+        key: false,
+        max_zoom: 20,
+    },
+    /// Vector tiles drawn by gpui-maps: OpenFreeMap's Positron style.
+    VectorPositron = "vector-positron" {
+        url: "vector:positron",
+        attribution: "© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors",
+        key: false,
+        max_zoom: 20,
+    },
+    /// Vector tiles drawn by gpui-maps: Streets Light, warm streets with
+    /// teal water (Liberty recoloured).
+    VectorStreets = "vector-streets" {
+        url: "vector:streets",
+        attribution: "© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors",
+        key: false,
+        max_zoom: 20,
+    },
     // keep-sorted end
+}
+
+impl MapProvider {
+    /// Whether the map is drawn from vector tiles by gpui-maps rather
+    /// than from the provider's raster images.
+    pub fn vector(self) -> bool {
+        self.source().url.starts_with("vector:")
+    }
 }
 
 /// A street map. Unset, `center` and `zoom` frame the pins and routes;
@@ -317,16 +367,21 @@ mod tests {
     #[test]
     fn every_provider_names_a_tile_and_credits_its_source() {
         for name in MapProvider::NAMES {
-            let provider = MapProvider::parse(name).map(MapProvider::source);
-            let Some(source) = provider else {
+            let Some(provider) = MapProvider::parse(name) else {
                 panic!("{name} does not parse");
             };
+            let source = provider.source();
+            assert!(!source.attribution.is_empty());
+            if provider.vector() {
+                // gpui-maps fetches its tiles itself: no address, no key.
+                assert!(!source.key, "{name}'s key");
+                continue;
+            }
             for part in ["{z}", "{x}", "{y}"] {
                 assert!(source.url.contains(part), "{name} lacks {part}");
             }
             assert!(source.url.starts_with("https://"), "{name} is not https");
             assert_eq!(source.key, source.url.contains("{key}"), "{name}'s key");
-            assert!(!source.attribution.is_empty());
         }
     }
 }

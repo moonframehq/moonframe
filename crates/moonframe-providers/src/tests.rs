@@ -655,7 +655,7 @@ fn a_native_provider_publishes_and_answers_the_mod_that_asked() {
 }
 
 #[test]
-fn a_native_manifest_takes_no_command_or_capabilities() {
+fn a_native_manifest_takes_capabilities_but_no_command() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     write(
@@ -674,7 +674,9 @@ fn a_native_manifest_takes_no_command_or_capabilities() {
         "kind = 'native'\n[settings]\nlimit = 3\n",
     );
     assert!(Manifest::load("a", &root.join("a")).is_err());
-    assert!(Manifest::load("b", &root.join("b")).is_err());
+    // What a portable provider's wasm build declares, compiled in too.
+    let manifest = Manifest::load("b", &root.join("b")).unwrap();
+    assert_eq!(manifest.capabilities, [Capability::System]);
     let manifest = Manifest::load("c", &root.join("c")).unwrap();
     assert_eq!(manifest.kind, Kind::Native);
     assert_eq!(manifest.settings["limit"], 3);

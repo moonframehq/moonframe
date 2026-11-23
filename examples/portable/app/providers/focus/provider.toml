@@ -1,0 +1,8 @@
+# A focus timer, shared as `app.focus`: the crate in this folder, built to a
+# WebAssembly component and run sandboxed. Edit src/lib.rs and it rebuilds;
+# the timer keeps its place (`save` and `restore`).
+interval = 1.0
+kind     = "wasm"
+
+[settings]
+minutes = 25

@@ -7,11 +7,14 @@ local segmented = use "segmented"
 local shell_card = use "shell-card"
 local empty_state = use "empty-state"
 
+-- A worktree's commands, or the runs they started, by which one ("setup", "run").
+type Scripts = { [string]: string? }
+
 type State = {
 	tab: string,
 	workspace: { path: string, name: string, branch: string }?,
-	scripts: { [string]: { setup: string?, run: string? } },
-	runs: { [string]: { setup: string?, run: string? } },
+	scripts: { [string]: Scripts },
+	runs: { [string]: Scripts },
 	editing: string?,
 	text: string,
 	pending: { [string]: { path: string, which: string } },
@@ -76,7 +79,7 @@ return mod {
 		elseif msg.msg == "text" then
 			state.text = msg.value
 		elseif msg.msg == "save" and workspace and state.editing then
-			local scripts = state.scripts[workspace.path] or {}
+			local scripts: Scripts = state.scripts[workspace.path] or {}
 			local text = string.match(state.text, "^%s*(.-)%s*$") or ""
 			scripts[state.editing] = if text == "" then nil else text
 			state.scripts[workspace.path] = scripts
@@ -97,7 +100,7 @@ return mod {
 			local pending = state.pending[msg.reply]
 			state.pending[msg.reply] = nil
 			if pending and msg.ok then
-				local runs = state.runs[pending.path] or {}
+				local runs: Scripts = state.runs[pending.path] or {}
 				runs[pending.which] = msg.run
 				state.runs[pending.path] = runs
 			end
@@ -120,7 +123,8 @@ return mod {
 			}
 		else
 			local which = state.tab
-			local command = (state.scripts[workspace.path] or {})[which]
+			local scripts: Scripts = state.scripts[workspace.path] or {}
+			local command = scripts[which]
 			local run_id = (state.runs[workspace.path] or {})[which]
 			local run = run_id and by_id[run_id]
 			if state.editing == which then

@@ -63,7 +63,7 @@ rich_text { parts = {
 } }]],
 
 	build = function(props: Props)
-		local runs = {}
+		local runs: { Element } = {}
 		for _, entry in props.parts do
 			local part: Part = if type(entry) == "string" then { text = entry } else entry
 			if part.tag then

@@ -22,6 +22,8 @@ type Props = {
 	find_index: number?,
 	found: any,
 	stream: boolean?,
+	scrolled: any,
+	scroll_at: { fraction: number, seq: number? }?,
 }
 
 return component {
@@ -47,6 +49,8 @@ return component {
 		["find_index"] = "which match is current, from 1: marked strongly and scrolled to",
 		["found"] = "message sent as the number of matches changes, with `count`",
 		["stream"] = "fade in what is added to `text`, as an answer streams in",
+		["scrolled"] = "message sent as the reader scrolls (with `scroll`), with `fraction`: 0 at the top, 1 at the end",
+		["scroll_at"] = "{ fraction = <0 to 1>, seq = <a number> }: scrolls there when it changes (with `scroll`), without sending `scrolled`; a new `seq` goes there again",
 	},
 	styles = {
 		[".markdown"] = { padding = { 12, 16 } },
@@ -88,6 +92,8 @@ markdown {
 			find_index = props.find_index,
 			found = props.found,
 			stream = props.stream,
+			scrolled = props.scrolled,
+			scroll_at = props.scroll_at,
 		}
 	end,
 }

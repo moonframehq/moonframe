@@ -111,9 +111,9 @@ kbd { keys = "cmd-k cmd-s", small = true }
 kbd { keys = "ctrl-tab", plain = true }]],
 
 	build = function(props: Props)
-		local chords = {}
+		local chords: { Element } = {}
 		for _, caps in parse(props.keys) do
-			local cells = {}
+			local cells: { Element } = {}
 			for _, cap in caps do
 				local class = { "kbd-key" }
 				if props.small then

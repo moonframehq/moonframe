@@ -54,17 +54,21 @@ pub mod gestures;
 mod history;
 mod host_menus;
 mod hosted;
+mod hotkeys;
 mod init;
 mod input;
 mod inspect;
 mod keys;
 mod launch;
 mod live;
+mod mockup;
 mod mod_window;
 mod motion;
 mod natives;
 mod overlay;
+mod panel;
 mod panes;
+mod pdf;
 #[cfg(any(feature = "terminal", feature = "herdr-core"))]
 mod persist;
 #[cfg(not(any(feature = "terminal", feature = "herdr-core")))]
@@ -77,6 +81,8 @@ mod render;
 #[cfg(feature = "capture")]
 mod render_entry;
 mod settings;
+mod share;
+mod status_item;
 mod terminal;
 mod theme_picker;
 mod themes;
@@ -107,7 +113,7 @@ pub use {
         schema,
     },
     moonframe_providers::{
-        Caller, Capabilities, Handle, HostCallLimits, HostCapability, Native, check_entry,
+        Caller, Capabilities, Handle, HostCallLimits, HostCapability, Native, Portable, check_entry,
     },
     rust_embed,
 };

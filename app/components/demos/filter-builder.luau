@@ -141,7 +141,7 @@ return mod {
 	end,
 
 	view = function(state: State)
-		local rows = {}
+		local rows: { Element } = {}
 		for _, task in shown(state) do
 			table.insert(rows, ui.row {
 				gap = "small",

@@ -118,7 +118,7 @@ ui.popover { open = state.menu == id, dismiss = "close-menu", width = 344,
 		local gap = 6
 		local tile_width = math.floor((width - gap * (columns - 1)) / columns)
 
-		local children = {}
+		local children: { Element } = {}
 		if props.title or props.subtitle or props.trailing then
 			children[#children + 1] = ui.row {
 				class = "action-tiles-header",
@@ -137,7 +137,7 @@ ui.popover { open = state.menu == id, dismiss = "close-menu", width = 344,
 		local grid = {}
 		local index = 1
 		while index <= #tiles do
-			local line = {}
+			local line: { Element } = {}
 			for column = 0, columns - 1 do
 				local tile = tiles[index + column]
 				if tile == nil then
@@ -185,7 +185,7 @@ ui.popover { open = state.menu == id, dismiss = "close-menu", width = 344,
 				entry.detail ~= nil and ui.text { entry.detail, class = "action-tiles-row-detail" },
 			}
 		end
-		local rows = {}
+		local rows: { Element } = {}
 		for _, entry in ipairs(props.rows or {}) do
 			rows[#rows + 1] = row(entry)
 		end

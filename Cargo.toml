@@ -1,5 +1,10 @@
 [workspace]
-exclude = ["app/providers", "crates/moonframe-provider"]
+exclude = [
+  "app/providers",
+  "crates/moonframe-provider",
+  "examples/portable/app/providers",
+  "examples/portable/bench/providers",
+]
 members = [
   "crates/moonframe",
   "crates/moonframe-acp",
@@ -28,6 +33,7 @@ members = [
   "crates/moonframe-transcripts",
   "crates/moonframe-usage",
   "examples/host",
+  "examples/portable/host",
 ]
 resolver = "2"
 
@@ -37,7 +43,7 @@ license      = "MIT"
 publish      = false
 repository   = "https://github.com/moonframehq/moonframe"
 rust-version = "1.99"
-version      = "1.1.1"
+version      = "1.5.1"
 
 [workspace.lints.rust]
 unsafe_code           = "deny"
@@ -54,13 +60,15 @@ alacritty_terminal = "0.26"
 # Dates a document list shows, in local time (moonframe-documents).
 chrono = { default-features = false, features = ["clock"], version = "0.4" }
 # Pictures sent to the pi agent (moonframe-pi).
-base64 = "0.22"
+base64 = "0.23"
 # Colored command-line output, plain when piped or under NO_COLOR.
 anstream = "1"
 anstyle  = "1"
 block2   = "0.6"
 futures  = "0.3"
-gpui-kit = "=0.8.1"
+gpui-kit = "=0.9.1"
+# Vector maps drawn on the GPU, for `map-vector`.
+gpui-maps = { default-features = false, version = "0.8.1" }
 # The parser `gpui-kit` renders with, read here for headings and footnotes.
 latex-rust = { default-features = false, features = ["std"], version = "3.0" }
 markdown   = "1.0"
@@ -96,27 +104,29 @@ image = { default-features = false, version = "0.25" }
 imagesize = "0.15"
 libc      = "0.2"
 # Unreleased: the Ghostty it pins builds with Zig 0.17, which links on macOS 27.
-keepawake                = { default-features = false, version = "0.6.1" }
-libghostty-vt            = { git = "https://github.com/uzaaft/libghostty-rs", rev = "575ed6b8ceb79ffaf247ecf7e34333876b0d5be4" }
-metal                    = "0.33"
-mlua                     = { features = ["luau"], version = "0.12.2" }
-moonframe                = { path = "crates/moonframe" }
-moonframe-acp            = { path = "crates/moonframe-acp" }
-moonframe-chat           = { path = "crates/moonframe-chat" }
-moonframe-core           = { path = "crates/moonframe-core" }
-moonframe-docs           = { path = "crates/moonframe-docs" }
-moonframe-documents      = { path = "crates/moonframe-documents" }
-moonframe-forge          = { path = "crates/moonframe-forge" }
-moonframe-frames         = { path = "crates/moonframe-frames" }
-moonframe-git            = { path = "crates/moonframe-git" }
-moonframe-history        = { path = "crates/moonframe-history" }
-moonframe-mux            = { default-features = false, path = "crates/moonframe-mux" }
-moonframe-notes          = { path = "crates/moonframe-notes" }
-moonframe-packages       = { path = "crates/moonframe-packages" }
-moonframe-pi             = { path = "crates/moonframe-pi" }
-moonframe-planner        = { path = "crates/moonframe-planner" }
-moonframe-procs          = { path = "crates/moonframe-procs" }
+keepawake           = { default-features = false, version = "0.6.1" }
+libghostty-vt       = { git = "https://github.com/uzaaft/libghostty-rs", rev = "575ed6b8ceb79ffaf247ecf7e34333876b0d5be4" }
+metal               = "0.33"
+mlua                = { features = ["luau"], version = "0.12.2" }
+moonframe           = { path = "crates/moonframe" }
+moonframe-acp       = { path = "crates/moonframe-acp" }
+moonframe-chat      = { path = "crates/moonframe-chat" }
+moonframe-core      = { path = "crates/moonframe-core" }
+moonframe-docs      = { path = "crates/moonframe-docs" }
+moonframe-documents = { path = "crates/moonframe-documents" }
+moonframe-forge     = { path = "crates/moonframe-forge" }
+moonframe-frames    = { path = "crates/moonframe-frames" }
+moonframe-git       = { path = "crates/moonframe-git" }
+moonframe-history   = { path = "crates/moonframe-history" }
+moonframe-mux       = { default-features = false, path = "crates/moonframe-mux" }
+moonframe-notes     = { path = "crates/moonframe-notes" }
+moonframe-packages  = { path = "crates/moonframe-packages" }
+moonframe-pi        = { path = "crates/moonframe-pi" }
+moonframe-planner   = { path = "crates/moonframe-planner" }
+moonframe-procs     = { path = "crates/moonframe-procs" }
+# The guest SDK, outside the workspace: provider crates build it alone.
 moonframe-projects       = { path = "crates/moonframe-projects" }
+moonframe-provider       = { path = "crates/moonframe-provider" }
 moonframe-providers      = { path = "crates/moonframe-providers" }
 moonframe-rune           = { path = "crates/moonframe-rune" }
 moonframe-shell          = { path = "crates/moonframe-shell" }
@@ -128,8 +138,8 @@ moonframe-usage          = { path = "crates/moonframe-usage" }
 notify                   = "8"
 objc2                    = "0.6"
 objc2-app-kit            = { default-features = false, features = ["NSApplication", "NSImage", "NSResponder", "std"], version = "0.3" }
-objc2-foundation         = { default-features = false, features = ["NSAttributedString", "NSBundle", "NSData", "NSDictionary", "NSProcessInfo", "NSString", "std"], version = "0.3" }
-objc2-user-notifications = { default-features = false, features = ["UNNotification", "UNNotificationContent", "UNNotificationRequest", "UNNotificationResponse", "UNUserNotificationCenter", "block2", "std"], version = "0.3" }
+objc2-foundation         = { default-features = false, features = ["NSArray", "NSAttributedString", "NSBundle", "NSData", "NSDictionary", "NSProcessInfo", "NSString", "std"], version = "0.3" }
+objc2-user-notifications = { default-features = false, features = ["UNNotification", "UNNotificationContent", "UNNotificationRequest", "UNNotificationResponse", "UNNotificationSettings", "UNUserNotificationCenter", "block2", "std"], version = "0.3" }
 objc2-web-kit            = { default-features = false, features = ["WKWebView", "objc2-app-kit", "std"], version = "0.3" }
 portable-pty             = "0.9"
 raw-window-handle        = "0.6"
@@ -153,6 +163,8 @@ tracing            = "0.1"
 tracing-subscriber = { default-features = false, features = ["ansi", "env-filter", "fmt", "std"], version = "0.3" }
 # Check for Updates: GitHub's releases API and the download (moonframe).
 ureq = "3.5"
+# Links to an app's own URL schemes, read for its mods (moonframe).
+url = "2.5"
 # The ids of pi threads, which pi takes as session ids (moonframe-pi).
 uuid          = { features = ["v4"], version = "1" }
 wasmtime      = "50"

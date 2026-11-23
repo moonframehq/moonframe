@@ -26,6 +26,10 @@ ignore = [
   { id = "RUSTSEC-2026-0391", reason = "zstd only via wasmtime's compilation cache, which is never enabled" },
   { id = "RUSTSEC-2026-0398", reason = "zstd only via wasmtime's compilation cache, which is never enabled" },
   { id = "RUSTSEC-2026-0403", reason = "zstd only via wasmtime's compilation cache, which is never enabled" },
+  # chrono is flagged unmaintained with no successor release. GPUI,
+  # gpui-component and ferrostar depend on it too, so dropping our direct use
+  # would not take it out of the build. Revisit when those move off it.
+  { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no fix; also pulled in by GPUI and ferrostar" },
 ]
 # Security vulnerabilities always fail. "Unmaintained" is scoped to crates
 # this workspace depends on directly: GPUI's own tree carries discontinued

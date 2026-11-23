@@ -1,0 +1,4 @@
+# The same crate as ../digest, linked into the bench with `Portable`.
+capabilities = ["bench.logs"]
+interval     = 3600.0
+kind         = "native"

@@ -5,7 +5,18 @@
 -- provider, which runs a coding agent.
 local feedback = use "feedback"
 
-return mod {
+type State = {
+	open: boolean,
+	text: string,
+	reply: string,
+	count: number,
+	runs: { any },
+	expanded: string?,
+	attached: { element: string, at: string, report: string }?,
+	copied: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		local runs: { any } = {
 			{

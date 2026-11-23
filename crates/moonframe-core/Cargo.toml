@@ -24,6 +24,7 @@ sys-locale.workspace      = true
 thiserror.workspace       = true
 tracing.workspace         = true
 unic-langid.workspace     = true
+url.workspace             = true
 
 [dev-dependencies]
 tempfile.workspace = true

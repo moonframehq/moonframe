@@ -85,7 +85,7 @@ return component {
 				table.insert(picks, other)
 			end
 		end
-		local related = {}
+		local related: { Element } = {}
 		for _, other in picks do
 			do
 				local other_read = read_of(state, other)

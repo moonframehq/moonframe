@@ -285,6 +285,125 @@ let a changed setting win over the saved state.
 - **A running provider panics.** It has nothing left to save, so the next
   build starts fresh. Only state from a clean stop is handed on.
 
+## Compile it into the app
+
+A provider written against the guest SDK builds either way from the same
+source: as a component, sandboxed and rebuilt as you edit, or linked into the
+app as an ordinary crate, with no wasmtime, Cargo or sandbox at run time.
+
+```rust
+// providers/counter/src/lib.rs
+use {moonframe_provider::Provider, serde_json::Value};
+
+pub struct Counter(u64);
+
+impl Provider for Counter {
+    fn start(_settings: Value) -> Result<Self, String> {
+        Ok(Self(0))
+    }
+
+    fn tick(&mut self) -> Option<Value> {
+        self.0 += 1;
+        Some(self.0.into())
+    }
+
+    fn receive(&mut self, message: Value) -> Option<Value> {
+        (message == "reset").then(|| { self.0 = 0; self.0.into() })
+    }
+}
+
+moonframe_provider::export!(Counter); // the component's exports; nothing natively
+```
+
+Give the crate `crate-type = ["cdylib", "rlib"]` so the app can depend on it,
+then register it under the folder's name and switch the folder's kind:
+
+```rust
+Moonframe::new(...).native("counter", moonframe::Portable::<counter::Counter>::new)
+```
+
+```toml
+# providers/counter/provider.toml
+kind = "native"     # was "wasm"; the rest stays as it was
+```
+
+Compiled in, it is called in the same order (`start`, `restore`, a first
+`tick` published at once, then ticks and messages) and `log`, `system_load`
+and `host_call` reach the app with the same `capabilities` from provider.toml
+(`system` needs the app's `system` or `wasm` feature). What differs: it has
+the user's access and no fuel or memory limits, so link only code you would
+run yourself; `save` hands state to the next start only within one launch;
+and a change needs the app rebuilt.
+
+`examples/portable` is a complete example to copy: a focus timer crate in
+`app/providers/focus` (settings, ticks, messages, `save`/`restore`, and unit
+tests that run natively), run as a component from that folder and compiled in
+for `app/providers/focus-native`, side by side in one window. Its `host/`
+binary sits beside the app folder, not around it: Cargo counts any crate
+inside a workspace member's folder as a member, so a provider crate there
+could not keep its own `[workspace]`. `examples/capability-provider` builds
+both ways too.
+
+### How the two builds compare
+
+`examples/portable/host/examples/bench` runs providers both ways through the
+provider runtime the app uses, so the numbers are what a view waits for. All
+figures are medians, from three runs on an Apple M4 Max (macOS, release build).
+
+**Calls and startup.** The example's `focus` timer does almost no work per call,
+so this is the runtime's own cost:
+
+| | Wasm | Native |
+| --- | --- | --- |
+| Start, to the first data | 15.6 ms prebuilt (`provider.wasm`); 236 ms from source, Cargo finding nothing to build; 7.2 s for the first build | 0.2 ms |
+| Message to published answer, median | 8.6 µs | 7.0 µs |
+| Same, p99 | 17.4 µs | 13.5 µs |
+| Messages per second, one at a time | about 109,000 | about 145,000 |
+
+Most of a round trip is the hop to the provider's thread and back, which both
+builds share; Wasm adds about 1.5 µs a call. Startup differs more: wasmtime
+compiles the component each time it starts (160 KiB here), and a provider built
+from source asks Cargo first.
+
+**A real workload.** `examples/portable/bench/providers/digest` does what Wasm
+providers are for, shaping data: each cycle it fetches a batch of request-log
+lines through a host capability, parses every line, folds numeric path
+segments into `:id`, works out per-route counts, error rates and p50/p95/p99
+latencies, and publishes the 50 busiest routes. One cycle, message to
+published summary (the `opt-level = 3` column, in brackets in the last, is
+from one run):
+
+| Lines | Batch | Wasm, `opt-level = "s"` | Wasm, `opt-level = 3` | Native | Wasm ÷ native |
+| --- | --- | --- | --- | --- | --- |
+| 1,000 | 59 KiB | 0.7 ms | 0.5 ms | 0.3 ms | 2.4× (1.7×) |
+| 10,000 | 596 KiB | 4.5 ms | 3.3 ms | 1.8 ms | 2.5× (1.8×) |
+| 50,000 | 2.9 MiB | 21.6 ms | 15.2 ms | 8.9 ms | 2.4× (1.7×) |
+
+Moving the lines alone (fetching without digesting, measured in one run each)
+is 1.5× slower in Wasm (1.3× at `opt-level = 3`), so the parsing and sorting itself runs about 3×
+slower, or 2× when optimised for speed. The repository's providers build with
+`opt-level = "s"` for small components; for one that computes much, use
+`opt-level = 3` in its `[profile.release]`.
+
+What this means:
+
+- At an interval of seconds, either build is fast enough: even 50,000 lines a
+  cycle is 22 ms of work as a component.
+- Compiling in pays off for an app that starts often or runs many providers,
+  and for a provider that digests large batches often: 50,000 lines every
+  half second is about 4% of a core as a component, 2% compiled in.
+- A Wasm provider's results cross as JSON text, so a float can come back one
+  bit away from the native build's: the host parses JSON with serde_json's
+  fast float parser.
+- A host call carries at most 1 MiB by default; the 50,000-line batch is
+  2.9 MiB, so the bench raises `HostCallLimits::max_bytes` (for both builds).
+
+Run it yourself (it needs `rustup target add wasm32-wasip2`):
+
+```sh
+cargo run --release -p moonframe-portable-example --example bench
+```
+
 ## Host-defined capabilities and external miniapps
 
 An embedding app can expose a narrow JSON API to Wasm:
@@ -429,10 +548,12 @@ be namespaced with dots; unprefixed names and `moonframe.*` are reserved.
 optional namespace, and all declared capability names.
 
 The standalone Rust guest SDK is `crates/moonframe-provider` (add it as a path
-or git dependency). Implement `moonframe_provider::bindings::Guest` and export
-with `moonframe_provider::bindings::export!(MyProvider with_types_in
-moonframe_provider::bindings)`. Enable its `stateful` feature for save/restore.
-Its typed helper serializes arguments and deserializes the JSON answer:
+or git dependency). Implement `moonframe_provider::Provider` and export it with
+`moonframe_provider::export!(MyProvider)`; the same crate can then be compiled
+into the app too (see [Compile it into the app](#compile-it-into-the-app)).
+Enable its `stateful` feature for save/restore. The raw WIT bindings stay
+available on wasm32 as `moonframe_provider::bindings`. Its typed helper
+serializes arguments and deserializes the JSON answer:
 
 ```rust
 let answer: serde_json::Value = moonframe_provider::host_call(
@@ -485,6 +606,50 @@ Reading `app.counter` from a drawn view starts the provider on demand.
 Subscribing to `provider/counter` or sending a message also starts it.
 Once started, it keeps running even if the view is hidden. Use
 `start = "always"` only when it should work before any mod needs it.
+
+## Declare its types
+
+Without types, `app.counter` is `any` to the Luau checker: a view that
+reads a field the provider never publishes, or sends it a message it
+ignores, passes `just types` and fails quietly at runtime. Declare both in
+`providers/counter/types.luau`:
+
+```lua
+-- What app.counter holds.
+export type Published = {
+    count: number,
+}
+
+-- What send "provider:counter" takes.
+export type Message = { add: boolean } | { reset: boolean }
+```
+
+Then send with `send`, which builds the same `{ to = ..., msg = ... }` a
+literal would, so its message is checked:
+
+```lua
+update = function(state, msg)
+    return state, { send "provider:counter" { add = true } }
+end,
+```
+
+`just types DIR` checks the app's mods against them: reading
+`counter.total`, or sending `{ ad = true }`, is a type error with its line.
+For a provider in the starter's `app/providers/`, `just provider-types`
+also copies them into `types/moonframe.d.luau`, so every app sees them;
+`just provider-types-check` (in `just ci`) fails when that copy is stale.
+
+Keep an example of what it publishes beside them as `published.json`, and
+hold both sides to it: `just provider-types-check` fails when the file's
+keys or kinds differ from `Published`, and a test in the crate compares a
+real `tick` against it (see `examples/portable/app/providers/focus`). Then
+neither the Rust nor the Luau side can change without the other.
+
+Limits: only `Published`'s own fields are held to the example, a level
+deep; button `msg = ..., to = ...` and plain `{ to = ..., msg = ... }`
+tables are not checked, only `send`; and the type names (`Published`) are
+not visible in mods, whose own annotations are checked against them by
+shape. Nothing checks the published JSON at runtime.
 
 ## Build, run and check
 
@@ -630,11 +795,13 @@ When asked to build a WASM provider:
 2. Copy the matching WIT locally; create an independent `cdylib` crate
    with `kind = "wasm"`. Keep manifest keys separate from `[settings]`.
 3. Define the published JSON shape and accepted message payloads before
-   writing the view. Validate settings and handle unknown messages.
+   writing the view, in `types.luau` (`Published`, `Message`) with an
+   example `published.json` and a test holding `tick` to it. Validate
+   settings and handle unknown messages.
 4. Implement `start`, `tick`, `receive` and `export!`. Publish whole
    snapshots, bound work and memory, and do not assume runtime state persists.
-5. Read `app.<name>` with a nil fallback; send payloads to
-   `provider:<name>`. Follow the Moonframe and component skills for UI.
+5. Read `app.<name>` with a nil fallback; send payloads with
+   `send "provider:<name>" { ... }`. Follow the Moonframe and component skills for UI.
 6. Build for `wasm32-wasip2`, run the app's headless checks and Luau type
    checks where configured, then verify startup, a message and reload.
    State explicitly when an interactive check was not performed.

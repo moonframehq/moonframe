@@ -2,7 +2,24 @@
 -- adds one at the top.
 local timeline = use "timeline"
 
-return mod {
+type Entry = {
+	id: string,
+	day: string,
+	time: string,
+	title: string,
+	detail: string,
+	added: number?,
+	removed: number?,
+	tone: string?,
+}
+
+type State = {
+	selected: string,
+	next: number,
+	entries: { Entry },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -14,7 +31,7 @@ return mod {
 					{ id = "c3", day = "Today", time = "11:47", title = "checkpoint-3", detail = "Tests for rounding", added = 64 },
 					{ id = "c2", day = "Yesterday", time = "18:20", title = "checkpoint-2", detail = "Agent stopped: needs input", tone = "warning" },
 					{ id = "c1", day = "Yesterday", time = "17:02", title = "checkpoint-1", detail = "Initial worktree", added = 3, removed = 1 },
-				} :: { any },
+				},
 			}
 	end,
 
@@ -39,7 +56,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local chosen
+		local chosen: Entry?
 		for _, entry in state.entries do
 			if entry.id == state.selected then
 				chosen = entry

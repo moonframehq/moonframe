@@ -120,8 +120,8 @@ local CATEGORIES = {
 
 -- Emoji in rows of `columns`, each sending `{ [event] = emoji }`.
 local function grid(list: { any }, columns: number, event: string, to: string?)
-	local rows = {}
-	local row = {}
+	local rows: { Element } = {}
+	local row: { Element } = {}
 	for _, entry in list do
 		table.insert(row, ui.row {
 			class = "emoji-picker-cell",
@@ -193,7 +193,7 @@ ui.popover {
 		local columns = props.columns or 8
 		local event = props.event or "pick"
 		local query = string.lower(props.query or "")
-		local sections = {}
+		local sections: { Element } = {}
 		if query == "" then
 			if props.recent and #props.recent > 0 then
 				local recent = {}

@@ -37,7 +37,7 @@ local function stale(deals: { any }): { any }
 	end
 	table.sort(found, function(a, b)
 		return (if a.status == "risk" then 1 else 0) > (if b.status == "risk" then 1 else 0)
-			or ((a.status == "risk") == (b.status == "risk") and a.amount > b.amount)
+			or ((a.status == "risk") == (b.status == "risk") and (a.amount :: number) > (b.amount :: number))
 	end)
 	return found
 end
@@ -162,7 +162,7 @@ return mod {
 			}
 		end
 
-		local turns = {}
+		local turns: { Element } = {}
 		if data then
 			table.insert(turns, ui.text {
 				if #late > 0

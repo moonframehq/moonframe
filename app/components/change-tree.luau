@@ -119,7 +119,7 @@ return component {
 		local fold = props.fold or "fold"
 		local pick = props.pick or "pick"
 		local indent = props.indent or 14
-		local rows = {}
+		local rows: { Element } = {}
 
 		local function add(at: Folder, depth: number)
 			for _, below in sorted_folders(at) do

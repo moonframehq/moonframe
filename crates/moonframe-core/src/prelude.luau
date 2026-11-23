@@ -114,4 +114,15 @@ local function component(definition)
 	return definition
 end
 
-return ui, define, stylesheet, component
+-- `send "provider:desk" { watch = id }` is `{ to = "provider:desk", msg =
+-- { watch = id } }`, curried so the declarations can type `msg` by `to`.
+local function send(to)
+	if type(to) ~= "string" then
+		error("send takes where to send, a string", 2)
+	end
+	return function(msg)
+		return { to = to, msg = msg }
+	end
+end
+
+return ui, define, stylesheet, component, send

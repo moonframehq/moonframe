@@ -211,6 +211,9 @@ tokens! {
         /// Opens another main window of the app, with its own copy of the
         /// layout and the same providers.
         NewWindow = "new-window",
+        /// Brings the app and the window forward, restoring it from the
+        /// Dock: a menu bar item's Open line, a hotkey that summons it.
+        Activate = "activate",
     }
 }
 

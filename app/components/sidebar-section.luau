@@ -114,6 +114,7 @@ section { title = "Agents", count = 3, collapsed = state.agents_folded, toggle =
 		if not collapsed and #children > 0 then
 			body = ui.column { class = "sidebar-section-body", table.unpack(children) }
 		end
-		return ui.column { class = "sidebar-section", header, body or false }
+		-- Never squeezed: a sidebar scrolls its sections once they outgrow it.
+		return ui.column { class = "sidebar-section", shrink = false, header, body or false }
 	end,
 }

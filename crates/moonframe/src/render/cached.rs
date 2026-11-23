@@ -1,8 +1,8 @@
 //! Parts of a window kept from one frame to the next, so that an element
 //! moving by itself pays for itself and not for what surrounds it.
 //!
-//! An element that moves on its own, a map, draws in a view of its own: a
-//! *live* one. While a window shows one, each run of plain nodes around it
+//! An element that moves on its own, a map or a spinning icon, draws in a
+//! view of its own: a *live* one. While a window shows one, each run of plain nodes around it
 //! (see [`nodes`]) also draws in a view, and the frame is then one of two
 //! kinds:
 //!
@@ -97,6 +97,12 @@ impl Cached {
         self.live_frame = live && !whole && same_size && self.keeping;
         self.has_live = false;
         self.drawn.clear();
+    }
+
+    /// Whether the frame drawn last replayed the kept views.
+    #[cfg(all(test, unix, feature = "markdown"))]
+    pub(crate) fn replayed(&self) -> bool {
+        self.live_frame
     }
 
     /// The frame is built: what a whole frame did not draw is gone.
@@ -446,7 +452,6 @@ impl<'w> Painter<'w, '_> {
     }
 
     /// The live view of the element at `place`, in a window that has them.
-    #[cfg_attr(not(feature = "map"), expect(dead_code))]
     pub(super) fn live_view(&mut self, place: &Place) -> Option<EntityId> {
         let cached = self.cached.as_mut()?;
         let entry = cached.entry(&place.path)?;
@@ -456,7 +461,6 @@ impl<'w> Painter<'w, '_> {
     }
 
     /// `element`, what the element at `place` drew, in its live view.
-    #[cfg_attr(not(feature = "map"), expect(dead_code))]
     pub(super) fn in_live_view(&mut self, element: AnyElement, place: &Place) -> AnyElement {
         let Some(entry) = self
             .cached
@@ -470,7 +474,6 @@ impl<'w> Painter<'w, '_> {
     }
 
     /// Asks for another frame of the live view `view`.
-    #[cfg_attr(not(feature = "map"), expect(dead_code))]
     pub(super) fn live_again(&mut self, view: EntityId) {
         self.live_again.push(view);
     }

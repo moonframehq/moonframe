@@ -20,7 +20,18 @@ impl Render for MoonframeApp {
             self.workspace.show_demos(false);
         }
         self.cached.prepare(cx);
-        let inspecting = self.inspector.sink().is_some();
+        // A mod's window it picked in that has closed hands it back.
+        if let Some(id) = self.inspector.window
+            && !cx.windows().iter().any(|window| window.window_id() == id)
+        {
+            self.inspector.move_to(None);
+        }
+        let sink = self
+            .inspector
+            .in_window(None)
+            .then(|| self.inspector.sink())
+            .flatten();
+        let inspecting = sink.is_some();
         let layers = self.views.layers().clone();
         layers.begin();
         // Drawn as a cached view, everything in it is drawn again with it.
@@ -37,7 +48,7 @@ impl Render for MoonframeApp {
             #[cfg(feature = "terminal")]
             &mut self.terminals,
             &self.inputs,
-            self.inspector.sink(),
+            sink,
             cx.theme(),
         )
         .with_browsers(&mut self.browsers)
@@ -104,7 +115,11 @@ impl Render for MoonframeApp {
             self.project.follow(folder);
         }
         let problems = self.problems_layer(cx);
-        let layers = self.inspector_layers(window.viewport_size(), cx);
+        let layers = if self.inspector.in_window(None) {
+            self.inspector_layers(window.viewport_size(), cx)
+        } else {
+            self.inspector_catcher(None, cx).into_iter().collect()
+        };
         let toast = self.toast.as_ref().map(|(id, message)| {
             let notice = self
                 .toast_notice
@@ -157,5 +172,13 @@ impl MoonframeApp {
         )
         .kept_in(window.window_handle().window_id())
         .redraw(source, size, kept, cx)
+    }
+}
+
+#[cfg(all(test, unix, feature = "markdown"))]
+impl MoonframeApp {
+    /// Whether the frame drawn last replayed what stood still in it.
+    pub(crate) fn replayed_last_frame(&self) -> bool {
+        self.cached.replayed()
     }
 }

@@ -1,26 +1,25 @@
 //! The embedding host registers `example.echo`; see docs/wasm-providers.md.
-use moonframe_provider::{bindings::Guest, host_call};
+//! The same crate runs as a wasm component or, linked into the host and
+//! registered with `moonframe_providers::Portable`, as a native provider.
+use {
+    moonframe_provider::{Provider, host_call},
+    serde_json::{Value, json},
+};
 
-struct Echo;
+pub struct Echo;
 
-impl Guest for Echo {
-    fn start(_: String) -> Result<(), String> {
-        Ok(())
+impl Provider for Echo {
+    fn start(_: Value) -> Result<Self, String> {
+        Ok(Self)
     }
 
-    fn tick() -> Option<String> {
-        let answer: serde_json::Value = host_call(
-            "example.echo",
-            "echo",
-            &serde_json::json!({"hello": "miniapp"}),
-        )
-        .ok()?;
-        Some(answer.to_string())
+    fn tick(&mut self) -> Option<Value> {
+        host_call("example.echo", "echo", &json!({"hello": "miniapp"})).ok()
     }
 
-    fn receive(_: String) -> Option<String> {
-        Self::tick()
+    fn receive(&mut self, _: Value) -> Option<Value> {
+        self.tick()
     }
 }
 
-moonframe_provider::bindings::export!(Echo with_types_in moonframe_provider::bindings);
+moonframe_provider::export!(Echo);

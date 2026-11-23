@@ -3,7 +3,21 @@
 -- the system's app for it; Save writes it to Downloads. Both go to the vault
 -- provider, which reads the bytes from the archive.
 
-return component {
+type File = {
+	id: string,
+	name: string,
+	size: string,
+	icon: string,
+	thumb: string?,
+}
+
+type Props = {
+	file: File,
+	width: number?,
+	large: boolean?,
+}
+
+return component<<Props>> {
 	title = "Vault File",
 	category = "Data",
 	icon = "paperclip",

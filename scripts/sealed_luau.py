@@ -135,7 +135,8 @@ class Lexer:
 # What an app's Luau reads or asks for, and the feature that brings it.
 APP_DATA = {"crash": "crash", "displays": "displays"}
 APP_REQUESTS = {"app:awake": "awake", "app:dock": "dock", "app:guard": "guard",
-                "app:restart": "restart"}
+                "app:hotkey": "hotkey", "app:pdf": "browser", "app:restart": "restart",
+                "app:share": "share", "app:status-item": "status-item"}
 
 
 @dataclass

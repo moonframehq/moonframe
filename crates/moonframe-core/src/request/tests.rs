@@ -293,6 +293,28 @@ fn update_posts_a_notification() {
         ]),
     );
     ask(&mut workspace, "app:notify", map(&[("title", "Hi")]));
+    let with = |fields: &[(&str, Data)]| {
+        Data::Map(
+            fields
+                .iter()
+                .map(|(key, value)| ((*key).to_owned(), value.clone()))
+                .collect(),
+        )
+    };
+    ask(
+        &mut workspace,
+        "app:notify",
+        with(&[
+            ("title", Data::from("Sharing")),
+            ("id", Data::from("share")),
+            ("replace", Data::Bool(true)),
+        ]),
+    );
+    ask(
+        &mut workspace,
+        "app:notify",
+        with(&[("ask", Data::Bool(true))]),
+    );
     assert_eq!(workspace.take_requests(), [
         (
             "asker".to_owned(),
@@ -300,6 +322,7 @@ fn update_posts_a_notification() {
                 title: "Agent done".to_owned(),
                 body: "claude finished".to_owned(),
                 id: Some("pane-3".to_owned()),
+                replace: false,
             })
         ),
         (
@@ -308,8 +331,19 @@ fn update_posts_a_notification() {
                 title: "Hi".to_owned(),
                 body: String::new(),
                 id: None,
+                replace: false,
             })
         ),
+        (
+            "asker".to_owned(),
+            Request::Notify(Notification {
+                title: "Sharing".to_owned(),
+                body: String::new(),
+                id: Some("share".to_owned()),
+                replace: true,
+            })
+        ),
+        ("asker".to_owned(), Request::AskToNotify),
     ]);
     let long = "x".repeat(MAX_TITLE + 1);
     for (wrong, problem) in [
@@ -319,6 +353,23 @@ fn update_posts_a_notification() {
         (map(&[("title", "a"), ("id", "a b")]), "`id` is 1 to"),
         (map(&[("title", "a"), ("url", "x")]), "unknown key `url`"),
         (Data::from("hello"), "takes {"),
+        (
+            with(&[("title", Data::from("a")), ("replace", Data::Bool(true))]),
+            "`replace` needs the `id`",
+        ),
+        (
+            with(&[
+                ("title", Data::from("a")),
+                ("id", Data::from("b")),
+                ("replace", Data::from("yes")),
+            ]),
+            "`replace` is a boolean",
+        ),
+        (with(&[("ask", Data::Bool(false))]), "`ask` is `true`"),
+        (
+            with(&[("ask", Data::Bool(true)), ("title", Data::from("a"))]),
+            "takes no other key",
+        ),
     ] {
         ask(&mut workspace, "app:notify", wrong);
         assert!(error(&workspace).contains(problem), "{}", error(&workspace));

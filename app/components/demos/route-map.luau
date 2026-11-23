@@ -37,7 +37,16 @@ local MARKERS = {
 	{ id = "balloon", label = "Balloon" },
 }
 
-return mod {
+type State = {
+	provider: string,
+	join: string,
+	marker: string,
+	stop: number,
+	-- Minutes each routed leg takes, by leg.
+	minutes: { [number]: number },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { provider = "openstreetmap", join = "walk", marker = "balloon", stop = 1, minutes = {} }
 	end,
@@ -63,7 +72,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local times = {}
+		local times: { string } = {}
 		for leg = 1, #STOPS - 1 do
 			local minutes = state.minutes[leg]
 			times[#times + 1] = `{leg}→{leg + 1}: ` .. (if minutes then `{minutes} min` else "…")

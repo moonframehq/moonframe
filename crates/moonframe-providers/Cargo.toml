@@ -19,21 +19,25 @@ socket = []
 # Native providers written with `async fn` (`AsyncNative`), on a tokio
 # runtime the app's views can use too.
 tokio = ["dep:tokio"]
+# The `system` capability (this machine's load) for providers compiled in;
+# wasm providers have it with `wasm`.
+system = ["dep:sysinfo"]
 # Wasm providers (`kind = "wasm"`), run sandboxed on wasmtime. Without it
 # one publishes nothing and fails only when a mod messages it.
-wasm = ["dep:sysinfo", "dep:wasmtime", "dep:wasmtime-wasi"]
+wasm = ["dep:wasmtime", "dep:wasmtime-wasi", "system"]
 
 [dependencies]
-moonframe-core.workspace = true
-serde.workspace          = true
-serde_json.workspace     = true
-sysinfo                  = { optional = true, workspace = true }
-thiserror.workspace      = true
-tokio                    = { features = ["rt-multi-thread", "time"], optional = true, workspace = true }
-toml.workspace           = true
-tracing.workspace        = true
-wasmtime                 = { optional = true, workspace = true }
-wasmtime-wasi            = { optional = true, workspace = true }
+moonframe-core.workspace     = true
+moonframe-provider.workspace = true
+serde.workspace              = true
+serde_json.workspace         = true
+sysinfo                      = { optional = true, workspace = true }
+thiserror.workspace          = true
+tokio                        = { features = ["rt-multi-thread", "time"], optional = true, workspace = true }
+toml.workspace               = true
+tracing.workspace            = true
+wasmtime                     = { optional = true, workspace = true }
+wasmtime-wasi                = { optional = true, workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

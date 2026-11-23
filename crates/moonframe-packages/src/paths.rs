@@ -237,6 +237,13 @@ pub fn images() -> PathBuf {
     cache().join("images")
 }
 
+/// Where providers write files for mods to share (`app:share`), such as a
+/// PDF: `$XDG_CACHE_HOME/<name>/share`, by default under `~/.cache`. Mods
+/// may share files from here, the image cache and the app's own folders.
+pub fn shared() -> PathBuf {
+    cache().join("share")
+}
+
 /// Where the inspector saves the selected element for agents:
 /// `$XDG_CACHE_HOME/<name>/selection.md`, by default under `~/.cache`.
 pub fn selection() -> PathBuf {
@@ -444,6 +451,18 @@ impl Folders {
             version,
             bundle: crate::update::running_bundle().filter(|_| replaceable),
         })
+    }
+
+    /// The URL schemes the app opens: its manifest's `schemes`, and outside
+    /// a profile also those the app was launched with.
+    pub fn schemes(&self) -> Vec<String> {
+        let mut schemes = self.manifest().map(|app| app.schemes).unwrap_or_default();
+        if self.profile.is_none() {
+            schemes.extend(crate::identity().schemes.iter().cloned());
+        }
+        schemes.sort();
+        schemes.dedup();
+        schemes
     }
 
     /// The app's name for people: its manifest's title, else its name, else

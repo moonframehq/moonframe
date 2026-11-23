@@ -4,7 +4,7 @@ local pr_badge = use "pr-badge"
 local segmented = use "segmented"
 local switch = use "switch"
 
-local TONES = {
+local TONES: { { tone: string, number: number, label: string? } } = {
 	{ tone = "draft", number = 839 },
 	{ tone = "waiting", number = 847 },
 	{ tone = "ready", number = 850, label = "Ready" },
@@ -14,7 +14,13 @@ local TONES = {
 	{ tone = "held", number = 805 },
 }
 
-return mod {
+type State = {
+	selected: number,
+	checks: string,
+	mr: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { selected = 850, checks = "passed", mr = false }
 	end,

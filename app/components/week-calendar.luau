@@ -122,7 +122,7 @@ end
 -- Lanes for events that overlap in one day: each gets { lane, lanes }.
 local function lanes_of(events: { Event }): { [string]: { lane: number, lanes: number } }
 	local sorted = table.clone(events)
-	table.sort(sorted, function(a, b)
+	table.sort(sorted, function(a: Event, b: Event)
 		return a.start < b.start or (a.start == b.start and a.finish > b.finish)
 	end)
 	local out = {}
@@ -330,21 +330,21 @@ local function month_view(props: Props, events: { Event }): any
 		table.insert(by_day[event.day], event)
 	end
 	for _, list in by_day do
-		table.sort(list, function(a, b)
+		table.sort(list, function(a: Event, b: Event)
 			return a.start < b.start
 		end)
 	end
-	local names = {}
+	local names: { Element } = {}
 	for _, name in props.weekdays or WEEKDAYS do
 		table.insert(names, ui.row { grow = true, class = "week-calendar-month-name", justify = "center", ui.text { name, class = "week-calendar-head-text" } })
 	end
 	local rows = { ui.row { class = "week-calendar-heads", height = 44, shrink = false, table.unpack(names) } }
 	local weeks: { { Day } } = props.weeks or {}
 	for _, week in weeks do
-		local cells = {}
+		local cells: { Element } = {}
 		for index, day in week do
 			local list: { Event } = by_day[day.id] or {}
-			local chips = {}
+			local chips: { Element } = {}
 			for n, event in list do
 				if n > most then
 					table.insert(chips, ui.text { `+{#list - most} more`, class = "week-calendar-more" })

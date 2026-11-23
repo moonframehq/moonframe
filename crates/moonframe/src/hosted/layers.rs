@@ -1,5 +1,5 @@
 //! Host views drawn over the app rather than inside it, so that one drawing
-//! again by itself, as a terminal printing does, costs what it costs alone.
+//! again by itself, as a terminal printing does, leaves the Luau shell cached.
 //!
 //! GPUI draws a view again when it is notified, and every view it was drawn
 //! inside with it. Drawn inside the app, a host view drawing again would draw
@@ -7,8 +7,14 @@
 //! `ui.view` goes, which notes where it lands, and the window's own view
 //! ([`crate::app::MainWindow`]) draws the app as a cached view and then
 //! [`HostLayers`], which lays each host view out over its placeholder. A host
-//! view drawing again then draws only itself, the window's view and GPUI's
-//! root: the app and the other host views are replayed as they were painted.
+//! view drawing again then draws the host layers, the window's view and
+//! GPUI's root: the app is replayed as it was painted.
+//!
+//! Host roots are not implicitly cached. GPUI 0.3.12 schedules a frame
+//! when a model read during rendering notifies, but only view notifications
+//! invalidate cached view ancestry. Caching a host root would hide updates
+//! from separate models its descendants read. Hosts may cache their own
+//! subviews when they can uphold that stronger notification contract.
 //!
 //! Each frame that draws the app notes where every host view goes before the
 //! layers are laid out, so a host view follows its place (a new layout, a
@@ -36,6 +42,7 @@ use {
 pub(crate) struct Layers {
     /// What the app's last drawn frame showed, in tree order.
     slots: RefCell<Vec<Slot>>,
+    placements: Rc<RefCell<Option<Rc<[Placement]>>>>,
     /// The window's view draws the app as a cached view this frame.
     replayed: Cell<bool>,
     /// How many frames drew the app, for tests to see one replayed.
@@ -48,6 +55,12 @@ pub(crate) struct Layers {
 struct Slot {
     view: AnyView,
     spot: Rc<RefCell<Option<Spot>>>,
+}
+
+struct Placement {
+    id: ElementId,
+    view: AnyView,
+    spot: Spot,
 }
 
 /// Where a placeholder landed, and what it would have drawn its view with.
@@ -64,6 +77,7 @@ impl Layers {
     /// The app starts drawing a frame: what it shows is noted afresh.
     pub(crate) fn begin(&self) {
         self.slots.borrow_mut().clear();
+        self.placements.borrow_mut().take();
         #[cfg(test)]
         self.frames.set(self.frames.get() + 1);
     }
@@ -94,12 +108,46 @@ impl Layers {
     /// What the app draws where `view` goes: it takes the room the view
     /// fills, and the view is drawn over it.
     pub(crate) fn place(&self, view: AnyView) -> AnyElement {
+        self.placements.borrow_mut().take();
         let spot = Rc::new(RefCell::new(None));
         self.slots.borrow_mut().push(Slot {
             view,
             spot: spot.clone(),
         });
-        Placeholder { spot }.into_any_element()
+        Placeholder {
+            spot,
+            placements: self.placements.clone(),
+        }
+        .into_any_element()
+    }
+
+    fn placements(&self) -> Rc<[Placement]> {
+        let mut placements = self.placements.borrow_mut();
+        placements
+            .get_or_insert_with(|| {
+                let mut seen: HashMap<EntityId, u64> = HashMap::new();
+                self.slots
+                    .borrow()
+                    .iter()
+                    .filter_map(|slot| {
+                        // Not laid out: in a list's rows out of sight, say.
+                        let spot = slot.spot.borrow().clone()?;
+                        let entity = slot.view.entity_id();
+                        // Named by the view, so it keeps its element state as it moves
+                        // from one place to another; a view shown twice, by its turn.
+                        let turn = seen.entry(entity).or_default();
+                        let id =
+                            ElementId::NamedInteger(format!("host-{turn}").into(), entity.as_u64());
+                        *turn += 1;
+                        Some(Placement {
+                            id,
+                            view: slot.view.clone(),
+                            spot,
+                        })
+                    })
+                    .collect()
+            })
+            .clone()
     }
 
     /// The layers, for the window's view to draw after the app.
@@ -114,6 +162,7 @@ impl Layers {
 /// where it landed.
 struct Placeholder {
     spot: Rc<RefCell<Option<Spot>>>,
+    placements: Rc<RefCell<Option<Rc<[Placement]>>>>,
 }
 
 impl IntoElement for Placeholder {
@@ -162,6 +211,7 @@ impl Element for Placeholder {
         window: &mut Window,
         _: &mut App,
     ) {
+        self.placements.borrow_mut().take();
         *self.spot.borrow_mut() = Some(Spot {
             bounds,
             mask: window.content_mask(),
@@ -189,10 +239,11 @@ pub(crate) struct HostLayers {
     layers: Rc<Layers>,
 }
 
-/// A host view laid out, and where.
+/// Host views laid out directly at their placeholders. Each ID scope
+/// keeps repeated placements distinct without a wrapper layout node.
 pub(crate) struct Drawn {
-    element: AnyElement,
-    spot: Spot,
+    placements: Rc<[Placement]>,
+    elements: Vec<AnyElement>,
 }
 
 impl IntoElement for HostLayers {
@@ -204,7 +255,7 @@ impl IntoElement for HostLayers {
 }
 
 impl Element for HostLayers {
-    type PrepaintState = Vec<Drawn>;
+    type PrepaintState = Drawn;
     type RequestLayoutState = ();
 
     fn id(&self) -> Option<ElementId> {
@@ -239,34 +290,24 @@ impl Element for HostLayers {
         _: &mut (),
         window: &mut Window,
         cx: &mut App,
-    ) -> Vec<Drawn> {
-        let slots = self.layers.slots.borrow().clone();
-        let mut seen: HashMap<EntityId, u64> = HashMap::new();
-        let mut drawn = Vec::with_capacity(slots.len());
-        for slot in slots {
-            // Not laid out: in a list's rows out of sight, say.
-            let Some(spot) = slot.spot.borrow().clone() else {
-                continue;
-            };
-            let entity = slot.view.entity_id();
-            // Named by the view, so it keeps its element state as it moves
-            // from one place to another; a view shown twice, by its turn.
-            let turn = seen.entry(entity).or_default();
-            let id = ElementId::NamedInteger(format!("host-{turn}").into(), entity.as_u64());
-            *turn += 1;
-            let mut element = div()
-                .id(id)
-                .size_full()
-                .child(slot.view.cached(full()))
-                .into_any_element();
-            within(&spot, window, |window| {
-                let room = spot.bounds.size.map(AvailableSpace::Definite);
-                element.layout_as_root(room, window, cx);
-                element.prepaint_at(spot.bounds.origin, window, cx);
+    ) -> Drawn {
+        let placements = self.layers.placements();
+        let mut elements = Vec::with_capacity(placements.len());
+        for placement in placements.iter() {
+            let mut element = placement.view.clone().into_any_element();
+            within(&placement.spot, window, |window| {
+                window.with_id(placement.id.clone(), |window| {
+                    let room = placement.spot.bounds.size.map(AvailableSpace::Definite);
+                    element.layout_as_root(room, window, cx);
+                    element.prepaint_at(placement.spot.bounds.origin, window, cx);
+                });
             });
-            drawn.push(Drawn { element, spot });
+            elements.push(element);
         }
-        drawn
+        Drawn {
+            placements,
+            elements,
+        }
     }
 
     fn paint(
@@ -275,12 +316,14 @@ impl Element for HostLayers {
         _: Option<&InspectorElementId>,
         _: Bounds<Pixels>,
         _: &mut (),
-        drawn: &mut Vec<Drawn>,
+        drawn: &mut Drawn,
         window: &mut Window,
         cx: &mut App,
     ) {
-        for Drawn { element, spot } in drawn {
-            within(spot, window, |window| element.paint(window, cx));
+        for (placement, element) in drawn.placements.iter().zip(&mut drawn.elements) {
+            within(&placement.spot, window, |window| {
+                window.with_id(placement.id.clone(), |window| element.paint(window, cx));
+            });
         }
     }
 }
@@ -293,14 +336,6 @@ fn within<R>(spot: &Spot, window: &mut Window, f: impl FnOnce(&mut Window) -> R)
             window.with_content_mask(Some(spot.mask), f)
         })
     })
-}
-
-/// A cached view's style: all of its box.
-fn full() -> StyleRefinement {
-    let mut style = StyleRefinement::default();
-    style.size.width = Some(relative(1.).into());
-    style.size.height = Some(relative(1.).into());
-    style
 }
 
 /// `style` as a refinement that sets every field, so that it is the text
@@ -326,5 +361,9 @@ fn refinement(style: &TextStyle) -> TextStyleRefinement {
     }
 }
 
+// keep-sorted start
+#[cfg(test)]
+mod redraw_tests;
 #[cfg(test)]
 mod tests;
+// keep-sorted end

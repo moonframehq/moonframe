@@ -191,8 +191,8 @@ impl Display {
 }
 
 /// The sizes a mod's window may ask for, opening and at its smallest.
-const MOD_WINDOW_WIDTH: std::ops::RangeInclusive<f32> = 200.0..=4000.0;
-const MOD_WINDOW_HEIGHT: std::ops::RangeInclusive<f32> = 160.0..=3000.0;
+pub(crate) const MOD_WINDOW_WIDTH: std::ops::RangeInclusive<f32> = 200.0..=4000.0;
+pub(crate) const MOD_WINDOW_HEIGHT: std::ops::RangeInclusive<f32> = 160.0..=3000.0;
 
 impl Read for ModWindowSize {
     fn read(value: &mlua::Value, cx: &Cx) -> Result<Self, Error> {

@@ -96,7 +96,8 @@ and how to try it.
   and come back on the next launch.
 - **Providers** for data Luau can't reach, publishing what views read as
   `app.<name>`: sandboxed WebAssembly (WASM) components, plain processes, or Rust
-  built into the app. The built-in ones cover git (status, diffs, commit and
+  built into the app. One Rust provider can build as either a component or
+  built-in code. The built-in ones cover git (status, diffs, commit and
   push), GitHub and GitLab, the project's files and markdown documents, the
   system's load, and coding agents.
 - **Coding agents in the app.** The `acp` provider runs Claude, Codex,
@@ -298,9 +299,11 @@ The window reloads while an agent edits it, so you can watch it work.
 - **Pick a component.** In the Components window, <b>Copy for agent</b>
   copies a request to add that component at your selection.
 - **See it before it is made.** Ask for ideas ("show me three takes on the
-  status bar") and the `moonframe-mockups` skill draws them live, side by
-  side, in a Mockups tab of your window. <b>Pick</b> copies your choice for
-  the agent; nothing real changes until then.
+  status bar") and the `moonframe-mockups` skill writes them as one Luau
+  file on the app's own components. `moonframe mockup` checks it, then
+  shows the variants side by side: rendered in light and dark in a Sheprd
+  tab, or live in a Mockups tab of your window. <b>Pick</b> hands your
+  choice to the agent; nothing real changes until then.
 
 ## Mods from git
 
@@ -328,6 +331,15 @@ Write a provider as a WASM component if it only shapes data or if it comes
 from someone else. A bug or bad actor in it can't read your files or reach
 the network. Keep process and native providers for things the sandbox
 can't reach, and read them as you would any script.
+
+A Rust provider written with the `moonframe-provider` SDK builds either way
+from the same source: as a WASM component, or compiled into an app on the
+library with `moonframe::Portable`, trading the sandbox for speed.
+[`examples/portable`](examples/portable) runs one both ways side by side. On
+an Apple M4 Max, a provider digesting 50,000 request-log lines a cycle takes
+8.9 ms compiled in against 21.6 ms as a component (15.2 ms built for speed),
+and starts in 0.2 ms against 15.6 ms
+([how the two builds compare](docs/wasm-providers.md#how-the-two-builds-compare)).
 
 The sandbox only covers the running component. Building it runs Cargo as
 your user, including proc macros and dependency build scripts. The host
@@ -582,6 +594,15 @@ feedback, shows at once.
       <img src="docs/screenshots/apps/folio.png" alt="Folio">
       <br>
       <sub><b>Folio</b> (<code>folio</code>): a quiet place to write: a library of markdown files beside a page that styles markdown as you type, with focus mode (the sentence or paragraph being written in full ink) and typewriter scrolling.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/strata.png" alt="Strata: repositories on the left, a repository's history as a commit graph in the middle, and the picked commit's message and diff on the right">
+      <br>
+      <sub><b>Strata</b> (<code>strata</code>): a git browser: your repositories, a repository's history as a graph or its branches, and each commit's message, parents and diff, file by file.</sub>
+    </td>
+    <td width="50%" valign="top">
     </td>
   </tr>
 </table>

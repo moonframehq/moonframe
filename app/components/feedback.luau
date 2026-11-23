@@ -55,7 +55,10 @@ type Props = {
 
 local PLACEHOLDER = "What should change? For example:\n• Focus the prompt when I open a session\n• Make deploys faster"
 
-local STATUS = {
+-- How a run's status is drawn: its icon, the class tinting it, its words.
+type Status = { icon: string, class: string, label: string, spin: boolean? }
+
+local STATUS: { [string]: Status } = {
 	starting = { icon = "loader-circle", class = "feedback-running", label = "Starting", spin = true },
 	running = { icon = "loader-circle", class = "feedback-running", label = "Working on it", spin = true },
 	waiting = { icon = "circle-alert", class = "feedback-waiting", label = "Needs your answer" },
@@ -192,7 +195,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 	local to = props.to
 	local status = STATUS[run.status] or STATUS.stopped
 	local going = run.status == "starting" or run.status == "running" or run.status == "waiting"
-	local body = {}
+	local body: { Element } = {}
 	if open then
 		for index, turn in turns do
 			if index > 1 then
@@ -219,6 +222,16 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 			copy = export(turns),
 			tooltip = "Copy this conversation as Markdown: the requests, what the agent said and ran, and how it ended",
 		}
+		-- Forgets the conversation; not while it runs.
+		local remove = if going then nil else ui.button {
+			"Remove",
+			icon = "trash",
+			variant = "ghost",
+			small = true,
+			msg = { forget_thread = first.id },
+			to = to,
+			tooltip = "Remove this conversation from the list",
+		}
 		if checking then
 			-- The provider checks the app after a run on it, and undoes a
 			-- change that broke it.
@@ -234,6 +247,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 				ui.button { "Undo these changes", variant = "outline", msg = { undo_thread = first.id }, to = to },
 				ui.spacer(),
 				copy_session,
+				remove,
 			})
 		elseif props.undo and undone then
 			table.insert(body, ui.row {
@@ -241,9 +255,10 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 				ui.text { "These changes were undone", class = "feedback-detail" },
 				ui.spacer(),
 				copy_session,
+				remove,
 			})
 		else
-			table.insert(body, ui.row { ui.spacer(), copy_session })
+			table.insert(body, ui.row { align = "center", ui.spacer(), copy_session, remove })
 		end
 		local blank = string.match(props.reply or "", "^%s*$") ~= nil
 		if props.follow and not going then
@@ -258,7 +273,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 					rows = 2,
 					grow = true,
 					change = { follow_type = first.id },
-					submit = not blank and { follow = first.id } or nil,
+					submit = if not blank then { follow = first.id } else nil,
 					to = to,
 				},
 				ui.button { "Reply", variant = "primary", msg = { follow = first.id }, to = to, disabled = blank },
@@ -274,7 +289,7 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 		shrink = false,
 		ui.row {
 			class = "feedback-item-head",
-			align = "start",
+			align = "center",
 			msg = { expand = first.id },
 			to = to,
 			ui.icon { name = status.icon :: any, class = status.class, spin = status.spin },
@@ -287,13 +302,6 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 					class = "feedback-detail",
 					truncate = true,
 				},
-			},
-			not going and ui.row {
-				class = "feedback-action",
-				msg = { forget_thread = first.id },
-				to = to,
-				tooltip = "Remove",
-				ui.icon "close",
 			},
 			ui.icon { name = if open then "chevron-down" else "chevron-right", class = "feedback-muted" },
 		},
@@ -318,7 +326,7 @@ return component {
 		["error"] = "why the last send failed, shown above the buttons",
 		["change"] = "sent on each edit, with `value` set to the text",
 		["send"] = "sent by Send and ⌘↩, with `value` set to the text from ⌘↩",
-		["runs"] = "runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it). A run's `warning` shows under it (a change that broke the app comes back undone, saying why), and `checking` shows while the provider checks the app after it",
+		["runs"] = "runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`; Remove under an open one that is not running sends `{ forget_thread = id }` (the mod forgets each run of it). A run's `warning` shows under it (a change that broke the app comes back undone, saying why), and `checking` shows while the provider checks the app after it",
 		["expanded"] = "id of the conversation shown open (its first run), each run with `agent-run`; one waiting on an answer is always open",
 		["undo"] = "show Undo these changes under an open conversation whose runs changed the app (`changed`, not yet `undone`): it sends `{ undo_thread = id }`; send the provider `{ undo = run }` for each of its runs, newest first",
 		["follow"] = "show a box to reply in under the open conversation: Reply sends `{ follow = id }` (⌘↩ with `value`), each edit `{ follow_type = id, value }`; start the follow-up with `thread = id`",
@@ -417,7 +425,7 @@ feedback { open = state.open, dismiss = "close", value = state.text, text = stat
 	build = function(props: Props)
 		local blank = string.match(props.text or "", "^%s*$") ~= nil
 		local runs: { any } = props.runs or {}
-		local rows = {}
+		local rows: { Element } = {}
 		for _, turns in conversations(runs) do
 			local open = turns[1].id == props.expanded or turns[#turns].status == "waiting"
 			table.insert(rows, conversation(turns, open, props))

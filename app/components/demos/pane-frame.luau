@@ -9,7 +9,13 @@ local PROGRAMS: { any } = {
 	{ title = "zsh", icon = "square-terminal", status = nil, lines = { "ledger-api main ›" } },
 }
 
-return mod {
+type State = {
+	rows: { { number } },
+	focus: number,
+	zoomed: number?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		-- rows of pane ids; each pane id indexes PROGRAMS.
 		return previous or { rows = { { 1, 2 } }, focus = 1, zoomed = nil }
@@ -86,7 +92,7 @@ return mod {
 		-- Side by side panes are narrow: show the folder only on a lone pane.
 		local function frame(id: number, alone: boolean)
 			local p = PROGRAMS[id]
-			local lines = {}
+			local lines: { Element } = {}
 			for i, line in p.lines do
 				lines[i] = ui.text { line, size = "small" }
 			end
@@ -105,12 +111,12 @@ return mod {
 				table.unpack(lines),
 			}
 		end
-		local rows = {}
+		local rows: { Element } = {}
 		if state.zoomed then
 			rows[1] = ui.row { grow = true, frame(state.zoomed, true) }
 		else
 			for r, row in state.rows do
-				local frames = {}
+				local frames: { Element } = {}
 				for c, id in row do
 					frames[c] = frame(id, #row == 1)
 				end

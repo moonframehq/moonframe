@@ -125,14 +125,14 @@ return mod {
 			if #items == 0 then
 				return ui.text { empty, class = "agenda-empty" }
 			end
-			local rows = {}
+			local rows: { Element } = {}
 			for _, item in items do
 				table.insert(rows, row(item))
 			end
 			return ui.column { gap = "none", shrink = false, table.unpack(rows) }
 		end
 
-		local body = {}
+		local body: { Element } = {}
 		local query = string.lower(state.query)
 		if query ~= "" then
 			local found = {}
@@ -210,7 +210,7 @@ return mod {
 			table.insert(body, ui.column { grow = true, scroll = true, list(day, "Nothing on this day") })
 		elseif state.view == "upcoming" then
 			table.insert(body, heading("Upcoming", "The next two weeks"))
-			local sections = {}
+			local sections: { Element } = {}
 			for _, day in planner.days do
 				local items = {}
 				for _, item in planner.items do
@@ -236,13 +236,13 @@ return mod {
 			})
 		else
 			local kind = if state.view == "notes" then "note" elseif state.view == "events" then "event" else "task"
-			local open, done = {}, {}
+			local open: { any }, done: { any } = {}, {}
 			for _, item in planner.items do
 				if item.kind == kind then
 					table.insert(if item.state == "done" then done else open, item)
 				end
 			end
-			table.sort(open, function(a, b)
+			table.sort(open, function(a: any, b: any)
 				return (a.date or "~") < (b.date or "~")
 			end)
 			table.insert(body, heading(VIEW_TITLES[state.view] or "Tasks", `{#open} {if kind == "note" then "notes" else "to come"}`))

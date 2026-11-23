@@ -67,7 +67,8 @@ pub fn render_entry(
     let root = path.parent().unwrap_or(&path);
     entries.add_root(namespace, root, policy.clone())?;
     entries.add_entry(namespace, id, &path)?;
-    let roots = entries.apply(layers(options.roots.as_ref(), shell.path().to_owned()));
+    let layers = layers(options.roots.as_ref(), shell.path().to_owned());
+    let roots = entries.apply(layers.clone());
     let app = match options.app.first() {
         Some(Data::Map(app)) => app.clone().into_iter().collect(),
         Some(_) => return Err("an `app` case is a table of keys".to_owned()),
@@ -77,6 +78,7 @@ pub fn render_entry(
     };
     window::draw(window::Job {
         name,
+        layers,
         roots,
         entries,
         folder: shell.path(),
@@ -168,6 +170,41 @@ mod tests {
             "{:?}",
             rendered.bounds
         );
+    }
+
+    /// The app's layers stay the window's: the app does not lay itself out
+    /// again over folders of its own, which would drop their components.
+    #[test]
+    fn render_entry_uses_the_components_of_the_app_it_is_given() {
+        let dir = tempfile::tempdir().unwrap();
+        let app = dir.path().join("app");
+        std::fs::create_dir_all(app.join("components")).unwrap();
+        std::fs::write(
+            app.join("components/pill.luau"),
+            r#"return component {
+  build = function(props) return ui.text { `pill: {props.label}` } end,
+}"#,
+        )
+        .unwrap();
+        let entry = dir.path().join("hello");
+        std::fs::create_dir(&entry).unwrap();
+        std::fs::write(
+            entry.join("main.luau"),
+            r#"local pill = use "pill"
+return mod { view = function() return ui.column { pill { label = "from the app" } } end }"#,
+        )
+        .unwrap();
+        let options = CheckOptions {
+            name: Some("user:hello".to_owned()),
+            roots: Some(Roots::new([app])),
+            ..CheckOptions::default()
+        };
+        let rendered =
+            render_entry(&entry, &RootPolicy::default(), &options, (320., 200.)).unwrap();
+        let snapshot = rendered.snapshot.expect("a snapshot of the entry's view");
+        assert_eq!(snapshot.error, None, "drawn as an error");
+        let tree = format!("{:?}", snapshot.tree);
+        assert!(tree.contains("pill: from the app"), "{tree}");
     }
 
     #[test]

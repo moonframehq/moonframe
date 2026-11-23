@@ -1,0 +1,9 @@
+# The same focus timer, shared as `app["focus-native"]`: the crate in
+# ../focus linked into the app and registered in src/main.rs with
+# `.native("focus-native", Portable::<focus::Focus>::new)`. Same code, same
+# settings, no sandbox; a change to it needs the app rebuilt.
+interval = 1.0
+kind     = "native"
+
+[settings]
+minutes = 25

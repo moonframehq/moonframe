@@ -6,7 +6,10 @@
   Artifacts and Tasks, recent projects and teams (only "Savings launch, Q1"
   is in this example), the plan's credits as a segmented bar, and who is
   signed in.
-- **Top:** the project's name and star, a search field, who is in it, Share.
+- **Top:** the project's name and star, a search field, who is in it, and
+  Share, which offers the sheet as far as it is written, as tab-separated
+  text, to the system's share menu (`app:share`, macOS): Mail, Notes,
+  Messages, Copy.
 - **Middle:** the main thread: the ask, the agent's reply, and its plan as a
   card that advances step by step: found apps, then three sub-agents
   (Banks, Neobanks, Apps) with a bar each and what one is reading now, then
@@ -15,7 +18,9 @@
 - **Right:** the sheet it fills. Step 1 adds a row per app found; step 2
   writes APY, monthly fee, minimum deposit and rating cell by cell, the row
   being worked on highlighted and the cell being typed outlined with a
-  caret, the cells still to come as grey skeleton bars. The grid is the
+  caret, the cells still to come as grey skeleton bars. The download button
+  above it saves the sheet as it stands as an A4 PDF (`app:pdf`, macOS), in
+  `~/.cache/moonframe/sorrel/competitors.pdf`, and its tooltip says where. The grid is the
   `spreadsheet` component (`app/components/spreadsheet.luau`).
 
 The agent is a **scripted demo**, not a model: `providers/research`, a Rust

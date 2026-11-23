@@ -23,6 +23,8 @@ use {
     },
 };
 
+mod access;
+
 thread_local! {
     /// The window whose message the provider on this thread is handling,
     /// which what it sends meanwhile answers.
@@ -61,6 +63,8 @@ pub struct Handle {
     settings: Data,
     events: crate::Events,
     publisher: crate::Publisher,
+    /// The host calls provider.toml grants; none for a handle a test makes.
+    access: Option<Arc<access::Access>>,
 }
 
 impl Handle {
@@ -78,6 +82,7 @@ impl Handle {
                 crate::Publish::All,
             ),
             events,
+            access: None,
         }
     }
 
@@ -120,6 +125,24 @@ impl Handle {
         });
     }
 
+    /// Calls a host capability listed under `capabilities` in provider.toml,
+    /// JSON text in and out, with the limits a wasm provider's calls have.
+    pub fn host_call(&self, capability: &str, method: &str, args: &str) -> Result<String, String> {
+        match &self.access {
+            Some(access) => access.host_call(capability, method, args),
+            None => Err(format!("undeclared capability `{capability}`")),
+        }
+    }
+
+    /// This machine's load, as the `system` capability gives it to a wasm
+    /// provider; provider.toml must list `capabilities = ["system"]`.
+    pub fn system_load(&self) -> Result<serde_json::Value, String> {
+        match &self.access {
+            Some(access) => access.system_load(),
+            None => Err("needs `capabilities = [\"system\"]` in provider.toml".to_owned()),
+        }
+    }
+
     /// Says what is wrong; it keeps running.
     pub fn fail(&self, problem: impl Into<String>) {
         (self.events)(Event::Failed {
@@ -143,6 +166,7 @@ pub(crate) fn run(context: &Context, factory: Option<Factory>) {
         settings: json::from_json(&context.manifest.settings).unwrap_or(Data::Nil),
         events: Arc::clone(&context.events),
         publisher: crate::Publisher::of(context),
+        access: Some(Arc::new(access::Access::of(context))),
     };
     // A panic in the provider is its own failure; the app goes on.
     let guarded = |call: &mut dyn FnMut() -> Result<(), String>| {

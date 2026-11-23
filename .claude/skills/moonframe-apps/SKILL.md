@@ -43,6 +43,7 @@ keep = ["terminal"]            # built-in mods it shows (default none)
 requires = ["owner/repo@v1"]   # packages installed with it; "../shared" is one beside it, linked
 version = "1.0.0"              # its version: the bundle's, and what updates compare with
 updates = "owner/my-app"       # GitHub repo it is released from: Check for Updates (needs version)
+schemes = ["my-app"]           # URL schemes its bundle opens: my-app: links reach mods on app/url
 ```
 
 What a profile loads, lowest first: the built-in app (its providers and
@@ -105,7 +106,9 @@ temporary one to try things without touching the user's).
    (in the app, or in `app/components` when it belongs to everyone), with
    `when`, `props`, `example`, and run `just components`.
 5. `moonframe --profile NAME --check`, and `just types DIR` to type-check
-   the app's Luau (copy `app/.luaurc` beside it for strict mode).
+   the app's Luau (copy `app/.luaurc` beside it for strict mode), its mods
+   against its own providers' `types.luau` too (see the moonframe skill's
+   "Providers").
 6. Compare with the design: screenshot your own window (start it with
    `--background`, note its PID, `just screenshot OUT PID`) and look at the
    result beside the reference: spacing, type sizes, corners, alignment.

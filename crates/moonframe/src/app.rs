@@ -4,7 +4,7 @@
 use {
     crate::{
         actions::*,
-        alerts::{Alerts, Posted},
+        alerts::Alerts,
         backends::Backends,
         browser::Browsers,
         color::rgba_color,
@@ -14,7 +14,7 @@ use {
         inspect::{self, Inspector, Placed},
         mod_window::ModWindow,
         motion::Motion,
-        packages,
+        packages, panel,
         paths::{self, Folders},
         render::{Finished, KeyLayer, ListRequest, Painter, cached::Cached},
         settings,
@@ -55,6 +55,7 @@ pub(crate) mod guard;
 mod history;
 mod hub;
 mod icon;
+pub(crate) mod links;
 mod listeners;
 mod live;
 mod live_settings;
@@ -62,11 +63,15 @@ mod machine;
 mod main_window;
 mod measuring;
 mod menu;
+mod menu_bar;
+mod notifications;
 mod omarchy;
 mod panes;
+mod pdfs;
 mod picking;
 mod problems;
 mod quick_inspect;
+mod sharing;
 mod toasts;
 mod updates;
 mod view;
@@ -141,6 +146,9 @@ pub(crate) struct MoonframeApp {
     /// The built-in app, the user's folder, and the profile, from which the
     /// app's layers are found again when the user installs a package.
     folders: Folders,
+    /// The layers to lay the app over in place of `folders`', for a window
+    /// drawn over layers its caller chose (`render_entry`).
+    layers: Option<Roots>,
     /// Where the theme is saved: `settings.toml` in the user's folder, or
     /// the profile's, when
     /// there is one.
@@ -241,6 +249,8 @@ impl MoonframeApp {
         };
         workspace.set_dark(theme.is_dark());
         workspace.set_window(window_state(chrome.titlebar, window, cx));
+        // The app's name, as the menu bar shows it: `app.title`.
+        workspace.set_host("title", Data::from(crate::title()));
         // What the providers shared before this window opened.
         for (key, data) in joined.latest {
             workspace.set_host(&key, data);
@@ -248,8 +258,15 @@ impl MoonframeApp {
         report(&workspace);
         cx.observe_window_bounds(window, |this, window, cx| this.sync_window(window, cx))
             .detach();
-        cx.observe_window_activation(window, |this, window, cx| this.sync_window(window, cx))
-            .detach();
+        cx.observe_window_activation(window, |this, window, cx| {
+            // The user may have allowed or refused notifications in the
+            // system's settings while away.
+            if window.is_window_active() {
+                crate::alerts::refresh();
+            }
+            this.sync_window(window, cx);
+        })
+        .detach();
         // The system's appearance, which `system` follows as it changes.
         cx.observe_window_appearance(window, |this, window, cx| {
             this.system_dark = is_dark(window.appearance());
@@ -311,6 +328,7 @@ impl MoonframeApp {
             themes: None,
             mod_windows: HashMap::new(),
             folders,
+            layers: None,
             settings,
             toast: None,
             toast_notice: None,
@@ -562,7 +580,7 @@ impl MoonframeApp {
         if let Action::Window(name) = action {
             // A preview opens nothing.
             if !from.starts_with(moonframe_core::DEMO) {
-                self.show_mod_window(name, None, cx);
+                self.show_mod_window(name, None, None, cx);
             }
             return;
         }
@@ -615,6 +633,18 @@ impl MoonframeApp {
     }
 
     fn run(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
+        // A panel hides; it is never minimized, closed or opened twice.
+        match panel::route(command, window) {
+            Some(panel::Route::Hide) => {
+                panel::hide();
+                return;
+            },
+            Some(panel::Route::Show) => {
+                panel::show();
+                return;
+            },
+            None => {},
+        }
         match command {
             // Unless a mod in any window holds it back.
             Command::Quit => cx.defer(guard::quit),
@@ -636,6 +666,10 @@ impl MoonframeApp {
             Command::Inspect => self.inspect_for(SHELL, cx),
             Command::CheckForUpdates => self.check_for_updates(true, cx),
             Command::NewWindow => cx.defer(open_main_window),
+            Command::Activate => {
+                cx.activate(true);
+                window.activate_window();
+            },
         }
     }
 
@@ -663,6 +697,7 @@ impl MoonframeApp {
         self.hub
             .update(cx, |hub, _| hub.send(id, wanted, outbox, from));
         let mut requests = self.workspace.take_requests();
+        self.sweep_menu_bar((from == "reload").then_some(&requests[..]), cx);
         // A reload runs every `init` again, as a new window does: one that
         // asks for either would loop, so what `init` asks as the app (or a
         // window) starts or reloads reloads nothing and opens no window.
@@ -682,6 +717,8 @@ impl MoonframeApp {
         if !requests.is_empty() {
             self.carry_out(requests, cx);
         }
+        // After the requests carried out above: whether the panel's item is there.
+        cx.defer(panel::check);
     }
 
     /// Does what mods asked of the app (`to = "app:<what>"`), once the
@@ -721,15 +758,7 @@ impl MoonframeApp {
     /// and its window forward and tells the mod, on `app/notification`:
     /// `{ id, clicked = true }`.
     fn notification_clicked(&mut self, from: &str, id: Option<String>, cx: &mut Context<Self>) {
-        cx.activate(true);
-        let main = self.main_window;
-        if let Some(window) = cx
-            .windows()
-            .into_iter()
-            .find(|window| window.window_id() == main)
-        {
-            let _ = window.update(cx, |_, window, _| window.activate_window());
-        }
+        self.come_forward(cx);
         let clicked = std::collections::BTreeMap::from([
             ("id".to_owned(), id.map_or(Data::Nil, Data::String)),
             ("clicked".to_owned(), Data::Bool(true)),
@@ -737,6 +766,26 @@ impl MoonframeApp {
         self.workspace
             .app_topic("notification", from, Data::Map(clicked));
         self.flush("notification", cx);
+    }
+
+    /// Brings the app and this main window forward.
+    fn come_forward(&self, cx: &mut Context<Self>) {
+        cx.activate(true);
+        let main = self.main_window;
+        if let Some(window) = cx
+            .windows()
+            .into_iter()
+            .find(|window| window.window_id() == main)
+        {
+            // A panel comes forward under its item.
+            let _ = window.update(cx, |_, window, _| {
+                if panel::is(window) {
+                    panel::show();
+                } else {
+                    window.activate_window();
+                }
+            });
+        }
     }
 
     /// The toast was clicked: when it shows a notification, as a click on
@@ -818,6 +867,10 @@ impl MoonframeApp {
             Request::Dock(dock) => self.dock_request(from, &dock),
             Request::Restart(name) => self.restart_provider(from, &name, cx),
             Request::Devtools(request) => self.devtools_request(from, request, cx),
+            Request::Share(request) => self.share_request(from, request, window, cx),
+            Request::StatusItem(request) => self.status_item_request(from, request, cx),
+            Request::Hotkey(request) => self.hotkey_request(from, request, cx),
+            Request::Pdf(request) => self.pdf_request(from, request, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);
@@ -825,22 +878,8 @@ impl MoonframeApp {
                     tracing::warn!("{from}: `app:open` asked too often; {url} not opened");
                 }
             },
-            Request::Notify(notification) => match self.alerts.notify(from, &notification) {
-                Ok(Posted::System) => {},
-                Ok(Posted::Toast) => {
-                    let text = if notification.body.is_empty() {
-                        notification.title.clone()
-                    } else {
-                        format!("{}: {}", notification.title, notification.body)
-                    };
-                    self.show_toast_for(text.into(), NOTICE, cx);
-                    // A click on it does what one on the system's would.
-                    if let Some((shown, _)) = &self.toast {
-                        self.toast_notice = Some((*shown, from.to_owned(), notification.id));
-                    }
-                },
-                Err(problem) => tracing::warn!("{from}: {problem}"),
-            },
+            Request::Notify(notification) => self.notify_request(from, notification, cx),
+            Request::AskToNotify => self.ask_to_notify(from),
             Request::Theme { light, dark } => {
                 if let Err(problem) = self.set_themes(light.as_deref(), dark.as_deref(), cx) {
                     self.workspace
@@ -871,11 +910,19 @@ impl MoonframeApp {
         cx.notify();
     }
 
+    /// Lays the app over `layers` (with its entries) from now on, rather
+    /// than over the layers its folders give.
+    #[cfg(feature = "capture")]
+    pub(crate) fn keep_layers(&mut self, layers: Roots) {
+        self.layers = Some(layers);
+    }
+
     /// Lays the app over again when the installed packages change: mods
     /// and providers that stay keep running, and the new folders are
     /// watched. False if the layers are the same.
     fn reload_packages(&mut self, cx: &mut Context<Self>) -> bool {
-        let roots = self.hub.read(cx).entry_roots(self.folders.roots());
+        let base = self.layers.clone().unwrap_or_else(|| self.folders.roots());
+        let roots = self.hub.read(cx).entry_roots(base);
         if &roots == self.workspace.roots() {
             return false;
         }

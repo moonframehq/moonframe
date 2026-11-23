@@ -1,0 +1,6 @@
+# Request logs digested per route, for the bench: its batches come from the
+# bench's `bench.logs` capability, as a real provider's would from an API.
+# The bench drives it with messages, so it never ticks on its own.
+capabilities = ["bench.logs"]
+interval     = 3600.0
+kind         = "wasm"

@@ -366,6 +366,161 @@ let a changed setting win over the saved state.</p>
 <li><strong>A running provider panics.</strong> It has nothing left to save, so the next
   build starts fresh. Only state from a clean stop is handed on.</li>
 </ul>
+<h2 id="compile-it-into-the-app">Compile it into the app</h2>
+<p>A provider written against the guest SDK builds either way from the same
+source: as a component, sandboxed and rebuilt as you edit, or linked into the
+app as an ordinary crate, with no wasmtime, Cargo or sandbox at run time.</p>
+<pre><code class="language-rust">// providers/counter/src/lib.rs
+use {moonframe_provider::Provider, serde_json::Value};
+
+pub struct Counter(u64);
+
+impl Provider for Counter {
+    fn start(_settings: Value) -&gt; Result&lt;Self, String&gt; {
+        Ok(Self(0))
+    }
+
+    fn tick(&amp;mut self) -&gt; Option&lt;Value&gt; {
+        self.0 += 1;
+        Some(self.0.into())
+    }
+
+    fn receive(&amp;mut self, message: Value) -&gt; Option&lt;Value&gt; {
+        (message == &quot;reset&quot;).then(|| { self.0 = 0; self.0.into() })
+    }
+}
+
+moonframe_provider::export!(Counter); // the component's exports; nothing natively
+</code></pre>
+<p>Give the crate <code>crate-type = ["cdylib", "rlib"]</code> so the app can depend on it,
+then register it under the folder's name and switch the folder's kind:</p>
+<pre><code class="language-rust">Moonframe::new(...).native(&quot;counter&quot;, moonframe::Portable::&lt;counter::Counter&gt;::new)
+</code></pre>
+<pre><code class="language-toml"># providers/counter/provider.toml
+kind = &quot;native&quot;     # was &quot;wasm&quot;; the rest stays as it was
+</code></pre>
+<p>Compiled in, it is called in the same order (<code>start</code>, <code>restore</code>, a first
+<code>tick</code> published at once, then ticks and messages) and <code>log</code>, <code>system_load</code>
+and <code>host_call</code> reach the app with the same <code>capabilities</code> from provider.toml
+(<code>system</code> needs the app's <code>system</code> or <code>wasm</code> feature). What differs: it has
+the user's access and no fuel or memory limits, so link only code you would
+run yourself; <code>save</code> hands state to the next start only within one launch;
+and a change needs the app rebuilt.</p>
+<p><code>examples/portable</code> is a complete example to copy: a focus timer crate in
+<code>app/providers/focus</code> (settings, ticks, messages, <code>save</code>/<code>restore</code>, and unit
+tests that run natively), run as a component from that folder and compiled in
+for <code>app/providers/focus-native</code>, side by side in one window. Its <code>host/</code>
+binary sits beside the app folder, not around it: Cargo counts any crate
+inside a workspace member's folder as a member, so a provider crate there
+could not keep its own <code>[workspace]</code>. <code>examples/capability-provider</code> builds
+both ways too.</p>
+<h3 id="how-the-two-builds-compare">How the two builds compare</h3>
+<p><code>examples/portable/host/examples/bench</code> runs providers both ways through the
+provider runtime the app uses, so the numbers are what a view waits for. All
+figures are medians, from three runs on an Apple M4 Max (macOS, release build).</p>
+<p><strong>Calls and startup.</strong> The example's <code>focus</code> timer does almost no work per call,
+so this is the runtime's own cost:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Wasm</th>
+<th>Native</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Start, to the first data</td>
+<td>15.6 ms prebuilt (<code>provider.wasm</code>); 236 ms from source, Cargo finding nothing to build; 7.2 s for the first build</td>
+<td>0.2 ms</td>
+</tr>
+<tr>
+<td>Message to published answer, median</td>
+<td>8.6 µs</td>
+<td>7.0 µs</td>
+</tr>
+<tr>
+<td>Same, p99</td>
+<td>17.4 µs</td>
+<td>13.5 µs</td>
+</tr>
+<tr>
+<td>Messages per second, one at a time</td>
+<td>about 109,000</td>
+<td>about 145,000</td>
+</tr>
+</tbody>
+</table>
+<p>Most of a round trip is the hop to the provider's thread and back, which both
+builds share; Wasm adds about 1.5 µs a call. Startup differs more: wasmtime
+compiles the component each time it starts (160 KiB here), and a provider built
+from source asks Cargo first.</p>
+<p><strong>A real workload.</strong> <code>examples/portable/bench/providers/digest</code> does what Wasm
+providers are for, shaping data: each cycle it fetches a batch of request-log
+lines through a host capability, parses every line, folds numeric path
+segments into <code>:id</code>, works out per-route counts, error rates and p50/p95/p99
+latencies, and publishes the 50 busiest routes. One cycle, message to
+published summary (the <code>opt-level = 3</code> column, in brackets in the last, is
+from one run):</p>
+<table>
+<thead>
+<tr>
+<th>Lines</th>
+<th>Batch</th>
+<th>Wasm, <code>opt-level = "s"</code></th>
+<th>Wasm, <code>opt-level = 3</code></th>
+<th>Native</th>
+<th>Wasm ÷ native</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1,000</td>
+<td>59 KiB</td>
+<td>0.7 ms</td>
+<td>0.5 ms</td>
+<td>0.3 ms</td>
+<td>2.4× (1.7×)</td>
+</tr>
+<tr>
+<td>10,000</td>
+<td>596 KiB</td>
+<td>4.5 ms</td>
+<td>3.3 ms</td>
+<td>1.8 ms</td>
+<td>2.5× (1.8×)</td>
+</tr>
+<tr>
+<td>50,000</td>
+<td>2.9 MiB</td>
+<td>21.6 ms</td>
+<td>15.2 ms</td>
+<td>8.9 ms</td>
+<td>2.4× (1.7×)</td>
+</tr>
+</tbody>
+</table>
+<p>Moving the lines alone (fetching without digesting, measured in one run each)
+is 1.5× slower in Wasm (1.3× at <code>opt-level = 3</code>), so the parsing and sorting itself runs about 3×
+slower, or 2× when optimised for speed. The repository's providers build with
+<code>opt-level = "s"</code> for small components; for one that computes much, use
+<code>opt-level = 3</code> in its <code>[profile.release]</code>.</p>
+<p>What this means:</p>
+<ul>
+<li>At an interval of seconds, either build is fast enough: even 50,000 lines a
+  cycle is 22 ms of work as a component.</li>
+<li>Compiling in pays off for an app that starts often or runs many providers,
+  and for a provider that digests large batches often: 50,000 lines every
+  half second is about 4% of a core as a component, 2% compiled in.</li>
+<li>A Wasm provider's results cross as JSON text, so a float can come back one
+  bit away from the native build's: the host parses JSON with serde_json's
+  fast float parser.</li>
+<li>A host call carries at most 1 MiB by default; the 50,000-line batch is
+  2.9 MiB, so the bench raises <code>HostCallLimits::max_bytes</code> (for both builds).</li>
+</ul>
+<p>Run it yourself (it needs <code>rustup target add wasm32-wasip2</code>):</p>
+<pre><code class="language-sh">cargo run --release -p moonframe-portable-example --example bench
+</code></pre>
 <h2 id="host-defined-capabilities-and-external-miniapps">Host-defined capabilities and external miniapps</h2>
 <p>An embedding app can expose a narrow JSON API to Wasm:</p>
 <pre><code class="language-rust">use moonframe::{Caller, HostCapability, Moonframe, RootPolicy};
@@ -489,10 +644,12 @@ be namespaced with dots; unprefixed names and <code>moonframe.*</code> are reser
 <code>Caller</code> includes the registered provider name, provider folder, root path,
 optional namespace, and all declared capability names.</p>
 <p>The standalone Rust guest SDK is <code>crates/moonframe-provider</code> (add it as a path
-or git dependency). Implement <code>moonframe_provider::bindings::Guest</code> and export
-with <code>moonframe_provider::bindings::export!(MyProvider with_types_in
-moonframe_provider::bindings)</code>. Enable its <code>stateful</code> feature for save/restore.
-Its typed helper serializes arguments and deserializes the JSON answer:</p>
+or git dependency). Implement <code>moonframe_provider::Provider</code> and export it with
+<code>moonframe_provider::export!(MyProvider)</code>; the same crate can then be compiled
+into the app too (see <a href="#compile-it-into-the-app">Compile it into the app</a>).
+Enable its <code>stateful</code> feature for save/restore. The raw WIT bindings stay
+available on wasm32 as <code>moonframe_provider::bindings</code>. Its typed helper
+serializes arguments and deserializes the JSON answer:</p>
 <pre><code class="language-rust">let answer: serde_json::Value = moonframe_provider::host_call(
     &quot;mshub.entities&quot;, &quot;echo&quot;, &amp;serde_json::json!({ &quot;id&quot;: 42 }),
 )?;
@@ -536,6 +693,40 @@ publishes its first value.</p>
 Subscribing to <code>provider/counter</code> or sending a message also starts it.
 Once started, it keeps running even if the view is hidden. Use
 <code>start = "always"</code> only when it should work before any mod needs it.</p>
+<h2 id="declare-its-types">Declare its types</h2>
+<p>Without types, <code>app.counter</code> is <code>any</code> to the Luau checker: a view that
+reads a field the provider never publishes, or sends it a message it
+ignores, passes <code>just types</code> and fails quietly at runtime. Declare both in
+<code>providers/counter/types.luau</code>:</p>
+<pre><code class="language-lua">-- What app.counter holds.
+export type Published = {
+    count: number,
+}
+
+-- What send &quot;provider:counter&quot; takes.
+export type Message = { add: boolean } | { reset: boolean }
+</code></pre>
+<p>Then send with <code>send</code>, which builds the same <code>{ to = ..., msg = ... }</code> a
+literal would, so its message is checked:</p>
+<pre><code class="language-lua">update = function(state, msg)
+    return state, { send &quot;provider:counter&quot; { add = true } }
+end,
+</code></pre>
+<p><code>just types DIR</code> checks the app's mods against them: reading
+<code>counter.total</code>, or sending <code>{ ad = true }</code>, is a type error with its line.
+For a provider in the starter's <code>app/providers/</code>, <code>just provider-types</code>
+also copies them into <code>types/moonframe.d.luau</code>, so every app sees them;
+<code>just provider-types-check</code> (in <code>just ci</code>) fails when that copy is stale.</p>
+<p>Keep an example of what it publishes beside them as <code>published.json</code>, and
+hold both sides to it: <code>just provider-types-check</code> fails when the file's
+keys or kinds differ from <code>Published</code>, and a test in the crate compares a
+real <code>tick</code> against it (see <code>examples/portable/app/providers/focus</code>). Then
+neither the Rust nor the Luau side can change without the other.</p>
+<p>Limits: only <code>Published</code>'s own fields are held to the example, a level
+deep; button <code>msg = ..., to = ...</code> and plain <code>{ to = ..., msg = ... }</code>
+tables are not checked, only <code>send</code>; and the type names (<code>Published</code>) are
+not visible in mods, whose own annotations are checked against them by
+shape. Nothing checks the published JSON at runtime.</p>
 <h2 id="build-run-and-check">Build, run and check</h2>
 <p>From the app folder, compile the exact component:</p>
 <pre><code class="language-sh">cargo build --release --target wasm32-wasip2 \
@@ -708,11 +899,13 @@ compiled components in a source package.</p>
 <li>Copy the matching WIT locally; create an independent <code>cdylib</code> crate
    with <code>kind = "wasm"</code>. Keep manifest keys separate from <code>[settings]</code>.</li>
 <li>Define the published JSON shape and accepted message payloads before
-   writing the view. Validate settings and handle unknown messages.</li>
+   writing the view, in <code>types.luau</code> (<code>Published</code>, <code>Message</code>) with an
+   example <code>published.json</code> and a test holding <code>tick</code> to it. Validate
+   settings and handle unknown messages.</li>
 <li>Implement <code>start</code>, <code>tick</code>, <code>receive</code> and <code>export!</code>. Publish whole
    snapshots, bound work and memory, and do not assume runtime state persists.</li>
-<li>Read <code>app.&lt;name&gt;</code> with a nil fallback; send payloads to
-   <code>provider:&lt;name&gt;</code>. Follow the Moonframe and component skills for UI.</li>
+<li>Read <code>app.&lt;name&gt;</code> with a nil fallback; send payloads with
+   <code>send "provider:&lt;name&gt;" { ... }</code>. Follow the Moonframe and component skills for UI.</li>
 <li>Build for <code>wasm32-wasip2</code>, run the app's headless checks and Luau type
    checks where configured, then verify startup, a message and reload.
    State explicitly when an interactive check was not performed.</li>
@@ -723,7 +916,7 @@ compiled components in a source package.</p>
 uses the host capability; <a href="https://github.com/moonframehq/moonframe/tree/main/examples/gantry/providers/telemetry">Gantry telemetry</a>
 keeps a larger in-memory model and handles messages (its data is simulated).</p>
 </main>
-<nav class="toc" aria-label="On this page"><b>On this page</b><a href="#choose-a-provider-kind">Choose a provider kind</a><a href="#set-up-the-folder">Set up the folder</a><a href="#declare-the-provider">Declare the provider</a><a href="#implement-the-component">Implement the component</a><a href="#keep-state-across-a-new-build">Keep state across a new build</a><a href="#host-defined-capabilities-and-external-miniapps">Host-defined capabilities and external miniapps</a><a href="#draw-it-and-send-messages">Draw it and send messages</a><a href="#build-run-and-check">Build, run and check</a><a href="#host-calls-and-limits">Host calls and limits</a><a href="#package-and-share">Package and share</a><a href="#troubleshooting">Troubleshooting</a><a href="#coding-agent-recipe">Coding-agent recipe</a>
+<nav class="toc" aria-label="On this page"><b>On this page</b><a href="#choose-a-provider-kind">Choose a provider kind</a><a href="#set-up-the-folder">Set up the folder</a><a href="#declare-the-provider">Declare the provider</a><a href="#implement-the-component">Implement the component</a><a href="#keep-state-across-a-new-build">Keep state across a new build</a><a href="#compile-it-into-the-app">Compile it into the app</a><a href="#host-defined-capabilities-and-external-miniapps">Host-defined capabilities and external miniapps</a><a href="#draw-it-and-send-messages">Draw it and send messages</a><a href="#declare-its-types">Declare its types</a><a href="#build-run-and-check">Build, run and check</a><a href="#host-calls-and-limits">Host calls and limits</a><a href="#package-and-share">Package and share</a><a href="#troubleshooting">Troubleshooting</a><a href="#coding-agent-recipe">Coding-agent recipe</a>
 <div class="edit"><a href="https://github.com/moonframehq/moonframe/edit/main/docs/wasm-providers.md">Edit this guide ↗</a></div>
 </nav>
 </div>

@@ -4,7 +4,7 @@
 //! click sends the pin's `msg`, else the map's `select` with its index.
 
 use {
-    super::Frame,
+    super::{Frame, tilt::Tilt},
     crate::{color::ThemeColor, render::pointer::Sender},
     gpui_kit::{
         component::{ActiveTheme, Icon},
@@ -40,6 +40,7 @@ const GLOW_ALPHA: f32 = 0.16;
 pub(super) fn pins(
     map: &Map,
     frame: Frame,
+    tilt: Tilt,
     sender: &Sender,
     pulse: Option<f32>,
     cx: &App,
@@ -50,18 +51,21 @@ pub(super) fn pins(
         .into_iter()
         .flat_map(|index| {
             let pin = &map.pins[index];
-            let at = frame.at(pin.lat, pin.lon);
-            frame
-                .copies(at, at, DISC * SELECTED + TAIL)
-                .flat_map(move |copy| {
-                    let (dx, dy) = frame.copy_offset(copy);
-                    let at = (at.0 + dx, at.1 + dy);
-                    let marker = self::pin(map, index, frame, sender, cx, copy, at);
-                    let halo = (pin.pulse && marker.is_some())
-                        .then(|| halo(pin, at, pulse, cx))
-                        .into_iter()
-                        .flatten();
-                    halo.chain(marker)
+            // Tilted past the eye: not drawn.
+            tilt.at(&frame, pin.lat, pin.lon)
+                .into_iter()
+                .flat_map(move |at| {
+                    tilt.copies(&frame, at, at, DISC * SELECTED + TAIL)
+                        .flat_map(move |copy| {
+                            let (dx, dy) = frame.copy_offset(copy);
+                            let at = (at.0 + dx, at.1 + dy);
+                            let marker = self::pin(map, index, frame, sender, cx, copy, at);
+                            let halo = (pin.pulse && marker.is_some())
+                                .then(|| halo(pin, at, pulse, cx))
+                                .into_iter()
+                                .flatten();
+                            halo.chain(marker)
+                        })
                 })
         })
         .collect()

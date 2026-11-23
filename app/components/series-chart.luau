@@ -145,7 +145,7 @@ series_chart {
 		local pinned = props.pinned
 		if pinned and pinned >= 1 and pinned <= count then
 			local x = x_of(pinned)
-			local dashes = table.create(math.floor(height / 6))
+			local dashes = table.create<<Element>>(math.floor(height / 6))
 			for index = 1, math.floor(height / 6) do
 				dashes[index] = ui.row { class = "series-chart-dash", width = 1, height = 3 }
 			end
@@ -186,7 +186,7 @@ series_chart {
 		-- each drawing the hairline on the side where the sample is.
 		if count > 0 then
 			local half = step / 2
-			local hits = table.create(count * 2)
+			local hits = table.create<<Element>>(count * 2)
 			local event = props.event or "pin"
 			for index = 1, count do
 				local lines = { if props.titles then props.titles[index] or "" else `#{index}` }

@@ -86,13 +86,14 @@ pub(crate) fn open(
     // The prelude keeps this for itself and the global goes: `ui` stamps
     // each element with the line that built it, for the inspector.
     globals.raw_set(CALLER_LINE, caller_line(&lua, name)?)?;
-    let (ui, define, style, component): (Value, Value, Value, Value) =
+    let (ui, define, style, component, send): (Value, Value, Value, Value, Value) =
         text(&lua, PRELUDE, "prelude").eval()?;
     globals.raw_set(CALLER_LINE, Value::Nil)?;
     globals.raw_set("ui", ui)?;
     globals.raw_set("mod", define)?;
     globals.raw_set("style", style)?;
     globals.raw_set("component", component)?;
+    globals.raw_set("send", send)?;
     library.install(&lua)?;
     let prefix = format!("[{name}]");
     let log = lua.create_function(move |_, values: Variadic<Value>| {

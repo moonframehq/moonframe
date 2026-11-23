@@ -14,9 +14,9 @@
 # With PROFILE it is that profile's app, standalone: its app package and the
 # packages it requires are staged in Contents/Resources/bundle, it takes the
 # app's title, id (dev.moonframe.app.NAME), version (its manifest's
-# `version`, else Moonframe's) and icon (its manifest's `icon`, else
-# icon.png), and it runs as a release, without Components… or
-# Inspect Element. What its users add goes in
+# `version`, else Moonframe's), icon (its manifest's `icon`, else
+# icon.png) and URL schemes (its manifest's `schemes`), and it runs as a
+# release, without Components… or Inspect Element. What its users add goes in
 # ~/.config/moonframe/profiles/NAME. MOONFRAME_USER names another user
 # folder to find the profile in.
 #
@@ -61,6 +61,7 @@ fi
 
 app=
 packages=()
+schemes=()
 # A sealed build already resolved its profile before compiling the reduced
 # executable, which deliberately has no package-management commands.
 app_paths() {
@@ -87,6 +88,7 @@ if [ -n "$profile" ]; then
             app) app=$(posix "$value") ;;
             icon) icon=$(posix "$value") ;;
             version) version=$value ;;
+            scheme) schemes+=("$value") ;;
             package) packages+=("$(posix "$value")") ;;
         esac
     done < <(app_paths)
@@ -250,6 +252,25 @@ done
 iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/AppIcon.icns"
 rm -rf "$(dirname "$iconset")"
 
+# The app's URL schemes (its manifest's `schemes`), for macOS to open its
+# links with it: CFBundleURLTypes, or nothing when it has none.
+url_types() {
+    [ ${#schemes[@]} -gt 0 ] || return 0
+    local scheme list=
+    for scheme in "${schemes[@]}"; do
+        case $scheme in
+            [a-z]*) ;;
+            *) echo "\`$scheme\` is not a URL scheme" >&2; exit 1 ;;
+        esac
+        case $scheme in
+            *[!a-z0-9+.-]*) echo "\`$scheme\` is not a URL scheme" >&2; exit 1 ;;
+        esac
+        list="$list<string>$scheme</string>"
+    done
+    printf '\n    <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>%s</string><key>CFBundleURLSchemes</key><array>%s</array></dict></array>' "$id" "$list"
+}
+urls=$(url_types)
+
 cat > "$bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -266,7 +287,7 @@ cat > "$bundle/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSMicrophoneUsageDescription</key><string>$title listens only while you dictate.</string>
-    <key>NSSpeechRecognitionUsageDescription</key><string>$title turns what you dictate into text on this Mac.</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>$title turns what you dictate into text on this Mac.</string>$urls
 </dict>
 </plist>
 PLIST

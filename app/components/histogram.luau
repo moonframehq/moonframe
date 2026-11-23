@@ -95,7 +95,7 @@ return component {
 		end
 		local layers = {}
 		for index, channel in props.channels do
-			local points = table.create(#channel.values)
+			local points = table.create<<number>>(#channel.values)
 			for at, count in channel.values do
 				points[at] = scale(count)
 			end
@@ -132,7 +132,7 @@ return component {
 		end
 		for _, marker in markers do
 			local x = INSET + math.clamp(marker.value, 0, 1) * inner
-			local line_style = marker.color and { background = marker.color } or nil
+			local line_style: Style? = if marker.color then { background = marker.color } else nil
 			local draggable = props.drag ~= nil
 			local msg = nil
 			if draggable then
@@ -162,7 +162,7 @@ return component {
 				ui.row { class = "histogram-marker", style = line_style, width = 1, height = height },
 				draggable and ui.row {
 					class = "histogram-knob",
-					style = marker.color and { background = marker.color } or nil,
+					style = if marker.color then { background = marker.color } else nil,
 					width = 8,
 					height = 8,
 					float = { bottom = 2, left = GRIP / 2 - 4 },

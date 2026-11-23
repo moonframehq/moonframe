@@ -34,7 +34,12 @@ local HUNKS: { { header: string, lines: { Line } } } = {
 	},
 }
 
-return mod {
+type State = {
+	split: boolean,
+	collapsed: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { split = false, collapsed = false }
 	end,

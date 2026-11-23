@@ -51,7 +51,7 @@ local function checks_view(state: State, app: any): any
 		return ui.text { forge.error, tone = "muted", wrap = true, style = { padding = { 8, 12 } } }
 	end
 	local branch = state.branch
-	local rows = {}
+	local rows: { Element } = {}
 	local prs = {}
 	for _, pr in forge.prs or {} do
 		if not branch or pr.branch == branch then
@@ -112,7 +112,7 @@ return mod {
 	},
 
 	init = function(previous: State?): (State, { any })
-		local state = previous or { tab = "files", scope = "uncommitted", folded = {}, open = {}, file = nil, limit = 400 }
+		local state: State = previous or { tab = "files", scope = "uncommitted", folded = {}, open = {}, file = nil, limit = 400 }
 		return state, { { to = "provider:projects", msg = { forge = state.tab == "checks" } } }
 	end,
 

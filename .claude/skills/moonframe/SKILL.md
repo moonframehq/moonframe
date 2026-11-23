@@ -81,9 +81,9 @@ keeps the user's window running; Rust changes don't.
 
 **"Show me some ideas first."** When the user wants options or mockups
 before a change, use the **moonframe-mockups** skill
-(`.claude/skills/moonframe-mockups`): variants drawn live in a throwaway
-`mods/mockup` in the user's folder, opened in a tab, applied only once the
-user picks one.
+(`.claude/skills/moonframe-mockups`): variants written as one Luau file on
+the app's components, checked and shown by `moonframe mockup` (PNGs in a
+Sheprd tab, or live in a Mockups tab), applied only once the user picks one.
 
 **"Add X here."** Read `~/.cache/moonframe/selection.md`
 (see "Here: the user's selection"). Open the file at the line it gives,
@@ -169,6 +169,9 @@ For a palette, add `keys = { up = "prev", down = "next" }` and
 
 **Mods that talk.** Send `msg = ..., to = "other"` from a control, or
 return sends from `update`. Messages to `provider:<name>` go to a provider.
+In `update`, build them with `send "provider:<name>" { ... }` (the same
+`{ to = ..., msg = ... }` table): where the provider declares a `Message`
+type, `just types` checks the message, which a bare table never is.
 
 **Remember something across launches.** Every mod's state is saved on its
 own and comes back to `init` as `previous` next launch (see "State that
@@ -719,9 +722,45 @@ return mod {
 - `provider/<name>` carries a provider's data each time it publishes, for a
   mod that must react (not only redraw); views still read `app.<name>`.
 - Names are 1 to 128 of `a-z A-Z 0-9 - _ . / :`; `provider/` is the
-  providers', and `app/` the app's own (`app/inspect`, `app/notification`). Previews (the Components window) hear nothing.
+  providers', and `app/` the app's own (`app/inspect`, `app/notification`,
+  `app/url`). Previews (the Components window) hear nothing.
 - Use a topic when several modules share a value; use `to = "<mod>"` when
   one module tells another.
+
+**Links to the app (`app/url`).** An app that claims URL schemes
+(`schemes = ["notes"]` in its `moonframe.toml`, or `.url_scheme("notes")`
+on the library) opens its links: a `notes:` link opened in a browser,
+another app or with `open` brings the app and its front main window
+forward, and every module there that subscribes to `app/url` hears it,
+read: `{ topic = "app/url", value = { url, scheme, host?, path, query,
+fragment? } }`. `query` holds each parameter decoded (`+` and `%20` are
+spaces), the first of a name; `host` is there for `notes://host/path`,
+not for `notes:/path`. It is news, not kept: a mod loading later does not
+hear it. A link that starts the app waits for its window.
+
+- Only a bundle hears links (macOS: `just bundle-app NAME`, or an app on
+  the library's `bundle`), once it has been opened once; a run from source
+  hears none.
+- Any web page can ask to open one, so treat it as input from anyone: ask
+  the user before acting on what it carries (saving a page, sending
+  something), and read only the paths you expect. Links of a scheme the
+  app did not claim, longer than 8 KiB, or more than 5 in 10 s are dropped.
+- A provider hears a link through a mod: the mod sends it on.
+
+```lua
+return mod {
+	subscribe = { "app/url" },
+	update = function(state, msg)
+		if type(msg) == "table" and msg.topic == "app/url" then
+			local link = msg.value
+			if link.path == "/capture" and link.query.url then
+				state.offer = { url = link.query.url, title = link.query.title }   -- shown for the user to confirm
+			end
+		end
+	end,
+	view = function(state) return ui.text(if state.offer then state.offer.url else "") end,
+}
+```
 
 ## Asking the app
 
@@ -742,8 +781,10 @@ end,
 - `app:command`, `msg` a command's name: runs it as a control's `command`
   does, with the same commands (`quit` `reload` `toggle-theme`
   `show-themes` `minimize` `maximize` `close-window` `check-for-updates`
-  `new-window` `inspect`) and nothing else. It runs once the update that
+  `new-window` `inspect` `activate`) and nothing else. It runs once the update that
   asked is done; `reload` and `new-window` asked from `init` are ignored.
+  `activate` brings the app and the window forward (restoring it from the
+  Dock): what a menu bar item's Open line or a summoning hotkey sends.
 - `app:appearance`, `msg` `"system"`, `"light"` or `"dark"`: whether the
   window follows the system's light or dark (and switches live as it
   does) or stays one. It is kept across launches for the app and profile
@@ -804,16 +845,28 @@ end
   absolute, and inside the app's folders. Never a URL. Sounds closer than
   150 ms apart are dropped. macOS plays them (`NSSound`); Linux with
   `paplay` or `aplay` when installed; Windows plays none yet (logged).
-- `app:notify`, `msg` `{ title, body?, id? }`: a system notification. macOS
+- `app:notify`, `msg` `{ title, body?, id?, replace? }`: a system notification. macOS
   posts it through the Notification Center when the app runs as a bundle
   (an installed app, `just bundle`, `just bundle-app`), asking the user to
   allow notifications the first time; it shows even when the window is in
   front, so check `app.window.active` to alert only when the user is not
   looking. A run from source (`just run`, a bare binary), Linux and Windows
-  show it as a toast in the window instead, for 5 s. Clicking either brings
+  show it as a toast in the window instead, for 5 s, as does macOS once the
+  user turns notifications off for the app. Clicking either brings
   the app and its window forward and tells the mod that posted it, if it subscribes to
   `app/notification`: `{ topic = "app/notification", value = { id, clicked
-  = true } }`. At most 5 notifications in 10 s are posted.
+  = true } }`; a click that starts the app waits for its window. Put what
+  to open in `id` (a page, a thread). `replace = true` (with an `id`) takes
+  the place of the mod's earlier ones with that `id`, from this run or an
+  earlier one, rather than stacking: "Uploading…" then "Uploaded".
+  At most 5 notifications in 10 s are posted.
+- `app:notify`, `msg` `{ ask = true }`: asks the user to allow notifications
+  now, posting none, as a button that turns them on would; the system asks
+  only once, and at most 2 asks in 10 s are made. `app.notifications` says
+  how it stands: `"allowed"`, `"denied"` (turned off in System Settings:
+  toasts show them), `"undecided"` (not asked yet), or `"in-window"` (no
+  system notifications here: toasts show them); nil until the system says,
+  and read again each time a window comes forward.
 
 ```lua
 return mod {
@@ -851,6 +904,88 @@ update = function(state, msg)
 	if type(msg) == "table" and msg.busy ~= nil then
 		state.busy = msg.busy
 		return state, { { to = "app:icon", msg = if msg.busy then "icons/busy.png" else "default" } }
+	end
+end,
+```
+
+- `app:share`, `msg` `{ url?, text?, files?, reply? }`: the system's share
+  menu (macOS's share picker: Mail, Messages, AirDrop, Notes, Copy...) at
+  the pointer, so send it from the click that asks. `url` is a web address
+  (`https://`, `http://`), `text` up to 4 KiB beside it (a page's title, a
+  table as text), `files` up to 20 paths named as `ui.image` names
+  pictures. A file must be the app's: in its folders, or in the image cache
+  (`~/.cache/moonframe/images`) or the share cache
+  (`~/.cache/moonframe/share`, where a provider writes a PDF to share), or
+  one the user picked for this mod with `app:pick` (or dropped on it); any
+  other, the rest of the cache and the state folder included, is the
+  sender's error. Nothing leaves until the user picks a service and goes on
+  in it.
+  With `reply`, the mod hears it back with `service` (the name of the one
+  picked, `"Mail"`; the user may still cancel in it) or `cancelled = true`
+  added. Elsewhere than macOS there is no menu yet, and the reply says
+  `cancelled`. The `browser` component has a Share button with `share =
+  true`.
+
+```lua
+-- a toolbar button: the page to the share menu, hearing what was picked
+ui.button { icon = "share", tooltip = "Share", to = "app:share",
+	msg = { url = state.page.url, text = state.page.title, reply = { shared = true } } }
+-- in update: if msg.shared then state.note = msg.service or "not shared" end
+```
+
+- `app:status-item`, `msg` `{ symbol | image, template?, title?, tooltip?,
+  items? }`: the mod's item in the menu bar (macOS), beside the clock. One
+  per mod: asking again changes it (send it only when what it shows
+  changes, not every frame), `false` takes it away, and so does the mod
+  going (reloaded without it, its package removed). A reload keeps it only
+  when the mod asks for it again as it loads: send it from `init` (which
+  a reload runs again with the state kept), not only when something
+  changes. `symbol` is a system
+  symbol's name (SF Symbols: `tray.and.arrow.down`), `image` an image file
+  found as `app:icon` finds one, drawn 18 points tall; either is drawn in
+  the menu bar's own colour unless `template = false`. `title` is short
+  text beside it (`✓`, `3`), `tooltip` what hovering says. `items` is its
+  menu: `"-"`, or `{ label, msg?, to?, enabled?, checked?, shortcut? }`; a
+  click sends `msg` to the mod (or `to`), as a menu item's does; a line
+  without `msg` is a heading, never clickable; `shortcut` only shows a key
+  beside the label (a hotkey's, say). `{ popup = items }` drops a menu down
+  from the mod's item at once, as if clicked: what else there is when the
+  hotkey's action has nothing to work on. Elsewhere than macOS it does
+  nothing. What it sends goes to the front main window's mod, and the app
+  does not come forward: send `app:command` `"activate"` for that.
+- `app:hotkey`, `msg` `{ keys, msg, to? }`: claims `keys` (`ctrl-alt-l`,
+  named as `keys` are, with two modifiers, not both shift, or a function
+  key: one alone would take ⌘C, Ctrl-A or ⌥E from every app) system-wide
+  for the mod: each press sends `msg` to it (or `to`), whichever app is in
+  front, and the app does not come forward, so the mod can act on what the
+  user is doing elsewhere; the window does not see the press. `{ keys,
+  release = true }` gives them back (under any spelling), as does the mod
+  going, or loading again without asking for them: claim them from
+  `init`. Keys held here, by another mod or under another spelling
+  (`secondary` is `cmd` on macOS), are the sender's error. Views read how
+  each stands in `app.hotkeys`: `{ ["ctrl-alt-l"] = "claimed" | "taken" |
+  "unsupported" }`, `"taken"` when another app holds them for itself alone
+  (say so in the menu: `"Capture (shortcut taken)"`; claiming again tries
+  again), `"unsupported"` off macOS. Apps that share their keys, and
+  system shortcuts (Spotlight's ⌘Space), may win without saying so: pick
+  keys with ctrl and alt.
+
+```lua
+-- examples/lantern/mods/menubar: CPU beside a flame, ⌃⌥L to come forward
+init = function()
+	return {}, {
+		{ to = "app:status-item", msg = { symbol = "flame", title = "12%", items = {
+			{ label = "Busiest processes" },               -- a heading
+			{ label = "rustc · 40%", msg = "processes" },
+			"-",
+			{ label = "Show Lantern", msg = "show", shortcut = "ctrl-alt-l" },
+		} } },
+		{ to = "app:hotkey", msg = { keys = "ctrl-alt-l", msg = "show" } },
+	}
+end,
+update = function(state, msg)
+	if msg == "show" then
+		return state, { { to = "app:command", msg = "activate" } }
 	end
 end,
 ```
@@ -895,7 +1030,10 @@ end,
   raises it), as a control's `window = "<mod>"` does, or closes it. `send`
   reaches the mod's `update` (from the asking mod) before its window
   draws, so it opens on a page; a `send` to a mod that does not exist is
-  the sender's error. The mod's `title` titles the window, and its
+  the sender's error. `size = { width, height }` opens it at that size
+  instead of its `window` key's, and grows it to that size if it is
+  already open, never shrinking it (a window that lists more once it has
+  something to list). The mod's `title` titles the window, and its
   `window = { size = { width, height }, min_size = { width, height } }`
   sizes it (both kept within the screen, as the main window's `size` is;
   420x560 and 280x240 when unset; a size takes effect the next time the
@@ -933,6 +1071,33 @@ return state, { { to = "app:window", msg = { open = "settings", send = { page = 
   Other schemes (`file`, an app's own) are the sender's error. At most 3
   pages open in 10 s. A control does it on a click: `ui.row { to =
   "app:open", msg = pr.url, ... }`.
+- `app:pdf`, `msg` `{ html | html_file | url, pdf, paper?, reply? }`: a page
+  made into a PDF file, as a reader saves an article (macOS, with the
+  `browser` feature). The page is `html` (text, up to 1 MiB), `html_file`
+  (an `.html` file under the app's cache or state folders, for bigger
+  pages a provider wrote) or `url` (an `https://` page on the internet).
+  HTML and `html_file` show with no script and nothing from the network:
+  inline pictures as `data:`. A `url` page runs its script, in a session of
+  its own (none of the app's cookies), and never reaches this machine or
+  its network, by address or by a name that resolves to one: its every
+  connection goes through a proxy in the app that checks the address it
+  connects to (macOS 14 or later; earlier, `url` answers `error`). It loads in an offscreen view and prints to
+  paper pages (`paper = "a4"` or `"letter"`, else the system's; half-inch
+  margins; backgrounds print; CSS `@page` and `break-before: page` work).
+  `pdf` is where: a path relative to the app's cache folder
+  (`~/.cache/<app>`), or one under its cache or state folders; anywhere
+  else is the sender's error. With `reply`, the mod hears it back with
+  `path` (the file written) or `error` (it did not load, took over 30 s,
+  ...). At most 3 at once. Share the file on with `app:share`, or have a
+  provider move it.
+
+```lua
+-- the article the mod shows, saved as a PDF
+ui.button { "Save as PDF", icon = "download", to = "app:pdf",
+	msg = { html = article_html, pdf = "articles/" .. id .. ".pdf", reply = { saved = id } } }
+-- in update: if msg.saved then state.files[msg.saved] = msg.path or false end
+```
+
 - A request the app cannot read (an unknown command, a misspelled
   `app:<what>`) is the sender's error, shown as an `update` error.
 - Previews (the Components window) ask nothing, and a provider's answer
@@ -1105,6 +1270,13 @@ Tabs open and close with the `.tabs-tab` rule's transition (see
 time. Run it after `just check`.
 - It catches unknown `ui` functions, wrong token values (`tone = "loud"`),
   and wrong value types before anything runs.
+- Component calls are typed too: `use "stat-tile"` returns a function of
+  the component's own `type Props`, so `stat_tile { value = 42 }` fails
+  (`value` is a string, `label` is missing). The records inside a list prop
+  are not checked yet. `just component-types` writes these into
+  `types/moonframe.d.luau` from `app/components`; run it after changing a
+  component's `Props`, or `just ci` fails. A name with no built-in
+  component takes any props.
 - It does not catch misspelled keys (`lable`), because Luau allows extra
   fields in a table literal. `just check` catches those.
 - Annotations are optional. Add them where they help, e.g.
@@ -1288,7 +1460,7 @@ Text-like elements take their main value positionally:
 - border: `true`, `all`, `top`, `bottom`, `left`, `right`, `none`
 - direction: `row` `column`
 - variant (button): `normal` `primary` `ghost` `outline` `danger`
-- command: `quit` `reload` `toggle-theme` (light to dark or back, keeping the themes) `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `new-window` (another main window: its own copy of the layout, the same providers; only the first keeps mod state across launches) `inspect` (Inspect Element for the mod: see "Here")
+- command: `quit` `reload` `toggle-theme` (light to dark or back, keeping the themes) `show-themes` `minimize` `maximize` (zoom or maximize, or restore) `close-window` `check-for-updates` (the app menu's Check for Updates) `new-window` (another main window: its own copy of the layout, the same providers; only the first keeps mod state across launches) `inspect` (Inspect Element for the mod: see "Here") `activate` (the app and the window forward, restored from the Dock)
 - place (overlay): `center` `top` `bottom` `left` `right` `top-start`
   `top-end` `bottom-start` `bottom-end`
 - browser commands (with `browser = "<id>"`): `browser-back`
@@ -1872,8 +2044,9 @@ installed), the native `app.acp` (coding agents a mod runs over ACP), and
 the native `app.usage` (plan usage of Claude, Codex, Copilot and the other
 AI services signed in here).
 Their shapes are under "Built-in providers" below and typed in
-`types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`, `Acp`,
-`Usage`, and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
+`types/moonframe.d.luau` (`Git`, `Forge`, `Files`, `Herdr`, `Acp`,
+`Usage`, and `Reply` for answers to actions; `system` and `agents` from
+their own `types.luau`, see "Providers"). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
 is labelled demo data.
 
@@ -1894,11 +2067,24 @@ terminal log. There are four kinds:
 - **`kind = "wasm"`:** a WebAssembly (WASM) component implementing
   `wit/provider.wit`, shipped as `provider.wasm` in the folder, or as the
   Rust crate it is built from (`Cargo.toml` with `crate-type = ["cdylib"]`
-  and its own empty `[workspace]`, plus `src/lib.rs` using
-  `wit_bindgen::generate!`).
-  - It exports `start(settings)`, `tick()` every `interval` seconds, and
-    `receive(message)`. All values are JSON text, and `tick` and `receive`
-    return JSON to publish, or nothing.
+  and its own empty `[workspace]`).
+  - Write new ones with the SDK, `crates/moonframe-provider`: implement
+    `moonframe_provider::Provider` (`start(settings) -> Result<Self>`,
+    `tick`, `receive`, optional `save`/`restore`, all `serde_json::Value`;
+    `tick` and `receive` return what to publish, or `None`) and end with
+    `moonframe_provider::export!(MyProvider)`. Older ones call
+    `wit_bindgen::generate!` on `wit/provider.wit` directly.
+  - An SDK crate also compiles into an app on the library, unchanged: add
+    `"rlib"` to its `crate-type`, depend on it, register
+    `.native("name", moonframe::Portable::<MyProvider>::new)`, and give that
+    folder `kind = "native"` (with the same `capabilities` and `[settings]`).
+    Keep it portable: state in `self`, the machine only through
+    capabilities, and its logic unit-tested natively with `cargo test`.
+    `examples/portable` runs one crate both ways side by side. Measured
+    there, compiled in runs real work about 2.4× faster than a component
+    built with `opt-level = "s"` (1.7× than `opt-level = 3`, which a Wasm
+    provider that computes much should use) and starts in 0.2 ms against
+    15.6 ms; the guide's "How the two builds compare" has the numbers.
   - With a `Cargo.toml` and Cargo installed (looked up on `PATH`, then in
     `~/.cargo/bin`), the host builds the crate when it starts and when its
     source changes, into `~/.cache/moonframe/providers`; a compile error
@@ -1926,7 +2112,8 @@ terminal log. There are four kinds:
     dependencies minimal. Something from elsewhere should come as
     `provider.wasm` alone.
     The host refuses to build a folder with a `build.rs` or a `.cargo/`.
-  - `app/providers/system` and `examples/capability-provider` are examples. For a complete walkthrough,
+  - `examples/portable` (both builds), `app/providers/system` and
+    `examples/capability-provider` are examples. For a complete walkthrough,
     read [Building WebAssembly (WASM) providers](https://docs.moonframe.dev/wasm-providers/)
     ([Markdown for agents](https://raw.githubusercontent.com/moonframehq/moonframe/main/docs/wasm-providers.md)):
     crate setup, the WIT interface, JSON messages, a Luau view, checks and packaging.
@@ -1986,6 +2173,21 @@ terminal log. There are four kinds:
   installed. It is published again when the file changes and on any
   message (a mod's Refresh hears back). The file is checked like anything
   a provider publishes. Use it for sample data; `examples/tessel` does.
+- **Its types, `types.luau` beside `provider.toml`:** `export type
+  Published` (what `app.<name>` holds) and optionally `export type Message`
+  (what `send "provider:<name>"` takes). With them, `just types DIR` fails
+  on a view that reads a field the provider never publishes or a `send`
+  of a message it does not take; without, `app.<name>` is `any`. Give
+  every new provider one. Keep `published.json` beside it, an example of
+  what it publishes: `just provider-types-check` holds its top level to
+  `Published`, and a test in the provider holds a real `tick` to it (see
+  `examples/portable/app/providers/focus` and `examples/helpdesk/providers/desk`).
+  A provider in `app/providers/` needs `just provider-types` after a
+  change, which copies its types into `types/moonframe.d.luau`; an app's
+  own providers are read by `just types DIR` directly. Only `send` is
+  checked (not button `msg`/`to` or bare tables), mods cannot name the
+  types (their own annotations are checked against them by shape), and
+  nothing checks the JSON at runtime.
 - **`kind = "process"`, `command = [...]`:** any program run in the folder.
   - Each line it prints on stdout is one JSON value to publish. Each message
     arrives on stdin as a `{"from":"<mod>","message":...}` line (compact,
@@ -2103,6 +2305,7 @@ repository is refused with the reason. Pick the folder with `app:pick`
 | `stashes` | count |
 | `log` | once a mod sends `{ log = 200 }` (at most 500; `false` stops it): `{ sha, short, parents, author, time, refs, subject }`, children before parents, of every branch, tag and HEAD. Draw it with `use "commit-graph"`; the `history` mod is a tab that does |
 | `diff` | `{ path, binary, lines, truncated, hunks = { { header, old_start, new_start, lines = { { kind ("add" "del" "ctx"), old?, new?, text } } } } }`, at most 1200 lines of 300 characters |
+| `commit` | once a mod sends `{ show = sha }` (a full or short hex id; `false` stops it): `{ sha, short, parents, author, email, time, refs, subject, body, files, count, truncated, added, deleted }`, `files` as `"<status>\t<added>\t<deleted>\t<path>"` for `change-tree`, at most 400. A merge is compared with its first parent. `{ show_diff = path }` adds one of its files as `diff`, shaped as above (`false` stops it); `examples/strata` uses both |
 
 `app.docs` (docs, native): `{ available, root }`, the root `app.files`
 lists, followed as it moves; a file read before it moved is still watched
@@ -2526,6 +2729,11 @@ costs what it costs in its own app: the Luau layout is replayed whole.
 For that:
 - **Root:** the view's root fills its box (`size_full()`), since it is
   laid out at the slot's size.
+- **Redraws:** hosted roots render on each scheduled window frame; the
+  Luau shell stays cached. A host may notify its view, a descendant view,
+  or a separate model read while drawing. Cache subviews only when the
+  host also notifies a view in that cached subtree: GPUI 0.3.12 does not
+  invalidate a cached view when only a separate model notifies.
 - **What goes over it:** use `float`/`area`, a popover, or an overlay.
   Something that overlaps it through a negative margin or overflow sits
   under it.
@@ -2687,7 +2895,7 @@ instead.
 | `just check` | loads everything headlessly (your folder and packages included), then adds what an open window of the app hit (`window:` lines); run after each edit |
 | `just check-builtin` | the same for `app/` alone |
 | `just types` | strict Luau type check against `types/moonframe.d.luau` |
-| `just screenshot OUT PID` | captures the window of the process you started |
+| `just screenshot OUT PID` | captures the window of the process you started (macOS, Linux on X11 or Sway/Hyprland, Windows from Git Bash) |
 | `just component-shot NAME [OUT]` | captures a component's preview page from a background instance it starts and stops; never takes focus |
 | `just run` | opens the window on `app/` (the user usually has one open) |
 | `just providers` | builds and lints the Wasm providers |

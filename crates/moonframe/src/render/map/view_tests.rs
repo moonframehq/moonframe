@@ -457,3 +457,36 @@ fn a_turn_left_close_to_north_settles_there() {
     assert_eq!(settled(10.0), 10.0);
     assert_eq!(settled(350.0), 350.0);
 }
+
+#[cfg(feature = "map-vector")]
+#[test]
+fn a_camera_moved_elsewhere_is_kept_and_ends_the_maps_own_glide() {
+    let (key, middle) = ("adopted", Point::new(px(400.), px(300.)));
+    let map = following([37.79, -122.40], 14.0);
+    assert_eq!(
+        super::adopt::adopt(key, 35.68, 139.76, 12.5, 30.0),
+        None,
+        "nothing drawn yet"
+    );
+    let drawn = frame(&map, key, (800.0, 600.0), Instant::now(), |pace| pace).0;
+    glide_zoom(key, drawn, 1.0, middle, 20.0);
+    let Some(adopted) = super::adopt::adopt(key, 35.68, 139.76, 12.5, -30.0) else {
+        panic!("the map was drawn");
+    };
+    assert_eq!(heading(key), None, "the glide ends");
+    assert!(
+        (adopted.bearing - 330.0).abs() < 1e-9,
+        "{}",
+        adopted.bearing
+    );
+    let kept = frame(&map, key, (800.0, 600.0), Instant::now(), |pace| pace).0;
+    let [lat, lon] = kept.middle();
+    assert!(
+        (lat - 35.68).abs() < 1e-9 && (lon - 139.76).abs() < 1e-9,
+        "{lat},{lon}"
+    );
+    assert!(
+        (kept.zoom - 12.5).abs() < 1e-9 && (kept.bearing - 330.0).abs() < 1e-9,
+        "{kept:?}"
+    );
+}

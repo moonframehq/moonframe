@@ -58,6 +58,12 @@ impl MoonframeApp {
 
     /// The pill and, while open, the details; nothing without a problem.
     pub(super) fn problems_layer(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        // A render draws its entry alone, from the data it was given: the
+        // app's providers there (natives the render has none of) are not
+        // the entry's problems.
+        if self.layers.is_some() {
+            return Vec::new();
+        }
         let all = self.problems();
         // A problem that went (or changed) is shown again if it comes back.
         self.problem_state

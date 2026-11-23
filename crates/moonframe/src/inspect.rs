@@ -130,9 +130,33 @@ pub(crate) struct Inspector {
     pub(crate) highlight: Rc<RefCell<crate::overlay::Highlight>>,
     /// How it measures, and what that needs.
     pub(crate) measuring: crate::overlay::Measuring,
+    /// The window it picks in and shows the selection in: a mod's, or the
+    /// main window when `None`. Picking follows the pointer from one to
+    /// another.
+    pub(crate) window: Option<WindowId>,
 }
 
 impl Inspector {
+    /// Whether it picks in, or shows its selection in, the window `id` (the
+    /// main window when `None`): only that one records where it draws.
+    pub(crate) fn in_window(&self, id: Option<WindowId>) -> bool {
+        (self.picking || self.selected.is_some()) && self.window == id
+    }
+
+    /// Moves picking to the window `id` (the main window when `None`),
+    /// forgetting what the last one drew; true when it moved.
+    pub(crate) fn move_to(&mut self, id: Option<WindowId>) -> bool {
+        if self.window == id {
+            return false;
+        }
+        self.window = id;
+        self.unhover();
+        self.sink.borrow_mut().clear();
+        self.drawn.borrow_mut().clear();
+        *self.highlight.borrow_mut() = crate::overlay::Highlight::default();
+        true
+    }
+
     /// Where this frame's nodes record themselves, when anything needs them.
     pub(crate) fn sink(&self) -> Option<Sink> {
         (self.picking || self.selected.is_some()).then(|| {

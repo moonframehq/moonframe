@@ -176,7 +176,7 @@ sidebar {
 	},
 
 	build = function(props: Props)
-		local sections = {}
+		local sections: { Element } = {}
 		local list: { Section } = props.sections or {}
 		for index, entry in ipairs(list) do
 			local rows = {}
@@ -200,7 +200,7 @@ sidebar {
 
 		local footer = nil
 		if props.footer and #props.footer > 0 then
-			local rows = {}
+			local rows: { Element } = {}
 			for index, item in props.footer do
 				rows[index] = ui.row {
 					class = item.muted and "sidebar-footer-row sidebar-footer-muted" or "sidebar-footer-row",

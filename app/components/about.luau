@@ -106,7 +106,7 @@ return component {
 
 		local info: any = false
 		if props.info and #props.info > 0 then
-			local rows = {}
+			local rows: { Element } = {}
 			for index, pair in props.info do
 				rows[index] = ui.row {
 					gap = "small",
@@ -119,7 +119,7 @@ return component {
 
 		local links: any = false
 		if props.links and #props.links > 0 then
-			local items = {}
+			local items: { Element } = {}
 			for index, link in props.links do
 				items[index] = ui.row {
 					class = "about-link",

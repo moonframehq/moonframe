@@ -41,6 +41,7 @@ default = [
   "gpui",
   "guard",
   "herdr-core",
+  "hotkey",
   "map",
   "markdown",
   "math",
@@ -51,9 +52,11 @@ default = [
   "projects",
   "prose",
   "restart",
+  "share",
   "shell",
   "socket",
   "speech",
+  "status-item",
   "studio",
   "tokio",
   "transcripts",
@@ -85,8 +88,10 @@ git       = ["moonframe/git"]
 gpui          = ["moonframe"]
 guard         = ["moonframe/guard"]
 herdr-core    = ["moonframe/herdr-core"]
+hotkey        = ["moonframe/hotkey"]
 map           = ["moonframe/map"]
 map-benchmark = ["moonframe/map-benchmark"]
+map-vector    = ["moonframe/map-vector"]
 markdown      = ["moonframe/markdown"]
 math          = ["moonframe/math"]
 notes         = ["moonframe/notes"]
@@ -98,11 +103,14 @@ prose         = ["moonframe/prose"]
 restart       = ["moonframe/restart"]
 rune          = ["dep:moonframe-rune", "moonframe-rune/ghostty"]
 sealed        = ["moonframe/sealed"]
+share         = ["moonframe/share"]
 shell         = ["moonframe/shell"]
 socket        = ["moonframe/socket"]
 speech        = ["moonframe/speech"]
+status-item   = ["moonframe/status-item"]
 studio        = ["moonframe/studio"]
 syntax        = ["moonframe/syntax"]
+system        = ["moonframe/system"]
 terminal      = ["moonframe/terminal"]
 tokio         = ["moonframe/tokio"]
 transcripts   = ["moonframe/transcripts"]

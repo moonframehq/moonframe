@@ -10,7 +10,14 @@ local PRESETS = {
 	{ id = "cozy", label = "Cozy Square" },
 }
 
-return mod {
+type State = {
+	preset: string,
+	open: boolean,
+	agents: boolean,
+	icons: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { preset = "comfortable", open = false, agents = true, icons = false }
 	end,

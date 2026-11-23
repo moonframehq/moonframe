@@ -89,7 +89,7 @@ text_editor {
 -- msg.view == "preview" sets state.preview (and "write" clears it).]],
 
 	build = function(props: Props)
-		local tools = {}
+		local tools: { Element } = {}
 		local names: { string } = props.tools or DEFAULT_TOOLS
 		for _, name in names do
 			if name == "|" then

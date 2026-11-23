@@ -37,7 +37,21 @@ pub fn balances(&self) -> HashMap<Currency, i64>
 [^why]: Summing euros and dollars gives a number that means nothing.
 ]]
 
-return mod {
+-- As `ui.markdown`'s `outline` message sends them.
+type Heading = { level: number, text: string, at: number, slug: string }
+
+type State = {
+	headings: { Heading },
+	query: string,
+	match: number,
+	count: number,
+	seq: number,
+	clicked: string?,
+	section: number?,
+	reveal: { at: number, seq: number }?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {

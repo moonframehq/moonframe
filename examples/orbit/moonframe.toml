@@ -1,5 +1,7 @@
 [app]
 # A task workspace: draggable boards, grouped lists, calendars and timelines,
 # with rich task details, comments and local attachments. Sample data.
-name  = "orbit"
-title = "Orbit"
+name = "orbit"
+# Links to orbit: (orbit:/new?title=…, orbit:/task?id=…) open in its bundle.
+schemes = ["orbit"]
+title   = "Orbit"

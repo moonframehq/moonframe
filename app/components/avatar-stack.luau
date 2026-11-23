@@ -36,7 +36,7 @@ return component {
 	build = function(props: Props)
 		local side = if props.size == "normal" then 24 else 18
 		local step = side - 6
-		local faces = {}
+		local faces: { Element } = {}
 		for index, person in props.people do
 			if index > (props.most or 3) then
 				break

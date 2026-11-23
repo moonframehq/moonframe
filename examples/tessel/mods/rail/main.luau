@@ -85,7 +85,7 @@ return mod {
 				align = "center",
 				justify = "center",
 				tooltip = user.name,
-				style = { background = user.color, radius = 999, color = "#ffffff" },
+				style = { background = user.color :: Color, radius = 999, color = "#ffffff" },
 				ui.text { (string.match(user.name, "^" .. utf8.charpattern) or ""), weight = "bold" },
 			})
 		end

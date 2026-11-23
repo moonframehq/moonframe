@@ -307,9 +307,11 @@ impl Manifest {
                 "a wasm provider needs a {PREBUILT}, or a Cargo.toml to build one, beside provider.toml"
             )));
         }
-        if kind != Kind::Wasm && !file.capabilities.is_empty() {
+        // A native provider has the user's access anyway; it may still
+        // declare what a portable one asks for, as its wasm build does.
+        if !matches!(kind, Kind::Wasm | Kind::Native) && !file.capabilities.is_empty() {
             return Err(problem(
-                "capabilities are for wasm providers; the others have the user's own access"
+                "capabilities are for wasm and native providers; the others have the user's own access"
                     .to_owned(),
             ));
         }

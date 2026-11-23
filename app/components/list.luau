@@ -36,7 +36,7 @@ return component {
 	},
 
 	build = function(props: Props)
-		local items = {}
+		local items: { Element } = {}
 		for index, row in props.rows do
 			local id = row.id or row.label
 			items[index] = ui.item {

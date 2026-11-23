@@ -8,7 +8,7 @@ type Props = {
 }
 
 -- Icon and colour by name, then by extension.
-local BY_NAME = {
+local BY_NAME: { [string]: { string } } = {
 	["Cargo.toml"] = { "settings-2", "#c76f3b" },
 	["Cargo.lock"] = { "lock", "#c76f3b" },
 	["go.mod"] = { "settings-2", "#00a5c8" },
@@ -25,7 +25,7 @@ local BY_NAME = {
 	[".gitattributes"] = { "git-branch", "#e0533a" },
 	[".gitmodules"] = { "git-branch", "#e0533a" },
 }
-local BY_EXTENSION = {
+local BY_EXTENSION: { [string]: { string } } = {
 	go = { "code", "#00a5c8" },
 	rs = { "code", "#c76f3b" },
 	swift = { "code", "#f05138" },
@@ -62,7 +62,7 @@ local BY_EXTENSION = {
 	gif = { "frame", "#a074c4" },
 	wit = { "plug", "#4fb3cf" },
 }
-local FILE = { "file", "#8a8f98" }
+local FILE: { string } = { "file", "#8a8f98" }
 local FOLDER = "#6b7280"
 
 return component {

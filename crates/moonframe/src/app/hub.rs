@@ -7,8 +7,8 @@
 //! - the last of everything shared as `app.<key>`, for a window that opens
 //!   later;
 //! - the history of the app's folders, and what runs once for the app:
-//!   the menu actions, notification clicks, `moonframe pane new`, update
-//!   checks.
+//!   the menu actions, notification clicks, links to the app's schemes,
+//!   `moonframe pane new`, update checks.
 //!
 //! What app-wide comes without a window (a menu item, a notification
 //! click) goes to the front main window: the active one, else the one
@@ -34,6 +34,8 @@ use {
 
 /// How far another window opens from the front one.
 const CASCADE: Pixels = px(28.);
+/// How often a notification click waiting for a main window looks for one.
+const CLICK_WAIT: Duration = Duration::from_millis(100);
 
 /// What opening another main window takes, from the first.
 #[derive(Clone)]
@@ -184,6 +186,8 @@ impl Hub {
         );
         menu_actions(cx);
         hear_notification_clicks(cx);
+        menu_bar::listen(cx);
+        links::deliver(cx);
         take_panes(&folders, cx);
         #[cfg(feature = "updates")]
         check_for_updates_daily(&folders, cx);
@@ -347,6 +351,15 @@ fn deliver(deliveries: Vec<(WeakEntity<MoonframeApp>, Delivery)>, cx: &mut App) 
                 app.flush(&from, cx);
             },
         });
+    }
+}
+
+/// Shares `data` as `app.<key>` in every main window, and in those that
+/// open later.
+pub(super) fn share_everywhere(key: &str, data: Data, cx: &mut App) {
+    if let Some(hub) = hub_of(cx) {
+        let deliveries = hub.update(cx, |hub, _| hub.share(key.to_owned(), data));
+        deliver(deliveries, cx);
     }
 }
 
@@ -569,15 +582,37 @@ fn menu_actions(cx: &mut App) {
 
 /// Hears the clicks on the notifications mods posted: each brings the
 /// app and its front window forward and tells the mod there that posted
-/// it, on `app/notification`: `{ id, clicked = true }`.
+/// it, on `app/notification`: `{ id, clicked = true }`. One that comes
+/// before a main window is open (the click started the app) waits for it.
+/// Also shares whether the user lets the app post them, as
+/// `app.notifications`.
 fn hear_notification_clicks(cx: &mut App) {
     let (sender, mut clicks) = futures::channel::mpsc::unbounded::<(String, Option<String>)>();
-    crate::alerts::listen(move |from, id| {
-        let _ = sender.unbounded_send((from, id));
-    });
+    let (told, mut permissions) = futures::channel::mpsc::unbounded();
+    crate::alerts::listen(
+        move |from, id| {
+            let _ = sender.unbounded_send((from, id));
+        },
+        move |permission| {
+            let _ = told.unbounded_send(permission);
+        },
+    );
     cx.spawn(async move |cx| {
         while let Some((from, id)) = clicks.next().await {
+            while cx.update(|cx| front(cx).is_none()) {
+                cx.background_executor().timer(CLICK_WAIT).await;
+            }
             cx.update(|cx| on_front(cx, |app, cx| app.notification_clicked(&from, id, cx)));
+        }
+    })
+    .detach();
+    cx.spawn(async move |cx| {
+        let mut shared = None;
+        while let Some(permission) = permissions.next().await {
+            if shared.replace(permission) != Some(permission) {
+                let name = crate::alerts::Permission::name(permission);
+                cx.update(|cx| share_everywhere("notifications", Data::from(name), cx));
+            }
         }
     })
     .detach();

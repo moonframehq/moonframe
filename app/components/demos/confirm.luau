@@ -3,7 +3,13 @@
 local confirm = use "confirm"
 local switch = use "switch"
 
-return mod {
+type State = {
+	open: boolean,
+	danger: boolean,
+	result: string,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = true, danger = true, result = "" }
 	end,

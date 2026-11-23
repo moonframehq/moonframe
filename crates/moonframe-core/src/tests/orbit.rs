@@ -194,3 +194,64 @@ fn orbit_filters_comments_reactions_and_attachment_replies_work() {
         &Data::from("/example/brief.txt")
     );
 }
+
+#[test]
+fn orbit_links_open_tasks_and_propose_new_ones() {
+    let mut app = Orbit::new();
+    let link = |path: &str, query: &[(&str, &str)]| {
+        Data::Map(
+            [
+                ("path".to_owned(), Data::from(path)),
+                (
+                    "query".to_owned(),
+                    Data::Map(
+                        query
+                            .iter()
+                            .map(|(name, value)| ((*name).to_owned(), Data::from(*value)))
+                            .collect(),
+                    ),
+                ),
+            ]
+            .into(),
+        )
+    };
+    app.workspace
+        .app_news("url", link("/task", &[("id", "APP-202")]));
+    app.check();
+    assert_eq!(field(&app.state(), "selected"), &Data::from("APP-202"));
+    assert_eq!(field(&app.state(), "page"), &Data::from("mobile"));
+
+    // A new task is only proposed until the user confirms it.
+    let before = app.state();
+    app.workspace
+        .app_news("url", link("/new", &[("title", "Call the printer")]));
+    app.check();
+    assert_eq!(field(&app.state(), "tasks"), field(&before, "tasks"));
+    assert_eq!(
+        field(field(&app.state(), "offer"), "title"),
+        &Data::from("Call the printer")
+    );
+    app.send("return 'drop-offer'");
+    assert_eq!(field(&app.state(), "offer"), &Data::Nil);
+    assert_eq!(field(&app.state(), "tasks"), field(&before, "tasks"));
+
+    app.workspace
+        .app_news("url", link("/new", &[("title", "Call the printer")]));
+    app.check();
+    app.send("return 'add-offer'");
+    assert_eq!(field(&app.state(), "offer"), &Data::Nil);
+    let Data::String(id) = field(&app.state(), "selected").clone() else {
+        panic!("not selected")
+    };
+    assert_eq!(
+        field(&app.task(&id), "title"),
+        &Data::from("Call the printer")
+    );
+    assert_eq!(field(&app.task(&id), "project"), &Data::from("mobile"));
+
+    // One it doesn't know changes nothing.
+    app.workspace
+        .app_news("url", link("/task", &[("id", "NOPE-1")]));
+    app.check();
+    assert_eq!(field(&app.state(), "selected"), &Data::String(id));
+}

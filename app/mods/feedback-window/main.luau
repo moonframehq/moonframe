@@ -10,6 +10,7 @@ local dropdown = use "dropdown"
 local dictation = use "dictation"
 
 local FEEDBACK = "feedback"
+local HOME = "https://moonframe.dev"
 
 -- Where the agent works, with the home folder as ~.
 local function short(path: string): string
@@ -33,8 +34,9 @@ end
 
 return mod {
 	title = "Make it yours",
-	-- Sized for the request and its buttons; runs below scroll.
-	window = { size = { width = 760, height = 460 }, min_size = { width = 520, height = 320 } },
+	-- Sized for the request, its buttons and the credit line; runs below
+	-- scroll.
+	window = { size = { width = 760, height = 320 }, min_size = { width = 520, height = 260 } },
 	subscribe = { "feedback/dialog", "app/inspect" },
 
 	init = function(previous)
@@ -53,6 +55,8 @@ return mod {
 		elseif msg == "close-agents" then
 			-- The agent picker's popover dismisses to the mod drawing it.
 			return state, { { to = FEEDBACK, msg = msg } }
+		elseif msg == "open-home" then
+			return state, { { to = "app:open", msg = HOME } }
 		elseif msg == "stop-listening" then
 			return state, { { to = "provider:speech", msg = { cancel = true } } }
 		elseif type(msg) == "table" and (msg.msg == "dictated" or msg.msg == "listening" or msg.msg == "dictation-failed") then
@@ -112,6 +116,9 @@ return mod {
 		end
 
 		local text = dialog.text or ""
+		-- Who made the app, for the credit line; the starter is Moonframe.
+		local name = app.title or "This app"
+		local credit = if name == "Moonframe" then "Built with Moonframe" else `{name} is built with Moonframe`
 		return ui.column {
 			grow = true,
 			gap = "none",
@@ -154,10 +161,30 @@ return mod {
 				copy = "copied",
 				copied = dialog.copied == true,
 			},
+			ui.divider(),
+			ui.row {
+				class = "feedback-credit",
+				align = "center",
+				gap = "small",
+				msg = "open-home",
+				tooltip = `Open {HOME}`,
+				ui.icon { name = "sparkles", tone = "muted", size = "small" },
+				ui.text { credit, tone = "muted", size = "small" },
+				ui.spacer(),
+				ui.row {
+					class = "feedback-credit-link",
+					align = "center",
+					gap = "small",
+					ui.icon { name = "external-link", size = "small" },
+					ui.text { "moonframe.dev", size = "small" },
+				},
+			},
 		}
 	end,
 
 	styles = {
 		[".feedback-window"] = { background = "background" },
+		[".feedback-credit"] = { padding = { 8, 20 } },
+		[".feedback-credit-link"] = { color = "muted-foreground" },
 	},
 }

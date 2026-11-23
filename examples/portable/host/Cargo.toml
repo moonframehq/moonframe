@@ -1,0 +1,36 @@
+# An app on the Moonframe library that runs one provider crate both ways:
+# ../app/providers/focus as a sandboxed wasm component, and the same crate
+# linked in as a native provider for ../app/providers/focus-native. The
+# binary sits beside the app folder, not around it: Cargo would otherwise
+# count the provider crate as a member of this workspace.
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-portable-example"
+publish                = false
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "portable-example"
+path = "src/main.rs"
+# No tests of its own (the provider's are in its crate): `cargo test
+# --workspace` would otherwise link a whole GPUI app for an empty harness.
+test = false
+
+[dependencies]
+# The provider crate, linked in as an ordinary dependency.
+focus               = { path = "../app/providers/focus" }
+moonframe.workspace = true
+
+# For examples/bench, which runs the provider both ways through the
+# provider runtime itself.
+[dev-dependencies]
+# The bench's workload: a provider that digests request logs.
+digest               = { path = "../bench/providers/digest" }
+moonframe-providers  = { features = ["wasm"], workspace = true }
+serde_json.workspace = true
+tempfile.workspace   = true

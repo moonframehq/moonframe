@@ -3,11 +3,18 @@
 local banner = use "banner"
 local switch = use "switch"
 
-local function fresh()
+local function fresh(): { [string]: boolean }
 	return { branch = true, provider = true, update = true, saved = true }
 end
 
-return mod {
+-- Which banners show, by the name each one dismisses with.
+type State = {
+	shown: { [string]: boolean },
+	solid: boolean,
+	restarted: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { shown = fresh(), solid = false, restarted = false }
 	end,

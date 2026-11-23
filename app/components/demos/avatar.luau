@@ -5,7 +5,13 @@ local segmented = use "segmented"
 
 local CYCLE = { none = "working", working = "blocked", blocked = "done", done = "idle", idle = "none" }
 
-return mod {
+type State = {
+	size: string,
+	shape: string,
+	spaces: { { name: string, status: string } },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -36,7 +42,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local tiles = {}
+		local tiles: { Element } = {}
 		for index, space in state.spaces do
 			tiles[index] = ui.column {
 				gap = "small",

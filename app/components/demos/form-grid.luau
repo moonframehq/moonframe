@@ -5,7 +5,16 @@ local dropdown = use "dropdown"
 local number_field = use "number-field"
 local checkbox = use "checkbox"
 
-return mod {
+type State = {
+	name: string,
+	counter: number,
+	kind: string,
+	ppi: number,
+	open: boolean,
+	sharpen: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { name = "scan", counter = 7, kind = "tiff16", ppi = 300, open = false, sharpen = true }
 	end,

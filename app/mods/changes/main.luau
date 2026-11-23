@@ -9,7 +9,7 @@ type State = {
 	-- The file whose diff shows, if any.
 	selected: string?,
 	-- Folders folded shut, by path.
-	folded: { [string]: boolean },
+	folded: { [string]: boolean? },
 	-- Asked git to look again, and waiting for what it publishes.
 	looking: boolean,
 }
@@ -63,7 +63,7 @@ return mod {
 			state.selected = if state.selected == msg.pick then nil else msg.pick
 			return state, ask(state.selected)
 		elseif msg.fold then
-			state.folded[msg.fold] = (if state.folded[msg.fold] then nil else true) :: any
+			state.folded[msg.fold] = if state.folded[msg.fold] then nil else true
 		end
 		return nil
 	end,

@@ -87,6 +87,44 @@ impl MoonframeApp {
         layers
     }
 
+    /// While picking in another window, a layer over the window `id` (the
+    /// main one when `None`) that brings picking here once the pointer
+    /// comes in, and keeps clicks from reaching what is under it meanwhile.
+    pub(crate) fn inspector_catcher(
+        &self,
+        id: Option<WindowId>,
+        cx: &Context<Self>,
+    ) -> Option<AnyElement> {
+        if !self.inspector.picking || self.inspector.window == id {
+            return None;
+        }
+        let come = move |this: &mut Self, cx: &mut Context<Self>| {
+            if this.inspector.move_to(id) {
+                cx.notify();
+            }
+        };
+        Some(
+            deferred(
+                div()
+                    .id("inspect-catcher")
+                    .absolute()
+                    .inset_0()
+                    .occlude()
+                    .cursor_crosshair()
+                    .child(crate::browser::cover())
+                    .on_mouse_move(
+                        cx.listener(move |this, _: &MouseMoveEvent, _, cx| come(this, cx)),
+                    )
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _: &MouseDownEvent, _, cx| come(this, cx)),
+                    ),
+            )
+            .with_priority(PRIORITY + 1)
+            .into_any_element(),
+        )
+    }
+
     /// Outlines the hovered and selected nodes where this frame drew them.
     fn highlight(&self, cx: &Context<Self>) -> AnyElement {
         let accent = cx.theme().primary;

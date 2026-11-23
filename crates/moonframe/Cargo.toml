@@ -80,6 +80,9 @@ speech = ["dep:moonframe-speech"]
 # `app:guard`: a mod holds back closing and quitting. Off by default; the
 # starter turns it on.
 guard = []
+# `app:hotkey`: system-wide shortcuts for mods (macOS). Off by default; the
+# starter turns it on.
+hotkey = []
 # State kept by herdr-core (`hc`) when installed; with `terminal`, it also
 # keeps shells across launches. tmux and local PTYs only need `terminal`.
 herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
@@ -89,6 +92,10 @@ herdr-core = ["dep:moonframe-mux", "moonframe-mux/herdr-core"]
 map = ["dep:image", "dep:ureq"]
 # Drives a map through input events and reports what it cost.
 map-benchmark = ["map"]
+# `vector-*` providers: vector tiles drawn on the GPU by gpui-maps, under
+# the same pins, routes and gestures as the raster map. `tokio-maps` is the
+# runtime it fetches tiles on, renamed: the `tokio` feature names another.
+map-vector = ["dep:gpui-maps", "dep:tokio-maps", "map"]
 # `ui.video`: frames from another process in a Metal view of their own,
 # 16-bit and colour managed (macOS). Off by default: few apps need it.
 video = ["dep:core-graphics-types", "dep:metal", "dep:moonframe-frames"]
@@ -157,6 +164,15 @@ syntax = [
   "gpui-kit/tree-sitter-yaml",
   # keep-sorted end
 ]
+# `app:share`: the system's share menu for an address, text or files
+# (macOS). Off by default; the starter turns it on.
+share = []
+# `app:status-item`: a mod's item in the menu bar, with its menu (macOS).
+# Off by default; the starter turns it on.
+status-item = []
+# The `system` capability (this machine's load) for providers compiled in
+# with `Portable`; wasm providers have it with `wasm`.
+system = ["moonframe-providers/system"]
 # Terminal rendering and local/tmux sessions. Engines enable this too.
 terminal = ["dep:moonframe-mux", "dep:moonframe-terminal", "moonframe-mux/terminal"]
 # Native providers written with `async fn` (`.native_async`), and a tokio
@@ -177,9 +193,10 @@ anstream.workspace = true
 anstyle.workspace  = true
 # Enable export on the same GPUI version as gpui-kit, without its test harness.
 futures.workspace             = true
-gpui-capture                  = { default-features = false, features = ["test-support"], optional = true, package = "gpui-pre", version = "=0.3.10" }
+gpui-capture                  = { default-features = false, features = ["test-support"], optional = true, package = "gpui-pre", version = "=0.3.12" }
 gpui-kit.workspace            = true
-gpui-platform-capture         = { default-features = false, features = ["test-support"], optional = true, package = "gpui-pre-platform", version = "=0.3.10" }
+gpui-maps                     = { features = ["sprite_http_fetch"], optional = true, workspace = true }
+gpui-platform-capture         = { default-features = false, features = ["test-support"], optional = true, package = "gpui-pre-platform", version = "=0.3.12" }
 image                         = { optional = true, workspace = true }
 imagesize.workspace           = true
 keepawake                     = { optional = true, workspace = true }
@@ -212,35 +229,37 @@ rust-embed.workspace          = true
 serde.workspace               = true
 serde_json.workspace          = true
 tempfile.workspace            = true
+tokio-maps                    = { features = ["rt-multi-thread"], optional = true, package = "tokio", version = "1" }
 toml.workspace                = true
 tracing.workspace             = true
 tracing-subscriber.workspace  = true
 ureq                          = { optional = true, workspace = true }
+url.workspace                 = true
 
 [dev-dependencies]
 # Real windows, headless: `src/e2e.rs` clicks and types in them. As for
 # `capture`, on GPUI itself: gpui-kit's `test-support` can't resolve with the
 # locked taffy.
-gpui-capture          = { default-features = false, features = ["test-support"], package = "gpui-pre", version = "=0.3.10" }
-gpui-platform-capture = { default-features = false, features = ["test-support"], package = "gpui-pre-platform", version = "=0.3.10" }
+gpui-capture          = { default-features = false, features = ["test-support"], package = "gpui-pre", version = "=0.3.12" }
+gpui-platform-capture = { default-features = false, features = ["test-support"], package = "gpui-pre-platform", version = "=0.3.12" }
 tempfile.workspace    = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics-types = { optional = true, workspace = true }
 # `render_entry`'s text, shaped off the main thread, unlike the platform's.
-gpui-apple-capture = { features = ["font-kit"], optional = true, package = "gpui-pre-apple", version = "=0.3.10" }
+gpui-apple-capture = { features = ["font-kit"], optional = true, package = "gpui-pre-apple", version = "=0.3.12" }
 metal              = { optional = true, workspace = true }
 moonframe-frames   = { optional = true, workspace = true }
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
-block2.workspace           = true
-objc2.workspace            = true
-objc2-app-kit              = { features = ["NSBezierPath", "NSColor", "NSControl", "NSDockTile", "NSEvent", "NSImageView", "NSRunningApplication", "NSSound", "NSView", "NSWindow", "block2"], workspace = true }
-objc2-foundation.workspace = true
+block2.workspace = true
+objc2.workspace  = true
+objc2-app-kit    = { features = ["NSBezierPath", "NSButton", "NSButtonCell", "NSCell", "NSColor", "NSControl", "NSDockTile", "NSEvent", "NSImageView", "NSMenu", "NSMenuItem", "NSPanel", "NSPrintInfo", "NSPrintOperation", "NSRunningApplication", "NSSavePanel", "NSScreen", "NSSharingService", "NSSound", "NSStatusBar", "NSStatusBarButton", "NSStatusItem", "NSView", "NSWindow", "block2"], workspace = true }
+objc2-foundation = { features = ["NSArray", "NSGeometry", "NSNotification", "NSOperation", "NSURL"], workspace = true }
 # Finding the AppKit window a trackpad gesture happened in.
 raw-window-handle.workspace = true
 # `app:notify`: system notifications, and hearing their clicks.
 objc2-user-notifications.workspace = true
-objc2-web-kit                      = { optional = true, workspace = true }
+objc2-web-kit                      = { features = ["WKContentRuleList", "WKContentRuleListStore", "WKNavigation", "WKNavigationDelegate", "WKPreferences", "WKUserContentController", "WKUserScript", "WKWebViewConfiguration", "WKWebpagePreferences", "WKWebsiteDataStore", "block2"], optional = true, workspace = true }
 
 # wry has no working GPUI child-view backend on Linux yet; a `ui.browser`
 # there shows its address and opens it in the system browser.

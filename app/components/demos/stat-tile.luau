@@ -2,14 +2,18 @@
 -- deltas that are good when up (tokens) or good when down (failing checks).
 local stat_tile = use "stat-tile"
 
-local TILES = {
+local TILES: { { id: string, label: string, icon: string, value: string, unit: string?, delta: string, good: string?, detail: string } } = {
 	{ id = "tokens", label = "Tokens today", icon = "activity", value = "1.84M", delta = "+12%", detail = "vs. yesterday · 3 agents" },
 	{ id = "prs", label = "Open PRs", icon = "git-pull-request", value = "14", delta = "+2", detail = "4 waiting for review" },
 	{ id = "failing", label = "Failing checks", icon = "circle-x", value = "3", delta = "+1", good = "down", detail = "ci / clippy on 2 branches" },
 	{ id = "latency", label = "Daemon latency", icon = "clock", value = "38", unit = "ms", delta = "−6ms", good = "down", detail = "p95 over 24h" },
 }
 
-return mod {
+type State = {
+	selected: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { selected = "tokens" }
 	end,
@@ -21,7 +25,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local tiles = {}
+		local tiles: { Element } = {}
 		for index, tile in TILES do
 			tiles[index] = stat_tile {
 				label = tile.label,

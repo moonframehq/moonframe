@@ -225,7 +225,7 @@ table_view {
 			}
 		end
 
-		local headings = {}
+		local headings: { Element } = {}
 		for index, column in props.columns do
 			local sorted = props.sort == column.key
 			local clickable = sortable and column.sortable ~= false
@@ -297,7 +297,7 @@ table_view {
 			local row: any = given or plain[index]
 			local id = row.id or index
 			local on = checked[id] == true
-			local cells = {}
+			local cells: { Element } = {}
 			if props.checkable then
 				cells[1] = checkbox(on, false, { [props.check or "check"] = id })
 			end
@@ -377,7 +377,7 @@ table_view {
 				row = if props.groups then draw_grouped else draw, grow = true,
 			}
 		elseif props.groups then
-			local grouped = {}
+			local grouped: { Element } = {}
 			for index = 1, #entries do
 				table.insert(grouped, draw_grouped(index))
 			end
@@ -393,7 +393,7 @@ table_view {
 				},
 			}
 		else
-			local rows = table.create(count)
+			local rows = table.create<<Element>>(count)
 			for index = 1, count do
 				rows[index] = draw(index)
 			end

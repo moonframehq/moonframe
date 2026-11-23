@@ -1,0 +1,27 @@
+# One provider, two builds. Built to `wasm32-wasip2` it is a component the
+# `focus` folder runs sandboxed and rebuilds as you edit; as an ordinary
+# crate (the `rlib`) the app links it in and runs it natively for the
+# `focus-native` folder. See src/lib.rs.
+[package]
+edition = "2024"
+license = "MIT"
+name    = "focus"
+publish = false
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# `stateful`: `save` and `restore` keep the timer across a new wasm build.
+moonframe-provider = { features = ["stateful"], path = "../../../../../crates/moonframe-provider" }
+serde              = { features = ["derive"], version = "1" }
+serde_json         = "1"
+
+[profile.release]
+lto       = true
+opt-level = "s"
+strip     = true
+
+# A provider builds on its own, as the host builds it.
+[workspace]

@@ -386,17 +386,17 @@ impl Scheme {
         colors.warning = Some(color(self.ansi[3]));
         colors.danger = Some(color(self.ansi[1]));
         colors.info = Some(color(self.ansi[6]));
-        ThemeConfig {
-            name: self.name.into(),
-            mode: if self.dark() {
-                ThemeMode::Dark
-            } else {
-                ThemeMode::Light
-            },
-            colors,
-            highlight: Some(self.highlight()),
-            ..ThemeConfig::default()
-        }
+        // `ThemeConfig` is `#[non_exhaustive]` from gpui-kit 0.9.
+        let mut config = ThemeConfig::default();
+        config.name = self.name.into();
+        config.mode = if self.dark() {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        };
+        config.colors = colors;
+        config.highlight = Some(self.highlight());
+        config
     }
 
     /// The code editor's colors: gpui-kit's own syntax colors for a light

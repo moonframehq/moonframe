@@ -990,6 +990,10 @@ fn keep(key: &str, frame: Frame) {
     });
 }
 
+#[cfg(feature = "map-vector")]
+#[path = "view_adopt.rs"]
+pub(super) mod adopt;
+
 #[cfg(test)]
 #[path = "view_tests.rs"]
 mod tests;

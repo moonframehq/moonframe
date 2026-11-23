@@ -67,20 +67,20 @@ return component {
 
 	build = function(props: Props)
 		local key = props.event or "select"
-		local heading = {}
+		local heading: { Element } = {}
 		local names: { string } = props.weekdays or WEEKDAYS
 		for _, name in names do
 			table.insert(heading, ui.row { grow = true, justify = "center", ui.text { name, class = "month-grid-weekday" } })
 		end
 		local rows = { ui.row { class = "month-grid-week", table.unpack(heading) } }
 		for _, week in props.weeks do
-			local cells = {}
+			local cells: { Element } = {}
 			for _, day in week do
 				local class = { "month-grid-day" }
 				if day.outside then
 					table.insert(class, "month-grid-outside")
 				end
-				local dots = {}
+				local dots: { Element } = {}
 				for _ = 1, math.min(day.count or 0, 3) do
 					table.insert(dots, ui.row { class = "month-grid-dot", width = 4, height = 4 })
 				end

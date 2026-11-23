@@ -2,13 +2,14 @@
 # Loads every example app in examples/ (each folder with a moonframe.toml)
 # headlessly with BINARY (default target/release/moonframe), each linked as
 # a profile in a throwaway user folder, so nothing in ~/.config is touched;
-# then, given HOST, the app built on the library (examples/host) too.
+# then each HOST given, the apps built on the library (examples/host,
+# examples/portable) too.
 #
-#   scripts/check-examples.sh [BINARY] [HOST]
+#   scripts/check-examples.sh [BINARY] [HOST...]
 set -euo pipefail
 
 binary=${1:-target/release/moonframe}
-host=${2:-}
+shift || true
 user=$(mktemp -d)
 trap 'rm -rf "$user"' EXIT
 
@@ -21,6 +22,6 @@ for manifest in examples/*/moonframe.toml; do
 done
 [ "$found" -gt 0 ] || { echo "no example apps in examples/" >&2; exit 1; }
 
-if [ -n "$host" ]; then
+for host in "$@"; do
     "$host" --user "$user" --check | cut -c1-120
-fi
+done

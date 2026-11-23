@@ -88,10 +88,6 @@ impl Outline {
     }
 
     /// Bytes into the source of each top-level block, in order.
-    #[allow(
-        dead_code,
-        reason = "Rune keys its blocks by them; GPUI asks `block_at`"
-    )]
     pub(super) fn blocks(&self) -> &[usize] {
         &self.blocks
     }

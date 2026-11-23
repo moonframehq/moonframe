@@ -46,7 +46,7 @@ selection_toolbar { field = "notes", selected = state.selected,
 -- update: msg.msg == "moved" keeps state.selected = msg.selected.]],
 
 	build = function(props: Props)
-		local buttons = {}
+		local buttons: { Element } = {}
 		local tools: { string } = props.tools or { "bold", "italic", "strike", "code", "link", "quote" }
 		for _, name in tools do
 			local tool = TOOLS[name]

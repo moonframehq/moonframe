@@ -96,7 +96,7 @@ local function value(picked: { Option }, props: Props): { any }
 		people = people and option.avatar ~= nil
 	end
 	if coloured then
-		local pills = {}
+		local pills: { Element } = {}
 		for _, option in picked do
 			table.insert(pills, pill { label = option.label or option.id, color = option.color })
 		end
@@ -107,7 +107,7 @@ local function value(picked: { Option }, props: Props): { any }
 		return { face(option, props.icon), ui.text { option.label or option.id, truncate = true } }
 	end
 	if people then
-		local faces = {}
+		local faces: { Element } = {}
 		for _, option in picked do
 			table.insert(faces, avatar { name = option.avatar, size = "small", shape = "circle" })
 		end

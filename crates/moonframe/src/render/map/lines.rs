@@ -8,6 +8,7 @@ use {
     super::{
         Frame,
         routing::{self, Ask, Routed, Way},
+        tilt::Tilt,
     },
     crate::{color::ThemeColor, render::pointer::Sender},
     gpui_kit::{component::ActiveTheme, *},
@@ -22,7 +23,8 @@ use {
 /// How faint a route is drawn straight when its router failed.
 const PENDING: f32 = 0.45;
 
-/// One line to paint, in pixels from the box's corner.
+/// One unbroken line to paint, in pixels from the box's corner: a route,
+/// or a piece of one a tilted map breaks.
 struct Line {
     corners: Vec<(f32, f32)>,
     color: Option<Hsla>,
@@ -35,6 +37,7 @@ struct Line {
 /// What the map's routes need painted.
 pub(super) struct Lines {
     frame: Frame,
+    tilt: Tilt,
     lines: Vec<Line>,
 }
 
@@ -47,7 +50,7 @@ pub(super) struct Ways {
 
 /// The map's routes as lines in `frame`, asking the router for those
 /// given as stops.
-pub(super) fn lines(map: &Map, frame: Frame, cx: &App) -> (Lines, Ways) {
+pub(super) fn lines(map: &Map, frame: Frame, tilt: Tilt, cx: &App) -> (Lines, Ways) {
     let theme = cx.theme();
     let mut ways = Ways {
         waiting: false,
@@ -57,7 +60,7 @@ pub(super) fn lines(map: &Map, frame: Frame, cx: &App) -> (Lines, Ways) {
         .routes
         .iter()
         .enumerate()
-        .map(|(index, route)| {
+        .flat_map(|(index, route)| {
             let (places, pending) = match Ask::of(route) {
                 None => (route.points.clone(), false),
                 Some(ask) => match routing::way(&ask) {
@@ -74,16 +77,19 @@ pub(super) fn lines(map: &Map, frame: Frame, cx: &App) -> (Lines, Ways) {
                     Routed::Failed(_) => (route.via.clone(), true),
                 },
             };
-            Line {
-                corners: frame.route(&places),
-                color: route.color.map(|color| color.hsla(theme)),
-                stroke: route.stroke,
-                dashed: route.dashed || pending,
-                pending,
-            }
+            let color = route.color.map(|color| color.hsla(theme));
+            tilt.route(&frame, &places)
+                .into_iter()
+                .map(move |corners| Line {
+                    corners,
+                    color,
+                    stroke: route.stroke,
+                    dashed: route.dashed || pending,
+                    pending,
+                })
         })
         .collect();
-    (Lines { frame, lines }, ways)
+    (Lines { frame, tilt, lines }, ways)
 }
 
 impl Lines {
@@ -111,7 +117,7 @@ impl Lines {
                     };
                     let color = line.color.unwrap_or(fallback);
                     let stroke = line.stroke;
-                    for copy in self.frame.copies(low, high, stroke + 3.0) {
+                    for copy in self.tilt.copies(&self.frame, low, high, stroke + 3.0) {
                         let (dx, dy) = self.frame.copy_offset(copy);
                         let at = |&(x, y): &(f32, f32)| {
                             point(bounds.origin.x + px(x + dx), bounds.origin.y + px(y + dy))

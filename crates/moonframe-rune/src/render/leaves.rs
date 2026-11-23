@@ -318,6 +318,13 @@ impl<'w> Painter<'w> {
                 .borrow_mut()
                 .insert("typewriter".to_owned());
         }
+        // Nor does it tell or take how far its text is scrolled.
+        if input.scrolled.is_some() || input.scroll_at.is_some() {
+            self.ui
+                .left_out
+                .borrow_mut()
+                .insert("input scrolling".to_owned());
+        }
         let shown = text_input(&field.edit, font);
         let shown = if painted.is_empty() {
             shown

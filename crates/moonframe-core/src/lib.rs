@@ -44,6 +44,7 @@ mod read;
 mod request;
 mod roots;
 mod schema;
+mod scroll_follow;
 mod style;
 mod vm;
 mod window;
@@ -65,13 +66,15 @@ pub use {
     read::MAX_DOCUMENT,
     request::{
         APP, AppIcon, Appearance, Awake, Devtools, DevtoolsPlace, Dock, Edit, EditChange, Guard,
-        ICON_TYPES, MAX_SOURCE, Notification, Pick, PickKind, Request, SOUND_TYPES, Sound, Splice,
-        WindowRequest,
+        Hotkey, ICON_TYPES, MAX_SOURCE, Notification, Paper, Pdf, PdfSource, Pick, PickKind,
+        Request, SOUND_TYPES, Share, Sound, Splice, StatusEntry, StatusIcon, StatusItem,
+        StatusLook, WindowRequest, public_address,
     },
     roots::{AppLayer, Roots, mod_name},
     schema::{
         ElementSchema, KeySchema, KeyType, SCHEMA_VERSION, Schema, StyleSchema, TokenSet, schema,
     },
+    scroll_follow::{SCROLL_JITTER, ScrollFollow},
     style::{
         Case, Color, Corners, Curve, Font, Gradient, Look, MonoFont, Paint, Part, Resolved, Rules,
         Shade, Shadow, ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token,

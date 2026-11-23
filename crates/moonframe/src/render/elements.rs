@@ -697,12 +697,31 @@ impl<'w> Draw<'w> for Icon {
             element = element.text_scaled(size, theme);
         }
         let mut icon = GpuiIcon::default().path(self.name.path());
-        if self.spin
-            && let Some(turned) = painter.spin()
-        {
+        let turned = if self.spin {
+            painter.spin()
+        } else {
+            None
+        };
+        if let Some(turned) = turned {
             icon = icon.rotate(radians(turned * std::f32::consts::TAU));
         }
-        with_extras(element.child(icon), &self.extras, painter, place, cx).into_any_element()
+        let element =
+            with_extras(element.child(icon), &self.extras, painter, place, cx).into_any_element();
+        if turned.is_none() {
+            return element;
+        }
+        // It turns in a live view of its own, as a map moves: the frames it
+        // asks for replay what stands still around it (see `cached`).
+        match painter.live_view(place) {
+            Some(view) => {
+                painter.live_again(view);
+                painter.in_live_view(element, place)
+            },
+            None => {
+                painter.animating = true;
+                element
+            },
+        }
     }
 }
 

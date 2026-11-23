@@ -38,19 +38,19 @@ return mod {
 		if props and props.always then
 			return state, { { to = "provider:git", msg = { log = COMMITS } } }
 		end
-		return state
+		return state, nil
 	end,
 
 	update = function(state: State, msg: any, props: any): (State?, { any }?)
 		local bar = bar_of(msg, props)
 		if not bar then
-			return nil
+			return nil, nil
 		end
 		local tab = type(msg.value) == "table" and msg.value.tab
 		state.shown[bar] = if tab and tab.kind == KIND then true else nil
 		local asking = next(state.shown) ~= nil
 		if asking == state.asking then
-			return state
+			return state, nil
 		end
 		state.asking = asking
 		return state, { { to = "provider:git", msg = { log = if asking then COMMITS else false } } }

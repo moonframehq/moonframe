@@ -20,6 +20,9 @@ mod rotated;
 mod routing;
 mod stand_in;
 mod tiles;
+mod tilt;
+#[cfg(feature = "map-vector")]
+mod vector;
 mod view;
 mod wake;
 
@@ -64,6 +67,13 @@ fn redraw(key: &str, window: &mut Window, cx: &mut App) {
         Some(view) => cx.notify(view),
         None => window.refresh(),
     }
+}
+
+/// Whether gpui-maps draws the map: a `vector-*` provider, in a build with
+/// `map-vector`. Without it, such a provider is drawn from raster tiles
+/// ([`tiles::source`]) and takes the map's own gestures.
+fn drawn_by_gpui_maps(map: &Map) -> bool {
+    cfg!(feature = "map-vector") && map.provider.vector()
 }
 
 /// The live view of the map `key`, if it has one.
@@ -119,13 +129,29 @@ impl<'w> Draw<'w> for Map {
                 None => painter.animating = true,
             }
         }
-        let (layer, tiles_missing) = if frame.turned() {
+        #[cfg(feature = "map-vector")]
+        let vector = self.provider.vector().then(|| {
+            vector::layer(
+                self.provider,
+                &key,
+                frame,
+                self.moved.clone(),
+                sender.clone(),
+            )
+        });
+        #[cfg(not(feature = "map-vector"))]
+        let vector: Option<Div> = None;
+        let (layer, tiles_missing) = if let Some(vector) = vector {
+            (vector, false)
+        } else if frame.turned() {
             rotated::layer(self, frame, scale, &key)
         } else {
             layer::tile_layer(self, frame, level, ahead, scale, grid)
         };
         // Its tiles set off now, not when the map arrives.
-        if let Some(heading) = view::heading(&key) {
+        if let Some(heading) = view::heading(&key)
+            && !drawn_by_gpui_maps(self)
+        {
             layer::ask_for(self, heading, scale);
         }
         // Decoded tiles are bounded per window rather than kept for the run.
@@ -133,7 +159,15 @@ impl<'w> Draw<'w> for Map {
             Some(window) => layer.image_cache(memory::TileCache(window)),
             None => layer,
         };
-        let (lines, ways) = lines::lines(self, frame, cx);
+        #[cfg(feature = "map-vector")]
+        let tilt = if self.provider.vector() {
+            vector::tilt(&key, cx)
+        } else {
+            tilt::Tilt::default()
+        };
+        #[cfg(not(feature = "map-vector"))]
+        let tilt = tilt::Tilt::default();
+        let (lines, ways) = lines::lines(self, frame, tilt, cx);
         let missing = tiles_missing || ways.waiting;
         #[cfg(feature = "map-benchmark")]
         benchmark::frame(level.0, tiles_missing);
@@ -162,10 +196,9 @@ impl<'w> Draw<'w> for Map {
             .bg(layer::placeholder(self.provider))
             .look(&look, theme)
             .edges(look.base.border, &look.base, theme)
-            .cursor_grab()
             .child(layer)
             .child(lines.paint(route_color, theme.background))
-            .children(pins::pins(self, frame, &sender, pulse, cx))
+            .children(pins::pins(self, frame, tilt, &sender, pulse, cx))
             .child(lines::announce(
                 &key,
                 painter.frame,
@@ -182,8 +215,18 @@ impl<'w> Draw<'w> for Map {
                 &sender,
                 cx,
             ))
-            .child(follow(&key, frame.turned(), self.moved.clone(), &sender))
-            .child(trackpad(&key, frame, most, self.moved.clone(), &sender));
+            .child(follow(&key, frame.turned(), self.moved.clone(), &sender));
+        // A vector map's gestures are gpui-maps' own.
+        let own_gestures = !drawn_by_gpui_maps(self);
+        if own_gestures {
+            element = element.cursor_grab().child(trackpad(
+                &key,
+                frame,
+                most,
+                self.moved.clone(),
+                &sender,
+            ));
+        }
         element = match self.width {
             Some(width) => element.w(px(width)),
             None => element.w_full(),
@@ -195,7 +238,9 @@ impl<'w> Draw<'w> for Map {
         if self.grow {
             element = element.flex_1();
         }
-        element = interact(element, &key, frame, most, self.moved.clone(), &sender);
+        if own_gestures {
+            element = interact(element, &key, frame, most, self.moved.clone(), &sender);
+        }
         painter.in_live_view(element.into_any_element(), place)
     }
 }
@@ -217,7 +262,7 @@ fn credit(map: &Map, cx: Cx) -> Div {
         .flex()
         .gap_2()
         .children(problem.map(|problem| div().text_color(theme.danger).child(problem)))
-        .child(map.provider.source().attribution)
+        .child(tiles::source(map.provider).attribution)
 }
 
 /// Zoom in and out, in the top corner.

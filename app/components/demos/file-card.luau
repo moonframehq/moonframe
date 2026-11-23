@@ -10,7 +10,13 @@ local FILES: { any } = {
 	{ id = "budget", name = "budget.xlsx", progress = 0.35 },
 }
 
-return mod {
+type State = {
+	layout: string,
+	files: { any },
+	selected: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		if previous then
 			return previous
@@ -48,7 +54,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local cards = {}
+		local cards: { Element } = {}
 		local uploading = false
 		for index, file in state.files do
 			uploading = uploading or file.progress ~= nil

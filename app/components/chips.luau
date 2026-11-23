@@ -67,7 +67,7 @@ return component {
 		for _, id in ipairs(props.selected or {}) do
 			on[id] = true
 		end
-		local cells = {}
+		local cells: { Element } = {}
 		for _, chip in props.chips do
 			local id = chip.id or chip.label
 			local active = chip.on == true or on[id] == true

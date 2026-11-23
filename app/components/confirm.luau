@@ -79,7 +79,7 @@ return component {
 
 		local list: any = false
 		if props.items and #props.items > 0 then
-			local rows = {}
+			local rows: { Element } = {}
 			for index, item in props.items do
 				local entry = if type(item) == "table" then item else { label = tostring(item) }
 				rows[index] = ui.row {

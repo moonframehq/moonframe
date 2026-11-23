@@ -21,7 +21,8 @@
 //!   messages it.
 //! - **native**: Rust built into the app (see [`native`]), for git, forges
 //!   and the like: the user's own access, real libraries, and replies to
-//!   the mod that asked.
+//!   the mod that asked. A wasm provider's crate written against the
+//!   `moonframe-provider` SDK can be linked in too, with [`Portable`].
 //! - **static**: a JSON file in the folder (`file = "sample.json"`),
 //!   published as it is, again when it changes and on any message: sample
 //!   data with no code at all.
@@ -58,13 +59,14 @@ mod mods;
 pub mod native;
 mod options;
 mod outbox;
+mod portable;
 mod process;
 pub mod program;
 mod running;
 #[cfg(all(unix, feature = "socket"))]
 mod socket;
 mod stream;
-#[cfg(feature = "wasm")]
+#[cfg(feature = "system")]
 mod system;
 #[cfg(feature = "wasm")]
 mod wasm;
@@ -84,6 +86,7 @@ pub use {
     mods::{Mods, owner},
     native::{Handle, Native, Natives},
     options::{ProviderOptions, check_entry},
+    portable::Portable,
 };
 
 #[cfg(feature = "tokio")]

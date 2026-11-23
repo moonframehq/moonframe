@@ -9,7 +9,7 @@
 //! request no map has wanted for a while is dropped unfetched.
 
 use {
-    moonframe_core::MapProvider,
+    moonframe_core::{MapProvider, TileSource},
     std::{
         collections::{HashMap, VecDeque},
         io::Read as _,
@@ -51,6 +51,16 @@ pub(super) struct Tile {
 }
 
 impl Tile {
+    /// The same tile of the provider it is fetched from: without
+    /// `map-vector`, a `vector-*` map's tiles are OpenStreetMap's, so they
+    /// share its connections, its requests and its files on disk.
+    fn fetched(&self) -> Self {
+        Self {
+            provider: fetched_from(self.provider),
+            ..self.clone()
+        }
+    }
+
     /// Where it is kept: by provider and density, never by key, so a key
     /// stays out of file names.
     fn file(&self) -> PathBuf {
@@ -67,7 +77,7 @@ impl Tile {
     }
 
     fn url(&self, key: Option<&str>) -> String {
-        let source = self.provider.source();
+        let source = source(self.provider);
         let retina = if self.retina {
             "@2x"
         } else {
@@ -94,12 +104,28 @@ pub(super) fn level(provider: MapProvider, zoom: f64, scale: f32) -> u8 {
     };
     (zoom + finer)
         .round()
-        .clamp(0.0, f64::from(provider.source().max_zoom)) as u8
+        .clamp(0.0, f64::from(source(provider).max_zoom)) as u8
 }
 
 /// Whether the provider has `@2x` tiles.
 pub(super) fn has_retina(provider: MapProvider) -> bool {
-    provider.source().url.contains("{r}")
+    source(provider).url.contains("{r}")
+}
+
+/// Where the provider's raster tiles come from, and whose they are. Built
+/// without `map-vector`, a `vector-*` provider has none of its own:
+/// OpenStreetMap's stand in, so the map still shows streets.
+pub(super) fn source(provider: MapProvider) -> TileSource {
+    fetched_from(provider).source()
+}
+
+/// The provider whose server `provider`'s tiles are fetched from.
+fn fetched_from(provider: MapProvider) -> MapProvider {
+    if cfg!(feature = "map-vector") || !provider.vector() {
+        provider
+    } else {
+        MapProvider::OpenStreetMap
+    }
 }
 
 /// What is known of a tile this run.
@@ -144,7 +170,8 @@ fn shared() -> std::sync::MutexGuard<'static, Shared> {
 /// The file to show for `tile`, if there is one yet; asks for it (in the
 /// background) when it is missing or old. `key` is the provider's API key.
 pub(super) fn tile(tile: &Tile, key: Option<&str>) -> Option<PathBuf> {
-    tile_in(&mut shared(), tile, key, || tile.file())
+    let tile = tile.fetched();
+    tile_in(&mut shared(), &tile, key, || tile.file())
 }
 
 fn tile_in(
@@ -197,7 +224,8 @@ fn tile_in(
 /// any age, without asking for it: what a coarser zoom can show while
 /// finer tiles arrive.
 pub(super) fn ready(tile: &Tile) -> Option<PathBuf> {
-    ready_in(&mut shared(), tile, || tile.file())
+    let tile = tile.fetched();
+    ready_in(&mut shared(), &tile, || tile.file())
 }
 
 fn ready_in(shared: &mut Shared, tile: &Tile, file: impl FnOnce() -> PathBuf) -> Option<PathBuf> {
@@ -227,7 +255,7 @@ pub(super) fn prefetch(tile: &Tile, key: Option<&str>) {
 
 /// What went wrong fetching `provider`'s tiles last, if anything.
 pub(super) fn failure(provider: MapProvider) -> Option<String> {
-    shared().failures.get(&provider).cloned()
+    shared().failures.get(&fetched_from(provider)).cloned()
 }
 
 /// Wakes every map waiting for something to arrive (a tile, a route),
@@ -288,7 +316,7 @@ fn forget(shared: &mut Shared, tile: &Tile) {
 
 /// The most tiles fetched from `provider` at once.
 fn connections(provider: MapProvider) -> usize {
-    match provider {
+    match fetched_from(provider) {
         MapProvider::OpenStreetMap => OSM_WORKERS,
         _ => WORKERS,
     }
@@ -563,5 +591,35 @@ mod tests {
             voyager,
         ]);
         assert_eq!(shared.queue.len(), 1);
+    }
+
+    #[cfg(not(feature = "map-vector"))]
+    #[test]
+    fn a_fallback_vector_map_shares_openstreetmaps_tiles_and_connections() {
+        let tile = |provider, x| Tile {
+            provider,
+            retina: false,
+            z: 3,
+            x,
+            y: 1,
+        };
+        let dark = tile(MapProvider::VectorDark, 0).fetched();
+        assert_eq!(dark, tile(MapProvider::OpenStreetMap, 0));
+        assert_eq!(dark.file(), tile(MapProvider::OpenStreetMap, 0).file());
+
+        let mut shared = Shared::default();
+        for job in [
+            tile(MapProvider::OpenStreetMap, 0),
+            tile(MapProvider::VectorDark, 1).fetched(),
+            tile(MapProvider::VectorLiberty, 2).fetched(),
+        ] {
+            shared.wanted.insert(job.clone(), Instant::now());
+            shared.queue.push_back((job, None, None));
+        }
+        // Two connections to OpenStreetMap, whichever map asked.
+        assert_eq!(
+            std::iter::from_fn(|| next(&mut shared)).count(),
+            OSM_WORKERS
+        );
     }
 }

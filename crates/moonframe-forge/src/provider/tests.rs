@@ -21,6 +21,28 @@ fn asker(attempt: u64) -> Asker {
     }
 }
 
+/// Writes a fake CLI and waits until it can run. Linux refuses to run a file
+/// open for writing ("Text file busy"), and a child another test forks while
+/// it is written keeps the write handle until that child runs its program.
+#[cfg(unix)]
+fn fake_cli(path: &std::path::Path, script: &str) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::write(path, script).unwrap();
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while let Err(error) = std::process::Command::new(path)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .status()
+    {
+        assert!(
+            error.kind() == std::io::ErrorKind::ExecutableFileBusy && Instant::now() < deadline,
+            "{error}"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
 fn signed_in() -> Forge {
     let mut forge = Forge::new(Kind::GitHub);
     forge.status = Status::SignedIn;
@@ -378,21 +400,19 @@ fn an_old_load_cannot_restore_a_signed_out_account_after_a_host_round_trip() {
 #[cfg(unix)]
 #[test]
 fn refresh_discovers_a_new_cli_login_without_selecting_it() {
-    use std::os::unix::fs::PermissionsExt;
     let (host, _) = handle();
     let dir = tempfile::tempdir().unwrap();
     let (mut forge, _) = with_store(dir.path());
     forge.status = Status::SignedOut;
     forge.context.as_mut().unwrap().path = dir.path().as_os_str().to_owned();
     let cli = dir.path().join("gh");
-    std::fs::write(&cli, "#!/bin/sh\nexit 1\n").unwrap();
-    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o700)).unwrap();
+    fake_cli(&cli, "#!/bin/sh\nexit 1\n");
     for (script, available) in [
         ("#!/bin/sh\nexit 1\n", false),
         ("#!/bin/sh\nprintf new-cli-token\n", true),
         ("#!/bin/sh\nexit 1\n", false),
     ] {
-        std::fs::write(&cli, script).unwrap();
+        fake_cli(&cli, script);
         forge.asked_at = None;
         forge.receive(&host, "forge", Data::map([("refresh", Data::Bool(true))]));
         let done = forge
@@ -435,7 +455,6 @@ fn an_obsolete_cli_probe_cannot_replace_the_current_one() {
 #[cfg(unix)]
 #[test]
 fn a_saved_cli_choice_retries_after_startup_read_failure() {
-    use std::os::unix::fs::PermissionsExt;
     let (host, _) = handle();
     let dir = tempfile::tempdir().unwrap();
     let (mut forge, saved) = with_store(dir.path());
@@ -448,8 +467,7 @@ fn a_saved_cli_choice_retries_after_startup_read_failure() {
     forge.status = Status::Checking;
     forge.context.as_mut().unwrap().path = dir.path().as_os_str().to_owned();
     let cli = dir.path().join("gh");
-    std::fs::write(&cli, "#!/bin/sh\nexit 1\n").unwrap();
-    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o700)).unwrap();
+    fake_cli(&cli, "#!/bin/sh\nexit 1\n");
     forge
         .context
         .as_ref()
@@ -465,7 +483,7 @@ fn a_saved_cli_choice_retries_after_startup_read_failure() {
     assert_eq!(forge.status, Status::Checking);
     assert!(forge.load_retry.is_some());
     assert!(forge.error.is_some());
-    std::fs::write(&cli, "#!/bin/sh\nprintf recovered-token\n").unwrap();
+    fake_cli(&cli, "#!/bin/sh\nprintf recovered-token\n");
     forge.load_retry = Some(Instant::now());
     forge.tick(&host);
     let result = forge

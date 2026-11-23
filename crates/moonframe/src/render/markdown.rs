@@ -7,10 +7,12 @@
 
 mod blocks;
 mod document;
+mod holding;
 #[cfg(feature = "math")]
 mod math;
 mod outline;
 mod parts;
+mod scrolling;
 mod search;
 
 use {

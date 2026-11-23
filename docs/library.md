@@ -51,7 +51,8 @@ Features: `acp`, `alacritty`, `browser`, `chat`, `docs`, `forge`, `git`,
 source with Zig; see `mise.toml`) is opt-in: `features = ["ghostty"]`, and
 so are `map` (`ui.map` street maps), `speech` (dictation), `video` (`ui.video`) and what long runs
 and live machines ask for (`awake`, `crash`, `displays`, `dock`, `guard`,
-`restart`, `socket`), which few apps need. The starter has them all.
+`hotkey`, `restart`, `share`, `socket`, `status-item`), which few apps
+need. The starter has them all.
 
 **Keep every default.** They are what lets the people using the app change
 it: Developer Mode (`studio`: Inspect Element, the Developer tools), Make
@@ -100,15 +101,19 @@ ship only their selected components.
 | `displays` | `app.displays`, and a mod's window placed with `display` and `fullscreen`. Off by default; without it such a window opens where it would have, and the mod hears why. |
 | `dock` | `app:dock`: a badge and a progress bar on the Dock icon (macOS). Off by default. |
 | `guard` | `app:guard`: a mod holds back closing and quitting. Off by default. |
+| `hotkey` | `app:hotkey` and `app.hotkeys`: system-wide shortcuts for mods (macOS, with Carbon's hot keys: no permission to ask for). Off by default. |
+| `status-item` | `app:status-item`: a mod's item in the menu bar, with its menu (macOS). Off by default. |
 | `restart` | `app:restart`, and `restart = "on-failure"` for process providers. Off by default; without it a process that goes stays gone. |
+| `share` | `app:share`: the system's share menu for a web address, text or the app's files (macOS). Off by default. |
 | `socket` | Socket providers (`kind = "socket"`), on Unix. Off by default; without it one fails as it starts. |
-| `browser` | Native web views and Wry on macOS/Windows. Linux keeps its system-browser fallback. |
+| `browser` | Native web views and Wry on macOS/Windows, and `app:pdf` (pages made into PDF files, macOS). Linux keeps its system-browser fallback. |
 | `terminal` | Terminal rendering, local PTYs and tmux; choose an engine below to run a shell. |
 | `alacritty`, `ghostty` | Each enables `terminal` and its respective emulator. |
 | `herdr-core` | herdr-core state storage and, with `terminal`, persistent terminals. |
 | `video` | `ui.video`: live frames from another process in a 16-bit, colour-managed Metal view (macOS). Off by default. See [Live video](video.md). |
 | `map` | `ui.map` street maps: tiles from OpenStreetMap and other listed providers, pins, and routes along streets, fetched over HTTP. Off by default. |
 | `map-benchmark` | A `ui.map` run with `MOONFRAME_MAP_BENCHMARK` drives itself through input events, reports what that cost, and quits. For measuring; off by default. |
+| `map-vector` | `vector-*` map providers: OpenFreeMap vector tiles drawn on the GPU by [gpui-maps](https://github.com/swatmobility/gpui-maps), tiltable, under the same pins, routes and buttons as the raster map. Off by default: it brings in wgpu and the map engine. |
 | `markdown` | Rich `ui.markdown` rendering (headings, lists, tables, links and code). |
 | `prose` | The writing editor for `ui.input` with `prose`, `dim` or `typewriter`. Ordinary single-line and multiline inputs remain available without it. |
 | `sealed` | Staged app resources instead of the full embedded toolbox. |
@@ -243,6 +248,7 @@ fn main() -> std::process::ExitCode {
 | `Moonframe::new(name)` | the app's name: `~/.config/<name>`, `~/.cache/<name>`, `~/.local/state/<name>`, its document in herdr-core, its default id `dev.moonframe.<name>` |
 | `.title`, `.app_id`, `.version`, `.icon` | how the menu bar, About panel, Dock and bundle name it; an `icon.png` (or a `moonframe.toml` `[app]` title and icon) in its app folder wins |
 | `.updates("owner/repo")` | the GitHub repository it is released from: **Check for Updates…** in the app menu, a daily check in a release build, and on macOS an install over the running `.app`; see [updates.md](updates.md) |
+| `.url_scheme("notes")` | a URL scheme its bundle claims (once per scheme, as `schemes` in a `moonframe.toml`): a `notes:` link opened in a browser or another app brings it forward, and its mods hear it on `app/url` (macOS, from the bundle) |
 | `.app_dir(path)` | its app folder while it runs from source; edits reload live |
 | `.embedded_app::<E>()` | its app folder compiled in (`#[derive(moonframe::rust_embed::RustEmbed)]`, `#[crate_path = "moonframe::rust_embed"]`), for a lone executable |
 | `.project_dir(path)` | the source checkout for an embedded app's debug branch bar; pass `env!("CARGO_MANIFEST_DIR")` from the host crate, including when Cargo builds into an external target folder |
@@ -307,6 +313,14 @@ github, system, ...) cost an app nothing until it uses them.
 Each call runs on the provider's own thread; `Handle` (`publish`,
 `publish_json`, `send`, `fail`) can be cloned into others. A mod sends it
 messages with `to = "provider:index"`.
+
+A wasm provider written with the `moonframe-provider` SDK can be linked in the
+same way: `.native("counter", moonframe::Portable::<counter::Counter>::new)`
+runs the very crate its `kind = "wasm"` folder builds, for a folder with
+`kind = "native"` (see [Compile it into the
+app](wasm-providers.md#compile-it-into-the-app)). `Handle::host_call` and
+`Handle::system_load` give any native provider the capabilities its
+provider.toml declares.
 
 ### Async and tokio
 
@@ -414,6 +428,18 @@ impl Render for Editor { /* ... */ }
   `Messenger`. `messenger.send(data)` reaches that mod's `update`, from any
   thread.
 - When the mod's `props` change, `set_props` runs and the view draws again.
+- In the main window, hosted views draw over placeholders beside the cached
+  Luau shell. Notifying a hosted view, its descendant, or a model read while
+  drawing it schedules a redraw without rendering the shell again. Hosted
+  roots are not implicitly cached: they render on each scheduled window
+  frame. A host can cache its own subviews when it can satisfy GPUI's cache
+  contract: notify the cached view or a descendant view when it changes.
+  Notifying only a separate model does not invalidate a cached view in
+  GPUI 0.3.12.
+  Placement metadata (IDs, geometry, clipping and inherited text style) is
+  reused while the shell is replayed, but discarded whenever a placeholder
+  prepaints or the shell changes its placements. This does not cache hosted
+  content or suppress host rendering.
 - The `view` stylesheet rule styles the box it fills (`radius`, `padding`,
   `border`, ...). Previews in the Components window show a placeholder.
 - Trackpad gestures: GPUI's `on_pinch` and `on_mouse_pressure` work as
@@ -425,6 +451,21 @@ impl Render for Editor { /* ... */ }
 `moonframe::Data` is what crosses between Rust and Luau: `Data::map`,
 `get`, `as_str`, `as_i64`, `as_f64`, `as_bool`, and `From` for strings,
 numbers, booleans and lists.
+
+The hosted redraw regression tests run without a desktop:
+
+```sh
+cargo test --locked -p moonframe --no-default-features --lib hosted::
+cargo test --locked -p moonframe --no-default-features --lib hosted_signal_redraw_benchmark -- --ignored --nocapture --test-threads=1
+```
+
+The benchmarks drive 50,000 model notifications with one or eight hosted
+placements and check that every new value is painted while the shell and
+host-owned cached sidebars never render again. Their elapsed time measures
+the headless draw loop, not GPU presentation or display FPS. For comparisons,
+build both versions with the same optimization settings (for example,
+`--config 'profile.dev.package.moonframe.opt-level=2'`), alternate their test
+binaries across multiple runs, and compare medians.
 
 ### More than one window
 

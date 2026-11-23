@@ -93,7 +93,7 @@ choice_cards {
 	build = function(props: Props)
 		local event = props.event or "select"
 		local width = props.width or 180
-		local cells = {}
+		local cells: { Element } = {}
 		for _, card in props.options do
 			local id = card.id or card.title
 			local chosen = id == props.selected

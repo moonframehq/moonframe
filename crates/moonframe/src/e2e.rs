@@ -6,12 +6,17 @@
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+// keep-sorted start
 mod both_backends;
 mod host_views;
 mod inspect_context;
+mod markdown_scroll;
 mod regressions;
 mod revision_timeline;
+mod scroll_sync;
+mod spinner;
 mod windows;
+// keep-sorted end
 
 use {
     crate::{
