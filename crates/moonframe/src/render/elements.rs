@@ -69,12 +69,25 @@ impl<'w> Draw<'w> for Stack {
             element
         };
         let handle = painter.motion.scroll_to(&place.path, self.scroll_to);
+        let drawn = children.len();
         let element = element.children(children).scrollbars(
             &self.frame,
             self.direction,
             &handle,
             place.part("scrollbar").id(),
         );
+        // Last, after the scrollbar, so no child's index moves.
+        let element = element.children(self.measure.as_ref().and_then(|measure| {
+            super::stack_measure::reader(
+                measure,
+                self.direction,
+                &handle,
+                drawn,
+                painter,
+                place,
+                cx,
+            )
+        }));
         // Hugging only says something across a column.
         let element = if self.frame.hug
             && self.frame.self_align.is_none()
