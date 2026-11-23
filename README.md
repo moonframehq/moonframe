@@ -352,6 +352,10 @@ and build nothing on your machine.
 Apps with no WASM providers can turn off the `wasm` feature, which is on by
 default (see [docs/library.md](docs/library.md)).
 
+The built-in T3 Code provider publishes local coding sessions as `app.t3`.
+Use `t3-sessions` for the grouped overview or `t3-thread` for a single row.
+[T3 Overview and connection setup](examples/t3-overview/README.md).
+
 **Build one:** [Building WebAssembly (WASM) providers](https://docs.moonframe.dev/wasm-providers/)
 walks through a complete Rust component, Luau messages, live reload and
 packaging, for people and coding agents. [Markdown source](docs/wasm-providers.md).

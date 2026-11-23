@@ -438,6 +438,8 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`list`](#list) | Lists | A plain selectable list of rows with label, detail and badge. For rich rows (status, icons, two lines) use `agent-row`, `workspace-row` or `tree`. |
 | [`mail-row`](#mail-row) | Lists | Each row of an inbox or a mailbox's message list; stack them in a `ui.list` (rows of one height) or a scrolling column, under `segmented` category tabs. For tasks use `task-row`; for pull requests use `pr-row`; for a plain selectable row use `list`; for the open message's header use `message-header`. |
 | [`ratio-row`](#ratio-row) | Lists | Lists of parts of a whole: where signups came from, top countries, devices, tiers. Stack them in a column; give `share` for the bar under each. For a bar of all the parts at once use `share-bar`; for a data grid use `table`. |
+| [`t3-sessions`](#t3-sessions) | Lists | Use for an overview of app.t3.threads, or a subset filtered by project, issue or worktree. Handle fold and thread messages in the drawing mod. |
+| [`t3-thread`](#t3-thread) | Lists | Use for one thread from app.t3 in a project sidebar or session overview. Set expanded to show its worktree, provider and update time. |
 | [`task-row`](#task-row) | Lists | Rows of tasks, to-dos, habits or events in a planner, an inbox or a day view; stack them in a column under `section` headings. For a plain selectable row use `list`; for pull requests use `pr-row`. |
 | [`tree`](#tree) | Lists | Nested rows: a file tree in a review, worktrees under a repository, agents and their sub-agents. For flat rows use `list`; for a heading over a group of rows use `group-header`; for one foldable block use `collapsible`. |
 | [`activity-bar`](#activity-bar) | Navigation | Switching between the app's main views from a thin strip at the window's edge (terminals, pull requests, issues, agents, settings). For a collapsed list of workspaces use `rail`; for text tabs use `tabs`; for a full list of rows use `sidebar`. |
@@ -5013,6 +5015,46 @@ A whole mod using it, with state: `app/components/demos/mail-row.luau`.
 local ratio_row = use "ratio-row"
 
 ratio_row { color = "#7c5cff", count = "604", icon = "globe", label = "Website signup form", percent = "44%", share = 44 }
+```
+
+#### `t3-sessions`
+
+**T3 Sessions.** T3 sessions grouped by what needs attention, with counts and expandable rows.
+
+**When:** Use for an overview of app.t3.threads, or a subset filtered by project, issue or worktree. Handle fold and thread messages in the drawing mod.
+
+| Prop | Meaning |
+| --- | --- |
+| `folded` | Map from group id to collapsed state |
+| `selected` | Id of the expanded thread |
+| `threads` | Threads in display order |
+| `to` | Mod receiving { fold = group } and { thread = id } |
+
+```lua
+local t3_sessions = use "t3-sessions"
+
+t3_sessions { threads = { { group = "running", id = "docs", issues = {  }, project = "Docs", projectId = "docs", pullRequests = {  }, status = "running", title = "Check examples", updatedAt = "" } } }
+```
+
+#### `t3-thread`
+
+**T3 Thread.** A T3 session with its project, branch and linked work.
+
+**When:** Use for one thread from app.t3 in a project sidebar or session overview. Set expanded to show its worktree, provider and update time.
+
+| Prop | Meaning |
+| --- | --- |
+| `expanded` | Show session details |
+| `msg` | Optional message sent when the row is clicked |
+| `thread` | A thread from app.t3.threads |
+| `to` | Mod receiving the click |
+
+**Styles:** `.t3-thread` `.t3-thread-meta`
+
+```lua
+local t3_thread = use "t3-thread"
+
+t3_thread { thread = { branch = "fix/paging", group = "waiting", id = "review", issues = {  }, project = "Moonframe", projectId = "mf", pullRequests = { { label = "#42", title = "Moonframe", url = "https://example.com/pr/42" } }, status = "waiting", title = "Review pagination", updatedAt = "2026-11-20T12:00:00Z" } }
 ```
 
 #### `task-row`

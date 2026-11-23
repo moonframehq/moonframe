@@ -222,6 +222,10 @@ provider-types-check:
     python3 -I scripts/test_provider_types.py
     python3 -I scripts/provider-types.py --check
 
+# Check the T3 process provider against a local HTTP fixture.
+test-t3:
+    python3 -I scripts/test_t3_provider.py
+
 # Type-check the app's Luau against types/moonframe.d.luau in strict mode;
 # an app with its own typed providers, against those types too.
 types dir="app":
@@ -368,4 +372,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check check-file-size check-sorted lint test rune-check test-sealed-bundles component-types-check provider-types-check types providers providers-examples check-builtin components-check check-examples patterns-check wasm-guide-check
+ci: format-check check-file-size check-sorted lint test test-t3 rune-check test-sealed-bundles component-types-check provider-types-check types providers providers-examples check-builtin components-check check-examples patterns-check wasm-guide-check

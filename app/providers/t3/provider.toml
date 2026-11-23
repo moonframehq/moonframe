@@ -1,0 +1,4 @@
+# Reads the T3 Code shell snapshot with the current user's pairing file.
+command = ["python3", "-I", "t3.py"]
+kind    = "process"
+publish = "latest"

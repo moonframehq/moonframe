@@ -187,6 +187,8 @@ jobs:
         run: just component-types-check
       - name: Check the provider types are current
         run: just provider-types-check
+      - name: Test the T3 process provider
+        run: just test-t3
       - name: Type-check the app's Luau
         run: just types
       - name: Type-check the example apps' Luau

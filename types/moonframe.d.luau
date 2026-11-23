@@ -2135,6 +2135,7 @@ export type App = {
 	-- generated: provider fields (just provider-types) start
 	agents: ProviderAgentsPublished?,
 	system: ProviderSystemPublished?,
+	t3: ProviderT3Published?,
 	-- generated: provider fields end
 	-- What any other provider publishes, as `app.<name>`.
 	[string]: any,
@@ -2372,12 +2373,35 @@ type ProviderSystemPublished = {
 	transmitted: number,
 }
 type ProviderSystemMessage = "clear"
+type ProviderT3Link = { label: string, title: string, url: string }
+type ProviderT3Thread = {
+	id: string,
+	title: string,
+	project: string,
+	projectId: string,
+	provider: string?,
+	status: string,
+	group: string,
+	updatedAt: string,
+	branch: string?,
+	worktree: string?,
+	pullRequests: { ProviderT3Link },
+	issues: { ProviderT3Link },
+}
+type ProviderT3Published = {
+	available: boolean,
+	error: string?,
+	threads: { ProviderT3Thread },
+	total: number,
+}
+type ProviderT3Message = "refresh"
 
 -- A message for `update` to return: `send "provider:desk" { watch = id }`
 -- is `{ to = "provider:desk", msg = { watch = id } }`, its `msg` typed
 -- by the provider's `Message` where it declares one.
 declare send:
 	((to: "provider:system") -> (msg: ProviderSystemMessage) -> Send)
+	& ((to: "provider:t3") -> (msg: ProviderT3Message) -> Send)
 	& ((to: string) -> (msg: Data) -> Send)
 -- generated: provider types end
 
@@ -4487,6 +4511,18 @@ type UseSystemLoadProps = {
 	read compact: boolean?,
 	read icons: boolean?,
 }
+type UseT3SessionsProps = {
+	read threads: index<index<App, "t3"> & {}, "threads">,
+	read folded: { [string]: boolean }?,
+	read selected: string?,
+	read to: string?,
+}
+type UseT3ThreadProps = {
+	read thread: index<index<index<App, "t3"> & {}, "threads">, number>,
+	read expanded: boolean?,
+	read msg: any,
+	read to: string?,
+}
 type UseTabViewTab = any
 type UseTabViewProps = {
 	read tab: UseTabViewTab?,
@@ -4967,6 +5003,8 @@ type UseProps = {
 	["swatches"]: UseSwatchesProps,
 	["switch"]: UseSwitchProps,
 	["system-load"]: UseSystemLoadProps,
+	["t3-sessions"]: UseT3SessionsProps,
+	["t3-thread"]: UseT3ThreadProps,
 	["tab-view"]: UseTabViewProps,
 	["tabbed"]: UseTabbedProps,
 	["table"]: UseTableProps,
