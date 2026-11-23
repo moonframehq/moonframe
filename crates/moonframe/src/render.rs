@@ -27,6 +27,7 @@ mod plot;
 mod pointer;
 mod popover;
 mod revision_timeline;
+mod stack_measure;
 mod styling;
 #[cfg_attr(not(feature = "syntax"), path = "render/syntax_left_out.rs")]
 mod syntax;
