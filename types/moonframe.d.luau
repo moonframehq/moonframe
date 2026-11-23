@@ -1089,6 +1089,9 @@ export type InputProps = {
 	focus: boolean?,
 	-- The monospace font.
 	mono: boolean?,
+	-- Sent with `files` (paths) and, for a picture, `image = { path, width,
+	-- height }` when files or a picture are pasted into it; text pastes.
+	paste: Data,
 	width: number?,
 	grow: boolean?,
 	-- Make it the address bar of this mod's `ui.browser` with this id (or
@@ -2492,6 +2495,10 @@ export type Mod<State> = {
 	-- `{ ["secondary-1"] = "histogram" }`; every mounted copy hears them
 	-- too. Keys that type text need ctrl, alt, cmd or secondary.
 	keys: Keys?,
+	-- Sent with `files` (paths) and, for a picture, `image = { path, width,
+	-- height }` when files or a picture are pasted while no text field or
+	-- terminal has focus. A paste of text is not.
+	paste: Data,
 	-- Offered as a kind of tab: each tab mounts an instance of it.
 	tab: TabEntry?,
 	region: string?,

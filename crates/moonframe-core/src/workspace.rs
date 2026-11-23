@@ -741,6 +741,19 @@ impl Workspace {
             .filter(|(_, keys)| !keys.is_empty())
     }
 
+    /// Each module with `paste` of its own, and what it hears a paste as:
+    /// files or a picture pasted while no field or terminal has focus.
+    pub fn mod_pastes(&self) -> impl Iterator<Item = (&str, &Data)> {
+        std::iter::once((SHELL, &self.shell))
+            .chain(self.mods.iter().map(|(name, slot)| (name.as_str(), slot)))
+            .chain(
+                self.instances
+                    .iter()
+                    .map(|(key, mounted)| (key.as_str(), &mounted.slot)),
+            )
+            .filter_map(|(name, slot)| Some((name, slot.paste()?)))
+    }
+
     pub fn mod_names(&self) -> impl Iterator<Item = &str> {
         self.mods.keys().map(String::as_str)
     }
