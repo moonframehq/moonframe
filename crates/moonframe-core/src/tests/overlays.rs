@@ -274,15 +274,53 @@ fn key_names_match_keystrokes_on_each_platform() {
     let dismiss = Data::from("close");
     let escape = key("escape", false, false, false, false);
     let none = Keys::default();
-    assert_eq!(none.message(Some(&dismiss), &escape, true), Some(&dismiss));
-    assert_eq!(none.message(None, &escape, true), None);
+    assert_eq!(
+        none.message(Some(&dismiss), &escape, true, false),
+        Some(&dismiss)
+    );
+    assert_eq!(none.message(None, &escape, true, false), None);
     let own = Keys(vec![(Chord::parse("escape").unwrap(), Data::from("back"))]);
     assert_eq!(
-        own.message(Some(&dismiss), &escape, true),
+        own.message(Some(&dismiss), &escape, true, false),
         Some(&Data::from("back"))
     );
     let enter = key("enter", false, false, false, false);
-    assert_eq!(own.message(Some(&dismiss), &enter, true), None);
+    assert_eq!(own.message(Some(&dismiss), &enter, true, false), None);
+}
+
+#[test]
+fn an_overlay_takes_a_plain_letter_while_no_field_has_focus() {
+    let key = |key| crate::Pressed {
+        key,
+        text: None,
+        ctrl: false,
+        alt: false,
+        shift: false,
+        cmd: false,
+    };
+    let source = r#"return mod { view = function()
+      return ui.overlay { open = true, keys = { t = "close", ["shift-/"] = "help", escape = "back" },
+        content = ui.text "sheet" } end }"#;
+    let Ok(Node::Overlay(overlay)) = view_of(source) else {
+        panic!("no overlay");
+    };
+    let t = key("t");
+    assert_eq!(
+        overlay.keys.message(None, &t, true, false),
+        Some(&Data::from("close"))
+    );
+    // A field or terminal has focus: T is typed there.
+    assert_eq!(overlay.keys.message(None, &t, true, true), None);
+    // Named keys go on whatever has focus.
+    let escape = key("escape");
+    assert_eq!(
+        overlay.keys.message(None, &escape, true, true),
+        Some(&Data::from("back"))
+    );
+    // A popover's keys too.
+    let popover = r#"return mod { view = function()
+      return ui.popover { open = true, keys = { j = "down" }, content = ui.text "x", "anchor" } end }"#;
+    assert!(view_of(popover).is_ok());
 }
 
 #[test]

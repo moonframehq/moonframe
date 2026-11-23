@@ -99,7 +99,8 @@ pub(crate) fn chord_name(pressed: &Pressed) -> Option<String> {
 impl Ui {
     /// Offers a key no control took, in the order the GPUI app does.
     pub(crate) fn key(&mut self, event: &KeyEvent, tx: &mut Tx) -> bool {
-        let taken = pressed(event, |pressed| self.offer_layers(pressed)).unwrap_or(false);
+        let typing = tx.focused().is_some();
+        let taken = pressed(event, |pressed| self.offer_layers(pressed, typing)).unwrap_or(false);
         if taken {
             return true;
         }
@@ -116,9 +117,11 @@ impl Ui {
         pressed(event, |pressed| self.offer(pressed, tx)).unwrap_or(false)
     }
 
-    fn offer_layers(&mut self, pressed: &Pressed) -> bool {
+    fn offer_layers(&mut self, pressed: &Pressed, typing: bool) -> bool {
         let topmost = self.layers.get_mut().last().and_then(|layer| {
-            let msg = layer.keys.message(layer.dismiss.as_ref(), pressed, MAC)?;
+            let msg = layer
+                .keys
+                .message(layer.dismiss.as_ref(), pressed, MAC, typing)?;
             Some((layer.owner.clone(), layer.to.clone(), msg.clone()))
         });
         if let Some((owner, to, msg)) = topmost {
@@ -155,7 +158,10 @@ impl Ui {
             .workspace()
             .mod_keys()
             .filter_map(|(owner, keys)| {
-                Some((owner.to_owned(), keys.message(None, pressed, MAC)?.clone()))
+                Some((
+                    owner.to_owned(),
+                    keys.message(None, pressed, MAC, false)?.clone(),
+                ))
             })
             .collect();
         for (owner, msg) in &hearers {

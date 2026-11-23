@@ -102,7 +102,11 @@ impl MoonframeApp {
             shift: modifiers.shift,
             cmd: modifiers.platform,
         };
-        match top.keys.message(top.dismiss.as_ref(), &pressed, MAC) {
+        let typing = self.typing(window, cx);
+        match top
+            .keys
+            .message(top.dismiss.as_ref(), &pressed, MAC, typing)
+        {
             Some(msg) => {
                 let action = Action::Send {
                     to: top.to.clone(),
@@ -114,6 +118,16 @@ impl MoonframeApp {
             None if top.modal => Taken::Blocked,
             None => Taken::Free,
         }
+    }
+
+    /// Whether a text field or terminal has the keyboard: the keys it
+    /// types are the user's, never a layer's.
+    fn typing(&self, window: &Window, cx: &mut Context<Self>) -> bool {
+        #[cfg(feature = "terminal")]
+        if self.terminals.any_focused(window) {
+            return true;
+        }
+        self.inputs.any_focused(window, cx)
     }
 
     /// Offers `keystroke` to the `keys` mods declare (`mod { keys = ... }`),
@@ -157,7 +171,7 @@ impl MoonframeApp {
             .workspace
             .mod_keys()
             .filter_map(|(owner, keys)| {
-                let msg = keys.message(None, &pressed, MAC)?;
+                let msg = keys.message(None, &pressed, MAC, false)?;
                 Some((owner.to_owned(), msg.clone()))
             })
             .collect();

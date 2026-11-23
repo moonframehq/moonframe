@@ -183,7 +183,10 @@ impl Build for Popover {
             align: fields.get("align")?.unwrap_or(Anchor::Start),
             gap: fields.number("gap", 0.0..=1000.0)?.unwrap_or(6.0),
             width: fields.number("width", PIXELS)?,
-            keys: fields.get("keys")?.unwrap_or_default(),
+            keys: fields
+                .get::<crate::keys::LayerKeys>("keys")?
+                .map(|keys| keys.0)
+                .unwrap_or_default(),
             anchor_clicks: fields.get("anchor_clicks")?.unwrap_or(false),
             anchor: tree.children(fields)?,
             content: Box::new(tree.node(content, &fields.cx().nested("content"))?),
@@ -207,7 +210,10 @@ impl Build for Overlay {
             backdrop: fields.get("backdrop")?.unwrap_or(false),
             width: fields.number("width", PIXELS)?,
             height: fields.number("height", PIXELS)?,
-            keys: fields.get("keys")?.unwrap_or_default(),
+            keys: fields
+                .get::<crate::keys::LayerKeys>("keys")?
+                .map(|keys| keys.0)
+                .unwrap_or_default(),
             content: Box::new(tree.node(content, &fields.cx().nested("content"))?),
         })
     }
