@@ -1,3 +1,4 @@
+# Local writes require MOONFRAME_T3_WRITER=profile/mod and a matching host sender.
 # Reads the T3 Code shell snapshot with the current user's pairing file.
 command = ["python3", "-I", "t3.py"]
 kind    = "process"

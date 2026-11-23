@@ -15,11 +15,28 @@ export type Thread = {
 	issues: { Link },
 }
 
+export type Result = { status: string, error: string?, threadId: string? }
+export type Project = { id: string, label: string }
+
 export type Published = {
 	available: boolean,
+	environmentId: string?,
+	projects: { Project },
+	writer: string?,
+	ticket: string?,
+	results: { [string]: Result },
 	error: string?,
 	threads: { Thread },
 	total: number,
 }
 
-export type Message = "refresh"
+export type Write = {
+	action: "start" | "send",
+	target: string,
+	text: string,
+	environmentId: string,
+	ticket: string,
+	id: string,
+}
+
+export type Message = "refresh" | Write

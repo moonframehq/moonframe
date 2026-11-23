@@ -354,6 +354,7 @@ default (see [docs/library.md](docs/library.md)).
 
 The built-in T3 Code provider publishes local coding sessions as `app.t3`.
 Use `t3-sessions` for the grouped overview or `t3-thread` for a single row.
+Enable local writes for a chosen mod to start chats and send follow-ups through `t3-composer`.
 [T3 Overview and connection setup](examples/t3-overview/README.md).
 
 **Build one:** [Building WebAssembly (WASM) providers](https://docs.moonframe.dev/wasm-providers/)

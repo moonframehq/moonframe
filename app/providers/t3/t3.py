@@ -3,6 +3,8 @@
 import http.client
 import json
 import os
+import queue
+import secrets
 from pathlib import Path
 import subprocess
 import sys
@@ -114,7 +116,7 @@ def load(home):
         token = saved["token"]
         if not valid_token(token):
             raise Unavailable("Invalid T3 pairing file.")
-        return overview(
+        state = overview(
             get(
                 connection,
                 "/api/orchestration/shell",
@@ -124,6 +126,8 @@ def load(home):
                 },
             )
         )
+        state["environmentId"] = identity
+        return state
     finally:
         connection.close()
 
@@ -161,7 +165,18 @@ def overview(snapshot):
     )
     rows = []
     # Leave space under Moonframe's 1 MiB and 10,000-value publish limits.
-    remaining = 1000000
+    # Reserve room for the project picker and write receipts.
+    choices = []
+    remaining = 990000
+    for project in snapshot["projects"]:
+        if project.get("archivedAt"):
+            continue
+        choice = {"id": project["id"], "label": project["title"]}
+        size = len(json.dumps(choice)) + 1
+        if len(choices) >= 200 or size > remaining // 2:
+            break
+        choices.append(choice)
+        remaining -= size
     for thread in threads[:200]:
         prs = {}
         for pr in thread.get("pullRequests", []):
@@ -195,41 +210,144 @@ def overview(snapshot):
         if remaining < 0:
             break
         rows.append(row)
-    return {"available": True, "threads": rows, "total": len(threads)}
+    return {"available": True, "threads": rows, "total": len(threads), "projects": choices}
+
+
+def snapshot(home):
+    try:
+        return load(home)
+    except Unavailable as error:
+        problem = str(error)
+    except (OSError, http.client.HTTPException):
+        problem = "Cannot read the pairing file or reach T3 Code. Check the server and retry."
+    except (ValueError, KeyError, TypeError, AttributeError):
+        problem = "Unrecognized T3 Code runtime, pairing file, or shell snapshot."
+    return {"available": False, "error": problem, "threads": [], "projects": [], "total": 0}
+
+
+def configured_writer():
+    profile, sep, name = os.getenv("MOONFRAME_T3_WRITER", "").partition("/")
+    if sep and profile and profile == os.getenv("MOONFRAME_PROFILE"):
+        return name or None
+    return None
+
+
+def perform_write(home, request, state):
+    action = request.get("action")
+    target = request.get("target")
+    prompt = request.get("text")
+    if not state["available"] or state["environmentId"] != request.get("environmentId"):
+        raise Unavailable("The T3 environment changed or is offline. Refresh before sending.")
+    if action not in ("start", "send"):
+        raise Unavailable("Unknown T3 write action.")
+    choices = state["projects" if action == "start" else "threads"]
+    if not any(item["id"] == target for item in choices) or target.startswith("-"):
+        raise Unavailable("The selected project or thread is no longer available.")
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt.encode("utf-8")) > 65536:
+        raise Unavailable("Enter a message of up to 64 KiB.")
+    try:
+        result = subprocess.run(
+            ["t3", "thread", action, "--base-dir", str(home), "--json", target, "-"],
+            input=prompt,
+            encoding="utf-8",
+            capture_output=True,
+            timeout=30,
+        )
+    except FileNotFoundError:
+        raise Unavailable("Moonframe could not find the t3 CLI on PATH.") from None
+    except (OSError, subprocess.TimeoutExpired, UnicodeError):
+        raise Unavailable(
+            "Delivery could not be confirmed. Check T3 Code before retrying."
+        ) from None
+    if result.returncode:
+        # CLI diagnostics can contain the prompt. Only the outcome is shared with other mods.
+        raise Unavailable(
+            "T3 did not confirm delivery. Check the thread and the CLI's project and provider settings."
+        )
+    try:
+        reply = json.loads(result.stdout)
+        thread_id = reply["threadId"]
+        if not isinstance(thread_id, str) or not 0 < len(thread_id) <= 256:
+            raise ValueError()
+        if action == "send" and thread_id != target:
+            raise ValueError()
+        if action == "start":
+            return {"status": "started", "threadId": thread_id}
+        if reply["delivery"] not in ("queued", "started", "steered", "restarted"):
+            raise ValueError()
+        return {
+            "status": "queued" if reply["delivery"] == "queued" else "sent",
+            "threadId": thread_id,
+        }
+    except (KeyError, ValueError, TypeError):
+        raise Unavailable("Unrecognized CLI reply. Check T3 Code before retrying.") from None
 
 
 def main(home):
-    # The reader only signals a refresh or EOF. Coalesce a burst of clicks.
-    wake = threading.Event()
-    closed = threading.Event()
+    # One consumer runs CLI calls in order. Bounded stdin backpressure keeps bursts bounded.
+    inbox = queue.Queue(maxsize=32)
 
     def listen():
-        for _ in sys.stdin:
-            wake.set()
-        closed.set()
-        wake.set()
+        for line in sys.stdin:
+            try:
+                envelope = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(envelope, dict):
+                inbox.put(envelope)
+        inbox.put(None)
 
     threading.Thread(target=listen, daemon=True).start()
+    writer = configured_writer()
+    ticket = secrets.token_hex(16)
+    receipts = {}
     previous = None
-    while not closed.is_set():
-        wake.clear()
+    state = snapshot(home)
+
+    def publish():
+        nonlocal previous
+        value = dict(state, writer=writer, ticket=ticket if writer else None, results=receipts)
+        line = json.dumps(value, separators=(",", ":"))
+        if previous != line:
+            print(line, flush=True)
+            previous = line
+
+    while True:
+        publish()
         try:
-            state = load(home)
-        except Unavailable as error:
-            state = {"error": str(error)}
-        except (OSError, http.client.HTTPException):
-            state = {
-                "error": "Cannot read the pairing file or reach T3 Code. Check the server and retry."
+            envelope = inbox.get(timeout=15)
+        except queue.Empty:
+            envelope = {"message": "refresh"}
+        if envelope is None:
+            return
+        request = envelope.get("message")
+        if not isinstance(request, dict):
+            state = snapshot(home)
+            continue
+        if not writer or envelope.get("from") != writer:
+            continue
+        key = request.get("id")
+        if not isinstance(key, str) or not 1 <= len(key) <= 80 or key in receipts:
+            continue
+        if len(receipts) >= 16:
+            del receipts[next(iter(receipts))]
+        if request.get("ticket") != ticket:
+            receipts[key] = {
+                "status": "error",
+                "error": "The composer has changed. Review the draft and retry.",
             }
-        except (ValueError, KeyError, TypeError, AttributeError):
-            state = {"error": "Unrecognized T3 Code runtime, pairing file, or shell snapshot."}
-        if "error" in state:
-            state.update(available=False, threads=[], total=0)
-        if state != previous:
-            print(json.dumps(state, separators=(",", ":")), flush=True)
-            previous = state
-        if not closed.is_set():
-            wake.wait(15)
+            continue
+        # Consume the ticket even if the CLI times out after accepting a message.
+        ticket = secrets.token_hex(16)
+        receipts[key] = {"status": "sending"}
+        publish()
+        state = snapshot(home)
+        try:
+            receipts[key] = perform_write(home, request, state)
+        except Unavailable as error:
+            receipts[key] = {"status": "error", "error": str(error)}
+        publish()
+        state = snapshot(home)
 
 
 if __name__ == "__main__":
@@ -241,6 +359,11 @@ if __name__ == "__main__":
             sys.exit(f"T3 setup failed: {error}")
         print("Connected Moonframe to T3 Code.")
     elif len(sys.argv) == 1:
-        main(home)
+        sys.stdin.reconfigure(encoding="utf-8")
+        try:
+            main(home)
+        except BrokenPipeError:
+            # Moonframe closed its end of the process-provider stream.
+            sys.stdout = open(os.devnull, "w")
     else:
         sys.exit("Usage: t3.py [--connect]")

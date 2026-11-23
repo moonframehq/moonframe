@@ -2388,13 +2388,28 @@ type ProviderT3Thread = {
 	pullRequests: { ProviderT3Link },
 	issues: { ProviderT3Link },
 }
+type ProviderT3Result = { status: string, error: string?, threadId: string? }
+type ProviderT3Project = { id: string, label: string }
 type ProviderT3Published = {
 	available: boolean,
+	environmentId: string?,
+	projects: { ProviderT3Project },
+	writer: string?,
+	ticket: string?,
+	results: { [string]: ProviderT3Result },
 	error: string?,
 	threads: { ProviderT3Thread },
 	total: number,
 }
-type ProviderT3Message = "refresh"
+type ProviderT3Write = {
+	action: "start" | "send",
+	target: string,
+	text: string,
+	environmentId: string,
+	ticket: string,
+	id: string,
+}
+type ProviderT3Message = "refresh" | ProviderT3Write
 
 -- A message for `update` to return: `send "provider:desk" { watch = id }`
 -- is `{ to = "provider:desk", msg = { watch = id } }`, its `msg` typed
@@ -4511,6 +4526,16 @@ type UseSystemLoadProps = {
 	read compact: boolean?,
 	read icons: boolean?,
 }
+type UseT3ComposerProps = {
+	read data: index<App, "t3"> & {},
+	read action: "start" | "send",
+	read id: string,
+	read environmentId: string,
+	read target: string?,
+	read title: string?,
+	read text: string,
+	read picker: boolean?,
+}
 type UseT3SessionsProps = {
 	read threads: index<index<App, "t3"> & {}, "threads">,
 	read folded: { [string]: boolean }?,
@@ -5003,6 +5028,7 @@ type UseProps = {
 	["swatches"]: UseSwatchesProps,
 	["switch"]: UseSwitchProps,
 	["system-load"]: UseSystemLoadProps,
+	["t3-composer"]: UseT3ComposerProps,
 	["t3-sessions"]: UseT3SessionsProps,
 	["t3-thread"]: UseT3ThreadProps,
 	["tab-view"]: UseTabViewProps,

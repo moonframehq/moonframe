@@ -313,6 +313,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`icon-button`](#icon-button) | Controls | An action or toggle shown only as an icon: in a title bar, a panel header, a toolbar. Always give a `tooltip`. For buttons with words use `ui.button` or `toolbar`; for back/forward use `nav-buttons`; for joined icon choices use `button-group`. |
 | [`picker`](#picker) | Controls | A property of a record set from many options: assignee, labels, project, status, priority, "blocked by", in a task's detail panel or a row. For a setting in a form use `dropdown`; for a filter over a list use `filter-dropdown`; for 2 to 4 short choices use `segmented`; for addresses use `recipient-field`. |
 | [`segmented`](#segmented) | Controls | A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`. |
+| [`t3-composer`](#t3-composer) | Controls | Draw inside the mod enabled as the T3 writer. Handle project, draft, picker and cancel messages locally and observe app.t3.results[id] for delivery. |
 | [`toolbar`](#toolbar) | Controls | A row of small quiet buttons above a panel or list. For icon-only buttons use `icon-button`; for one-of-many choices use `segmented`. |
 | [`audio-meter`](#audio-meter) | Data | Sound levels while recording or playing, from values an engine published. For a fraction that isn't sound use `vertical-bar` or `meter`. |
 | [`avatar`](#avatar) | Data | Stand for a person, space, project or agent by its name: comment authors, workspace switchers, people lists. Use `comment-card` for an authored message (it draws one), `status-dot` for a state alone. |
@@ -1239,6 +1240,29 @@ segmented { options = { { id = "light", label = "Light" }, { id = "dark", label 
 ```
 
 A whole mod using it, with state: `app/components/demos/segmented.luau`.
+
+#### `t3-composer`
+
+**T3 Composer.** Start a local T3 Code chat or send a follow-up to an existing thread.
+
+**When:** Draw inside the mod enabled as the T3 writer. Handle project, draft, picker and cancel messages locally and observe app.t3.results[id] for delivery.
+
+| Prop | Meaning |
+| --- | --- |
+| `action` | start or send |
+| `data` | The current app.t3 snapshot |
+| `environmentId` | Environment in which the draft was opened |
+| `id` | Unique request id for this draft revision |
+| `picker` | Whether the project picker is open |
+| `target` | Project id for start, thread id for send |
+| `text` | The current draft |
+| `title` | Thread title when sending a follow-up |
+
+```lua
+local t3_composer = use "t3-composer"
+
+t3_composer { action = "start", data = { available = true, environmentId = "preview", projects = { { id = "mf", label = "Moonframe" } }, results = {  }, threads = {  }, ticket = "preview", total = 0 }, environmentId = "preview", id = "example", target = "mf", text = "" }
+```
 
 #### `toolbar`
 
