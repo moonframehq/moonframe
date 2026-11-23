@@ -338,6 +338,11 @@ impl<'w> Painter<'w> {
         } else {
             shown.single_line()
         };
+        let element = if input.secret {
+            element.secure()
+        } else {
+            element
+        };
         let muted = self.palette.token(Token::MutedForeground);
         let element = element
             .key(place.path.clone())

@@ -1089,6 +1089,8 @@ export type InputProps = {
 	focus: boolean?,
 	-- The monospace font.
 	mono: boolean?,
+	-- A password: drawn as bullets, never copied or cut; one line only.
+	secret: boolean?,
 	width: number?,
 	grow: boolean?,
 	-- Make it the address bar of this mod's `ui.browser` with this id (or

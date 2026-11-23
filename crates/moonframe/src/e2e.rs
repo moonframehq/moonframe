@@ -14,6 +14,7 @@ mod markdown_scroll;
 mod regressions;
 mod revision_timeline;
 mod scroll_sync;
+mod secret_input;
 mod spinner;
 mod stack_measure;
 mod windows;
