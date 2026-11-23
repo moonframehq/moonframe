@@ -100,7 +100,7 @@ return mod {
 	},
 
 	init = function(previous: any): State
-		local state: State = previous or { draft = "", thread = "chat-1", chats = 1 }
+		local state: State = previous or { draft = "", thread = "chat-1", chats = 1, starting = false }
 		state.starting = false
 		state.error = nil
 		return state
@@ -164,7 +164,7 @@ return mod {
 		local notes: any = app.notes or {}
 		local vault = notes.vault and notes.vault.path
 		local runs = thread_runs(app, state.thread)
-		local turns = {}
+		local turns: { Element } = {}
 		local said = {}
 		local busy = nil
 		for _, run in runs do

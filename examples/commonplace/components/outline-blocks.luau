@@ -52,7 +52,7 @@ return component {
 		},
 	},
 	build = function(props)
-		local rows = {}
+		local rows: { Element } = {}
 		local link = props.link or "open"
 		for index, block: any in props.blocks or {} do
 			local marker

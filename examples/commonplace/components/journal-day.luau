@@ -58,7 +58,7 @@ return component {
 		local list = blocks(day.text or "")
 		return ui.column {
 			class = "journal-day",
-			ui.text { props.label or day.date or "", size = if day.today then "headline" else "title", weight = "bold" },
+			ui.text { if type(props.label) == "string" then props.label else day.date or "", size = if day.today then "headline" else "title", weight = "bold" },
 			#list > 0 and outline_blocks { blocks = list, link = props.link } or ui.text {
 				if day.today then "Nothing yet today. Add a line below." else "Nothing written.",
 				class = "journal-empty",

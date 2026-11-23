@@ -121,7 +121,7 @@ end
 -- A block whose every line is a link, each line a row with the link's
 -- favicon; nil when a line isn't one or no favicon is cached.
 local function linked_lines(text: string, favicons: { [string]: string }, link: any): any
-	local rows = {}
+	local rows: { Element } = {}
 	local any_icon = false
 	for line in string.gmatch(text, "[^\n]+") do
 		local host = link_host(line)
@@ -159,7 +159,7 @@ local function header(note: any, into: { any })
 		end
 	end
 	table.sort(keys)
-	local rows = {}
+	local rows: { Element } = {}
 	for _, key in keys do
 		table.insert(
 			rows,
@@ -300,7 +300,7 @@ return component {
 		local text: string = note.text or ""
 		local favicons: { [string]: string } = note.favicons or {}
 		local editing = state.editing ~= nil and state.path == note.path
-		local body = {}
+		local body: { Element } = {}
 		if editing then
 			-- The blocks around the edit as they were when it began.
 			for index, part in split(state.before) do

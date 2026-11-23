@@ -106,11 +106,13 @@ local function snippet(text: string?): string
 	return out
 end
 
+type FileRow = { path: string, title: string }
+
 local function tree_rows(state: State): { any }
 	local rows: { any } = {}
 	local seen: { [string]: boolean } = {}
-	local files: { any } = table.clone((state.views.all or {}).rows or {})
-	table.sort(files, function(a, b)
+	local files: { FileRow } = table.clone((state.views.all or {}).rows or {})
+	table.sort(files, function(a: FileRow, b: FileRow)
 		return a.path < b.path
 	end)
 	for _, file in files do
@@ -199,7 +201,7 @@ local function tree(state: State)
 end
 
 local function editor(state: State)
-	local tabs = {}
+	local tabs: { Element } = {}
 	for _, path in state.tabs do
 		table.insert(
 			tabs,
@@ -266,7 +268,7 @@ end
 local function wiki(state: State)
 	local health = state.views.health or {}
 	local log = log_entries((state.views.log or {}).text or "")
-	local entries = {}
+	local entries: { Element } = {}
 	for index, entry in log do
 		if index > 8 then
 			break
@@ -281,7 +283,7 @@ local function wiki(state: State)
 			}
 		)
 	end
-	local dangling = {}
+	local dangling: { Element } = {}
 	for _, link in health.unresolved or {} do
 		table.insert(
 			dangling,
@@ -294,7 +296,7 @@ local function wiki(state: State)
 			}
 		)
 	end
-	local orphans = {}
+	local orphans: { Element } = {}
 	for _, page in health.orphans or {} do
 		table.insert(orphans, ui.row { class = "ref", msg = { open = page.path }, ui.text { page.title, class = "small", truncate = true } })
 	end
@@ -381,6 +383,7 @@ return mod {
 			return
 		end
 		if msg.reply ~= nil then
+			local note: { text: string? }? = state.views.note
 			if msg.action == "create" and msg.ok and msg.path then
 				return open(state, msg.path)
 			elseif msg.action == "enhance" then
@@ -388,8 +391,8 @@ return mod {
 				state.notice = if msg.ok
 					then `{msg.titled or 0} titles, {msg.icons or 0} icons`
 					else msg.error or "Enhance failed"
-			elseif msg.action == "save" and msg.outcome == "merged" and state.views.note then
-				state.views.note.text = msg.text
+			elseif msg.action == "save" and msg.outcome == "merged" and note then
+				note.text = msg.text
 			end
 			return
 		end

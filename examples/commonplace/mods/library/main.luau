@@ -94,7 +94,7 @@ end
 
 local function sidebar(state: State, notes: any)
 	local counts = notes.counts or {}
-	local rows = {}
+	local rows: { Element } = {}
 	for _, section in SECTIONS do
 		local count = if section.folder then counts[if section.folder == "" then "all" else section.folder] else nil
 		table.insert(
@@ -110,7 +110,7 @@ local function sidebar(state: State, notes: any)
 			}
 		)
 	end
-	local tags = {}
+	local tags: { Element } = {}
 	for index, tag in notes.tags or {} do
 		if index > 10 then
 			break
@@ -242,15 +242,15 @@ end
 
 local function context(state: State)
 	local view = state.views.context or {}
-	local refs = {}
+	local refs: { Element } = {}
 	for _, ref in view.backlinks or {} do
 		table.insert(refs, ui.column { class = "ref", msg = { open = ref.path }, ui.text { ref.title, class = "ref-title" }, ui.text { ref.context, class = "ref-context", lines = 2 } })
 	end
-	local mentions = {}
+	local mentions: { Element } = {}
 	for _, ref in view.mentions or {} do
 		table.insert(mentions, ui.column { class = "ref", msg = { open = ref.path }, ui.text { ref.title, class = "ref-title" }, ui.text { plain(ref.snippet), class = "ref-context", lines = 2 } })
 	end
-	local heads = {}
+	local heads: { Element } = {}
 	local info = view.info or {}
 	for _, head in info.headings or {} do
 		table.insert(heads, ui.text { head[2], class = "small", style = { padding = { 0, 0, 0, (head[1] - 1) * 12 } } })
@@ -348,6 +348,7 @@ return mod {
 			return
 		end
 		if msg.reply ~= nil then
+			local note: { text: string? }? = state.views.note
 			if (msg.action == "create" or msg.action == "today") and msg.ok and msg.path then
 				return open(state, msg.path)
 			elseif msg.action == "enhance" then
@@ -355,8 +356,8 @@ return mod {
 				state.notice = if msg.ok
 					then `{msg.titled or 0} titles, {msg.icons or 0} icons`
 					else msg.error or "Enhance failed"
-			elseif msg.action == "save" and msg.outcome == "merged" and state.views.note then
-				state.views.note.text = msg.text
+			elseif msg.action == "save" and msg.outcome == "merged" and note then
+				note.text = msg.text
 			end
 			return
 		end

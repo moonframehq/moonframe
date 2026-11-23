@@ -44,7 +44,7 @@ local function items(text: string): { any }
 end
 
 local function rail()
-	local buttons = {}
+	local buttons: { Element } = {}
 	for _, item in RAIL do
 		table.insert(buttons, icon_button { icon = item.icon, tooltip = item.tooltip, active = item.layout == "journal", to = "shell", msg = { layout = item.layout } })
 	end
@@ -53,7 +53,7 @@ end
 
 local function journal(state: State)
 	local days = (state.views.days or {}).rows or {}
-	local blocks = {}
+	local blocks: { Element } = {}
 	for index, day in days do
 		table.insert(blocks, journal_day { day = day })
 		if day.today then
@@ -91,7 +91,7 @@ local function inbox(state: State)
 	local note = state.views.inbox or {}
 	local list = items(note.text or "")
 	local pick = state.pick or #list
-	local rows = {}
+	local rows: { Element } = {}
 	for index, item in list do
 		table.insert(
 			rows,
