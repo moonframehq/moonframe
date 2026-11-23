@@ -226,6 +226,9 @@ pub struct List {
     pub start: usize,
     /// The rows from `start` the view built.
     pub rows: Vec<Node>,
+    /// Sent with the first and last row that show as they change, so a
+    /// mod can fetch the rows around them.
+    pub range: Option<Action>,
 }
 
 /// The rows of a list a view builds: from `start`, `len` of them.

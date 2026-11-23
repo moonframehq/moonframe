@@ -1206,6 +1206,11 @@ export type ListProps = {
 	-- Each row's height in pixels.
 	row_height: number,
 	row: (index: number) -> Child,
+	-- Sent with `first` and `last`, the rows (from 1) any part of which
+	-- shows, as they change while it scrolls and resizes.
+	range: Data,
+	-- The mod `range` goes to, if not the drawing one.
+	to: string?,
 	gap: Space?,
 	padding: Space?,
 	grow: boolean?,

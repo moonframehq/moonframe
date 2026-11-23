@@ -12,6 +12,8 @@ use {
     moonframe_core::{Direction, List, ListWindow, Part, Space},
 };
 
+mod range;
+
 /// Rows built beyond those showing, on each side, so scrolling a little
 /// never waits for the mod.
 const OVERSCAN: usize = 16;
@@ -90,6 +92,9 @@ impl<'w> Draw<'w> for List {
                     .h(px(self.count as f32 * row))
                     .children(rows),
             )
+            .children(self.range.as_ref().and_then(|range| {
+                range::reader(range, &handle, row, self.count, painter, place, cx)
+            }))
             .into_any_element()
     }
 }

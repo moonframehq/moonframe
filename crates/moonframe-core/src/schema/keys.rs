@@ -110,6 +110,7 @@ pub(super) fn key_type(element: &str, key: &str) -> KeyType {
         ("video", "gain") => number(0.0, 1000.0),
         ("video", "gamma") => number(0.1, 10.0),
         ("icon", "name") => Icon,
+        ("list", "range") => Data,
         ("list", "row") => Function,
         ("list", "row_height") => number(1.0, 10_000.0),
         ("list", "count") => number(0.0, 10_000_000.0),
