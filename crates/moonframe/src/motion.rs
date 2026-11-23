@@ -31,8 +31,9 @@ pub(crate) struct Motion {
     pub(crate) tweens: RefCell<Tweens>,
     /// Where each `ui.list` is scrolled, by path.
     scrolls: Recent<ScrollHandle>,
-    /// Last requested child, so redraws do not undo wheel scrolling.
-    scroll_targets: Recent<Option<usize>>,
+    /// Last requested child, so redraws do not undo wheel scrolling, and
+    /// whether it still waits for a frame laid out to reveal it in.
+    scroll_targets: Recent<(Option<usize>, bool)>,
     /// Each popover's anchor and the side its content fits on, by path.
     rooms: Recent<Rc<Room>>,
 }
@@ -360,17 +361,30 @@ impl Motion {
             .clone()
     }
 
-    /// Reveal a direct child only when the view's request changes.
-    pub(crate) fn scroll_to(&mut self, path: &str, target: Option<usize>) -> ScrollHandle {
+    /// Reveal a direct child only when the view's request changes, and
+    /// whether to draw again for it. GPUI reveals a child only in a box it
+    /// has laid out before (one appearing, as an overlay's content does,
+    /// knows neither its size nor that it scrolls), so the request is made
+    /// again each frame until one where the box was there to take it.
+    pub(crate) fn scroll_to(&mut self, path: &str, target: Option<usize>) -> (ScrollHandle, bool) {
         let handle = self.scroll(path);
-        let previous = self.scroll_targets.get_or(path, Instant::now(), || None);
+        let (previous, waiting) = self
+            .scroll_targets
+            .get_or(path, Instant::now(), || (None, false));
         if *previous != target {
-            if let Some(index) = target {
-                handle.scroll_to_item(index - 1);
-            }
             *previous = target;
+            *waiting = target.is_some();
         }
-        handle
+        let again = match (*waiting, target) {
+            (true, Some(index)) => {
+                handle.scroll_to_item(index - 1);
+                *waiting = handle.bounds().size.height <= Pixels::ZERO
+                    && handle.bounds().size.width <= Pixels::ZERO;
+                *waiting
+            },
+            _ => false,
+        };
+        (handle, again)
     }
 
     /// What the popover at `path` measured.
@@ -639,6 +653,16 @@ mod tests {
         // Shown from 230: waits until 280, halfway at 330, there by 380.
         assert_eq!(step("shown", 100.0, 330), (snapshot(50.0), true));
         assert_eq!(step("shown", 100.0, 400), (snapshot(100.0), false));
+    }
+
+    #[test]
+    fn a_request_waits_for_a_box_laid_out_to_take_it() {
+        let mut motion = Motion::default();
+        // Never laid out: asked again next frame.
+        assert!(motion.scroll_to("sheet", Some(35)).1);
+        assert!(motion.scroll_to("sheet", Some(35)).1);
+        assert!(!motion.scroll_to("sheet", None).1);
+        assert!(!motion.scroll_to("list", None).1);
     }
 
     #[test]
