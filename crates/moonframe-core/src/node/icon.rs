@@ -107,6 +107,7 @@ pub const ICONS: &[&str] = &[
     "book-open",
     "bookmark",
     "bot",
+    "brain",
     "brand-anthropic",
     "brand-github",
     "brand-gitlab",
