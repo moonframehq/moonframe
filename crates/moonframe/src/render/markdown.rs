@@ -7,6 +7,7 @@
 
 mod blocks;
 mod document;
+mod emoji;
 mod holding;
 #[cfg(feature = "math")]
 mod math;

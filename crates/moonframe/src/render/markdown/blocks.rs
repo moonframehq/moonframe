@@ -70,6 +70,7 @@ pub(super) fn extensions(shared: &SharedRef) -> MarkdownExtensions {
             draw_picture(node, &pictures, window, cx)
         })
         .plugin(Footnotes(shared.clone()))
+        .plugin(super::emoji::Emojis(shared.clone()))
         .plugin(Chips);
     #[cfg(feature = "math")]
     let extensions = super::math::with(extensions);
@@ -145,6 +146,10 @@ fn parse_picture(node: &Node, cx: &MarkdownParseContext<'_>) -> Option<MarkdownN
     let [Node::Image(image)] = paragraph.children.as_slice() else {
         return None;
     };
+    // An emoji alone on its line is still one.
+    if super::emoji::is_emoji(&paragraph.children[0]) {
+        return None;
+    }
     Some(
         MarkdownNode::new(PICTURE, Picture {
             src: image.url.clone(),
