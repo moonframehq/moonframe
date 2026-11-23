@@ -596,6 +596,15 @@ feedback, shows at once.
       <sub><b>Folio</b> (<code>folio</code>): a quiet place to write: a library of markdown files beside a page that styles markdown as you type, with focus mode (the sentence or paragraph being written in full ink) and typewriter scrolling.</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/apps/strata.png" alt="Strata: repositories on the left, a repository's history as a commit graph in the middle, and the picked commit's message and diff on the right">
+      <br>
+      <sub><b>Strata</b> (<code>strata</code>): a git browser: your repositories, a repository's history as a graph or its branches, and each commit's message, parents and diff, file by file.</sub>
+    </td>
+    <td width="50%" valign="top">
+    </td>
+  </tr>
 </table>
 
 Sessions, Workbench, Stage, Switchyard, Trellis, Lantern and Cairn require the `projects`

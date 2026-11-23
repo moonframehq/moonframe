@@ -3,7 +3,12 @@
 local section = use "section"
 local switch = use "switch"
 
-return mod {
+type State = {
+	selected: string,
+	tests: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { selected = "src/ledger.rs", tests = false }
 	end,

@@ -35,7 +35,7 @@ return component {
 
 	build = function(props: Props)
 		local color = if props.tone then TONES[props.tone] else nil
-		local style = if color
+		local style: Style? = if color
 			then { color = color, background = color .. "26", border_color = if props.solid then color .. "00" else color .. "40" }
 			else nil
 		return ui.row {

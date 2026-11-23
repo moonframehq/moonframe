@@ -3,7 +3,14 @@
 -- and the trash closes a terminal until none are left.
 local icon_button = use "icon-button"
 
-return mod {
+type State = {
+	sidebar: boolean,
+	unread: number,
+	terminals: number,
+	refreshed: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { sidebar = true, unread = 3, terminals = 3, refreshed = 0 }
 	end,

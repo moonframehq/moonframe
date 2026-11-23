@@ -38,7 +38,13 @@ local MENUS: { { title: string, items: { any } } } = {
 	} },
 }
 
-return mod {
+type State = {
+	left: boolean,
+	agent: boolean,
+	page: string,
+}
+
+return mod<<State>> {
 	window = { titlebar = "hidden", traffic_lights = { x = 18, y = 22 }, size = { width = 1760, height = 1080 } },
 
 	about = {
@@ -53,7 +59,7 @@ return mod {
 	subscribe = { "tally/page" },
 
 	init = function(previous)
-		local state = previous or { left = true, agent = true }
+		local state: State = previous or { left = true, agent = true, page = "pipeline" }
 		state.page = state.page or "pipeline"
 		return state
 	end,

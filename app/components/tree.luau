@@ -218,7 +218,7 @@ tree { selected = state.selected, guides = true, nodes = {
 	},
 
 	build = function(props: Props)
-		local out = {}
+		local out: { Element } = {}
 		rows(props.nodes, props, {}, out)
 		return ui.column { class = "tree", table.unpack(out) }
 	end,

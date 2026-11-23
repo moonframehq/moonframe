@@ -151,7 +151,7 @@ return mod {
 			},
 		}
 
-		local cells = {}
+		local cells: { Element } = {}
 		for index, kpi in register.kpis do
 			if index > 1 then
 				table.insert(cells, ui.row { class = "strip-rule", width = 1 })
@@ -170,7 +170,7 @@ return mod {
 		end
 
 		-- Filter pills and the search.
-		local pills = {}
+		local pills: { Element } = {}
 		for _, filter in register.filters do
 			local on = state.filter == filter.id
 			table.insert(pills, ui.row {
@@ -184,8 +184,8 @@ return mod {
 		end
 
 		local query = string.lower(state.query)
-		local shown = {}
-		local all = {}
+		local shown: { any } = {}
+		local all: { any } = {}
 		for _, row in state.added do
 			table.insert(all, row)
 		end
@@ -202,7 +202,7 @@ return mod {
 			end
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		for _, row in shown do
 			local regime = REGIMES[row.regime] or REGIMES.act
 			table.insert(rows, ui.row {

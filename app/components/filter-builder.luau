@@ -149,7 +149,7 @@ ui.popover {
 			}
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		local conditions: { Condition } = props.conditions or {}
 		for _, condition in conditions do
 			local field = fields[condition.field or ""]

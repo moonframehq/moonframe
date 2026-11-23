@@ -42,6 +42,10 @@ pub(crate) fn quit(cx: &mut App) {
         .any(|app| app.update(cx, |app, cx| app.held(Closing::Quit, cx)));
     if !held {
         cx.quit();
+    } else if panel::on() {
+        // Quit came from the item's menu with the panel hidden: the mod
+        // answers in it, so it shows.
+        panel::show();
     }
 }
 
@@ -49,7 +53,12 @@ impl MoonframeApp {
     /// Lets the main window's close button ask.
     pub(super) fn watch_closing(window: &mut Window, cx: &mut Context<Self>) {
         let app = cx.entity().downgrade();
-        window.on_window_should_close(cx, move |_, cx| {
+        window.on_window_should_close(cx, move |window, cx| {
+            // A panel hides, held or not: it never closes, so the app stays.
+            if panel::is(window) {
+                panel::hide();
+                return false;
+            }
             !app.update(cx, |app, cx| app.held(Closing::Window, cx))
                 .unwrap_or(false)
         });

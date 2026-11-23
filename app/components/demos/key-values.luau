@@ -28,7 +28,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local items = {}
+		local items: { Element } = {}
 		for index, branch in BRANCHES do
 			table.insert(items, ui.item { branch.name, selected = index == state.selected, msg = { branch = index } })
 		end

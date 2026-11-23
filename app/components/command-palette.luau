@@ -99,12 +99,14 @@ end
 
 -- The commands that match the query, best first; in their given order (and
 -- groups) while the query is empty.
+type Ranked = { command: Command, score: number, index: number }
+
 local function matches(commands: { Command }, query: string): { Command }
 	local q = string.lower(query)
 	if q == "" then
 		return commands
 	end
-	local ranked = {}
+	local ranked: { Ranked } = {}
 	for index, command in commands do
 		local best = score(command.label, q)
 		local extra = score(`{command.label} {command.keywords or ""} {command.group or ""}`, q)
@@ -115,7 +117,7 @@ local function matches(commands: { Command }, query: string): { Command }
 			table.insert(ranked, { command = command, score = best, index = index })
 		end
 	end
-	table.sort(ranked, function(a, b)
+	table.sort(ranked, function(a: Ranked, b: Ranked)
 		if a.score ~= b.score then
 			return a.score > b.score
 		end
@@ -288,7 +290,7 @@ command_palette {
 		local highlighted = clamp(state.highlighted, #found)
 		local grouped = shape.headings and state.query == ""
 
-		local rows = {}
+		local rows: { Element } = {}
 		local heading: string? = nil
 		for index, command in found do
 			if grouped and command.group and command.group ~= heading then

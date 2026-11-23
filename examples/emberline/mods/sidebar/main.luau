@@ -5,7 +5,9 @@
 
 type State = { page: string, query: string }
 
-local PAGES: { any } = {
+type Page = { id: string, label: string, icon: IconName }
+
+local PAGES: { Page } = {
 	{ id = "assigned", label = "Assigned to me", icon = "message-square" },
 	{ id = "drafts", label = "Drafts", icon = "file" },
 	{ id = "schedule", label = "Schedule", icon = "calendar" },
@@ -15,7 +17,9 @@ local PAGES: { any } = {
 }
 
 -- A mark is an icon in a colour, or a person's initials on a disc.
-local FAVORITES: { any } = {
+type Favorite = { id: string, label: string, kind: string, icon: IconName?, initials: string?, color: string }
+
+local FAVORITES: { Favorite } = {
 	{ id = "orchard", label = "Orchard", kind = "Company", icon = "heart", color = "#f4f4f4" },
 	{ id = "gamut", label = "Gamut", kind = "Company", icon = "palette", color = "#4b9dff" },
 	{ id = "loopwise", label = "Loopwise", kind = "Company", icon = "workflow", color = "#b56bff" },
@@ -23,7 +27,9 @@ local FAVORITES: { any } = {
 	{ id = "ines", label = "Ines Duval", kind = "Designer", initials = "ID", color = "#d9822b" },
 }
 
-local SEARCHES: { any } = {
+type Search = { id: string, label: string, icon: IconName, color: string }
+
+local SEARCHES: { Search } = {
 	{ id = "success", label = "Customer Success", icon = "sparkles", color = "#ff7a1a" },
 	{ id = "outsourcing", label = "Outsourcing", icon = "chart-pie", color = "#1fc77a" },
 	{ id = "fundraising", label = "Fundraising", icon = "chart-column", color = "#ff3d6e" },

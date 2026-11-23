@@ -169,6 +169,9 @@ For a palette, add `keys = { up = "prev", down = "next" }` and
 
 **Mods that talk.** Send `msg = ..., to = "other"` from a control, or
 return sends from `update`. Messages to `provider:<name>` go to a provider.
+In `update`, build them with `send "provider:<name>" { ... }` (the same
+`{ to = ..., msg = ... }` table): where the provider declares a `Message`
+type, `just types` checks the message, which a bare table never is.
 
 **Remember something across launches.** Every mod's state is saved on its
 own and comes back to `init` as `previous` next launch (see "State that
@@ -1027,7 +1030,10 @@ end,
   raises it), as a control's `window = "<mod>"` does, or closes it. `send`
   reaches the mod's `update` (from the asking mod) before its window
   draws, so it opens on a page; a `send` to a mod that does not exist is
-  the sender's error. The mod's `title` titles the window, and its
+  the sender's error. `size = { width, height }` opens it at that size
+  instead of its `window` key's, and grows it to that size if it is
+  already open, never shrinking it (a window that lists more once it has
+  something to list). The mod's `title` titles the window, and its
   `window = { size = { width, height }, min_size = { width, height } }`
   sizes it (both kept within the screen, as the main window's `size` is;
   420x560 and 280x240 when unset; a size takes effect the next time the
@@ -1264,6 +1270,13 @@ Tabs open and close with the `.tabs-tab` rule's transition (see
 time. Run it after `just check`.
 - It catches unknown `ui` functions, wrong token values (`tone = "loud"`),
   and wrong value types before anything runs.
+- Component calls are typed too: `use "stat-tile"` returns a function of
+  the component's own `type Props`, so `stat_tile { value = 42 }` fails
+  (`value` is a string, `label` is missing). The records inside a list prop
+  are not checked yet. `just component-types` writes these into
+  `types/moonframe.d.luau` from `app/components`; run it after changing a
+  component's `Props`, or `just ci` fails. A name with no built-in
+  component takes any props.
 - It does not catch misspelled keys (`lable`), because Luau allows extra
   fields in a table literal. `just check` catches those.
 - Annotations are optional. Add them where they help, e.g.
@@ -2028,8 +2041,9 @@ installed), the native `app.acp` (coding agents a mod runs over ACP), and
 the native `app.usage` (plan usage of Claude, Codex, Copilot and the other
 AI services signed in here).
 Their shapes are under "Built-in providers" below and typed in
-`types/moonframe.d.luau` (`Git`, `Forge`, `Agents`, `Files`, `Herdr`, `Acp`,
-`Usage`, and `Reply` for answers to actions). Views re-run with each publish. If a widget needs data
+`types/moonframe.d.luau` (`Git`, `Forge`, `Files`, `Herdr`, `Acp`,
+`Usage`, and `Reply` for answers to actions; `system` and `agents` from
+their own `types.luau`, see "Providers"). Views re-run with each publish. If a widget needs data
 that isn't there, write a provider (below); don't fake it in Luau unless it
 is labelled demo data.
 
@@ -2156,6 +2170,21 @@ terminal log. There are four kinds:
   installed. It is published again when the file changes and on any
   message (a mod's Refresh hears back). The file is checked like anything
   a provider publishes. Use it for sample data; `examples/tessel` does.
+- **Its types, `types.luau` beside `provider.toml`:** `export type
+  Published` (what `app.<name>` holds) and optionally `export type Message`
+  (what `send "provider:<name>"` takes). With them, `just types DIR` fails
+  on a view that reads a field the provider never publishes or a `send`
+  of a message it does not take; without, `app.<name>` is `any`. Give
+  every new provider one. Keep `published.json` beside it, an example of
+  what it publishes: `just provider-types-check` holds its top level to
+  `Published`, and a test in the provider holds a real `tick` to it (see
+  `examples/portable/app/providers/focus` and `examples/helpdesk/providers/desk`).
+  A provider in `app/providers/` needs `just provider-types` after a
+  change, which copies its types into `types/moonframe.d.luau`; an app's
+  own providers are read by `just types DIR` directly. Only `send` is
+  checked (not button `msg`/`to` or bare tables), mods cannot name the
+  types (their own annotations are checked against them by shape), and
+  nothing checks the JSON at runtime.
 - **`kind = "process"`, `command = [...]`:** any program run in the folder.
   - Each line it prints on stdout is one JSON value to publish. Each message
     arrives on stdin as a `{"from":"<mod>","message":...}` line (compact,
@@ -2273,6 +2302,7 @@ repository is refused with the reason. Pick the folder with `app:pick`
 | `stashes` | count |
 | `log` | once a mod sends `{ log = 200 }` (at most 500; `false` stops it): `{ sha, short, parents, author, time, refs, subject }`, children before parents, of every branch, tag and HEAD. Draw it with `use "commit-graph"`; the `history` mod is a tab that does |
 | `diff` | `{ path, binary, lines, truncated, hunks = { { header, old_start, new_start, lines = { { kind ("add" "del" "ctx"), old?, new?, text } } } } }`, at most 1200 lines of 300 characters |
+| `commit` | once a mod sends `{ show = sha }` (a full or short hex id; `false` stops it): `{ sha, short, parents, author, email, time, refs, subject, body, files, count, truncated, added, deleted }`, `files` as `"<status>\t<added>\t<deleted>\t<path>"` for `change-tree`, at most 400. A merge is compared with its first parent. `{ show_diff = path }` adds one of its files as `diff`, shaped as above (`false` stops it); `examples/strata` uses both |
 
 `app.docs` (docs, native): `{ available, root }`, the root `app.files`
 lists, followed as it moves; a file read before it moved is still watched
@@ -2696,6 +2726,11 @@ costs what it costs in its own app: the Luau layout is replayed whole.
 For that:
 - **Root:** the view's root fills its box (`size_full()`), since it is
   laid out at the slot's size.
+- **Redraws:** hosted roots render on each scheduled window frame; the
+  Luau shell stays cached. A host may notify its view, a descendant view,
+  or a separate model read while drawing. Cache subviews only when the
+  host also notifies a view in that cached subtree: GPUI 0.3.12 does not
+  invalidate a cached view when only a separate model notifies.
 - **What goes over it:** use `float`/`area`, a popover, or an overlay.
   Something that overlaps it through a negative margin or overflow sits
   under it.

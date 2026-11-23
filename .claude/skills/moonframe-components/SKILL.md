@@ -72,7 +72,7 @@ for the API, limits, caller identity and build policies.
 | Element | Use it for | Keys |
 | --- | --- | --- |
 | `ui.text "..."` | any text; a bare string child is plain text | `text`, `tone`, `size`, `weight` (`light` `normal` `medium` `semibold` `bold`), `truncate` (one line), `lines` (at most N lines), `wrap = false` (keep lines whole, for code that scrolls sideways), `syntax` (color it as code in this language, a line at a time), extras |
-| `ui.icon "name"` | a bundled icon at the text's size and color; `spin = true` turns it (loaders). Lucide glyphs (git: `git-branch` `git-commit-horizontal` `git-merge` `git-pull-request` `git-pull-request-draft` `git-pull-request-closed` `git-compare` `circle-dot`), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, brands `brand-github` `brand-gitlab` `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama`; the full list is `IconName` in types/moonframe.d.luau | `name`, `tone`, `size`, `spin`, extras |
+| `ui.icon "name"` | a bundled icon at the text's size and color; `spin = true` turns it (loaders). Lucide glyphs (git: `git-branch` `git-commit-horizontal` `git-merge` `git-pull-request` `git-pull-request-draft` `git-pull-request-closed` `git-compare` `circle-dot`), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, brands `brand-github` `brand-gitlab` `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama`; the full list is `IconName` in types/moonframe.d.luau. An app built on Moonframe adds its own as `app-NAME` (lowercase words joined by hyphens): its `icons/app-NAME.svg`, or `circle-dashed`, a placeholder, where the app lacks it | `name`, `tone`, `size`, `spin`, extras |
 | `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), `zoom` (screen pixels per picture pixel, 1 is 100 %: a viewer that fills its parent unless sized) panned to `center = { x, y }` (fractions of the picture), `overlay = { elements }` drawn over the picture wherever it lands (their `area` is in fractions of the picture: a crop frame, spots), `measure` (sent with the picture's `width`, `height`, `box_width`, `box_height` and the `fit` zoom when they change), extras |
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone`, extras |
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`), `exit` (sent once, with `exited = true` added, as the shell exits; without it Enter starts another) |
@@ -329,6 +329,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`dot-chart`](#dot-chart) | Data | A daily or weekly count compared with the period before (signups, orders), where the squares' rhythm reads better than smooth bars. For stacked counts by kind use `bar-chart`; for a balance against a floor use `forecast-chart`; for a trend line use `ui.line`. |
 | [`file-card`](#file-card) | Data | Attachments on a task, a comment or a message, in a grid of tiles or a list of rows, while they upload and after. For the area files are dropped on use `dropzone`; for a file in a tree use `tree` with `file-icon`; for a picture to look at closely use `image-viewer`. |
 | [`file-icon`](#file-icon) | Data | Beside a file name in a tree, a tab or a list of changes. For a generic icon use `ui.icon`. |
+| [`flow-diagram`](#flow-diagram) | Data | Explain how the parts of a system talk to each other, and what moves between them now: a request path, a cache miss, a retry, a pipeline. The caller places each node in a grid cell, so the same diagram fits a side panel and a full pane. Pass a growing `time` to move the tokens; leave it out for a still diagram. For a line of commits use `commit-graph`; for a tree use `tree`; for places on a map use `route-map`. |
 | [`forecast-chart`](#forecast-chart) | Data | A balance or capacity projected over weeks or months against a minimum (cash against a floor, stock against a reorder point). For counts per bucket, stacked by kind, use `bar-chart`; for a small trend use `sparkline` or `ui.line`. |
 | [`gantt`](#gantt) | Data | A project's schedule or timeline: when tasks run, how far they are, what waits on what. For events placed in hours use `week-calendar`; for a dated list of events use `timeline`; for a board by status use `kanban-column`. |
 | [`guide-card`](#guide-card) | Data | Cards of reading material or courses the reader works through (guides, docs, tutorials), three or so to a row, each with how far the reader got. For one featured course with actions use `course-card`; for a plain titled box use `card`; for a linked record inside a message use `record-card`. |
@@ -526,7 +527,7 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | `open` | show it |
 | `placeholder` | grey text while empty (default: two examples) |
 | `reply` | the reply the mod has from `follow_type`; Reply is greyed out while it is blank |
-| `runs` | runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`, its × `{ forget_thread = id }` (the mod forgets each run of it). A run's `warning` shows under it (a change that broke the app comes back undone, saying why), and `checking` shows while the provider checks the app after it |
+| `runs` | runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`; Remove under an open one that is not running sends `{ forget_thread = id }` (the mod forgets each run of it). A run's `warning` shows under it (a change that broke the app comes back undone, saying why), and `checking` shows while the provider checks the app after it |
 | `send` | sent by Send and ⌘↩, with `value` set to the text from ⌘↩ |
 | `text` | the text the mod has from `change`; Send is greyed out while it is blank |
 | `to` | mod its own messages go to, if not the drawing one |
@@ -1722,6 +1723,49 @@ local file_icon = use "file-icon"
 
 file_icon { name = "app.go" }
 ```
+
+#### `flow-diagram`
+
+**Flow Diagram.** A small system diagram on a grid: named nodes with an icon and a meter, links between neighbours, a tinted group around nodes, and coloured tokens that travel the links.
+
+**When:** Explain how the parts of a system talk to each other, and what moves between them now: a request path, a cache miss, a retry, a pipeline. The caller places each node in a grid cell, so the same diagram fits a side panel and a full pane. Pass a growing `time` to move the tokens; leave it out for a still diagram. For a line of commits use `commit-graph`; for a tree use `tree`; for places on a map use `route-map`.
+
+| Prop | Meaning |
+| --- | --- |
+| `columns` | the grid's width in cells (default: what the nodes use) |
+| `event` | key of the message a click on a node sends, default "select": { select = id } |
+| `flows` | { path = { ids }, tokens = { tones }, lane? }: one token for each tone, spread along the path. Tokens travel only steps with a link in `links` (either way round), skipping any other step; `lane` (-1, 0, 1) keeps two flows on one link apart |
+| `groups` | { label, nodes = { ids } }: a tinted box around the cells of its nodes, its label at the top right |
+| `height` | pixels (default 120 for each row) |
+| `links` | { from, to, label? }: two nodes in one row or one column (a slanted link is left out); the head points at `to`; `label` shows above a level link and beside an upright one |
+| `nodes` | { id, label, sublabel?, icon?, col, row, tone?, note?, meter? = { text, level?, tone? }, planned? }: `col` and `row` count from 0 (a negative one moves the whole grid over); `tone` is accent \| success \| warning \| danger |
+| `rows` | the grid's height in cells (default: what the nodes use) |
+| `selected` | the id of the node to show as picked |
+| `size` | small \| normal: the most a node takes. In a narrow cell it narrows to fit and cuts its name short (the tooltip shows it whole); where two cards leave no room for a link's head, the link shows as a short line in the gap between them |
+| `speed` | how far a token goes each second, in cells along its path (default 0.55): the same in any grid |
+| `time` | seconds: where the tokens are. The caller owns the clock |
+| `to` | mod to send the click to, if not the drawing one |
+
+**Styles:** `.flow-diagram` `.flow-diagram-cell` `.flow-diagram-fill-accent` `.flow-diagram-fill-danger` `.flow-diagram-fill-plain` `.flow-diagram-fill-success` `.flow-diagram-fill-warning` `.flow-diagram-group` `.flow-diagram-group-label` `.flow-diagram-head` `.flow-diagram-icon` `.flow-diagram-icon-accent` `.flow-diagram-icon-danger` `.flow-diagram-icon-success` `.flow-diagram-icon-warning` `.flow-diagram-label` `.flow-diagram-line` `.flow-diagram-link-label` `.flow-diagram-link-label-side` `.flow-diagram-meter` `.flow-diagram-meter-text` `.flow-diagram-node` `.flow-diagram-node:hover` `.flow-diagram-node:selected` `.flow-diagram-node-accent` `.flow-diagram-node-danger` `.flow-diagram-node-planned` `.flow-diagram-node-success` `.flow-diagram-node-warning` `.flow-diagram-note` `.flow-diagram-plate` `.flow-diagram-plate:selected` `.flow-diagram-plate-flat` `.flow-diagram-sublabel` `.flow-diagram-text-accent` `.flow-diagram-text-danger` `.flow-diagram-text-plain` `.flow-diagram-text-success` `.flow-diagram-text-warning` `.flow-diagram-token` `.flow-diagram-token-accent` `.flow-diagram-token-danger` `.flow-diagram-token-plain` `.flow-diagram-token-success` `.flow-diagram-token-warning` `.flow-diagram-top` `.flow-diagram-track`
+
+```lua
+local flow_diagram = use "flow-diagram"
+
+flow_diagram {
+	nodes = {
+		{ id = "web", label = "Web app", icon = "globe", col = 0, row = 0 },
+		{ id = "api", label = "API", icon = "server", col = 1, row = 0 },
+		{ id = "db", label = "Database", icon = "database", col = 2, row = 0 },
+	},
+	links = { { from = "web", to = "api", label = "HTTPS" }, { from = "api", to = "db" } },
+	flows = { { path = { "web", "api", "db" }, tokens = { "warning", "warning", "danger" } } },
+	time = state.seconds,      -- from a clock the mod owns
+	selected = state.node,
+	event = "node",            -- a click sends { node = id }
+}
+```
+
+A whole mod using it, with state: `app/components/demos/flow-diagram.luau`.
 
 #### `forecast-chart`
 
@@ -3895,6 +3939,7 @@ A whole mod using it, with state: `app/components/demos/recipient-field.luau`.
 | `cancel` | sent on Esc |
 | `change` | sent on each edit, with `value` set to the text |
 | `focus` | take focus when it appears |
+| `grow` | fill the width of its row or column instead |
 | `icon` | an icon before the text (`true` for a magnifier); draws the field in a rounded box of its own |
 | `id` | keeps the text across renders |
 | `next` | sent on down |

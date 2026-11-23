@@ -8,11 +8,19 @@
 -- is what a shell did, and can name a command: send that to the strip itself,
 -- never on a topic, which every mod can read.
 
+-- A tab as `tabbed` keeps it; it has more fields this does not read.
+type Tab = {
+	id: string,
+	-- "component:terminal" or "mod:explorer", as in `app.kinds`.
+	kind: string,
+	title: string?,
+	props: { [string]: any }?,
+}
+
 type Props = {
-	-- { id, kind, title?, props }, as `tabbed` keeps it.
-	tab: any,
+	tab: Tab?,
 	-- Its entry in `app.kinds`, for the kind's own props and report.
-	kind: any,
+	kind: TabKind?,
 }
 
 return component {
@@ -45,7 +53,8 @@ tab_view { tab = state.tab, kind = kind_of(app.kinds, state.tab.kind) }]],
 			}
 		end
 		local merged = table.clone(kind and kind.props or {})
-		for key, value in tab.props or {} do
+		local own: { [string]: any } = tab.props or {}
+		for key, value in own do
 			merged[key] = value
 		end
 		local of, name = string.match(tab.kind, "^(%a+):(.+)$")

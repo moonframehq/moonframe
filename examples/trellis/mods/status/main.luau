@@ -37,7 +37,7 @@ return mod {
 			}
 		end
 
-		local items = {}
+		local items: { Element } = {}
 		if current then
 			table.insert(items, item { icon = "folder", text = `{current.home}/{current.name}`, tooltip = current.path })
 			table.insert(items, item { icon = "git-merge", text = current.branch })

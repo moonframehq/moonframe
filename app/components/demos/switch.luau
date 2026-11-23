@@ -2,7 +2,16 @@
 -- is disabled until "Animations" is on.
 local switch = use "switch"
 
-return mod {
+type State = {
+	follow: boolean,
+	contrast: boolean,
+	animations: boolean,
+	reduce: boolean,
+	-- A row flips its field by name.
+	[string]: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { follow = true, contrast = false, animations = true, reduce = false }
 	end,

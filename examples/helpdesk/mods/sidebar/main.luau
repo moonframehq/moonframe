@@ -120,12 +120,12 @@ return mod {
 			}
 		end
 
-		local views = {}
+		local views: { Element } = {}
 		for _, item in VIEWS do
 			local count = if item.count then counts[item.count] else nil
 			table.insert(views, row(item, state.view == item.id, if count then tostring(count) else nil, { view = item.id }))
 		end
-		local sections = {}
+		local sections: { Element } = {}
 		for _, item in SECTIONS do
 			table.insert(sections, ui.row {
 				class = "side-row",

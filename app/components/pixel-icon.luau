@@ -52,9 +52,9 @@ return component {
 		end
 		-- The sprite fills about three quarters of the tile, on whole pixels.
 		local cell = math.max(1, math.floor(size * 0.78 / math.max(count, width)))
-		local lines = {}
+		local lines: { Element } = {}
 		for _, line in rows do
-			local runs = {}
+			local runs: { Element } = {}
 			local i = 1
 			while i <= #line do
 				local digit = string.sub(line, i, i)

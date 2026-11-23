@@ -3,6 +3,8 @@
 # branch, ahead/behind, changed files with +/- counts, HEAD, worktrees,
 # recent branches, remote and stashes, and on request one file's diff and
 # the recent commits with their parents (`{ log = 200 }`, `{ log = false }`).
+# One commit with its files (`{ show = sha }`) and one of those files' diff
+# (`{ show_diff = path }`), each until `false`.
 # Mods also ask it to commit (`{ commit = "message", root, id = ... }`) or
 # push (`{ push = true, root, id = ... }`), `root` naming the repository as
 # `app.git.root` gave it (refused once it moved); it answers the mod that

@@ -5,7 +5,12 @@ local segmented = use "segmented"
 
 local NEXT = { none = "low", low = "medium", medium = "high", high = "urgent", urgent = "none" }
 
-return mod {
+type State = {
+	size: string,
+	tasks: { { title: string, priority: string } },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -34,7 +39,7 @@ return mod {
 
 	view = function(state)
 		local size = tonumber(state.size)
-		local rows = {}
+		local rows: { Element } = {}
 		for index, task in state.tasks do
 			rows[index] = ui.row {
 				gap = "normal",

@@ -24,7 +24,7 @@ return component {
 	example = { items = { "Send the revised pricing deck", "Book a call with procurement", "Offer a two-year term" } },
 
 	build = function(props: Props)
-		local rows = {}
+		local rows: { Element } = {}
 		for index, item in props.items do
 			table.insert(rows, ui.row {
 				class = "numbered-list-item",

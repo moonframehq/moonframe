@@ -37,7 +37,13 @@ local GROUPS = {
 	},
 }
 
-return mod {
+type State = {
+	open: boolean,
+	inline: boolean,
+	ran: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = true, inline = false, ran = nil }
 	end,

@@ -16,6 +16,7 @@ use {
     objc2_app_kit::{
         NSCellImagePosition, NSControlStateValueOff, NSControlStateValueOn, NSEventModifierFlags,
         NSImage, NSMenu, NSMenuItem, NSStatusBar, NSStatusItem, NSVariableStatusItemLength,
+        NSWindow,
     },
     objc2_foundation::{NSData, NSPoint, NSSize, NSString},
     std::{cell::RefCell, collections::BTreeMap},
@@ -86,6 +87,13 @@ pub(super) fn remove(owner: &str) {
 
 pub(super) fn owners() -> Vec<String> {
     ITEMS.with_borrow(|items| items.keys().cloned().collect())
+}
+
+/// The menu bar window the mod `owner`'s item is drawn in: where a click on it
+/// lands, and where its icon is on the screen.
+pub(super) fn window(owner: &str) -> Option<Retained<NSWindow>> {
+    let item = ITEMS.with_borrow(|items| items.get(owner).cloned())?;
+    item.button(MainThreadMarker::new()?)?.window()
 }
 
 /// The icon as AppKit draws it, standing [`ICON_HEIGHT`] tall.

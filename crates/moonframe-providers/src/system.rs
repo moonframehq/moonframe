@@ -46,3 +46,41 @@ impl SystemLoad {
         })
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use {super::SystemLoad, serde_json::Value};
+
+    /// Each top-level key with its JSON kind, which types.luau's `Published`
+    /// is checked against through published.json (`just provider-types-check`).
+    fn shape(value: &Value) -> Vec<(String, &'static str)> {
+        let kind = |value: &Value| match value {
+            Value::Null => "null",
+            Value::Bool(_) => "boolean",
+            Value::Number(_) => "number",
+            Value::String(_) => "string",
+            Value::Array(_) => "array",
+            Value::Object(_) => "object",
+        };
+        let mut found: Vec<_> = value
+            .as_object()
+            .expect("an object")
+            .iter()
+            .map(|(key, value)| (key.clone(), kind(value)))
+            .collect();
+        found.sort();
+        found
+    }
+
+    #[test]
+    fn the_system_provider_publishes_what_published_json_shows() {
+        let example: Value =
+            serde_json::from_str(include_str!("../../../app/providers/system/published.json"))
+                .unwrap();
+        let mut load = SystemLoad::new().unwrap().sample();
+        // What app/providers/system adds to the host's sample.
+        load["cpu_history"] = serde_json::json!([load["cpu"]]);
+        assert_eq!(shape(&load), shape(&example));
+    }
+}

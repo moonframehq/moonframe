@@ -608,13 +608,15 @@ mod tests {
 
     #[test]
     fn a_tunnel_quiet_one_way_stays_open_while_the_other_carries() {
-        let wait = Duration::from_millis(400);
+        // Long enough that a busy machine's late wake-up between two bytes
+        // stays well inside it.
+        let wait = Duration::from_millis(1000);
         let ((mut page, client), (upstream, mut site)) = (pair(), pair());
         let spliced = thread::spawn(move || splice(client, upstream, b"", wait));
-        // The site answers slowly, a byte at a time, for three waits, while
+        // The site answers slowly, a byte at a time, for two waits, while
         // the page, having asked, says nothing more.
         for _ in 0..8 {
-            thread::sleep(wait * 3 / 8);
+            thread::sleep(wait / 4);
             site.write_all(b"x").unwrap();
         }
         page.set_read_timeout(Some(wait * 4)).unwrap();

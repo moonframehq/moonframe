@@ -51,7 +51,15 @@ local function find(list: { any }, id: string)
 	return nil
 end
 
-return mod {
+type State = {
+	messages: { any },
+	category: string,
+	open: string,
+	menu: string?,
+	expanded: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { messages = messages(), category = "primary", open = "m2", menu = nil, expanded = nil }
 	end,
@@ -98,7 +106,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local counts = {}
+		local counts: { [string]: number } = {}
 		for _, message in state.messages do
 			counts[message.category] = (counts[message.category] or 0) + 1
 		end
@@ -107,7 +115,7 @@ return mod {
 			table.insert(options, { id = id, label = TITLES[id], count = counts[id] or 0 })
 		end
 
-		local rows = {}
+		local rows: { Element } = {}
 		for _, m in state.messages do
 			if m.category ~= state.category then
 				continue

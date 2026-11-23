@@ -51,7 +51,7 @@ return mod {
 
 	-- The page is published on `inkwell/page`, which the pages and the top
 	-- bar follow; it goes out once at launch too, so they start in step.
-	init = function(previous: State?)
+	init = function(previous: State?): (State, { Send })
 		local state: State = previous or { page = "audience" }
 		return state, { { to = "topic:inkwell/page", msg = state.page } }
 	end,

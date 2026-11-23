@@ -214,3 +214,27 @@ fn providers_are_wanted_by_what_views_read_and_mods_hear() {
     let dir = app(&[("hears", &listener(r#""provider/*""#))]);
     assert_eq!(Workspace::open(dir.path(), false).wanted_providers(), None);
 }
+
+#[test]
+fn send_builds_the_message_a_literal_would() {
+    let sender = r#"return mod {
+      update = function(state, msg)
+        return state, { send "provider:desk" { watch = msg }, send "topic:seen" (msg) }
+      end,
+      view = function() return ui.text "sender" end,
+    }"#;
+    let dir = app(&[("sender", sender)]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    workspace.send("sender", "sender", Data::from("INC-1"));
+    let sent: Vec<_> = workspace
+        .take_outbox()
+        .into_iter()
+        .map(|(to, _, msg)| (to, msg))
+        .collect();
+    let watch = Data::Map(
+        [("watch".into(), Data::from("INC-1"))]
+            .into_iter()
+            .collect(),
+    );
+    assert!(sent.contains(&("desk".to_owned(), watch)), "{sent:?}");
+}

@@ -10,6 +10,7 @@ use {
 };
 
 // keep-sorted start
+mod app_icons;
 mod check_data;
 mod checks;
 mod components;
@@ -17,6 +18,7 @@ mod dictation;
 mod elements;
 mod entries;
 mod entry_scopes;
+mod flow_diagram;
 mod font_size;
 mod gestures;
 mod history;

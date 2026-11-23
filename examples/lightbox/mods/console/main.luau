@@ -54,12 +54,24 @@ local function follow(state: any, scanner: any)
 	return state, asked
 end
 
-return mod {
+type State = {
+	exposure: number,
+	parade: boolean,
+	zoom: number?,
+	center: { number },
+	stats: { [string]: any },
+	running: boolean,
+	percent: number,
+	closing: string?,
+	leaving: boolean,
+}
+
+return mod<<State>> {
 	region = "main",
 	subscribe = { "provider/scanner" },
 
 	init = function(previous)
-		local state = previous or {
+		local state: State = previous or {
 			exposure = 1,
 			parade = true,
 			zoom = nil :: number?,
@@ -122,7 +134,7 @@ return mod {
 					then ui.row {
 						class = "closing",
 						align = "center",
-						ui.text { "A scan is running. Stop it first?", grow = true },
+						ui.row { grow = true, ui.text { "A scan is running. Stop it first?" } },
 						ui.button { "Keep scanning", msg = "keep-scanning" },
 						ui.button { "Stop and close", msg = "stop-and-close", variant = "primary" },
 					}

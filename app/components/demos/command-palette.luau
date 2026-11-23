@@ -16,7 +16,13 @@ local COMMANDS: { any } = {
 	{ id = "reload", label = "Reload window", icon = "refresh-cw", shortcut = "cmd-r", group = "View" },
 }
 
-return mod {
+type State = {
+	open: boolean,
+	look: string,
+	ran: string?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { open = true, look = "spotlight", ran = nil }
 	end,

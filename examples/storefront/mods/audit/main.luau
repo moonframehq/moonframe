@@ -67,7 +67,7 @@ local function matching(state: State, store: any): { any }
 	end
 	if state.newest then
 		table.sort(list, function(a, b)
-			return a.time > b.time
+			return (a.time :: number) > (b.time :: number)
 		end)
 	end
 	return list
@@ -263,7 +263,7 @@ return mod {
 			table.insert(kind_options, { id = kind.id, label = kind.label, icon = kind.icon })
 		end
 
-		local rows = {}
+		local rows: { { [string]: any } } = {}
 		local ids = {}
 		for _, activity in page_of(list, page, state.per_page) do
 			local author = authors[activity.author] or { name = activity.author, color = "#cccccc" }
@@ -274,7 +274,7 @@ return mod {
 				{ tag = activity.tag },
 			}
 			local stamp: { any } = { activity.date, { text = activity.clock, muted = true } }
-			table.insert(rows, {
+			rows[#rows + 1] = {
 				id = activity.id,
 				activity = rich_text { parts = sentence },
 				author = ui.row {
@@ -284,7 +284,7 @@ return mod {
 					ui.text { author.name, truncate = true },
 				},
 				time = rich_text { parts = stamp },
-			})
+			}
 		end
 
 		-- Export the ticked rows, else every row the filters let through.

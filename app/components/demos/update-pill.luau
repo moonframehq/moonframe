@@ -3,7 +3,13 @@
 local update_pill = use "update-pill"
 local switch = use "switch"
 
-return mod {
+type State = {
+	shown: boolean,
+	downloading: boolean,
+	status: string,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { shown = true, downloading = false, status = "" }
 	end,

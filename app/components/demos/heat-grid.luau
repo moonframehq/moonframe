@@ -4,7 +4,12 @@
 local heat_grid = use "heat-grid"
 local segmented = use "segmented"
 
-return mod {
+type State = {
+	weeks: { number },
+	mode: string,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { weeks = { 1, 0, 1, 0, 0, 2, 1, 0, 3, 1, 1, 1 }, mode = "counts" }
 	end,

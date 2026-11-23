@@ -23,8 +23,17 @@ tmp=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/moonframe-tap.XXXXXXXX")
 trap 'rm -rf -- "$tmp"' EXIT
 printf '%s\n' "$HOMEBREW_TAP_SSH_KEY" > "$tmp/key"
 unset HOMEBREW_TAP_SSH_KEY
+# With GH_TOKEN, ask as this workflow: GitHub refuses unauthenticated calls
+# from a runner's shared address once others have spent its hourly share.
+# The header goes through a file so the token stays out of curl's arguments.
+: > "$tmp/headers"
+if [[ -n ${GH_TOKEN:-} ]]; then
+    printf 'Authorization: Bearer %s\n' "$GH_TOKEN" > "$tmp/headers"
+fi
+unset GH_TOKEN
 # Trust GitHub's SSH host keys as published over HTTPS, never ssh-keyscan.
 curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+    --retry 3 --retry-all-errors --header "@$tmp/headers" \
     --connect-timeout 15 --max-time 60 https://api.github.com/meta |
     jq -er '.ssh_keys | select(type == "array" and length > 0) | .[] | "github.com " + .' \
         > "$tmp/known_hosts"

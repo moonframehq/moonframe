@@ -193,6 +193,8 @@ providers-examples:
     cargo clippy --quiet --manifest-path examples/capability-provider/Cargo.toml --target-dir target/providers -- -D warnings
     cargo clippy --quiet --all-targets --manifest-path examples/portable/app/providers/focus/Cargo.toml --target-dir target/providers -- -D warnings
     cargo test --quiet --manifest-path examples/portable/app/providers/focus/Cargo.toml --target-dir target/providers
+    # The help desk's output against its published.json, natively.
+    cargo test --quiet --manifest-path examples/helpdesk/providers/desk/Cargo.toml --target-dir target/providers
     cargo clippy --quiet --all-targets --manifest-path examples/portable/bench/providers/digest/Cargo.toml --target-dir target/providers -- -D warnings
     cargo test --quiet --manifest-path examples/portable/bench/providers/digest/Cargo.toml --target-dir target/providers
     cargo test --quiet --manifest-path crates/moonframe-provider/Cargo.toml --target-dir target/providers
@@ -201,20 +203,32 @@ providers-examples:
 setup-luau:
     scripts/setup-luau-lsp.sh
 
-# Type-check the app's Luau against types/moonframe.d.luau in strict mode.
+# Type each component's `use "name"` in types/moonframe.d.luau from its Props.
+component-types:
+    python3 -I scripts/component-types.py
+
+# Fail when types/moonframe.d.luau's component types are out of date.
+component-types-check:
+    python3 -I scripts/component-types.py --check
+
+# Type each provider's `app.<name>` and `send "provider:<name>"` in
+# types/moonframe.d.luau from its types.luau.
+provider-types:
+    python3 -I scripts/provider-types.py
+
+# Fail when types/moonframe.d.luau's provider types are out of date, or a
+# provider's published.json does not match its types.luau.
+provider-types-check:
+    python3 -I scripts/test_provider_types.py
+    python3 -I scripts/provider-types.py --check
+
+# Type-check the app's Luau against types/moonframe.d.luau in strict mode;
+# an app with its own typed providers, against those types too.
 types dir="app":
     #!/usr/bin/env bash
     set -euo pipefail
     lsp=$(scripts/setup-luau-lsp.sh)
-    files=()
-    while IFS= read -r -d '' file; do
-        files+=("$file")
-    done < <(find "{{dir}}" -name '*.luau' -not -name '*.d.luau' -print0 | sort -z)
-    output=$("$lsp" analyze --platform=standard --definitions=@moonframe=types/moonframe.d.luau "${files[@]}" 2>&1 | grep -v '^\[INFO\]' || true)
-    if [ -n "$output" ]; then
-        echo "$output"
-        exit 1
-    fi
+    python3 -I scripts/luau-types.py "$lsp" "{{dir}}"
     echo "ok: types in {{dir}}"
 
 # Capture a running window to a PNG (macOS); pass the PID of the one you started.
@@ -354,4 +368,4 @@ release:
     echo "Releasing v$version from $sha"
     gh workflow run release.yml --ref main -f expected_sha="$sha"
 
-ci: format-check check-file-size check-sorted lint test rune-check test-sealed-bundles types providers providers-examples check-builtin components-check check-examples patterns-check wasm-guide-check
+ci: format-check check-file-size check-sorted lint test rune-check test-sealed-bundles component-types-check provider-types-check types providers providers-examples check-builtin components-check check-examples patterns-check wasm-guide-check

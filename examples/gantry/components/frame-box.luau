@@ -8,7 +8,7 @@ type Props = {
 	class: string?,
 }
 
-local function corner(at: { top: number?, left: number?, right: number?, bottom: number? }, across: boolean)
+local function corner(at: Float, across: boolean)
 	return ui.row {
 		class = "frame-box-mark",
 		width = if across then 7 else 1,

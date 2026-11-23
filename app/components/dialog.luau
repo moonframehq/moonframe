@@ -182,7 +182,7 @@ dialog { open = state.renaming, dismiss = "close", title = "Rename workspace",
 			}
 		end
 
-		local footer_items = {}
+		local footer_items: { Element } = {}
 		for _, button in ipairs(props.buttons or {}) do
 			footer_items[#footer_items + 1] = ui.button {
 				button.label,

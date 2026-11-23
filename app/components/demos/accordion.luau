@@ -12,7 +12,13 @@ local function check(icon: string, tone: string, text: string, spin: boolean?)
 	}
 end
 
-return mod {
+type State = {
+	mode: string,
+	open: string?,
+	many: { [string]: boolean },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { mode = "one", open = "checks", many = { checks = true } }
 	end,

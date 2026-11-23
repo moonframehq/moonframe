@@ -4,7 +4,13 @@
 -- focus.
 local text_editor = use "text-editor"
 
-return mod {
+type State = {
+	text: string,
+	preview: boolean,
+	saved: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {

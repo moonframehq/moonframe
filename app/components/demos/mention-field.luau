@@ -11,7 +11,15 @@ local MEMBERS = {
 	{ name = "Lena Fischer", detail = "Product" },
 }
 
-return mod {
+type State = {
+	text: string,
+	caret: number,
+	highlighted: number,
+	posted: { string },
+	closed: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { text = "", caret = 0, highlighted = 1, posted = {}, closed = false }
 	end,

@@ -150,7 +150,7 @@ ui.row { gap = "large", align = "start",
 			},
 		}
 
-		local chips = {}
+		local chips: { Element } = {}
 		local presets: { any } = props.presets or {}
 		for _, preset in presets do
 			local h = preset.hour or 0

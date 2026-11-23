@@ -24,7 +24,7 @@ return component {
 	example = { buttons = { { label = "New", msg = "new" }, { label = "Refresh", msg = "refresh" }, { label = "Remove", msg = "remove", variant = "danger" } } },
 
 	build = function(props: Props)
-		local buttons = {}
+		local buttons: { Element } = {}
 		for index, button in props.buttons do
 			buttons[index] = ui.button {
 				button.label,

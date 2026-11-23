@@ -693,6 +693,40 @@ publishes its first value.</p>
 Subscribing to <code>provider/counter</code> or sending a message also starts it.
 Once started, it keeps running even if the view is hidden. Use
 <code>start = "always"</code> only when it should work before any mod needs it.</p>
+<h2 id="declare-its-types">Declare its types</h2>
+<p>Without types, <code>app.counter</code> is <code>any</code> to the Luau checker: a view that
+reads a field the provider never publishes, or sends it a message it
+ignores, passes <code>just types</code> and fails quietly at runtime. Declare both in
+<code>providers/counter/types.luau</code>:</p>
+<pre><code class="language-lua">-- What app.counter holds.
+export type Published = {
+    count: number,
+}
+
+-- What send &quot;provider:counter&quot; takes.
+export type Message = { add: boolean } | { reset: boolean }
+</code></pre>
+<p>Then send with <code>send</code>, which builds the same <code>{ to = ..., msg = ... }</code> a
+literal would, so its message is checked:</p>
+<pre><code class="language-lua">update = function(state, msg)
+    return state, { send &quot;provider:counter&quot; { add = true } }
+end,
+</code></pre>
+<p><code>just types DIR</code> checks the app's mods against them: reading
+<code>counter.total</code>, or sending <code>{ ad = true }</code>, is a type error with its line.
+For a provider in the starter's <code>app/providers/</code>, <code>just provider-types</code>
+also copies them into <code>types/moonframe.d.luau</code>, so every app sees them;
+<code>just provider-types-check</code> (in <code>just ci</code>) fails when that copy is stale.</p>
+<p>Keep an example of what it publishes beside them as <code>published.json</code>, and
+hold both sides to it: <code>just provider-types-check</code> fails when the file's
+keys or kinds differ from <code>Published</code>, and a test in the crate compares a
+real <code>tick</code> against it (see <code>examples/portable/app/providers/focus</code>). Then
+neither the Rust nor the Luau side can change without the other.</p>
+<p>Limits: only <code>Published</code>'s own fields are held to the example, a level
+deep; button <code>msg = ..., to = ...</code> and plain <code>{ to = ..., msg = ... }</code>
+tables are not checked, only <code>send</code>; and the type names (<code>Published</code>) are
+not visible in mods, whose own annotations are checked against them by
+shape. Nothing checks the published JSON at runtime.</p>
 <h2 id="build-run-and-check">Build, run and check</h2>
 <p>From the app folder, compile the exact component:</p>
 <pre><code class="language-sh">cargo build --release --target wasm32-wasip2 \
@@ -865,11 +899,13 @@ compiled components in a source package.</p>
 <li>Copy the matching WIT locally; create an independent <code>cdylib</code> crate
    with <code>kind = "wasm"</code>. Keep manifest keys separate from <code>[settings]</code>.</li>
 <li>Define the published JSON shape and accepted message payloads before
-   writing the view. Validate settings and handle unknown messages.</li>
+   writing the view, in <code>types.luau</code> (<code>Published</code>, <code>Message</code>) with an
+   example <code>published.json</code> and a test holding <code>tick</code> to it. Validate
+   settings and handle unknown messages.</li>
 <li>Implement <code>start</code>, <code>tick</code>, <code>receive</code> and <code>export!</code>. Publish whole
    snapshots, bound work and memory, and do not assume runtime state persists.</li>
-<li>Read <code>app.&lt;name&gt;</code> with a nil fallback; send payloads to
-   <code>provider:&lt;name&gt;</code>. Follow the Moonframe and component skills for UI.</li>
+<li>Read <code>app.&lt;name&gt;</code> with a nil fallback; send payloads with
+   <code>send "provider:&lt;name&gt;" { ... }</code>. Follow the Moonframe and component skills for UI.</li>
 <li>Build for <code>wasm32-wasip2</code>, run the app's headless checks and Luau type
    checks where configured, then verify startup, a message and reload.
    State explicitly when an interactive check was not performed.</li>
@@ -880,7 +916,7 @@ compiled components in a source package.</p>
 uses the host capability; <a href="https://github.com/moonframehq/moonframe/tree/main/examples/gantry/providers/telemetry">Gantry telemetry</a>
 keeps a larger in-memory model and handles messages (its data is simulated).</p>
 </main>
-<nav class="toc" aria-label="On this page"><b>On this page</b><a href="#choose-a-provider-kind">Choose a provider kind</a><a href="#set-up-the-folder">Set up the folder</a><a href="#declare-the-provider">Declare the provider</a><a href="#implement-the-component">Implement the component</a><a href="#keep-state-across-a-new-build">Keep state across a new build</a><a href="#compile-it-into-the-app">Compile it into the app</a><a href="#host-defined-capabilities-and-external-miniapps">Host-defined capabilities and external miniapps</a><a href="#draw-it-and-send-messages">Draw it and send messages</a><a href="#build-run-and-check">Build, run and check</a><a href="#host-calls-and-limits">Host calls and limits</a><a href="#package-and-share">Package and share</a><a href="#troubleshooting">Troubleshooting</a><a href="#coding-agent-recipe">Coding-agent recipe</a>
+<nav class="toc" aria-label="On this page"><b>On this page</b><a href="#choose-a-provider-kind">Choose a provider kind</a><a href="#set-up-the-folder">Set up the folder</a><a href="#declare-the-provider">Declare the provider</a><a href="#implement-the-component">Implement the component</a><a href="#keep-state-across-a-new-build">Keep state across a new build</a><a href="#compile-it-into-the-app">Compile it into the app</a><a href="#host-defined-capabilities-and-external-miniapps">Host-defined capabilities and external miniapps</a><a href="#draw-it-and-send-messages">Draw it and send messages</a><a href="#declare-its-types">Declare its types</a><a href="#build-run-and-check">Build, run and check</a><a href="#host-calls-and-limits">Host calls and limits</a><a href="#package-and-share">Package and share</a><a href="#troubleshooting">Troubleshooting</a><a href="#coding-agent-recipe">Coding-agent recipe</a>
 <div class="edit"><a href="https://github.com/moonframehq/moonframe/edit/main/docs/wasm-providers.md">Edit this guide ↗</a></div>
 </nav>
 </div>

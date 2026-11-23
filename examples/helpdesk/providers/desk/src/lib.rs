@@ -341,3 +341,37 @@ impl Guest for Desk {
 }
 
 export!(Desk);
+
+#[cfg(test)]
+mod tests {
+    use {super::State, serde_json::Value};
+
+    /// Each top-level key with its JSON kind.
+    fn shape(value: &Value) -> Vec<(String, &'static str)> {
+        let kind = |value: &Value| match value {
+            Value::Null => "null",
+            Value::Bool(_) => "boolean",
+            Value::Number(_) => "number",
+            Value::String(_) => "string",
+            Value::Array(_) => "array",
+            Value::Object(_) => "object",
+        };
+        let mut found: Vec<_> = value
+            .as_object()
+            .expect("an object")
+            .iter()
+            .map(|(key, value)| (key.clone(), kind(value)))
+            .collect();
+        found.sort();
+        found
+    }
+
+    /// types.luau's `Published` is checked against published.json (`just
+    /// provider-types-check`); this holds what the desk publishes to it.
+    #[test]
+    fn it_publishes_what_published_json_shows() {
+        let example: Value = serde_json::from_str(include_str!("../published.json")).unwrap();
+        let published = State::new().unwrap().out();
+        assert_eq!(shape(&published), shape(&example));
+    }
+}

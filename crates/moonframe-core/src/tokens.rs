@@ -34,13 +34,17 @@ macro_rules! tokens {
 
         impl $crate::read::Read for $name {
             fn read(value: &mlua::Value, cx: &$crate::read::Cx) -> Result<Self, $crate::Error> {
-                let names = Self::NAMES.join(", ");
+                // Only a problem spells out the names it could have been.
+                let names = || Self::NAMES.join(", ");
                 let mlua::Value::String(name) = value else {
-                    return Err(cx.fail(format!("expected one of {names}")));
+                    return Err(cx.fail(format!("expected one of {}", names())));
                 };
+                if let Some(token) = name.to_str().ok().and_then(|name| Self::parse(&name)) {
+                    return Ok(token);
+                }
                 let name = name.to_string_lossy();
                 Self::parse(&name).ok_or_else(|| {
-                    cx.fail(format!("unknown `{name}`; expected one of {names}"))
+                    cx.fail(format!("unknown `{name}`; expected one of {}", names()))
                         .with(|detail| {
                             detail.suggestion =
                                 $crate::diagnostic::did_you_mean(&name, Self::NAMES);

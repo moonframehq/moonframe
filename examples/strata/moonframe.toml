@@ -1,0 +1,7 @@
+[app]
+# A git browser: your repositories, a branch's history as a graph, and each
+# commit's message and diff. `moonframe --profile strata` opens it.
+name  = "strata"
+title = "Strata"
+# The projects provider, for the repositories pane.
+requires = ["../projects"]

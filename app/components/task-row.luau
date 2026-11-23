@@ -88,7 +88,7 @@ return component {
 		else
 			lead = task_check { state = state, msg = props.toggle, to = props.to }
 		end
-		local meta = {}
+		local meta: { Element } = {}
 		if props.icon then
 			table.insert(meta, ui.icon { name = props.icon :: any, size = "small", class = "task-row-meta" })
 		end

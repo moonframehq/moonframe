@@ -20,6 +20,9 @@
 
 -- The mod drawing the window, and the topic it reads.
 local WINDOW = "feedback-window"
+-- Its size once it lists sessions under the request, which the size its
+-- `window` key opens at, sized for the request alone, leaves no room for.
+local LISTING = { width = 760, height = 460 }
 local TOPIC = "topic:feedback/dialog"
 
 -- The window going away takes the mic button with it, so the take is
@@ -131,7 +134,8 @@ end
 local function show(state: State): { any }
 	state.open = true
 	state.seen = state.latest
-	return { { to = "app:window", msg = { open = WINDOW } }, warm(state.agent) }
+	local size = if #state.runs > 0 then LISTING else nil
+	return { { to = "app:window", msg = { open = WINDOW, size = size } }, warm(state.agent) }
 end
 
 -- What the window draws from this mod, shared on `feedback/dialog`.
@@ -326,6 +330,11 @@ local function handle(state: State, msg: any): { any }?
 		if state.listening then
 			state.listening = false
 			table.insert(sends, STOP_LISTENING)
+		end
+		if not msg.quiet then
+			-- Sent from the window, which then lists the new session: it
+			-- grows to make room, unless already larger.
+			table.insert(sends, { to = "app:window", msg = { open = WINDOW, size = LISTING } })
 		end
 		return sends
 	elseif msg.reply == "feedback" and msg.action == "finished" then

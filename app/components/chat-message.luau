@@ -59,7 +59,7 @@ chat_message {
 }]],
 
 	build = function(props: Props)
-		local paragraphs = {}
+		local paragraphs: { Element } = {}
 		for paragraph in string.gmatch((props.text or "") .. "\n\n", "(.-)\n\n") do
 			if string.match(paragraph, "%S") then
 				table.insert(paragraphs, ui.text { paragraph, wrap = true })

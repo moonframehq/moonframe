@@ -33,6 +33,13 @@ impl AssetSource for Assets {
         if let Some(Ok(Some(data))) = self.host.as_ref().map(|host| host.load(path)) {
             return Ok(Some(data));
         }
+        // An app icon is the host's alone: when it lacks one, the placeholder.
+        if path
+            .strip_prefix("icons/")
+            .is_some_and(|name| name.starts_with(moonframe_core::APP_ICON))
+        {
+            return self.load(&format!("icons/{}.svg", moonframe_core::MISSING_APP_ICON));
+        }
         match Ours::get(path) {
             Some(file) => Ok(Some(file.data)),
             None => gpui_kit::assets::Assets.load(path),
@@ -72,7 +79,7 @@ mod tests {
     impl AssetSource for Host {
         fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
             match path {
-                "icons/host-only.svg" | "icons/cpu.svg" => {
+                "icons/host-only.svg" | "icons/cpu.svg" | "icons/app-sessions.svg" => {
                     Ok(Some(Cow::Borrowed(b"host".as_slice())))
                 },
                 _ => Err(std::io::Error::other(path.to_owned()).into()),
@@ -101,6 +108,23 @@ mod tests {
         let ours = assets.load("icons/agent-claude.svg").unwrap().unwrap();
         assert_ne!(ours.as_ref(), b"host");
         assert!(assets.load("icons/no-such-icon.svg").is_err());
+    }
+
+    #[test]
+    fn an_app_icon_is_the_host_s_or_the_placeholder() {
+        let path = IconName::new("app-sessions").unwrap().path();
+        assert_eq!(
+            with_host().load(&path).unwrap(),
+            Some(Cow::Borrowed(b"host".as_slice()))
+        );
+        // Without a host that ships it, the placeholder, never nothing.
+        let placeholder = Assets::default()
+            .load(&format!("icons/{}.svg", moonframe_core::MISSING_APP_ICON))
+            .unwrap();
+        assert!(placeholder.is_some());
+        assert_eq!(Assets::default().load(&path).unwrap(), placeholder);
+        let missing = IconName::new("app-missing").unwrap().path();
+        assert_eq!(with_host().load(&missing).unwrap(), placeholder);
     }
 
     #[test]

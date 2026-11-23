@@ -39,7 +39,7 @@ return mod {
 	end,
 
 	view = function(state: State)
-		local items = {}
+		local items: { Element } = {}
 		for _, item in TOP do
 			local selected = item.id == state.selected
 			table.insert(items, ui.row {

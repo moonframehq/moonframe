@@ -1,7 +1,8 @@
 //! Type-checking a miniapp's Luau without running it: `luau-lsp analyze`
-//! in strict mode against the Moonframe declarations, as `just types` runs
-//! it on the app. A wrong token or a value of the wrong type is an error
-//! with its line, before the window ever reads the view.
+//! in strict mode with Luau's new type solver against the Moonframe
+//! declarations, as `just types` runs it on the app. A wrong token or a
+//! value of the wrong type is an error with its line, before the window
+//! ever reads the view.
 
 use {
     super::{Diagnostic, Severity},
@@ -56,6 +57,9 @@ pub fn typecheck(path: &Path, luau_lsp: &Path) -> Result<Vec<Diagnostic>, String
     let luaurc = scratch.write("base.luaurc", BASE_LUAURC)?;
     let output = Command::new(luau_lsp)
         .arg("analyze")
+        // Luau's new type solver, as `just types` runs it: the declarations
+        // use its type functions, which the old solver cannot read.
+        .arg("--flag:LuauSolverV2=true")
         .arg("--platform=standard")
         .arg(format!("--base-luaurc={}", luaurc.display()))
         .arg(format!(
@@ -270,7 +274,8 @@ mod tests {
             .unwrap_or_else(|| panic!("no error in {found:?}"));
         assert_eq!(error.file, main);
         assert_eq!(error.line, Some(3));
-        assert!(error.message.contains("padding"), "{}", error.message);
+        // The new solver names the type it wanted, not the property.
+        assert!(error.message.contains("got 'number'"), "{}", error.message);
     }
 
     #[test]

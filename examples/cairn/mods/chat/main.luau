@@ -59,7 +59,10 @@ local function going(run: any): boolean
 	return run.status == "starting" or run.status == "running" or run.status == "waiting"
 end
 
-local function current_session(state: State): any
+-- The fields of a `cairn/sessions` entry the chat reads.
+type Session = { id: string, title: string, folder: string, name: string }
+
+local function current_session(state: State): Session?
 	for _, session: any in state.list do
 		if session.id == state.current then
 			return session
@@ -154,7 +157,7 @@ local function tools_row(state: State, run: any): any
 		return nil
 	end
 	local open = state.open_tools[run.id] == true
-	local steps = {}
+	local steps: { Element } = {}
 	if open then
 		for _, tool in run.tools or {} do
 			table.insert(steps, ui.row { gap = "small", align = "center",
@@ -181,7 +184,7 @@ end
 -- the run.
 local function question_card(run: any)
 	local question = run.question
-	local buttons = {}
+	local buttons: { Element } = {}
 	local refusal = false
 	for _, option in question.options or {} do
 		if option.kind ~= "allow_always" then
@@ -274,7 +277,7 @@ local function composer(state: State, session: any, app: any, options: { any }, 
 	else
 		people = changed_files(app, session.folder)
 	end
-	local chips = {}
+	local chips: { Element } = {}
 	for index, path in state.attached do
 		table.insert(chips, ui.row { class = "chip", align = "center", msg = { detach = index }, tooltip = "Remove",
 			ui.icon { "file", tone = "muted" }, ui.text { string.match(path, "[^/\\]+$") or path, size = "small" }, ui.icon { "close", tone = "muted" } })
@@ -488,7 +491,7 @@ return mod {
 		local acp = app.acp
 		local options, title = agents(state, acp)
 
-		local turns = {}
+		local turns: { Element } = {}
 		for _, run in session_runs(state.runs, session.id) do
 			table.insert(turns, run_view(state, run))
 		end

@@ -629,3 +629,32 @@ do {
     fill(cx, CGRect(x: 690, y: 560, width: 136, height: 150), 20, color(0xffffff, 0.16))
     save(cx, "examples/cairn/icon.png")
 }
+
+// Strata: layers of history, a commit graph running down through them,
+// one branch forking off and merging back.
+do {
+    let cx = body([0xf59e0b, 0xea580c, 0x9a3412])
+    // The layers: bands of rock, palest on top.
+    for (band, alpha) in [0.34, 0.26, 0.2, 0.14].enumerated() {
+        let y = 676 - CGFloat(band) * 132
+        fill(cx, CGRect(x: 172, y: y, width: 680, height: 104), 40, color(0xffffff, alpha))
+    }
+    // The graph: a main line, and a branch out to the right and back.
+    cx.setLineCap(.round)
+    cx.setLineWidth(26)
+    cx.setStrokeColor(color(0xffffff))
+    cx.move(to: CGPoint(x: 360, y: 760))
+    cx.addLine(to: CGPoint(x: 360, y: 264))
+    cx.strokePath()
+    cx.setStrokeColor(color(0xfde68a))
+    cx.move(to: CGPoint(x: 360, y: 596))
+    cx.addCurve(to: CGPoint(x: 600, y: 464), control1: CGPoint(x: 360, y: 520), control2: CGPoint(x: 600, y: 560))
+    cx.addCurve(to: CGPoint(x: 360, y: 332), control1: CGPoint(x: 600, y: 368), control2: CGPoint(x: 360, y: 408))
+    cx.strokePath()
+    // A commit on each layer.
+    for (x, y) in [(360.0, 728.0), (360.0, 596.0), (600.0, 464.0), (360.0, 464.0), (360.0, 332.0)] {
+        fill(cx, CGRect(x: x - 34, y: y - 34, width: 68, height: 68), 34, color(0xffffff))
+        fill(cx, CGRect(x: x - 16, y: y - 16, width: 32, height: 32), 16, color(0xc2410c))
+    }
+    save(cx, "examples/strata/icon.png")
+}

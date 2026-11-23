@@ -10,6 +10,7 @@
 mod both_backends;
 mod host_views;
 mod inspect_context;
+mod markdown_scroll;
 mod regressions;
 mod revision_timeline;
 mod scroll_sync;

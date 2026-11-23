@@ -7,7 +7,15 @@ local MORE = {
 	{ location = "tests/book.rs:88", text = "Add a case with two currencies and a zero balance." },
 }
 
-return mod {
+type Note = { id: number, location: string, text: string }
+
+type State = {
+	selected: number,
+	next: number,
+	notes: { Note },
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {
@@ -39,7 +47,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local cards = {}
+		local cards: { Element } = {}
 		for index, note in state.notes do
 			cards[index] = note_card {
 				id = note.id,

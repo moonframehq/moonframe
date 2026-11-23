@@ -14,7 +14,7 @@ use {
         inspect::{self, Inspector, Placed},
         mod_window::ModWindow,
         motion::Motion,
-        packages,
+        packages, panel,
         paths::{self, Folders},
         render::{Finished, KeyLayer, ListRequest, Painter, cached::Cached},
         settings,
@@ -249,6 +249,8 @@ impl MoonframeApp {
         };
         workspace.set_dark(theme.is_dark());
         workspace.set_window(window_state(chrome.titlebar, window, cx));
+        // The app's name, as the menu bar shows it: `app.title`.
+        workspace.set_host("title", Data::from(crate::title()));
         // What the providers shared before this window opened.
         for (key, data) in joined.latest {
             workspace.set_host(&key, data);
@@ -578,7 +580,7 @@ impl MoonframeApp {
         if let Action::Window(name) = action {
             // A preview opens nothing.
             if !from.starts_with(moonframe_core::DEMO) {
-                self.show_mod_window(name, None, cx);
+                self.show_mod_window(name, None, None, cx);
             }
             return;
         }
@@ -628,6 +630,18 @@ impl MoonframeApp {
     }
 
     fn run(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
+        // A panel hides; it is never minimized, closed or opened twice.
+        match panel::route(command, window) {
+            Some(panel::Route::Hide) => {
+                panel::hide();
+                return;
+            },
+            Some(panel::Route::Show) => {
+                panel::show();
+                return;
+            },
+            None => {},
+        }
         match command {
             // Unless a mod in any window holds it back.
             Command::Quit => cx.defer(guard::quit),
@@ -700,6 +714,8 @@ impl MoonframeApp {
         if !requests.is_empty() {
             self.carry_out(requests, cx);
         }
+        // After the requests carried out above: whether the panel's item is there.
+        cx.defer(panel::check);
     }
 
     /// Does what mods asked of the app (`to = "app:<what>"`), once the
@@ -758,7 +774,14 @@ impl MoonframeApp {
             .into_iter()
             .find(|window| window.window_id() == main)
         {
-            let _ = window.update(cx, |_, window, _| window.activate_window());
+            // A panel comes forward under its item.
+            let _ = window.update(cx, |_, window, _| {
+                if panel::is(window) {
+                    panel::show();
+                } else {
+                    window.activate_window();
+                }
+            });
         }
     }
 

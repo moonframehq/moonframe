@@ -57,7 +57,7 @@ return mod {
 	end,
 
 	view = function(state)
-		local rows = {}
+		local rows: { Element } = {}
 		for _, file in state.files do
 			table.insert(
 				rows,

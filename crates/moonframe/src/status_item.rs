@@ -106,6 +106,12 @@ pub(crate) fn owners() -> Vec<String> {
     macos::owners()
 }
 
+/// The menu bar window of the mod `owner`'s item; see `crate::panel`.
+#[cfg(all(feature = "status-item", target_os = "macos"))]
+pub(crate) fn window(owner: &str) -> Option<objc2::rc::Retained<objc2_app_kit::NSWindow>> {
+    macos::window(owner)
+}
+
 // Elsewhere nothing draws them, and a mod asking is not at fault, as with
 // `app:dock`.
 #[cfg(not(all(feature = "status-item", target_os = "macos")))]

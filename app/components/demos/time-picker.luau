@@ -36,7 +36,13 @@ local function when(hour: number, minute: number): string
 	return string.format("%d:%02d %s", if shown == 0 then 12 else shown, minute, if hour < 12 then "AM" else "PM")
 end
 
-return mod {
+type State = {
+	day: string,
+	hour: number,
+	minute: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { day = "2026-11-02", hour = 9, minute = 0 }
 	end,

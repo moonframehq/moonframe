@@ -1,0 +1,17 @@
+# The built-in git provider, here so that the repositories mod may open the
+# repository the user picks. Everything else is as the app ships it.
+
+# The git state of the repository opened (else the one the app runs from),
+# shared as `app.git`: branch, changed files, worktrees, branches, remote
+# and stashes, and on request the commits with their parents
+# (`{ log = 500 }`), one commit with its files (`{ show = sha }`) and one of
+# its files' diff (`{ show_diff = path }`).
+# A native provider: Rust built into the app (crates/moonframe-git, the
+# `git` feature), running git through herdr-vcs with your own access.
+interval = 1.0
+kind     = "native"
+
+[settings]
+# The mods that may open a repository (and commit, push and change
+# worktrees, which Strata never asks for); any other is refused.
+writers = ["repositories"]

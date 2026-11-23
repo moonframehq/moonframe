@@ -1,0 +1,9 @@
+{
+  "available": true,
+  "assistant": "Tandem",
+  "workspace": { "team": "IT Help", "company": "Corvo" },
+  "me": { "name": "Elena Ruiz", "email": "elena@corvo.co" },
+  "week": { "total": 148, "share": 61, "first_reply": "38 seconds", "split": [] },
+  "tickets": [],
+  "counts": { "all": 0, "open": 0, "mine": 0, "waiting": 0 }
+}

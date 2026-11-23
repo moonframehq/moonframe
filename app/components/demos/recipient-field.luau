@@ -29,7 +29,17 @@ local function matches(typed: string): { any }
 	return found
 end
 
-return mod {
+type Contact = { name: string?, email: string, invalid: boolean? }
+
+type State = {
+	lines: { [string]: { Contact } },
+	typed: { [string]: string },
+	highlighted: number,
+	hidden: { [string]: boolean },
+	cc: boolean,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {

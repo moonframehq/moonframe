@@ -1,7 +1,11 @@
 -- Select some words: the bar shows over the field, and its buttons format them.
 local selection_toolbar = use "selection-toolbar"
 
-return mod {
+type State = {
+	selected: number,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous or { selected = 0 }
 	end,

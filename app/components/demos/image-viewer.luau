@@ -4,7 +4,14 @@
 -- the same part of the scan at any zoom; drag inside it to move it.
 local image_viewer = use "image-viewer"
 
-return mod {
+type State = {
+	zoom: number?,
+	center: { number },
+	crop: { number },
+	from: { number }?,
+}
+
+return mod<<State>> {
 	init = function(previous)
 		return previous
 			or {

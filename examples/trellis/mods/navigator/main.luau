@@ -146,7 +146,7 @@ return mod {
 		[".avatar"] = { radius = 7 },
 	},
 
-	init = function(previous: State?)
+	init = function(previous: State?): (State, ...{ Send })
 		local state: State = previous
 			or {
 				selected = nil,
@@ -274,7 +274,7 @@ return mod {
 		local window = app.window
 		local mac = window.platform == "macos" and not window.fullscreen
 
-		local rows = {}
+		local rows: { Element } = {}
 		table.insert(rows, ui.row {
 			class = "nav-row",
 			selected = state.selected == "~",

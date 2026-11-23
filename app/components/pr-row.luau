@@ -134,7 +134,7 @@ ui.column { gap = "none",
 		end
 		local prefix = if props.kind == "mr" then "!" else "#"
 
-		local tags = {}
+		local tags: { Element } = {}
 		if props.draft then
 			table.insert(tags, ui.row { class = "pr-row-draft", ui.text { "draft", class = "pr-row-draft-text" } })
 		end

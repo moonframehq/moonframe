@@ -128,7 +128,22 @@ impl Render for ModWindow {
         div()
             .key_context("ModWindow")
             .track_focus(&self.focus)
-            .on_action(|_: &Dismiss, window, _| window.remove_window())
+            .on_action(cx.listener(|this, _: &Dismiss, window, cx| {
+                // Escape stops picking, or drops a selection shown here,
+                // before it closes the window.
+                let id = Some(window.window_handle().window_id());
+                let inspecting = this.app.update(cx, |app, cx| {
+                    let inspector = &app.inspector;
+                    let here = inspector.picking || inspector.in_window(id);
+                    if here {
+                        app.dismiss(cx);
+                    }
+                    here
+                });
+                if !inspecting {
+                    window.remove_window();
+                }
+            }))
             .size_full()
             .flex()
             .flex_col()
