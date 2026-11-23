@@ -10,6 +10,7 @@
 mod browser;
 pub(crate) mod cached;
 mod carry;
+mod divider;
 mod elements;
 mod floating;
 mod gallery;
@@ -66,6 +67,7 @@ use {
 
 #[cfg(feature = "terminal")]
 use crate::terminal::Terminals;
+pub(crate) use divider::keystroke as divider_keystroke;
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
 

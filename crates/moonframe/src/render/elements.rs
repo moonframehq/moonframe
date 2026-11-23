@@ -396,13 +396,18 @@ impl<'w> Draw<'w> for Split {
                 .clone()
                 .unwrap_or_else(|| format!("{}:{}", place.owner, place.path)),
         );
-        let mut group = match self.direction {
-            Direction::Row => h_resizable(key),
-            Direction::Column => v_resizable(key),
+        let group = match self.direction {
+            Direction::Row => h_resizable(key.clone()),
+            Direction::Column => v_resizable(key.clone()),
         };
-        if !self.divider {
-            group = group.with_handle_appearance(bare_handle());
-        }
+        let look = if self.divider {
+            component::resize_handle_appearance()
+        } else {
+            bare_handle()
+        };
+        let sizes = self.panes.iter().map(|pane| pane.size).collect();
+        let vertical = self.direction == Direction::Column;
+        let (group, measure) = super::divider::wire(group, &key, vertical, sizes, look);
         let group = panes
             .into_iter()
             .fold(group, |group, (pane, place, look, shown)| {
@@ -469,7 +474,9 @@ impl<'w> Draw<'w> for Split {
             .min_h_0()
             .min_w_0()
             .size_full()
+            .relative()
             .child(group)
+            .child(measure)
             .into_any_element()
     }
 }
