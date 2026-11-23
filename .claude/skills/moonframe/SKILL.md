@@ -723,7 +723,12 @@ return mod {
   mod that must react (not only redraw); views still read `app.<name>`.
 - Names are 1 to 128 of `a-z A-Z 0-9 - _ . / :`; `provider/` is the
   providers', and `app/` the app's own (`app/inspect`, `app/notification`,
-  `app/url`). Previews (the Components window) hear nothing.
+  `app/url`, `app/window`). Previews (the Components window) hear nothing.
+- `app/window` is news each time the window's state changes, its value
+  what views read as `app.window` (`active`, `maximized`, `fullscreen`,
+  `display`, ...): a mod that acts when the user comes back to the window
+  (marks what it shows as seen) does it in `update` on `active = true`.
+  Not kept: read `app.window` in `view` for its state now.
 - Use a topic when several modules share a value; use `to = "<mod>"` when
   one module tells another.
 

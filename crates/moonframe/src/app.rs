@@ -678,7 +678,8 @@ impl MoonframeApp {
         }
         self.workspace
             .set_window(window_state(self.chrome.titlebar, window, cx));
-        cx.notify();
+        // What a mod hearing `app/window` sent goes out.
+        self.flush("window", cx);
     }
 
     /// Starts the providers the views now want, and passes on what the mods

@@ -238,3 +238,35 @@ fn send_builds_the_message_a_literal_would() {
     );
     assert!(sent.contains(&("desk".to_owned(), watch)), "{sent:?}");
 }
+
+#[test]
+fn a_module_hears_the_window_come_to_the_front_and_go() {
+    let source = r#"return mod {
+      subscribe = { "app/window" },
+      init = function() return { heard = "" } end,
+      update = function(state, msg)
+        if msg.topic == "app/window" then
+          state.heard ..= if msg.value.active then "active;" else "inactive;"
+        end
+      end,
+      view = function(state) return ui.text(state.heard) end,
+    }"#;
+    let dir = app(&[("looks", source)]);
+    let mut workspace = Workspace::open(dir.path(), false);
+    let heard = |workspace: &Workspace| match workspace.slot("looks").and_then(crate::Slot::view) {
+        Some(Node::Text(text)) => text.text.clone(),
+        other => panic!("{other:?}"),
+    };
+    let window = crate::WindowState::default();
+    workspace.set_window(crate::WindowState {
+        active: false,
+        ..window
+    });
+    workspace.set_window(crate::WindowState {
+        active: false,
+        ..window
+    });
+    workspace.set_window(window);
+    // Told of each change, once.
+    assert_eq!(heard(&workspace), "inactive;active;");
+}

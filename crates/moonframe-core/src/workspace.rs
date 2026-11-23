@@ -591,9 +591,14 @@ impl Workspace {
 
     /// Shares the window's state as `app.window`, drawing the views again
     /// when it changed.
+    /// Shares the window's state as `app.window`, and tells the modules
+    /// that subscribe to `app/window` when it changes: one acting on the
+    /// window coming to the front, not only drawing it, hears it in
+    /// `update`.
     pub fn set_window(&mut self, window: WindowState) {
         if self.window != window {
             self.window = window;
+            self.app_news("window", window.data());
             self.render();
         }
     }
