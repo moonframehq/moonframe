@@ -27,5 +27,9 @@ fn a_split_takes_resize_and_sends_the_sizes_where_to_says() {
         Some(&Data::List(vec![Data::Integer(212), Data::Integer(788)]))
     );
     let alone = r#"return mod { view = function() return ui.vsplit { to = "layout", ui.pane { "a" } } end }"#;
-    assert!(split(alone).unwrap_err().contains("`to` goes with `resize`"));
+    assert!(
+        split(alone)
+            .unwrap_err()
+            .contains("`to` goes with `resize`")
+    );
 }
