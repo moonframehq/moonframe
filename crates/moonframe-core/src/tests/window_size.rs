@@ -27,3 +27,39 @@ fn a_view_reads_the_windows_size_and_follows_it() {
     });
     assert_eq!(text(&workspace), "600 800 narrow");
 }
+
+#[test]
+fn a_mod_a_resize_mounts_starts_in_step() {
+    let publisher = r#"return mod {
+      update = function(state, msg) return state, { { to = "topic:tabs/main", msg = msg } } end,
+      view = function() return ui.text "publisher" end,
+    }"#;
+    let watcher = r#"return mod {
+      subscribe = { "tabs/main" },
+      init = function() return { heard = "nothing" } end,
+      update = function(state, msg)
+        if type(msg) == "table" and msg.topic then state.heard = msg.topic .. "=" .. tostring(msg.value) end
+      end,
+      view = function(state) return ui.text(state.heard) end,
+    }"#;
+    let dir = app(&[("publisher", publisher), ("watcher", watcher)]);
+    // Only a narrow window shows the watcher.
+    write(
+        dir.path(),
+        "main.luau",
+        r#"return mod { view = function(_, app)
+            local narrow = app.window.width ~= nil and app.window.width < 768
+            return ui.column { narrow and ui.mount { "watcher", id = "drawer" } }
+        end }"#,
+    );
+    let mut workspace = Workspace::open(dir.path(), false);
+    workspace.send("publisher", "publisher", Data::from("early"));
+    workspace.set_window(WindowState {
+        size: Some((600, 800)),
+        ..WindowState::default()
+    });
+    assert_eq!(
+        instance_text(&workspace, "watcher#drawer"),
+        "tabs/main=early"
+    );
+}

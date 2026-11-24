@@ -591,10 +591,12 @@ impl Workspace {
 
     /// Shares the window's state as `app.window`, drawing the views again
     /// when it changed.
+    /// Shares the main window's state with the views, and lets what they
+    /// mount for it (a narrow layout's drawer) start in step.
     pub fn set_window(&mut self, window: WindowState) {
         if self.window != window {
             self.window = window;
-            self.render();
+            self.settle();
         }
     }
 
