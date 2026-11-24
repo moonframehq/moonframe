@@ -23,9 +23,9 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 Embedding apps can select miniapps outside `app_dir` with `Moonframe::root`
 and `entry`, or `entry_handle().add_entry(namespace, id, path)` at runtime.
 Roots set policy without scanning. An entry holds `main.luau` and/or
-`provider/provider.toml`: mount `ui.mount "mshub:notes"` (or give it an `id`
-for independent instance state), read `app["mshub:notes"]`, send to
-`"provider:mshub:notes"`, and subscribe to `"provider/mshub:notes"`.
+`provider/provider.toml`: mount `ui.mount "acme:notes"` (or give it an `id`
+for independent instance state), read `app["acme:notes"]`, send to
+`"provider:acme:notes"`, and subscribe to `"provider/acme:notes"`.
 Saved mod/instance state includes the namespace. Namespace and id each use
 1–48 of `a-z 0-9 - _`; `app provider topic demo component shell parent` are
 reserved namespaces. `remove_entry` / `remove_root` unload them without
