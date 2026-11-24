@@ -85,7 +85,11 @@ pub(crate) fn payload(
             let path = folder.join(format!("{:016x}.{extension}", fnv(&bytes)));
             std::fs::create_dir_all(folder).ok()?;
             if !path.exists() {
-                std::fs::write(&path, &bytes).ok()?;
+                // Whole or not at all: written aside, then put in place.
+                let partial =
+                    path.with_extension(format!("{extension}.{}.partial", std::process::id()));
+                std::fs::write(&partial, &bytes).ok()?;
+                std::fs::rename(&partial, &path).ok()?;
             }
             let mut image = BTreeMap::from([("path".to_owned(), path_of(&path))]);
             if let Ok(size) = imagesize::blob_size(&bytes) {
@@ -157,20 +161,13 @@ impl MoonframeApp {
         let Some(pasted) = cx.read_from_clipboard().as_ref().and_then(pasted) else {
             return false;
         };
-        // A picture is hashed and written off the window's thread, then
-        // handed over.
-        let folder = paths::images().join(FOLDER);
-        let saved = cx.background_spawn(async move { payload(pasted, &folder) });
-        cx.spawn_in(window, async move |app, cx| {
-            let Some((fields, files)) = saved.await else {
-                return;
-            };
-            app.update_in(cx, |app, window, cx| {
-                app.hand_over(hearers, &fields, &files, window, cx)
-            })
-            .ok();
-        })
-        .detach();
+        // Saved before the key returns, so pastes reach the mod in the
+        // order they were made and while the caret is where the user
+        // pasted: a mod inserts what it heard there.
+        let Some((fields, files)) = payload(pasted, &paths::images().join(FOLDER)) else {
+            return true;
+        };
+        self.hand_over(hearers, &fields, &files, window, cx);
         true
     }
 
@@ -186,8 +183,12 @@ impl MoonframeApp {
     ) {
         for (owner, to, msg) in hearers {
             crate::render::images::grant(&owner, files);
-            if let Some(to) = &to {
-                crate::render::images::grant(&self.workspace.recipient(&owner, to), files);
+            // Only where the send may go: a preview's stays in it.
+            if let Some(to) = to
+                .as_ref()
+                .and_then(|to| self.workspace.recipient(&owner, to))
+            {
+                crate::render::images::grant(&to, files);
             }
             let msg = with_fields(&msg, fields.clone());
             self.dispatch(&owner, &Action::Send { to, msg }, window, cx);
