@@ -287,6 +287,8 @@ impl<'w> Painter<'w> {
         let renewed = passed && input.value.as_deref() != Some(field.edit.text.as_str());
         if passed {
             field.passed.clone_from(&input.value);
+        }
+        if renewed {
             field
                 .edit
                 .replace_text(input.value.clone().unwrap_or_default());
