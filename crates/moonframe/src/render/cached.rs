@@ -492,6 +492,8 @@ fn nodes(node: &Node) -> Option<usize> {
             && stack.pointer.is_none()
             && stack.scroll_to.is_none()
             && !stack.drag
+            // Its keys are recorded as it draws, each frame.
+            && stack.keys.is_empty()
             && stack.frame.scroll == Scroll::No;
         if !plain {
             return None;
@@ -653,7 +655,12 @@ mod tests {
         scrolled.frame.scroll = Scroll::Along;
         let mut easing = stack(Vec::new());
         easing.look.state = Some("open".to_owned());
-        for node in [keyed, scrolled, easing] {
+        let mut shortcuts = stack(Vec::new());
+        let Ok(left) = moonframe_core::Chord::parse("left") else {
+            panic!("a key");
+        };
+        shortcuts.keys = moonframe_core::Keys(vec![(left, Data::from("back"))]);
+        for node in [keyed, scrolled, easing, shortcuts] {
             assert_eq!(nodes(&Node::Stack(node)), None);
         }
         let holding = stack(vec![Node::Problem("no".to_owned())]);
