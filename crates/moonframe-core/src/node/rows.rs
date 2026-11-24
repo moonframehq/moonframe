@@ -7,28 +7,38 @@ use std::{ops::Range, sync::Arc};
 pub enum RowHeights {
     /// Every row this many pixels.
     Same(f32),
-    /// Each row its own: where each starts, from 0, then where the last
-    /// ends, so `count + 1` offsets.
-    Each(Arc<[f32]>),
+    /// Each row its own.
+    Each(Arc<OwnHeights>),
+}
+
+/// Rows of their own heights: each as given, and where each starts, from
+/// 0, then where the last ends (`count + 1` offsets). The offsets add up
+/// in double precision, so a short row far down keeps its height.
+#[derive(Debug, PartialEq)]
+pub struct OwnHeights {
+    heights: Vec<f32>,
+    tops: Vec<f64>,
 }
 
 impl RowHeights {
     /// Row heights from each row's own height.
     pub fn each(heights: impl IntoIterator<Item = f32>) -> Self {
+        let heights: Vec<f32> = heights.into_iter().collect();
         let mut top = 0.0;
-        let mut offsets = vec![0.0];
-        for height in heights {
-            top += height;
-            offsets.push(top);
+        let mut tops = Vec::with_capacity(heights.len() + 1);
+        tops.push(top);
+        for height in &heights {
+            top += f64::from(*height);
+            tops.push(top);
         }
-        Self::Each(offsets.into())
+        Self::Each(Arc::new(OwnHeights { heights, tops }))
     }
 
     /// Where row `index` (from 0) starts.
     pub fn top(&self, index: usize) -> f32 {
         match self {
             Self::Same(row) => index as f32 * row,
-            Self::Each(offsets) => offsets[index.min(offsets.len() - 1)],
+            Self::Each(rows) => rows.tops[index.min(rows.tops.len() - 1)] as f32,
         }
     }
 
@@ -36,7 +46,7 @@ impl RowHeights {
     pub fn height(&self, index: usize) -> f32 {
         match self {
             Self::Same(row) => *row,
-            Self::Each(_) => self.top(index + 1) - self.top(index),
+            Self::Each(rows) => rows.heights.get(index).copied().unwrap_or_default(),
         }
     }
 
@@ -60,11 +70,11 @@ impl RowHeights {
         let y = y.max(0.0);
         match self {
             Self::Same(row) => ((y / row).floor() as usize).min(count),
-            Self::Each(offsets) => {
-                let offsets = &offsets[..=count.min(offsets.len() - 1)];
+            Self::Each(rows) => {
+                let y = f64::from(y);
+                let tops = &rows.tops[..=count.min(rows.tops.len() - 1)];
                 // The last offset that is not below `y` starts its row.
-                offsets
-                    .partition_point(|top| *top <= y)
+                tops.partition_point(|top| *top <= y)
                     .saturating_sub(1)
                     .min(count)
             },
@@ -101,5 +111,13 @@ mod tests {
         // Scrolled past the end, no row shows.
         assert!(rows.shown(1000.0, 50.0, 5).is_empty());
         assert_eq!(RowHeights::each([]).shown(0.0, 50.0, 0), 0..0);
+    }
+
+    #[test]
+    fn a_short_row_far_down_keeps_its_height() {
+        let tall = std::iter::repeat_n(1000.0, 20_000);
+        let rows = RowHeights::each(tall.chain([1.0, 1000.0]));
+        assert_eq!(rows.height(20_000), 1.0);
+        assert_eq!(rows.shown(20_000_000.0, 0.0, 20_002), 20_000..20_001);
     }
 }
