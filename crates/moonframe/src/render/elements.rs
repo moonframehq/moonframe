@@ -116,7 +116,7 @@ impl<'w> Draw<'w> for Stack {
         };
         let element = match (&self.outside, inside) {
             (Some(action), Some(inside)) => {
-                super::outside::attach(element, action, inside, place.owner, cx)
+                super::outside::attach(element, action, inside, place.owner, &place.path, cx)
             },
             _ => element,
         };

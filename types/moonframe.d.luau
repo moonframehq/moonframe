@@ -287,9 +287,10 @@ export type StackProps = {
 	-- With `scroll`: sent with `width`, `height`, `content_width`,
 	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
 	measure: Data,
-	-- Sent (to `to`, else this mod) when a press lands outside its box and
-	-- outside the popovers and overlays inside it; the press still reaches
-	-- what it landed on. A floating panel that minimizes on a click elsewhere.
+	-- Sent (to `to`, else this mod) when a click begins and ends outside its
+	-- box and outside the popovers and overlays inside it; the click still
+	-- reaches what it landed on. A floating panel that minimizes on a click
+	-- elsewhere. The GPUI window only; Rune does not send it yet.
 	outside: Data,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
