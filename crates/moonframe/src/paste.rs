@@ -157,15 +157,41 @@ impl MoonframeApp {
         let Some(pasted) = cx.read_from_clipboard().as_ref().and_then(pasted) else {
             return false;
         };
-        let Some((fields, files)) = payload(pasted, &paths::images().join(FOLDER)) else {
-            return true;
-        };
+        // A picture is hashed and written off the window's thread, then
+        // handed over.
+        let folder = paths::images().join(FOLDER);
+        let saved = cx.background_spawn(async move { payload(pasted, &folder) });
+        cx.spawn_in(window, async move |app, cx| {
+            let Some((fields, files)) = saved.await else {
+                return;
+            };
+            app.update_in(cx, |app, window, cx| {
+                app.hand_over(hearers, &fields, &files, window, cx)
+            })
+            .ok();
+        })
+        .detach();
+        true
+    }
+
+    /// Sends each hearer its paste, letting the mod it reaches, as well as
+    /// the one that asked for it, show and share the files.
+    fn hand_over(
+        &mut self,
+        hearers: Vec<(String, Option<String>, Data)>,
+        fields: &BTreeMap<String, Data>,
+        files: &[PathBuf],
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         for (owner, to, msg) in hearers {
-            crate::render::images::grant(&owner, &files);
+            crate::render::images::grant(&owner, files);
+            if let Some(to) = &to {
+                crate::render::images::grant(&self.workspace.recipient(&owner, to), files);
+            }
             let msg = with_fields(&msg, fields.clone());
             self.dispatch(&owner, &Action::Send { to, msg }, window, cx);
         }
-        true
     }
 }
 
@@ -211,17 +237,21 @@ mod tests {
         let Some(picture) = pasted(&item) else {
             panic!("a picture")
         };
-        let folder = tempfile::tempdir().unwrap();
-        let (fields, files) = payload(picture, folder.path()).unwrap();
+        let Ok(folder) = tempfile::tempdir() else {
+            panic!("a folder")
+        };
+        let Some((fields, files)) = payload(picture, folder.path()) else {
+            panic!("saved")
+        };
         assert_eq!(files.len(), 1);
-        assert_eq!(std::fs::read(&files[0]).unwrap(), png);
+        assert_eq!(std::fs::read(&files[0]).ok(), Some(png));
         let Some(Data::Map(image)) = fields.get("image") else {
             panic!("{fields:?}")
         };
         assert_eq!(image.get("width"), Some(&Data::Integer(1)));
         assert!(matches!(fields.get("files"), Some(Data::List(paths)) if paths.len() == 1));
         // Pasted again: the same file.
-        let again = pasted(&item).unwrap();
-        assert_eq!(payload(again, folder.path()).unwrap().1, files);
+        let again = pasted(&item).and_then(|again| payload(again, folder.path()));
+        assert_eq!(again.map(|(_, again)| again), Some(files));
     }
 }

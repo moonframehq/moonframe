@@ -31,6 +31,13 @@ return mod {
 }
 "##;
 
+/// ⌘V on macOS, Ctrl-V elsewhere.
+const PASTE: &str = if cfg!(target_os = "macos") {
+    "cmd-v"
+} else {
+    "ctrl-v"
+};
+
 fn copy_files(window: &mut Window<'_>, paths: &[&str]) {
     let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
     window.cx.write_to_clipboard(ClipboardItem {
@@ -43,10 +50,10 @@ fn pasted_files_reach_the_field_or_the_page(cx: &mut TestAppContext) {
     let mut window = open(cx, COMPOSER);
     copy_files(&mut window, &["/tmp/notes.pdf", "/tmp/plan.key"]);
     // No field has focus: the page's mod hears it.
-    window.keys("cmd-v");
+    window.keys(PASTE);
     assert_eq!(window.log(), "|page /tmp/notes.pdf,/tmp/plan.key");
     window.click("focus");
-    window.keys("cmd-v");
+    window.keys(PASTE);
     assert_eq!(
         window.log(),
         "|page /tmp/notes.pdf,/tmp/plan.key|attach /tmp/notes.pdf,/tmp/plan.key"
@@ -55,6 +62,6 @@ fn pasted_files_reach_the_field_or_the_page(cx: &mut TestAppContext) {
     window
         .cx
         .write_to_clipboard(ClipboardItem::new_string("hello".to_owned()));
-    window.keys("cmd-v");
+    window.keys(PASTE);
     assert!(window.log().ends_with("|typed hello"), "{}", window.log());
 }

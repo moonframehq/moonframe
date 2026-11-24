@@ -28,6 +28,12 @@ impl Workspace {
         to.to_owned()
     }
 
+    /// The module a send from `from` to `to` reaches, as delivering it
+    /// would resolve it: what the app grants files to before sending them.
+    pub fn recipient(&self, from: &str, to: &str) -> String {
+        self.resolve(from, to)
+    }
+
     /// Runs what a control drawn by the module `from` asks for. Messages go
     /// to modules here; commands are the app's, so they are handed back.
     pub fn dispatch(&mut self, from: &str, action: &Action) -> Option<Command> {
