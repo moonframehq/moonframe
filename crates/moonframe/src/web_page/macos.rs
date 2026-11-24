@@ -34,7 +34,7 @@ use {
     },
     std::{
         cell::{Cell, RefCell},
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         sync::{
             Arc,
             atomic::{AtomicBool, AtomicU64, Ordering},
@@ -76,6 +76,9 @@ thread_local! {
     static RUNNING: RefCell<HashMap<u64, Running>> = RefCell::new(HashMap::new());
     /// Pages waiting for their rules to compile, counted with `RUNNING`.
     static STARTING: Cell<usize> = const { Cell::new(0) };
+    /// Pages whose time ran out while their rules compiled: they answer
+    /// as they would have shown then, with nothing, rather than load.
+    static LATE: RefCell<HashSet<u64>> = RefCell::new(HashSet::new());
 }
 
 /// Renders `request` on the main thread, waiting here (a provider's call)
@@ -123,6 +126,11 @@ fn start(id: u64, request: Request, answer: Answer, wanted: &Arc<AtomicBool>) {
         if !wanted.load(Ordering::Acquire) {
             return;
         }
+        // Out of time while they compiled: nothing showed in its time.
+        if LATE.with_borrow_mut(|late| late.remove(&id)) {
+            let _ = answer.send(Ok(Rendered::page(&request.url, "", "", true)));
+            return;
+        }
         match rules.and_then(|rules| open(id, &request, &rules, main)) {
             Ok((window, view, delegate)) => RUNNING.with_borrow_mut(|running| {
                 running.insert(id, Running {
@@ -165,10 +173,22 @@ fn read(id: u64, timed_out: bool) {
     let Some(main) = MainThreadMarker::new() else {
         return;
     };
-    let Some((view, request)) = RUNNING.with_borrow_mut(|running| {
-        let running = running.get_mut(&id).filter(|running| !running.reading)?;
-        running.reading = true;
-        Some((running.view.clone(), running.request.clone()))
+    let opened = RUNNING.with_borrow_mut(|running| {
+        let running = running.get_mut(&id)?;
+        Some((!running.reading).then(|| {
+            running.reading = true;
+            (running.view.clone(), running.request.clone())
+        }))
+    });
+    let Some((view, request)) = (match opened {
+        Some(reading) => reading,
+        // Not open yet: its rules are still compiling.
+        None => {
+            if timed_out {
+                LATE.with_borrow_mut(|late| late.insert(id));
+            }
+            None
+        },
     }) else {
         return;
     };
@@ -333,6 +353,7 @@ fn answer(id: u64, result: Result<Rendered, String>) {
 
 /// Lets the page `id` go, answered or given up.
 fn finish(id: u64) {
+    LATE.with_borrow_mut(|late| late.remove(&id));
     if let Some(running) = RUNNING.with_borrow_mut(|running| running.remove(&id)) {
         // SAFETY: the page's own view, on the main thread; it loads no more.
         unsafe {
