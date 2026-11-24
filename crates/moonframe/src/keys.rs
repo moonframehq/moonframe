@@ -14,8 +14,9 @@ pub(crate) enum Taken {
     /// It sent a message; nothing else sees the key.
     Sent,
     /// Not one of its keys, but it blocks the window behind (a backdrop):
-    /// a terminal there must not get it; key bindings still may.
-    Blocked,
+    /// a terminal there must not get it; key bindings still may, and a
+    /// divider in the layer, of this paint priority, or above it.
+    Blocked(usize),
     /// Nothing open takes it.
     Free,
 }
@@ -41,11 +42,14 @@ pub(crate) fn intercept(cx: &mut Context<MoonframeApp>) -> Subscription {
                 }
                 match app.layer_keystroke(&event.keystroke, window, cx) {
                     Taken::Sent => true,
-                    Taken::Blocked => app.input_keystroke(&event.keystroke, window, cx),
+                    Taken::Blocked(layer) => {
+                        app.input_keystroke(&event.keystroke, window, cx)
+                            || crate::render::divider_keystroke(&event.keystroke, layer, window, cx)
+                    },
                     Taken::Free => {
                         app.input_keystroke(&event.keystroke, window, cx)
                             || app.terminal_keystroke(&event.keystroke, window, cx)
-                            || crate::render::divider_keystroke(&event.keystroke, window, cx)
+                            || crate::render::divider_keystroke(&event.keystroke, 0, window, cx)
                             || app.mod_keystroke(&event.keystroke, window, cx)
                             || app.menu_keystroke(&event.keystroke, window, cx)
                     },
@@ -112,7 +116,7 @@ impl MoonframeApp {
                 self.dispatch(&top.owner, &action, window, cx);
                 Taken::Sent
             },
-            None if top.modal => Taken::Blocked,
+            None if top.modal => Taken::Blocked(top.priority),
             None => Taken::Free,
         }
     }

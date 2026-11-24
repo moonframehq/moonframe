@@ -405,9 +405,14 @@ impl<'w> Draw<'w> for Split {
         } else {
             bare_handle()
         };
-        let sizes = self.panes.iter().map(|pane| pane.size).collect();
-        let vertical = self.direction == Direction::Column;
-        let (group, measure) = super::divider::wire(group, &key, vertical, sizes, look);
+        let drawn = super::divider::Drawn {
+            key,
+            window: painter.window,
+            layer: painter.layer,
+            vertical: self.direction == Direction::Column,
+            sizes: self.panes.iter().map(|pane| pane.size).collect(),
+        };
+        let (group, measure) = super::divider::wire(group, drawn, look);
         let group = panes
             .into_iter()
             .fold(group, |group, (pane, place, look, shown)| {

@@ -84,3 +84,34 @@ fn a_divider_moves_with_the_keys_and_comes_back_on_a_double_click(cx: &mut TestA
         width(&mut window)
     );
 }
+
+/// The same split in a dialog with a backdrop.
+const DIALOG: &str = r##"
+return mod {
+	init = function()
+		return { log = "" }
+	end,
+	view = function(state)
+		return shell(state, ui.overlay { open = true, backdrop = true, width = 600, height = 300,
+			content = ui.hsplit { id = "people",
+				ui.pane { size = 200, min = 100, max = 400, ui.column { class = "list", grow = true, ui.text { "List" } } },
+				ui.pane { ui.column { class = "person", grow = true, ui.text { "Person" } } },
+			},
+		})
+	end,
+}
+"##;
+
+#[gpui_kit::test]
+fn a_divider_in_a_dialog_takes_the_keys(cx: &mut TestAppContext) {
+    let mut window = open(cx, DIALOG);
+    let start = width(&mut window);
+    let at = divider(&mut window);
+    window.click_at(at);
+    window.keys("right");
+    assert!(
+        (width(&mut window) - (start + 16.)).abs() < 1.,
+        "{start} then {}",
+        width(&mut window)
+    );
+}

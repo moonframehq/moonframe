@@ -35,6 +35,9 @@ thread_local! {
 #[derive(Default)]
 struct Split {
     vertical: bool,
+    /// The paint priority of the layer it is drawn in: 0 for the window,
+    /// an overlay's inside one, whose backdrop keeps keys from those below.
+    layer: usize,
     /// The group's box, where its first pane starts.
     group: Rc<Cell<Bounds<Pixels>>>,
     /// Each pane's starting `size`.
@@ -48,20 +51,35 @@ struct Divider {
     bounds: Rc<Cell<Bounds<Pixels>>>,
 }
 
-/// `group`, keyed `key`, with dividers drawn as `look` draws them that take
-/// keys and a double-click, and a box of no size that notes where the
-/// group is, to go beside it. `sizes` are its panes' starting sizes.
+/// How a split is drawn, for its dividers.
+pub(super) struct Drawn {
+    /// Its group's key.
+    pub(super) key: String,
+    /// The window it is in, whose own sizes it keeps.
+    pub(super) window: Option<WindowId>,
+    /// The paint priority of the layer it is drawn in.
+    pub(super) layer: usize,
+    pub(super) vertical: bool,
+    /// Its panes' starting sizes.
+    pub(super) sizes: Vec<Option<f32>>,
+}
+
+/// `group`, drawn as `drawn` says, with dividers drawn as `look` draws them
+/// that take keys and a double-click, and a box of no size that notes
+/// where the group is, to go beside it.
 pub(super) fn wire(
     group: ResizablePanelGroup,
-    key: &str,
-    vertical: bool,
-    sizes: Vec<Option<f32>>,
+    drawn: Drawn,
     look: ResizeHandleRenderer,
 ) -> (ResizablePanelGroup, impl IntoElement) {
+    // Kept per window: two windows showing one split each size their own.
+    let key = format!("{:?}/{}", drawn.window, drawn.key);
+    let key = key.as_str();
     let at = SPLITS.with_borrow_mut(|splits| {
         let split = splits.entry(key.to_owned()).or_default();
-        split.vertical = vertical;
-        split.sizes = sizes;
+        split.vertical = drawn.vertical;
+        split.layer = drawn.layer;
+        split.sizes = drawn.sizes;
         split.group.clone()
     });
     let measure = canvas(move |laid, _, _| at.set(laid), |_, (), _, _| {})
@@ -130,10 +148,14 @@ pub(super) fn wire(
     (group, measure)
 }
 
-/// The split and the bounds of the divider with focus in `window`.
-fn focused(window: &Window) -> Option<(String, Bounds<Pixels>)> {
+/// The split and the bounds of the divider with focus in `window`, in a
+/// layer of paint priority `above` or higher.
+fn focused(window: &Window, above: usize) -> Option<(String, Bounds<Pixels>)> {
     SPLITS.with_borrow(|splits| {
         splits.iter().find_map(|(key, split)| {
+            if split.layer < above {
+                return None;
+            }
             let divider = split
                 .dividers
                 .iter()
@@ -181,9 +203,16 @@ fn locate(
 }
 
 /// Moves the focused divider for a key: arrows along the split, Home and
-/// End. Whether a divider had focus and took the key.
-pub(crate) fn keystroke(keystroke: &Keystroke, window: &mut Window, cx: &mut App) -> bool {
-    let Some((key, bounds)) = focused(window) else {
+/// End; only one in a layer of paint priority `above` or higher, as an
+/// overlay's backdrop keeps keys from the window behind it. Whether a
+/// divider had focus and took the key.
+pub(crate) fn keystroke(
+    keystroke: &Keystroke,
+    above: usize,
+    window: &mut Window,
+    cx: &mut App,
+) -> bool {
+    let Some((key, bounds)) = focused(window, above) else {
         return false;
     };
     let modifiers = keystroke.modifiers;
