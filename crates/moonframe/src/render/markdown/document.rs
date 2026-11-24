@@ -10,6 +10,7 @@ use {
         outline::Outline,
         scrolling::{Applied, Scrolling},
         search, send,
+        tooltips::{self, Titles},
     },
     crate::app::MoonframeApp,
     gpui_kit::{
@@ -69,6 +70,8 @@ struct Searched {
 struct Kept {
     shared: SharedRef,
     extensions: MarkdownExtensions,
+    /// Its links' titles, noted as the text parses.
+    titles: Titles,
     /// The text last handed to the view.
     text: String,
     /// The mod's wishes, as of the last frame.
@@ -172,7 +175,10 @@ impl RenderOnce for Document {
                 kept.reveal_after_layout(&state, rendered, window, cx);
             }
         });
-        let extensions = kept.read(cx).extensions.clone();
+        let (extensions, titles) = {
+            let kept = kept.read(cx);
+            (kept.extensions.clone(), kept.titles.clone())
+        };
         let mut view = TextView::new(&state)
             // A preview is for looking at: a click on it belongs to its card.
             .selectable(self.markdown.lines.is_none())
@@ -186,7 +192,8 @@ impl RenderOnce for Document {
             })
             .inline_code_style(self.inline_code)
             .blockquote_style(self.quote)
-            .on_link_click(blocks::link_click(&shared));
+            .on_link_click(blocks::link_click(&shared))
+            .link_tooltip(tooltips::builder(self.markdown.tooltips.clone(), titles));
         if let Some(lines) = self.markdown.lines {
             view = view.max_lines(lines).on_link_click(|_, _, _, cx| {
                 // TextView stops mouse-up propagation before calling us.
@@ -211,8 +218,10 @@ impl RenderOnce for Document {
 
 impl Kept {
     fn new(shared: SharedRef, text: String) -> Self {
+        let titles = Titles::default();
         Self {
-            extensions: blocks::extensions(&shared),
+            extensions: blocks::extensions(&shared, &titles),
+            titles,
             shared,
             text,
             find: None,

@@ -8,6 +8,7 @@
 type Props = {
 	text: string?,
 	link: any,
+	tooltips: { [string]: string }?,
 	to: string?,
 	grow: boolean?,
 	scroll: boolean?,
@@ -36,6 +37,7 @@ return component {
 		["text"] = "the markdown, up to 1 MiB",
 		["link"] = "message a link click sends, with `url` added (a table gets the field; anything else arrives as { msg = link, url })",
 		["to"] = "mod to send its messages to, if not the drawing one",
+		["tooltips"] = "what a link to each address shows on hover, `{ [url] = text }`, over the link's own title (`[text](url \"title\")`): where a wrapped address leads",
 		["grow"] = "fill the parent's free space",
 		["scroll"] = "scroll its own content (with `grow` or a fixed height around it)",
 		["max_width"] = "pixels: a readable measure for long prose",
@@ -78,6 +80,7 @@ markdown {
 			class = "markdown",
 			text = props.text or "",
 			link = props.link,
+			tooltips = props.tooltips,
 			to = props.to,
 			grow = props.grow,
 			scroll = props.scroll,

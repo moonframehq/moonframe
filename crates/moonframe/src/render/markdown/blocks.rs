@@ -10,6 +10,7 @@ use {
         outline::Outline,
         parts::{self, AlertKind},
         send,
+        tooltips::{LinkTitles, Titles},
     },
     gpui_kit::{
         base::{StyledExt as _, text::CodeBlock},
@@ -56,7 +57,7 @@ struct Cite {
     source: SharedString,
 }
 
-pub(super) fn extensions(shared: &SharedRef) -> MarkdownExtensions {
+pub(super) fn extensions(shared: &SharedRef, titles: &Titles) -> MarkdownExtensions {
     let alerts = shared.clone();
     let pictures = shared.clone();
     let extensions = MarkdownExtensions::default()
@@ -70,7 +71,8 @@ pub(super) fn extensions(shared: &SharedRef) -> MarkdownExtensions {
             draw_picture(node, &pictures, window, cx)
         })
         .plugin(Footnotes(shared.clone()))
-        .plugin(Chips);
+        .plugin(Chips)
+        .plugin(LinkTitles(titles.clone()));
     #[cfg(feature = "math")]
     let extensions = super::math::with(extensions);
     extensions
