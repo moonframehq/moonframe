@@ -1822,6 +1822,12 @@ return mod {
   window menu.
 - `app.window` updates as the window is maximized, goes fullscreen, or
   gains and loses focus: dim the title bar on `not app.window.active`.
+- `app.window.width` and `app.window.height` are the window's content size
+  in whole points, updated as it is resized (a mod's own window reports
+  its own). A layout that changes under a breakpoint reads them:
+  `local narrow = (app.window.width or 1024) < 768`, then shows a list as a
+  drawer behind a button instead of a pane. Every resize runs the views
+  that read `app.window`, so keep them cheap.
 - `app/main.luau` ships without the system title bar: its top row is the
   title bar, with the main tab strip in it. Reserve room for the traffic
   lights only when `app.window.titlebar == "hidden"` (until the restart that

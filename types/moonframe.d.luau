@@ -1460,6 +1460,11 @@ export type WindowState = {
 	active: boolean,
 	-- The screen it is on: an `id` from `app.displays`.
 	display: number?,
+	-- Its content's size in whole points, updated as it is resized: switch
+	-- to a narrow layout under a breakpoint. Nil where the renderer does
+	-- not say (Rune).
+	width: number?,
+	height: number?,
 }
 
 -- A screen, in `app.displays`. `x`, `y`, `width` and `height` are its
