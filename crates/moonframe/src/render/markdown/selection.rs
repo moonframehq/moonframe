@@ -19,7 +19,7 @@ thread_local! {
 /// A layer over the document that notes its selection when a press that
 /// began on it comes up, wherever the pointer then is.
 pub(super) fn watch(shown: Shown, owner: &str, cx: Cx) -> impl IntoElement {
-    let app = cx.entity_id();
+    let app = cx.entity().downgrade();
     let owner = owner.to_owned();
     canvas(
         |_, _, _| {},
@@ -39,7 +39,7 @@ pub(super) fn watch(shown: Shown, owner: &str, cx: Cx) -> impl IntoElement {
                     });
                 }
             });
-            let owner = owner.clone();
+            let (app, owner) = (app.clone(), owner.clone());
             window.on_mouse_event(move |_: &MouseUpEvent, phase, _, cx| {
                 if !phase.bubble() || !PRESSED.with_borrow_mut(|pressed| pressed.remove(&id)) {
                     return;
@@ -49,10 +49,11 @@ pub(super) fn watch(shown: Shown, owner: &str, cx: Cx) -> impl IntoElement {
                 };
                 // Once the release is done with: the view settles its
                 // selection on it too.
-                let owner = owner.clone();
+                let (app, owner) = (app.clone(), owner.clone());
                 cx.defer(move |cx| {
                     let text = state.read(cx).selected_text();
-                    crate::app::text::remember(app, &owner, text);
+                    app.update(cx, |app, _| app.remember_selection(&owner, &text))
+                        .ok();
                 });
             });
         },

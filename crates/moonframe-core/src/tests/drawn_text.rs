@@ -54,3 +54,33 @@ fn asking_for_text_is_a_request_the_app_answers() {
         "{requests:?}"
     );
 }
+
+#[test]
+fn a_row_inside_a_row_reads_on_one_line() {
+    let source = r#"return mod { view = function()
+        return ui.column { ui.row { ui.row { ui.text "Total" }, ui.text "$10" }, ui.text "Paid" }
+    end }"#;
+    let dir = app(&[("bill", source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    assert_eq!(
+        workspace
+            .drawn_text(&TextOf::Mod("bill".to_owned()))
+            .as_deref(),
+        Some("Total $10\nPaid")
+    );
+}
+
+#[test]
+fn a_mod_that_mounts_itself_is_read_once() {
+    let source = r#"return mod { view = function()
+        return ui.column { ui.text "once", ui.mount "loop", ui.mount "loop", ui.mount "loop", ui.mount "loop" }
+    end }"#;
+    let dir = app(&[("loop", source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    assert_eq!(
+        workspace
+            .drawn_text(&TextOf::Mod("loop".to_owned()))
+            .as_deref(),
+        Some("once")
+    );
+}

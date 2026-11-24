@@ -6,30 +6,21 @@
 use {
     super::*,
     moonframe_core::{Selected, TextRequest},
-    std::{cell::RefCell, collections::HashMap},
 };
 
-thread_local! {
-    /// The last selection made in each app (each main window and the mod
-    /// windows it opened), by the app's entity.
-    static SELECTED: RefCell<HashMap<EntityId, Selected>> = RefCell::default();
-}
-
-/// Notes that the user selected `text` in what `owner` draws, in `app`.
-pub(crate) fn remember(app: EntityId, owner: &str, text: String) {
-    let text = text.trim();
-    if text.is_empty() {
-        return;
-    }
-    SELECTED.with_borrow_mut(|selected| {
-        selected.insert(app, Selected {
-            text: text.to_owned(),
-            owner: owner.to_owned(),
-        })
-    });
-}
-
 impl MoonframeApp {
+    /// Notes that the user selected `text` in what `owner` draws.
+    #[cfg_attr(not(feature = "markdown"), allow(dead_code))]
+    pub(crate) fn remember_selection(&mut self, owner: &str, text: &str) {
+        let text = text.trim();
+        if !text.is_empty() {
+            self.selected = Some(Selected {
+                text: text.to_owned(),
+                owner: owner.to_owned(),
+            });
+        }
+    }
+
     /// Answers the mod `from`'s `app:text`.
     pub(super) fn text_request(
         &mut self,
@@ -41,8 +32,7 @@ impl MoonframeApp {
             .of
             .as_ref()
             .and_then(|of| self.workspace.drawn_text(of));
-        let id = cx.entity_id();
-        let selected = SELECTED.with_borrow(|selected| selected.get(&id).cloned());
-        self.deliver(from, request.answer(text, selected), cx);
+        let answer = request.answer(text, self.selected.clone());
+        self.deliver(from, answer, cx);
     }
 }

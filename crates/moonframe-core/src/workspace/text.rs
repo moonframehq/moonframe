@@ -10,111 +10,142 @@ use {
     crate::{Direction, TextOf},
 };
 
-/// How deep mounts nest before the rest is left out, as a mount cycle
-/// would never end.
+/// How deep mounts nest before the rest is left out.
 const MAX_DEPTH: usize = 16;
+/// The most elements read, however mods mount each other: as many as
+/// views may draw in all.
+const MAX_VISITS: usize = 100_000;
 /// The most text read, in bytes, whatever the asker's `max`.
 const MOST: usize = 4 * 1024 * 1024;
 
 impl Workspace {
     /// The text `of` draws, line by line; `None` when there is no such mod.
     pub fn drawn_text(&self, of: &TextOf) -> Option<String> {
-        let mut lines = Lines::default();
+        let mut reader = Reader {
+            workspace: self,
+            lines: Lines::default(),
+            reading: Vec::new(),
+            visits: 0,
+        };
         match of {
             TextOf::Mod(name) => {
                 let slot = self.slot(name)?;
-                self.read_slot(name, slot, &mut lines, 0);
+                reader.slot(name, slot);
             },
-            TextOf::Region(region) => self.read_region(region, &mut lines, 0),
+            TextOf::Region(region) => reader.region(region),
         }
-        Some(lines.finish())
+        Some(reader.lines.finish())
     }
+}
 
-    fn read_slot(&self, name: &str, slot: &Slot, lines: &mut Lines, depth: usize) {
-        if depth > MAX_DEPTH {
+/// A walk through what mods draw.
+struct Reader<'w> {
+    workspace: &'w Workspace,
+    lines: Lines,
+    /// The mods being read, outermost first: one mounted inside itself is
+    /// read once.
+    reading: Vec<&'w str>,
+    /// Elements read so far.
+    visits: usize,
+}
+
+impl<'w> Reader<'w> {
+    fn slot(&mut self, name: &'w str, slot: &'w Slot) {
+        if self.reading.len() >= MAX_DEPTH || self.reading.contains(&name) {
             return;
         }
         if let Some(view) = slot.view() {
-            self.read(name, view, lines, depth);
+            self.reading.push(name);
+            self.node(name, view);
+            self.reading.pop();
         }
     }
 
-    fn read_region(&self, region: &str, lines: &mut Lines, depth: usize) {
-        for name in self.region(region) {
-            if let Some(slot) = self.slot(name) {
-                self.read_slot(name, slot, lines, depth + 1);
-                lines.end();
+    fn region(&mut self, region: &str) {
+        let workspace = self.workspace;
+        for name in workspace.region(region) {
+            if let Some(slot) = workspace.slot(name) {
+                self.lines.end();
+                self.slot(name, slot);
+                self.lines.end();
             }
         }
     }
 
-    fn read_all(&self, owner: &str, nodes: &[Node], across: bool, lines: &mut Lines, depth: usize) {
+    /// `nodes` read across, as a row reads, or each on lines of its own.
+    fn all(&mut self, owner: &'w str, nodes: &'w [Node], across: bool) {
         for node in nodes {
-            self.read(owner, node, lines, depth);
             if !across {
-                lines.end();
+                self.lines.end();
             }
+            self.node(owner, node);
         }
-        lines.end();
+        if !across {
+            self.lines.end();
+        }
     }
 
     /// Adds what `node`, drawn by `owner`, shows.
-    fn read(&self, owner: &str, node: &Node, lines: &mut Lines, depth: usize) {
-        if lines.full() {
+    fn node(&mut self, owner: &'w str, node: &'w Node) {
+        if self.lines.full() || self.visits >= MAX_VISITS {
             return;
         }
+        self.visits += 1;
+        let workspace = self.workspace;
         match node {
             Node::Stack(stack) => {
-                let across = stack.direction == Direction::Row;
-                self.read_all(owner, &stack.children, across, lines, depth);
+                self.all(owner, &stack.children, stack.direction == Direction::Row);
             },
             Node::Panel(panel) => {
-                lines.add(panel.title.as_deref().unwrap_or_default());
-                self.read_all(owner, &panel.actions, true, lines, depth);
-                self.read_all(owner, &panel.children, false, lines, depth);
+                self.lines.end();
+                self.lines.add(panel.title.as_deref().unwrap_or_default());
+                self.all(owner, &panel.actions, true);
+                self.all(owner, &panel.children, false);
             },
             Node::Split(split) => {
                 for pane in split.panes.iter().filter(|pane| pane.visible) {
-                    self.read_all(owner, &pane.children, false, lines, depth);
+                    self.all(owner, &pane.children, false);
                 }
             },
-            Node::Text(text) => lines.add(&text.text),
-            Node::Button(button) => lines.add(&button.label),
+            Node::Text(text) => self.lines.add(&text.text),
+            Node::Button(button) => self.lines.add(&button.label),
             Node::Item(item) => {
-                lines.add(&item.label);
-                lines.add(item.detail.as_deref().unwrap_or_default());
-                lines.add(item.badge.as_deref().unwrap_or_default());
+                self.lines.add(&item.label);
+                self.lines.add(item.detail.as_deref().unwrap_or_default());
+                self.lines.add(item.badge.as_deref().unwrap_or_default());
             },
-            Node::Badge(badge) => lines.add(&badge.text),
+            Node::Badge(badge) => self.lines.add(&badge.text),
             Node::Markdown(markdown) => {
-                lines.end();
                 for line in markdown.text.lines() {
-                    lines.add(line);
-                    lines.end();
+                    self.lines.end();
+                    self.lines.add(line);
                 }
+                self.lines.end();
             },
             Node::Popover(popover) => {
-                self.read_all(owner, &popover.anchor, true, lines, depth);
+                self.all(owner, &popover.anchor, true);
                 if popover.open {
-                    self.read(owner, &popover.content, lines, depth);
-                    lines.end();
+                    self.lines.end();
+                    self.node(owner, &popover.content);
+                    self.lines.end();
                 }
             },
             Node::Overlay(overlay) if overlay.open => {
-                self.read(owner, &overlay.content, lines, depth);
-                lines.end();
+                self.lines.end();
+                self.node(owner, &overlay.content);
+                self.lines.end();
             },
-            Node::List(list) => self.read_all(owner, &list.rows, false, lines, depth),
-            Node::Image(image) => self.read_all(owner, &image.overlay, false, lines, depth),
-            Node::Region(region) => self.read_region(&region.name, lines, depth),
+            Node::List(list) => self.all(owner, &list.rows, false),
+            Node::Image(image) => self.all(owner, &image.overlay, false),
+            Node::Region(region) => self.region(&region.name),
             Node::Mount(name) => {
-                if let Some(slot) = self.slot(name) {
-                    self.read_slot(name, slot, lines, depth + 1);
+                if let Some(slot) = workspace.slot(name) {
+                    self.slot(name, slot);
                 }
             },
             Node::Instance(instance) => {
-                if let Some((key, slot)) = self.instance(owner, instance) {
-                    self.read_slot(key, slot, lines, depth + 1);
+                if let Some((key, slot)) = workspace.instance(owner, instance) {
+                    self.slot(key, slot);
                 }
             },
             _ => {},
