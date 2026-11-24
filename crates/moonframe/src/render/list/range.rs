@@ -115,7 +115,11 @@ fn tell(key: &str, list: &(String, Action), frame: u64, rows: Shown, now: Instan
 fn late(key: &str, generation: u64, frame: u64, now: Instant) -> Option<(Shown, Action)> {
     KEPT.with_borrow_mut(|kept| {
         let entry = kept.get_mut(key)?;
-        if entry.generation != generation || (frame > 0 && entry.frame + 1 < frame) {
+        // Held for another list: what waits now is that one's.
+        if entry.generation != generation {
+            return None;
+        }
+        if frame > 0 && entry.frame + 1 < frame {
             entry.untold = None;
             return None;
         }
@@ -282,7 +286,14 @@ mod tests {
         );
         // The same rows, another list: told at once.
         assert_eq!(tell(key, &new, 3, (2, 6), at(20)), Tell::Now);
-        assert_eq!(late(key, 1, 3, at(100)), None);
+        // The new list scrolls before the old wait ends: its own range
+        // waits, and the old wait leaves it alone.
+        assert_eq!(
+            tell(key, &new, 4, (3, 7), at(30)),
+            Tell::After(Duration::from_millis(90), 2)
+        );
+        assert_eq!(late(key, 1, 4, at(100)), None);
+        assert_eq!(late(key, 2, 4, at(120)), Some(((3, 7), new.1.clone())));
     }
 
     #[test]
