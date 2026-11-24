@@ -287,6 +287,10 @@ export type StackProps = {
 	-- With `scroll`: sent with `width`, `height`, `content_width`,
 	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
 	measure: Data,
+	-- Sent (to `to`, else this mod) when a press lands outside its box and
+	-- outside the popovers and overlays inside it; the press still reaches
+	-- what it landed on. A floating panel that minimizes on a click elsewhere.
+	outside: Data,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows

@@ -132,8 +132,9 @@ fn by_key(key: &str) -> KeyType {
         | "text" | "title" | "to" | "tooltip" | "url" | "value" => String,
         "blur" | "capture" | "carry" | "change" | "context" | "dismiss" | "drop" | "exit"
         | "force" | "found" | "hover" | "image" | "link" | "loading" | "measure" | "move"
-        | "msg" | "navigate" | "outline" | "pointer" | "props" | "rotate" | "routed"
-        | "scrolled" | "section" | "select" | "smart_zoom" | "submit" | "swipe" | "wheel" => Data,
+        | "msg" | "navigate" | "outline" | "outside" | "pointer" | "props" | "rotate"
+        | "routed" | "scrolled" | "section" | "select" | "smart_zoom" | "submit" | "swipe"
+        | "wheel" => Data,
         "border" => OneOf(vec![Bool, Tokens(token_set!(Border))]),
         "color" => Color,
         "command" => OneOf(vec![

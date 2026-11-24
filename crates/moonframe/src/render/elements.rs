@@ -31,7 +31,15 @@ impl<'w> Draw<'w> for Stack {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
         let in_drag = painter.in_drag;
         painter.in_drag |= self.drag;
+        let inside = self.outside.as_ref().map(|_| {
+            let inside = super::outside::Inside::default();
+            painter.outside.push(inside.clone());
+            inside
+        });
         let children = painter.keyed_children(&self.children, place, self.direction, cx);
+        if inside.is_some() {
+            painter.outside.pop();
+        }
         painter.in_drag = in_drag;
         let part = match self.direction {
             Direction::Row => Part::Row,
@@ -105,6 +113,12 @@ impl<'w> Draw<'w> for Stack {
         let element = match &self.pointer {
             Some(pointer) => super::pointer::attach(element, pointer, place, cx),
             None => element,
+        };
+        let element = match (&self.outside, inside) {
+            (Some(action), Some(inside)) => {
+                super::outside::attach(element, action, inside, place.owner, cx)
+            },
+            _ => element,
         };
         let element = match &self.action {
             Some(action) => covering(element, in_drag)

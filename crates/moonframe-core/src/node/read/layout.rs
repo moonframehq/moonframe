@@ -21,6 +21,7 @@ impl Build for Stack {
             "key",
             "scroll_to",
             "measure",
+            "outside",
         ],
         pointer::POINTER,
     ];
@@ -66,6 +67,15 @@ impl Build for Stack {
             selected: fields.get("selected")?.unwrap_or(false),
             scroll_to: scroll_to.map(|index| index as usize),
             measure,
+            outside: fields
+                .get::<Data>("outside")?
+                .map(|msg| -> Result<_, Error> {
+                    Ok(Action::Send {
+                        to: fields.get("to")?,
+                        msg,
+                    })
+                })
+                .transpose()?,
             action: Action::from_fields(fields)?,
             extras: Extras::from_fields(fields)?,
             drag: fields.get("drag")?.unwrap_or(false),

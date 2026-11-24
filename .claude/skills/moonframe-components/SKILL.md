@@ -146,6 +146,13 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   false`) keeps the first `fit` and opens the rest from Show more; a list
   keeps `first`, to reveal it with `scroll_to` when it comes back.
 
+- **Hear a press outside** (`row`, `column`): `outside = msg` sends `msg`
+  (to `to`, else the drawing mod) when a press lands outside its box and
+  outside the popovers and overlays drawn inside it. Unlike a popover's
+  `dismiss`, nothing covers the window: the press still reaches whatever
+  it landed on, so one click both closes a floating panel and presses the
+  button beside it.
+
 - **Frame keys** (`row`, `column`, `panel`): `grow`, `width`, `height`,
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `follow = true` (with `scroll`:
   while at its end, stay there as the content grows, as a chat or log
