@@ -127,7 +127,24 @@ pub struct Split {
     /// Draws a hairline between panes; without it the panes meet with no
     /// line, and only a hovered or dragged handle shows.
     pub divider: bool,
+    /// Sent once the user lets go of a divider, with `sizes`: each pane's
+    /// size in whole pixels, in order, 0 for a hidden one. A mod keeps them
+    /// in its state, which outlives the app, and passes them back as the
+    /// panes' `size`, so they reopen as the user left them.
+    pub resize: Option<Action>,
     pub panes: Vec<Pane>,
+}
+
+impl Split {
+    /// What `resize` sends for `msg` when the panes are `sizes` pixels: a
+    /// table `msg` with `sizes` added, else `{ msg = msg, sizes = ... }`.
+    pub fn resized(msg: &Data, sizes: impl IntoIterator<Item = f32>) -> Data {
+        let sizes = sizes
+            .into_iter()
+            .map(|size| Data::Integer(size.round().max(0.0) as i64))
+            .collect();
+        Markdown::note(msg, [("sizes", Data::List(sizes))])
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

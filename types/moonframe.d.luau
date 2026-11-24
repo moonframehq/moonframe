@@ -447,6 +447,12 @@ export type SplitProps = {
 	id: string?,
 	-- false: no hairline between panes; a handle shows only when hovered.
 	divider: boolean?,
+	-- Sent once the user lets go of a divider, with `sizes`: each pane's
+	-- whole pixels, in order, 0 for a hidden one. Keep them in state (it
+	-- outlives the app) and pass them back as the panes' `size`.
+	resize: Data,
+	-- The mod `resize` goes to; this one when unset.
+	to: string?,
 	[number]: Element | false | nil,
 }
 

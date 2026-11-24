@@ -35,6 +35,7 @@ mod revision_timeline;
 mod scroll_sync;
 mod scrollbar;
 mod shell;
+mod split_resize;
 mod stack_measure;
 mod state;
 mod styles;
