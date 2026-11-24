@@ -40,6 +40,7 @@ mod stack_measure;
 mod state;
 mod styles;
 mod switchyard;
+mod t3_overview;
 mod task_manager;
 mod topics;
 mod video;

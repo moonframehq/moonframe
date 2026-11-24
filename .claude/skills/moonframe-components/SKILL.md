@@ -321,6 +321,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`icon-button`](#icon-button) | Controls | An action or toggle shown only as an icon: in a title bar, a panel header, a toolbar. Always give a `tooltip`. For buttons with words use `ui.button` or `toolbar`; for back/forward use `nav-buttons`; for joined icon choices use `button-group`. |
 | [`picker`](#picker) | Controls | A property of a record set from many options: assignee, labels, project, status, priority, "blocked by", in a task's detail panel or a row. For a setting in a form use `dropdown`; for a filter over a list use `filter-dropdown`; for 2 to 4 short choices use `segmented`; for addresses use `recipient-field`. |
 | [`segmented`](#segmented) | Controls | A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`. |
+| [`t3-composer`](#t3-composer) | Controls | Draw inside the mod enabled as the T3 writer. Handle project, draft, picker and cancel messages locally and observe app.t3.results[id] for delivery. |
 | [`toolbar`](#toolbar) | Controls | A row of small quiet buttons above a panel or list. For icon-only buttons use `icon-button`; for one-of-many choices use `segmented`. |
 | [`audio-meter`](#audio-meter) | Data | Sound levels while recording or playing, from values an engine published. For a fraction that isn't sound use `vertical-bar` or `meter`. |
 | [`avatar`](#avatar) | Data | Stand for a person, space, project or agent by its name: comment authors, workspace switchers, people lists. Use `comment-card` for an authored message (it draws one), `status-dot` for a state alone. |
@@ -446,6 +447,8 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`list`](#list) | Lists | A plain selectable list of rows with label, detail and badge. For rich rows (status, icons, two lines) use `agent-row`, `workspace-row` or `tree`. |
 | [`mail-row`](#mail-row) | Lists | Each row of an inbox or a mailbox's message list; stack them in a `ui.list` (rows of one height) or a scrolling column, under `segmented` category tabs. For tasks use `task-row`; for pull requests use `pr-row`; for a plain selectable row use `list`; for the open message's header use `message-header`. |
 | [`ratio-row`](#ratio-row) | Lists | Lists of parts of a whole: where signups came from, top countries, devices, tiers. Stack them in a column; give `share` for the bar under each. For a bar of all the parts at once use `share-bar`; for a data grid use `table`. |
+| [`t3-sessions`](#t3-sessions) | Lists | Use for an overview of app.t3.threads, or a subset filtered by project, issue or worktree. Handle fold and thread messages in the drawing mod. |
+| [`t3-thread`](#t3-thread) | Lists | Use for one thread from app.t3 in a project sidebar or session overview. Set expanded to show its worktree, provider and update time. |
 | [`task-row`](#task-row) | Lists | Rows of tasks, to-dos, habits or events in a planner, an inbox or a day view; stack them in a column under `section` headings. For a plain selectable row use `list`; for pull requests use `pr-row`. |
 | [`tree`](#tree) | Lists | Nested rows: a file tree in a review, worktrees under a repository, agents and their sub-agents. For flat rows use `list`; for a heading over a group of rows use `group-header`; for one foldable block use `collapsible`. |
 | [`activity-bar`](#activity-bar) | Navigation | Switching between the app's main views from a thin strip at the window's edge (terminals, pull requests, issues, agents, settings). For a collapsed list of workspaces use `rail`; for text tabs use `tabs`; for a full list of rows use `sidebar`. |
@@ -1245,6 +1248,29 @@ segmented { options = { { id = "light", label = "Light" }, { id = "dark", label 
 ```
 
 A whole mod using it, with state: `app/components/demos/segmented.luau`.
+
+#### `t3-composer`
+
+**T3 Composer.** Start a local T3 Code chat or send a follow-up to an existing thread.
+
+**When:** Draw inside the mod enabled as the T3 writer. Handle project, draft, picker and cancel messages locally and observe app.t3.results[id] for delivery.
+
+| Prop | Meaning |
+| --- | --- |
+| `action` | start or send |
+| `data` | The current app.t3 snapshot |
+| `environmentId` | Environment in which the draft was opened |
+| `id` | Unique request id for this draft revision |
+| `picker` | Whether the project picker is open |
+| `target` | Project id for start, thread id for send |
+| `text` | The current draft |
+| `title` | Thread title when sending a follow-up |
+
+```lua
+local t3_composer = use "t3-composer"
+
+t3_composer { action = "start", data = { available = true, environmentId = "preview", projects = { { id = "mf", label = "Moonframe" } }, results = {  }, threads = {  }, ticket = "preview", total = 0 }, environmentId = "preview", id = "example", target = "mf", text = "" }
+```
 
 #### `toolbar`
 
@@ -5021,6 +5047,46 @@ A whole mod using it, with state: `app/components/demos/mail-row.luau`.
 local ratio_row = use "ratio-row"
 
 ratio_row { color = "#7c5cff", count = "604", icon = "globe", label = "Website signup form", percent = "44%", share = 44 }
+```
+
+#### `t3-sessions`
+
+**T3 Sessions.** T3 sessions grouped by what needs attention, with counts and expandable rows.
+
+**When:** Use for an overview of app.t3.threads, or a subset filtered by project, issue or worktree. Handle fold and thread messages in the drawing mod.
+
+| Prop | Meaning |
+| --- | --- |
+| `folded` | Map from group id to collapsed state |
+| `selected` | Id of the expanded thread |
+| `threads` | Threads in display order |
+| `to` | Mod receiving { fold = group } and { thread = id } |
+
+```lua
+local t3_sessions = use "t3-sessions"
+
+t3_sessions { threads = { { group = "running", id = "docs", issues = {  }, project = "Docs", projectId = "docs", pullRequests = {  }, status = "running", title = "Check examples", updatedAt = "" } } }
+```
+
+#### `t3-thread`
+
+**T3 Thread.** A T3 session with its project, branch and linked work.
+
+**When:** Use for one thread from app.t3 in a project sidebar or session overview. Set expanded to show its worktree, provider and update time.
+
+| Prop | Meaning |
+| --- | --- |
+| `expanded` | Show session details |
+| `msg` | Optional message sent when the row is clicked |
+| `thread` | A thread from app.t3.threads |
+| `to` | Mod receiving the click |
+
+**Styles:** `.t3-thread` `.t3-thread-meta`
+
+```lua
+local t3_thread = use "t3-thread"
+
+t3_thread { thread = { branch = "fix/paging", group = "waiting", id = "review", issues = {  }, project = "Moonframe", projectId = "mf", pullRequests = { { label = "#42", title = "Moonframe", url = "https://example.com/pr/42" } }, status = "waiting", title = "Review pagination", updatedAt = "2026-11-20T12:00:00Z" } }
 ```
 
 #### `task-row`
