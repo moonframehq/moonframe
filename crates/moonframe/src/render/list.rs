@@ -93,7 +93,9 @@ impl<'w> Draw<'w> for List {
                     .children(rows),
             )
             .children(self.range.as_ref().and_then(|range| {
-                range::reader(range, &handle, row, self.count, painter, place, cx)
+                range::reader(
+                    &self.id, range, &handle, row, self.count, painter, place, cx,
+                )
             }))
             .into_any_element()
     }

@@ -16,6 +16,9 @@ use {
 
 /// The least time between two messages of one list.
 const EVERY: Duration = Duration::from_millis(100);
+/// How long a list not drawn is remembered: its window closed, or the
+/// view dropped it.
+const FORGET: Duration = Duration::from_secs(60);
 
 thread_local! {
     /// What each list told its mod, by its window and place.
@@ -27,12 +30,16 @@ pub(super) type Shown = (usize, usize);
 
 #[derive(Default)]
 struct Kept {
+    /// The list drawn there: its id and `range`. Another list in its place
+    /// starts afresh.
+    list: Option<(String, Action)>,
     /// The last range told, and when.
     told: Option<(Shown, Instant)>,
     /// A range held back until [`EVERY`] has passed.
     untold: Option<Shown>,
-    /// The window frame it was last drawn in.
+    /// The window frame it was last drawn in, and when.
     frame: u64,
+    seen: Option<Instant>,
 }
 
 /// What to do with a range the list read.
@@ -52,23 +59,33 @@ pub(super) fn shown(scrolled: f32, height: f32, row: f32, count: usize) -> Shown
     if count == 0 || height <= 0.0 || row <= 0.0 {
         return (0, 0);
     }
-    let first = ((scrolled.max(0.0) + 0.5) / row).floor() as usize;
+    let first = (((scrolled.max(0.0) + 0.5) / row).floor() as usize).min(count - 1);
     let end = ((scrolled.max(0.0) + height - 0.5) / row).ceil() as usize;
-    let last = end.clamp(first + 1, count);
-    (first.min(count - 1) + 1, last)
+    (first + 1, end.clamp(first + 1, count))
 }
 
-/// Whether the list `key`, drawn in window frame `frame` and showing
-/// `rows`, tells its mod `now`.
-fn tell(key: &str, frame: u64, rows: Shown, now: Instant) -> Tell {
+/// Whether the list `list` at `key`, drawn in window frame `frame` and
+/// showing `rows`, tells its mod `now`.
+fn tell(key: &str, list: &(String, Action), frame: u64, rows: Shown, now: Instant) -> Tell {
     KEPT.with_borrow_mut(|kept| {
+        kept.retain(|_, entry| {
+            entry
+                .seen
+                .is_none_or(|seen| now.saturating_duration_since(seen) < FORGET)
+        });
         let entry = kept.entry(key.to_owned()).or_default();
         // Missing from the frame before: drawn anew, so its mod (whose
-        // state may have started over) is told again.
-        if frame > 0 && entry.frame + 1 < frame {
-            *entry = Kept::default();
+        // state may have started over) is told again. Another list in its
+        // place, or the same asking elsewhere, is told afresh too, and what
+        // was held back for the last one is dropped.
+        if (frame > 0 && entry.frame + 1 < frame) || entry.list.as_ref() != Some(list) {
+            *entry = Kept {
+                list: Some(list.clone()),
+                ..Kept::default()
+            };
         }
         entry.frame = frame;
+        entry.seen = Some(now);
         if entry.untold.is_some() {
             entry.untold = Some(rows);
             return Tell::No;
@@ -87,8 +104,9 @@ fn tell(key: &str, frame: u64, rows: Shown, now: Instant) -> Tell {
     })
 }
 
-/// The range held back from the list `key`, if it is not the one told.
-fn late(key: &str, now: Instant) -> Option<Shown> {
+/// The range held back from the list `key`, if it is not the one told,
+/// and the `range` of the list now there that tells it.
+fn late(key: &str, now: Instant) -> Option<(Shown, Action)> {
     KEPT.with_borrow_mut(|kept| {
         let entry = kept.get_mut(key)?;
         let rows = entry.untold.take()?;
@@ -96,7 +114,7 @@ fn late(key: &str, now: Instant) -> Option<Shown> {
             return None;
         }
         entry.told = Some((rows, now));
-        Some(rows)
+        Some((rows, entry.list.as_ref()?.1.clone()))
     })
 }
 
@@ -115,6 +133,7 @@ pub(super) fn message(msg: &Data, (first, last): Shown) -> Data {
 /// A box of no size among the list's children that reads `handle` once
 /// the list has laid out and scrolled, and tells `range` what shows.
 pub(super) fn reader(
+    id: &str,
     range: &Action,
     handle: &ScrollHandle,
     row: f32,
@@ -130,10 +149,12 @@ pub(super) fn reader(
         return None;
     }
     let key = format!("{:?}/{}", painter.window, place.path);
+    let list = (id.to_owned(), range.clone());
     let frame = painter.frame;
+    let (app, owner) = (cx.entity().downgrade(), place.owner.to_owned());
     let sender = Sender {
-        app: cx.entity().downgrade(),
-        owner: place.owner.to_owned(),
+        app: app.clone(),
+        owner: owner.clone(),
         to: to.clone(),
     };
     let (msg, handle) = (msg.clone(), handle.clone());
@@ -142,7 +163,7 @@ pub(super) fn reader(
             let scrolled = -f32::from(handle.offset().y);
             let height = f32::from(handle.bounds().size.height);
             let rows = shown(scrolled, height, row, count);
-            match tell(&key, frame, rows, Instant::now()) {
+            match tell(&key, &list, frame, rows, Instant::now()) {
                 Tell::No => {},
                 Tell::Now => {
                     let msg = message(&msg, rows);
@@ -153,7 +174,11 @@ pub(super) fn reader(
                         .spawn(cx, async move |cx| {
                             cx.background_executor().timer(wait).await;
                             let _ = cx.update(|window, cx| {
-                                if let Some(rows) = late(&key, Instant::now()) {
+                                // Sent as the list there now asks.
+                                if let Some((rows, Action::Send { to, msg })) =
+                                    late(&key, Instant::now())
+                                {
+                                    let sender = Sender { app, owner, to };
                                     sender.send(message(&msg, rows), window, cx);
                                 }
                             });
@@ -172,9 +197,14 @@ pub(super) fn reader(
 #[cfg(test)]
 mod tests {
     use {
-        super::{Data, Tell, late, message, shown, tell},
+        super::{Action, Data, Tell, late, message, shown, tell},
         std::time::{Duration, Instant},
     };
+
+    fn list(msg: &str) -> (String, Action) {
+        let msg = Data::String(msg.to_owned());
+        ("list".to_owned(), Action::Send { to: None, msg })
+    }
 
     #[test]
     fn the_rows_any_part_of_which_shows() {
@@ -189,41 +219,69 @@ mod tests {
         assert_eq!(shown(0.0, 100.0, 20.0, 3), (1, 3));
         assert_eq!(shown(0.0, 100.0, 20.0, 0), (0, 0));
         assert_eq!(shown(0.0, 0.0, 20.0, 10), (0, 0));
+        // Squeezed at the end, or scrolled past it: the last row.
+        assert_eq!(shown(199.75, 0.25, 20.0, 10), (10, 10));
+        assert_eq!(shown(5000.0, 100.0, 20.0, 10), (10, 10));
     }
 
     #[test]
     fn changes_are_told_at_most_every_little_while_and_the_last_arrives() {
         let start = Instant::now();
         let at = |ms| start + Duration::from_millis(ms);
-        let key = "told";
-        assert_eq!(tell(key, 1, (1, 5), at(0)), Tell::Now);
-        assert_eq!(tell(key, 2, (1, 5), at(10)), Tell::No);
+        let (key, rows) = ("told", list("rows"));
+        assert_eq!(tell(key, &rows, 1, (1, 5), at(0)), Tell::Now);
+        assert_eq!(tell(key, &rows, 2, (1, 5), at(10)), Tell::No);
         assert_eq!(
-            tell(key, 3, (2, 6), at(30)),
+            tell(key, &rows, 3, (2, 6), at(30)),
             Tell::After(Duration::from_millis(70))
         );
         // Held back already: the latest replaces it.
-        assert_eq!(tell(key, 4, (3, 7), at(50)), Tell::No);
-        assert_eq!(late(key, at(100)), Some((3, 7)));
+        assert_eq!(tell(key, &rows, 4, (3, 7), at(50)), Tell::No);
+        assert_eq!(late(key, at(100)), Some(((3, 7), rows.1.clone())));
         assert_eq!(late(key, at(100)), None);
-        assert_eq!(tell(key, 5, (9, 13), at(300)), Tell::Now);
+        assert_eq!(tell(key, &rows, 5, (9, 13), at(300)), Tell::Now);
         // Back where it was told before the wait ended: nothing to say.
         assert_eq!(
-            tell(key, 6, (10, 14), at(310)),
+            tell(key, &rows, 6, (10, 14), at(310)),
             Tell::After(Duration::from_millis(90))
         );
-        assert_eq!(tell(key, 7, (9, 13), at(320)), Tell::No);
+        assert_eq!(tell(key, &rows, 7, (9, 13), at(320)), Tell::No);
         assert_eq!(late(key, at(400)), None);
     }
 
     #[test]
     fn a_list_drawn_again_after_a_gap_tells_its_mod_again() {
         let now = Instant::now();
-        let key = "again";
-        assert_eq!(tell(key, 1, (1, 5), now), Tell::Now);
-        assert_eq!(tell(key, 2, (1, 5), now), Tell::No);
+        let (key, rows) = ("again", list("rows"));
+        assert_eq!(tell(key, &rows, 1, (1, 5), now), Tell::Now);
+        assert_eq!(tell(key, &rows, 2, (1, 5), now), Tell::No);
         // Not drawn in frame 3.
-        assert_eq!(tell(key, 4, (1, 5), now), Tell::Now);
+        assert_eq!(tell(key, &rows, 4, (1, 5), now), Tell::Now);
+    }
+
+    #[test]
+    fn another_list_in_the_same_place_is_told_afresh_and_drops_what_waited() {
+        let start = Instant::now();
+        let at = |ms| start + Duration::from_millis(ms);
+        let (key, old, new) = ("replaced", list("old"), list("new"));
+        assert_eq!(tell(key, &old, 1, (1, 5), at(0)), Tell::Now);
+        assert_eq!(
+            tell(key, &old, 2, (2, 6), at(10)),
+            Tell::After(Duration::from_millis(90))
+        );
+        // The same rows, another list: told at once.
+        assert_eq!(tell(key, &new, 3, (2, 6), at(20)), Tell::Now);
+        assert_eq!(late(key, at(100)), None);
+    }
+
+    #[test]
+    fn a_list_not_drawn_for_long_is_forgotten() {
+        let start = Instant::now();
+        let (key, rows) = ("forgotten", list("rows"));
+        assert_eq!(tell(key, &rows, 1, (1, 5), start), Tell::Now);
+        let later = start + super::FORGET + Duration::from_secs(1);
+        assert_eq!(tell("other", &rows, 1, (1, 5), later), Tell::Now);
+        assert!(super::KEPT.with_borrow(|kept| !kept.contains_key(key)));
     }
 
     #[test]
