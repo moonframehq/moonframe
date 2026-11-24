@@ -16,6 +16,7 @@ mod regressions;
 mod revision_timeline;
 mod scroll_sync;
 mod spinner;
+mod stack_measure;
 mod windows;
 // keep-sorted end
 

@@ -11,7 +11,7 @@ use {
         styling::{LookExt as _, StyleExt as _},
     },
     gpui_kit::{component::ActiveTheme, *},
-    moonframe_core::{Direction, Fit, Image, Part, with_fields},
+    moonframe_core::{Data, Direction, Fit, Image, Part, with_fields},
     std::{cell::RefCell, collections::HashMap, path::Path},
 };
 
@@ -20,12 +20,18 @@ thread_local! {
     /// shown in two windows has a viewer in each, of different sizes.
     static BOXES: RefCell<HashMap<String, Size<Pixels>>> = RefCell::new(HashMap::new());
     /// What each viewer last told its mod, so it is told only of changes.
-    static TOLD: RefCell<HashMap<String, [u32; 5]>> = RefCell::new(HashMap::new());
+    static TOLD: RefCell<HashMap<String, Announcement>> = RefCell::new(HashMap::new());
     /// Frames each window has drawn, and the frame each viewer was last
     /// drawn in: one missing from the frame before is a new viewer, whose
     /// mod has been told nothing yet.
     static FRAMES: RefCell<HashMap<WindowId, u64>> = RefCell::new(HashMap::new());
     static SEEN: RefCell<HashMap<String, u64>> = RefCell::new(HashMap::new());
+}
+
+struct Announcement {
+    reading: [u32; 5],
+    msg: Data,
+    to: Option<String>,
 }
 
 /// Counts a frame of `window`, returning its number.
@@ -63,6 +69,9 @@ pub(super) fn draw<'w>(
     let frame = painter.frame;
     let last = SEEN.with_borrow_mut(|seen| seen.insert(key.clone(), frame));
     if frame > 0 && !matches!(last, Some(seen) if seen + 1 >= frame) {
+        TOLD.with_borrow_mut(|told| told.remove(&key));
+    }
+    if image.measure.is_none() {
         TOLD.with_borrow_mut(|told| told.remove(&key));
     }
     let laid = BOXES.with_borrow(|boxes| boxes.get(&key).copied());
@@ -192,7 +201,21 @@ fn measure(
                 f32::from(laid.height).round() as u32,
                 (zoom * 10_000.0).round() as u32,
             ];
-            if TOLD.with_borrow_mut(|told| told.insert(key, reading) == Some(reading)) {
+            let changed = TOLD.with_borrow_mut(|told| {
+                if told.get(&key).is_some_and(|previous| {
+                    previous.reading == reading && previous.msg == msg && previous.to == sender.to
+                }) {
+                    false
+                } else {
+                    told.insert(key, Announcement {
+                        reading,
+                        msg: msg.clone(),
+                        to: sender.to.clone(),
+                    });
+                    true
+                }
+            });
+            if !changed {
                 return;
             }
             let fields = [
@@ -205,7 +228,7 @@ fn measure(
             .into_iter()
             .map(|(name, value)| {
                 let value = (f64::from(value) * 10_000.0).round() / 10_000.0;
-                (name.to_owned(), moonframe_core::Data::Number(value))
+                (name.to_owned(), Data::Number(value))
             })
             .collect();
             let msg = with_fields(&msg, fields);

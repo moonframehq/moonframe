@@ -284,6 +284,9 @@ export type StackProps = {
 	scroll: (boolean | "x" | "y" | "both")?,
 	-- Reveal this direct child (one-based) when the index changes.
 	scroll_to: number?,
+	-- With `scroll`: sent with `width`, `height`, `content_width`,
+	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
+	measure: Data,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
@@ -2137,6 +2140,7 @@ export type App = {
 	-- generated: provider fields (just provider-types) start
 	agents: ProviderAgentsPublished?,
 	system: ProviderSystemPublished?,
+	t3: ProviderT3Published?,
 	-- generated: provider fields end
 	-- What any other provider publishes, as `app.<name>`.
 	[string]: any,
@@ -2374,12 +2378,51 @@ type ProviderSystemPublished = {
 	transmitted: number,
 }
 type ProviderSystemMessage = "clear"
+type ProviderT3Link = { label: string, title: string, url: string }
+type ProviderT3Thread = {
+	id: string,
+	title: string,
+	project: string,
+	projectId: string,
+	provider: string?,
+	status: string,
+	group: string,
+	updatedAt: string,
+	branch: string?,
+	worktree: string?,
+	pullRequests: { ProviderT3Link },
+	issues: { ProviderT3Link },
+}
+type ProviderT3Result = { status: string, error: string?, threadId: string? }
+type ProviderT3Project = { id: string, label: string }
+type ProviderT3Published = {
+	available: boolean,
+	environmentId: string?,
+	projects: { ProviderT3Project },
+	writer: string?,
+	ticket: string?,
+	results: { [string]: ProviderT3Result },
+	error: string?,
+	setup: ("install" | "start" | "pair")?,
+	threads: { ProviderT3Thread },
+	total: number,
+}
+type ProviderT3Write = {
+	action: "start" | "send",
+	target: string,
+	text: string,
+	environmentId: string,
+	ticket: string,
+	id: string,
+}
+type ProviderT3Message = "refresh" | "connect" | ProviderT3Write
 
 -- A message for `update` to return: `send "provider:desk" { watch = id }`
 -- is `{ to = "provider:desk", msg = { watch = id } }`, its `msg` typed
 -- by the provider's `Message` where it declares one.
 declare send:
 	((to: "provider:system") -> (msg: ProviderSystemMessage) -> Send)
+	& ((to: "provider:t3") -> (msg: ProviderT3Message) -> Send)
 	& ((to: string) -> (msg: Data) -> Send)
 -- generated: provider types end
 
@@ -4489,6 +4532,28 @@ type UseSystemLoadProps = {
 	read compact: boolean?,
 	read icons: boolean?,
 }
+type UseT3ComposerProps = {
+	read data: index<App, "t3"> & {},
+	read action: "start" | "send",
+	read id: string,
+	read environmentId: string,
+	read target: string?,
+	read title: string?,
+	read text: string,
+	read picker: boolean?,
+}
+type UseT3SessionsProps = {
+	read threads: index<index<App, "t3"> & {}, "threads">,
+	read folded: { [string]: boolean }?,
+	read selected: string?,
+	read to: string?,
+}
+type UseT3ThreadProps = {
+	read thread: index<index<index<App, "t3"> & {}, "threads">, number>,
+	read expanded: boolean?,
+	read msg: any,
+	read to: string?,
+}
 type UseTabViewTab = any
 type UseTabViewProps = {
 	read tab: UseTabViewTab?,
@@ -4969,6 +5034,9 @@ type UseProps = {
 	["swatches"]: UseSwatchesProps,
 	["switch"]: UseSwitchProps,
 	["system-load"]: UseSystemLoadProps,
+	["t3-composer"]: UseT3ComposerProps,
+	["t3-sessions"]: UseT3SessionsProps,
+	["t3-thread"]: UseT3ThreadProps,
 	["tab-view"]: UseTabViewProps,
 	["tabbed"]: UseTabbedProps,
 	["table"]: UseTableProps,
