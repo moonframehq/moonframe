@@ -167,6 +167,8 @@ impl Hub {
             }
         });
         cx.set_global(Installed(hub.clone()));
+        // Providers' `moonframe.view` calls reach the windows from here on.
+        acting::serve(cx);
         entries::listen(hub.read(cx).launch.entries.clone(), cx);
         cx.on_window_closed(|cx, id| {
             if let Some(hub) = hub_of(cx) {

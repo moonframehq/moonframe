@@ -46,6 +46,7 @@ use {
 use {crate::terminal::Terminals, listeners::wake_on_output};
 
 // keep-sorted start
+mod acting;
 mod appearance;
 mod devtools;
 mod dialogs;
@@ -77,9 +78,9 @@ mod updates;
 mod view;
 mod watch;
 mod windows;
-pub(crate) use fonts::list_ahead as list_fonts_ahead;
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use picking::selection_file;
+pub(crate) use {acting::on_front, fonts::list_ahead as list_fonts_ahead};
 
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use hub::every as main_windows;

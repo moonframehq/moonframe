@@ -461,6 +461,44 @@ impl Inputs {
         Ok(())
     }
 
+    /// Puts `text` in the field `id` drawn by `owner`, in place of what it
+    /// holds, as one edit (`moonframe.view`'s fill): it sends its `change`
+    /// as typing would. An error when no such field is drawn.
+    pub(crate) fn fill(
+        &self,
+        owner: &str,
+        id: &str,
+        text: &str,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Result<(), String> {
+        let editor = self
+            .drawn(owner, id)
+            .ok_or_else(|| format!("no field with `id = \"{id}\"` drawn by `{owner}`"))?;
+        let all = editor.value(cx).len();
+        editor.select(0..all, cx);
+        on_state!(&editor, |state| state.update(cx, |state, cx| {
+            state.replace(text.to_owned(), window, cx);
+        }));
+        Ok(())
+    }
+
+    /// The text in the field `id` drawn by `owner`, if it is drawn.
+    pub(crate) fn text(&self, owner: &str, id: &str, cx: &App) -> Option<String> {
+        self.drawn(owner, id)
+            .map(|editor| editor.value(cx).to_string())
+    }
+
+    /// The editor of the field `id` drawn by `owner`, while it is drawn.
+    fn drawn(&self, owner: &str, id: &str) -> Option<Editor> {
+        let registry = self.0.borrow();
+        registry
+            .fields
+            .get(&format!("{owner} {id}"))
+            .filter(|field| field.mounted.upgrade().is_some())
+            .map(|field| field.editor.clone())
+    }
+
     /// App edits must run in the window that actually draws the field.
     pub(crate) fn window(&self, owner: &str, field: &str) -> Option<WindowId> {
         self.0

@@ -86,13 +86,19 @@ impl Moonframe {
         let mut providers = moonframe_providers::ProviderOptions::default();
         let mut errors = Vec::new();
         // Moonframe's own capabilities, which any app's providers may list.
-        if let Err(error) = providers.capabilities.moonframe(
-            crate::web_page::NAME,
-            crate::web_page::Page,
-            crate::web_page::bounds(),
-        ) {
-            errors.push(error);
-        }
+        let own = [
+            providers.capabilities.moonframe(
+                crate::web_page::NAME,
+                crate::web_page::Page,
+                crate::web_page::bounds(),
+            ),
+            providers.capabilities.moonframe(
+                crate::view_access::NAME,
+                crate::view_access::View,
+                crate::view_access::bounds(),
+            ),
+        ];
+        errors.extend(own.into_iter().filter_map(Result::err));
         Self {
             entries: Default::default(),
             view_diagnostics: None,

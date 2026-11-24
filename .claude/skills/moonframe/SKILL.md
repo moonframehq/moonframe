@@ -2099,7 +2099,11 @@ terminal log. There are four kinds:
     `"system"` (`host::system_load()`), `"moonframe.page"` (`render` a public
     web page with its scripts: `{ url, screenshot? }` answers `url`, `title`,
     `text`, `timed_out` and a base64 PNG `screenshot`; macOS, `browser`
-    feature; see docs/wasm-providers.md) and namespaced APIs the embedding host
+    feature; see docs/wasm-providers.md), `"moonframe.view"` (`tree { mod }`
+    reads a mod's view as roles, names and refs; `act { mod, ref, action,
+    value }` clicks, fills, presses a key or selects an option through the
+    element's own messages; a miniapp's provider reaches only its own
+    namespace's mods) and namespaced APIs the embedding host
     registers with `Moonframe::capability` (or `capability_async`, on `.tokio`).
     Both WIT worlds import `host-call(capability, method, args)`; use the serde
     helper `moonframe_provider::host_call` from `crates/moonframe-provider`.

@@ -43,6 +43,7 @@ mod t3_overview;
 mod task_manager;
 mod topics;
 mod video;
+mod view_access;
 mod view_context;
 mod view_diagnostics;
 mod views;

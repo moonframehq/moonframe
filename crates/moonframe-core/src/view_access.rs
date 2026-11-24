@@ -1,0 +1,616 @@
+//! A mod's drawn view as roles and names, for a provider to read, and what
+//! acting on one of its elements sends: a click, filling a field, a key, or
+//! choosing an option, as a person's would. Components, mounted mods and
+//! regions are read through, so the tree is what shows; each element has a
+//! `ref`, its place in that tree, to act on.
+
+use crate::{Action, Data, KeyChord, Node, Workspace};
+
+/// Most elements a tree lists; past it, `truncated` is set.
+pub const MAX_VIEW_NODES: usize = 2000;
+/// Longest name kept, in characters: a document's text is longer.
+const MAX_NAME: usize = 200;
+const MAX_TEXT: usize = 4000;
+/// Deepest the tree is read, mounts within mounts included.
+const MAX_DEPTH: usize = 128;
+
+/// One element as a person would describe it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ViewNode {
+    /// Where it is, to act on: `e0.2.1`.
+    pub reference: String,
+    /// `button`, `textbox`, `item`, `text`, `dialog`, ...
+    pub role: &'static str,
+    pub name: String,
+    /// A field's text.
+    pub value: Option<String>,
+    pub selected: bool,
+    pub disabled: bool,
+    /// How many listed elements it is inside.
+    pub depth: usize,
+}
+
+/// A mod's view as [`ViewNode`]s, in the order they show.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ViewTree {
+    pub nodes: Vec<ViewNode>,
+    /// There were more than [`MAX_VIEW_NODES`].
+    pub truncated: bool,
+}
+
+impl ViewTree {
+    /// One line per element, indented by depth: `button "Save" [e0.3]`.
+    pub fn lines(&self) -> String {
+        let mut lines = String::new();
+        for node in &self.nodes {
+            lines.push_str(&"  ".repeat(node.depth));
+            lines.push_str(node.role);
+            if !node.name.is_empty() {
+                lines.push_str(&format!(" {:?}", node.name));
+            }
+            if let Some(value) = &node.value {
+                lines.push_str(&format!(" value={value:?}"));
+            }
+            if node.selected {
+                lines.push_str(" selected");
+            }
+            if node.disabled {
+                lines.push_str(" disabled");
+            }
+            lines.push_str(&format!(" [{}]\n", node.reference));
+        }
+        if self.truncated {
+            lines.push_str("…\n");
+        }
+        lines
+    }
+}
+
+/// What to do to an element.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ViewAct {
+    /// Click it, or the nearest element around it that takes a click.
+    Click,
+    /// Put this text in the field, in place of what it holds.
+    Fill(String),
+    /// Press a key (`enter`, `escape`, `cmd-k`) on it: a field's, an open
+    /// popover's or dialog's around it, else its mod's.
+    Press(String),
+    /// Choose the option of this name inside it: a menu's or a list's.
+    Select(String),
+}
+
+/// What the host does to carry out a [`ViewAct`].
+#[derive(Clone, Debug, PartialEq)]
+pub enum Acting {
+    /// Dispatches `action` from `owner`, as a click on it would.
+    Send { owner: String, action: Action },
+    /// Puts `text` in the field `id` (`None`: one with no id), which sends
+    /// its `change`, if it has one, with the text, as typing would.
+    Fill {
+        owner: String,
+        id: Option<String>,
+        to: Option<String>,
+        change: Option<Data>,
+        text: String,
+    },
+    /// A key the field `id` takes: sends `msg` with the field's text, as
+    /// [`crate::Input::message`] does; `value` is the text the mod gave it.
+    FieldKey {
+        owner: String,
+        id: Option<String>,
+        to: Option<String>,
+        msg: Data,
+        value: String,
+    },
+}
+
+/// Where a walk goes after an element.
+#[derive(Clone, Copy, PartialEq)]
+enum Flow {
+    /// Into what is inside it.
+    Into,
+    /// On to the next, past what is inside it.
+    Over,
+    /// Nowhere: the walk is over.
+    Stop,
+}
+
+/// An element as the walk meets it: what drew it.
+#[derive(Clone, Copy)]
+struct Visited<'w> {
+    node: &'w Node,
+    owner: &'w str,
+}
+
+impl Workspace {
+    /// The mod `name`'s view as it shows, as roles and names.
+    pub fn view_tree(&self, name: &str) -> Result<ViewTree, String> {
+        let root = self.view_root(name)?;
+        let mut tree = ViewTree::default();
+        let mut path = Vec::new();
+        let mut around = Vec::new();
+        self.walk(root, &mut path, &mut around, &mut |path, at, around| {
+            if tree.nodes.len() >= MAX_VIEW_NODES {
+                tree.truncated = true;
+                return Flow::Stop;
+            }
+            if let Some(listed) = role(at.node, around) {
+                tree.nodes.push(ViewNode {
+                    reference: reference(path),
+                    role: listed,
+                    name: self.name(at),
+                    value: match at.node {
+                        Node::Input(input) => Some(input.value.clone().unwrap_or_default()),
+                        _ => None,
+                    },
+                    selected: matches!(at.node, Node::Item(item) if item.selected)
+                        || matches!(at.node, Node::Stack(stack) if stack.selected),
+                    disabled: matches!(at.node, Node::Button(button) if button.disabled)
+                        || matches!(at.node, Node::Input(input) if input.disabled),
+                    depth: around
+                        .iter()
+                        .enumerate()
+                        .filter(|(at, visited)| role(visited.node, &around[..*at]).is_some())
+                        .count(),
+                });
+            }
+            Flow::Into
+        });
+        Ok(tree)
+    }
+
+    /// What doing `act` to the element `reference` of the mod `name`'s view
+    /// sends, for the host to carry out.
+    pub fn view_act(&self, name: &str, reference: &str, act: &ViewAct) -> Result<Acting, String> {
+        let root = self.view_root(name)?;
+        let wanted = parse_reference(reference)?;
+        let mut found = None;
+        let mut path = Vec::new();
+        let mut around = Vec::new();
+        self.walk(root, &mut path, &mut around, &mut |path, at, around| {
+            if path == wanted.as_slice() {
+                found = Some((at, around.to_vec()));
+                Flow::Stop
+            } else if wanted.starts_with(path) {
+                Flow::Into
+            } else {
+                Flow::Over
+            }
+        });
+        let (at, around) = found.ok_or_else(|| {
+            format!("no element `{reference}` in `{name}`'s view; read the tree again")
+        })?;
+        // The element, then those around it, nearest first.
+        let mut chain = around;
+        chain.push(at);
+        chain.reverse();
+        match act {
+            ViewAct::Click => click(&chain),
+            ViewAct::Fill(text) => fill(at, text),
+            ViewAct::Press(key) => self.press(&chain, key),
+            ViewAct::Select(option) => self.select(at, option),
+        }
+    }
+
+    /// The view of the mod `name` (or a mounted copy, or the shell).
+    fn view_root<'w>(&'w self, name: &'w str) -> Result<Visited<'w>, String> {
+        let slot = self
+            .slot(name)
+            .ok_or_else(|| format!("no mod named `{name}`"))?;
+        let node = slot
+            .view()
+            .ok_or_else(|| format!("`{name}` has drawn nothing"))?;
+        Ok(Visited { node, owner: name })
+    }
+
+    /// Calls `visit` with each element under `at`, `at` first, with its
+    /// place and those around it, outermost first; `visit` says where to
+    /// go next. False once the walk is stopped.
+    fn walk<'w>(
+        &'w self,
+        at: Visited<'w>,
+        path: &mut Vec<usize>,
+        around: &mut Vec<Visited<'w>>,
+        visit: &mut dyn FnMut(&[usize], Visited<'w>, &[Visited<'w>]) -> Flow,
+    ) -> bool {
+        match visit(path, at, around) {
+            Flow::Stop => return false,
+            Flow::Over => return true,
+            Flow::Into if around.len() >= MAX_DEPTH => return true,
+            Flow::Into => {},
+        }
+        around.push(at);
+        let mut go_on = true;
+        for (index, child) in self.children(at).into_iter().enumerate() {
+            path.push(index);
+            go_on = self.walk(child, path, around, visit);
+            path.pop();
+            if !go_on {
+                break;
+            }
+        }
+        around.pop();
+        go_on
+    }
+
+    /// What shows inside `at`: components and mounted mods read through.
+    fn children<'w>(&'w self, at: Visited<'w>) -> Vec<Visited<'w>> {
+        let owner = at.owner;
+        let all = |nodes: &'w [Node]| nodes.iter().map(move |node| Visited { node, owner });
+        let view = |name: &'w str| {
+            self.slot(name)
+                .and_then(|slot| slot.view())
+                .map(|node| Visited { node, owner: name })
+        };
+        match at.node {
+            Node::Stack(stack) => all(&stack.children).collect(),
+            Node::Panel(panel) => all(&panel.actions).chain(all(&panel.children)).collect(),
+            Node::Split(split) => split
+                .panes
+                .iter()
+                .filter(|pane| pane.visible)
+                .flat_map(|pane| all(&pane.children))
+                .collect(),
+            Node::Popover(popover) => {
+                let mut nodes: Vec<_> = all(&popover.anchor).collect();
+                if popover.open {
+                    nodes.push(Visited {
+                        node: &popover.content,
+                        owner,
+                    });
+                }
+                nodes
+            },
+            Node::Overlay(overlay) if overlay.open => vec![Visited {
+                node: &overlay.content,
+                owner,
+            }],
+            Node::List(list) => all(&list.rows).collect(),
+            Node::Image(image) => all(&image.overlay).collect(),
+            Node::Instance(instance) => self
+                .instance(owner, instance)
+                .and_then(|(key, slot)| {
+                    Some(Visited {
+                        node: slot.view()?,
+                        owner: key,
+                    })
+                })
+                .into_iter()
+                .collect(),
+            Node::Mount(name) => view(name).into_iter().collect(),
+            Node::Region(region) => self
+                .region(&region.name)
+                .into_iter()
+                .filter_map(view)
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// What a person would call it: its label or text, or for a clickable
+    /// row the text inside it.
+    fn name(&self, at: Visited<'_>) -> String {
+        let name = match at.node {
+            Node::Text(text) => return cut(&text.text, MAX_TEXT),
+            Node::Markdown(markdown) => return cut(&markdown.text, MAX_TEXT),
+            Node::Button(button) if !button.label.is_empty() => button.label.clone(),
+            Node::Button(button) => button
+                .extras
+                .tooltip
+                .clone()
+                .or_else(|| button.icon.as_ref().map(|icon| icon.name().to_owned()))
+                .unwrap_or_default(),
+            Node::Item(item) => item.label.clone(),
+            Node::Badge(badge) => badge.text.clone(),
+            Node::Panel(panel) => panel.title.clone().unwrap_or_default(),
+            Node::Input(input) => input
+                .placeholder
+                .clone()
+                .or_else(|| input.id.clone())
+                .unwrap_or_default(),
+            Node::Image(image) => image.src.clone(),
+            Node::Browser(browser) => browser.url.clone().unwrap_or_default(),
+            Node::View(view) => view.name.clone(),
+            Node::Problem(problem) => problem.clone(),
+            Node::Stack(stack) => match &stack.extras.tooltip {
+                Some(tooltip) => tooltip.clone(),
+                None => self.words(at),
+            },
+            _ => String::new(),
+        };
+        cut(&name, MAX_NAME)
+    }
+
+    /// The words shown inside `at`, joined.
+    fn words(&self, at: Visited<'_>) -> String {
+        let mut words: Vec<String> = Vec::new();
+        let mut path = Vec::new();
+        let mut around = Vec::new();
+        let mut length = 0;
+        self.walk(at, &mut path, &mut around, &mut |_, inside, _| {
+            let word = match inside.node {
+                Node::Text(text) => text.text.as_str(),
+                Node::Badge(badge) => badge.text.as_str(),
+                Node::Button(button) => button.label.as_str(),
+                Node::Item(item) => item.label.as_str(),
+                _ => "",
+            };
+            let word = word.trim();
+            if !word.is_empty() {
+                length += word.len() + 1;
+                words.push(word.to_owned());
+            }
+            if length < MAX_NAME * 4 {
+                Flow::Into
+            } else {
+                Flow::Stop
+            }
+        });
+        words.join(" ")
+    }
+
+    /// A key on the element or around it: a field's, an open popover's or
+    /// dialog's, else the mod's own `keys`.
+    fn press(&self, chain: &[Visited<'_>], key: &str) -> Result<Acting, String> {
+        let pressed = KeyChord::parse(key).map_err(|problem| format!("`{key}`: {problem}"))?;
+        let pressed = Held::of(&pressed);
+        for at in chain {
+            match at.node {
+                Node::Input(input) => {
+                    let submits = if input.multiline {
+                        pressed == Held::of_name("secondary-enter")
+                    } else {
+                        pressed == Held::of_name("enter")
+                    };
+                    let msg = input
+                        .keys
+                        .iter()
+                        .find(|(chord, _)| Held::of(chord) == pressed)
+                        .map(|(_, msg)| msg)
+                        .or(input.submit.as_ref().filter(|_| submits));
+                    if let Some(msg) = msg {
+                        return Ok(Acting::FieldKey {
+                            owner: at.owner.to_owned(),
+                            id: input.id.clone(),
+                            to: input.to.clone(),
+                            msg: msg.clone(),
+                            value: input.value.clone().unwrap_or_default(),
+                        });
+                    }
+                },
+                Node::Popover(popover) if popover.open => {
+                    if let Some(msg) = keyed(&popover.keys, popover.dismiss.as_ref(), &pressed) {
+                        return Ok(sent(at.owner, popover.to.clone(), msg));
+                    }
+                },
+                Node::Overlay(overlay) if overlay.open => {
+                    if let Some(msg) = keyed(&overlay.keys, overlay.dismiss.as_ref(), &pressed) {
+                        return Ok(sent(at.owner, overlay.to.clone(), msg));
+                    }
+                },
+                _ => {},
+            }
+        }
+        // The mods whose views it is in, nearest first.
+        for at in chain {
+            if let Some((owner, keys)) = self.mod_keys().find(|(name, _)| *name == at.owner)
+                && let Some(msg) = keyed(keys, None, &pressed)
+            {
+                return Ok(sent(owner, None, msg));
+            }
+        }
+        Err(format!("nothing there takes `{key}`"))
+    }
+
+    /// The option named `option` inside `at`: an item, a button or a
+    /// clickable row, by its whole name, else the only one whose name has it.
+    fn select(&self, at: Visited<'_>, option: &str) -> Result<Acting, String> {
+        let wanted = option.trim().to_lowercase();
+        let mut options: Vec<(String, Visited<'_>)> = Vec::new();
+        let mut path = Vec::new();
+        let mut around = Vec::new();
+        self.walk(at, &mut path, &mut around, &mut |path, inside, _| {
+            if options.len() >= MAX_VIEW_NODES {
+                return Flow::Stop;
+            }
+            if !path.is_empty() && action(inside.node).is_some() {
+                options.push((self.name(inside), inside));
+                return Flow::Over;
+            }
+            Flow::Into
+        });
+        let whole = options
+            .iter()
+            .find(|(name, _)| name.trim().to_lowercase() == wanted);
+        let partly: Vec<_> = options
+            .iter()
+            .filter(|(name, _)| name.to_lowercase().contains(&wanted))
+            .collect();
+        let chosen = match (whole, partly.as_slice()) {
+            (Some((_, chosen)), _) | (None, [(_, chosen)]) => *chosen,
+            _ => {
+                let names: Vec<&str> = options
+                    .iter()
+                    .map(|(name, _)| name.as_str())
+                    .take(20)
+                    .collect();
+                return Err(format!(
+                    "no one option named {option:?} there; it has {names:?}"
+                ));
+            },
+        };
+        click(&[chosen])
+    }
+}
+
+/// Its role, if a person would name it; `around` are the elements it is
+/// inside, outermost first. Text inside something clickable names it, so
+/// is not listed again.
+fn role(node: &Node, around: &[Visited<'_>]) -> Option<&'static str> {
+    let in_clickable = || around.iter().any(|at| clickable(at.node));
+    Some(match node {
+        Node::Text(text) if !text.text.trim().is_empty() && !in_clickable() => "text",
+        Node::Badge(_) if !in_clickable() => "badge",
+        Node::Button(_) => "button",
+        Node::Item(_) => "item",
+        Node::Stack(stack) if stack.action.is_some() => "button",
+        Node::Panel(_) => "panel",
+        Node::Input(_) => "textbox",
+        Node::Markdown(_) => "document",
+        Node::Image(_) => "image",
+        Node::Popover(popover) if popover.open => "popover",
+        Node::Overlay(overlay) if overlay.open => "dialog",
+        Node::List(_) => "list",
+        Node::Terminal(_) => "terminal",
+        Node::Browser(_) => "browser",
+        Node::Map(_) => "map",
+        Node::Video(_) => "video",
+        Node::View(_) => "view",
+        Node::Problem(_) => "problem",
+        _ => return None,
+    })
+}
+
+/// Whether a click on it does something of its own.
+fn clickable(node: &Node) -> bool {
+    matches!(node, Node::Button(_) | Node::Item(_)) || action(node).is_some()
+}
+
+/// What a click on it sends.
+fn action(node: &Node) -> Option<&Action> {
+    match node {
+        Node::Button(button) => button.action.as_ref(),
+        Node::Item(item) => item.action.as_ref(),
+        Node::Stack(stack) => stack.action.as_ref(),
+        _ => None,
+    }
+}
+
+/// A click on the first of `chain` that takes one.
+fn click(chain: &[Visited<'_>]) -> Result<Acting, String> {
+    for at in chain {
+        if let Node::Button(button) = at.node
+            && button.disabled
+        {
+            return Err("it is disabled".to_owned());
+        }
+        if let Some(action) = action(at.node) {
+            return Ok(Acting::Send {
+                owner: at.owner.to_owned(),
+                action: action.clone(),
+            });
+        }
+    }
+    Err("nothing happens when it is clicked".to_owned())
+}
+
+fn fill(at: Visited<'_>, text: &str) -> Result<Acting, String> {
+    match at.node {
+        Node::Input(input) if input.disabled => Err("the field is disabled".to_owned()),
+        Node::Input(input) => Ok(Acting::Fill {
+            owner: at.owner.to_owned(),
+            id: input.id.clone(),
+            to: input.to.clone(),
+            change: input.change.clone(),
+            text: text.to_owned(),
+        }),
+        _ => Err("only a text field can be filled".to_owned()),
+    }
+}
+
+/// A message sent as a click would send it.
+fn sent(owner: &str, to: Option<String>, msg: &Data) -> Acting {
+    Acting::Send {
+        owner: owner.to_owned(),
+        action: Action::Send {
+            to,
+            msg: msg.clone(),
+        },
+    }
+}
+
+/// What `keys` (and Escape, `dismiss`) send for `pressed`.
+fn keyed<'k>(keys: &'k crate::Keys, dismiss: Option<&'k Data>, pressed: &Held) -> Option<&'k Data> {
+    keys.0
+        .iter()
+        .find(|(chord, _)| Held::of_chord(chord) == *pressed)
+        .map(|(_, msg)| msg)
+        .or_else(|| {
+            (*pressed == Held::of_name("escape"))
+                .then_some(dismiss)
+                .flatten()
+        })
+}
+
+/// A key and the modifiers held, `secondary` made the platform's own.
+#[derive(Debug, PartialEq)]
+struct Held {
+    key: String,
+    ctrl: bool,
+    alt: bool,
+    shift: bool,
+    cmd: bool,
+}
+
+impl Held {
+    fn new(key: &str, [ctrl, alt, shift, cmd, secondary]: [bool; 5]) -> Self {
+        let mac = cfg!(target_os = "macos");
+        Self {
+            key: key.to_owned(),
+            ctrl: ctrl || (secondary && !mac),
+            alt,
+            shift,
+            cmd: cmd || (secondary && mac),
+        }
+    }
+
+    fn of(chord: &KeyChord) -> Self {
+        Self::new(&chord.key, [
+            chord.ctrl,
+            chord.alt,
+            chord.shift,
+            chord.cmd,
+            chord.secondary,
+        ])
+    }
+
+    fn of_chord(chord: &crate::Chord) -> Self {
+        Self::new(&chord.key, [
+            chord.ctrl,
+            chord.alt,
+            chord.shift,
+            chord.cmd,
+            chord.secondary,
+        ])
+    }
+
+    fn of_name(name: &str) -> Self {
+        KeyChord::parse(name).map_or_else(|_| Self::new(name, [false; 5]), |chord| Self::of(&chord))
+    }
+}
+
+fn reference(path: &[usize]) -> String {
+    let places: Vec<String> = path.iter().map(usize::to_string).collect();
+    format!("e{}", places.join("."))
+}
+
+fn parse_reference(reference: &str) -> Result<Vec<usize>, String> {
+    let bad = || format!("`{reference}` is no element ref; refs look like `e0.2`");
+    let places = reference.strip_prefix('e').ok_or_else(bad)?;
+    if places.is_empty() {
+        return Ok(Vec::new());
+    }
+    places
+        .split('.')
+        .map(|place| place.parse::<usize>().map_err(|_| bad()))
+        .collect()
+}
+
+/// `text` cut to `most` characters.
+fn cut(text: &str, most: usize) -> String {
+    match text.char_indices().nth(most) {
+        Some((end, _)) => format!("{}…", &text[..end]),
+        None => text.to_owned(),
+    }
+}

@@ -46,6 +46,7 @@ mod roots;
 mod schema;
 mod scroll_follow;
 mod style;
+mod view_access;
 mod vm;
 mod window;
 pub mod words;
@@ -80,6 +81,7 @@ pub use {
         Shade, Shadow, ShadowLayer, ShadowPreset, Sides, States, Style, Stylesheet, Token,
         Transition, TransitionKind,
     },
+    view_access::{Acting, MAX_VIEW_NODES, ViewAct, ViewNode, ViewTree},
     vm::printable,
     window::{Chrome, Display, ModWindowSize, Platform, Titlebar, WindowPlace, WindowState},
     workspace::{

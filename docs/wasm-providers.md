@@ -20,8 +20,9 @@ not rebuild or restart the Moonframe executable to add one.
 
 WASM providers cannot read your files, use the network, inherit your
 environment, or spawn processes. The built-in machine-data capability
-is `system` (CPU, memory and network counters), and `moonframe.page` renders
-a public web page for it ([below](#rendering-a-web-page)). Embedding apps can register
+is `system` (CPU, memory and network counters); `moonframe.page` renders
+a public web page for it ([below](#rendering-a-web-page)), and `moonframe.view`
+reads a mod's view and acts on it ([below](#reading-and-driving-a-view)). Embedding apps can register
 namespaced capabilities such as `mshub.entities`. There are no built-in `http`, `fs`
 or `exec` capabilities. Process and native providers run with the user's
 access instead. See the [library guide](https://github.com/moonframehq/moonframe/blob/main/docs/library.md)
@@ -106,7 +107,7 @@ Manifest fields for a WASM provider are:
 | `kind` | Must be `"wasm"`; no `command` or `file` field. |
 | `interval` | Seconds to wait for a message before calling `tick`; defaults to `1.0`, allowed range `0.1`–`3600.0`. |
 | `start` | `"on-demand"` (default), or `"always"` to start with the app. |
-| `capabilities` | An empty list by default; `"system"`, Moonframe's own (`"moonframe.page"`), and names registered by the embedding host. Unknown names are manifest errors. |
+| `capabilities` | An empty list by default; `"system"`, Moonframe's own (`"moonframe.page"`, `"moonframe.view"`), and names registered by the embedding host. Unknown names are manifest errors. |
 | `[settings]` | Your configuration, converted to JSON and passed to `start`. |
 
 Unknown manifest fields are errors. Keep provider-specific configuration
@@ -761,6 +762,47 @@ and lookup, and WebRTC is off. Its calls have their own bounds (a minute
 and a quarter, about 8 MiB), not `host_call_limits`. Four render at once.
 It needs the `browser` feature and, so far, macOS; elsewhere the call
 answers why not.
+
+### Reading and driving a view
+
+`moonframe.view` lets a provider look at a mod's view in the front main
+window as a person would describe it, and do one thing a person could do
+to it: test a page it wrote, or drive one for its user. List it,
+`capabilities = ["moonframe.view"]`, then:
+
+```rust
+let page: serde_json::Value =
+    moonframe_provider::host_call("moonframe.view", "tree", &serde_json::json!({ "mod": "notes" }))?;
+let after: serde_json::Value = moonframe_provider::host_call(
+    "moonframe.view",
+    "act",
+    &serde_json::json!({ "mod": "notes", "ref": "e0.3", "action": "fill", "value": "Groceries" }),
+)?;
+```
+
+`tree` takes `mod` and answers `tree`, one line per element indented by
+depth (`button "Save" [e0.3]`), the same as `nodes` (`ref`, `role`, `name`,
+`value`, `selected`, `disabled`, `depth`), `truncated` past 2,000 elements,
+and `problems`, what the mod and the components it drew report wrong.
+Components and mounted mods are read through; text inside a clickable
+row names the row. Roles are `button` (a button or a clickable row),
+`item`, `textbox`, `text`, `badge`, `panel`, `document` (markdown),
+`image`, `list`, `popover`, `dialog`, `terminal`, `browser`, `map`,
+`video`, `view` and `problem`.
+
+`act` takes `mod`, `ref` (from the last tree), `action` and its `value`,
+and answers the tree again. It sends what the element itself sends, as a
+person's act would: `click` (the element, or the nearest one around it
+that takes a click), `fill` (a field's text, in place of what it holds,
+typed into the field while it is drawn, which sends its `change`),
+`press` (a key such as `enter`, `escape` or `cmd-k`: the field's `keys` or
+`submit`, an open popover's or dialog's `keys` or `dismiss`, else the
+mod's own `keys`) and `select` (the option of that name inside the
+element: an item, button or clickable row, by its whole name, else the
+only one whose name has it). One that does nothing says why.
+
+The app's own providers reach any mod; a miniapp's provider reaches only
+the mods of its own namespace (`<namespace>:...`).
 
 Each component has a 64 MiB aggregate linear-memory cap and a fresh fuel
 budget per call (currently 2 billion Wasmtime fuel units, not a wall-clock
