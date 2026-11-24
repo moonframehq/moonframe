@@ -9,8 +9,7 @@ use {
         document::{SharedRef, go_to},
         outline::Outline,
         parts::{self, AlertKind},
-        send,
-        tooltips::{LinkTitles, Titles},
+        send, tooltips,
     },
     gpui_kit::{
         base::{StyledExt as _, text::CodeBlock},
@@ -57,7 +56,7 @@ struct Cite {
     source: SharedString,
 }
 
-pub(super) fn extensions(shared: &SharedRef, titles: &Titles) -> MarkdownExtensions {
+pub(super) fn extensions(shared: &SharedRef) -> MarkdownExtensions {
     let alerts = shared.clone();
     let pictures = shared.clone();
     let extensions = MarkdownExtensions::default()
@@ -71,8 +70,7 @@ pub(super) fn extensions(shared: &SharedRef, titles: &Titles) -> MarkdownExtensi
             draw_picture(node, &pictures, window, cx)
         })
         .plugin(Footnotes(shared.clone()))
-        .plugin(Chips)
-        .plugin(LinkTitles(titles.clone()));
+        .plugin(Chips);
     #[cfg(feature = "math")]
     let extensions = super::math::with(extensions);
     extensions
@@ -135,9 +133,19 @@ fn draw_alert(node: &MarkdownNode, shared: &SharedRef, _: &mut Window, cx: &mut 
 /// A view inside the document, kept to the document's rules: its links go
 /// to the mod and its pictures load nothing the mod couldn't show.
 fn guarded(view: TextView, shared: &SharedRef) -> TextView {
-    view.selectable(true)
+    let view = view
+        .selectable(true)
         .image_source(image_source(shared))
-        .on_link_click(link_click(shared))
+        .on_link_click(link_click(shared));
+    // Its links show the tooltips the document's do.
+    let tooltip = shared
+        .lock()
+        .ok()
+        .map(|shared| tooltips::builder(shared.tips.clone()));
+    match tooltip {
+        Some(tooltip) => view.link_tooltip(tooltip),
+        None => view,
+    }
 }
 
 fn parse_picture(node: &Node, cx: &MarkdownParseContext<'_>) -> Option<MarkdownNode> {

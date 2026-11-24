@@ -943,7 +943,8 @@ export type MarkdownProps = {
 	text: string?,
 	link: Data,
 	-- A link's tooltip by its address, over the link's own title
-	-- (`[text](url "title")`, which shows when this names none).
+	-- (`[text](url "title")`, which shows when this names none and every
+	-- link to that address has the same title).
 	tooltips: { [string]: string }?,
 	-- The mod its messages go to; this one when unset.
 	to: string?,

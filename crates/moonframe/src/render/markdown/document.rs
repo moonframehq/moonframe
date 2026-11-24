@@ -10,7 +10,7 @@ use {
         outline::Outline,
         scrolling::{Applied, Scrolling},
         search, send,
-        tooltips::{self, Titles},
+        tooltips::{self, Tips, Titling},
     },
     crate::app::MoonframeApp,
     gpui_kit::{
@@ -53,6 +53,9 @@ pub(super) struct Shared {
     pub(super) alert: Style,
     pub(super) state: Option<WeakEntity<TextViewState>>,
     pub(super) scroll: bool,
+    /// What its links show on hover, for the views inside it (an alert's
+    /// body) as for the document.
+    pub(super) tips: Tips,
 }
 
 pub(super) type SharedRef = Arc<Mutex<Shared>>;
@@ -70,8 +73,8 @@ struct Searched {
 struct Kept {
     shared: SharedRef,
     extensions: MarkdownExtensions,
-    /// Its links' titles, noted as the text parses.
-    titles: Titles,
+    /// Its links' titles, read from its text.
+    titling: Titling,
     /// The text last handed to the view.
     text: String,
     /// The mod's wishes, as of the last frame.
@@ -144,6 +147,7 @@ impl RenderOnce for Document {
             alert: self.alert.clone(),
             state: Some(state.downgrade()),
             scroll: self.markdown.scroll,
+            tips: Tips::default(),
         }));
         let kept = window.use_keyed_state(SharedString::from(format!("{key}/kept")), cx, {
             let shared = shared.clone();
@@ -157,6 +161,9 @@ impl RenderOnce for Document {
                 && let (Ok(mut into), Ok(mut from)) = (current.lock(), shared.lock())
             {
                 std::mem::swap(&mut *into, &mut *from);
+            }
+            if let Ok(mut current) = current.lock() {
+                current.tips = kept.titling.tips();
             }
             current
         });
@@ -175,9 +182,9 @@ impl RenderOnce for Document {
                 kept.reveal_after_layout(&state, rendered, window, cx);
             }
         });
-        let (extensions, titles) = {
+        let (extensions, tips) = {
             let kept = kept.read(cx);
-            (kept.extensions.clone(), kept.titles.clone())
+            (kept.extensions.clone(), kept.titling.tips())
         };
         let mut view = TextView::new(&state)
             // A preview is for looking at: a click on it belongs to its card.
@@ -193,7 +200,7 @@ impl RenderOnce for Document {
             .inline_code_style(self.inline_code)
             .blockquote_style(self.quote)
             .on_link_click(blocks::link_click(&shared))
-            .link_tooltip(tooltips::builder(self.markdown.tooltips.clone(), titles));
+            .link_tooltip(tooltips::builder(tips));
         if let Some(lines) = self.markdown.lines {
             view = view.max_lines(lines).on_link_click(|_, _, _, cx| {
                 // TextView stops mouse-up propagation before calling us.
@@ -218,10 +225,9 @@ impl RenderOnce for Document {
 
 impl Kept {
     fn new(shared: SharedRef, text: String) -> Self {
-        let titles = Titles::default();
         Self {
-            extensions: blocks::extensions(&shared, &titles),
-            titles,
+            extensions: blocks::extensions(&shared),
+            titling: Titling::default(),
             shared,
             text,
             find: None,
@@ -257,6 +263,7 @@ impl Kept {
         cx: &mut Context<Self>,
     ) {
         self.text.clone_from(&markdown.text);
+        self.titling.follow(&markdown.text, &markdown.tooltips, cx);
         self.find.clone_from(&markdown.find);
         self.find_index = markdown.find_index;
         self.found.clone_from(&markdown.found);
