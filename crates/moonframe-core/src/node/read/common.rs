@@ -74,10 +74,12 @@ impl Action {
             },
             (None, ..) if browser.is_some() => Err(misplaced()),
             (None, Some(_), _)
-                if fields.raw("context").is_none() && !Pointer::sends(fields) =>
+                if fields.raw("context").is_none()
+                    && fields.raw("measure").is_none()
+                    && !Pointer::sends(fields) =>
             {
                 Err(fields.cx().key("to").fail(
-                    "`to` goes with a `msg`, `context`, `pointer`, `wheel`, `drop`, a gesture or browser `command`",
+                    "`to` goes with a `msg`, `context`, `measure`, `pointer`, `wheel`, `drop`, a gesture or browser `command`",
                 ))
             },
             (None, _, Some(AnyCommand::App(command))) => Ok(Some(Self::Command(command))),

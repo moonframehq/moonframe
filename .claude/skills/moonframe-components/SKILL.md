@@ -73,13 +73,13 @@ for the API, limits, caller identity and build policies.
 | --- | --- | --- |
 | `ui.text "..."` | any text; a bare string child is plain text | `text`, `tone`, `size`, `weight` (`light` `normal` `medium` `semibold` `bold`), `truncate` (one line), `lines` (at most N lines), `wrap = false` (keep lines whole, for code that scrolls sideways), `syntax` (color it as code in this language, a line at a time), extras |
 | `ui.icon "name"` | a bundled icon at the text's size and color; `spin = true` turns it (loaders). Lucide glyphs (git: `git-branch` `git-commit-horizontal` `git-merge` `git-pull-request` `git-pull-request-draft` `git-pull-request-closed` `git-compare` `circle-dot`), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, brands `brand-github` `brand-gitlab` `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama`; the full list is `IconName` in types/moonframe.d.luau. An app built on Moonframe adds its own as `app-NAME` (lowercase words joined by hyphens): its `icons/app-NAME.svg`, or `circle-dashed`, a placeholder, where the app lacks it | `name`, `tone`, `size`, `spin`, extras |
-| `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), `zoom` (screen pixels per picture pixel, 1 is 100 %: a viewer that fills its parent unless sized) panned to `center = { x, y }` (fractions of the picture), `overlay = { elements }` drawn over the picture wherever it lands (their `area` is in fractions of the picture: a crop frame, spots), `measure` (sent with the picture's `width`, `height`, `box_width`, `box_height` and the `fit` zoom when they change), extras |
+| `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), `zoom` (screen pixels per picture pixel, 1 is 100 %: a viewer that fills its parent unless sized) panned to `center = { x, y }` (fractions of the picture), `overlay = { elements }` drawn over the picture wherever it lands (their `area` is in fractions of the picture: a crop frame, spots), `measure` (sent with the picture's `width`, `height`, `box_width`, `box_height` and the `fit` zoom when they, `measure`, or `to` change), extras |
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone`, extras |
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`), `exit` (sent once, with `exited = true` added, as the shell exits; without it Enter starts another) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
 | `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, `> [!NOTE]` alerts, footnotes, frontmatter, highlighted code with a copy button; LaTeX in a build with `math`), up to 1 MiB; links send `link` instead of opening, a `#heading` link scrolls there, a `[label](cite:source)` link draws a source chip, and pictures show only with `images`, never from the web (a picture titled `emoji`, `![:party:](~/.cache/moonframe/images/emoji/party.png "emoji")`, draws inline at the line's height from the image cache alone, with or without `images`, its alt text standing in until it loads or when it is missing); styled by `markdown`, `markdown-code`, `markdown-quote`, `markdown-alert`, `markdown-find` and `markdown-find-current` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `lines` (at most N lines, for a preview), `images`, `image` (a click on a picture on its own line, with `src` and `alt`), `outline` (sent with `headings`: `level`, `text`, `at`, `slug`), `section` (sent with `heading`, the index being read), `reveal = { at, seq }` (scrolls there when it changes), `find`, `find_index`, `found` (sent with `count`), `stream` (fade in what is added), `scrolled` (with `scroll`: sent as the reader scrolls, with `fraction`, 0 at the top to 1 at the end), `scroll_at = { fraction, seq }` (with `scroll`: scrolls there when it changes, without sending `scrolled`) |
 | `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
-| `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a two-finger double tap, a double click and its buttons zoom, and two fingers turn it (it settles on north within a few degrees); without `center`/`zoom` it frames the pins and routes. With `glide`, a new `center`, `zoom` or `bearing` eases the map there. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key, nor do `vector-liberty` `vector-positron` `vector-streets` `vector-dark` `vector-graphite`, vector tiles drawn on the GPU by gpui-maps in builds with the `map-vector` feature; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `bearing` (the compass direction up the box, degrees clockwise from north; a new one turns the map where it stands, so feed `move`'s back in and a compass shown while it is not 0 sets it to 0 on a click), `pins` (each `lat`, `lon`, `label` up to 3 characters or `icon`, `color`, `shape` `dot` `disc` `balloon`, `selected`, `pulse` (a halo breathes out of it: where the user is), `msg`), `routes` (each `points` flat lat, lon pairs drawn as they are, or `via` stops and `mode` `walk` `bike` `car` routed along streets by routing.openstreetmap.de; `color`, `stroke`, `dashed`; the style's `color` otherwise), `routed` (sent with `route`, `seconds`, `meters` once a `via` route is found), `move` (sent with `lat`, `lon`, `zoom`, `bearing` after the user moves it, as they go), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
+| `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a two-finger double tap, a double click and its buttons zoom, and two fingers turn it (it settles on north within a few degrees); without `center`/`zoom` it frames the pins and routes. With `glide`, a new `center`, `zoom` or `bearing` eases the map there. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key, nor do `vector-liberty` `vector-positron` `vector-streets` `vector-dark` `vector-graphite`, vector tiles drawn on the GPU by gpui-maps in builds with the `map-vector` feature; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `bearing` (the compass direction up the box, degrees clockwise from north; a new one turns the map where it stands, so feed `move`'s back in and a compass shown while it is not 0 sets it to 0 on a click), `pins` (each `lat`, `lon`, `label` up to 3 characters or `icon`, `color`, `shape` `dot` `disc` `balloon`, `selected`, `pulse` (a halo breathes out of it: where the user is), `msg`), `routes` (each `points` flat lat, lon pairs drawn as they are, or `via` stops and `mode` `walk` `bike` `car` routed along streets by routing.openstreetmap.de; `color`, `stroke`, `dashed`; the style's `color` otherwise), `routed` (sent with `route`, `seconds`, `meters` when a `via` route is found or `routed`/`to` changes), `move` (sent with `lat`, `lon`, `zoom`, `bearing` after the user moves it, as they go), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
 | `ui.video { source = "camera", white = 4095 }` | live frames from another process, from a ring in shared memory, in a 16-bit colour-managed native view that fills its space (macOS, the `video` feature); nothing draws over it, so `guides` draws crop frames and lines in the picture. `source`, `id`, `zoom`, `center`, `filter` (`auto` `nearest` `linear`), `color` (`srgb` `display-p3` `rec709` `rec2020` `linear-srgb` `linear-p3` `none`), `extended`, `black`, `white`, `gain`, `gamma`, `guides`, `probe`, `stats`, `probed`, `width`, `height`. Most apps want `video-viewer`; see `docs/video.md` |
 | `ui.view { name = "chart", id = "sales", props = {...} }` | a view the app writes in Rust and registers by `name` (apps on the Moonframe library; the starter registers none): what Luau can't draw, such as an editor or a canvas. Kept by mod and `id`, it gets `props` again when they change, and sends this mod's `update` messages of its own | `name`, `id`, `props`, `class`, `style` |
 
@@ -131,6 +131,20 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `scroll_to = 12` reveals direct child 12 (one-based) when the index
   changes. It scrolls only as far as needed and leaves wheel scrolling
   free between changes. Set it to nil to reset the request.
+
+- **Measure a scrolling stack** (`row`, `column`): with `scroll` enabled,
+  `measure = msg` sends `msg` (to `to`, else the drawing mod) with its
+  box's `width` and `height`, its content's `content_width` and
+  `content_height`, how far it is scrolled (`x`, `y`), how many of its
+  first children end inside its box (`fit`, as laid out before scrolling)
+  and the first and last child any part of which shows (`first`, `last`,
+  one-based; 0 when none does), each time one of them, `measure`, or `to`
+  changes: as it lays out, resizes and scrolls, in whole pixels. A strip
+  shows its arrows only
+  while `content_width > width`, each unavailable at its end (`x == 0`,
+  `x >= content_width - width`); a row of pills (`scroll = "x", scrollbar =
+  false`) keeps the first `fit` and opens the rest from Show more; a list
+  keeps `first`, to reveal it with `scroll_to` when it comes back.
 
 - **Frame keys** (`row`, `column`, `panel`): `grow`, `width`, `height`,
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `follow = true` (with `scroll`:
@@ -299,6 +313,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`icon-button`](#icon-button) | Controls | An action or toggle shown only as an icon: in a title bar, a panel header, a toolbar. Always give a `tooltip`. For buttons with words use `ui.button` or `toolbar`; for back/forward use `nav-buttons`; for joined icon choices use `button-group`. |
 | [`picker`](#picker) | Controls | A property of a record set from many options: assignee, labels, project, status, priority, "blocked by", in a task's detail panel or a row. For a setting in a form use `dropdown`; for a filter over a list use `filter-dropdown`; for 2 to 4 short choices use `segmented`; for addresses use `recipient-field`. |
 | [`segmented`](#segmented) | Controls | A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`. |
+| [`t3-composer`](#t3-composer) | Controls | Draw inside the mod enabled as the T3 writer. Handle project, draft, picker and cancel messages locally and observe app.t3.results[id] for delivery. |
 | [`toolbar`](#toolbar) | Controls | A row of small quiet buttons above a panel or list. For icon-only buttons use `icon-button`; for one-of-many choices use `segmented`. |
 | [`audio-meter`](#audio-meter) | Data | Sound levels while recording or playing, from values an engine published. For a fraction that isn't sound use `vertical-bar` or `meter`. |
 | [`avatar`](#avatar) | Data | Stand for a person, space, project or agent by its name: comment authors, workspace switchers, people lists. Use `comment-card` for an authored message (it draws one), `status-dot` for a state alone. |
@@ -424,6 +439,8 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`list`](#list) | Lists | A plain selectable list of rows with label, detail and badge. For rich rows (status, icons, two lines) use `agent-row`, `workspace-row` or `tree`. |
 | [`mail-row`](#mail-row) | Lists | Each row of an inbox or a mailbox's message list; stack them in a `ui.list` (rows of one height) or a scrolling column, under `segmented` category tabs. For tasks use `task-row`; for pull requests use `pr-row`; for a plain selectable row use `list`; for the open message's header use `message-header`. |
 | [`ratio-row`](#ratio-row) | Lists | Lists of parts of a whole: where signups came from, top countries, devices, tiers. Stack them in a column; give `share` for the bar under each. For a bar of all the parts at once use `share-bar`; for a data grid use `table`. |
+| [`t3-sessions`](#t3-sessions) | Lists | Use for an overview of app.t3.threads, or a subset filtered by project, issue or worktree. Handle fold and thread messages in the drawing mod. |
+| [`t3-thread`](#t3-thread) | Lists | Use for one thread from app.t3 in a project sidebar or session overview. Set expanded to show its worktree, provider and update time. |
 | [`task-row`](#task-row) | Lists | Rows of tasks, to-dos, habits or events in a planner, an inbox or a day view; stack them in a column under `section` headings. For a plain selectable row use `list`; for pull requests use `pr-row`. |
 | [`tree`](#tree) | Lists | Nested rows: a file tree in a review, worktrees under a repository, agents and their sub-agents. For flat rows use `list`; for a heading over a group of rows use `group-header`; for one foldable block use `collapsible`. |
 | [`activity-bar`](#activity-bar) | Navigation | Switching between the app's main views from a thin strip at the window's edge (terminals, pull requests, issues, agents, settings). For a collapsed list of workspaces use `rail`; for text tabs use `tabs`; for a full list of rows use `sidebar`. |
@@ -1223,6 +1240,29 @@ segmented { options = { { id = "light", label = "Light" }, { id = "dark", label 
 ```
 
 A whole mod using it, with state: `app/components/demos/segmented.luau`.
+
+#### `t3-composer`
+
+**T3 Composer.** Start a local T3 Code chat or send a follow-up to an existing thread.
+
+**When:** Draw inside the mod enabled as the T3 writer. Handle project, draft, picker and cancel messages locally and observe app.t3.results[id] for delivery.
+
+| Prop | Meaning |
+| --- | --- |
+| `action` | start or send |
+| `data` | The current app.t3 snapshot |
+| `environmentId` | Environment in which the draft was opened |
+| `id` | Unique request id for this draft revision |
+| `picker` | Whether the project picker is open |
+| `target` | Project id for start, thread id for send |
+| `text` | The current draft |
+| `title` | Thread title when sending a follow-up |
+
+```lua
+local t3_composer = use "t3-composer"
+
+t3_composer { action = "start", data = { available = true, environmentId = "preview", projects = { { id = "mf", label = "Moonframe" } }, results = {  }, threads = {  }, ticket = "preview", total = 0 }, environmentId = "preview", id = "example", target = "mf", text = "" }
+```
 
 #### `toolbar`
 
@@ -4999,6 +5039,46 @@ A whole mod using it, with state: `app/components/demos/mail-row.luau`.
 local ratio_row = use "ratio-row"
 
 ratio_row { color = "#7c5cff", count = "604", icon = "globe", label = "Website signup form", percent = "44%", share = 44 }
+```
+
+#### `t3-sessions`
+
+**T3 Sessions.** T3 sessions grouped by what needs attention, with counts and expandable rows.
+
+**When:** Use for an overview of app.t3.threads, or a subset filtered by project, issue or worktree. Handle fold and thread messages in the drawing mod.
+
+| Prop | Meaning |
+| --- | --- |
+| `folded` | Map from group id to collapsed state |
+| `selected` | Id of the expanded thread |
+| `threads` | Threads in display order |
+| `to` | Mod receiving { fold = group } and { thread = id } |
+
+```lua
+local t3_sessions = use "t3-sessions"
+
+t3_sessions { threads = { { group = "running", id = "docs", issues = {  }, project = "Docs", projectId = "docs", pullRequests = {  }, status = "running", title = "Check examples", updatedAt = "" } } }
+```
+
+#### `t3-thread`
+
+**T3 Thread.** A T3 session with its project, branch and linked work.
+
+**When:** Use for one thread from app.t3 in a project sidebar or session overview. Set expanded to show its worktree, provider and update time.
+
+| Prop | Meaning |
+| --- | --- |
+| `expanded` | Show session details |
+| `msg` | Optional message sent when the row is clicked |
+| `thread` | A thread from app.t3.threads |
+| `to` | Mod receiving the click |
+
+**Styles:** `.t3-thread` `.t3-thread-meta`
+
+```lua
+local t3_thread = use "t3-thread"
+
+t3_thread { thread = { branch = "fix/paging", group = "waiting", id = "review", issues = {  }, project = "Moonframe", projectId = "mf", pullRequests = { { label = "#42", title = "Moonframe", url = "https://example.com/pr/42" } }, status = "waiting", title = "Review pagination", updatedAt = "2026-11-20T12:00:00Z" } }
 ```
 
 #### `task-row`

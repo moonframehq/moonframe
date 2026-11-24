@@ -2,8 +2,12 @@ use {super::*, std::os::unix::fs::PermissionsExt};
 
 fn script(folder: &Path, name: &str, body: &str) {
     let path = folder.join(name);
-    std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    // Replace the executable by rename: rewriting an inode that was just
+    // executed can make the next spawn fail with ETXTBSY on Linux.
+    let file = tempfile::NamedTempFile::new_in(folder).unwrap();
+    std::fs::write(file.path(), format!("#!/bin/sh\n{body}\n")).unwrap();
+    std::fs::set_permissions(file.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    file.persist(path).unwrap();
 }
 
 #[test]
