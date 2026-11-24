@@ -135,6 +135,12 @@ impl MoonframeApp {
     ) -> Result<(), String> {
         match self.workspace.view_act(name, reaches, reference, act)? {
             Acting::Send { owner, action } => self.dispatch(&owner, &action, window, cx),
+            Acting::Copy { owner, text, then } => {
+                cx.write_to_clipboard(ClipboardItem::new_string(text));
+                if let Some(action) = then {
+                    self.dispatch(&owner, &action, window, cx);
+                }
+            },
             Acting::Fill {
                 owner,
                 id,

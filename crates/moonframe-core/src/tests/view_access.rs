@@ -315,3 +315,61 @@ fn an_open_layer_takes_a_key_before_its_field_and_an_address_bar_goes_on_enter()
         other => panic!("{other:?}"),
     }
 }
+
+#[test]
+fn a_shortcut_field_records_the_key_and_a_copy_button_copies() {
+    let controls = r#"return mod { view = function()
+        return ui.column {
+          ui.input { id = "shortcut", placeholder = "Shortcut", capture = "recorded" },
+          ui.button { "Copy code", copy = "ABCD-1234" },
+          ui.button { "Copy and close", copy = "link", msg = "close" },
+        }
+    end }"#;
+    let dir = app(&[("controls", controls)]);
+    let workspace = Workspace::open(dir.path(), false);
+    let tree = workspace.view_tree("controls", &anyone, &no_live).unwrap();
+    let reference = |name: &str| {
+        tree.nodes
+            .iter()
+            .find(|node| node.name == name)
+            .unwrap_or_else(|| panic!("no {name} in\n{}", tree.lines()))
+            .reference
+            .clone()
+    };
+    let act =
+        |name: &str, act: ViewAct| workspace.view_act("controls", &anyone, &reference(name), &act);
+    match act("Shortcut", ViewAct::Press("cmd-shift-k".into())) {
+        Ok(Acting::Send {
+            action:
+                Action::Send {
+                    msg: Data::Map(msg),
+                    ..
+                },
+            ..
+        }) => {
+            assert_eq!(msg.get("msg"), Some(&Data::from("recorded")));
+            assert_eq!(msg.get("keys"), Some(&Data::from("shift-cmd-k")));
+        },
+        other => panic!("{other:?}"),
+    }
+    let lone = act("Shortcut", ViewAct::Press("a".into())).unwrap_err();
+    assert!(lone.contains("no shortcut"), "{lone}");
+    assert_eq!(
+        act("Copy code", ViewAct::Click),
+        Ok(Acting::Copy {
+            owner: "controls".into(),
+            text: "ABCD-1234".into(),
+            then: None
+        })
+    );
+    match act("Copy and close", ViewAct::Click) {
+        Ok(Acting::Copy {
+            text,
+            then: Some(Action::Send { msg, .. }),
+            ..
+        }) => {
+            assert_eq!((text.as_str(), msg), ("link", Data::from("close")));
+        },
+        other => panic!("{other:?}"),
+    }
+}

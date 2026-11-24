@@ -105,6 +105,13 @@ pub enum Acting {
         change: Option<Data>,
         text: String,
     },
+    /// Puts `text` on the clipboard, as a click on a copying control does,
+    /// then dispatches `then` from `owner`, if it sends anything too.
+    Copy {
+        owner: String,
+        text: String,
+        then: Option<Action>,
+    },
     /// A key the field `id` takes: sends `msg` with the field's text, as
     /// [`crate::Input::message`] does; `value` is the text the mod gave it.
     /// Enter in an address bar first takes the browser `browser` (of the
@@ -501,6 +508,20 @@ impl Workspace {
                 .browser
                 .clone()
                 .filter(|_| !input.multiline && pressed == Held::of_name("enter"));
+            // A field recording a shortcut takes it, as it is pressed.
+            if msg.is_none()
+                && browser.is_none()
+                && let Some(capture) = &input.capture
+            {
+                let keys = pressed.name().ok_or_else(|| {
+                    format!("`{key}` is no shortcut: the field records keys held with a modifier")
+                })?;
+                return Ok(sent(
+                    at.owner,
+                    input.to.clone(),
+                    &crate::Markdown::note(capture, [("keys", Data::String(keys))]),
+                ));
+            }
             if msg.is_some() || browser.is_some() {
                 return Ok(Acting::FieldKey {
                     owner: at.owner.to_owned(),
@@ -545,7 +566,7 @@ impl Workspace {
                 if options.len() >= MAX_VIEW_NODES {
                     return Flow::Stop;
                 }
-                if !path.is_empty() && action(inside.node).is_some() {
+                if !path.is_empty() && takes_clicks(inside.node) {
                     options.push((self.name(reading, inside), inside));
                     return Flow::Over;
                 }
@@ -586,7 +607,7 @@ fn role(node: &Node, around: &[Visited<'_>]) -> Option<&'static str> {
         Node::Badge(_) if !in_clickable() => "badge",
         Node::Button(_) => "button",
         Node::Item(_) => "item",
-        Node::Stack(stack) if stack.action.is_some() => "button",
+        Node::Stack(_) if takes_clicks(node) => "button",
         Node::Panel(_) => "panel",
         Node::Input(_) => "textbox",
         Node::Markdown(_) => "document",
@@ -606,7 +627,22 @@ fn role(node: &Node, around: &[Visited<'_>]) -> Option<&'static str> {
 
 /// Whether a click on it does something of its own.
 fn clickable(node: &Node) -> bool {
-    matches!(node, Node::Button(_) | Node::Item(_)) || action(node).is_some()
+    matches!(node, Node::Button(_) | Node::Item(_)) || takes_clicks(node)
+}
+
+/// Whether a click on it sends something or copies something.
+fn takes_clicks(node: &Node) -> bool {
+    action(node).is_some() || copied(node).is_some()
+}
+
+/// What a click on it puts on the clipboard.
+fn copied(node: &Node) -> Option<&String> {
+    match node {
+        Node::Button(button) => button.extras.copy.as_ref(),
+        Node::Item(item) => item.extras.copy.as_ref(),
+        Node::Stack(stack) => stack.extras.copy.as_ref(),
+        _ => None,
+    }
 }
 
 /// What a click on it sends.
@@ -627,11 +663,22 @@ fn click(chain: &[Visited<'_>]) -> Result<Acting, String> {
         {
             return Err("it is disabled".to_owned());
         }
-        if let Some(action) = action(at.node) {
-            return Ok(Acting::Send {
-                owner: at.owner.to_owned(),
-                action: action.clone(),
-            });
+        let owner = at.owner.to_owned();
+        match (copied(at.node), action(at.node)) {
+            (Some(text), then) => {
+                return Ok(Acting::Copy {
+                    owner,
+                    text: text.clone(),
+                    then: then.cloned(),
+                });
+            },
+            (None, Some(action)) => {
+                return Ok(Acting::Send {
+                    owner,
+                    action: action.clone(),
+                });
+            },
+            (None, None) => {},
         }
     }
     Err("nothing happens when it is clicked".to_owned())
@@ -719,6 +766,26 @@ impl Held {
             chord.cmd,
             chord.secondary,
         ])
+    }
+
+    /// Its name as a field recording shortcuts sends it (`cmd-shift-p`):
+    /// none for a lone character, which types rather than being a key.
+    fn name(&self) -> Option<String> {
+        if !(self.ctrl || self.alt || self.cmd) && self.key.chars().count() == 1 {
+            return None;
+        }
+        let held = [
+            (self.ctrl, "ctrl"),
+            (self.alt, "alt"),
+            (self.shift, "shift"),
+            (self.cmd, "cmd"),
+        ];
+        let mut parts: Vec<&str> = held
+            .into_iter()
+            .filter_map(|(on, name)| on.then_some(name))
+            .collect();
+        parts.push(&self.key);
+        Some(parts.join("-"))
     }
 
     fn of_name(name: &str) -> Self {
