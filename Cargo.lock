@@ -6469,6 +6469,7 @@ dependencies = [
  "anstyle",
  "block2 0.6.2",
  "core-graphics-types 0.2.0",
+ "dispatch2",
  "futures",
  "gpui-kit",
  "gpui-maps",

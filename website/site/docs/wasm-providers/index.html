@@ -70,7 +70,8 @@ not rebuild or restart the Moonframe executable to add one.</p>
 </table>
 <p>WASM providers cannot read your files, use the network, inherit your
 environment, or spawn processes. The built-in machine-data capability
-is <code>system</code> (CPU, memory and network counters). Embedding apps can register
+is <code>system</code> (CPU, memory and network counters), and <code>moonframe.page</code> renders
+a public web page for it (<a href="#rendering-a-web-page">below</a>). Embedding apps can register
 namespaced capabilities such as <code>mshub.entities</code>. There are no built-in <code>http</code>, <code>fs</code>
 or <code>exec</code> capabilities. Process and native providers run with the user's
 access instead. See the <a href="https://github.com/moonframehq/moonframe/blob/main/docs/library.md">library guide</a>
@@ -165,7 +166,7 @@ Manifest fields for a WASM provider are:</p>
 </tr>
 <tr>
 <td><code>capabilities</code></td>
-<td>An empty list by default; <code>"system"</code> and names registered by the embedding host. Unknown names are manifest errors.</td>
+<td>An empty list by default; <code>"system"</code>, Moonframe's own (<code>"moonframe.page"</code>), and names registered by the embedding host. Unknown names are manifest errors.</td>
 </tr>
 <tr>
 <td><code>[settings]</code></td>
@@ -809,6 +810,34 @@ fractions from 0 to 1; <code>memory_used</code> and <code>memory_total</code> ar
 <code>received</code> and <code>transmitted</code> are bytes per second. See the complete
 <a href="https://github.com/moonframehq/moonframe/tree/main/app/providers/system">system provider</a>
 for collecting a bounded history and handling a failed host call.</p>
+<h3 id="rendering-a-web-page">Rendering a web page</h3>
+<p><code>moonframe.page</code> loads a web page the way a reader sees it, with its
+scripts, in a hidden web view, and answers with its text and, when asked,
+a picture. List it, <code>capabilities = ["moonframe.page"]</code>, then:</p>
+<pre><code class="language-rust">let page: serde_json::Value = moonframe_provider::host_call(
+    &quot;moonframe.page&quot;,
+    &quot;render&quot;,
+    &amp;serde_json::json!({ &quot;url&quot;: &quot;https://example.com&quot;, &quot;screenshot&quot;: true }),
+)?;
+</code></pre>
+<p><code>render</code> takes <code>url</code> (http or https, no user name or password),
+<code>screenshot</code> (default false), <code>width</code> and <code>height</code> (the window it lays out
+in, 1280 by 900 points by default), <code>timeout</code> (seconds to load, 20 by
+default, at most 60) and <code>drop</code> (up to 64 CSS selectors left out of the
+text, such as <code>["nav", "footer"]</code>). It answers <code>url</code> (where it ended up,
+after redirects), <code>title</code>, <code>text</code> (the rendered text, <code>innerText</code>, up to
+2 MiB), <code>truncated</code>, <code>timed_out</code> (it had not finished loading in its time
+and was read as it showed), and with <code>screenshot</code>, <code>screenshot</code> (<code>mime</code>
+<code>image/png</code>, <code>base64</code>, <code>width</code>, <code>height</code>: what showed, <code>width</code> pixels
+wide whatever the screen's scale, up to 4 MiB) or <code>screenshot_error</code>.
+A page that does not load is an error.</p>
+<p>The page gets a session of its own, kept nowhere, that reaches the public
+internet alone: every connection goes through the proxy a PDF of a web
+page uses, which refuses this machine and its network after each redirect
+and lookup, and WebRTC is off. Its calls have their own bounds (a minute
+and a quarter, about 8 MiB), not <code>host_call_limits</code>. Four render at once.
+It needs the <code>browser</code> feature and, so far, macOS; elsewhere the call
+answers why not.</p>
 <p>Each component has a 64 MiB aggregate linear-memory cap and a fresh fuel
 budget per call (currently 2 billion Wasmtime fuel units, not a wall-clock
 deadline). Bound histories, collections and computation accordingly.

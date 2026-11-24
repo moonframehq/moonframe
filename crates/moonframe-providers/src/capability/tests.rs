@@ -138,3 +138,45 @@ fn async_calls_use_runtime_and_cancel_on_timeout() {
             .contains("timed out")
     );
 }
+
+#[test]
+fn moonframes_own_capabilities_have_their_own_bounds() {
+    let mut caps = Capabilities::default();
+    caps.limits.max_bytes = 8;
+    caps.limits.timeout = Duration::from_millis(10);
+    let bounds = Bounds {
+        max_bytes: 1024,
+        timeout: Duration::from_secs(5),
+    };
+    assert!(
+        caps.moonframe("moonframe.other", Echo(Default::default()), bounds)
+            .unwrap_err()
+            .contains("not one of Moonframe's")
+    );
+    assert!(
+        caps.capability("moonframe.page", Echo(Default::default()))
+            .is_err()
+    );
+    caps.moonframe("moonframe.page", Echo(Default::default()), bounds)
+        .unwrap();
+    let mut who = caller();
+    who.capabilities = vec!["moonframe.page".into()];
+    let large = format!("\"{}\"", "x".repeat(100));
+    assert_eq!(
+        caps.call(&who, &Arc::default(), "moonframe.page", "echo", &large)
+            .unwrap(),
+        large
+    );
+}
+
+#[test]
+fn a_check_outside_the_host_knows_moonframes_own_capabilities() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("provider.toml"),
+        "kind = 'wasm'\ncapabilities = ['moonframe.page']",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("provider.wasm"), "").unwrap();
+    assert!(crate::Manifest::load_declared("acme:test", dir.path(), &[]).is_ok());
+}

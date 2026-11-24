@@ -54,14 +54,40 @@ impl Default for HostCallLimits {
     }
 }
 
+/// The capabilities Moonframe itself gives providers, under `moonframe.`:
+/// a provider.toml may list them in any app, and an app cannot take their
+/// names.
+pub const MOONFRAME_CAPABILITIES: &[&str] = &[
+    // keep-sorted start
+    "moonframe.page",
+    // keep-sorted end
+];
+
 #[derive(Clone, Default)]
 pub struct Capabilities {
-    handlers: BTreeMap<String, Handler>,
+    handlers: BTreeMap<String, Registered>,
     pub limits: HostCallLimits,
     active: Arc<AtomicUsize>,
 }
 
 type Handler = Arc<dyn Fn(&Caller, &str, &str, Duration) -> Result<String, String> + Send + Sync>;
+
+/// A capability's handler, and the bounds its calls have when not the
+/// host's [`HostCallLimits`].
+#[derive(Clone)]
+struct Registered {
+    handler: Handler,
+    bounds: Option<Bounds>,
+}
+
+/// How long one of a capability's calls may take and how large its answer
+/// may be, when its work needs other bounds than the app's other calls
+/// (a page that loads, a picture that comes back).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Bounds {
+    pub max_bytes: usize,
+    pub timeout: Duration,
+}
 
 impl Capabilities {
     /// Registers a namespaced capability, for example `mshub.entities`.
@@ -73,16 +99,40 @@ impl Capabilities {
         )
     }
 
+    /// Registers one of Moonframe's own capabilities, one of
+    /// [`MOONFRAME_CAPABILITIES`], with the bounds its calls have.
+    pub fn moonframe(
+        &mut self,
+        name: &str,
+        cap: impl HostCapability,
+        bounds: Bounds,
+    ) -> Result<(), String> {
+        if !MOONFRAME_CAPABILITIES.contains(&name) {
+            return Err(format!("`{name}` is not one of Moonframe's capabilities"));
+        }
+        self.register(name, Registered {
+            handler: Arc::new(move |caller, method, args, _| cap.call(caller, method, args)),
+            bounds: Some(bounds),
+        })
+    }
+
     fn insert(&mut self, name: &str, handler: Handler) -> Result<(), String> {
         if !valid_name(name) {
             return Err(format!(
                 "capability `{name}` needs a non-reserved namespace, e.g. mshub.entities"
             ));
         }
+        self.register(name, Registered {
+            handler,
+            bounds: None,
+        })
+    }
+
+    fn register(&mut self, name: &str, registered: Registered) -> Result<(), String> {
         if self.handlers.contains_key(name) {
             return Err(format!("capability `{name}` is already registered"));
         }
-        self.handlers.insert(name.to_owned(), handler);
+        self.handlers.insert(name.to_owned(), registered);
         Ok(())
     }
 
@@ -121,15 +171,20 @@ impl Capabilities {
         if !caller.capabilities.iter().any(|name| name == capability) {
             return Err(format!("undeclared capability `{capability}`"));
         }
-        let handler = self
+        let Registered { handler, bounds } = self
             .handlers
             .get(capability)
             .cloned()
             .ok_or_else(|| format!("unknown host capability `{capability}`"))?;
-        if args.len() > self.limits.max_bytes || method.len() > self.limits.max_bytes {
+        let mut limits = self.limits;
+        if let Some(bounds) = bounds {
+            limits.max_bytes = bounds.max_bytes;
+            limits.timeout = bounds.timeout;
+        }
+        if args.len() > limits.max_bytes || method.len() > limits.max_bytes {
             return Err(format!(
                 "host-call arguments exceed {} bytes",
-                self.limits.max_bytes
+                limits.max_bytes
             ));
         }
         serde_json::from_str::<serde_json::Value>(args)
@@ -152,7 +207,6 @@ impl Capabilities {
         };
         let (caller, method, args) = (caller.clone(), method.to_owned(), args.to_owned());
         let (send, receive) = mpsc::sync_channel(1);
-        let limits = self.limits;
         std::thread::Builder::new()
             .name("host-capability".into())
             .spawn(move || {

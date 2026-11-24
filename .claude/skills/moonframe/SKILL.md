@@ -2096,7 +2096,10 @@ terminal log. There are four kinds:
   - It runs sandboxed: no files, network or environment, a 64 MB memory cap,
     and an instruction budget per call.
   - It reaches the machine only through declared `capabilities`: built-in
-    `"system"` (`host::system_load()`) and namespaced APIs the embedding host
+    `"system"` (`host::system_load()`), `"moonframe.page"` (`render` a public
+    web page with its scripts: `{ url, screenshot? }` answers `url`, `title`,
+    `text`, `timed_out` and a base64 PNG `screenshot`; macOS, `browser`
+    feature; see docs/wasm-providers.md) and namespaced APIs the embedding host
     registers with `Moonframe::capability` (or `capability_async`, on `.tokio`).
     Both WIT worlds import `host-call(capability, method, args)`; use the serde
     helper `moonframe_provider::host_call` from `crates/moonframe-provider`.
