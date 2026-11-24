@@ -869,9 +869,10 @@ that takes a click), <code>fill</code> (a field's text, in place of what it hold
 typed into the field while it is drawn, which sends its <code>change</code>; a field
 with no <code>id</code> hears its <code>change</code> with the text, so give one an <code>id</code> to fill
 it as typing would),
-<code>press</code> (a key such as <code>enter</code>, <code>escape</code> or <code>cmd-k</code>: the field's <code>keys</code> or
-<code>submit</code> unless it is disabled, an open popover's or dialog's <code>keys</code> or
-<code>dismiss</code>, else the mod's own <code>keys</code>) and <code>select</code> (the option of that name inside the
+<code>press</code> (a key such as <code>enter</code>, <code>escape</code> or <code>cmd-k</code>: an open popover's or
+dialog's <code>keys</code> or <code>dismiss</code> around it first, then the field's <code>keys</code> or
+<code>submit</code> unless it is disabled, Enter in an address bar taking its browser
+there, else the mod's own <code>keys</code>) and <code>select</code> (the option of that name inside the
 element: an item, button or clickable row, by its whole name, else the
 only one whose name has it). One that does nothing says why. A step the
 window does not take within 5 s fails, and is never carried out later.</p>

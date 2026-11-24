@@ -162,16 +162,25 @@ impl MoonframeApp {
                 id,
                 to,
                 msg,
+                browser,
                 value,
             } => {
                 let value = id
                     .and_then(|id| self.inputs.text(&owner, &id, cx))
                     .unwrap_or(value);
-                let action = Action::Send {
-                    to,
-                    msg: Input::message(&msg, &value),
-                };
-                self.dispatch(&owner, &action, window, cx);
+                if let Some(browser) = browser {
+                    let mod_of = to.as_deref().unwrap_or(&owner);
+                    if self.browsers.visit(mod_of, &browser, &value) {
+                        cx.notify();
+                    }
+                }
+                if let Some(msg) = msg {
+                    let action = Action::Send {
+                        to,
+                        msg: Input::message(&msg, &value),
+                    };
+                    self.dispatch(&owner, &action, window, cx);
+                }
             },
         }
         Ok(())

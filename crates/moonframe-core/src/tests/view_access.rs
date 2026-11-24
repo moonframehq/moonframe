@@ -136,7 +136,7 @@ fn acting_sends_what_a_persons_act_would() {
         else {
             panic!("{key} on the field sends");
         };
-        assert_eq!(sent, Data::from(msg));
+        assert_eq!(sent, Some(Data::from(msg)));
     }
 
     // Escape inside the open popover dismisses it; an option is chosen by name.
@@ -272,4 +272,46 @@ fn a_fields_live_text_shows_over_its_value_and_a_disabled_field_takes_no_key() {
         )
         .unwrap_err();
     assert!(error.contains("no `id` and no `change`"), "{error}");
+}
+
+#[test]
+fn an_open_layer_takes_a_key_before_its_field_and_an_address_bar_goes_on_enter() {
+    let dialog = r#"return mod { view = function()
+        return ui.column {
+          ui.overlay { open = true, keys = { enter = "confirm" },
+            content = ui.column { ui.input { id = "name", placeholder = "Name", submit = "named" } } },
+          ui.input { id = "address", placeholder = "Address", browser = "docs" },
+        }
+    end }"#;
+    let dir = app(&[("dialog", dialog)]);
+    let workspace = Workspace::open(dir.path(), false);
+    let tree = workspace.view_tree("dialog", &anyone, &no_live).unwrap();
+    let reference = |name: &str| {
+        tree.nodes
+            .iter()
+            .find(|node| node.name == name)
+            .unwrap_or_else(|| panic!("no {name} in\n{}", tree.lines()))
+            .reference
+            .clone()
+    };
+    let enter = ViewAct::Press("enter".into());
+    match workspace.view_act("dialog", &anyone, &reference("Name"), &enter) {
+        Ok(Acting::Send {
+            action: Action::Send { msg, .. },
+            ..
+        }) => {
+            assert_eq!(msg, Data::from("confirm"));
+        },
+        other => panic!("{other:?}"),
+    }
+    match workspace.view_act("dialog", &anyone, &reference("Address"), &enter) {
+        Ok(Acting::FieldKey {
+            msg: None,
+            browser: Some(browser),
+            ..
+        }) => {
+            assert_eq!(browser, "docs");
+        },
+        other => panic!("{other:?}"),
+    }
 }

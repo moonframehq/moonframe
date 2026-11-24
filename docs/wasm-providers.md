@@ -798,9 +798,10 @@ that takes a click), `fill` (a field's text, in place of what it holds,
 typed into the field while it is drawn, which sends its `change`; a field
 with no `id` hears its `change` with the text, so give one an `id` to fill
 it as typing would),
-`press` (a key such as `enter`, `escape` or `cmd-k`: the field's `keys` or
-`submit` unless it is disabled, an open popover's or dialog's `keys` or
-`dismiss`, else the mod's own `keys`) and `select` (the option of that name inside the
+`press` (a key such as `enter`, `escape` or `cmd-k`: an open popover's or
+dialog's `keys` or `dismiss` around it first, then the field's `keys` or
+`submit` unless it is disabled, Enter in an address bar taking its browser
+there, else the mod's own `keys`) and `select` (the option of that name inside the
 element: an item, button or clickable row, by its whole name, else the
 only one whose name has it). One that does nothing says why. A step the
 window does not take within 5 s fails, and is never carried out later.

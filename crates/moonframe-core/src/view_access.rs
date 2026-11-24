@@ -107,11 +107,14 @@ pub enum Acting {
     },
     /// A key the field `id` takes: sends `msg` with the field's text, as
     /// [`crate::Input::message`] does; `value` is the text the mod gave it.
+    /// Enter in an address bar first takes the browser `browser` (of the
+    /// mod `to`, else `owner`) to what it says.
     FieldKey {
         owner: String,
         id: Option<String>,
         to: Option<String>,
-        msg: Data,
+        msg: Option<Data>,
+        browser: Option<String>,
         value: String,
     },
 }
@@ -458,44 +461,55 @@ impl Workspace {
     ) -> Result<Acting, String> {
         let pressed = KeyChord::parse(key).map_err(|problem| format!("`{key}`: {problem}"))?;
         let pressed = Held::of(&pressed);
+        // The open popovers and dialogs around it take keys first, nearest
+        // first, as the window's layers do.
         for at in chain {
-            match at.node {
-                Node::Input(input) if input.disabled => {
-                    return Err("the field is disabled".to_owned());
-                },
-                Node::Input(input) => {
-                    let submits = if input.multiline {
-                        pressed == Held::of_name("secondary-enter")
-                    } else {
-                        pressed == Held::of_name("enter")
-                    };
-                    let msg = input
-                        .keys
-                        .iter()
-                        .find(|(chord, _)| Held::of(chord) == pressed)
-                        .map(|(_, msg)| msg)
-                        .or(input.submit.as_ref().filter(|_| submits));
-                    if let Some(msg) = msg {
-                        return Ok(Acting::FieldKey {
-                            owner: at.owner.to_owned(),
-                            id: input.id.clone(),
-                            to: input.to.clone(),
-                            msg: msg.clone(),
-                            value: input.value.clone().unwrap_or_default(),
-                        });
-                    }
-                },
+            let (keys, dismiss, to) = match at.node {
                 Node::Popover(popover) if popover.open => {
-                    if let Some(msg) = keyed(&popover.keys, popover.dismiss.as_ref(), &pressed) {
-                        return Ok(sent(at.owner, popover.to.clone(), msg));
-                    }
+                    (&popover.keys, popover.dismiss.as_ref(), &popover.to)
                 },
                 Node::Overlay(overlay) if overlay.open => {
-                    if let Some(msg) = keyed(&overlay.keys, overlay.dismiss.as_ref(), &pressed) {
-                        return Ok(sent(at.owner, overlay.to.clone(), msg));
-                    }
+                    (&overlay.keys, overlay.dismiss.as_ref(), &overlay.to)
                 },
-                _ => {},
+                _ => continue,
+            };
+            if let Some(msg) = keyed(keys, dismiss, &pressed) {
+                return Ok(sent(at.owner, to.clone(), msg));
+            }
+        }
+        // Then the field it is, or is in.
+        if let Some((at, input)) = chain.iter().find_map(|at| match at.node {
+            Node::Input(input) => Some((at, input)),
+            _ => None,
+        }) {
+            if input.disabled {
+                return Err("the field is disabled".to_owned());
+            }
+            let submits = if input.multiline {
+                pressed == Held::of_name("secondary-enter")
+            } else {
+                pressed == Held::of_name("enter")
+            };
+            let msg = input
+                .keys
+                .iter()
+                .find(|(chord, _)| Held::of(chord) == pressed)
+                .map(|(_, msg)| msg)
+                .or(input.submit.as_ref().filter(|_| submits));
+            // An address bar goes where it says on Enter, submit or not.
+            let browser = input
+                .browser
+                .clone()
+                .filter(|_| !input.multiline && pressed == Held::of_name("enter"));
+            if msg.is_some() || browser.is_some() {
+                return Ok(Acting::FieldKey {
+                    owner: at.owner.to_owned(),
+                    id: input.id.clone(),
+                    to: input.to.clone(),
+                    msg: msg.cloned(),
+                    browser,
+                    value: input.value.clone().unwrap_or_default(),
+                });
             }
         }
         // The mods whose views it is in, nearest first.
