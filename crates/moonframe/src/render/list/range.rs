@@ -40,14 +40,18 @@ struct Kept {
     /// The window frame it was last drawn in, and when.
     frame: u64,
     seen: Option<Instant>,
+    /// Counts the lists drawn here: a range held back for one is never
+    /// sent once another took its place.
+    generation: u64,
 }
 
 /// What to do with a range the list read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Tell {
     Now,
-    /// Held back: send the latest after this long.
-    After(Duration),
+    /// Held back: send the latest after this long, if the list it was held
+    /// for (of this generation) is still there.
+    After(Duration, u64),
     /// Nothing new, or already held back.
     No,
 }
@@ -81,6 +85,7 @@ fn tell(key: &str, list: &(String, Action), frame: u64, rows: Shown, now: Instan
         if (frame > 0 && entry.frame + 1 < frame) || entry.list.as_ref() != Some(list) {
             *entry = Kept {
                 list: Some(list.clone()),
+                generation: entry.generation + 1,
                 ..Kept::default()
             };
         }
@@ -94,7 +99,7 @@ fn tell(key: &str, list: &(String, Action), frame: u64, rows: Shown, now: Instan
             Some((told, _)) if told == rows => Tell::No,
             Some((_, at)) if now.saturating_duration_since(at) < EVERY => {
                 entry.untold = Some(rows);
-                Tell::After(EVERY - now.saturating_duration_since(at))
+                Tell::After(EVERY - now.saturating_duration_since(at), entry.generation)
             },
             _ => {
                 entry.told = Some((rows, now));
@@ -104,11 +109,16 @@ fn tell(key: &str, list: &(String, Action), frame: u64, rows: Shown, now: Instan
     })
 }
 
-/// The range held back from the list `key`, if it is not the one told,
-/// and the `range` of the list now there that tells it.
-fn late(key: &str, now: Instant) -> Option<(Shown, Action)> {
+/// The range held back from the list `key` of `generation`, if that list
+/// is still there (drawn in `frame`, the window's last, or the one before)
+/// and it is not the range told; and the list's `range`, which tells it.
+fn late(key: &str, generation: u64, frame: u64, now: Instant) -> Option<(Shown, Action)> {
     KEPT.with_borrow_mut(|kept| {
         let entry = kept.get_mut(key)?;
+        if entry.generation != generation || (frame > 0 && entry.frame + 1 < frame) {
+            entry.untold = None;
+            return None;
+        }
         let rows = entry.untold.take()?;
         if entry.told.is_some_and(|(told, _)| told == rows) {
             return None;
@@ -169,14 +179,15 @@ pub(super) fn reader(
                     let msg = message(&msg, rows);
                     window.defer(cx, move |window, cx| sender.send(msg, window, cx));
                 },
-                Tell::After(wait) => {
+                Tell::After(wait, generation) => {
                     window
                         .spawn(cx, async move |cx| {
                             cx.background_executor().timer(wait).await;
                             let _ = cx.update(|window, cx| {
-                                // Sent as the list there now asks.
+                                let frame =
+                                    super::super::viewer::frame(window.window_handle().window_id());
                                 if let Some((rows, Action::Send { to, msg })) =
-                                    late(&key, Instant::now())
+                                    late(&key, generation, frame, Instant::now())
                                 {
                                     let sender = Sender { app, owner, to };
                                     sender.send(message(&msg, rows), window, cx);
@@ -233,20 +244,20 @@ mod tests {
         assert_eq!(tell(key, &rows, 2, (1, 5), at(10)), Tell::No);
         assert_eq!(
             tell(key, &rows, 3, (2, 6), at(30)),
-            Tell::After(Duration::from_millis(70))
+            Tell::After(Duration::from_millis(70), 1)
         );
         // Held back already: the latest replaces it.
         assert_eq!(tell(key, &rows, 4, (3, 7), at(50)), Tell::No);
-        assert_eq!(late(key, at(100)), Some(((3, 7), rows.1.clone())));
-        assert_eq!(late(key, at(100)), None);
+        assert_eq!(late(key, 1, 4, at(100)), Some(((3, 7), rows.1.clone())));
+        assert_eq!(late(key, 1, 4, at(100)), None);
         assert_eq!(tell(key, &rows, 5, (9, 13), at(300)), Tell::Now);
         // Back where it was told before the wait ended: nothing to say.
         assert_eq!(
             tell(key, &rows, 6, (10, 14), at(310)),
-            Tell::After(Duration::from_millis(90))
+            Tell::After(Duration::from_millis(90), 1)
         );
         assert_eq!(tell(key, &rows, 7, (9, 13), at(320)), Tell::No);
-        assert_eq!(late(key, at(400)), None);
+        assert_eq!(late(key, 1, 7, at(400)), None);
     }
 
     #[test]
@@ -267,11 +278,25 @@ mod tests {
         assert_eq!(tell(key, &old, 1, (1, 5), at(0)), Tell::Now);
         assert_eq!(
             tell(key, &old, 2, (2, 6), at(10)),
-            Tell::After(Duration::from_millis(90))
+            Tell::After(Duration::from_millis(90), 1)
         );
         // The same rows, another list: told at once.
         assert_eq!(tell(key, &new, 3, (2, 6), at(20)), Tell::Now);
-        assert_eq!(late(key, at(100)), None);
+        assert_eq!(late(key, 1, 3, at(100)), None);
+    }
+
+    #[test]
+    fn a_range_held_back_for_a_list_gone_is_not_sent() {
+        let start = Instant::now();
+        let at = |ms| start + Duration::from_millis(ms);
+        let (key, rows) = ("gone", list("rows"));
+        assert_eq!(tell(key, &rows, 1, (1, 5), at(0)), Tell::Now);
+        assert_eq!(
+            tell(key, &rows, 2, (2, 6), at(10)),
+            Tell::After(Duration::from_millis(90), 1)
+        );
+        // Frames 3 and 4 drew the window without it.
+        assert_eq!(late(key, 1, 4, at(100)), None);
     }
 
     #[test]
