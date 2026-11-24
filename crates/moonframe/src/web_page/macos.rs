@@ -229,13 +229,7 @@ fn text(
             .and_then(|url| url.absoluteString())
             .map_or_else(|| request.url.clone(), |url| url.to_string());
         let rendered = read.map(|(title, text)| {
-            let mut rendered = Rendered {
-                url,
-                title,
-                timed_out,
-                ..Rendered::default()
-            }
-            .with_text(text);
+            let mut rendered = Rendered::page(&url, &title, &text, timed_out);
             match picture.borrow_mut().take() {
                 Some(Ok(screenshot)) => rendered.screenshot = Some(screenshot),
                 Some(Err(problem)) => rendered.screenshot_error = Some(problem),

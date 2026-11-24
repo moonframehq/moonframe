@@ -31,8 +31,12 @@ const READING: Duration = Duration::from_secs(10);
 /// The window the page is laid out in, by default, in points.
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 900;
-/// Most text kept, in bytes: the rest is cut, and `truncated` says so.
+/// Most text kept, in bytes as the answer's JSON writes it: the rest is
+/// cut, and `truncated` says so.
 const MAX_TEXT: usize = 2 * 1024 * 1024;
+/// Most of a title and an address kept, the same way.
+const MAX_TITLE: usize = 4 * 1024;
+const MAX_URL: usize = 8 * 1024;
 /// Largest picture answered, as PNG bytes.
 const MAX_PICTURE: usize = 4 * 1024 * 1024;
 /// Most selectors `drop` takes, and the longest.
@@ -42,8 +46,9 @@ const MAX_SELECTOR: usize = 256;
 /// The bounds of a call: a page that runs its whole time, then is read.
 pub(crate) fn bounds() -> Bounds {
     Bounds {
-        // The text and the picture, as base64, with room for the rest.
-        max_bytes: MAX_TEXT + MAX_PICTURE * 4 / 3 + 64 * 1024,
+        // The text, title and address as JSON writes them and the picture
+        // as base64, with room for the rest.
+        max_bytes: MAX_TEXT + MAX_TITLE + MAX_URL + MAX_PICTURE.div_ceil(3) * 4 + 64 * 1024,
         timeout: MAX_TIMEOUT + READING + Duration::from_secs(5),
     }
 }
@@ -154,19 +159,37 @@ pub(crate) struct Screenshot {
 }
 
 impl Rendered {
-    /// `text` kept up to [`MAX_TEXT`] bytes, on a character's edge.
-    pub(crate) fn with_text(mut self, mut text: String) -> Self {
-        if text.len() > MAX_TEXT {
-            let mut end = MAX_TEXT;
-            while !text.is_char_boundary(end) {
-                end -= 1;
-            }
-            text.truncate(end);
-            self.truncated = true;
+    /// What a page that ended up at `url`, titled `title`, showed: each
+    /// kept within its most as the answer's JSON writes it, on a
+    /// character's edge; a cut text says so.
+    pub(crate) fn page(url: &str, title: &str, text: &str, timed_out: bool) -> Self {
+        let (text, truncated) = within(text, MAX_TEXT);
+        Self {
+            url: within(url, MAX_URL).0.to_owned(),
+            title: within(title, MAX_TITLE).0.to_owned(),
+            text: text.to_owned(),
+            truncated,
+            timed_out,
+            ..Self::default()
         }
-        self.text = text;
-        self
     }
+}
+
+/// The start of `text` that JSON writes in at most `most` bytes, and
+/// whether that is less than all of it.
+fn within(text: &str, most: usize) -> (&str, bool) {
+    let mut written = 0;
+    for (at, c) in text.char_indices() {
+        written += match c {
+            '"' | '\\' | '\n' | '\r' | '\t' | '\u{8}' | '\u{c}' => 2,
+            c if u32::from(c) < 0x20 => 6,
+            c => c.len_utf8(),
+        };
+        if written > most {
+            return (&text[..at], true);
+        }
+    }
+    (text, false)
 }
 
 /// The capability providers call.
@@ -248,24 +271,25 @@ mod tests {
     }
 
     #[test]
-    fn long_text_is_cut_on_a_character() {
-        let text = "é".repeat(MAX_TEXT);
-        let rendered = Rendered::default().with_text(text);
+    fn long_text_is_cut_on_a_character_as_json_writes_it() {
+        let rendered = Rendered::page("", "", &"é".repeat(MAX_TEXT), false);
         assert!(rendered.truncated);
         assert!(rendered.text.len() <= MAX_TEXT);
         assert!(rendered.text.chars().all(|c| c == 'é'));
-        let short = Rendered::default().with_text("hello".to_owned());
+        // Quotes take two bytes each in the answer, which stays in bounds.
+        let quoted = Rendered::page("", "", &"\"".repeat(MAX_TEXT), false);
+        assert_eq!((quoted.text.len(), quoted.truncated), (MAX_TEXT / 2, true));
+        let json = serde_json::to_string(&quoted.text).unwrap();
+        assert!(json.len() <= MAX_TEXT + 2, "{}", json.len());
+        let title = Rendered::page("", &"\u{1}".repeat(MAX_TITLE), "", false).title;
+        assert_eq!(title.len(), MAX_TITLE / 6);
+        let short = Rendered::page("", "", "hello", false);
         assert_eq!((short.text.as_str(), short.truncated), ("hello", false));
     }
 
     #[test]
     fn the_answer_names_its_parts() {
-        let rendered = Rendered {
-            url: "https://example.com/".to_owned(),
-            title: "Example".to_owned(),
-            ..Rendered::default()
-        }
-        .with_text("Hello".to_owned());
+        let rendered = Rendered::page("https://example.com/", "Example", "Hello", false);
         let json: serde_json::Value = serde_json::to_value(&rendered).unwrap();
         assert_eq!(
             json,
