@@ -5,6 +5,7 @@ mountComponents(document.getElementById("cbrowser"), "agent-run");
 // The apps in examples/ that have a screenshot, with the README's one-liners.
 const APPS = [
   ["sessions","Sessions","coding sessions across your repositories"],
+  ["t3-overview","T3 Overview","see which T3 Code sessions need you and reply to a thread"],
   ["workbench","Workbench","a terminal, an editor and files, in tabs and splits"],
   ["daybook","Daybook","a planner with today, an inbox and a month"],
   ["ledger","Ledger","cash against a floor, and funds with their curves"],
@@ -46,6 +47,7 @@ const RELEASED = {
   pilot:["Pilot","a desktop app for the pi coding agent","Needs pi installed."],
   sessions:["Sessions","coding sessions across your repositories",""],
   switchyard:["Switchyard","coding agents across repositories and worktrees",""],
+  "t3-overview":["T3 Overview","follow local coding agents and their pull requests","New to T3? The app walks you through installing T3 Code and connecting it. Requires Python 3. If your release predates this app, see the <a href=\"https://github.com/moonframehq/moonframe/tree/main/examples/t3-overview\">setup and source instructions</a>."],
   trellis:["Trellis","a terminal multiplexer around work trees",""],
   workbench:["Workbench","a terminal, an editor and files, side by side",""],
 };
@@ -112,7 +114,7 @@ const PLATES = APPS.map(([id, title, d]) => ({ lo:`img/${id}.webp`, full:`img/fu
   // example in place, then open its profile. The link refuses a profile that
   // already exists, so the open runs either way.
   cmd: RELEASED[id] ? brew(id) : `moonframe app link examples/${id} --yes; moonframe --profile ${id}`,
-  how: RELEASED[id] ? `<b>Install ${title}</b> on a Mac; Linux and Windows builds are in the <a href="https://github.com/moonframehq/moonframe/releases?q=apps-v&amp;expanded=true">apps release</a>.`
+  how: RELEASED[id] ? `<b>Install ${title}</b> on a Mac; Linux and Windows builds are in the <a href="https://github.com/moonframehq/moonframe/releases?q=apps-v&amp;expanded=true">apps release</a>. ${RELEASED[id][2]}`
     : `<b>Run ${title}</b> from a clone of the repository, with Moonframe installed.` }));
 const SHOTS = [["week-calendar","Week calendar","Day, week and month, with events"],["palette","Command palette","Spotlight, classic, compact or cards"],
   ["table","Table","Sortable, filterable, paged"],["notification-drawer","Notification drawer","Behind a bell, with a badge"]]
