@@ -1110,6 +1110,10 @@ export type InputProps = {
 	-- A code editor's caret goes to this line (from 1), scrolled into view,
 	-- when it changes or the field takes a new `value`.
 	line: number?,
+	-- Where the caret goes when the field takes a new `value`, or when this
+	-- changes: "start", "end" (after a recalled line), or a byte offset, as
+	-- `change` and `select` count `caret`.
+	caret: ("start" | "end" | number)?,
 	-- With `multiline`: sent as the text scrolls (the wheel, the scrollbar,
 	-- the caret carrying it), with `fraction` added, from 0 (the top) to 1
 	-- (the last line at the bottom). Not sent for `scroll_at`.

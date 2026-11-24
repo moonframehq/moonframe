@@ -281,7 +281,11 @@ impl<'w> Painter<'w> {
         }
         let mut fields = self.ui.fields.borrow_mut();
         let field = fields.entry(key.clone()).or_default();
-        if input.value.is_some() && input.value != field.passed {
+        let passed = input.value.is_some() && input.value != field.passed;
+        // A value the field already shows (a mod echoing what was typed)
+        // leaves the caret where the user put it.
+        let renewed = passed && input.value.as_deref() != Some(field.edit.text.as_str());
+        if passed {
             field.passed.clone_from(&input.value);
             field
                 .edit
@@ -291,6 +295,13 @@ impl<'w> Painter<'w> {
                 field.edit.set_caret(0);
             }
         }
+        if let Some(caret) = input.caret
+            && (renewed || field.caret != input.caret)
+        {
+            let at = caret.offset(&field.edit.text);
+            field.edit.set_caret(at);
+        }
+        field.caret = input.caret;
         if input.focus && !field.asked_focus {
             field.edit.focused = true;
         }

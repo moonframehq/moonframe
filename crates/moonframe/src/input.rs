@@ -250,6 +250,8 @@ struct Field {
     rows: Option<u32>,
     /// The code editor's last `line`, to move the caret as it changes.
     line: Option<u32>,
+    /// The last `caret`, to move the caret as it changes.
+    caret: Option<moonframe_core::Caret>,
     /// The mod's `focus` when last drawn, so it takes focus as it turns true.
     focus: bool,
     /// The frame it was last drawn in.
@@ -338,6 +340,7 @@ impl Inputs {
                 placeholder: None,
                 rows: None,
                 line: None,
+                caret: None,
                 focus: false,
                 seen: frame,
                 window: window.window_handle().window_id(),
@@ -374,6 +377,13 @@ impl Inputs {
             state.update(cx, |state, cx| state.set_cursor_position(at, window, cx));
         }
         field.line = input.line;
+        if let Some(caret) = input.caret
+            && (renewed || field.caret != input.caret)
+        {
+            let at = caret.offset(&editor.value(cx));
+            editor.select(at..at, cx);
+        }
+        field.caret = input.caret;
         if input.placeholder != field.placeholder {
             editor.set_placeholder(input.placeholder.as_deref().unwrap_or(""), window, cx);
             field.placeholder = input.placeholder.clone();
