@@ -21,6 +21,7 @@ impl Build for Stack {
             "key",
             "keys",
             "scroll_to",
+            "measure",
         ],
         pointer::POINTER,
     ];
@@ -32,6 +33,19 @@ impl Build for Stack {
                 .cx()
                 .key("scroll_to")
                 .fail("expected a positive child index"));
+        }
+        let measure = match fields.get::<Data>("measure")? {
+            Some(msg) => Some(Action::Send {
+                to: fields.get("to")?,
+                msg,
+            }),
+            None => None,
+        };
+        if measure.is_some() && Frame::from_fields(fields)?.scroll == Scroll::No {
+            return Err(fields
+                .cx()
+                .key("measure")
+                .fail("`measure` reports a scrolling row or column; give it `scroll`"));
         }
         if fields.raw("carry").is_some() && fields.get::<bool>("drag")?.unwrap_or(false) {
             return Err(fields
@@ -52,6 +66,7 @@ impl Build for Stack {
             spread: fields.get("spread")?.unwrap_or(false),
             selected: fields.get("selected")?.unwrap_or(false),
             scroll_to: scroll_to.map(|index| index as usize),
+            measure,
             action: Action::from_fields(fields)?,
             extras: Extras::from_fields(fields)?,
             drag: fields.get("drag")?.unwrap_or(false),
