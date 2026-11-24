@@ -9,7 +9,7 @@ use {
     rune::{El, Tx},
     std::{
         cell::RefCell,
-        collections::{BTreeMap, HashMap},
+        collections::{BTreeMap, HashMap, HashSet},
         rc::Rc,
     },
 };
@@ -29,9 +29,20 @@ pub(crate) struct StackEnds {
     told: Rc<RefCell<HashMap<String, bool>>>,
     /// Messages for mods: sender, recipient and message.
     notes: Rc<RefCell<Vec<(String, String, Data)>>>,
+    /// The stacks with ends the view being drawn drew, by key.
+    drawn: RefCell<HashSet<String>>,
 }
 
 impl StackEnds {
+    /// The view is drawn: stacks it no longer drew are forgotten, so one
+    /// drawn there again later (a chat reopened) starts afresh and tells
+    /// its mod where its end is.
+    pub(crate) fn drawn(&self) {
+        let drawn = self.drawn.take();
+        self.told.borrow_mut().retain(|key, _| drawn.contains(key));
+        self.asked.borrow_mut().retain(|key, _| drawn.contains(key));
+    }
+
     /// Carries out the scrolls stacks asked for while drawing, and hands
     /// back what they have to tell their mods.
     pub(crate) fn settle(&self, tx: &mut Tx) -> Vec<(String, String, Data)> {
@@ -68,6 +79,9 @@ impl<'w> Painter<'w> {
     ) -> El {
         let state = &self.ui.stack_ends;
         let key = place.path.clone();
+        if ends.is_some() {
+            state.drawn.borrow_mut().insert(key.clone());
+        }
         let across = across(direction, frame.scroll);
         match ends.and_then(|ends| ends.scroll_end.as_ref()) {
             Some(asked) => {

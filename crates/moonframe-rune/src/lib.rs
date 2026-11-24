@@ -626,6 +626,7 @@ fn view(ui: &Ui, cx: &mut Cx<Ui>) -> El {
     ui.system_dark.set(cx.system_dark());
     let began = Instant::now();
     let window = render::window(ui);
+    ui.stack_ends.drawn();
     if let Some(name) = &ui.shows {
         ui.shared.drew(name, began.elapsed());
     }
