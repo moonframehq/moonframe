@@ -83,6 +83,32 @@ fn click(workspace: &mut Workspace, label: &str) {
 }
 
 #[test]
+fn t3_overview_guides_first_run_and_connects_from_the_shell() {
+    let (mut workspace, _profile) = overview();
+    for (step, title) in [
+        ("install", "Install T3 Code"),
+        ("start", "Start T3 Code"),
+        ("pair", "Connect to T3 Code"),
+    ] {
+        workspace.set_host(
+            "t3",
+            Data::map([
+                ("available", Data::from(false)),
+                ("setup", Data::from(step)),
+            ]),
+        );
+        assert!(shows(&workspace, title));
+    }
+    click(&mut workspace, "Connect");
+    let outbox = workspace.take_outbox();
+    let [(provider, sender, msg)] = outbox.as_slice() else {
+        panic!("expected a pairing request")
+    };
+    assert_eq!((provider.as_str(), sender.as_str()), ("t3", SHELL));
+    assert_eq!(msg, &Data::from("connect"));
+}
+
+#[test]
 fn t3_composer_submits_through_the_control_and_handles_receipts() {
     let (mut workspace, _profile) = overview();
     let lua = mlua::Lua::new();

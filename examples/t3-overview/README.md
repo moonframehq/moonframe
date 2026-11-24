@@ -4,17 +4,27 @@ A Moonframe app for the sessions in a local T3 Code environment. Fold a group or
 
 ![T3 Overview rendered with sample sessions and usage](../../docs/screenshots/apps/t3-overview.png)
 
-## Run it
+## Try T3 Overview
 
-With T3 Code running locally, run these commands from the Moonframe checkout. Setup uses the T3 CLI to issue a token scoped to `orchestration:read`. Python 3 runs the provider. This flow has been tested with T3 Code 0.1.11.
+T3 Overview is packaged as a standalone app for macOS, Linux and Windows. Look for **T3 Overview** in the [Moonframe apps releases](https://github.com/moonframehq/moonframe/releases?q=apps-v&expanded=true). Once the first release containing it ships, Mac users can also run `brew install moonframehq/tap/moonframe-t3-overview`. To try it before that release, use the source instructions below.
+
+1. Open T3 Overview. Its provider needs [Python 3](https://www.python.org/downloads/) available as `python3`. After installing Python, reopen the app.
+2. If you're new to T3, choose **Get T3 Code** and follow the **Terminal** instructions on the [official download page](https://t3.codes/download) for your operating system. If you already use T3 Desktop, you can install the `t3` command from **Settings → About**.
+3. Run `t3` in a terminal and leave it running. In T3 Code, add a project folder and sign in to a coding agent to start a chat. See the [T3 setup guide](https://github.com/pingdotgg/t3code/blob/main/docs/user/install.md) for supported agents and platform details.
+4. Return to T3 Overview, choose **Refresh**, then **Connect**. This grants read access to the local sessions. The list updates as you work.
+
+![T3 Overview's first-run screen with the T3 Code download and setup guide](../../docs/screenshots/apps/t3-overview-setup.png)
+
+### Run from source
+
+From a Moonframe checkout with Rust installed, link the example and launch it. The same in-app setup works here.
 
 ```sh
-python3 app/providers/t3/t3.py --connect
 cargo run --locked -p moonframe-app -- app link examples/t3-overview
 cargo run --locked -p moonframe-app -- --profile t3-overview app
 ```
 
-Setup saves the token privately in `$T3CODE_HOME/moonframe-token.json`. The default home is `~/.t3`. If a Sheprd pairing already exists for this environment, skip setup and launch Moonframe with `MOONFRAME_T3_TOKEN_FILE` set to the file created by `sheprd-t3 pair --token-file FILE`. The provider checks the environment ID before sending a token and discovers the loopback origin from T3's runtime file. Run setup again when the Moonframe token expires.
+The terminal equivalent of **Connect** is `python3 app/providers/t3/t3.py --connect`. Both use the T3 CLI to issue a token scoped to `orchestration:read` and save it privately in `$T3CODE_HOME/moonframe-token.json`. The default home is `~/.t3`. If a Sheprd pairing already exists for this environment, launch Moonframe with `MOONFRAME_T3_TOKEN_FILE` set to the file created by `sheprd-t3 pair --token-file FILE`. The provider checks the environment ID before sending a token and discovers the loopback origin from T3's runtime file.
 
 ## Start chats and send follow-ups
 

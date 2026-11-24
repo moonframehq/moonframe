@@ -22,11 +22,50 @@ def thread(name, status, **fields):
 
 
 class T3ProviderTest(unittest.TestCase):
-    def test_cli_writes_are_scoped_correlated_and_not_replayed(self):
+    def setUp(self):
         spec = importlib.util.spec_from_file_location("provider", PROVIDER)
-        provider = importlib.util.module_from_spec(spec)
+        self.provider = importlib.util.module_from_spec(spec)
         with mock.patch.object(sys, "dont_write_bytecode", True):
-            spec.loader.exec_module(provider)
+            spec.loader.exec_module(self.provider)
+
+    def test_first_launch_and_in_app_pairing(self):
+        provider = self.provider
+        with tempfile.TemporaryDirectory() as folder, mock.patch.dict(os.environ, clear=True):
+            home = Path(folder)
+            with mock.patch.object(provider, "cli_path", return_value=None):
+                self.assertEqual(provider.snapshot(home)["setup"], "install")
+            with mock.patch.object(provider, "cli_path", return_value="t3"):
+                self.assertEqual(provider.snapshot(home)["setup"], "start")
+                (home / "userdata").mkdir()
+                (home / "userdata/server-runtime.json").write_text('{"origin":"http://localhost:1234"}')
+
+                def run(profile, sender):
+                    envelope = json.dumps({"from": sender, "message": "connect"}) + "\n"
+                    output = io.StringIO()
+                    with (mock.patch.dict(os.environ, MOONFRAME_PROFILE=profile),
+                          mock.patch("sys.stdin", io.StringIO(envelope)), contextlib.redirect_stdout(output)):
+                        provider.main(home)
+                    self.assertNotIn("fixture-token", output.getvalue())
+                    return [json.loads(line) for line in output.getvalue().splitlines()]
+
+                with (mock.patch.object(provider, "environment", return_value="local"),
+                      mock.patch.object(provider, "get", return_value={"schemaVersion": 2, "projects": [], "threads": []}),
+                      mock.patch.object(provider.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "fixture-token")) as issue):
+                    self.assertEqual(run("other", "shell")[-1]["setup"], "pair")
+                    self.assertEqual(run("t3-overview", "other")[-1]["setup"], "pair")
+                    with mock.patch.dict(os.environ, MOONFRAME_T3_TOKEN_FILE=str(home / "external")):
+                        self.assertIsNone(run("t3-overview", "shell")[-1]["setup"])
+                    issue.assert_not_called()
+                    first, ready = run("t3-overview", "shell")
+                    self.assertEqual(first["setup"], "pair")
+                    self.assertTrue(ready["available"])
+                    self.assertEqual(json.loads((home / "moonframe-token.json").read_text())["environmentId"], "local")
+                    self.assertTrue(run("t3-overview", "shell")[-1]["available"])
+                    issue.assert_called_once()
+                    self.assertIn("orchestration:read", issue.call_args.args[0])
+
+    def test_cli_writes_are_scoped_correlated_and_not_replayed(self):
+        provider = self.provider
         home = Path("/fixture/t3")
         state = {
             "available": True,
@@ -76,6 +115,7 @@ class T3ProviderTest(unittest.TestCase):
                     os.environ, MOONFRAME_PROFILE=profile, MOONFRAME_T3_WRITER="overview/shell"
                 ),
                 mock.patch.object(provider, "snapshot", return_value=state),
+                mock.patch.object(provider, "cli_path", return_value="t3"),
                 mock.patch.object(
                     provider.secrets,
                     "token_hex",

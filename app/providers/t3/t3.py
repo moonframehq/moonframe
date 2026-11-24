@@ -5,6 +5,7 @@ import json
 import os
 import queue
 import secrets
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -15,6 +16,31 @@ from urllib.parse import urlsplit
 
 class Unavailable(Exception):
     """A connection or configuration problem fit to show in the overview."""
+
+
+class SetupNeeded(Unavailable):
+    def __init__(self, step, message):
+        super().__init__(message)
+        self.step = step
+
+
+def cli_path():
+    # Desktop launches often lack the shell PATH that T3's installer updated.
+    return shutil.which("t3") or shutil.which("t3", path=str(Path.home() / ".local" / "bin"))
+
+
+def require_cli():
+    cli = cli_path()
+    if not cli:
+        raise SetupNeeded("install", "Install the T3 Code command-line tool on this computer.")
+    return cli
+
+
+def pairing_problem(message):
+    if os.getenv("MOONFRAME_T3_TOKEN_FILE"):
+        return Unavailable(message + " Check the pairing file named by MOONFRAME_T3_TOKEN_FILE.")
+    require_cli()
+    return SetupNeeded("pair", message)
 
 
 def read_json(stream, limit):
@@ -29,7 +55,7 @@ def get(connection, path, headers):
     response = connection.getresponse()
     if response.status != 200:
         if response.status in (401, 403):
-            raise Unavailable("T3 Code refused access. Pair again with orchestration read access.")
+            raise pairing_problem("T3 Code refused access. Pair again with orchestration read access.")
         raise Unavailable(f"T3 Code returned HTTP {response.status}.")
     return read_json(response, 32 << 20)
 
@@ -39,7 +65,8 @@ def local_server(home):
         with (home / "userdata/server-runtime.json").open("rb") as stream:
             origin = urlsplit(read_json(stream, 65536)["origin"])
     except FileNotFoundError:
-        raise Unavailable("Start T3 Code on this machine to see its sessions.") from None
+        require_cli()
+        raise SetupNeeded("start", "Run t3 in a terminal to start your local server.") from None
     if origin.scheme != "http" or origin.hostname not in {"localhost", "127.0.0.1", "::1"}:
         raise Unavailable("Expected a local T3 Code server in server-runtime.json.")
     return http.client.HTTPConnection(origin.hostname, origin.port, timeout=6)
@@ -66,7 +93,7 @@ def connect(home):
     path = home / "moonframe-token.json"
     issued = subprocess.run(
         [
-            "t3",
+            require_cli(),
             "auth",
             "session",
             "issue",
@@ -103,19 +130,17 @@ def load(home):
     path = credential_path(home)
     connection = local_server(home)
     try:
+        identity = environment(connection)
         try:
             with path.open("rb") as stream:
                 saved = read_json(stream, 16384)
         except FileNotFoundError:
-            raise Unavailable(
-                "Run the T3 provider setup (t3.py --connect) or set MOONFRAME_T3_TOKEN_FILE."
-            ) from None
-        identity = environment(connection)
+            raise pairing_problem("Connect Moonframe to read sessions from your local T3 server.") from None
         if not saved["environmentId"] or saved["environmentId"] != identity:
-            raise Unavailable("The pairing file belongs to a different T3 environment.")
+            raise pairing_problem("The pairing file belongs to a different T3 environment.")
         token = saved["token"]
         if not valid_token(token):
-            raise Unavailable("Invalid T3 pairing file.")
+            raise pairing_problem("Invalid T3 pairing file.")
         state = overview(
             get(
                 connection,
@@ -214,15 +239,21 @@ def overview(snapshot):
 
 
 def snapshot(home):
+    step = None
     try:
         return load(home)
+    except SetupNeeded as error:
+        step, problem = error.step, str(error)
+    except ConnectionRefusedError:
+        step = "start" if cli_path() else "install"
+        problem = "The local T3 server is offline. Start T3 Code and refresh."
     except Unavailable as error:
         problem = str(error)
     except (OSError, http.client.HTTPException):
         problem = "Cannot read the pairing file or reach T3 Code. Check the server and retry."
     except (ValueError, KeyError, TypeError, AttributeError):
         problem = "Unrecognized T3 Code runtime, pairing file, or shell snapshot."
-    return {"available": False, "error": problem, "threads": [], "projects": [], "total": 0}
+    return {"available": False, "error": problem, "setup": step, "threads": [], "projects": [], "total": 0}
 
 
 def configured_writer():
@@ -247,7 +278,7 @@ def perform_write(home, request, state):
         raise Unavailable("Enter a message of up to 64 KiB.")
     try:
         result = subprocess.run(
-            ["t3", "thread", action, "--base-dir", str(home), "--json", target, "-"],
+            [require_cli(), "thread", action, "--base-dir", str(home), "--json", target, "-"],
             input=prompt,
             encoding="utf-8",
             capture_output=True,
@@ -321,6 +352,21 @@ def main(home):
         if envelope is None:
             return
         request = envelope.get("message")
+        if request == "connect":
+            if (
+                state.get("setup") != "pair"
+                or os.getenv("MOONFRAME_T3_TOKEN_FILE")
+                or os.getenv("MOONFRAME_PROFILE") != "t3-overview"
+                or envelope.get("from") != "shell"
+            ):
+                continue
+            try:
+                connect(home)
+            except (OSError, http.client.HTTPException, Unavailable, ValueError, KeyError, subprocess.SubprocessError):
+                state = dict(state, error="Pairing failed. Check the local t3 command and server, then try again.")
+                continue
+            state = snapshot(home)
+            continue
         if not isinstance(request, dict):
             state = snapshot(home)
             continue

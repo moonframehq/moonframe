@@ -2,3 +2,7 @@
 keep  = []
 name  = "t3-overview"
 title = "T3 Overview"
+
+[release]
+cask        = "moonframe-t3-overview"
+description = "Track local T3 Code sessions, start chats and reply to coding agents"

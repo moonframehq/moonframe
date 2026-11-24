@@ -26,6 +26,7 @@ export type Published = {
 	ticket: string?,
 	results: { [string]: Result },
 	error: string?,
+	setup: ("install" | "start" | "pair")?,
 	threads: { Thread },
 	total: number,
 }
@@ -39,4 +40,4 @@ export type Write = {
 	id: string,
 }
 
-export type Message = "refresh" | Write
+export type Message = "refresh" | "connect" | Write

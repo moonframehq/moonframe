@@ -2398,6 +2398,7 @@ type ProviderT3Published = {
 	ticket: string?,
 	results: { [string]: ProviderT3Result },
 	error: string?,
+	setup: ("install" | "start" | "pair")?,
 	threads: { ProviderT3Thread },
 	total: number,
 }
@@ -2409,7 +2410,7 @@ type ProviderT3Write = {
 	ticket: string,
 	id: string,
 }
-type ProviderT3Message = "refresh" | ProviderT3Write
+type ProviderT3Message = "refresh" | "connect" | ProviderT3Write
 
 -- A message for `update` to return: `send "provider:desk" { watch = id }`
 -- is `{ to = "provider:desk", msg = { watch = id } }`, its `msg` typed

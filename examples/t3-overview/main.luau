@@ -13,6 +13,29 @@ end
 
 local tabs = { "Sessions", "Pull requests", "Issues", "Worktrees" }
 
+local installGuide = "https://github.com/pingdotgg/t3code/blob/main/docs/user/install.md"
+
+local function setup(data: index<App, "t3">)
+	local step = if data then data.setup else nil
+	return ui.column { class = "overview",
+		ui.text { "T3 Overview", size = "headline", weight = "semibold" },
+		ui.text { if not data then "Connecting to T3 Code…" elseif step == "install" then "Install T3 Code"
+			elseif step == "start" then "Start T3 Code" elseif step == "pair" then "Connect to T3 Code" else "T3 Code unavailable",
+			size = "large", weight = "semibold" },
+		ui.text(if step == "install" then "Choose Get T3 Code and follow the Terminal instructions to install the t3 command. Run t3 and leave it open."
+			elseif data then data.error or "Check your local server and refresh."
+			else "If this screen persists, install Python 3 with the python3 command on PATH, then reopen T3 Overview."),
+		(step == "start" or step == "install") and ui.text "In T3 Code, add a project folder and sign in to a coding agent to start your first chat.",
+		ui.row {
+			step == "install" and ui.button { label = "Get T3 Code", variant = "primary", to = "app:open", msg = "https://t3.codes/download" },
+			step == "pair" and ui.button { label = "Connect", variant = "primary", to = "provider:t3", msg = "connect" },
+			not data and ui.button { label = "Get Python 3", to = "app:open", msg = "https://www.python.org/downloads/" },
+			ui.button { label = "T3 setup guide", to = "app:open", msg = installGuide },
+			ui.button { label = "Refresh", msg = "refresh" },
+		},
+	}
+end
+
 return mod {
 	subscribe = { "provider/t3", "provider/system", "provider/usage" },
 	init = function(previous: State?): State
@@ -58,7 +81,8 @@ return mod {
 	end,
 	view = function(state: State, app)
 		local data = app.t3
-		local threads = if data then data.threads else {}
+		if not data or not data.available then return setup(data) end
+		local threads = data.threads
 		local selected = nil
 		local filtered = {}
 		local prs: { [string]: boolean } = {}
@@ -106,8 +130,7 @@ return mod {
 			state.notice and ui.text(state.notice),
 			data and state.draft and composer { data = data, action = state.draft.action, id = state.draft.id, text = state.draft.text,
 				environmentId = state.draft.environmentId, target = state.draft.target, title = state.draft.title, picker = state.picker },
-			if not data then ui.text "Connecting to T3 Code…"
-			elseif not data.available then ui.text(data.error or "T3 Code unavailable")
+			if data.total == 0 then ui.text "Connected. Add a project and start your first chat in T3 Code to see it here."
 			elseif #filtered == 0 then ui.text "No matching sessions"
 			else ui.column { scroll = true, grow = true, sessions { threads = filtered, folded = state.folded, selected = state.selected } },
 			data and data.total > #threads and ui.text { `Showing the newest {#threads} of {data.total} sessions` },
