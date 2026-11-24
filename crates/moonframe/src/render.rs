@@ -67,7 +67,7 @@ use {
 
 #[cfg(feature = "terminal")]
 use crate::terminal::Terminals;
-pub(crate) use focus_keys::FocusKeys;
+pub(crate) use focus_keys::{FocusKeys, closed as focus_keys_closed, drawn as focus_keys_drawn};
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
 

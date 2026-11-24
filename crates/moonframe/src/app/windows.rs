@@ -237,8 +237,9 @@ impl MoonframeApp {
     ) -> bool {
         self.key_layers
             .insert(window.window_handle().window_id(), frame.key_layers);
-        self.focus_keys
-            .insert(window.window_handle().window_id(), frame.focus_keys);
+        let id = window.window_handle().window_id();
+        crate::render::focus_keys_drawn(id, &frame.focus_keys);
+        self.focus_keys.insert(id, frame.focus_keys);
         self.request_list_rows(frame.list_requests, cx);
         self.make_views(window, cx);
         frame.animating

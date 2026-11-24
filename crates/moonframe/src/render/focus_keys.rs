@@ -5,39 +5,18 @@
 
 use {
     super::{Cx, Painter, Place},
-    gpui_kit::FocusHandle,
+    gpui_kit::{FocusHandle, WindowId},
     moonframe_core::Keys,
-    std::{
-        cell::{Cell, RefCell},
-        collections::HashMap,
-        time::{Duration, Instant},
-    },
+    std::{cell::RefCell, collections::HashMap},
 };
 
-/// How long a stack not drawn keeps its focus: its window closed, or it
-/// scrolled away in a list.
-const FORGET: Duration = Duration::from_secs(60);
+/// Each window's stacks' focus, by place.
+type Handles = HashMap<Option<WindowId>, HashMap<String, FocusHandle>>;
 
 thread_local! {
     /// Each stack's focus, by its window and place, so it stays the same
-    /// handle from frame to frame, and when it was last drawn.
-    static HANDLES: RefCell<HashMap<String, (FocusHandle, Instant)>> =
-        RefCell::new(HashMap::new());
-    /// When handles not drawn for a while were last let go of.
-    static PRUNED: Cell<Option<Instant>> = const { Cell::new(None) };
-}
-
-/// Lets go of the handles of stacks not drawn for [`FORGET`], at most once
-/// a second.
-fn prune(handles: &mut HashMap<String, (FocusHandle, Instant)>, now: Instant) {
-    if PRUNED
-        .get()
-        .is_some_and(|at| now.saturating_duration_since(at) < Duration::from_secs(1))
-    {
-        return;
-    }
-    PRUNED.set(Some(now));
-    handles.retain(|_, (_, seen)| now.saturating_duration_since(*seen) < FORGET);
+    /// handle from frame to frame while the stack is drawn.
+    static HANDLES: RefCell<Handles> = RefCell::new(HashMap::new());
 }
 
 /// A stack with keys a frame drew: innermost first, as children are drawn
@@ -48,6 +27,27 @@ pub(crate) struct FocusKeys {
     /// The mod that drew it, whose `update` gets the messages.
     pub(crate) owner: String,
     pub(crate) keys: Keys,
+    /// Its place, which its handle is kept by.
+    path: String,
+}
+
+/// A frame of `window` is drawn, with the stacks in `drawn`: the handles of
+/// those it no longer drew go (rows scrolled away in a list, a closed tab).
+pub(crate) fn drawn(window: WindowId, drawn: &[FocusKeys]) {
+    HANDLES.with_borrow_mut(|handles| keep(handles, Some(window), drawn));
+}
+
+/// Windows other than `open` closed: their handles go.
+pub(crate) fn closed(open: &[WindowId]) {
+    HANDLES.with_borrow_mut(|handles| {
+        handles.retain(|window, _| window.is_none_or(|window| open.contains(&window)));
+    });
+}
+
+fn keep(handles: &mut Handles, window: Option<WindowId>, drawn: &[FocusKeys]) {
+    if let Some(places) = handles.get_mut(&window) {
+        places.retain(|path, _| drawn.iter().any(|stack| stack.path == *path));
+    }
 }
 
 impl Painter<'_, '_> {
@@ -63,20 +63,19 @@ impl Painter<'_, '_> {
         if keys.is_empty() || self.preview {
             return None;
         }
-        let key = format!("{:?}/{}", self.window, place.path);
-        let now = Instant::now();
         let focus = HANDLES.with_borrow_mut(|handles| {
-            prune(handles, now);
-            let (focus, seen) = handles
-                .entry(key)
-                .or_insert_with(|| (cx.focus_handle(), now));
-            *seen = now;
-            focus.clone()
+            handles
+                .entry(self.window)
+                .or_default()
+                .entry(place.path.clone())
+                .or_insert_with(|| cx.focus_handle())
+                .clone()
         });
         self.focus_keys.push(FocusKeys {
             focus: focus.clone(),
             owner: place.owner.to_owned(),
             keys: keys.clone(),
+            path: place.path.clone(),
         });
         Some(focus)
     }
@@ -85,24 +84,25 @@ impl Painter<'_, '_> {
 #[cfg(test)]
 mod tests {
     use {
-        super::{FORGET, prune},
+        super::{FocusKeys, Handles, keep},
         gpui_kit::TestAppContext,
-        std::{collections::HashMap, time::Duration},
+        std::collections::HashMap,
     };
 
     #[gpui_kit::test]
-    fn a_stack_not_drawn_for_long_lets_go_of_its_focus(cx: &mut TestAppContext) {
-        let now = std::time::Instant::now();
-        let mut handles = HashMap::new();
-        cx.update(|cx| {
-            handles.insert("drawn".to_owned(), (cx.focus_handle(), now));
-            handles.insert("gone".to_owned(), (cx.focus_handle(), now));
+    fn a_stack_no_longer_drawn_lets_go_of_its_focus(cx: &mut TestAppContext) {
+        let mut handles: Handles = HashMap::new();
+        let stack = cx.update(|cx| FocusKeys {
+            focus: cx.focus_handle(),
+            owner: "list".to_owned(),
+            keys: Default::default(),
+            path: "row[1]".to_owned(),
         });
-        let later = now + FORGET + Duration::from_secs(1);
-        if let Some((_, seen)) = handles.get_mut("drawn") {
-            *seen = later;
-        }
-        prune(&mut handles, later);
-        assert!(handles.contains_key("drawn") && !handles.contains_key("gone"));
+        let places = handles.entry(None).or_default();
+        places.insert("row[1]".to_owned(), stack.focus.clone());
+        places.insert("row[2]".to_owned(), stack.focus.clone());
+        keep(&mut handles, None, &[stack]);
+        let places = &handles[&None];
+        assert!(places.contains_key("row[1]") && !places.contains_key("row[2]"));
     }
 }
