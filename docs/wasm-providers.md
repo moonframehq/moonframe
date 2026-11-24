@@ -782,27 +782,32 @@ let after: serde_json::Value = moonframe_provider::host_call(
 
 `tree` takes `mod` and answers `tree`, one line per element indented by
 depth (`button "Save" [e0.3]`), the same as `nodes` (`ref`, `role`, `name`,
-`value`, `selected`, `disabled`, `depth`), `truncated` past 2,000 elements,
-and `problems`, what the mod and the components it drew report wrong.
-Components and mounted mods are read through; text inside a clickable
-row names the row. Roles are `button` (a button or a clickable row),
+`value`, `selected`, `disabled`, `depth`), `truncated` past 2,000 elements
+or 128 KiB of names and values (each cut at 4,000 characters), and
+`problems`, what the mods it read report wrong. Components and mounted
+mods are read through, a mod that mounts itself once; text inside a
+clickable row names the row, and a field's `value` is the text it holds. Roles are `button` (a button or a clickable row),
 `item`, `textbox`, `text`, `badge`, `panel`, `document` (markdown),
 `image`, `list`, `popover`, `dialog`, `terminal`, `browser`, `map`,
 `video`, `view` and `problem`.
 
 `act` takes `mod`, `ref` (from the last tree), `action` and its `value`,
-and answers the tree again. It sends what the element itself sends, as a
+and answers the tree again, from the window it acted in. It sends what the element itself sends, as a
 person's act would: `click` (the element, or the nearest one around it
 that takes a click), `fill` (a field's text, in place of what it holds,
-typed into the field while it is drawn, which sends its `change`),
+typed into the field while it is drawn, which sends its `change`; a field
+with no `id` hears its `change` with the text, so give one an `id` to fill
+it as typing would),
 `press` (a key such as `enter`, `escape` or `cmd-k`: the field's `keys` or
-`submit`, an open popover's or dialog's `keys` or `dismiss`, else the
-mod's own `keys`) and `select` (the option of that name inside the
+`submit` unless it is disabled, an open popover's or dialog's `keys` or
+`dismiss`, else the mod's own `keys`) and `select` (the option of that name inside the
 element: an item, button or clickable row, by its whole name, else the
-only one whose name has it). One that does nothing says why.
+only one whose name has it). One that does nothing says why. A step the
+window does not take within 5 s fails, and is never carried out later.
 
 The app's own providers reach any mod; a miniapp's provider reaches only
-the mods of its own namespace (`<namespace>:...`).
+the mods of its own namespace (`<namespace>:...`), whatever its view
+mounts: another mod drawn inside it is left out of the tree.
 
 Each component has a 64 MiB aggregate linear-memory cap and a fresh fuel
 budget per call (currently 2 billion Wasmtime fuel units, not a wall-clock

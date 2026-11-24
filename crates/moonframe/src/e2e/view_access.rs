@@ -34,8 +34,8 @@ impl Window<'_> {
     /// The ref of the first element of the shell's view with `role` and `name`.
     fn reference(&mut self, role: &str, name: &str) -> String {
         let app = self.app.clone();
-        self.cx.read_entity(&app, |app, _| {
-            let tree = app.workspace.view_tree(SHELL).unwrap();
+        self.cx.read_entity(&app, |app, cx| {
+            let tree = app.read_view(SHELL, &|_| true, cx).unwrap();
             tree.nodes
                 .iter()
                 .find(|node| node.role == role && node.name == name)
@@ -50,7 +50,7 @@ impl Window<'_> {
         self.cx
             .update(|window, cx| {
                 app.update(cx, |app, cx| {
-                    app.act_on_view(SHELL, reference, &act, window, cx)
+                    app.act_on_view(SHELL, &|_| true, reference, &act, window, cx)
                 })
             })
             .unwrap();
@@ -68,6 +68,15 @@ fn a_fill_types_in_the_field_and_a_key_sends_what_it_holds(cx: &mut TestAppConte
         .cx
         .read_entity(&app, |app, cx| app.inputs.text(SHELL, "q", cx));
     assert_eq!(shown.as_deref(), Some("pears"));
+    // The tree shows what the field holds, which the mod never passed back.
+    let app = window.app.clone();
+    let lines = window.cx.read_entity(&app, |app, cx| {
+        app.read_view(SHELL, &|_| true, cx).unwrap().lines()
+    });
+    assert!(
+        lines.contains(r#"textbox "Search" value="pears""#),
+        "{lines}"
+    );
     assert_eq!(window.log(), "|typed:pears");
     window.act(&field, ViewAct::Press("enter".to_owned()));
     assert_eq!(window.log(), "|typed:pears|go:pears");

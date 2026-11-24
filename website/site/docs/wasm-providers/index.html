@@ -854,25 +854,30 @@ let after: serde_json::Value = moonframe_provider::host_call(
 </code></pre>
 <p><code>tree</code> takes <code>mod</code> and answers <code>tree</code>, one line per element indented by
 depth (<code>button "Save" [e0.3]</code>), the same as <code>nodes</code> (<code>ref</code>, <code>role</code>, <code>name</code>,
-<code>value</code>, <code>selected</code>, <code>disabled</code>, <code>depth</code>), <code>truncated</code> past 2,000 elements,
-and <code>problems</code>, what the mod and the components it drew report wrong.
-Components and mounted mods are read through; text inside a clickable
-row names the row. Roles are <code>button</code> (a button or a clickable row),
+<code>value</code>, <code>selected</code>, <code>disabled</code>, <code>depth</code>), <code>truncated</code> past 2,000 elements
+or 128 KiB of names and values (each cut at 4,000 characters), and
+<code>problems</code>, what the mods it read report wrong. Components and mounted
+mods are read through, a mod that mounts itself once; text inside a
+clickable row names the row, and a field's <code>value</code> is the text it holds. Roles are <code>button</code> (a button or a clickable row),
 <code>item</code>, <code>textbox</code>, <code>text</code>, <code>badge</code>, <code>panel</code>, <code>document</code> (markdown),
 <code>image</code>, <code>list</code>, <code>popover</code>, <code>dialog</code>, <code>terminal</code>, <code>browser</code>, <code>map</code>,
 <code>video</code>, <code>view</code> and <code>problem</code>.</p>
 <p><code>act</code> takes <code>mod</code>, <code>ref</code> (from the last tree), <code>action</code> and its <code>value</code>,
-and answers the tree again. It sends what the element itself sends, as a
+and answers the tree again, from the window it acted in. It sends what the element itself sends, as a
 person's act would: <code>click</code> (the element, or the nearest one around it
 that takes a click), <code>fill</code> (a field's text, in place of what it holds,
-typed into the field while it is drawn, which sends its <code>change</code>),
+typed into the field while it is drawn, which sends its <code>change</code>; a field
+with no <code>id</code> hears its <code>change</code> with the text, so give one an <code>id</code> to fill
+it as typing would),
 <code>press</code> (a key such as <code>enter</code>, <code>escape</code> or <code>cmd-k</code>: the field's <code>keys</code> or
-<code>submit</code>, an open popover's or dialog's <code>keys</code> or <code>dismiss</code>, else the
-mod's own <code>keys</code>) and <code>select</code> (the option of that name inside the
+<code>submit</code> unless it is disabled, an open popover's or dialog's <code>keys</code> or
+<code>dismiss</code>, else the mod's own <code>keys</code>) and <code>select</code> (the option of that name inside the
 element: an item, button or clickable row, by its whole name, else the
-only one whose name has it). One that does nothing says why.</p>
+only one whose name has it). One that does nothing says why. A step the
+window does not take within 5 s fails, and is never carried out later.</p>
 <p>The app's own providers reach any mod; a miniapp's provider reaches only
-the mods of its own namespace (<code>&lt;namespace&gt;:...</code>).</p>
+the mods of its own namespace (<code>&lt;namespace&gt;:...</code>), whatever its view
+mounts: another mod drawn inside it is left out of the tree.</p>
 <p>Each component has a 64 MiB aggregate linear-memory cap and a fresh fuel
 budget per call (currently 2 billion Wasmtime fuel units, not a wall-clock
 deadline). Bound histories, collections and computation accordingly.

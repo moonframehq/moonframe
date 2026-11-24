@@ -80,7 +80,10 @@ mod watch;
 mod windows;
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use picking::selection_file;
-pub(crate) use {acting::on_front, fonts::list_ahead as list_fonts_ahead};
+pub(crate) use {
+    acting::{Chosen, Windows},
+    fonts::list_ahead as list_fonts_ahead,
+};
 
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use hub::every as main_windows;

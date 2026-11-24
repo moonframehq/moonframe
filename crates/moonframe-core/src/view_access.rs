@@ -4,7 +4,10 @@
 //! regions are read through, so the tree is what shows; each element has a
 //! `ref`, its place in that tree, to act on.
 
-use crate::{Action, Data, KeyChord, Node, Workspace};
+use {
+    crate::{Action, Data, KeyChord, Node, Workspace},
+    std::{cell::Cell, collections::BTreeSet},
+};
 
 /// Most elements a tree lists; past it, `truncated` is set.
 pub const MAX_VIEW_NODES: usize = 2000;
@@ -13,6 +16,10 @@ const MAX_NAME: usize = 200;
 const MAX_TEXT: usize = 4000;
 /// Deepest the tree is read, mounts within mounts included.
 const MAX_DEPTH: usize = 128;
+/// Most elements one read visits, listed or not.
+const MAX_VISITS: usize = 50_000;
+/// Most bytes of names and values a tree carries; past it, `truncated`.
+const MAX_TREE_TEXT: usize = 128 * 1024;
 
 /// One element as a person would describe it.
 #[derive(Clone, Debug, PartialEq)]
@@ -34,8 +41,11 @@ pub struct ViewNode {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ViewTree {
     pub nodes: Vec<ViewNode>,
-    /// There were more than [`MAX_VIEW_NODES`].
+    /// There was more than it carries: past [`MAX_VIEW_NODES`] elements or
+    /// their text's budget.
     pub truncated: bool,
+    /// The mods (and copies and components) whose views it read.
+    pub owners: BTreeSet<String>,
 }
 
 impl ViewTree {
@@ -85,8 +95,9 @@ pub enum ViewAct {
 pub enum Acting {
     /// Dispatches `action` from `owner`, as a click on it would.
     Send { owner: String, action: Action },
-    /// Puts `text` in the field `id` (`None`: one with no id), which sends
-    /// its `change`, if it has one, with the text, as typing would.
+    /// Puts `text` in the field `id`, typed into its editor while it is
+    /// drawn, which sends its `change`; a field with no `id` (or none
+    /// drawn) hears its `change` with the text alone.
     Fill {
         owner: String,
         id: Option<String>,
@@ -116,6 +127,27 @@ enum Flow {
     Stop,
 }
 
+/// How a walk reads a view: the mods it may enter, and how many more
+/// elements it may visit.
+struct Reading<'r> {
+    reaches: &'r dyn Fn(&str) -> bool,
+    left: Cell<usize>,
+}
+
+impl<'r> Reading<'r> {
+    fn new(reaches: &'r dyn Fn(&str) -> bool) -> Self {
+        Self {
+            reaches,
+            left: Cell::new(MAX_VISITS),
+        }
+    }
+
+    /// It visited as many as it may.
+    fn spent(&self) -> bool {
+        self.left.get() == 0
+    }
+}
+
 /// An element as the walk meets it: what drew it.
 #[derive(Clone, Copy)]
 struct Visited<'w> {
@@ -124,60 +156,101 @@ struct Visited<'w> {
 }
 
 impl Workspace {
-    /// The mod `name`'s view as it shows, as roles and names.
-    pub fn view_tree(&self, name: &str) -> Result<ViewTree, String> {
-        let root = self.view_root(name)?;
+    /// The mod `name`'s view as it shows, as roles and names: only what
+    /// mods `reaches` allows draw is read, and `live` gives the text a
+    /// field with an `id` shows (by its mod and id), over its `value`.
+    pub fn view_tree(
+        &self,
+        name: &str,
+        reaches: &dyn Fn(&str) -> bool,
+        live: &dyn Fn(&str, &str) -> Option<String>,
+    ) -> Result<ViewTree, String> {
+        let reading = Reading::new(reaches);
+        let root = self.view_root(name, &reading)?;
         let mut tree = ViewTree::default();
+        let mut text = 0;
         let mut path = Vec::new();
         let mut around = Vec::new();
-        self.walk(root, &mut path, &mut around, &mut |path, at, around| {
-            if tree.nodes.len() >= MAX_VIEW_NODES {
-                tree.truncated = true;
-                return Flow::Stop;
-            }
-            if let Some(listed) = role(at.node, around) {
-                tree.nodes.push(ViewNode {
-                    reference: reference(path),
-                    role: listed,
-                    name: self.name(at),
-                    value: match at.node {
-                        Node::Input(input) => Some(input.value.clone().unwrap_or_default()),
+        self.walk(
+            &reading,
+            root,
+            &mut path,
+            &mut around,
+            &mut |path, at, around| {
+                tree.owners.insert(at.owner.to_owned());
+                if tree.nodes.len() >= MAX_VIEW_NODES || text > MAX_TREE_TEXT {
+                    tree.truncated = true;
+                    return Flow::Stop;
+                }
+                if let Some(listed) = role(at.node, around) {
+                    let value = match at.node {
+                        Node::Input(input) => Some(cut(
+                            &input
+                                .id
+                                .as_deref()
+                                .and_then(|id| live(at.owner, id))
+                                .or_else(|| input.value.clone())
+                                .unwrap_or_default(),
+                            MAX_TEXT,
+                        )),
                         _ => None,
-                    },
-                    selected: matches!(at.node, Node::Item(item) if item.selected)
-                        || matches!(at.node, Node::Stack(stack) if stack.selected),
-                    disabled: matches!(at.node, Node::Button(button) if button.disabled)
-                        || matches!(at.node, Node::Input(input) if input.disabled),
-                    depth: around
-                        .iter()
-                        .enumerate()
-                        .filter(|(at, visited)| role(visited.node, &around[..*at]).is_some())
-                        .count(),
-                });
-            }
-            Flow::Into
-        });
+                    };
+                    let name = self.name(&reading, at);
+                    text += name.len() + value.as_ref().map_or(0, String::len);
+                    tree.nodes.push(ViewNode {
+                        reference: reference(path),
+                        role: listed,
+                        name,
+                        value,
+                        selected: matches!(at.node, Node::Item(item) if item.selected)
+                            || matches!(at.node, Node::Stack(stack) if stack.selected),
+                        disabled: matches!(at.node, Node::Button(button) if button.disabled)
+                            || matches!(at.node, Node::Input(input) if input.disabled),
+                        depth: around
+                            .iter()
+                            .enumerate()
+                            .filter(|(at, visited)| role(visited.node, &around[..*at]).is_some())
+                            .count(),
+                    });
+                }
+                Flow::Into
+            },
+        );
+        tree.truncated |= reading.spent();
         Ok(tree)
     }
 
     /// What doing `act` to the element `reference` of the mod `name`'s view
     /// sends, for the host to carry out.
-    pub fn view_act(&self, name: &str, reference: &str, act: &ViewAct) -> Result<Acting, String> {
-        let root = self.view_root(name)?;
+    pub fn view_act(
+        &self,
+        name: &str,
+        reaches: &dyn Fn(&str) -> bool,
+        reference: &str,
+        act: &ViewAct,
+    ) -> Result<Acting, String> {
+        let reading = Reading::new(reaches);
+        let root = self.view_root(name, &reading)?;
         let wanted = parse_reference(reference)?;
         let mut found = None;
         let mut path = Vec::new();
         let mut around = Vec::new();
-        self.walk(root, &mut path, &mut around, &mut |path, at, around| {
-            if path == wanted.as_slice() {
-                found = Some((at, around.to_vec()));
-                Flow::Stop
-            } else if wanted.starts_with(path) {
-                Flow::Into
-            } else {
-                Flow::Over
-            }
-        });
+        self.walk(
+            &reading,
+            root,
+            &mut path,
+            &mut around,
+            &mut |path, at, around| {
+                if path == wanted.as_slice() {
+                    found = Some((at, around.to_vec()));
+                    Flow::Stop
+                } else if wanted.starts_with(path) {
+                    Flow::Into
+                } else {
+                    Flow::Over
+                }
+            },
+        );
         let (at, around) = found.ok_or_else(|| {
             format!("no element `{reference}` in `{name}`'s view; read the tree again")
         })?;
@@ -188,13 +261,20 @@ impl Workspace {
         match act {
             ViewAct::Click => click(&chain),
             ViewAct::Fill(text) => fill(at, text),
-            ViewAct::Press(key) => self.press(&chain, key),
-            ViewAct::Select(option) => self.select(at, option),
+            ViewAct::Press(key) => self.press(&reading, &chain, key),
+            ViewAct::Select(option) => self.select(&reading, at, option),
         }
     }
 
     /// The view of the mod `name` (or a mounted copy, or the shell).
-    fn view_root<'w>(&'w self, name: &'w str) -> Result<Visited<'w>, String> {
+    fn view_root<'w>(
+        &'w self,
+        name: &'w str,
+        reading: &Reading<'_>,
+    ) -> Result<Visited<'w>, String> {
+        if !(reading.reaches)(name) {
+            return Err(format!("`{name}` is out of reach"));
+        }
         let slot = self
             .slot(name)
             .ok_or_else(|| format!("no mod named `{name}`"))?;
@@ -206,14 +286,21 @@ impl Workspace {
 
     /// Calls `visit` with each element under `at`, `at` first, with its
     /// place and those around it, outermost first; `visit` says where to
-    /// go next. False once the walk is stopped.
+    /// go next. It enters only the mods `reading` reaches, none twice on
+    /// the way down (a mod that mounts itself), and stops once it visited
+    /// as many as it may. False once the walk is stopped.
     fn walk<'w>(
         &'w self,
+        reading: &Reading<'_>,
         at: Visited<'w>,
         path: &mut Vec<usize>,
         around: &mut Vec<Visited<'w>>,
         visit: &mut dyn FnMut(&[usize], Visited<'w>, &[Visited<'w>]) -> Flow,
     ) -> bool {
+        let Some(left) = reading.left.get().checked_sub(1) else {
+            return false;
+        };
+        reading.left.set(left);
         match visit(path, at, around) {
             Flow::Stop => return false,
             Flow::Over => return true,
@@ -223,8 +310,19 @@ impl Workspace {
         around.push(at);
         let mut go_on = true;
         for (index, child) in self.children(at).into_iter().enumerate() {
+            let entered = child.owner != at.owner
+                || matches!(
+                    at.node,
+                    Node::Mount(_) | Node::Region(_) | Node::Instance(_)
+                );
+            if entered
+                && (!(reading.reaches)(child.owner)
+                    || around.iter().any(|outer| outer.owner == child.owner))
+            {
+                continue;
+            }
             path.push(index);
-            go_on = self.walk(child, path, around, visit);
+            go_on = self.walk(reading, child, path, around, visit);
             path.pop();
             if !go_on {
                 break;
@@ -290,7 +388,7 @@ impl Workspace {
 
     /// What a person would call it: its label or text, or for a clickable
     /// row the text inside it.
-    fn name(&self, at: Visited<'_>) -> String {
+    fn name(&self, reading: &Reading<'_>, at: Visited<'_>) -> String {
         let name = match at.node {
             Node::Text(text) => return cut(&text.text, MAX_TEXT),
             Node::Markdown(markdown) => return cut(&markdown.text, MAX_TEXT),
@@ -315,7 +413,7 @@ impl Workspace {
             Node::Problem(problem) => problem.clone(),
             Node::Stack(stack) => match &stack.extras.tooltip {
                 Some(tooltip) => tooltip.clone(),
-                None => self.words(at),
+                None => self.words(reading, at),
             },
             _ => String::new(),
         };
@@ -323,12 +421,12 @@ impl Workspace {
     }
 
     /// The words shown inside `at`, joined.
-    fn words(&self, at: Visited<'_>) -> String {
+    fn words(&self, reading: &Reading<'_>, at: Visited<'_>) -> String {
         let mut words: Vec<String> = Vec::new();
         let mut path = Vec::new();
         let mut around = Vec::new();
         let mut length = 0;
-        self.walk(at, &mut path, &mut around, &mut |_, inside, _| {
+        self.walk(reading, at, &mut path, &mut around, &mut |_, inside, _| {
             let word = match inside.node {
                 Node::Text(text) => text.text.as_str(),
                 Node::Badge(badge) => badge.text.as_str(),
@@ -352,11 +450,19 @@ impl Workspace {
 
     /// A key on the element or around it: a field's, an open popover's or
     /// dialog's, else the mod's own `keys`.
-    fn press(&self, chain: &[Visited<'_>], key: &str) -> Result<Acting, String> {
+    fn press(
+        &self,
+        reading: &Reading<'_>,
+        chain: &[Visited<'_>],
+        key: &str,
+    ) -> Result<Acting, String> {
         let pressed = KeyChord::parse(key).map_err(|problem| format!("`{key}`: {problem}"))?;
         let pressed = Held::of(&pressed);
         for at in chain {
             match at.node {
+                Node::Input(input) if input.disabled => {
+                    return Err("the field is disabled".to_owned());
+                },
                 Node::Input(input) => {
                     let submits = if input.multiline {
                         pressed == Held::of_name("secondary-enter")
@@ -395,6 +501,7 @@ impl Workspace {
         // The mods whose views it is in, nearest first.
         for at in chain {
             if let Some((owner, keys)) = self.mod_keys().find(|(name, _)| *name == at.owner)
+                && (reading.reaches)(owner)
                 && let Some(msg) = keyed(keys, None, &pressed)
             {
                 return Ok(sent(owner, None, msg));
@@ -405,21 +512,32 @@ impl Workspace {
 
     /// The option named `option` inside `at`: an item, a button or a
     /// clickable row, by its whole name, else the only one whose name has it.
-    fn select(&self, at: Visited<'_>, option: &str) -> Result<Acting, String> {
+    fn select(
+        &self,
+        reading: &Reading<'_>,
+        at: Visited<'_>,
+        option: &str,
+    ) -> Result<Acting, String> {
         let wanted = option.trim().to_lowercase();
         let mut options: Vec<(String, Visited<'_>)> = Vec::new();
         let mut path = Vec::new();
         let mut around = Vec::new();
-        self.walk(at, &mut path, &mut around, &mut |path, inside, _| {
-            if options.len() >= MAX_VIEW_NODES {
-                return Flow::Stop;
-            }
-            if !path.is_empty() && action(inside.node).is_some() {
-                options.push((self.name(inside), inside));
-                return Flow::Over;
-            }
-            Flow::Into
-        });
+        self.walk(
+            reading,
+            at,
+            &mut path,
+            &mut around,
+            &mut |path, inside, _| {
+                if options.len() >= MAX_VIEW_NODES {
+                    return Flow::Stop;
+                }
+                if !path.is_empty() && action(inside.node).is_some() {
+                    options.push((self.name(reading, inside), inside));
+                    return Flow::Over;
+                }
+                Flow::Into
+            },
+        );
         let whole = options
             .iter()
             .find(|(name, _)| name.trim().to_lowercase() == wanted);
@@ -508,6 +626,10 @@ fn click(chain: &[Visited<'_>]) -> Result<Acting, String> {
 fn fill(at: Visited<'_>, text: &str) -> Result<Acting, String> {
     match at.node {
         Node::Input(input) if input.disabled => Err("the field is disabled".to_owned()),
+        // Its editor is found by its `id`; without one only `change` hears.
+        Node::Input(input) if input.id.is_none() && input.change.is_none() => {
+            Err("the field has no `id` and no `change`, so nothing would take the text".to_owned())
+        },
         Node::Input(input) => Ok(Acting::Fill {
             owner: at.owner.to_owned(),
             id: input.id.clone(),

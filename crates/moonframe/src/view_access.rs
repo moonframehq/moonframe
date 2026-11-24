@@ -125,35 +125,40 @@ impl From<&ViewNode> for Element {
     }
 }
 
-/// Whether `caller` may reach the mod `name`: the app's own providers any,
-/// a miniapp's only those of its namespace.
+/// Whether a provider of `namespace` may reach the mod `name`: the app's
+/// own providers (no namespace) any, a miniapp's only those of its own.
+fn within(namespace: Option<&str>, name: &str) -> bool {
+    namespace.is_none_or(|namespace| {
+        name.strip_prefix(namespace)
+            .is_some_and(|rest| rest.starts_with(':'))
+    })
+}
+
+/// [`within`] as an answer for `caller`.
 fn reaches(caller: &Caller, name: &str) -> Result<(), String> {
-    match &caller.namespace {
-        None => Ok(()),
-        Some(namespace)
-            if name
-                .strip_prefix(namespace.as_str())
-                .is_some_and(|rest| rest.starts_with(':')) =>
-        {
-            Ok(())
+    match caller.namespace.as_deref() {
+        namespace if within(namespace, name) => Ok(()),
+        namespace => {
+            let namespace = namespace.unwrap_or_default();
+            Err(format!(
+                "a `{namespace}` provider reaches only `{namespace}:` mods, not `{name}`"
+            ))
         },
-        Some(namespace) => Err(format!(
-            "a `{namespace}` provider reaches only `{namespace}:` mods, not `{name}`"
-        )),
     }
 }
 
-/// The capability providers call.
-pub(crate) struct View;
+/// The capability providers call, reaching the app's main windows.
+pub(crate) struct View(pub(crate) crate::app::Windows);
 
 impl HostCapability for View {
     fn call(&self, caller: &Caller, method: &str, args: &str) -> Result<String, String> {
+        let namespace = caller.namespace.clone();
         let answer = match method {
             "tree" => {
                 let look: Look = serde_json::from_str(args)
                     .map_err(|error| format!("tree's arguments: {error}"))?;
                 reaches(caller, &look.name)?;
-                read(look.name)?
+                self.read(None, look.name, namespace)?
             },
             "act" => {
                 let asked: Act = serde_json::from_str(args)
@@ -161,10 +166,13 @@ impl HostCapability for View {
                 reaches(caller, &asked.name)?;
                 let act = asked.act()?;
                 let (name, reference) = (asked.name.clone(), asked.reference);
-                crate::app::on_front(WAIT, move |app, window, cx| {
-                    app.act_on_view(&name, &reference, &act, window, cx)
+                let space = namespace.clone();
+                let ((), window) = self.0.on(None, WAIT, move |app, window, cx| {
+                    let reach = |name: &str| within(space.as_deref(), name);
+                    app.act_on_view(&name, &reach, &reference, &act, window, cx)
                 })?;
-                read(asked.name)?
+                // The window the act went to, whichever is in front now.
+                self.read(Some(window), asked.name, namespace)?
             },
             other => {
                 return Err(format!(
@@ -176,13 +184,23 @@ impl HostCapability for View {
     }
 }
 
-/// The mod `name`'s view in the front main window, and its problems.
-fn read(name: String) -> Result<Answer, String> {
-    crate::app::on_front(WAIT, move |app, _, _| {
-        let tree = app.workspace.view_tree(&name)?;
-        let problems = app.view_problems(&name);
-        Ok(Answer::new(name, &tree, problems))
-    })
+impl View {
+    /// The mod `name`'s view in the main window `chosen`, else the front
+    /// one, as a provider of `namespace` may read it, and its problems.
+    fn read(
+        &self,
+        chosen: Option<crate::app::Chosen>,
+        name: String,
+        namespace: Option<String>,
+    ) -> Result<Answer, String> {
+        let (answer, _) = self.0.on(chosen, WAIT, move |app, _, cx| {
+            let reach = |name: &str| within(namespace.as_deref(), name);
+            let tree = app.read_view(&name, &reach, cx)?;
+            let problems = app.view_problems(&tree.owners);
+            Ok(Answer::new(name, &tree, problems))
+        })?;
+        Ok(answer)
+    }
 }
 
 #[cfg(test)]
@@ -214,7 +232,7 @@ mod tests {
                 "{other}"
             );
         }
-        let refused = View
+        let refused = View(Default::default())
             .call(&miniapp, "tree", r#"{ "mod": "settings" }"#)
             .unwrap_err();
         assert!(refused.contains("reaches only"), "{refused}");
@@ -246,7 +264,8 @@ mod tests {
                 .contains("no action")
         );
         assert!(
-            View.call(&caller(None), "look", "{}")
+            View(Default::default())
+                .call(&caller(None), "look", "{}")
                 .unwrap_err()
                 .contains("`tree` and `act`")
         );

@@ -48,6 +48,8 @@ pub(crate) struct Launch {
     pub(crate) backends: Arc<Backends>,
     pub(crate) views: Registry,
     pub(crate) chrome: Chrome,
+    /// Where providers' `moonframe.view` calls reach the main windows.
+    pub(crate) windows: Windows,
 }
 
 pub(crate) struct Hub {
@@ -168,7 +170,8 @@ impl Hub {
         });
         cx.set_global(Installed(hub.clone()));
         // Providers' `moonframe.view` calls reach the windows from here on.
-        acting::serve(cx);
+        let windows = hub.read(cx).launch.windows.clone();
+        windows.serve(cx);
         entries::listen(hub.read(cx).launch.entries.clone(), cx);
         cx.on_window_closed(|cx, id| {
             if let Some(hub) = hub_of(cx) {

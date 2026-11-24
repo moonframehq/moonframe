@@ -101,6 +101,7 @@ fn open_with(cx: &mut TestAppContext, dir: TempDir, views: Registry) -> Window<'
                 backends: backends.clone(),
                 views: views.clone(),
                 chrome,
+                windows: Default::default(),
             },
             cx,
         );
