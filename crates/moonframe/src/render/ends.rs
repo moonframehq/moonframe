@@ -57,6 +57,16 @@ fn newly_asked(key: &str, asked: &Data) -> bool {
     })
 }
 
+/// Forgets the stack at `place`'s last `scroll_end`, as it draws without
+/// one: asked for again, the same value is a new request.
+pub(super) fn not_asked(painter: &Painter<'_, '_>, place: &Place<'_>) {
+    if ASKED.with_borrow(HashMap::is_empty) {
+        return;
+    }
+    let key = format!("{:?}/{}", painter.window, place.path);
+    ASKED.with_borrow_mut(|seen| seen.remove(&key));
+}
+
 /// Whether the stack `key`, drawn in window frame `frame` and `end` now,
 /// tells its mod.
 fn tell(key: &str, frame: u64, end: bool) -> bool {
@@ -84,6 +94,9 @@ pub(super) fn ends(
 ) -> Option<AnyElement> {
     let axes = axes(direction, frame);
     let key = format!("{:?}/{}", painter.window, place.path);
+    if ends.scroll_end.is_none() {
+        not_asked(painter, place);
+    }
     if let Some(asked) = &ends.scroll_end
         && newly_asked(&key, asked)
     {
@@ -168,6 +181,9 @@ mod tests {
         let second = Data::Map([("seq".to_owned(), Data::Integer(2))].into());
         assert!(newly_asked("asked", &first));
         assert!(!newly_asked("asked", &first));
+        assert!(newly_asked("asked", &second));
+        // Drawn without one, then asked for the same again: a new request.
+        super::ASKED.with_borrow_mut(|seen| seen.remove("asked"));
         assert!(newly_asked("asked", &second));
     }
 }

@@ -192,6 +192,13 @@ impl<'w> Painter<'w> {
         let element = looked(element, &look, stack.frame.border, self.palette);
         let element = framed(element, &stack.frame, column, self.palette);
         let element = crate::style::inset_by_border(element, &look, &stack.frame);
+        let element = self.ends(
+            element,
+            stack.ends.as_deref(),
+            stack.direction,
+            &stack.frame,
+            place,
+        );
         let element = if stack.drag {
             element.window_drag()
         } else {

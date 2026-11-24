@@ -194,6 +194,8 @@ pub struct Ui {
     pub(crate) markdown_found: RefCell<HashMap<String, usize>>,
     /// What documents have to tell their mods, which a view cannot send.
     pub(crate) markdown_notes: RefCell<Vec<(String, String, Data)>>,
+    /// What scrolling stacks ask of their ends, and tell of them.
+    pub(crate) stack_ends: render::StackEnds,
     /// When `app:open` last opened pages, to keep it to a burst.
     pub(crate) opens: opens::Opens,
     /// What a drag inside the app carries, and the rows that take it.
@@ -553,6 +555,7 @@ impl Ui {
             row_regions: render::RowRegions::default(),
             markdown_found: RefCell::default(),
             markdown_notes: RefCell::default(),
+            stack_ends: render::StackEnds::default(),
             opens: opens::Opens::default(),
             documents: RefCell::default(),
             markdown_again: Cell::default(),
@@ -668,6 +671,10 @@ fn polled(ui: &mut Ui, tx: &mut Tx) -> bool {
     }
     changed |= ui.markdown_again.take();
     for (owner, to, note) in ui.markdown_notes.take() {
+        ui.send(&owner, &to, note);
+        changed = true;
+    }
+    for (owner, to, note) in ui.stack_ends.settle(tx) {
         ui.send(&owner, &to, note);
         changed = true;
     }

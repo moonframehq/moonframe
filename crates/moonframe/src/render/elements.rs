@@ -70,6 +70,9 @@ impl<'w> Draw<'w> for Stack {
         };
         let handle = painter.motion.scroll_to(&place.path, self.scroll_to);
         let drawn = children.len();
+        if self.ends.is_none() {
+            super::ends::not_asked(painter, place);
+        }
         let ends = self.ends.as_deref().and_then(|ends| {
             super::ends::ends(
                 ends,

@@ -7,6 +7,7 @@
 mod carry;
 mod containers;
 mod embeds;
+mod ends;
 mod floating;
 mod gallery;
 mod leaves;
@@ -30,6 +31,7 @@ use {
 pub(crate) use {
     carry::{Carrying, Target},
     containers::RowRegions,
+    ends::StackEnds,
     markdown::Document,
     shell::Metrics,
 };
