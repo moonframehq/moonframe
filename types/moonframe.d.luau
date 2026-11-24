@@ -2277,6 +2277,19 @@ export type PdfMsg = {
 	reply: Data?,
 }
 
+-- What `{ to = "app:text", msg = ... }` asks: the text `mod` (or the mods
+-- of `region`) draws, rows across and columns down, with what it mounts
+-- and without fields, hidden panes or closed popovers; and the text the
+-- user last selected in a document, kept after a click into a field clears
+-- it. The mod hears `reply` back with `text` and `selection` (`{ text, mod }`,
+-- the mod that drew it) added, each cut to `max` characters (64,000).
+export type TextMsg = {
+	mod: string?,
+	region: string?,
+	max: number?,
+	reply: Data,
+}
+
 -- What `{ to = "app:edit", msg = ... }` does to the sending mod's input
 -- with `id = field`, around its selection, keeping undo and focus; the
 -- field then sends its `change`. `wrap` puts `{ before, after }` around the
@@ -2329,7 +2342,7 @@ export type DevtoolsMsg =
 -- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
 -- `"app:devtools"` (`msg` a `DevtoolsMsg`), `"app:share"` (`msg` a `ShareMsg`), `"app:status-item"` (`msg` a
--- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
+-- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`), `"app:text"` (`msg` a `TextMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
 export type Send = {
 	to: string,
 	msg: Data,

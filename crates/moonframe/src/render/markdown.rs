@@ -14,6 +14,7 @@ mod outline;
 mod parts;
 mod scrolling;
 mod search;
+mod selection;
 
 use {
     super::{
@@ -62,7 +63,10 @@ impl<'w> Draw<'w> for Markdown {
         } else {
             Vec::new()
         };
+        let shown = selection::Shown::default();
+        let watch = selection::watch(shown.clone(), place.owner, cx);
         let document = Document {
+            shown,
             id: place.part("text").id(),
             owner: place.owner.to_owned(),
             app: cx.entity().downgrade(),
@@ -106,7 +110,7 @@ impl<'w> Draw<'w> for Markdown {
         if let Some(width) = self.max_width {
             frame = frame.max_w(px(width));
         }
-        frame.child(document).into_any_element()
+        frame.child(document).child(watch).into_any_element()
     }
 }
 

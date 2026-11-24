@@ -17,6 +17,7 @@ mod messages;
 mod render;
 mod scope;
 mod slot;
+mod text;
 mod windows;
 // keep-sorted end
 

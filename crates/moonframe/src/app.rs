@@ -72,6 +72,7 @@ mod picking;
 mod problems;
 mod quick_inspect;
 mod sharing;
+pub(crate) mod text;
 mod toasts;
 mod updates;
 mod view;
@@ -868,6 +869,7 @@ impl MoonframeApp {
             Request::StatusItem(request) => self.status_item_request(from, request, cx),
             Request::Hotkey(request) => self.hotkey_request(from, request, cx),
             Request::Pdf(request) => self.pdf_request(from, request, cx),
+            Request::Text(request) => self.text_request(from, request, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);
