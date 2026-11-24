@@ -83,6 +83,10 @@ pub struct Stack {
     /// Reveal this direct child (one-based) when it changes; scrolling
     /// by hand remains free between changes.
     pub scroll_to: Option<usize>,
+    /// Sent, as a scrolling stack lays out and scrolls, with its box, its
+    /// content's size, how far it is scrolled and which children fit and
+    /// show, each time one of them changes (see `render/stack_measure`).
+    pub measure: Option<Action>,
     /// What clicking anywhere in it does, as on a button.
     pub action: Option<Action>,
     pub extras: Extras,

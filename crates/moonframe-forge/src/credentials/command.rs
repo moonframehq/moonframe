@@ -30,7 +30,7 @@ pub(super) fn run_for(
     }
     let mut child = command
         .spawn()
-        .map_err(|_| Failure::Network("cannot start the forge CLI".into()))?;
+        .map_err(|error| Failure::Network(format!("cannot start the forge CLI: {error}")))?;
     drop(command);
     let result = collect(&mut child, deadline);
     if result.is_err() {
