@@ -252,14 +252,7 @@ impl Build for List {
                     .key("count")
                     .fail(format!("expected 0 to {MAX_ROWS} rows"))
             })?;
-        let row_height = fields
-            .number("row_height", 1.0..=10_000.0)?
-            .ok_or_else(|| {
-                fields
-                    .cx()
-                    .key("row_height")
-                    .fail("missing: each row's height in pixels")
-            })?;
+        let row_height = row_heights(fields, count)?;
         let row: mlua::Function = fields.need("row")?;
         let window = tree.windows.get(&id).copied().unwrap_or(ListWindow::FIRST);
         let range = window.range(count);
@@ -286,6 +279,34 @@ impl Build for List {
 
 /// The most rows a list may have; it builds only those that show.
 const MAX_ROWS: usize = 10_000_000;
+/// The most rows a list whose rows each have their own height may have:
+/// it asks for every row's height each time the view runs.
+const MAX_SIZED_ROWS: usize = 100_000;
+const ROW_HEIGHT: std::ops::RangeInclusive<f32> = 1.0..=10_000.0;
+
+/// `row_height`: a number for every row, or a function giving row `i`'s.
+fn row_heights(fields: &Fields, count: usize) -> Result<RowHeights, Error> {
+    let cx = fields.cx().key("row_height");
+    let Some(Value::Function(height)) = fields.raw("row_height") else {
+        return fields
+            .number("row_height", ROW_HEIGHT)?
+            .map(RowHeights::Same)
+            .ok_or_else(|| cx.fail("missing: each row's height in pixels"));
+    };
+    if count > MAX_SIZED_ROWS {
+        return Err(cx.fail(format!(
+            "a function only for up to {MAX_SIZED_ROWS} rows; give one height for more"
+        )));
+    }
+    let mut heights = Vec::with_capacity(count);
+    for index in 1..=count {
+        let row = height
+            .call::<f32>(index)
+            .map_err(|error| Error::from(error).context(format!("row_height({index})")))?;
+        heights.push(crate::read::within(row, ROW_HEIGHT, &cx.index(index))?);
+    }
+    Ok(RowHeights::each(heights))
+}
 
 /// The element a popover or overlay floats.
 fn content<'f>(fields: &'f Fields) -> Result<&'f Value, Error> {

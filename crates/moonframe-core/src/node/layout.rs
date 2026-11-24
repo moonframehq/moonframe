@@ -212,10 +212,11 @@ pub struct Overlay {
     pub content: Box<Node>,
 }
 
-/// Rows of the same height, of which the host draws only those that show,
-/// so a list of any length costs what one screenful does. The view gives a
-/// `row` function rather than the rows; it is called for the rows around
-/// the ones showing, and the host asks again as the list scrolls.
+/// Rows, of one height or each of its own, of which the host draws only
+/// those that show, so a list of any length costs what one screenful does.
+/// The view gives a `row` function rather than the rows; it is called for
+/// the rows around the ones showing, and the host asks again as the list
+/// scrolls.
 #[derive(Clone, Debug, PartialEq)]
 pub struct List {
     pub look: Look,
@@ -224,8 +225,8 @@ pub struct List {
     pub id: String,
     /// How many rows there are in all.
     pub count: usize,
-    /// Each row's height in pixels.
-    pub row_height: f32,
+    /// The rows' heights in pixels.
+    pub row_height: RowHeights,
     /// The position of `rows[0]`, from 0.
     pub start: usize,
     /// The rows from `start` the view built.
