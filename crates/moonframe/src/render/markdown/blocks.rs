@@ -59,11 +59,14 @@ struct Cite {
 pub(super) fn extensions(shared: &SharedRef) -> MarkdownExtensions {
     let alerts = shared.clone();
     let pictures = shared.clone();
+    // An alert's body is a view of its own: emoji draw there too. Built
+    // once, as a view parses its text again when its extensions change.
+    let inner = MarkdownExtensions::default().plugin(super::emoji::Emojis(shared.clone()));
     let extensions = MarkdownExtensions::default()
         .frontmatter()
         .block_parser(parse_alert)
         .block_renderer(ALERT, move |node, window, cx| {
-            draw_alert(node, &alerts, window, cx)
+            draw_alert(node, &alerts, &inner, window, cx)
         })
         .block_parser(parse_picture)
         .block_renderer(PICTURE, move |node, window, cx| {
@@ -93,7 +96,13 @@ fn parse_alert(node: &Node, cx: &MarkdownParseContext<'_>) -> Option<MarkdownNod
     )
 }
 
-fn draw_alert(node: &MarkdownNode, shared: &SharedRef, _: &mut Window, cx: &mut App) -> AnyElement {
+fn draw_alert(
+    node: &MarkdownNode,
+    shared: &SharedRef,
+    inner: &MarkdownExtensions,
+    _: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
     let Some(alert) = node.data::<Alert>() else {
         return div().into_any_element();
     };
@@ -113,7 +122,8 @@ fn draw_alert(node: &MarkdownNode, shared: &SharedRef, _: &mut Window, cx: &mut 
     }
     let id = node.source_range().map_or(0, |range| range.start);
     let body = guarded(
-        TextView::markdown(("markdown-alert", id), alert.body.clone()),
+        TextView::markdown(("markdown-alert", id), alert.body.clone())
+            .markdown_extensions(inner.clone()),
         shared,
     );
     frame
