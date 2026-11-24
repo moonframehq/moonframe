@@ -154,8 +154,13 @@ impl Capabilities {
         )
     }
 
+    /// Whether a provider may list `name`: `system`, Moonframe's own
+    /// (known to every check, even one without the app's registry), and
+    /// those registered here.
     pub fn contains(&self, name: &str) -> bool {
-        name == "system" || self.handlers.contains_key(name)
+        name == "system"
+            || MOONFRAME_CAPABILITIES.contains(&name)
+            || self.handlers.contains_key(name)
     }
 
     /// Dispatch used by the Wasm import. Each instance has its own `busy`

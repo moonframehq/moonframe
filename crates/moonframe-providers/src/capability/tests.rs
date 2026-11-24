@@ -179,4 +179,6 @@ fn a_check_outside_the_host_knows_moonframes_own_capabilities() {
     .unwrap();
     std::fs::write(dir.path().join("provider.wasm"), "").unwrap();
     assert!(crate::Manifest::load_declared("acme:test", dir.path(), &[]).is_ok());
+    // A check made without the app's registry, as the doctor's.
+    assert!(crate::Manifest::load("acme:test", dir.path()).is_ok());
 }
