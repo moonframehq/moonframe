@@ -69,7 +69,7 @@ use {
 
 #[cfg(feature = "terminal")]
 use crate::terminal::Terminals;
-#[cfg(test)]
+#[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use divider::kept as dividers_kept;
 pub(crate) use divider::{
     closed as dividers_closed, frame_drawn as dividers_drawn, keystroke as divider_keystroke,

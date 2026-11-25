@@ -166,3 +166,52 @@ return mod {
     window.click("close");
     assert_eq!(crate::render::dividers_kept(), 0);
 }
+
+#[gpui_kit::test]
+fn a_double_click_puts_back_the_start_when_the_mod_keeps_the_sizes(cx: &mut TestAppContext) {
+    let source = r##"
+return mod {
+	init = function() return { log = "" } end,
+	update = function(state, msg) state.width = msg.sizes[1] end,
+	view = function(state)
+		return shell(state, ui.hsplit { id = "people", resize = "sized",
+			ui.pane { size = state.width or 200, min = 100, max = 400,
+				ui.column { class = "list", grow = true, ui.text { "List" } } },
+			ui.pane { ui.column { class = "person", grow = true, ui.text { "Person" } } },
+		})
+	end,
+}
+"##;
+    let mut window = open(cx, source);
+    let start = width(&mut window);
+    let at = divider(&mut window);
+    window.click_at(at);
+    window.keys("shift-right");
+    assert!(
+        (width(&mut window) - (start + 64.)).abs() < 1.,
+        "{}",
+        width(&mut window)
+    );
+    let at = divider(&mut window);
+    for event in 1..=2 {
+        window.cx.simulate_event(MouseDownEvent {
+            button: MouseButton::Left,
+            position: at,
+            modifiers: Modifiers::none(),
+            click_count: event,
+            first_mouse: false,
+        });
+        window.cx.simulate_event(MouseUpEvent {
+            button: MouseButton::Left,
+            position: at,
+            modifiers: Modifiers::none(),
+            click_count: event,
+        });
+    }
+    window.settle();
+    assert!(
+        (width(&mut window) - start).abs() < 2.,
+        "{}",
+        width(&mut window)
+    );
+}

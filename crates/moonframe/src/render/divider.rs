@@ -50,8 +50,10 @@ struct Split {
     layer: usize,
     /// The group's box, where its first pane starts.
     group: Rc<Cell<Bounds<Pixels>>>,
-    /// Each pane's starting `size`.
+    /// Each pane's starting `size`, as first drawn.
     sizes: Vec<Option<f32>>,
+    /// Whether `sizes` is set.
+    started: bool,
     /// Each divider drawn, in the order the group draws them.
     dividers: Vec<Divider>,
 }
@@ -97,13 +99,18 @@ pub(crate) fn frame_drawn(window: WindowId) {
     forget(|split, key| split.window != Some(window) || drawn.contains(key));
 }
 
-/// Windows other than `open` closed: their splits go.
-pub(crate) fn closed(open: &[WindowId]) {
-    forget(|split, _| split.window.is_none_or(|window| open.contains(&window)));
+/// Windows other than `open` and `drawing` (which may not be listed while
+/// it opens) closed: their splits go.
+pub(crate) fn closed(open: &[WindowId], drawing: WindowId) {
+    forget(|split, _| {
+        split
+            .window
+            .is_none_or(|window| window == drawing || open.contains(&window))
+    });
 }
 
 /// How many splits are kept, for tests.
-#[cfg(test)]
+#[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) fn kept() -> usize {
     SPLITS.with_borrow(HashMap::len)
 }
@@ -128,13 +135,29 @@ pub(super) fn wire(
     let key = key.as_str();
     DRAWN.with_borrow_mut(|keys| keys.insert(key.to_owned()));
     let resized = drawn.resized.clone();
+    let base = key.rsplit_once('#').map_or(key, |(split, _)| split);
     let at = SPLITS.with_borrow_mut(|splits| {
+        // The sizes a double-click puts back are those the split started
+        // with, kept through its phases: a mod that keeps the user's sizes
+        // and passes them back as `size` must not make them the start.
+        let started = splits
+            .iter()
+            .find(|(other, _)| {
+                other
+                    .rsplit_once('#')
+                    .map_or(other.as_str(), |(split, _)| split)
+                    == base
+            })
+            .map(|(_, split)| split.sizes.clone());
         let split = splits.entry(key.to_owned()).or_default();
         split.window = drawn.window;
         split.resized = drawn.resized;
         split.vertical = drawn.vertical;
         split.layer = drawn.layer;
-        split.sizes = drawn.sizes;
+        if !split.started {
+            split.sizes = started.unwrap_or(drawn.sizes);
+            split.started = true;
+        }
         split.group.clone()
     });
     let measure = canvas(move |laid, _, _| at.set(laid), |_, (), _, _| {})
