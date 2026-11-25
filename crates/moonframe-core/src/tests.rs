@@ -27,6 +27,7 @@ mod maps;
 mod mods;
 mod motion;
 mod orbit;
+mod outside;
 mod overlays;
 mod packages;
 mod paint;

@@ -129,6 +129,7 @@ impl<'w> Draw<'w> for Popover {
         }
         let sheet = sheet
             .child(content)
+            .children(super::outside::recorder(painter))
             .child(crate::browser::cover())
             .child(measure_content(room.clone(), self.side, self.gap));
         container
