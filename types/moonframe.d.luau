@@ -294,6 +294,11 @@ export type StackProps = {
 	outside: Data,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
+	-- With `scroll`: sent with `at_end = true|false` as it first lays out
+	-- and each time it reaches or leaves its end.
+	at_end: Data,
+	-- With `scroll`: scroll to the end each time this value changes.
+	scroll_end: Data,
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
 	-- the system's setting).
 	scrollbar: boolean?,

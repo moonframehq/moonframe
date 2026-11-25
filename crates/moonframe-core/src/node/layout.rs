@@ -110,6 +110,9 @@ pub struct Stack {
     /// place keeps each itself as one before it comes and goes. Empty when
     /// not read from Luau.
     pub slots: Vec<usize>,
+    /// Told of its end, and scrolled to it; boxed, as most stacks have
+    /// neither.
+    pub ends: Option<Box<Ends>>,
 }
 
 /// A titled section: a header with optional actions over a column body.

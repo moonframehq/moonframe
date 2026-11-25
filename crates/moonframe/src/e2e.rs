@@ -19,6 +19,7 @@ mod page_text;
 mod paste;
 mod regressions;
 mod revision_timeline;
+mod scroll_end;
 mod scroll_sync;
 mod spinner;
 mod split_resize;

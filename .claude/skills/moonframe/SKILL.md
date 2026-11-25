@@ -1454,6 +1454,11 @@ Text-like elements take their main value positionally:
 - `follow = true`, with `scroll`, keeps it at its end while it is there:
   as the content grows (a chat streaming in, a log), it scrolls along;
   scrolled back, it stays where the user put it.
+- `at_end = msg`, with `scroll`, sends `msg` with `at_end = true|false`
+  added as it first lays out and each time it reaches or leaves its end;
+  `scroll_end = value` scrolls to its end each time the value changes. A
+  chat's "latest message" button shows while `at_end` is false and sets
+  `state.jump = { seq = state.seq + 1 }` for `scroll_end = state.jump`.
 - `shrink = false` keeps the content's size when the parent is short of
   space (strips, toolbars), instead of being squeezed.
 - `self_align = "start"` (or `center`, `end`, `stretch`) places it across
