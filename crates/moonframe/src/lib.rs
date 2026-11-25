@@ -91,6 +91,7 @@ mod video;
 #[cfg(not(all(feature = "video", target_os = "macos")))]
 #[path = "video_left_out.rs"]
 mod video;
+mod web_page;
 
 #[cfg(feature = "tokio")]
 pub use moonframe_providers::AsyncHostCapability;
