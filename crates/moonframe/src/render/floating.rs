@@ -139,7 +139,10 @@ impl<'w> Draw<'w> for Overlay {
             layer = layer.child(crate::browser::cover());
         }
         let sheet = BoundedSheet {
-            content: sheet.child(content).child(crate::browser::cover()),
+            content: sheet
+                .child(content)
+                .children(super::outside::recorder(painter))
+                .child(crate::browser::cover()),
             place: self.place,
             margin: look.base.margin,
         };

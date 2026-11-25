@@ -110,8 +110,9 @@ pub(super) fn key_type(element: &str, key: &str) -> KeyType {
         ("video", "gain") => number(0.0, 1000.0),
         ("video", "gamma") => number(0.1, 10.0),
         ("icon", "name") => Icon,
+        ("input", "caret") => OneOf(vec![String, number(0.0, 1_048_576.0)]),
         ("list", "row") => Function,
-        ("list", "row_height") => number(1.0, 10_000.0),
+        ("list", "row_height") => OneOf(vec![number(1.0, 10_000.0), Function]),
         ("list", "count") => number(0.0, 10_000_000.0),
         (_, key) => by_key(key),
     }
@@ -132,8 +133,9 @@ fn by_key(key: &str) -> KeyType {
         | "text" | "title" | "to" | "tooltip" | "url" | "value" => String,
         "blur" | "capture" | "carry" | "change" | "context" | "dismiss" | "drop" | "exit"
         | "force" | "found" | "hover" | "image" | "link" | "loading" | "measure" | "move"
-        | "msg" | "navigate" | "outline" | "pointer" | "props" | "rotate" | "routed"
-        | "scrolled" | "section" | "select" | "smart_zoom" | "submit" | "swipe" | "wheel" => Data,
+        | "msg" | "navigate" | "outline" | "outside" | "pointer" | "props" | "resize"
+        | "rotate" | "routed" | "scrolled" | "section" | "select" | "smart_zoom" | "submit"
+        | "swipe" | "wheel" => Data,
         "border" => OneOf(vec![Bool, Tokens(token_set!(Border))]),
         "color" => Color,
         "command" => OneOf(vec![

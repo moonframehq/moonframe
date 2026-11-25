@@ -41,9 +41,14 @@ pub(crate) fn intercept(cx: &mut Context<MoonframeApp>) -> Subscription {
                 }
                 match app.layer_keystroke(&event.keystroke, window, cx) {
                     Taken::Sent => true,
-                    Taken::Blocked => app.input_keystroke(&event.keystroke, window, cx),
+                    Taken::Blocked => {
+                        app.input_keystroke(&event.keystroke, window, cx)
+                            || (app.inputs.any_focused(window, cx)
+                                && app.paste_keystroke(&event.keystroke, window, cx))
+                    },
                     Taken::Free => {
                         app.input_keystroke(&event.keystroke, window, cx)
+                            || app.paste_keystroke(&event.keystroke, window, cx)
                             || app.terminal_keystroke(&event.keystroke, window, cx)
                             || app.mod_keystroke(&event.keystroke, window, cx)
                             || app.menu_keystroke(&event.keystroke, window, cx)

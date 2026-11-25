@@ -134,6 +134,9 @@ struct Definition {
     /// Keys it takes anywhere in the window, while nothing nearer the
     /// keystroke (an overlay, a text field, a terminal) does.
     keys: Keys,
+    /// Sent with the files or picture pasted while no text field or
+    /// terminal has focus.
+    paste: Option<Data>,
     meta: Meta,
 }
 
@@ -158,6 +161,7 @@ impl Definition {
             "menus",
             "about",
             "keys",
+            "paste",
         ]])?;
         Ok(Self {
             init: fields.get("init")?,
@@ -174,6 +178,7 @@ impl Definition {
             menus: fields.get("menus")?,
             about: fields.get("about")?,
             keys: fields.get("keys")?.unwrap_or_default(),
+            paste: fields.get("paste")?,
             meta: Meta {
                 region: fields.get("region")?,
                 order: fields.get("order")?.unwrap_or(0),
@@ -275,6 +280,7 @@ impl Module {
             menus: None,
             about: None,
             keys: Keys::default(),
+            paste: None,
             meta: Meta::default(),
         };
         let peaks = Peaks::new(name, vm::SMALL_MEMORY, vm::INTERRUPTS);
@@ -374,6 +380,11 @@ impl Module {
     /// The keys it takes anywhere in the window.
     pub(crate) fn keys(&self) -> &Keys {
         &self.definition.keys
+    }
+
+    /// What it hears a paste of files or a picture as.
+    pub(crate) fn paste(&self) -> Option<&Data> {
+        self.definition.paste.as_ref()
     }
 
     /// What the shell's About panel says.
