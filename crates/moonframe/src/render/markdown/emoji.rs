@@ -90,12 +90,11 @@ fn cached(src: &str, shared: &SharedRef) -> Option<PathBuf> {
         let shared = shared.lock().ok()?;
         (shared.owner.clone(), shared.folder.clone())
     };
-    crate::render::images::resolve_src(src, &owner, &folder, || vec![crate::paths::images()])
-        .filter(|path| {
-            crate::paths::images()
-                .canonicalize()
-                .is_ok_and(|cache| path.starts_with(cache))
-        })
+    crate::render::images::resolve_cached(src, &owner, &folder).filter(|path| {
+        crate::paths::images()
+            .canonicalize()
+            .is_ok_and(|cache| path.starts_with(cache))
+    })
 }
 
 #[cfg(test)]

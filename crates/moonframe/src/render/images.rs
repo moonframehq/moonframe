@@ -16,6 +16,11 @@ use {
 /// missing before it is looked for again: a provider may be downloading it.
 const RETRY: Duration = Duration::from_secs(1);
 
+/// What a lookup is kept by: the mod, its folder, the address, and whether
+/// it looked in the image cache alone (an emoji's), whose answer is not an
+/// ordinary picture's.
+type Key = (String, PathBuf, String, bool);
+
 /// What a file resolved to, and when a missing one was looked for.
 enum Resolved {
     Found(PathBuf),
@@ -26,7 +31,7 @@ thread_local! {
     /// By the drawing mod, its folder and the image's `src`; the UI
     /// thread's only. The mod is part of the key because what it may show
     /// is its own: components drawn by two mods share a folder.
-    static CACHE: RefCell<HashMap<(String, PathBuf, String), Resolved>> =
+    static CACHE: RefCell<HashMap<Key, Resolved>> =
         RefCell::new(HashMap::new());
     /// Files and folders the user picked (`app:pick`) or dropped on the
     /// window this run, by the mod they were given to: what they chose to
@@ -127,7 +132,29 @@ pub(super) fn resolve_src(
     folder: &Path,
     allowed: impl FnOnce() -> Vec<PathBuf>,
 ) -> Option<PathBuf> {
-    let key = (owner.to_owned(), folder.to_owned(), src.to_owned());
+    resolve_kept(src, owner, folder, allowed, false)
+}
+
+/// The file `src` names in the image cache alone, if it is there: what an
+/// emoji draws, whatever else the document may show. Kept apart from
+/// [`resolve_src`]'s answers, which may look further.
+pub(super) fn resolve_cached(src: &str, owner: &str, folder: &Path) -> Option<PathBuf> {
+    resolve_kept(src, owner, folder, || vec![crate::paths::images()], true)
+}
+
+fn resolve_kept(
+    src: &str,
+    owner: &str,
+    folder: &Path,
+    allowed: impl FnOnce() -> Vec<PathBuf>,
+    cache_only: bool,
+) -> Option<PathBuf> {
+    let key = (
+        owner.to_owned(),
+        folder.to_owned(),
+        src.to_owned(),
+        cache_only,
+    );
     let now = Instant::now();
     let cached = CACHE.with_borrow(|cache| match cache.get(&key) {
         Some(Resolved::Found(path)) => Some(Some(path.clone())),
@@ -138,8 +165,13 @@ pub(super) fn resolve_src(
         return cached;
     }
     let home = std::env::home_dir();
-    let path = resolve_file(src, folder, home.as_deref(), &allowed(), MAX_IMAGE_BYTES)
-        .or_else(|| granted_file(owner, src, folder, home.as_deref()));
+    let path =
+        resolve_file(src, folder, home.as_deref(), &allowed(), MAX_IMAGE_BYTES).or_else(|| {
+            // What the user gave the mod is not in the image cache.
+            (!cache_only)
+                .then(|| granted_file(owner, src, folder, home.as_deref()))
+                .flatten()
+        });
     let resolved = match &path {
         Some(path) => Resolved::Found(path.clone()),
         None => Resolved::Missing(now),
@@ -185,6 +217,16 @@ pub(crate) fn forget() {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_emoji_turned_away_leaves_the_picture_to_show() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("logo.png"), "png").unwrap();
+        let allowed = || vec![dir.path().to_owned()];
+        // Not in the image cache: no emoji, but still a picture.
+        assert_eq!(resolve_cached("logo.png", "notes", dir.path()), None);
+        assert!(resolve_src("logo.png", "notes", dir.path(), allowed).is_some());
+    }
 
     #[test]
     fn a_grant_is_the_mods_it_was_given_to_and_its_components() {
