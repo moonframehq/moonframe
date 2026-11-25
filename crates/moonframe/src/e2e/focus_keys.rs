@@ -81,7 +81,11 @@ impl gpui_kit::Render for Field {
         _: &mut gpui_kit::Context<Self>,
     ) -> impl gpui_kit::IntoElement {
         use gpui_kit::{InteractiveElement as _, Styled as _};
-        gpui_kit::div().id("field").track_focus(&self.0).size_full()
+        gpui_kit::div()
+            .id("field")
+            .debug_selector(|| "field".into())
+            .track_focus(&self.0)
+            .size_full()
     }
 }
 
@@ -89,20 +93,32 @@ impl crate::hosted::HostView for Field {
     fn set_props(&mut self, _: &moonframe_core::Data, _: &mut gpui_kit::Context<Self>) {}
 }
 
-#[gpui_kit::test]
-fn a_column_takes_its_keys_while_a_view_in_it_has_focus(cx: &mut TestAppContext) {
-    let source = r##"
+/// A column with keys, around a row with keys, around the `field` view;
+/// both faded.
+const AROUND_VIEW: &str = r##"
 return mod {
 	keys = { right = "page" },
 	init = function() return { log = "" } end,
 	update = function(state, msg) logged(state, msg) end,
 	view = function(state)
-		return shell(state, ui.column { class = "deck", keys = { right = "keep" }, height = 100,
-			ui.view { name = "field" },
+		return shell(state, ui.column { class = "deck faded", keys = { right = "keep" }, height = 100,
+			ui.row { class = "faded", keys = { left = "back" }, grow = true, ui.view { name = "field" } },
 		})
 	end,
 }
 "##;
+
+/// A window on [`AROUND_VIEW`], with `faded` at half opacity, and the
+/// focus of its view's control.
+fn around_view(cx: &mut TestAppContext) -> (Window<'_>, gpui_kit::FocusHandle) {
+    let dir = folder(AROUND_VIEW);
+    let style = dir.path().join("style.luau");
+    let sheet = std::fs::read_to_string(&style).unwrap().replacen(
+        "\trules = {",
+        "\trules = {\n\t\t[\".faded\"] = { opacity = 0.5 },",
+        1,
+    );
+    std::fs::write(&style, sheet).unwrap();
     let focus = std::rc::Rc::new(std::cell::RefCell::new(None));
     let mut views = Registry::default();
     {
@@ -113,12 +129,45 @@ return mod {
             Field(handle)
         });
     }
-    let mut window = open_with(cx, folder(source), views);
-    let Some(handle) = focus.borrow().clone() else {
-        panic!("the view is made");
-    };
+    let window = open_with(cx, dir, views);
+    let handle = focus.borrow().clone().expect("the view is made");
+    (window, handle)
+}
+
+#[gpui_kit::test]
+fn a_column_takes_its_keys_while_a_view_in_it_has_focus(cx: &mut TestAppContext) {
+    let (mut window, handle) = around_view(cx);
+    window.keys("right");
+    assert_eq!(window.log(), "|page");
+    // The view's own control has focus: that is inside the row around it,
+    // and the column around that.
     window.cx.update(|window, cx| handle.focus(window, cx));
     window.settle();
+    window.keys("left");
     window.keys("right");
-    assert_eq!(window.log(), "|keep");
+    assert_eq!(window.log(), "|page|back|keep");
+    // A click in the view gives its control focus, as before.
+    window.cx.update(|window, cx| window.blur(cx));
+    window.settle();
+    window.click("field");
+    let focused = window.cx.update(|window, _| handle.is_focused(window));
+    assert!(focused, "the view's control has focus");
+    window.keys("left");
+    assert_eq!(window.log(), "|page|back|keep|back");
+    // The view stays in its layer: the app may be replayed under it.
+    let app = window.app.clone();
+    let replayable = window
+        .cx
+        .read_entity(&app, |app, _| app.views.layers().replayable());
+    assert!(replayable, "the view is drawn in a layer");
+}
+
+#[gpui_kit::test]
+fn a_view_in_a_layer_fades_with_what_it_is_in(cx: &mut TestAppContext) {
+    let (window, _) = around_view(cx);
+    let app = window.app.clone();
+    let opacities = window
+        .cx
+        .read_entity(&app, |app, _| app.views.layers().opacities());
+    assert_eq!(opacities, [Some(0.25)]);
 }

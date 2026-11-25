@@ -36,19 +36,21 @@ impl<'w> Draw<'w> for Stack {
             painter.outside.push(inside.clone());
             inside
         });
-        let children = painter.focusing(!self.keys.is_empty(), |painter| {
-            painter.keyed_children(&self.children, place, self.direction, cx)
-        });
-        if inside.is_some() {
-            painter.outside.pop();
-        }
-        painter.in_drag = in_drag;
         let part = match self.direction {
             Direction::Row => Part::Row,
             Direction::Column => Part::Column,
         };
         let look = painter.look(part, &self.look, self.selected, place);
-        let focus = painter.focus_keys(&self.keys, place, cx);
+        let (children, views) = painter.faded(look.base.opacity, |painter| {
+            painter.focusing(!self.keys.is_empty(), |painter| {
+                painter.keyed_children(&self.children, place, self.direction, cx)
+            })
+        });
+        if inside.is_some() {
+            painter.outside.pop();
+        }
+        painter.in_drag = in_drag;
+        let focus = painter.focus_keys(&self.keys, views, place, cx);
         let theme = cx.theme();
         let element = div()
             .id(place.id())
@@ -312,9 +314,13 @@ fn covering<E: InteractiveElement>(element: E, in_drag: bool) -> E {
 
 impl<'w> Draw<'w> for Panel {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
-        let actions = painter.children(&self.actions, &place.part("actions"), Direction::Row, cx);
-        let children = painter.children(&self.children, place, Direction::Column, cx);
         let look = painter.look(Part::Panel, &self.look, false, place);
+        let (actions, children) = painter.faded(look.base.opacity, |painter| {
+            let actions =
+                painter.children(&self.actions, &place.part("actions"), Direction::Row, cx);
+            let children = painter.children(&self.children, place, Direction::Column, cx);
+            (actions, children)
+        });
         let header_look = painter.look(Part::PanelHeader, &Look::default(), false, place);
         let theme = cx.theme();
         let header = (self.title.is_some() || !actions.is_empty()).then(|| {
@@ -477,7 +483,9 @@ impl<'w> Draw<'w> for Split {
         let group = panes
             .into_iter()
             .fold(group, |group, (pane, place, look, shown)| {
-                let children = painter.children(&pane.children, &place, Direction::Column, cx);
+                let children = painter.faded(look.base.opacity, |painter| {
+                    painter.children(&pane.children, &place, Direction::Column, cx)
+                });
                 let transition = look.base.transition;
                 let theme = cx.theme();
                 let mut panel = resizable_panel().visible(!shown.hidden());
