@@ -13,10 +13,48 @@ use {
         },
         *,
     },
-    std::{path::PathBuf, sync::Arc},
+    std::{
+        cell::RefCell,
+        collections::HashMap,
+        path::PathBuf,
+        sync::Arc,
+        time::{Duration, Instant},
+    },
 };
 
 const EMOJI: &str = "moonframe-emoji";
+/// How often a missing emoji is looked for again, as a provider may be
+/// downloading it, and for how long.
+const AGAIN: Duration = Duration::from_secs(1);
+const AWHILE: Duration = Duration::from_secs(60);
+
+thread_local! {
+    /// Emoji not there yet, by address: when first missed, and whether a
+    /// look is due.
+    static WAITING: RefCell<HashMap<String, (Instant, bool)>> = RefCell::new(HashMap::new());
+}
+
+/// Whether to look for the missing emoji `src` again in a while: for
+/// [`AWHILE`] after it was first missed, once at a time.
+fn look_again(src: &str, now: Instant) -> bool {
+    WAITING.with_borrow_mut(|waiting| {
+        let (since, due) = waiting.entry(src.to_owned()).or_insert((now, false));
+        if *due || now.saturating_duration_since(*since) > AWHILE {
+            return false;
+        }
+        *due = true;
+        true
+    })
+}
+
+/// The look for `src` is done: the next miss may ask for another.
+fn looked(src: &str) {
+    WAITING.with_borrow_mut(|waiting| {
+        if let Some((_, due)) = waiting.get_mut(src) {
+            *due = false;
+        }
+    });
+}
 
 /// The title that marks a picture as one.
 pub(super) const TITLE: &str = "emoji";
@@ -61,14 +99,27 @@ impl MarkdownPlugin for Emojis {
         &self,
         node: &MarkdownNode,
         context: &InlineRenderContext,
-        _: &mut Window,
-        _: &mut App,
+        window: &mut Window,
+        cx: &mut App,
     ) -> Option<InlineElement> {
         let emoji = node.data::<Arc<Emoji>>()?.clone();
         let alt = emoji.alt.clone();
         let Some(path) = cached(&emoji.src, &self.0) else {
+            // A provider may still be downloading it: draw again in a
+            // while, when the lookup is tried anew.
+            if look_again(&emoji.src, Instant::now()) {
+                let src = emoji.src.clone();
+                window
+                    .spawn(cx, async move |cx| {
+                        cx.background_executor().timer(AGAIN).await;
+                        looked(&src);
+                        cx.update(|window, _| window.refresh()).ok();
+                    })
+                    .detach();
+            }
             return Some(InlineElement::new(div().child(alt)));
         };
+        WAITING.with_borrow_mut(|waiting| waiting.remove(&emoji.src));
         let side = context.line_height();
         let fallback = alt.clone();
         Some(InlineElement::new(
@@ -100,7 +151,7 @@ fn cached(src: &str, shared: &SharedRef) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use {
-        super::is_emoji,
+        super::{AWHILE, is_emoji, look_again, looked},
         gpui_kit::component::text::markdown_ast::{Image, Node},
     };
 
@@ -118,5 +169,21 @@ mod tests {
         assert!(is_emoji(&picture(Some("emoji"))));
         assert!(!is_emoji(&picture(None)));
         assert!(!is_emoji(&picture(Some("A party"))));
+    }
+
+    #[test]
+    fn a_missing_emoji_is_looked_for_again_for_a_while() {
+        let start = std::time::Instant::now();
+        let src = "emoji/later.png";
+        assert!(look_again(src, start));
+        // One look at a time.
+        assert!(!look_again(src, start));
+        looked(src);
+        assert!(look_again(src, start + std::time::Duration::from_secs(1)));
+        looked(src);
+        assert!(!look_again(
+            src,
+            start + AWHILE + std::time::Duration::from_secs(1)
+        ));
     }
 }

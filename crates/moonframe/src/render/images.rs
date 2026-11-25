@@ -138,6 +138,7 @@ pub(super) fn resolve_src(
 /// The file `src` names in the image cache alone, if it is there: what an
 /// emoji draws, whatever else the document may show. Kept apart from
 /// [`resolve_src`]'s answers, which may look further.
+#[cfg_attr(not(feature = "markdown"), allow(dead_code))]
 pub(super) fn resolve_cached(src: &str, owner: &str, folder: &Path) -> Option<PathBuf> {
     resolve_kept(src, owner, folder, || vec![crate::paths::images()], true)
 }
