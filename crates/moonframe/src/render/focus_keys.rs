@@ -7,7 +7,10 @@ use {
     super::{Cx, Painter, Place},
     gpui_kit::{FocusHandle, WindowId},
     moonframe_core::Keys,
-    std::{cell::RefCell, collections::HashMap},
+    std::{
+        cell::RefCell,
+        collections::{HashMap, HashSet},
+    },
 };
 
 /// Each window's stacks' focus, by place.
@@ -49,7 +52,8 @@ pub(crate) fn closed(open: &[WindowId]) {
 
 fn keep(handles: &mut Handles, window: Option<WindowId>, drawn: &[FocusKeys]) {
     if let Some(places) = handles.get_mut(&window) {
-        places.retain(|path, _| drawn.iter().any(|stack| stack.path == *path));
+        let drawn: HashSet<&str> = drawn.iter().map(|stack| stack.path.as_str()).collect();
+        places.retain(|path, _| drawn.contains(path.as_str()));
     }
 }
 

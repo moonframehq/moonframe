@@ -70,3 +70,55 @@ fn a_column_in_a_dialog_takes_its_keys(cx: &mut TestAppContext) {
     window.keys("right");
     assert_eq!(window.log(), "|keep");
 }
+
+/// A host view that only takes focus.
+struct Field(gpui_kit::FocusHandle);
+
+impl gpui_kit::Render for Field {
+    fn render(
+        &mut self,
+        _: &mut gpui_kit::Window,
+        _: &mut gpui_kit::Context<Self>,
+    ) -> impl gpui_kit::IntoElement {
+        use gpui_kit::{InteractiveElement as _, Styled as _};
+        gpui_kit::div().id("field").track_focus(&self.0).size_full()
+    }
+}
+
+impl crate::hosted::HostView for Field {
+    fn set_props(&mut self, _: &moonframe_core::Data, _: &mut gpui_kit::Context<Self>) {}
+}
+
+#[gpui_kit::test]
+fn a_column_takes_its_keys_while_a_view_in_it_has_focus(cx: &mut TestAppContext) {
+    let source = r##"
+return mod {
+	keys = { right = "page" },
+	init = function() return { log = "" } end,
+	update = function(state, msg) logged(state, msg) end,
+	view = function(state)
+		return shell(state, ui.column { class = "deck", keys = { right = "keep" }, height = 100,
+			ui.view { name = "field" },
+		})
+	end,
+}
+"##;
+    let focus = std::rc::Rc::new(std::cell::RefCell::new(None));
+    let mut views = Registry::default();
+    {
+        let focus = focus.clone();
+        views.insert("field", move |_, _, cx| {
+            let handle = cx.focus_handle();
+            *focus.borrow_mut() = Some(handle.clone());
+            Field(handle)
+        });
+    }
+    let mut window = open_with(cx, folder(source), views);
+    let Some(handle) = focus.borrow().clone() else {
+        panic!("the view is made");
+    };
+    window.cx.update(|window, cx| handle.focus(window, cx));
+    window.settle();
+    window.keys("right");
+    assert_eq!(window.log(), "|keep");
+}

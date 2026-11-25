@@ -36,7 +36,9 @@ impl<'w> Draw<'w> for Stack {
             painter.outside.push(inside.clone());
             inside
         });
-        let children = painter.keyed_children(&self.children, place, self.direction, cx);
+        let children = painter.focusing(!self.keys.is_empty(), |painter| {
+            painter.keyed_children(&self.children, place, self.direction, cx)
+        });
         if inside.is_some() {
             painter.outside.pop();
         }
