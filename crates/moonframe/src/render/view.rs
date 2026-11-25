@@ -38,9 +38,12 @@ impl<'w> Draw<'w> for View {
             },
         };
         match views.show(place.owner, &self.id, &self.name, &self.props) {
-            Shown::View(view) => frame
-                .child(painter.host(view, place, cx))
-                .into_any_element(),
+            Shown::View(view) => {
+                // What the view's own box fades, the view fades with it.
+                let view =
+                    painter.faded(look.base.opacity, |painter| painter.host(view, place, cx));
+                frame.child(view).into_any_element()
+            },
             Shown::Pending => frame.into_any_element(),
             Shown::Missing(why) => problem(why, cx),
         }

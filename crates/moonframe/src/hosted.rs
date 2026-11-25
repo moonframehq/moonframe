@@ -16,7 +16,7 @@
 
 mod layers;
 
-pub(crate) use layers::Layers;
+pub(crate) use layers::{Around, Layers};
 
 use {
     futures::channel::mpsc::UnboundedSender,

@@ -1,5 +1,5 @@
 use {
-    super::{Layers, Placeholder, Slot, refinement},
+    super::{Around, Layers, Placeholder, Slot, refinement},
     gpui_kit::{
         AnyView, AppContext as _, Bounds, ContentMask, Context, Element as _, EmptyView,
         FontWeight, IntoElement, Refineable as _, Render, Styled as _, TestAppContext, TextStyle,
@@ -39,7 +39,7 @@ fn a_frame_notes_its_host_views_afresh() {
     layers.slots.borrow_mut().push(Slot {
         view: placeholder_view(),
         spot: Rc::default(),
-        focus: None,
+        around: Around::default(),
     });
     assert!(layers.any());
     let frames = layers.frames();
@@ -54,7 +54,7 @@ fn an_app_with_a_view_inside_it_is_not_replayed() {
     layers.slots.borrow_mut().push(Slot {
         view: placeholder_view(),
         spot: Rc::default(),
-        focus: None,
+        around: Around::default(),
     });
     assert!(layers.replayable());
     layers.drawn_inline();
@@ -64,7 +64,7 @@ fn an_app_with_a_view_inside_it_is_not_replayed() {
     layers.slots.borrow_mut().push(Slot {
         view: placeholder_view(),
         spot: Rc::default(),
-        focus: None,
+        around: Around::default(),
     });
     assert!(layers.replayable());
 }
@@ -86,7 +86,7 @@ fn placements_reuse_metadata_until_a_placeholder_prepaints(cx: &mut TestAppConte
                         layers.slots.borrow_mut().push(Slot {
                             view: view.clone(),
                             spot: spot.clone(),
-                            focus: None,
+                            around: Around::default(),
                         });
                         placeholders.push(Placeholder {
                             spot,
@@ -143,7 +143,7 @@ fn placements_reuse_metadata_until_a_placeholder_prepaints(cx: &mut TestAppConte
                     layers.begin();
                     let cleared = layers.placements();
                     assert!(cleared.is_empty());
-                    let _placeholder = layers.place(view, None);
+                    let _placeholder = layers.place(view, Around::default());
                     assert!(!Rc::ptr_eq(&cleared, &layers.placements()));
                     complete.set(true);
                 },

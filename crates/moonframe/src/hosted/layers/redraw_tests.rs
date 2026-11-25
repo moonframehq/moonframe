@@ -1,5 +1,5 @@
 use {
-    super::Layers,
+    super::{Around, Layers},
     gpui_kit::{
         AnyView, AppContext as _, AvailableSpace, Context, Entity, IntoElement, ParentElement as _,
         Render, StyleRefinement, Styled as _, TestAppContext, Window, canvas, div, point, px,
@@ -65,9 +65,9 @@ impl Render for Shell {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         self.frames.set(self.frames.get() + 1);
         self.layers.begin();
-        div()
-            .size_full()
-            .children((0..self.copies).map(|_| self.layers.place(self.host.clone(), None)))
+        div().size_full().children(
+            (0..self.copies).map(|_| self.layers.place(self.host.clone(), Around::default())),
+        )
     }
 }
 

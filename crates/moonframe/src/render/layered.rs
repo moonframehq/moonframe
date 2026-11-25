@@ -12,6 +12,7 @@
 
 use {
     super::{Cx, Painter, Place, draw_node},
+    crate::hosted::Around,
     gpui_kit::*,
     moonframe_core::Node,
 };
@@ -30,6 +31,9 @@ pub(super) struct Layering {
     /// For each row or column with `keys` being drawn, innermost last, the
     /// focus of the host views put in layers inside it so far.
     focusing: Vec<Vec<FocusHandle>>,
+    /// How opaque what is being drawn is, when something around it fades
+    /// it: a view in a layer is painted apart, and fades by itself.
+    opacity: Option<f32>,
 }
 
 impl<'w> Painter<'w, '_> {
@@ -66,7 +70,33 @@ impl<'w> Painter<'w, '_> {
             inside.push(focus.clone());
             focus
         });
-        views.layers().place(view, focus)
+        let around = Around {
+            focus,
+            opacity: layering.opacity,
+        };
+        views.layers().place(view, around)
+    }
+
+    /// Draws with `draw` what is inside something `opacity` fades.
+    pub(super) fn faded<R>(
+        &mut self,
+        opacity: Option<f32>,
+        draw: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let Some((layering, opacity)) = self
+            .layering
+            .as_mut()
+            .zip(opacity.filter(|opacity| *opacity < 1.0))
+        else {
+            return draw(self);
+        };
+        let outer = layering.opacity;
+        layering.opacity = Some(outer.unwrap_or(1.0) * opacity.max(0.0));
+        let drawn = draw(self);
+        if let Some(layering) = self.layering.as_mut() {
+            layering.opacity = outer;
+        }
+        drawn
     }
 
     /// Draws with `draw` what is painted after the window's tree.

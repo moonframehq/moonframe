@@ -43,27 +43,28 @@ impl<'w> Draw<'w> for List {
                     len: shown.len() + 2 * OVERSCAN,
                 }));
         }
-        let rows: Vec<AnyElement> = self
-            .rows
-            .iter()
-            .enumerate()
-            .map(|(offset, node)| {
-                let index = self.start + offset;
-                let child = node.draw(painter, &place.child(index, Direction::Column), cx);
-                div()
-                    .absolute()
-                    .top(px(rows_of.top(index)))
-                    .left_0()
-                    .right_0()
-                    .h(px(rows_of.height(index)))
-                    .flex()
-                    .flex_col()
-                    .justify_center()
-                    .overflow_hidden()
-                    .child(child)
-                    .into_any_element()
-            })
-            .collect();
+        let rows: Vec<AnyElement> = painter.faded(look.base.opacity, |painter| {
+            self.rows
+                .iter()
+                .enumerate()
+                .map(|(offset, node)| {
+                    let index = self.start + offset;
+                    let child = node.draw(painter, &place.child(index, Direction::Column), cx);
+                    div()
+                        .absolute()
+                        .top(px(rows_of.top(index)))
+                        .left_0()
+                        .right_0()
+                        .h(px(rows_of.height(index)))
+                        .flex()
+                        .flex_col()
+                        .justify_center()
+                        .overflow_hidden()
+                        .child(child)
+                        .into_any_element()
+                })
+                .collect()
+        });
         // Where the rows sit, under the list's padding, for `range`.
         let laid = std::rc::Rc::new(std::cell::Cell::new(Bounds::<Pixels>::default()));
         let measure = self.range.is_some().then(|| {
