@@ -269,6 +269,9 @@ pub struct WindowState {
     pub active: bool,
     /// The screen it is on: an `id` from `app.displays`.
     pub display: Option<i64>,
+    /// Its content's width and height, in whole points, where the renderer
+    /// says: a view switches to a narrow layout under a breakpoint.
+    pub size: Option<(u32, u32)>,
 }
 
 impl Default for WindowState {
@@ -280,6 +283,7 @@ impl Default for WindowState {
             fullscreen: false,
             active: true,
             display: None,
+            size: None,
         }
     }
 }
@@ -295,6 +299,10 @@ impl WindowState {
         ]);
         if let Some(display) = self.display {
             fields.insert("display".to_owned(), Data::Integer(display));
+        }
+        if let Some((width, height)) = self.size {
+            fields.insert("width".to_owned(), Data::Integer(width.into()));
+            fields.insert("height".to_owned(), Data::Integer(height.into()));
         }
         Data::Map(fields)
     }

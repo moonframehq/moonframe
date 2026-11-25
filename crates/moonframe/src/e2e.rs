@@ -10,13 +10,21 @@
 mod both_backends;
 mod divider_keys;
 mod host_views;
+mod input_caret;
 mod inspect_context;
+mod list_rows;
 mod markdown_scroll;
+mod outside;
+mod page_text;
+mod paste;
 mod regressions;
 mod revision_timeline;
 mod scroll_sync;
 mod spinner;
+mod split_resize;
 mod stack_measure;
+mod view_access;
+mod window_size;
 mod windows;
 // keep-sorted end
 
@@ -101,6 +109,7 @@ fn open_with(cx: &mut TestAppContext, dir: TempDir, views: Registry) -> Window<'
                 backends: backends.clone(),
                 views: views.clone(),
                 chrome,
+                windows: Default::default(),
             },
             cx,
         );

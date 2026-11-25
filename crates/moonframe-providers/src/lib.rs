@@ -80,7 +80,9 @@ pub use {
     tokio,
 };
 pub use {
-    capability::{Caller, Capabilities, HostCallLimits, HostCapability},
+    capability::{
+        Bounds, Caller, Capabilities, HostCallLimits, HostCapability, MOONFRAME_CAPABILITIES,
+    },
     json::{MAX_ENTRIES, from_json, to_json},
     manifest::{Capability, Kind, Manifest, PREBUILT, Publish, Restart, Start},
     mods::{Mods, owner},

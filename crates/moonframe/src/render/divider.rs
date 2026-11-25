@@ -16,7 +16,7 @@ use {
     },
     std::{
         cell::{Cell, RefCell},
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         rc::Rc,
     },
 };
@@ -30,10 +30,20 @@ thread_local! {
     static STATES: RefCell<HashMap<String, Entity<ResizableState>>> = RefCell::new(HashMap::new());
     /// Each split's dividers, by the same key.
     static SPLITS: RefCell<HashMap<String, Split>> = RefCell::new(HashMap::new());
+    /// The splits drawn since their window's last frame ended, by key.
+    static DRAWN: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
 }
+
+/// What a split tells its mod once its panes are resized: by a drag, a
+/// key or a double-click.
+pub(super) type Resized = Rc<dyn Fn(&Entity<ResizableState>, &mut Window, &mut App)>;
 
 #[derive(Default)]
 struct Split {
+    /// The window it is drawn in.
+    window: Option<WindowId>,
+    /// Its `resize`, if it has one.
+    resized: Option<Resized>,
     vertical: bool,
     /// The paint priority of the layer it is drawn in: 0 for the window,
     /// an overlay's inside one, whose backdrop keeps keys from those below.
@@ -62,6 +72,47 @@ pub(super) struct Drawn {
     pub(super) vertical: bool,
     /// Its panes' starting sizes.
     pub(super) sizes: Vec<Option<f32>>,
+    /// Its `resize`, if it has one.
+    pub(super) resized: Option<Resized>,
+}
+
+/// A frame of `window` is drawn: the splits it no longer drew go, with
+/// their sizes, dividers and focus.
+pub(crate) fn frame_drawn(window: WindowId) {
+    let drawn = DRAWN.with_borrow_mut(|drawn| {
+        let mine: HashSet<String> = SPLITS.with_borrow(|splits| {
+            drawn
+                .iter()
+                .filter(|key| {
+                    splits
+                        .get(*key)
+                        .is_some_and(|split| split.window == Some(window))
+                })
+                .cloned()
+                .collect()
+        });
+        drawn.retain(|key| !mine.contains(key));
+        mine
+    });
+    forget(|split, key| split.window != Some(window) || drawn.contains(key));
+}
+
+/// Windows other than `open` closed: their splits go.
+pub(crate) fn closed(open: &[WindowId]) {
+    forget(|split, _| split.window.is_none_or(|window| open.contains(&window)));
+}
+
+/// How many splits are kept, for tests.
+#[cfg(test)]
+pub(crate) fn kept() -> usize {
+    SPLITS.with_borrow(HashMap::len)
+}
+
+/// Keeps only the splits `keep` says, and their sizes.
+fn forget(keep: impl Fn(&Split, &str) -> bool) {
+    SPLITS.with_borrow_mut(|splits| splits.retain(|key, split| keep(split, key)));
+    let kept = |key: &String| SPLITS.with_borrow(|splits| splits.contains_key(key));
+    STATES.with_borrow_mut(|states| states.retain(|key, _| kept(key)));
 }
 
 /// `group`, drawn as `drawn` says, with dividers drawn as `look` draws them
@@ -75,8 +126,12 @@ pub(super) fn wire(
     // Kept per window: two windows showing one split each size their own.
     let key = format!("{:?}/{}", drawn.window, drawn.key);
     let key = key.as_str();
+    DRAWN.with_borrow_mut(|keys| keys.insert(key.to_owned()));
+    let resized = drawn.resized.clone();
     let at = SPLITS.with_borrow_mut(|splits| {
         let split = splits.entry(key.to_owned()).or_default();
+        split.window = drawn.window;
+        split.resized = drawn.resized;
         split.vertical = drawn.vertical;
         split.layer = drawn.layer;
         split.sizes = drawn.sizes;
@@ -101,6 +156,10 @@ pub(super) fn wire(
     // before there is one, with the group's own.
     let group = match STATES.with_borrow(|states| states.get(key).cloned()) {
         Some(state) => group.with_state(&state),
+        None => group,
+    };
+    let group = match resized {
+        Some(resized) => group.on_resize(move |state, window, cx| resized(state, window, cx)),
         None => group,
     };
     let key = key.to_owned();
@@ -236,7 +295,18 @@ pub(crate) fn keystroke(
         _ => return false,
     };
     state.update(cx, |state, cx| state.resize_panel(index, to, window, cx));
+    tell_resized(&key, &state, window, cx);
     true
+}
+
+/// Tells the split `key`'s mod its panes' sizes, as a drag does once it
+/// ends.
+fn tell_resized(key: &str, state: &Entity<ResizableState>, window: &mut Window, cx: &mut App) {
+    if let Some(resized) = SPLITS.with_borrow(|splits| splits.get(key)?.resized.clone()) {
+        // Once the key is done with: the app hears keys while updating.
+        let state = state.clone();
+        window.defer(cx, move |window, cx| resized(&state, window, cx));
+    }
 }
 
 /// Puts the panes beside the divider at `bounds` of the split `key` back to
@@ -259,6 +329,7 @@ fn restore(key: &str, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut App)
         _ => (index, (current[index] + current[index + 1]) / 2.),
     };
     state.update(cx, |state, cx| state.resize_panel(pane, size, window, cx));
+    tell_resized(key, &state, window, cx);
 }
 
 #[cfg(test)]

@@ -23,6 +23,7 @@ mod list;
 mod map;
 #[cfg_attr(not(feature = "markdown"), path = "render/markdown_left_out.rs")]
 mod markdown;
+mod outside;
 mod place;
 mod plot;
 mod pointer;
@@ -68,7 +69,11 @@ use {
 
 #[cfg(feature = "terminal")]
 use crate::terminal::Terminals;
-pub(crate) use divider::keystroke as divider_keystroke;
+#[cfg(test)]
+pub(crate) use divider::kept as dividers_kept;
+pub(crate) use divider::{
+    closed as dividers_closed, frame_drawn as dividers_drawn, keystroke as divider_keystroke,
+};
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
 
@@ -306,6 +311,9 @@ pub(crate) struct Painter<'w, 'm> {
     live_again: Vec<EntityId>,
     /// Where host views go, in a window that draws them in layers.
     layering: Option<layered::Layering>,
+    /// The stacks being drawn that hear presses `outside` them: popovers
+    /// and overlays drawn inside them record their boxes in each.
+    outside: Vec<outside::Inside>,
 }
 
 /// A list's rows a mod should build, which the app asks the workspace for
@@ -353,6 +361,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             in_kept: false,
             live_again: Vec::new(),
             layering: None,
+            outside: Vec::new(),
         }
     }
 

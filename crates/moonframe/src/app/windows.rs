@@ -237,6 +237,7 @@ impl MoonframeApp {
     ) -> bool {
         self.key_layers
             .insert(window.window_handle().window_id(), frame.key_layers);
+        crate::render::dividers_drawn(window.window_handle().window_id());
         self.request_list_rows(frame.list_requests, cx);
         self.make_views(window, cx);
         frame.animating

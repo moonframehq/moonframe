@@ -115,3 +115,54 @@ fn a_divider_in_a_dialog_takes_the_keys(cx: &mut TestAppContext) {
         width(&mut window)
     );
 }
+
+/// The split telling its mod the sizes the user leaves it at.
+const TOLD: &str = r##"
+return mod {
+	init = function()
+		return { log = "" }
+	end,
+	update = function(state, msg)
+		logged(state, `{msg.msg} {msg.sizes[1]}`)
+	end,
+	view = function(state)
+		return shell(state, ui.hsplit { id = "people", resize = "sized",
+			ui.pane { size = 200, min = 100, max = 400, ui.column { class = "list", grow = true, ui.text { "List" } } },
+			ui.pane { ui.column { class = "person", grow = true, ui.text { "Person" } } },
+		})
+	end,
+}
+"##;
+
+#[gpui_kit::test]
+fn a_divider_moved_by_a_key_tells_the_mod_the_sizes(cx: &mut TestAppContext) {
+    let mut window = open(cx, TOLD);
+    let at = divider(&mut window);
+    window.click_at(at);
+    window.keys("right");
+    let start = width(&mut window).round() as i64;
+    assert_eq!(window.log(), format!("|sized {start}"));
+}
+
+#[gpui_kit::test]
+fn a_split_gone_lets_go_of_its_dividers(cx: &mut TestAppContext) {
+    let source = r##"
+return mod {
+	init = function() return { log = "", shown = true } end,
+	update = function(state, msg) state.shown = false end,
+	view = function(state)
+		return shell(state, ui.column { grow = true,
+			ui.row { class = "close", msg = "close", ui.text { "Close" } },
+			state.shown and ui.hsplit { id = "people",
+				ui.pane { size = 200, ui.text { "List" } },
+				ui.pane { ui.text { "Person" } },
+			},
+		})
+	end,
+}
+"##;
+    let mut window = open(cx, source);
+    assert_eq!(crate::render::dividers_kept(), 1);
+    window.click("close");
+    assert_eq!(crate::render::dividers_kept(), 0);
+}
