@@ -366,8 +366,21 @@ fn what_the_app_asked_for_survives_a_restart() {
 fn nothing_new_publishes_nothing() {
     let fixture = Fixture::new();
     let mut projects = fixture.projects();
-    assert!(projects.emit(true).is_some());
-    assert!(projects.emit(false).is_none());
+    let Some(first) = projects.emit(true) else {
+        panic!("the first look publishes");
+    };
+    // A slow scan (Windows runners) can cross a minute between the two
+    // looks: then the minute is all that may be new.
+    if let Some(second) = projects.emit(false) {
+        let without_minute = |mut value: Value| {
+            if let Some(fields) = value.as_object_mut() {
+                fields.remove("now");
+            }
+            value
+        };
+        assert_ne!(first["now"], second["now"], "{second}");
+        assert_eq!(without_minute(second), without_minute(first));
+    }
 }
 
 #[test]
