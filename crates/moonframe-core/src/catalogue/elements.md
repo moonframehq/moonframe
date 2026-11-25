@@ -23,9 +23,9 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 Embedding apps can select miniapps outside `app_dir` with `Moonframe::root`
 and `entry`, or `entry_handle().add_entry(namespace, id, path)` at runtime.
 Roots set policy without scanning. An entry holds `main.luau` and/or
-`provider/provider.toml`: mount `ui.mount "mshub:notes"` (or give it an `id`
-for independent instance state), read `app["mshub:notes"]`, send to
-`"provider:mshub:notes"`, and subscribe to `"provider/mshub:notes"`.
+`provider/provider.toml`: mount `ui.mount "acme:notes"` (or give it an `id`
+for independent instance state), read `app["acme:notes"]`, send to
+`"provider:acme:notes"`, and subscribe to `"provider/acme:notes"`.
 Saved mod/instance state includes the namespace. Namespace and id each use
 1–48 of `a-z 0-9 - _`; `app provider topic demo component shell parent` are
 reserved namespaces. `remove_entry` / `remove_root` unload them without
@@ -93,7 +93,7 @@ and `preview` to false. Preview cards are noninteractive and stay inside the com
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
-| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers; read only with `disabled`, not dimmed) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `paste` (sent with `files`, their paths, when files or a picture are pasted into it; a picture is saved to the image cache first and also comes as `image = { path, width, height }`; text pastes as usual), `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there), `scrolled` (multiline: sent as the text scrolls, with `fraction`, 0 at the top to 1 with the last line at the bottom), `scroll_at = { fraction, seq }` (multiline: scrolls there when it changes, without sending `scrolled`); a source and its `ui.markdown` preview follow each other with the two |
+| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers; read only with `disabled`, not dimmed) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `paste` (sent with `files`, their paths, when files or a picture are pasted into it; a picture is saved to the image cache first and also comes as `image = { path, width, height }`; text pastes as usual), `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there), `caret` (`"start"`, `"end"` or a byte offset: where the caret goes when the field takes a new `value` or this changes, as after a recalled line), `scrolled` (multiline: sent as the text scrolls, with `fraction`, 0 at the top to 1 with the last line at the bottom), `scroll_at = { fraction, seq }` (multiline: scrolls there when it changes, without sending `scrolled`); a source and its `ui.markdown` preview follow each other with the two |
 
 ### Overlays
 
@@ -130,6 +130,16 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `x >= content_width - width`); a row of pills (`scroll = "x", scrollbar =
   false`) keeps the first `fit` and opens the rest from Show more; a list
   keeps `first`, to reveal it with `scroll_to` when it comes back.
+
+- **Hear a click outside** (`row`, `column`): `outside = msg` sends `msg`
+  (to `to`, else the drawing mod) when a click begins and ends outside its
+  box and outside the popovers and overlays drawn inside it; a drag that
+  began inside it does not count. Unlike a popover's `dismiss`, nothing
+  covers the window: the click still reaches whatever it landed on, so one
+  click both closes a floating panel and presses the button beside it. It
+  is sent as the button comes up, so closing the panel never moves what
+  was clicked from under the pointer. In the GPUI window only, so far:
+  Rune draws the stack but does not send it.
 
 - **Frame keys** (`row`, `column`, `panel`): `grow`, `width`, `height`,
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `follow = true` (with `scroll`:

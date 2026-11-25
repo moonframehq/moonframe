@@ -287,6 +287,11 @@ export type StackProps = {
 	-- With `scroll`: sent with `width`, `height`, `content_width`,
 	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
 	measure: Data,
+	-- Sent (to `to`, else this mod) when a click begins and ends outside its
+	-- box and outside the popovers and overlays inside it; the click still
+	-- reaches what it landed on. A floating panel that minimizes on a click
+	-- elsewhere. The GPUI window only; Rune does not send it yet.
+	outside: Data,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
@@ -1120,6 +1125,10 @@ export type InputProps = {
 	-- A code editor's caret goes to this line (from 1), scrolled into view,
 	-- when it changes or the field takes a new `value`.
 	line: number?,
+	-- Where the caret goes when the field takes a new `value`, or when this
+	-- changes: "start", "end" (after a recalled line), or a byte offset, as
+	-- `change` and `select` count `caret`.
+	caret: ("start" | "end" | number)?,
 	-- With `multiline`: sent as the text scrolls (the wheel, the scrollbar,
 	-- the caret carrying it), with `fraction` added, from 0 (the top) to 1
 	-- (the last line at the bottom). Not sent for `scroll_at`.

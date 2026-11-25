@@ -87,6 +87,10 @@ pub struct Stack {
     /// content's size, how far it is scrolled and which children fit and
     /// show, each time one of them changes (see `render/stack_measure`).
     pub measure: Option<Action>,
+    /// Sent when a click begins and ends outside its box and outside the
+    /// popovers and overlays drawn inside it; the click goes on to whatever
+    /// is there, as a menu that closes on a click elsewhere lets it through.
+    pub outside: Option<Action>,
     /// What clicking anywhere in it does, as on a button.
     pub action: Option<Action>,
     pub extras: Extras,

@@ -593,6 +593,12 @@ ui.input {
   from the last `value` the mod passed, so a mod echoing the text back
   changes nothing, and `value = ""` after a submit clears it. Without
   `value`, the user's text stands.
+- **`caret`** puts the caret when the field takes a new `value` or
+  `caret` changes: `"start"`, `"end"`, or a byte offset (as `change` counts
+  `caret`). A prompt history recalling a line on `up` keeps `caret = "end"`
+  so the caret lands after the line, ready to edit; without it a new value
+  may leave the caret at the start. A value the field already shows (the
+  mod echoing what was typed) leaves the caret where the user put it.
 - **Messages carry the text.** A table `msg` arrives as a copy with
   `value = <text>` added: `change = { query = true }` sends
   `{ query = true, value = "ab" }`. Anything else arrives as
@@ -1409,7 +1415,7 @@ Text-like elements take their main value positionally:
 
 | Element | Keys (besides children) | Notes |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window, and a `window = { size, min_size }` to size it; `window` takes no `msg`, so to open it on a page send `app:window` instead) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
+| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, `outside` (a message sent when a click begins and ends outside it and the popovers inside it; the click still goes through: a floating panel that minimizes on a click elsewhere. GPUI window only; Rune does not send it yet), extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window, and a `window = { size, min_size }` to size it; `window` takes no `msg`, so to open it on a page send `app:window` instead) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider`, `resize`, `to` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover. The user's sizes last the session; `resize` keeps them across launches (see "Pane sizes that outlive the app") |
 | `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
@@ -2176,12 +2182,12 @@ terminal log. There are four kinds:
     `.entry(namespace, id, path)` at launch, or clone `.entry_handle()` before
     `.run()` and call `add_root` / `remove_root`, `add_entry` / `remove_entry`
     from host threads. An entry contains `main.luau` and/or
-    `provider/provider.toml`. Mount `ui.mount "mshub:notes"`, read
-    `app["mshub:notes"]`, send `provider:mshub:notes`, subscribe to
-    `provider/mshub:notes`. Namespace and id use 1–48 of `a-z 0-9 - _`;
+    `provider/provider.toml`. Mount `ui.mount "acme:notes"`, read
+    `app["acme:notes"]`, send `provider:acme:notes`, subscribe to
+    `provider/acme:notes`. Namespace and id use 1–48 of `a-z 0-9 - _`;
     routing namespaces `app provider topic demo component shell parent` are
     reserved. State keys include the namespace, also for mounted instances.
-    `kind = "native"` binds only to a compiled `.native("mshub:notes", ...)`.
+    `kind = "native"` binds only to a compiled `.native("acme:notes", ...)`.
   - `RootPolicy::default()` is `PrebuiltOnly` (requires `provider.wasm`, refuses
     `Cargo.toml`) with process/socket disabled. Use `BuildPolicy::Cargo` for
     reviewed source; hooks remain refused. Entries reload live, including in
