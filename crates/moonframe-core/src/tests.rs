@@ -46,6 +46,7 @@ mod video;
 mod view_context;
 mod view_diagnostics;
 mod views;
+mod window_size;
 mod windows;
 mod words;
 // keep-sorted end
