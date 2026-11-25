@@ -43,6 +43,8 @@ pub struct Input {
     pub focus: bool,
     /// Use the monospace font.
     pub mono: bool,
+    /// A password: drawn as bullets, and never copied or cut.
+    pub secret: bool,
     /// Sent with the files or picture pasted into it; a paste of text
     /// edits as usual.
     pub paste: Option<Data>,

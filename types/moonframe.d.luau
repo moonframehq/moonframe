@@ -1106,6 +1106,8 @@ export type InputProps = {
 	focus: boolean?,
 	-- The monospace font.
 	mono: boolean?,
+	-- A password: drawn as bullets, never copied or cut; one line only.
+	secret: boolean?,
 	-- Sent with `files` (paths) and, for a picture, `image = { path, width,
 	-- height }` when files or a picture are pasted into it; text pastes.
 	paste: Data,

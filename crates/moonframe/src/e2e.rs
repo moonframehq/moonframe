@@ -22,6 +22,7 @@ mod regressions;
 mod revision_timeline;
 mod scroll_end;
 mod scroll_sync;
+mod secret_input;
 mod spinner;
 mod split_resize;
 mod stack_measure;
