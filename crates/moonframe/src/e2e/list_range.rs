@@ -37,3 +37,23 @@ fn a_list_says_which_rows_show_as_it_scrolls(cx: &mut TestAppContext) {
     window.settle();
     assert_eq!(window.log(), log);
 }
+
+#[gpui_kit::test]
+fn a_padded_list_counts_its_rows_below_the_padding(cx: &mut TestAppContext) {
+    let padded = LIST.replace(
+        "height = 100,",
+        "height = 100, style = { padding = { 20, 0, 0, 0 } },",
+    );
+    let mut window = open(cx, &padded);
+    // 20 of padding, then rows 1 to 4 in the 80 left.
+    assert_eq!(window.log(), "|rows 1-4");
+    window.wheel("box", 200.0);
+    window
+        .cx
+        .executor()
+        .advance_clock(Duration::from_millis(200));
+    window.settle();
+    let log = window.log();
+    // Scrolled 200: the padding is gone above, and rows 10 to 14 show.
+    assert_eq!(log.split('|').next_back(), Some("rows 10-14"), "{log}");
+}

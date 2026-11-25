@@ -8,8 +8,9 @@ use {
     gpui_kit::*,
     moonframe_core::{Action, Data, with_fields},
     std::{
-        cell::RefCell,
+        cell::{Cell, RefCell},
         collections::{BTreeMap, HashMap},
+        rc::Rc,
         time::{Duration, Instant},
     },
 };
@@ -64,7 +65,7 @@ pub(super) fn shown(scrolled: f32, height: f32, row: f32, count: usize) -> Shown
         return (0, 0);
     }
     let first = (((scrolled.max(0.0) + 0.5) / row).floor() as usize).min(count - 1);
-    let end = ((scrolled.max(0.0) + height - 0.5) / row).ceil() as usize;
+    let end = ((scrolled + height - 0.5).max(0.0) / row).ceil() as usize;
     (first + 1, end.clamp(first + 1, count))
 }
 
@@ -150,6 +151,7 @@ pub(super) fn reader(
     id: &str,
     range: &Action,
     handle: &ScrollHandle,
+    rows: Rc<Cell<Bounds<Pixels>>>,
     row: f32,
     count: usize,
     painter: &Painter<'_, '_>,
@@ -174,8 +176,11 @@ pub(super) fn reader(
     let (msg, handle) = (msg.clone(), handle.clone());
     let element = canvas(
         move |_, window, cx| {
-            let scrolled = -f32::from(handle.offset().y);
-            let height = f32::from(handle.bounds().size.height);
+            // From the box's top, how far down the rows it shows: above the
+            // first while the list's padding shows.
+            let shows = handle.bounds();
+            let scrolled = f32::from(shows.top() - rows.get().top());
+            let height = f32::from(shows.size.height);
             let rows = shown(scrolled, height, row, count);
             match tell(&key, &list, frame, rows, Instant::now()) {
                 Tell::No => {},
@@ -234,6 +239,8 @@ mod tests {
         assert_eq!(shown(0.0, 100.0, 20.0, 3), (1, 3));
         assert_eq!(shown(0.0, 100.0, 20.0, 0), (0, 0));
         assert_eq!(shown(0.0, 0.0, 20.0, 10), (0, 0));
+        // Padding above the rows takes room the rows do not show in.
+        assert_eq!(shown(-20.0, 100.0, 20.0, 1000), (1, 4));
         // Squeezed at the end, or scrolled past it: the last row.
         assert_eq!(shown(199.75, 0.25, 20.0, 10), (10, 10));
         assert_eq!(shown(5000.0, 100.0, 20.0, 10), (10, 10));
