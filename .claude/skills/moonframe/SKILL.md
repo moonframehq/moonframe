@@ -630,6 +630,10 @@ ui.input {
 - **Size.** `width` in pixels, or `grow = true` to take the free space
   along the parent's axis (in a row, the width). In a column it fills the
   width anyway. `mono = true` uses the monospace font.
+- **`secret = true`** makes a password field: the text draws as bullets
+  and copy and cut take nothing, while `change` and `submit` still carry
+  it to the mod. One line only. Keep the password out of saved state:
+  hand it to a provider at `submit` and clear it (`value = ""`).
 - **Pasting files and pictures.** `paste = msg` hears ⌘V (Ctrl-V
   elsewhere) of copied files or a picture (a screenshot): `msg` comes with
   `files`, their paths, and for a picture, saved to the image cache first,
@@ -1419,7 +1423,7 @@ Text-like elements take their main value positionally:
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider`, `resize`, `to` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover. The user's sizes last the session; `resize` keeps them across launches (see "Pane sizes that outlive the app") |
 | `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
-| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
+| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, `range`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
 | `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
@@ -1429,7 +1433,7 @@ Text-like elements take their main value positionally:
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
 | `ui.markdown "# Notes"` | `text`, `link`, `tooltips`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures are not loaded. A link shows its title (`[text](url "title")`) on hover while every link to that address has the same one, or what `tooltips = { [url] = text }` gives for its address: where a wrapped (scanned) address really leads |
-| `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `paste`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
+| `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `secret`, `paste`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
 | `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
 | `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras, `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
 | `ui.line { points = { 3, 5, 2, 8 } }` | `points`, `min`, `max`, `baseline`, `area`, `dots` (`last` `all`), `stroke`, `dashed`, `width`, `height`, `class`, `style` | a line through values evenly spaced across its box (fills its parent without `width`/`height`): trends, curves in tables, forecasts. Style `color` strokes it, `background` fills the area to `baseline` (with `area = true`), `border_color` draws the baseline dashed. Use it for any line or curve, a dashed rule (two equal points with `dashed = true`) included |
@@ -1454,6 +1458,11 @@ Text-like elements take their main value positionally:
 - `follow = true`, with `scroll`, keeps it at its end while it is there:
   as the content grows (a chat streaming in, a log), it scrolls along;
   scrolled back, it stays where the user put it.
+- `at_end = msg`, with `scroll`, sends `msg` with `at_end = true|false`
+  added as it first lays out and each time it reaches or leaves its end;
+  `scroll_end = value` scrolls to its end each time the value changes. A
+  chat's "latest message" button shows while `at_end` is false and sets
+  `state.jump = { seq = state.seq + 1 }` for `scroll_end = state.jump`.
 - `shrink = false` keeps the content's size when the parent is short of
   space (strips, toolbars), instead of being squeezed.
 - `self_align = "start"` (or `center`, `end`, `stretch`) places it across
@@ -1896,7 +1905,8 @@ return mod {
   `shift-u`), as a mail client's keys are: it works only while no text
   field or terminal has focus, so typing is never taken, and the menu does
   not show it (name it in the label or a hint). `examples/tidings` uses J
-  and K this way. Overlay and field `keys` still refuse such keys.
+  and K this way. An overlay's or popover's `keys` take them the same way;
+  a mod's `keys` refuse them.
 - About opens macOS's own About panel (the app's icon and name, `version`,
   `description` and `website` as credits, `copyright`), and a toast
   elsewhere.
@@ -1986,6 +1996,23 @@ lookup (up to 100,000 rows):
 row_height = function(i)
 	return if chats[i].status then 60 else 44
 end,
+```
+
+When the rows come from a provider that can't publish them all (a
+publish holds at most 10,000 values), give the list `range = msg`: it is
+sent, with `first` and `last` (the rows any part of which shows, from 1)
+added, as they change, at most every 100 ms and always the last. Keep
+`count` the whole total, ask the provider for a window of rows around
+`first`..`last`, and draw a placeholder in `row` for one not yet there:
+
+```lua
+-- in update
+if type(msg) == "table" and msg.msg == "rows" then
+	return state, { send "provider:people" { window = { from = msg.first - 50, to = msg.last + 50 } } }
+end
+-- in view
+ui.list { id = "people", count = app.people.total, row_height = 40, range = "rows",
+	row = function(i) local person = app.people.rows[i] ... end }
 ```
 
 **Views run only when needed.** The host keeps each view's last tree and
@@ -2691,10 +2718,14 @@ has an `escape`. Other keys go on as usual.
   `left`, `right`, `home`, `end`, `pageup`, `pagedown`. Names are lowercase:
   write `shift-a`, not `A`. A wrong name, or two names for the same key, is
   an error `just check` reports.
-- Keys never take what is typed: a letter, digit, symbol or `space` needs
-  `ctrl`, `alt`, `cmd` or `secondary` (`secondary-k`, `alt-?`), so an
-  overlay cannot read keystrokes meant for a terminal behind it. For typing,
-  use `ui.input` and its own `keys`.
+- Keys never take what is typed: a key that types text (a letter, digit,
+  symbol or `space`, alone or with `shift`: `t`, `/`, `shift-j`) is taken
+  only while no text field or terminal has focus, so an overlay cannot read
+  keystrokes meant for a field in it or a terminal behind it. A sheet that
+  opened on T can close on `t`; while its search field has focus, T types.
+  With `ctrl`, `alt`, `cmd` or `secondary` (`secondary-k`, `alt-?`) a key
+  is taken whatever has focus. For typing, use `ui.input` and its own
+  `keys`.
 - Modifiers must match exactly: `down` does not fire for `shift-down`.
 - While the Inspector is picking or showing its card, Escape is its own;
   while it is picking, so are ↑, ↓ and Enter (they choose the element).

@@ -12,6 +12,8 @@ use {
     moonframe_core::{Direction, List, ListWindow, Part, Space},
 };
 
+mod range;
+
 /// Rows built beyond those showing, on each side, so scrolling a little
 /// never waits for the mod.
 const OVERSCAN: usize = 16;
@@ -62,6 +64,14 @@ impl<'w> Draw<'w> for List {
                     .into_any_element()
             })
             .collect();
+        // Where the rows sit, under the list's padding, for `range`.
+        let laid = std::rc::Rc::new(std::cell::Cell::new(Bounds::<Pixels>::default()));
+        let measure = self.range.is_some().then(|| {
+            let laid = laid.clone();
+            canvas(move |bounds, _, _| laid.set(bounds), |_, (), _, _| {})
+                .absolute()
+                .size_full()
+        });
         let theme = cx.theme();
         let mut element = div().id(place.id()).flex().flex_col();
         // A list needs a bounded height to scroll in: without one of its
@@ -86,8 +96,14 @@ impl<'w> Draw<'w> for List {
                     .flex_shrink_0()
                     .w_full()
                     .h(px(rows_of.total(self.count)))
-                    .children(rows),
+                    .children(rows)
+                    .children(measure),
             )
+            .children(self.range.as_ref().and_then(|range| {
+                range::reader(
+                    &self.id, range, &handle, laid, rows_of, self.count, painter, place, cx,
+                )
+            }))
             .into_any_element()
     }
 }

@@ -290,7 +290,7 @@ fn a_mod_takes_keys_anywhere() {
         cmd: true,
     };
     assert_eq!(
-        keys.message(None, &pressed, true),
+        keys.message(None, &pressed, true, false),
         Some(&Data::from("histogram"))
     );
     // Keys that type text are refused, as on overlays.

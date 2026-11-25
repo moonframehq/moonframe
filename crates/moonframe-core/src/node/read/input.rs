@@ -23,6 +23,7 @@ impl Build for Input {
         "disabled",
         "focus",
         "mono",
+        "secret",
         "paste",
         "width",
         "grow",
@@ -55,6 +56,13 @@ impl Build for Input {
                     .key(key)
                     .fail(format!("`{key}` goes with `multiline = true`")));
             }
+        }
+        let secret = fields.get("secret")?.unwrap_or(false);
+        if secret && multiline {
+            return Err(fields
+                .cx()
+                .key("secret")
+                .fail("a secret is one line; drop `multiline`"));
         }
         let rows = fields.get::<f32>("rows")?;
         if rows.is_some() && !multiline {
@@ -147,6 +155,7 @@ impl Build for Input {
             disabled: fields.get("disabled")?.unwrap_or(false),
             focus: fields.get("focus")?.unwrap_or(false),
             mono: fields.get("mono")?.unwrap_or(false),
+            secret,
             paste,
             width: fields.number("width", PIXELS)?,
             grow: fields.get("grow")?.unwrap_or(false),

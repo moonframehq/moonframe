@@ -143,6 +143,16 @@ impl Editor {
             .update(cx, |state, cx| state.set_selected_range(range, cx)))
     }
 
+    /// Draws a one-line field's text as bullets and keeps it off the
+    /// clipboard, or not; only when that changes, so it draws no more.
+    fn set_masked(&self, masked: bool, window: &mut Window, cx: &mut App) {
+        if let Self::Line(state) = self
+            && state.read(cx).presentation().is_masked() != masked
+        {
+            state.update(cx, |state, cx| state.set_masked(masked, window, cx));
+        }
+    }
+
     fn set_disabled(&self, disabled: bool, cx: &mut App) {
         // A disabled code editor stays readable, not dimmed: its text can
         // be selected and copied, never changed.
@@ -403,6 +413,7 @@ impl Inputs {
             writing.apply(input, state, window, cx);
         }
         editor.set_disabled(input.disabled, cx);
+        editor.set_masked(input.secret, window, cx);
         if input.multiline {
             editor.take_scroll(&mut field.scrolling, input, cx);
         }
@@ -523,7 +534,10 @@ impl Inputs {
 
     /// Whether a field has keyboard focus in `window`.
     pub(crate) fn any_focused(&self, window: &Window, cx: &App) -> bool {
-        self.focused(window, cx).is_some()
+        // Without the field's text, which a keystroke has no use for.
+        self.0.borrow().fields.values().any(|field| {
+            field.mounted.upgrade().is_some() && field.editor.focus_handle(cx).is_focused(window)
+        })
     }
 
     /// The field with keyboard focus in `window`, if any.

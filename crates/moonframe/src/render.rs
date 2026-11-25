@@ -11,6 +11,7 @@ mod browser;
 pub(crate) mod cached;
 mod carry;
 mod elements;
+mod ends;
 mod floating;
 mod gallery;
 pub(crate) mod images;
