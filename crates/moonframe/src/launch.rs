@@ -83,11 +83,21 @@ impl Moonframe {
         identity.title = name.to_owned();
         identity.hosted = true;
         identity.updates = None;
+        let mut providers = moonframe_providers::ProviderOptions::default();
+        let mut errors = Vec::new();
+        // Moonframe's own capabilities, which any app's providers may list.
+        if let Err(error) = providers.capabilities.moonframe(
+            crate::web_page::NAME,
+            crate::web_page::Page,
+            crate::web_page::bounds(),
+        ) {
+            errors.push(error);
+        }
         Self {
             entries: Default::default(),
             view_diagnostics: None,
-            providers: Default::default(),
-            errors: Vec::new(),
+            providers,
+            errors,
             log: format!("error,moonframe=info,{}=info", name.replace('-', "_")),
             identity,
             app: None,

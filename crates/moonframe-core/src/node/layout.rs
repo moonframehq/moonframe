@@ -131,7 +131,24 @@ pub struct Split {
     /// Draws a hairline between panes; without it the panes meet with no
     /// line, and only a hovered or dragged handle shows.
     pub divider: bool,
+    /// Sent once the user lets go of a divider, with `sizes`: each pane's
+    /// size in whole pixels, in order, 0 for a hidden one. A mod keeps them
+    /// in its state, which outlives the app, and passes them back as the
+    /// panes' `size`, so they reopen as the user left them.
+    pub resize: Option<Action>,
     pub panes: Vec<Pane>,
+}
+
+impl Split {
+    /// What `resize` sends for `msg` when the panes are `sizes` pixels: a
+    /// table `msg` with `sizes` added, else `{ msg = msg, sizes = ... }`.
+    pub fn resized(msg: &Data, sizes: impl IntoIterator<Item = f32>) -> Data {
+        let sizes = sizes
+            .into_iter()
+            .map(|size| Data::Integer(size.round().max(0.0) as i64))
+            .collect();
+        Markdown::note(msg, [("sizes", Data::List(sizes))])
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -216,10 +233,11 @@ pub struct Overlay {
     pub content: Box<Node>,
 }
 
-/// Rows of the same height, of which the host draws only those that show,
-/// so a list of any length costs what one screenful does. The view gives a
-/// `row` function rather than the rows; it is called for the rows around
-/// the ones showing, and the host asks again as the list scrolls.
+/// Rows, of one height or each of its own, of which the host draws only
+/// those that show, so a list of any length costs what one screenful does.
+/// The view gives a `row` function rather than the rows; it is called for
+/// the rows around the ones showing, and the host asks again as the list
+/// scrolls.
 #[derive(Clone, Debug, PartialEq)]
 pub struct List {
     pub look: Look,
@@ -228,8 +246,8 @@ pub struct List {
     pub id: String,
     /// How many rows there are in all.
     pub count: usize,
-    /// Each row's height in pixels.
-    pub row_height: f32,
+    /// The rows' heights in pixels.
+    pub row_height: RowHeights,
     /// The position of `rows[0]`, from 0.
     pub start: usize,
     /// The rows from `start` the view built.

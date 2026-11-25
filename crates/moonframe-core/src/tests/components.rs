@@ -246,6 +246,16 @@ return mod {
         workspace.dispatch("demo:pill", &Action::Command(Command::Quit)),
         None
     );
+    // Nor would anything it hands over: a paste's files.
+    assert_eq!(workspace.recipient("demo:pill", "other"), None);
+    assert_eq!(
+        workspace.recipient("demo:pill", "demo:pill").as_deref(),
+        Some("demo:pill")
+    );
+    assert_eq!(
+        workspace.recipient("other", "notes").as_deref(),
+        Some("notes")
+    );
     // The browser shows the file it runs.
     let component = &workspace.components()[0];
     assert!(

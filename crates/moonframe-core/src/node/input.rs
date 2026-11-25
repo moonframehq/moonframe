@@ -43,6 +43,9 @@ pub struct Input {
     pub focus: bool,
     /// Use the monospace font.
     pub mono: bool,
+    /// Sent with the files or picture pasted into it; a paste of text
+    /// edits as usual.
+    pub paste: Option<Data>,
     /// The `ui.browser` this field is the address bar of: Enter loads the
     /// typed address there (see [`typed_address`]), focus selects the
     /// text, and Escape puts back the page's address.
