@@ -43,3 +43,30 @@ fn a_column_takes_its_keys_while_focus_is_inside_it(cx: &mut TestAppContext) {
     window.keys("left");
     assert_eq!(window.log(), "|page|keep|dismiss|note");
 }
+
+/// The deck in a dialog with a backdrop.
+const DIALOG: &str = r##"
+return mod {
+	init = function()
+		return { log = "" }
+	end,
+	update = function(state, msg)
+		logged(state, msg)
+	end,
+	view = function(state)
+		return shell(state, ui.overlay { open = true, backdrop = true, width = 400, height = 200,
+			content = ui.column { class = "deck", keys = { left = "dismiss", right = "keep" },
+				ui.row { class = "card", height = 40, ui.text { "Follow up with Ana" } },
+			},
+		})
+	end,
+}
+"##;
+
+#[gpui_kit::test]
+fn a_column_in_a_dialog_takes_its_keys(cx: &mut TestAppContext) {
+    let mut window = open(cx, DIALOG);
+    window.click("card");
+    window.keys("right");
+    assert_eq!(window.log(), "|keep");
+}

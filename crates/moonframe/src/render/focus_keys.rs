@@ -29,6 +29,9 @@ pub(crate) struct FocusKeys {
     pub(crate) keys: Keys,
     /// Its place, which its handle is kept by.
     path: String,
+    /// The paint priority of the layer it is drawn in: 0 for the window,
+    /// an overlay's inside one, whose backdrop keeps keys from those below.
+    pub(crate) layer: usize,
 }
 
 /// A frame of `window` is drawn, with the stacks in `drawn`: the handles of
@@ -76,6 +79,7 @@ impl Painter<'_, '_> {
             owner: place.owner.to_owned(),
             keys: keys.clone(),
             path: place.path.clone(),
+            layer: self.layer,
         });
         Some(focus)
     }
@@ -97,6 +101,7 @@ mod tests {
             owner: "list".to_owned(),
             keys: Default::default(),
             path: "row[1]".to_owned(),
+            layer: 0,
         });
         let places = handles.entry(None).or_default();
         places.insert("row[1]".to_owned(), stack.focus.clone());

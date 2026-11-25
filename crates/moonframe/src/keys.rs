@@ -14,8 +14,9 @@ pub(crate) enum Taken {
     /// It sent a message; nothing else sees the key.
     Sent,
     /// Not one of its keys, but it blocks the window behind (a backdrop):
-    /// a terminal there must not get it; key bindings still may.
-    Blocked,
+    /// a terminal there must not get it; key bindings still may, and a
+    /// stack in the layer, of this paint priority, or above it.
+    Blocked(usize),
     /// Nothing open takes it.
     Free,
 }
@@ -54,11 +55,14 @@ pub(crate) fn intercept(cx: &mut Context<MoonframeApp>) -> Subscription {
                 }
                 match app.layer_keystroke(&event.keystroke, window, cx) {
                     Taken::Sent => true,
-                    Taken::Blocked => app.input_keystroke(&event.keystroke, window, cx),
+                    Taken::Blocked(layer) => {
+                        app.input_keystroke(&event.keystroke, window, cx)
+                            || app.focus_keystroke(&event.keystroke, layer, window, cx)
+                    },
                     Taken::Free => {
                         app.input_keystroke(&event.keystroke, window, cx)
                             || app.terminal_keystroke(&event.keystroke, window, cx)
-                            || app.focus_keystroke(&event.keystroke, window, cx)
+                            || app.focus_keystroke(&event.keystroke, 0, window, cx)
                             || app.mod_keystroke(&event.keystroke, window, cx)
                             || app.menu_keystroke(&event.keystroke, window, cx)
                     },
@@ -125,7 +129,7 @@ impl MoonframeApp {
                 self.dispatch(&top.owner, &action, window, cx);
                 Taken::Sent
             },
-            None if top.modal => Taken::Blocked,
+            None if top.modal => Taken::Blocked(top.priority),
             None => Taken::Free,
         }
     }
@@ -136,6 +140,7 @@ impl MoonframeApp {
     pub(crate) fn focus_keystroke(
         &mut self,
         keystroke: &Keystroke,
+        above: usize,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
@@ -148,7 +153,7 @@ impl MoonframeApp {
             .get(&window.window_handle().window_id())
             .into_iter()
             .flatten()
-            .filter(|stack| stack.focus.contains_focused(window, cx))
+            .filter(|stack| stack.layer >= above && stack.focus.contains_focused(window, cx))
             .find_map(|stack| {
                 let msg = stack.keys.message(None, &pressed, MAC)?;
                 Some((stack.owner.clone(), msg.clone()))
