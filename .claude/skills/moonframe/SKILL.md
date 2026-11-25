@@ -1390,7 +1390,7 @@ Text-like elements take their main value positionally:
 | --- | --- | --- |
 | `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window, and a `window = { size, min_size }` to size it; `window` takes no `msg`, so to open it on a page send `app:window` instead) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
-| `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover |
+| `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider`, `resize`, `to` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover. The user's sizes last the session; `resize` keeps them across launches (see "Pane sizes that outlive the app") |
 | `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
 | `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
 | `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
@@ -1993,6 +1993,24 @@ ui.hsplit {
 	ui.pane { ui.region "main" },
 	ui.pane { size = 280, fixed = true, visible = state.right, surface = "sidebar", ui.region "right" },
 }
+```
+
+**Pane sizes that outlive the app.** A split keeps the user's sizes for
+the session. To keep them across launches, give it `resize`: once the user
+lets go of a divider it sends `sizes`, each pane's whole pixels in order (0
+for a hidden one). Keep them in state, which is saved, and pass them back
+as `size`; a new launch opens the panes there:
+
+```lua
+update = function(state, msg)
+	if msg.msg == "sized" then state.list_width = msg.sizes[1] end
+end,
+view = function(state)
+	return ui.hsplit { id = "chat", resize = "sized",
+		ui.pane { size = state.list_width or 280, min = 200, ui.region "list" },
+		ui.pane { ui.region "conversation" },
+	}
+end,
 ```
 
 **Bottom panel.** Put a `ui.vsplit` inside the center pane, with a second

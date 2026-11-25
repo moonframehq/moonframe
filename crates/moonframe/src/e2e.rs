@@ -16,6 +16,7 @@ mod regressions;
 mod revision_timeline;
 mod scroll_sync;
 mod spinner;
+mod split_resize;
 mod stack_measure;
 mod window_size;
 mod windows;

@@ -96,7 +96,7 @@ impl Build for Panel {
 
 impl Build for Split {
     const CHILDREN: bool = true;
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["id", "divider"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["id", "divider", "resize", "to"]];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let panes = fields
@@ -121,6 +121,16 @@ impl Build for Split {
             },
             id: fields.get("id")?,
             divider: fields.get("divider")?.unwrap_or(true),
+            resize: match fields.get::<Data>("resize")? {
+                Some(msg) => Some(Action::Send {
+                    to: fields.get("to")?,
+                    msg,
+                }),
+                None if fields.raw("to").is_some() => {
+                    return Err(fields.cx().key("to").fail("`to` goes with `resize`"));
+                },
+                None => None,
+            },
             panes,
         })
     }
