@@ -14,6 +14,7 @@ mod inspect_context;
 mod list_rows;
 mod markdown_scroll;
 mod outside;
+mod page_text;
 mod paste;
 mod regressions;
 mod revision_timeline;

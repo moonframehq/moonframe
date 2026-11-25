@@ -1086,6 +1086,18 @@ return state, { { to = "app:window", msg = { open = "settings", send = { page = 
   Other schemes (`file`, an app's own) are the sender's error. At most 3
   pages open in 10 s. A control does it on a click: `ui.row { to =
   "app:open", msg = pr.url, ... }`.
+- `app:text`, `msg` `{ mod? | region?, max?, reply }`: answers with `reply`
+  plus `text`, what that mod (or region's mods) draws as plain text (rows
+  across, columns down, with what it mounts; fields, hidden panes, closed
+  popovers and overlays, and list rows not built are left out), and
+  `selection = { text, mod }`, the text the user last selected in a
+  `ui.markdown` and the mod that drew it. The selection is noted as the
+  user lets go of the pointer, so it is still there after they click into
+  the field they ask in. Each is cut to `max` characters (64,000). An
+  assistant sends both with a question:
+  `{ to = "app:text", msg = { region = "main", reply = { ask = question } } }`,
+  then in `update`, `msg.ask` comes back with `msg.text` and
+  `msg.selection`. Rune answers `text` only.
 - `app:pdf`, `msg` `{ html | html_file | url, pdf, paper?, reply? }`: a page
   made into a PDF file, as a reader saves an article (macOS, with the
   `browser` feature). The page is `html` (text, up to 1 MiB), `html_file`

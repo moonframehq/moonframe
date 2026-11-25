@@ -15,6 +15,7 @@ mod check_data;
 mod checks;
 mod components;
 mod dictation;
+mod drawn_text;
 mod elements;
 mod entries;
 mod entry_scopes;

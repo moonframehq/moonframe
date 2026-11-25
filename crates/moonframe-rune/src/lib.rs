@@ -287,6 +287,13 @@ impl Ui {
                 self.pick(from, pick, tx);
                 false
             },
+            // Rune's text is not selectable yet: only what mods draw.
+            Request::Text(request) => {
+                let mut workspace = self.workspace_mut();
+                let text = request.of.as_ref().and_then(|of| workspace.drawn_text(of));
+                workspace.send(from, from, request.answer(text, None));
+                true
+            },
             Request::Appearance(appearance) => {
                 self.set_appearance(appearance);
                 true

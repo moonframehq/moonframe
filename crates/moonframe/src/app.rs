@@ -72,6 +72,7 @@ mod picking;
 mod problems;
 mod quick_inspect;
 mod sharing;
+mod text;
 mod toasts;
 mod updates;
 mod view;
@@ -207,6 +208,8 @@ pub(crate) struct MoonframeApp {
     /// The number of the last tab `moonframe pane new` opened, which names
     /// it: each one's is higher, even for two in the same millisecond.
     last_pane: i64,
+    /// The text the user last selected in a document, for `app:text`.
+    selected: Option<moonframe_core::Selected>,
 }
 
 struct Defaults {
@@ -358,6 +361,7 @@ impl MoonframeApp {
             _omarchy: omarchy,
             _keys: crate::keys::intercept(cx),
             last_pane: 0,
+            selected: None,
         };
         app.load_measure();
         live::ticking(cx);
@@ -869,6 +873,7 @@ impl MoonframeApp {
             Request::StatusItem(request) => self.status_item_request(from, request, cx),
             Request::Hotkey(request) => self.hotkey_request(from, request, cx),
             Request::Pdf(request) => self.pdf_request(from, request, cx),
+            Request::Text(request) => self.text_request(from, request, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);

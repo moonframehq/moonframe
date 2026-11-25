@@ -220,6 +220,14 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `open`, `folder` or `save` with `name` and `folder`); the answer comes
   back to the mod as `reply` with `paths` (`path` for a save) or
   `cancelled = true`. Picked files may then show in that mod's `ui.image`.
+- **Page text:** `{ to = "app:text", msg = { mod = "notes", reply = "page"
+  } }` answers with `text`, what `notes` draws (rows across, columns down,
+  with what it mounts; not fields, hidden panes or closed popovers), and
+  `selection = { text, mod }`, the text the user last selected in a
+  document and the mod that drew it, kept after a click into a field
+  clears it on screen. `region = "main"` reads a region's mods instead;
+  neither, only the selection. `max` cuts each (64,000 characters): what
+  an assistant sends with a question.
 - **Text edits:** `{ to = "app:edit", msg = { field = "notes", wrap = {
   "**", "**" } } }` edits the mod's `ui.input` with that `id` around its
   selection, keeping undo and focus: `wrap` puts the two around it (or
