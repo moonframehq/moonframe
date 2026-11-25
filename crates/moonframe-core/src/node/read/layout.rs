@@ -249,8 +249,14 @@ impl Build for Overlay {
 }
 
 impl Build for List {
-    const KEYS: &'static [&'static [&'static str]] =
-        &[TYPE, FRAME, LOOK, &["id", "count", "row_height", "row"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, FRAME, LOOK, &[
+        "id",
+        "count",
+        "row_height",
+        "row",
+        "range",
+        "to",
+    ]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let id = fields
@@ -274,6 +280,10 @@ impl Build for List {
             })?;
         let row_height = row_heights(fields, count)?;
         let row: mlua::Function = fields.need("row")?;
+        let to: Option<String> = fields.get("to")?;
+        if to.is_some() && fields.raw("range").is_none() {
+            return Err(fields.cx().key("to").fail("`to` goes with a `range`"));
+        }
         let window = tree.windows.get(&id).copied().unwrap_or(ListWindow::FIRST);
         let range = window.range(count);
         let cx = fields.cx().key("row");
@@ -293,6 +303,9 @@ impl Build for List {
             row_height,
             start: range.start,
             rows,
+            range: fields
+                .get::<Data>("range")?
+                .map(|msg| Action::Send { to, msg }),
         })
     }
 }
