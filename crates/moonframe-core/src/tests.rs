@@ -22,6 +22,7 @@ mod flow_diagram;
 mod font_size;
 mod gestures;
 mod history;
+mod input_caret;
 mod lightbox;
 mod maps;
 mod mods;

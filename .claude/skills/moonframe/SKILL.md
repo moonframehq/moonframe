@@ -593,6 +593,12 @@ ui.input {
   from the last `value` the mod passed, so a mod echoing the text back
   changes nothing, and `value = ""` after a submit clears it. Without
   `value`, the user's text stands.
+- **`caret`** puts the caret when the field takes a new `value` or
+  `caret` changes: `"start"`, `"end"`, or a byte offset (as `change` counts
+  `caret`). A prompt history recalling a line on `up` keeps `caret = "end"`
+  so the caret lands after the line, ready to edit; without it a new value
+  may leave the caret at the start. A value the field already shows (the
+  mod echoing what was typed) leaves the caret where the user put it.
 - **Messages carry the text.** A table `msg` arrives as a copy with
   `value = <text>` added: `change = { query = true }` sends
   `{ query = true, value = "ab" }`. Anything else arrives as
