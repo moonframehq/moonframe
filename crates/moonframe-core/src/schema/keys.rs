@@ -92,7 +92,7 @@ pub(super) fn key_type(element: &str, key: &str) -> KeyType {
         ("revision_timeline", "spread") => number(0.0, 5.0),
         ("revision_timeline", "tick_width") => number(1.0, 128.0),
         ("revision_timeline", "tick_height") => number(0.5, 16.0),
-        ("pane", "size" | "min" | "max") => PIXELS,
+        ("pane", "size" | "reset" | "min" | "max") => PIXELS,
         ("line", "min" | "max" | "baseline") => number(-1.0e12, 1.0e12),
         ("line", "area") => Bool,
         ("line", "stroke") => number(0.5, 8.0),

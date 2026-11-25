@@ -460,6 +460,7 @@ impl<'w> Draw<'w> for Split {
             layer: painter.layer,
             vertical: self.direction == Direction::Column,
             sizes: self.panes.iter().map(|pane| pane.size).collect(),
+            resets: self.panes.iter().map(|pane| pane.reset).collect(),
             resized: self
                 .resize
                 .as_ref()

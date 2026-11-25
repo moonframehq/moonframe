@@ -159,7 +159,8 @@ fn kind_of(table: &Table) -> Option<Element> {
 impl Build for Pane {
     const CHILDREN: bool = true;
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "size", "min", "max", "fixed", "visible", "lazy", "gap", "padding", "surface", "scroll",
+        "size", "reset", "min", "max", "fixed", "visible", "lazy", "gap", "padding", "surface",
+        "scroll",
     ]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
@@ -171,6 +172,7 @@ impl Build for Pane {
         Ok(Self {
             look: Look::from_fields(fields)?,
             size,
+            reset: fields.number("reset", PIXELS)?,
             min: fields.number("min", PIXELS)?,
             max: fields.number("max", PIXELS)?,
             fixed,
