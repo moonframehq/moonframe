@@ -50,6 +50,11 @@ impl<'w> Painter<'w, '_> {
         let (true, Some(views), Some(layering)) =
             (layered, self.views.as_deref(), self.layering.as_mut())
         else {
+            // In place, inside the app: the window must not replay the app
+            // while it is there.
+            if let (Some(views), Some(_)) = (self.views.as_deref(), self.layering.as_ref()) {
+                views.layers().drawn_inline();
+            }
             return view.into_any_element();
         };
         layering.layered += 1;
