@@ -1187,6 +1187,16 @@ return mod {
 }
 ```
 
+A row or column takes `keys` of its own, named the same way, only while
+focus is inside it: a click anywhere in it gives it focus (a control in it
+keeps it there), and while no text field has focus its keys come before the
+mod's. A deck whose ← dismisses and → keeps once the reader is in it, while
+the page's arrows stay the page's elsewhere:
+
+```lua
+ui.column { class = "deck", keys = { left = "dismiss", right = "keep" }, ... }
+```
+
 ## Tabs
 
 `tabbed { id = "main", start = "component:terminal" }` is a tab bar that

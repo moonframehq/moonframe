@@ -173,6 +173,12 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   on an icon's corner), `area` (out of the flow at fractions of the parent,
   `area = { left = 0.1, top = 0.2, width = 0.5, height = 0.3 }`: a crop
   frame, a marker on a track). `grow` with a `width` or `height` grows from that size.
+- **Keys while inside** (`row`, `column`): `keys = { left = <msg>, ... }`,
+  named as an overlay's are, sends its messages to the drawing mod while
+  focus is inside it (a click anywhere in it gives it focus, and a control
+  in it keeps it there) and no text field has it, ahead of the mod's own
+  `keys`: a deck whose arrows dismiss and keep only once the reader is in
+  it. The innermost row or column with the key takes it.
 - **Ends** (`row`, `column`, with `scroll`): `at_end = <msg>` sends `msg`
   to the drawing mod with `at_end = true` or `false` as it first lays out
   and each time it reaches or leaves its end (its bottom; a row that

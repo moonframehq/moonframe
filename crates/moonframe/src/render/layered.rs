@@ -27,6 +27,9 @@ pub(super) struct Layering {
     lifted: usize,
     /// Drawing a keyed child moving in or out, which fades or is covered.
     moving: usize,
+    /// Drawing inside a row or column with `keys`: a view there stays in
+    /// its tree, so focus in one of its controls is focus inside the stack.
+    focusing: usize,
 }
 
 impl<'w> Painter<'w, '_> {
@@ -41,13 +44,17 @@ impl<'w> Painter<'w, '_> {
     pub(super) fn host(&mut self, view: AnyView) -> AnyElement {
         let layered = self.layer == 0
             && !self.preview
-            && self
-                .layering
-                .as_ref()
-                .is_some_and(|layering| layering.lifted == 0 && layering.moving == 0);
+            && self.layering.as_ref().is_some_and(|layering| {
+                layering.lifted == 0 && layering.moving == 0 && layering.focusing == 0
+            });
         let (true, Some(views), Some(layering)) =
             (layered, self.views.as_deref(), self.layering.as_mut())
         else {
+            // In place, inside the app: the window must not replay the app
+            // while it is there.
+            if let (Some(views), Some(_)) = (self.views.as_deref(), self.layering.as_ref()) {
+                views.layers().drawn_inline();
+            }
             return view.into_any_element();
         };
         layering.layered += 1;
@@ -62,6 +69,12 @@ impl<'w> Painter<'w, '_> {
     /// Draws with `draw` a keyed child, `moving` in or out.
     pub(super) fn moving<R>(&mut self, moving: bool, draw: impl FnOnce(&mut Self) -> R) -> R {
         self.layered_depth(moving, draw, |layering| &mut layering.moving)
+    }
+
+    /// Draws with `draw` the children of a stack that takes keys while
+    /// focus is inside it, when `keys` says it does.
+    pub(super) fn focusing<R>(&mut self, keys: bool, draw: impl FnOnce(&mut Self) -> R) -> R {
+        self.layered_depth(keys, draw, |layering| &mut layering.focusing)
     }
 
     fn layered_depth<R>(
