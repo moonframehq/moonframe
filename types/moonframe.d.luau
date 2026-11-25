@@ -447,6 +447,12 @@ export type SplitProps = {
 	id: string?,
 	-- false: no hairline between panes; a handle shows only when hovered.
 	divider: boolean?,
+	-- Sent once the user lets go of a divider, with `sizes`: each pane's
+	-- whole pixels, in order, 0 for a hidden one. Keep them in state (it
+	-- outlives the app) and pass them back as the panes' `size`.
+	resize: Data,
+	-- The mod `resize` goes to; this one when unset.
+	to: string?,
 	[number]: Element | false | nil,
 }
 
@@ -573,6 +579,7 @@ export type IconName =
 	| "book-open"
 	| "bookmark"
 	| "bot"
+	| "brain"
 	| "brand-anthropic"
 	| "brand-github"
 	| "brand-gitlab"
@@ -1089,6 +1096,9 @@ export type InputProps = {
 	focus: boolean?,
 	-- The monospace font.
 	mono: boolean?,
+	-- Sent with `files` (paths) and, for a picture, `image = { path, width,
+	-- height }` when files or a picture are pasted into it; text pastes.
+	paste: Data,
 	width: number?,
 	grow: boolean?,
 	-- Make it the address bar of this mod's `ui.browser` with this id (or
@@ -1196,9 +1206,10 @@ export type OverlayProps = {
 	content: Element,
 }
 
--- Rows of one height, of which only those showing are built and drawn, so
--- a list of any length costs a screenful. `row(i)` builds row `i` (from 1)
--- and is called again as the list scrolls; keep it cheap and pure.
+-- Rows, of one height or each its own, of which only those showing are
+-- built and drawn, so a list of any length costs a screenful. `row(i)`
+-- builds row `i` (from 1) and is called again as the list scrolls; keep it
+-- cheap and pure.
 export type ListProps = {
 	class: Class?,
 	style: Style?,
@@ -1206,8 +1217,9 @@ export type ListProps = {
 	-- Names it among this mod's lists (default "list"); two need two ids.
 	id: string?,
 	count: number,
-	-- Each row's height in pixels.
-	row_height: number,
+	-- Every row's height in pixels, or a function giving row `i`'s own
+	-- (called for every row each time the view runs; up to 100,000 rows).
+	row_height: number | ((index: number) -> number),
 	row: (index: number) -> Child,
 	gap: Space?,
 	padding: Space?,
@@ -1460,6 +1472,11 @@ export type WindowState = {
 	active: boolean,
 	-- The screen it is on: an `id` from `app.displays`.
 	display: number?,
+	-- Its content's size in whole points, updated as it is resized: switch
+	-- to a narrow layout under a breakpoint. Nil where the renderer does
+	-- not say (Rune).
+	width: number?,
+	height: number?,
 }
 
 -- A screen, in `app.displays`. `x`, `y`, `width` and `height` are its
@@ -2532,6 +2549,10 @@ export type Mod<State> = {
 	-- `{ ["secondary-1"] = "histogram" }`; every mounted copy hears them
 	-- too. Keys that type text need ctrl, alt, cmd or secondary.
 	keys: Keys?,
+	-- Sent with `files` (paths) and, for a picture, `image = { path, width,
+	-- height }` when files or a picture are pasted while no text field or
+	-- terminal has focus. A paste of text is not.
+	paste: Data,
 	-- Offered as a kind of tab: each tab mounts an instance of it.
 	tab: TabEntry?,
 	region: string?,

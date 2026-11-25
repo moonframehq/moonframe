@@ -198,6 +198,8 @@ pub(crate) struct Wiring {
     pub(crate) blur: Option<Data>,
     pub(crate) keys: Vec<(KeyChord, Data)>,
     pub(crate) capture: Option<Data>,
+    /// Sent with the files or picture pasted into it.
+    pub(crate) paste: Option<Data>,
     pub(crate) scrolled: Option<Data>,
     pub(crate) multiline: bool,
     pub(crate) disabled: bool,
@@ -216,6 +218,7 @@ impl Wiring {
             blur: input.blur.clone(),
             keys: input.keys.clone(),
             capture: input.capture.clone(),
+            paste: input.paste.clone(),
             scrolled: input.scrolled.clone(),
             multiline: input.multiline,
             disabled: input.disabled,

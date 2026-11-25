@@ -35,6 +35,7 @@ mod revision_timeline;
 mod scroll_sync;
 mod scrollbar;
 mod shell;
+mod split_resize;
 mod stack_measure;
 mod state;
 mod styles;
@@ -47,6 +48,7 @@ mod view_access;
 mod view_context;
 mod view_diagnostics;
 mod views;
+mod window_size;
 mod windows;
 mod words;
 // keep-sorted end
