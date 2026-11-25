@@ -27,9 +27,9 @@ pub(super) struct Layering {
     lifted: usize,
     /// Drawing a keyed child moving in or out, which fades or is covered.
     moving: usize,
-    /// Drawing inside a row or column with `keys`: a view there stays in
-    /// its tree, so focus in one of its controls is focus inside the stack.
-    focusing: usize,
+    /// For each row or column with `keys` being drawn, innermost last, the
+    /// focus of the host views put in layers inside it so far.
+    focusing: Vec<Vec<FocusHandle>>,
 }
 
 impl<'w> Painter<'w, '_> {
@@ -39,14 +39,15 @@ impl<'w> Painter<'w, '_> {
         self
     }
 
-    /// What goes where the host view `view` does: a placeholder it is drawn
-    /// over, or the view itself where it cannot be.
-    pub(super) fn host(&mut self, view: AnyView) -> AnyElement {
+    /// What goes where the host view `view` at `place` does: a placeholder
+    /// it is drawn over, or the view itself where it cannot be.
+    pub(super) fn host(&mut self, view: AnyView, place: &Place<'_>, cx: Cx) -> AnyElement {
         let layered = self.layer == 0
             && !self.preview
-            && self.layering.as_ref().is_some_and(|layering| {
-                layering.lifted == 0 && layering.moving == 0 && layering.focusing == 0
-            });
+            && self
+                .layering
+                .as_ref()
+                .is_some_and(|layering| layering.lifted == 0 && layering.moving == 0);
         let (true, Some(views), Some(layering)) =
             (layered, self.views.as_deref(), self.layering.as_mut())
         else {
@@ -58,7 +59,14 @@ impl<'w> Painter<'w, '_> {
             return view.into_any_element();
         };
         layering.layered += 1;
-        views.layers().place(view)
+        // In a row or column with `keys`, the layer gives the view a focus
+        // of its own, which each stack around it counts as inside it.
+        let focus = layering.focusing.last_mut().map(|inside| {
+            let focus = super::focus_keys::kept(self.window, &place.path, self.frame, cx);
+            inside.push(focus.clone());
+            focus
+        });
+        views.layers().place(view, focus)
     }
 
     /// Draws with `draw` what is painted after the window's tree.
@@ -72,9 +80,27 @@ impl<'w> Painter<'w, '_> {
     }
 
     /// Draws with `draw` the children of a stack that takes keys while
-    /// focus is inside it, when `keys` says it does.
-    pub(super) fn focusing<R>(&mut self, keys: bool, draw: impl FnOnce(&mut Self) -> R) -> R {
-        self.layered_depth(keys, draw, |layering| &mut layering.focusing)
+    /// focus is inside it, when `keys` says it does; with the focus of the
+    /// host views put in layers inside it.
+    pub(super) fn focusing<R>(
+        &mut self,
+        keys: bool,
+        draw: impl FnOnce(&mut Self) -> R,
+    ) -> (R, Vec<FocusHandle>) {
+        let Some(layering) = self.layering.as_mut().filter(|_| keys) else {
+            return (draw(self), Vec::new());
+        };
+        layering.focusing.push(Vec::new());
+        let drawn = draw(self);
+        let Some(layering) = self.layering.as_mut() else {
+            return (drawn, Vec::new());
+        };
+        let views = layering.focusing.pop().unwrap_or_default();
+        // The stack around this one holds them too.
+        if let Some(outer) = layering.focusing.last_mut() {
+            outer.extend(views.iter().cloned());
+        }
+        (drawn, views)
     }
 
     fn layered_depth<R>(

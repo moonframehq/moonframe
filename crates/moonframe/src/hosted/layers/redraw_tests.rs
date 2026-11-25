@@ -67,7 +67,7 @@ impl Render for Shell {
         self.layers.begin();
         div()
             .size_full()
-            .children((0..self.copies).map(|_| self.layers.place(self.host.clone())))
+            .children((0..self.copies).map(|_| self.layers.place(self.host.clone(), None)))
     }
 }
 

@@ -36,7 +36,7 @@ impl<'w> Draw<'w> for Stack {
             painter.outside.push(inside.clone());
             inside
         });
-        let children = painter.focusing(!self.keys.is_empty(), |painter| {
+        let (children, views) = painter.focusing(!self.keys.is_empty(), |painter| {
             painter.keyed_children(&self.children, place, self.direction, cx)
         });
         if inside.is_some() {
@@ -48,7 +48,7 @@ impl<'w> Draw<'w> for Stack {
             Direction::Column => Part::Column,
         };
         let look = painter.look(part, &self.look, self.selected, place);
-        let focus = painter.focus_keys(&self.keys, place, cx);
+        let focus = painter.focus_keys(&self.keys, views, place, cx);
         let theme = cx.theme();
         let element = div()
             .id(place.id())

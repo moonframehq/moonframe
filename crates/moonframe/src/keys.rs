@@ -163,7 +163,7 @@ impl MoonframeApp {
             .get(&window.window_handle().window_id())
             .into_iter()
             .flatten()
-            .filter(|stack| stack.layer >= above && stack.focus.contains_focused(window, cx))
+            .filter(|stack| stack.layer >= above && stack.holds_focus(window, cx))
             .find_map(|stack| {
                 let msg = stack.keys.message(None, &pressed, MAC, typing)?;
                 Some((stack.owner.clone(), msg.clone()))

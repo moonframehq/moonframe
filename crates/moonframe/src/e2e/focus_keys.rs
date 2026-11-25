@@ -81,7 +81,11 @@ impl gpui_kit::Render for Field {
         _: &mut gpui_kit::Context<Self>,
     ) -> impl gpui_kit::IntoElement {
         use gpui_kit::{InteractiveElement as _, Styled as _};
-        gpui_kit::div().id("field").track_focus(&self.0).size_full()
+        gpui_kit::div()
+            .id("field")
+            .debug_selector(|| "field".into())
+            .track_focus(&self.0)
+            .size_full()
     }
 }
 
@@ -98,27 +102,26 @@ return mod {
 	update = function(state, msg) logged(state, msg) end,
 	view = function(state)
 		return shell(state, ui.column { class = "deck", keys = { right = "keep" }, height = 100,
-			ui.view { name = "field" },
+			ui.row { keys = { left = "back" }, grow = true, ui.view { name = "field" } },
 		})
 	end,
 }
 "##;
-    let focus = std::rc::Rc::new(std::cell::RefCell::new(None));
     let mut views = Registry::default();
-    {
-        let focus = focus.clone();
-        views.insert("field", move |_, _, cx| {
-            let handle = cx.focus_handle();
-            *focus.borrow_mut() = Some(handle.clone());
-            Field(handle)
-        });
-    }
+    views.insert("field", |_, _, cx| Field(cx.focus_handle()));
     let mut window = open_with(cx, folder(source), views);
-    let Some(handle) = focus.borrow().clone() else {
-        panic!("the view is made");
-    };
-    window.cx.update(|window, cx| handle.focus(window, cx));
-    window.settle();
     window.keys("right");
-    assert_eq!(window.log(), "|keep");
+    assert_eq!(window.log(), "|page");
+    // Focus in the view is inside the row around it, and the column
+    // around that.
+    window.click("field");
+    window.keys("left");
+    window.keys("right");
+    assert_eq!(window.log(), "|page|back|keep");
+    // The view stays in its layer: the app may be replayed under it.
+    let app = window.app.clone();
+    let replayable = window
+        .cx
+        .read_entity(&app, |app, _| app.views.layers().replayable());
+    assert!(replayable, "the view is drawn in a layer");
 }
