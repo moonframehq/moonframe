@@ -523,7 +523,10 @@ impl Inputs {
 
     /// Whether a field has keyboard focus in `window`.
     pub(crate) fn any_focused(&self, window: &Window, cx: &App) -> bool {
-        self.focused(window, cx).is_some()
+        // Without the field's text, which a keystroke has no use for.
+        self.0.borrow().fields.values().any(|field| {
+            field.mounted.upgrade().is_some() && field.editor.focus_handle(cx).is_focused(window)
+        })
     }
 
     /// The field with keyboard focus in `window`, if any.

@@ -10,10 +10,12 @@
 //! Windows key elsewhere) and `secondary` (⌘ on macOS, Ctrl elsewhere, for
 //! shortcuts that should feel native on each).
 //!
-//! What a key types is never taken: a printable key (a letter, digit,
-//! symbol or `space`) needs `ctrl`, `alt`, `cmd` or `secondary`, so an open
-//! overlay cannot read what the user types into a terminal behind it. Text
-//! entry goes through `ui.input`.
+//! What a key types is never taken from a text field or terminal: a
+//! printable key (a letter, digit, symbol or `space`) needs `ctrl`, `alt`,
+//! `cmd` or `secondary` in a mod's keys, and an overlay's or popover's own
+//! (see [`LayerKeys`]) is offered only while no field or terminal has
+//! focus, so an open overlay cannot read what the user types into a
+//! terminal behind it. Text entry goes through `ui.input`.
 
 use {
     crate::{
@@ -216,14 +218,21 @@ impl Keys {
     }
 
     /// What `pressed` sends to the mod: its own key's message, else for
-    /// plain Escape the `dismiss` message when no key takes Escape.
+    /// plain Escape the `dismiss` message when no key takes Escape. While
+    /// the user is `typing` (a text field or terminal has focus), a key
+    /// that types text is theirs.
     pub fn message<'a>(
         &'a self,
         dismiss: Option<&'a Data>,
         pressed: &Pressed,
         mac: bool,
+        typing: bool,
     ) -> Option<&'a Data> {
-        if let Some((_, msg)) = self.0.iter().find(|(chord, _)| chord.matches(pressed, mac)) {
+        if let Some((_, msg)) = self
+            .0
+            .iter()
+            .find(|(chord, _)| !(typing && chord.types_text()) && chord.matches(pressed, mac))
+        {
             return Some(msg);
         }
         let escape = Chord::plain("escape");
@@ -238,6 +247,29 @@ impl Keys {
 
 impl Read for Keys {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        Self::read_as(value, cx, Chord::parse)
+    }
+}
+
+/// An overlay's or popover's keys, which may also be one key that types
+/// text (`t`, `/`, `shift-j`), as a sheet that opened on T closes on it:
+/// such a key is offered only while no text field or terminal has focus.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LayerKeys(pub Keys);
+
+impl Read for LayerKeys {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        Keys::read_as(value, cx, Chord::parse_typed).map(Self)
+    }
+}
+
+impl Keys {
+    /// Keys whose names `parse` reads.
+    fn read_as(
+        value: &Value,
+        cx: &Cx,
+        parse: fn(&str) -> Result<Chord, String>,
+    ) -> Result<Self, Error> {
         let Value::Table(table) = value else {
             return Err(cx.fail("expected a table of key names to messages"));
         };
@@ -249,7 +281,7 @@ impl Read for Keys {
             };
             let name = name.to_string_lossy();
             let at = cx.quoted(&name);
-            let chord = Chord::parse(&name).map_err(|problem| at.fail(problem))?;
+            let chord = parse(&name).map_err(|problem| at.fail(problem))?;
             if let Some((other, ..)) = keys.iter().find(|(_, other, _)| *other == chord) {
                 return Err(at.fail(format!("the same key as `{other}`")));
             }

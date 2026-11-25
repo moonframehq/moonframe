@@ -1901,7 +1901,8 @@ return mod {
   `shift-u`), as a mail client's keys are: it works only while no text
   field or terminal has focus, so typing is never taken, and the menu does
   not show it (name it in the label or a hint). `examples/tidings` uses J
-  and K this way. Overlay and field `keys` still refuse such keys.
+  and K this way. An overlay's or popover's `keys` take them the same way;
+  a mod's `keys` refuse them.
 - About opens macOS's own About panel (the app's icon and name, `version`,
   `description` and `website` as credits, `copyright`), and a toast
   elsewhere.
@@ -2713,10 +2714,14 @@ has an `escape`. Other keys go on as usual.
   `left`, `right`, `home`, `end`, `pageup`, `pagedown`. Names are lowercase:
   write `shift-a`, not `A`. A wrong name, or two names for the same key, is
   an error `just check` reports.
-- Keys never take what is typed: a letter, digit, symbol or `space` needs
-  `ctrl`, `alt`, `cmd` or `secondary` (`secondary-k`, `alt-?`), so an
-  overlay cannot read keystrokes meant for a terminal behind it. For typing,
-  use `ui.input` and its own `keys`.
+- Keys never take what is typed: a key that types text (a letter, digit,
+  symbol or `space`, alone or with `shift`: `t`, `/`, `shift-j`) is taken
+  only while no text field or terminal has focus, so an overlay cannot read
+  keystrokes meant for a field in it or a terminal behind it. A sheet that
+  opened on T can close on `t`; while its search field has focus, T types.
+  With `ctrl`, `alt`, `cmd` or `secondary` (`secondary-k`, `alt-?`) a key
+  is taken whatever has focus. For typing, use `ui.input` and its own
+  `keys`.
 - Modifiers must match exactly: `down` does not fire for `shift-down`.
 - While the Inspector is picking or showing its card, Escape is its own;
   while it is picking, so are ↑, ↓ and Enter (they choose the element).
