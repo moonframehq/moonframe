@@ -68,6 +68,7 @@ mod natives;
 mod overlay;
 mod panel;
 mod panes;
+mod paste;
 mod pdf;
 #[cfg(any(feature = "terminal", feature = "herdr-core"))]
 mod persist;

@@ -12,6 +12,7 @@ mod host_views;
 mod inspect_context;
 mod list_rows;
 mod markdown_scroll;
+mod paste;
 mod regressions;
 mod revision_timeline;
 mod scroll_sync;
