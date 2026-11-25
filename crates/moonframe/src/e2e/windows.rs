@@ -98,6 +98,7 @@ fn windows_with_entries(
                 backends: Arc::new(Backends::for_app("e2e")),
                 views: Registry::default(),
                 chrome: workspace.chrome(),
+                windows: Default::default(),
             },
             cx,
         );

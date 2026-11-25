@@ -70,8 +70,9 @@ not rebuild or restart the Moonframe executable to add one.</p>
 </table>
 <p>WASM providers cannot read your files, use the network, inherit your
 environment, or spawn processes. The built-in machine-data capability
-is <code>system</code> (CPU, memory and network counters), and <code>moonframe.page</code> renders
-a public web page for it (<a href="#rendering-a-web-page">below</a>). Embedding apps can register
+is <code>system</code> (CPU, memory and network counters); <code>moonframe.page</code> renders
+a public web page for it (<a href="#rendering-a-web-page">below</a>), and <code>moonframe.view</code>
+reads a mod's view and acts on it (<a href="#reading-and-driving-a-view">below</a>). Embedding apps can register
 namespaced capabilities such as <code>acme.entities</code>. There are no built-in <code>http</code>, <code>fs</code>
 or <code>exec</code> capabilities. Process and native providers run with the user's
 access instead. See the <a href="https://github.com/moonframehq/moonframe/blob/main/docs/library.md">library guide</a>
@@ -166,7 +167,7 @@ Manifest fields for a WASM provider are:</p>
 </tr>
 <tr>
 <td><code>capabilities</code></td>
-<td>An empty list by default; <code>"system"</code>, Moonframe's own (<code>"moonframe.page"</code>), and names registered by the embedding host. Unknown names are manifest errors.</td>
+<td>An empty list by default; <code>"system"</code>, Moonframe's own (<code>"moonframe.page"</code>, <code>"moonframe.view"</code>), and names registered by the embedding host. Unknown names are manifest errors.</td>
 </tr>
 <tr>
 <td><code>[settings]</code></td>
@@ -838,6 +839,47 @@ and lookup, and WebRTC is off. Its calls have their own bounds (a minute
 and a quarter, about 8 MiB), not <code>host_call_limits</code>. Four render at once.
 It needs the <code>browser</code> feature and, so far, macOS; elsewhere the call
 answers why not.</p>
+<h3 id="reading-and-driving-a-view">Reading and driving a view</h3>
+<p><code>moonframe.view</code> lets a provider look at a mod's view in the front main
+window as a person would describe it, and do one thing a person could do
+to it: test a page it wrote, or drive one for its user. List it,
+<code>capabilities = ["moonframe.view"]</code>, then:</p>
+<pre><code class="language-rust">let page: serde_json::Value =
+    moonframe_provider::host_call(&quot;moonframe.view&quot;, &quot;tree&quot;, &amp;serde_json::json!({ &quot;mod&quot;: &quot;notes&quot; }))?;
+let after: serde_json::Value = moonframe_provider::host_call(
+    &quot;moonframe.view&quot;,
+    &quot;act&quot;,
+    &amp;serde_json::json!({ &quot;mod&quot;: &quot;notes&quot;, &quot;ref&quot;: &quot;e0.3&quot;, &quot;action&quot;: &quot;fill&quot;, &quot;value&quot;: &quot;Groceries&quot; }),
+)?;
+</code></pre>
+<p><code>tree</code> takes <code>mod</code> and answers <code>tree</code>, one line per element indented by
+depth (<code>button "Save" [e0.3]</code>), the same as <code>nodes</code> (<code>ref</code>, <code>role</code>, <code>name</code>,
+<code>value</code>, <code>selected</code>, <code>disabled</code>, <code>depth</code>), <code>truncated</code> past 2,000 elements
+or 128 KiB of names and values (each cut at 4,000 characters), and
+<code>problems</code>, what the mods it read report wrong. Components and mounted
+mods are read through, a mod that mounts itself once; text inside a
+clickable row names the row, and a field's <code>value</code> is the text it holds. Roles are <code>button</code> (a button or a clickable row),
+<code>item</code>, <code>textbox</code>, <code>text</code>, <code>badge</code>, <code>panel</code>, <code>document</code> (markdown),
+<code>image</code>, <code>list</code>, <code>popover</code>, <code>dialog</code>, <code>terminal</code>, <code>browser</code>, <code>map</code>,
+<code>video</code>, <code>view</code> and <code>problem</code>.</p>
+<p><code>act</code> takes <code>mod</code>, <code>ref</code> (from the last tree), <code>action</code> and its <code>value</code>,
+and answers the tree again, from the window it acted in. It sends what the element itself sends, as a
+person's act would: <code>click</code> (the element, or the nearest one around it
+that takes a click, copying what a <code>copy</code> control copies), <code>fill</code> (a field's text, in place of what it holds,
+typed into the field while it is drawn, which sends its <code>change</code>; a field
+with no <code>id</code> hears its <code>change</code> with the text, so give one an <code>id</code> to fill
+it as typing would),
+<code>press</code> (a key such as <code>enter</code>, <code>escape</code> or <code>cmd-k</code>: an open popover's or
+dialog's <code>keys</code> or <code>dismiss</code> around it first, then the field's <code>keys</code> or
+<code>submit</code> unless it is disabled, Enter in an address bar taking its browser
+there, a field recording shortcuts (<code>capture</code>) taking the key held with a
+modifier, else the mod's own <code>keys</code>) and <code>select</code> (the option of that name inside the
+element: an item, button or clickable row, by its whole name, else the
+only one whose name has it). One that does nothing says why. A step the
+window does not take within 5 s fails, and is never carried out later.</p>
+<p>The app's own providers reach any mod; a miniapp's provider reaches only
+the mods of its own namespace (<code>&lt;namespace&gt;:...</code>), whatever its view
+mounts: another mod drawn inside it is left out of the tree.</p>
 <p>Each component has a 64 MiB aggregate linear-memory cap and a fresh fuel
 budget per call (currently 2 billion Wasmtime fuel units, not a wall-clock
 deadline). Bound histories, collections and computation accordingly.

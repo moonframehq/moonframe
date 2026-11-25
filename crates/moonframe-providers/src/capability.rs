@@ -60,6 +60,7 @@ impl Default for HostCallLimits {
 pub const MOONFRAME_CAPABILITIES: &[&str] = &[
     // keep-sorted start
     "moonframe.page",
+    "moonframe.view",
     // keep-sorted end
 ];
 

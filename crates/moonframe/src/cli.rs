@@ -738,6 +738,7 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
                 backends: backends.clone(),
                 views: views.clone(),
                 chrome,
+                windows: launch.windows.clone(),
             },
             cx,
         );
