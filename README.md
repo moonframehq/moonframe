@@ -361,11 +361,11 @@ Enable local writes for a chosen mod to start chats and send follow-ups through 
 walks through a complete Rust component, Luau messages, live reload and
 packaging, for people and coding agents. [Markdown source](docs/wasm-providers.md).
 
-**Embedding miniapps:** register `.capability("mshub.entities", handler)` and
-`.root("mshub", path, RootPolicy::default())`, then select entries with
+**Embedding miniapps:** register `.capability("acme.entities", handler)` and
+`.root("acme", path, RootPolicy::default())`, then select entries with
 `.entry(...)` or the runtime `entry_handle()`. An entry's `main.luau` mounts as
-`ui.mount "mshub:notes"`; its `provider/provider.toml` publishes as
-`app["mshub:notes"]`. Roots default to prebuilt Wasm with process/socket kinds
+`ui.mount "acme:notes"`; its `provider/provider.toml` publishes as
+`app["acme:notes"]`. Roots default to prebuilt Wasm with process/socket kinds
 disabled. `on_entry_status` reports builds and stale revisions; failed Wasm
 builds keep the old worker running. Stateful entry providers survive clean
 restarts. Entries may bring their own `components/` and a `style.luau`

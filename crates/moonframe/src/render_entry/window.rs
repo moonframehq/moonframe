@@ -136,6 +136,7 @@ fn open(
                 backends: backends.clone(),
                 views: views.clone(),
                 chrome,
+                windows: Default::default(),
             },
             cx,
         );

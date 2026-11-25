@@ -30,6 +30,8 @@ pub struct Moonframe {
     pub(crate) entries: moonframe_core::entries::Entries,
     pub(crate) view_diagnostics: Option<moonframe_core::ViewDiagnostics>,
     pub(crate) providers: moonframe_providers::ProviderOptions,
+    /// Where `moonframe.view` calls reach the app's main windows.
+    pub(crate) windows: crate::app::Windows,
     pub(crate) errors: Vec<String>,
     pub(crate) identity: Identity,
     pub(crate) app: Option<AppSource>,
@@ -83,11 +85,29 @@ impl Moonframe {
         identity.title = name.to_owned();
         identity.hosted = true;
         identity.updates = None;
+        let mut providers = moonframe_providers::ProviderOptions::default();
+        let mut errors = Vec::new();
+        let windows = crate::app::Windows::default();
+        // Moonframe's own capabilities, which any app's providers may list.
+        let own = [
+            providers.capabilities.moonframe(
+                crate::web_page::NAME,
+                crate::web_page::Page,
+                crate::web_page::bounds(),
+            ),
+            providers.capabilities.moonframe(
+                crate::view_access::NAME,
+                crate::view_access::View(windows.clone()),
+                crate::view_access::bounds(),
+            ),
+        ];
+        errors.extend(own.into_iter().filter_map(Result::err));
         Self {
             entries: Default::default(),
             view_diagnostics: None,
-            providers: Default::default(),
-            errors: Vec::new(),
+            providers,
+            windows,
+            errors,
             log: format!("error,moonframe=info,{}=info", name.replace('-', "_")),
             identity,
             app: None,

@@ -167,11 +167,13 @@ impl Manifest {
         Self::load_known(name, dir, &|capability| registry.contains(capability))
     }
 
-    /// Reads it, knowing only the names of the host's capabilities, as a
-    /// check run outside the host does.
+    /// Reads it, knowing only the names of the host's capabilities (and
+    /// Moonframe's own), as a check run outside the host does.
     pub fn load_declared(name: &str, dir: &Path, capabilities: &[&str]) -> Result<Self, Error> {
         Self::load_known(name, dir, &|capability| {
-            capability == "system" || capabilities.contains(&capability)
+            capability == "system"
+                || capabilities.contains(&capability)
+                || crate::MOONFRAME_CAPABILITIES.contains(&capability)
         })
     }
 

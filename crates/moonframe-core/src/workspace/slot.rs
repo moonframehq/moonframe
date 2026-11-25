@@ -47,6 +47,12 @@ impl Slot {
         self.module.as_ref().map(Module::keys)
     }
 
+    /// What its mod hears a paste of files or a picture as (`paste` in
+    /// `mod {}`).
+    pub fn paste(&self) -> Option<&Data> {
+        self.module.as_ref().and_then(Module::paste)
+    }
+
     /// The file the module comes from.
     pub fn source(&self) -> Option<&Path> {
         self.source.as_deref()

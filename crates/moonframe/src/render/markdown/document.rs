@@ -125,6 +125,9 @@ pub(super) struct Document {
     pub(super) quote: StyleRefinement,
     pub(super) alert: Style,
     pub(super) colors: Colors,
+    /// Where it leaves its view's state for the frame around it to watch
+    /// what the user selects.
+    pub(super) shown: super::selection::Shown,
 }
 
 impl RenderOnce for Document {
@@ -135,6 +138,7 @@ impl RenderOnce for Document {
             let text = text.clone();
             move |_, cx| TextViewState::markdown(&text, cx)
         });
+        self.shown.replace(Some(state.downgrade()));
         let shared: SharedRef = Arc::new(Mutex::new(Shared {
             owner: self.owner.clone(),
             to: self.markdown.to.clone(),

@@ -95,3 +95,49 @@ fn an_edit_of_no_such_field_is_refused() {
         "{problems:?}"
     );
 }
+
+/// A writing field whose mod keeps what is typed as its value, and asks
+/// for the caret at the end.
+const ECHOED: &str = r#"
+return mod {
+	init = function() return { text = "" } end,
+	update = function(state, msg)
+		if msg.typed then state.text = msg.value end
+		return state
+	end,
+	view = function(state)
+		return ui.column {
+			ui.input { id = "page", multiline = true, prose = true, focus = true, value = state.text, caret = "end",
+				change = { typed = true } },
+			ui.text { "said:" .. state.text },
+		}
+	end,
+}"#;
+
+#[test]
+fn a_mod_echoing_a_writing_field_leaves_its_caret_where_typing_put_it() {
+    let dir = folder(ECHOED);
+    let mut window = Runtime::new(
+        Ui::open(dir.path().to_owned(), None),
+        view,
+        (600., 200.),
+        Env::new(true, 2.),
+    );
+    settle(&mut window);
+    for letter in ["a", "b", "c"] {
+        window.key(KeyEvent {
+            key: Key::Text(letter.to_owned()),
+            mods: Mods::default(),
+        });
+        settle(&mut window);
+    }
+    let said: Vec<_> = window
+        .elements()
+        .iter()
+        .filter_map(|element| element.text.clone())
+        .collect();
+    assert!(
+        shows(&window, "said:abc"),
+        "the letters in the order typed: {said:?}"
+    );
+}
