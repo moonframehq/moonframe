@@ -571,7 +571,7 @@ let found = check_entry(path, &RootPolicy::default(), &CheckOptions {
     messages: vec![Data::from("open")],      // sent to `update`, drawn after each
     sizes: vec![],                           // for render_entry; views read no size
     strict: false,                           // see below
-    capabilities: vec!["mshub.entities".into()],
+    capabilities: vec!["acme.entities".into()],
     luau_lsp: None,                          // Some(binary): also type-check statically
 });
 for diagnostic in &found {

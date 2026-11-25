@@ -8,16 +8,16 @@ use {
     crate::color::ThemeColor,
     gpui_kit::{
         component::{
-            ActiveTheme, Disableable as _, Icon as GpuiIcon, Sizable as _, Theme,
+            ActiveTheme, Disableable as _, Icon as GpuiIcon, ResizableState, Sizable as _, Theme,
             button::{Button as GpuiButton, ButtonCustomVariant, ButtonVariants as _},
             h_flex, h_resizable, resizable_panel, v_resizable,
         },
         *,
     },
     moonframe_core::{
-        Align, Badge, Button, Case, Color, Direction, Extras, Fit, Icon, Image, Item, Justify,
-        Look, Paint, Panel, Part, Region, Resolved, Sides, Space, Split, Stack, States, Text,
-        Token, Tone, TransitionKind, Variant,
+        Action, Align, Badge, Button, Case, Color, Direction, Extras, Fit, Icon, Image, Item,
+        Justify, Look, Paint, Panel, Part, Region, Resolved, Sides, Space, Split, Stack, States,
+        Text, Token, Tone, TransitionKind, Variant,
     },
     std::path::Path,
 };
@@ -31,7 +31,15 @@ impl<'w> Draw<'w> for Stack {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
         let in_drag = painter.in_drag;
         painter.in_drag |= self.drag;
+        let inside = self.outside.as_ref().map(|_| {
+            let inside = super::outside::Inside::default();
+            painter.outside.push(inside.clone());
+            inside
+        });
         let children = painter.keyed_children(&self.children, place, self.direction, cx);
+        if inside.is_some() {
+            painter.outside.pop();
+        }
         painter.in_drag = in_drag;
         let part = match self.direction {
             Direction::Row => Part::Row,
@@ -110,6 +118,12 @@ impl<'w> Draw<'w> for Stack {
         let element = match &self.pointer {
             Some(pointer) => super::pointer::attach(element, pointer, place, cx),
             None => element,
+        };
+        let element = match (&self.outside, inside) {
+            (Some(action), Some(inside)) => {
+                super::outside::attach(element, action, inside, place.owner, &place.path, cx)
+            },
+            _ => element,
         };
         let element = match &self.action {
             Some(action) => covering(element, in_drag)
@@ -421,6 +435,9 @@ impl<'w> Draw<'w> for Split {
         if !self.divider {
             group = group.with_handle_appearance(bare_handle());
         }
+        if let Some(action) = &self.resize {
+            group = group.on_resize(resized(action, place.owner, cx));
+        }
         let group = panes
             .into_iter()
             .fold(group, |group, (pane, place, look, shown)| {
@@ -489,6 +506,30 @@ impl<'w> Draw<'w> for Split {
             .size_full()
             .child(group)
             .into_any_element()
+    }
+}
+
+/// Sends a split's `resize` from `owner` with its panes' sizes, once the
+/// user lets go of a divider.
+fn resized(
+    action: &Action,
+    owner: &str,
+    cx: Cx,
+) -> impl Fn(&Entity<ResizableState>, &mut Window, &mut App) + 'static {
+    let app = cx.entity().downgrade();
+    let owner = owner.to_owned();
+    let action = action.clone();
+    move |state, window, cx| {
+        let Action::Send { to, msg } = &action else {
+            return;
+        };
+        let sizes = state.read(cx).sizes().iter().map(|size| f32::from(*size));
+        let action = Action::Send {
+            to: to.clone(),
+            msg: Split::resized(msg, sizes),
+        };
+        app.update(cx, |app, cx| app.dispatch(&owner, &action, window, cx))
+            .ok();
     }
 }
 

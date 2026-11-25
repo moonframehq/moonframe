@@ -33,6 +33,7 @@ fn column() -> Stack {
         selected: false,
         scroll_to: None,
         measure: None,
+        outside: None,
         action: None,
         extras: Default::default(),
         drag: false,
