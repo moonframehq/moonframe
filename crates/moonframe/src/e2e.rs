@@ -16,6 +16,7 @@ mod inspect_context;
 mod list_range;
 mod list_rows;
 mod markdown_scroll;
+mod markdown_tooltips;
 mod outside;
 mod overlay_letter_keys;
 mod page_text;

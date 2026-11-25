@@ -16,6 +16,7 @@ mod parts;
 mod scrolling;
 mod search;
 mod selection;
+mod tooltips;
 
 use {
     super::{

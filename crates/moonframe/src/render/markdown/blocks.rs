@@ -9,7 +9,7 @@ use {
         document::{SharedRef, go_to},
         outline::Outline,
         parts::{self, AlertKind},
-        send,
+        send, tooltips,
     },
     gpui_kit::{
         base::{StyledExt as _, text::CodeBlock},
@@ -144,9 +144,19 @@ fn draw_alert(
 /// A view inside the document, kept to the document's rules: its links go
 /// to the mod and its pictures load nothing the mod couldn't show.
 fn guarded(view: TextView, shared: &SharedRef) -> TextView {
-    view.selectable(true)
+    let view = view
+        .selectable(true)
         .image_source(image_source(shared))
-        .on_link_click(link_click(shared))
+        .on_link_click(link_click(shared));
+    // Its links show the tooltips the document's do.
+    let tooltip = shared
+        .lock()
+        .ok()
+        .map(|shared| tooltips::builder(shared.tips.clone()));
+    match tooltip {
+        Some(tooltip) => view.link_tooltip(tooltip),
+        None => view,
+    }
 }
 
 fn parse_picture(node: &Node, cx: &MarkdownParseContext<'_>) -> Option<MarkdownNode> {

@@ -417,6 +417,9 @@ pub struct Markdown {
     pub text: String,
     /// Sent when a link is clicked, shaped as [`Markdown::message`].
     pub link: Option<Data>,
+    /// What a link to each address shows on hover, over the link's own
+    /// title (`[text](url "title")`): where a wrapped address leads.
+    pub tooltips: std::collections::BTreeMap<String, String>,
     /// The mod its messages go to; the drawing mod when unset.
     pub to: Option<String>,
     /// Take the free space along the parent's axis.

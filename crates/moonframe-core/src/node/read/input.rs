@@ -219,6 +219,7 @@ impl Build for Markdown {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
         "text",
         "link",
+        "tooltips",
         "to",
         "grow",
         "scroll",
@@ -287,6 +288,10 @@ impl Build for Markdown {
                 .map(|text| text.0)
                 .unwrap_or_default(),
             link,
+            tooltips: fields
+                .get::<LinkTooltips>("tooltips")?
+                .map(|tooltips| tooltips.0)
+                .unwrap_or_default(),
             to,
             grow: fields.get("grow")?.unwrap_or(false),
             scroll,
@@ -311,6 +316,32 @@ impl Build for Markdown {
 
 /// Most lines a `ui.markdown` can be cut to.
 const MAX_LINES: f32 = 1000.0;
+/// Most addresses `tooltips` names.
+const MAX_TOOLTIPS: usize = 1000;
+
+/// `tooltips = { [url] = "text" }`: what a link to each address shows.
+struct LinkTooltips(BTreeMap<String, String>);
+
+impl Read for LinkTooltips {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let Value::Table(table) = value else {
+            return Err(cx.fail("expected a table of addresses to their tooltips"));
+        };
+        let mut tooltips = BTreeMap::new();
+        for pair in table.pairs::<Value, Value>() {
+            let (url, text) = pair?;
+            let Value::String(name) = &url else {
+                return Err(cx.fail("its keys are link addresses"));
+            };
+            let cx = cx.quoted(&name.to_string_lossy());
+            tooltips.insert(String::read(&url, &cx)?, String::read(&text, &cx)?);
+            if tooltips.len() > MAX_TOOLTIPS {
+                return Err(cx.fail(format!("more than {MAX_TOOLTIPS} addresses")));
+            }
+        }
+        Ok(Self(tooltips))
+    }
+}
 
 impl Read for Reveal {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {

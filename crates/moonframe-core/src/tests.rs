@@ -27,6 +27,7 @@ mod history;
 mod input_caret;
 mod lightbox;
 mod maps;
+mod markdown_tooltips;
 mod mods;
 mod motion;
 mod orbit;
