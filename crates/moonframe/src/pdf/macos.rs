@@ -120,7 +120,7 @@ pub(super) fn render(source: Source, paper: Option<Paper>, out: PathBuf) -> Resu
     let kind = match source {
         Source::Html(_) => 0,
         Source::HtmlFile(_) => 1,
-        Source::Url(_) => 2,
+        Source::Url(_) => WEB,
     };
     let job = Pending {
         id,
@@ -185,9 +185,12 @@ struct Pending {
     answer: oneshot::Sender<Result<(), String>>,
 }
 
+/// The rules for a web page, for [`with_rules`].
+pub(crate) const WEB: usize = 2;
+
 /// Runs `then` with the rules for HTML (`0`), an `.html` file (`1`) or a
-/// web page (`2`), compiling them the first time.
-fn with_rules(
+/// web page ([`WEB`]), compiling them the first time.
+pub(crate) fn with_rules(
     kind: usize,
     main: MainThreadMarker,
     then: impl FnOnce(Result<Retained<WKContentRuleList>, String>) + 'static,
@@ -252,57 +255,22 @@ fn start(job: Pending, rules: &WKContentRuleList, main: MainThreadMarker) {
     let paper = paper_size(job.paper);
     let width = (paper.width - 2.0 * MARGIN).max(100.0);
     let online = matches!(job.source, Source::Url(_));
-    // SAFETY: a fresh session of its own, on the main thread.
-    let store = unsafe { WKWebsiteDataStore::nonPersistentDataStore(main) };
-    // A web page connects only through the proxy, which reaches the public
-    // internet alone; the content rules below are only a first check.
-    if online
-        && let Err(problem) =
-            proxy::proxy().and_then(|proxy| network::through_proxy(&store, &proxy))
-    {
-        let _ = job.answer.send(Err(problem));
-        return;
-    }
-    // SAFETY: a fresh configuration on the main thread, given its own
-    // store, script setting and rules before any view takes it.
-    let configuration = unsafe {
-        let configuration = WKWebViewConfiguration::new(main);
-        configuration.setWebsiteDataStore(&store);
-        configuration
-            .defaultWebpagePreferences()
-            .setAllowsContentJavaScript(online);
-        configuration
-            .userContentController()
-            .addContentRuleList(rules);
-        // Colours and pictures behind the text print, as the page shows them.
-        configuration.preferences().setShouldPrintBackgrounds(true);
-        configuration
+    let configuration = if online {
+        web_configuration(rules, main)
+    } else {
+        Ok(configuration(rules, false, main))
     };
-    if online && let Err(problem) = without_webrtc(&configuration, main) {
-        let _ = job.answer.send(Err(problem));
-        return;
-    }
-    let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(width, 1000.0));
-    // SAFETY: a fresh view with the configuration above.
-    let view = unsafe {
-        WKWebView::initWithFrame_configuration(WKWebView::alloc(main), frame, &configuration)
+    let configuration = match configuration {
+        Ok(configuration) => configuration,
+        Err(problem) => {
+            let _ = job.answer.send(Err(problem));
+            return;
+        },
     };
-    // Far off any screen, never shown: the view lays out in it.
-    let place = NSRect::new(NSPoint::new(-30_000.0, -30_000.0), frame.size);
-    // SAFETY: a fresh borderless window, kept (not released) when closed,
-    // as `RUNNING` holds it.
-    let window = unsafe {
-        let window = NSWindow::initWithContentRect_styleMask_backing_defer(
-            NSWindow::alloc(main),
-            place,
-            NSWindowStyleMask::Borderless,
-            NSBackingStoreType::Buffered,
-            false,
-        );
-        window.setReleasedWhenClosed(false);
-        window
-    };
-    window.setContentView(Some(&view));
+    // SAFETY: the configuration's own preferences, before any view takes it.
+    // Colours and pictures behind the text print, as the page shows them.
+    unsafe { configuration.preferences().setShouldPrintBackgrounds(true) };
+    let (window, view) = offscreen(&configuration, NSSize::new(width, 1000.0), main);
     let id = job.id;
     let delegate = Delegate::new(main, Printing {
         id,
@@ -323,12 +291,7 @@ fn start(job: Pending, rules: &WKContentRuleList, main: MainThreadMarker) {
             // SAFETY: the file alone may be read, nothing beside it.
             unsafe { view.loadFileURL_allowingReadAccessToURL(&url, &url) }
         },
-        Source::Url(address) => {
-            NSURL::URLWithString(&NSString::from_str(address)).and_then(|url| {
-                // SAFETY: a request for a checked web address.
-                unsafe { view.loadRequest(&NSURLRequest::requestWithURL(&url)) }
-            })
-        },
+        Source::Url(address) => load(&view, address),
     };
     if loading.is_none() {
         delegate.answer(Err("the page did not start loading".to_owned()));
@@ -340,6 +303,84 @@ fn start(job: Pending, rules: &WKContentRuleList, main: MainThreadMarker) {
             delegate,
         })
     });
+}
+
+/// A configuration for a web page with its script, in a session of its own
+/// whose connections all go through the proxy, which reaches the public
+/// internet alone (the content rules, `rules` for [`WEB`], are only a
+/// first check), and without WebRTC, whose connections would pass it by.
+pub(crate) fn web_configuration(
+    rules: &WKContentRuleList,
+    main: MainThreadMarker,
+) -> Result<Retained<WKWebViewConfiguration>, String> {
+    let configuration = configuration(rules, true, main);
+    // SAFETY: the configuration's own store, before any view takes it.
+    let store = unsafe { configuration.websiteDataStore() };
+    proxy::proxy().and_then(|proxy| network::through_proxy(&store, &proxy))?;
+    without_webrtc(&configuration, main)?;
+    Ok(configuration)
+}
+
+/// A configuration in a fresh session of its own, with `rules`, running the
+/// page's script when `script`.
+fn configuration(
+    rules: &WKContentRuleList,
+    script: bool,
+    main: MainThreadMarker,
+) -> Retained<WKWebViewConfiguration> {
+    // SAFETY: a fresh session and configuration on the main thread, given
+    // its store, script setting and rules before any view takes it.
+    unsafe {
+        let store = WKWebsiteDataStore::nonPersistentDataStore(main);
+        let configuration = WKWebViewConfiguration::new(main);
+        configuration.setWebsiteDataStore(&store);
+        configuration
+            .defaultWebpagePreferences()
+            .setAllowsContentJavaScript(script);
+        configuration
+            .userContentController()
+            .addContentRuleList(rules);
+        configuration
+    }
+}
+
+/// A view `size` big with `configuration`, in a borderless window far off
+/// any screen, never shown, which it lays out in. The window is kept (not
+/// released) when closed, as its caller holds it.
+pub(crate) fn offscreen(
+    configuration: &WKWebViewConfiguration,
+    size: NSSize,
+    main: MainThreadMarker,
+) -> (Retained<NSWindow>, Retained<WKWebView>) {
+    let frame = NSRect::new(NSPoint::new(0.0, 0.0), size);
+    // SAFETY: a fresh view with the configuration given.
+    let view = unsafe {
+        WKWebView::initWithFrame_configuration(WKWebView::alloc(main), frame, configuration)
+    };
+    let place = NSRect::new(NSPoint::new(-30_000.0, -30_000.0), size);
+    // SAFETY: a fresh borderless window, kept when closed.
+    let window = unsafe {
+        let window = NSWindow::initWithContentRect_styleMask_backing_defer(
+            NSWindow::alloc(main),
+            place,
+            NSWindowStyleMask::Borderless,
+            NSBackingStoreType::Buffered,
+            false,
+        );
+        window.setReleasedWhenClosed(false);
+        window
+    };
+    window.setContentView(Some(&view));
+    (window, view)
+}
+
+/// Starts loading the web page at `address` in `view`; `None` when it is
+/// no address or did not start.
+pub(crate) fn load(view: &WKWebView, address: &str) -> Option<Retained<WKNavigation>> {
+    NSURL::URLWithString(&NSString::from_str(address)).and_then(|url| {
+        // SAFETY: a request for a checked web address.
+        unsafe { view.loadRequest(&NSURLRequest::requestWithURL(&url)) }
+    })
 }
 
 /// Takes WebRTC from a web page: its connections are its own, not the
