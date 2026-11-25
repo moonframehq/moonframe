@@ -13,11 +13,11 @@ impl HostCapability for Echo {
 
 fn caller() -> Caller {
     Caller {
-        provider: "mshub:notes".into(),
+        provider: "acme:notes".into(),
         folder: "/miniapps/notes/provider".into(),
         root: "/miniapps".into(),
-        namespace: Some("mshub".into()),
-        capabilities: vec!["mshub.entities".into()],
+        namespace: Some("acme".into()),
+        capabilities: vec!["acme.entities".into()],
     }
 }
 
@@ -26,7 +26,7 @@ fn declaration_identity_roundtrip_and_size_limits() {
     let seen = Arc::new(Mutex::new(Vec::new()));
     let mut caps = Capabilities::default();
     caps.limits.max_bytes = 32;
-    caps.capability("mshub.entities", Echo(seen.clone()))
+    caps.capability("acme.entities", Echo(seen.clone()))
         .unwrap();
     assert!(caps.capability("system", Echo(seen.clone())).is_err());
     assert!(
@@ -37,25 +37,25 @@ fn declaration_identity_roundtrip_and_size_limits() {
     let mut who = caller();
     let json = r#"{"id":42}"#;
     assert_eq!(
-        caps.call(&who, &busy, "mshub.entities", "echo", json)
+        caps.call(&who, &busy, "acme.entities", "echo", json)
             .unwrap(),
         json
     );
     assert_eq!(seen.lock().unwrap().as_slice(), &[who.clone()]);
     assert!(
-        caps.call(&who, &busy, "mshub.entities", "large", "null")
+        caps.call(&who, &busy, "acme.entities", "large", "null")
             .unwrap_err()
             .contains("result exceeds")
     );
     let count = seen.lock().unwrap().len();
     assert!(
-        caps.call(&who, &busy, "mshub.entities", "echo", &"x".repeat(33))
+        caps.call(&who, &busy, "acme.entities", "echo", &"x".repeat(33))
             .unwrap_err()
             .contains("arguments exceed")
     );
     who.capabilities.clear();
     assert!(
-        caps.call(&who, &busy, "mshub.entities", "echo", json)
+        caps.call(&who, &busy, "acme.entities", "echo", json)
             .unwrap_err()
             .contains("undeclared")
     );
@@ -75,16 +75,16 @@ fn timeout_bounds_wait_and_does_not_spawn_more_blocked_work() {
     let (release, blocked) = mpsc::channel();
     let mut caps = Capabilities::default();
     caps.limits.timeout = Duration::from_millis(20);
-    caps.capability("mshub.entities", Block(Mutex::new(blocked)))
+    caps.capability("acme.entities", Block(Mutex::new(blocked)))
         .unwrap();
     let busy = Arc::default();
     assert_eq!(
-        caps.call(&caller(), &busy, "mshub.entities", "wait", "null")
+        caps.call(&caller(), &busy, "acme.entities", "wait", "null")
             .unwrap_err(),
         "host-call timed out"
     );
     assert!(
-        caps.call(&caller(), &busy, "mshub.entities", "wait", "null")
+        caps.call(&caller(), &busy, "acme.entities", "wait", "null")
             .unwrap_err()
             .contains("still running")
     );
@@ -96,20 +96,20 @@ fn unknown_manifest_capability_names_the_capability() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("provider.toml"),
-        "kind = 'wasm'\ncapabilities = ['mshub.missing']",
+        "kind = 'wasm'\ncapabilities = ['acme.missing']",
     )
     .unwrap();
     std::fs::write(dir.path().join("provider.wasm"), "").unwrap();
     assert!(
-        crate::Manifest::load("mshub:test", dir.path())
+        crate::Manifest::load("acme:test", dir.path())
             .unwrap_err()
             .to_string()
-            .contains("unknown capability `mshub.missing`")
+            .contains("unknown capability `acme.missing`")
     );
     let mut caps = Capabilities::default();
-    caps.capability("mshub.missing", Echo(Default::default()))
+    caps.capability("acme.missing", Echo(Default::default()))
         .unwrap();
-    assert!(crate::Manifest::load_with("mshub:test", dir.path(), &caps).is_ok());
+    assert!(crate::Manifest::load_with("acme:test", dir.path(), &caps).is_ok());
 }
 
 #[cfg(feature = "tokio")]
@@ -126,15 +126,59 @@ fn async_calls_use_runtime_and_cancel_on_timeout() {
     }
     let mut caps = Capabilities::default();
     caps.limits.timeout = Duration::from_millis(30);
-    caps.capability_async("mshub.entities", Wait).unwrap();
+    caps.capability_async("acme.entities", Wait).unwrap();
     assert_eq!(
-        caps.call(&caller(), &Arc::default(), "mshub.entities", "now", "null")
+        caps.call(&caller(), &Arc::default(), "acme.entities", "now", "null")
             .unwrap(),
         "42"
     );
     assert!(
-        caps.call(&caller(), &Arc::default(), "mshub.entities", "wait", "null")
+        caps.call(&caller(), &Arc::default(), "acme.entities", "wait", "null")
             .unwrap_err()
             .contains("timed out")
     );
+}
+
+#[test]
+fn moonframes_own_capabilities_have_their_own_bounds() {
+    let mut caps = Capabilities::default();
+    caps.limits.max_bytes = 8;
+    caps.limits.timeout = Duration::from_millis(10);
+    let bounds = Bounds {
+        max_bytes: 1024,
+        timeout: Duration::from_secs(5),
+    };
+    assert!(
+        caps.moonframe("moonframe.other", Echo(Default::default()), bounds)
+            .unwrap_err()
+            .contains("not one of Moonframe's")
+    );
+    assert!(
+        caps.capability("moonframe.page", Echo(Default::default()))
+            .is_err()
+    );
+    caps.moonframe("moonframe.page", Echo(Default::default()), bounds)
+        .unwrap();
+    let mut who = caller();
+    who.capabilities = vec!["moonframe.page".into()];
+    let large = format!("\"{}\"", "x".repeat(100));
+    assert_eq!(
+        caps.call(&who, &Arc::default(), "moonframe.page", "echo", &large)
+            .unwrap(),
+        large
+    );
+}
+
+#[test]
+fn a_check_outside_the_host_knows_moonframes_own_capabilities() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("provider.toml"),
+        "kind = 'wasm'\ncapabilities = ['moonframe.page']",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("provider.wasm"), "").unwrap();
+    assert!(crate::Manifest::load_declared("acme:test", dir.path(), &[]).is_ok());
+    // A check made without the app's registry, as the doctor's.
+    assert!(crate::Manifest::load("acme:test", dir.path()).is_ok());
 }

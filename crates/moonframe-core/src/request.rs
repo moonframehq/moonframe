@@ -18,6 +18,7 @@ mod pdf;
 mod pick;
 mod share;
 mod status_item;
+mod text;
 mod window;
 
 pub use {
@@ -32,6 +33,7 @@ pub use {
     pick::{Pick, PickKind},
     share::Share,
     status_item::{StatusEntry, StatusIcon, StatusItem, StatusLook},
+    text::{Selected, TextOf, TextRequest},
     window::WindowRequest,
 };
 
@@ -105,6 +107,9 @@ pub enum Request {
     /// `app:pdf`: a page rendered to a PDF file under the app's cache or
     /// state; the file's path (or why not) goes back to the mod.
     Pdf(Pdf),
+    /// `app:text`: the text a mod or a region draws, and the window's most
+    /// recent text selection, back to the mod that asked.
+    Text(TextRequest),
 }
 
 /// What `app:sound` plays.
@@ -190,6 +195,7 @@ impl Request {
             "status-item" => status_item::status_item(msg).map(Self::StatusItem),
             "hotkey" => hotkey::hotkey(msg).map(Self::Hotkey),
             "pdf" => pdf::pdf(msg).map(Self::Pdf),
+            "text" => text::text(msg).map(Self::Text),
             _ => Err(Error::new(format!(
                 "no `{APP}{what}`; the app takes {}",
                 NAMES
@@ -223,6 +229,7 @@ pub const NAMES: &[&str] = &[
     "status-item",
     "hotkey",
     "pdf",
+    "text",
 ];
 
 /// Longest address `app:open` opens.

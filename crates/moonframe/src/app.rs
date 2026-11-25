@@ -46,6 +46,7 @@ use {
 use {crate::terminal::Terminals, listeners::wake_on_output};
 
 // keep-sorted start
+mod acting;
 mod appearance;
 mod devtools;
 mod dialogs;
@@ -72,14 +73,18 @@ mod picking;
 mod problems;
 mod quick_inspect;
 mod sharing;
+mod text;
 mod toasts;
 mod updates;
 mod view;
 mod watch;
 mod windows;
-pub(crate) use fonts::list_ahead as list_fonts_ahead;
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use picking::selection_file;
+pub(crate) use {
+    acting::{Chosen, Windows},
+    fonts::list_ahead as list_fonts_ahead,
+};
 
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use hub::every as main_windows;
@@ -207,6 +212,8 @@ pub(crate) struct MoonframeApp {
     /// The number of the last tab `moonframe pane new` opened, which names
     /// it: each one's is higher, even for two in the same millisecond.
     last_pane: i64,
+    /// The text the user last selected in a document, for `app:text`.
+    selected: Option<moonframe_core::Selected>,
 }
 
 struct Defaults {
@@ -358,6 +365,7 @@ impl MoonframeApp {
             _omarchy: omarchy,
             _keys: crate::keys::intercept(cx),
             last_pane: 0,
+            selected: None,
         };
         app.load_measure();
         live::ticking(cx);
@@ -678,7 +686,8 @@ impl MoonframeApp {
         }
         self.workspace
             .set_window(window_state(self.chrome.titlebar, window, cx));
-        cx.notify();
+        // What the views mounted for it may want providers, or have sent.
+        self.flush("window", cx);
     }
 
     /// Starts the providers the views now want, and passes on what the mods
@@ -868,6 +877,7 @@ impl MoonframeApp {
             Request::StatusItem(request) => self.status_item_request(from, request, cx),
             Request::Hotkey(request) => self.hotkey_request(from, request, cx),
             Request::Pdf(request) => self.pdf_request(from, request, cx),
+            Request::Text(request) => self.text_request(from, request, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);
@@ -979,5 +989,12 @@ pub(crate) fn window_state(titlebar: Titlebar, window: &Window, cx: &App) -> Win
         display: window
             .display(cx)
             .map(|display| display_number(display.id())),
+        size: Some(points(window.viewport_size())),
     }
+}
+
+/// A window's size in whole points.
+fn points(size: Size<Pixels>) -> (u32, u32) {
+    let whole = |length: Pixels| f32::from(length).round().max(0.0) as u32;
+    (whole(size.width), whole(size.height))
 }

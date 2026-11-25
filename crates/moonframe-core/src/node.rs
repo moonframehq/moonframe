@@ -20,6 +20,7 @@ mod map;
 mod pointer;
 mod read;
 mod revision_timeline;
+mod rows;
 mod snapshot;
 mod tokens;
 mod video;
@@ -27,7 +28,7 @@ mod video;
 
 pub use {
     embed::*, ends::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*,
-    revision_timeline::*, snapshot::*, tokens::*, video::*,
+    revision_timeline::*, rows::*, snapshot::*, tokens::*, video::*,
 };
 
 pub(crate) use read::{element_keys, read};

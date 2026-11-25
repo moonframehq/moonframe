@@ -125,13 +125,15 @@ pub(crate) struct Field {
     pub(crate) change: Option<fields::Hearing>,
     /// The selection and caret `select` last saw.
     pub(crate) selection: ((usize, usize), usize),
+    /// The last `caret` the mod passed, to move the caret as it changes.
+    pub(crate) caret: Option<moonframe_core::Caret>,
 }
 
 /// A `ui.list` on screen: where it is scrolled, written as Rune lays it out.
 pub(crate) struct Watched {
     pub(crate) owner: String,
     pub(crate) id: String,
-    pub(crate) row_height: f32,
+    pub(crate) row_height: moonframe_core::RowHeights,
     pub(crate) count: usize,
     pub(crate) window: ListWindow,
     /// Scrolled offset and viewport height, in points.
@@ -286,6 +288,13 @@ impl Ui {
             Request::Pick(pick) => {
                 self.pick(from, pick, tx);
                 false
+            },
+            // Rune's text is not selectable yet: only what mods draw.
+            Request::Text(request) => {
+                let mut workspace = self.workspace_mut();
+                let text = request.of.as_ref().and_then(|of| workspace.drawn_text(of));
+                workspace.send(from, from, request.answer(text, None));
+                true
             },
             Request::Appearance(appearance) => {
                 self.set_appearance(appearance);
@@ -462,15 +471,13 @@ impl Ui {
         let mut changed = false;
         for list in self.lists.get_mut().values() {
             let (offset, height) = list.seen.get();
-            let first = (offset / list.row_height).floor().max(0.) as usize;
-            let showing = (height / list.row_height).ceil() as usize + 1;
-            let shown = first..(first + showing).min(list.count);
+            let shown = list.row_height.shown(offset, height, list.count);
             let built = list.window.start..list.window.start + list.window.len;
             if shown.start < built.start || shown.end > built.end {
-                let start = first.saturating_sub(OVERSCAN);
+                let start = shown.start.saturating_sub(OVERSCAN);
                 let window = ListWindow {
                     start,
-                    len: (showing + 2 * OVERSCAN).min(list.count - start),
+                    len: (shown.len() + 2 * OVERSCAN).min(list.count - start),
                 };
                 changed |=
                     self.shared

@@ -458,25 +458,27 @@ impl<'w> Painter<'w> {
         let watched = lists.entry(key).or_insert_with(|| Watched {
             owner: place.owner.to_owned(),
             id: list.id.clone(),
-            row_height: list.row_height,
+            row_height: list.row_height.clone(),
             count: list.count,
             window,
             seen: Rc::new(Cell::new((0., 0.))),
         });
         watched.count = list.count;
-        watched.row_height = list.row_height;
+        watched.row_height = list.row_height.clone();
         watched.window = window;
         let seen = Rc::clone(&watched.seen);
         drop(lists);
         // Rows sit where they would among all of them: the space above and
         // below stands for those not built.
-        let above = list.start as f32 * list.row_height;
-        let below =
-            list.count.saturating_sub(list.start + list.rows.len()) as f32 * list.row_height;
+        let heights = &list.row_height;
+        let end = list.start + list.rows.len();
+        let above = heights.top(list.start);
+        let below = heights.total(list.count) - heights.top(end);
         let rows = self
             .nodes(&list.rows, place)
             .into_iter()
-            .map(|built| built.h(list.row_height).w_full());
+            .enumerate()
+            .map(|(offset, built)| built.h(heights.height(list.start + offset)).w_full());
         let element = col()
             .key(place.path.clone())
             .min_h(0.)
