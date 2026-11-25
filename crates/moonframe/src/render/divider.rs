@@ -1,7 +1,8 @@
 //! A split's dividers take the keyboard and a double-click: a click on one
 //! gives it focus, the arrow keys along the split then move it 16 px (64
 //! with Shift), Home and End take the pane before it to its least and most,
-//! and a double-click puts the panes back to their starting `size`.
+//! and a double-click puts the panes back to their `reset` size, else the
+//! `size` they started with.
 //!
 //! GPUI's resize handle draws what its renderer returns inside its band, so
 //! the renderer here wraps the look in a box that takes focus and the
@@ -54,6 +55,8 @@ struct Split {
     sizes: Vec<Option<f32>>,
     /// Whether `sizes` is set.
     started: bool,
+    /// Each pane's `reset`, as last drawn: over `sizes` for a double-click.
+    resets: Vec<Option<f32>>,
     /// Each divider drawn, in the order the group draws them.
     dividers: Vec<Divider>,
 }
@@ -74,6 +77,8 @@ pub(super) struct Drawn {
     pub(super) vertical: bool,
     /// Its panes' starting sizes.
     pub(super) sizes: Vec<Option<f32>>,
+    /// Its panes' `reset` sizes.
+    pub(super) resets: Vec<Option<f32>>,
     /// Its `resize`, if it has one.
     pub(super) resized: Option<Resized>,
 }
@@ -154,6 +159,7 @@ pub(super) fn wire(
         split.resized = drawn.resized;
         split.vertical = drawn.vertical;
         split.layer = drawn.layer;
+        split.resets = drawn.resets;
         if !split.started {
             split.sizes = started.unwrap_or(drawn.sizes);
             split.started = true;
@@ -333,17 +339,23 @@ fn tell_resized(key: &str, state: &Entity<ResizableState>, window: &mut Window, 
 }
 
 /// Puts the panes beside the divider at `bounds` of the split `key` back to
-/// their starting size: the pane before it, else the one after, else halves.
+/// their `reset` size, else their starting size: the pane before it, else
+/// the one after, else halves.
 fn restore(key: &str, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut App) {
     let Some((state, _, index)) = locate(key, bounds, cx) else {
         return;
     };
     let starting = SPLITS.with_borrow(|splits| {
-        let sizes = &splits.get(key)?.sizes;
-        Some((
-            sizes.get(index).copied().flatten(),
-            sizes.get(index + 1).copied().flatten(),
-        ))
+        let split = splits.get(key)?;
+        let back = |pane: usize| {
+            split
+                .resets
+                .get(pane)
+                .copied()
+                .flatten()
+                .or_else(|| split.sizes.get(pane).copied().flatten())
+        };
+        Some((back(index), back(index + 1)))
     });
     let current = state.read(cx).sizes().clone();
     let (pane, size) = match starting {

@@ -436,6 +436,9 @@ export type PaneProps = {
 	style: Style?,
 	state: string?,
 	size: number?,
+	-- The size a double-click on its divider puts it back to; default: the
+	-- size it started with. The app's default when `size` is the user's kept one.
+	reset: number?,
 	min: number?,
 	max: number?,
 	fixed: boolean?,

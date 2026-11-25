@@ -163,6 +163,10 @@ pub struct Pane {
     pub look: Look,
     /// The starting size in pixels; without one the pane shares the rest.
     pub size: Option<f32>,
+    /// The size in pixels a double-click on its divider puts it back to;
+    /// without one, the size it started with. A mod that passes the user's
+    /// kept size back as `size` gives its own default here.
+    pub reset: Option<f32>,
     pub min: Option<f32>,
     pub max: Option<f32>,
     /// Keep its size when the window resizes, as a sidebar does.
