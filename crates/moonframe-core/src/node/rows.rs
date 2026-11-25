@@ -65,8 +65,8 @@ impl RowHeights {
         }
     }
 
-    /// The row of `count` at `y`, from the top.
-    fn at(&self, y: f32, count: usize) -> usize {
+    /// The row of `count` at `y`, from the top: `count` past the last.
+    pub fn at(&self, y: f32, count: usize) -> usize {
         let y = y.max(0.0);
         match self {
             Self::Same(row) => ((y / row).floor() as usize).min(count),

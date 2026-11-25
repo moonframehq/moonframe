@@ -43,6 +43,11 @@ pub(super) fn begin_frame(window: WindowId) -> u64 {
     })
 }
 
+/// The number of the last frame `window` drew.
+pub(super) fn frame(window: WindowId) -> u64 {
+    FRAMES.with_borrow(|frames| frames.get(&window).copied().unwrap_or_default())
+}
+
 /// Whether `image` needs the viewer rather than a plain picture.
 pub(super) fn wanted(image: &Image) -> bool {
     image.zoom.is_some() || image.measure.is_some() || !image.overlay.is_empty()

@@ -41,6 +41,7 @@ fn column() -> Stack {
         pointer: None,
         children: Vec::new(),
         slots: Vec::new(),
+        ends: None,
     }
 }
 
