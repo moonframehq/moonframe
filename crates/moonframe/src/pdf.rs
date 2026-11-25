@@ -4,7 +4,7 @@
 //! the `browser` feature; there is none elsewhere yet.
 
 #[cfg(all(feature = "browser", target_os = "macos"))]
-mod macos;
+pub(crate) mod macos;
 
 use {
     futures::channel::oneshot,
