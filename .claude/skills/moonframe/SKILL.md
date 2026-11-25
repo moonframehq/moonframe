@@ -1089,7 +1089,9 @@ return state, { { to = "app:window", msg = { open = "settings", send = { page = 
 
 - `app:open`, `msg` a web address (`https://` or `http://`): opens it in
   the system's browser, as a pull request link or a sign-in page wants.
-  Other schemes (`file`, an app's own) are the sender's error. At most 3
+  Or one `mailto:` address (`mailto:ada@example.com`), opened in the mail
+  app: no headers (`?subject=`) and no list. Other schemes (`file`, an
+  app's own) are the sender's error. At most 3
   pages open in 10 s. A control does it on a click: `ui.row { to =
   "app:open", msg = pr.url, ... }`.
 - `app:text`, `msg` `{ mod? | region?, max?, reply }`: answers with `reply`
