@@ -23,7 +23,7 @@ environment, or spawn processes. The built-in machine-data capability
 is `system` (CPU, memory and network counters); `moonframe.page` renders
 a public web page for it ([below](#rendering-a-web-page)), and `moonframe.view`
 reads a mod's view and acts on it ([below](#reading-and-driving-a-view)). Embedding apps can register
-namespaced capabilities such as `mshub.entities`. There are no built-in `http`, `fs`
+namespaced capabilities such as `acme.entities`. There are no built-in `http`, `fs`
 or `exec` capabilities. Process and native providers run with the user's
 access instead. See the [library guide](https://github.com/moonframehq/moonframe/blob/main/docs/library.md)
 for native providers.
@@ -417,23 +417,23 @@ struct Entities;
 impl HostCapability for Entities {
     fn call(&self, caller: &Caller, method: &str, args: &str) -> Result<String, String> {
         // Authorize using this loader-supplied identity, never an id in args.
-        if caller.provider != "mshub:notes" || method != "echo" {
+        if caller.provider != "acme:notes" || method != "echo" {
             return Err("not allowed".into());
         }
         Ok(args.to_owned())
     }
 }
 
-let app = Moonframe::new("mshub")
+let app = Moonframe::new("acme")
     .app_dir("app")
-    .capability("mshub.entities", Entities)
-    .root("mshub", "/path/to/miniapps", RootPolicy::default())
-    .entry("mshub", "notes", "/path/to/miniapps/notes")
+    .capability("acme.entities", Entities)
+    .root("acme", "/path/to/miniapps", RootPolicy::default())
+    .entry("acme", "notes", "/path/to/miniapps/notes")
     .on_entry_status(|status| eprintln!("{}: {:?}", status.name, status.state));
 let entries = app.entry_handle(); // Clone into host threads before app.run().
 // After the host's own platform/enabled filtering:
-entries.add_entry("mshub", "tasks", "/path/to/tasks")?;
-entries.remove_entry("mshub", "tasks");
+entries.add_entry("acme", "tasks", "/path/to/tasks")?;
+entries.remove_entry("acme", "tasks");
 ```
 
 Roots register a namespace, path and policy; **they do not scan**. Use the
@@ -444,11 +444,11 @@ and may lie outside the root directory. Guests cannot change this registry.
 
 The name is exactly `<namespace>:<id>`:
 
-- `ui.mount "mshub:notes"`, or `ui.mount { "mshub:notes", id = "second" }`;
-- `app["mshub:notes"]`, `to = "provider:mshub:notes"`;
-- `subscribe = { "provider/mshub:notes" }`;
-- persisted mod/instance keys include `mshub:notes` (for example
-  `mod:mshub:notes#second`). Removing an entry does not erase its saved state.
+- `ui.mount "acme:notes"`, or `ui.mount { "acme:notes", id = "second" }`;
+- `app["acme:notes"]`, `to = "provider:acme:notes"`;
+- `subscribe = { "provider/acme:notes" }`;
+- persisted mod/instance keys include `acme:notes` (for example
+  `mod:acme:notes#second`). Removing an entry does not erase its saved state.
 
 Namespace and id each use 1–48 lowercase ASCII letters, digits, `-`, `_`.
 Namespaces `app`, `provider`, `topic`, `demo`, `component`, `shell` and `parent`
@@ -456,7 +456,7 @@ are reserved because those prefixes route messages elsewhere. `:` is supported
 in topics and persistence keys. Entry edits are watched like app-folder edits,
 including in release bundles; invalid mod parse/init/first-view edits keep the
 previous working code. Native code is compiled into the host: register
-`.native("mshub:notes", factory)` and put `kind = "native"` in that entry's
+`.native("acme:notes", factory)` and put `kind = "native"` in that entry's
 provider manifest. There is no runtime native-library loading.
 
 `RootPolicy::default()` uses `BuildPolicy::PrebuiltOnly` and disables process
@@ -470,7 +470,7 @@ An entry may also bring `components/<name>.luau` and `style.luau`:
 
 ```text
 notes/
-  main.luau            the mod, mounted as ui.mount "mshub:notes"
+  main.luau            the mod, mounted as ui.mount "acme:notes"
   style.luau           optional: return style { rules = { ... } }
   components/
     card.luau          use "card" finds this before the app's `card`
@@ -500,7 +500,7 @@ live reload, as with `embedded_app` and `app_dir`:
 #[folder = "miniapps/notes"]
 struct Notes;
 
-let app = Moonframe::new("mshub").root("builtin", "miniapps", RootPolicy::default());
+let app = Moonframe::new("acme").root("builtin", "miniapps", RootPolicy::default());
 let app = if cfg!(debug_assertions) {
     app.entry("builtin", "notes", concat!(env!("CARGO_MANIFEST_DIR"), "/miniapps/notes"))
 } else {
@@ -539,7 +539,7 @@ In the guest's `provider.toml`:
 
 ```toml
 kind = "wasm"
-capabilities = ["mshub.entities"]
+capabilities = ["acme.entities"]
 ```
 
 Both WIT worlds import `host-call(capability, method, args) -> result<string,
@@ -559,7 +559,7 @@ serializes arguments and deserializes the JSON answer:
 
 ```rust
 let answer: serde_json::Value = moonframe_provider::host_call(
-    "mshub.entities", "echo", &serde_json::json!({ "id": 42 }),
+    "acme.entities", "echo", &serde_json::json!({ "id": 42 }),
 )?;
 ```
 

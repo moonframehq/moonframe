@@ -9,9 +9,11 @@
 // keep-sorted start
 mod both_backends;
 mod host_views;
+mod input_caret;
 mod inspect_context;
 mod list_rows;
 mod markdown_scroll;
+mod outside;
 mod paste;
 mod regressions;
 mod revision_timeline;

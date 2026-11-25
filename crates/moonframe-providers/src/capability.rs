@@ -91,7 +91,7 @@ pub struct Bounds {
 }
 
 impl Capabilities {
-    /// Registers a namespaced capability, for example `mshub.entities`.
+    /// Registers a namespaced capability, for example `acme.entities`.
     /// Unprefixed names and the `moonframe` namespace belong to the host.
     pub fn capability(&mut self, name: &str, cap: impl HostCapability) -> Result<(), String> {
         self.insert(
@@ -120,7 +120,7 @@ impl Capabilities {
     fn insert(&mut self, name: &str, handler: Handler) -> Result<(), String> {
         if !valid_name(name) {
             return Err(format!(
-                "capability `{name}` needs a non-reserved namespace, e.g. mshub.entities"
+                "capability `{name}` needs a non-reserved namespace, e.g. acme.entities"
             ));
         }
         self.register(name, Registered {

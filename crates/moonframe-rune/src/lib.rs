@@ -125,6 +125,8 @@ pub(crate) struct Field {
     pub(crate) change: Option<fields::Hearing>,
     /// The selection and caret `select` last saw.
     pub(crate) selection: ((usize, usize), usize),
+    /// The last `caret` the mod passed, to move the caret as it changes.
+    pub(crate) caret: Option<moonframe_core::Caret>,
 }
 
 /// A `ui.list` on screen: where it is scrolled, written as Rune lays it out.
