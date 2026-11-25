@@ -32,13 +32,13 @@ const GUEST: &str = r#"(component
   (core module $guest
     (import "mem" "memory" (memory 1))
     (import "host" "call" (func $call (param i32 i32 i32 i32 i32 i32 i32)))
-    (data (i32.const 100) "mshub.entities")
+    (data (i32.const 100) "acme.entities")
     (data (i32.const 120) "echo")
     (data (i32.const 128) "{\22id\22:42}")
     (data (i32.const 150) "1")
     (func (export "start") (param i32 i32) (result i32) (i32.const 0))
     (func (export "tick") (result i32)
-      (call $call (i32.const 100) (i32.const 14) (i32.const 120) (i32.const 4)
+      (call $call (i32.const 100) (i32.const 13) (i32.const 120) (i32.const 4)
         (i32.const 128) (i32.const 9) (i32.const 16))
       (i32.store (i32.const 32) (i32.const 1))
       (if (i32.load (i32.const 16))
@@ -87,7 +87,7 @@ fn wasm_host_call_checks_declarations_and_supplies_loader_identity() {
             format!(
                 "kind = 'wasm'\ninterval = 60\ncapabilities = {}",
                 if declared {
-                    "['mshub.entities']"
+                    "['acme.entities']"
                 } else {
                     "[]"
                 }
@@ -96,10 +96,10 @@ fn wasm_host_call_checks_declarations_and_supplies_loader_identity() {
         .unwrap();
         let entries = Entries::default();
         entries
-            .add_root("mshub", root.path(), RootPolicy::default())
+            .add_root("acme", root.path(), RootPolicy::default())
             .unwrap();
         entries
-            .add_entry("mshub", "notes", dir.parent().unwrap())
+            .add_entry("acme", "notes", dir.parent().unwrap())
             .unwrap();
         let seen = Arc::new(Mutex::new(Vec::new()));
         let mut capabilities = Capabilities::default();
@@ -113,7 +113,7 @@ fn wasm_host_call_checks_declarations_and_supplies_loader_identity() {
             capabilities.limits.timeout = Duration::from_millis(10);
         }
         capabilities
-            .capability("mshub.entities", Echo {
+            .capability("acme.entities", Echo {
                 seen: seen.clone(),
                 delay: if mode == "timeout" {
                     Duration::from_millis(80)
@@ -140,7 +140,7 @@ fn wasm_host_call_checks_declarations_and_supplies_loader_identity() {
         let event = receive.recv_timeout(Duration::from_secs(20)).unwrap();
         match event {
             Event::Published { provider, data } => {
-                assert_eq!(provider, "mshub:notes");
+                assert_eq!(provider, "acme:notes");
                 assert_eq!(
                     data,
                     if mode == "roundtrip" {
@@ -154,11 +154,11 @@ fn wasm_host_call_checks_declarations_and_supplies_loader_identity() {
         }
         if declared && mode != "args" {
             assert_eq!(seen.lock().unwrap().as_slice(), &[Caller {
-                provider: "mshub:notes".into(),
+                provider: "acme:notes".into(),
                 folder: dir.clone(),
                 root: root.path().to_owned(),
-                namespace: Some("mshub".into()),
-                capabilities: vec!["mshub.entities".into()]
+                namespace: Some("acme".into()),
+                capabilities: vec!["acme.entities".into()]
             }]);
         } else {
             assert!(seen.lock().unwrap().is_empty());

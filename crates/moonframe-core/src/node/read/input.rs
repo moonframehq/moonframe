@@ -1,6 +1,9 @@
 //! Text elements: inputs (with their keys and ids) and markdown.
 
-use {super::*, crate::read::Document};
+use {
+    super::*,
+    crate::read::{Document, MAX_DOCUMENT},
+};
 
 impl Build for Input {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
@@ -21,6 +24,7 @@ impl Build for Input {
         "focus",
         "mono",
         "secret",
+        "paste",
         "width",
         "grow",
         "browser",
@@ -29,6 +33,7 @@ impl Build for Input {
         "typewriter",
         "code",
         "line",
+        "caret",
         "scrolled",
         "scroll_at",
     ]];
@@ -103,6 +108,7 @@ impl Build for Input {
         let submit = fields.get::<Data>("submit")?;
         let blur = fields.get::<Data>("blur")?;
         let capture = fields.get::<Data>("capture")?;
+        let paste = fields.get::<Data>("paste")?;
         let keys = fields
             .get::<InputKeys>("keys")?
             .map(|keys| keys.0)
@@ -118,6 +124,7 @@ impl Build for Input {
             && blur.is_none()
             && keys.is_empty()
             && capture.is_none()
+            && paste.is_none()
             && browser.is_none()
         {
             return Err(fields.cx().key("to").fail(
@@ -149,6 +156,7 @@ impl Build for Input {
             focus: fields.get("focus")?.unwrap_or(false),
             mono: fields.get("mono")?.unwrap_or(false),
             secret,
+            paste,
             width: fields.number("width", PIXELS)?,
             grow: fields.get("grow")?.unwrap_or(false),
             browser,
@@ -156,6 +164,7 @@ impl Build for Input {
             dim,
             typewriter,
             line: caret_line(fields, code.is_some())?,
+            caret: fields.get("caret")?,
             code,
             scrolled,
             scroll_at,
@@ -407,6 +416,27 @@ impl Read for Dim {
             other => Err(cx.fail(format!(
                 "`{other}` is no dim; use \"sentence\" or \"paragraph\""
             ))),
+        }
+    }
+}
+
+/// `caret = "start"`, `"end"`, or a byte offset from 0.
+impl Read for Caret {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        match value {
+            Value::String(_) => match String::read(value, cx)?.as_str() {
+                "start" => Ok(Self::Start),
+                "end" => Ok(Self::End),
+                other => Err(cx.fail(format!(
+                    "`{other}` is no caret; use \"start\", \"end\" or a byte offset"
+                ))),
+            },
+            _ => match f64::read(value, cx)? {
+                at if at.fract() == 0.0 && (0.0..=MAX_DOCUMENT as f64).contains(&at) => {
+                    Ok(Self::At(at as usize))
+                },
+                _ => Err(cx.fail("a byte offset from 0, or \"start\" or \"end\"")),
+            },
         }
     }
 }

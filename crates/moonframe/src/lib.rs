@@ -68,6 +68,7 @@ mod natives;
 mod overlay;
 mod panel;
 mod panes;
+mod paste;
 mod pdf;
 #[cfg(any(feature = "terminal", feature = "herdr-core"))]
 mod persist;
@@ -91,6 +92,8 @@ mod video;
 #[cfg(not(all(feature = "video", target_os = "macos")))]
 #[path = "video_left_out.rs"]
 mod video;
+mod view_access;
+mod web_page;
 
 #[cfg(feature = "tokio")]
 pub use moonframe_providers::AsyncHostCapability;

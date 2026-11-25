@@ -28,6 +28,27 @@ impl Workspace {
         to.to_owned()
     }
 
+    /// The module a send from `from` to `to` reaches, as delivering it
+    /// would resolve it, or `None` when a preview may not send there: what
+    /// the app grants files to before sending them.
+    pub fn recipient(&self, from: &str, to: &str) -> Option<String> {
+        let to = self.resolve(from, to);
+        (!self.kept_in_preview(from, &to)).then_some(to)
+    }
+
+    /// Whether a send from `from` to `to`, already resolved, stays unheard:
+    /// a preview, and every instance it drew at any depth, keeps to itself,
+    /// so no other mod, provider or topic hears it. `app:edit` touches only
+    /// the sender's own fields, so a demo may edit them.
+    fn kept_in_preview(&self, from: &str, to: &str) -> bool {
+        let root = self.root_owner(from);
+        root.starts_with(DEMO)
+            && to != from
+            && to != root
+            && to != EDIT
+            && !self.owned_by(to, &root)
+    }
+
     /// Runs what a control drawn by the module `from` asks for. Messages go
     /// to modules here; commands are the app's, so they are handed back.
     pub fn dispatch(&mut self, from: &str, action: &Action) -> Option<Command> {
@@ -84,16 +105,7 @@ impl Workspace {
                 break;
             }
             let to = self.resolve(&from, &to);
-            // A preview, and every instance it drew at any depth, keeps to
-            // itself: no other mod, provider or topic hears it. `app:edit`
-            // touches only the sender's own fields, so a demo may edit them.
-            let root = self.root_owner(&from);
-            if root.starts_with(DEMO)
-                && to != from
-                && to != root
-                && to != EDIT
-                && !self.owned_by(&to, &root)
-            {
+            if self.kept_in_preview(&from, &to) {
                 continue;
             }
             if let Some(provider) = to.strip_prefix(PROVIDER) {

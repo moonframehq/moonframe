@@ -45,6 +45,9 @@ pub struct Input {
     pub mono: bool,
     /// A password: drawn as bullets, and never copied or cut.
     pub secret: bool,
+    /// Sent with the files or picture pasted into it; a paste of text
+    /// edits as usual.
+    pub paste: Option<Data>,
     /// The `ui.browser` this field is the address bar of: Enter loads the
     /// typed address there (see [`typed_address`]), focus selects the
     /// text, and Escape puts back the page's address.
@@ -65,10 +68,40 @@ pub struct Input {
     /// A code editor's caret goes to this line (from 1), scrolled into
     /// view, when it changes or the field takes a new `value`.
     pub line: Option<u32>,
+    /// Where the caret goes when the field takes a new `value`, or when
+    /// this changes: after a recalled line, rather than before it.
+    pub caret: Option<Caret>,
     /// Sent with `fraction` as the text scrolls (a multiline field).
     pub scrolled: Option<Data>,
     /// Where to scroll the text to; a new one scrolls.
     pub scroll_at: Option<ScrollAt>,
+}
+
+/// Where a mod puts a field's caret.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Caret {
+    /// Before the first character.
+    Start,
+    /// After the last character.
+    End,
+    /// This many bytes in, as `change` and `select` count them.
+    At(usize),
+}
+
+impl Caret {
+    /// Its offset in `text`, in bytes: past the end it is the end, and off
+    /// a character's edge it moves back to it.
+    pub fn offset(self, text: &str) -> usize {
+        let mut at = match self {
+            Self::Start => 0,
+            Self::End => text.len(),
+            Self::At(at) => at.min(text.len()),
+        };
+        while !text.is_char_boundary(at) {
+            at -= 1;
+        }
+        at
+    }
 }
 
 /// What a writing field keeps in full while the rest of its text fades.
