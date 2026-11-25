@@ -2170,12 +2170,12 @@ terminal log. There are four kinds:
     `.entry(namespace, id, path)` at launch, or clone `.entry_handle()` before
     `.run()` and call `add_root` / `remove_root`, `add_entry` / `remove_entry`
     from host threads. An entry contains `main.luau` and/or
-    `provider/provider.toml`. Mount `ui.mount "mshub:notes"`, read
-    `app["mshub:notes"]`, send `provider:mshub:notes`, subscribe to
-    `provider/mshub:notes`. Namespace and id use 1–48 of `a-z 0-9 - _`;
+    `provider/provider.toml`. Mount `ui.mount "acme:notes"`, read
+    `app["acme:notes"]`, send `provider:acme:notes`, subscribe to
+    `provider/acme:notes`. Namespace and id use 1–48 of `a-z 0-9 - _`;
     routing namespaces `app provider topic demo component shell parent` are
     reserved. State keys include the namespace, also for mounted instances.
-    `kind = "native"` binds only to a compiled `.native("mshub:notes", ...)`.
+    `kind = "native"` binds only to a compiled `.native("acme:notes", ...)`.
   - `RootPolicy::default()` is `PrebuiltOnly` (requires `provider.wasm`, refuses
     `Cargo.toml`) with process/socket disabled. Use `BuildPolicy::Cargo` for
     reviewed source; hooks remain refused. Entries reload live, including in
