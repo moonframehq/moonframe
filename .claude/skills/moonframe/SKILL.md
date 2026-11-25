@@ -624,6 +624,15 @@ ui.input {
 - **Size.** `width` in pixels, or `grow = true` to take the free space
   along the parent's axis (in a row, the width). In a column it fills the
   width anyway. `mono = true` uses the monospace font.
+- **Pasting files and pictures.** `paste = msg` hears ⌘V (Ctrl-V
+  elsewhere) of copied files or a picture (a screenshot): `msg` comes with
+  `files`, their paths, and for a picture, saved to the image cache first,
+  `image = { path, width, height }`. A paste of text types as usual. A mod
+  with `paste = msg` in `mod { }` hears the same while no text field or
+  terminal has focus (a page's "paste a screenshot"); every such mod hears
+  it, so act only when its page shows. What is pasted, the mod may show in
+  `ui.image` and share, as a dropped file. To write a link to it at the
+  caret, send `app:edit { field, insert = ... }`.
 - **Look.** Style the `input` rule and its states, `:hover`, `:focus` and
   `:disabled`, and `input-placeholder`, `input-selection` and
   `input-caret` (see "Stylesheet"). Without a rule it has a 1px border and
@@ -1402,9 +1411,9 @@ Text-like elements take their main value positionally:
 | --- | --- | --- |
 | `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window, and a `window = { size, min_size }` to size it; `window` takes no `msg`, so to open it on a page send `app:window` instead) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
-| `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover |
+| `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider`, `resize`, `to` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover. The user's sizes last the session; `resize` keeps them across launches (see "Pane sizes that outlive the app") |
 | `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
-| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, frame keys, `class`, `style` | rows of one height of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
+| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
 | `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
@@ -1414,7 +1423,7 @@ Text-like elements take their main value positionally:
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
 | `ui.markdown "# Notes"` | `text`, `link`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures are not loaded |
-| `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
+| `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `paste`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
 | `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
 | `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras, `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
 | `ui.line { points = { 3, 5, 2, 8 } }` | `points`, `min`, `max`, `baseline`, `area`, `dots` (`last` `all`), `stroke`, `dashed`, `width`, `height`, `class`, `style` | a line through values evenly spaced across its box (fills its parent without `width`/`height`): trends, curves in tables, forecasts. Style `color` strokes it, `background` fills the area to `baseline` (with `area = true`), `border_color` draws the baseline dashed. Use it for any line or curve, a dashed rule (two equal points with `dashed = true`) included |
@@ -1834,6 +1843,12 @@ return mod {
   window menu.
 - `app.window` updates as the window is maximized, goes fullscreen, or
   gains and loses focus: dim the title bar on `not app.window.active`.
+- `app.window.width` and `app.window.height` are the window's content size
+  in whole points, updated as it is resized (a mod's own window reports
+  its own). A layout that changes under a breakpoint reads them:
+  `local narrow = (app.window.width or 1024) < 768`, then shows a list as a
+  drawer behind a button instead of a pane. Every resize runs the views
+  that read `app.window`, so keep them cheap.
 - `app/main.luau` ships without the system title bar: its top row is the
   title bar, with the main tab strip in it. Reserve room for the traffic
   lights only when `app.window.titlebar == "hidden"` (until the restart that
@@ -1955,8 +1970,17 @@ return ui.panel { grow = true, title = "Files",
 }
 ```
 
-Rows must all be `row_height` tall (they are centered in it). The explorer
-(`app/mods/explorer`) flattens its open folders this way.
+Each row is centered in its `row_height`. The explorer (`app/mods/explorer`)
+flattens its open folders this way. When some rows need more room (a chat
+with a second line), give `row_height` as a function of the row instead of
+a number; it is asked for every row each time the view runs, so keep it a
+lookup (up to 100,000 rows):
+
+```lua
+row_height = function(i)
+	return if chats[i].status then 60 else 44
+end,
+```
 
 **Views run only when needed.** The host keeps each view's last tree and
 runs `view` again only when the mod's state or props may have changed (a
@@ -1990,6 +2014,24 @@ ui.hsplit {
 	ui.pane { ui.region "main" },
 	ui.pane { size = 280, fixed = true, visible = state.right, surface = "sidebar", ui.region "right" },
 }
+```
+
+**Pane sizes that outlive the app.** A split keeps the user's sizes for
+the session. To keep them across launches, give it `resize`: once the user
+lets go of a divider it sends `sizes`, each pane's whole pixels in order (0
+for a hidden one). Keep them in state, which is saved, and pass them back
+as `size`; a new launch opens the panes there:
+
+```lua
+update = function(state, msg)
+	if msg.msg == "sized" then state.list_width = msg.sizes[1] end
+end,
+view = function(state)
+	return ui.hsplit { id = "chat", resize = "sized",
+		ui.pane { size = state.list_width or 280, min = 200, ui.region "list" },
+		ui.pane { ui.region "conversation" },
+	}
+end,
 ```
 
 **Bottom panel.** Put a `ui.vsplit` inside the center pane, with a second
@@ -2108,7 +2150,10 @@ terminal log. There are four kinds:
   - It runs sandboxed: no files, network or environment, a 64 MB memory cap,
     and an instruction budget per call.
   - It reaches the machine only through declared `capabilities`: built-in
-    `"system"` (`host::system_load()`) and namespaced APIs the embedding host
+    `"system"` (`host::system_load()`), `"moonframe.page"` (`render` a public
+    web page with its scripts: `{ url, screenshot? }` answers `url`, `title`,
+    `text`, `timed_out` and a base64 PNG `screenshot`; macOS, `browser`
+    feature; see docs/wasm-providers.md) and namespaced APIs the embedding host
     registers with `Moonframe::capability` (or `capability_async`, on `.tokio`).
     Both WIT worlds import `host-call(capability, method, args)`; use the serde
     helper `moonframe_provider::host_call` from `crates/moonframe-provider`.

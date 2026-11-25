@@ -131,7 +131,7 @@ pub(crate) struct Field {
 pub(crate) struct Watched {
     pub(crate) owner: String,
     pub(crate) id: String,
-    pub(crate) row_height: f32,
+    pub(crate) row_height: moonframe_core::RowHeights,
     pub(crate) count: usize,
     pub(crate) window: ListWindow,
     /// Scrolled offset and viewport height, in points.
@@ -467,15 +467,13 @@ impl Ui {
         let mut changed = false;
         for list in self.lists.get_mut().values() {
             let (offset, height) = list.seen.get();
-            let first = (offset / list.row_height).floor().max(0.) as usize;
-            let showing = (height / list.row_height).ceil() as usize + 1;
-            let shown = first..(first + showing).min(list.count);
+            let shown = list.row_height.shown(offset, height, list.count);
             let built = list.window.start..list.window.start + list.window.len;
             if shown.start < built.start || shown.end > built.end {
-                let start = first.saturating_sub(OVERSCAN);
+                let start = shown.start.saturating_sub(OVERSCAN);
                 let window = ListWindow {
                     start,
-                    len: (showing + 2 * OVERSCAN).min(list.count - start),
+                    len: (shown.len() + 2 * OVERSCAN).min(list.count - start),
                 };
                 changed |=
                     self.shared

@@ -682,7 +682,8 @@ impl MoonframeApp {
         }
         self.workspace
             .set_window(window_state(self.chrome.titlebar, window, cx));
-        cx.notify();
+        // What the views mounted for it may want providers, or have sent.
+        self.flush("window", cx);
     }
 
     /// Starts the providers the views now want, and passes on what the mods
@@ -984,5 +985,12 @@ pub(crate) fn window_state(titlebar: Titlebar, window: &Window, cx: &App) -> Win
         display: window
             .display(cx)
             .map(|display| display_number(display.id())),
+        size: Some(points(window.viewport_size())),
     }
+}
+
+/// A window's size in whole points.
+fn points(size: Size<Pixels>) -> (u32, u32) {
+    let whole = |length: Pixels| f32::from(length).round().max(0.0) as u32;
+    (whole(size.width), whole(size.height))
 }
