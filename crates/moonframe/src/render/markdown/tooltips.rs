@@ -14,7 +14,10 @@ use {
     gpui_kit::{component::tooltip::Tooltip, *},
     std::{
         collections::{BTreeMap, HashMap},
-        sync::{Arc, PoisonError, RwLock},
+        sync::{
+            Arc, PoisonError, RwLock,
+            atomic::{AtomicU64, Ordering},
+        },
     },
 };
 
@@ -36,6 +39,9 @@ pub(super) struct Titling {
     tips: Tips,
     /// The text `titles` are being read from, or were.
     of: Option<String>,
+    /// Counts the texts read: a read publishes only while its text is
+    /// still the latest, so an older one finishing last changes nothing.
+    latest: Arc<AtomicU64>,
     reading: Option<Task<()>>,
 }
 
@@ -61,22 +67,31 @@ impl Titling {
             return;
         }
         self.of = Some(text.to_owned());
-        let titles = Arc::clone(&self.tips.titles);
+        let mine = self.latest.fetch_add(1, Ordering::AcqRel) + 1;
+        let (titles, latest) = (Arc::clone(&self.tips.titles), Arc::clone(&self.latest));
         // Nothing to read in text with no link or link definition.
         if !text.contains("](") && !text.contains("]:") {
             self.reading = None;
-            titles
-                .write()
-                .unwrap_or_else(PoisonError::into_inner)
-                .clear();
+            publish(&titles, &latest, mine, HashMap::new());
             return;
         }
         let text = text.to_owned();
         self.reading = Some(cx.background_spawn(async move {
-            let found = titles_of(&text);
-            *titles.write().unwrap_or_else(PoisonError::into_inner) = found;
+            publish(&titles, &latest, mine, titles_of(&text));
         }));
     }
+}
+
+/// Puts `found`, read from text number `mine`, in `titles`, unless a later
+/// text is wanted by now; whether it did.
+fn publish(titles: &Titles, latest: &AtomicU64, mine: u64, found: HashMap<String, String>) -> bool {
+    let mut titles = titles.write().unwrap_or_else(PoisonError::into_inner);
+    // Checked under the lock: a later read publishing meanwhile waits.
+    if latest.load(Ordering::Acquire) != mine {
+        return false;
+    }
+    *titles = found;
+    true
 }
 
 /// Each address's title in `source`, for addresses whose every link has
@@ -194,7 +209,7 @@ fn text(tips: &Tips, url: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use {
-        super::{Tips, text, titles_of},
+        super::{Tips, publish, text, titles_of},
         std::{collections::HashMap, sync::PoisonError},
     };
 
@@ -237,5 +252,17 @@ mod tests {
         .collect();
         assert_eq!(found, expected);
         assert!(titles_of("[a](https://a.example)").is_empty());
+    }
+
+    #[test]
+    fn an_older_read_finishing_last_leaves_the_newer_titles() {
+        let tips = Tips::default();
+        let latest = std::sync::atomic::AtomicU64::new(2);
+        let titled =
+            |title: &str| HashMap::from([("https://a.example".to_owned(), title.to_owned())]);
+        // Text 2's read lands first, then text 1's, which is no longer wanted.
+        assert!(publish(&tips.titles, &latest, 2, titled("New")));
+        assert!(!publish(&tips.titles, &latest, 1, titled("Old")));
+        assert_eq!(text(&tips, "https://a.example").as_deref(), Some("New"));
     }
 }
