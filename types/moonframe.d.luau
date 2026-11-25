@@ -294,6 +294,11 @@ export type StackProps = {
 	outside: Data,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
+	-- With `scroll`: sent with `at_end = true|false` as it first lays out
+	-- and each time it reaches or leaves its end.
+	at_end: Data,
+	-- With `scroll`: scroll to the end each time this value changes.
+	scroll_end: Data,
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
 	-- the system's setting).
 	scrollbar: boolean?,
@@ -1102,6 +1107,8 @@ export type InputProps = {
 	focus: boolean?,
 	-- The monospace font.
 	mono: boolean?,
+	-- A password: drawn as bullets, never copied or cut; one line only.
+	secret: boolean?,
 	-- Sent with `files` (paths) and, for a picture, `image = { path, width,
 	-- height }` when files or a picture are pasted into it; text pastes.
 	paste: Data,
@@ -1231,6 +1238,11 @@ export type ListProps = {
 	-- (called for every row each time the view runs; up to 100,000 rows).
 	row_height: number | ((index: number) -> number),
 	row: (index: number) -> Child,
+	-- Sent with `first` and `last`, the rows (from 1) any part of which
+	-- shows, as they change while it scrolls and resizes.
+	range: Data,
+	-- The mod `range` goes to, if not the drawing one.
+	to: string?,
 	gap: Space?,
 	padding: Space?,
 	grow: boolean?,
