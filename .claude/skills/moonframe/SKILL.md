@@ -1392,7 +1392,7 @@ Text-like elements take their main value positionally:
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover |
 | `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
-| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, frame keys, `class`, `style` | rows of one height of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
+| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
 | `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
@@ -1943,8 +1943,17 @@ return ui.panel { grow = true, title = "Files",
 }
 ```
 
-Rows must all be `row_height` tall (they are centered in it). The explorer
-(`app/mods/explorer`) flattens its open folders this way.
+Each row is centered in its `row_height`. The explorer (`app/mods/explorer`)
+flattens its open folders this way. When some rows need more room (a chat
+with a second line), give `row_height` as a function of the row instead of
+a number; it is asked for every row each time the view runs, so keep it a
+lookup (up to 100,000 rows):
+
+```lua
+row_height = function(i)
+	return if chats[i].status then 60 else 44
+end,
+```
 
 **Views run only when needed.** The host keeps each view's last tree and
 runs `view` again only when the mod's state or props may have changed (a

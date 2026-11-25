@@ -1197,9 +1197,10 @@ export type OverlayProps = {
 	content: Element,
 }
 
--- Rows of one height, of which only those showing are built and drawn, so
--- a list of any length costs a screenful. `row(i)` builds row `i` (from 1)
--- and is called again as the list scrolls; keep it cheap and pure.
+-- Rows, of one height or each its own, of which only those showing are
+-- built and drawn, so a list of any length costs a screenful. `row(i)`
+-- builds row `i` (from 1) and is called again as the list scrolls; keep it
+-- cheap and pure.
 export type ListProps = {
 	class: Class?,
 	style: Style?,
@@ -1207,8 +1208,9 @@ export type ListProps = {
 	-- Names it among this mod's lists (default "list"); two need two ids.
 	id: string?,
 	count: number,
-	-- Each row's height in pixels.
-	row_height: number,
+	-- Every row's height in pixels, or a function giving row `i`'s own
+	-- (called for every row each time the view runs; up to 100,000 rows).
+	row_height: number | ((index: number) -> number),
 	row: (index: number) -> Child,
 	gap: Space?,
 	padding: Space?,
