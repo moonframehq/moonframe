@@ -15,7 +15,7 @@ pub(crate) enum Taken {
     Sent,
     /// Not one of its keys, but it blocks the window behind (a backdrop):
     /// a terminal there must not get it; key bindings still may, and a
-    /// stack in the layer, of this paint priority, or above it.
+    /// divider or stack in the layer, of this paint priority, or above it.
     Blocked(usize),
     /// Nothing open takes it.
     Free,
@@ -59,12 +59,14 @@ pub(crate) fn intercept(cx: &mut Context<MoonframeApp>) -> Subscription {
                         app.input_keystroke(&event.keystroke, window, cx)
                             || (app.inputs.any_focused(window, cx)
                                 && app.paste_keystroke(&event.keystroke, window, cx))
+                            || crate::render::divider_keystroke(&event.keystroke, layer, window, cx)
                             || app.focus_keystroke(&event.keystroke, layer, window, cx)
                     },
                     Taken::Free => {
                         app.input_keystroke(&event.keystroke, window, cx)
                             || app.paste_keystroke(&event.keystroke, window, cx)
                             || app.terminal_keystroke(&event.keystroke, window, cx)
+                            || crate::render::divider_keystroke(&event.keystroke, 0, window, cx)
                             || app.focus_keystroke(&event.keystroke, 0, window, cx)
                             || app.mod_keystroke(&event.keystroke, window, cx)
                             || app.menu_keystroke(&event.keystroke, window, cx)

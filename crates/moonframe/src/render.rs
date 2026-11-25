@@ -10,6 +10,7 @@
 mod browser;
 pub(crate) mod cached;
 mod carry;
+mod divider;
 mod elements;
 mod ends;
 mod floating;
@@ -70,7 +71,14 @@ use {
 
 #[cfg(feature = "terminal")]
 use crate::terminal::Terminals;
-pub(crate) use focus_keys::{FocusKeys, closed as focus_keys_closed, drawn as focus_keys_drawn};
+#[cfg(all(test, unix, feature = "markdown"))]
+pub(crate) use divider::kept as dividers_kept;
+pub(crate) use {
+    divider::{
+        closed as dividers_closed, frame_drawn as dividers_drawn, keystroke as divider_keystroke,
+    },
+    focus_keys::{FocusKeys, closed as focus_keys_closed, drawn as focus_keys_drawn},
+};
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
 

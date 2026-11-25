@@ -137,7 +137,8 @@ pub struct Split {
     /// Draws a hairline between panes; without it the panes meet with no
     /// line, and only a hovered or dragged handle shows.
     pub divider: bool,
-    /// Sent once the user lets go of a divider, with `sizes`: each pane's
+    /// Sent once the user lets go of a divider (or moves one by key or a
+    /// double-click), with `sizes`: each pane's
     /// size in whole pixels, in order, 0 for a hidden one. A mod keeps them
     /// in its state, which outlives the app, and passes them back as the
     /// panes' `size`, so they reopen as the user left them.

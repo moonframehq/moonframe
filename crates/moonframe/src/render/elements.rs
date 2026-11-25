@@ -445,16 +445,34 @@ impl<'w> Draw<'w> for Split {
                 .clone()
                 .unwrap_or_else(|| format!("{}:{}", place.owner, place.path)),
         );
-        let mut group = match self.direction {
-            Direction::Row => h_resizable(key),
-            Direction::Column => v_resizable(key),
+        let group = match self.direction {
+            Direction::Row => h_resizable(key.clone()),
+            Direction::Column => v_resizable(key.clone()),
         };
-        if !self.divider {
-            group = group.with_handle_appearance(bare_handle());
-        }
-        if let Some(action) = &self.resize {
-            group = group.on_resize(resized(action, place.owner, cx));
-        }
+        let look = if self.divider {
+            component::resize_handle_appearance()
+        } else {
+            bare_handle()
+        };
+        let drawn = super::divider::Drawn {
+            key,
+            window: painter.window,
+            layer: painter.layer,
+            vertical: self.direction == Direction::Column,
+            sizes: self.panes.iter().map(|pane| pane.size).collect(),
+            resized: self
+                .resize
+                .as_ref()
+                .map(|action| std::rc::Rc::new(resized(action, place.owner, cx)) as _),
+        };
+        // A preview's split is looked at, not used: its dividers keep
+        // nothing past the frame.
+        let (group, measure) = if painter.preview {
+            (group.with_handle_appearance(look), None)
+        } else {
+            let (group, measure) = super::divider::wire(group, drawn, look);
+            (group, Some(measure))
+        };
         let group = panes
             .into_iter()
             .fold(group, |group, (pane, place, look, shown)| {
@@ -521,7 +539,9 @@ impl<'w> Draw<'w> for Split {
             .min_h_0()
             .min_w_0()
             .size_full()
+            .relative()
             .child(group)
+            .children(measure)
             .into_any_element()
     }
 }

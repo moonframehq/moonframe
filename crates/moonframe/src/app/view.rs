@@ -88,6 +88,7 @@ impl Render for MoonframeApp {
             .map(AnyWindowHandle::window_id)
             .collect();
         self.key_layers.retain(|id, _| open.contains(id));
+        crate::render::dividers_closed(&open, window.window_handle().window_id());
         self.focus_keys.retain(|id, _| open.contains(id));
         crate::render::focus_keys_closed(&open);
         self.after_frame(frame, window, cx);
