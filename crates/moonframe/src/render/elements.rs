@@ -458,7 +458,14 @@ impl<'w> Draw<'w> for Split {
                 .as_ref()
                 .map(|action| std::rc::Rc::new(resized(action, place.owner, cx)) as _),
         };
-        let (group, measure) = super::divider::wire(group, drawn, look);
+        // A preview's split is looked at, not used: its dividers keep
+        // nothing past the frame.
+        let (group, measure) = if painter.preview {
+            (group.with_handle_appearance(look), None)
+        } else {
+            let (group, measure) = super::divider::wire(group, drawn, look);
+            (group, Some(measure))
+        };
         let group = panes
             .into_iter()
             .fold(group, |group, (pane, place, look, shown)| {
@@ -527,7 +534,7 @@ impl<'w> Draw<'w> for Split {
             .size_full()
             .relative()
             .child(group)
-            .child(measure)
+            .children(measure)
             .into_any_element()
     }
 }
