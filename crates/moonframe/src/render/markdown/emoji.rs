@@ -29,16 +29,19 @@ const AGAIN: Duration = Duration::from_secs(1);
 const AWHILE: Duration = Duration::from_secs(60);
 
 thread_local! {
-    /// Emoji not there yet, by address: when first missed, and whether a
-    /// look is due.
-    static WAITING: RefCell<HashMap<String, (Instant, bool)>> = RefCell::new(HashMap::new());
+    /// Emoji not there yet, by address and window: when first missed, and
+    /// whether a look is due. Each window waiting draws itself again.
+    static WAITING: RefCell<HashMap<(String, WindowId), (Instant, bool)>> =
+        RefCell::new(HashMap::new());
 }
 
-/// Whether to look for the missing emoji `src` again in a while: for
-/// [`AWHILE`] after it was first missed, once at a time.
-fn look_again(src: &str, now: Instant) -> bool {
+/// Whether to look for the missing emoji `src` again in a while, in
+/// `window`: for [`AWHILE`] after it was first missed there, once at a
+/// time.
+fn look_again(src: &str, window: WindowId, now: Instant) -> bool {
     WAITING.with_borrow_mut(|waiting| {
-        let (since, due) = waiting.entry(src.to_owned()).or_insert((now, false));
+        let key = (src.to_owned(), window);
+        let (since, due) = waiting.entry(key).or_insert((now, false));
         if *due || now.saturating_duration_since(*since) > AWHILE {
             return false;
         }
@@ -47,10 +50,11 @@ fn look_again(src: &str, now: Instant) -> bool {
     })
 }
 
-/// The look for `src` is done: the next miss may ask for another.
-fn looked(src: &str) {
+/// The look for `src` in `window` is done: the next miss may ask for
+/// another.
+fn looked(src: &str, window: WindowId) {
     WAITING.with_borrow_mut(|waiting| {
-        if let Some((_, due)) = waiting.get_mut(src) {
+        if let Some((_, due)) = waiting.get_mut(&(src.to_owned(), window)) {
             *due = false;
         }
     });
@@ -107,19 +111,23 @@ impl MarkdownPlugin for Emojis {
         let Some(path) = cached(&emoji.src, &self.0) else {
             // A provider may still be downloading it: draw again in a
             // while, when the lookup is tried anew.
-            if look_again(&emoji.src, Instant::now()) {
+            let id = window.window_handle().window_id();
+            if look_again(&emoji.src, id, Instant::now()) {
                 let src = emoji.src.clone();
                 window
                     .spawn(cx, async move |cx| {
                         cx.background_executor().timer(AGAIN).await;
-                        looked(&src);
+                        looked(&src, id);
                         cx.update(|window, _| window.refresh()).ok();
                     })
                     .detach();
             }
             return Some(InlineElement::new(div().child(alt)));
         };
-        WAITING.with_borrow_mut(|waiting| waiting.remove(&emoji.src));
+        if WAITING.with_borrow(|waiting| !waiting.is_empty()) {
+            let found = (emoji.src.clone(), window.window_handle().window_id());
+            WAITING.with_borrow_mut(|waiting| waiting.remove(&found));
+        }
         let side = context.line_height();
         let fallback = alt.clone();
         Some(InlineElement::new(
@@ -151,7 +159,7 @@ fn cached(src: &str, shared: &SharedRef) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use {
-        super::{AWHILE, is_emoji, look_again, looked},
+        super::{AWHILE, WindowId, is_emoji, look_again, looked},
         gpui_kit::component::text::markdown_ast::{Image, Node},
     };
 
@@ -175,14 +183,21 @@ mod tests {
     fn a_missing_emoji_is_looked_for_again_for_a_while() {
         let start = std::time::Instant::now();
         let src = "emoji/later.png";
-        assert!(look_again(src, start));
-        // One look at a time.
-        assert!(!look_again(src, start));
-        looked(src);
-        assert!(look_again(src, start + std::time::Duration::from_secs(1)));
-        looked(src);
+        let (one, two) = (WindowId::from(1), WindowId::from(2));
+        assert!(look_again(src, one, start));
+        // One look at a time in a window; each window looks for itself.
+        assert!(!look_again(src, one, start));
+        assert!(look_again(src, two, start));
+        looked(src, one);
+        assert!(look_again(
+            src,
+            one,
+            start + std::time::Duration::from_secs(1)
+        ));
+        looked(src, one);
         assert!(!look_again(
             src,
+            one,
             start + AWHILE + std::time::Duration::from_secs(1)
         ));
     }
