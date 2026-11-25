@@ -338,31 +338,31 @@ fn tell_resized(key: &str, state: &Entity<ResizableState>, window: &mut Window, 
     }
 }
 
-/// Puts the panes beside the divider at `bounds` of the split `key` back to
-/// their `reset` size, else their starting size: the pane before it, else
-/// the one after, else halves.
+/// Puts the panes beside the divider at `bounds` of the split `key` back:
+/// to a `reset` size (the pane before it's, else the one after's), else to
+/// a starting size (the same way), else to halves.
 fn restore(key: &str, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut App) {
     let Some((state, _, index)) = locate(key, bounds, cx) else {
         return;
     };
-    let starting = SPLITS.with_borrow(|splits| {
+    // Each pane's `reset`, and its starting size.
+    let back = SPLITS.with_borrow(|splits| {
         let split = splits.get(key)?;
-        let back = |pane: usize| {
-            split
-                .resets
-                .get(pane)
-                .copied()
-                .flatten()
-                .or_else(|| split.sizes.get(pane).copied().flatten())
-        };
-        Some((back(index), back(index + 1)))
+        let of = |sizes: &[Option<f32>], pane: usize| sizes.get(pane).copied().flatten();
+        Some([
+            (of(&split.resets, index), of(&split.resets, index + 1)),
+            (of(&split.sizes, index), of(&split.sizes, index + 1)),
+        ])
     });
     let current = state.read(cx).sizes().clone();
-    let (pane, size) = match starting {
-        Some((Some(before), _)) => (index, px(before)),
-        Some((None, Some(after))) => (index + 1, px(after)),
-        _ => (index, (current[index] + current[index + 1]) / 2.),
-    };
+    // A `reset` on either side comes before either starting size.
+    let chosen = back.into_iter().flatten().find_map(|sizes| match sizes {
+        (Some(before), _) => Some((index, px(before))),
+        (None, Some(after)) => Some((index + 1, px(after))),
+        (None, None) => None,
+    });
+    let (pane, size) =
+        chosen.unwrap_or_else(|| (index, (current[index] + current[index + 1]) / 2.));
     state.update(cx, |state, cx| state.resize_panel(pane, size, window, cx));
     tell_resized(key, &state, window, cx);
 }
