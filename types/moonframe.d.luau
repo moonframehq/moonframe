@@ -333,6 +333,9 @@ export type StackProps = {
 	-- itself as they come and go: with a `transition` rule it grows in when
 	-- it appears and shrinks away when it goes, as tabs open and close.
 	key: string?,
+	-- Keys it takes while focus is inside it (a click in it gives it focus)
+	-- and no text field has it, ahead of the mod's own `keys`.
+	keys: Keys?,
 	-- Opens the mod named this in a window of its own (or raises it) when
 	-- clicked: a tool that stays open beside the main window. Takes no `msg`;
 	-- to open it on a page, send `app:window` `{ open = "<mod>", send = ... }`.

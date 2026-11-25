@@ -124,7 +124,9 @@ in the Components window, then `use` it from the mod.
 **Markdown.** To show it: `local markdown = use "markdown"`, then
 `markdown { text = state.notes, grow = true, scroll = true, link =
 "open-link" }` (or `ui.markdown`); a link click sends `{ msg = "open-link",
-url = ... }` and opens nothing by itself, and pictures are not loaded. To
+url = ... }` and opens nothing by itself, and pictures load only with
+`images` (a chat's custom emoji: `![:party:](<cached file> "emoji")`
+draws inline from the image cache without it). To
 edit a project file: `local markdown_editor = use "markdown-editor"`, then
 `markdown_editor { id = "readme", path = "README.md" }` in a growing
 container; it reads and saves through the `docs` provider (see "Built-in
@@ -1185,6 +1187,16 @@ return mod {
 }
 ```
 
+A row or column takes `keys` of its own, named the same way, only while
+focus is inside it: a click anywhere in it gives it focus (a control in it
+keeps it there), and while no text field has focus its keys come before the
+mod's. A deck whose ← dismisses and → keeps once the reader is in it, while
+the page's arrows stay the page's elsewhere:
+
+```lua
+ui.column { class = "deck", keys = { left = "dismiss", right = "keep" }, ... }
+```
+
 ## Tabs
 
 `tabbed { id = "main", start = "component:terminal" }` is a tab bar that
@@ -1432,7 +1444,7 @@ Text-like elements take their main value positionally:
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
-| `ui.markdown "# Notes"` | `text`, `link`, `tooltips`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures are not loaded. A link shows its title (`[text](url "title")`) on hover while every link to that address has the same one, or what `tooltips = { [url] = text }` gives for its address: where a wrapped (scanned) address really leads |
+| `ui.markdown "# Notes"` | `text`, `link`, `tooltips`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures load only with `images` (from files a `ui.image` could show), except a picture titled `emoji` (`![:party:](~/.cache/moonframe/images/emoji/party.png "emoji")`), drawn inline at the line's height from the image cache alone, its alt text standing in until it loads. A link shows its title (`[text](url "title")`) on hover while every link to that address has the same one, or what `tooltips = { [url] = text }` gives for its address: where a wrapped (scanned) address really leads |
 | `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `secret`, `paste`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
 | `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
 | `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras, `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |

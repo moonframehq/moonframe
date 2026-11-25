@@ -14,14 +14,28 @@ pub(crate) enum Taken {
     /// It sent a message; nothing else sees the key.
     Sent,
     /// Not one of its keys, but it blocks the window behind (a backdrop):
-    /// a terminal there must not get it; key bindings still may.
-    Blocked,
+    /// a terminal there must not get it; key bindings still may, and a
+    /// stack in the layer, of this paint priority, or above it.
+    Blocked(usize),
     /// Nothing open takes it.
     Free,
 }
 
 /// `secondary` means ⌘ here, Ctrl elsewhere.
 const MAC: bool = cfg!(target_os = "macos");
+
+/// `keystroke` as keys match it.
+fn pressed(keystroke: &Keystroke) -> Pressed<'_> {
+    let modifiers = keystroke.modifiers;
+    Pressed {
+        key: &keystroke.key,
+        text: keystroke.key_char.as_deref(),
+        ctrl: modifiers.control,
+        alt: modifiers.alt,
+        shift: modifiers.shift,
+        cmd: modifiers.platform,
+    }
+}
 
 /// Shared key routing also runs in builds without a terminal: text fields,
 /// overlays and mod shortcuts must keep working there.
@@ -41,15 +55,17 @@ pub(crate) fn intercept(cx: &mut Context<MoonframeApp>) -> Subscription {
                 }
                 match app.layer_keystroke(&event.keystroke, window, cx) {
                     Taken::Sent => true,
-                    Taken::Blocked => {
+                    Taken::Blocked(layer) => {
                         app.input_keystroke(&event.keystroke, window, cx)
                             || (app.inputs.any_focused(window, cx)
                                 && app.paste_keystroke(&event.keystroke, window, cx))
+                            || app.focus_keystroke(&event.keystroke, layer, window, cx)
                     },
                     Taken::Free => {
                         app.input_keystroke(&event.keystroke, window, cx)
                             || app.paste_keystroke(&event.keystroke, window, cx)
                             || app.terminal_keystroke(&event.keystroke, window, cx)
+                            || app.focus_keystroke(&event.keystroke, 0, window, cx)
                             || app.mod_keystroke(&event.keystroke, window, cx)
                             || app.menu_keystroke(&event.keystroke, window, cx)
                     },
@@ -120,9 +136,41 @@ impl MoonframeApp {
                 self.dispatch(&top.owner, &action, window, cx);
                 Taken::Sent
             },
-            None if top.modal => Taken::Blocked,
+            None if top.modal => Taken::Blocked(top.priority),
             None => Taken::Free,
         }
+    }
+
+    /// Offers `keystroke` to the rows and columns with `keys` that focus is
+    /// inside, innermost first, unless a text field has focus: its keys
+    /// and editing come first.
+    pub(crate) fn focus_keystroke(
+        &mut self,
+        keystroke: &Keystroke,
+        above: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.inputs.any_focused(window, cx) {
+            return false;
+        }
+        let pressed = pressed(keystroke);
+        let typing = self.typing(window, cx);
+        let taken = self
+            .focus_keys
+            .get(&window.window_handle().window_id())
+            .into_iter()
+            .flatten()
+            .filter(|stack| stack.layer >= above && stack.focus.contains_focused(window, cx))
+            .find_map(|stack| {
+                let msg = stack.keys.message(None, &pressed, MAC, typing)?;
+                Some((stack.owner.clone(), msg.clone()))
+            });
+        let Some((owner, msg)) = taken else {
+            return false;
+        };
+        self.dispatch(&owner, &Action::Send { to: None, msg }, window, cx);
+        true
     }
 
     /// Whether a text field or terminal has the keyboard: the keys it
