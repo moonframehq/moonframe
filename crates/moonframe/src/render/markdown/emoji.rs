@@ -13,13 +13,7 @@ use {
         },
         *,
     },
-    std::{
-        cell::RefCell,
-        collections::HashMap,
-        path::PathBuf,
-        sync::Arc,
-        time::{Duration, Instant},
-    },
+    std::{cell::RefCell, collections::HashMap, path::PathBuf, sync::Arc, time::Duration},
 };
 
 const EMOJI: &str = "moonframe-emoji";
@@ -28,16 +22,11 @@ const EMOJI: &str = "moonframe-emoji";
 /// [`LONGEST`], for as long as it is drawn.
 const AGAIN: Duration = Duration::from_secs(1);
 const LONGEST: Duration = Duration::from_secs(30);
-/// How long a missing emoji no frame drew is remembered: its document, or
-/// its window, is gone.
-const FORGET: Duration = Duration::from_secs(90);
 
 /// A missing emoji a window waits for.
 struct Waiting {
     /// How long the next look waits.
     wait: Duration,
-    /// When a frame last drew it.
-    drawn: Instant,
     /// A look is on its way.
     due: bool,
 }
@@ -50,18 +39,14 @@ thread_local! {
 }
 
 /// How long to wait before looking for the missing emoji `src` again in
-/// `window`, drawn there at `now`: none while a look is already on its way.
-fn look_again(src: &str, window: WindowId, now: Instant) -> Option<Duration> {
+/// `window`, drawn there: none while a look is already on its way.
+fn look_again(src: &str, window: WindowId) -> Option<Duration> {
     WAITING.with_borrow_mut(|waiting| {
-        waiting.retain(|_, waiting| {
-            waiting.due || now.saturating_duration_since(waiting.drawn) < FORGET
-        });
-        let waiting = waiting.entry((src.to_owned(), window)).or_insert(Waiting {
+        let key = (src.to_owned(), window);
+        let waiting = waiting.entry(key).or_insert(Waiting {
             wait: AGAIN,
-            drawn: now,
             due: false,
         });
-        waiting.drawn = now;
         if waiting.due {
             return None;
         }
@@ -72,12 +57,24 @@ fn look_again(src: &str, window: WindowId, now: Instant) -> Option<Duration> {
     })
 }
 
-/// The look for `src` in `window` is done: the next miss may ask for
-/// another.
+/// The look for `src` in `window` is done: the frame it draws asks for the
+/// next one, if it still shows the emoji missing.
 fn looked(src: &str, window: WindowId) {
     WAITING.with_borrow_mut(|waiting| {
         if let Some(waiting) = waiting.get_mut(&(src.to_owned(), window)) {
             waiting.due = false;
+        }
+    });
+}
+
+/// A while after a look: no frame asked for another, so nothing shows `src`
+/// missing in `window` any more (its document or window is gone), and it
+/// is forgotten.
+fn forget_unless_asked(src: &str, window: WindowId) {
+    WAITING.with_borrow_mut(|waiting| {
+        let key = (src.to_owned(), window);
+        if waiting.get(&key).is_some_and(|waiting| !waiting.due) {
+            waiting.remove(&key);
         }
     });
 }
@@ -134,13 +131,15 @@ impl MarkdownPlugin for Emojis {
             // A provider may still be downloading it: draw again in a
             // while, when the lookup is tried anew.
             let id = window.window_handle().window_id();
-            if let Some(wait) = look_again(&emoji.src, id, Instant::now()) {
+            if let Some(wait) = look_again(&emoji.src, id) {
                 let src = emoji.src.clone();
                 window
                     .spawn(cx, async move |cx| {
                         cx.background_executor().timer(wait).await;
                         looked(&src, id);
                         cx.update(|window, _| window.refresh()).ok();
+                        cx.background_executor().timer(AGAIN).await;
+                        forget_unless_asked(&src, id);
                     })
                     .detach();
             }
@@ -181,9 +180,8 @@ fn cached(src: &str, shared: &SharedRef) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use {
-        super::{AGAIN, FORGET, WAITING, WindowId, is_emoji, look_again, looked},
+        super::{AGAIN, WAITING, WindowId, forget_unless_asked, is_emoji, look_again, looked},
         gpui_kit::component::text::markdown_ast::{Image, Node},
-        std::time::{Duration, Instant},
     };
 
     fn picture(title: Option<&str>) -> Node {
@@ -204,36 +202,41 @@ mod tests {
 
     #[test]
     fn a_missing_emoji_is_looked_for_again_ever_less_often() {
-        let start = Instant::now();
         let src = "emoji/later.png";
         let (one, two) = (WindowId::from(1), WindowId::from(2));
-        assert_eq!(look_again(src, one, start), Some(AGAIN));
+        assert_eq!(look_again(src, one), Some(AGAIN));
         // One look at a time in a window; each window looks for itself.
-        assert_eq!(look_again(src, one, start), None);
-        assert_eq!(look_again(src, two, start), Some(AGAIN));
-        let mut at = start;
-        let mut waits = Vec::new();
-        for _ in 0..7 {
-            looked(src, one);
-            at += Duration::from_secs(10);
-            waits.push(look_again(src, one, at).map(|wait| wait.as_secs()));
-        }
-        // Long after the first miss, it is still looked for.
-        let waits: Vec<_> = waits.into_iter().flatten().collect();
+        assert_eq!(look_again(src, one), None);
+        assert_eq!(look_again(src, two), Some(AGAIN));
+        let waits: Vec<u64> = (0..7)
+            .filter_map(|_| {
+                looked(src, one);
+                look_again(src, one).map(|wait| wait.as_secs())
+            })
+            .collect();
+        // However long it has been missing, it is still looked for.
         assert_eq!(waits, [2, 4, 8, 16, 30, 30, 30]);
     }
 
     #[test]
-    fn an_emoji_no_frame_draws_is_forgotten() {
-        let start = Instant::now();
-        let (gone, kept) = ("emoji/gone.png", "emoji/kept.png");
+    fn an_emoji_no_frame_draws_after_a_look_is_forgotten() {
+        let (gone, shown) = ("emoji/gone.png", "emoji/shown.png");
         let window = WindowId::from(1);
-        assert_eq!(look_again(gone, window, start), Some(AGAIN));
-        looked(gone, window);
-        let later = start + FORGET;
-        assert_eq!(look_again(kept, window, later), Some(AGAIN));
+        for src in [gone, shown] {
+            assert_eq!(look_again(src, window), Some(AGAIN));
+            looked(src, window);
+        }
+        // Only the frame after the look drew `shown`, asking for the next.
+        assert_eq!(look_again(shown, window), Some(AGAIN * 2));
+        for src in [gone, shown] {
+            forget_unless_asked(src, window);
+        }
         WAITING.with_borrow(|waiting| {
             assert!(!waiting.contains_key(&(gone.to_owned(), window)));
+            assert!(waiting.contains_key(&(shown.to_owned(), window)));
         });
+        // It goes on waiting longer each time.
+        looked(shown, window);
+        assert_eq!(look_again(shown, window), Some(AGAIN * 4));
     }
 }
