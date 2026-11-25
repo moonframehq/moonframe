@@ -14,6 +14,7 @@ mod divider;
 mod elements;
 mod ends;
 mod floating;
+mod focus_keys;
 mod gallery;
 pub(crate) mod images;
 mod input;
@@ -72,8 +73,11 @@ use {
 use crate::terminal::Terminals;
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use divider::kept as dividers_kept;
-pub(crate) use divider::{
-    closed as dividers_closed, frame_drawn as dividers_drawn, keystroke as divider_keystroke,
+pub(crate) use {
+    divider::{
+        closed as dividers_closed, frame_drawn as dividers_drawn, keystroke as divider_keystroke,
+    },
+    focus_keys::{FocusKeys, closed as focus_keys_closed, drawn as focus_keys_drawn},
 };
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
@@ -239,6 +243,8 @@ pub(crate) struct Finished {
     pub(crate) list_requests: Vec<ListRequest>,
     /// The open popovers and overlays it drew, for their keys.
     pub(crate) key_layers: Vec<KeyLayer>,
+    /// The rows and columns with keys it drew, innermost first.
+    pub(crate) focus_keys: Vec<FocusKeys>,
 }
 
 pub(crate) struct Painter<'w, 'm> {
@@ -262,6 +268,8 @@ pub(crate) struct Painter<'w, 'm> {
     layer: usize,
     /// Open popovers and overlays, for the keys they take.
     key_layers: Vec<KeyLayer>,
+    /// Rows and columns with keys, for those taken while focus is inside.
+    focus_keys: Vec<FocusKeys>,
     /// Where nodes record their bounds while inspecting.
     sink: Option<Sink>,
     /// The innermost node being drawn, while inspecting: what a mod mounted
@@ -344,6 +352,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             overlays: Vec::new(),
             layer: 0,
             key_layers: Vec::new(),
+            focus_keys: Vec::new(),
             sink,
             outer: None,
             radii: RefCell::default(),
@@ -419,6 +428,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             live_again: self.live_again,
             list_requests: self.list_requests,
             key_layers: self.key_layers,
+            focus_keys: self.focus_keys,
         }
     }
 

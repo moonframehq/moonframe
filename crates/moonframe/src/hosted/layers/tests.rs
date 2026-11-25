@@ -47,6 +47,25 @@ fn a_frame_notes_its_host_views_afresh() {
     assert_eq!(layers.frames(), frames + 1);
 }
 
+#[test]
+fn an_app_with_a_view_inside_it_is_not_replayed() {
+    let layers = Layers::default();
+    layers.slots.borrow_mut().push(Slot {
+        view: placeholder_view(),
+        spot: Rc::default(),
+    });
+    assert!(layers.replayable());
+    layers.drawn_inline();
+    assert!(!layers.replayable());
+    // The next frame notes it afresh.
+    layers.begin();
+    layers.slots.borrow_mut().push(Slot {
+        view: placeholder_view(),
+        spot: Rc::default(),
+    });
+    assert!(layers.replayable());
+}
+
 #[gpui_kit::test]
 fn placements_reuse_metadata_until_a_placeholder_prepaints(cx: &mut TestAppContext) {
     struct Probe(Rc<Cell<bool>>);

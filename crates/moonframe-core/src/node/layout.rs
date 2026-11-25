@@ -101,6 +101,9 @@ pub struct Stack {
     /// go: with a `transition` rule it grows in when it appears and shrinks
     /// away when it goes, as tabs open and close.
     pub key: Option<String>,
+    /// Keys it takes while focus is inside it (a click in it gives it
+    /// focus) and no text field has it, ahead of the page's own.
+    pub keys: Keys,
     /// Presses, drags, the wheel, dropped files and the cursor; boxed, as
     /// most stacks have none.
     pub pointer: Option<Box<Pointer>>,
