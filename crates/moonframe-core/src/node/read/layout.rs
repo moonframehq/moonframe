@@ -25,6 +25,7 @@ impl Build for Stack {
             "outside",
         ],
         pointer::POINTER,
+        ends::ENDS,
     ];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
@@ -87,6 +88,7 @@ impl Build for Stack {
                 .map(Box::new),
             children: tree.children(fields)?,
             slots: fields.slots().to_vec(),
+            ends: Ends::from_fields(fields)?,
         })
     }
 }
@@ -220,7 +222,10 @@ impl Build for Popover {
             align: fields.get("align")?.unwrap_or(Anchor::Start),
             gap: fields.number("gap", 0.0..=1000.0)?.unwrap_or(6.0),
             width: fields.number("width", PIXELS)?,
-            keys: fields.get("keys")?.unwrap_or_default(),
+            keys: fields
+                .get::<crate::keys::LayerKeys>("keys")?
+                .map(|keys| keys.0)
+                .unwrap_or_default(),
             anchor_clicks: fields.get("anchor_clicks")?.unwrap_or(false),
             anchor: tree.children(fields)?,
             content: Box::new(tree.node(content, &fields.cx().nested("content"))?),
@@ -244,15 +249,24 @@ impl Build for Overlay {
             backdrop: fields.get("backdrop")?.unwrap_or(false),
             width: fields.number("width", PIXELS)?,
             height: fields.number("height", PIXELS)?,
-            keys: fields.get("keys")?.unwrap_or_default(),
+            keys: fields
+                .get::<crate::keys::LayerKeys>("keys")?
+                .map(|keys| keys.0)
+                .unwrap_or_default(),
             content: Box::new(tree.node(content, &fields.cx().nested("content"))?),
         })
     }
 }
 
 impl Build for List {
-    const KEYS: &'static [&'static [&'static str]] =
-        &[TYPE, FRAME, LOOK, &["id", "count", "row_height", "row"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, FRAME, LOOK, &[
+        "id",
+        "count",
+        "row_height",
+        "row",
+        "range",
+        "to",
+    ]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let id = fields
@@ -276,6 +290,10 @@ impl Build for List {
             })?;
         let row_height = row_heights(fields, count)?;
         let row: mlua::Function = fields.need("row")?;
+        let to: Option<String> = fields.get("to")?;
+        if to.is_some() && fields.raw("range").is_none() {
+            return Err(fields.cx().key("to").fail("`to` goes with a `range`"));
+        }
         let window = tree.windows.get(&id).copied().unwrap_or(ListWindow::FIRST);
         let range = window.range(count);
         let cx = fields.cx().key("row");
@@ -295,6 +313,9 @@ impl Build for List {
             row_height,
             start: range.start,
             rows,
+            range: fields
+                .get::<Data>("range")?
+                .map(|msg| Action::Send { to, msg }),
         })
     }
 }

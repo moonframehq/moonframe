@@ -113,6 +113,9 @@ pub struct Stack {
     /// place keeps each itself as one before it comes and goes. Empty when
     /// not read from Luau.
     pub slots: Vec<usize>,
+    /// Told of its end, and scrolled to it; boxed, as most stacks have
+    /// neither.
+    pub ends: Option<Box<Ends>>,
 }
 
 /// A titled section: a header with optional actions over a column body.
@@ -255,6 +258,9 @@ pub struct List {
     pub start: usize,
     /// The rows from `start` the view built.
     pub rows: Vec<Node>,
+    /// Sent with the first and last row that show as they change, so a
+    /// mod can fetch the rows around them.
+    pub range: Option<Action>,
 }
 
 /// The rows of a list a view builds: from `start`, `len` of them.

@@ -200,6 +200,29 @@ return mod {
 }
 
 #[test]
+fn a_list_keeps_its_range_and_sends_it_where_to_says() {
+    let range = |list: &str| {
+        let source = format!("return mod {{ view = function() return {list} end }}");
+        let Node::List(list) = view_of(&source).unwrap() else {
+            panic!("expected a list");
+        };
+        list.range
+    };
+    let row = "row_height = 20, row = function() return 'x' end";
+    assert_eq!(range(&format!("ui.list {{ count = 3, {row} }}")), None);
+    let Some(Action::Send { to: None, msg }) =
+        range(&format!("ui.list {{ count = 3, range = 'rows', {row} }}"))
+    else {
+        panic!("range kept");
+    };
+    assert_eq!(msg, Data::String("rows".into()));
+    assert!(matches!(
+        range(&format!("ui.list {{ count = 3, range = {{ people = true }}, to = 'feed', {row} }}")),
+        Some(Action::Send { to: Some(to), .. }) if to == "feed"
+    ));
+}
+
+#[test]
 fn a_list_row_can_have_its_own_height() {
     let source = r#"
 local chats = { "one", "two\nsecond line", "three" }
@@ -248,6 +271,10 @@ fn lists_are_checked() {
             "row_height: missing",
         ),
         ("ui.list { count = 3, row_height = 20 }", "row: missing"),
+        (
+            "ui.list { count = 3, row_height = 20, to = 'feed', row = function() return 'x' end }",
+            "`to` goes with a `range`",
+        ),
         (
             "ui.list { count = 3, row_height = function(i) return 0 end, row = function() return 'x' end }",
             "row_height[1]",

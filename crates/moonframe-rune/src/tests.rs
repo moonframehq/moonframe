@@ -22,6 +22,7 @@ mod markdown;
 mod reload;
 mod scroll_sync;
 mod splits;
+mod stack_ends;
 mod terminals;
 mod windows;
 // keep-sorted end
