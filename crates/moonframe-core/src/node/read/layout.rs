@@ -21,6 +21,7 @@ impl Build for Stack {
             "key",
             "scroll_to",
             "measure",
+            "outside",
         ],
         pointer::POINTER,
     ];
@@ -66,6 +67,15 @@ impl Build for Stack {
             selected: fields.get("selected")?.unwrap_or(false),
             scroll_to: scroll_to.map(|index| index as usize),
             measure,
+            outside: fields
+                .get::<Data>("outside")?
+                .map(|msg| -> Result<_, Error> {
+                    Ok(Action::Send {
+                        to: fields.get("to")?,
+                        msg,
+                    })
+                })
+                .transpose()?,
             action: Action::from_fields(fields)?,
             extras: Extras::from_fields(fields)?,
             drag: fields.get("drag")?.unwrap_or(false),
@@ -96,7 +106,7 @@ impl Build for Panel {
 
 impl Build for Split {
     const CHILDREN: bool = true;
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["id", "divider"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["id", "divider", "resize", "to"]];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let panes = fields
@@ -121,6 +131,16 @@ impl Build for Split {
             },
             id: fields.get("id")?,
             divider: fields.get("divider")?.unwrap_or(true),
+            resize: match fields.get::<Data>("resize")? {
+                Some(msg) => Some(Action::Send {
+                    to: fields.get("to")?,
+                    msg,
+                }),
+                None if fields.raw("to").is_some() => {
+                    return Err(fields.cx().key("to").fail("`to` goes with `resize`"));
+                },
+                None => None,
+            },
             panes,
         })
     }
@@ -258,14 +278,7 @@ impl Build for List {
                     .key("count")
                     .fail(format!("expected 0 to {MAX_ROWS} rows"))
             })?;
-        let row_height = fields
-            .number("row_height", 1.0..=10_000.0)?
-            .ok_or_else(|| {
-                fields
-                    .cx()
-                    .key("row_height")
-                    .fail("missing: each row's height in pixels")
-            })?;
+        let row_height = row_heights(fields, count)?;
         let row: mlua::Function = fields.need("row")?;
         let to: Option<String> = fields.get("to")?;
         if to.is_some() && fields.raw("range").is_none() {
@@ -299,6 +312,34 @@ impl Build for List {
 
 /// The most rows a list may have; it builds only those that show.
 const MAX_ROWS: usize = 10_000_000;
+/// The most rows a list whose rows each have their own height may have:
+/// it asks for every row's height each time the view runs.
+const MAX_SIZED_ROWS: usize = 100_000;
+const ROW_HEIGHT: std::ops::RangeInclusive<f32> = 1.0..=10_000.0;
+
+/// `row_height`: a number for every row, or a function giving row `i`'s.
+fn row_heights(fields: &Fields, count: usize) -> Result<RowHeights, Error> {
+    let cx = fields.cx().key("row_height");
+    let Some(Value::Function(height)) = fields.raw("row_height") else {
+        return fields
+            .number("row_height", ROW_HEIGHT)?
+            .map(RowHeights::Same)
+            .ok_or_else(|| cx.fail("missing: each row's height in pixels"));
+    };
+    if count > MAX_SIZED_ROWS {
+        return Err(cx.fail(format!(
+            "a function only for up to {MAX_SIZED_ROWS} rows; give one height for more"
+        )));
+    }
+    let mut heights = Vec::with_capacity(count);
+    for index in 1..=count {
+        let row = height
+            .call::<f32>(index)
+            .map_err(|error| Error::from(error).context(format!("row_height({index})")))?;
+        heights.push(crate::read::within(row, ROW_HEIGHT, &cx.index(index))?);
+    }
+    Ok(RowHeights::each(heights))
+}
 
 /// The element a popover or overlay floats.
 fn content<'f>(fields: &'f Fields) -> Result<&'f Value, Error> {

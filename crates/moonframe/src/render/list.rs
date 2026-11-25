@@ -1,7 +1,7 @@
-//! `ui.list`: rows of one height in a box that scrolls, of which only those
-//! the view built are drawn. Where the box is scrolled says which rows show;
-//! when they are not all built, the painter asks the mod for them once the
-//! frame is drawn, and the next frame has them.
+//! `ui.list`: rows, of one height or each its own, in a box that scrolls,
+//! of which only those the view built are drawn. Where the box is scrolled
+//! says which rows show; when they are not all built, the painter asks the
+//! mod for them once the frame is drawn, and the next frame has them.
 
 use {
     super::{
@@ -24,7 +24,7 @@ impl<'w> Draw<'w> for List {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
         let look = painter.look(Part::List, &self.look, false, place);
         let handle = painter.motion.scroll(&place.path);
-        let row = self.row_height;
+        let rows_of = &self.row_height;
         // Last frame's layout: where it is scrolled, and how tall it is.
         let scrolled = (-f32::from(handle.offset().y)).max(0.0);
         let height = f32::from(handle.bounds().size.height);
@@ -33,16 +33,14 @@ impl<'w> Draw<'w> for List {
         } else {
             FIRST_HEIGHT
         };
-        let first = ((scrolled / row).floor() as usize).min(self.count);
-        let showing = (height / row).ceil() as usize + 1;
-        let shown = first..(first + showing).min(self.count);
+        let shown = rows_of.shown(scrolled, height, self.count);
         let built = self.start..self.start + self.rows.len();
         if shown.start < built.start || shown.end > built.end {
             painter
                 .list_requests
                 .push((place.owner.to_owned(), self.id.clone(), ListWindow {
-                    start: first.saturating_sub(OVERSCAN),
-                    len: showing + 2 * OVERSCAN,
+                    start: shown.start.saturating_sub(OVERSCAN),
+                    len: shown.len() + 2 * OVERSCAN,
                 }));
         }
         let rows: Vec<AnyElement> = self
@@ -54,10 +52,10 @@ impl<'w> Draw<'w> for List {
                 let child = node.draw(painter, &place.child(index, Direction::Column), cx);
                 div()
                     .absolute()
-                    .top(px(index as f32 * row))
+                    .top(px(rows_of.top(index)))
                     .left_0()
                     .right_0()
-                    .h(px(row))
+                    .h(px(rows_of.height(index)))
                     .flex()
                     .flex_col()
                     .justify_center()
@@ -97,13 +95,13 @@ impl<'w> Draw<'w> for List {
                     .relative()
                     .flex_shrink_0()
                     .w_full()
-                    .h(px(self.count as f32 * row))
+                    .h(px(rows_of.total(self.count)))
                     .children(rows)
                     .children(measure),
             )
             .children(self.range.as_ref().and_then(|range| {
                 range::reader(
-                    &self.id, range, &handle, laid, row, self.count, painter, place, cx,
+                    &self.id, range, &handle, laid, rows_of, self.count, painter, place, cx,
                 )
             }))
             .into_any_element()

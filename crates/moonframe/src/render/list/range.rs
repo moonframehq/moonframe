@@ -6,7 +6,7 @@
 use {
     super::super::{Cx, Painter, Place, pointer::Sender},
     gpui_kit::*,
-    moonframe_core::{Action, Data, with_fields},
+    moonframe_core::{Action, Data, RowHeights, with_fields},
     std::{
         cell::{Cell, RefCell},
         collections::{BTreeMap, HashMap},
@@ -57,16 +57,18 @@ enum Tell {
     No,
 }
 
-/// The rows of `count`, each `row` high, that show in a box `height` high
-/// scrolled `scrolled` down, one-based. Half a pixel either way is layout's
-/// rounding, not a row showing.
-pub(super) fn shown(scrolled: f32, height: f32, row: f32, count: usize) -> Shown {
-    if count == 0 || height <= 0.0 || row <= 0.0 {
+/// The rows of `count`, as tall as `heights` says, that show in a box
+/// `height` high scrolled `scrolled` down, one-based. Half a pixel either
+/// way is layout's rounding, not a row showing.
+pub(super) fn shown(scrolled: f32, height: f32, heights: &RowHeights, count: usize) -> Shown {
+    if count == 0 || height <= 0.0 {
         return (0, 0);
     }
-    let first = (((scrolled.max(0.0) + 0.5) / row).floor() as usize).min(count - 1);
-    let end = ((scrolled + height - 0.5).max(0.0) / row).ceil() as usize;
-    (first + 1, end.clamp(first + 1, count))
+    let top = scrolled.max(0.0) + 0.5;
+    let bottom = (scrolled + height - 0.5).max(top);
+    let first = heights.at(top, count).min(count - 1);
+    let last = heights.at(bottom, count).clamp(first, count - 1);
+    (first + 1, last + 1)
 }
 
 /// Whether the list `list` at `key`, drawn in window frame `frame` and
@@ -152,7 +154,7 @@ pub(super) fn reader(
     range: &Action,
     handle: &ScrollHandle,
     rows: Rc<Cell<Bounds<Pixels>>>,
-    row: f32,
+    heights: &RowHeights,
     count: usize,
     painter: &Painter<'_, '_>,
     place: &Place<'_>,
@@ -173,7 +175,7 @@ pub(super) fn reader(
         owner: owner.clone(),
         to: to.clone(),
     };
-    let (msg, handle) = (msg.clone(), handle.clone());
+    let (msg, handle, heights) = (msg.clone(), handle.clone(), heights.clone());
     let element = canvas(
         move |_, window, cx| {
             // From the box's top, how far down the rows it shows: above the
@@ -181,7 +183,7 @@ pub(super) fn reader(
             let shows = handle.bounds();
             let scrolled = f32::from(shows.top() - rows.get().top());
             let height = f32::from(shows.size.height);
-            let rows = shown(scrolled, height, row, count);
+            let rows = shown(scrolled, height, &heights, count);
             match tell(&key, &list, frame, rows, Instant::now()) {
                 Tell::No => {},
                 Tell::Now => {
@@ -217,9 +219,13 @@ pub(super) fn reader(
 #[cfg(test)]
 mod tests {
     use {
-        super::{Action, Data, Tell, late, message, shown, tell},
+        super::{Action, Data, RowHeights, Tell, late, message, shown, tell},
         std::time::{Duration, Instant},
     };
+
+    fn every(row: f32) -> RowHeights {
+        RowHeights::Same(row)
+    }
 
     fn list(msg: &str) -> (String, Action) {
         let msg = Data::String(msg.to_owned());
@@ -229,21 +235,25 @@ mod tests {
     #[test]
     fn the_rows_any_part_of_which_shows() {
         // Rows 20 high in a box 100 high: five, and a sixth once scrolled.
-        assert_eq!(shown(0.0, 100.0, 20.0, 1000), (1, 5));
-        assert_eq!(shown(10.0, 100.0, 20.0, 1000), (1, 6));
-        assert_eq!(shown(20.0, 100.0, 20.0, 1000), (2, 6));
+        assert_eq!(shown(0.0, 100.0, &every(20.0), 1000), (1, 5));
+        assert_eq!(shown(10.0, 100.0, &every(20.0), 1000), (1, 6));
+        assert_eq!(shown(20.0, 100.0, &every(20.0), 1000), (2, 6));
         // Rounding is not a row showing.
-        assert_eq!(shown(19.7, 100.0, 20.0, 1000), (2, 6));
+        assert_eq!(shown(19.7, 100.0, &every(20.0), 1000), (2, 6));
         // At the end, or with fewer rows than room.
-        assert_eq!(shown(19_900.0, 100.0, 20.0, 1000), (996, 1000));
-        assert_eq!(shown(0.0, 100.0, 20.0, 3), (1, 3));
-        assert_eq!(shown(0.0, 100.0, 20.0, 0), (0, 0));
-        assert_eq!(shown(0.0, 0.0, 20.0, 10), (0, 0));
+        assert_eq!(shown(19_900.0, 100.0, &every(20.0), 1000), (996, 1000));
+        assert_eq!(shown(0.0, 100.0, &every(20.0), 3), (1, 3));
+        assert_eq!(shown(0.0, 100.0, &every(20.0), 0), (0, 0));
+        assert_eq!(shown(0.0, 0.0, &every(20.0), 10), (0, 0));
         // Padding above the rows takes room the rows do not show in.
-        assert_eq!(shown(-20.0, 100.0, 20.0, 1000), (1, 4));
+        assert_eq!(shown(-20.0, 100.0, &every(20.0), 1000), (1, 4));
         // Squeezed at the end, or scrolled past it: the last row.
-        assert_eq!(shown(199.75, 0.25, 20.0, 10), (10, 10));
-        assert_eq!(shown(5000.0, 100.0, 20.0, 10), (10, 10));
+        assert_eq!(shown(199.75, 0.25, &every(20.0), 10), (10, 10));
+        assert_eq!(shown(5000.0, 100.0, &every(20.0), 10), (10, 10));
+        // Rows of their own heights: 44, then 60, then 44s.
+        let own = RowHeights::each([44.0, 60.0, 44.0, 44.0, 44.0]);
+        assert_eq!(shown(0.0, 100.0, &own, 5), (1, 2));
+        assert_eq!(shown(50.0, 100.0, &own, 5), (2, 4));
     }
 
     #[test]

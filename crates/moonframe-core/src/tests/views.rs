@@ -177,8 +177,8 @@ return mod {
     };
     let first = list(&workspace);
     assert_eq!(
-        (first.count, first.row_height, first.start),
-        (100_000, 20.0, 0)
+        (first.count, &first.row_height, first.start),
+        (100_000, &crate::RowHeights::Same(20.0), 0)
     );
     assert_eq!(first.rows.len(), crate::ListWindow::FIRST.len);
     assert_eq!(text_of(&first.rows[0]), "row 1");
@@ -223,6 +223,39 @@ fn a_list_keeps_its_range_and_sends_it_where_to_says() {
 }
 
 #[test]
+fn a_list_row_can_have_its_own_height() {
+    let source = r#"
+local chats = { "one", "two\nsecond line", "three" }
+return mod {
+  view = function()
+    return ui.column {
+      ui.list { count = #chats, row = function(i) return ui.text(chats[i]) end,
+        row_height = function(i) return if chats[i]:find("\n") then 60 else 44 end },
+    }
+  end,
+}"#;
+    let dir = app(&[("chats", source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let Some(Node::Stack(column)) = workspace.slot("chats").unwrap().view() else {
+        panic!("no column");
+    };
+    let Node::List(list) = &column.children[0] else {
+        panic!("no list");
+    };
+    let heights = &list.row_height;
+    assert_eq!(
+        (heights.height(0), heights.height(1), heights.top(2)),
+        (44.0, 60.0, 104.0)
+    );
+    assert_eq!(heights.total(list.count), 148.0);
+}
+
+#[test]
 fn lists_are_checked() {
     for (list, expected) in [
         (
@@ -241,6 +274,14 @@ fn lists_are_checked() {
         (
             "ui.list { count = 3, row_height = 20, to = 'feed', row = function() return 'x' end }",
             "`to` goes with a `range`",
+        ),
+        (
+            "ui.list { count = 3, row_height = function(i) return 0 end, row = function() return 'x' end }",
+            "row_height[1]",
+        ),
+        (
+            "ui.list { count = 200000, row_height = function(i) return 20 end, row = function() return 'x' end }",
+            "a function only for up to",
         ),
         (
             "ui.list { count = 3, row_height = 20, row = function(i) error('no row ' .. i) end }",
