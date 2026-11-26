@@ -35,6 +35,10 @@ struct Kept {
     asked: Option<ListScrollTo>,
     /// Asked for, and waiting for the list's height.
     pending: Option<ListScroll>,
+    /// Another frame was asked for, for `pending`: once is enough to lay
+    /// the list out; a list that stays without a height (collapsed) waits
+    /// for whatever draws it next.
+    redrawn: bool,
     anchor: Option<Anchor>,
     seen: Option<Instant>,
 }
@@ -95,8 +99,8 @@ pub(super) struct Pad {
 
 /// How far down `list` shows this frame, its `handle` moved there: last
 /// frame's place, kept on its first row as rows arrive above, then where a
-/// new `scroll_to` asks; and whether to draw again, for a row asked for
-/// before the list has a height.
+/// new `scroll_to` asks; and whether to draw again, once, for a row asked
+/// for before the list has a height.
 pub(super) fn place(
     list: &List,
     handle: &ScrollHandle,
@@ -133,6 +137,7 @@ pub(super) fn place(
         if entry.asked != list.scroll_to {
             entry.pending = list.scroll_to.as_ref().map(|asked| asked.to);
             entry.asked = list.scroll_to.clone();
+            entry.redrawn = false;
         }
         let known = (height > 0.0).then_some(height);
         if let Some(to) = entry.pending
@@ -146,7 +151,9 @@ pub(super) fn place(
             scrolled = scrolled.min((content - height).max(0.0));
         }
         entry.anchor = anchor(scrolled, pad, &built, heights, list.count);
-        (scrolled, entry.pending.is_some())
+        let again = entry.pending.is_some() && !entry.redrawn;
+        entry.redrawn |= again;
+        (scrolled, again)
     });
     if (scrolled.0 - was).abs() > SLACK {
         handle.set_offset(point(handle.offset().x, px(-scrolled.0)));
