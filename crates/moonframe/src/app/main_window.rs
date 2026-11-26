@@ -50,7 +50,7 @@ impl Render for MainWindow {
         let layers = app.views.layers().clone();
         let focus = app.focus.clone();
         // While inspecting, every node notes where it lands in each frame.
-        let replayed = layers.any() && !app.inspector.in_window(None);
+        let replayed = layers.replayable() && !app.inspector.in_window(None);
         layers.set_replayed(replayed);
         let view = AnyView::from(self.app.clone());
         let content = if replayed {

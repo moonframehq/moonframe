@@ -10,6 +10,7 @@ use {
 
 // keep-sorted start
 mod embed;
+mod ends;
 mod gesture;
 mod icon;
 mod input;
@@ -19,14 +20,15 @@ mod map;
 mod pointer;
 mod read;
 mod revision_timeline;
+mod rows;
 mod snapshot;
 mod tokens;
 mod video;
 // keep-sorted end
 
 pub use {
-    embed::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*,
-    revision_timeline::*, snapshot::*, tokens::*, video::*,
+    embed::*, ends::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*,
+    revision_timeline::*, rows::*, snapshot::*, tokens::*, video::*,
 };
 
 pub(crate) use read::{element_keys, read};
@@ -415,6 +417,9 @@ pub struct Markdown {
     pub text: String,
     /// Sent when a link is clicked, shaped as [`Markdown::message`].
     pub link: Option<Data>,
+    /// What a link to each address shows on hover, over the link's own
+    /// title (`[text](url "title")`): where a wrapped address leads.
+    pub tooltips: std::collections::BTreeMap<String, String>,
     /// The mod its messages go to; the drawing mod when unset.
     pub to: Option<String>,
     /// Take the free space along the parent's axis.

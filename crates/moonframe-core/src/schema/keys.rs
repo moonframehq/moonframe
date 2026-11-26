@@ -92,7 +92,7 @@ pub(super) fn key_type(element: &str, key: &str) -> KeyType {
         ("revision_timeline", "spread") => number(0.0, 5.0),
         ("revision_timeline", "tick_width") => number(1.0, 128.0),
         ("revision_timeline", "tick_height") => number(0.5, 16.0),
-        ("pane", "size" | "min" | "max") => PIXELS,
+        ("pane", "size" | "reset" | "min" | "max") => PIXELS,
         ("line", "min" | "max" | "baseline") => number(-1.0e12, 1.0e12),
         ("line", "area") => Bool,
         ("line", "stroke") => number(0.5, 8.0),
@@ -110,8 +110,10 @@ pub(super) fn key_type(element: &str, key: &str) -> KeyType {
         ("video", "gain") => number(0.0, 1000.0),
         ("video", "gamma") => number(0.1, 10.0),
         ("icon", "name") => Icon,
+        ("list", "range") => Data,
+        ("input", "caret") => OneOf(vec![String, number(0.0, 1_048_576.0)]),
         ("list", "row") => Function,
-        ("list", "row_height") => number(1.0, 10_000.0),
+        ("list", "row_height") => OneOf(vec![number(1.0, 10_000.0), Function]),
         ("list", "count") => number(0.0, 10_000_000.0),
         (_, key) => by_key(key),
     }
@@ -130,10 +132,11 @@ fn by_key(key: &str) -> KeyType {
         "badge" | "browser" | "class" | "code" | "component" | "copy" | "cwd" | "detail" | "id"
         | "key" | "label" | "mod" | "name" | "placeholder" | "src" | "state" | "syntax"
         | "text" | "title" | "to" | "tooltip" | "url" | "value" => String,
-        "blur" | "capture" | "carry" | "change" | "context" | "dismiss" | "drop" | "exit"
-        | "force" | "found" | "hover" | "image" | "link" | "loading" | "measure" | "move"
-        | "msg" | "navigate" | "outline" | "pointer" | "props" | "rotate" | "routed"
-        | "scrolled" | "section" | "select" | "smart_zoom" | "submit" | "swipe" | "wheel" => Data,
+        "at_end" | "blur" | "capture" | "carry" | "change" | "context" | "dismiss" | "drop"
+        | "exit" | "force" | "found" | "hover" | "image" | "link" | "loading" | "measure"
+        | "move" | "msg" | "navigate" | "outline" | "outside" | "pointer" | "props" | "resize"
+        | "rotate" | "routed" | "scroll_end" | "scrolled" | "section" | "select" | "smart_zoom"
+        | "submit" | "swipe" | "wheel" => Data,
         "border" => OneOf(vec![Bool, Tokens(token_set!(Border))]),
         "color" => Color,
         "command" => OneOf(vec![

@@ -46,6 +46,7 @@ use {
 use {crate::terminal::Terminals, listeners::wake_on_output};
 
 // keep-sorted start
+mod acting;
 mod appearance;
 mod devtools;
 mod dialogs;
@@ -72,14 +73,19 @@ mod picking;
 mod problems;
 mod quick_inspect;
 mod sharing;
+mod text;
 mod toasts;
 mod updates;
 mod view;
 mod watch;
+mod window_state;
 mod windows;
-pub(crate) use fonts::list_ahead as list_fonts_ahead;
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use picking::selection_file;
+pub(crate) use {
+    acting::{Chosen, Windows},
+    fonts::list_ahead as list_fonts_ahead,
+};
 
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use hub::every as main_windows;
@@ -88,6 +94,7 @@ pub(crate) use {
     hub::{Hub, Launch},
     listeners::display_number,
     main_window::MainWindow,
+    window_state::window_state,
 };
 // keep-sorted end
 
@@ -201,12 +208,17 @@ pub(crate) struct MoonframeApp {
     /// The open popovers and overlays each window's last frame drew, which
     /// take their `keys` before anything else in that window only.
     pub(crate) key_layers: HashMap<WindowId, Vec<KeyLayer>>,
+    /// The rows and columns with keys each window's last frame drew,
+    /// which take them while focus is inside.
+    pub(crate) focus_keys: HashMap<WindowId, Vec<crate::render::FocusKeys>>,
     /// Sends keys to the topmost overlay or popover, else a focused
     /// terminal, before key bindings see them.
     _keys: Subscription,
     /// The number of the last tab `moonframe pane new` opened, which names
     /// it: each one's is higher, even for two in the same millisecond.
     last_pane: i64,
+    /// The text the user last selected in a document, for `app:text`.
+    selected: Option<moonframe_core::Selected>,
 }
 
 struct Defaults {
@@ -350,6 +362,7 @@ impl MoonframeApp {
             close_guard: None,
             awake: Default::default(),
             key_layers: HashMap::new(),
+            focus_keys: HashMap::new(),
             history: joined.history,
             _watcher: watcher,
             _settings_watcher: settings_watcher,
@@ -358,6 +371,7 @@ impl MoonframeApp {
             _omarchy: omarchy,
             _keys: crate::keys::intercept(cx),
             last_pane: 0,
+            selected: None,
         };
         app.load_measure();
         live::ticking(cx);
@@ -681,7 +695,8 @@ impl MoonframeApp {
         }
         self.workspace
             .set_window(window_state(self.chrome.titlebar, window, cx));
-        cx.notify();
+        // What the views mounted for it may want providers, or have sent.
+        self.flush("window", cx);
     }
 
     /// Starts the providers the views now want, and passes on what the mods
@@ -871,6 +886,7 @@ impl MoonframeApp {
             Request::StatusItem(request) => self.status_item_request(from, request, cx),
             Request::Hotkey(request) => self.hotkey_request(from, request, cx),
             Request::Pdf(request) => self.pdf_request(from, request, cx),
+            Request::Text(request) => self.text_request(from, request, cx),
             Request::Open(url) => {
                 if self.alerts.may_open() {
                     cx.open_url(&url);
@@ -962,25 +978,5 @@ impl MoonframeApp {
                 });
             }
         });
-    }
-}
-
-/// The window as views see it. The title bar is hidden only where the
-/// system went along: a Linux compositor may keep its own decorations.
-pub(crate) fn window_state(titlebar: Titlebar, window: &Window, cx: &App) -> WindowState {
-    let platform = Platform::current();
-    let titlebar = match (titlebar, platform, window.window_decorations()) {
-        (Titlebar::Hidden, Platform::Linux, Decorations::Server) => Titlebar::System,
-        (titlebar, ..) => titlebar,
-    };
-    WindowState {
-        platform,
-        titlebar,
-        maximized: window.is_maximized(),
-        fullscreen: window.is_fullscreen(),
-        active: window.is_window_active(),
-        display: window
-            .display(cx)
-            .map(|display| display_number(display.id())),
     }
 }

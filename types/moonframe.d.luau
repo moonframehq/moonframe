@@ -287,8 +287,18 @@ export type StackProps = {
 	-- With `scroll`: sent with `width`, `height`, `content_width`,
 	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
 	measure: Data,
+	-- Sent (to `to`, else this mod) when a click begins and ends outside its
+	-- box and outside the popovers and overlays inside it; the click still
+	-- reaches what it landed on. A floating panel that minimizes on a click
+	-- elsewhere. The GPUI window only; Rune does not send it yet.
+	outside: Data,
 	-- While scrolled to its end, stay there as the content grows (a chat).
 	follow: boolean?,
+	-- With `scroll`: sent with `at_end = true|false` as it first lays out
+	-- and each time it reaches or leaves its end.
+	at_end: Data,
+	-- With `scroll`: scroll to the end each time this value changes.
+	scroll_end: Data,
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
 	-- the system's setting).
 	scrollbar: boolean?,
@@ -323,6 +333,9 @@ export type StackProps = {
 	-- itself as they come and go: with a `transition` rule it grows in when
 	-- it appears and shrinks away when it goes, as tabs open and close.
 	key: string?,
+	-- Keys it takes while focus is inside it (a click in it gives it focus)
+	-- and no text field has it, ahead of the mod's own `keys`.
+	keys: Keys?,
 	-- Opens the mod named this in a window of its own (or raises it) when
 	-- clicked: a tool that stays open beside the main window. Takes no `msg`;
 	-- to open it on a page, send `app:window` `{ open = "<mod>", send = ... }`.
@@ -423,6 +436,9 @@ export type PaneProps = {
 	style: Style?,
 	state: string?,
 	size: number?,
+	-- The size a double-click on its divider puts it back to; default: the
+	-- size it started with. The app's default when `size` is the user's kept one.
+	reset: number?,
 	min: number?,
 	max: number?,
 	fixed: boolean?,
@@ -447,6 +463,13 @@ export type SplitProps = {
 	id: string?,
 	-- false: no hairline between panes; a handle shows only when hovered.
 	divider: boolean?,
+	-- Sent once the user lets go of a divider (or moves one by key or a
+	-- double-click), with `sizes`: each pane's
+	-- whole pixels, in order, 0 for a hidden one. Keep them in state (it
+	-- outlives the app) and pass them back as the panes' `size`.
+	resize: Data,
+	-- The mod `resize` goes to; this one when unset.
+	to: string?,
 	[number]: Element | false | nil,
 }
 
@@ -573,6 +596,7 @@ export type IconName =
 	| "book-open"
 	| "bookmark"
 	| "bot"
+	| "brain"
 	| "brand-anthropic"
 	| "brand-github"
 	| "brand-gitlab"
@@ -942,6 +966,10 @@ export type MarkdownProps = {
 	state: string?,
 	text: string?,
 	link: Data,
+	-- A link's tooltip by its address, over the link's own title
+	-- (`[text](url "title")`, which shows when this names none and every
+	-- link to that address has the same title).
+	tooltips: { [string]: string }?,
 	-- The mod its messages go to; this one when unset.
 	to: string?,
 	grow: boolean?,
@@ -1089,6 +1117,11 @@ export type InputProps = {
 	focus: boolean?,
 	-- The monospace font.
 	mono: boolean?,
+	-- A password: drawn as bullets, never copied or cut; one line only.
+	secret: boolean?,
+	-- Sent with `files` (paths) and, for a picture, `image = { path, width,
+	-- height }` when files or a picture are pasted into it; text pastes.
+	paste: Data,
 	width: number?,
 	grow: boolean?,
 	-- Make it the address bar of this mod's `ui.browser` with this id (or
@@ -1110,6 +1143,10 @@ export type InputProps = {
 	-- A code editor's caret goes to this line (from 1), scrolled into view,
 	-- when it changes or the field takes a new `value`.
 	line: number?,
+	-- Where the caret goes when the field takes a new `value`, or when this
+	-- changes: "start", "end" (after a recalled line), or a byte offset, as
+	-- `change` and `select` count `caret`.
+	caret: ("start" | "end" | number)?,
 	-- With `multiline`: sent as the text scrolls (the wheel, the scrollbar,
 	-- the caret carrying it), with `fraction` added, from 0 (the top) to 1
 	-- (the last line at the bottom). Not sent for `scroll_at`.
@@ -1196,9 +1233,10 @@ export type OverlayProps = {
 	content: Element,
 }
 
--- Rows of one height, of which only those showing are built and drawn, so
--- a list of any length costs a screenful. `row(i)` builds row `i` (from 1)
--- and is called again as the list scrolls; keep it cheap and pure.
+-- Rows, of one height or each its own, of which only those showing are
+-- built and drawn, so a list of any length costs a screenful. `row(i)`
+-- builds row `i` (from 1) and is called again as the list scrolls; keep it
+-- cheap and pure.
 export type ListProps = {
 	class: Class?,
 	style: Style?,
@@ -1206,9 +1244,15 @@ export type ListProps = {
 	-- Names it among this mod's lists (default "list"); two need two ids.
 	id: string?,
 	count: number,
-	-- Each row's height in pixels.
-	row_height: number,
+	-- Every row's height in pixels, or a function giving row `i`'s own
+	-- (called for every row each time the view runs; up to 100,000 rows).
+	row_height: number | ((index: number) -> number),
 	row: (index: number) -> Child,
+	-- Sent with `first` and `last`, the rows (from 1) any part of which
+	-- shows, as they change while it scrolls and resizes.
+	range: Data,
+	-- The mod `range` goes to, if not the drawing one.
+	to: string?,
 	gap: Space?,
 	padding: Space?,
 	grow: boolean?,
@@ -1460,6 +1504,11 @@ export type WindowState = {
 	active: boolean,
 	-- The screen it is on: an `id` from `app.displays`.
 	display: number?,
+	-- Its content's size in whole points, updated as it is resized: switch
+	-- to a narrow layout under a breakpoint. Nil where the renderer does
+	-- not say (Rune).
+	width: number?,
+	height: number?,
 }
 
 -- A screen, in `app.displays`. `x`, `y`, `width` and `height` are its
@@ -2135,6 +2184,7 @@ export type App = {
 	-- generated: provider fields (just provider-types) start
 	agents: ProviderAgentsPublished?,
 	system: ProviderSystemPublished?,
+	t3: ProviderT3Published?,
 	-- generated: provider fields end
 	-- What any other provider publishes, as `app.<name>`.
 	[string]: any,
@@ -2276,6 +2326,19 @@ export type PdfMsg = {
 	reply: Data?,
 }
 
+-- What `{ to = "app:text", msg = ... }` asks: the text `mod` (or the mods
+-- of `region`) draws, rows across and columns down, with what it mounts
+-- and without fields, hidden panes or closed popovers; and the text the
+-- user last selected in a document, kept after a click into a field clears
+-- it. The mod hears `reply` back with `text` and `selection` (`{ text, mod }`,
+-- the mod that drew it) added, each cut to `max` characters (64,000).
+export type TextMsg = {
+	mod: string?,
+	region: string?,
+	max: number?,
+	reply: Data,
+}
+
 -- What `{ to = "app:edit", msg = ... }` does to the sending mod's input
 -- with `id = field`, around its selection, keeping undo and focus; the
 -- field then sends its `change`. `wrap` puts `{ before, after }` around the
@@ -2328,7 +2391,7 @@ export type DevtoolsMsg =
 -- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
 -- `"app:devtools"` (`msg` a `DevtoolsMsg`), `"app:share"` (`msg` a `ShareMsg`), `"app:status-item"` (`msg` a
--- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
+-- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`), `"app:text"` (`msg` a `TextMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
 export type Send = {
 	to: string,
 	msg: Data,
@@ -2372,12 +2435,51 @@ type ProviderSystemPublished = {
 	transmitted: number,
 }
 type ProviderSystemMessage = "clear"
+type ProviderT3Link = { label: string, title: string, url: string }
+type ProviderT3Thread = {
+	id: string,
+	title: string,
+	project: string,
+	projectId: string,
+	provider: string?,
+	status: string,
+	group: string,
+	updatedAt: string,
+	branch: string?,
+	worktree: string?,
+	pullRequests: { ProviderT3Link },
+	issues: { ProviderT3Link },
+}
+type ProviderT3Result = { status: string, error: string?, threadId: string? }
+type ProviderT3Project = { id: string, label: string }
+type ProviderT3Published = {
+	available: boolean,
+	environmentId: string?,
+	projects: { ProviderT3Project },
+	writer: string?,
+	ticket: string?,
+	results: { [string]: ProviderT3Result },
+	error: string?,
+	setup: ("install" | "start" | "pair")?,
+	threads: { ProviderT3Thread },
+	total: number,
+}
+type ProviderT3Write = {
+	action: "start" | "send",
+	target: string,
+	text: string,
+	environmentId: string,
+	ticket: string,
+	id: string,
+}
+type ProviderT3Message = "refresh" | "connect" | ProviderT3Write
 
 -- A message for `update` to return: `send "provider:desk" { watch = id }`
 -- is `{ to = "provider:desk", msg = { watch = id } }`, its `msg` typed
 -- by the provider's `Message` where it declares one.
 declare send:
 	((to: "provider:system") -> (msg: ProviderSystemMessage) -> Send)
+	& ((to: "provider:t3") -> (msg: ProviderT3Message) -> Send)
 	& ((to: string) -> (msg: Data) -> Send)
 -- generated: provider types end
 
@@ -2495,6 +2597,10 @@ export type Mod<State> = {
 	-- `{ ["secondary-1"] = "histogram" }`; every mounted copy hears them
 	-- too. Keys that type text need ctrl, alt, cmd or secondary.
 	keys: Keys?,
+	-- Sent with `files` (paths) and, for a picture, `image = { path, width,
+	-- height }` when files or a picture are pasted while no text field or
+	-- terminal has focus. A paste of text is not.
+	paste: Data,
 	-- Offered as a kind of tab: each tab mounts an instance of it.
 	tab: TabEntry?,
 	region: string?,
@@ -2786,6 +2892,7 @@ type UseChatMarkdownProps = {
 	read cursor: boolean?,
 	read link: any,
 	read to: string?,
+	read tooltips: { [string]: string }?,
 }
 type UseChatMessageProps = {
 	read from: string?,
@@ -3627,6 +3734,7 @@ type UseMarkdownEditorProps = {
 type UseMarkdownProps = {
 	read text: string?,
 	read link: any,
+	read tooltips: { [string]: string }?,
 	read to: string?,
 	read grow: boolean?,
 	read scroll: boolean?,
@@ -4490,6 +4598,28 @@ type UseSystemLoadProps = {
 	read compact: boolean?,
 	read icons: boolean?,
 }
+type UseT3ComposerProps = {
+	read data: index<App, "t3"> & {},
+	read action: "start" | "send",
+	read id: string,
+	read environmentId: string,
+	read target: string?,
+	read title: string?,
+	read text: string,
+	read picker: boolean?,
+}
+type UseT3SessionsProps = {
+	read threads: index<index<App, "t3"> & {}, "threads">,
+	read folded: { [string]: boolean }?,
+	read selected: string?,
+	read to: string?,
+}
+type UseT3ThreadProps = {
+	read thread: index<index<index<App, "t3"> & {}, "threads">, number>,
+	read expanded: boolean?,
+	read msg: any,
+	read to: string?,
+}
 type UseTabViewTab = any
 type UseTabViewProps = {
 	read tab: UseTabViewTab?,
@@ -4970,6 +5100,9 @@ type UseProps = {
 	["swatches"]: UseSwatchesProps,
 	["switch"]: UseSwitchProps,
 	["system-load"]: UseSystemLoadProps,
+	["t3-composer"]: UseT3ComposerProps,
+	["t3-sessions"]: UseT3SessionsProps,
+	["t3-thread"]: UseT3ThreadProps,
 	["tab-view"]: UseTabViewProps,
 	["tabbed"]: UseTabbedProps,
 	["table"]: UseTableProps,

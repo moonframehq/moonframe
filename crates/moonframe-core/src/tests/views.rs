@@ -177,8 +177,8 @@ return mod {
     };
     let first = list(&workspace);
     assert_eq!(
-        (first.count, first.row_height, first.start),
-        (100_000, 20.0, 0)
+        (first.count, &first.row_height, first.start),
+        (100_000, &crate::RowHeights::Same(20.0), 0)
     );
     assert_eq!(first.rows.len(), crate::ListWindow::FIRST.len);
     assert_eq!(text_of(&first.rows[0]), "row 1");
@@ -200,6 +200,62 @@ return mod {
 }
 
 #[test]
+fn a_list_keeps_its_range_and_sends_it_where_to_says() {
+    let range = |list: &str| {
+        let source = format!("return mod {{ view = function() return {list} end }}");
+        let Node::List(list) = view_of(&source).unwrap() else {
+            panic!("expected a list");
+        };
+        list.range
+    };
+    let row = "row_height = 20, row = function() return 'x' end";
+    assert_eq!(range(&format!("ui.list {{ count = 3, {row} }}")), None);
+    let Some(Action::Send { to: None, msg }) =
+        range(&format!("ui.list {{ count = 3, range = 'rows', {row} }}"))
+    else {
+        panic!("range kept");
+    };
+    assert_eq!(msg, Data::String("rows".into()));
+    assert!(matches!(
+        range(&format!("ui.list {{ count = 3, range = {{ people = true }}, to = 'feed', {row} }}")),
+        Some(Action::Send { to: Some(to), .. }) if to == "feed"
+    ));
+}
+
+#[test]
+fn a_list_row_can_have_its_own_height() {
+    let source = r#"
+local chats = { "one", "two\nsecond line", "three" }
+return mod {
+  view = function()
+    return ui.column {
+      ui.list { count = #chats, row = function(i) return ui.text(chats[i]) end,
+        row_height = function(i) return if chats[i]:find("\n") then 60 else 44 end },
+    }
+  end,
+}"#;
+    let dir = app(&[("chats", source)]);
+    let workspace = Workspace::open(dir.path(), false);
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    let Some(Node::Stack(column)) = workspace.slot("chats").unwrap().view() else {
+        panic!("no column");
+    };
+    let Node::List(list) = &column.children[0] else {
+        panic!("no list");
+    };
+    let heights = &list.row_height;
+    assert_eq!(
+        (heights.height(0), heights.height(1), heights.top(2)),
+        (44.0, 60.0, 104.0)
+    );
+    assert_eq!(heights.total(list.count), 148.0);
+}
+
+#[test]
 fn lists_are_checked() {
     for (list, expected) in [
         (
@@ -215,6 +271,18 @@ fn lists_are_checked() {
             "row_height: missing",
         ),
         ("ui.list { count = 3, row_height = 20 }", "row: missing"),
+        (
+            "ui.list { count = 3, row_height = 20, to = 'feed', row = function() return 'x' end }",
+            "`to` goes with a `range`",
+        ),
+        (
+            "ui.list { count = 3, row_height = function(i) return 0 end, row = function() return 'x' end }",
+            "row_height[1]",
+        ),
+        (
+            "ui.list { count = 200000, row_height = function(i) return 20 end, row = function() return 'x' end }",
+            "a function only for up to",
+        ),
         (
             "ui.list { count = 3, row_height = 20, row = function(i) error('no row ' .. i) end }",
             "no row 1",

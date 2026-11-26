@@ -26,7 +26,13 @@
 //! lifts the floats drawn after one (see `crate::render::layered`). Where that
 //! cannot hold, the view is drawn in place, inside the app, as before: in a
 //! popover or an overlay, in a keyed child moving in or out (which fades or
-//! covers it), and in windows other than the main one.
+//! covers it), and in windows other than the main one. While one is drawn
+//! in place, the app is not replayed: a model it reads could change unseen.
+//!
+//! A view in a row or column with `keys` is drawn in a box tracking a focus
+//! of its own, which the stack counts as inside it: focus in one of the
+//! view's controls is then focus inside the stack, as if drawn in place. One
+//! in something faded (`opacity`) is drawn in a box as faded.
 
 use {
     gpui_kit::*,
@@ -45,6 +51,8 @@ pub(crate) struct Layers {
     placements: Rc<RefCell<Option<Rc<[Placement]>>>>,
     /// The window's view draws the app as a cached view this frame.
     replayed: Cell<bool>,
+    /// The app's last frame drew a host view in place, inside it.
+    inline: Cell<bool>,
     /// How many frames drew the app, for tests to see one replayed.
     #[cfg(test)]
     frames: Cell<usize>,
@@ -55,12 +63,23 @@ pub(crate) struct Layers {
 struct Slot {
     view: AnyView,
     spot: Rc<RefCell<Option<Spot>>>,
+    around: Around,
 }
 
 struct Placement {
     id: ElementId,
     view: AnyView,
     spot: Spot,
+    around: Around,
+}
+
+/// What a host view's box in its layer keeps of the app around its place.
+#[derive(Clone, Default)]
+pub(crate) struct Around {
+    /// The focus it tracks, in a row or column with `keys`.
+    pub(crate) focus: Option<FocusHandle>,
+    /// How opaque what it is drawn in is, when faded.
+    pub(crate) opacity: Option<f32>,
 }
 
 /// Where a placeholder landed, and what it would have drawn its view with.
@@ -78,6 +97,7 @@ impl Layers {
     pub(crate) fn begin(&self) {
         self.slots.borrow_mut().clear();
         self.placements.borrow_mut().take();
+        self.inline.set(false);
         #[cfg(test)]
         self.frames.set(self.frames.get() + 1);
     }
@@ -85,6 +105,18 @@ impl Layers {
     /// Whether the app's last frame showed a host view.
     pub(crate) fn any(&self) -> bool {
         !self.slots.borrow().is_empty()
+    }
+
+    /// Notes that the app drew a host view in place, inside itself.
+    pub(crate) fn drawn_inline(&self) {
+        self.inline.set(true);
+    }
+
+    /// Whether the app may be replayed while host views draw again: not
+    /// while one is drawn inside it, as models it reads may change without
+    /// telling the app's cached view.
+    pub(crate) fn replayable(&self) -> bool {
+        self.any() && !self.inline.get()
     }
 
     /// Notes whether the window's view draws the app as a cached view.
@@ -105,14 +137,26 @@ impl Layers {
         self.frames.get()
     }
 
+    /// How faded each host view the app's last frame showed is drawn.
+    #[cfg(all(test, unix, feature = "markdown"))]
+    pub(crate) fn opacities(&self) -> Vec<Option<f32>> {
+        self.slots
+            .borrow()
+            .iter()
+            .map(|slot| slot.around.opacity)
+            .collect()
+    }
+
     /// What the app draws where `view` goes: it takes the room the view
-    /// fills, and the view is drawn over it.
-    pub(crate) fn place(&self, view: AnyView) -> AnyElement {
+    /// fills, and the view is drawn over it, in a box keeping what is
+    /// `around` it.
+    pub(crate) fn place(&self, view: AnyView, around: Around) -> AnyElement {
         self.placements.borrow_mut().take();
         let spot = Rc::new(RefCell::new(None));
         self.slots.borrow_mut().push(Slot {
             view,
             spot: spot.clone(),
+            around,
         });
         Placeholder {
             spot,
@@ -143,6 +187,7 @@ impl Layers {
                             id,
                             view: slot.view.clone(),
                             spot,
+                            around: slot.around.clone(),
                         })
                     })
                     .collect()
@@ -294,7 +339,29 @@ impl Element for HostLayers {
         let placements = self.layers.placements();
         let mut elements = Vec::with_capacity(placements.len());
         for placement in placements.iter() {
-            let mut element = placement.view.clone().into_any_element();
+            let view = placement.view.clone().into_any_element();
+            let mut element = match &placement.around {
+                Around {
+                    focus: None,
+                    opacity: None,
+                } => view,
+                Around { focus, opacity } => {
+                    let around = div()
+                        .flex()
+                        .flex_col()
+                        .w(placement.spot.bounds.size.width)
+                        .h(placement.spot.bounds.size.height);
+                    let around = match focus {
+                        Some(focus) => around.track_focus(focus),
+                        None => around,
+                    };
+                    let around = match opacity {
+                        Some(opacity) => around.opacity(*opacity),
+                        None => around,
+                    };
+                    around.child(view).into_any_element()
+                },
+            };
             within(&placement.spot, window, |window| {
                 window.with_id(placement.id.clone(), |window| {
                     let room = placement.spot.bounds.size.map(AvailableSpace::Definite);

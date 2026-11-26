@@ -10,6 +10,7 @@ type Props = {
 	cursor: boolean?,
 	link: any,
 	to: string?,
+	tooltips: { [string]: string }?,
 }
 
 -- The marks a paragraph leaves open, closed in order, innermost first.
@@ -132,6 +133,7 @@ return component {
 		["cursor"] = "the text is still being written: new words fade in, open marks style what follows them, and a dot follows the last word",
 		["link"] = "message a link click sends, with `url` added, as `markdown` sends it",
 		["to"] = "mod to send `link` to, if not the drawing one",
+		["tooltips"] = "what a link to each address shows on hover, `{ [url] = text }`, over the link's own title (`[text](url \"title\")`): where a wrapped address leads",
 	},
 	styles = {
 		[".chat-markdown"] = { padding = 0 },
@@ -146,6 +148,7 @@ return component {
 			stream = props.cursor,
 			link = props.link,
 			to = if props.link then props.to else nil,
+			tooltips = props.tooltips,
 		}
 	end,
 }

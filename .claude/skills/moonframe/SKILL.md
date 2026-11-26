@@ -124,7 +124,9 @@ in the Components window, then `use` it from the mod.
 **Markdown.** To show it: `local markdown = use "markdown"`, then
 `markdown { text = state.notes, grow = true, scroll = true, link =
 "open-link" }` (or `ui.markdown`); a link click sends `{ msg = "open-link",
-url = ... }` and opens nothing by itself, and pictures are not loaded. To
+url = ... }` and opens nothing by itself, and pictures load only with
+`images` (a chat's custom emoji: `![:party:](<cached file> "emoji")`
+draws inline from the image cache without it). To
 edit a project file: `local markdown_editor = use "markdown-editor"`, then
 `markdown_editor { id = "readme", path = "README.md" }` in a growing
 container; it reads and saves through the `docs` provider (see "Built-in
@@ -593,6 +595,12 @@ ui.input {
   from the last `value` the mod passed, so a mod echoing the text back
   changes nothing, and `value = ""` after a submit clears it. Without
   `value`, the user's text stands.
+- **`caret`** puts the caret when the field takes a new `value` or
+  `caret` changes: `"start"`, `"end"`, or a byte offset (as `change` counts
+  `caret`). A prompt history recalling a line on `up` keeps `caret = "end"`
+  so the caret lands after the line, ready to edit; without it a new value
+  may leave the caret at the start. A value the field already shows (the
+  mod echoing what was typed) leaves the caret where the user put it.
 - **Messages carry the text.** A table `msg` arrives as a copy with
   `value = <text>` added: `change = { query = true }` sends
   `{ query = true, value = "ab" }`. Anything else arrives as
@@ -624,6 +632,19 @@ ui.input {
 - **Size.** `width` in pixels, or `grow = true` to take the free space
   along the parent's axis (in a row, the width). In a column it fills the
   width anyway. `mono = true` uses the monospace font.
+- **`secret = true`** makes a password field: the text draws as bullets
+  and copy and cut take nothing, while `change` and `submit` still carry
+  it to the mod. One line only. Keep the password out of saved state:
+  hand it to a provider at `submit` and clear it (`value = ""`).
+- **Pasting files and pictures.** `paste = msg` hears ⌘V (Ctrl-V
+  elsewhere) of copied files or a picture (a screenshot): `msg` comes with
+  `files`, their paths, and for a picture, saved to the image cache first,
+  `image = { path, width, height }`. A paste of text types as usual. A mod
+  with `paste = msg` in `mod { }` hears the same while no text field or
+  terminal has focus (a page's "paste a screenshot"); every such mod hears
+  it, so act only when its page shows. What is pasted, the mod may show in
+  `ui.image` and share, as a dropped file. To write a link to it at the
+  caret, send `app:edit { field, insert = ... }`.
 - **Look.** Style the `input` rule and its states, `:hover`, `:focus` and
   `:disabled`, and `input-placeholder`, `input-selection` and
   `input-caret` (see "Stylesheet"). Without a rule it has a 1px border and
@@ -1071,6 +1092,18 @@ return state, { { to = "app:window", msg = { open = "settings", send = { page = 
   Other schemes (`file`, an app's own) are the sender's error. At most 3
   pages open in 10 s. A control does it on a click: `ui.row { to =
   "app:open", msg = pr.url, ... }`.
+- `app:text`, `msg` `{ mod? | region?, max?, reply }`: answers with `reply`
+  plus `text`, what that mod (or region's mods) draws as plain text (rows
+  across, columns down, with what it mounts; fields, hidden panes, closed
+  popovers and overlays, and list rows not built are left out), and
+  `selection = { text, mod }`, the text the user last selected in a
+  `ui.markdown` and the mod that drew it. The selection is noted as the
+  user lets go of the pointer, so it is still there after they click into
+  the field they ask in. Each is cut to `max` characters (64,000). An
+  assistant sends both with a question:
+  `{ to = "app:text", msg = { region = "main", reply = { ask = question } } }`,
+  then in `update`, `msg.ask` comes back with `msg.text` and
+  `msg.selection`. Rune answers `text` only.
 - `app:pdf`, `msg` `{ html | html_file | url, pdf, paper?, reply? }`: a page
   made into a PDF file, as a reader saves an article (macOS, with the
   `browser` feature). The page is `html` (text, up to 1 MiB), `html_file`
@@ -1152,6 +1185,16 @@ return mod {
 	update = function(state, msg) ... end,
 	view = function(state) ... end,
 }
+```
+
+A row or column takes `keys` of its own, named the same way, only while
+focus is inside it: a click anywhere in it gives it focus (a control in it
+keeps it there), and while no text field has focus its keys come before the
+mod's. A deck whose ← dismisses and → keeps once the reader is in it, while
+the page's arrows stay the page's elsewhere:
+
+```lua
+ui.column { class = "deck", keys = { left = "dismiss", right = "keep" }, ... }
 ```
 
 ## Tabs
@@ -1388,11 +1431,11 @@ Text-like elements take their main value positionally:
 
 | Element | Keys (besides children) | Notes |
 | --- | --- | --- |
-| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window, and a `window = { size, min_size }` to size it; `window` takes no `msg`, so to open it on a page send `app:window` instead) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
+| `ui.row { ... }`, `ui.column { ... }` | frame keys, `align`, `justify`, `wrap`, `drag`, `selected`, `key`, `outside` (a message sent when a click begins and ends outside it and the popovers inside it; the click still goes through: a floating panel that minimizes on a click elsewhere. GPUI window only; Rune does not send it yet), extras, and `msg`/`to`, `command` or `window` (a mod to open in a window of its own, as the title bar's layout button opens `mods/looks`; give the mod no `region` and a `title`, which titles the window, and a `window = { size, min_size }` to size it; `window` takes no `msg`, so to open it on a page send `app:window` instead) | flex containers; with `msg` or `command` the whole stack is clickable (style it with `.class:hover`). `drag = true` makes it a title bar: dragging it moves the window, a double click zooms it, and buttons and clickable stacks inside still take their clicks (see "Window and title bar"). Defaults: `gap = "normal"`, `padding = "none"` |
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
-| `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover |
-| `ui.pane { ... }` | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
-| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, frame keys, `class`, `style` | rows of one height of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
+| `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider`, `resize`, `to` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover. A clicked divider takes the keyboard: the arrows along the split move it 16 px (64 with Shift), Home and End take the pane before it to its `min` and `max`, and a double-click puts back the `reset` size of a pane beside it (the one before, else after), else a starting `size` the same way. The user's sizes last the session; `resize` keeps them across launches (see "Pane sizes that outlive the app") |
+| `ui.pane { ... }` | `size`, `reset`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `reset` is the size a double-click on its divider puts it back to, apart from `size` (default: the size it started with). `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
+| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, `range`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
 | `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
@@ -1401,8 +1444,8 @@ Text-like elements take their main value positionally:
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
-| `ui.markdown "# Notes"` | `text`, `link`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures are not loaded |
-| `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
+| `ui.markdown "# Notes"` | `text`, `link`, `tooltips`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures load only with `images` (from files a `ui.image` could show), except a picture titled `emoji` (`![:party:](~/.cache/moonframe/images/emoji/party.png "emoji")`), drawn inline at the line's height from the image cache alone, its alt text standing in until it loads. A link shows its title (`[text](url "title")`) on hover while every link to that address has the same one, or what `tooltips = { [url] = text }` gives for its address: where a wrapped (scanned) address really leads |
+| `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `secret`, `paste`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
 | `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
 | `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras, `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
 | `ui.line { points = { 3, 5, 2, 8 } }` | `points`, `min`, `max`, `baseline`, `area`, `dots` (`last` `all`), `stroke`, `dashed`, `width`, `height`, `class`, `style` | a line through values evenly spaced across its box (fills its parent without `width`/`height`): trends, curves in tables, forecasts. Style `color` strokes it, `background` fills the area to `baseline` (with `area = true`), `border_color` draws the baseline dashed. Use it for any line or curve, a dashed rule (two equal points with `dashed = true`) included |
@@ -1427,6 +1470,11 @@ Text-like elements take their main value positionally:
 - `follow = true`, with `scroll`, keeps it at its end while it is there:
   as the content grows (a chat streaming in, a log), it scrolls along;
   scrolled back, it stays where the user put it.
+- `at_end = msg`, with `scroll`, sends `msg` with `at_end = true|false`
+  added as it first lays out and each time it reaches or leaves its end;
+  `scroll_end = value` scrolls to its end each time the value changes. A
+  chat's "latest message" button shows while `at_end` is false and sets
+  `state.jump = { seq = state.seq + 1 }` for `scroll_end = state.jump`.
 - `shrink = false` keeps the content's size when the parent is short of
   space (strips, toolbars), instead of being squeezed.
 - `self_align = "start"` (or `center`, `end`, `stretch`) places it across
@@ -1822,6 +1870,12 @@ return mod {
   window menu.
 - `app.window` updates as the window is maximized, goes fullscreen, or
   gains and loses focus: dim the title bar on `not app.window.active`.
+- `app.window.width` and `app.window.height` are the window's content size
+  in whole points, updated as it is resized (a mod's own window reports
+  its own). A layout that changes under a breakpoint reads them:
+  `local narrow = (app.window.width or 1024) < 768`, then shows a list as a
+  drawer behind a button instead of a pane. Every resize runs the views
+  that read `app.window`, so keep them cheap.
 - `app/main.luau` ships without the system title bar: its top row is the
   title bar, with the main tab strip in it. Reserve room for the traffic
   lights only when `app.window.titlebar == "hidden"` (until the restart that
@@ -1866,7 +1920,8 @@ return mod {
   `shift-u`), as a mail client's keys are: it works only while no text
   field or terminal has focus, so typing is never taken, and the menu does
   not show it (name it in the label or a hint). `examples/tidings` uses J
-  and K this way. Overlay and field `keys` still refuse such keys.
+  and K this way. An overlay's or popover's `keys` take them the same way;
+  a mod's `keys` refuse them.
 - About opens macOS's own About panel (the app's icon and name, `version`,
   `description` and `website` as credits, `copyright`), and a toast
   elsewhere.
@@ -1946,8 +2001,34 @@ return ui.panel { grow = true, title = "Files",
 }
 ```
 
-Rows must all be `row_height` tall (they are centered in it). The explorer
-(`app/mods/explorer`) flattens its open folders this way.
+Each row is centered in its `row_height`. The explorer (`app/mods/explorer`)
+flattens its open folders this way. When some rows need more room (a chat
+with a second line), give `row_height` as a function of the row instead of
+a number; it is asked for every row each time the view runs, so keep it a
+lookup (up to 100,000 rows):
+
+```lua
+row_height = function(i)
+	return if chats[i].status then 60 else 44
+end,
+```
+
+When the rows come from a provider that can't publish them all (a
+publish holds at most 10,000 values), give the list `range = msg`: it is
+sent, with `first` and `last` (the rows any part of which shows, from 1)
+added, as they change, at most every 100 ms and always the last. Keep
+`count` the whole total, ask the provider for a window of rows around
+`first`..`last`, and draw a placeholder in `row` for one not yet there:
+
+```lua
+-- in update
+if type(msg) == "table" and msg.msg == "rows" then
+	return state, { send "provider:people" { window = { from = msg.first - 50, to = msg.last + 50 } } }
+end
+-- in view
+ui.list { id = "people", count = app.people.total, row_height = 40, range = "rows",
+	row = function(i) local person = app.people.rows[i] ... end }
+```
 
 **Views run only when needed.** The host keeps each view's last tree and
 runs `view` again only when the mod's state or props may have changed (a
@@ -1981,6 +2062,27 @@ ui.hsplit {
 	ui.pane { ui.region "main" },
 	ui.pane { size = 280, fixed = true, visible = state.right, surface = "sidebar", ui.region "right" },
 }
+```
+
+**Pane sizes that outlive the app.** A split keeps the user's sizes for
+the session. To keep them across launches, give it `resize`: once the user
+lets go of a divider (or moves one by key or a double-click) it sends
+`sizes`, each pane's whole pixels in order (0
+for a hidden one). Keep them in state, which is saved, and pass them back
+as `size`; a new launch opens the panes there. Give the app's own default
+as `reset`, so a double-click on the divider still goes back to it rather
+than to the kept size:
+
+```lua
+update = function(state, msg)
+	if msg.msg == "sized" then state.list_width = msg.sizes[1] end
+end,
+view = function(state)
+	return ui.hsplit { id = "chat", resize = "sized",
+		ui.pane { size = state.list_width or 280, reset = 280, min = 200, ui.region "list" },
+		ui.pane { ui.region "conversation" },
+	}
+end,
 ```
 
 **Bottom panel.** Put a `ui.vsplit` inside the center pane, with a second
@@ -2099,7 +2201,14 @@ terminal log. There are four kinds:
   - It runs sandboxed: no files, network or environment, a 64 MB memory cap,
     and an instruction budget per call.
   - It reaches the machine only through declared `capabilities`: built-in
-    `"system"` (`host::system_load()`) and namespaced APIs the embedding host
+    `"system"` (`host::system_load()`), `"moonframe.page"` (`render` a public
+    web page with its scripts: `{ url, screenshot? }` answers `url`, `title`,
+    `text`, `timed_out` and a base64 PNG `screenshot`; macOS, `browser`
+    feature; see docs/wasm-providers.md), `"moonframe.view"` (`tree { mod }`
+    reads a mod's view as roles, names and refs; `act { mod, ref, action,
+    value }` clicks, fills, presses a key or selects an option through the
+    element's own messages; a miniapp's provider reaches only its own
+    namespace's mods) and namespaced APIs the embedding host
     registers with `Moonframe::capability` (or `capability_async`, on `.tokio`).
     Both WIT worlds import `host-call(capability, method, args)`; use the serde
     helper `moonframe_provider::host_call` from `crates/moonframe-provider`.
@@ -2122,12 +2231,12 @@ terminal log. There are four kinds:
     `.entry(namespace, id, path)` at launch, or clone `.entry_handle()` before
     `.run()` and call `add_root` / `remove_root`, `add_entry` / `remove_entry`
     from host threads. An entry contains `main.luau` and/or
-    `provider/provider.toml`. Mount `ui.mount "mshub:notes"`, read
-    `app["mshub:notes"]`, send `provider:mshub:notes`, subscribe to
-    `provider/mshub:notes`. Namespace and id use 1–48 of `a-z 0-9 - _`;
+    `provider/provider.toml`. Mount `ui.mount "acme:notes"`, read
+    `app["acme:notes"]`, send `provider:acme:notes`, subscribe to
+    `provider/acme:notes`. Namespace and id use 1–48 of `a-z 0-9 - _`;
     routing namespaces `app provider topic demo component shell parent` are
     reserved. State keys include the namespace, also for mounted instances.
-    `kind = "native"` binds only to a compiled `.native("mshub:notes", ...)`.
+    `kind = "native"` binds only to a compiled `.native("acme:notes", ...)`.
   - `RootPolicy::default()` is `PrebuiltOnly` (requires `provider.wasm`, refuses
     `Cargo.toml`) with process/socket disabled. Use `BuildPolicy::Cargo` for
     reviewed source; hooks remain refused. Entries reload live, including in
@@ -2627,10 +2736,14 @@ has an `escape`. Other keys go on as usual.
   `left`, `right`, `home`, `end`, `pageup`, `pagedown`. Names are lowercase:
   write `shift-a`, not `A`. A wrong name, or two names for the same key, is
   an error `just check` reports.
-- Keys never take what is typed: a letter, digit, symbol or `space` needs
-  `ctrl`, `alt`, `cmd` or `secondary` (`secondary-k`, `alt-?`), so an
-  overlay cannot read keystrokes meant for a terminal behind it. For typing,
-  use `ui.input` and its own `keys`.
+- Keys never take what is typed: a key that types text (a letter, digit,
+  symbol or `space`, alone or with `shift`: `t`, `/`, `shift-j`) is taken
+  only while no text field or terminal has focus, so an overlay cannot read
+  keystrokes meant for a field in it or a terminal behind it. A sheet that
+  opened on T can close on `t`; while its search field has focus, T types.
+  With `ctrl`, `alt`, `cmd` or `secondary` (`secondary-k`, `alt-?`) a key
+  is taken whatever has focus. For typing, use `ui.input` and its own
+  `keys`.
 - Modifiers must match exactly: `down` does not fire for `shift-down`.
 - While the Inspector is picking or showing its card, Escape is its own;
   while it is picking, so are ↑, ↓ and Enter (they choose the element).

@@ -316,6 +316,18 @@ fn input_view(view: &str) -> Result<Node, String> {
 }
 
 #[test]
+fn a_secret_input_is_one_line() {
+    let Ok(Node::Input(field)) = input_view("ui.input { id = 'password', secret = true }") else {
+        panic!("no input");
+    };
+    assert!(field.secret && !field.multiline);
+    let Ok(Node::Input(field)) = input_view("ui.input { id = 'email' }") else {
+        panic!("no input");
+    };
+    assert!(!field.secret);
+}
+
+#[test]
 fn inputs_read_their_text_messages_and_keys() {
     use crate::{Input, KeyChord};
     let Ok(Node::Input(input)) = input_view(
@@ -551,6 +563,10 @@ fn bad_inputs_are_refused() {
         ("ui.input { id = 'a b' }", "an id is 1 to 64"),
         ("ui.input { browser = 'a/b' }", "an id is 1 to 64"),
         ("ui.input { to = 'x' }", "`to` goes with `change`"),
+        (
+            "ui.input { secret = true, multiline = true }",
+            "a secret is one line",
+        ),
         ("ui.input { keys = 'up' }", "expected a table"),
         ("ui.input { keys = { 'up' } }", "keys are key names"),
         (

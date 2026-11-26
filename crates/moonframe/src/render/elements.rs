@@ -8,16 +8,16 @@ use {
     crate::color::ThemeColor,
     gpui_kit::{
         component::{
-            ActiveTheme, Disableable as _, Icon as GpuiIcon, Sizable as _, Theme,
+            ActiveTheme, Disableable as _, Icon as GpuiIcon, ResizableState, Sizable as _, Theme,
             button::{Button as GpuiButton, ButtonCustomVariant, ButtonVariants as _},
             h_flex, h_resizable, resizable_panel, v_resizable,
         },
         *,
     },
     moonframe_core::{
-        Align, Badge, Button, Case, Color, Direction, Extras, Fit, Icon, Image, Item, Justify,
-        Look, Paint, Panel, Part, Region, Resolved, Sides, Space, Split, Stack, States, Text,
-        Token, Tone, TransitionKind, Variant,
+        Action, Align, Badge, Button, Case, Color, Direction, Extras, Fit, Icon, Image, Item,
+        Justify, Look, Paint, Panel, Part, Region, Resolved, Sides, Space, Split, Stack, States,
+        Text, Token, Tone, TransitionKind, Variant,
     },
     std::path::Path,
 };
@@ -31,13 +31,26 @@ impl<'w> Draw<'w> for Stack {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
         let in_drag = painter.in_drag;
         painter.in_drag |= self.drag;
-        let children = painter.keyed_children(&self.children, place, self.direction, cx);
-        painter.in_drag = in_drag;
+        let inside = self.outside.as_ref().map(|_| {
+            let inside = super::outside::Inside::default();
+            painter.outside.push(inside.clone());
+            inside
+        });
         let part = match self.direction {
             Direction::Row => Part::Row,
             Direction::Column => Part::Column,
         };
         let look = painter.look(part, &self.look, self.selected, place);
+        let (children, views) = painter.faded(look.base.opacity, |painter| {
+            painter.focusing(!self.keys.is_empty(), |painter| {
+                painter.keyed_children(&self.children, place, self.direction, cx)
+            })
+        });
+        if inside.is_some() {
+            painter.outside.pop();
+        }
+        painter.in_drag = in_drag;
+        let focus = painter.focus_keys(&self.keys, views, place, cx);
         let theme = cx.theme();
         let element = div()
             .id(place.id())
@@ -70,6 +83,20 @@ impl<'w> Draw<'w> for Stack {
         };
         let handle = painter.motion.scroll_to(&place.path, self.scroll_to);
         let drawn = children.len();
+        if self.ends.is_none() {
+            super::ends::not_asked(painter, place);
+        }
+        let ends = self.ends.as_deref().and_then(|ends| {
+            super::ends::ends(
+                ends,
+                self.direction,
+                &self.frame,
+                &handle,
+                painter,
+                place,
+                cx,
+            )
+        });
         let element = element.children(children).scrollbars(
             &self.frame,
             self.direction,
@@ -88,6 +115,7 @@ impl<'w> Draw<'w> for Stack {
                 cx,
             )
         }));
+        let element = element.children(ends);
         // Hugging only says something across a column.
         let element = if self.frame.hug
             && self.frame.self_align.is_none()
@@ -102,9 +130,19 @@ impl<'w> Draw<'w> for Stack {
         } else {
             element
         };
+        let element = match &focus {
+            Some(focus) => element.track_focus(focus),
+            None => element,
+        };
         let element = match &self.pointer {
             Some(pointer) => super::pointer::attach(element, pointer, place, cx),
             None => element,
+        };
+        let element = match (&self.outside, inside) {
+            (Some(action), Some(inside)) => {
+                super::outside::attach(element, action, inside, place.owner, &place.path, cx)
+            },
+            _ => element,
         };
         let element = match &self.action {
             Some(action) => covering(element, in_drag)
@@ -276,9 +314,13 @@ fn covering<E: InteractiveElement>(element: E, in_drag: bool) -> E {
 
 impl<'w> Draw<'w> for Panel {
     fn draw(&'w self, painter: &mut Painter<'w, '_>, place: &Place<'w>, cx: Cx) -> AnyElement {
-        let actions = painter.children(&self.actions, &place.part("actions"), Direction::Row, cx);
-        let children = painter.children(&self.children, place, Direction::Column, cx);
         let look = painter.look(Part::Panel, &self.look, false, place);
+        let (actions, children) = painter.faded(look.base.opacity, |painter| {
+            let actions =
+                painter.children(&self.actions, &place.part("actions"), Direction::Row, cx);
+            let children = painter.children(&self.children, place, Direction::Column, cx);
+            (actions, children)
+        });
         let header_look = painter.look(Part::PanelHeader, &Look::default(), false, place);
         let theme = cx.theme();
         let header = (self.title.is_some() || !actions.is_empty()).then(|| {
@@ -409,17 +451,41 @@ impl<'w> Draw<'w> for Split {
                 .clone()
                 .unwrap_or_else(|| format!("{}:{}", place.owner, place.path)),
         );
-        let mut group = match self.direction {
-            Direction::Row => h_resizable(key),
-            Direction::Column => v_resizable(key),
+        let group = match self.direction {
+            Direction::Row => h_resizable(key.clone()),
+            Direction::Column => v_resizable(key.clone()),
         };
-        if !self.divider {
-            group = group.with_handle_appearance(bare_handle());
-        }
+        let look = if self.divider {
+            component::resize_handle_appearance()
+        } else {
+            bare_handle()
+        };
+        let drawn = super::divider::Drawn {
+            key,
+            window: painter.window,
+            layer: painter.layer,
+            vertical: self.direction == Direction::Column,
+            sizes: self.panes.iter().map(|pane| pane.size).collect(),
+            resets: self.panes.iter().map(|pane| pane.reset).collect(),
+            resized: self
+                .resize
+                .as_ref()
+                .map(|action| std::rc::Rc::new(resized(action, place.owner, cx)) as _),
+        };
+        // A preview's split is looked at, not used: its dividers keep
+        // nothing past the frame.
+        let (group, measure) = if painter.preview {
+            (group.with_handle_appearance(look), None)
+        } else {
+            let (group, measure) = super::divider::wire(group, drawn, look);
+            (group, Some(measure))
+        };
         let group = panes
             .into_iter()
             .fold(group, |group, (pane, place, look, shown)| {
-                let children = painter.children(&pane.children, &place, Direction::Column, cx);
+                let children = painter.faded(look.base.opacity, |painter| {
+                    painter.children(&pane.children, &place, Direction::Column, cx)
+                });
                 let transition = look.base.transition;
                 let theme = cx.theme();
                 let mut panel = resizable_panel().visible(!shown.hidden());
@@ -482,8 +548,34 @@ impl<'w> Draw<'w> for Split {
             .min_h_0()
             .min_w_0()
             .size_full()
+            .relative()
             .child(group)
+            .children(measure)
             .into_any_element()
+    }
+}
+
+/// Sends a split's `resize` from `owner` with its panes' sizes, once the
+/// user lets go of a divider.
+fn resized(
+    action: &Action,
+    owner: &str,
+    cx: Cx,
+) -> impl Fn(&Entity<ResizableState>, &mut Window, &mut App) + 'static {
+    let app = cx.entity().downgrade();
+    let owner = owner.to_owned();
+    let action = action.clone();
+    move |state, window, cx| {
+        let Action::Send { to, msg } = &action else {
+            return;
+        };
+        let sizes = state.read(cx).sizes().iter().map(|size| f32::from(*size));
+        let action = Action::Send {
+            to: to.clone(),
+            msg: Split::resized(msg, sizes),
+        };
+        app.update(cx, |app, cx| app.dispatch(&owner, &action, window, cx))
+            .ok();
     }
 }
 

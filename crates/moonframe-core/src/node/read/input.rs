@@ -1,6 +1,9 @@
 //! Text elements: inputs (with their keys and ids) and markdown.
 
-use {super::*, crate::read::Document};
+use {
+    super::*,
+    crate::read::{Document, MAX_DOCUMENT},
+};
 
 impl Build for Input {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
@@ -20,6 +23,8 @@ impl Build for Input {
         "disabled",
         "focus",
         "mono",
+        "secret",
+        "paste",
         "width",
         "grow",
         "browser",
@@ -28,6 +33,7 @@ impl Build for Input {
         "typewriter",
         "code",
         "line",
+        "caret",
         "scrolled",
         "scroll_at",
     ]];
@@ -50,6 +56,13 @@ impl Build for Input {
                     .key(key)
                     .fail(format!("`{key}` goes with `multiline = true`")));
             }
+        }
+        let secret = fields.get("secret")?.unwrap_or(false);
+        if secret && multiline {
+            return Err(fields
+                .cx()
+                .key("secret")
+                .fail("a secret is one line; drop `multiline`"));
         }
         let rows = fields.get::<f32>("rows")?;
         if rows.is_some() && !multiline {
@@ -95,6 +108,7 @@ impl Build for Input {
         let submit = fields.get::<Data>("submit")?;
         let blur = fields.get::<Data>("blur")?;
         let capture = fields.get::<Data>("capture")?;
+        let paste = fields.get::<Data>("paste")?;
         let keys = fields
             .get::<InputKeys>("keys")?
             .map(|keys| keys.0)
@@ -110,6 +124,7 @@ impl Build for Input {
             && blur.is_none()
             && keys.is_empty()
             && capture.is_none()
+            && paste.is_none()
             && browser.is_none()
         {
             return Err(fields.cx().key("to").fail(
@@ -140,6 +155,8 @@ impl Build for Input {
             disabled: fields.get("disabled")?.unwrap_or(false),
             focus: fields.get("focus")?.unwrap_or(false),
             mono: fields.get("mono")?.unwrap_or(false),
+            secret,
+            paste,
             width: fields.number("width", PIXELS)?,
             grow: fields.get("grow")?.unwrap_or(false),
             browser,
@@ -147,6 +164,7 @@ impl Build for Input {
             dim,
             typewriter,
             line: caret_line(fields, code.is_some())?,
+            caret: fields.get("caret")?,
             code,
             scrolled,
             scroll_at,
@@ -201,6 +219,7 @@ impl Build for Markdown {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
         "text",
         "link",
+        "tooltips",
         "to",
         "grow",
         "scroll",
@@ -269,6 +288,10 @@ impl Build for Markdown {
                 .map(|text| text.0)
                 .unwrap_or_default(),
             link,
+            tooltips: fields
+                .get::<LinkTooltips>("tooltips")?
+                .map(|tooltips| tooltips.0)
+                .unwrap_or_default(),
             to,
             grow: fields.get("grow")?.unwrap_or(false),
             scroll,
@@ -293,6 +316,32 @@ impl Build for Markdown {
 
 /// Most lines a `ui.markdown` can be cut to.
 const MAX_LINES: f32 = 1000.0;
+/// Most addresses `tooltips` names.
+const MAX_TOOLTIPS: usize = 1000;
+
+/// `tooltips = { [url] = "text" }`: what a link to each address shows.
+struct LinkTooltips(BTreeMap<String, String>);
+
+impl Read for LinkTooltips {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let Value::Table(table) = value else {
+            return Err(cx.fail("expected a table of addresses to their tooltips"));
+        };
+        let mut tooltips = BTreeMap::new();
+        for pair in table.pairs::<Value, Value>() {
+            let (url, text) = pair?;
+            let Value::String(name) = &url else {
+                return Err(cx.fail("its keys are link addresses"));
+            };
+            let cx = cx.quoted(&name.to_string_lossy());
+            tooltips.insert(String::read(&url, &cx)?, String::read(&text, &cx)?);
+            if tooltips.len() > MAX_TOOLTIPS {
+                return Err(cx.fail(format!("more than {MAX_TOOLTIPS} addresses")));
+            }
+        }
+        Ok(Self(tooltips))
+    }
+}
 
 impl Read for Reveal {
     fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
@@ -398,6 +447,27 @@ impl Read for Dim {
             other => Err(cx.fail(format!(
                 "`{other}` is no dim; use \"sentence\" or \"paragraph\""
             ))),
+        }
+    }
+}
+
+/// `caret = "start"`, `"end"`, or a byte offset from 0.
+impl Read for Caret {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        match value {
+            Value::String(_) => match String::read(value, cx)?.as_str() {
+                "start" => Ok(Self::Start),
+                "end" => Ok(Self::End),
+                other => Err(cx.fail(format!(
+                    "`{other}` is no caret; use \"start\", \"end\" or a byte offset"
+                ))),
+            },
+            _ => match f64::read(value, cx)? {
+                at if at.fract() == 0.0 && (0.0..=MAX_DOCUMENT as f64).contains(&at) => {
+                    Ok(Self::At(at as usize))
+                },
+                _ => Err(cx.fail("a byte offset from 0, or \"start\" or \"end\"")),
+            },
         }
     }
 }

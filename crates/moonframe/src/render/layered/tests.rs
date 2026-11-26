@@ -33,13 +33,16 @@ fn column() -> Stack {
         selected: false,
         scroll_to: None,
         measure: None,
+        outside: None,
         action: None,
         extras: Default::default(),
         drag: false,
         key: None,
+        keys: Default::default(),
         pointer: None,
         children: Vec::new(),
         slots: Vec::new(),
+        ends: None,
     }
 }
 

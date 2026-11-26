@@ -143,6 +143,16 @@ impl Editor {
             .update(cx, |state, cx| state.set_selected_range(range, cx)))
     }
 
+    /// Draws a one-line field's text as bullets and keeps it off the
+    /// clipboard, or not; only when that changes, so it draws no more.
+    fn set_masked(&self, masked: bool, window: &mut Window, cx: &mut App) {
+        if let Self::Line(state) = self
+            && state.read(cx).presentation().is_masked() != masked
+        {
+            state.update(cx, |state, cx| state.set_masked(masked, window, cx));
+        }
+    }
+
     fn set_disabled(&self, disabled: bool, cx: &mut App) {
         // A disabled code editor stays readable, not dimmed: its text can
         // be selected and copied, never changed.
@@ -198,6 +208,8 @@ pub(crate) struct Wiring {
     pub(crate) blur: Option<Data>,
     pub(crate) keys: Vec<(KeyChord, Data)>,
     pub(crate) capture: Option<Data>,
+    /// Sent with the files or picture pasted into it.
+    pub(crate) paste: Option<Data>,
     pub(crate) scrolled: Option<Data>,
     pub(crate) multiline: bool,
     pub(crate) disabled: bool,
@@ -216,6 +228,7 @@ impl Wiring {
             blur: input.blur.clone(),
             keys: input.keys.clone(),
             capture: input.capture.clone(),
+            paste: input.paste.clone(),
             scrolled: input.scrolled.clone(),
             multiline: input.multiline,
             disabled: input.disabled,
@@ -250,6 +263,8 @@ struct Field {
     rows: Option<u32>,
     /// The code editor's last `line`, to move the caret as it changes.
     line: Option<u32>,
+    /// The last `caret`, to move the caret as it changes.
+    caret: Option<moonframe_core::Caret>,
     /// The mod's `focus` when last drawn, so it takes focus as it turns true.
     focus: bool,
     /// The frame it was last drawn in.
@@ -338,6 +353,7 @@ impl Inputs {
                 placeholder: None,
                 rows: None,
                 line: None,
+                caret: None,
                 focus: false,
                 seen: frame,
                 window: window.window_handle().window_id(),
@@ -374,6 +390,13 @@ impl Inputs {
             state.update(cx, |state, cx| state.set_cursor_position(at, window, cx));
         }
         field.line = input.line;
+        if let Some(caret) = input.caret
+            && (renewed || field.caret != input.caret)
+        {
+            let at = caret.offset(&editor.value(cx));
+            editor.select(at..at, cx);
+        }
+        field.caret = input.caret;
         if input.placeholder != field.placeholder {
             editor.set_placeholder(input.placeholder.as_deref().unwrap_or(""), window, cx);
             field.placeholder = input.placeholder.clone();
@@ -390,6 +413,7 @@ impl Inputs {
             writing.apply(input, state, window, cx);
         }
         editor.set_disabled(input.disabled, cx);
+        editor.set_masked(input.secret, window, cx);
         if input.multiline {
             editor.take_scroll(&mut field.scrolling, input, cx);
         }
@@ -461,6 +485,44 @@ impl Inputs {
         Ok(())
     }
 
+    /// Puts `text` in the field `id` drawn by `owner`, in place of what it
+    /// holds, as one edit (`moonframe.view`'s fill): it sends its `change`
+    /// as typing would. An error when no such field is drawn.
+    pub(crate) fn fill(
+        &self,
+        owner: &str,
+        id: &str,
+        text: &str,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Result<(), String> {
+        let editor = self
+            .drawn(owner, id)
+            .ok_or_else(|| format!("no field with `id = \"{id}\"` drawn by `{owner}`"))?;
+        let all = editor.value(cx).len();
+        editor.select(0..all, cx);
+        on_state!(&editor, |state| state.update(cx, |state, cx| {
+            state.replace(text.to_owned(), window, cx);
+        }));
+        Ok(())
+    }
+
+    /// The text in the field `id` drawn by `owner`, if it is drawn.
+    pub(crate) fn text(&self, owner: &str, id: &str, cx: &App) -> Option<String> {
+        self.drawn(owner, id)
+            .map(|editor| editor.value(cx).to_string())
+    }
+
+    /// The editor of the field `id` drawn by `owner`, while it is drawn.
+    fn drawn(&self, owner: &str, id: &str) -> Option<Editor> {
+        let registry = self.0.borrow();
+        registry
+            .fields
+            .get(&format!("{owner} {id}"))
+            .filter(|field| field.mounted.upgrade().is_some())
+            .map(|field| field.editor.clone())
+    }
+
     /// App edits must run in the window that actually draws the field.
     pub(crate) fn window(&self, owner: &str, field: &str) -> Option<WindowId> {
         self.0
@@ -472,7 +534,10 @@ impl Inputs {
 
     /// Whether a field has keyboard focus in `window`.
     pub(crate) fn any_focused(&self, window: &Window, cx: &App) -> bool {
-        self.focused(window, cx).is_some()
+        // Without the field's text, which a keystroke has no use for.
+        self.0.borrow().fields.values().any(|field| {
+            field.mounted.upgrade().is_some() && field.editor.focus_handle(cx).is_focused(window)
+        })
     }
 
     /// The field with keyboard focus in `window`, if any.

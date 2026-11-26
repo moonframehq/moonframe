@@ -87,6 +87,10 @@ pub struct Stack {
     /// content's size, how far it is scrolled and which children fit and
     /// show, each time one of them changes (see `render/stack_measure`).
     pub measure: Option<Action>,
+    /// Sent when a click begins and ends outside its box and outside the
+    /// popovers and overlays drawn inside it; the click goes on to whatever
+    /// is there, as a menu that closes on a click elsewhere lets it through.
+    pub outside: Option<Action>,
     /// What clicking anywhere in it does, as on a button.
     pub action: Option<Action>,
     pub extras: Extras,
@@ -97,6 +101,9 @@ pub struct Stack {
     /// go: with a `transition` rule it grows in when it appears and shrinks
     /// away when it goes, as tabs open and close.
     pub key: Option<String>,
+    /// Keys it takes while focus is inside it (a click in it gives it
+    /// focus) and no text field has it, ahead of the page's own.
+    pub keys: Keys,
     /// Presses, drags, the wheel, dropped files and the cursor; boxed, as
     /// most stacks have none.
     pub pointer: Option<Box<Pointer>>,
@@ -106,6 +113,9 @@ pub struct Stack {
     /// place keeps each itself as one before it comes and goes. Empty when
     /// not read from Luau.
     pub slots: Vec<usize>,
+    /// Told of its end, and scrolled to it; boxed, as most stacks have
+    /// neither.
+    pub ends: Option<Box<Ends>>,
 }
 
 /// A titled section: a header with optional actions over a column body.
@@ -127,7 +137,25 @@ pub struct Split {
     /// Draws a hairline between panes; without it the panes meet with no
     /// line, and only a hovered or dragged handle shows.
     pub divider: bool,
+    /// Sent once the user lets go of a divider (or moves one by key or a
+    /// double-click), with `sizes`: each pane's
+    /// size in whole pixels, in order, 0 for a hidden one. A mod keeps them
+    /// in its state, which outlives the app, and passes them back as the
+    /// panes' `size`, so they reopen as the user left them.
+    pub resize: Option<Action>,
     pub panes: Vec<Pane>,
+}
+
+impl Split {
+    /// What `resize` sends for `msg` when the panes are `sizes` pixels: a
+    /// table `msg` with `sizes` added, else `{ msg = msg, sizes = ... }`.
+    pub fn resized(msg: &Data, sizes: impl IntoIterator<Item = f32>) -> Data {
+        let sizes = sizes
+            .into_iter()
+            .map(|size| Data::Integer(size.round().max(0.0) as i64))
+            .collect();
+        Markdown::note(msg, [("sizes", Data::List(sizes))])
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -135,6 +163,10 @@ pub struct Pane {
     pub look: Look,
     /// The starting size in pixels; without one the pane shares the rest.
     pub size: Option<f32>,
+    /// The size in pixels a double-click on its divider puts it back to;
+    /// without one, the size it started with. A mod that passes the user's
+    /// kept size back as `size` gives its own default here.
+    pub reset: Option<f32>,
     pub min: Option<f32>,
     pub max: Option<f32>,
     /// Keep its size when the window resizes, as a sidebar does.
@@ -212,10 +244,11 @@ pub struct Overlay {
     pub content: Box<Node>,
 }
 
-/// Rows of the same height, of which the host draws only those that show,
-/// so a list of any length costs what one screenful does. The view gives a
-/// `row` function rather than the rows; it is called for the rows around
-/// the ones showing, and the host asks again as the list scrolls.
+/// Rows, of one height or each of its own, of which the host draws only
+/// those that show, so a list of any length costs what one screenful does.
+/// The view gives a `row` function rather than the rows; it is called for
+/// the rows around the ones showing, and the host asks again as the list
+/// scrolls.
 #[derive(Clone, Debug, PartialEq)]
 pub struct List {
     pub look: Look,
@@ -224,12 +257,15 @@ pub struct List {
     pub id: String,
     /// How many rows there are in all.
     pub count: usize,
-    /// Each row's height in pixels.
-    pub row_height: f32,
+    /// The rows' heights in pixels.
+    pub row_height: RowHeights,
     /// The position of `rows[0]`, from 0.
     pub start: usize,
     /// The rows from `start` the view built.
     pub rows: Vec<Node>,
+    /// Sent with the first and last row that show as they change, so a
+    /// mod can fetch the rows around them.
+    pub range: Option<Action>,
 }
 
 /// The rows of a list a view builds: from `start`, `len` of them.

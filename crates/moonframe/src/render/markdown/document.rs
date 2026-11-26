@@ -10,6 +10,7 @@ use {
         outline::Outline,
         scrolling::{Applied, Scrolling},
         search, send,
+        tooltips::{self, Tips, Titling},
     },
     crate::app::MoonframeApp,
     gpui_kit::{
@@ -52,6 +53,9 @@ pub(super) struct Shared {
     pub(super) alert: Style,
     pub(super) state: Option<WeakEntity<TextViewState>>,
     pub(super) scroll: bool,
+    /// What its links show on hover, for the views inside it (an alert's
+    /// body) as for the document.
+    pub(super) tips: Tips,
 }
 
 pub(super) type SharedRef = Arc<Mutex<Shared>>;
@@ -69,6 +73,8 @@ struct Searched {
 struct Kept {
     shared: SharedRef,
     extensions: MarkdownExtensions,
+    /// Its links' titles, read from its text.
+    titling: Titling,
     /// The text last handed to the view.
     text: String,
     /// The mod's wishes, as of the last frame.
@@ -119,6 +125,9 @@ pub(super) struct Document {
     pub(super) quote: StyleRefinement,
     pub(super) alert: Style,
     pub(super) colors: Colors,
+    /// Where it leaves its view's state for the frame around it to watch
+    /// what the user selects.
+    pub(super) shown: super::selection::Shown,
 }
 
 impl RenderOnce for Document {
@@ -129,6 +138,7 @@ impl RenderOnce for Document {
             let text = text.clone();
             move |_, cx| TextViewState::markdown(&text, cx)
         });
+        self.shown.replace(Some(state.downgrade()));
         let shared: SharedRef = Arc::new(Mutex::new(Shared {
             owner: self.owner.clone(),
             to: self.markdown.to.clone(),
@@ -141,6 +151,7 @@ impl RenderOnce for Document {
             alert: self.alert.clone(),
             state: Some(state.downgrade()),
             scroll: self.markdown.scroll,
+            tips: Tips::default(),
         }));
         let kept = window.use_keyed_state(SharedString::from(format!("{key}/kept")), cx, {
             let shared = shared.clone();
@@ -154,6 +165,9 @@ impl RenderOnce for Document {
                 && let (Ok(mut into), Ok(mut from)) = (current.lock(), shared.lock())
             {
                 std::mem::swap(&mut *into, &mut *from);
+            }
+            if let Ok(mut current) = current.lock() {
+                current.tips = kept.titling.tips();
             }
             current
         });
@@ -172,7 +186,10 @@ impl RenderOnce for Document {
                 kept.reveal_after_layout(&state, rendered, window, cx);
             }
         });
-        let extensions = kept.read(cx).extensions.clone();
+        let (extensions, tips) = {
+            let kept = kept.read(cx);
+            (kept.extensions.clone(), kept.titling.tips())
+        };
         let mut view = TextView::new(&state)
             // A preview is for looking at: a click on it belongs to its card.
             .selectable(self.markdown.lines.is_none())
@@ -186,7 +203,8 @@ impl RenderOnce for Document {
             })
             .inline_code_style(self.inline_code)
             .blockquote_style(self.quote)
-            .on_link_click(blocks::link_click(&shared));
+            .on_link_click(blocks::link_click(&shared))
+            .link_tooltip(tooltips::builder(tips));
         if let Some(lines) = self.markdown.lines {
             view = view.max_lines(lines).on_link_click(|_, _, _, cx| {
                 // TextView stops mouse-up propagation before calling us.
@@ -213,6 +231,7 @@ impl Kept {
     fn new(shared: SharedRef, text: String) -> Self {
         Self {
             extensions: blocks::extensions(&shared),
+            titling: Titling::default(),
             shared,
             text,
             find: None,
@@ -248,6 +267,7 @@ impl Kept {
         cx: &mut Context<Self>,
     ) {
         self.text.clone_from(&markdown.text);
+        self.titling.follow(&markdown.text, &markdown.tooltips, cx);
         self.find.clone_from(&markdown.find);
         self.find_index = markdown.find_index;
         self.found.clone_from(&markdown.found);

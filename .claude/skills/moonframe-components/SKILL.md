@@ -25,9 +25,9 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | --- | --- | --- |
 | `ui.row { ... }`, `ui.column { ... }` | any box of children; with `msg`/`command` the whole box is clickable (rows, tabs, tiles); `drag = true` makes it a title bar that moves the window | frame keys, `align`, `justify`, `wrap`, `selected`, `drag`, `key` (names it among its siblings: with a `transition` rule it grows in as it appears and shrinks away as it goes; with `rise` it fills its box and comes up from below it whole, once the one it replaces has sunk away), `msg`/`to`, `command` or `window` (a mod opened in a window of its own), pointer keys, extras |
 | `ui.panel { ... }` | a titled section with header actions over a body | frame keys, `title`, `actions = { elements }` |
-| `ui.hsplit { ... }`, `ui.vsplit { ... }` | areas the user resizes by dragging; children must be `ui.pane` | `id` |
-| `ui.pane { ... }` | one side of a split; slides in and out when `visible` changes; `lazy = true` starts what it mounts only once it first shows, and keeps it asleep (not run, not drawn) while hidden | `size`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` |
-| `ui.list { count = n, row_height = 24, row = function(i) ... end }` | long lists of same-height rows (files, logs, results): only the rows that show are built and drawn, so any length costs a screenful; it scrolls itself and takes the space it is given | `id` (two lists in one mod need two), `count`, `row_height`, `row` (builds row `i`, from 1; called again as it scrolls, so keep it cheap), frame keys |
+| `ui.hsplit { ... }`, `ui.vsplit { ... }` | areas the user resizes by dragging; a clicked divider also moves with the arrow keys (16 px, 64 with Shift), Home and End take the pane before it to its `min` and `max`, and a double-click puts back the `reset` size of a pane beside it (the one before, else after), else a starting `size` the same way; children must be `ui.pane` | `id`, `divider`, `resize` (sent once the user lets go of a divider, or moves it by key or double-click, with `sizes`, each pane's whole pixels in order, 0 for a hidden one: keep them in state and pass them back as the panes' `size`, and they survive a relaunch), `to` |
+| `ui.pane { ... }` | one side of a split; slides in and out when `visible` changes; `lazy = true` starts what it mounts only once it first shows, and keeps it asleep (not run, not drawn) while hidden | `size`, `reset` (the size a double-click on its divider puts it back to, apart from `size`: the app's default when `size` passes back the user's kept one; else the starting `size`), `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` |
+| `ui.list { count = n, row_height = 24, row = function(i) ... end }` | long lists (files, logs, results, chats): only the rows that show are built and drawn, so any length costs a screenful; it scrolls itself and takes the space it is given | `id` (two lists in one mod need two), `count`, `row_height` (pixels for every row, or `function(i)` giving row `i`'s own, for up to 100,000 rows: a row with a second line can be taller than the rest), `row` (builds row `i`, from 1; called again as it scrolls, so keep it cheap), `range` (sent with `first` and `last`, the rows any part of which shows, as they change, at most every 100 ms; `to` names another mod), frame keys |
 | `ui.region "name"` | the slot mods fill by naming it in `region` (shell only) | `name`, `direction`, `gap`, `justify` |
 | `ui.mount "name"` | one mod's view, by name | `mod` |
 | `ui.divider()` | a line across the parent's axis | |
@@ -38,9 +38,9 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 Embedding apps can select miniapps outside `app_dir` with `Moonframe::root`
 and `entry`, or `entry_handle().add_entry(namespace, id, path)` at runtime.
 Roots set policy without scanning. An entry holds `main.luau` and/or
-`provider/provider.toml`: mount `ui.mount "mshub:notes"` (or give it an `id`
-for independent instance state), read `app["mshub:notes"]`, send to
-`"provider:mshub:notes"`, and subscribe to `"provider/mshub:notes"`.
+`provider/provider.toml`: mount `ui.mount "acme:notes"` (or give it an `id`
+for independent instance state), read `app["acme:notes"]`, send to
+`"provider:acme:notes"`, and subscribe to `"provider/acme:notes"`.
 Saved mod/instance state includes the namespace. Namespace and id each use
 1–48 of `a-z 0-9 - _`; `app provider topic demo component shell parent` are
 reserved namespaces. `remove_entry` / `remove_root` unload them without
@@ -77,7 +77,7 @@ for the API, limits, caller identity and build policies.
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone`, extras |
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`), `exit` (sent once, with `exited = true` added, as the shell exits; without it Enter starts another) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
-| `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, `> [!NOTE]` alerts, footnotes, frontmatter, highlighted code with a copy button; LaTeX in a build with `math`), up to 1 MiB; links send `link` instead of opening, a `#heading` link scrolls there, a `[label](cite:source)` link draws a source chip, and pictures show only with `images`, never from the web; styled by `markdown`, `markdown-code`, `markdown-quote`, `markdown-alert`, `markdown-find` and `markdown-find-current` rules | `text`, `link` (sent with `url` added), `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `lines` (at most N lines, for a preview), `images`, `image` (a click on a picture on its own line, with `src` and `alt`), `outline` (sent with `headings`: `level`, `text`, `at`, `slug`), `section` (sent with `heading`, the index being read), `reveal = { at, seq }` (scrolls there when it changes), `find`, `find_index`, `found` (sent with `count`), `stream` (fade in what is added), `scrolled` (with `scroll`: sent as the reader scrolls, with `fraction`, 0 at the top to 1 at the end), `scroll_at = { fraction, seq }` (with `scroll`: scrolls there when it changes, without sending `scrolled`) |
+| `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, `> [!NOTE]` alerts, footnotes, frontmatter, highlighted code with a copy button; LaTeX in a build with `math`), up to 1 MiB; links send `link` instead of opening, a `#heading` link scrolls there, a `[label](cite:source)` link draws a source chip, and pictures show only with `images`, never from the web (a picture titled `emoji`, `![:party:](~/.cache/moonframe/images/emoji/party.png "emoji")`, draws inline at the line's height from the image cache alone, with or without `images`, its alt text standing in until it loads or when it is missing); styled by `markdown`, `markdown-code`, `markdown-quote`, `markdown-alert`, `markdown-find` and `markdown-find-current` rules | `text`, `link` (sent with `url` added), `tooltips` (`{ [url] = text }`: a link's tooltip, over its own title; a link with a title, `[text](url "title")`, shows it while every link to that address has the same title; links in a `> [!NOTE]` alert too), `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `lines` (at most N lines, for a preview), `images`, `image` (a click on a picture on its own line, with `src` and `alt`), `outline` (sent with `headings`: `level`, `text`, `at`, `slug`), `section` (sent with `heading`, the index being read), `reveal = { at, seq }` (scrolls there when it changes), `find`, `find_index`, `found` (sent with `count`), `stream` (fade in what is added), `scrolled` (with `scroll`: sent as the reader scrolls, with `fraction`, 0 at the top to 1 at the end), `scroll_at = { fraction, seq }` (with `scroll`: scrolls there when it changes, without sending `scrolled`) |
 | `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
 | `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a two-finger double tap, a double click and its buttons zoom, and two fingers turn it (it settles on north within a few degrees); without `center`/`zoom` it frames the pins and routes. With `glide`, a new `center`, `zoom` or `bearing` eases the map there. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key, nor do `vector-liberty` `vector-positron` `vector-streets` `vector-dark` `vector-graphite`, vector tiles drawn on the GPU by gpui-maps in builds with the `map-vector` feature; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `bearing` (the compass direction up the box, degrees clockwise from north; a new one turns the map where it stands, so feed `move`'s back in and a compass shown while it is not 0 sets it to 0 on a click), `pins` (each `lat`, `lon`, `label` up to 3 characters or `icon`, `color`, `shape` `dot` `disc` `balloon`, `selected`, `pulse` (a halo breathes out of it: where the user is), `msg`), `routes` (each `points` flat lat, lon pairs drawn as they are, or `via` stops and `mode` `walk` `bike` `car` routed along streets by routing.openstreetmap.de; `color`, `stroke`, `dashed`; the style's `color` otherwise), `routed` (sent with `route`, `seconds`, `meters` when a `via` route is found or `routed`/`to` changes), `move` (sent with `lat`, `lon`, `zoom`, `bearing` after the user moves it, as they go), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
 | `ui.video { source = "camera", white = 4095 }` | live frames from another process, from a ring in shared memory, in a 16-bit colour-managed native view that fills its space (macOS, the `video` feature); nothing draws over it, so `guides` draws crop frames and lines in the picture. `source`, `id`, `zoom`, `center`, `filter` (`auto` `nearest` `linear`), `color` (`srgb` `display-p3` `rec709` `rec2020` `linear-srgb` `linear-p3` `none`), `extended`, `black`, `white`, `gain`, `gamma`, `guides`, `probe`, `stats`, `probed`, `width`, `height`. Most apps want `video-viewer`; see `docs/video.md` |
@@ -108,7 +108,7 @@ and `preview` to false. Preview cards are noninteractive and stay inside the com
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
-| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers; read only with `disabled`, not dimmed) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there), `scrolled` (multiline: sent as the text scrolls, with `fraction`, 0 at the top to 1 with the last line at the bottom), `scroll_at = { fraction, seq }` (multiline: scrolls there when it changes, without sending `scrolled`); a source and its `ui.markdown` preview follow each other with the two |
+| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers; read only with `disabled`, not dimmed) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `secret` (a password: drawn as bullets and never copied or cut, while `change` and `submit` still carry the text; one line), `paste` (sent with `files`, their paths, when files or a picture are pasted into it; a picture is saved to the image cache first and also comes as `image = { path, width, height }`; text pastes as usual), `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there), `caret` (`"start"`, `"end"` or a byte offset: where the caret goes when the field takes a new `value` or this changes, as after a recalled line), `scrolled` (multiline: sent as the text scrolls, with `fraction`, 0 at the top to 1 with the last line at the bottom), `scroll_at = { fraction, seq }` (multiline: scrolls there when it changes, without sending `scrolled`); a source and its `ui.markdown` preview follow each other with the two |
 
 ### Overlays
 
@@ -146,6 +146,16 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   false`) keeps the first `fit` and opens the rest from Show more; a list
   keeps `first`, to reveal it with `scroll_to` when it comes back.
 
+- **Hear a click outside** (`row`, `column`): `outside = msg` sends `msg`
+  (to `to`, else the drawing mod) when a click begins and ends outside its
+  box and outside the popovers and overlays drawn inside it; a drag that
+  began inside it does not count. Unlike a popover's `dismiss`, nothing
+  covers the window: the click still reaches whatever it landed on, so one
+  click both closes a floating panel and presses the button beside it. It
+  is sent as the button comes up, so closing the panel never moves what
+  was clicked from under the pointer. In the GPUI window only, so far:
+  Rune draws the stack but does not send it.
+
 - **Frame keys** (`row`, `column`, `panel`): `grow`, `width`, `height`,
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `follow = true` (with `scroll`:
   while at its end, stay there as the content grows, as a chat or log
@@ -163,6 +173,20 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   on an icon's corner), `area` (out of the flow at fractions of the parent,
   `area = { left = 0.1, top = 0.2, width = 0.5, height = 0.3 }`: a crop
   frame, a marker on a track). `grow` with a `width` or `height` grows from that size.
+- **Keys while inside** (`row`, `column`): `keys = { left = <msg>, ... }`,
+  named as an overlay's are, sends its messages to the drawing mod while
+  focus is inside it (a click anywhere in it gives it focus, and a control
+  in it keeps it there) and no text field has it, ahead of the mod's own
+  `keys`: a deck whose arrows dismiss and keep only once the reader is in
+  it. The innermost row or column with the key takes it.
+- **Ends** (`row`, `column`, with `scroll`): `at_end = <msg>` sends `msg`
+  to the drawing mod with `at_end = true` or `false` as it first lays out
+  and each time it reaches or leaves its end (its bottom; a row that
+  scrolls only sideways, its right), within the 24 px `follow` keeps:
+  show a chat's "latest message" button while it is `false`.
+  `scroll_end = <value>` scrolls to the end each time the value changes,
+  so `scroll_end = { seq = n }` with a new `n` asks again; with `follow` it
+  stays there as lines arrive.
 - **Pointer keys** (`row`, `column`): `pointer = <msg>` is sent as a button
   goes down on it, as the pointer moves while held (anywhere in the
   window), and as it comes up, with `phase` (`down` `move` `up`), `x`, `y`
@@ -210,6 +234,14 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `open`, `folder` or `save` with `name` and `folder`); the answer comes
   back to the mod as `reply` with `paths` (`path` for a save) or
   `cancelled = true`. Picked files may then show in that mod's `ui.image`.
+- **Page text:** `{ to = "app:text", msg = { mod = "notes", reply = "page"
+  } }` answers with `text`, what `notes` draws (rows across, columns down,
+  with what it mounts; not fields, hidden panes or closed popovers), and
+  `selection = { text, mod }`, the text the user last selected in a
+  document and the mod that drew it, kept after a click into a field
+  clears it on screen. `region = "main"` reads a region's mods instead;
+  neither, only the selection. `max` cuts each (64,000 characters): what
+  an assistant sends with a question.
 - **Text edits:** `{ to = "app:edit", msg = { field = "notes", wrap = {
   "**", "**" } } }` edits the mod's `ui.input` with that `id` around its
   selection, keeping undo and focus: `wrap` puts the two around it (or
@@ -229,7 +261,9 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   traffic_lights = { x, y } } }` draws the layout under the title bar (at
   startup only); `app.window` tells views the `platform`, `titlebar`,
   `maximized`, `fullscreen` and `active`, so a title bar knows whether to
-  draw window buttons or leave room for traffic lights. The main window
+  draw window buttons or leave room for traffic lights, and its `width`
+  and `height` in points as it is resized, so a view can switch to a
+  narrow layout under a breakpoint. The main window
   reopens where and as large as it last was, kept within the screen;
   `window = { remember = false }` opens it at its `size`, centered, instead.
 - **A mod's own window** takes `titlebar = "hidden"` and `traffic_lights`
@@ -313,6 +347,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`icon-button`](#icon-button) | Controls | An action or toggle shown only as an icon: in a title bar, a panel header, a toolbar. Always give a `tooltip`. For buttons with words use `ui.button` or `toolbar`; for back/forward use `nav-buttons`; for joined icon choices use `button-group`. |
 | [`picker`](#picker) | Controls | A property of a record set from many options: assignee, labels, project, status, priority, "blocked by", in a task's detail panel or a row. For a setting in a form use `dropdown`; for a filter over a list use `filter-dropdown`; for 2 to 4 short choices use `segmented`; for addresses use `recipient-field`. |
 | [`segmented`](#segmented) | Controls | A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`. |
+| [`t3-composer`](#t3-composer) | Controls | Draw inside the mod enabled as the T3 writer. Handle project, draft, picker and cancel messages locally and observe app.t3.results[id] for delivery. |
 | [`toolbar`](#toolbar) | Controls | A row of small quiet buttons above a panel or list. For icon-only buttons use `icon-button`; for one-of-many choices use `segmented`. |
 | [`audio-meter`](#audio-meter) | Data | Sound levels while recording or playing, from values an engine published. For a fraction that isn't sound use `vertical-bar` or `meter`. |
 | [`avatar`](#avatar) | Data | Stand for a person, space, project or agent by its name: comment authors, workspace switchers, people lists. Use `comment-card` for an authored message (it draws one), `status-dot` for a state alone. |
@@ -438,6 +473,8 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`list`](#list) | Lists | A plain selectable list of rows with label, detail and badge. For rich rows (status, icons, two lines) use `agent-row`, `workspace-row` or `tree`. |
 | [`mail-row`](#mail-row) | Lists | Each row of an inbox or a mailbox's message list; stack them in a `ui.list` (rows of one height) or a scrolling column, under `segmented` category tabs. For tasks use `task-row`; for pull requests use `pr-row`; for a plain selectable row use `list`; for the open message's header use `message-header`. |
 | [`ratio-row`](#ratio-row) | Lists | Lists of parts of a whole: where signups came from, top countries, devices, tiers. Stack them in a column; give `share` for the bar under each. For a bar of all the parts at once use `share-bar`; for a data grid use `table`. |
+| [`t3-sessions`](#t3-sessions) | Lists | Use for an overview of app.t3.threads, or a subset filtered by project, issue or worktree. Handle fold and thread messages in the drawing mod. |
+| [`t3-thread`](#t3-thread) | Lists | Use for one thread from app.t3 in a project sidebar or session overview. Set expanded to show its worktree, provider and update time. |
 | [`task-row`](#task-row) | Lists | Rows of tasks, to-dos, habits or events in a planner, an inbox or a day view; stack them in a column under `section` headings. For a plain selectable row use `list`; for pull requests use `pr-row`. |
 | [`tree`](#tree) | Lists | Nested rows: a file tree in a review, worktrees under a repository, agents and their sub-agents. For flat rows use `list`; for a heading over a group of rows use `group-header`; for one foldable block use `collapsible`. |
 | [`activity-bar`](#activity-bar) | Navigation | Switching between the app's main views from a thin strip at the window's edge (terminals, pull requests, issues, agents, settings). For a collapsed list of workspaces use `rail`; for text tabs use `tabs`; for a full list of rows use `sidebar`. |
@@ -752,6 +789,7 @@ A whole mod using it, with state: `app/components/demos/browser.luau`.
 | `link` | message a link click sends, with `url` added, as `markdown` sends it |
 | `text` | the markdown; a `[label](cite:source)` link draws a source chip |
 | `to` | mod to send `link` to, if not the drawing one |
+| `tooltips` | what a link to each address shows on hover, `{ [url] = text }`, over the link's own title (`[text](url "title")`): where a wrapped address leads |
 
 **Styles:** `.chat-markdown`
 
@@ -820,6 +858,7 @@ A whole mod using it, with state: `app/components/demos/image-viewer.luau`.
 | `stream` | fade in what is added to `text`, as an answer streams in |
 | `text` | the markdown, up to 1 MiB |
 | `to` | mod to send its messages to, if not the drawing one |
+| `tooltips` | what a link to each address shows on hover, `{ [url] = text }`, over the link's own title (`[text](url "title")`): where a wrapped address leads |
 
 **Styles:** `.markdown`
 
@@ -1237,6 +1276,29 @@ segmented { options = { { id = "light", label = "Light" }, { id = "dark", label 
 ```
 
 A whole mod using it, with state: `app/components/demos/segmented.luau`.
+
+#### `t3-composer`
+
+**T3 Composer.** Start a local T3 Code chat or send a follow-up to an existing thread.
+
+**When:** Draw inside the mod enabled as the T3 writer. Handle project, draft, picker and cancel messages locally and observe app.t3.results[id] for delivery.
+
+| Prop | Meaning |
+| --- | --- |
+| `action` | start or send |
+| `data` | The current app.t3 snapshot |
+| `environmentId` | Environment in which the draft was opened |
+| `id` | Unique request id for this draft revision |
+| `picker` | Whether the project picker is open |
+| `target` | Project id for start, thread id for send |
+| `text` | The current draft |
+| `title` | Thread title when sending a follow-up |
+
+```lua
+local t3_composer = use "t3-composer"
+
+t3_composer { action = "start", data = { available = true, environmentId = "preview", projects = { { id = "mf", label = "Moonframe" } }, results = {  }, threads = {  }, ticket = "preview", total = 0 }, environmentId = "preview", id = "example", target = "mf", text = "" }
+```
 
 #### `toolbar`
 
@@ -5013,6 +5075,46 @@ A whole mod using it, with state: `app/components/demos/mail-row.luau`.
 local ratio_row = use "ratio-row"
 
 ratio_row { color = "#7c5cff", count = "604", icon = "globe", label = "Website signup form", percent = "44%", share = 44 }
+```
+
+#### `t3-sessions`
+
+**T3 Sessions.** T3 sessions grouped by what needs attention, with counts and expandable rows.
+
+**When:** Use for an overview of app.t3.threads, or a subset filtered by project, issue or worktree. Handle fold and thread messages in the drawing mod.
+
+| Prop | Meaning |
+| --- | --- |
+| `folded` | Map from group id to collapsed state |
+| `selected` | Id of the expanded thread |
+| `threads` | Threads in display order |
+| `to` | Mod receiving { fold = group } and { thread = id } |
+
+```lua
+local t3_sessions = use "t3-sessions"
+
+t3_sessions { threads = { { group = "running", id = "docs", issues = {  }, project = "Docs", projectId = "docs", pullRequests = {  }, status = "running", title = "Check examples", updatedAt = "" } } }
+```
+
+#### `t3-thread`
+
+**T3 Thread.** A T3 session with its project, branch and linked work.
+
+**When:** Use for one thread from app.t3 in a project sidebar or session overview. Set expanded to show its worktree, provider and update time.
+
+| Prop | Meaning |
+| --- | --- |
+| `expanded` | Show session details |
+| `msg` | Optional message sent when the row is clicked |
+| `thread` | A thread from app.t3.threads |
+| `to` | Mod receiving the click |
+
+**Styles:** `.t3-thread` `.t3-thread-meta`
+
+```lua
+local t3_thread = use "t3-thread"
+
+t3_thread { thread = { branch = "fix/paging", group = "waiting", id = "review", issues = {  }, project = "Moonframe", projectId = "mf", pullRequests = { { label = "#42", title = "Moonframe", url = "https://example.com/pr/42" } }, status = "waiting", title = "Review pagination", updatedAt = "2026-11-20T12:00:00Z" } }
 ```
 
 #### `task-row`

@@ -125,13 +125,15 @@ pub(crate) struct Field {
     pub(crate) change: Option<fields::Hearing>,
     /// The selection and caret `select` last saw.
     pub(crate) selection: ((usize, usize), usize),
+    /// The last `caret` the mod passed, to move the caret as it changes.
+    pub(crate) caret: Option<moonframe_core::Caret>,
 }
 
 /// A `ui.list` on screen: where it is scrolled, written as Rune lays it out.
 pub(crate) struct Watched {
     pub(crate) owner: String,
     pub(crate) id: String,
-    pub(crate) row_height: f32,
+    pub(crate) row_height: moonframe_core::RowHeights,
     pub(crate) count: usize,
     pub(crate) window: ListWindow,
     /// Scrolled offset and viewport height, in points.
@@ -194,6 +196,8 @@ pub struct Ui {
     pub(crate) markdown_found: RefCell<HashMap<String, usize>>,
     /// What documents have to tell their mods, which a view cannot send.
     pub(crate) markdown_notes: RefCell<Vec<(String, String, Data)>>,
+    /// What scrolling stacks ask of their ends, and tell of them.
+    pub(crate) stack_ends: render::StackEnds,
     /// When `app:open` last opened pages, to keep it to a burst.
     pub(crate) opens: opens::Opens,
     /// What a drag inside the app carries, and the rows that take it.
@@ -284,6 +288,13 @@ impl Ui {
             Request::Pick(pick) => {
                 self.pick(from, pick, tx);
                 false
+            },
+            // Rune's text is not selectable yet: only what mods draw.
+            Request::Text(request) => {
+                let mut workspace = self.workspace_mut();
+                let text = request.of.as_ref().and_then(|of| workspace.drawn_text(of));
+                workspace.send(from, from, request.answer(text, None));
+                true
             },
             Request::Appearance(appearance) => {
                 self.set_appearance(appearance);
@@ -460,15 +471,13 @@ impl Ui {
         let mut changed = false;
         for list in self.lists.get_mut().values() {
             let (offset, height) = list.seen.get();
-            let first = (offset / list.row_height).floor().max(0.) as usize;
-            let showing = (height / list.row_height).ceil() as usize + 1;
-            let shown = first..(first + showing).min(list.count);
+            let shown = list.row_height.shown(offset, height, list.count);
             let built = list.window.start..list.window.start + list.window.len;
             if shown.start < built.start || shown.end > built.end {
-                let start = first.saturating_sub(OVERSCAN);
+                let start = shown.start.saturating_sub(OVERSCAN);
                 let window = ListWindow {
                     start,
-                    len: (showing + 2 * OVERSCAN).min(list.count - start),
+                    len: (shown.len() + 2 * OVERSCAN).min(list.count - start),
                 };
                 changed |=
                     self.shared
@@ -553,6 +562,7 @@ impl Ui {
             row_regions: render::RowRegions::default(),
             markdown_found: RefCell::default(),
             markdown_notes: RefCell::default(),
+            stack_ends: render::StackEnds::default(),
             opens: opens::Opens::default(),
             documents: RefCell::default(),
             markdown_again: Cell::default(),
@@ -623,6 +633,7 @@ fn view(ui: &Ui, cx: &mut Cx<Ui>) -> El {
     ui.system_dark.set(cx.system_dark());
     let began = Instant::now();
     let window = render::window(ui);
+    ui.stack_ends.drawn();
     if let Some(name) = &ui.shows {
         ui.shared.drew(name, began.elapsed());
     }
@@ -668,6 +679,10 @@ fn polled(ui: &mut Ui, tx: &mut Tx) -> bool {
     }
     changed |= ui.markdown_again.take();
     for (owner, to, note) in ui.markdown_notes.take() {
+        ui.send(&owner, &to, note);
+        changed = true;
+    }
+    for (owner, to, note) in ui.stack_ends.settle(tx) {
         ui.send(&owner, &to, note);
         changed = true;
     }

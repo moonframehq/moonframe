@@ -19,10 +19,13 @@ impl Build for Stack {
             "selected",
             "drag",
             "key",
+            "keys",
             "scroll_to",
             "measure",
+            "outside",
         ],
         pointer::POINTER,
+        ends::ENDS,
     ];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
@@ -66,15 +69,26 @@ impl Build for Stack {
             selected: fields.get("selected")?.unwrap_or(false),
             scroll_to: scroll_to.map(|index| index as usize),
             measure,
+            outside: fields
+                .get::<Data>("outside")?
+                .map(|msg| -> Result<_, Error> {
+                    Ok(Action::Send {
+                        to: fields.get("to")?,
+                        msg,
+                    })
+                })
+                .transpose()?,
             action: Action::from_fields(fields)?,
             extras: Extras::from_fields(fields)?,
             drag: fields.get("drag")?.unwrap_or(false),
             key: fields.get::<PlainId>("key")?.map(|key| key.0),
+            keys: fields.get("keys")?.unwrap_or_default(),
             pointer: Some(Pointer::from_fields(fields)?)
                 .filter(|pointer| !pointer.is_empty())
                 .map(Box::new),
             children: tree.children(fields)?,
             slots: fields.slots().to_vec(),
+            ends: Ends::from_fields(fields)?,
         })
     }
 }
@@ -96,7 +110,7 @@ impl Build for Panel {
 
 impl Build for Split {
     const CHILDREN: bool = true;
-    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["id", "divider"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, &["id", "divider", "resize", "to"]];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let panes = fields
@@ -121,6 +135,16 @@ impl Build for Split {
             },
             id: fields.get("id")?,
             divider: fields.get("divider")?.unwrap_or(true),
+            resize: match fields.get::<Data>("resize")? {
+                Some(msg) => Some(Action::Send {
+                    to: fields.get("to")?,
+                    msg,
+                }),
+                None if fields.raw("to").is_some() => {
+                    return Err(fields.cx().key("to").fail("`to` goes with `resize`"));
+                },
+                None => None,
+            },
             panes,
         })
     }
@@ -135,7 +159,8 @@ fn kind_of(table: &Table) -> Option<Element> {
 impl Build for Pane {
     const CHILDREN: bool = true;
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, LOOK, &[
-        "size", "min", "max", "fixed", "visible", "lazy", "gap", "padding", "surface", "scroll",
+        "size", "reset", "min", "max", "fixed", "visible", "lazy", "gap", "padding", "surface",
+        "scroll",
     ]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
@@ -147,6 +172,7 @@ impl Build for Pane {
         Ok(Self {
             look: Look::from_fields(fields)?,
             size,
+            reset: fields.number("reset", PIXELS)?,
             min: fields.number("min", PIXELS)?,
             max: fields.number("max", PIXELS)?,
             fixed,
@@ -198,7 +224,10 @@ impl Build for Popover {
             align: fields.get("align")?.unwrap_or(Anchor::Start),
             gap: fields.number("gap", 0.0..=1000.0)?.unwrap_or(6.0),
             width: fields.number("width", PIXELS)?,
-            keys: fields.get("keys")?.unwrap_or_default(),
+            keys: fields
+                .get::<crate::keys::LayerKeys>("keys")?
+                .map(|keys| keys.0)
+                .unwrap_or_default(),
             anchor_clicks: fields.get("anchor_clicks")?.unwrap_or(false),
             anchor: tree.children(fields)?,
             content: Box::new(tree.node(content, &fields.cx().nested("content"))?),
@@ -222,15 +251,24 @@ impl Build for Overlay {
             backdrop: fields.get("backdrop")?.unwrap_or(false),
             width: fields.number("width", PIXELS)?,
             height: fields.number("height", PIXELS)?,
-            keys: fields.get("keys")?.unwrap_or_default(),
+            keys: fields
+                .get::<crate::keys::LayerKeys>("keys")?
+                .map(|keys| keys.0)
+                .unwrap_or_default(),
             content: Box::new(tree.node(content, &fields.cx().nested("content"))?),
         })
     }
 }
 
 impl Build for List {
-    const KEYS: &'static [&'static [&'static str]] =
-        &[TYPE, FRAME, LOOK, &["id", "count", "row_height", "row"]];
+    const KEYS: &'static [&'static [&'static str]] = &[TYPE, FRAME, LOOK, &[
+        "id",
+        "count",
+        "row_height",
+        "row",
+        "range",
+        "to",
+    ]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
         let id = fields
@@ -252,15 +290,12 @@ impl Build for List {
                     .key("count")
                     .fail(format!("expected 0 to {MAX_ROWS} rows"))
             })?;
-        let row_height = fields
-            .number("row_height", 1.0..=10_000.0)?
-            .ok_or_else(|| {
-                fields
-                    .cx()
-                    .key("row_height")
-                    .fail("missing: each row's height in pixels")
-            })?;
+        let row_height = row_heights(fields, count)?;
         let row: mlua::Function = fields.need("row")?;
+        let to: Option<String> = fields.get("to")?;
+        if to.is_some() && fields.raw("range").is_none() {
+            return Err(fields.cx().key("to").fail("`to` goes with a `range`"));
+        }
         let window = tree.windows.get(&id).copied().unwrap_or(ListWindow::FIRST);
         let range = window.range(count);
         let cx = fields.cx().key("row");
@@ -280,12 +315,43 @@ impl Build for List {
             row_height,
             start: range.start,
             rows,
+            range: fields
+                .get::<Data>("range")?
+                .map(|msg| Action::Send { to, msg }),
         })
     }
 }
 
 /// The most rows a list may have; it builds only those that show.
 const MAX_ROWS: usize = 10_000_000;
+/// The most rows a list whose rows each have their own height may have:
+/// it asks for every row's height each time the view runs.
+const MAX_SIZED_ROWS: usize = 100_000;
+const ROW_HEIGHT: std::ops::RangeInclusive<f32> = 1.0..=10_000.0;
+
+/// `row_height`: a number for every row, or a function giving row `i`'s.
+fn row_heights(fields: &Fields, count: usize) -> Result<RowHeights, Error> {
+    let cx = fields.cx().key("row_height");
+    let Some(Value::Function(height)) = fields.raw("row_height") else {
+        return fields
+            .number("row_height", ROW_HEIGHT)?
+            .map(RowHeights::Same)
+            .ok_or_else(|| cx.fail("missing: each row's height in pixels"));
+    };
+    if count > MAX_SIZED_ROWS {
+        return Err(cx.fail(format!(
+            "a function only for up to {MAX_SIZED_ROWS} rows; give one height for more"
+        )));
+    }
+    let mut heights = Vec::with_capacity(count);
+    for index in 1..=count {
+        let row = height
+            .call::<f32>(index)
+            .map_err(|error| Error::from(error).context(format!("row_height({index})")))?;
+        heights.push(crate::read::within(row, ROW_HEIGHT, &cx.index(index))?);
+    }
+    Ok(RowHeights::each(heights))
+}
 
 /// The element a popover or overlay floats.
 fn content<'f>(fields: &'f Fields) -> Result<&'f Value, Error> {
