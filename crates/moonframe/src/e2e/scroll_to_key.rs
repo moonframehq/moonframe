@@ -89,3 +89,50 @@ fn an_inner_request_does_not_hide_the_outer_one(cx: &mut TestAppContext) {
         "{wanted:?} {outer:?}"
     );
 }
+
+/// A card growing in before the row as it is asked for: the column follows
+/// the row until the card is in place.
+const GROWING: &str = r##"
+return mod {
+	init = function()
+		return { log = "", added = false }
+	end,
+	update = function(state, msg)
+		if msg == "go" then
+			state.added = true
+			state.target = { key = "wanted", seq = 1 }
+		end
+	end,
+	styles = { [".grow-in"] = { transition = "slide 200ms linear" } },
+	view = function(state)
+		local rows = {}
+		for i = 1, 6 do
+			table.insert(rows, ui.row { key = `after-{i}`, height = 40, shrink = false, ui.text { `after {i}` } })
+		end
+		return shell(state, ui.column {
+			ui.row { class = "go", msg = "go", ui.text { "Go" } },
+			ui.column { class = "growing", height = 200, gap = "none", scroll = true, scroll_to = state.target,
+				ui.row { key = "first", height = 40, shrink = false, ui.text { "first" } },
+				state.added and ui.row { key = "card", class = "grow-in", height = 300, shrink = false, ui.text { "card" } },
+				ui.row { key = "wanted", class = "wanted", height = 40, shrink = false, ui.text { "wanted" } },
+				table.unpack(rows),
+			},
+		})
+	end,
+}
+"##;
+
+#[gpui_kit::test]
+fn a_reveal_follows_its_row_while_a_card_grows_in_before_it(cx: &mut TestAppContext) {
+    let mut window = open(cx, GROWING);
+    window.click("go");
+    for _ in 0..16 {
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        window.settle();
+    }
+    let (list, wanted) = (window.bounds("growing"), window.bounds("wanted"));
+    assert!(
+        wanted.top() >= list.top() && wanted.bottom() <= list.bottom() + px(1.),
+        "{wanted:?} {list:?}"
+    );
+}
