@@ -63,12 +63,12 @@ local function by_day(a: any, b: any): boolean
 	if ha ~= hb then
 		return ha < hb
 	end
-	local ta = a.title or ""
-	local tb = b.title or ""
+	local ta = tostring(a.title or "")
+	local tb = tostring(b.title or "")
 	if ta ~= tb then
 		return ta < tb
 	end
-	return (a.id or "") < (b.id or "")
+	return tostring(a.id or "") < tostring(b.id or "")
 end
 
 local function find_item(planner: any, id: string?): any
@@ -780,8 +780,8 @@ return mod {
 				end
 			end
 			table.sort(upcoming_ev, function(a: any, b: any)
-				local da = a.date or "~"
-				local db = b.date or "~"
+				local da = tostring(a.date or "~")
+				local db = tostring(b.date or "~")
 				if da ~= db then
 					return da < db
 				end
@@ -790,12 +790,12 @@ return mod {
 				if ha ~= hb then
 					return ha < hb
 				end
-				local ta = a.title or ""
-				local tb = b.title or ""
+				local ta = tostring(a.title or "")
+				local tb = tostring(b.title or "")
 				if ta ~= tb then
 					return ta < tb
 				end
-				return (a.id or "") < (b.id or "")
+				return tostring(a.id or "") < tostring(b.id or "")
 			end)
 			return ui.column {
 				class = "agenda",

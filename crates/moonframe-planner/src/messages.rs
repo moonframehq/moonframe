@@ -64,14 +64,27 @@ pub(crate) fn done_dates_set(item: &Map<String, Value>) -> BTreeSet<String> {
         .collect()
 }
 
+/// Whether an item counts as completed on `today`. For habits, derives
+/// completion from `done_dates` when present, falling back to a same-day
+/// `done` flag for older habits that predate `done_dates`.
+pub(crate) fn is_done_today(item: &Map<String, Value>, today: &str) -> bool {
+    if item.get("habit").is_some_and(truthy) {
+        if item.get("done_dates").is_some_and(Value::is_array) {
+            return done_dates_set(item).contains(today);
+        }
+        return item.get("done").is_some_and(truthy)
+            && item.get("date").filter(|d| truthy(d)).map(text).as_deref() == Some(today);
+    }
+    item.get("done").is_some_and(truthy)
+}
+
 /// Effective progress for a habit on `today`, resetting stale values from
 /// earlier days.
 pub(crate) fn habit_progress_for_day(item: &Map<String, Value>, today_str: &str) -> i64 {
     if item.get("progress_date").and_then(Value::as_str) == Some(today_str) {
         return item.get("progress").and_then(integer).unwrap_or(0).max(0);
     }
-    let dates = done_dates_set(item);
-    if dates.contains(today_str) {
+    if is_done_today(item, today_str) {
         return item.get("goal").and_then(integer).unwrap_or(0).max(0);
     }
     0
@@ -145,13 +158,9 @@ impl Planner {
         if let Some(id) = field(msg, "toggle")
             && let Some(item) = self.find(id)
         {
+            let today_str = day(today, None, 0);
             let is_habit = item.get("habit").is_some_and(truthy);
-            let done = if is_habit {
-                let today_str = day(today, None, 0);
-                !done_dates_set(item).contains(&today_str)
-            } else {
-                !item.get("done").is_some_and(truthy)
-            };
+            let done = !is_done_today(item, &today_str);
             item.insert("done".to_owned(), json!(done));
             if is_habit {
                 sync_habit_today(item, today, done);
@@ -284,6 +293,7 @@ impl Planner {
             if let Some(goal) = msg.get("goal").and_then(integer).filter(|&g| g > 0) {
                 item.insert("goal".to_owned(), json!(goal));
                 item.insert("progress".to_owned(), json!(0));
+                item.insert("progress_date".to_owned(), json!(day(today, None, 0)));
             }
         }
         if let Some(folder) = msg.get("folder").and_then(Value::as_str)
@@ -542,6 +552,9 @@ impl Planner {
             return false;
         };
         let mut dates = done_dates_set(item);
+        if item.get("done_dates").is_none() && is_done_today(item, &today_str) {
+            dates.insert(today_str.clone());
+        }
         let now_checked = if dates.contains(&target_date) {
             dates.remove(&target_date);
             false
@@ -661,7 +674,7 @@ impl Planner {
         let mut changed = false;
         for item in items.iter_mut().filter_map(Value::as_object_mut) {
             let is_task = item.get("kind").and_then(Value::as_str) == Some("task");
-            let done = item.get("done").is_some_and(truthy);
+            let done = is_done_today(item, &today_str);
             let earlier = item
                 .get("date")
                 .filter(|d| truthy(d))
@@ -669,6 +682,9 @@ impl Planner {
                 .is_some_and(|d| d < today_str);
             if is_task && !done && earlier {
                 item.insert("date".to_owned(), json!(today_str));
+                if item.get("habit").is_some_and(truthy) {
+                    item.insert("done".to_owned(), json!(false));
+                }
                 changed = true;
             }
         }

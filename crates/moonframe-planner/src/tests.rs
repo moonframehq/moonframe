@@ -713,4 +713,24 @@ fn habits_roll_over_at_midnight_and_covers_and_quick_dates_stay_accurate() {
     assert!(planner.receive(&json!({ "update": plain_id, "cover": "none" }), oct31));
     let pub_notes2 = planner.published(at("2026-10-31 12:00"));
     assert_eq!(item(&pub_notes2, &plain_id)["cover"], "none");
+
+    // Overdue habit completed yesterday is rescheduled to today.
+    let (_temp2, mut planner2) = with_items(json!([
+        {"id": "oh", "kind": "task", "title": "Stretch", "date": "2026-10-30", "habit": true,
+         "done": true, "done_dates": ["2026-10-30"]},
+        {"id": "legacy", "kind": "task", "title": "Walk", "date": "2026-10-31", "habit": true,
+         "done": true},
+    ]));
+    let before = planner2.published(at("2026-10-31 09:00"));
+    assert_eq!(item(&before, "oh")["overdue"], true);
+    assert_eq!(item(&before, "legacy")["done"], true);
+    assert!(planner2.receive(&json!({ "reschedule_overdue": true }), oct31));
+    let after_resched = planner2.published(at("2026-10-31 09:00"));
+    assert_eq!(item(&after_resched, "oh")["date"], "2026-10-31");
+    assert_eq!(item(&after_resched, "oh")["overdue"], false);
+
+    // Older habit without done_dates unchecks on the very first toggle click.
+    assert!(planner2.receive(&json!({ "toggle": "legacy" }), oct31));
+    let after_toggle = planner2.published(at("2026-10-31 09:00"));
+    assert_eq!(item(&after_toggle, "legacy")["done"], false);
 }

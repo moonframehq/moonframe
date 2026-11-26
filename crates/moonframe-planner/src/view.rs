@@ -5,7 +5,7 @@ use {
     crate::{
         Planner,
         dates::{day, label, parts},
-        messages::{compute_streak, done_dates_set, habit_progress_for_day},
+        messages::{compute_streak, done_dates_set, habit_progress_for_day, is_done_today},
         values::{field, integer, text, truthy},
     },
     chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike},
@@ -21,17 +21,6 @@ const DEFAULT_DURATION_MINS: i64 = 60;
 
 fn is(item: &Map<String, Value>, key: &str, word: &str) -> bool {
     item.get(key).and_then(Value::as_str) == Some(word)
-}
-
-fn is_done_today(item: &Map<String, Value>, today: &str) -> bool {
-    if item.get("habit").is_some_and(truthy) {
-        if item.get("done_dates").is_some_and(Value::is_array) {
-            return done_dates_set(item).contains(today);
-        }
-        return item.get("done").is_some_and(truthy)
-            && item.get("date").filter(|d| truthy(d)).map(text).as_deref() == Some(today);
-    }
-    item.get("done").is_some_and(truthy)
 }
 
 fn parse_hour(time: &str) -> Option<f64> {

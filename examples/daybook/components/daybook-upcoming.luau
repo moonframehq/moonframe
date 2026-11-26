@@ -33,12 +33,12 @@ local function sort_items(items: { any })
 		if ha ~= hb then
 			return ha < hb
 		end
-		local ta = a.title or ""
-		local tb = b.title or ""
+		local ta = tostring(a.title or "")
+		local tb = tostring(b.title or "")
 		if ta ~= tb then
 			return ta < tb
 		end
-		return (a.id or "") < (b.id or "")
+		return tostring(a.id or "") < tostring(b.id or "")
 	end)
 end
 
