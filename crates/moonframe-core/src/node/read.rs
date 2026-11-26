@@ -9,6 +9,7 @@ mod embed;
 mod ends;
 mod input;
 mod layout;
+mod list_scroll;
 mod map;
 mod pointer;
 mod revision_timeline;

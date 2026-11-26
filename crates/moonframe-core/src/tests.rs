@@ -26,6 +26,7 @@ mod gestures;
 mod history;
 mod input_caret;
 mod lightbox;
+mod list_scroll;
 mod maps;
 mod markdown_tooltips;
 mod mods;

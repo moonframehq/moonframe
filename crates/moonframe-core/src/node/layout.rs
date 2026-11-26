@@ -263,9 +263,11 @@ pub struct List {
     pub start: usize,
     /// The rows from `start` the view built.
     pub rows: Vec<Node>,
-    /// Sent with the first and last row that show as they change, so a
-    /// mod can fetch the rows around them.
+    /// Sent with the first and last row that show, and how far it is
+    /// scrolled, as they change, so a mod can fetch the rows around them.
     pub range: Option<Action>,
+    /// A row to reveal, or a `y` to go back to, when it changes.
+    pub scroll_to: Option<ListScrollTo>,
 }
 
 /// The rows of a list a view builds: from `start`, `len` of them.

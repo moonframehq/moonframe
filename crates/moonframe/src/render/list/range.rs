@@ -1,6 +1,7 @@
-//! A `ui.list` with `range`: told which rows show as the user scrolls, so
-//! its mod can ask a provider for the rows around them while `count` stays
-//! the whole total. Told only of changes, and at most every [`EVERY`]
+//! A `ui.list` with `range`: told which rows show, and how far it is
+//! scrolled, as the user scrolls, so its mod can ask a provider for the
+//! rows around them while `count` stays the whole total, and knows when it
+//! is at the top. Told only of changes, and at most every [`EVERY`]
 //! while they come fast, the last one always arriving.
 
 use {
@@ -29,15 +30,19 @@ thread_local! {
 /// The rows that show, one-based; `(0, 0)` when none does.
 pub(super) type Shown = (usize, usize);
 
+/// What a list tells: the rows that show, and how far down it is scrolled
+/// in whole pixels.
+pub(super) type Reading = (Shown, i64);
+
 #[derive(Default)]
 struct Kept {
     /// The list drawn there: its id and `range`. Another list in its place
     /// starts afresh.
     list: Option<(String, Action)>,
     /// The last range told, and when.
-    told: Option<(Shown, Instant)>,
+    told: Option<(Reading, Instant)>,
     /// A range held back until [`EVERY`] has passed.
-    untold: Option<Shown>,
+    untold: Option<Reading>,
     /// The window frame it was last drawn in, and when.
     frame: u64,
     seen: Option<Instant>,
@@ -73,7 +78,7 @@ pub(super) fn shown(scrolled: f32, height: f32, heights: &RowHeights, count: usi
 
 /// Whether the list `list` at `key`, drawn in window frame `frame` and
 /// showing `rows`, tells its mod `now`.
-fn tell(key: &str, list: &(String, Action), frame: u64, rows: Shown, now: Instant) -> Tell {
+fn tell(key: &str, list: &(String, Action), frame: u64, rows: Reading, now: Instant) -> Tell {
     KEPT.with_borrow_mut(|kept| {
         kept.retain(|_, entry| {
             entry
@@ -115,7 +120,7 @@ fn tell(key: &str, list: &(String, Action), frame: u64, rows: Shown, now: Instan
 /// The range held back from the list `key` of `generation`, if that list
 /// is still there (drawn in `frame`, the window's last, or the one before)
 /// and it is not the range told; and the list's `range`, which tells it.
-fn late(key: &str, generation: u64, frame: u64, now: Instant) -> Option<(Shown, Action)> {
+fn late(key: &str, generation: u64, frame: u64, now: Instant) -> Option<(Reading, Action)> {
     KEPT.with_borrow_mut(|kept| {
         let entry = kept.get_mut(key)?;
         // Held for another list: what waits now is that one's.
@@ -135,14 +140,15 @@ fn late(key: &str, generation: u64, frame: u64, now: Instant) -> Option<(Shown, 
     })
 }
 
-/// `msg` with `first` and `last` added.
-pub(super) fn message(msg: &Data, (first, last): Shown) -> Data {
+/// `msg` with `first`, `last` and `y` added.
+pub(super) fn message(msg: &Data, ((first, last), y): Reading) -> Data {
     let number = |row: usize| Data::Integer(row as i64);
     with_fields(
         msg,
         BTreeMap::from([
             ("first".to_owned(), number(first)),
             ("last".to_owned(), number(last)),
+            ("y".to_owned(), Data::Integer(y)),
         ]),
     )
 }
@@ -183,7 +189,10 @@ pub(super) fn reader(
             let shows = handle.bounds();
             let scrolled = f32::from(shows.top() - rows.get().top());
             let height = f32::from(shows.size.height);
-            let rows = shown(scrolled, height, &heights, count);
+            let rows = (
+                shown(scrolled, height, &heights, count),
+                (-f32::from(handle.offset().y)).max(0.0).round() as i64,
+            );
             match tell(&key, &list, frame, rows, Instant::now()) {
                 Tell::No => {},
                 Tell::Now => {
@@ -261,23 +270,26 @@ mod tests {
         let start = Instant::now();
         let at = |ms| start + Duration::from_millis(ms);
         let (key, rows) = ("told", list("rows"));
-        assert_eq!(tell(key, &rows, 1, (1, 5), at(0)), Tell::Now);
-        assert_eq!(tell(key, &rows, 2, (1, 5), at(10)), Tell::No);
+        assert_eq!(tell(key, &rows, 1, ((1, 5), 0), at(0)), Tell::Now);
+        assert_eq!(tell(key, &rows, 2, ((1, 5), 0), at(10)), Tell::No);
         assert_eq!(
-            tell(key, &rows, 3, (2, 6), at(30)),
+            tell(key, &rows, 3, ((2, 6), 0), at(30)),
             Tell::After(Duration::from_millis(70), 1)
         );
         // Held back already: the latest replaces it.
-        assert_eq!(tell(key, &rows, 4, (3, 7), at(50)), Tell::No);
-        assert_eq!(late(key, 1, 4, at(100)), Some(((3, 7), rows.1.clone())));
+        assert_eq!(tell(key, &rows, 4, ((3, 7), 0), at(50)), Tell::No);
+        assert_eq!(
+            late(key, 1, 4, at(100)),
+            Some((((3, 7), 0), rows.1.clone()))
+        );
         assert_eq!(late(key, 1, 4, at(100)), None);
-        assert_eq!(tell(key, &rows, 5, (9, 13), at(300)), Tell::Now);
+        assert_eq!(tell(key, &rows, 5, ((9, 13), 0), at(300)), Tell::Now);
         // Back where it was told before the wait ended: nothing to say.
         assert_eq!(
-            tell(key, &rows, 6, (10, 14), at(310)),
+            tell(key, &rows, 6, ((10, 14), 0), at(310)),
             Tell::After(Duration::from_millis(90), 1)
         );
-        assert_eq!(tell(key, &rows, 7, (9, 13), at(320)), Tell::No);
+        assert_eq!(tell(key, &rows, 7, ((9, 13), 0), at(320)), Tell::No);
         assert_eq!(late(key, 1, 7, at(400)), None);
     }
 
@@ -285,10 +297,10 @@ mod tests {
     fn a_list_drawn_again_after_a_gap_tells_its_mod_again() {
         let now = Instant::now();
         let (key, rows) = ("again", list("rows"));
-        assert_eq!(tell(key, &rows, 1, (1, 5), now), Tell::Now);
-        assert_eq!(tell(key, &rows, 2, (1, 5), now), Tell::No);
+        assert_eq!(tell(key, &rows, 1, ((1, 5), 0), now), Tell::Now);
+        assert_eq!(tell(key, &rows, 2, ((1, 5), 0), now), Tell::No);
         // Not drawn in frame 3.
-        assert_eq!(tell(key, &rows, 4, (1, 5), now), Tell::Now);
+        assert_eq!(tell(key, &rows, 4, ((1, 5), 0), now), Tell::Now);
     }
 
     #[test]
@@ -296,21 +308,21 @@ mod tests {
         let start = Instant::now();
         let at = |ms| start + Duration::from_millis(ms);
         let (key, old, new) = ("replaced", list("old"), list("new"));
-        assert_eq!(tell(key, &old, 1, (1, 5), at(0)), Tell::Now);
+        assert_eq!(tell(key, &old, 1, ((1, 5), 0), at(0)), Tell::Now);
         assert_eq!(
-            tell(key, &old, 2, (2, 6), at(10)),
+            tell(key, &old, 2, ((2, 6), 0), at(10)),
             Tell::After(Duration::from_millis(90), 1)
         );
         // The same rows, another list: told at once.
-        assert_eq!(tell(key, &new, 3, (2, 6), at(20)), Tell::Now);
+        assert_eq!(tell(key, &new, 3, ((2, 6), 0), at(20)), Tell::Now);
         // The new list scrolls before the old wait ends: its own range
         // waits, and the old wait leaves it alone.
         assert_eq!(
-            tell(key, &new, 4, (3, 7), at(30)),
+            tell(key, &new, 4, ((3, 7), 0), at(30)),
             Tell::After(Duration::from_millis(90), 2)
         );
         assert_eq!(late(key, 1, 4, at(100)), None);
-        assert_eq!(late(key, 2, 4, at(120)), Some(((3, 7), new.1.clone())));
+        assert_eq!(late(key, 2, 4, at(120)), Some((((3, 7), 0), new.1.clone())));
     }
 
     #[test]
@@ -318,9 +330,9 @@ mod tests {
         let start = Instant::now();
         let at = |ms| start + Duration::from_millis(ms);
         let (key, rows) = ("gone", list("rows"));
-        assert_eq!(tell(key, &rows, 1, (1, 5), at(0)), Tell::Now);
+        assert_eq!(tell(key, &rows, 1, ((1, 5), 0), at(0)), Tell::Now);
         assert_eq!(
-            tell(key, &rows, 2, (2, 6), at(10)),
+            tell(key, &rows, 2, ((2, 6), 0), at(10)),
             Tell::After(Duration::from_millis(90), 1)
         );
         // Frames 3 and 4 drew the window without it.
@@ -331,19 +343,29 @@ mod tests {
     fn a_list_not_drawn_for_long_is_forgotten() {
         let start = Instant::now();
         let (key, rows) = ("forgotten", list("rows"));
-        assert_eq!(tell(key, &rows, 1, (1, 5), start), Tell::Now);
+        assert_eq!(tell(key, &rows, 1, ((1, 5), 0), start), Tell::Now);
         let later = start + super::FORGET + Duration::from_secs(1);
-        assert_eq!(tell("other", &rows, 1, (1, 5), later), Tell::Now);
+        assert_eq!(tell("other", &rows, 1, ((1, 5), 0), later), Tell::Now);
         assert!(super::KEPT.with_borrow(|kept| !kept.contains_key(key)));
     }
 
     #[test]
     fn the_message_is_the_mods_with_the_rows_added() {
-        let Data::Map(told) = message(&Data::String("rows".into()), (3, 9)) else {
+        let Data::Map(told) = message(&Data::String("rows".into()), ((3, 9), 120)) else {
             panic!("a map")
         };
         assert_eq!(told.get("msg"), Some(&Data::String("rows".into())));
         assert_eq!(told.get("first"), Some(&Data::Integer(3)));
         assert_eq!(told.get("last"), Some(&Data::Integer(9)));
+        assert_eq!(told.get("y"), Some(&Data::Integer(120)));
+    }
+
+    #[test]
+    fn a_scroll_within_the_same_rows_is_told_too() {
+        let now = Instant::now();
+        let (key, rows) = ("scrolled", list("rows"));
+        assert_eq!(tell(key, &rows, 1, ((1, 5), 0), now), Tell::Now);
+        let later = now + Duration::from_millis(200);
+        assert_eq!(tell(key, &rows, 2, ((1, 5), 8), later), Tell::Now);
     }
 }

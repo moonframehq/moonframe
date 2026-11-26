@@ -16,6 +16,7 @@ mod icon;
 mod input;
 mod instance;
 mod layout;
+mod list_scroll;
 mod map;
 mod pointer;
 mod read;
@@ -27,8 +28,8 @@ mod video;
 // keep-sorted end
 
 pub use {
-    embed::*, ends::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*,
-    revision_timeline::*, rows::*, snapshot::*, tokens::*, video::*,
+    embed::*, ends::*, gesture::*, icon::*, input::*, instance::*, layout::*, list_scroll::*,
+    map::*, pointer::*, revision_timeline::*, rows::*, snapshot::*, tokens::*, video::*,
 };
 
 pub(crate) use read::{element_keys, read};
