@@ -6,8 +6,9 @@
 //! descendants draw inside ([`Painter::reveal`]); the first with the key
 //! draws a mark that records where it is, and the stack, which lays out
 //! after its children, scrolls to it and draws again, until it stays put
-//! and nothing inside the stack moves (a card growing in before it, or
-//! waiting to, may push it on for a while).
+//! and nothing inside the stack grows or shrinks (a card growing in before
+//! it, or waiting to, may push it on for a while). Scrolling by hand in
+//! between ends it.
 
 use {
     super::{Painter, Place},
@@ -28,9 +29,12 @@ pub(crate) struct Pending {
     /// it has been revealed in.
     last: Cell<Option<Point<Pixels>>>,
     tries: Cell<u32>,
-    /// Something inside the stack moved this frame (a card growing in, or
-    /// waiting to): the target may yet move.
+    /// Something inside the stack grew or shrank this frame (a card growing
+    /// in, or waiting to): the target may yet move.
     moving: Cell<bool>,
+    /// The offset it last scrolled to: one that differs since is the
+    /// user's, which ends the reveal.
+    set: Cell<Option<Point<Pixels>>>,
     done: Cell<bool>,
 }
 
@@ -47,6 +51,7 @@ impl Pending {
             last: Cell::new(None),
             tries: Cell::new(0),
             moving: Cell::new(false),
+            set: Cell::new(None),
             done: Cell::new(false),
         }
     }
@@ -63,9 +68,9 @@ pub(super) struct Revealing {
     pending: Option<Rc<Pending>>,
     /// The marks this stack draws, being what stacks around it ask for.
     marks: Vec<AnyElement>,
-    /// Whether what was drawn before this stack moves, put back once its
+    /// Whether what was drawn before this stack resizes, put back once its
     /// children have said whether they do.
-    animating: bool,
+    resizing: bool,
 }
 
 /// Before `stack` draws its children: its scroll handle, with any
@@ -82,16 +87,16 @@ pub(super) fn begin(stack: &Stack, painter: &mut Painter<'_, '_>, place: &Place<
     let (handle, pending) = painter
         .motion
         .scroll_to(&place.path, stack.scroll_to.as_ref());
-    let animating = painter.animating;
+    let resizing = painter.resizing;
     if let Some(pending) = &pending {
         painter.reveal.push(pending.clone());
-        painter.animating = false;
+        painter.resizing = false;
     }
     Revealing {
         handle,
         pending,
         marks,
-        animating,
+        resizing,
     }
 }
 
@@ -101,8 +106,8 @@ impl Revealing {
     pub(super) fn end(self, painter: &mut Painter<'_, '_>) -> (ScrollHandle, Vec<AnyElement>) {
         if let Some(pending) = &self.pending {
             painter.reveal.pop();
-            pending.moving.set(painter.animating);
-            painter.animating |= self.animating;
+            pending.moving.set(painter.resizing);
+            painter.resizing |= self.resizing;
         }
         let reader = self.pending.map(|pending| reader(pending, &self.handle));
         let extra = self.marks.into_iter().chain(reader).collect();
@@ -140,14 +145,23 @@ fn reader(pending: Rc<Pending>, handle: &ScrollHandle) -> AnyElement {
                 return;
             };
             let (view, offset) = (handle.bounds(), handle.offset());
+            let near = |a: Point<Pixels>, b: Point<Pixels>| {
+                (a.x - b.x).abs() < px(0.5) && (a.y - b.y).abs() < px(0.5)
+            };
+            if pending.set.get().is_some_and(|set| !near(set, offset)) {
+                pending.done.set(true);
+                return;
+            }
             let shown = revealed(view, target, offset, handle.max_offset());
             if shown != offset {
                 handle.set_offset(shown);
             }
+            pending.set.set(Some(shown));
             let at = target.origin - view.origin - offset;
-            let settled = pending.last.replace(Some(at)).is_some_and(|last| {
-                (last.x - at.x).abs() < px(0.5) && (last.y - at.y).abs() < px(0.5)
-            });
+            let settled = pending
+                .last
+                .replace(Some(at))
+                .is_some_and(|last| near(last, at));
             pending.tries.set(pending.tries.get() + 1);
             if (settled && !pending.moving.get()) || pending.tries.get() >= MAX_TRIES {
                 pending.done.set(true);

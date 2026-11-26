@@ -136,3 +136,46 @@ fn a_reveal_follows_its_row_while_a_card_grows_in_before_it(cx: &mut TestAppCont
         "{wanted:?} {list:?}"
     );
 }
+
+/// A spinner in the column animates every frame without moving any row:
+/// the reveal still ends, and the wheel is free after it.
+const SPINNING: &str = r##"
+return mod {
+	init = function()
+		return { log = "" }
+	end,
+	update = function(state, msg)
+		if msg == "go" then
+			state.target = { key = "wanted", seq = 1 }
+		end
+	end,
+	view = function(state)
+		local rows = {}
+		for i = 1, 10 do
+			table.insert(rows, ui.row { key = `row-{i}`, height = 40, shrink = false, ui.text { `row {i}` } })
+		end
+		table.insert(rows, ui.row { key = "wanted", class = "wanted", height = 40, shrink = false, ui.text { "wanted" } })
+		return shell(state, ui.column {
+			ui.row { class = "go", msg = "go", ui.text { "Go" } },
+			ui.column { class = "spinning", height = 200, gap = "none", scroll = true, scroll_to = state.target,
+				ui.row { height = 40, shrink = false, ui.icon { "loader", spin = true } },
+				table.unpack(rows),
+			},
+		})
+	end,
+}
+"##;
+
+#[gpui_kit::test]
+fn a_spinner_does_not_hold_the_scroll_after_a_reveal(cx: &mut TestAppContext) {
+    let mut window = open(cx, SPINNING);
+    window.click("go");
+    let list = window.bounds("spinning");
+    assert!(window.bounds("wanted").bottom() <= list.bottom() + px(1.));
+    window.wheel("spinning", -400.0);
+    for _ in 0..4 {
+        window.settle();
+    }
+    let wanted = window.bounds("wanted");
+    assert!(wanted.top() > list.bottom(), "{wanted:?} {list:?}");
+}
