@@ -2822,7 +2822,7 @@ system_load { cpu = 0.14, history = { 0.1, 0.2, 0.1, 0.3, 0.2, 0.6, 0.4, 0.2, 0.
 | `height` | pixels: the body scrolls within it |
 | `id` | names the list a long scrolling body becomes (default "table"); two long tables in one mod need two |
 | `marker` | draw a drop line by a row: { id, after? }, or { group } for a group's end |
-| `measure` | with `height` or `grow`, the scrolling body's `measure`, sent to `to`: its `first`, `last`, `y`, ... count rows, not the header (with `groups`, headings and Add rows too); a body past 200 rows is a `ui.list`, which takes `range` instead |
+| `measure` | with `height` or `grow`, the scrolling body's `measure`, sent to `to`: its `first`, `last`, `y`, ... count rows, not the header (with `groups`, headings and Add rows too; empty, `first` and `last` are 0); a body past 200 rows is a `ui.list`, which takes `range` instead |
 | `reorder` | rows drag to another place: a drop on a row sends { [reorder] = its id, group, phase, carry = { row, group }, y } (before it when `y < 0.5`), on a group's heading { [reorder] = true, group, ... } (its end); `over` and `leave` come the same way |
 | `rows` | list of maps: `id` plus a value per column key; a value may be a string, a number or an element |
 | `scroll_to` | with `height` or `grow`, the scrolling body's `scroll_to`: reveals row n (one-based, counted as `measure` counts) when it changes |

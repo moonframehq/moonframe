@@ -515,4 +515,16 @@ return mod {{
     let (_dir, workspace) = fixture(&source(""), &["table"]);
     let rows = body(&workspace);
     assert!(rows.measure.is_none() && rows.scroll_to.is_none());
+    // Emptied, it is still measured, by a column of no rows beside the
+    // empty text.
+    let (_dir, workspace) = fixture(
+        &source("height = 300,").replace("for i = 1, 20", "for i = 1, 0"),
+        &["table"],
+    );
+    let empty = body(&workspace);
+    let [Node::Stack(text), Node::Stack(measured)] = &empty.children[..] else {
+        panic!("the empty text and a measured column: {:?}", empty.children)
+    };
+    assert!(text.measure.is_none());
+    assert!(measured.children.is_empty() && measured.measure.is_some());
 }

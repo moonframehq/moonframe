@@ -85,7 +85,7 @@ return component {
 		["add_label"] = "the text of a group's Add row (default \"Add\")",
 		["reorder"] = "rows drag to another place: a drop on a row sends { [reorder] = its id, group, phase, carry = { row, group }, y } (before it when `y < 0.5`), on a group's heading { [reorder] = true, group, ... } (its end); `over` and `leave` come the same way",
 		["marker"] = "draw a drop line by a row: { id, after? }, or { group } for a group's end",
-		["measure"] = "with `height` or `grow`, the scrolling body's `measure`, sent to `to`: its `first`, `last`, `y`, ... count rows, not the header (with `groups`, headings and Add rows too); a body past 200 rows is a `ui.list`, which takes `range` instead",
+		["measure"] = "with `height` or `grow`, the scrolling body's `measure`, sent to `to`: its `first`, `last`, `y`, ... count rows, not the header (with `groups`, headings and Add rows too; empty, `first` and `last` are 0); a body past 200 rows is a `ui.list`, which takes `range` instead",
 		["scroll_to"] = "with `height` or `grow`, the scrolling body's `scroll_to`: reveals row n (one-based, counted as `measure` counts) when it changes",
 	},
 	styles = {
@@ -408,6 +408,8 @@ table_view {
 					justify = "center",
 					ui.text { props.empty or "Nothing to show", class = "table-empty-text" },
 				},
+				-- Still measured, with no rows: `first` and `last` go to 0.
+				measure ~= nil and ui.column { grow = true, scroll = true, measure = measure, to = measure_to },
 			}
 		else
 			local rows = table.create<<Element>>(count)
