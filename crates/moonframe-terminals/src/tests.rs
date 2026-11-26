@@ -204,6 +204,7 @@ fn actions_go_to_the_backend_that_owns_the_address() {
     core.watching = Some(Watch {
         address: "default:%3".into(),
         by: "peek".into(),
+        window: Origin::default(),
     });
     assert_eq!(core.peek().unwrap()["text"], "screen of default:%3");
     assert!(

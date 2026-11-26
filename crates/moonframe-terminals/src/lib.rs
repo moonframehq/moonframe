@@ -74,7 +74,7 @@ mod tmux;
 
 use {
     moonframe_core::Data,
-    moonframe_providers::{Handle, Mods, Native, from_json},
+    moonframe_providers::{Handle, Mods, Native, Origin, from_json},
     serde_json::{Value, json},
     std::{
         io::{self, Read, Write as _},
@@ -102,10 +102,12 @@ const PROGRAMS_EVERY: u64 = 10;
 /// Ticks between looks at herdr-core's machines.
 const MACHINES_EVERY: u64 = 30;
 
-/// A terminal a writer watches: its screen goes to that mod alone.
+/// A terminal a writer watches: its screen goes to that mod alone, in the
+/// window that asked.
 struct Watch {
     address: String,
     by: String,
+    window: Origin,
 }
 
 /// What one backend listed at a tick.
@@ -340,7 +342,7 @@ impl Terminals {
             return;
         }
         if let (Some(watch), Ok(data)) = (&self.watching, from_json(&json!({ "peek": peek }))) {
-            host.send(&watch.by, data);
+            host.send_to_origin(watch.window, &watch.by, data);
         }
         self.peeked = peek;
     }
@@ -490,6 +492,7 @@ impl Native for Terminals {
             self.watching = (!address.is_empty()).then(|| Watch {
                 address: address.to_owned(),
                 by: from.to_owned(),
+                window: host.origin(),
             });
             self.peeked = Value::Null;
         } else if let Some((action, address, result)) = self.act(&message) {

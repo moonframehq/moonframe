@@ -31,6 +31,11 @@ thread_local! {
     static ANSWERING: Cell<Option<u64>> = const { Cell::new(None) };
 }
 
+/// Which of the app's windows a message came from, kept by a native
+/// provider to answer it later ([`Handle::origin`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Origin(Option<u64>);
+
 /// A provider written in Rust and built into the app.
 ///
 /// Every call runs on the provider's own thread; a panic stops the provider
@@ -122,6 +127,25 @@ impl Handle {
             to: to.to_owned(),
             msg,
             origin: ANSWERING.get(),
+        });
+    }
+
+    /// The window whose message this provider is handling now, to answer
+    /// later with [`Handle::send_to_origin`]: a reply that comes after
+    /// `receive` returns (each tick, say) still reaches only that window's
+    /// mod. Outside `receive` it is every window.
+    pub fn origin(&self) -> Origin {
+        Origin(ANSWERING.get())
+    }
+
+    /// Sends `msg` to the mod `to` in the window `origin` names, as
+    /// [`Handle::send`] does from within `receive`.
+    pub fn send_to_origin(&self, origin: Origin, to: &str, msg: Data) {
+        (self.events)(Event::Sent {
+            provider: self.name.clone(),
+            to: to.to_owned(),
+            msg,
+            origin: origin.0,
         });
     }
 
@@ -221,5 +245,35 @@ pub(crate) fn run(context: &Context, factory: Option<Factory>) {
             context.fail(problem);
             return;
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use {
+        super::*,
+        std::sync::{Arc, Mutex},
+    };
+
+    #[test]
+    fn a_kept_origin_answers_its_window_after_receive() {
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        let events: crate::Events = {
+            let sent = Arc::clone(&sent);
+            Arc::new(move |event| {
+                if let Event::Sent { origin, .. } = event {
+                    sent.lock().unwrap().push(origin);
+                }
+            })
+        };
+        let host = Handle::new("p", Path::new("."), Data::Nil, events);
+        ANSWERING.set(Some(3));
+        let origin = host.origin();
+        ANSWERING.set(None);
+        // Later, on a tick: the plain send is for every window.
+        host.send_to_origin(origin, "peek", Data::Nil);
+        host.send("peek", Data::Nil);
+        assert_eq!(*sent.lock().unwrap(), [Some(3), None]);
     }
 }
