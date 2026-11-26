@@ -476,3 +476,55 @@ return mod {
     send(&mut workspace, &[("query", Data::from("Option 98"))]);
     inspect(&workspace, "down"); // filtered-out highlight falls back to the match
 }
+
+#[test]
+fn a_scrolling_table_passes_measure_and_scroll_to_to_its_rows() {
+    let source = |height: &str| {
+        format!(
+            r#"
+local table_view = use "table"
+return mod {{
+  view = function()
+    local rows = {{}}
+    for i = 1, 20 do rows[i] = {{ id = tostring(i), a = "a" }} end
+    return table_view {{ {height} columns = {{ {{ key = "a" }} }}, rows = rows,
+      measure = "seen", scroll_to = 12, to = "pages" }}
+  end,
+}}"#
+        )
+    };
+    let body = |workspace: &Workspace| {
+        let Node::Stack(table) = tree(workspace) else {
+            panic!("no table")
+        };
+        let [Node::Stack(header), Node::Stack(body)] = &table.children[..] else {
+            panic!("a header and a body: {:?}", table.children)
+        };
+        assert!(header.measure.is_none() && header.scroll_to.is_none());
+        body.clone()
+    };
+    let (_dir, workspace) = fixture(&source("height = 300,"), &["table"]);
+    let rows = body(&workspace);
+    assert_eq!(rows.children.len(), 20);
+    assert_eq!(rows.scroll_to, Some(12));
+    assert!(matches!(
+        &rows.measure,
+        Some(Action::Send { to: Some(to), msg }) if to == "pages" && *msg == Data::from("seen")
+    ));
+    // A table that does not scroll has no body to measure or scroll.
+    let (_dir, workspace) = fixture(&source(""), &["table"]);
+    let rows = body(&workspace);
+    assert!(rows.measure.is_none() && rows.scroll_to.is_none());
+    // Emptied, it is still measured, by a column of no rows beside the
+    // empty text.
+    let (_dir, workspace) = fixture(
+        &source("height = 300,").replace("for i = 1, 20", "for i = 1, 0"),
+        &["table"],
+    );
+    let empty = body(&workspace);
+    let [Node::Stack(text), Node::Stack(measured)] = &empty.children[..] else {
+        panic!("the empty text and a measured column: {:?}", empty.children)
+    };
+    assert!(text.measure.is_none());
+    assert!(measured.children.is_empty() && measured.measure.is_some());
+}

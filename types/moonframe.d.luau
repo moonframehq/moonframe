@@ -4659,6 +4659,8 @@ type UseTableProps = {
 	read add_label: string?,
 	read reorder: string?,
 	read marker: any,
+	read measure: any,
+	read scroll_to: any,
 }
 type UseTabsTab = any
 type UseTabsProps = {
