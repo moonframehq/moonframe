@@ -22,6 +22,7 @@ mod markdown_scroll;
 mod markdown_tooltips;
 mod outside;
 mod overlay_letter_keys;
+mod overlay_scroll_to;
 mod page_text;
 mod paste;
 mod regressions;

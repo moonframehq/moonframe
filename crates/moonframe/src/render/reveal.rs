@@ -1,6 +1,7 @@
-//! A scrolling row or column's `scroll_to` by key: the first row or column
-//! drawn inside it with that key, however deep, comes into view, scrolled
-//! only as far as needed, once it is drawn.
+//! A scrolling row or column's `scroll_to`: a direct child, or the first
+//! row or column drawn inside it with a key, however deep, comes into view,
+//! scrolled only as far as needed, once the stack is laid out with it (an
+//! overlay's content first appears with no size, and grows in).
 //!
 //! While a key is asked for, the scrolling stack is among those its
 //! descendants draw inside ([`Painter::reveal`]); the first with the key
@@ -17,17 +18,17 @@ use {
     std::{cell::Cell, rc::Rc},
 };
 
-/// A key a scrolling stack is to reveal, kept until it has shown.
+/// What a scrolling stack is to reveal, kept until it has shown.
 #[derive(Debug)]
 pub(crate) struct Pending {
-    key: String,
+    target: Target,
     /// The frame the first stack with the key was drawn in.
     claimed: Cell<Option<u64>>,
     /// Where that stack was laid out, scrolled as it was.
     found: Cell<Option<Bounds<Pixels>>>,
-    /// Where it was in the content when last revealed, and how many frames
-    /// it has been revealed in.
-    last: Cell<Option<Point<Pixels>>>,
+    /// Where it was in the content when last revealed, in a box of what
+    /// size, and how many frames it has been revealed in.
+    last: Cell<Option<(Point<Pixels>, Size<Pixels>)>>,
     tries: Cell<u32>,
     /// Something inside the stack grew or shrank this frame (a card growing
     /// in, or waiting to): the target may yet move.
@@ -42,10 +43,26 @@ pub(crate) struct Pending {
 /// never settles does not hold the scroll for good.
 const MAX_TRIES: u32 = 120;
 
+#[derive(Debug)]
+enum Target {
+    /// A direct child, from 0.
+    Child(usize),
+    Key(String),
+}
+
 impl Pending {
-    pub(crate) fn new(key: String) -> Self {
+    /// The direct child at `index`, from 0.
+    pub(crate) fn child(index: usize) -> Self {
+        Self::new(Target::Child(index))
+    }
+
+    pub(crate) fn key(key: String) -> Self {
+        Self::new(Target::Key(key))
+    }
+
+    fn new(target: Target) -> Self {
         Self {
-            key,
+            target,
             claimed: Cell::new(None),
             found: Cell::new(None),
             last: Cell::new(None),
@@ -64,7 +81,7 @@ impl Pending {
 /// What [`begin`] set up for one stack, until its children are drawn.
 pub(super) struct Revealing {
     handle: ScrollHandle,
-    /// The key this stack asks for, if it does.
+    /// What this stack asks to reveal, if anything.
     pending: Option<Rc<Pending>>,
     /// The marks this stack draws, being what stacks around it ask for.
     marks: Vec<AnyElement>,
@@ -118,7 +135,8 @@ impl Revealing {
 /// The mark the first stack with `pending`'s key draws each frame: a box
 /// over it that records where it is laid out.
 fn mark(key: &str, pending: &Rc<Pending>, frame: u64) -> Option<AnyElement> {
-    if pending.key != key || pending.done() || pending.claimed.get() == Some(frame) {
+    let wanted = matches!(&pending.target, Target::Key(wanted) if wanted == key);
+    if !wanted || pending.done() || pending.claimed.get() == Some(frame) {
         return None;
     }
     pending.claimed.set(Some(frame));
@@ -135,16 +153,25 @@ fn mark(key: &str, pending: &Rc<Pending>, frame: u64) -> Option<AnyElement> {
 }
 
 /// A box of no size, last in the scrolling stack, that scrolls it to where
-/// the mark was laid out, each frame until the mark stays where it was in
-/// the content.
+/// the child, or the mark, was laid out, each frame until it stays where it
+/// was in the content of a box that keeps its size.
 fn reader(pending: Rc<Pending>, handle: &ScrollHandle) -> AnyElement {
     let handle = handle.clone();
     canvas(
         move |_, window, _| {
-            let Some(target) = pending.found.take() else {
+            let (view, offset) = (handle.bounds(), handle.offset());
+            // Its children as laid out, before scrolling.
+            let target = match pending.target {
+                Target::Child(index) => handle.bounds_for_item(index).map(|child| child + offset),
+                Target::Key(_) => pending.found.take(),
+            };
+            let Some(target) = target.filter(|_| !view.size.is_zero()) else {
+                // Not laid out yet: the next frame may be.
+                if !pending.done() {
+                    window.refresh();
+                }
                 return;
             };
-            let (view, offset) = (handle.bounds(), handle.offset());
             let near = |a: Point<Pixels>, b: Point<Pixels>| {
                 (a.x - b.x).abs() < px(0.5) && (a.y - b.y).abs() < px(0.5)
             };
@@ -160,8 +187,8 @@ fn reader(pending: Rc<Pending>, handle: &ScrollHandle) -> AnyElement {
             let at = target.origin - view.origin - offset;
             let settled = pending
                 .last
-                .replace(Some(at))
-                .is_some_and(|last| near(last, at));
+                .replace(Some((at, view.size)))
+                .is_some_and(|(last, size)| near(last, at) && size == view.size);
             pending.tries.set(pending.tries.get() + 1);
             if (settled && !pending.moving.get()) || pending.tries.get() >= MAX_TRIES {
                 pending.done.set(true);
