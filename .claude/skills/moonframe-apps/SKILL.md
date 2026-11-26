@@ -186,9 +186,9 @@ and live things (terminals, pages, text fields) need the host.
 - A list whose entries differ in shape fails the type check: give every
   entry the same keys, or type it (`local items: { any } = …`); menus too.
 - `ui.text` does not take `case`; use `string.upper`.
-- A region or a scroll column squeezes its children: `shrink = false` on
-  the column inside a `scroll` column, a fixed-height row around a top
-  region.
+- A region squeezes its children: a fixed-height row with
+  `shrink = false` around a top region. A `scroll` row or column keeps its
+  children's size along its axis by itself.
 - Hidden windows (behind others, or a locked screen) build no frames, so a
   `--background` screenshot may show a state from before the data came.
   Start the window when it can be seen, or check headlessly.

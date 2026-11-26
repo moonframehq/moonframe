@@ -55,7 +55,7 @@ impl Build for Stack {
                 .key("carry")
                 .fail("a title bar (`drag = true`) moves the window; it can't be carried too"));
         }
-        Ok(Self {
+        let mut stack = Self {
             look: Look::from_fields(fields)?,
             direction: match kind {
                 Element::Row => Direction::Row,
@@ -89,7 +89,14 @@ impl Build for Stack {
             children: tree.children(fields)?,
             slots: fields.slots().to_vec(),
             ends: Ends::from_fields(fields)?,
-        })
+        };
+        scrolled::hold_along(
+            &stack.frame,
+            stack.direction,
+            fields.items(),
+            &mut stack.children,
+        );
+        Ok(stack)
     }
 }
 
@@ -98,13 +105,20 @@ impl Build for Panel {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, FRAME, LOOK, &["title", "actions"]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
-        Ok(Self {
+        let mut panel = Self {
             look: Look::from_fields(fields)?,
             title: fields.get("title")?,
             actions: tree.list(fields, "actions")?,
             frame: Frame::from_fields(fields)?,
             children: tree.children(fields)?,
-        })
+        };
+        scrolled::hold_along(
+            &panel.frame,
+            Direction::Column,
+            fields.items(),
+            &mut panel.children,
+        );
+        Ok(panel)
     }
 }
 

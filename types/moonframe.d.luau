@@ -302,7 +302,8 @@ export type StackProps = {
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
 	-- the system's setting).
 	scrollbar: boolean?,
-	-- false keeps the content's size when the parent is short of space.
+	-- false keeps the content's size when the parent is short of space;
+	-- the default in a row or column that scrolls along its axis.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.
 	self_align: Align?,
@@ -414,7 +415,8 @@ export type PanelProps = {
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
 	-- the system's setting).
 	scrollbar: boolean?,
-	-- false keeps the content's size when the parent is short of space.
+	-- false keeps the content's size when the parent is short of space;
+	-- the default in a row or column that scrolls along its axis.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.
 	self_align: Align?,
