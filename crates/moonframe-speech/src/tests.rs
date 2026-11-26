@@ -1,7 +1,10 @@
 // The stub program and the login shell need a Unix shell.
 #![cfg_attr(not(unix), allow(dead_code, unused_imports))]
 
+// keep-sorted start
+mod http_client;
 mod remote_cancel;
+// keep-sorted end
 
 use {
     super::{audio::*, *},

@@ -13,6 +13,7 @@ use {
 };
 
 mod range;
+mod scroll;
 
 /// Rows built beyond those showing, on each side, so scrolling a little
 /// never waits for the mod.
@@ -25,8 +26,24 @@ impl<'w> Draw<'w> for List {
         let look = painter.look(Part::List, &self.look, false, place);
         let handle = painter.motion.scroll(&place.path);
         let rows_of = &self.row_height;
-        // Last frame's layout: where it is scrolled, and how tall it is.
-        let scrolled = (-f32::from(handle.offset().y)).max(0.0);
+        // Last frame's layout: where it is scrolled (kept on its first row,
+        // or moved where `scroll_to` asks), and how tall it is.
+        let pad = scroll::Pad {
+            top: self
+                .frame
+                .padding
+                .map(Space::pixels)
+                .or(look.base.padding.top)
+                .unwrap_or(0.0),
+            bottom: self
+                .frame
+                .padding
+                .map(Space::pixels)
+                .or(look.base.padding.bottom)
+                .unwrap_or(0.0),
+        };
+        let (scrolled, again) = scroll::place(self, &handle, pad, painter, place);
+        painter.animating |= again;
         let height = f32::from(handle.bounds().size.height);
         let height = if height > 0.0 {
             height

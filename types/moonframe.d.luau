@@ -304,7 +304,8 @@ export type StackProps = {
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
 	-- the system's setting).
 	scrollbar: boolean?,
-	-- false keeps the content's size when the parent is short of space.
+	-- false keeps the content's size when the parent is short of space;
+	-- the default in a row or column that scrolls along its axis.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.
 	self_align: Align?,
@@ -416,7 +417,8 @@ export type PanelProps = {
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
 	-- the system's setting).
 	scrollbar: boolean?,
-	-- false keeps the content's size when the parent is short of space.
+	-- false keeps the content's size when the parent is short of space;
+	-- the default in a row or column that scrolls along its axis.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.
 	self_align: Align?,
@@ -602,9 +604,14 @@ export type IconName =
 	| "brand-anthropic"
 	| "brand-github"
 	| "brand-gitlab"
+	| "brand-google-scholar"
+	| "brand-linkedin"
 	| "brand-mistral"
 	| "brand-ollama"
 	| "brand-openai"
+	| "brand-slack"
+	| "brand-wikipedia"
+	| "brand-x"
 	| "bug"
 	| "building-2"
 	| "calendar"
@@ -1251,8 +1258,13 @@ export type ListProps = {
 	row_height: number | ((index: number) -> number),
 	row: (index: number) -> Child,
 	-- Sent with `first` and `last`, the rows (from 1) any part of which
-	-- shows, as they change while it scrolls and resizes.
+	-- shows, and `y`, the pixels it is scrolled down (0 at the top), as
+	-- they change while it scrolls and resizes.
 	range: Data,
+	-- When it changes (a new `seq` asks again): reveal row n, scrolling
+	-- only as far as needed (`n` or `{ row = n, seq = s }`), or go back to
+	-- a `y` its `range` told (`{ y = px, seq = s }`).
+	scroll_to: (number | { row: number?, y: number?, seq: any? })?,
 	-- The mod `range` goes to, if not the drawing one.
 	to: string?,
 	gap: Space?,
@@ -2393,7 +2405,7 @@ export type DevtoolsMsg =
 -- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
 -- `"app:devtools"` (`msg` a `DevtoolsMsg`), `"app:share"` (`msg` a `ShareMsg`), `"app:status-item"` (`msg` a
--- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`), `"app:text"` (`msg` a `TextMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
+-- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`), `"app:text"` (`msg` a `TextMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser, or one `mailto:` address without headers, opened in its mail app).
 export type Send = {
 	to: string,
 	msg: Data,
@@ -4659,6 +4671,8 @@ type UseTableProps = {
 	read add_label: string?,
 	read reorder: string?,
 	read marker: any,
+	read measure: any,
+	read scroll_to: any,
 }
 type UseTabsTab = any
 type UseTabsProps = {

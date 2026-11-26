@@ -162,7 +162,10 @@ toml               = "1"
 tracing            = "0.1"
 tracing-subscriber = { default-features = false, features = ["ansi", "env-filter", "fmt", "std"], version = "0.3" }
 # Check for Updates: GitHub's releases API and the download (moonframe).
-ureq = "3.5"
+# Without the default `gzip`: on anywhere in a build, ureq decodes every gzip
+# answer for every crate in it and drops its Content-Encoding, with no way to
+# ask otherwise per request. A crate that wants it asks for it itself.
+ureq = { default-features = false, features = ["rustls"], version = "3.5" }
 # Links to an app's own URL schemes, read for its mods (moonframe).
 url = "2.5"
 # The ids of pi threads, which pi takes as session ids (moonframe-pi).

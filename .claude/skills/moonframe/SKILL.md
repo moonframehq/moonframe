@@ -1089,7 +1089,9 @@ return state, { { to = "app:window", msg = { open = "settings", send = { page = 
 
 - `app:open`, `msg` a web address (`https://` or `http://`): opens it in
   the system's browser, as a pull request link or a sign-in page wants.
-  Other schemes (`file`, an app's own) are the sender's error. At most 3
+  Or one `mailto:` address (`mailto:ada@example.com`), opened in the mail
+  app: no headers (`?subject=`) and no list. Other schemes (`file`, an
+  app's own) are the sender's error. At most 3
   pages open in 10 s. A control does it on a click: `ui.row { to =
   "app:open", msg = pr.url, ... }`.
 - `app:text`, `msg` `{ mod? | region?, max?, reply }`: answers with `reply`
@@ -1435,7 +1437,7 @@ Text-like elements take their main value positionally:
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider`, `resize`, `to` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover. A clicked divider takes the keyboard: the arrows along the split move it 16 px (64 with Shift), Home and End take the pane before it to its `min` and `max`, and a double-click puts back the `reset` size of a pane beside it (the one before, else after), else a starting `size` the same way. The user's sizes last the session; `resize` keeps them across launches (see "Pane sizes that outlive the app") |
 | `ui.pane { ... }` | `size`, `reset`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `reset` is the size a double-click on its divider puts it back to, apart from `size` (default: the size it started with). `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
-| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, `range`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
+| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, `range`, `scroll_to`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
 | `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
@@ -1446,7 +1448,7 @@ Text-like elements take their main value positionally:
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
 | `ui.markdown "# Notes"` | `text`, `link`, `tooltips`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures load only with `images` (from files a `ui.image` could show), except a picture titled `emoji` (`![:party:](~/.cache/moonframe/images/emoji/party.png "emoji")`), drawn inline at the line's height from the image cache alone, its alt text standing in until it loads. A link shows its title (`[text](url "title")`) on hover while every link to that address has the same one, or what `tooltips = { [url] = text }` gives for its address: where a wrapped (scanned) address really leads |
 | `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `secret`, `paste`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
-| `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
+| `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab` `brand-linkedin` `brand-x` `brand-slack` `brand-wikipedia` `brand-google-scholar`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
 | `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras, `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
 | `ui.line { points = { 3, 5, 2, 8 } }` | `points`, `min`, `max`, `baseline`, `area`, `dots` (`last` `all`), `stroke`, `dashed`, `width`, `height`, `class`, `style` | a line through values evenly spaced across its box (fills its parent without `width`/`height`): trends, curves in tables, forecasts. Style `color` strokes it, `background` fills the area to `baseline` (with `area = true`), `border_color` draws the baseline dashed. Use it for any line or curve, a dashed rule (two equal points with `dashed = true`) included |
 | `ui.hatch { width = 40, height = 12 }` | `gap`, `width`, `height`, `grow`, `class`, `style` | diagonal stripes in style `color` over `background`: what is held back, pending or still missing (in a stacked bar, under a floor) |
@@ -1481,7 +1483,10 @@ Text-like elements take their main value positionally:
   card in the list, once it is drawn), and `{ key = "row-7", seq = n }` the
   same, asked again with each new `seq` (a link opened twice).
 - `shrink = false` keeps the content's size when the parent is short of
-  space (strips, toolbars), instead of being squeezed.
+  space (strips, toolbars), instead of being squeezed. The rows, columns
+  and panels inside a row or column that scrolls along its axis keep it
+  without asking (as CSS's `min-height: auto` does), so they scroll rather
+  than draw over each other; `shrink = true` squeezes one anyway.
 - `self_align = "start"` (or `center`, `end`, `stretch`) places it across
   the parent's axis over the parent's `align`: a column stretches its
   children by default, so a capsule or track that should keep its own
@@ -1556,7 +1561,7 @@ return style {
 		fallbacks = { "Symbols Nerd Font Mono" },
 		ligatures = false,
 	},
-	radius = 8,          -- the theme's corner radius, which buttons use
+	radius = 8,          -- the theme's corner radius, which buttons use (0 to 64)
 	speeds = { drawer = "220ms" }, -- named durations (fast/normal/slow exist already)
 	animation_speed = 1, -- every animation: 2 twice as fast, 0.5 half, 0 off
 
@@ -1698,7 +1703,7 @@ Leave an element's own keys off if the stylesheet should decide.
 | --- | --- |
 | `background`, `color` (text, inherited), `border_color` | a color |
 | `border` | `true`, `all`, `top`, `bottom`, `left`, `right`, `none` |
-| `radius` | pixels, or each corner clockwise from the top left as in CSS: `{ 8, 8, 0, 0 }` rounds the top only, `{ a, b }` gives the top left and bottom right `a` |
+| `radius` | pixels, 0 to 1000 (`999` rounds a pill), or each corner clockwise from the top left as in CSS: `{ 8, 8, 0, 0 }` rounds the top only, `{ a, b }` gives the top left and bottom right `a` |
 | `padding`, `margin` | a space token or pixels for every edge, `{ y, x }`, `{ top, right, bottom, left }`, or named edges `{ x = 12, top = 4 }` (edge names win over `x`/`y`) |
 | `gap` | a space token or pixels |
 | `shadow` | a preset (`small` `medium` `large`, or `none` to remove one set by a lower rule), a CSS box-shadow string, a layer table, or a list of layers (see below) |
@@ -2018,7 +2023,8 @@ end,
 When the rows come from a provider that can't publish them all (a
 publish holds at most 10,000 values), give the list `range = msg`: it is
 sent, with `first` and `last` (the rows any part of which shows, from 1)
-added, as they change, at most every 100 ms and always the last. Keep
+and `y` (the pixels it is scrolled down, 0 at the top) added, as they
+change, at most every 100 ms and always the last. Keep
 `count` the whole total, ask the provider for a window of rows around
 `first`..`last`, and draw a placeholder in `row` for one not yet there:
 
@@ -2031,6 +2037,17 @@ end
 ui.list { id = "people", count = app.people.total, row_height = 40, range = "rows",
 	row = function(i) local person = app.people.rows[i] ... end }
 ```
+
+`scroll_to` moves a list when it changes: `scroll_to = 120` or `{ row =
+120, seq = n }` reveals row 120, scrolling only as far as needed, and `{ y
+= state.y, seq = n }` goes back to a `y` that `range` told (a page opened
+again where it was left). A new `seq` asks again for the same place.
+
+A feed whose new rows come at the top keeps what is being read in place:
+give each row a `key` (`ui.row { key = item.id, ... }`) and, while the list
+is scrolled down, the first row showing stays where it is on screen as
+rows arrive above it. At the top, new rows join the top. (`range`,
+`scroll_to` and keeping in place are the GPUI window's, so far.)
 
 **Views run only when needed.** The host keeps each view's last tree and
 runs `view` again only when the mod's state or props may have changed (a
