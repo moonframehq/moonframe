@@ -241,7 +241,7 @@ local function editor(state: State)
 			},
 		},
 		if note and note.text
-			then ui.column { grow = true, scroll = true, align = "center", note_page { id = "workspace", note = note, width = 640 } }
+			then ui.column { grow = true, scroll = true, note_page { id = "workspace", note = note, width = 640 } }
 			else ui.column { grow = true, align = "center", justify = "center", ui.text { if state.open then "Opening…" else "Open a note from the tree.", class = "muted" } },
 		state.open and ui.row {
 			padding = "small",

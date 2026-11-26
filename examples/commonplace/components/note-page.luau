@@ -187,7 +187,7 @@ local function field(state: State)
 		multiline = true,
 		prose = true,
 		rows = 1,
-		max_rows = 400,
+		max_rows = 200,
 		focus = true,
 		placeholder = "Write…",
 		change = { draft = true },
@@ -310,7 +310,12 @@ return component {
 			-- `after` has no frontmatter of its own: split it as a body.
 			local rest = "---\n---\n" .. state.after
 			for _, part in split(rest) do
-				table.insert(body, ui.markdown { wikify(string.sub(rest, part.from, part.to)), link = "link", images = true })
+				local chunk = string.sub(rest, part.from, part.to)
+				table.insert(
+					body,
+					linked_lines(chunk, favicons, "link")
+						or ui.markdown { wikify(chunk), link = "link", images = true }
+				)
 			end
 		else
 			for index, part in split(text) do
@@ -324,12 +329,16 @@ return component {
 			-- Below the last block: a click starts a new one.
 			table.insert(page, ui.column { class = "note-more", msg = { block = 0 } })
 		end
-		return ui.column {
-			class = "note-page",
+		return ui.row {
+			justify = "center",
 			-- Inside a scrolling column: keep its full height, so it scrolls.
 			shrink = false,
-			max_width = props.width or 680,
-			table.unpack(page),
+			ui.column {
+				class = "note-page",
+				grow = true,
+				max_width = props.width or 680,
+				table.unpack(page),
+			},
 		}
 	end,
 }

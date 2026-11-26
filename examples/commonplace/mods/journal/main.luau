@@ -101,7 +101,7 @@ local function inbox(state: State)
 				align = "start",
 				msg = { pick = index },
 				ui.text { "•", class = "muted" },
-				ui.row { grow = true, gap = "none", ui.text { item.text, wrap = true } },
+				ui.column { grow = true, gap = "none", ui.text { item.text, wrap = true } },
 			}
 		)
 	end

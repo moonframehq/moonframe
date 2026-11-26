@@ -235,7 +235,7 @@ local function editor(state: State)
 			state.open and icon_button { icon = "trash-2", tooltip = "Move to the trash", size = "small", msg = "trash" },
 		},
 		if note and note.text
-			then ui.column { grow = true, scroll = true, align = "center", note_page { id = "library", note = note } }
+			then ui.column { grow = true, scroll = true, note_page { id = "library", note = note } }
 			else ui.column { grow = true, align = "center", justify = "center", ui.text { if state.open then "Opening…" else "Pick a note.", class = "muted" } },
 	}
 end
