@@ -724,6 +724,8 @@ fn habits_roll_over_at_midnight_and_covers_and_quick_dates_stay_accurate() {
     let before = planner2.published(at("2026-10-31 09:00"));
     assert_eq!(item(&before, "oh")["overdue"], true);
     assert_eq!(item(&before, "legacy")["done"], true);
+    assert_eq!(item(&before, "legacy")["done_dates"], json!(["2026-10-31"]));
+    assert_eq!(item(&before, "legacy")["streak"], 1);
     assert!(planner2.receive(&json!({ "reschedule_overdue": true }), oct31));
     let after_resched = planner2.published(at("2026-10-31 09:00"));
     assert_eq!(item(&after_resched, "oh")["date"], "2026-10-31");

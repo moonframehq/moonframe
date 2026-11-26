@@ -230,7 +230,11 @@ fn shown(original: &Map<String, Value>, today_date: NaiveDate, today: &str, cloc
         item["done_dates"] = json!([]);
     }
     if is_habit {
-        let dates = done_dates_set(original);
+        let mut dates = done_dates_set(original);
+        if original.get("done_dates").is_none() && done {
+            dates.insert(today.to_owned());
+            item["done_dates"] = Value::Array(dates.iter().cloned().map(Value::String).collect());
+        }
         item["streak"] = json!(compute_streak(&dates, today_date));
         if original
             .get("goal")
