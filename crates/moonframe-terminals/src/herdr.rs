@@ -41,26 +41,6 @@ const PEEK_LINES: &str = "60";
 /// into a terminal only while it has none.
 const START_LABEL: &str = "moonframe-start";
 
-/// Programs herdr-core names that are coding agents, as it reports them.
-const AGENTS: &[&str] = &[
-    // keep-sorted start
-    "amp",
-    "claude",
-    "claude-code",
-    "codex",
-    "copilot",
-    "cursor",
-    "cursor-agent",
-    "droid",
-    "gemini",
-    "grok",
-    "kiro",
-    "opencode",
-    "pi",
-    "qwen",
-    // keep-sorted end
-];
-
 /// What `hc get` said of a terminal that does not change while it lives.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Labels {
@@ -147,12 +127,16 @@ impl HerdrCore {
         if let Some(labels) = self.labels.get(address) {
             return labels.clone();
         }
-        let labels = self
-            .hc_json(&["get", address, "--json"])
-            .map(|terminal| labels_from(&terminal))
-            .unwrap_or_default();
-        self.labels.insert(address.to_owned(), labels.clone());
-        labels
+        // Only a read that worked is kept: one that failed (a timeout) is
+        // tried again next time, or the terminal would stay another app's.
+        match self.hc_json(&["get", address, "--json"]) {
+            Ok(terminal) => {
+                let labels = labels_from(&terminal);
+                self.labels.insert(address.to_owned(), labels.clone());
+                labels
+            },
+            Err(_) => Labels::default(),
+        }
     }
 
     /// When `terminal` (from `hc ls`) entered its status, in ms since the
@@ -413,7 +397,7 @@ fn pane_of(key: &str) -> String {
 }
 
 fn is_agent(agent: &str, status: &str) -> bool {
-    !status.is_empty() || AGENTS.contains(&agent)
+    !status.is_empty() || crate::programs::agent_named(agent).is_some()
 }
 
 fn turn(terminal: &Value) -> i64 {
@@ -473,6 +457,13 @@ mod tests {
             hc: None,
             ..HerdrCore::new()
         }
+    }
+
+    #[test]
+    fn a_failed_label_read_is_tried_again() {
+        let mut core = missing();
+        assert_eq!(core.labels_of("t1"), Labels::default());
+        assert!(core.labels.is_empty(), "a failed read was kept");
     }
 
     #[cfg(unix)]

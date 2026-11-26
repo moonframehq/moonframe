@@ -14,8 +14,10 @@
 //! `@moonframe-start` before typing into it, and never types into a
 //! marked one.
 
+// keep-sorted start
 mod agents;
 mod server;
+// keep-sorted end
 
 use {
     super::{Backend, Listing, now_ms, tilde},

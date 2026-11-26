@@ -243,20 +243,16 @@ fn the_clock_is_published_by_the_minute() {
 }
 
 #[test]
-fn only_the_named_writers_may_act() {
+fn only_the_named_writers_and_their_components_may_act() {
     let settings = Data::map([("writers", vec!["peek", "workspace"].into())]);
-    let writers = writers(&settings);
-    assert!(may_act(&writers, "peek"));
-    assert!(may_act(&writers, "workspace"));
-    assert!(!may_act(&writers, "sidebar"));
-    assert!(!may_act(&writers, "someones-package"));
-}
-
-#[test]
-fn without_writers_no_mod_may_act() {
-    let none = writers(&Data::Nil);
-    assert!(none.is_empty());
-    assert!(!may_act(&none, "peek"));
+    let writers = Mods::from_settings(&settings, "writers");
+    assert!(writers.allows("peek"));
+    assert!(writers.allows("workspace"));
+    assert!(writers.allows("workspace/peek#main"));
+    assert!(!writers.allows("workspace#2"));
+    assert!(!writers.allows("sidebar"));
+    assert!(!writers.allows("someones-package"));
+    assert!(!Mods::from_settings(&Data::Nil, "writers").allows("peek"));
 }
 
 #[test]
@@ -336,4 +332,16 @@ fn a_command_past_its_deadline_is_stopped() {
     let output = output_within(&mut quick, b"hi\n", Duration::from_secs(5)).unwrap();
     assert!(output.status.success());
     assert_eq!(output.stdout, b"hi\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn output_left_open_by_a_child_is_not_waited_for() {
+    // The shell exits at once; its `sleep` keeps stdout open.
+    let mut command = new_command("sh");
+    command.args(["-c", "sleep 5 & echo hi"]);
+    let started = Instant::now();
+    let result = output_within(&mut command, b"", Duration::from_millis(200));
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::TimedOut);
+    assert!(started.elapsed() < Duration::from_secs(2));
 }

@@ -65,18 +65,21 @@
 //!
 //! This app's own terminals are the ones under its namespace
 //! (`moonframe-<profile>` in a profile), as `moonframe-mux` keeps them.
+// keep-sorted start
 mod herdr;
 mod live;
 mod programs;
 mod tmux;
+// keep-sorted end
 
 use {
     moonframe_core::Data,
-    moonframe_providers::{Handle, Native, from_json},
+    moonframe_providers::{Handle, Mods, Native, from_json},
     serde_json::{Value, json},
     std::{
         io::{self, Read, Write as _},
         process::{Command, Output, Stdio},
+        sync::mpsc,
         thread,
         time::{Duration, Instant},
     },
@@ -179,7 +182,7 @@ struct Terminals {
     /// moves between ticks; from `start` on.
     live: Option<live::Live>,
     /// The mods that may watch and act (`[settings] writers`).
-    writers: Vec<String>,
+    writers: Mods,
 }
 
 impl Terminals {
@@ -197,7 +200,7 @@ impl Terminals {
             programs: Value::Null,
             ticks: 0,
             live: None,
-            writers: Vec::new(),
+            writers: Mods::default(),
         }
     }
 
@@ -239,11 +242,12 @@ impl Terminals {
         let mut errors = Vec::new();
         let mut ok = false;
         for backend in &mut self.backends {
+            // After listing, which is when a backend reads its server.
+            let listed = backend.list(self.ticks, &home);
             let info = backend.info();
             if backend.id() == "herdr-core" && backend.installed() {
                 core = info.clone();
             }
-            let listed = backend.list(self.ticks, &home);
             let error = listed.as_ref().err().cloned().unwrap_or_default();
             if !error.is_empty() {
                 errors.push((backend.installed(), error.clone()));
@@ -439,7 +443,7 @@ impl Terminals {
 
 impl Native for Terminals {
     fn start(&mut self, host: &Handle) -> Result<(), String> {
-        self.writers = writers(host.settings());
+        self.writers = Mods::from_settings(host.settings(), "writers");
         let live = live::Live::new(host, &std::env::var("HOME").unwrap_or_default());
         for backend in &mut self.backends {
             backend.follow(&live);
@@ -465,7 +469,7 @@ impl Native for Terminals {
         }
         // Typing into, interrupting or reading another program's terminal
         // is for this app's own mods, never one from elsewhere.
-        if !may_act(&self.writers, from) {
+        if !self.writers.allows(from) {
             tracing::warn!(
                 "terminals: refused `{from}`: only the mods in providers/terminals' `writers` may act"
             );
@@ -538,7 +542,9 @@ pub(crate) fn new_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
 /// `command`'s output, as [`Command::output`] gives it, after writing
 /// `input` to it, unless it runs longer than `deadline`: then it is stopped
 /// and the error is [`io::ErrorKind::TimedOut`]. Its output is read as it
-/// prints, so a full pipe never stalls it.
+/// prints, so a full pipe never stalls it, and within the same deadline: a
+/// program that leaves a child of its own holding its output open is not
+/// waited for.
 pub(crate) fn output_within(
     command: &mut Command,
     input: &[u8],
@@ -569,43 +575,41 @@ pub(crate) fn output_within(
         if started.elapsed() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
-            return Err(io::Error::new(io::ErrorKind::TimedOut, "timed out"));
+            return Err(timed_out());
         }
         thread::sleep(pause);
         pause = (pause * 2).min(Duration::from_millis(20));
     };
+    let left = |started: Instant| deadline.saturating_sub(started.elapsed());
+    let stdout = stdout
+        .recv_timeout(left(started))
+        .map_err(|_| timed_out())?;
+    let stderr = stderr
+        .recv_timeout(left(started))
+        .map_err(|_| timed_out())?;
     Ok(Output {
         status,
-        stdout: stdout.join().unwrap_or_default(),
-        stderr: stderr.join().unwrap_or_default(),
+        stdout,
+        stderr,
     })
 }
 
-/// Reads all of `pipe` on a thread of its own.
-fn drain(pipe: Option<impl Read + Send + 'static>) -> thread::JoinHandle<Vec<u8>> {
+fn timed_out() -> io::Error {
+    io::Error::new(io::ErrorKind::TimedOut, "timed out")
+}
+
+/// Reads all of `pipe` on a thread of its own, and sends it when the pipe
+/// closes.
+fn drain(pipe: Option<impl Read + Send + 'static>) -> mpsc::Receiver<Vec<u8>> {
+    let (sent, received) = mpsc::channel();
     thread::spawn(move || {
         let mut bytes = Vec::new();
         if let Some(mut pipe) = pipe {
             let _ = pipe.read_to_end(&mut bytes);
         }
-        bytes
-    })
-}
-
-/// The mods `[settings] writers` names.
-fn writers(settings: &Data) -> Vec<String> {
-    match settings.get("writers") {
-        Some(Data::List(names)) => names
-            .iter()
-            .filter_map(Data::as_str)
-            .map(str::to_owned)
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-
-fn may_act(writers: &[String], from: &str) -> bool {
-    writers.iter().any(|writer| writer == from)
+        let _ = sent.send(bytes);
+    });
+    received
 }
 
 /// `path` under the home folder, as `~/...`.

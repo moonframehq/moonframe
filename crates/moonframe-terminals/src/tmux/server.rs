@@ -26,10 +26,17 @@ const MAX_SOCKETS: usize = 32;
 /// How long one tmux command may take: a server that stops answering
 /// would otherwise hold up the tick, and every backend's terminals with it.
 const DEADLINE: Duration = Duration::from_secs(2);
-/// What `list-panes` prints for each pane, one field per tab.
-const PANE_FORMAT: &str = "#{pane_id}\t#{session_name}\t#{window_index}\t#{pane_index}\t\
-                           #{pane_pid}\t#{pane_current_command}\t#{pane_current_path}\t\
-                           #{pane_dead}";
+/// What `list-panes` prints for each pane: fields apart by [`FIELD`], each
+/// pane ended by [`RECORD`]. tmux prints a folder's tabs and newlines as
+/// they are, so neither may part fields or panes; the folder comes last, so
+/// whatever it holds stays in it.
+const PANE_FORMAT: &str = "#{pane_id}\x1f#{session_name}\x1f#{window_index}\x1f#{pane_index}\x1f\
+                           #{pane_pid}\x1f#{pane_current_command}\x1f#{pane_dead}\x1f\
+                           #{pane_current_path}\x1e";
+/// What parts the fields of a pane in [`PANE_FORMAT`].
+const FIELD: char = '\x1f';
+/// What ends a pane in [`PANE_FORMAT`].
+const RECORD: char = '\x1e';
 
 /// The `tmux` found on this machine.
 #[derive(Clone, Debug)]
@@ -118,8 +125,8 @@ impl Program {
     pub(crate) fn panes(&self, server: &str) -> Result<Vec<Pane>, String> {
         match self.run(server, &["list-panes", "-a", "-F", PANE_FORMAT]) {
             Ok(text) => Ok(text
-                .lines()
-                .filter_map(|line| Pane::parse(server, line))
+                .split(RECORD)
+                .filter_map(|record| Pane::parse(server, record.trim_start_matches(['\r', '\n'])))
                 .collect()),
             Err(Failure::NoServer) => Ok(Vec::new()),
             Err(Failure::Failed(error)) => Err(error),
@@ -168,8 +175,8 @@ pub(crate) struct Pane {
 
 impl Pane {
     fn parse(server: &str, line: &str) -> Option<Self> {
-        let fields: Vec<&str> = line.split('\t').collect();
-        let [id, session, window, index, pid, command, cwd, dead] = fields[..] else {
+        let fields: Vec<&str> = line.splitn(8, FIELD).collect();
+        let [id, session, window, index, pid, command, dead, cwd] = fields[..] else {
             return None;
         };
         is_pane_id(id).then(|| Self {
@@ -277,7 +284,7 @@ mod tests {
 
     #[test]
     fn a_pane_line_parses() {
-        let line = "%7\twork\t1\t0\t4242\tzsh\t/home/u/x\t0";
+        let line = "%7\x1fwork\x1f1\x1f0\x1f4242\x1fzsh\x1f0\x1f/home/u/x";
         let pane = Pane::parse("default", line).unwrap();
         assert_eq!(pane.id, "%7");
         assert_eq!(pane.pid, 4242);
@@ -292,8 +299,16 @@ mod tests {
     #[test]
     fn a_malformed_line_is_skipped() {
         assert!(Pane::parse("default", "").is_none());
-        assert!(Pane::parse("default", "%7\twork").is_none());
-        assert!(Pane::parse("default", "7\tw\t1\t0\t1\tzsh\t/\t0\t0").is_none());
+        assert!(Pane::parse("default", "%7\x1fwork").is_none());
+        assert!(Pane::parse("default", "7\x1fw\x1f1\x1f0\x1f1\x1fzsh\x1f0\x1f/").is_none());
+    }
+
+    #[test]
+    fn a_folder_with_tabs_and_newlines_stays_whole() {
+        let line = "%7\x1fwork\x1f1\x1f0\x1f4242\x1fzsh\x1f0\x1f/home/u/a\tb\nc";
+        let pane = Pane::parse("default", line).unwrap();
+        assert_eq!(pane.cwd, "/home/u/a\tb\nc");
+        assert!(!pane.dead);
     }
 
     #[test]
