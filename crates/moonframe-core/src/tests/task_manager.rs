@@ -506,7 +506,7 @@ return mod {{
     let (_dir, workspace) = fixture(&source("height = 300,"), &["table"]);
     let rows = body(&workspace);
     assert_eq!(rows.children.len(), 20);
-    assert_eq!(rows.scroll_to, Some(12));
+    assert_eq!(rows.scroll_to, Some(crate::ScrollTo::Child(12)));
     assert!(matches!(
         &rows.measure,
         Some(Action::Send { to: Some(to), msg }) if to == "pages" && *msg == Data::from("seen")
