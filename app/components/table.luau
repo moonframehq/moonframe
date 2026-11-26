@@ -44,6 +44,8 @@ type Props = {
 	add_label: string?,
 	reorder: string?,
 	marker: any,
+	measure: any,
+	scroll_to: any,
 }
 
 local JUSTIFY = { left = "start", start = "start", center = "center", right = "end", ["end"] = "end" }
@@ -83,6 +85,8 @@ return component {
 		["add_label"] = "the text of a group's Add row (default \"Add\")",
 		["reorder"] = "rows drag to another place: a drop on a row sends { [reorder] = its id, group, phase, carry = { row, group }, y } (before it when `y < 0.5`), on a group's heading { [reorder] = true, group, ... } (its end); `over` and `leave` come the same way",
 		["marker"] = "draw a drop line by a row: { id, after? }, or { group } for a group's end",
+		["measure"] = "with `height` or `grow`, the scrolling body's `measure`, sent to `to`: its `first`, `last`, `y`, ... count rows, not the header (with `groups`, headings and Add rows too); a body past 200 rows is a `ui.list`, which takes `range` instead",
+		["scroll_to"] = "with `height` or `grow`, the scrolling body's `scroll_to`: reveals row n (one-based, counted as `measure` counts) when it changes",
 	},
 	styles = {
 		[".table"] = { gap = 0 },
@@ -370,6 +374,11 @@ table_view {
 			}
 		end
 
+		-- What the page asks of the body that scrolls: the rows, not the header.
+		local measure = if scrolls then props.measure else nil
+		local scroll_to = if scrolls then props.scroll_to else nil
+		local measure_to = if measure ~= nil then props.to else nil
+
 		local body
 		if listed then
 			body = ui.list {
@@ -381,7 +390,15 @@ table_view {
 			for index = 1, #entries do
 				table.insert(grouped, draw_grouped(index))
 			end
-			body = ui.column { gap = "none", grow = scrolls, scroll = scrolls, table.unpack(grouped) }
+			body = ui.column {
+				gap = "none",
+				grow = scrolls,
+				scroll = scrolls,
+				measure = measure,
+				scroll_to = scroll_to,
+				to = measure_to,
+				table.unpack(grouped),
+			}
 		elseif count == 0 then
 			body = ui.column {
 				gap = "none",
@@ -397,7 +414,15 @@ table_view {
 			for index = 1, count do
 				rows[index] = draw(index)
 			end
-			body = ui.column { gap = "none", grow = scrolls, scroll = scrolls, table.unpack(rows) }
+			body = ui.column {
+				gap = "none",
+				grow = scrolls,
+				scroll = scrolls,
+				measure = measure,
+				scroll_to = scroll_to,
+				to = measure_to,
+				table.unpack(rows),
+			}
 		end
 
 		if props.checkable then
