@@ -136,4 +136,26 @@ mod tests {
         assert!(ok);
         assert_eq!(out, b"ready");
     }
+
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    fn a_program_that_stays_busy_fails_by_the_deadline() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("cli");
+        let mut file = std::fs::File::create(&path).unwrap();
+        file.write_all(b"#!/bin/sh\nprintf ready\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let started = Instant::now();
+        let failed = run_for(Command::new(&path), true, Duration::from_millis(200));
+        drop(file);
+        assert!(
+            matches!(&failed, Err(Failure::Network(why)) if why.contains("busy")),
+            "{failed:?}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "{:?}",
+            started.elapsed()
+        );
+    }
 }
