@@ -7,6 +7,7 @@
 
 use crate::{Command, Data, Error};
 
+// keep-sorted start
 mod awake;
 mod devtools;
 mod dock;
@@ -21,6 +22,7 @@ mod share;
 mod status_item;
 mod text;
 mod window;
+// keep-sorted end
 
 pub use {
     awake::Awake,
