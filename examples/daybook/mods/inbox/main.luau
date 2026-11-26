@@ -96,7 +96,7 @@ local function answer_prompt(prompt: string, planner: any): (AssistantTurn, { an
 	-- Action: add task from prompt ("add task ...")
 	local task_title = string.match(prompt, "^[Aa]dd%s+task%s+(.+)$") or string.match(prompt, "^[Cc]reate%s+task%s+(.+)$")
 	if task_title and string.match(task_title, "%S") then
-		table.insert(sends, { to = "provider:planner", msg = { add = task_title } })
+		table.insert(sends, { to = "provider:planner", msg = { add = task_title, date = today } })
 		return {
 			from = "assistant",
 			text = `Added **“{task_title}”** to Today's schedule.`,
@@ -371,10 +371,10 @@ return mod {
 			end
 		elseif msg.insp_cycle_date then
 			local item = find_item(state.planner, msg.insp_cycle_date)
-			local details: { any } = (state.planner and state.planner.day_details) or {}
-			local today = (state.planner and state.planner.today) or ""
-			local tomorrow = details[2] and details[2].id or today
-			local plus3 = details[4] and details[4].id or tomorrow
+			local quick = state.planner and state.planner.quick_dates
+			local today = (quick and quick.today) or (state.planner and state.planner.today) or ""
+			local tomorrow = (quick and quick.tomorrow) or today
+			local plus3 = (quick and quick.plus3) or tomorrow
 			local next_date = cycle_in({ today, tomorrow, plus3, "" }, (item and item.date) or "")
 			return state, { { to = "provider:planner", msg = { update = msg.insp_cycle_date, date = next_date } } }
 		elseif msg.insp_cycle_time then
@@ -527,7 +527,17 @@ return mod {
 			end
 		end
 		table.sort(today, function(a: any, b: any)
-			return (a.time or "99") < (b.time or "99")
+			local ha: number = a.start_hour or 99
+			local hb: number = b.start_hour or 99
+			if ha ~= hb then
+				return ha < hb
+			end
+			local ta = a.title or ""
+			local tb = b.title or ""
+			if ta ~= tb then
+				return ta < tb
+			end
+			return (a.id or "") < (b.id or "")
 		end)
 
 		local sections: { Element } = {}

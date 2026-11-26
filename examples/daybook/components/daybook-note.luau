@@ -40,6 +40,9 @@ return component {
 		[".note-cover-btn"] = { background = "#ffffffd8", color = "#1b1b1d", radius = 16 },
 		[".note-cover-btn:hover"] = { background = "#ffffff" },
 		[".note-cover-fav"] = { background = "#ffffffe6", color = "warning", radius = 16 },
+		[".note-plain-btn"] = { background = "surface-soft", color = "muted-foreground", radius = 16 },
+		[".note-plain-btn:hover"] = { background = "list-hover", color = "foreground" },
+		[".note-plain-fav"] = { background = "surface-soft", color = "warning", radius = 16 },
 		[".note-title-row"] = { gap = 10, padding = { 2, 0 } },
 		[".note-emoji-btn"] = { radius = 10, padding = { 4, 8 } },
 		[".note-emoji-btn:hover"] = { background = "list-hover" },
@@ -71,7 +74,7 @@ return component {
 		local note = props.note
 		local planner = props.planner
 		local tags_map = props.tags_map or {}
-		local cover_grad = COVERS[note.cover or "sunset"] or COVERS.sunset
+		local cover_grad: string? = if note.cover and note.cover ~= "none" then COVERS[note.cover] else nil
 
 		local linked_tasks: { any } = {}
 		local linked_events: { any } = {}
@@ -85,43 +88,59 @@ return component {
 			end
 		end
 
-		local cover_bar = ui.row {
-			class = "note-cover",
-			height = 124,
-			shrink = false,
-			align = "start",
-			justify = "end",
-			style = { gradient = cover_grad },
+		local btn_cls = if cover_grad then "note-cover-btn" else "note-plain-btn"
+		local fav_cls = if cover_grad then "note-cover-fav" else "note-plain-fav"
+		local action_buttons = ui.row {
+			gap = "small",
 			ui.row {
-				gap = "small",
-				ui.row {
-					class = "note-cover-btn",
-					icon_button { icon = "image", tooltip = "Change cover", size = "small", msg = { note_cycle_cover = note.id } },
-				},
-				ui.row {
-					class = if note.favorite then "note-cover-fav" else "note-cover-btn",
-					icon_button {
-						icon = if note.favorite then "star-fill" else "star",
-						tooltip = if note.favorite then "Remove from favorites" else "Add to favorites",
-						size = "small",
-						msg = { note_toggle_fav = note.id },
-					},
-				},
-				ui.row {
-					class = "note-cover-btn",
-					icon_button {
-						icon = if props.preview then "pencil" else "eye",
-						tooltip = if props.preview then "Edit markdown" else "Preview markdown",
-						size = "small",
-						msg = "note-toggle-preview",
-					},
-				},
-				ui.row {
-					class = "note-cover-btn",
-					icon_button { icon = "trash-2", tooltip = "Delete note", size = "small", msg = { note_delete = note.id } },
+				class = btn_cls,
+				icon_button {
+					icon = "image",
+					tooltip = if cover_grad then "Change cover" else "Add cover",
+					size = "small",
+					msg = { note_cycle_cover = note.id },
 				},
 			},
+			ui.row {
+				class = if note.favorite then fav_cls else btn_cls,
+				icon_button {
+					icon = if note.favorite then "star-fill" else "star",
+					tooltip = if note.favorite then "Remove from favorites" else "Add to favorites",
+					size = "small",
+					msg = { note_toggle_fav = note.id },
+				},
+			},
+			ui.row {
+				class = btn_cls,
+				icon_button {
+					icon = if props.preview then "pencil" else "eye",
+					tooltip = if props.preview then "Edit markdown" else "Preview markdown",
+					size = "small",
+					msg = "note-toggle-preview",
+				},
+			},
+			ui.row {
+				class = btn_cls,
+				icon_button { icon = "trash-2", tooltip = "Delete note", size = "small", msg = { note_delete = note.id } },
+			},
 		}
+
+		local cover_bar: Element = if cover_grad
+			then ui.row {
+				class = "note-cover",
+				height = 124,
+				shrink = false,
+				align = "start",
+				justify = "end",
+				style = { gradient = cover_grad },
+				action_buttons,
+			}
+			else ui.row {
+				shrink = false,
+				align = "center",
+				justify = "end",
+				action_buttons,
+			}
 
 		local title_row = ui.row {
 			class = "note-title-row",

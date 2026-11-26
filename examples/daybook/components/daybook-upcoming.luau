@@ -21,13 +21,24 @@ local function sort_items(items: { any })
 		if a.kind ~= b.kind then
 			return a.kind == "event"
 		end
-		if a.time and b.time and a.time ~= b.time then
-			return a.time < b.time
+		if a.kind == "task" then
+			local ra = RANK[a.state] or 9
+			local rb = RANK[b.state] or 9
+			if ra ~= rb then
+				return ra < rb
+			end
 		end
-		if a.kind == "task" and a.state ~= b.state then
-			return (RANK[a.state] or 9) < (RANK[b.state] or 9)
+		local ha: number = a.start_hour or 99
+		local hb: number = b.start_hour or 99
+		if ha ~= hb then
+			return ha < hb
 		end
-		return (a.title or "") < (b.title or "")
+		local ta = a.title or ""
+		local tb = b.title or ""
+		if ta ~= tb then
+			return ta < tb
+		end
+		return (a.id or "") < (b.id or "")
 	end)
 end
 

@@ -54,7 +54,7 @@ pub(crate) fn compute_streak(dates: &BTreeSet<String>, today: NaiveDate) -> i64 
     streak
 }
 
-fn done_dates_set(item: &Map<String, Value>) -> BTreeSet<String> {
+pub(crate) fn done_dates_set(item: &Map<String, Value>) -> BTreeSet<String> {
     item.get("done_dates")
         .and_then(Value::as_array)
         .into_iter()
@@ -64,11 +64,24 @@ fn done_dates_set(item: &Map<String, Value>) -> BTreeSet<String> {
         .collect()
 }
 
+/// Effective progress for a habit on `today`, resetting stale values from
+/// earlier days.
+pub(crate) fn habit_progress_for_day(item: &Map<String, Value>, today_str: &str) -> i64 {
+    if item.get("progress_date").and_then(Value::as_str) == Some(today_str) {
+        return item.get("progress").and_then(integer).unwrap_or(0).max(0);
+    }
+    let dates = done_dates_set(item);
+    if dates.contains(today_str) {
+        return item.get("goal").and_then(integer).unwrap_or(0).max(0);
+    }
+    0
+}
+
 fn sync_habit_today(item: &mut Map<String, Value>, today: NaiveDate, checked: bool) {
     let today_str = day(today, None, 0);
     let mut dates = done_dates_set(item);
     if checked {
-        dates.insert(today_str);
+        dates.insert(today_str.clone());
     } else {
         dates.remove(&today_str);
     }
@@ -77,12 +90,20 @@ fn sync_habit_today(item: &mut Map<String, Value>, today: NaiveDate, checked: bo
     item.insert("done_dates".to_owned(), Value::Array(list));
     item.insert("streak".to_owned(), json!(streak));
     if let Some(goal) = item.get("goal").and_then(integer).filter(|&g| g > 0) {
-        let progress = item.get("progress").and_then(integer).unwrap_or(0);
-        if checked && progress < goal {
-            item.insert("progress".to_owned(), json!(goal));
+        let progress = if item.get("progress_date").and_then(Value::as_str) == Some(&today_str) {
+            item.get("progress").and_then(integer).unwrap_or(0)
+        } else {
+            0
+        };
+        let next = if checked && progress < goal {
+            goal
         } else if !checked && progress >= goal {
-            item.insert("progress".to_owned(), json!(0));
-        }
+            0
+        } else {
+            progress.clamp(0, goal)
+        };
+        item.insert("progress".to_owned(), json!(next));
+        item.insert("progress_date".to_owned(), json!(today_str));
     }
 }
 
@@ -124,9 +145,15 @@ impl Planner {
         if let Some(id) = field(msg, "toggle")
             && let Some(item) = self.find(id)
         {
-            let done = !item.get("done").is_some_and(truthy);
+            let is_habit = item.get("habit").is_some_and(truthy);
+            let done = if is_habit {
+                let today_str = day(today, None, 0);
+                !done_dates_set(item).contains(&today_str)
+            } else {
+                !item.get("done").is_some_and(truthy)
+            };
             item.insert("done".to_owned(), json!(done));
-            if item.get("habit").is_some_and(truthy) {
+            if is_habit {
                 sync_habit_today(item, today, done);
             }
             return true;
@@ -282,7 +309,6 @@ impl Planner {
         }
         if let Some(cover) = msg.get("cover").and_then(Value::as_str)
             && COVERS.contains(&cover)
-            && cover != "none"
         {
             item.insert("cover".to_owned(), json!(cover));
         }
@@ -396,11 +422,7 @@ impl Planner {
         if let Some(cover) = msg.get("cover").and_then(Value::as_str)
             && COVERS.contains(&cover)
         {
-            if cover == "none" {
-                item.remove("cover");
-            } else {
-                item.insert("cover".to_owned(), json!(cover));
-            }
+            item.insert("cover".to_owned(), json!(cover));
             changed = true;
         }
         if let Some(body) = msg.get("body").and_then(Value::as_str) {
@@ -542,6 +564,7 @@ impl Planner {
                         0
                     }),
                 );
+                item.insert("progress_date".to_owned(), json!(today_str));
             }
         }
         true
@@ -551,13 +574,15 @@ impl Planner {
         let Some(delta) = msg.get("delta").and_then(integer) else {
             return false;
         };
+        let today_str = day(today, None, 0);
         let Some(item) = self.find(id) else {
             return false;
         };
         let goal = item.get("goal").and_then(integer).unwrap_or(100).max(1);
-        let current = item.get("progress").and_then(integer).unwrap_or(0);
+        let current = habit_progress_for_day(item, &today_str);
         let next = (current + delta).clamp(0, goal);
         item.insert("progress".to_owned(), json!(next));
+        item.insert("progress_date".to_owned(), json!(today_str));
         let done = next >= goal;
         item.insert("done".to_owned(), json!(done));
         sync_habit_today(item, today, done);

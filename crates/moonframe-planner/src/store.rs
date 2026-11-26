@@ -98,21 +98,21 @@ pub(crate) fn sample(today: NaiveDate) -> Map<String, Value> {
     item(json!({
         "kind": "task", "title": "Morning run", "date": today_text, "time": "07:30",
         "duration": 45, "habit": true, "streak": 5, "goal": 5, "progress": 3,
-        "folder": "Personal", "tags": ["Health"],
+        "progress_date": today_text, "folder": "Personal", "tags": ["Health"],
         "done_dates": [near(-5), near(-4), near(-3), near(-2), near(-1)],
         "body": "5 km easy pace along the waterfront.",
     }));
     item(json!({
         "kind": "task", "title": "Pushups x100", "date": today_text, "time": "08:30",
         "duration": 30, "habit": true, "streak": 4, "goal": 100, "progress": 40,
-        "folder": "Personal", "tags": ["Health"],
+        "progress_date": today_text, "folder": "Personal", "tags": ["Health"],
         "done_dates": [near(-4), near(-3), near(-2), near(-1)],
         "body": "Split into 4 sets of 25 across the morning.",
     }));
     item(json!({
         "kind": "task", "title": "Read 20 pages", "date": today_text,
-        "habit": true, "streak": 6, "goal": 20, "progress": 20, "done": true,
-        "folder": "Personal", "tags": ["Health"],
+        "habit": true, "streak": 6, "goal": 20, "progress": 20, "progress_date": today_text,
+        "done": true, "folder": "Personal", "tags": ["Health"],
         "done_dates": [near(-5), near(-4), near(-3), near(-2), near(-1), today_text],
     }));
     item(json!({

@@ -40,7 +40,7 @@ type State = {
 }
 
 local RANK: { [string]: number } = { done = 1, progress = 2, important = 3, open = 4 }
-local COVER_CYCLE = { "sunset", "ocean", "forest", "aurora", "amber", "plum" }
+local COVER_CYCLE = { "sunset", "ocean", "forest", "aurora", "amber", "plum", "none" }
 local EMOJI_CYCLE = { "📝", "⭐", "🧳", "🚀", "💡", "📋", "🌿", "🎯", "✨" }
 local COVER_GRADS: { [string]: string } = {
 	sunset = "135deg, #ff7e5f, #e5484d",
@@ -58,7 +58,17 @@ local function by_day(a: any, b: any): boolean
 	if a.kind == "task" and a.state ~= b.state then
 		return (RANK[a.state] or 9) < (RANK[b.state] or 9)
 	end
-	return (a.time or "99") < (b.time or "99")
+	local ha: number = a.start_hour or 99
+	local hb: number = b.start_hour or 99
+	if ha ~= hb then
+		return ha < hb
+	end
+	local ta = a.title or ""
+	local tb = b.title or ""
+	if ta ~= tb then
+		return ta < tb
+	end
+	return (a.id or "") < (b.id or "")
 end
 
 local function find_item(planner: any, id: string?): any
@@ -93,12 +103,36 @@ local function load_note_drafts(state: State, note: any)
 	end
 end
 
-local function format_hour_from_y(y: number?): string
+local function calendar_hours(planner: any, mode: string): (number, number)
+	local from_h, to_h = 7, 21
+	if not planner or mode == "month" then
+		return from_h, to_h
+	end
+	local details: { any } = planner.day_details or {}
+	local span = if mode == "week" then 7 else 3
+	local visible: { [string]: boolean } = {}
+	for i = 1, math.min(span, #details) do
+		visible[details[i].id] = true
+	end
+	for _, item in planner.items or {} do
+		if item.kind ~= "note" and item.date and visible[item.date] and item.start_hour ~= nil then
+			local start_h: number = item.start_hour
+			local end_h: number = item.end_hour or math.min(24, start_h + 1)
+			from_h = math.min(from_h, math.max(0, math.floor(start_h)))
+			to_h = math.max(to_h, math.min(24, math.ceil(end_h)))
+		end
+	end
+	return from_h, to_h
+end
+
+local function format_hour_from_y(y: number?, from_h: number, to_h: number): string
 	local frac = if type(y) == "number" then math.max(0, math.min(1, y)) else 0.25
-	local hours = 7 + frac * 14
+	local span = math.max(1, to_h - from_h)
+	local hours = from_h + frac * span
 	local h = math.floor(hours)
 	local m = if (hours - h) >= 0.5 then 30 else 0
-	return string.format("%02d:%02d", math.min(20, math.max(7, h)), m)
+	local max_h = math.min(23, math.max(from_h, to_h - 1))
+	return string.format("%02d:%02d", math.min(max_h, math.max(from_h, h)), m)
 end
 
 return mod {
@@ -260,7 +294,8 @@ return mod {
 				if event_id then
 					local patch: any = { update = event_id, date = day_id }
 					if state.calendar_mode ~= "month" and type(msg.y) == "number" then
-						patch.time = format_hour_from_y(msg.y)
+						local from_h, to_h = calendar_hours(state.planner, state.calendar_mode)
+						patch.time = format_hour_from_y(msg.y, from_h, to_h)
 					end
 					return state, { { to = "provider:planner", msg = patch } }
 				end
@@ -272,7 +307,8 @@ return mod {
 			return state, { { to = "provider:planner", msg = msg } }
 		elseif msg.note_cycle_cover then
 			local note = find_item(state.planner, msg.note_cycle_cover)
-			local next_cover = cycle_in(COVER_CYCLE, note and note.cover)
+			local current = if note and note.cover then note.cover else "none"
+			local next_cover = cycle_in(COVER_CYCLE, current)
 			return state, { { to = "provider:planner", msg = { update = msg.note_cycle_cover, cover = next_cover } } }
 		elseif msg.note_cycle_emoji then
 			local note = find_item(state.planner, msg.note_cycle_emoji)
@@ -590,7 +626,7 @@ return mod {
 				local pair: { Element } = {}
 				for j = i, math.min(i + 1, #notes) do
 					local n = notes[j]
-					local grad = COVER_GRADS[n.cover or "sunset"] or COVER_GRADS.sunset
+					local grad: string? = if n.cover and n.cover ~= "none" then COVER_GRADS[n.cover] else nil
 					local tag_pills: { Element } = {}
 					if n.folder then
 						table.insert(tag_pills, pill { label = n.folder, icon = "folder", tone = "neutral" })
@@ -605,7 +641,7 @@ return mod {
 						width = 1,
 						gap = "none",
 						msg = { open_note = n.id },
-						ui.row { height = 56, style = { gradient = grad } },
+						grad and ui.row { height = 56, style = { gradient = grad } },
 						ui.column {
 							class = "agenda-note-body",
 							ui.row {
@@ -744,7 +780,22 @@ return mod {
 				end
 			end
 			table.sort(upcoming_ev, function(a: any, b: any)
-				return `{a.date or "~"}{a.time or "99"}` < `{b.date or "~"}{b.time or "99"}`
+				local da = a.date or "~"
+				local db = b.date or "~"
+				if da ~= db then
+					return da < db
+				end
+				local ha: number = a.start_hour or 99
+				local hb: number = b.start_hour or 99
+				if ha ~= hb then
+					return ha < hb
+				end
+				local ta = a.title or ""
+				local tb = b.title or ""
+				if ta ~= tb then
+					return ta < tb
+				end
+				return (a.id or "") < (b.id or "")
 			end)
 			return ui.column {
 				class = "agenda",

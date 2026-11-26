@@ -5,6 +5,7 @@ use {
     crate::{
         Planner,
         dates::{day, label, parts},
+        messages::{compute_streak, done_dates_set, habit_progress_for_day},
         values::{field, integer, text, truthy},
     },
     chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike},
@@ -20,6 +21,17 @@ const DEFAULT_DURATION_MINS: i64 = 60;
 
 fn is(item: &Map<String, Value>, key: &str, word: &str) -> bool {
     item.get(key).and_then(Value::as_str) == Some(word)
+}
+
+fn is_done_today(item: &Map<String, Value>, today: &str) -> bool {
+    if item.get("habit").is_some_and(truthy) {
+        if item.get("done_dates").is_some_and(Value::is_array) {
+            return done_dates_set(item).contains(today);
+        }
+        return item.get("done").is_some_and(truthy)
+            && item.get("date").filter(|d| truthy(d)).map(text).as_deref() == Some(today);
+    }
+    item.get("done").is_some_and(truthy)
 }
 
 fn parse_hour(time: &str) -> Option<f64> {
@@ -46,9 +58,8 @@ impl Planner {
         let selected = self.selected.get_or_insert_with(|| today.clone()).clone();
         let clock = now.format("%H:%M").to_string();
         let now_hour = f64::from(now.hour()) + f64::from(now.minute()) / 60.0;
-        let open_dated = |item: &&Map<String, Value>| {
-            !is(item, "kind", "note") && !item.get("done").is_some_and(truthy)
-        };
+        let open_dated =
+            |item: &&Map<String, Value>| !is(item, "kind", "note") && !is_done_today(item, &today);
         let busy: BTreeSet<String> = self
             .items()
             .filter(open_dated)
@@ -62,7 +73,7 @@ impl Planner {
             }
             if let Some(date) = item.get("date").filter(|date| truthy(date)) {
                 let key = text(date);
-                if item.get("done").is_some_and(truthy) {
+                if is_done_today(item, &today) {
                     *done_count.entry(key).or_default() += 1;
                 } else {
                     *count.entry(key).or_default() += 1;
@@ -140,6 +151,11 @@ impl Planner {
         } else {
             label(&selected, "%A")
         };
+        let quick_dates = json!({
+            "today": today,
+            "tomorrow": day(today_date, None, 1),
+            "plus3": day(today_date, None, 3),
+        });
         let kept = |key: &str, otherwise: Value| field_of(&self.store, key).unwrap_or(otherwise);
         json!({
             "available": true,
@@ -149,6 +165,7 @@ impl Planner {
             "subtitle": label(&selected, "%Y. %B %-d."),
             "today": today,
             "selected": selected,
+            "quick_dates": quick_dates,
             "now_hour": now_hour,
             "greeting": greeting,
             "days": days,
@@ -170,7 +187,8 @@ fn field_of(store: &Map<String, Value>, key: &str) -> Option<Value> {
 /// `time` without a leading zero and `tags`/`subtasks`/`done_dates` always there.
 fn shown(original: &Map<String, Value>, today_date: NaiveDate, today: &str, clock: &str) -> Value {
     let mut item = Value::Object(original.clone());
-    let done = item.get("done").is_some_and(truthy);
+    let is_habit = original.get("habit").is_some_and(truthy);
+    let done = is_done_today(original, today);
     let when = item.get("date").filter(|d| truthy(d)).map(text);
     let time = item.get("time").filter(|t| truthy(t)).map(text);
     let state = field(&item, "state").cloned().unwrap_or(json!("open"));
@@ -222,8 +240,16 @@ fn shown(original: &Map<String, Value>, today_date: NaiveDate, today: &str, cloc
     if field(&item, "done_dates").is_none() {
         item["done_dates"] = json!([]);
     }
-    if item.get("habit").is_some_and(truthy) && field(&item, "streak").is_none() {
-        item["streak"] = json!(0);
+    if is_habit {
+        let dates = done_dates_set(original);
+        item["streak"] = json!(compute_streak(&dates, today_date));
+        if original
+            .get("goal")
+            .and_then(integer)
+            .is_some_and(|g| g > 0)
+        {
+            item["progress"] = json!(habit_progress_for_day(original, today));
+        }
     }
     item
 }

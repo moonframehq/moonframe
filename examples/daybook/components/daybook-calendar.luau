@@ -62,15 +62,23 @@ return component {
 
 		local events: { any } = {}
 		local untimed: { any } = {}
+		local from_hour = 7
+		local to_hour = 21
 		for _, item in planner.items or {} do
 			if item.kind ~= "note" and item.date then
 				local first_tag = item.tags and item.tags[1]
 				if item.start_hour ~= nil then
+					local start_h: number = item.start_hour
+					local end_h: number = item.end_hour or math.min(24, start_h + 1)
+					if mode ~= "month" and visible_set[item.date] then
+						from_hour = math.min(from_hour, math.max(0, math.floor(start_h)))
+						to_hour = math.max(to_hour, math.min(24, math.ceil(end_h)))
+					end
 					table.insert(events, {
 						id = item.id,
 						day = item.date,
-						start = item.start_hour,
-						finish = item.end_hour or (item.start_hour + 1),
+						start = start_h,
+						finish = end_h,
 						title = item.title,
 						caption = first_tag,
 						time = item.time,
@@ -165,7 +173,7 @@ return component {
 				days = visible_days,
 				events = events,
 				selected = props.selected_id,
-				hours = { from = 7, to = 21 },
+				hours = { from = from_hour, to = to_hour },
 				hour_height = 68,
 				column_width = if mode == "3days" then 166 else 144,
 				gutter = 54,
