@@ -6503,6 +6503,7 @@ dependencies = [
  "moonframe-speech",
  "moonframe-store",
  "moonframe-terminal",
+ "moonframe-terminals",
  "moonframe-transcripts",
  "moonframe-usage",
  "notify",
@@ -6798,6 +6799,7 @@ dependencies = [
  "moonframe-speech",
  "moonframe-store",
  "moonframe-terminal",
+ "moonframe-terminals",
  "moonframe-transcripts",
  "moonframe-usage",
  "notify",
@@ -6865,6 +6867,18 @@ dependencies = [
  "libghostty-vt",
  "portable-pty",
  "sysinfo 0.40.1",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "moonframe-terminals"
+version = "1.8.0"
+dependencies = [
+ "moonframe-core",
+ "moonframe-packages",
+ "moonframe-providers",
+ "serde_json",
  "tempfile",
  "tracing",
 ]

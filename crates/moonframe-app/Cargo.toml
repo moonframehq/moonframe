@@ -57,6 +57,7 @@ default = [
   "speech",
   "status-item",
   "studio",
+  "terminals",
   "tokio",
   "transcripts",
   "updates",
@@ -110,6 +111,7 @@ studio        = ["moonframe/studio"]
 syntax        = ["moonframe/syntax"]
 system        = ["moonframe/system"]
 terminal      = ["moonframe/terminal"]
+terminals     = ["moonframe/terminals"]
 tokio         = ["moonframe/tokio"]
 transcripts   = ["moonframe/transcripts"]
 updates       = ["moonframe/updates"]

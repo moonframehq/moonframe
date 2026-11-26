@@ -129,6 +129,10 @@ sealed = ["moonframe-packages/sealed"]
 # sessions and their transcripts, read only, for Cinder. Off by default;
 # the starter turns it on.
 transcripts = ["dep:moonframe-transcripts"]
+# The `terminals` native provider (`app.terminals`): every terminal
+# herdr-core and tmux run, and the coding agents in them, for an agent
+# workspace such as Moonmux. Off by default; the starter turns it on.
+terminals = ["dep:moonframe-terminals"]
 # Socket providers (`kind = "socket"`): a program that runs on its own. Off
 # by default; the starter turns it on.
 socket = ["moonframe-providers/socket"]
@@ -218,6 +222,7 @@ moonframe-shell               = { optional = true, workspace = true }
 moonframe-speech              = { optional = true, workspace = true }
 moonframe-store.workspace     = true
 moonframe-terminal            = { optional = true, workspace = true }
+moonframe-terminals           = { optional = true, workspace = true }
 moonframe-transcripts         = { optional = true, workspace = true }
 moonframe-usage               = { optional = true, workspace = true }
 notify.workspace              = true

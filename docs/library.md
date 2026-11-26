@@ -121,6 +121,7 @@ ship only their selected components.
 | `updates` | Release checks, downloads and in-place app updates. Omitting it hides the updater menu and disables automatic checks. |
 | `acp`, `chat`, `docs`, `forge`, `git`, `shell`, `usage` | The respective built-in native providers. |
 | `speech` | The `speech` native provider: dictation from the microphone (`use "dictation"`), through Apple's on-device recognizer, a local program or a remote service. Opt-in. |
+| `terminals` | The `terminals` native provider: every terminal herdr-core and tmux run, the coding agents in them and what each is doing, for an agent workspace such as Moonmux. Opt-in. |
 | `tokio` | Async native-provider support. |
 | `wasm` | Wasmtime and building/running Wasm providers. |
 

@@ -25,6 +25,7 @@ pub(crate) fn natives() -> Natives {
         ("repo", moonframe_pi::repo),
         ("shell", moonframe_shell::native),
         ("speech", moonframe_speech::native),
+        ("terminals", moonframe_terminals::native),
         ("usage", moonframe_usage::native),
         // keep-sorted end
     ];

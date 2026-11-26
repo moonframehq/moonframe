@@ -38,6 +38,7 @@ moonframe-shell.workspace       = true
 moonframe-speech.workspace      = true
 moonframe-store.workspace       = true
 moonframe-terminal              = { features = ["alacritty"], workspace = true }
+moonframe-terminals.workspace   = true
 moonframe-transcripts.workspace = true
 moonframe-usage.workspace       = true
 notify.workspace                = true
