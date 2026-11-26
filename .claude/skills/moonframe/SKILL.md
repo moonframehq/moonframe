@@ -1551,7 +1551,7 @@ return style {
 		fallbacks = { "Symbols Nerd Font Mono" },
 		ligatures = false,
 	},
-	radius = 8,          -- the theme's corner radius, which buttons use
+	radius = 8,          -- the theme's corner radius, which buttons use (0 to 64)
 	speeds = { drawer = "220ms" }, -- named durations (fast/normal/slow exist already)
 	animation_speed = 1, -- every animation: 2 twice as fast, 0.5 half, 0 off
 
@@ -1693,7 +1693,7 @@ Leave an element's own keys off if the stylesheet should decide.
 | --- | --- |
 | `background`, `color` (text, inherited), `border_color` | a color |
 | `border` | `true`, `all`, `top`, `bottom`, `left`, `right`, `none` |
-| `radius` | pixels, or each corner clockwise from the top left as in CSS: `{ 8, 8, 0, 0 }` rounds the top only, `{ a, b }` gives the top left and bottom right `a` |
+| `radius` | pixels, 0 to 1000 (`999` rounds a pill), or each corner clockwise from the top left as in CSS: `{ 8, 8, 0, 0 }` rounds the top only, `{ a, b }` gives the top left and bottom right `a` |
 | `padding`, `margin` | a space token or pixels for every edge, `{ y, x }`, `{ top, right, bottom, left }`, or named edges `{ x = 12, top = 4 }` (edge names win over `x`/`y`) |
 | `gap` | a space token or pixels |
 | `shadow` | a preset (`small` `medium` `large`, or `none` to remove one set by a lower rule), a CSS box-shadow string, a layer table, or a list of layers (see below) |
