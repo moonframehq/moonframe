@@ -28,8 +28,7 @@ pub(super) fn run_for(
         use std::os::unix::process::CommandExt;
         command.process_group(0);
     }
-    let mut child = command
-        .spawn()
+    let mut child = spawn(&mut command, deadline)
         .map_err(|error| Failure::Network(format!("cannot start the forge CLI: {error}")))?;
     drop(command);
     let result = collect(&mut child, deadline);
@@ -38,6 +37,26 @@ pub(super) fn run_for(
     }
     result
 }
+
+/// Starts `command`, again a little later while its program is busy being
+/// written (`ETXTBSY`): the CLI being replaced by an update, or, in a
+/// process that starts others, one that forked while the file was open.
+fn spawn(command: &mut Command, deadline: Instant) -> std::io::Result<Child> {
+    loop {
+        match command.spawn() {
+            Err(error)
+                if error.kind() == std::io::ErrorKind::ExecutableFileBusy
+                    && Instant::now() + BUSY_WAIT < deadline =>
+            {
+                thread::sleep(BUSY_WAIT);
+            },
+            started => return started,
+        }
+    }
+}
+
+/// How long to wait before starting a busy program again.
+const BUSY_WAIT: Duration = Duration::from_millis(10);
 
 fn collect(child: &mut Child, deadline: Instant) -> Result<(bool, Vec<u8>), Failure> {
     let reader = child
@@ -90,4 +109,31 @@ fn stop(child: &mut Child) {
     }
     let _ = child.kill();
     let _ = child.wait();
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use {
+        super::*,
+        std::{io::Write, os::unix::fs::PermissionsExt},
+    };
+
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    fn a_program_still_being_written_starts_once_it_is_closed() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("cli");
+        let mut file = std::fs::File::create(&path).unwrap();
+        file.write_all(b"#!/bin/sh\nprintf ready\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        // Open for writing a little longer: starting it is ETXTBSY until then.
+        let writer = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+            drop(file);
+        });
+        let (ok, out) = run_for(Command::new(&path), true, Duration::from_secs(5)).unwrap();
+        writer.join().unwrap();
+        assert!(ok);
+        assert_eq!(out, b"ready");
+    }
 }
