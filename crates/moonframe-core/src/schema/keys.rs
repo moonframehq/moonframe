@@ -157,10 +157,14 @@ fn by_key(key: &str) -> KeyType {
         },
         "place" => Tokens(token_set!(Placement)),
         "scroll" => OneOf(vec![Bool, Tokens(token_set!(Scroll))]),
-        "scroll_to" => Number {
-            min: Some(1.0),
-            max: None,
-        },
+        "scroll_to" => OneOf(vec![
+            Number {
+                min: Some(1.0),
+                max: None,
+            },
+            String,
+            Data,
+        ]),
         "size" => Tokens(token_set!(TextSize)),
         "style" => Style,
         "surface" => Tokens(token_set!(Surface)),

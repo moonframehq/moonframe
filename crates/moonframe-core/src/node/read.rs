@@ -12,6 +12,7 @@ mod layout;
 mod map;
 mod pointer;
 mod revision_timeline;
+mod scroll_to;
 mod strict;
 mod video;
 // keep-sorted end

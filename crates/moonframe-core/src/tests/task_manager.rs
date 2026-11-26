@@ -431,7 +431,7 @@ return mod {
         let mut target = None;
         walk(&popover.content, &mut vec![], &mut |node, _| {
             if let Node::Stack(stack) = node
-                && let Some(index) = stack.scroll_to
+                && let Some(crate::ScrollTo::Child(index)) = stack.scroll_to
             {
                 assert_eq!(stack.frame.max_height, Some(300.));
                 assert_ne!(stack.frame.scroll, crate::Scroll::No);

@@ -282,8 +282,10 @@ export type StackProps = {
 	border: Border?,
 	-- `true` scrolls along its axis; or "x", "y", "both".
 	scroll: (boolean | "x" | "y" | "both")?,
-	-- Reveal this direct child (one-based) when the index changes.
-	scroll_to: number?,
+	-- Reveal this direct child (one-based) when the index changes; or the
+	-- first row or column with this `key`, however deep, when the key (or
+	-- `seq`, to ask again) changes.
+	scroll_to: (number | string | { key: string, seq: any? })?,
 	-- With `scroll`: sent with `width`, `height`, `content_width`,
 	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
 	measure: Data,

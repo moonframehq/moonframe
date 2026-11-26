@@ -1475,6 +1475,11 @@ Text-like elements take their main value positionally:
   `scroll_end = value` scrolls to its end each time the value changes. A
   chat's "latest message" button shows while `at_end` is false and sets
   `state.jump = { seq = state.seq + 1 }` for `scroll_end = state.jump`.
+- `scroll_to`, with `scroll`, reveals what it names when it changes,
+  scrolling only as far as needed: `12` the twelfth direct child, `"row-7"`
+  the first row or column with `key = "row-7"` however deep (a row in a
+  card in the list, once it is drawn), and `{ key = "row-7", seq = n }` the
+  same, asked again with each new `seq` (a link opened twice).
 - `shrink = false` keeps the content's size when the parent is short of
   space (strips, toolbars), instead of being squeezed.
 - `self_align = "start"` (or `center`, `end`, `stretch`) places it across

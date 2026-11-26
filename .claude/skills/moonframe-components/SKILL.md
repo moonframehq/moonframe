@@ -131,6 +131,10 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `scroll_to = 12` reveals direct child 12 (one-based) when the index
   changes. It scrolls only as far as needed and leaves wheel scrolling
   free between changes. Set it to nil to reset the request.
+  `scroll_to = "row-7"` reveals the first row or column with
+  `key = "row-7"` inside it, however deep (a row in a card in the list),
+  once it is drawn; `scroll_to = { key = "row-7", seq = n }` asks again
+  for the same key with each new `seq`. Both are the GPUI window's, so far.
 
 - **Measure a scrolling stack** (`row`, `column`): with `scroll` enabled,
   `measure = msg` sends `msg` (to `to`, else the drawing mod) with its

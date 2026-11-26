@@ -39,6 +39,7 @@ mod pointer;
 mod revision_timeline;
 mod scroll_end;
 mod scroll_sync;
+mod scroll_to;
 mod scrollbar;
 mod shell;
 mod split_resize;

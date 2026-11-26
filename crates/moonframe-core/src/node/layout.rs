@@ -80,9 +80,9 @@ pub struct Stack {
     /// Matches `:selected` rules, as a selected item does: a tab, a
     /// segment, a row.
     pub selected: bool,
-    /// Reveal this direct child (one-based) when it changes; scrolling
-    /// by hand remains free between changes.
-    pub scroll_to: Option<usize>,
+    /// What to reveal when it changes; scrolling by hand remains free
+    /// between changes.
+    pub scroll_to: Option<ScrollTo>,
     /// Sent, as a scrolling stack lays out and scrolls, with its box, its
     /// content's size, how far it is scrolled and which children fit and
     /// show, each time one of them changes (see `render/stack_measure`).
@@ -116,6 +116,18 @@ pub struct Stack {
     /// Told of its end, and scrolled to it; boxed, as most stacks have
     /// neither.
     pub ends: Option<Box<Ends>>,
+}
+
+/// What a scrolling row or column's `scroll_to` reveals, scrolling only as
+/// far as needed to show it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ScrollTo {
+    /// A direct child, one-based.
+    Child(usize),
+    /// The first row or column, in tree order, whose `key` this is, however
+    /// deep: a row in a card in the list. A new `seq` asks again for the
+    /// same key.
+    Key { key: String, seq: Data },
 }
 
 /// A titled section: a header with optional actions over a column body.
