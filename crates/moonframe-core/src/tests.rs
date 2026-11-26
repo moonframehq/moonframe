@@ -46,6 +46,7 @@ mod shell;
 mod split_resize;
 mod stack_measure;
 mod state;
+mod style_ranges;
 mod styles;
 mod switchyard;
 mod t3_overview;
