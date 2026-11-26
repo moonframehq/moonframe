@@ -201,8 +201,15 @@ fn actions_go_to_the_backend_that_owns_the_address() {
         "tmux close p1,p4",
     ]);
     // A peek reads from the owner too.
-    core.watching = "default:%3".into();
-    assert_eq!(core.snapshot()["peek"]["text"], "screen of default:%3");
+    core.watching = Some(Watch {
+        address: "default:%3".into(),
+        by: "peek".into(),
+    });
+    assert_eq!(core.peek().unwrap()["text"], "screen of default:%3");
+    assert!(
+        core.snapshot().get("peek").is_none(),
+        "a screen is never published"
+    );
 }
 
 #[test]

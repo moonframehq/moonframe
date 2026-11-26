@@ -22,7 +22,6 @@
 //!   counts = { live, agents, working, blocked, done },
 //!   ended = { "p3", ... },   -- this app's panes whose shell exited
 //!   programs = { { key, name, installed } },   -- the agents "+" can start
-//!   peek = { address, text, error },
 //!   app_version,             -- Moonframe's version
 //!   machines = { ok, error, list = { { name, target, state, version } } } }
 //! ```
@@ -44,8 +43,9 @@
 //! minute, for the views to count ages by: Luau has no clock. `parent` is
 //! the terminal that started it, if any.
 //!
-//! What it takes: `{ watch = address }` (publish that terminal's screen as
-//! `peek` each tick; `""` stops), `{ send = address, text }`,
+//! What it takes: `{ watch = address }` (send that terminal's screen to the
+//! mod that asked, as `{ peek = { address, text, error } }`, each time it
+//! changes; `""` stops; never published, as any mod reads what is), `{ send = address, text }`,
 //! `{ keys = address, key = "enter" }`, `{ interrupt = address }`,
 //! `{ close_panes = "p1,p4" }` (end the shells of those panes of this app,
 //! on every backend), `{ start = "p3", program = "claude" }` (type a
@@ -72,7 +72,7 @@ mod tmux;
 
 use {
     moonframe_core::Data,
-    moonframe_providers::{Handle, Native},
+    moonframe_providers::{Handle, Native, from_json},
     serde_json::{Value, json},
     std::{
         io::{self, Read, Write as _},
@@ -98,6 +98,12 @@ fn namespace() -> String {
 const PROGRAMS_EVERY: u64 = 10;
 /// Ticks between looks at herdr-core's machines.
 const MACHINES_EVERY: u64 = 30;
+
+/// A terminal a writer watches: its screen goes to that mod alone.
+struct Watch {
+    address: String,
+    by: String,
+}
 
 /// What one backend listed at a tick.
 #[derive(Debug, Default)]
@@ -156,8 +162,10 @@ fn backends() -> Vec<Box<dyn Backend>> {
 
 struct Terminals {
     backends: Vec<Box<dyn Backend>>,
-    /// The terminal shown in a peek, if any.
-    watching: String,
+    /// The terminal shown in a peek, if any, and the mod that asked.
+    watching: Option<Watch>,
+    /// The peek last sent, so an unchanged screen is not sent again.
+    peeked: Value,
     /// The machines herdr-core reaches over ssh, read now and then.
     machines: Value,
     /// The tick of the last refresh: any mod may ask for one, so it runs
@@ -182,7 +190,8 @@ impl Terminals {
     fn with(backends: Vec<Box<dyn Backend>>) -> Self {
         Self {
             backends,
-            watching: String::new(),
+            watching: None,
+            peeked: Value::Null,
             machines: Value::Null,
             refreshed: None,
             programs: Value::Null,
@@ -280,7 +289,7 @@ impl Terminals {
             });
         }
         let ended = ended_panes(finished, &terminals);
-        let mut snapshot = json!({
+        let snapshot = json!({
             "ok": true,
             "error": error,
             "now": to_minute(now_ms()),
@@ -293,26 +302,43 @@ impl Terminals {
             "machines": self.machines,
             "programs": self.programs,
         });
-        if !self.watching.is_empty() {
-            let watching = self.watching.clone();
-            let peek = match self
-                .owner(&watching)
-                .and_then(|backend| backend.read(&watching))
-            {
-                Ok(text) => json!({ "address": watching, "text": text, "error": "" }),
-                Err(error) => json!({ "address": watching, "text": "", "error": error }),
-            };
-            snapshot["peek"] = peek;
-        }
         snapshot
     }
 
-    /// Publishes what the backends list, unless nothing changed.
-    fn publish(&mut self) {
+    /// The screen of the terminal being watched, if any: `{ address, text,
+    /// error }`.
+    fn peek(&mut self) -> Option<Value> {
+        let address = self.watching.as_ref()?.address.clone();
+        Some(
+            match self
+                .owner(&address)
+                .and_then(|backend| backend.read(&address))
+            {
+                Ok(text) => json!({ "address": address, "text": text, "error": "" }),
+                Err(error) => json!({ "address": address, "text": "", "error": error }),
+            },
+        )
+    }
+
+    /// Publishes what the backends list, unless nothing changed, and sends
+    /// the watched screen to the mod that asked for it, unless it is the
+    /// one last sent. A screen is never published: any mod reads what is,
+    /// and only writers may read another program's terminal.
+    fn publish(&mut self, host: &Handle) {
         let snapshot = self.snapshot();
         if let Some(live) = &self.live {
             live.publish(snapshot);
         }
+        let Some(peek) = self.peek() else {
+            return;
+        };
+        if peek == self.peeked {
+            return;
+        }
+        if let (Some(watch), Ok(data)) = (&self.watching, from_json(&json!({ "peek": peek }))) {
+            host.send(&watch.by, data);
+        }
+        self.peeked = peek;
     }
 
     /// An action a mod asked for: what the backend was told, and whether it
@@ -419,13 +445,13 @@ impl Native for Terminals {
             backend.follow(&live);
         }
         self.live = Some(live);
-        self.publish();
+        self.publish(host);
         Ok(())
     }
 
-    fn tick(&mut self, _host: &Handle) {
+    fn tick(&mut self, host: &Handle) {
         self.ticks += 1;
-        self.publish();
+        self.publish(host);
     }
 
     fn receive(&mut self, host: &Handle, from: &str, message: Data) {
@@ -433,7 +459,7 @@ impl Native for Terminals {
         if message.get("refresh").and_then(Data::as_str) == Some("machines") {
             if once_a_tick(&mut self.refreshed, self.ticks) {
                 self.machines = Value::Null;
-                self.publish();
+                self.publish(host);
             }
             return;
         }
@@ -457,14 +483,18 @@ impl Native for Terminals {
             return;
         }
         if let Some(address) = message.get("watch").and_then(Data::as_str) {
-            self.watching = address.to_owned();
+            self.watching = (!address.is_empty()).then(|| Watch {
+                address: address.to_owned(),
+                by: from.to_owned(),
+            });
+            self.peeked = Value::Null;
         } else if let Some((action, address, result)) = self.act(&message) {
             if let Err(error) = &result {
                 tracing::warn!("terminals: {action} {address}: {error}");
             }
             host.send(from, reply(action, &address, result));
         }
-        self.publish();
+        self.publish(host);
     }
 }
 
