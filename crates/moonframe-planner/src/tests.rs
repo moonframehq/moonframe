@@ -565,3 +565,91 @@ fn moving_days_publishes_without_writing() {
     assert_ne!(all[0]["selected"], all[1]["selected"]);
     assert_eq!(fs::read_to_string(&file).unwrap(), written);
 }
+
+#[test]
+fn updates_notes_subtasks_habits_folders_tags_and_reschedules() {
+    let today = date("2026-10-31");
+    let (_temp, mut planner) = with_items(json!([
+        {"id": "t1", "kind": "task", "title": "Overdue task", "date": "2026-10-29"},
+        {"id": "h1", "kind": "task", "title": "Pushups", "date": "2026-10-31", "habit": true,
+         "goal": 100, "progress": 20, "done_dates": ["2026-10-29", "2026-10-30"]},
+    ]));
+
+    // Create a note and update its body, cover, favorite, folder, and tags.
+    assert!(planner.receive(
+        &json!({ "add": "Weekend plan", "kind": "note", "folder": "Personal", "tags": ["Ideas"] }),
+        today
+    ));
+    let note_id = planner.items().last().unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(planner.receive(
+        &json!({
+            "update": note_id,
+            "body": "# Packing\n- Boots",
+            "cover": "aurora",
+            "favorite": true,
+            "toggle_tag": "Work",
+        }),
+        today
+    ));
+    let published = planner.published(at("2026-10-31 10:30"));
+    let note = item(&published, &note_id);
+    assert_eq!(note["cover"], "aurora");
+    assert_eq!(note["favorite"], true);
+    assert_eq!(note["body"], "# Packing\n- Boots");
+    assert_eq!(note["tags"], json!(["Ideas", "Work"]));
+    assert_eq!(published["now_hour"], 10.5);
+    assert_eq!(published["day_details"].as_array().unwrap().len(), 14);
+    assert_eq!(published["week_history"].as_array().unwrap().len(), 7);
+
+    // Subtasks CRUD.
+    assert!(planner.receive(&json!({ "subtask_add": "t1", "title": "Step one" }), today));
+    let sub_id = planner.items().next().unwrap()["subtasks"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(planner.receive(&json!({ "subtask_toggle": "t1", "subtask": sub_id }), today));
+    assert_eq!(
+        planner.items().next().unwrap()["subtasks"][0]["done"],
+        json!(true)
+    );
+    assert!(planner.receive(&json!({ "subtask_remove": "t1", "subtask": sub_id }), today));
+    assert_eq!(
+        planner.items().next().unwrap()["subtasks"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
+
+    // Habit progress step and check-in streak calculation.
+    assert!(planner.receive(&json!({ "habit_step": "h1", "delta": 80 }), today));
+    let published = planner.published(at("2026-10-31 10:30"));
+    let habit = item(&published, "h1");
+    assert_eq!(habit["progress"], 100);
+    assert_eq!(habit["done"], true);
+    assert_eq!(habit["streak"], 3);
+    assert!(planner.receive(
+        &json!({ "habit_checkin": "h1", "date": "2026-10-31" }),
+        today
+    ));
+    let published = planner.published(at("2026-10-31 10:30"));
+    let habit = item(&published, "h1");
+    assert_eq!(habit["done"], false);
+    assert_eq!(habit["streak"], 2);
+
+    // Folders and tags CRUD.
+    assert!(planner.receive(&json!({ "folder_add": "Projects" }), today));
+    assert!(!planner.receive(&json!({ "folder_add": "Projects" }), today));
+    assert!(planner.receive(&json!({ "tag_add": "Urgent" }), today));
+    assert!(planner.receive(&json!({ "folder_remove": "Projects" }), today));
+    assert!(planner.receive(&json!({ "tag_remove": "Urgent" }), today));
+
+    // Reschedule overdue tasks to today.
+    assert!(planner.receive(&json!({ "reschedule_overdue": true }), today));
+    let published = planner.published(at("2026-10-31 10:30"));
+    assert_eq!(item(&published, "t1")["date"], "2026-10-31");
+    assert_eq!(item(&published, "t1")["overdue"], false);
+}
