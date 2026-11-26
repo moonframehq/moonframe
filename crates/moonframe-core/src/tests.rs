@@ -40,6 +40,7 @@ mod revision_timeline;
 mod scroll_end;
 mod scroll_sync;
 mod scrollbar;
+mod scrolled_children;
 mod shell;
 mod split_resize;
 mod stack_measure;

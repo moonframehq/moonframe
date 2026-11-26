@@ -145,7 +145,8 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `follow = true` (with `scroll`:
   while at its end, stay there as the content grows, as a chat or log
   does), `shrink = false` (keep
-  the content's size instead of being squeezed), `self_align` (`start`,
+  the content's size instead of being squeezed; the default inside a row or
+  column that scrolls along its axis), `self_align` (`start`,
   `center`, `end`, `stretch`: e.g. keep a capsule at its own width inside a
   column, which otherwise stretches it), `hug = true` (keep its own width in
   a column, and follow a row's `align`: the usual choice for pills, badges
