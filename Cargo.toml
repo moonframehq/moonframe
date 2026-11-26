@@ -29,6 +29,7 @@ members = [
   "crates/moonframe-speech",
   "crates/moonframe-store",
   "crates/moonframe-terminal",
+  "crates/moonframe-terminals",
   "crates/moonframe-transcripts",
   "crates/moonframe-usage",
   "examples/host",
@@ -133,6 +134,7 @@ moonframe-shell          = { path = "crates/moonframe-shell" }
 moonframe-speech         = { path = "crates/moonframe-speech" }
 moonframe-store          = { path = "crates/moonframe-store" }
 moonframe-terminal       = { default-features = false, path = "crates/moonframe-terminal" }
+moonframe-terminals      = { path = "crates/moonframe-terminals" }
 moonframe-transcripts    = { path = "crates/moonframe-transcripts" }
 moonframe-usage          = { path = "crates/moonframe-usage" }
 notify                   = "8"
