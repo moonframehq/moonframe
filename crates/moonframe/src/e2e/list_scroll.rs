@@ -83,3 +83,39 @@ fn at_the_top_rows_arriving_join_the_top(cx: &mut TestAppContext) {
     later(&mut window);
     assert_eq!(window.log(), log);
 }
+
+#[gpui_kit::test]
+fn a_padded_list_brings_the_row_wholly_into_view(cx: &mut TestAppContext) {
+    let padded = FEED.replace(
+        "height = 100, range",
+        "height = 100, style = { padding = { 20, 0, 0, 0 } }, range",
+    );
+    let mut window = open(cx, &padded);
+    later(&mut window);
+    window.click("row");
+    // Row 50 ends 20 lower, under the padding: 1020 - 100.
+    assert_eq!(later(&mut window), "46-50 y=920 i46");
+}
+
+/// A list that opens on row 50, with nothing else to draw it again.
+const OPENS_ON: &str = r##"
+return mod {
+	init = function() return { log = "" } end,
+	view = function(state)
+		return shell(state, ui.column { class = "box",
+			ui.list { count = 1000, row_height = 20, height = 100, scroll_to = 50,
+				row = function(i) return ui.row { class = if i == 50 then "fifty" else nil, ui.text { `row {i}` } } end },
+		})
+	end,
+}
+"##;
+
+#[gpui_kit::test]
+fn a_list_opens_on_the_row_it_asks_for(cx: &mut TestAppContext) {
+    let mut window = open(cx, OPENS_ON);
+    let (list, row) = (window.bounds("box"), window.bounds("fifty"));
+    assert!(
+        row.top() >= list.top() && row.bottom() <= list.bottom() + px(1.),
+        "{row:?} {list:?}"
+    );
+}

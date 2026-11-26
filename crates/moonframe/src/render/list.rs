@@ -28,7 +28,22 @@ impl<'w> Draw<'w> for List {
         let rows_of = &self.row_height;
         // Last frame's layout: where it is scrolled (kept on its first row,
         // or moved where `scroll_to` asks), and how tall it is.
-        let scrolled = scroll::place(self, &handle, painter, place);
+        let pad = scroll::Pad {
+            top: self
+                .frame
+                .padding
+                .map(Space::pixels)
+                .or(look.base.padding.top)
+                .unwrap_or(0.0),
+            bottom: self
+                .frame
+                .padding
+                .map(Space::pixels)
+                .or(look.base.padding.bottom)
+                .unwrap_or(0.0),
+        };
+        let (scrolled, again) = scroll::place(self, &handle, pad, painter, place);
+        painter.animating |= again;
         let height = f32::from(handle.bounds().size.height);
         let height = if height > 0.0 {
             height

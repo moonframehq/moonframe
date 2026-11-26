@@ -29,6 +29,8 @@ thread_local! {
 
 #[derive(Default)]
 struct Kept {
+    /// The list's `id`: another list in its place starts afresh.
+    id: String,
     /// The last `scroll_to`, so a redraw does not undo the wheel.
     asked: Option<ListScrollTo>,
     /// Asked for, and waiting for the list's height.
@@ -84,15 +86,24 @@ impl<'a> Built<'a> {
     }
 }
 
+/// The list's padding above and below its rows, in pixels.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(super) struct Pad {
+    pub top: f32,
+    pub bottom: f32,
+}
+
 /// How far down `list` shows this frame, its `handle` moved there: last
 /// frame's place, kept on its first row as rows arrive above, then where a
-/// new `scroll_to` asks.
+/// new `scroll_to` asks; and whether to draw again, for a row asked for
+/// before the list has a height.
 pub(super) fn place(
     list: &List,
     handle: &ScrollHandle,
+    pad: Pad,
     painter: &Painter<'_, '_>,
     place: &Place<'_>,
-) -> f32 {
+) -> (f32, bool) {
     let key = format!("{:?}/{}", painter.window, place.path);
     let now = Instant::now();
     let heights = &list.row_height;
@@ -106,6 +117,12 @@ pub(super) fn place(
                 .is_none_or(|seen| now.saturating_duration_since(seen) < FORGET)
         });
         let entry = kept.entry(key).or_default();
+        if entry.id != list.id {
+            *entry = Kept {
+                id: list.id.clone(),
+                ..Kept::default()
+            };
+        }
         entry.seen = Some(now);
         let mut scrolled = entry
             .anchor
@@ -121,28 +138,30 @@ pub(super) fn place(
         if let Some(to) = entry.pending
             && (known.is_some() || matches!(to, ListScroll::Y(_)))
         {
-            scrolled = target(to, scrolled, known, heights, list.count);
+            scrolled = target(to, scrolled, known, pad, heights, list.count);
             entry.pending = None;
         }
         if let Some(height) = known {
-            scrolled = scrolled.min((heights.total(list.count) - height).max(0.0));
+            let content = pad.top + heights.total(list.count) + pad.bottom;
+            scrolled = scrolled.min((content - height).max(0.0));
         }
-        entry.anchor = anchor(scrolled, &built, heights, list.count);
-        scrolled
+        entry.anchor = anchor(scrolled, pad, &built, heights, list.count);
+        (scrolled, entry.pending.is_some())
     });
-    if (scrolled - was).abs() > SLACK {
-        handle.set_offset(point(handle.offset().x, px(-scrolled)));
+    if (scrolled.0 - was).abs() > SLACK {
+        handle.set_offset(point(handle.offset().x, px(-scrolled.0)));
     }
     scrolled
 }
 
 /// How far down to show `to`, from `scrolled`, in a box `height` high
-/// when known: a row comes into view only as far as needed (its top when it
-/// is taller than the box), a `y` as it is.
+/// when known, its rows under `pad`: a row comes into view only as far as
+/// needed (its top when it is taller than the box), a `y` as it is.
 pub(super) fn target(
     to: ListScroll,
     scrolled: f32,
     height: Option<f32>,
+    pad: Pad,
     heights: &RowHeights,
     count: usize,
 ) -> f32 {
@@ -153,10 +172,8 @@ pub(super) fn target(
             if count == 0 {
                 return scrolled;
             }
-            let (top, bottom) = (
-                heights.top(index),
-                heights.top(index) + heights.height(index),
-            );
+            let top = pad.top + heights.top(index);
+            let bottom = top + heights.height(index);
             let height = height.unwrap_or(0.0);
             if top < scrolled {
                 top
@@ -186,10 +203,11 @@ pub(super) fn anchored(
     (moved.abs() > SLACK).then(|| (scrolled + moved).max(0.0))
 }
 
-/// The row to follow from `scrolled`: the first that shows, if it has a
-/// key; none at the top, where arrivals join it.
+/// The row to follow from `scrolled`: the first that shows below `pad`, if
+/// it has a key; none at the top, where arrivals join it.
 pub(super) fn anchor(
     scrolled: f32,
+    pad: Pad,
     built: &Built<'_>,
     heights: &RowHeights,
     count: usize,
@@ -197,7 +215,9 @@ pub(super) fn anchor(
     if scrolled <= SLACK || count == 0 {
         return None;
     }
-    let index = heights.at(scrolled + SLACK, count).min(count - 1);
+    let index = heights
+        .at((scrolled - pad.top).max(0.0) + SLACK, count)
+        .min(count - 1);
     Some(Anchor {
         key: built.key(index)?.to_owned(),
         index,
