@@ -2,7 +2,7 @@
 #![cfg_attr(not(unix), allow(dead_code, unused_imports))]
 
 // keep-sorted start
-mod plain_http;
+mod http_client;
 mod remote_cancel;
 // keep-sorted end
 
