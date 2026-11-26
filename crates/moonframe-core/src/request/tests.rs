@@ -500,3 +500,47 @@ fn open_takes_only_web_addresses() {
     }
     assert!(Request::parse("open", &Data::from(true)).is_err());
 }
+
+#[test]
+fn open_takes_one_mailto_address_and_nothing_it_could_write() {
+    for url in [
+        "mailto:ada@example.com",
+        "MAILTO:first.last+notes@mail.example.org",
+    ] {
+        assert_eq!(
+            Request::parse("open", &Data::from(url)),
+            Ok(Request::Open(url.to_owned())),
+            "{url}"
+        );
+    }
+    let long = format!("mailto:{}@example.com", "a".repeat(250));
+    for refused in [
+        "mailto:",
+        "mailto:ada",
+        "mailto:@example.com",
+        "mailto:ada@",
+        "mailto:ada@localhost",
+        "mailto:ada@example.com?subject=Hi",
+        "mailto:ada@example.com?body=x",
+        "mailto:ada@example.com,bob@example.com",
+        "mailto:ada@example.com;bob@example.com",
+        "mailto:ada smith@example.com",
+        "mailto:ada@example.com\\n",
+        "mailto:ada@example.com\n",
+        "mailto:ada@example.com\r",
+        "mailto:ada@example.com\0",
+        "mailto:ada\t@example.com",
+        "mailto:ada%40x@example.com",
+        "mailto:ada@exa mple.com",
+        "mailto:ada@@example.com",
+        "mailto:ada@.example.com",
+        long.as_str(),
+        "mail:ada@example.com",
+        "tel:+15550100",
+    ] {
+        assert!(
+            Request::parse("open", &Data::from(refused)).is_err(),
+            "{refused}"
+        );
+    }
+}

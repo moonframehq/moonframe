@@ -2398,7 +2398,7 @@ export type DevtoolsMsg =
 -- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
 -- `"app:devtools"` (`msg` a `DevtoolsMsg`), `"app:share"` (`msg` a `ShareMsg`), `"app:status-item"` (`msg` a
--- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`), `"app:text"` (`msg` a `TextMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
+-- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`), `"app:text"` (`msg` a `TextMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser, or one `mailto:` address without headers, opened in its mail app).
 export type Send = {
 	to: string,
 	msg: Data,
