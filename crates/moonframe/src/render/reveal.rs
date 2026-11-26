@@ -2,10 +2,11 @@
 //! drawn inside it with that key, however deep, comes into view, scrolled
 //! only as far as needed, once it is drawn.
 //!
-//! While a key is asked for, the scrolling stack is what its descendants
-//! draw inside ([`Painter::reveal`]); the first with the key draws a mark
-//! that records where it is, and the stack, which lays out after its
-//! children, scrolls to it and draws again.
+//! While a key is asked for, the scrolling stack is among those its
+//! descendants draw inside ([`Painter::reveal`]); the first with the key
+//! draws a mark that records where it is, and the stack, which lays out
+//! after its children, scrolls to it and draws again, until it stays put
+//! (a card growing in before it may push it on for a while).
 
 use {
     super::{Painter, Place},
@@ -22,8 +23,16 @@ pub(crate) struct Pending {
     claimed: Cell<Option<u64>>,
     /// Where that stack was laid out, scrolled as it was.
     found: Cell<Option<Bounds<Pixels>>>,
+    /// Where it was in the content when last revealed, and how many frames
+    /// it has been revealed in.
+    last: Cell<Option<Point<Pixels>>>,
+    tries: Cell<u32>,
     done: Cell<bool>,
 }
+
+/// The most frames a reveal follows a moving target for: a layout that
+/// never settles does not hold the scroll for good.
+const MAX_TRIES: u32 = 120;
 
 impl Pending {
     pub(crate) fn new(key: String) -> Self {
@@ -31,6 +40,8 @@ impl Pending {
             key,
             claimed: Cell::new(None),
             found: Cell::new(None),
+            last: Cell::new(None),
+            tries: Cell::new(0),
             done: Cell::new(false),
         }
     }
@@ -45,31 +56,31 @@ pub(super) struct Revealing {
     handle: ScrollHandle,
     /// The key this stack asks for, if it does.
     pending: Option<Rc<Pending>>,
-    /// The one asked for around it, to restore.
-    outer: Option<Rc<Pending>>,
-    /// The mark this stack draws, being the one asked for around it.
-    mark: Option<AnyElement>,
+    /// The marks this stack draws, being what stacks around it ask for.
+    marks: Vec<AnyElement>,
 }
 
 /// Before `stack` draws its children: its scroll handle, with any
 /// `scroll_to` applied, and the key its descendants are looked through for.
 pub(super) fn begin(stack: &Stack, painter: &mut Painter<'_, '_>, place: &Place<'_>) -> Revealing {
-    let mark = stack
-        .key
-        .as_deref()
-        .and_then(|key| mark(key, painter.reveal.as_ref()?, painter.frame));
+    let marks = match stack.key.as_deref() {
+        Some(key) => painter
+            .reveal
+            .iter()
+            .filter_map(|pending| mark(key, pending, painter.frame))
+            .collect(),
+        None => Vec::new(),
+    };
     let (handle, pending) = painter
         .motion
         .scroll_to(&place.path, stack.scroll_to.as_ref());
-    let outer = match &pending {
-        Some(pending) => painter.reveal.replace(pending.clone()),
-        None => painter.reveal.clone(),
-    };
+    if let Some(pending) = &pending {
+        painter.reveal.push(pending.clone());
+    }
     Revealing {
         handle,
         pending,
-        outer,
-        mark,
+        marks,
     }
 }
 
@@ -77,9 +88,11 @@ impl Revealing {
     /// Once the children are drawn: the handle, and what to draw last
     /// among them (no child's index moves).
     pub(super) fn end(self, painter: &mut Painter<'_, '_>) -> (ScrollHandle, Vec<AnyElement>) {
-        painter.reveal = self.outer;
+        if self.pending.is_some() {
+            painter.reveal.pop();
+        }
         let reader = self.pending.map(|pending| reader(pending, &self.handle));
-        let extra = self.mark.into_iter().chain(reader).collect();
+        let extra = self.marks.into_iter().chain(reader).collect();
         (self.handle, extra)
     }
 }
@@ -104,7 +117,8 @@ fn mark(key: &str, pending: &Rc<Pending>, frame: u64) -> Option<AnyElement> {
 }
 
 /// A box of no size, last in the scrolling stack, that scrolls it to where
-/// the mark was laid out, once.
+/// the mark was laid out, each frame until the mark stays where it was in
+/// the content.
 fn reader(pending: Rc<Pending>, handle: &ScrollHandle) -> AnyElement {
     let handle = handle.clone();
     canvas(
@@ -112,11 +126,20 @@ fn reader(pending: Rc<Pending>, handle: &ScrollHandle) -> AnyElement {
             let Some(target) = pending.found.take() else {
                 return;
             };
-            pending.done.set(true);
-            let offset = handle.offset();
-            let shown = revealed(handle.bounds(), target, offset, handle.max_offset());
+            let (view, offset) = (handle.bounds(), handle.offset());
+            let shown = revealed(view, target, offset, handle.max_offset());
             if shown != offset {
                 handle.set_offset(shown);
+            }
+            let at = target.origin - view.origin - offset;
+            let settled = pending.last.replace(Some(at)).is_some_and(|last| {
+                (last.x - at.x).abs() < px(0.5) && (last.y - at.y).abs() < px(0.5)
+            });
+            pending.tries.set(pending.tries.get() + 1);
+            if settled || pending.tries.get() >= MAX_TRIES {
+                pending.done.set(true);
+            }
+            if shown != offset || !pending.done() {
                 window.refresh();
             }
         },

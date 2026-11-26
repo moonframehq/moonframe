@@ -325,8 +325,9 @@ pub(crate) struct Painter<'w, 'm> {
     /// The stacks being drawn that hear presses `outside` them: popovers
     /// and overlays drawn inside them record their boxes in each.
     outside: Vec<outside::Inside>,
-    /// The key the innermost scrolling stack being drawn is to reveal.
-    reveal: Option<Rc<Pending>>,
+    /// The keys the scrolling stacks being drawn are to reveal, outermost
+    /// first.
+    reveal: Vec<Rc<Pending>>,
 }
 
 /// A list's rows a mod should build, which the app asks the workspace for
@@ -376,7 +377,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             live_again: Vec::new(),
             layering: None,
             outside: Vec::new(),
-            reveal: None,
+            reveal: Vec::new(),
         }
     }
 

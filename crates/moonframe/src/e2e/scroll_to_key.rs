@@ -59,3 +59,33 @@ fn a_keyed_row_deep_in_a_scrolling_column_comes_into_view(cx: &mut TestAppContex
     let target = window.bounds("target");
     assert!(target.bottom() < list.top(), "{target:?} {list:?}");
 }
+
+/// The row is inside a scrolling card that waits for a row it does not
+/// have yet: the outer column still finds it.
+const NESTED: &str = r##"
+return mod {
+	init = function()
+		return { log = "" }
+	end,
+	view = function(state)
+		return shell(state, ui.column { class = "outer", height = 200, gap = "none", scroll = true,
+			scroll_to = "wanted",
+			ui.row { height = 600, ui.text { "above" } },
+			ui.column { height = 150, gap = "none", shrink = false, scroll = true, scroll_to = "missing",
+				ui.row { key = "first", height = 40, ui.text { "first" } },
+				ui.row { key = "wanted", class = "wanted", height = 40, ui.text { "wanted" } },
+			},
+		})
+	end,
+}
+"##;
+
+#[gpui_kit::test]
+fn an_inner_request_does_not_hide_the_outer_one(cx: &mut TestAppContext) {
+    let mut window = open(cx, NESTED);
+    let (outer, wanted) = (window.bounds("outer"), window.bounds("wanted"));
+    assert!(
+        wanted.top() >= outer.top() && wanted.bottom() <= outer.bottom() + px(1.),
+        "{wanted:?} {outer:?}"
+    );
+}
