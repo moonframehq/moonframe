@@ -27,16 +27,17 @@ const MAX_SOCKETS: usize = 32;
 /// would otherwise hold up the tick, and every backend's terminals with it.
 const DEADLINE: Duration = Duration::from_secs(2);
 /// What `list-panes` prints for each pane: fields apart by [`FIELD`], each
-/// pane ended by [`RECORD`]. tmux prints a folder's tabs and newlines as
-/// they are, so neither may part fields or panes; the folder comes last, so
-/// whatever it holds stays in it.
-const PANE_FORMAT: &str = "#{pane_id}\x1f#{session_name}\x1f#{window_index}\x1f#{pane_index}\x1f\
-                           #{pane_pid}\x1f#{pane_current_command}\x1f#{pane_dead}\x1f\
-                           #{pane_current_path}\x1e";
+/// pane ended by [`RECORD`]. A newer tmux prints a folder's tabs and
+/// newlines as they are, so neither may part fields or panes, and an older
+/// one escapes control characters, so the marks are printable; the folder
+/// comes last, so whatever it holds stays in it.
+const PANE_FORMAT: &str = "#{pane_id}<mf|>#{session_name}<mf|>#{window_index}<mf|>#{pane_index}<mf|>\
+                           #{pane_pid}<mf|>#{pane_current_command}<mf|>#{pane_dead}<mf|>\
+                           #{pane_current_path}<mf$>";
 /// What parts the fields of a pane in [`PANE_FORMAT`].
-const FIELD: char = '\x1f';
+const FIELD: &str = "<mf|>";
 /// What ends a pane in [`PANE_FORMAT`].
-const RECORD: char = '\x1e';
+const RECORD: &str = "<mf$>";
 
 /// The `tmux` found on this machine.
 #[derive(Clone, Debug)]
@@ -284,7 +285,7 @@ mod tests {
 
     #[test]
     fn a_pane_line_parses() {
-        let line = "%7\x1fwork\x1f1\x1f0\x1f4242\x1fzsh\x1f0\x1f/home/u/x";
+        let line = "%7<mf|>work<mf|>1<mf|>0<mf|>4242<mf|>zsh<mf|>0<mf|>/home/u/x";
         let pane = Pane::parse("default", line).unwrap();
         assert_eq!(pane.id, "%7");
         assert_eq!(pane.pid, 4242);
@@ -299,13 +300,13 @@ mod tests {
     #[test]
     fn a_malformed_line_is_skipped() {
         assert!(Pane::parse("default", "").is_none());
-        assert!(Pane::parse("default", "%7\x1fwork").is_none());
-        assert!(Pane::parse("default", "7\x1fw\x1f1\x1f0\x1f1\x1fzsh\x1f0\x1f/").is_none());
+        assert!(Pane::parse("default", "%7<mf|>work").is_none());
+        assert!(Pane::parse("default", "7<mf|>w<mf|>1<mf|>0<mf|>1<mf|>zsh<mf|>0<mf|>/").is_none());
     }
 
     #[test]
     fn a_folder_with_tabs_and_newlines_stays_whole() {
-        let line = "%7\x1fwork\x1f1\x1f0\x1f4242\x1fzsh\x1f0\x1f/home/u/a\tb\nc";
+        let line = "%7<mf|>work<mf|>1<mf|>0<mf|>4242<mf|>zsh<mf|>0<mf|>/home/u/a\tb\nc";
         let pane = Pane::parse("default", line).unwrap();
         assert_eq!(pane.cwd, "/home/u/a\tb\nc");
         assert!(!pane.dead);
