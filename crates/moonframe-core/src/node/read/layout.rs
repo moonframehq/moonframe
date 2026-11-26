@@ -268,6 +268,7 @@ impl Build for List {
         "row",
         "range",
         "to",
+        "scroll_to",
     ]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
@@ -318,6 +319,7 @@ impl Build for List {
             range: fields
                 .get::<Data>("range")?
                 .map(|msg| Action::Send { to, msg }),
+            scroll_to: fields.get("scroll_to")?,
         })
     }
 }

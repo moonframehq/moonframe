@@ -1435,7 +1435,7 @@ Text-like elements take their main value positionally:
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider`, `resize`, `to` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover. A clicked divider takes the keyboard: the arrows along the split move it 16 px (64 with Shift), Home and End take the pane before it to its `min` and `max`, and a double-click puts back the `reset` size of a pane beside it (the one before, else after), else a starting `size` the same way. The user's sizes last the session; `resize` keeps them across launches (see "Pane sizes that outlive the app") |
 | `ui.pane { ... }` | `size`, `reset`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `reset` is the size a double-click on its divider puts it back to, apart from `size` (default: the size it started with). `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
-| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, `range`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
+| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, `range`, `scroll_to`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
 | `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
@@ -2013,7 +2013,8 @@ end,
 When the rows come from a provider that can't publish them all (a
 publish holds at most 10,000 values), give the list `range = msg`: it is
 sent, with `first` and `last` (the rows any part of which shows, from 1)
-added, as they change, at most every 100 ms and always the last. Keep
+and `y` (the pixels it is scrolled down, 0 at the top) added, as they
+change, at most every 100 ms and always the last. Keep
 `count` the whole total, ask the provider for a window of rows around
 `first`..`last`, and draw a placeholder in `row` for one not yet there:
 
@@ -2026,6 +2027,17 @@ end
 ui.list { id = "people", count = app.people.total, row_height = 40, range = "rows",
 	row = function(i) local person = app.people.rows[i] ... end }
 ```
+
+`scroll_to` moves a list when it changes: `scroll_to = 120` or `{ row =
+120, seq = n }` reveals row 120, scrolling only as far as needed, and `{ y
+= state.y, seq = n }` goes back to a `y` that `range` told (a page opened
+again where it was left). A new `seq` asks again for the same place.
+
+A feed whose new rows come at the top keeps what is being read in place:
+give each row a `key` (`ui.row { key = item.id, ... }`) and, while the list
+is scrolled down, the first row showing stays where it is on screen as
+rows arrive above it. At the top, new rows join the top. (`range`,
+`scroll_to` and keeping in place are the GPUI window's, so far.)
 
 **Views run only when needed.** The host keeps each view's last tree and
 runs `view` again only when the mod's state or props may have changed (a

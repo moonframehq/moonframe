@@ -1249,8 +1249,13 @@ export type ListProps = {
 	row_height: number | ((index: number) -> number),
 	row: (index: number) -> Child,
 	-- Sent with `first` and `last`, the rows (from 1) any part of which
-	-- shows, as they change while it scrolls and resizes.
+	-- shows, and `y`, the pixels it is scrolled down (0 at the top), as
+	-- they change while it scrolls and resizes.
 	range: Data,
+	-- When it changes (a new `seq` asks again): reveal row n, scrolling
+	-- only as far as needed (`n` or `{ row = n, seq = s }`), or go back to
+	-- a `y` its `range` told (`{ y = px, seq = s }`).
+	scroll_to: (number | { row: number?, y: number?, seq: any? })?,
 	-- The mod `range` goes to, if not the drawing one.
 	to: string?,
 	gap: Space?,
