@@ -4,8 +4,9 @@
 //! an element's named `state`: its look eases from one state's to the next.
 
 use {
+    crate::render::Pending,
     gpui_kit::{Bounds, Hsla, Pixels, Rgba, ScrollHandle, Size},
-    moonframe_core::{Curve, Node, Transition, TransitionKind},
+    moonframe_core::{Curve, Node, ScrollTo, Transition, TransitionKind},
     std::{
         cell::{Cell, RefCell},
         collections::HashMap,
@@ -31,8 +32,9 @@ pub(crate) struct Motion {
     pub(crate) tweens: RefCell<Tweens>,
     /// Where each `ui.list` is scrolled, by path.
     scrolls: Recent<ScrollHandle>,
-    /// Last requested child, so redraws do not undo wheel scrolling.
-    scroll_targets: Recent<Option<usize>>,
+    /// Last request, so redraws do not undo wheel scrolling, and the key
+    /// it still has to reveal.
+    scroll_targets: Recent<(Option<ScrollTo>, Option<Rc<Pending>>)>,
     /// Each popover's anchor and the side its content fits on, by path.
     rooms: Recent<Rc<Room>>,
 }
@@ -360,17 +362,32 @@ impl Motion {
             .clone()
     }
 
-    /// Reveal a direct child only when the view's request changes.
-    pub(crate) fn scroll_to(&mut self, path: &str, target: Option<usize>) -> ScrollHandle {
+    /// Reveal a direct child only when the view's request changes; a key
+    /// is kept, and returned, until what it names has shown.
+    pub(crate) fn scroll_to(
+        &mut self,
+        path: &str,
+        target: Option<&ScrollTo>,
+    ) -> (ScrollHandle, Option<Rc<Pending>>) {
         let handle = self.scroll(path);
-        let previous = self.scroll_targets.get_or(path, Instant::now(), || None);
-        if *previous != target {
-            if let Some(index) = target {
-                handle.scroll_to_item(index - 1);
-            }
-            *previous = target;
+        let (previous, pending) = self
+            .scroll_targets
+            .get_or(path, Instant::now(), || (None, None));
+        if previous.as_ref() != target {
+            *pending = match target {
+                Some(ScrollTo::Child(index)) => {
+                    handle.scroll_to_item(index - 1);
+                    None
+                },
+                Some(ScrollTo::Key { key, .. }) => Some(Rc::new(Pending::new(key.clone()))),
+                None => None,
+            };
+            *previous = target.cloned();
         }
-        handle
+        if pending.as_ref().is_some_and(|pending| pending.done()) {
+            *pending = None;
+        }
+        (handle, pending.clone())
     }
 
     /// What the popover at `path` measured.

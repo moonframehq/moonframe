@@ -29,13 +29,6 @@ impl Build for Stack {
     ];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
-        let scroll_to = fields.get::<i64>("scroll_to")?;
-        if scroll_to.is_some_and(|index| index < 1) {
-            return Err(fields
-                .cx()
-                .key("scroll_to")
-                .fail("expected a positive child index"));
-        }
         let measure = match fields.get::<Data>("measure")? {
             Some(msg) => Some(Action::Send {
                 to: fields.get("to")?,
@@ -67,7 +60,7 @@ impl Build for Stack {
             wrap: fields.get("wrap")?.unwrap_or(false),
             spread: fields.get("spread")?.unwrap_or(false),
             selected: fields.get("selected")?.unwrap_or(false),
-            scroll_to: scroll_to.map(|index| index as usize),
+            scroll_to: fields.get("scroll_to")?,
             measure,
             outside: fields
                 .get::<Data>("outside")?
