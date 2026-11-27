@@ -1137,8 +1137,18 @@ export type InputProps = {
 	change: Data,
 	-- Selection movement, with `value` and the caret's byte offset added.
 	select: Data,
-	-- Sent on Enter, or ⌘/Ctrl-Enter when `multiline`.
+	-- Sent on Enter, or ⌘/Ctrl-Enter when `multiline` (and Enter too with
+	-- `enter = "submit"`).
 	submit: Data,
+	-- What Enter does in a multiline field: `"newline"` (default; ⌘/Ctrl-Enter
+	-- submits) or `"submit"`, where Shift-Enter makes a new line, as in a
+	-- chat's composer.
+	enter: ("submit" | "newline")?,
+	-- What was sent before, oldest first: Up with the caret on the first
+	-- line recalls the entry before the one shown, Down on the last line the
+	-- one after, and Down past the newest puts back what was being written.
+	-- Each recall replaces the text as an edit, so `change` is sent.
+	history: { string }?,
 	-- Sent with `value` when it loses keyboard focus: a title edited in
 	-- place is saved as the user clicks away.
 	blur: Data,

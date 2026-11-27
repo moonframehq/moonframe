@@ -8,6 +8,7 @@
 
 // keep-sorted start
 mod both_backends;
+mod composer_field;
 mod divider_keys;
 mod focus_keys;
 mod host_views;

@@ -653,6 +653,12 @@ ui.input {
   so the caret lands after the line, ready to edit; without it a new value
   may leave the caret at the start. A value the field already shows (the
   mod echoing what was typed) leaves the caret where the user put it.
+- **A chat's composer** is `multiline` with `enter = "submit"` (Enter
+  sends, Shift-Enter makes a new line), `max_rows` (it grows with its
+  lines, then scrolls), `history = state.sent` (the prompts sent, oldest
+  first: Up on the first line recalls the one before, Down on the last
+  line the one after and then the draft; each recall sends `change`) and
+  `paste` (files and pictures). The `agent-chat` component has one.
 - **Messages carry the text.** A table `msg` arrives as a copy with
   `value = <text>` added: `change = { query = true }` sends
   `{ query = true, value = "ab" }`. Anything else arrives as
