@@ -454,3 +454,45 @@ fn commands_wait_for_a_starting_chat_and_answer_their_sender() {
     assert_eq!(state.chat("new").unwrap().held.len(), MAX_HELD);
     assert!(state.pending.values().all(|pending| pending.to == from));
 }
+
+#[cfg(unix)]
+#[test]
+fn the_start_context_goes_only_with_the_first_prompt_even_one_with_its_own() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut chats, host, seen) = chats(
+        dir.path(),
+        r#"{ "starters": ["chat"], "store": "STORE", "program": "/nowhere/herdr-acp" }"#,
+    );
+    {
+        let mut state = lock(&chats.state);
+        state.chats.push(Chat {
+            id: "new".to_owned(),
+            owner: "chat".to_owned(),
+            agent: "claude".to_owned(),
+            cwd: "/".to_owned(),
+            created: 0,
+            pid: None,
+            endpoint: None,
+            session: None,
+            phase: Phase::Starting,
+            context: Some("You help with mail.".to_owned()),
+            transcript: None,
+            cursor: None,
+            writer: None,
+            held: Vec::new(),
+            closing: false,
+        });
+    }
+    chats.receive(
+        &host,
+        "chat",
+        message(r#"{ "prompt": "hi", "chat": "new", "context": "Its own" }"#),
+    );
+    assert!(replies(&seen).is_empty(), "held, answered as it attaches");
+    assert_eq!(chats.start_context("chat", "new"), None);
+    let state = lock(&chats.state);
+    let Command::Prompt { text, .. } = &state.chat("new").unwrap().held[0].1 else {
+        panic!("not a prompt")
+    };
+    assert_eq!(moonframe_chat_view::unframe(text), (Some("Its own"), "hi"));
+}

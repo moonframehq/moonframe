@@ -354,13 +354,14 @@ impl Chats {
                     "prompt" => context_of(message),
                     _ => Ok(None),
                 };
-                let from_start = action == "prompt" && matches!(own, Ok(None));
                 let context = own.map(|own| own.or_else(|| self.start_context(owner, id)));
                 match context.and_then(|context| command(action, message, context.as_deref())) {
                     Ok(command) => {
                         let reply = message.get("id").cloned().unwrap_or_else(|| json!(action));
                         let sent = self.command(from, id, command, reply, action);
-                        if from_start
+                        // The start's context belongs to the first prompt sent,
+                        // even one that brought its own instead.
+                        if action == "prompt"
                             && sent.is_ok()
                             && let Some(chat) = lock(&self.state).chat_mut(id)
                         {

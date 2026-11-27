@@ -7,6 +7,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 // keep-sorted start
+mod agent_chat;
 mod both_backends;
 mod composer_field;
 mod divider_keys;

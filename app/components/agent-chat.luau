@@ -117,12 +117,16 @@ end
 -- Sends the draft: to the chat, or a new chat first.
 local function send_prompt(props: Props, state: State, text: string): { any }
 	local prompt = string.gsub(text, "%s+$", "")
-	if prompt == "" and #state.files == 0 then
+	if prompt == "" then
+		-- A prompt carries files; it is never only files. They stay.
+		if #state.files > 0 then
+			state.error = "Write a message to send with the files."
+		end
 		return {}
 	end
 	local sends: { any } = {}
 	local files = state.files
-	if #prompt > 0 and state.sent[#state.sent] ~= prompt then
+	if state.sent[#state.sent] ~= prompt then
 		table.insert(state.sent, prompt)
 		if #state.sent > HISTORY then
 			table.remove(state.sent, 1)
@@ -168,6 +172,20 @@ local function picker_options(picker: any): { any }
 	return options
 end
 
+-- A picker's choice, `{ ["pick:<send>:<setting id>"] = choice }`: how it is
+-- sent ("mode" or "setting"), the setting's id and the choice.
+local function picked(msg: { [any]: any }): (string?, string?, any)
+	for key, choice in msg do
+		if type(key) == "string" then
+			local send, setting = string.match(key, "^pick:(%a+):(.+)$")
+			if send then
+				return send, setting, choice
+			end
+		end
+	end
+	return nil, nil, nil
+end
+
 -- A dropdown for the mode, model or effort; a toggle as a small button.
 local function picker(name: string, value: any, state: State): any
 	if value == nil then
@@ -188,7 +206,9 @@ local function picker(name: string, value: any, state: State): any
 		open = state.open == name,
 		toggle = { open = if state.open == name then "" else name },
 		dismiss = { open = "" },
-		event = "pick_" .. name,
+		-- The choice's message names how it is sent and the setting's id,
+		-- which `update` (with no `app`) could not look up.
+		event = `pick:{value.send}:{value.id}`,
 		side = "top",
 		width = 300,
 	}
@@ -438,7 +458,15 @@ local function composer(props: Props, state: State, view: any, chat: any, servic
 	local accepts = chat == nil or view == nil or view.accepts
 	local keys: { [string]: any }? = nil
 	if completing then
-		keys = { up = "complete-up", down = "complete-down", tab = "complete", enter = "complete", escape = "complete-close" }
+		-- What Tab and Enter pick is read here, where the commands are.
+		local chosen = { complete_with = found[math.clamp(state.pick, 1, #found)].name }
+		keys = {
+			up = "complete-up",
+			down = { complete_down = #found },
+			tab = chosen,
+			enter = chosen,
+			escape = "complete-close",
+		}
 	elseif working then
 		keys = { escape = "stop" }
 	end
@@ -628,7 +656,6 @@ end
 	end,
 
 	update = function(state: State, msg: any, props: any)
-		local view = props.view and props.view.view
 		local id = chat_id(props, state)
 		local sends: { any } = {}
 		local function chat_msg(fields: any)
@@ -676,21 +703,13 @@ end
 			state.open = msg.open
 		elseif kind == "complete-up" then
 			state.pick = math.max(1, state.pick - 1)
-		elseif kind == "complete-down" then
-			state.pick += 1
+		elseif type(msg) == "table" and msg.complete_down then
+			state.pick = math.min(state.pick + 1, msg.complete_down)
 		elseif kind == "complete-close" then
 			state.open = "no-complete"
-		elseif kind == "complete" or (type(msg) == "table" and msg.complete_with) then
-			local name = type(msg) == "table" and msg.complete_with
-			if not name then
-				local found = completions(state.draft, view)
-				local chosen = found[math.clamp(state.pick, 1, math.max(#found, 1))]
-				name = chosen and chosen.name
-			end
-			if name then
-				state.draft = "/" .. name .. " "
-				state.seq += 1
-			end
+		elseif type(msg) == "table" and msg.complete_with then
+			state.draft = "/" .. msg.complete_with .. " "
+			state.seq += 1
 			state.open = "no-complete"
 		elseif kind == "stop" then
 			if id then
@@ -708,15 +727,13 @@ end
 			chat_msg({ unqueue = msg.unqueue })
 		elseif type(msg) == "table" and msg.auto_accept ~= nil then
 			chat_msg({ auto_accept = msg.auto_accept })
-		elseif type(msg) == "table" and msg.pick_mode then
-			chat_msg({ mode = msg.pick_mode })
-			state.open = ""
-		elseif type(msg) == "table" and (msg.pick_model or msg.pick_effort) then
-			local which = if msg.pick_model then "model" else "effort"
-			local current = view and view[which]
-			-- The setting's own id, from the published view when there is one.
-			local setting = (current and current.id) or which
-			chat_msg({ setting = setting, value = msg.pick_model or msg.pick_effort })
+		elseif type(msg) == "table" and picked(msg) then
+			local send, setting, choice = picked(msg)
+			if send == "mode" then
+				chat_msg({ mode = choice })
+			else
+				chat_msg({ setting = setting, value = choice })
+			end
 			state.open = ""
 		elseif type(msg) == "table" and msg.toggle_setting then
 			chat_msg({ setting = msg.toggle_setting, value = msg.on })
