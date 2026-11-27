@@ -7,9 +7,10 @@
 //! launch attaches to it again and gets only what it missed. A chat whose
 //! program ended keeps its agent session's id, so it can be resumed.
 //!
-//! Messages (only from mods in provider.toml's `[settings] starters`; a chat
-//! obeys only the mod that started it). Each may carry an `id`, which its
-//! answer `{ reply = id, action, ok, error? }` carries back:
+//! Messages (only from mods in provider.toml's `[settings] starters`, or
+//! component instances they drew; a chat obeys only the mod that started
+//! it). Each may carry an `id`, which its answer `{ reply = id, action, ok,
+//! error? }` carries back to the sender:
 //! - `{ start = "<agent>", cwd?, load?, context? }` starts a chat in `cwd`
 //!   (else the app's repository), continuing the agent's session `load` if
 //!   given; answered with `chat`. `context` goes before its first prompt.
@@ -17,6 +18,7 @@
 //!   queues it behind the running turn; `files` are absolute paths sent
 //!   with it. `context`, a frame the app puts before the prompt (what the
 //!   user is looking at), reaches the agent and is left out of the view.
+//!   A prompt to a chat still starting waits for it to attach.
 //! - `{ cancel = chat }`, `{ answer = chat, permission, option }`,
 //!   `{ mode = "<id>", chat }`, `{ setting = "<id>", value, chat }` (a
 //!   choice's id, or a boolean), `{ unqueue = "<queued id>", chat }`,
@@ -67,6 +69,8 @@ use std::os::unix::net::UnixStream;
 const MAX_CHATS: usize = 24;
 /// The longest prompt a mod may send.
 const MAX_PROMPT: usize = 256 * 1024;
+/// Commands a chat holds until it attaches.
+const MAX_HELD: usize = 8;
 /// The longest context a mod may put before a prompt.
 const MAX_CONTEXT: usize = 64 * 1024;
 
@@ -102,6 +106,8 @@ pub(crate) struct Chat {
     pub(crate) cursor: Option<Cursor>,
     #[cfg(unix)]
     pub(crate) writer: Option<UnixStream>,
+    /// Commands sent before it attached, sent as it does.
+    pub(crate) held: Vec<(CommandId, Command)>,
     pub(crate) closing: bool,
 }
 
@@ -111,7 +117,8 @@ pub(crate) struct Chat {
 pub(crate) struct Pending {
     /// The chat it went to: answered with an error if it goes first.
     pub(crate) chat: String,
-    pub(crate) owner: String,
+    /// Who sent it, and so gets the answer: a mod or an instance it drew.
+    pub(crate) to: String,
     pub(crate) reply: Value,
     pub(crate) action: &'static str,
 }
@@ -151,7 +158,7 @@ impl State {
                 let answer = json!({
                     "reply": pending.reply, "action": pending.action, "ok": false, "error": why,
                 });
-                send(host, &pending.owner, &answer);
+                send(host, &pending.to, &answer);
             }
         }
     }
@@ -273,7 +280,7 @@ impl Native for Chats {
             if answer.get("ok").is_none() {
                 answer["ok"] = json!(true);
             }
-            send(host, owner(from), &answer);
+            send(host, from, &answer);
         }
         lock(&self.state).dirty = true;
         self.publish(host);
@@ -351,7 +358,7 @@ impl Chats {
                 match context.and_then(|context| command(action, message, context.as_deref())) {
                     Ok(command) => {
                         let reply = message.get("id").cloned().unwrap_or_else(|| json!(action));
-                        let sent = self.command(owner, id, command, reply, action);
+                        let sent = self.command(from, id, command, reply, action);
                         if from_start
                             && sent.is_ok()
                             && let Some(chat) = lock(&self.state).chat_mut(id)
@@ -417,6 +424,7 @@ impl Chats {
                 cursor: None,
                 #[cfg(unix)]
                 writer: None,
+                held: Vec::new(),
                 closing: false,
             });
             trim(&mut state);
@@ -481,7 +489,9 @@ impl Chats {
                         attach(shared, host, id, endpoint);
                     },
                     Err(error) => {
-                        chat.phase = Phase::Failed(error);
+                        chat.phase = Phase::Failed(error.clone());
+                        chat.held.clear();
+                        state.settle(&host, &id, &error);
                         state.dirty = true;
                     },
                 }
@@ -528,10 +538,12 @@ impl Chats {
         Ok(Some(json!({ "chat": id })))
     }
 
+    /// Sends `command` from `from` to chat `id`, or holds it while the
+    /// chat is still starting; answered when the program acknowledges it.
     #[cfg(unix)]
     fn command(
         &self,
-        owner: &str,
+        from: &str,
         id: &str,
         command: Command,
         reply: Value,
@@ -540,20 +552,26 @@ impl Chats {
         let mut state = lock(&self.state);
         let chat = state
             .chat_mut(id)
-            .filter(|chat| chat.owner == owner)
+            .filter(|chat| chat.owner == owner(from))
             .ok_or_else(|| "no such chat".to_owned())?;
-        let writer = chat
-            .writer
-            .as_mut()
-            .ok_or_else(|| "the chat is not attached yet".to_owned())?;
         let command_id = CommandId::random();
-        if !link::command(writer, command_id, command) {
-            return Err("the chat's program did not take it".to_owned());
+        match chat.writer.as_mut() {
+            Some(writer) => {
+                if !link::command(writer, command_id, command) {
+                    return Err("the chat's program did not take it".to_owned());
+                }
+            },
+            None if matches!(chat.phase, Phase::Starting | Phase::Reconnecting) => {
+                if chat.held.len() >= MAX_HELD {
+                    return Err("the chat is still starting".to_owned());
+                }
+                chat.held.push((command_id, command));
+            },
+            None => return Err("the chat is not running".to_owned()),
         }
-        let owner = owner.to_owned();
         state.pending.insert(command_id, Pending {
             chat: id.to_owned(),
-            owner,
+            to: from.to_owned(),
             reply,
             action,
         });
@@ -564,7 +582,7 @@ impl Chats {
     #[cfg(not(unix))]
     fn command(
         &self,
-        _owner: &str,
+        _from: &str,
         _id: &str,
         _command: Command,
         _reply: Value,
@@ -721,6 +739,7 @@ impl Chats {
                 cursor: None,
                 #[cfg(unix)]
                 writer: None,
+                held: Vec::new(),
                 closing: false,
             });
         }

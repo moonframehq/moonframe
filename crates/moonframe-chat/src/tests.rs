@@ -224,6 +224,14 @@ fn a_real_chat_starts_attaches_and_takes_commands() {
         )),
     );
     let id = replies(&seen)[0]["chat"].as_str().unwrap().to_owned();
+    // Sent while it starts: held, and sent as it attaches.
+    chats.receive(
+        &host,
+        "chat",
+        message(&format!(
+            r#"{{ "auto_accept": true, "chat": "{id}", "id": "aa" }}"#
+        )),
+    );
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
     loop {
         chats.tick(&host);
@@ -238,13 +246,6 @@ fn a_real_chat_starts_attaches_and_takes_commands() {
         );
         thread::sleep(std::time::Duration::from_millis(200));
     }
-    chats.receive(
-        &host,
-        "chat",
-        message(&format!(
-            r#"{{ "auto_accept": true, "chat": "{id}", "id": "aa" }}"#
-        )),
-    );
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     loop {
         chats.tick(&host);
@@ -391,4 +392,65 @@ fn chats_share_a_prepared_view_and_the_raw_transcript_only_on_request() {
         drop(chats);
         let _ = std::fs::remove_file(dir.path().join("chats.json"));
     }
+}
+
+#[cfg(unix)]
+#[test]
+fn commands_wait_for_a_starting_chat_and_answer_their_sender() {
+    let dir = tempfile::tempdir().unwrap();
+    let (chats, _host, _seen) = chats(
+        dir.path(),
+        r#"{ "starters": ["chat"], "store": "STORE", "program": "/nowhere/herdr-acp" }"#,
+    );
+    let starting = |id: &str, phase| Chat {
+        id: id.to_owned(),
+        owner: "chat".to_owned(),
+        agent: "claude".to_owned(),
+        cwd: "/".to_owned(),
+        created: 0,
+        pid: None,
+        endpoint: None,
+        session: None,
+        phase,
+        context: None,
+        transcript: None,
+        cursor: None,
+        writer: None,
+        held: Vec::new(),
+        closing: false,
+    };
+    {
+        let mut state = lock(&chats.state);
+        state.chats.push(starting("new", Phase::Starting));
+        state
+            .chats
+            .push(starting("old", Phase::Ended("gone".to_owned())));
+    }
+    let prompt = || Command::Prompt {
+        text: "hi".to_owned(),
+        attachments: Vec::new(),
+    };
+    let from = "chat/agent-chat#main";
+    for _ in 0..MAX_HELD {
+        let sent = chats.command(from, "new", prompt(), json!("p"), "prompt");
+        assert_eq!(sent, Ok(None), "answered as it attaches");
+    }
+    assert!(
+        chats
+            .command(from, "new", prompt(), json!("p"), "prompt")
+            .is_err()
+    );
+    assert!(
+        chats
+            .command(from, "old", prompt(), json!("p"), "prompt")
+            .is_err()
+    );
+    assert!(
+        chats
+            .command("other", "new", prompt(), json!("p"), "prompt")
+            .is_err()
+    );
+    let state = lock(&chats.state);
+    assert_eq!(state.chat("new").unwrap().held.len(), MAX_HELD);
+    assert!(state.pending.values().all(|pending| pending.to == from));
 }

@@ -61,6 +61,7 @@ fn run(shared: &Shared, host: &Handle, id: &str, endpoint: &EndpointId) {
         }
         if gone {
             chat.phase = Phase::Ended("the chat program ended".to_owned());
+            chat.held.clear();
             state.dirty = true;
             state.unsaved = true;
             return;
@@ -98,6 +99,13 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
                 return false;
             }
             if let Some(chat) = state.chat_mut(id) {
+                // What was sent while it started goes first.
+                let mut writer = writer;
+                for (command_id, held) in std::mem::take(&mut chat.held) {
+                    if !command(&mut writer, command_id, held) {
+                        return false;
+                    }
+                }
                 chat.writer = Some(writer);
             }
         },
@@ -152,7 +160,7 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
                             "reply": pending.reply, "action": pending.action, "ok": true,
                         }),
                     };
-                    send(host, &pending.owner, &answer);
+                    send(host, &pending.to, &answer);
                 }
             },
             ServerMessage::Bye { .. } => return true,
