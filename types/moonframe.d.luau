@@ -1068,6 +1068,42 @@ export type BrowserProps = {
 	[number]: string,
 }
 
+-- HTML shown sealed, kept by mod and `id`: its scripts never run and it
+-- loads nothing but itself (pictures and fonts inline, as `data:`), and it
+-- follows the app's light or dark look. Give `html` or `src`, a file named
+-- as `ui.image` names pictures. Links are told, never followed; `#part`
+-- scrolls to it. A table message gets the fields added; any other value
+-- arrives as `{ msg = ... }`.
+export type DocumentProps = {
+	class: Class?,
+	style: Style?,
+	state: string?,
+	id: string?,
+	html: string?,
+	src: string?,
+	-- Sent as a link is clicked, with `url` (as written) and `text` added.
+	link: Data,
+	-- Sent as it scrolls, at most every 100 ms, with `y`, `height` and
+	-- `content_height` (points) added.
+	scroll: Data,
+	-- When it changes (a new `seq` asks again): a `y` (points down, as
+	-- `scroll` told) or an element's `id`, brought to the top.
+	scroll_to: (number | string | { y: number?, id: string?, seq: any? })?,
+	-- Sent as the selection changes, with `text` ("" once none) and its box
+	-- `x`, `y`, `width`, `height`, in points from the box's top left as it
+	-- shows.
+	select: Data,
+	-- Edited in place; a link then opens with cmd (ctrl) and a click.
+	editable: boolean?,
+	-- While editable: sent with `html`, the whole document, half a second
+	-- after an edit; give it back as `html` and nothing reloads. Grown past
+	-- the 8 MB `html` takes, it comes with `error` instead.
+	change: Data,
+	-- While editable: sent with `html` as the document loses the keyboard.
+	done: Data,
+	[number]: string,
+}
+
 -- A view the app writes in Rust and registers by `name` (an app on the
 -- Moonframe library; the starter has none). The host keeps it by mod and
 -- `id`, so it lives across reloads and while hidden, and hands it `props`,
@@ -1454,6 +1490,7 @@ declare ui: {
 	map: (props: MapProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,
 	browser: (props: string | BrowserProps) -> Element,
+	document: (props: string | DocumentProps) -> Element,
 	video: (props: string | VideoProps) -> Element,
 	view: (props: string | ViewProps) -> Element,
 	input: (props: InputProps) -> Element,

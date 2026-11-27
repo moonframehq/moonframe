@@ -15,7 +15,9 @@
 //! they queue it, and the app hands it to the mod as the `navigate` and
 //! `loading` messages it asked for.
 
+mod document;
 mod native;
+pub(crate) mod sealed;
 
 #[cfg(all(feature = "browser", target_os = "macos"))]
 mod keys;
@@ -39,8 +41,9 @@ use {
 
 pub(crate) use native::SUPPORTED;
 
-/// Pages one mod can have, and the whole app: each runs web content
-/// processes, so a mod drawing ids in a loop must not start them without end.
+/// Pages one mod can have, browsers and documents, and the whole app: each
+/// runs web content processes, so a mod drawing ids in a loop must not
+/// start them without end.
 const PER_MOD: usize = 4;
 const TOTAL: usize = 16;
 /// Reports kept between two drains; later ones are dropped.
@@ -62,6 +65,8 @@ pub(crate) enum Event {
     Title(String),
     /// The page asked for a new window; it opens in the same page.
     Open(String),
+    /// A `ui.document`'s script reported something.
+    Document(sealed::Reported),
 }
 
 /// Where a page's callbacks queue what it reports, and how they wake the
@@ -133,6 +138,10 @@ pub(crate) struct Page {
     /// Where it laid out this frame, whole and as much as shows, in the
     /// window's points; [`presenter`] takes it.
     drawn: Cell<Option<(Bounds<Pixels>, Bounds<Pixels>)>>,
+    /// A `ui.document`'s, sealed: what it shows, and the look its view was
+    /// last given.
+    document: Option<RefCell<sealed::State>>,
+    dark: Cell<Option<bool>>,
 }
 
 impl Page {
@@ -161,6 +170,7 @@ impl Page {
             url,
             self.outbox.clone(),
             self.local.clone(),
+            self.document.is_some(),
             window,
             cx,
         );
@@ -265,6 +275,9 @@ impl Page {
 
     /// The messages `event` makes for the page's mod.
     fn report(&self, event: Event) -> Vec<Data> {
+        if self.document.is_some() {
+            return self.document_report(event).into_iter().collect();
+        }
         let mut state = self.state.borrow_mut();
         let mut sends = Vec::new();
         let loading = match event {
@@ -297,6 +310,7 @@ impl Page {
                 }
                 return sends;
             },
+            Event::Document(_) => return sends,
         };
         if let (Some(loading), Some(msg)) = (loading, &state.loading) {
             sends.push(with(msg, [
@@ -375,17 +389,7 @@ impl Browsers {
             page.update(element);
             return Ok(page.clone());
         }
-        let mine = self
-            .pages
-            .values()
-            .filter(|page| page.owner == owner)
-            .count();
-        if mine >= PER_MOD {
-            return Err(format!("`{owner}` already has {PER_MOD} browsers"));
-        }
-        if self.pages.len() >= TOTAL {
-            return Err(format!("the app already has {TOTAL} browsers"));
-        }
+        self.room(owner)?;
         let page = Rc::new(Page {
             owner: owner.to_owned(),
             outbox: Outbox {
@@ -404,9 +408,27 @@ impl Browsers {
                 ..State::default()
             }),
             drawn: Cell::new(None),
+            document: None,
+            dark: Cell::new(None),
         });
         self.pages.insert(key, page.clone());
         Ok(page)
+    }
+
+    /// Whether `owner` may have another page, and the app another.
+    fn room(&self, owner: &str) -> Result<(), String> {
+        let mine = self
+            .pages
+            .values()
+            .filter(|page| page.owner == owner)
+            .count();
+        if mine >= PER_MOD {
+            return Err(format!("`{owner}` already has {PER_MOD} pages"));
+        }
+        if self.pages.len() >= TOTAL {
+            return Err(format!("the app already has {TOTAL} pages"));
+        }
+        Ok(())
     }
 
     /// Every page, for [`presenter`].

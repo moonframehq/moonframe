@@ -61,6 +61,7 @@ Pick the lowest layer that can do the job:
 | a widget with memory of its own, reusable | a component with `update` (an instance) | `components/<name>.luau` | no |
 | several modules sharing a value | a topic: publish to `topic:<name>`, `subscribe` to it | in the mods | no |
 | a web page in the window | `ui.browser` | in a mod | no |
+| HTML shown safely (a briefing, a shared file) or edited in place | `ui.document` | in a mod | no |
 | a text field, search box, prompt or text area | `ui.input` or `use "search-field"` | in a mod | no |
 | data from the machine, files, network or a CLI | a **provider** feeding `app.<name>` | `providers/<name>/` | no (the host builds Wasm providers itself) |
 | state that survives quitting the app (open panels, tabs, a choice) | nothing to add: every mod's state is saved; shape what comes back in `init` | the mod's `init` | no |
@@ -567,6 +568,57 @@ ui.input { id = "docs-address", value = state.page.url, browser = "docs" }  -- i
   element shows its address with an **Open in browser** button that opens
   it in the system browser.
 - **In the component browser** it shows its address and loads nothing.
+
+## Documents
+
+`ui.document` shows HTML the mod has (a briefing, a shared file's
+preview, a note) sealed, in the same kind of native view as a browser: no
+script in it runs, it loads nothing but itself, and it follows the app's
+light or dark look. `editable = true` makes it an editor of that HTML.
+
+```lua
+ui.document {
+	id = "brief",                     -- one page per mod and id
+	html = state.html,                -- or src = "briefs/acme.html"
+	link = "link",                    -- arrives as { msg = "link", url, text }
+	scroll = "scroll",                -- { msg = "scroll", y, height, content_height }
+	scroll_to = state.place,          -- 480, "part-2", or { y = 480 | id = "part-2", seq = n }
+	select = "select",                -- { msg = "select", text, x, y, width, height }
+	editable = state.editing,
+	change = "change",                -- { msg = "change", html }: keep it, give it back as html
+	done = "done",                    -- { msg = "done", html } as it loses the keyboard
+}
+```
+
+- **Sealed:** the page's scripts are off (inline handlers and
+  `javascript:` links too), its session keeps nothing, and a
+  Content-Security-Policy put first in it refuses every load: pictures,
+  styles and fonts come inline (`<style>`, `style=`, `data:`), or not at
+  all. On macOS WebKit's content rules refuse every load but `about:` and
+  `data:` as well. The host's own script, which reports links, scrolling,
+  the selection and edits, is the only one that runs.
+- **Source:** `html`, up to 8 MB, or `src`, a file named and allowed as
+  `ui.image` names pictures (the mod's folder, the app's folders, a file
+  the user gave it). A changed file is read again. It is HTML: an SVG
+  document shows inline; put other text in a `<pre>`.
+- **Links** are never followed: `link` tells the mod, which may open one
+  with `app:open`. A fragment link (`#part-2`) scrolls to its element.
+- **Light and dark:** it takes the app's look as `color-scheme`, so its
+  default colors follow, and `prefers-color-scheme` in its styles too.
+- **Scroll:** `scroll` reports `y` as it scrolls; keep it and give it back
+  as `scroll_to = { y = state.y, seq = n }` to reopen it where it was, or
+  name a section, `scroll_to = "part-2"`, to open it there.
+- **Editing:** with `editable = true` the user types in it (a link then
+  opens with cmd or ctrl and a click). `change` sends the whole document
+  as `html` half a second after an edit: save it, and pass it back as
+  `html`; the same HTML loads nothing, so the caret stays. New HTML from
+  the mod loads in its place, and the HTML from before an edit loads again
+  (a reset). `done` is sent as it loses the keyboard. An edit that grows
+  the document past the 8 MB `html` takes comes with `error` instead of
+  `html`.
+- **Lifetime, size, input and what lies over it** are a browser's (see
+  "Browsers"): a mod has at most four browsers and documents together.
+- **Elsewhere:** Rune and Linux show a placeholder, so far.
 
 ## Text input
 
@@ -1446,6 +1498,7 @@ Text-like elements take their main value positionally:
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
+| `ui.document { html = state.html }` | `id`, `html` or `src`, `link`, `scroll`, `scroll_to`, `select`, `editable`, `change`, `done`, `class`, `style` | HTML shown sealed (no script, no network, light or dark as the app), or edited in place; see "Documents" |
 | `ui.markdown "# Notes"` | `text`, `link`, `tooltips`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures load only with `images` (from files a `ui.image` could show), except a picture titled `emoji` (`![:party:](~/.cache/moonframe/images/emoji/party.png "emoji")`), drawn inline at the line's height from the image cache alone, its alt text standing in until it loads. A link shows its title (`[text](url "title")`) on hover while every link to that address has the same one, or what `tooltips = { [url] = text }` gives for its address: where a wrapped (scanned) address really leads |
 | `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `secret`, `paste`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
 | `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab` `brand-linkedin` `brand-x` `brand-slack` `brand-wikipedia` `brand-google-scholar`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |

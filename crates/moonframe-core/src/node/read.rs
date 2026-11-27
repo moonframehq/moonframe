@@ -5,6 +5,7 @@
 // keep-sorted start
 mod common;
 mod content;
+mod document;
 mod embed;
 mod ends;
 mod input;
@@ -122,6 +123,7 @@ pub(crate) fn element_keys() -> Vec<(&'static str, &'static [&'static [&'static 
                 Element::Map => of::<Map>(),
                 Element::Terminal => of::<Terminal>(),
                 Element::Browser => of::<Browser>(),
+                Element::Document => of::<Document>(),
                 Element::Video => of::<Video>(),
                 Element::View => of::<View>(),
                 Element::Input => of::<Input>(),
@@ -191,6 +193,7 @@ impl Tree<'_> {
             Element::Map => Node::Map(self.build(kind, table, &cx)?),
             Element::Terminal => Node::Terminal(self.build(kind, table, &cx)?),
             Element::Browser => Node::Browser(self.build(kind, table, &cx)?),
+            Element::Document => Node::Document(self.build(kind, table, &cx)?),
             Element::Video => Node::Video(self.build(kind, table, &cx)?),
             Element::View => Node::View(self.build(kind, table, &cx)?),
             Element::Input => Node::Input(self.build(kind, table, &cx)?),

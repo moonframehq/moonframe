@@ -88,8 +88,8 @@ fn placeholder(frame: Stateful<Div>, address: String, open: bool, cx: Cx) -> Any
 }
 
 /// Fills its space; the page's view follows wherever that is.
-struct PageElement {
-    page: Rc<Page>,
+pub(super) struct PageElement {
+    pub(super) page: Rc<Page>,
 }
 
 impl IntoElement for PageElement {

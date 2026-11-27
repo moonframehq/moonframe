@@ -51,6 +51,7 @@ impl Node {
             Self::Map(_) => "map",
             Self::Terminal(_) => "terminal",
             Self::Browser(_) => "browser",
+            Self::Document(_) => "document",
             Self::Video(_) => "video",
             Self::View(_) => "view",
             Self::Input(_) => "input",
