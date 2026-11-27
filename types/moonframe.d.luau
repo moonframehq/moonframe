@@ -2796,6 +2796,21 @@ type UseActivityBarProps = {
 	read height: number?,
 	read fill: boolean?,
 }
+type UseAgentChatProps = {
+	read id: string?,
+	read chat: string?,
+	read agent: string?,
+	read cwd: string?,
+	read context: string?,
+	read placeholder: string?,
+	read suggestions: { any }?,
+	read title: string?,
+	read started: any,
+	read link: any,
+	read to: string?,
+	read view: any,
+}
+type UseAgentChatState = any
 type UseAgentRunTool = any
 type UseAgentRunOption = any
 type UseAgentRunRun = any
@@ -4873,6 +4888,12 @@ type UseToastsProps = {
 	read event: string?,
 	read to: string?,
 }
+type UseToolGroupProps = {
+	read group: any,
+	read open: boolean?,
+	read msg: any,
+	read to: string?,
+}
 type UseToolbarButton = any
 type UseToolbarProps = {
 	read buttons: { UseToolbarButton },
@@ -5003,6 +5024,7 @@ type UseProps = {
 	["accordion"]: UseAccordionProps,
 	["action-tiles"]: UseActionTilesProps,
 	["activity-bar"]: UseActivityBarProps,
+	["agent-chat"]: UseAgentChatProps,
 	["agent-run"]: UseAgentRunProps,
 	["ahead-behind"]: UseAheadBehindProps,
 	["audio-meter"]: UseAudioMeterProps,
@@ -5180,6 +5202,7 @@ type UseProps = {
 	["title-bar"]: UseTitleBarProps,
 	["toast"]: UseToastProps,
 	["toasts"]: UseToastsProps,
+	["tool-group"]: UseToolGroupProps,
 	["toolbar"]: UseToolbarProps,
 	["tree"]: UseTreeProps,
 	["update-pill"]: UseUpdatePillProps,
