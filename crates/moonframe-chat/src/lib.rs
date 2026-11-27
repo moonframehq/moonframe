@@ -69,7 +69,8 @@ use std::os::unix::net::UnixStream;
 const MAX_CHATS: usize = 24;
 /// The longest prompt a mod may send.
 const MAX_PROMPT: usize = 256 * 1024;
-/// Commands a chat holds until it attaches.
+/// Commands a chat holds until it attaches. Commands go out on Unix alone.
+#[cfg(unix)]
 const MAX_HELD: usize = 8;
 /// The longest context a mod may put before a prompt.
 const MAX_CONTEXT: usize = 64 * 1024;
