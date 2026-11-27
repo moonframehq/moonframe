@@ -103,10 +103,13 @@ pub(crate) fn read(body: &str) -> Option<Reported> {
 pub(crate) struct State {
     /// The HTML the mod gave last (the file's, for `src`).
     html: String,
+    /// The mod gave other HTML since the view last took it.
+    given: bool,
     /// The HTML the view shows: what it was given, not sealed yet, or what
-    /// its editor reported since; `None` before its first load. The mod's
-    /// HTML loads when it differs, so an edit given back loads nothing and
-    /// the HTML from before the edit loads again.
+    /// its editor reported since; `None` before its first load. New HTML
+    /// from the mod loads unless it is this, so an edit given back loads
+    /// nothing, the HTML from before the edit loads again, and HTML the mod
+    /// leaves as it was never undoes edits it was not given.
     shown: Option<String>,
     /// The view finished its last load.
     ready: bool,
@@ -149,6 +152,7 @@ impl State {
         self.done.clone_from(&element.done);
         if self.html != html {
             html.clone_into(&mut self.html);
+            self.given = true;
         }
         self.editable = element.editable;
         self.dark = Some(dark);
@@ -181,7 +185,8 @@ impl State {
         if look != self.dark {
             work.dark = self.dark;
         }
-        if self.shown.as_deref() != Some(self.html.as_str()) {
+        let given = std::mem::take(&mut self.given) || self.shown.is_none();
+        if given && self.shown.as_deref() != Some(self.html.as_str()) {
             work.load = Some(sealed(&self.html));
             self.shown = Some(self.html.clone());
             self.ready = false;
@@ -246,7 +251,11 @@ impl State {
     /// `msg` with the edited `html`, which the view now shows; or, when it
     /// grew past what `html` takes back, with `error` saying so instead.
     fn edited(&mut self, html: String, large: bool, msg: Option<Data>) -> Option<Data> {
-        if large || html.len() > MAX_HTML {
+        let large = large || html.len() > MAX_HTML;
+        if !large {
+            self.shown = Some(html.clone());
+        }
+        if large {
             return Some(with(msg.as_ref()?, [(
                 "error",
                 Data::String(format!(
@@ -254,7 +263,6 @@ impl State {
                 )),
             )]));
         }
-        self.shown = Some(html.clone());
         Some(with(msg.as_ref()?, [("html", Data::String(html))]))
     }
 }

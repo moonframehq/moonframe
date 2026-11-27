@@ -199,3 +199,25 @@ fn only_what_the_script_reports_is_read() {
     );
     assert_eq!(read(&huge), None);
 }
+
+#[test]
+fn html_the_mod_leaves_as_it_was_keeps_the_edits() {
+    let mut state = State::default();
+    state.seal();
+    let mut only_done = element(true, None);
+    only_done.change = None;
+    state.update(&only_done, "<p>a</p>", false);
+    state.work(Some(false));
+    state.loaded();
+    state.work(Some(false));
+    // Edited, with no `change` asked for: the mod's HTML stays as it was.
+    assert_eq!(
+        state.report(Reported::Change {
+            html: "<p>ab</p>".into(),
+            large: false,
+        }),
+        None
+    );
+    state.update(&only_done, "<p>a</p>", false);
+    assert_eq!(state.work(Some(false)).load, None);
+}
