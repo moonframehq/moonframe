@@ -612,7 +612,10 @@ ui.document {
   opens with cmd or ctrl and a click). `change` sends the whole document
   as `html` half a second after an edit: save it, and pass it back as
   `html`; the same HTML loads nothing, so the caret stays. New HTML from
-  the mod loads in its place. `done` is sent as it loses the keyboard.
+  the mod loads in its place, and the HTML from before an edit loads again
+  (a reset). `done` is sent as it loses the keyboard. An edit that grows
+  the document past the 8 MB `html` takes comes with `error` instead of
+  `html`.
 - **Lifetime, size, input and what lies over it** are a browser's (see
   "Browsers"): a mod has at most four browsers and documents together.
 - **Elsewhere:** Rune and Linux show a placeholder, so far.

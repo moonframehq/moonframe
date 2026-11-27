@@ -18,7 +18,7 @@
 
 use {
     super::with,
-    moonframe_core::{Data, Document, DocumentScroll, DocumentScrollTo},
+    moonframe_core::{Data, Document, DocumentScroll, DocumentScrollTo, MAX_HTML},
     serde::Deserialize,
 };
 
@@ -28,8 +28,9 @@ pub(crate) const SCRIPT: &str = include_str!("sealed.js");
 /// The address a sealed page shows, the only one it may load.
 pub(crate) const BLANK: &str = "about:blank";
 
-/// The longest report read: a whole document's HTML, with room to spare.
-pub(crate) const MAX_REPORT: usize = 3 * moonframe_core::MAX_HTML;
+/// The longest report read: a whole document's HTML as JSON writes it.
+/// One past the most `html` takes is read, to tell the mod it is too large.
+pub(crate) const MAX_REPORT: usize = 3 * MAX_HTML;
 
 /// What comes first in every sealed document, marked for the editor to
 /// leave out of the HTML it reports.
@@ -72,11 +73,19 @@ pub(crate) enum Reported {
         width: f64,
         height: f64,
     },
+    /// An edit; `large` when the document grew past what `html` takes,
+    /// and is not sent.
     Change {
+        #[serde(default)]
         html: String,
+        #[serde(default)]
+        large: bool,
     },
     Done {
+        #[serde(default)]
         html: String,
+        #[serde(default)]
+        large: bool,
     },
 }
 
@@ -94,11 +103,12 @@ pub(crate) fn read(body: &str) -> Option<Reported> {
 pub(crate) struct State {
     /// The HTML the mod gave last (the file's, for `src`).
     html: String,
-    /// The HTML the view was given, not sealed yet; `None` before.
-    loaded: Option<String>,
-    /// The HTML the editor last reported: given back, it loads nothing.
-    reported: Option<String>,
-    /// The view finished loading `loaded`.
+    /// The HTML the view shows: what it was given, not sealed yet, or what
+    /// its editor reported since; `None` before its first load. The mod's
+    /// HTML loads when it differs, so an edit given back loads nothing and
+    /// the HTML from before the edit loads again.
+    shown: Option<String>,
+    /// The view finished its last load.
     ready: bool,
     /// The editing switch the loaded document was last given.
     switched: Option<bool>,
@@ -155,29 +165,25 @@ impl State {
 
     /// The view finished a load.
     pub(crate) fn loaded(&mut self) {
-        if self.loaded.is_some() {
+        if self.shown.is_some() {
             self.ready = true;
         }
     }
 
-    /// What the view is to do, given what it showed and was told before
-    /// (`shown`, its look): a document to load, unless it is the one shown
-    /// or the one the editor reported; then, once it has loaded, the
-    /// editing switch and where to scroll.
-    pub(crate) fn work(&mut self, shown: Option<bool>) -> Work {
+    /// What the view is to do, given the look it was last given: the mod's
+    /// document to load, unless it is the one shown; then, once it has
+    /// loaded, the editing switch and where to scroll.
+    pub(crate) fn work(&mut self, look: Option<bool>) -> Work {
         let mut work = Work::default();
         if !self.sealed {
             return work;
         }
-        if shown != self.dark {
+        if look != self.dark {
             work.dark = self.dark;
         }
-        let fresh = self.loaded.as_deref() != Some(self.html.as_str())
-            && self.reported.as_deref() != Some(self.html.as_str());
-        if fresh {
+        if self.shown.as_deref() != Some(self.html.as_str()) {
             work.load = Some(sealed(&self.html));
-            self.loaded = Some(self.html.clone());
-            self.reported = None;
+            self.shown = Some(self.html.clone());
             self.ready = false;
             self.switched = None;
         }
@@ -225,16 +231,31 @@ impl State {
                 ("width", number(width)),
                 ("height", number(height)),
             ])),
-            Reported::Change { html } if self.editable => {
-                self.reported = Some(html.clone());
-                Some(with(self.change.as_ref()?, [("html", Data::String(html))]))
+            Reported::Change { html, large } if self.editable => {
+                self.edited(html, large, self.change.clone())
             },
-            Reported::Done { html } if self.editable => {
-                self.reported = Some(html.clone());
-                Some(with(self.done.as_ref()?, [("html", Data::String(html))]))
+            Reported::Done { html, large } if self.editable => {
+                self.edited(html, large, self.done.clone())
             },
             Reported::Change { .. } | Reported::Done { .. } => None,
         }
+    }
+}
+
+impl State {
+    /// `msg` with the edited `html`, which the view now shows; or, when it
+    /// grew past what `html` takes back, with `error` saying so instead.
+    fn edited(&mut self, html: String, large: bool, msg: Option<Data>) -> Option<Data> {
+        if large || html.len() > MAX_HTML {
+            return Some(with(msg.as_ref()?, [(
+                "error",
+                Data::String(format!(
+                    "the document is larger than the {MAX_HTML} bytes `html` takes"
+                )),
+            )]));
+        }
+        self.shown = Some(html.clone());
+        Some(with(msg.as_ref()?, [("html", Data::String(html))]))
     }
 }
 

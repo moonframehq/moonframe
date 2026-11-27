@@ -13,7 +13,7 @@ use {
         collections::HashMap,
         path::{Path, PathBuf},
         rc::Rc,
-        time::SystemTime,
+        time::{Instant, SystemTime},
     },
 };
 
@@ -88,11 +88,21 @@ fn placeholder(frame: Stateful<Div>, preview: bool, cx: Cx) -> AnyElement {
         .into_any_element()
 }
 
+/// The most the files kept take, in bytes: past it, those read longest ago
+/// go (the documents showing them read them again).
+const KEPT_BYTES: usize = 32 * 1024 * 1024;
+
+/// A file read: the length and time it had, and when it was last asked for.
+struct Kept {
+    stamp: (u64, Option<SystemTime>),
+    html: Rc<str>,
+    used: Instant,
+}
+
 thread_local! {
-    /// Each file read, with the length and time it had: a file written again
-    /// is read again, and one drawn each frame is read once.
-    static FILES: RefCell<HashMap<PathBuf, (u64, Option<SystemTime>, Rc<str>)>> =
-        RefCell::new(HashMap::new());
+    /// Each file read: a file written again is read again, and one drawn
+    /// each frame is read once.
+    static FILES: RefCell<HashMap<PathBuf, Kept>> = RefCell::new(HashMap::new());
 }
 
 /// The HTML in the file at `path`, up to [`MAX_HTML`] bytes.
@@ -102,18 +112,35 @@ fn read(path: &Path) -> Result<Rc<str>, String> {
         return Err(format!("larger than {MAX_HTML} bytes"));
     }
     let stamp = (metadata.len(), metadata.modified().ok());
-    if let Some(html) = FILES.with_borrow(|files| {
-        files
-            .get(path)
-            .filter(|(len, at, _)| (*len, *at) == stamp)
-            .map(|(.., html)| html.clone())
+    let now = Instant::now();
+    if let Some(html) = FILES.with_borrow_mut(|files| {
+        let kept = files.get_mut(path).filter(|kept| kept.stamp == stamp)?;
+        kept.used = now;
+        Some(kept.html.clone())
     }) {
         return Ok(html);
     }
     let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
     let html: Rc<str> = String::from_utf8_lossy(&bytes).into();
     FILES.with_borrow_mut(|files| {
-        files.insert(path.to_owned(), (stamp.0, stamp.1, html.clone()));
+        files.insert(path.to_owned(), Kept {
+            stamp,
+            html: html.clone(),
+            used: now,
+        });
+        let mut total: usize = files.values().map(|kept| kept.html.len()).sum();
+        while total > KEPT_BYTES {
+            let Some(oldest) = files
+                .iter()
+                .min_by_key(|(_, kept)| kept.used)
+                .map(|(path, _)| path.clone())
+            else {
+                break;
+            };
+            if let Some(gone) = files.remove(&oldest) {
+                total -= gone.html.len();
+            }
+        }
     });
     Ok(html)
 }
@@ -132,6 +159,27 @@ mod tests {
         assert!(Rc::ptr_eq(&first, &read(&path).unwrap()));
         std::fs::write(&path, "<p>two, longer</p>").unwrap();
         assert_eq!(&*read(&path).unwrap(), "<p>two, longer</p>");
+    }
+
+    #[test]
+    fn files_read_long_ago_go_once_too_many_are_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        // Five of 7 MB: past the 32 MB kept.
+        let big = "a".repeat(7 * 1024 * 1024);
+        let paths: Vec<_> = (0..5)
+            .map(|index| {
+                let path = dir.path().join(format!("{index}.html"));
+                std::fs::write(&path, &big).unwrap();
+                read(&path).unwrap();
+                path
+            })
+            .collect();
+        super::FILES.with_borrow(|files| {
+            assert!(!files.contains_key(&paths[0]));
+            assert!(files.contains_key(&paths[4]));
+            let total: usize = files.values().map(|kept| kept.html.len()).sum();
+            assert!(total <= super::KEPT_BYTES);
+        });
     }
 
     #[test]

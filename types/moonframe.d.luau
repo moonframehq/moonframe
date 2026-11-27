@@ -1096,7 +1096,8 @@ export type DocumentProps = {
 	-- Edited in place; a link then opens with cmd (ctrl) and a click.
 	editable: boolean?,
 	-- While editable: sent with `html`, the whole document, half a second
-	-- after an edit; give it back as `html` and nothing reloads.
+	-- after an edit; give it back as `html` and nothing reloads. Grown past
+	-- the 8 MB `html` takes, it comes with `error` instead.
 	change: Data,
 	-- While editable: sent with `html` as the document loses the keyboard.
 	done: Data,

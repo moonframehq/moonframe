@@ -87,6 +87,7 @@ fn the_html_an_editor_reported_does_not_load_again() {
     let changed = state
         .report(Reported::Change {
             html: "<p>ab</p>".into(),
+            large: false,
         })
         .unwrap();
     assert_eq!(field(&changed, "html"), Some(Data::from("<p>ab</p>")));
@@ -94,18 +95,53 @@ fn the_html_an_editor_reported_does_not_load_again() {
     // The mod keeps it and gives it back: the caret stays where it is.
     state.update(&element(true, None), "<p>ab</p>", false);
     assert_eq!(state.work(Some(false)).load, None);
+    // The HTML from before the edit loads again: a reset.
+    state.update(&element(true, None), "<p>a</p>", false);
+    assert_eq!(state.work(Some(false)).load, Some(sealed("<p>a</p>")));
     // Something else entirely loads.
     state.update(&element(true, None), "<p>new</p>", false);
     assert_eq!(state.work(Some(false)).load, Some(sealed("<p>new</p>")));
 }
 
 #[test]
+fn an_edit_too_large_to_give_back_says_so() {
+    let mut state = State::default();
+    state.seal();
+    state.update(&element(true, None), "<p>a</p>", false);
+    state.work(Some(false));
+    let large = state
+        .report(Reported::Change {
+            html: String::new(),
+            large: true,
+        })
+        .unwrap();
+    assert!(field(&large, "html").is_none());
+    assert!(
+        matches!(field(&large, "error"), Some(Data::String(error)) if error.contains("larger"))
+    );
+    let over = "a".repeat(moonframe_core::MAX_HTML + 1);
+    let done = state
+        .report(Reported::Done {
+            html: over,
+            large: false,
+        })
+        .unwrap();
+    assert!(field(&done, "error").is_some());
+    // The view's document stays the mod's: nothing reloads.
+    assert_eq!(state.work(Some(false)).load, None);
+}
+
+#[test]
 fn edits_are_told_only_while_editable() {
     let mut state = State::default();
     state.update(&element(false, None), "<p>a</p>", false);
-    assert_eq!(state.report(Reported::Done { html: "x".into() }), None);
+    let done = || Reported::Done {
+        html: "x".into(),
+        large: false,
+    };
+    assert_eq!(state.report(done()), None);
     state.update(&element(true, None), "<p>a</p>", false);
-    let done = state.report(Reported::Done { html: "x".into() }).unwrap();
+    let done = state.report(done()).unwrap();
     assert_eq!(field(&done, "html"), Some(Data::from("x")));
 }
 

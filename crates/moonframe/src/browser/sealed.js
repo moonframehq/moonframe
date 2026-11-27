@@ -33,6 +33,8 @@
     };
   };
   const MAX_TEXT = 65536;
+  // What `html` takes back, in bytes (`MAX_HTML`).
+  const MAX_HTML = 8 * 1024 * 1024;
   let editable = false;
 
   // The document as the mod gave it, edits included: without what the host
@@ -66,8 +68,14 @@
     post({ kind: "select", text, ...rect });
   });
 
+  // An edit, or that the document grew past what the mod can give back.
+  const report = (kind) => {
+    const text = html();
+    if (new TextEncoder().encode(text).length > MAX_HTML) post({ kind, large: true });
+    else post({ kind, html: text });
+  };
   const edited = settled(500, () => {
-    if (editable) post({ kind: "change", html: html() });
+    if (editable) report("change");
   });
 
   const reveal = (id) => {
@@ -103,7 +111,7 @@
   document.addEventListener("selectionchange", selected);
   document.addEventListener("input", edited, true);
   window.addEventListener("blur", () => {
-    if (editable) post({ kind: "done", html: html() });
+    if (editable) report("done");
   });
   document.addEventListener("DOMContentLoaded", scrolled);
 
