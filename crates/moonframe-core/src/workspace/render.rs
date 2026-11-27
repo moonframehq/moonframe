@@ -77,6 +77,14 @@ impl Workspace {
         self.app()
     }
 
+    /// Runs the view of the module `name` again on what it last saw, and
+    /// returns the table it built, unread: the conformance tests.
+    #[cfg(test)]
+    pub(crate) fn raw_view(&self, name: &str) -> Option<Result<mlua::Value, Error>> {
+        let module = self.slot(name)?.module.as_ref()?;
+        Some(module.raw_view(&self.app))
+    }
+
     /// What every `view` gets as `app`: what the host shares, the mods,
     /// which regions they asked for, and the theme.
     pub(super) fn app(&self) -> AppData {

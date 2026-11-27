@@ -14,6 +14,7 @@ mod app_icons;
 mod check_data;
 mod checks;
 mod components;
+mod conformance;
 mod dictation;
 mod document;
 mod drawn_text;

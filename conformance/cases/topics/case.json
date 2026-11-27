@@ -1,0 +1,45 @@
+{
+  "about": "A topic by name and by prefix; a mod not subscribed hears nothing.",
+  "steps": [
+    {
+      "send": {
+        "topic": "page",
+        "value": "settings"
+      },
+      "to": "nav"
+    },
+    {
+      "send": {
+        "topic": "tabs/main",
+        "value": 3
+      },
+      "to": "nav"
+    },
+    {
+      "send": {
+        "topic": "tabs/side",
+        "value": 1
+      },
+      "to": "nav"
+    },
+    {
+      "send": {
+        "topic": "other",
+        "value": 9
+      },
+      "to": "nav"
+    },
+    {
+      "expect": {
+        "shell": {
+          "text": "settings",
+          "type": "text"
+        },
+        "watch": {
+          "text": "tabs/main=3 tabs/side=1",
+          "type": "text"
+        }
+      }
+    }
+  ]
+}

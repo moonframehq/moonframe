@@ -1540,7 +1540,8 @@ export type GitCommit = {
 -- app/providers/system/types.luau.
 export type System = ProviderSystemPublished
 
-export type Platform = "macos" | "linux" | "windows"
+-- `ios` is what MoonSwift reports on an iPhone or iPad.
+export type Platform = "macos" | "linux" | "windows" | "ios"
 export type Titlebar = "system" | "hidden"
 
 -- The window, for a title bar the layout draws itself.
@@ -2183,8 +2184,8 @@ export type MountProps = {
 	[number]: string,
 }
 
--- What draws this build.
-export type Renderer = "gpui" | "rune"
+-- What draws this build; `swiftui` is what MoonSwift reports.
+export type Renderer = "gpui" | "rune" | "swiftui"
 
 -- What every `view` gets as `app`.
 export type App = {
