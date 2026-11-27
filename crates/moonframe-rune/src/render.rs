@@ -202,6 +202,7 @@ fn named(node: &Node) -> Option<(String, Option<u32>)> {
         Node::Markdown(markdown) => ("ui.markdown", &markdown.look),
         Node::Terminal(terminal) => ("ui.terminal", &terminal.look),
         Node::Browser(browser) => ("ui.browser", &browser.look),
+        Node::Document(document) => ("ui.document", &document.look),
         _ => return None,
     };
     let label = match look.class.first() {
@@ -425,6 +426,8 @@ impl<'w> Painter<'w> {
             Node::Image(image) => self.image(image, place),
             Node::Terminal(terminal) => self.terminal(terminal, place),
             Node::Browser(browser) => self.browser(browser, place),
+            // A sealed document needs a web view this backend has not built.
+            Node::Document(_) => self.not_here_named("ui.document", place),
             Node::Map(map) => self.map(map, place),
             Node::Video(video) => self.video(video, place),
             Node::View(view) => match self.ui.views.get(&view.name) {

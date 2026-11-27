@@ -329,6 +329,16 @@ fn describe(node: &Node) -> String {
             quote(&terminal.id),
             terminal.engine.name()
         ),
+        Node::Document(document) => format!(
+            "document{} {}{}",
+            classes(&document.look),
+            quote(&document.id),
+            if document.editable {
+                " editable"
+            } else {
+                ""
+            }
+        ),
         Node::Browser(browser) => format!(
             "browser{} {} {}",
             classes(&browser.look),
@@ -402,6 +412,7 @@ fn line(node: &Node) -> Option<u32> {
         Node::Badge(badge) => badge.look.line,
         Node::Icon(icon) => icon.look.line,
         Node::Image(image) => image.look.line,
+        Node::Document(document) => document.look.line,
         Node::Line(line) => line.look.line,
         Node::Paths(paths) => paths.look.line,
         Node::RevisionTimeline(timeline) => timeline.look.line,

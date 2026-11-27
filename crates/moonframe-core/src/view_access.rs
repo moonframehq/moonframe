@@ -610,7 +610,7 @@ fn role(node: &Node, around: &[Visited<'_>]) -> Option<&'static str> {
         Node::Stack(_) if takes_clicks(node) => "button",
         Node::Panel(_) => "panel",
         Node::Input(_) => "textbox",
-        Node::Markdown(_) => "document",
+        Node::Markdown(_) | Node::Document(_) => "document",
         Node::Image(_) => "image",
         Node::Popover(popover) if popover.open => "popover",
         Node::Overlay(overlay) if overlay.open => "dialog",
