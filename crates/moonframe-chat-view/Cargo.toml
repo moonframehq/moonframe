@@ -1,0 +1,19 @@
+[package]
+description            = "What a chat view draws from herdr's chat transcript: rows with folded tool groups, permissions, the queue and the session's controls; no GUI"
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-chat-view"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[dependencies]
+herdr-chat-protocol.workspace = true
+serde.workspace               = true
+
+[dev-dependencies]
+serde_json.workspace = true
