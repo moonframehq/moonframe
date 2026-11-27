@@ -1,13 +1,58 @@
-//! A transcript as views read it: herdr's own shape (see
-//! herdr-chat-protocol's `Transcript`), trimmed to what a view can hold.
+//! A chat as `app.chat` shares it: its record, and what a view draws of its
+//! transcript (moonframe-chat-view's `ChatView`), whole for the chat in
+//! focus and its last rows for the others.
+//!
+//! With `raw`, herdr's own transcript (see herdr-chat-protocol's
+//! `Transcript`) comes too, trimmed to what a view can hold.
 //! The latest entries are kept, long texts are cut from the front (an
 //! answer's end is what is being read), pictures lose their bytes, and a
 //! file change keeps its path and line counts, not both whole files.
 
 use {
+    crate::{Chat, Phase},
     herdr_chat_protocol::Transcript,
+    moonframe_chat_view::{Limits, prepare},
     serde_json::{Map, Value, json},
 };
+
+/// `chat` as `app.chat` shares it; `focus` says whether a view shows it.
+pub(crate) fn chat(chat: &Chat, focus: bool, raw: bool) -> Value {
+    let (status, error) = match &chat.phase {
+        Phase::Starting => ("starting", None),
+        Phase::Live => ("live", None),
+        Phase::Reconnecting => ("reconnecting", None),
+        Phase::Ended(why) => ("ended", Some(why.clone())),
+        Phase::Failed(why) => ("failed", Some(why.clone())),
+    };
+    let limits = if focus {
+        Limits::FULL
+    } else {
+        Limits::SHORT
+    };
+    let mut shared = json!({
+        "id": chat.id,
+        "owner": chat.owner,
+        "agent": chat.agent,
+        "cwd": chat.cwd,
+        "created": chat.created,
+        "status": status,
+        "error": error,
+        "session": chat.session,
+        "view": chat
+            .transcript
+            .as_ref()
+            .and_then(|transcript| serde_json::to_value(prepare(transcript, &limits)).ok()),
+    });
+    if raw && let Some(whole) = &chat.transcript {
+        let entries = if focus {
+            FULL_ENTRIES
+        } else {
+            SHORT_ENTRIES
+        };
+        shared["transcript"] = transcript(whole, entries);
+    }
+    shared
+}
 
 /// Entries shared, from the end, of the chat in view and of the others;
 /// `hidden` counts those left out.

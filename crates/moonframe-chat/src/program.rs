@@ -24,23 +24,54 @@ const PROGRAM: &str = "herdr-acp";
 /// How long a new chat may take to start listening.
 const LISTEN_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Where `herdr-acp` is: the setting, then the search path, then inside an
-/// installed Herdr.
-pub(crate) fn find(setting: Option<&Path>, path: &OsStr, home: Option<&Path>) -> Option<PathBuf> {
-    if let Some(setting) = setting {
-        return setting.is_file().then(|| setting.to_path_buf());
+/// The apps that bundle `herdr-acp`, in the order they are tried.
+const BUNDLES: &[&str] = &[
+    "Applications/Sheprd.app/Contents/MacOS",
+    "Applications/Herdr.app/Contents/MacOS",
+];
+
+/// Where an installed app keeps `herdr-acp`: in `/Applications`, then in
+/// the user's own `~/Applications`.
+pub(crate) fn bundled(home: Option<&Path>) -> Vec<PathBuf> {
+    let roots = [Some(Path::new("/")), home];
+    roots
+        .into_iter()
+        .flatten()
+        .flat_map(|root| {
+            BUNDLES
+                .iter()
+                .map(move |bundle| root.join(bundle).join(PROGRAM))
+        })
+        .collect()
+}
+
+/// Where `herdr-acp` was found, and a `program` setting that named no file
+/// and so was passed over for the search.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct Found {
+    pub(crate) program: Option<PathBuf>,
+    pub(crate) missing: Option<PathBuf>,
+}
+
+/// Where `herdr-acp` is: the setting when it names a file, else the search
+/// path, then inside an installed app (`bundled`).
+pub(crate) fn find(setting: Option<&Path>, path: &OsStr, bundled: &[PathBuf]) -> Found {
+    if let Some(setting) = setting.filter(|setting| setting.is_file()) {
+        return Found {
+            program: Some(setting.to_path_buf()),
+            missing: None,
+        };
     }
-    if let Some(found) = moonframe_providers::program::find(PROGRAM, path) {
-        return Some(found);
+    let program = moonframe_providers::program::find(PROGRAM, path).or_else(|| {
+        bundled
+            .iter()
+            .find(|candidate| candidate.is_file())
+            .cloned()
+    });
+    Found {
+        program,
+        missing: setting.map(Path::to_path_buf),
     }
-    let bundled = Path::new("Applications/Herdr.app/Contents/MacOS").join(PROGRAM);
-    [
-        Some(Path::new("/").join(&bundled)),
-        home.map(|home| home.join(&bundled)),
-    ]
-    .into_iter()
-    .flatten()
-    .find(|candidate| candidate.is_file())
 }
 
 /// The agents installed here, as `herdr-acp agents` names them.
