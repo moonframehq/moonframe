@@ -40,6 +40,9 @@ pub(crate) enum Gesture {
         guides: Vec<(Point, Point)>,
         travelled: bool,
         pressed: String,
+        /// A shift-press, which added or removed `pressed` and leaves the
+        /// rest chosen.
+        shift: bool,
     },
     Resize {
         id: String,
@@ -181,6 +184,7 @@ pub(crate) fn down(
                     guides: Vec::new(),
                     travelled: false,
                     pressed: id,
+                    shift,
                 });
             },
             (_, Hit::Edge(id)) => choose(view, id, shift, cx),
@@ -314,9 +318,10 @@ fn released(view: &mut DiagramView, cx: &mut Context<DiagramView>) {
             view.pending.extend(moved.iter().cloned());
             cx.emit(DiagramEvent::Move(moved));
         },
-        Gesture::Move { pressed, .. } => {
-            // A click on one of several chosen nodes chooses it alone.
-            if view.selected.len() > 1 {
+        Gesture::Move { pressed, shift, .. } => {
+            // A click on one of several chosen nodes chooses it alone; a
+            // shift-click has already added or removed it.
+            if !shift && view.selected.len() > 1 {
                 view.select(vec![pressed], cx);
             }
         },

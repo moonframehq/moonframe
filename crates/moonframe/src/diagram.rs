@@ -39,6 +39,9 @@ pub(crate) struct DiagramHost {
     waiting: Option<moonframe_diagram::Diagram>,
     /// The last `camera` request acted on, by its `seq`.
     camera_seq: Option<Data>,
+    /// A fit asked for with a new document, done once that document is
+    /// the view's.
+    fit_waiting: bool,
     _events: Subscription,
 }
 
@@ -54,6 +57,7 @@ impl DiagramHost {
             document: Data::Nil,
             waiting: None,
             camera_seq: None,
+            fit_waiting: false,
             _events: events,
         };
         host.set_props(init.props(), cx);
@@ -83,6 +87,9 @@ impl HostView for DiagramHost {
             view.set_highlight(props.highlight, cx);
             view.set_scroll_needs_focus(props.scroll_needs_focus);
             match camera.map(|(_, ask)| ask) {
+                // The waiting document is the one to fit, after render
+                // hands it over.
+                Some(read::Camera::Fit) if self.waiting.is_some() => self.fit_waiting = true,
                 Some(read::Camera::Fit) => view.fit(cx),
                 Some(read::Camera::ZoomBy(by)) => view.zoom_by(by, cx),
                 Some(read::Camera::ZoomTo(to)) => view.zoom_to(to, cx),
@@ -96,8 +103,13 @@ impl HostView for DiagramHost {
 impl Render for DiagramHost {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if let Some(diagram) = self.waiting.take() {
-            self.view
-                .update(cx, |view, cx| view.set_diagram(diagram, window, cx));
+            let fit = std::mem::take(&mut self.fit_waiting);
+            self.view.update(cx, |view, cx| {
+                view.set_diagram(diagram, window, cx);
+                if fit {
+                    view.fit(cx);
+                }
+            });
         }
         div().size_full().child(self.view.clone())
     }

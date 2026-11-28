@@ -21,7 +21,7 @@ use {
     crate::{
         geometry::{Point, Rect},
         layout::{self, Layout, Options, Widths},
-        model::{Diagram, NodeKind},
+        model::{Diagram, DiagramKind, NodeKind},
     },
     gpui_kit::{
         component::input::{Input, InputEvent, InputState},
@@ -134,6 +134,8 @@ pub struct DiagramView {
     pub(crate) scroll_needs_focus: bool,
     pub(crate) told_zoom: f32,
     layout_task: Option<Task<()>>,
+    /// A layout is under way on a background thread; a fit waits for it.
+    laying_out: bool,
 }
 
 impl EventEmitter<DiagramEvent> for DiagramView {}
@@ -169,6 +171,7 @@ impl DiagramView {
             scroll_needs_focus: false,
             told_zoom: 1.0,
             layout_task: None,
+            laying_out: false,
         }
     }
 
@@ -186,7 +189,17 @@ impl DiagramView {
 
     /// Shows `diagram`, laying it out again from the current layout, so
     /// what stayed keeps its place.
-    pub fn set_diagram(&mut self, diagram: Diagram, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn set_diagram(
+        &mut self,
+        mut diagram: Diagram,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // A participant only a message names is drawn, chosen and hit as
+        // the listed ones are.
+        if diagram.kind == DiagramKind::Sequence {
+            diagram.nodes = diagram.participants();
+        }
         self.measure(&diagram, window, cx);
         let widths = Widths(self.widths.clone());
         let options = self.options.clone();
@@ -199,6 +212,7 @@ impl DiagramView {
             self.apply(out, cx);
             return;
         }
+        self.laying_out = true;
         let work = cx.background_spawn(async move {
             layout::layout(&diagram, &widths, &options, Some(&previous))
         });
@@ -220,6 +234,7 @@ impl DiagramView {
                 start: Instant::now(),
             });
         }
+        self.laying_out = false;
         // The owner's diagram now says where moved nodes are; an edit it
         // turned down would wait for ever, so none is kept.
         self.pending.clear();
@@ -253,10 +268,14 @@ impl DiagramView {
         }
     }
 
+    /// Changing the mode ends the gesture under way; the same mode again,
+    /// as an owner's props repeat it, leaves a drag alone.
     pub fn set_mode(&mut self, mode: Mode, cx: &mut Context<Self>) {
-        self.mode = mode;
-        self.gesture = None;
-        cx.notify();
+        if mode != self.mode {
+            self.mode = mode;
+            self.gesture = None;
+            cx.notify();
+        }
     }
 
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
@@ -297,11 +316,12 @@ impl DiagramView {
         self.zoom_by(zoom / self.camera.zoom, cx);
     }
 
-    /// Shows the whole diagram.
+    /// Shows the whole diagram: the one being laid out, if a layout is
+    /// under way, once it is done.
     pub fn fit(&mut self, cx: &mut Context<Self>) {
         let size = self.bounds.get().size;
         let (w, h) = (f32::from(size.width), f32::from(size.height));
-        if w <= 0.0 || self.layout.nodes.is_empty() {
+        if w <= 0.0 || self.layout.nodes.is_empty() || self.laying_out {
             self.fit_pending = true;
             return;
         }
@@ -323,6 +343,7 @@ impl DiagramView {
             guides: Vec::new(),
             travelled: true,
             pressed,
+            shift: false,
         });
         cx.notify();
     }
@@ -413,6 +434,7 @@ impl DiagramView {
 impl Render for DiagramView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.fit_pending
+            && !self.laying_out
             && f32::from(self.bounds.get().size.width) > 0.0
             && !self.layout.nodes.is_empty()
         {
