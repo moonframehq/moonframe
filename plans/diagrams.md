@@ -392,7 +392,28 @@ The plan as first written:
 - This is what Sheprd uses once it moves onto Moonframe's chats, with no
   diagram code of its own.
 
-### 7. Finish
+### 7. Finish (done)
+
+As built:
+
+- `moonframe_diagram::export::svg`: a laid-out diagram as SVG, drawn as
+  the view draws it (shapes, rounded edges and every head, labels,
+  groups, a sequence's lifelines and notes, the highlight), in
+  `export::Colors`; `view::export_colors` reads them from the theme, so
+  an export matches the app, light or dark. Font families fall back to a
+  sans serif any renderer knows.
+- `ui.diagram { export = { format = "png" | "svg", seq } }` writes the
+  diagram to the app's share folder (where `app:share` may take it, and
+  nowhere a mod names) and sends `{ exported = { path, format } }`; PNG
+  is the SVG rasterized at 2x by GPUI's SVG renderer. `copy = { seq }`
+  puts it on the clipboard as Mermaid.
+- `examples/diagram`: Document > Copy as Mermaid, Export PNG…, Export
+  SVG… (handed to the system's share menu).
+- Light and dark: every PR's screenshots show both.
+- A parser fix found on the way: a node named before a subgraph and
+  listed inside it joins it, as Mermaid has it.
+
+The plan as first written:
 
 - Export PNG and SVG; copy as Mermaid; light and dark checked against
   style.luau.
