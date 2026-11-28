@@ -5,7 +5,10 @@
 //! `#heading` link scrolls to its heading, and pictures show only with
 //! `images`, from files a `ui.image` could show.
 
+// keep-sorted start
 mod blocks;
+#[cfg(feature = "diagram")]
+mod diagram;
 mod document;
 mod emoji;
 mod holding;
@@ -17,6 +20,7 @@ mod scrolling;
 mod search;
 mod selection;
 mod tooltips;
+// keep-sorted end
 
 use {
     super::{

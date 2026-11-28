@@ -135,7 +135,9 @@ providers"), which takes saves only from its `writers` (`editor` as
 shipped; add yours there as for git). In the starter, a markdown file
 picked in the explorer opens in a main tab of this kind.
 
-**A diagram.** To show one an agent or the data describes, give
+**A diagram.** In any `ui.markdown`, a ` ```mermaid ` or ` ```dot `
+fence draws as a diagram (the `diagram` feature): a chat answer needs
+nothing more. To show one an agent or the data describes, give
 `ui.diagram` a `document` of nodes and edges with no places and it lays
 them out: `ui.diagram { id = "deps", document = { direction = "right",
 nodes = { { id = "api", label = "API" }, { id = "db", label = "Postgres",

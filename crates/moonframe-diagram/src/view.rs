@@ -13,12 +13,12 @@ pub mod camera;
 mod hit;
 mod input;
 mod paint;
+mod picture;
 mod scene;
 mod snap;
 pub mod style;
 // keep-sorted end
 
-pub use camera::Camera;
 use {
     crate::{
         geometry::{Point, Rect},
@@ -36,6 +36,10 @@ use {
         sync::Arc,
         time::{Duration, Instant},
     },
+};
+pub use {
+    camera::Camera,
+    picture::{measure, picture},
 };
 
 /// Diagrams with up to this many nodes are laid out at once, on the UI

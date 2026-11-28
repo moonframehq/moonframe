@@ -59,9 +59,12 @@ struct Cite {
 pub(super) fn extensions(shared: &SharedRef) -> MarkdownExtensions {
     let alerts = shared.clone();
     let pictures = shared.clone();
-    // An alert's body is a view of its own: emoji draw there too. Built
-    // once, as a view parses its text again when its extensions change.
+    // An alert's body is a view of its own: emoji and diagrams draw there
+    // too. Built once, as a view parses its text again when its
+    // extensions change.
     let inner = MarkdownExtensions::default().plugin(super::emoji::Emojis(shared.clone()));
+    #[cfg(feature = "diagram")]
+    let inner = super::diagram::with(inner);
     let extensions = MarkdownExtensions::default()
         .frontmatter()
         .block_parser(parse_alert)
@@ -77,6 +80,8 @@ pub(super) fn extensions(shared: &SharedRef) -> MarkdownExtensions {
         .plugin(Chips);
     #[cfg(feature = "math")]
     let extensions = super::math::with(extensions);
+    #[cfg(feature = "diagram")]
+    let extensions = super::diagram::with(extensions);
     extensions
 }
 

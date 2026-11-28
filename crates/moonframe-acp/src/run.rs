@@ -322,7 +322,7 @@ impl Run {
     fn open_session(&mut self) {
         self.request_rpc(
             "session/new",
-            &json!({ "cwd": self.cwd, "mcpServers": [] }),
+            &json!({ "cwd": self.cwd, "mcpServers": crate::mcp_servers() }),
             Pending::NewSession,
         );
     }

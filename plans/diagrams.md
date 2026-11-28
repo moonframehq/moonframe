@@ -267,7 +267,32 @@ The plan as first written:
 - Fixtures: a folder of real agent-written diagrams (collect from
   transcripts) with snapshot tests of parse and layout.
 
-### 4. Fences in markdown
+### 4. Fences in markdown (done)
+
+As built: `crates/moonframe/src/render/markdown/diagram.rs`, a block
+parser and renderer as `math.rs` is, behind `diagram`, so every
+`ui.markdown` (`chat-markdown`, `agent-chat`, docs, notes) draws
+` ```mermaid `, ` ```dot `, ` ```graphviz ` fences.
+
+- Drawn with moonframe-diagram's new `view::picture`: stateless, fitted
+  to the width (never past 100 %), at most 480 px tall, labels measured
+  in the theme's font. No scroll is taken, so a chat scrolls past it.
+- Each fence's text is laid out once and cached (256 kept). Streaming:
+  a version that parses is laid out from the longest earlier one it grew
+  from (nodes keep their places); one that doesn't yet shows that earlier
+  one, so it never flickers back to source.
+- "Copy as Mermaid" (the writer's text, also for DOT) and "Copy source"
+  in the corner.
+- What doesn't parse, or has over 300 nodes (laid out as the document
+  draws, so a bigger one would hold the window up), shows as code with
+  why.
+- Not yet: pan and zoom after a click, and "Open" in a pane with "Edit a
+  copy". A picture has no state, and a block renderer can't keep a view
+  entity safely (gpui keyed state only works while laying out or
+  painting); this comes with the chat cards of phase 6, which own their
+  views.
+
+The plan as first written:
 
 - A markdown plugin, as `crates/moonframe/src/render/markdown/math.rs` is,
   behind the `diagram` feature: ` ```mermaid ` and ` ```dot ` (and
@@ -279,7 +304,46 @@ The plan as first written:
   after a click inside); a corner with "Source", "Copy as Mermaid", "Open".
   Open shows it in a pane in `ui.diagram`'s view mode, with "Edit a copy".
 
-### 5. Live diagrams from agents
+### 5. Live diagrams from agents (done)
+
+As built: `crates/moonframe-diagrams` (behind `diagram`), with the MCP
+server and the provider meeting in a folder, one JSON file per diagram
+(`store.rs`): `$MOONFRAME_DIAGRAMS`, else the cache's
+`moonframe/diagrams`. Files keep the two apart: the server can start
+before the app, outlive it, or belong to an agent the app didn't start.
+
+- `moonframe mcp diagrams [--dir] [--agent]` (`mcp.rs`, routed first
+  thing in `cli::main`, as stdout is the protocol's): JSON-RPC over stdio
+  with `diagram_show` (Mermaid, DOT or a graph; a parse error goes back
+  to the agent with its line, so it can fix it), `diagram_patch` (add or
+  remove nodes, edges, groups; set fields), `diagram_highlight` (ids and
+  a note), `diagram_close`. A restarted server picks diagrams up from
+  their files.
+- moonframe-acp offers it in every `session/new` (`offer_mcp_servers`,
+  set by Moonframe at launch to its own executable). Agents in a
+  terminal can add the same command to their MCP settings.
+- The `diagrams` native provider (`provider.rs`) reads that folder and
+  the project's `.moonframe/diagrams` (`.mmd`, `.dot`, `.json`) each
+  second, reads a file again only when it changed, and publishes
+  `app.diagrams` (typed in `app/providers/diagrams/types.luau`) only when
+  something did: newest first, each with the `document` `ui.diagram`
+  takes, documents dropped past a budget of 8,000 values so a publish
+  stays under 10,000. `{ close = key }` removes an agent's diagram (only
+  a JSON file the MCP server wrote, `agent/<id>.json`). Files are read
+  through the folder opened, never through a link.
+- `examples/diagram` lists them under FROM AGENTS (the app's
+  `live-diagrams` component) and shows one read-only with the agent's
+  highlight and note.
+
+Checked end to end: the release binary driven over stdio like an agent
+writes the file, and the app (captured with a driver mod picking it)
+draws it with its highlight.
+
+- Not yet: agents in `agent-chat` run through herdr-acp, which takes no
+  MCP servers yet, so only `acp` runs (and agents told the command) get
+  the tools. "Send to agent" for a user's edits waits on phase 6.
+
+The plan as first written:
 
 - The `diagrams` provider takes diagrams two ways:
   - **MCP tools**, from a stdio MCP server Moonframe runs
@@ -324,6 +388,8 @@ One PR per phase where it can stand alone (1 and 2 may go together).
   others (2026-11 survey, above), so state, class and ER stay basic and
   gantt, pie, mindmap and the rest wait for a use.
 - Is the watched folder per project (`.moonframe/diagrams`) or global?
+  Both, as built: agents' diagrams go to one folder for the user (the
+  cache), a project's own files sit in the project.
 - Should the user's edits to an agent's diagram be sent back automatically?
 - Should `ui.diagram` name a provider's diagram (`source =
   "diagrams:<id>"`) so documents past the 10,000-value limit never cross

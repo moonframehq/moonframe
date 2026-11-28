@@ -7,7 +7,7 @@ use {
     super::{DiagramView, input::Gesture},
     crate::{
         geometry::{Point, Rect},
-        layout::{Route, placed},
+        layout::{Layout, Route, placed},
     },
     std::collections::{HashMap, HashSet},
 };
@@ -29,6 +29,24 @@ pub(crate) struct Scene {
 }
 
 impl Scene {
+    /// A layout as it is: nothing moving, nothing under way.
+    pub(crate) fn still(layout: &Layout) -> Self {
+        Scene {
+            rects: layout.nodes.iter().map(|(k, v)| (k.clone(), *v)).collect(),
+            routes: layout
+                .edges
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+            edge_alpha: 1.0,
+            animating: false,
+            guides: Vec::new(),
+            marquee: None,
+            link: None,
+            creating: None,
+        }
+    }
+
     pub(crate) fn build(view: &mut DiagramView) -> Self {
         let (mut rects, t) = view.eased();
         let easing = t < 1.0;

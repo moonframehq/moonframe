@@ -431,6 +431,12 @@ pub(crate) fn framed(chrome: Chrome) -> WindowOptions {
 
 /// What `Moonframe::run` does.
 pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
+    // An MCP server speaks on stdout: before anything else can print.
+    if let Some(code) = crate::mcp::run_if_asked() {
+        return code;
+    }
+    #[cfg(all(feature = "diagram", feature = "acp"))]
+    crate::mcp::offer();
     {
         use tracing_subscriber::{
             Layer as _, layer::SubscriberExt as _, util::SubscriberInitExt as _,

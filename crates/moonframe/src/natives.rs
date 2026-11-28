@@ -22,6 +22,7 @@ pub(crate) fn natives() -> Natives {
         // The demo gallery's (examples/demo): it opens apps on this binary.
         #[cfg(feature = "studio")]
         ("demos", crate::demos::native),
+        ("diagrams", diagrams),
         ("docs", docs),
         ("git", git),
         ("github", github),
@@ -148,6 +149,16 @@ fn shell() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(feature = "diagram")]
+fn diagrams() -> Box<dyn Native> {
+    moonframe_diagrams::native()
+}
+
+#[cfg(not(feature = "diagram"))]
+fn diagrams() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 #[cfg(not(feature = "docs"))]
 fn docs() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -224,6 +235,7 @@ fn usage() -> Box<dyn Native> {
     all(
         feature = "acp",
         feature = "chat",
+        feature = "diagram",
         feature = "docs",
         feature = "documents",
         feature = "forge",
@@ -289,6 +301,7 @@ mod tests {
         for name in [
             "acp",
             "chat",
+            "diagrams",
             "docs",
             "git",
             "github",

@@ -6640,6 +6640,7 @@ dependencies = [
  "moonframe-chat",
  "moonframe-core",
  "moonframe-diagram",
+ "moonframe-diagrams",
  "moonframe-docs",
  "moonframe-documents",
  "moonframe-forge",
@@ -6752,6 +6753,18 @@ name = "moonframe-diagram"
 version = "1.8.0"
 dependencies = [
  "gpui-kit",
+]
+
+[[package]]
+name = "moonframe-diagrams"
+version = "1.8.0"
+dependencies = [
+ "moonframe-core",
+ "moonframe-diagram",
+ "moonframe-providers",
+ "rustix 1.1.6",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

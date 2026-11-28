@@ -1,0 +1,26 @@
+[package]
+description            = "Live diagrams from agents: an MCP server agents draw with, and the `diagrams` provider that shares them and a project's diagram files as `app.diagrams`"
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-diagrams"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[dependencies]
+moonframe-core.workspace      = true
+moonframe-diagram.workspace   = true
+moonframe-providers.workspace = true
+serde_json.workspace          = true
+
+# Reads a project's diagram files through the folder it opened, never
+# following a link.
+[target.'cfg(unix)'.dependencies]
+rustix.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
