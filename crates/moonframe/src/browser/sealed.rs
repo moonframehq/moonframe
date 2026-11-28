@@ -81,11 +81,15 @@ pub(crate) enum Reported {
         #[serde(default)]
         large: bool,
     },
+    /// The document lost the keyboard; `edited` when typed into since the
+    /// last `done`, or since it loaded.
     Done {
         #[serde(default)]
         html: String,
         #[serde(default)]
         large: bool,
+        #[serde(default)]
+        edited: bool,
     },
 }
 
@@ -239,8 +243,16 @@ impl State {
             Reported::Change { html, large } if self.editable => {
                 self.edited(html, large, self.change.clone())
             },
-            Reported::Done { html, large } if self.editable => {
-                self.edited(html, large, self.done.clone())
+            Reported::Done {
+                html,
+                large,
+                edited,
+            } if self.editable => {
+                let done = self
+                    .done
+                    .as_ref()
+                    .map(|done| with(done, [("edited", Data::Bool(edited))]));
+                self.edited(html, large, done)
             },
             Reported::Change { .. } | Reported::Done { .. } => None,
         }

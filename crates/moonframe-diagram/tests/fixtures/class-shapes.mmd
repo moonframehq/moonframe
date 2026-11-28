@@ -1,0 +1,16 @@
+classDiagram
+    direction LR
+    class Shape {
+        <<interface>>
+        +area() float
+        +perimeter() float
+    }
+    class Circle {
+        +float radius
+    }
+    Shape <|-- Circle
+    Shape <|-- Square
+    Square : +float side
+    Canvas "1" *-- "many" Shape : draws
+    Canvas o-- Theme
+    Canvas ..> Renderer : uses

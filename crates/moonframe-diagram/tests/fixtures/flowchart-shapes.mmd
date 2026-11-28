@@ -1,0 +1,24 @@
+---
+title: Request path
+---
+flowchart LR
+    client([Browser]) --> cdn>CDN edge]
+    cdn --> api-gw[[API gateway]]
+    subgraph backend [Backend services]
+        direction TB
+        api-gw --> users(Users) & orders(Orders)
+        subgraph data["Data"]
+            pg[(Postgres)]
+            cache((Redis))
+        end
+        users --> pg
+        orders -- writes --> pg
+        orders -.->|warms| cache
+    end
+    orders ==> queue{{Queue}}
+    queue --o worker[/Worker/]
+    worker --x dlq[\Dead letters\]
+    client ~~~ worker
+    worker:::hot --> client
+    classDef hot fill:#fde68a
+    style queue fill:#e0e7ff

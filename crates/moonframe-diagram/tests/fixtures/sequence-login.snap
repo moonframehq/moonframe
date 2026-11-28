@@ -1,0 +1,14 @@
+Sequence Down
+node U "User" pill
+node App "Desktop app" box
+node API "Auth API" box
+node DB "DB" box
+message U -> App Sync "Click Sign in"
+message App -> API Sync "POST /session"
+message API -> DB Sync "check code"
+message DB -> API Reply "valid"
+message API -> App Reply "200 token"
+message API -> App Reply "401"
+message App -> U Async "Signed in"
+note over App,API before 2 "TLS, retried with the same key"
+note over U before 7 "done"

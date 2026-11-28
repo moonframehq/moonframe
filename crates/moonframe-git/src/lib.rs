@@ -629,6 +629,8 @@ impl Job {
             Self::Vcs(Action::Commit(_)) => "commit",
             Self::Vcs(Action::Push) => "push",
             Self::Vcs(Action::CreatePullRequest) => "pull_request",
+            // No mod asks for one; herdr-vcs runs it for stacked branches.
+            Self::Vcs(Action::Restack { .. }) => "restack",
             Self::Worktree(Change::Add { .. }) => "worktree_add",
             Self::Worktree(Change::Remove { .. }) => "worktree_remove",
         }
@@ -687,7 +689,7 @@ fn run(input: Input, action: Action) -> Result<String, String> {
     }
     match (git.outcome(), git.error()) {
         (Some(outcome), _) => Ok(outcome.message.clone()),
-        (None, Some(error)) => Err(error.to_owned()),
+        (None, Some(error)) => Err(error.to_string()),
         (None, None) => Err("git stopped without saying why".to_owned()),
     }
 }

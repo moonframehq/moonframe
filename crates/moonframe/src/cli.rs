@@ -439,8 +439,12 @@ pub(crate) fn main(mut launch: Moonframe) -> ExitCode {
         // app's own layers see every event and filter for themselves.
         let filter = tracing_subscriber::EnvFilter::try_from_default_env()
             .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(&launch.log));
+        // An empty list of layers tells tracing its most verbose level is
+        // OFF, which turns every event off, the perf log's included: add
+        // the app's layers only when it has some.
+        let layers = std::mem::take(&mut launch.log_layers);
         tracing_subscriber::registry()
-            .with(std::mem::take(&mut launch.log_layers))
+            .with((!layers.is_empty()).then_some(layers))
             .with(
                 tracing_subscriber::fmt::layer()
                     .with_writer(std::io::stderr)

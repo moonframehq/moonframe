@@ -124,6 +124,7 @@ fn an_edit_too_large_to_give_back_says_so() {
         .report(Reported::Done {
             html: over,
             large: false,
+            edited: true,
         })
         .unwrap();
     assert!(field(&done, "error").is_some());
@@ -138,6 +139,7 @@ fn edits_are_told_only_while_editable() {
     let done = || Reported::Done {
         html: "x".into(),
         large: false,
+        edited: true,
     };
     assert_eq!(state.report(done()), None);
     state.update(&element(true, None), "<p>a</p>", false);
@@ -220,4 +222,29 @@ fn html_the_mod_leaves_as_it_was_keeps_the_edits() {
     );
     state.update(&only_done, "<p>a</p>", false);
     assert_eq!(state.work(Some(false)).load, None);
+}
+
+#[test]
+fn done_says_whether_the_page_was_typed_into() {
+    let mut state = State::default();
+    state.update(&element(true, None), "<p>a</p>", false);
+    for edited in [false, true] {
+        let done = state
+            .report(Reported::Done {
+                html: "<p>a</p>".into(),
+                large: false,
+                edited,
+            })
+            .unwrap();
+        assert_eq!(field(&done, "edited"), Some(Data::Bool(edited)));
+        assert_eq!(field(&done, "msg"), Some(Data::from("done")));
+    }
+    assert_eq!(
+        read(r#"{"kind":"done","html":"<p>a</p>","edited":true}"#),
+        Some(Reported::Done {
+            html: "<p>a</p>".into(),
+            large: false,
+            edited: true
+        })
+    );
 }

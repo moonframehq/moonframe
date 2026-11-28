@@ -68,15 +68,21 @@
     post({ kind: "select", text, ...rect });
   });
 
-  // An edit, or that the document grew past what the mod can give back.
-  const report = (kind) => {
+  // An edit, or that the document grew past what the mod can give back;
+  // `more` goes with it.
+  const report = (kind, more) => {
     const text = html();
-    if (new TextEncoder().encode(text).length > MAX_HTML) post({ kind, large: true });
-    else post({ kind, html: text });
+    if (new TextEncoder().encode(text).length > MAX_HTML) post({ kind, large: true, ...more });
+    else post({ kind, html: text, ...more });
   };
   const edited = settled(500, () => {
     if (editable) report("change");
   });
+  // Typed into since the last `done` (or the load): what `done` tells.
+  let typed = false;
+  document.addEventListener("input", () => {
+    typed = true;
+  }, true);
 
   const reveal = (id) => {
     const target = document.getElementById(id);
@@ -111,7 +117,9 @@
   document.addEventListener("selectionchange", selected);
   document.addEventListener("input", edited, true);
   window.addEventListener("blur", () => {
-    if (editable) report("done");
+    if (!editable) return;
+    report("done", { edited: typed });
+    typed = false;
   });
   document.addEventListener("DOMContentLoaded", scrolled);
 

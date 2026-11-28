@@ -116,7 +116,7 @@ impl Moonframe {
             agent: AgentHints::default(),
             log_layers: Vec::new(),
             natives: crate::natives::natives(),
-            views: Registry::default(),
+            views: built_in_views(),
             panel: None,
             assets: None,
             #[cfg(feature = "tokio")]
@@ -371,4 +371,13 @@ impl Moonframe {
         }
         crate::cli::main(self)
     }
+}
+
+/// The views every app has: `ui.diagram`'s, with the `diagram` feature.
+pub(crate) fn built_in_views() -> Registry {
+    #[allow(unused_mut)]
+    let mut views = Registry::default();
+    #[cfg(feature = "diagram")]
+    crate::diagram::register(&mut views);
+    views
 }

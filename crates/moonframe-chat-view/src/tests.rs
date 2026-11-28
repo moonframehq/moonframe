@@ -25,6 +25,8 @@ fn user(text: &str) -> EntryKind {
     EntryKind::User {
         text: text.to_owned(),
         files: 0,
+        note: None,
+        guest: None,
     }
 }
 
@@ -117,6 +119,7 @@ fn row_type(row: &Row) -> &'static str {
         Row::Tools(_) => "tools",
         Row::Image { .. } => "image",
         Row::Notice { .. } => "notice",
+        Row::Handoff { .. } => "handoff",
         Row::Turn { .. } => "turn",
     }
 }
@@ -208,7 +211,12 @@ fn a_prompt_hides_its_context_frame_and_lists_its_files() {
     let mut text = framed.clone();
     text.push_str("\n\u{1f4ce} /tmp/a.pdf\n\u{1f4ce} /tmp/b.png");
     let view = prepare(
-        &transcript(vec![EntryKind::User { text, files: 2 }]),
+        &transcript(vec![EntryKind::User {
+            text,
+            files: 2,
+            note: None,
+            guest: None,
+        }]),
         &Limits::FULL,
     );
     let Row::User {
@@ -258,6 +266,8 @@ fn permissions_carry_the_agents_options_and_the_calls_title() {
             },
         ],
         title: "Run a command?".to_owned(),
+        question: None,
+        guest: None,
     });
     let view = prepare(&chat, &Limits::FULL);
     let permission = &view.permissions[0];
@@ -283,6 +293,9 @@ fn the_queue_keeps_ids_to_unqueue_without_context_frames() {
         }],
         id,
         text: frame("context", "and then this"),
+        guest: None,
+        held: false,
+        steered: false,
     });
     let view = prepare(&chat, &Limits::FULL);
     let queued = &view.queue[0];
@@ -495,3 +508,5 @@ fn output_key_is_exposed_only_after_a_tool_finishes() {
         .collect();
     assert_eq!(keys, [None, None, Some("e3"), Some("e4")]);
 }
+
+mod session;

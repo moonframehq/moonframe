@@ -1,0 +1,16 @@
+Flow Down
+node A "Agent opens a PR" box
+node B "CI green?" diamond
+node C "Request review" box
+node D "Fix failing checks" box tone=Danger
+node E "Approved?" diamond
+node F "Address comments and push" box
+node G "Merge" pill fill="#d1fae5"
+edge e0 A -> B Solid none..arrow
+edge e1 B -> C Solid none..arrow "yes"
+edge e2 B -> D Solid none..arrow "no"
+edge e3 D -> B Solid none..arrow
+edge e4 C -> E Solid none..arrow
+edge e5 E -> F Solid none..arrow "changes requested"
+edge e6 F -> C Solid none..arrow
+edge e7 E -> G Solid none..arrow "approved"

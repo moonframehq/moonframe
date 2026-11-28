@@ -1,0 +1,24 @@
+Flow Down
+group Shipping "Shipping" in -
+node start "" circle
+node Draft "Draft" rounded
+node Review "In review" rounded
+node Shipping-start "" circle group="Shipping"
+node Packed "Packed" rounded group="Shipping"
+node Sent "Sent" rounded group="Shipping"
+node Shipping-end "" circle group="Shipping"
+node check "" diamond
+node Done "Done" rounded
+node Lost "Lost" rounded sub="investigate with the carrier"
+node end "" circle
+edge e0 start -> Draft Solid none..arrow
+edge e1 Draft -> Review Solid none..arrow "submit"
+edge e2 Review -> Draft Solid none..arrow "changes"
+edge e3 Review -> Shipping-start Solid none..arrow "approve"
+edge e4 Shipping-start -> Packed Solid none..arrow
+edge e5 Packed -> Sent Solid none..arrow
+edge e6 Sent -> Shipping-end Solid none..arrow
+edge e7 Shipping-end -> check Solid none..arrow
+edge e8 check -> Done Solid none..arrow "delivered"
+edge e9 check -> Lost Solid none..arrow "no scan"
+edge e10 Done -> end Solid none..arrow
