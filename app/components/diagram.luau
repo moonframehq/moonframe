@@ -56,12 +56,16 @@ local SLOP = 3
 local SIZES: { [string]: { number } } = {
 	box = { 140, 64 },
 	pill = { 150, 64 },
+	-- A rotated square is beyond Luau: a decision draws as a pill here and
+	-- as a diamond in the Rust view.
+	diamond = { 150, 72 },
 	ellipse = { 120, 72 },
 	text = { 120, 32 },
 	sticky = { 150, 120 },
 }
 -- Tools that place a new shape, by the kind they make.
-local MAKES: { [string]: string } = { box = "box", pill = "pill", ellipse = "ellipse", text = "text", sticky = "sticky" }
+local MAKES: { [string]: string } =
+	{ box = "box", pill = "pill", diamond = "diamond", ellipse = "ellipse", text = "text", sticky = "sticky" }
 
 local KEYS = {
 	backspace = "delete",
@@ -224,7 +228,7 @@ local function told_zoom(state: State): { any }?
 	local z = round(state.view.zoom * 100) / 100
 	if state.zoom_told ~= z then
 		state.zoom_told = z
-		return to_parent { zoom = z }
+		return to_parent { zoom = z, canvas = "luau" }
 	end
 	return nil
 end
@@ -548,7 +552,7 @@ return component {
 	when = "An editable diagram the user draws: flows, architecture sketches, mind maps. The parent keeps `shapes`, `links` and `selected` and applies the edits it is sent. For a fixed system diagram on a grid use `flow-diagram`; for dependency arrows between dated bars use `gantt`.",
 	props = {
 		["id"] = "the instance's id (its pan and zoom are kept under it)",
-		["shapes"] = "list of { id, kind (box pill ellipse text sticky), x, y, w, h (world pixels), label?, fill? (a color) }, bottom first",
+		["shapes"] = "list of { id, kind (box pill diamond ellipse text sticky), x, y, w, h (world pixels), label?, fill? (a color) }, bottom first",
 		["links"] = "list of { id, from, to (shape ids), label?, dashed? }: drawn as elbows that follow the shapes",
 		["selected"] = "ids of the chosen shapes and links",
 		["tool"] = "select (default), hand, box, pill, ellipse, text, sticky or connector",
@@ -560,6 +564,7 @@ return component {
 		[".diagram-shape"] = { background = "card", border = true, border_color = "foreground/25", radius = 8, padding = 6 },
 		[".diagram-box"] = { radius = 8 },
 		[".diagram-pill"] = { radius = 999 },
+		[".diagram-diamond"] = { radius = 999 },
 		[".diagram-ellipse"] = { radius = 999 },
 		[".diagram-text"] = { background = "#00000000", border = "none" },
 		[".diagram-sticky"] = { radius = 2, border = "none", padding = 10, shadow = "0 6px 14px -6px #00000040" },

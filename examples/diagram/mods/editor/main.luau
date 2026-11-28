@@ -20,6 +20,10 @@ type State = {
 	next: number,
 	version: number,
 	zoom: number,
+	-- The Luau canvas said it is there (a build without `ui.diagram`):
+	-- zooming is a message to it, else a `camera` prop.
+	luau: boolean,
+	camera: { [string]: any }?,
 	undo: { Doc },
 	redo: { Doc },
 }
@@ -27,14 +31,15 @@ type State = {
 -- How many earlier documents undo keeps.
 local HISTORY = 50
 local FILLS = { "#e2e8f0", "#bfdbfe", "#bbf7d0", "#fde68a", "#fecaca", "#ddd6fe" }
-local DEFAULT_FILL: { [string]: string } = { sticky = "#fde68a", pill = "#ddd6fe", ellipse = "#bbf7d0" }
-local LABELS: { [string]: string } = { box = "Box", pill = "Decision?", ellipse = "Ellipse", text = "Text", sticky = "Note" }
+local DEFAULT_FILL: { [string]: string } = { sticky = "#fde68a", diamond = "#ddd6fe", pill = "#ddd6fe", ellipse = "#bbf7d0" }
+local LABELS: { [string]: string } =
+	{ box = "Box", diamond = "Decision?", pill = "Step", ellipse = "Ellipse", text = "Text", sticky = "Note" }
 
 local TOOLS = {
 	{ id = "select", icon = "mouse-pointer-2", tooltip = "Select (V)" },
 	{ id = "hand", icon = "hand", tooltip = "Pan (H)" },
 	{ id = "box", icon = "square", tooltip = "Box (R)" },
-	{ id = "pill", icon = "diamond", tooltip = "Decision (D)" },
+	{ id = "diamond", icon = "diamond", tooltip = "Decision (D)" },
 	{ id = "ellipse", icon = "circle", tooltip = "Ellipse (O)" },
 	{ id = "text", icon = "type", tooltip = "Text (T)" },
 	{ id = "sticky", icon = "sticky-note", tooltip = "Sticky note (S)" },
@@ -45,7 +50,7 @@ local function sample(): Doc
 	return {
 		shapes = {
 			{ id = "cart", kind = "box", x = 40, y = 70, w = 140, h = 64, label = "Cart", fill = "#e2e8f0" },
-			{ id = "auth", kind = "pill", x = 250, y = 70, w = 150, h = 64, label = "Signed in?", fill = "#ddd6fe" },
+			{ id = "auth", kind = "diamond", x = 250, y = 70, w = 150, h = 64, label = "Signed in?", fill = "#ddd6fe" },
 			{ id = "pay", kind = "box", x = 470, y = 70, w = 140, h = 64, label = "Payment", fill = "#bfdbfe" },
 			{ id = "login", kind = "box", x = 250, y = 220, w = 150, h = 64, label = "Log in", fill = "#e2e8f0" },
 			{ id = "done", kind = "ellipse", x = 690, y = 70, w = 120, h = 64, label = "Receipt", fill = "#bbf7d0" },
@@ -310,7 +315,8 @@ end
 
 local KIND_ICON: { [string]: string } = {
 	box = "square",
-	pill = "diamond",
+	pill = "square",
+	diamond = "diamond",
 	ellipse = "circle",
 	text = "type",
 	sticky = "sticky-note",
@@ -386,6 +392,8 @@ return mod {
 		state.next = if type(state.next) == "number" then state.next else 100
 		state.version = if type(state.version) == "number" then state.version else 1
 		state.zoom = if type(state.zoom) == "number" then state.zoom else 1
+		state.luau = false
+		state.camera = nil
 		-- History lives for the session only.
 		state.undo, state.redo = {}, {}
 		return state
@@ -432,8 +440,13 @@ return mod {
 			state.tool = msg.tool
 		elseif msg.zoom then
 			state.zoom = msg.zoom
+			state.luau = state.luau or msg.canvas == "luau"
 		elseif msg.zoom_by or msg.zoom_to or msg.fit then
-			return state, { { to = "diagram#main", msg = msg } }
+			if state.luau then
+				return state, { { to = "diagram#main", msg = msg } }
+			end
+			local seq = if state.camera then (state.camera.seq or 0) + 1 else 1
+			state.camera = { zoom_by = msg.zoom_by, zoom = msg.zoom_to, fit = msg.fit, seq = seq }
 		elseif msg.selected then
 			state.selected = msg.selected
 		elseif msg.pick then
@@ -441,7 +454,10 @@ return mod {
 		elseif msg.stress then
 			remember(state)
 			stress(state, msg.stress)
-			return state, { { to = "diagram#main", msg = { fit = true } } }
+			if state.luau then
+				return state, { { to = "diagram#main", msg = { fit = true } } }
+			end
+			state.camera = { fit = true, seq = (if state.camera then state.camera.seq or 0 else 0) + 1 }
 		else
 			local before = copy(state.doc)
 			if apply(state, msg) then
@@ -455,7 +471,7 @@ return mod {
 		end
 	end,
 
-	view = function(state: State)
+	view = function(state: State, app)
 		return ui.column {
 			grow = true,
 			gap = "none",
@@ -468,14 +484,25 @@ return mod {
 				ui.column {
 					grow = true,
 					gap = "none",
-					diagram {
-						id = "main",
-						shapes = state.doc.shapes,
-						links = state.doc.links,
-						selected = state.selected,
-						tool = state.tool,
-						version = state.version,
-					},
+					-- The Rust view where the build has it, else the Luau canvas:
+					-- the same props, the same messages back.
+					if app.capabilities.diagram
+						then ui.diagram {
+							id = "main",
+							shapes = state.doc.shapes,
+							links = state.doc.links,
+							selected = state.selected,
+							tool = state.tool,
+							camera = state.camera,
+						}
+						else diagram {
+							id = "main",
+							shapes = state.doc.shapes,
+							links = state.doc.links,
+							selected = state.selected,
+							tool = state.tool,
+							version = state.version,
+						},
 				},
 				inspector { doc = state.doc, selected = state.selected, fills = FILLS },
 			},
