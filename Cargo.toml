@@ -174,7 +174,7 @@ ureq = { default-features = false, features = ["rustls"], version = "3.5" }
 url = "2.5"
 # The ids of pi threads, which pi takes as session ids (moonframe-pi).
 uuid          = { features = ["v4"], version = "1" }
-wasmtime      = "50"
+wasmtime      = "51"
 wasmtime-wasi = "50"
 # The native web views behind `ui.browser` (WebKit, WebView2): a fork of
 # wry that renders under GPUI.
