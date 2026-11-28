@@ -99,7 +99,57 @@ app without log layers of its own (an empty layer list turned every event
 off), and `measure` was not sent again in a headless window that reused an
 id (so a second render drew an empty canvas).
 
-### 1. The model, layout and view
+### 1. The model, layout and view (done, with phase 2)
+
+`crates/moonframe-diagram`: `model`, `geometry`, `layout` (`rank`,
+`order`, `place`, `layered` and its `route`, `placed`, `sequence`,
+`groups`) and, behind its `view` feature, `view` (`camera`, `scene`,
+`hit`, `input`, `snap`, `paint`, `style`).
+
+As built:
+
+- Ranks by longest path after breaking cycles with a depth-first walk;
+  sources pulled down beside what they point at. Long edges get a
+  stand-in per rank. Order by barycenter sweeps (12) with neighbour swaps
+  in ranks of up to 48, a Fenwick-tree crossing count, and group members
+  kept side by side. Coordinates by isotonic regression (pool adjacent
+  violators) toward the neighbours' weighted middle, stand-ins pulling
+  hardest so long edges run straight. Edges leave a node's facing side at
+  ports spread in the order of where they go, and bends in one gap take
+  tracks of their own.
+- Incremental: a node keeps at least its previous rank, and ranks start
+  in the previous order, which a sweep only replaces with fewer crossings.
+- Placed diagrams: routes chosen among elbows and L shapes by what they
+  cross (a grid index of the nodes), length, bends and whether they enter
+  the target's facing side; detours only around what blocks the plain
+  shapes. A node with no place goes beside a placed neighbour.
+- The view lays out up to 150 nodes at once and bigger diagrams on a
+  background thread, easing nodes to their new places (240 ms) and fading
+  edges in. Drags reroute only the edges touching what moves. Labels wrap
+  at words to the box; text under 4 px is not drawn.
+- Not yet: edges avoiding each other (labels of two edges in one gap can
+  touch), a jog where one edge meets a node whose side spreads several
+  ports, label editing for edges, `icon`.
+
+Measured (release, M-series Mac):
+
+| Layout (`cargo run --release -p moonframe-diagram --example layout-bench`) | 100 nodes | 500 | 1,000 |
+| --- | --- | --- | --- |
+| layered (about 1.4 edges a node) | 0.6 ms | 3.8 ms | 9.1 ms |
+| placed, routed | 1.9 ms | 21 ms | 58 ms |
+| one node added to 500, from the last layout | | 3.8 ms | |
+
+| A frame while dragging (`diagram::bench`, headless, CPU) | idle | one node | 100 nodes |
+| --- | --- | --- | --- |
+| 1,000 nodes, all in view (21 %, labels too small to draw) | 3.3 ms | 3.7 ms | 4.0 ms |
+| 1,000 nodes at 60 % (labels drawn) | 1.5 ms | 1.3 ms | 1.4 ms |
+| 500 nodes, all in view (33 %) | 2.4 ms | 2.5 ms | 2.6 ms |
+
+Both targets are met: 500 nodes lay out in 3.8 ms (target 30 ms), and a
+drag frame with 1,000 shapes costs under 4 ms, where the Luau canvas
+spent about 16 ms on 500.
+
+The plan as first written:
 
 - Model: node `id`, `label`, `sublabel`, `kind` (box, rounded, pill,
   diamond, circle, cylinder, note, text), `icon`, `tone`, `group`; edge
@@ -118,7 +168,34 @@ id (so a second render drew an empty canvas).
   while dragging). Targets: layout of 500 nodes under 30 ms, drag at the
   display's frame rate with 1,000 shapes.
 
-### 2. `ui.diagram`
+### 2. `ui.diagram` (done)
+
+As built: a hosted view registered by Moonframe itself behind the
+`diagram` feature (on in the starter; `app.capabilities.diagram`), so
+`ui.diagram { ... }` is `ui.view { name = "diagram", props = ... }` with
+the props spelled out. `crates/moonframe/src/diagram.rs` reads props
+(`read.rs`) and turns the view's events into messages (`tell.rs`).
+
+- Props: `shapes`/`links` (the Luau canvas's document, as it is) or
+  `document`; `mode`, `tool`, `selected`, `highlight`, `camera` (`fit`,
+  `zoom`, `zoom_by`, acted on per `seq`), `scroll = "focus"`.
+- Messages keep the Luau canvas's names (`selected`, `moved`, `resized`,
+  `created`, `connected`, `deleted`, `edited`, plus `opened`, `zoom`,
+  `tool`) rather than the ones first planned, so `examples/diagram` uses
+  either canvas with the same `update`.
+- `examples/diagram` uses `ui.diagram` when the build has it, else the
+  Luau canvas; diamonds draw as pills there.
+- `flows` (tokens travelling paths) and `layout` as a prop are left for
+  later; `direction` sits in the document.
+- Rune draws its "not here" placeholder for any `ui.view`.
+  `docs/rune-coverage.md` is generated from components, so it is noted
+  here rather than there.
+- The 10,000-value limit stays: a document is props, so about 1,000
+  shapes is the most a mod can hand over (as for any mod state).
+  Diagrams bigger than that come from a provider (phase 5) or from text
+  (Mermaid, phase 3), which is one value however many nodes it names.
+
+The plan as first written:
 
 - Props: `document` (model as a table), `mode` (`view`, `edit`),
   `selected`, `highlight` (node and edge ids), `flows` (paths with tokens,
@@ -204,7 +281,6 @@ One PR per phase where it can stand alone (1 and 2 may go together).
   write in real transcripts.
 - Is the watched folder per project (`.moonframe/diagrams`) or global?
 - Should the user's edits to an agent's diagram be sent back automatically?
-- `ui.diagram` and the 10,000-value limit: a 1,000-shape document can't be
-  a prop. Options: the view keeps the document and Luau gets a handle and
-  edits (Luau stops owning it), or a provider holds big documents and
-  `ui.diagram` names one. Decide in phase 2.
+- Should `ui.diagram` name a provider's diagram (`source =
+  "diagrams:<id>"`) so documents past the 10,000-value limit never cross
+  into Luau? Decide with phase 5, when the provider exists.

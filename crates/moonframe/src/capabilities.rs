@@ -19,6 +19,7 @@ fn compiled() -> std::collections::BTreeMap<String, bool> {
         "capture",
         "chat",
         "crash",
+        "diagram",
         "displays",
         "dock",
         "docs",

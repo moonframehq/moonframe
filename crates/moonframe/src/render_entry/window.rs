@@ -6,7 +6,6 @@ use {
     crate::{
         app::{Hub, Launch, MoonframeApp},
         backends::Backends,
-        hosted::Registry,
     },
     gpui_kit::{
         AnyWindowHandle, AppContext as _, Entity, HeadlessAppContext, PlatformTextSystem,
@@ -95,12 +94,12 @@ pub(super) fn draw(job: Job<'_>) -> Result<RenderedEntry, String> {
 /// The system's text shaping. On macOS, without the platform, which only
 /// the main thread may create (and a host already has).
 #[cfg(target_os = "macos")]
-fn text_system() -> Arc<dyn PlatformTextSystem> {
+pub(crate) fn text_system() -> Arc<dyn PlatformTextSystem> {
     Arc::new(gpui_apple_capture::AppleTextSystem::new())
 }
 
 #[cfg(not(target_os = "macos"))]
-fn text_system() -> Arc<dyn PlatformTextSystem> {
+pub(crate) fn text_system() -> Arc<dyn PlatformTextSystem> {
     gpui_platform_capture::current_platform(true).text_system()
 }
 
@@ -123,7 +122,7 @@ fn open(
         bundled: None,
     };
     let backends = Arc::new(Backends::for_app("render-entry"));
-    let views = Registry::default();
+    let views = crate::launch::built_in_views();
     cx.update(|cx| {
         Hub::install(
             &workspace,

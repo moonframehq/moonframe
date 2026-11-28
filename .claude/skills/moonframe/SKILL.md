@@ -135,6 +135,19 @@ providers"), which takes saves only from its `writers` (`editor` as
 shipped; add yours there as for git). In the starter, a markdown file
 picked in the explorer opens in a main tab of this kind.
 
+**A diagram.** To show one an agent or the data describes, give
+`ui.diagram` a `document` of nodes and edges with no places and it lays
+them out: `ui.diagram { id = "deps", document = { direction = "right",
+nodes = { { id = "api", label = "API" }, { id = "db", label = "Postgres",
+kind = "cylinder" } }, edges = { { from = "api", to = "db" } } } }` inside
+a container with `grow = true`. To let the user draw one, keep `shapes`
+and `links` in the mod's state and pass them with `selected` and `tool`;
+apply each message (`moved`, `resized`, `created`, `connected`,
+`deleted`, `edited`, `selected`) to the state and the view follows.
+`examples/diagram` is the whole editor (layers, inspector, undo), and
+falls back to the Luau `diagram` component where `app.capabilities.diagram`
+is false.
+
 **A web page.** With browser chrome (back, forward, reload, an address
 bar that navigates, the title): `local browser = use "browser"`, then
 `browser { id = "docs", url = state.url, page = state.page, navigate =
@@ -1502,6 +1515,7 @@ Text-like elements take their main value positionally:
 | `ui.revision_timeline { entries = { { id = "r1", day = "Today", label = "10:30" } }, select = "pick" }` | `entries`, `selected`, `select`, `to`, `id`, `width`, `height`, `grow`, `disabled`, `class`, `style`, `state` | native right-aligned revision ruler, with Dock-like pointer magnification; clicks and keyboard navigation choose revisions or days; `select` adds `revision`, `index`, `day`, `label` |
 | `ui.badge "..."` | `text`, `tone`, extras | pill |
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
+| `ui.diagram { id = "flow", document = { nodes = ..., edges = ... } }` | `id`, `shapes`/`links` or `document`, `mode`, `tool`, `selected`, `highlight`, `camera`, `scroll`, `class`, `style` | a diagram drawn and laid out in Rust (the `diagram` feature, in the starter): flows laid out in layers or placed, sequence diagrams, pan and zoom; `mode = "edit"` selects, drags, resizes, connects and creates, sending `selected`, `moved`, `resized`, `created`, `connected`, `deleted`, `edited` to this mod, which keeps the document. See "A diagram" |
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
 | `ui.document { html = state.html }` | `id`, `html` or `src`, `link`, `scroll`, `scroll_to`, `select`, `editable`, `change`, `done`, `class`, `style` | HTML shown sealed (no script, no network, light or dark as the app), or edited in place; see "Documents" |

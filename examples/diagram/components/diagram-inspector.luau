@@ -18,7 +18,8 @@ local swatches = use "swatches"
 
 local KINDS = {
 	{ id = "box", icon = "square", tooltip = "Box" },
-	{ id = "pill", icon = "diamond", tooltip = "Decision" },
+	{ id = "diamond", icon = "diamond", tooltip = "Decision" },
+	{ id = "pill", icon = "square", tooltip = "Step" },
 	{ id = "ellipse", icon = "circle", tooltip = "Ellipse" },
 	{ id = "text", icon = "type", tooltip = "Text" },
 	{ id = "sticky", icon = "sticky-note", tooltip = "Sticky note" },
