@@ -203,6 +203,34 @@ fn a_sub_agents_steps_count_in_its_call_and_are_not_rows() {
 }
 
 #[test]
+fn a_sub_agents_diagrams_draw_in_its_parents_group() {
+    let mut shown = tool("s1", ToolKind::Other, "diagram_show", ToolStatus::Completed);
+    shown.parent = Some("task".to_owned());
+    shown.content = vec![ToolContent::Text {
+        text: "Showing `plan` (2 nodes) to the user.\n[run session-9]".to_owned(),
+    }];
+    let view = prepare(
+        &transcript(vec![
+            user("explore"),
+            EntryKind::Tool(tool(
+                "task",
+                ToolKind::Subagent,
+                "Explore the repo",
+                ToolStatus::Completed,
+            )),
+            EntryKind::Tool(shown),
+        ]),
+        &Limits::FULL,
+    );
+    let tools = group(&view.rows[1]);
+    assert_eq!(tools.items.len(), 1, "the step is no row");
+    assert_eq!(tools.diagrams, [DiagramRef {
+        id: "plan".to_owned(),
+        run: Some("session-9".to_owned()),
+    }]);
+}
+
+#[test]
 fn a_prompt_hides_its_context_frame_and_lists_its_files() {
     let framed = frame("The open message: Re: invoice", "Summarize it");
     let mut text = framed.clone();
