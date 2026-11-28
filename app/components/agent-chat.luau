@@ -293,7 +293,7 @@ local function user_row(row: any): any
 	}
 end
 
-local function row_element(row: any, state: State, props: Props): any
+local function row_element(row: any, state: State, props: Props, diagrams: { any }?): any
 	local kind = row.type
 	if kind == "user" then
 		return user_row(row)
@@ -320,7 +320,12 @@ local function row_element(row: any, state: State, props: Props): any
 		end
 		return ui.column {
 			key = row.key,
-			tool_group { group = row, open = open, msg = { fold = row.key, open = not open } },
+			tool_group {
+				group = row,
+				open = open,
+				msg = { fold = row.key, open = not open },
+				diagrams = diagrams,
+			},
 		}
 	elseif kind == "turn" then
 		return ui.row {
@@ -803,7 +808,7 @@ end
 				})
 			end
 			for index = first, #rows do
-				local element = row_element(rows[index], state, props)
+				local element = row_element(rows[index], state, props, app.diagrams and app.diagrams.diagrams)
 				if element then
 					table.insert(children, element)
 				end

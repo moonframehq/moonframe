@@ -135,6 +135,7 @@ return mod {
 				note = note,
 				error = dialog.error,
 				runs = ours(acp),
+				diagrams = app.diagrams and app.diagrams.diagrams,
 				expanded = dialog.expanded,
 				follow = true,
 				undo = true,

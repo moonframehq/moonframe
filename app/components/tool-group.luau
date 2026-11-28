@@ -9,6 +9,7 @@ type Props = {
 	open: boolean?,
 	msg: any,
 	to: string?,
+	diagrams: { any }?,
 }
 
 -- Lucide icons for herdr's tool kinds.
@@ -90,6 +91,37 @@ local function call_line(tool: any): any
 	}
 end
 
+local diagram_card = use "diagram-card"
+
+-- Whether a call is one of `moonframe mcp diagrams`' tools.
+local function is_diagram_call(item: any): boolean
+	return string.find(item.title or "", "diagram_", 1, true) ~= nil
+end
+
+-- Cards for the diagrams the group's `diagram_*` calls showed: their
+-- answers name it first ("Showing `plan` ...", "`plan`: ..."), and each
+-- draws once, as it stands now in `app.diagrams`.
+local function diagram_cards(group: any, diagrams: { any }?): { any }
+	local cards: { any } = {}
+	if not diagrams then
+		return cards
+	end
+	local seen: { [string]: boolean } = {}
+	for _, item in group.items or {} do
+		local id = item.type == "tool" and is_diagram_call(item) and item.detail and string.match(item.detail, "`([%w_-]+)`")
+		if id and not seen[id] then
+			seen[id] = true
+			for _, d in diagrams do
+				if d.id == id and d.from == "agent" then
+					table.insert(cards, diagram_card { diagram = d })
+					break
+				end
+			end
+		end
+	end
+	return cards
+end
+
 return component {
 	title = "Tool Group",
 	category = "Data",
@@ -101,6 +133,7 @@ return component {
 		["open"] = "show its calls",
 		["msg"] = "message a click on the header sends (the mod flips `open`)",
 		["to"] = "mod to send it to, if not the drawing one",
+		["diagrams"] = "`app.diagrams.diagrams`: the diagrams its `diagram_*` calls showed draw as cards, open or folded",
 	},
 	styles = {
 		[".tool-group"] = { border = true, border_color = "border", radius = 10, gap = 0 },
@@ -108,6 +141,7 @@ return component {
 		[".tool-group-head:hover"] = { background = "list-hover" },
 		[".tool-group-title"] = { size = "small", weight = "medium" },
 		[".tool-group-current"] = { size = "small", color = "muted-foreground" },
+		[".tool-group-cards"] = { padding = { 4, 10, 10, 10 }, gap = 8 },
 		[".tool-group-body"] = { padding = { 4, 10, 10, 10 }, gap = 8, border = "top", border_color = "border" },
 		[".tool-group-kind"] = { color = "muted-foreground" },
 		[".tool-group-call-title"] = { font = "mono" },
@@ -142,12 +176,15 @@ return component {
 	build = function(props: Props)
 		local group = props.group or {}
 		local items: { any } = {}
+		local cards = diagram_cards(group, props.diagrams)
 		if props.open then
 			if (group.more or 0) > 0 then
 				table.insert(items, ui.text { `{group.more} earlier calls`, size = "small", tone = "muted" })
 			end
 			for _, item in group.items or {} do
-				if item.type == "tool" then
+				if item.type == "tool" and is_diagram_call(item) then
+					-- Drawn as its card instead.
+				elseif item.type == "tool" then
 					table.insert(items, call_line(item))
 				elseif item.gist and item.gist ~= "" then
 					table.insert(items, ui.row {
@@ -164,7 +201,6 @@ return component {
 		local running = group.status == "running"
 		return ui.column {
 			class = "tool-group",
-			state = group.status,
 			ui.row {
 				class = "tool-group-head",
 				align = "center",
@@ -183,6 +219,7 @@ return component {
 				(added > 0 or removed > 0) and counts({ added = added, removed = removed }),
 				(group.count or 0) > 1 and ui.text { tostring(group.count), size = "small", tone = "muted" },
 			},
+			#cards > 0 and ui.column { class = "tool-group-cards", table.unpack(cards) },
 			#items > 0 and ui.column { class = "tool-group-body", table.unpack(items) },
 		}
 	end,
