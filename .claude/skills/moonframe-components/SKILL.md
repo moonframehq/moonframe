@@ -333,6 +333,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | Component | Category | Use it for |
 | --- | --- | --- |
 | [`agent-run`](#agent-run) | Agents | Show what an agent started through `app.acp` is doing or did, with Stop and the answers to its permission questions. For the Send feedback dialog, which lists runs with this, use `feedback`; for a chat transcript use `chat-message`. |
+| [`diagram-card`](#diagram-card) | Agents | In a chat or an agent run, for the `app.diagrams` entry its `diagram_*` tool calls showed (`tool-group` and `agent-run` draw it from their `diagrams` prop). For a diagram the mod owns use `ui.diagram`; for Mermaid in an answer a ```mermaid fence draws by itself. |
 | [`feedback`](#feedback) | Agents | Let the user ask for a change to the app itself, from inside it, and follow what the agent does (`app.acp`). For one run on its own use `agent-run`; for a plain form use `dialog`; for chatting with an agent use `composer`. |
 | [`accordion`](#accordion) | Containers | A stack of foldable sections of the same kind: a merge request's checks, files and activity, or groups of settings. The mod decides whether opening one closes the others. For one foldable block use `collapsible`; for sidebar groups use `sidebar-section`; for switching between views use `tabs`. |
 | [`card`](#card) | Containers | A titled box around related content inside a panel or page; for a whole sidebar section use `ui.panel`, for a plain heading use `section`. |
@@ -538,6 +539,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 
 | Prop | Meaning |
 | --- | --- |
+| `diagrams` | `app.diagrams.diagrams`: the diagrams this run showed through `moonframe mcp diagrams` draw as cards, in place of their tool calls |
 | `lines` | lines of the agent's message shown (default 6; 0 hides it) |
 | `request` | show the user's words above |
 | `run` | a run from `app.acp.runs` { id, agent, agent_title, text, status, started, finished, error, message, tools, tool_count, plan, question } |
@@ -550,6 +552,25 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 local agent_run = use "agent-run"
 
 agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id = "1", message = "The status bar is the row at the bottom of app/main.luau; I'll raise its height.", plan = { { content = "Find the status bar's row", status = "completed" }, { content = "Make it 36px tall", status = "in_progress" }, { content = "Run just check", status = "pending" } }, question = { options = { { id = "allow", kind = "allow_once", name = "Allow" }, { id = "always", kind = "allow_always", name = "Always allow" }, { id = "reject", kind = "reject_once", name = "Reject" } }, title = "Edit app/main.luau" }, started = 0, status = "waiting", text = "Make the status bar taller", tool_count = 3, tools = { { id = "a", kind = "read", status = "completed", title = "Read app/main.luau" }, { id = "b", kind = "edit", status = "pending", title = "Edit app/main.luau" } } } }
+```
+
+#### `diagram-card`
+
+**Diagram Card.** A diagram an agent shows through `moonframe mcp diagrams`, drawn in its chat and kept up to date as it patches it.
+
+**When:** In a chat or an agent run, for the `app.diagrams` entry its `diagram_*` tool calls showed (`tool-group` and `agent-run` draw it from their `diagrams` prop). For a diagram the mod owns use `ui.diagram`; for Mermaid in an answer a ```mermaid fence draws by itself.
+
+| Prop | Meaning |
+| --- | --- |
+| `diagram` | one of `app.diagrams.diagrams`: { key, title, agent?, note?, document?, highlight, revision, error? } |
+| `height` | the diagram's height in pixels (default 300) |
+
+**Styles:** `.diagram-card` `.diagram-card-detail` `.diagram-card-head` `.diagram-card-note` `.diagram-card-problem` `.diagram-card-title`
+
+```lua
+local diagram_card = use "diagram-card"
+
+diagram_card { diagram = { agent = "claude", document = { direction = "right", edges = { { from = "md", to = "parse" }, { from = "parse", to = "view" } }, nodes = { { id = "md", label = "Markdown" }, { id = "parse", label = "Parser" }, { id = "view", label = "View" } } }, highlight = { "parse" }, key = "agent/example", note = "Working on the parser", revision = 1, title = "What I am changing" } }
 ```
 
 #### `feedback`
@@ -566,6 +587,7 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | `copied` | show "Copied" with a check on the Copy button |
 | `copy` | msg the Copy button sends, as well as copying, e.g. to set `copied` |
 | `detach` | msg the chip's × sends |
+| `diagrams` | `app.diagrams.diagrams`: the diagrams a run showed draw in it (see `agent-run`) |
 | `dismiss` | msg sent by Cancel, Escape or a backdrop click |
 | `error` | why the last send failed, shown above the buttons |
 | `expanded` | id of the conversation shown open (its first run), each run with `agent-run`; one waiting on an answer is always open |
@@ -3053,14 +3075,16 @@ A whole mod using it, with state: `app/components/demos/timeline.luau`.
 
 | Prop | Meaning |
 | --- | --- |
-| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = "tool", id, kind, title, status, detail?, output_key?, files, steps } or { type = "thought", gist, text } } } |
+| `cards` | which group draws each diagram's card, its id to the group's `key`: a chat passes the first group to show it, so a diagram draws once however many groups change it |
+| `diagrams` | `app.diagrams.diagrams`: the diagrams its `diagram_*` calls showed (`group.diagrams`, each drawn while the run that showed it here is its latest writer) draw as cards, open or folded, in place of the calls |
+| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, diagrams? = { { id, run? } }, items = { { type = "tool", id, kind, title, status, detail?, output_key?, files, steps } or { type = "thought", gist, text } } } |
 | `inspect` | enable clicking a detail to send { inspect, page, fetch } or { close_output = true } |
 | `msg` | message a click on the header sends (the mod flips `open`) |
 | `open` | show its calls |
 | `output` | the expanded detail { key, page, text?, more? } |
 | `to` | mod to send it to, if not the drawing one |
 
-**Styles:** `.tool-group` `.tool-group-added` `.tool-group-body` `.tool-group-call-title` `.tool-group-current` `.tool-group-detail` `.tool-group-done` `.tool-group-failed` `.tool-group-file` `.tool-group-head` `.tool-group-head:hover` `.tool-group-kind` `.tool-group-removed` `.tool-group-running` `.tool-group-thought` `.tool-group-title`
+**Styles:** `.tool-group` `.tool-group-added` `.tool-group-body` `.tool-group-call-title` `.tool-group-cards` `.tool-group-current` `.tool-group-detail` `.tool-group-done` `.tool-group-failed` `.tool-group-file` `.tool-group-head` `.tool-group-head:hover` `.tool-group-kind` `.tool-group-removed` `.tool-group-running` `.tool-group-thought` `.tool-group-title`
 
 ```lua
 local tool_group = use "tool-group"
