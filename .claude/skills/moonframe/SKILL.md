@@ -2650,8 +2650,8 @@ Protocol (crates/moonframe-acp), each in the app's repository (else
 `~/.config/moonframe`; `[settings] cwd` to change), one prompt per run,
 published as it goes (every 0.25 s while something changed). Only mods in
 `[settings] starters` (`feedback` as shipped) may start runs, and a run
-obeys only the mod that started it. Agents are found as herdr-acp finds
-them: `claude-agent-acp`, `codex-acp` (each else through `npx`),
+obeys only the mod that started it. Agents are found as Sheprd's
+`sheprd-acp` finds them: `claude-agent-acp`, `codex-acp` (each else through `npx`),
 `gemini --acp`, `opencode acp`, `copilot --acp`; `[settings] commands`
 replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
 runs are kept (30) across launches.
@@ -2675,24 +2675,36 @@ for a run on the app itself, above), `{ cancel = run }`, `{ forget = run }`
 | `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `parts` everything said in order, `{ kind = "text", text }` or `{ kind = "tools", tools = { { id, title, kind, status } } }`; `agent_info` `{ name, title?, version? }` as the agent names itself; `model` the model its session says it uses, by name; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }`; `changed`, `undone`, `warning?`, `checking`; `timing` milliseconds from its start `{ spawned, initialized, session, first_token, ended, check, baseline, warm }`, and each tool's `ms` |
 
 `app.chat` (chat, native, crates/moonframe-chat): conversations with
-coding agents, each run by herdr-gpui's `herdr-acp` program with no view
-of its own (found on PATH or in Herdr.app; `[settings] program`) and
-attached over herdr's chat protocol. A chat takes prompt after prompt and
-outlives the app: the next launch attaches again. Only `[settings]
-starters` drive chats, each obeying the mod that started it: `{ start =
-"<agent>", cwd?, load? }`, `{ prompt, chat, files? }`, `{ cancel = chat }`,
-`{ answer = chat, permission, option }`, `{ mode, chat }`, `{ setting,
-value, chat }`, `{ unqueue, chat }`, `{ auto_accept, chat }`, `{ resume =
-chat }`, `{ close = chat }`, each answered `{ reply, action, ok, error? }`;
-anyone may send `{ focus = chat }`, the chat whose whole recent transcript
-is shared (the others share their last few entries). It publishes `{
-available, reason?, program, agents, default, cwd, chats }`, a chat being
-`{ id, owner, agent, cwd, created, status ("starting" "live" "reconnecting"
-"ended" "failed"), error?, session?, transcript? }` and `transcript`
-herdr's own (`Transcript` in herdr-chat-protocol: `entries`, `status`,
-`permissions`, `plan`, `options`, `modes`, `usage`, `queued`, `commands`),
-trimmed (see crates/moonframe-chat/src/project.rs). `examples/switchyard`
-is the whole example.
+coding agents, each run by Sheprd's chat program (`sheprd-acp`, also
+bundled as `herdr-acp`) with no view of its own (found on PATH or in
+Sheprd.app; `[settings] program`) and attached over its chat protocol, so
+Sheprd's agents, memory, pull request tracking and handoffs come with it.
+A chat takes prompt after prompt and outlives the app: the next launch
+attaches again. Only `[settings] starters` drive chats, each obeying the
+mod that started it: `{ start = "<agent>", cwd?, load?, context? }`, `{
+prompt, chat, files?, context? }`, `{ cancel = chat }`, `{ answer = chat,
+permission, option }` (or `answers = { ... }`, option labels or the user's
+own words, for a permission carrying a `question`), `{ mode, chat }`, `{
+setting, value, chat }`, `{ unqueue, chat }`, `{ send_now = queued, chat }`
+(into the running turn when `can_steer`, else in place of it), `{
+stop_activity = call_id, chat }` (one sub-agent or shell), `{ agent =
+"<agent>", chat }` (hand the conversation to another of `view.agents`
+while idle; a new chat offers every installed agent, a continued one
+none), `{ auto_accept, chat }`, `{ resume = chat }`, `{ close = chat }`,
+each answered `{ reply, action, ok, error? }`; anyone may send `{ focus =
+chat }`, the chat whose whole recent transcript is shared (the others
+share their last few rows). It publishes `{ available, reason?, warning?,
+program, agents, default, cwd, chats }`, a chat being `{ id, owner, agent,
+cwd, created, status ("starting" "live" "reconnecting" "ended" "failed"),
+error?, session?, view? }`, `view` what a view draws (`ChatView` in
+crates/moonframe-chat-view: `rows` (`user`, `answer`, `thought`, `tools`,
+`image`, `notice`, `handoff`, `turn`), `permissions` (with `question` or
+`guest`), `queue` (`held`, `steered`), `plan`, `mode`, `model`, `effort`,
+`settings`, `usage`, `commands`, `activities` (`stoppable`), `agents`,
+`pull_requests`, `clients`, `continued`, `can_steer`, `title`, `last`).
+`[settings] raw = true` adds the protocol's own `transcript` beside it
+(see crates/moonframe-chat/src/project.rs). The `agent-chat` component
+draws a view whole; `examples/switchyard` is the whole example.
 
 `app.speech` (speech, native, the `speech` feature, crates/moonframe-speech):
 dictation. Only `[settings] recorders` may listen, and a take obeys only the

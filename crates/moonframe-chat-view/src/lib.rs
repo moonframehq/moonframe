@@ -12,6 +12,8 @@
 //! - **The session's controls**: the mode, model and effort pickers with
 //!   their choices, any other setting, auto-accept, usage, the plan, the
 //!   running sub-agents and shells, and the slash commands to complete.
+//! - **The session around it**: the agents it may hand over to, the pull
+//!   requests its agent worked on, and how many others watch.
 //!
 //! Everything is bounded by [`Limits`], so a long session prepares into
 //! what a view can hold. A prompt an app framed with [`frame`] shows
@@ -20,6 +22,7 @@
 // keep-sorted start
 mod controls;
 mod rows;
+mod session;
 mod text;
 mod tool;
 // keep-sorted end
@@ -32,9 +35,10 @@ use {
 pub use {
     controls::{
         ActivityView, ChoiceView, CommandView, PermissionChoice, PermissionView, Picker, PlanItem,
-        PlanView, QueuedView, UsageView,
+        PlanView, QuestionAsked, QuestionChoice, QueuedView, UsageView,
     },
     rows::{FileChange, QuestionView, Row, ToolGroup, ToolItem, ToolView},
+    session::{AgentChoice, PullRequestView},
     text::{duration, tokens},
 };
 
@@ -166,6 +170,20 @@ pub struct ChatView {
     pub commands: Vec<CommandView>,
     /// Sub-agents and background shells still running.
     pub activities: Vec<ActivityView>,
+    /// The agent takes a queued prompt into its running turn, so `send_now`
+    /// steers rather than stops the turn.
+    pub can_steer: bool,
+    /// The agents it may switch to while idle, the current one marked;
+    /// empty when it cannot switch.
+    pub agents: Vec<AgentChoice>,
+    /// Pull requests the agent worked on in this chat, oldest first.
+    pub pull_requests: Vec<PullRequestView>,
+    /// Other apps watching it, such as Sheprd or a phone.
+    pub clients: u32,
+    /// The key of the row a continued session's earlier conversation ends
+    /// at (it came before this chat); a view may fold the rows up to it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub continued: Option<String>,
     /// One line for a list of chats: what it last said or is doing.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last: Option<String>,
@@ -222,6 +240,11 @@ pub fn prepare(transcript: &Transcript, limits: &Limits) -> ChatView {
         usage: transcript.usage.as_ref().map(controls::usage),
         commands: controls::commands(transcript, limits),
         activities: controls::activities(transcript),
+        can_steer: session.is_some_and(|session| session.can_steer),
+        agents: session::agents(transcript),
+        pull_requests: session::pull_requests(transcript),
+        clients: transcript.clients,
+        continued: session::continued(transcript),
         last,
     }
 }
