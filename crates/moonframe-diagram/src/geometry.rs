@@ -47,7 +47,12 @@ impl Rect {
 
     /// The box of `size` centred on `center`.
     pub fn centered(center: Point, size: Size) -> Self {
-        Self::new(center.x - size.w / 2.0, center.y - size.h / 2.0, size.w, size.h)
+        Self::new(
+            center.x - size.w / 2.0,
+            center.y - size.h / 2.0,
+            size.w,
+            size.h,
+        )
     }
 
     pub fn right(&self) -> f32 {
@@ -72,24 +77,42 @@ impl Rect {
 
     /// Whether the two boxes share any area.
     pub fn overlaps(&self, other: &Rect) -> bool {
-        self.x < other.right() && other.x < self.right() && self.y < other.bottom() && other.y < self.bottom()
+        self.x < other.right()
+            && other.x < self.right()
+            && self.y < other.bottom()
+            && other.y < self.bottom()
     }
 
     /// This box grown by `by` on every side.
     pub fn inflate(&self, by: f32) -> Self {
-        Self::new(self.x - by, self.y - by, self.w + by * 2.0, self.h + by * 2.0)
+        Self::new(
+            self.x - by,
+            self.y - by,
+            self.w + by * 2.0,
+            self.h + by * 2.0,
+        )
     }
 
     /// The smallest box holding both.
     pub fn union(&self, other: &Rect) -> Self {
         let x = self.x.min(other.x);
         let y = self.y.min(other.y);
-        Self::new(x, y, self.right().max(other.right()) - x, self.bottom().max(other.bottom()) - y)
+        Self::new(
+            x,
+            y,
+            self.right().max(other.right()) - x,
+            self.bottom().max(other.bottom()) - y,
+        )
     }
 
     /// The box with its corners in any order: a marquee dragged up or left.
     pub fn from_corners(a: Point, b: Point) -> Self {
-        Self::new(a.x.min(b.x), a.y.min(b.y), (a.x - b.x).abs(), (a.y - b.y).abs())
+        Self::new(
+            a.x.min(b.x),
+            a.y.min(b.y),
+            (a.x - b.x).abs(),
+            (a.y - b.y).abs(),
+        )
     }
 
     pub fn translate(&self, dx: f32, dy: f32) -> Self {
@@ -101,13 +124,18 @@ impl Rect {
     pub fn crossed_by(&self, a: Point, b: Point) -> bool {
         let (x0, x1) = (a.x.min(b.x), a.x.max(b.x));
         let (y0, y1) = (a.y.min(b.y), a.y.max(b.y));
-        x1 > self.x + 0.5 && x0 < self.right() - 0.5 && y1 > self.y + 0.5 && y0 < self.bottom() - 0.5
+        x1 > self.x + 0.5
+            && x0 < self.right() - 0.5
+            && y1 > self.y + 0.5
+            && y0 < self.bottom() - 0.5
     }
 }
 
 /// The box holding every one of `rects`, or `None` for none.
 pub fn bounds<'a>(rects: impl IntoIterator<Item = &'a Rect>) -> Option<Rect> {
-    rects.into_iter().fold(None, |all: Option<Rect>, r| Some(all.map_or(*r, |a| a.union(r))))
+    rects.into_iter().fold(None, |all: Option<Rect>, r| {
+        Some(all.map_or(*r, |a| a.union(r)))
+    })
 }
 
 #[cfg(test)]
@@ -126,7 +154,11 @@ mod tests {
 
     #[test]
     fn bounds_hold_every_box() {
-        let all = bounds(&[Rect::new(0.0, 0.0, 10.0, 10.0), Rect::new(20.0, -5.0, 5.0, 5.0)]).unwrap();
+        let all = bounds(&[
+            Rect::new(0.0, 0.0, 10.0, 10.0),
+            Rect::new(20.0, -5.0, 5.0, 5.0),
+        ])
+        .unwrap();
         assert_eq!(all, Rect::new(0.0, -5.0, 25.0, 15.0));
         assert_eq!(bounds(&[]), None);
     }

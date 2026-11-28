@@ -29,23 +29,57 @@ const LEAST: f32 = 16.0;
 pub(crate) const PORT_OUT: f32 = 12.0;
 
 pub(crate) enum Gesture {
-    Pan { start: Point, camera: Camera },
-    Move { ids: Vec<String>, start: Point, delta: Point, guides: Vec<(Point, Point)>, travelled: bool, pressed: String },
-    Resize { id: String, corner: Corner, start: Point, original: Rect, now: Rect },
-    Marquee { start: Point, end: Point, add: bool },
-    Connect { from: String, end: Point, over: Option<String> },
-    Create { kind: NodeKind, start: Point, end: Point },
+    Pan {
+        start: Point,
+        camera: Camera,
+    },
+    Move {
+        ids: Vec<String>,
+        start: Point,
+        delta: Point,
+        guides: Vec<(Point, Point)>,
+        travelled: bool,
+        pressed: String,
+    },
+    Resize {
+        id: String,
+        corner: Corner,
+        start: Point,
+        original: Rect,
+        now: Rect,
+    },
+    Marquee {
+        start: Point,
+        end: Point,
+        add: bool,
+    },
+    Connect {
+        from: String,
+        end: Point,
+        over: Option<String>,
+    },
+    Create {
+        kind: NodeKind,
+        start: Point,
+        end: Point,
+    },
 }
 
 /// A window position in the view, from its corner.
 fn local(view: &DiagramView, position: gpui_kit::Point<Pixels>) -> Point {
     let origin = view.bounds.get().origin;
-    Point::new(f32::from(position.x - origin.x), f32::from(position.y - origin.y))
+    Point::new(
+        f32::from(position.x - origin.x),
+        f32::from(position.y - origin.y),
+    )
 }
 
 /// The one chosen node, whose handles and ports show.
 pub(crate) fn alone(view: &DiagramView) -> Option<&str> {
-    let mut nodes = view.selected.iter().filter(|id| view.layout.nodes.contains_key(*id));
+    let mut nodes = view
+        .selected
+        .iter()
+        .filter(|id| view.layout.nodes.contains_key(*id));
     let first = nodes.next()?;
     nodes.next().is_none().then_some(first.as_str())
 }
@@ -54,17 +88,42 @@ fn order(view: &DiagramView) -> Vec<String> {
     view.diagram.nodes.iter().map(|n| n.id.clone()).collect()
 }
 
-pub(crate) fn down(view: &mut DiagramView, event: &MouseDownEvent, window: &mut Window, cx: &mut Context<DiagramView>) {
+pub(crate) fn down(
+    view: &mut DiagramView,
+    event: &MouseDownEvent,
+    window: &mut Window,
+    cx: &mut Context<DiagramView>,
+) {
     view.focus.focus(window, cx);
     cx.stop_propagation();
     let screen = local(view, event.position);
     let world = view.camera.to_world(screen);
     let (rects, _) = view.eased();
-    let routes: std::collections::HashMap<_, _> = view.layout.edges.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let routes: std::collections::HashMap<_, _> = view
+        .layout
+        .edges
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
     let edit = view.mode == Mode::Edit;
-    let handles = if edit && view.tool == Tool::Select { alone(view).map(str::to_owned) } else { None };
-    let found = hit::hit(&order(view), &rects, &routes, world, REACH / view.camera.zoom, handles.as_deref(), PORT_OUT / view.camera.zoom);
-    let pan = Gesture::Pan { start: screen, camera: view.camera };
+    let handles = if edit && view.tool == Tool::Select {
+        alone(view).map(str::to_owned)
+    } else {
+        None
+    };
+    let found = hit::hit(
+        &order(view),
+        &rects,
+        &routes,
+        world,
+        REACH / view.camera.zoom,
+        handles.as_deref(),
+        PORT_OUT / view.camera.zoom,
+    );
+    let pan = Gesture::Pan {
+        start: screen,
+        camera: view.camera,
+    };
     let shift = event.modifiers.shift;
     if event.button == MouseButton::Middle || (edit && view.tool == Tool::Hand) {
         view.gesture = Some(pan);
@@ -76,12 +135,30 @@ pub(crate) fn down(view: &mut DiagramView, event: &MouseDownEvent, window: &mut 
         }
     } else {
         match (view.tool, found) {
-            (Tool::Create(kind), _) => view.gesture = Some(Gesture::Create { kind, start: world, end: world }),
-            (Tool::Connect, Hit::Node(from)) | (_, Hit::Port(from)) => view.gesture = Some(Gesture::Connect { from, end: world, over: None }),
+            (Tool::Create(kind), _) => {
+                view.gesture = Some(Gesture::Create {
+                    kind,
+                    start: world,
+                    end: world,
+                })
+            },
+            (Tool::Connect, Hit::Node(from)) | (_, Hit::Port(from)) => {
+                view.gesture = Some(Gesture::Connect {
+                    from,
+                    end: world,
+                    over: None,
+                })
+            },
             (Tool::Connect, _) => {},
             (_, Hit::Handle(id, corner)) => {
                 if let Some(original) = rects.get(&id).copied() {
-                    view.gesture = Some(Gesture::Resize { id, corner, start: world, original, now: original });
+                    view.gesture = Some(Gesture::Resize {
+                        id,
+                        corner,
+                        start: world,
+                        original,
+                        now: original,
+                    });
                 }
             },
             (_, Hit::Node(id)) if event.click_count >= 2 => view.edit_label(id, window, cx),
@@ -91,15 +168,31 @@ pub(crate) fn down(view: &mut DiagramView, event: &MouseDownEvent, window: &mut 
                 } else if !view.selected.contains(&id) {
                     view.select(vec![id.clone()], cx);
                 }
-                let ids: Vec<String> = view.selected_order.iter().filter(|s| rects.contains_key(*s)).cloned().collect();
-                view.gesture = Some(Gesture::Move { ids, start: world, delta: Point::default(), guides: Vec::new(), travelled: false, pressed: id });
+                let ids: Vec<String> = view
+                    .selected_order
+                    .iter()
+                    .filter(|s| rects.contains_key(*s))
+                    .cloned()
+                    .collect();
+                view.gesture = Some(Gesture::Move {
+                    ids,
+                    start: world,
+                    delta: Point::default(),
+                    guides: Vec::new(),
+                    travelled: false,
+                    pressed: id,
+                });
             },
             (_, Hit::Edge(id)) => choose(view, id, shift, cx),
             (_, Hit::Nothing) => {
                 if !shift {
                     view.select(Vec::new(), cx);
                 }
-                view.gesture = Some(Gesture::Marquee { start: world, end: world, add: shift });
+                view.gesture = Some(Gesture::Marquee {
+                    start: world,
+                    end: world,
+                    add: shift,
+                });
             },
         }
     }
@@ -108,7 +201,11 @@ pub(crate) fn down(view: &mut DiagramView, event: &MouseDownEvent, window: &mut 
 
 /// Chooses `id` alone, or with shift adds or removes it.
 fn choose(view: &mut DiagramView, id: String, shift: bool, cx: &mut Context<DiagramView>) {
-    let mut ids = if shift { view.selected_order.clone() } else { Vec::new() };
+    let mut ids = if shift {
+        view.selected_order.clone()
+    } else {
+        Vec::new()
+    };
     if let Some(at) = ids.iter().position(|s| *s == id) {
         ids.remove(at);
     } else {
@@ -124,32 +221,68 @@ fn dragged(view: &mut DiagramView, event: &MouseMoveEvent, cx: &mut Context<Diag
     let world = view.camera.to_world(screen);
     let zoom = view.camera.zoom;
     let (rects, _) = view.eased();
-    let visible = view.camera.visible(f32::from(view.bounds.get().size.width), f32::from(view.bounds.get().size.height));
+    let visible = view.camera.visible(
+        f32::from(view.bounds.get().size.width),
+        f32::from(view.bounds.get().size.height),
+    );
     match &mut view.gesture {
         Some(Gesture::Pan { start, camera }) => {
             view.camera.x = camera.x - (screen.x - start.x) / camera.zoom;
             view.camera.y = camera.y - (screen.y - start.y) / camera.zoom;
         },
-        Some(Gesture::Move { ids, start, delta, guides, travelled, .. }) => {
+        Some(Gesture::Move {
+            ids,
+            start,
+            delta,
+            guides,
+            travelled,
+            ..
+        }) => {
             let raw = Point::new(world.x - start.x, world.y - start.y);
             *travelled |= raw.x.hypot(raw.y) * zoom > SLOP;
             let moving: HashSet<&String> = ids.iter().collect();
-            let own: Vec<Rect> = ids.iter().filter_map(|id| rects.get(id)).map(|r| r.translate(raw.x, raw.y)).collect();
-            let others: Vec<&Rect> = rects.iter().filter(|(id, r)| !moving.contains(id) && r.overlaps(&visible)).map(|(_, r)| r).collect();
+            let own: Vec<Rect> = ids
+                .iter()
+                .filter_map(|id| rects.get(id))
+                .map(|r| r.translate(raw.x, raw.y))
+                .collect();
+            let others: Vec<&Rect> = rects
+                .iter()
+                .filter(|(id, r)| !moving.contains(id) && r.overlaps(&visible))
+                .map(|(_, r)| r)
+                .collect();
             let snapped = match bounds(&own) {
-                Some(selection) if !event.modifiers.alt => snap::snap(selection, others, REACH / zoom),
-                _ => snap::Snapped { dx: 0.0, dy: 0.0, guides: Vec::new() },
+                Some(selection) if !event.modifiers.alt => {
+                    snap::snap(selection, others, REACH / zoom)
+                },
+                _ => snap::Snapped {
+                    dx: 0.0,
+                    dy: 0.0,
+                    guides: Vec::new(),
+                },
             };
             *delta = Point::new(raw.x + snapped.dx, raw.y + snapped.dy);
             *guides = snapped.guides;
         },
-        Some(Gesture::Resize { corner, start, original, now, .. }) => {
+        Some(Gesture::Resize {
+            corner,
+            start,
+            original,
+            now,
+            ..
+        }) => {
             *now = corner.drag(original, world.x - start.x, world.y - start.y, LEAST);
         },
         Some(Gesture::Marquee { end, .. }) | Some(Gesture::Create { end, .. }) => *end = world,
         Some(Gesture::Connect { from, end, over }) => {
             *end = world;
-            *over = view.diagram.nodes.iter().rev().find(|n| n.id != *from && rects.get(&n.id).is_some_and(|r| r.contains(world))).map(|n| n.id.clone());
+            *over = view
+                .diagram
+                .nodes
+                .iter()
+                .rev()
+                .find(|n| n.id != *from && rects.get(&n.id).is_some_and(|r| r.contains(world)))
+                .map(|n| n.id.clone());
         },
         None => return,
     }
@@ -164,10 +297,19 @@ fn released(view: &mut DiagramView, cx: &mut Context<DiagramView>) {
     let (rects, _) = view.eased();
     match gesture {
         Gesture::Pan { .. } => view.tell_zoom(cx),
-        Gesture::Move { ids, delta, travelled: true, .. } => {
+        Gesture::Move {
+            ids,
+            delta,
+            travelled: true,
+            ..
+        } => {
             let moved: Vec<(String, Rect)> = ids
                 .iter()
-                .filter_map(|id| rects.get(id).map(|r| (id.clone(), round(r.translate(delta.x, delta.y)))))
+                .filter_map(|id| {
+                    rects
+                        .get(id)
+                        .map(|r| (id.clone(), round(r.translate(delta.x, delta.y))))
+                })
                 .collect();
             view.pending.extend(moved.iter().cloned());
             cx.emit(DiagramEvent::Move(moved));
@@ -178,7 +320,9 @@ fn released(view: &mut DiagramView, cx: &mut Context<DiagramView>) {
                 view.select(vec![pressed], cx);
             }
         },
-        Gesture::Resize { id, now, original, .. } if now != original => {
+        Gesture::Resize {
+            id, now, original, ..
+        } if now != original => {
             let rect = round(now);
             view.pending.insert(id.clone(), rect);
             cx.emit(DiagramEvent::Resize { id, rect });
@@ -187,24 +331,44 @@ fn released(view: &mut DiagramView, cx: &mut Context<DiagramView>) {
         Gesture::Marquee { start, end, add } => {
             let area = Rect::from_corners(start, end);
             if area.w * view.camera.zoom > SLOP || area.h * view.camera.zoom > SLOP {
-                let keep: HashSet<String> = if add { view.selected.clone() } else { HashSet::new() };
+                let keep: HashSet<String> = if add {
+                    view.selected.clone()
+                } else {
+                    HashSet::new()
+                };
                 let ids = hit::within(&rects, &area, &order(view), &keep);
                 view.select(ids, cx);
             }
         },
-        Gesture::Connect { from, over: Some(to), .. } => cx.emit(DiagramEvent::Connect { from, to }),
+        Gesture::Connect {
+            from,
+            over: Some(to),
+            ..
+        } => cx.emit(DiagramEvent::Connect { from, to }),
         Gesture::Connect { .. } => {},
         Gesture::Create { kind, start, end } => {
             let drawn = Rect::from_corners(start, end);
-            let rect = if drawn.w * view.camera.zoom > SLOP * 2.0 && drawn.h * view.camera.zoom > SLOP * 2.0 {
+            let rect = if drawn.w * view.camera.zoom > SLOP * 2.0
+                && drawn.h * view.camera.zoom > SLOP * 2.0
+            {
                 drawn
             } else {
                 // A click: the kind's own size, centred on it.
                 let mut node = Node::new("", default_label(kind));
                 node.kind = kind;
-                Rect::centered(start, node_size(&node, &crate::layout::Approx, &crate::layout::Options::default()))
+                Rect::centered(
+                    start,
+                    node_size(
+                        &node,
+                        &crate::layout::Approx,
+                        &crate::layout::Options::default(),
+                    ),
+                )
             };
-            cx.emit(DiagramEvent::Create { kind, rect: round(rect) });
+            cx.emit(DiagramEvent::Create {
+                kind,
+                rect: round(rect),
+            });
             view.tool = Tool::Select;
             cx.emit(DiagramEvent::Tool(Tool::Select));
         },
@@ -243,20 +407,46 @@ pub(crate) fn listen_while_dragging(view: &Entity<DiagramView>, window: &mut Win
 }
 
 /// The pointer over the view with no button held: what it would take.
-pub(crate) fn hover(view: &mut DiagramView, event: &MouseMoveEvent, _: &mut Window, cx: &mut Context<DiagramView>) {
+pub(crate) fn hover(
+    view: &mut DiagramView,
+    event: &MouseMoveEvent,
+    _: &mut Window,
+    cx: &mut Context<DiagramView>,
+) {
     if view.gesture.is_some() || event.pressed_button.is_some() {
         return;
     }
     let world = view.camera.to_world(local(view, event.position));
     let (rects, _) = view.eased();
     let routes = std::collections::HashMap::new();
-    let handles = if view.mode == Mode::Edit && view.tool == Tool::Select { alone(view).map(str::to_owned) } else { None };
-    let found = hit::hit(&order(view), &rects, &routes, world, REACH / view.camera.zoom, handles.as_deref(), PORT_OUT / view.camera.zoom);
+    let handles = if view.mode == Mode::Edit && view.tool == Tool::Select {
+        alone(view).map(str::to_owned)
+    } else {
+        None
+    };
+    let found = hit::hit(
+        &order(view),
+        &rects,
+        &routes,
+        world,
+        REACH / view.camera.zoom,
+        handles.as_deref(),
+        PORT_OUT / view.camera.zoom,
+    );
     let (hovered, cursor) = match found {
-        Hit::Handle(_, Corner::TopLeft | Corner::BottomRight) => (None, CursorStyle::ResizeUpLeftDownRight),
+        Hit::Handle(_, Corner::TopLeft | Corner::BottomRight) => {
+            (None, CursorStyle::ResizeUpLeftDownRight)
+        },
         Hit::Handle(..) => (None, CursorStyle::ResizeUpRightDownLeft),
         Hit::Port(_) => (None, CursorStyle::Crosshair),
-        Hit::Node(id) => (Some(id), if view.mode == Mode::Edit { CursorStyle::Arrow } else { CursorStyle::PointingHand }),
+        Hit::Node(id) => (
+            Some(id),
+            if view.mode == Mode::Edit {
+                CursorStyle::Arrow
+            } else {
+                CursorStyle::PointingHand
+            },
+        ),
         _ => (None, CursorStyle::Arrow),
     };
     if hovered != view.hover || cursor != view.cursor_now {
@@ -276,7 +466,12 @@ pub(crate) fn cursor(view: &DiagramView) -> CursorStyle {
     }
 }
 
-pub(crate) fn scroll(view: &mut DiagramView, event: &ScrollEvent, window: &mut Window, cx: &mut Context<DiagramView>) {
+pub(crate) fn scroll(
+    view: &mut DiagramView,
+    event: &ScrollEvent,
+    window: &mut Window,
+    cx: &mut Context<DiagramView>,
+) {
     if view.scroll_needs_focus && !view.focus.is_focused(window) {
         return;
     }
@@ -287,7 +482,8 @@ pub(crate) fn scroll(view: &mut DiagramView, event: &ScrollEvent, window: &mut W
     };
     if event.modifiers.platform || event.modifiers.control {
         let at = local(view, event.position);
-        view.camera.zoom_at(view.camera.zoom * (delta.y * 0.004).exp(), at);
+        view.camera
+            .zoom_at(view.camera.zoom * (delta.y * 0.004).exp(), at);
         view.tell_zoom(cx);
     } else {
         view.camera.x -= delta.x / view.camera.zoom;
@@ -296,25 +492,40 @@ pub(crate) fn scroll(view: &mut DiagramView, event: &ScrollEvent, window: &mut W
     cx.notify();
 }
 
-pub(crate) fn pinch(view: &mut DiagramView, event: &PinchEvent, window: &mut Window, cx: &mut Context<DiagramView>) {
+pub(crate) fn pinch(
+    view: &mut DiagramView,
+    event: &PinchEvent,
+    window: &mut Window,
+    cx: &mut Context<DiagramView>,
+) {
     if view.scroll_needs_focus && !view.focus.is_focused(window) {
         return;
     }
     cx.stop_propagation();
     let at = local(view, event.position);
-    view.camera.zoom_at(view.camera.zoom * (1.0 + event.delta), at);
+    view.camera
+        .zoom_at(view.camera.zoom * (1.0 + event.delta), at);
     view.tell_zoom(cx);
     cx.notify();
 }
 
-pub(crate) fn key(view: &mut DiagramView, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<DiagramView>) {
+pub(crate) fn key(
+    view: &mut DiagramView,
+    event: &KeyDownEvent,
+    _: &mut Window,
+    cx: &mut Context<DiagramView>,
+) {
     if view.editing.is_some() {
         return;
     }
     let keys = &event.keystroke;
     let secondary = keys.modifiers.platform || keys.modifiers.control;
     let edit = view.mode == Mode::Edit;
-    let step = if keys.modifiers.shift { 10.0 } else { 1.0 };
+    let step = if keys.modifiers.shift {
+        10.0
+    } else {
+        1.0
+    };
     let nudge = match keys.key.as_str() {
         "up" => Some((0.0, -step)),
         "down" => Some((0.0, step)),
@@ -323,7 +534,9 @@ pub(crate) fn key(view: &mut DiagramView, event: &KeyDownEvent, _: &mut Window, 
         _ => None,
     };
     match keys.key.as_str() {
-        "backspace" | "delete" if edit && !view.selected.is_empty() => cx.emit(DiagramEvent::Delete(view.selected_order.clone())),
+        "backspace" | "delete" if edit && !view.selected.is_empty() => {
+            cx.emit(DiagramEvent::Delete(view.selected_order.clone()))
+        },
         "escape" if view.gesture.is_some() => view.gesture = None,
         "escape" => view.select(Vec::new(), cx),
         "a" if secondary => {
@@ -336,7 +549,11 @@ pub(crate) fn key(view: &mut DiagramView, event: &KeyDownEvent, _: &mut Window, 
         _ if edit && nudge.is_some() && !view.selected.is_empty() => {
             let (dx, dy) = nudge.unwrap_or_default();
             let (rects, _) = view.eased();
-            let moved: Vec<(String, Rect)> = view.selected_order.iter().filter_map(|id| rects.get(id).map(|r| (id.clone(), r.translate(dx, dy)))).collect();
+            let moved: Vec<(String, Rect)> = view
+                .selected_order
+                .iter()
+                .filter_map(|id| rects.get(id).map(|r| (id.clone(), r.translate(dx, dy))))
+                .collect();
             if !moved.is_empty() {
                 view.pending.extend(moved.iter().cloned());
                 cx.emit(DiagramEvent::Move(moved));

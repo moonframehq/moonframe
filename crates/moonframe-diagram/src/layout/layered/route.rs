@@ -37,25 +37,35 @@ pub(super) fn edges(
     let mut incoming: HashMap<usize, Vec<usize>> = HashMap::new();
     for (c, chain) in chains.iter().enumerate() {
         outgoing.entry(chain.items[0]).or_default().push(c);
-        incoming.entry(*chain.items.last().unwrap_or(&0)).or_default().push(c);
+        incoming
+            .entry(*chain.items.last().unwrap_or(&0))
+            .or_default()
+            .push(c);
     }
-    let spread = |v: usize, list: &mut Vec<usize>, next: &dyn Fn(usize) -> usize, ports: &mut [f32]| {
-        list.sort_by(|&a, &b| across[next(a)].total_cmp(&across[next(b)]));
-        let centred = v >= real || matches!(diagram.nodes[v].kind, NodeKind::Diamond | NodeKind::Circle);
-        let width = items[v].across;
-        for (k, &c) in list.iter().enumerate() {
-            ports[c] = if centred {
-                across[v]
-            } else {
-                across[v] - width / 2.0 + width * (k + 1) as f32 / (list.len() + 1) as f32
-            };
-        }
-    };
+    let spread =
+        |v: usize, list: &mut Vec<usize>, next: &dyn Fn(usize) -> usize, ports: &mut [f32]| {
+            list.sort_by(|&a, &b| across[next(a)].total_cmp(&across[next(b)]));
+            let centred =
+                v >= real || matches!(diagram.nodes[v].kind, NodeKind::Diamond | NodeKind::Circle);
+            let width = items[v].across;
+            for (k, &c) in list.iter().enumerate() {
+                ports[c] = if centred {
+                    across[v]
+                } else {
+                    across[v] - width / 2.0 + width * (k + 1) as f32 / (list.len() + 1) as f32
+                };
+            }
+        };
     for (&v, list) in &mut outgoing {
         spread(v, list, &|c| chains[c].items[1], &mut leave);
     }
     for (&v, list) in &mut incoming {
-        spread(v, list, &|c| chains[c].items[chains[c].items.len() - 2], &mut reach);
+        spread(
+            v,
+            list,
+            &|c| chains[c].items[chains[c].items.len() - 2],
+            &mut reach,
+        );
     }
 
     // Each chain's corners in the layered frame, with its bends' gaps
@@ -71,18 +81,29 @@ pub(super) fn edges(
     for (c, chain) in chains.iter().enumerate() {
         let first = chain.items[0];
         let last = *chain.items.last().unwrap_or(&first);
-        let mut stops = vec![(leave[c], bands.middle(items[first].rank) + items[first].along / 2.0)];
+        let mut stops = vec![(
+            leave[c],
+            bands.middle(items[first].rank) + items[first].along / 2.0,
+        )];
         for &d in &chain.items[1..chain.items.len() - 1] {
             stops.push((across[d], bands.middle(items[d].rank)));
         }
-        stops.push((reach[c], bands.middle(items[last].rank) - items[last].along / 2.0));
+        stops.push((
+            reach[c],
+            bands.middle(items[last].rank) - items[last].along / 2.0,
+        ));
         let mut path = vec![stops[0]];
         for (k, w) in stops.windows(2).enumerate() {
             let (p, q) = (w[0], w[1]);
             if (p.0 - q.0).abs() >= 0.5 {
                 let rank = items[chain.items[k]].rank;
                 let mid = bands.channel(rank);
-                bends.push(Bend { chain: c, corner: path.len(), rank, from: p.0 });
+                bends.push(Bend {
+                    chain: c,
+                    corner: path.len(),
+                    rank,
+                    from: p.0,
+                });
                 path.push((p.0, mid));
                 path.push((q.0, mid));
             }
@@ -100,7 +121,10 @@ pub(super) fn edges(
             continue;
         }
         list.sort_by(|&a, &b| bends[a].from.total_cmp(&bends[b].from));
-        let room = (bands.start.get(rank + 1).copied().unwrap_or(bands.total) - bands.start[rank] - bands.depth[rank]) * 0.6;
+        let room = (bands.start.get(rank + 1).copied().unwrap_or(bands.total)
+            - bands.start[rank]
+            - bands.depth[rank])
+            * 0.6;
         let step = TRACK_STEP.min(room / list.len() as f32);
         let middle = (list.len() - 1) as f32 / 2.0;
         for (i, &b) in list.iter().enumerate() {
@@ -117,7 +141,9 @@ pub(super) fn edges(
         if chain.reversed {
             points.reverse();
         }
-        let placed_end = [&edge.from, &edge.to].iter().any(|id| diagram.node(id).is_some_and(|n| n.at.is_some()));
+        let placed_end = [&edge.from, &edge.to]
+            .iter()
+            .any(|id| diagram.node(id).is_some_and(|n| n.at.is_some()));
         let route = if placed_end {
             // A node with a place of its own isn't where the layers put
             // it: route straight to where it is.
@@ -125,7 +151,10 @@ pub(super) fn edges(
             placed::route_between(&a, &b, &[])
         } else {
             let points = simplify(points);
-            Route { label: Route::middle(&points), points }
+            Route {
+                label: Route::middle(&points),
+                points,
+            }
         };
         out.edges.insert(edge.id.clone(), route);
     }
@@ -139,7 +168,10 @@ pub(super) fn edges(
             Point::new(x + LOOP_OUT, cy + 8.0),
             Point::new(x, cy + 8.0),
         ];
-        out.edges.insert(edge.id.clone(), Route { label: Some(Point::new(x + LOOP_OUT + 4.0, cy)), points });
+        out.edges.insert(edge.id.clone(), Route {
+            label: Some(Point::new(x + LOOP_OUT + 4.0, cy)),
+            points,
+        });
     }
 }
 

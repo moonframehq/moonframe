@@ -28,7 +28,11 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
             }
         }
     }
-    let index: HashMap<&str, usize> = people.iter().enumerate().map(|(i, p)| (p.id.as_str(), i)).collect();
+    let index: HashMap<&str, usize> = people
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (p.id.as_str(), i))
+        .collect();
     let size = options.font_size;
     let head_h = size * 1.4 + options.padding.h * 2.0;
     let widths: Vec<f32> = people
@@ -67,7 +71,10 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
         at += need.get(i).copied().unwrap_or(0.0);
     }
     for (i, p) in people.iter().enumerate() {
-        out.nodes.insert(p.id.clone(), Rect::new(x[i] - widths[i] / 2.0, 0.0, widths[i], head_h));
+        out.nodes.insert(
+            p.id.clone(),
+            Rect::new(x[i] - widths[i] / 2.0, 0.0, widths[i], head_h),
+        );
     }
 
     // Rows: notes before the message they precede, then the message.
@@ -87,11 +94,19 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
                 Point::new(x[a] + LOOP_OUT, y + ROW * 0.5),
                 Point::new(x[a], y + ROW * 0.5),
             ];
-            out.messages.push(Route { label: Some(Point::new(x[a] + LOOP_OUT + 6.0, y - 4.0)), points });
+            // Its label beside the loop, not over it.
+            let half = measure.width(&m.label, size * 0.9) / 2.0;
+            out.messages.push(Route {
+                label: Some(Point::new(x[a] + LOOP_OUT + 8.0 + half, y + ROW * 0.25)),
+                points,
+            });
             y += ROW * 1.5;
         } else {
             let points = vec![Point::new(x[a], y), Point::new(x[b], y)];
-            out.messages.push(Route { label: Some(Point::new((x[a] + x[b]) / 2.0, y - size * 0.8)), points });
+            out.messages.push(Route {
+                label: Some(Point::new((x[a] + x[b]) / 2.0, y - size * 0.8)),
+                points,
+            });
             y += ROW;
         }
     }
@@ -99,7 +114,8 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
         y = place_note(note, &index, &x, measure, options, y, &mut out);
     }
     for (i, p) in people.iter().enumerate() {
-        out.lifelines.push((p.id.clone(), Point::new(x[i], head_h), Point::new(x[i], y)));
+        out.lifelines
+            .push((p.id.clone(), Point::new(x[i], head_h), Point::new(x[i], y)));
     }
     out
 }
@@ -115,14 +131,22 @@ fn place_note(
     y: f32,
     out: &mut Layout,
 ) -> f32 {
-    let lanes: Vec<usize> = note.over.iter().filter_map(|id| index.get(id.as_str()).copied()).collect();
+    let lanes: Vec<usize> = note
+        .over
+        .iter()
+        .filter_map(|id| index.get(id.as_str()).copied())
+        .collect();
     let (lo, hi) = match (lanes.iter().min(), lanes.iter().max()) {
         (Some(&lo), Some(&hi)) => (x[lo], x[hi]),
-        _ => (x.first().copied().unwrap_or(0.0), x.first().copied().unwrap_or(0.0)),
+        _ => (
+            x.first().copied().unwrap_or(0.0),
+            x.first().copied().unwrap_or(0.0),
+        ),
     };
     let text = measure.width(&note.text, options.font_size * 0.9) + options.padding.w * 2.0;
     let w = text.max(hi - lo + 40.0);
     let h = options.font_size * 1.4 + options.padding.h * 2.0;
-    out.notes.push(Rect::new((lo + hi) / 2.0 - w / 2.0, y - h / 2.0, w, h));
+    out.notes
+        .push(Rect::new((lo + hi) / 2.0 - w / 2.0, y - h / 2.0, w, h));
     y + h + ROW * 0.4
 }

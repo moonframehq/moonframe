@@ -34,13 +34,21 @@ pub(super) fn across(
     }
     for pass in 0..PASSES {
         let downward = pass % 2 == 0;
-        let ranks: Vec<usize> = if downward { (1..layers.len()).collect() } else { (0..layers.len().saturating_sub(1)).rev().collect() };
+        let ranks: Vec<usize> = if downward {
+            (1..layers.len()).collect()
+        } else {
+            (0..layers.len().saturating_sub(1)).rev().collect()
+        };
         for r in ranks {
             let layer = &layers[r];
             let wanted: Vec<f32> = layer
                 .iter()
                 .map(|&v| {
-                    let around = if downward { &up[v] } else { &down[v] };
+                    let around = if downward {
+                        &up[v]
+                    } else {
+                        &down[v]
+                    };
                     pull(v, around, &x, &weight).unwrap_or(x[v])
                 })
                 .collect();
@@ -82,7 +90,12 @@ fn span(layer: &[usize], widths: &[f32], gap: f32) -> f32 {
 }
 
 /// The weighted middle of `around`'s places, as `v` would like to sit.
-fn pull(v: usize, around: &[usize], x: &[f32], weight: &impl Fn(usize, usize) -> f32) -> Option<f32> {
+fn pull(
+    v: usize,
+    around: &[usize],
+    x: &[f32],
+    weight: &impl Fn(usize, usize) -> f32,
+) -> Option<f32> {
     if around.is_empty() {
         return None;
     }
@@ -146,7 +159,10 @@ mod tests {
         let placed = nearest_in_order(&[0, 1], &[0.0, 0.0], &[10.0, 10.0], 4.0);
         assert_eq!(placed, vec![-7.0, 7.0]);
         // Far enough apart already: untouched.
-        assert_eq!(nearest_in_order(&[0, 1], &[0.0, 50.0], &[10.0, 10.0], 4.0), vec![0.0, 50.0]);
+        assert_eq!(
+            nearest_in_order(&[0, 1], &[0.0, 50.0], &[10.0, 10.0], 4.0),
+            vec![0.0, 50.0]
+        );
     }
 
     #[test]
@@ -157,7 +173,10 @@ mod tests {
         let down = vec![vec![1], vec![2], vec![], vec![]];
         let up = vec![vec![], vec![0], vec![1], vec![]];
         let x = across(&layers, &widths, 10.0, &down, &up, |_, _| 1.0);
-        assert!((x[0] - x[1]).abs() < 0.5 && (x[1] - x[2]).abs() < 0.5, "{x:?}");
+        assert!(
+            (x[0] - x[1]).abs() < 0.5 && (x[1] - x[2]).abs() < 0.5,
+            "{x:?}"
+        );
         assert!(x[1] - x[3] >= 70.0 - 0.01, "{x:?}");
     }
 }

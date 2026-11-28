@@ -60,17 +60,32 @@ impl Bands {
     }
 }
 
-pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options, previous: Option<&Layout>) -> Layout {
+pub(super) fn layout(
+    diagram: &Diagram,
+    measure: &dyn Measure,
+    options: &Options,
+    previous: Option<&Layout>,
+) -> Layout {
     let vertical = diagram.direction.vertical();
-    let index: HashMap<&str, usize> = diagram.nodes.iter().enumerate().map(|(i, n)| (n.id.as_str(), i)).collect();
+    let index: HashMap<&str, usize> = diagram
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
     let real = diagram.nodes.len();
-    let sizes: Vec<Size> = diagram.nodes.iter().map(|n| node_size(n, measure, options)).collect();
+    let sizes: Vec<Size> = diagram
+        .nodes
+        .iter()
+        .map(|n| node_size(n, measure, options))
+        .collect();
 
     // Edges between known nodes; self loops apart.
     let mut pairs = Vec::new();
     let mut loops = Vec::new();
     for (i, edge) in diagram.edges.iter().enumerate() {
-        let (Some(&a), Some(&b)) = (index.get(edge.from.as_str()), index.get(edge.to.as_str())) else {
+        let (Some(&a), Some(&b)) = (index.get(edge.from.as_str()), index.get(edge.to.as_str()))
+        else {
             continue;
         };
         if a == b {
@@ -81,7 +96,17 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
     }
     let plain: Vec<(usize, usize)> = pairs.iter().map(|&(_, a, b)| (a, b)).collect();
     let back = rank::reversed(real, &plain);
-    let directed: Vec<(usize, usize)> = plain.iter().zip(&back).map(|(&(a, b), &r)| if r { (b, a) } else { (a, b) }).collect();
+    let directed: Vec<(usize, usize)> = plain
+        .iter()
+        .zip(&back)
+        .map(|(&(a, b), &r)| {
+            if r {
+                (b, a)
+            } else {
+                (a, b)
+            }
+        })
+        .collect();
     let hints: Vec<Option<(usize, f32)>> = diagram
         .nodes
         .iter()
@@ -94,19 +119,37 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
     let mut items: Vec<Item> = (0..real)
         .map(|v| {
             let s = sizes[v];
-            let (across, along) = if vertical { (s.w, s.h) } else { (s.h, s.w) };
-            Item { rank: ranks[v], across, along, dummy: false }
+            let (across, along) = if vertical {
+                (s.w, s.h)
+            } else {
+                (s.h, s.w)
+            };
+            Item {
+                rank: ranks[v],
+                across,
+                along,
+                dummy: false,
+            }
         })
         .collect();
     let mut chains = Vec::new();
-    for (&(edge, _, _), (&(a, b), &reversed)) in pairs.iter().zip(directed.iter().zip(&back)) {
+    for (&(edge, ..), (&(a, b), &reversed)) in pairs.iter().zip(directed.iter().zip(&back)) {
         let mut chain = vec![a];
         for r in ranks[a] + 1..ranks[b] {
-            items.push(Item { rank: r, across: DUMMY_WIDTH, along: 0.0, dummy: true });
+            items.push(Item {
+                rank: r,
+                across: DUMMY_WIDTH,
+                along: 0.0,
+                dummy: true,
+            });
             chain.push(items.len() - 1);
         }
         chain.push(b);
-        chains.push(Chain { edge, items: chain, reversed });
+        chains.push(Chain {
+            edge,
+            items: chain,
+            reversed,
+        });
     }
     let count = items.len();
     let mut down = vec![Vec::new(); count];
@@ -130,16 +173,32 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
     if keep {
         for layer in &mut layers {
             layer.sort_by(|&a, &b| {
-                let key = |v: usize| if v < real { hints[v].map_or(f32::MAX, |(_, o)| o) } else { f32::MAX };
+                let key = |v: usize| {
+                    if v < real {
+                        hints[v].map_or(f32::MAX, |(_, o)| o)
+                    } else {
+                        f32::MAX
+                    }
+                };
                 key(a).total_cmp(&key(b)).then(a.cmp(&b))
             });
         }
     }
-    let group_ids: HashMap<&str, usize> = diagram.groups.iter().enumerate().map(|(i, g)| (g.id.as_str(), i)).collect();
+    let group_ids: HashMap<&str, usize> = diagram
+        .groups
+        .iter()
+        .enumerate()
+        .map(|(i, g)| (g.id.as_str(), i))
+        .collect();
     let group: Vec<Option<usize>> = (0..count)
         .map(|v| {
             (v < real)
-                .then(|| diagram.nodes[v].group.as_deref().and_then(|g| group_ids.get(g).copied()))
+                .then(|| {
+                    diagram.nodes[v]
+                        .group
+                        .as_deref()
+                        .and_then(|g| group_ids.get(g).copied())
+                })
                 .flatten()
         })
         .collect();
@@ -153,8 +212,16 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
         (false, false) => 1.0,
     };
     let across = place::across(&layers, &widths, options.node_gap, &down, &up, weight);
-    let labelled = diagram.edges.iter().any(|e| e.label.as_deref().is_some_and(|l| !l.is_empty()));
-    let gap = options.rank_gap + if labelled { options.font_size * 1.4 } else { 0.0 };
+    let labelled = diagram
+        .edges
+        .iter()
+        .any(|e| e.label.as_deref().is_some_and(|l| !l.is_empty()));
+    let gap = options.rank_gap
+        + if labelled {
+            options.font_size * 1.4
+        } else {
+            0.0
+        };
     let mut start = Vec::with_capacity(ranks_count);
     let mut depth = Vec::with_capacity(ranks_count);
     let mut at = 0.0;
@@ -164,10 +231,17 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
         depth.push(deep);
         at += deep + gap;
     }
-    let bands = Bands { total: (at - gap).max(0.0), start, depth };
+    let bands = Bands {
+        total: (at - gap).max(0.0),
+        start,
+        depth,
+    };
 
     // Turned to the diagram's direction.
-    let turn = Turn { direction: diagram.direction, total: bands.total };
+    let turn = Turn {
+        direction: diagram.direction,
+        total: bands.total,
+    };
     let mut out = Layout::default();
     for (v, node) in diagram.nodes.iter().enumerate() {
         let center = turn.point(across[v], bands.middle(items[v].rank));
@@ -181,7 +255,9 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
             }
         }
     }
-    route::edges(diagram, &items, &chains, &loops, &across, &bands, &turn, &mut out);
+    route::edges(
+        diagram, &items, &chains, &loops, &across, &bands, &turn, &mut out,
+    );
     out
 }
 

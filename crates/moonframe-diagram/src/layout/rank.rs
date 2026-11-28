@@ -90,7 +90,9 @@ pub(super) fn ranks(n: usize, edges: &[(usize, usize)], hints: &[Option<usize>])
     let mut used: Vec<usize> = rank.clone();
     used.sort_unstable();
     used.dedup();
-    rank.iter().map(|r| used.binary_search(r).unwrap_or(0)).collect()
+    rank.iter()
+        .map(|r| used.binary_search(r).unwrap_or(0))
+        .collect()
 }
 
 #[cfg(test)]
@@ -103,7 +105,17 @@ mod tests {
         let edges = [(0, 1), (1, 2), (2, 0)];
         let back = reversed(3, &edges);
         assert_eq!(back, vec![false, false, true]);
-        let acyclic: Vec<_> = edges.iter().zip(&back).map(|(&(a, b), &r)| if r { (b, a) } else { (a, b) }).collect();
+        let acyclic: Vec<_> = edges
+            .iter()
+            .zip(&back)
+            .map(|(&(a, b), &r)| {
+                if r {
+                    (b, a)
+                } else {
+                    (a, b)
+                }
+            })
+            .collect();
         assert_eq!(ranks(3, &acyclic, &[None; 3]), vec![0, 1, 2]);
     }
 

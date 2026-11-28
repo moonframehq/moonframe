@@ -15,7 +15,11 @@ pub struct Camera {
 
 impl Default for Camera {
     fn default() -> Self {
-        Self { x: -40.0, y: -40.0, zoom: 1.0 }
+        Self {
+            x: -40.0,
+            y: -40.0,
+            zoom: 1.0,
+        }
     }
 }
 
@@ -53,13 +57,21 @@ impl Camera {
     /// never past 100 %.
     pub fn fit(content: Rect, w: f32, h: f32, margin: f32) -> Self {
         if content.w <= 0.0 || content.h <= 0.0 || w <= 0.0 || h <= 0.0 {
-            return Self { x: content.x - margin, y: content.y - margin, zoom: 1.0 };
+            return Self {
+                x: content.x - margin,
+                y: content.y - margin,
+                zoom: 1.0,
+            };
         }
         let zoom = ((w - margin * 2.0) / content.w)
             .min((h - margin * 2.0) / content.h)
             .clamp(MIN_ZOOM, 1.0);
         let center = content.center();
-        Self { x: center.x - w / 2.0 / zoom, y: center.y - h / 2.0 / zoom, zoom }
+        Self {
+            x: center.x - w / 2.0 / zoom,
+            y: center.y - h / 2.0 / zoom,
+            zoom,
+        }
     }
 }
 
@@ -83,6 +95,9 @@ mod tests {
         let camera = Camera::fit(Rect::new(0.0, 0.0, 2000.0, 1000.0), 800.0, 600.0, 40.0);
         let shown = camera.visible(800.0, 600.0);
         assert!(shown.x <= 0.0 && shown.right() >= 2000.0, "{shown:?}");
-        assert_eq!(Camera::fit(Rect::new(0.0, 0.0, 50.0, 50.0), 800.0, 600.0, 40.0).zoom, 1.0);
+        assert_eq!(
+            Camera::fit(Rect::new(0.0, 0.0, 50.0, 50.0), 800.0, 600.0, 40.0).zoom,
+            1.0
+        );
     }
 }

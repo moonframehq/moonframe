@@ -19,7 +19,12 @@ pub(crate) enum Corner {
 }
 
 impl Corner {
-    pub(crate) const ALL: [Self; 4] = [Self::TopLeft, Self::TopRight, Self::BottomLeft, Self::BottomRight];
+    pub(crate) const ALL: [Self; 4] = [
+        Self::TopLeft,
+        Self::TopRight,
+        Self::BottomLeft,
+        Self::BottomRight,
+    ];
 
     /// Where on a box it sits, as fractions across and down.
     pub(crate) fn at(self, r: &Rect) -> Point {
@@ -92,7 +97,10 @@ pub(crate) fn hit(
                 return Hit::Handle(id.to_owned(), corner);
             }
         }
-        if ports(r, port_out).iter().any(|q| q.distance(p) <= reach * 1.2) {
+        if ports(r, port_out)
+            .iter()
+            .any(|q| q.distance(p) <= reach * 1.2)
+        {
             return Hit::Port(id.to_owned());
         }
     }
@@ -104,7 +112,11 @@ pub(crate) fn hit(
     let mut best: Option<(f32, &String)> = None;
     for (id, route) in routes {
         let near = route.label.map_or(f32::INFINITY, |l| l.distance(p) * 0.7);
-        let line = route.points.windows(2).map(|w| to_segment(p, w[0], w[1])).fold(near, f32::min);
+        let line = route
+            .points
+            .windows(2)
+            .map(|w| to_segment(p, w[0], w[1]))
+            .fold(near, f32::min);
         if line <= reach && best.is_none_or(|(d, _)| line < d) {
             best = Some((line, id));
         }
@@ -113,7 +125,12 @@ pub(crate) fn hit(
 }
 
 /// The nodes whose boxes share any area with `area`.
-pub(crate) fn within(rects: &HashMap<String, Rect>, area: &Rect, order: &[String], also: &HashSet<String>) -> Vec<String> {
+pub(crate) fn within(
+    rects: &HashMap<String, Rect>,
+    area: &Rect,
+    order: &[String],
+    also: &HashSet<String>,
+) -> Vec<String> {
     order
         .iter()
         .filter(|id| also.contains(*id) || rects.get(*id).is_some_and(|r| r.overlaps(area)))
@@ -139,8 +156,14 @@ mod tests {
     #[test]
     fn a_corner_drags_its_own_sides_and_keeps_a_least_size() {
         let r = Rect::new(0.0, 0.0, 100.0, 50.0);
-        assert_eq!(Corner::BottomRight.drag(&r, 10.0, 5.0, 12.0), Rect::new(0.0, 0.0, 110.0, 55.0));
-        assert_eq!(Corner::TopLeft.drag(&r, 10.0, 5.0, 12.0), Rect::new(10.0, 5.0, 90.0, 45.0));
+        assert_eq!(
+            Corner::BottomRight.drag(&r, 10.0, 5.0, 12.0),
+            Rect::new(0.0, 0.0, 110.0, 55.0)
+        );
+        assert_eq!(
+            Corner::TopLeft.drag(&r, 10.0, 5.0, 12.0),
+            Rect::new(10.0, 5.0, 90.0, 45.0)
+        );
         assert_eq!(Corner::TopLeft.drag(&r, 500.0, 0.0, 12.0).w, 12.0);
     }
 
@@ -151,10 +174,46 @@ mod tests {
             ("b".to_string(), Rect::new(50.0, 50.0, 100.0, 100.0)),
         ]);
         let order = vec!["a".to_string(), "b".to_string()];
-        let route = Route { points: vec![Point::new(200.0, 0.0), Point::new(200.0, 100.0)], label: None };
+        let route = Route {
+            points: vec![Point::new(200.0, 0.0), Point::new(200.0, 100.0)],
+            label: None,
+        };
         let routes = HashMap::from([("e".to_string(), route)]);
-        assert_eq!(hit(&order, &rects, &routes, Point::new(60.0, 60.0), 6.0, None, 12.0), Hit::Node("b".into()));
-        assert_eq!(hit(&order, &rects, &routes, Point::new(203.0, 50.0), 6.0, None, 12.0), Hit::Edge("e".into()));
-        assert_eq!(hit(&order, &rects, &routes, Point::new(300.0, 50.0), 6.0, None, 12.0), Hit::Nothing);
+        assert_eq!(
+            hit(
+                &order,
+                &rects,
+                &routes,
+                Point::new(60.0, 60.0),
+                6.0,
+                None,
+                12.0
+            ),
+            Hit::Node("b".into())
+        );
+        assert_eq!(
+            hit(
+                &order,
+                &rects,
+                &routes,
+                Point::new(203.0, 50.0),
+                6.0,
+                None,
+                12.0
+            ),
+            Hit::Edge("e".into())
+        );
+        assert_eq!(
+            hit(
+                &order,
+                &rects,
+                &routes,
+                Point::new(300.0, 50.0),
+                6.0,
+                None,
+                12.0
+            ),
+            Hit::Nothing
+        );
     }
 }

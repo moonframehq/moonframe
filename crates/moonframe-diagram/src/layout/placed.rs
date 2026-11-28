@@ -13,6 +13,8 @@ use {
 
 /// How far a bend must keep from a node it goes around.
 const CLEARANCE: f32 = 14.0;
+/// What entering a box across the way it stands from the other costs.
+const FACING: f32 = 120.0;
 /// The most boxes in the way a route tries to go around.
 const MOST_DETOURS: usize = 6;
 /// The side of a cell of the obstacles' grid.
@@ -34,9 +36,13 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
         let size = node_size(node, measure, options);
         let beside = diagram.edges.iter().find_map(|e| {
             if e.to == node.id {
-                out.nodes.get(&e.from).map(|r| Point::new(r.right() + options.node_gap * 2.0, r.y))
+                out.nodes
+                    .get(&e.from)
+                    .map(|r| Point::new(r.right() + options.node_gap * 2.0, r.y))
             } else if e.from == node.id {
-                out.nodes.get(&e.to).map(|r| Point::new(r.x - options.node_gap * 2.0 - size.w, r.y))
+                out.nodes
+                    .get(&e.to)
+                    .map(|r| Point::new(r.x - options.node_gap * 2.0 - size.w, r.y))
             } else {
                 None
             }
@@ -46,7 +52,11 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
             Point::new(all.x, all.bottom() + options.rank_gap)
         });
         let mut rect = Rect::new(start.x, start.y, size.w, size.h);
-        while out.nodes.values().any(|r| r.inflate(options.node_gap / 2.0).overlaps(&rect)) {
+        while out
+            .nodes
+            .values()
+            .any(|r| r.inflate(options.node_gap / 2.0).overlaps(&rect))
+        {
             rect.y += size.h + options.node_gap;
         }
         out.nodes.insert(node.id.clone(), rect);
@@ -69,8 +79,16 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
 
 fn self_loop(r: &Rect) -> Route {
     let (x, cy) = (r.right(), r.center().y);
-    let points = vec![Point::new(x, cy - 8.0), Point::new(x + 20.0, cy - 8.0), Point::new(x + 20.0, cy + 8.0), Point::new(x, cy + 8.0)];
-    Route { label: Some(Point::new(x + 24.0, cy)), points }
+    let points = vec![
+        Point::new(x, cy - 8.0),
+        Point::new(x + 20.0, cy - 8.0),
+        Point::new(x + 20.0, cy + 8.0),
+        Point::new(x, cy + 8.0),
+    ];
+    Route {
+        label: Some(Point::new(x + 24.0, cy)),
+        points,
+    }
 }
 
 /// Routes every edge again from `rects` (by node id), as the view does
@@ -90,7 +108,11 @@ pub fn reroute(
         let (Some(a), Some(b)) = (rects.get(&from), rects.get(&to)) else {
             continue;
         };
-        let route = if from == to { self_loop(a) } else { route_through(a, b, &obstacles) };
+        let route = if from == to {
+            self_loop(a)
+        } else {
+            route_through(a, b, &obstacles)
+        };
         routes.insert(id, route);
     }
 }
@@ -108,29 +130,59 @@ pub fn route_between(a: &Rect, b: &Rect, obstacles: &[Rect]) -> Route {
 pub fn route_through(a: &Rect, b: &Rect, obstacles: &Obstacles) -> Route {
     let (ac, bc) = (a.center(), b.center());
     // Each leg leaves and enters by the side facing where it goes.
-    let side_x = |r: &Rect, toward: f32| if toward >= r.center().x { r.right() } else { r.x };
-    let side_y = |r: &Rect, toward: f32| if toward >= r.center().y { r.bottom() } else { r.y };
+    let side_x = |r: &Rect, toward: f32| {
+        if toward >= r.center().x {
+            r.right()
+        } else {
+            r.x
+        }
+    };
+    let side_y = |r: &Rect, toward: f32| {
+        if toward >= r.center().y {
+            r.bottom()
+        } else {
+            r.y
+        }
+    };
 
     let side_to_side = |mx: f32| {
         let (sx, ex) = (side_x(a, mx), side_x(b, mx));
-        simplify(vec![Point::new(sx, ac.y), Point::new(mx, ac.y), Point::new(mx, bc.y), Point::new(ex, bc.y)])
+        simplify(vec![
+            Point::new(sx, ac.y),
+            Point::new(mx, ac.y),
+            Point::new(mx, bc.y),
+            Point::new(ex, bc.y),
+        ])
     };
     let end_to_end = |my: f32| {
         let (sy, ey) = (side_y(a, my), side_y(b, my));
-        simplify(vec![Point::new(ac.x, sy), Point::new(ac.x, my), Point::new(bc.x, my), Point::new(bc.x, ey)])
+        simplify(vec![
+            Point::new(ac.x, sy),
+            Point::new(ac.x, my),
+            Point::new(bc.x, my),
+            Point::new(bc.x, ey),
+        ])
     };
     // The plain shapes: two bends with the middle leg halfway, either way,
     // and one bend either way.
     let plain = [
         side_to_side((side_x(a, bc.x) + side_x(b, ac.x)) / 2.0),
         end_to_end((side_y(a, bc.y) + side_y(b, ac.y)) / 2.0),
-        simplify(vec![Point::new(side_x(a, bc.x), ac.y), Point::new(bc.x, ac.y), Point::new(bc.x, side_y(b, ac.y))]),
-        simplify(vec![Point::new(ac.x, side_y(a, bc.y)), Point::new(ac.x, bc.y), Point::new(side_x(b, ac.x), bc.y)]),
+        simplify(vec![
+            Point::new(side_x(a, bc.x), ac.y),
+            Point::new(bc.x, ac.y),
+            Point::new(bc.x, side_y(b, ac.y)),
+        ]),
+        simplify(vec![
+            Point::new(ac.x, side_y(a, bc.y)),
+            Point::new(ac.x, bc.y),
+            Point::new(side_x(b, ac.x), bc.y),
+        ]),
     ];
     let cheapest = |routes: Vec<Vec<Point>>| {
         routes
             .into_iter()
-            .map(|r| (cost(&r, obstacles), r))
+            .map(|r| (cost(&r, obstacles) + facing(&r, a, b), r))
             .min_by(|p, q| p.0.total_cmp(&q.0))
             .unwrap_or_default()
     };
@@ -139,7 +191,10 @@ pub fn route_through(a: &Rect, b: &Rect, obstacles: &Obstacles) -> Route {
         // Something is in the way of every plain shape: try the middle leg
         // just clear of each box the plain shapes cross.
         let mut detours = Vec::new();
-        let mut blocking: Vec<Rect> = plain.iter().flat_map(|r| r.windows(2).flat_map(|w| obstacles.crossing(w[0], w[1]))).collect();
+        let mut blocking: Vec<Rect> = plain
+            .iter()
+            .flat_map(|r| r.windows(2).flat_map(|w| obstacles.crossing(w[0], w[1])))
+            .collect();
         blocking.dedup();
         for o in blocking.iter().take(MOST_DETOURS) {
             detours.push(side_to_side(o.x - CLEARANCE));
@@ -153,7 +208,10 @@ pub fn route_through(a: &Rect, b: &Rect, obstacles: &Obstacles) -> Route {
         }
     }
     let _ = best_cost;
-    Route { label: Route::middle(&best), points: best }
+    Route {
+        label: Route::middle(&best),
+        points: best,
+    }
 }
 
 /// What a route costs: each box it passes through costs far more than any
@@ -170,13 +228,42 @@ fn cost(points: &[Point], obstacles: &Obstacles) -> f32 {
         [.., p, q] => p.distance(*q),
         _ => 0.0,
     };
-    let short = if last < LAST_LEG { 400.0 } else { 0.0 };
+    let short = if last < LAST_LEG {
+        400.0
+    } else {
+        0.0
+    };
     let first = match points {
         [p, q, ..] => p.distance(*q),
         _ => 0.0,
     };
-    let stub = if first < LAST_LEG / 2.0 { 200.0 } else { 0.0 };
+    let stub = if first < LAST_LEG / 2.0 {
+        200.0
+    } else {
+        0.0
+    };
     crossed as f32 * BLOCKED + length + points.len() as f32 * 30.0 + short + stub
+}
+
+/// What a route pays for reaching `b` across the way the boxes stand
+/// apart: boxes further apart up and down than across are joined top to
+/// bottom, so the last leg comes in upright (and side by side, level),
+/// keeping clear of the level edges along a row.
+fn facing(points: &[Point], a: &Rect, b: &Rect) -> f32 {
+    let gap_x = (b.x - a.right()).max(a.x - b.right());
+    let gap_y = (b.y - a.bottom()).max(a.y - b.bottom());
+    let Some([p, q]) = points
+        .get(points.len().saturating_sub(2)..)
+        .and_then(|w| <&[Point; 2]>::try_from(w).ok())
+    else {
+        return 0.0;
+    };
+    let upright = (p.x - q.x).abs() < 0.01;
+    if gap_y > gap_x && !upright || gap_x > gap_y && upright {
+        FACING
+    } else {
+        0.0
+    }
 }
 
 /// Boxes to route around, in a grid of cells so a leg only looks at the
@@ -194,7 +281,10 @@ impl Obstacles {
                 cells.entry(cell).or_default().push(i as u32);
             }
         }
-        Self { rects: rects.to_vec(), cells }
+        Self {
+            rects: rects.to_vec(),
+            cells,
+        }
     }
 
     /// The boxes the level or upright leg from `a` to `b` passes through.
@@ -229,7 +319,10 @@ mod tests {
         let a = Rect::new(0.0, 0.0, 100.0, 40.0);
         let b = Rect::new(200.0, 0.0, 100.0, 40.0);
         let route = route_between(&a, &b, &[a, b]);
-        assert_eq!(route.points, vec![Point::new(100.0, 20.0), Point::new(200.0, 20.0)]);
+        assert_eq!(route.points, vec![
+            Point::new(100.0, 20.0),
+            Point::new(200.0, 20.0)
+        ]);
     }
 
     #[test]

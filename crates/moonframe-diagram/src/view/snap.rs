@@ -14,7 +14,11 @@ pub(crate) struct Snapped {
 
 /// Snaps `moving` (the dragged selection's box, already moved) to `others`
 /// within `reach` diagram pixels.
-pub(crate) fn snap<'a>(moving: Rect, others: impl IntoIterator<Item = &'a Rect>, reach: f32) -> Snapped {
+pub(crate) fn snap<'a>(
+    moving: Rect,
+    others: impl IntoIterator<Item = &'a Rect>,
+    reach: f32,
+) -> Snapped {
     let xs = |r: &Rect| [r.x, r.x + r.w / 2.0, r.right()];
     let ys = |r: &Rect| [r.y, r.y + r.h / 2.0, r.bottom()];
     // The nearest line up on each axis: (distance, shift, the other node).
@@ -24,7 +28,7 @@ pub(crate) fn snap<'a>(moving: Rect, others: impl IntoIterator<Item = &'a Rect>,
         for a in xs(&moving) {
             for b in xs(other) {
                 let d = (b - a).abs();
-                if d <= reach && best_x.is_none_or(|(e, _, _)| d < e) {
+                if d <= reach && best_x.is_none_or(|(e, ..)| d < e) {
                     best_x = Some((d, b - a, *other));
                 }
             }
@@ -32,7 +36,7 @@ pub(crate) fn snap<'a>(moving: Rect, others: impl IntoIterator<Item = &'a Rect>,
         for a in ys(&moving) {
             for b in ys(other) {
                 let d = (b - a).abs();
-                if d <= reach && best_y.is_none_or(|(e, _, _)| d < e) {
+                if d <= reach && best_y.is_none_or(|(e, ..)| d < e) {
                     best_y = Some((d, b - a, *other));
                 }
             }
@@ -45,12 +49,24 @@ pub(crate) fn snap<'a>(moving: Rect, others: impl IntoIterator<Item = &'a Rect>,
     if let Some((_, _, other)) = best_x {
         // The line both share, from the top of the higher to the bottom of
         // the lower.
-        let x = xs(&moved).into_iter().find(|a| xs(&other).iter().any(|b| (a - b).abs() < 0.01)).unwrap_or(moved.x);
-        guides.push((Point::new(x, moved.y.min(other.y)), Point::new(x, moved.bottom().max(other.bottom()))));
+        let x = xs(&moved)
+            .into_iter()
+            .find(|a| xs(&other).iter().any(|b| (a - b).abs() < 0.01))
+            .unwrap_or(moved.x);
+        guides.push((
+            Point::new(x, moved.y.min(other.y)),
+            Point::new(x, moved.bottom().max(other.bottom())),
+        ));
     }
     if let Some((_, _, other)) = best_y {
-        let y = ys(&moved).into_iter().find(|a| ys(&other).iter().any(|b| (a - b).abs() < 0.01)).unwrap_or(moved.y);
-        guides.push((Point::new(moved.x.min(other.x), y), Point::new(moved.right().max(other.right()), y)));
+        let y = ys(&moved)
+            .into_iter()
+            .find(|a| ys(&other).iter().any(|b| (a - b).abs() < 0.01))
+            .unwrap_or(moved.y);
+        guides.push((
+            Point::new(moved.x.min(other.x), y),
+            Point::new(moved.right().max(other.right()), y),
+        ));
     }
     Snapped { dx, dy, guides }
 }
@@ -72,7 +88,14 @@ mod tests {
 
     #[test]
     fn nothing_near_moves_nothing() {
-        let snapped = snap(Rect::new(500.0, 500.0, 10.0, 10.0), [&Rect::new(0.0, 0.0, 10.0, 10.0)], 6.0);
-        assert_eq!((snapped.dx, snapped.dy, snapped.guides.len()), (0.0, 0.0, 0));
+        let snapped = snap(
+            Rect::new(500.0, 500.0, 10.0, 10.0),
+            [&Rect::new(0.0, 0.0, 10.0, 10.0)],
+            6.0,
+        );
+        assert_eq!(
+            (snapped.dx, snapped.dy, snapped.guides.len()),
+            (0.0, 0.0, 0)
+        );
     }
 }

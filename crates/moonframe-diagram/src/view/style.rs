@@ -34,8 +34,16 @@ impl Palette {
             quiet: theme.muted_foreground,
             edge: theme.muted_foreground,
             accent: theme.primary,
-            note: if dark { hsla(48.0 / 360.0, 0.55, 0.30, 1.0) } else { hsla(48.0 / 360.0, 0.95, 0.80, 1.0) },
-            note_text: if dark { hsla(48.0 / 360.0, 0.4, 0.92, 1.0) } else { hsla(30.0 / 360.0, 0.5, 0.18, 1.0) },
+            note: if dark {
+                hsla(48.0 / 360.0, 0.55, 0.30, 1.0)
+            } else {
+                hsla(48.0 / 360.0, 0.95, 0.80, 1.0)
+            },
+            note_text: if dark {
+                hsla(48.0 / 360.0, 0.4, 0.92, 1.0)
+            } else {
+                hsla(30.0 / 360.0, 0.5, 0.18, 1.0)
+            },
             dark,
         }
     }
@@ -52,18 +60,39 @@ impl Palette {
     }
 
     /// A node's fill, outline and text color.
-    pub fn node(&self, kind: NodeKind, tone: Option<Tone>, fill: Option<&str>, cx: &App) -> (Hsla, Hsla, Hsla) {
+    pub fn node(
+        &self,
+        kind: NodeKind,
+        tone: Option<Tone>,
+        fill: Option<&str>,
+        cx: &App,
+    ) -> (Hsla, Hsla, Hsla) {
         if let Some(color) = fill.and_then(hex) {
             // A light fill of its own keeps dark text in either theme.
-            let text = if color.l > 0.6 { hsla(0.0, 0.0, 0.12, 1.0) } else { hsla(0.0, 0.0, 0.96, 1.0) };
-            return (color, color.blend(self.outline.opacity(0.9)).opacity(1.0).darken(0.15), text);
+            let text = if color.l > 0.6 {
+                hsla(0.0, 0.0, 0.12, 1.0)
+            } else {
+                hsla(0.0, 0.0, 0.96, 1.0)
+            };
+            return (
+                color,
+                color
+                    .blend(self.outline.opacity(0.9))
+                    .opacity(1.0)
+                    .darken(0.15),
+                text,
+            );
         }
         match (kind, tone) {
             (NodeKind::Text, _) => (transparent_black(), transparent_black(), self.text),
             (NodeKind::Note, None) => (self.note, self.note.darken(0.1), self.note_text),
             (_, Some(tone)) => {
                 let color = self.tone(tone, cx);
-                (self.card.blend(color.opacity(0.14)), color.opacity(0.8), self.text)
+                (
+                    self.card.blend(color.opacity(0.14)),
+                    color.opacity(0.8),
+                    self.text,
+                )
             },
             (_, None) => (self.card, self.outline, self.text),
         }
@@ -76,7 +105,10 @@ trait Darken {
 
 impl Darken for Hsla {
     fn darken(self, by: f32) -> Self {
-        Hsla { l: (self.l - by).max(0.0), ..self }
+        Hsla {
+            l: (self.l - by).max(0.0),
+            ..self
+        }
     }
 }
 

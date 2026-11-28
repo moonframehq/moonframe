@@ -86,7 +86,11 @@ pub struct Node {
 
 impl Node {
     pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
-        Self { id: id.into(), label: label.into(), ..Self::default() }
+        Self {
+            id: id.into(),
+            label: label.into(),
+            ..Self::default()
+        }
     }
 }
 
@@ -185,7 +189,13 @@ pub struct Edge {
 
 impl Edge {
     pub fn new(id: impl Into<String>, from: impl Into<String>, to: impl Into<String>) -> Self {
-        Self { id: id.into(), from: from.into(), to: to.into(), end: Head::Arrow, ..Self::default() }
+        Self {
+            id: id.into(),
+            from: from.into(),
+            to: to.into(),
+            end: Head::Arrow,
+            ..Self::default()
+        }
     }
 }
 

@@ -20,7 +20,10 @@ pub(super) fn place(diagram: &Diagram, options: &Options, out: &mut Layout) {
             if depth > diagram.groups.len() {
                 break;
             }
-            at = group.parent.as_deref().and_then(|p| diagram.groups.iter().find(|g| g.id == p));
+            at = group
+                .parent
+                .as_deref()
+                .and_then(|p| diagram.groups.iter().find(|g| g.id == p));
         }
         depth
     };

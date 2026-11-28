@@ -69,14 +69,26 @@ pub enum DiagramEvent {
     Select(Vec<String>),
     /// Nodes dragged to these boxes.
     Move(Vec<(String, Rect)>),
-    Resize { id: String, rect: Rect },
-    Connect { from: String, to: String },
+    Resize {
+        id: String,
+        rect: Rect,
+    },
+    Connect {
+        from: String,
+        to: String,
+    },
     /// A new node of `kind` drawn at `rect`.
-    Create { kind: NodeKind, rect: Rect },
+    Create {
+        kind: NodeKind,
+        rect: Rect,
+    },
     /// The chosen nodes and edges, to delete.
     Delete(Vec<String>),
     /// A label edited in place.
-    EditLabel { id: String, label: String },
+    EditLabel {
+        id: String,
+        label: String,
+    },
     /// A node double-clicked in [`Mode::View`].
     Open(String),
     /// The zoom changed, as a fraction (1.0 is 100 %).
@@ -187,7 +199,9 @@ impl DiagramView {
             self.apply(out, cx);
             return;
         }
-        let work = cx.background_spawn(async move { layout::layout(&diagram, &widths, &options, Some(&previous)) });
+        let work = cx.background_spawn(async move {
+            layout::layout(&diagram, &widths, &options, Some(&previous))
+        });
         self.layout_task = Some(cx.spawn(async move |this, cx| {
             let out = work.await;
             let _ = this.update(cx, |this, cx| this.apply(out, cx));
@@ -201,13 +215,22 @@ impl DiagramView {
         let laid_out = !self.diagram.nodes.iter().any(|n| n.at.is_some());
         if laid_out && !self.layout.nodes.is_empty() && !self.fit_pending {
             let from: HashMap<String, Rect> = self.layout.nodes.clone().into_iter().collect();
-            self.easing = Some(Easing { from, start: Instant::now() });
+            self.easing = Some(Easing {
+                from,
+                start: Instant::now(),
+            });
         }
         // The owner's diagram now says where moved nodes are; an edit it
         // turned down would wait for ever, so none is kept.
         self.pending.clear();
         self.layout = Arc::new(out);
-        let known: HashSet<&str> = self.diagram.nodes.iter().map(|n| n.id.as_str()).chain(self.diagram.edges.iter().map(|e| e.id.as_str())).collect();
+        let known: HashSet<&str> = self
+            .diagram
+            .nodes
+            .iter()
+            .map(|n| n.id.as_str())
+            .chain(self.diagram.edges.iter().map(|e| e.id.as_str()))
+            .collect();
         self.selected.retain(|id| known.contains(id.as_str()));
         self.selected_order.retain(|id| known.contains(id.as_str()));
         cx.notify();
@@ -288,6 +311,22 @@ impl DiagramView {
         cx.notify();
     }
 
+    /// Holds `ids` dragged by (dx, dy), as a press and a move would: for
+    /// measuring frames while dragging, with no pointer to drive.
+    #[doc(hidden)]
+    pub fn hold_drag(&mut self, ids: Vec<String>, dx: f32, dy: f32, cx: &mut Context<Self>) {
+        let pressed = ids.first().cloned().unwrap_or_default();
+        self.gesture = Some(input::Gesture::Move {
+            ids,
+            start: Point::default(),
+            delta: Point::new(dx, dy),
+            guides: Vec::new(),
+            travelled: true,
+            pressed,
+        });
+        cx.notify();
+    }
+
     pub(crate) fn tell_zoom(&mut self, cx: &mut Context<Self>) {
         let zoom = (self.camera.zoom * 100.0).round() / 100.0;
         if zoom != self.told_zoom {
@@ -306,7 +345,12 @@ impl DiagramView {
 
     /// Where each node is drawn this frame, and how far through easing in.
     pub(crate) fn eased(&mut self) -> (HashMap<String, Rect>, f32) {
-        let mut rects: HashMap<String, Rect> = self.layout.nodes.iter().map(|(k, v)| (k.clone(), *v)).collect();
+        let mut rects: HashMap<String, Rect> = self
+            .layout
+            .nodes
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
         let mut t = 1.0;
         if let Some(easing) = &self.easing {
             let raw = easing.start.elapsed().as_secs_f32() / EASE.as_secs_f32();
@@ -344,16 +388,23 @@ impl DiagramView {
             state.focus(window, cx);
         });
         let editing = id.clone();
-        let subscription = cx.subscribe_in(&state, window, move |this, state, event: &InputEvent, window, cx| match event {
-            InputEvent::PressEnter { .. } | InputEvent::Blur => {
-                let label = state.read(cx).value().to_string();
-                this.editing = None;
-                this.focus.focus(window, cx);
-                cx.emit(DiagramEvent::EditLabel { id: editing.clone(), label });
-                cx.notify();
+        let subscription = cx.subscribe_in(
+            &state,
+            window,
+            move |this, state, event: &InputEvent, window, cx| match event {
+                InputEvent::PressEnter { .. } | InputEvent::Blur => {
+                    let label = state.read(cx).value().to_string();
+                    this.editing = None;
+                    this.focus.focus(window, cx);
+                    cx.emit(DiagramEvent::EditLabel {
+                        id: editing.clone(),
+                        label,
+                    });
+                    cx.notify();
+                },
+                _ => {},
             },
-            _ => {},
-        });
+        );
         self.editing = Some((id, state, subscription));
         cx.notify();
     }
@@ -361,7 +412,10 @@ impl DiagramView {
 
 impl Render for DiagramView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self.fit_pending && f32::from(self.bounds.get().size.width) > 0.0 && !self.layout.nodes.is_empty() {
+        if self.fit_pending
+            && f32::from(self.bounds.get().size.width) > 0.0
+            && !self.layout.nodes.is_empty()
+        {
             self.fit(cx);
         }
         let scene = scene::Scene::build(self);

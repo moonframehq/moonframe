@@ -27,16 +27,33 @@ fn graph(n: usize, placed: bool) -> Diagram {
     for i in 0..n {
         let mut node = Node::new(format!("n{i}"), format!("Step {i}"));
         if placed {
-            node.at = Some(Rect::new((i % columns) as f32 * 180.0, (i / columns) as f32 * 110.0, 140.0, 60.0));
+            node.at = Some(Rect::new(
+                (i % columns) as f32 * 180.0,
+                (i / columns) as f32 * 110.0,
+                140.0,
+                60.0,
+            ));
         }
         d.nodes.push(node);
         if i > 0 {
-            d.edges.push(Edge::new(format!("e{i}"), format!("n{}", next(i)), format!("n{i}")));
+            d.edges.push(Edge::new(
+                format!("e{i}"),
+                format!("n{}", next(i)),
+                format!("n{i}"),
+            ));
             if i % 3 == 0 {
-                d.edges.push(Edge::new(format!("f{i}"), format!("n{}", next(i)), format!("n{i}")));
+                d.edges.push(Edge::new(
+                    format!("f{i}"),
+                    format!("n{}", next(i)),
+                    format!("n{i}"),
+                ));
             }
             if i % 17 == 0 {
-                d.edges.push(Edge::new(format!("b{i}"), format!("n{i}"), format!("n{}", next(i))));
+                d.edges.push(Edge::new(
+                    format!("b{i}"),
+                    format!("n{i}"),
+                    format!("n{}", next(i)),
+                ));
             }
         }
     }
@@ -61,8 +78,16 @@ fn main() {
                     start.elapsed()
                 })
                 .collect();
-            let what = if placed { "placed, routed" } else { "layered" };
-            println!("{what:>15}: {n:>5} nodes, {:>5} edges: {:>8.1?}", d.edges.len(), median(runs));
+            let what = if placed {
+                "placed, routed"
+            } else {
+                "layered"
+            };
+            println!(
+                "{what:>15}: {n:>5} nodes, {:>5} edges: {:>8.1?}",
+                d.edges.len(),
+                median(runs)
+            );
         }
     }
     // Growing: one node more, laid out from the last layout.
@@ -73,5 +98,9 @@ fn main() {
     grown.edges.push(Edge::new("extra-edge", "n10", "extra"));
     let start = Instant::now();
     let _ = layout(&grown, &Approx, &options, Some(&first));
-    println!("{:>15}: 501 nodes from the last layout: {:>8.1?}", "incremental", start.elapsed());
+    println!(
+        "{:>15}: 501 nodes from the last layout: {:>8.1?}",
+        "incremental",
+        start.elapsed()
+    );
 }

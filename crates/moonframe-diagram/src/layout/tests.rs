@@ -6,7 +6,11 @@ use {
 fn flow(nodes: &[&str], edges: &[(&str, &str)]) -> Diagram {
     Diagram {
         nodes: nodes.iter().map(|id| Node::new(*id, *id)).collect(),
-        edges: edges.iter().enumerate().map(|(i, (a, b))| Edge::new(format!("e{i}"), *a, *b)).collect(),
+        edges: edges
+            .iter()
+            .enumerate()
+            .map(|(i, (a, b))| Edge::new(format!("e{i}"), *a, *b))
+            .collect(),
         ..Diagram::default()
     }
 }
@@ -43,7 +47,10 @@ fn a_chain_goes_down_in_ranks_and_its_edges_run_straight() {
 #[test]
 fn every_direction_turns_the_ranks() {
     for (direction, check) in [
-        (Direction::Down, (|a: Rect, b: Rect| a.bottom() < b.y) as fn(Rect, Rect) -> bool),
+        (
+            Direction::Down,
+            (|a: Rect, b: Rect| a.bottom() < b.y) as fn(Rect, Rect) -> bool,
+        ),
         (Direction::Up, |a, b| b.bottom() < a.y),
         (Direction::Right, |a, b| a.right() < b.x),
         (Direction::Left, |a, b| b.right() < a.x),
@@ -51,24 +58,52 @@ fn every_direction_turns_the_ranks() {
         let mut d = flow(&["a", "b"], &[("a", "b")]);
         d.direction = direction;
         let out = lay(&d);
-        assert!(check(out.nodes["a"], out.nodes["b"]), "{direction:?}: {out:?}");
+        assert!(
+            check(out.nodes["a"], out.nodes["b"]),
+            "{direction:?}: {out:?}"
+        );
     }
 }
 
 #[test]
 fn edges_are_orthogonal_and_end_on_their_nodes() {
     // A diamond with a long edge across it and a cycle back.
-    let d = flow(&["a", "b", "c", "d"], &[("a", "b"), ("a", "c"), ("b", "d"), ("c", "d"), ("a", "d"), ("d", "a")]);
+    let d = flow(&["a", "b", "c", "d"], &[
+        ("a", "b"),
+        ("a", "c"),
+        ("b", "d"),
+        ("c", "d"),
+        ("a", "d"),
+        ("d", "a"),
+    ]);
     let out = lay(&d);
     assert_eq!(overlapping(&out), None);
     for edge in &d.edges {
         let route = &out.edges[&edge.id];
         for w in route.points.windows(2) {
-            assert!((w[0].x - w[1].x).abs() < 0.01 || (w[0].y - w[1].y).abs() < 0.01, "{}: {:?}", edge.id, route.points);
+            assert!(
+                (w[0].x - w[1].x).abs() < 0.01 || (w[0].y - w[1].y).abs() < 0.01,
+                "{}: {:?}",
+                edge.id,
+                route.points
+            );
         }
-        let (from, to) = (out.nodes[&edge.from].inflate(0.5), out.nodes[&edge.to].inflate(0.5));
-        assert!(from.contains(route.points[0]), "{} starts off its node: {:?}", edge.id, route.points);
-        assert!(to.contains(*route.points.last().unwrap()), "{} ends off its node: {:?}", edge.id, route.points);
+        let (from, to) = (
+            out.nodes[&edge.from].inflate(0.5),
+            out.nodes[&edge.to].inflate(0.5),
+        );
+        assert!(
+            from.contains(route.points[0]),
+            "{} starts off its node: {:?}",
+            edge.id,
+            route.points
+        );
+        assert!(
+            to.contains(*route.points.last().unwrap()),
+            "{} ends off its node: {:?}",
+            edge.id,
+            route.points
+        );
     }
 }
 
@@ -116,14 +151,21 @@ fn adding_a_node_keeps_the_others_in_rank_and_order() {
 #[test]
 fn a_group_surrounds_its_nodes() {
     let mut d = flow(&["a", "b", "c"], &[("a", "b"), ("b", "c")]);
-    d.groups.push(Group { id: "g".into(), label: "Group".into(), ..Group::default() });
+    d.groups.push(Group {
+        id: "g".into(),
+        label: "Group".into(),
+        ..Group::default()
+    });
     d.nodes[0].group = Some("g".into());
     d.nodes[1].group = Some("g".into());
     let out = lay(&d);
     let g = out.groups["g"];
     for id in ["a", "b"] {
         let r = out.nodes[id];
-        assert!(g.x <= r.x && g.y <= r.y && g.right() >= r.right() && g.bottom() >= r.bottom(), "{id}");
+        assert!(
+            g.x <= r.x && g.y <= r.y && g.right() >= r.right() && g.bottom() >= r.bottom(),
+            "{id}"
+        );
     }
 }
 
@@ -144,9 +186,24 @@ fn a_sequence_puts_messages_in_rows_between_lanes() {
         kind: DiagramKind::Sequence,
         nodes: vec![Node::new("alice", "Alice"), Node::new("bob", "Bob")],
         messages: vec![
-            Message { from: "alice".into(), to: "bob".into(), label: "Hello Bob, how are you?".into(), ..Message::default() },
-            Message { from: "bob".into(), to: "alice".into(), label: "Fine".into(), ..Message::default() },
-            Message { from: "bob".into(), to: "bob".into(), label: "think".into(), ..Message::default() },
+            Message {
+                from: "alice".into(),
+                to: "bob".into(),
+                label: "Hello Bob, how are you?".into(),
+                ..Message::default()
+            },
+            Message {
+                from: "bob".into(),
+                to: "alice".into(),
+                label: "Fine".into(),
+                ..Message::default()
+            },
+            Message {
+                from: "bob".into(),
+                to: "bob".into(),
+                label: "think".into(),
+                ..Message::default()
+            },
         ],
         ..Diagram::default()
     };
@@ -154,6 +211,9 @@ fn a_sequence_puts_messages_in_rows_between_lanes() {
     assert_eq!(out.messages.len(), 3);
     assert!(out.messages[0].points[0].y < out.messages[1].points[0].y);
     let gap = out.nodes["bob"].center().x - out.nodes["alice"].center().x;
-    assert!(gap > Approx.width("Hello Bob, how are you?", 14.0 * 0.9), "lanes too close: {gap}");
+    assert!(
+        gap > Approx.width("Hello Bob, how are you?", 14.0 * 0.9),
+        "lanes too close: {gap}"
+    );
     assert_eq!(out.lifelines.len(), 2);
 }

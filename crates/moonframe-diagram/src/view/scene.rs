@@ -44,7 +44,9 @@ impl Scene {
             creating: None,
         };
         match &view.gesture {
-            Some(Gesture::Move { ids, delta, guides, .. }) => {
+            Some(Gesture::Move {
+                ids, delta, guides, ..
+            }) => {
                 for id in ids {
                     if let Some(r) = rects.get_mut(id) {
                         *r = r.translate(delta.x, delta.y);
@@ -57,18 +59,31 @@ impl Scene {
                 rects.insert(id.clone(), *now);
                 moved.insert(id.clone());
             },
-            Some(Gesture::Marquee { start, end, .. }) => scene.marquee = Some(Rect::from_corners(*start, *end)),
+            Some(Gesture::Marquee { start, end, .. }) => {
+                scene.marquee = Some(Rect::from_corners(*start, *end))
+            },
             Some(Gesture::Connect { from, end, over }) => {
                 if let Some(r) = rects.get(from) {
                     scene.link = Some((r.center(), *end, over.clone()));
                 }
             },
-            Some(Gesture::Create { start, end, .. }) => scene.creating = Some(Rect::from_corners(*start, *end)),
+            Some(Gesture::Create { start, end, .. }) => {
+                scene.creating = Some(Rect::from_corners(*start, *end))
+            },
             Some(Gesture::Pan { .. }) | None => {},
         }
-        let mut routes: HashMap<String, Route> = view.layout.edges.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        let mut routes: HashMap<String, Route> = view
+            .layout
+            .edges
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
         if !moved.is_empty() {
-            let edges = view.diagram.edges.iter().map(|e| (e.id.clone(), e.from.clone(), e.to.clone()));
+            let edges = view
+                .diagram
+                .edges
+                .iter()
+                .map(|e| (e.id.clone(), e.from.clone(), e.to.clone()));
             placed::reroute(edges, &rects, &|id| moved.contains(id), &mut routes);
         }
         scene.rects = rects;

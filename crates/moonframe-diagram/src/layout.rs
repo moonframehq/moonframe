@@ -55,7 +55,10 @@ pub struct Widths(pub HashMap<String, f32>);
 
 impl Measure for Widths {
     fn width(&self, text: &str, size: f32) -> f32 {
-        self.0.get(text).copied().unwrap_or_else(|| Approx.width(text, size))
+        self.0
+            .get(text)
+            .copied()
+            .unwrap_or_else(|| Approx.width(text, size))
     }
 }
 
@@ -107,7 +110,10 @@ impl Route {
             let step = w[0].distance(w[1]);
             if step >= left && step > 0.0 {
                 let t = left / step;
-                return Some(Point::new(w[0].x + (w[1].x - w[0].x) * t, w[0].y + (w[1].y - w[0].y) * t));
+                return Some(Point::new(
+                    w[0].x + (w[1].x - w[0].x) * t,
+                    w[0].y + (w[1].y - w[0].y) * t,
+                ));
             }
             left -= step;
         }
@@ -135,19 +141,35 @@ pub struct Layout {
 }
 
 /// Lays `diagram` out, keeping what `previous` decided where it can.
-pub fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options, previous: Option<&Layout>) -> Layout {
+pub fn layout(
+    diagram: &Diagram,
+    measure: &dyn Measure,
+    options: &Options,
+    previous: Option<&Layout>,
+) -> Layout {
     let mut out = match diagram.kind {
         DiagramKind::Sequence => sequence::layout(diagram, measure, options),
-        DiagramKind::Flow if diagram.nodes.iter().any(|n| n.at.is_some()) => placed::layout(diagram, measure, options),
+        DiagramKind::Flow if diagram.nodes.iter().any(|n| n.at.is_some()) => {
+            placed::layout(diagram, measure, options)
+        },
         DiagramKind::Flow => layered::layout(diagram, measure, options, previous),
     };
     groups::place(diagram, options, &mut out);
+    // Everything drawn: boxes, and every corner of every line.
+    let dots: Vec<Rect> = out
+        .edges
+        .values()
+        .chain(out.messages.iter())
+        .flat_map(|r| r.points.iter())
+        .chain(out.lifelines.iter().flat_map(|(_, a, b)| [a, b]))
+        .map(|p| Rect::new(p.x, p.y, 0.0, 0.0))
+        .collect();
     out.bounds = bounds(
         out.nodes
             .values()
             .chain(out.groups.values())
             .chain(out.notes.iter())
-            .chain(out.edges.values().flat_map(|r| r.points.iter()).map(|p| Rect::new(p.x, p.y, 0.0, 0.0)).collect::<Vec<_>>().iter()),
+            .chain(dots.iter()),
     )
     .unwrap_or_default();
     out

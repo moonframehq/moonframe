@@ -51,7 +51,12 @@ pub(super) fn node(
         NodeKind::Circle => outlined(ellipse(r, origin), fill, outline, width, window),
         NodeKind::Diamond => {
             let c = r.center();
-            let corners = [Point::new(c.x, r.y), Point::new(r.right(), c.y), Point::new(c.x, r.bottom()), Point::new(r.x, c.y)];
+            let corners = [
+                Point::new(c.x, r.y),
+                Point::new(r.right(), c.y),
+                Point::new(c.x, r.bottom()),
+                Point::new(r.x, c.y),
+            ];
             outlined(
                 |path: &mut PathBuilder| {
                     path.move_to(at(origin, corners[0]));
@@ -77,11 +82,27 @@ pub(super) fn node(
                     path.move_to(at(origin, Point::new(x0, ty)));
                     path.line_to(at(origin, Point::new(x0, by)));
                     // The bottom's front curve.
-                    path.cubic_bezier_to(at(origin, Point::new(cx, r.bottom())), at(origin, Point::new(x0, by + lid * k)), at(origin, Point::new(cx - r.w / 2.0 * k, r.bottom())));
-                    path.cubic_bezier_to(at(origin, Point::new(x1, by)), at(origin, Point::new(cx + r.w / 2.0 * k, r.bottom())), at(origin, Point::new(x1, by + lid * k)));
+                    path.cubic_bezier_to(
+                        at(origin, Point::new(cx, r.bottom())),
+                        at(origin, Point::new(x0, by + lid * k)),
+                        at(origin, Point::new(cx - r.w / 2.0 * k, r.bottom())),
+                    );
+                    path.cubic_bezier_to(
+                        at(origin, Point::new(x1, by)),
+                        at(origin, Point::new(cx + r.w / 2.0 * k, r.bottom())),
+                        at(origin, Point::new(x1, by + lid * k)),
+                    );
                     path.line_to(at(origin, Point::new(x1, ty)));
-                    path.cubic_bezier_to(at(origin, Point::new(cx, r.y)), at(origin, Point::new(x1, ty - lid * k)), at(origin, Point::new(cx + r.w / 2.0 * k, r.y)));
-                    path.cubic_bezier_to(at(origin, Point::new(x0, ty)), at(origin, Point::new(cx - r.w / 2.0 * k, r.y)), at(origin, Point::new(x0, ty - lid * k)));
+                    path.cubic_bezier_to(
+                        at(origin, Point::new(cx, r.y)),
+                        at(origin, Point::new(x1, ty - lid * k)),
+                        at(origin, Point::new(cx + r.w / 2.0 * k, r.y)),
+                    );
+                    path.cubic_bezier_to(
+                        at(origin, Point::new(x0, ty)),
+                        at(origin, Point::new(cx - r.w / 2.0 * k, r.y)),
+                        at(origin, Point::new(x0, ty - lid * k)),
+                    );
                     path.close();
                 },
                 fill,
@@ -107,16 +128,38 @@ fn ellipse(r: Rect, origin: gpui_kit::Point<Pixels>) -> impl Fn(&mut PathBuilder
         let (c, rx, ry) = (r.center(), r.w / 2.0, r.h / 2.0);
         let p = |x: f32, y: f32| at(origin, Point::new(x, y));
         path.move_to(p(c.x + rx, c.y));
-        path.cubic_bezier_to(p(c.x, c.y + ry), p(c.x + rx, c.y + ry * k), p(c.x + rx * k, c.y + ry));
-        path.cubic_bezier_to(p(c.x - rx, c.y), p(c.x - rx * k, c.y + ry), p(c.x - rx, c.y + ry * k));
-        path.cubic_bezier_to(p(c.x, c.y - ry), p(c.x - rx, c.y - ry * k), p(c.x - rx * k, c.y - ry));
-        path.cubic_bezier_to(p(c.x + rx, c.y), p(c.x + rx * k, c.y - ry), p(c.x + rx, c.y - ry * k));
+        path.cubic_bezier_to(
+            p(c.x, c.y + ry),
+            p(c.x + rx, c.y + ry * k),
+            p(c.x + rx * k, c.y + ry),
+        );
+        path.cubic_bezier_to(
+            p(c.x - rx, c.y),
+            p(c.x - rx * k, c.y + ry),
+            p(c.x - rx, c.y + ry * k),
+        );
+        path.cubic_bezier_to(
+            p(c.x, c.y - ry),
+            p(c.x - rx, c.y - ry * k),
+            p(c.x - rx * k, c.y - ry),
+        );
+        path.cubic_bezier_to(
+            p(c.x + rx, c.y),
+            p(c.x + rx * k, c.y - ry),
+            p(c.x + rx, c.y - ry * k),
+        );
         path.close();
     }
 }
 
 /// The same outline filled, then stroked.
-fn outlined(shape: impl Fn(&mut PathBuilder), fill: Hsla, outline: Hsla, width: f32, window: &mut Window) {
+fn outlined(
+    shape: impl Fn(&mut PathBuilder),
+    fill: Hsla,
+    outline: Hsla,
+    width: f32,
+    window: &mut Window,
+) {
     let mut inside = PathBuilder::fill();
     shape(&mut inside);
     if let Ok(path) = inside.build() {
@@ -143,7 +186,14 @@ pub(super) struct Stroke {
 /// A line through `points` (screen pixels from `origin`) with rounded
 /// corners and its heads; the line stops short of a head, so it doesn't
 /// poke through its tip.
-pub(super) fn line(points: &[Point], stroke: Stroke, start: Head, end: Head, origin: gpui_kit::Point<Pixels>, window: &mut Window) {
+pub(super) fn line(
+    points: &[Point],
+    stroke: Stroke,
+    start: Head,
+    end: Head,
+    origin: gpui_kit::Point<Pixels>,
+    window: &mut Window,
+) {
     if points.len() < 2 {
         return;
     }
@@ -178,7 +228,15 @@ pub(super) fn line(points: &[Point], stroke: Stroke, start: Head, end: Head, ori
     }
     let n = points.len();
     head(start, points[0], points[1], length, stroke, origin, window);
-    head(end, points[n - 1], points[n - 2], length, stroke, origin, window);
+    head(
+        end,
+        points[n - 1],
+        points[n - 2],
+        length,
+        stroke,
+        origin,
+        window,
+    );
 }
 
 /// How far into its length a head's base sits from its tip.
@@ -194,7 +252,15 @@ fn inset(head: Head) -> f32 {
 }
 
 /// A head with its tip at `tip`, pointing away from `from`.
-fn head(kind: Head, tip: Point, from: Point, length: f32, stroke: Stroke, origin: gpui_kit::Point<Pixels>, window: &mut Window) {
+fn head(
+    kind: Head,
+    tip: Point,
+    from: Point,
+    length: f32,
+    stroke: Stroke,
+    origin: gpui_kit::Point<Pixels>,
+    window: &mut Window,
+) {
     let span = tip.distance(from);
     if kind == Head::None || span <= f32::EPSILON {
         return;
@@ -204,7 +270,11 @@ fn head(kind: Head, tip: Point, from: Point, length: f32, stroke: Stroke, origin
     let back = |d: f32| Point::new(tip.x - ux * d, tip.y - uy * d);
     let side = |p: Point, s: f32| Point::new(p.x - uy * s, p.y + ux * s);
     let polygon = |corners: &[Point], filled: bool, window: &mut Window| {
-        let mut path = if filled { PathBuilder::fill() } else { PathBuilder::stroke(px(stroke.width)) };
+        let mut path = if filled {
+            PathBuilder::fill()
+        } else {
+            PathBuilder::stroke(px(stroke.width))
+        };
         path.move_to(at(origin, corners[0]));
         for &p in &corners[1..] {
             path.line_to(at(origin, p));
@@ -218,11 +288,28 @@ fn head(kind: Head, tip: Point, from: Point, length: f32, stroke: Stroke, origin
     };
     match kind {
         Head::None => {},
-        Head::Arrow => polygon(&[tip, side(back(length), half), side(back(length), -half)], true, window),
-        Head::Open => polygon(&[side(back(length), half), tip, side(back(length), -half)], false, window),
-        Head::Triangle => polygon(&[tip, side(back(length), half), side(back(length), -half)], false, window),
+        Head::Arrow => polygon(
+            &[tip, side(back(length), half), side(back(length), -half)],
+            true,
+            window,
+        ),
+        Head::Open => polygon(
+            &[side(back(length), half), tip, side(back(length), -half)],
+            false,
+            window,
+        ),
+        Head::Triangle => polygon(
+            &[tip, side(back(length), half), side(back(length), -half)],
+            false,
+            window,
+        ),
         Head::Diamond | Head::HollowDiamond => {
-            let corners = [tip, side(back(length * 0.8), half * 0.7), back(length * 1.6), side(back(length * 0.8), -half * 0.7)];
+            let corners = [
+                tip,
+                side(back(length * 0.8), half * 0.7),
+                back(length * 1.6),
+                side(back(length * 0.8), -half * 0.7),
+            ];
             polygon(&corners, kind == Head::Diamond, window);
         },
         Head::Circle => {
@@ -230,8 +317,20 @@ fn head(kind: Head, tip: Point, from: Point, length: f32, stroke: Stroke, origin
             let r = length * 0.4;
             let mut path = PathBuilder::stroke(px(stroke.width));
             path.move_to(at(origin, Point::new(c.x + r, c.y)));
-            path.arc_to(point(px(r), px(r)), px(0.0), false, true, at(origin, Point::new(c.x - r, c.y)));
-            path.arc_to(point(px(r), px(r)), px(0.0), false, true, at(origin, Point::new(c.x + r, c.y)));
+            path.arc_to(
+                point(px(r), px(r)),
+                px(0.0),
+                false,
+                true,
+                at(origin, Point::new(c.x - r, c.y)),
+            );
+            path.arc_to(
+                point(px(r), px(r)),
+                px(0.0),
+                false,
+                true,
+                at(origin, Point::new(c.x + r, c.y)),
+            );
             if let Ok(path) = path.build() {
                 window.paint_path(path, stroke.color);
             }
@@ -239,8 +338,22 @@ fn head(kind: Head, tip: Point, from: Point, length: f32, stroke: Stroke, origin
         Head::Cross => {
             let c = back(length * 0.6);
             let d = length * 0.35;
-            polygon(&[side(Point::new(c.x - ux * d, c.y - uy * d), d), side(Point::new(c.x + ux * d, c.y + uy * d), -d)], false, window);
-            polygon(&[side(Point::new(c.x - ux * d, c.y - uy * d), -d), side(Point::new(c.x + ux * d, c.y + uy * d), d)], false, window);
+            polygon(
+                &[
+                    side(Point::new(c.x - ux * d, c.y - uy * d), d),
+                    side(Point::new(c.x + ux * d, c.y + uy * d), -d),
+                ],
+                false,
+                window,
+            );
+            polygon(
+                &[
+                    side(Point::new(c.x - ux * d, c.y - uy * d), -d),
+                    side(Point::new(c.x + ux * d, c.y + uy * d), d),
+                ],
+                false,
+                window,
+            );
         },
     }
 }
@@ -259,7 +372,14 @@ fn run(text: &str, color: Hsla, bold: bool, cx: &App) -> TextRun {
     if bold {
         font.weight = FontWeight::MEDIUM;
     }
-    TextRun { len: text.len(), font, color, background_color: None, underline: None, strikethrough: None }
+    TextRun {
+        len: text.len(),
+        font,
+        color,
+        background_color: None,
+        underline: None,
+        strikethrough: None,
+    }
 }
 
 /// The width of `text` on one line at `size` pixels in the theme's font.
@@ -267,17 +387,39 @@ pub(crate) fn text_width(text: &str, size: f32, window: &mut Window, cx: &App) -
     if text.is_empty() {
         return 0.0;
     }
-    let line = window.text_system().shape_line(text.to_owned().into(), px(size), &[run(text, black(), true, cx)], None);
+    let line = window.text_system().shape_line(
+        text.to_owned().into(),
+        px(size),
+        &[run(text, black(), true, cx)],
+        None,
+    );
     f32::from(line.width)
 }
 
 /// `text` on one line centred on `center`, cut with an ellipsis to fit
 /// `room` pixels.
-pub(super) fn text(text: &str, center: Point, size: f32, room: f32, color: Hsla, bold: bool, origin: gpui_kit::Point<Pixels>, window: &mut Window, cx: &mut App) {
+pub(super) fn text(
+    text: &str,
+    center: Point,
+    size: f32,
+    room: f32,
+    color: Hsla,
+    bold: bool,
+    origin: gpui_kit::Point<Pixels>,
+    window: &mut Window,
+    cx: &mut App,
+) {
     if text.is_empty() || size < 4.0 {
         return;
     }
-    let shape = |text: &str, window: &mut Window| window.text_system().shape_line(text.to_owned().into(), px(size), &[run(text, color, bold, cx)], None);
+    let shape = |text: &str, window: &mut Window| {
+        window.text_system().shape_line(
+            text.to_owned().into(),
+            px(size),
+            &[run(text, color, bold, cx)],
+            None,
+        )
+    };
     let mut line = shape(text, window);
     if f32::from(line.width) > room {
         // Cut at characters, by halves, to the longest start that fits.
@@ -298,5 +440,75 @@ pub(super) fn text(text: &str, center: Point, size: f32, room: f32, color: Hsla,
     let height = size * 1.3;
     let left = center.x - f32::from(line.width) / 2.0;
     let top = center.y - height / 2.0;
-    let _ = line.paint(at(origin, Point::new(left, top)), px(height), TextAlign::Left, None, window, cx);
+    let _ = line.paint(
+        at(origin, Point::new(left, top)),
+        px(height),
+        TextAlign::Left,
+        None,
+        window,
+        cx,
+    );
+}
+
+/// `text` wrapped at words to `room` pixels wide, as many lines as `height`
+/// holds (the last cut with an ellipsis), centred on `center`, or hanging
+/// from it with `top`.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn paragraph(
+    words: &str,
+    center: Point,
+    top: bool,
+    size: f32,
+    room: f32,
+    height: f32,
+    color: Hsla,
+    bold: bool,
+    origin: gpui_kit::Point<Pixels>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    if words.is_empty() || size < 4.0 {
+        return;
+    }
+    let line = size * 1.3;
+    let most = ((height / line).floor() as usize).max(1);
+    let mut lines: Vec<String> = Vec::new();
+    if most == 1 || text_width(words, size, window, cx) <= room {
+        lines.push(words.to_owned());
+    } else {
+        let mut current = String::new();
+        for word in words.split_whitespace() {
+            let tried = if current.is_empty() {
+                word.to_owned()
+            } else {
+                format!("{current} {word}")
+            };
+            if current.is_empty() || text_width(&tried, size, window, cx) <= room {
+                current = tried;
+            } else {
+                lines.push(std::mem::replace(&mut current, word.to_owned()));
+            }
+        }
+        if !current.is_empty() {
+            lines.push(current);
+        }
+        if lines.len() > most {
+            lines.truncate(most);
+            if let Some(last) = lines.last_mut() {
+                last.push('…');
+            }
+        }
+    }
+    let total = line * lines.len() as f32;
+    let start = if top {
+        center.y
+    } else {
+        center.y - total / 2.0
+    };
+    for (i, text_line) in lines.iter().enumerate() {
+        let middle = Point::new(center.x, start + line * (i as f32 + 0.5));
+        text(
+            text_line, middle, size, room, color, bold, origin, window, cx,
+        );
+    }
 }

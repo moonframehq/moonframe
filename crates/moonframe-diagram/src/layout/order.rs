@@ -74,7 +74,12 @@ pub(super) fn order(
 /// `layer` sorted by where its nodes' neighbours sit (`pos`); a node with
 /// none keeps its place. Then each group's members are drawn together, at
 /// the place of the group's first.
-fn sort_by_neighbours(layer: &mut [usize], neighbours: &[Vec<usize>], pos: &[usize], group: &[Option<usize>]) {
+fn sort_by_neighbours(
+    layer: &mut [usize],
+    neighbours: &[Vec<usize>],
+    pos: &[usize],
+    group: &[Option<usize>],
+) {
     let mut keyed: Vec<(f32, usize, usize)> = layer
         .iter()
         .enumerate()
@@ -108,7 +113,9 @@ fn cluster(layer: &[usize], group: &[Option<usize>]) -> Vec<usize> {
         .iter()
         .enumerate()
         .map(|(i, &v)| {
-            let anchor = group[v].and_then(|g| first.iter().find(|&&(h, _)| h == g)).map_or(i, |&(_, at)| at);
+            let anchor = group[v]
+                .and_then(|g| first.iter().find(|&&(h, _)| h == g))
+                .map_or(i, |&(_, at)| at);
             (anchor, i, v)
         })
         .collect();
@@ -233,6 +240,9 @@ mod tests {
 
     #[test]
     fn a_groups_members_stay_together() {
-        assert_eq!(cluster(&[0, 1, 2, 3], &[Some(0), None, Some(0), None]), vec![0, 2, 1, 3]);
+        assert_eq!(
+            cluster(&[0, 1, 2, 3], &[Some(0), None, Some(0), None]),
+            vec![0, 2, 1, 3]
+        );
     }
 }
