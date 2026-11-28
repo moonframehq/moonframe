@@ -28,6 +28,9 @@ type State = {
 	-- The agent's (or project's) diagram on show instead of the document,
 	-- by its key in `app.diagrams`.
 	live: string?,
+	-- Exports and copies asked of the view, each new `seq` once.
+	export: { [string]: any }?,
+	copy: { [string]: any }?,
 	undo: { Doc },
 	redo: { Doc },
 }
@@ -445,6 +448,8 @@ return mod {
 		state.luau = false
 		state.camera = nil
 		state.live = nil
+		state.export = nil
+		state.copy = nil
 		-- History lives for the session only.
 		state.undo, state.redo = {}, {}
 		return state
@@ -470,6 +475,8 @@ return mod {
 				remember(state)
 				duplicate(state, state.selected)
 			end
+		elseif msg == "copy" then
+			state.copy = { seq = if state.copy then (state.copy.seq or 0) + 1 else 1 }
 		elseif msg == "select-all" then
 			local all = {}
 			for _, s in state.doc.shapes do
@@ -500,6 +507,14 @@ return mod {
 			state.camera = { zoom_by = msg.zoom_by, zoom = msg.zoom_to, fit = msg.fit, seq = seq }
 		elseif msg.selected then
 			state.selected = msg.selected
+		elseif msg.export then
+			local seq = if state.export then (state.export.seq or 0) + 1 else 1
+			state.export = { format = msg.export, seq = seq }
+		elseif msg.exported then
+			-- The file is in the app's share folder: offer it to the system.
+			if msg.exported.path then
+				return state, { { to = "app:share", msg = { files = { msg.exported.path } } } }
+			end
 		elseif msg.live ~= nil then
 			state.live = msg.live or nil
 		elseif msg.close_live then
@@ -553,6 +568,8 @@ return mod {
 							selected = state.selected,
 							tool = state.tool,
 							camera = state.camera,
+							export = state.export,
+							copy = state.copy,
 						}
 						else diagram {
 							id = "main",

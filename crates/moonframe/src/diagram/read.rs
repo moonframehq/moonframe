@@ -17,6 +17,14 @@ pub(super) enum Camera {
     ZoomTo(f32),
 }
 
+/// What the mod asks the view to hand out.
+pub(super) enum Hand {
+    /// The diagram as a file, `svg` or `png`.
+    Export(String),
+    /// The diagram as Mermaid on the clipboard.
+    Copy,
+}
+
 pub(super) struct Props {
     /// The diagram, or why its `mermaid` or `dot` text is not one.
     pub diagram: Result<Diagram, String>,
@@ -29,6 +37,10 @@ pub(super) struct Props {
     /// A camera request and the `seq` that asks for it.
     pub camera: Option<(Data, Camera)>,
     pub scroll_needs_focus: bool,
+    /// An export asked for (`export = { format, seq }`) and its `seq`.
+    pub export: Option<(Data, String)>,
+    /// A copy as Mermaid asked for (`copy = { seq }`): its `seq`.
+    pub copy: Option<Data>,
 }
 
 fn text(data: &Data, key: &str) -> Option<String> {
@@ -254,6 +266,13 @@ pub(super) fn props(props: &Data) -> Props {
         highlight: strings(props, "highlight"),
         camera,
         scroll_needs_focus: text(props, "scroll").as_deref() == Some("focus"),
+        export: props.get("export").map(|e| {
+            let seq = e.get("seq").cloned().unwrap_or(Data::Nil);
+            (seq, text(e, "format").unwrap_or_else(|| "png".to_owned()))
+        }),
+        copy: props
+            .get("copy")
+            .map(|c| c.get("seq").cloned().unwrap_or(Data::Nil)),
     }
 }
 

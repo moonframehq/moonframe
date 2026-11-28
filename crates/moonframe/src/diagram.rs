@@ -14,6 +14,10 @@
 #[cfg(all(test, feature = "capture"))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod bench;
+mod export;
+#[cfg(all(test, feature = "capture"))]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod export_tests;
 mod read;
 mod tell;
 
@@ -41,6 +45,15 @@ pub(crate) struct DiagramHost {
     problem: Option<String>,
     /// The last `camera` request acted on, by its `seq`.
     camera_seq: Option<Data>,
+    /// The last `export` and `copy` requests acted on, by their `seq`.
+    export_seq: Option<Data>,
+    copy_seq: Option<Data>,
+    /// Exports and copies asked for, done once the frame has laid the
+    /// document out.
+    asked: Vec<read::Hand>,
+    messenger: Messenger,
+    /// The view's `id`, naming its exported files.
+    name: String,
     _events: Subscription,
 }
 
@@ -48,8 +61,9 @@ impl DiagramHost {
     fn new(init: &ViewInit, _: &mut Window, cx: &mut Context<Self>) -> Self {
         let view = cx.new(DiagramView::new);
         let messenger: Messenger = init.messenger();
+        let tells = messenger.clone();
         let events = cx.subscribe(&view, move |_, _, event: &DiagramEvent, _| {
-            messenger.send(tell::message(event))
+            tells.send(tell::message(event))
         });
         let mut host = Self {
             view,
@@ -57,6 +71,11 @@ impl DiagramHost {
             waiting: None,
             problem: None,
             camera_seq: None,
+            export_seq: None,
+            copy_seq: None,
+            asked: Vec::new(),
+            messenger,
+            name: format!("{}-{}", init.owner(), init.id()),
             _events: events,
         };
         host.set_props(init.props(), cx);
@@ -83,6 +102,17 @@ impl HostView for DiagramHost {
         if let Some((seq, _)) = &camera {
             self.camera_seq = Some(seq.clone());
         }
+        if let Some((seq, format)) = props
+            .export
+            .filter(|(seq, _)| Some(seq) != self.export_seq.as_ref())
+        {
+            self.export_seq = Some(seq);
+            self.asked.push(read::Hand::Export(format));
+        }
+        if let Some(seq) = props.copy.filter(|seq| Some(seq) != self.copy_seq.as_ref()) {
+            self.copy_seq = Some(seq);
+            self.asked.push(read::Hand::Copy);
+        }
         self.view.update(cx, |view, cx| {
             view.set_mode(props.mode, cx);
             view.set_tool(props.tool, cx);
@@ -107,6 +137,21 @@ impl Render for DiagramHost {
         if let Some(diagram) = self.waiting.take() {
             self.view
                 .update(cx, |view, cx| view.set_diagram(diagram, window, cx));
+        }
+        for hand in std::mem::take(&mut self.asked) {
+            let view = self.view.read(cx);
+            let (diagram, layout, lit) = (
+                view.diagram().clone(),
+                view.layout().clone(),
+                view.highlighted(),
+            );
+            match hand {
+                read::Hand::Export(format) => {
+                    let done = export::file(&diagram, &layout, &lit, &format, &self.name, cx);
+                    self.messenger.send(export::told(done, &format));
+                },
+                read::Hand::Copy => export::copy(&diagram, cx),
+            }
         }
         let problem = self.problem.clone().map(|problem| {
             let theme = cx.theme();
