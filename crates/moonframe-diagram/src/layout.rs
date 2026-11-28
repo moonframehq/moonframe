@@ -12,6 +12,7 @@
 //! A layout given the previous one keeps each node's rank and order where
 //! it can, so a diagram that grows (an agent adding nodes) keeps its shape.
 
+mod cost;
 mod groups;
 mod layered;
 mod order;
@@ -23,6 +24,7 @@ mod sequence;
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests;
 
+pub use cost::cost;
 use {
     crate::{
         geometry::{Point, Rect, Size, bounds},
