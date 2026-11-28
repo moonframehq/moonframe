@@ -19,6 +19,12 @@ pub(super) enum Camera {
     // keep-sorted end
 }
 
+/// What the mod asks the view to hand out.
+pub(super) enum Hand {
+    /// The diagram as a file, `svg` or `png`, asked with `seq`.
+    Export { format: String, seq: Data },
+}
+
 pub(super) struct Props {
     /// The props the diagram is read from, to tell when it changed: only
     /// then is it read, with [`diagram`].
@@ -30,6 +36,8 @@ pub(super) struct Props {
     /// A camera request and the `seq` that asks for it.
     pub camera: Option<(Data, Camera)>,
     pub scroll_needs_focus: bool,
+    /// An export asked for (`export = { format, seq }`) and its `seq`.
+    pub export: Option<(Data, String)>,
 }
 
 fn text(data: &Data, key: &str) -> Option<String> {
@@ -80,7 +88,7 @@ fn node(data: &Data) -> Option<Node> {
             .unwrap_or_default(),
         icon: text(data, "icon"),
         tone: text(data, "tone").and_then(|t| Tone::from_name(&t)),
-        fill: text(data, "fill"),
+        fill: text(data, "fill").filter(|f| moonframe_diagram::model::is_hex_color(f)),
         group: text(data, "group"),
         at: place(data),
     })
@@ -262,6 +270,10 @@ pub(super) fn props(props: &Data) -> Props {
         highlight: strings(props, "highlight"),
         camera,
         scroll_needs_focus: text(props, "scroll").as_deref() == Some("focus"),
+        export: props.get("export").map(|e| {
+            let seq = e.get("seq").cloned().unwrap_or(Data::Nil);
+            (seq, text(e, "format").unwrap_or_else(|| "png".to_owned()))
+        }),
     }
 }
 

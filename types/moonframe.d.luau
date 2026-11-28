@@ -1191,6 +1191,11 @@ export type DiagramProps = {
 	-- "focus": scrolling pans only after a click inside (in a page that
 	-- scrolls, as a chat does).
 	scroll: "focus"?,
+	-- Writes the diagram, in the app's colors, to the share folder as
+	-- `format` ("png" or "svg"), once per new `seq`; the mod hears
+	-- `{ exported = { path, format } | { error, format } }` and may pass
+	-- the path to `app:share`.
+	export: { format: ("png" | "svg")?, seq: any }?,
 	[string]: any,
 }
 
