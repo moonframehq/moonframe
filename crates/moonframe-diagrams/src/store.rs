@@ -8,6 +8,7 @@ use {
     std::{
         io,
         path::{Path, PathBuf},
+        sync::Mutex,
         time::{SystemTime, UNIX_EPOCH},
     },
 };
@@ -143,8 +144,30 @@ pub fn read(file: &Path) -> Result<Shown, String> {
     Shown::from_json(&value)
 }
 
-/// Where agents' diagrams go: `$MOONFRAME_DIAGRAMS`, else the cache
-/// folder's `moonframe/diagrams`.
+/// The folder the `diagrams` provider reads, once it started: its
+/// `folder` setting, else [`default_dir`].
+static AGENTS_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+/// Says which folder the provider reads, so the server offered to agents
+/// writes there.
+pub fn set_agents_dir(dir: &Path) {
+    if let Ok(mut known) = AGENTS_DIR.lock() {
+        *known = Some(dir.to_owned());
+    }
+}
+
+/// Where agents' diagrams go: the folder the provider reads, else
+/// [`default_dir`].
+pub fn agents_dir() -> PathBuf {
+    AGENTS_DIR
+        .lock()
+        .ok()
+        .and_then(|known| known.clone())
+        .unwrap_or_else(default_dir)
+}
+
+/// Where agents' diagrams go by default: `$MOONFRAME_DIAGRAMS`, else the
+/// cache folder's `moonframe/diagrams`.
 pub fn default_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("MOONFRAME_DIAGRAMS").filter(|d| !d.is_empty()) {
         return PathBuf::from(dir);

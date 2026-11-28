@@ -56,17 +56,20 @@ fn run(words: &[String]) -> ExitCode {
 }
 
 /// The MCP servers to offer each agent session: this executable serving
-/// `diagrams`, as ACP's `mcpServers` lists a stdio server.
+/// `diagrams` into the folder the `diagrams` provider reads, as ACP's
+/// `mcpServers` lists a stdio server.
 #[cfg(all(feature = "diagram", feature = "acp"))]
 pub(crate) fn offer() {
-    let Ok(exe) = std::env::current_exe() else {
-        return;
-    };
-    let dir = moonframe_diagrams::store::default_dir();
-    moonframe_acp::offer_mcp_servers(vec![serde_json::json!({
-        "name": "moonframe-diagrams",
-        "command": exe,
-        "args": ["mcp", "diagrams", "--dir", dir],
-        "env": [],
-    })]);
+    moonframe_acp::offer_mcp_servers(|| {
+        let Ok(exe) = std::env::current_exe() else {
+            return Vec::new();
+        };
+        let dir = moonframe_diagrams::store::agents_dir();
+        vec![serde_json::json!({
+            "name": "moonframe-diagrams",
+            "command": exe,
+            "args": ["mcp", "diagrams", "--dir", dir],
+            "env": [],
+        })]
+    });
 }
