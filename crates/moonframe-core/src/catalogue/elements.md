@@ -123,7 +123,11 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `scroll_to = "row-7"` reveals the first row or column with
   `key = "row-7"` inside it, however deep (a row in a card in the list),
   once it is drawn; `scroll_to = { key = "row-7", seq = n }` asks again
-  for the same key with each new `seq`. Both are the GPUI window's, so far.
+  for the same key with each new `seq`. `scroll_to = { y = state.y, seq =
+  n }` (and `x`) scrolls back to how far `measure` told it was, as far as
+  the content goes: a reader reopened where it was left. With a `seq`, only
+  a new `seq` asks again, so keep `measure`'s `y` in state as it comes. All are the GPUI
+  window's, so far.
 
 - **Measure a scrolling stack** (`row`, `column`): with `scroll` enabled,
   `measure = msg` sends `msg` (to `to`, else the drawing mod) with its

@@ -31,11 +31,33 @@ fn scroll_to_takes_a_child_a_key_or_a_key_asked_again() {
 }
 
 #[test]
+fn scroll_to_takes_how_far_measure_told_it_was() {
+    assert_eq!(
+        asked("{ y = 480, seq = 2 }"),
+        Ok(Some(ScrollTo::At {
+            x: None,
+            y: Some(480.0),
+            seq: Data::Integer(2)
+        }))
+    );
+    assert_eq!(
+        asked("{ x = 12, y = 0 }"),
+        Ok(Some(ScrollTo::At {
+            x: Some(12.0),
+            y: Some(0.0),
+            seq: Data::Nil
+        }))
+    );
+}
+
+#[test]
 fn scroll_to_refuses_what_names_nothing() {
     for (bad, said) in [
         ("0", "positive child index"),
         (r#""two words""#, "an id is"),
-        ("{ seq = 1 }", "names the row or column"),
+        ("{ seq = 1 }", "the `key` of a row or column"),
+        (r#"{ key = "a", y = 1 }"#, "not both"),
+        ("{ y = -1 }", "y"),
         (r#"{ key = "a", line = 1 }"#, "line"),
         ("true", "a child index, a key"),
     ] {
