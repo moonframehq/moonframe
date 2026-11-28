@@ -12,10 +12,12 @@ use {
 /// A resize handle's corner.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Corner {
-    TopLeft,
-    TopRight,
+    // keep-sorted start
     BottomLeft,
     BottomRight,
+    TopLeft,
+    TopRight,
+    // keep-sorted end
 }
 
 impl Corner {
@@ -71,11 +73,13 @@ pub(crate) fn ports(r: &Rect, out: f32) -> [Point; 4] {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Hit {
-    Handle(String, Corner),
-    Port(String),
-    Node(String),
+    // keep-sorted start
     Edge(String),
+    Handle(String, Corner),
+    Node(String),
     Nothing,
+    Port(String),
+    // keep-sorted end
 }
 
 /// What is under `p`. `reach` is how near, in diagram pixels, counts as on

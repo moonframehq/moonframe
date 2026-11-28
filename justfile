@@ -340,6 +340,11 @@ test:
     cargo test --locked --workspace --all-features
     cargo test --locked -p moonframe --no-default-features --features sealed --lib
 
+# Play conformance/, the cases MoonSwift draws too (docs/moonswift-compat.md);
+# `just conformance bless` fills each `expect` left null from what Moonframe draws.
+conformance mode="":
+    CONFORMANCE_BLESS={{ if mode == "bless" { "1" } else { "" } }} cargo test --locked -p moonframe-core --lib tests::conformance
+
 # Audit the GitHub workflows (zizmor, actionlint) and the dependency graph
 # (cargo-deny: advisories, licenses, sources) as CI does.
 audit:

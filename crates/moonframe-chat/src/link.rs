@@ -130,6 +130,7 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
             ServerMessage::Snapshot { cursor, transcript } => {
                 chat.cursor = Some(cursor);
                 chat.transcript = Some(*transcript);
+                chat.output_revisions.on_snapshot();
                 chat.phase = Phase::Live;
             },
             ServerMessage::Change { change, cursor } => {
@@ -138,7 +139,10 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
                     .as_mut()
                     .map(|transcript| transcript.apply(&change));
                 match applied {
-                    Some(Ok(())) => chat.cursor = Some(cursor),
+                    Some(Ok(())) => {
+                        chat.cursor = Some(cursor);
+                        chat.output_revisions.on_change(&change);
+                    },
                     // Out of step: start over from a snapshot.
                     Some(Err(_)) | None => {
                         chat.cursor = None;

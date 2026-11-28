@@ -132,7 +132,9 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
 - **Scroll to a child** (`row`, `column`): with `scroll` enabled,
   `scroll_to = 12` reveals direct child 12 (one-based) when the index
   changes. It scrolls only as far as needed and leaves wheel scrolling
-  free between changes. Set it to nil to reset the request.
+  free between changes, and a column that appears with it (an overlay's
+  content as it opens) shows the child once it is laid out. Set it to nil
+  to reset the request.
   `scroll_to = "row-7"` reveals the first row or column with
   `key = "row-7"` inside it, however deep (a row in a card in the list),
   once it is drawn; `scroll_to = { key = "row-7", seq = n }` asks again
@@ -3051,9 +3053,11 @@ A whole mod using it, with state: `app/components/demos/timeline.luau`.
 
 | Prop | Meaning |
 | --- | --- |
-| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = "tool", id, kind, title, status, detail?, files, steps } or { type = "thought", gist, text } } } |
+| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = "tool", id, kind, title, status, detail?, output_key?, files, steps } or { type = "thought", gist, text } } } |
+| `inspect` | enable clicking a detail to send { inspect, page, fetch } or { close_output = true } |
 | `msg` | message a click on the header sends (the mod flips `open`) |
 | `open` | show its calls |
+| `output` | the expanded detail { key, page, text?, more? } |
 | `to` | mod to send it to, if not the drawing one |
 
 **Styles:** `.tool-group` `.tool-group-added` `.tool-group-body` `.tool-group-call-title` `.tool-group-current` `.tool-group-detail` `.tool-group-done` `.tool-group-failed` `.tool-group-file` `.tool-group-head` `.tool-group-head:hover` `.tool-group-kind` `.tool-group-removed` `.tool-group-running` `.tool-group-thought` `.tool-group-title`

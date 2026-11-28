@@ -1,6 +1,6 @@
 use {
     super::*,
-    crate::model::{Diagram, DiagramKind, Direction, Edge, Group, Message, Node},
+    crate::model::{Diagram, DiagramKind, Direction, Edge, Group, Message, Node, Note},
 };
 
 fn flow(nodes: &[&str], edges: &[(&str, &str)]) -> Diagram {
@@ -216,4 +216,68 @@ fn a_sequence_puts_messages_in_rows_between_lanes() {
         "lanes too close: {gap}"
     );
     assert_eq!(out.lifelines.len(), 2);
+}
+
+fn message(from: &str, to: &str, label: &str) -> Message {
+    Message {
+        from: from.into(),
+        to: to.into(),
+        label: label.into(),
+        ..Message::default()
+    }
+}
+
+#[test]
+fn notes_sit_before_their_message_in_any_order_given() {
+    let note = |text: &str, before| Note {
+        over: vec!["a".into()],
+        text: text.into(),
+        before,
+    };
+    let d = Diagram {
+        kind: DiagramKind::Sequence,
+        messages: vec![
+            message("a", "b", "one"),
+            message("b", "a", "two"),
+            message("a", "b", "three"),
+        ],
+        notes: vec![note("late", 2), note("early", 0)],
+        ..Diagram::default()
+    };
+    let out = lay(&d);
+    // Each rect stays at its note's index: `early` above the first
+    // message, `late` between the second and the third.
+    let (late, early) = (out.notes[0], out.notes[1]);
+    assert!(early.bottom() < out.messages[0].points[0].y, "{early:?}");
+    assert!(late.y > out.messages[1].points[0].y, "{late:?}");
+    assert!(late.bottom() < out.messages[2].points[0].y, "{late:?}");
+}
+
+#[test]
+fn participants_only_messages_name_get_a_box() {
+    let d = Diagram {
+        kind: DiagramKind::Sequence,
+        nodes: vec![Node::new("a", "Alice")],
+        messages: vec![message("a", "b", "hi")],
+        ..Diagram::default()
+    };
+    let ids: Vec<String> = d.participants().into_iter().map(|p| p.id).collect();
+    assert_eq!(ids, ["a", "b"]);
+    let out = lay(&d);
+    assert!(out.nodes.contains_key("b"));
+}
+
+#[test]
+fn a_sequences_bounds_hold_its_message_labels() {
+    let long = "a rather long label for a message to itself";
+    let d = Diagram {
+        kind: DiagramKind::Sequence,
+        nodes: vec![Node::new("a", "A"), Node::new("b", "B")],
+        messages: vec![message("a", "b", "go"), message("b", "b", long)],
+        ..Diagram::default()
+    };
+    let out = lay(&d);
+    let label = out.messages[1].label.unwrap();
+    let half = Approx.width(long, 14.0 * 0.9) / 2.0;
+    assert!(out.bounds.right() >= label.x + half, "{:?}", out.bounds);
 }

@@ -1,0 +1,117 @@
+{
+  "about": "ui.list with count and a row function: the rows it builds follow the state.",
+  "steps": [
+    {
+      "expect": {
+        "shell": {
+          "children": [
+            {
+              "count": 4,
+              "grow": true,
+              "id": "files",
+              "row": "<function>",
+              "row_height": 24,
+              "rows": [
+                {
+                  "label": "README.MD",
+                  "msg": {
+                    "pick": 1
+                  },
+                  "selected": true,
+                  "type": "item"
+                },
+                {
+                  "label": "MAIN.LUAU",
+                  "msg": {
+                    "pick": 2
+                  },
+                  "selected": false,
+                  "type": "item"
+                },
+                {
+                  "label": "STYLE.LUAU",
+                  "msg": {
+                    "pick": 3
+                  },
+                  "selected": false,
+                  "type": "item"
+                },
+                {
+                  "label": "NOTES.TXT",
+                  "msg": {
+                    "pick": 4
+                  },
+                  "selected": false,
+                  "type": "item"
+                }
+              ],
+              "type": "list"
+            }
+          ],
+          "grow": true,
+          "title": "Files",
+          "type": "panel"
+        }
+      }
+    },
+    {
+      "send": {
+        "pick": 3
+      },
+      "to": "shell"
+    },
+    {
+      "expect": {
+        "shell": {
+          "children": [
+            {
+              "count": 4,
+              "grow": true,
+              "id": "files",
+              "row": "<function>",
+              "row_height": 24,
+              "rows": [
+                {
+                  "label": "README.MD",
+                  "msg": {
+                    "pick": 1
+                  },
+                  "selected": false,
+                  "type": "item"
+                },
+                {
+                  "label": "MAIN.LUAU",
+                  "msg": {
+                    "pick": 2
+                  },
+                  "selected": false,
+                  "type": "item"
+                },
+                {
+                  "label": "STYLE.LUAU",
+                  "msg": {
+                    "pick": 3
+                  },
+                  "selected": true,
+                  "type": "item"
+                },
+                {
+                  "label": "NOTES.TXT",
+                  "msg": {
+                    "pick": 4
+                  },
+                  "selected": false,
+                  "type": "item"
+                }
+              ],
+              "type": "list"
+            }
+          ],
+          "grow": true,
+          "title": "Files",
+          "type": "panel"
+        }
+      }
+    }
+  ]
+}

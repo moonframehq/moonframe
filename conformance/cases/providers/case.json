@@ -1,0 +1,98 @@
+{
+  "about": "app.<provider> is nil until it publishes; a publish redraws the mod that read it and goes out on provider/<name>; a send to provider:<name> reaches the provider.",
+  "steps": [
+    {
+      "expect": {
+        "shell": {
+          "children": [
+            {
+              "text": "waiting",
+              "type": "text"
+            },
+            {
+              "label": "Ask",
+              "msg": "ask",
+              "type": "button"
+            }
+          ],
+          "type": "column"
+        },
+        "ticker": {
+          "text": "0 none",
+          "type": "text"
+        }
+      }
+    },
+    {
+      "data": {
+        "time": "10:00"
+      },
+      "publish": "clock"
+    },
+    {
+      "expect": {
+        "shell": {
+          "children": [
+            {
+              "text": "10:00",
+              "type": "text"
+            },
+            {
+              "label": "Ask",
+              "msg": "ask",
+              "type": "button"
+            }
+          ],
+          "type": "column"
+        },
+        "ticker": {
+          "text": "1 10:00",
+          "type": "text"
+        }
+      }
+    },
+    {
+      "data": {
+        "time": "10:01"
+      },
+      "publish": "clock"
+    },
+    {
+      "send": "ask",
+      "to": "shell"
+    },
+    {
+      "expect": {
+        "shell": {
+          "children": [
+            {
+              "text": "10:01",
+              "type": "text"
+            },
+            {
+              "label": "Ask",
+              "msg": "ask",
+              "type": "button"
+            }
+          ],
+          "type": "column"
+        },
+        "ticker": {
+          "text": "2 10:01",
+          "type": "text"
+        }
+      }
+    },
+    {
+      "outbox": [
+        {
+          "from": "shell",
+          "msg": {
+            "zone": "UTC"
+          },
+          "to": "clock"
+        }
+      ]
+    }
+  ]
+}
