@@ -391,8 +391,10 @@ fn node_colors(
             colors.note.clone(),
             colors.note_text.clone(),
         ),
+        // As the view does: the card tinted with the tone, opaque, so a
+        // group or the background under it doesn't show through.
         (_, Some(tone)) => (
-            colors.tone(tone).to_owned() + "24",
+            mix(&colors.card, colors.tone(tone), 0.14),
             colors.tone(tone).to_owned(),
             colors.text.clone(),
         ),
@@ -404,9 +406,12 @@ fn node_colors(
     }
 }
 
-/// The HSL lightness of a `#rgb` or `#rrggbb` color, 0 to 1.
-fn lightness(hex: &str) -> f32 {
-    let digits = hex.trim_start_matches('#');
+/// A `#rgb` or `#rrggbb` color's red, green and blue, 0 to 1.
+fn rgb(hex: &str) -> Option<[f32; 3]> {
+    if !crate::model::is_hex_color(hex) {
+        return None;
+    }
+    let digits = &hex[1..];
     let channel = |i: usize| -> f32 {
         let v = if digits.len() == 3 {
             u8::from_str_radix(&digits[i..=i], 16).map_or(0, |v| v * 17)
@@ -415,8 +420,23 @@ fn lightness(hex: &str) -> f32 {
         };
         f32::from(v) / 255.0
     };
-    let (r, g, b) = (channel(0), channel(1), channel(2));
+    Some([channel(0), channel(1), channel(2)])
+}
+
+/// The HSL lightness of a `#rgb` or `#rrggbb` color, 0 to 1.
+fn lightness(hex: &str) -> f32 {
+    let [r, g, b] = rgb(hex).unwrap_or_default();
     (r.max(g).max(b) + r.min(g).min(b)) / 2.0
+}
+
+/// `base` with `by` of `over` laid on it, as `#rrggbb`; `base` alone when
+/// either is not a hex color.
+fn mix(base: &str, over: &str, by: f32) -> String {
+    let (Some(a), Some(b)) = (rgb(base), rgb(over)) else {
+        return base.to_owned();
+    };
+    let byte = |i: usize| ((a[i] + (b[i] - a[i]) * by).clamp(0.0, 1.0) * 255.0).round() as u8;
+    format!("#{:02x}{:02x}{:02x}", byte(0), byte(1), byte(2))
 }
 
 fn shape(out: &mut String, kind: NodeKind, r: Rect, fill: &str, stroke: &str, width: f32) {
@@ -585,14 +605,22 @@ fn line(
     if points.len() < 2 {
         return;
     }
-    let mut d = format!("M{:.1},{:.1}", points[0].x, points[0].y);
-    for i in 1..points.len() {
-        let corner = points[i];
-        match points.get(i + 1) {
+    // The line stops short of a head, as the view's does, so it never
+    // crosses a hollow one.
+    let length = (width * 4.0).max(8.0);
+    let n = points.len();
+    let mut ends = points.to_vec();
+    ends[0] = toward(points[0], points[1], length * inset(start));
+    ends[n - 1] = toward(points[n - 1], points[n - 2], length * inset(end));
+    let trimmed = &ends;
+    let mut d = format!("M{:.1},{:.1}", trimmed[0].x, trimmed[0].y);
+    for i in 1..trimmed.len() {
+        let corner = trimmed[i];
+        match trimmed.get(i + 1) {
             Some(&next) => {
-                let room = points[i - 1].distance(corner).min(corner.distance(next)) / 2.0;
+                let room = trimmed[i - 1].distance(corner).min(corner.distance(next)) / 2.0;
                 let r = radius.min(room);
-                let a = toward(corner, points[i - 1], r);
+                let a = toward(corner, trimmed[i - 1], r);
                 let z = toward(corner, next, r);
                 let _ = write!(
                     d,
@@ -615,6 +643,17 @@ fn line(
     let n = points.len();
     head(out, start, points[0], points[1], color, width);
     head(out, end, points[n - 1], points[n - 2], color, width);
+}
+
+/// How far, in head lengths, a line stops short of a head: the view's.
+fn inset(head: Head) -> f32 {
+    match head {
+        Head::None | Head::Cross => 0.0,
+        Head::Open => 0.2,
+        Head::Circle => 0.9,
+        Head::Diamond | Head::HollowDiamond => 1.6,
+        Head::Arrow | Head::Triangle => 0.85,
+    }
 }
 
 fn toward(from: Point, to: Point, by: f32) -> Point {
@@ -776,6 +815,42 @@ mod tests {
             out.bounds.right() + MARGIN * 2.0 < right,
             "the layout alone would cut it"
         );
+    }
+
+    #[test]
+    fn a_toned_node_is_the_card_tinted_and_a_hollow_head_is_not_crossed() {
+        let d = parse::mermaid::parse("classDiagram\n Animal <|-- Duck").unwrap();
+        let out = layout(&d, &Approx, &Options::default(), None);
+        let svg = svg(&d, &out, &Colors::dark(), "Inter", &[], &mut approx);
+        assert_eq!(mix("#000000", "#ffffff", 0.5), "#808080");
+        let mut toned = parse::mermaid::parse("flowchart LR\n a --> b").unwrap();
+        toned.nodes[0].tone = Some(Tone::Accent);
+        let laid = layout(&toned, &Approx, &Options::default(), None);
+        let dark = Colors::dark();
+        let tinted = svg_of(&toned, &laid, &dark);
+        let fill = format!("fill=\"{}\"", mix(&dark.card, &dark.accent, 0.14));
+        assert!(tinted.contains(&fill), "{tinted}");
+        assert!(!tinted.contains(&format!("{}24", dark.accent)), "{tinted}");
+        assert_eq!(mix("#1c1c1f", "not a color", 0.5), "#1c1c1f");
+        // The line ends a head's length short of its tip.
+        let route = out.edges.values().next().unwrap();
+        let tip = route.points[0];
+        let path = svg.split("<path d=\"M").nth(1).unwrap();
+        let xy: Vec<f32> = path
+            .split(' ')
+            .next()
+            .unwrap()
+            .split(',')
+            .map(|v| v.parse().unwrap())
+            .collect();
+        let shift = MARGIN - drawn_bounds(&d, &out, &mut approx).x;
+        let shift_y = MARGIN - drawn_bounds(&d, &out, &mut approx).y;
+        let gap = Point::new(xy[0], xy[1]).distance(Point::new(tip.x + shift, tip.y + shift_y));
+        assert!(gap > 5.0, "the line stops short of the triangle: {gap}");
+    }
+
+    fn svg_of(d: &Diagram, out: &Layout, colors: &Colors) -> String {
+        svg(d, out, colors, "Inter", &[], &mut approx)
     }
 
     fn approx(text: &str, size: f32) -> f32 {
