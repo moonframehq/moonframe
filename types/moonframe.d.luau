@@ -1073,7 +1073,8 @@ export type BrowserProps = {
 -- HTML shown sealed, kept by mod and `id`: its scripts never run and it
 -- loads nothing but itself (pictures and fonts inline, as `data:`), and it
 -- follows the app's light or dark look. Give `html` or `src`, a file named
--- as `ui.image` names pictures. Links are told, never followed; `#part`
+-- as `ui.image` names pictures (the app's folders or the image cache, where
+-- a provider writes a page too large to publish). Links are told, never followed; `#part`
 -- scrolls to it. A table message gets the fields added; any other value
 -- arrives as `{ msg = ... }`.
 export type DocumentProps = {
